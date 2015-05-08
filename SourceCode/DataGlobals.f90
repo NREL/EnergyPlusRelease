@@ -85,6 +85,7 @@ INTEGER, PARAMETER :: emsCallFromSetupSimulation                      = 13 ! ide
 INTEGER, PARAMETER :: emsCallFromExternalInterface                    = 14 ! Identity where EMS called from
 INTEGER, PARAMETER :: emsCallFromComponentGetInput                    = 15  ! EMS called from end of get input for a component
 INTEGER, PARAMETER :: emsCallFromUserDefinedComponentModel            = 16  ! EMS called from inside a custom user component model
+INTEGER, PARAMETER :: emsCallFromUnitarySystemSizing                  = 17  ! EMS called from unitary system compound component
 
 INTEGER, PARAMETER :: ScheduleAlwaysOn = -1    ! Value when passed to schedule routines gives back 1.0 (on)
 

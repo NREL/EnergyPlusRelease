@@ -2806,6 +2806,9 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
   REAL(r64) :: LatOutputProvided ! latent output delivered by zone equipment (kg/s)
   REAL(r64) :: AirSysOutput
   REAL(r64) :: NonAirSysOutput
+  LOGICAL   :: ZoneHasAirLoopHVACTerminal = .FALSE. ! true if zone has an air loop terminal
+  LOGICAL   :: ZoneHasAirLoopHVACDirectAir = .FALSE. ! true if zone has an uncontrolled air loop terminal
+  LOGICAL, DIMENSION(:), ALLOCATABLE, SAVE :: DirectAirAndAirTerminalWarningIssued ! only warn once for each zone with problems
 
        ! Determine flow rate and temperature of supply air based on type of damper
 
@@ -2843,6 +2846,11 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
 
      END DO
 
+     IF (FirstCall .AND. .NOT. ALLOCATED(DirectAirAndAirTerminalWarningIssued)) THEN
+       ALLOCATE(DirectAirAndAirTerminalWarningIssued(NumOfZones) )
+       DirectAirAndAirTerminalWarningIssued = .FALSE.
+     ENDIF
+
      FirstCall = .FALSE.
 
      ! Loop over all the primary air loop; simulate their components (equipment)
@@ -2858,7 +2866,8 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
        ZoneEquipConfig(ControlledZoneNum)%ZoneExh = 0.d0
        ZoneEquipConfig(ControlledZoneNum)%ZoneExhBalanced = 0.d0
        ZoneEquipConfig(ControlledZoneNum)%PlenumMassFlow = 0.d0
-
+       ZoneHasAirLoopHVACTerminal  = .FALSE.
+       ZoneHasAirLoopHVACDirectAir = .FALSE.
        CurZoneEqNum = ControlledZoneNum
 
        CALL InitSystemOutputRequired(ActualZoneNum, SysOutputProvided, LatOutputProvided)
@@ -2932,13 +2941,13 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
 
              NonAirSystemResponse(ActualZoneNum) = NonAirSystemResponse(ActualZoneNum) + NonAirSysOutput
              SysOutputProvided = NonAirSysOutput + AirSysOutput
-
+             ZoneHasAirLoopHVACTerminal = .TRUE.
            CASE(DirectAir_Num)  ! 'AirTerminal:SingleDuct:Uncontrolled'
              CALL SimDirectAir(PrioritySimOrder(EquipTypeNum)%EquipName, &
                                   ControlledZoneNum, FirstHVACIteration, &
                                   SysOutputProvided, LatOutputProvided, &
                                   ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
-
+             ZoneHasAirLoopHVACDirectAir = .TRUE.
            CASE(VRFTerminalUnit_Num)  ! 'ZoneHVAC:TerminalUnit:VariableRefrigerantFlow'
              CALL SimulateVRF(PrioritySimOrder(EquipTypeNum)%EquipName, &
                                   ControlledZoneNum, FirstHVACIteration, &
@@ -3116,7 +3125,19 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
 
          CALL UpdateSystemOutputRequired(ActualZoneNum, SysOutputProvided, LatOutputProvided, EquipPriorityNum = EquipTypeNum)
 
-       END DO
+         IF (ZoneHasAirLoopHVACTerminal .AND. ZoneHasAirLoopHVACDirectAir) THEN
+           ! zone has both AirTerminal:SingleDuct:Uncontrolled and another kind of Air terminal unit which is not supported
+           IF ( .NOT. DirectAirAndAirTerminalWarningIssued(ActualZoneNum)) THEN
+             CALL ShowSevereError('In zone "' // TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName) // &
+                                  '" there are too many air terminals served by AirLoopHVAC systems.')
+             CALL ShowContinueError('A single zone cannot have both an AirTerminal:SingleDuct:Uncontrolled ' &
+                                  // 'and also a second AirTerminal:* object.')
+             
+             DirectAirAndAirTerminalWarningIssued(ActualZoneNum) = .TRUE.
+             ErrorFlag = .TRUE.
+           ENDIF
+         ENDIF
+       END DO ! zone loop
 
        AirLoopNum = ZoneEquipConfig(ControlledZoneNum)%AirLoopNum
        IF (AirLoopInit) THEN

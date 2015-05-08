@@ -154,6 +154,10 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
   INTEGER, SAVE                     :: NotTooLowIndex=0  ! error processing
   !INTEGER , SAVE                    :: ErrCount = 0     !number of errors
   !CHARACTER(len=20)                 :: CharErrOut       !Error message
+  INTEGER                           :: NumCompsOnList
+  INTEGER                           :: CompIndex
+  INTEGER                           :: EquipBranchNum
+  INTEGER                           :: EquipCompNum
 
     !Shut down equipment and return if so instructed by LoopShutdownFlag
   IF(LoopShutdownFlag)THEN
@@ -266,6 +270,16 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
     ENDDO
 
     IF (CurListNum > 0)THEN
+      ! there could be equipment on another list that needs to be nulled out, it may have a load from earlier iteration
+      DO ListNum = 1,NumEquipLists
+        IF (ListNum == CurListNum ) Cycle ! leave current one alone
+        NumCompsOnList = PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListNum)%NumComps
+        DO CompIndex =1, NumCompsOnList
+          EquipBranchNum   =  PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListNum)%Comp(CompIndex)%BranchNumPtr
+          EquipCompNum     =  PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListNum)%Comp(CompIndex)%CompNumPtr
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(EquipBranchNum)%Comp(EquipCompNum)%Myload = 0.d0
+        ENDDO
+      ENDDO
       IF (PlantLoop(LoopNum)%Opscheme(CurSchemePtr)%EquipList(ListPtr)%NumComps .GT. 0) THEN
         CALL TurnOnPlantLoopPipes(LoopNum, LoopSideNum)
         CALL DistributePlantLoad(LoopNum, LoopSideNum,CurSchemePtr,ListPtr,LoopDemand,RemLoopDemand)
@@ -770,6 +784,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
 
           ! USE STATEMENTS:
   USE InputProcessor, ONLY: GetObjectItem, SameString, GetObjectDefMaxArgs
+  USE General,        ONLY: RoundSigDigits
 
   IMPLICIT NONE
 
@@ -805,6 +820,11 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
   INTEGER :: ListNum
   CHARACTER(len=MaxNameLength) :: LoopOpSchemeObj    ! Used to identify the object name for loop equipment operation scheme
   LOGICAL :: SchemeNameFound ! Set to FALSE if a match of OpScheme object and OpScheme name is not found
+  INTEGER :: InnerListNum  !inner loop list number
+  REAL(r64) :: OuterListNumLowerLimit
+  REAL(r64) :: OuterListNumUpperLimit
+  REAL(r64) :: InnerListNumLowerLimit
+  REAL(r64) :: InnerListNumUpperLimit
 
   SchemeNameFound = .TRUE.
 
@@ -900,6 +920,47 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
 
             CALL LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
           END DO
+          ! now run through lists again and check that range limits do not overlap each other
+          DO ListNum = 1, NumEquipLists
+            OuterListNumLowerLimit = PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeLowerLimit
+            OuterListNumUpperLimit = PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeUpperLimit
+            DO InnerListNum = 1, NumEquipLists
+              IF (InnerListNum == ListNum) CYCLE ! don't check against self. 
+              InnerListNumLowerLimit = PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(InnerListNum)%RangeLowerLimit
+              InnerListNumUpperLimit = PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(InnerListNum)%RangeUpperLimit
+              ! Check if inner list has a lower limit that is between an outer's lower and upper limit
+              IF (  InnerListNumLowerLimit > OuterListNumLowerLimit .AND. InnerListNumLowerLimit < OuterListNumUpperLimit ) THEN
+                CALL ShowWarningError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
+                                   '", detected overlapping ranges in '// &
+                         TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+                CALL ShowContinueError('Range # '//Trim(RoundSigDigits(InnerListNum,0))//' Lower limit = ' &
+                                        //TRIM(RoundSigDigits(InnerListNumLowerLimit,1)) // &
+                                       ' lies within the Range # '//TRIM(RoundSigDigits(ListNum,1)) &
+                                       //' ('//TRIM(RoundSigDigits(OuterListNumLowerLimit,1))//' to ' &
+                                         //TRIM(RoundSigDigits(OuterListNumUpperLimit ,1)) // &
+                                        ').')
+                CALL ShowContinueError('Check that input for load range limit values do not overlap, ' &
+                                      // 'and the simulation continues...')
+
+              ENDIF
+              ! Check if inner list has an upper limit that is between an outer's lower and upper limit
+              IF (  InnerListNumUpperLimit > OuterListNumLowerLimit .AND. InnerListNumUpperLimit < OuterListNumUpperLimit ) THEN
+                CALL ShowWarningError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
+                                   '", detected overlapping ranges in '// &
+                         TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+                CALL ShowContinueError('Range # '//Trim(RoundSigDigits(InnerListNum,0))//' Upper limit = '&
+                                       //TRIM(RoundSigDigits(InnerListNumUpperLimit,1)) // &
+                                       ' lies within Range # '//TRIM(RoundSigDigits(ListNum,1)) &
+                                         // ' ('//TRIM(RoundSigDigits(OuterListNumLowerLimit,1))//' to ' &
+                                         //TRIM(RoundSigDigits(OuterListNumUpperLimit ,1)) // &
+                                        ').')
+                CALL ShowContinueError('Check that input for load range limit values do not overlap, ' &
+                                        // 'and the simulation continues...')
+
+              ENDIF
+            ENDDO
+          ENDDO
+
         ENDIF
       ENDIF
     ENDIF

@@ -262,7 +262,7 @@ TYPE WaterThermalTankData
   REAL(r64)                    :: SourceEffectiveness = 0.0d0     ! Heat transfer effectiveness on source side ()
   REAL(r64)                    :: PlantSourceMassFlowRateMax = 0.0d0 ! Plant demand-side max flow request on source side (kg/s)
   REAL(r64)                    :: SavedSourceOutletTemp = 0.0d0   ! Source side outlet temp saved for demand-side flow control (C)
-  REAL(r64)                    :: SourceDesignVolFlowRate = 0.0d0 ! Source side plant volume flow rate (input data, autosizable) m3/s
+  REAL(r64)                    :: SourceDesignVolFlowRate = 0.0d0 ! Source side plant volume flow rate (input , autosizable) m3/s
   INTEGER                      :: SourceBranchControlType = 2   ! source side plant branch control type e.g active, passive, bypass
   INTEGER                      :: SourceSidePlantSizNum = 0     ! index in plant sizing that the source side is on
   LOGICAL                      :: SourceSideSeries = .TRUE.
@@ -361,7 +361,7 @@ TYPE WaterThermalTankData
   INTEGER                      :: CycleOnCount = 0              ! Number of times heater cycles on in the current time step
   INTEGER                      :: CycleOnCount1 = 0             ! Number of times heater 1 cycles on in the current time step
   INTEGER                      :: CycleOnCount2 = 0             ! Number of times heater 2 cycles on in the current time step
-  REAL(r64)                    :: RuntimeFraction = 0.0d0         ! Runtime fraction, fraction of timestep that any  heater is running
+  REAL(r64)                    :: RuntimeFraction = 0.0d0      ! Runtime fraction, fraction of timestep that any  heater is running
   REAL(r64)                    :: RuntimeFraction1 = 0.0d0        ! Runtime fraction, fraction of timestep that heater 1 is running
   REAL(r64)                    :: RuntimeFraction2 = 0.0d0        ! Runtime fraction, fraction of timestep that heater 2 is running
   REAL(r64)                    :: PartLoadRatio = 0.0d0           ! Part load ratio, fraction of maximum heater capacity
@@ -599,6 +599,7 @@ PRIVATE SizeDemandSidePlantConnections
 PRIVATE SizeSupplySidePlantConnections
 PRIVATE SizeTankForDemandSide
 PRIVATE SizeTankForSupplySide
+PRIVATE SizeStandAloneWaterHeater
 PRIVATE UpdateWaterThermalTank
 PRIVATE ReportWaterThermalTank
 PRIVATE CalcStandardRatings
@@ -5401,9 +5402,16 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
     ENDIF
 
     IF (PlantSizesOkayToFinalize) SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
-    IF (WaterThermalTank(WaterThermalTankNum)%StandAlone) SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
+    IF (WaterThermalTank(WaterThermalTankNum)%StandAlone) THEN
+      CALL SizeStandAloneWaterHeater(WaterThermalTankNum)
+      SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
+    ENDIF
 
   ELSEIF( SetLoopIndexFlag(WaterThermalTankNum) .AND. .NOT. AnyPlantInModel) THEN
+    IF (WaterThermalTank(WaterThermalTankNum)%StandAlone) THEN
+      CALL SizeStandAloneWaterHeater(WaterThermalTankNum)
+    ENDIF
+ 
     CALL CalcStandardRatings(WaterThermalTankNum)
     SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
   ENDIF
@@ -10046,6 +10054,391 @@ SUBROUTINE SizeDemandSidePlantConnections(WaterThermalTankNum)
 
   RETURN
 END SUBROUTINE SizeDemandSidePlantConnections
+
+SUBROUTINE SizeStandAloneWaterHeater(WaterThermalTankNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   October 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! allow autosizing of tank volume and heat capacity for stand alone tanks
+
+          ! METHODOLOGY EMPLOYED:
+          ! same as for plant connected water heaters, only draws are scheduled. 
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing,      ONLY: AutoSize
+  USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE ScheduleManager, ONLY: GetScheduleMaxValue
+  USE InputProcessor,  ONLY: SameString
+  USE DataHeatBalance, ONLY: Zone
+  USE SolarCollectors, ONLY: Collector, NumOfCollectors
+  USE DataSurfaces,    ONLY: Surface
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: WaterThermalTankNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  Real(r64), PARAMETER :: GalTocubicMeters = 0.0037854D0
+  Real(r64), PARAMETER :: kBtuPerHrToWatts = 293.1D0
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpTankVolume ! local temporary for tank volume m3
+  REAL(r64) :: tmpMaxCapacity ! local temporary for heating capacity W
+  REAL(r64) :: Tstart        ! initial tank temp for sizing.
+  REAL(r64) :: Tfinish       ! final target temp for sizing
+  Logical   :: SizeVolume = .FALSE.
+  LOGICAL   :: SizeMaxCapacity = .FALSE.
+  LOGICAL   :: FuelTypeIsLikeGas = .FALSE.
+  INTEGER   :: DummyWaterIndex = 1
+  REAL(r64) :: rho
+  REAL(r64) :: Cp
+  REAL(r64) :: DrawDesignVolFlowRate
+  REAL(r64) :: SumPeopleAllZones
+  REAL(r64) :: SumFloorAreaAllZones
+  INTEGER   :: CollectorNum
+
+  ! local inits
+  Tstart  = 14.44d0
+  TFinish = 57.22d0
+  SizeVolume = .FALSE.
+  SizeMaxCapacity = .FALSE.
+
+  tmpTankVolume = WaterThermalTank(WaterThermalTankNum)%Volume
+  tmpMaxCapacity = WaterThermalTank(WaterThermalTankNum)%MaxCapacity
+  If (tmpTankVolume == Autosize) SizeVolume = .TRUE.
+  If (tmpMaxCapacity == Autosize) SizeMaxCapacity = .TRUE.
+
+  IF (SizeVolume .OR. SizeMaxCapacity) THEN
+
+    SELECT CASE (WaterThermalTank(WaterThermalTankNum)%Sizing%DesignMode)
+
+
+    CASE (SizePeakDraw)
+      ! get draw rate from maximum in schedule
+      rho = GetDensityGlycol('WATER', InitConvTemp, DummyWaterIndex, 'SizeStandAloneWaterHeater')
+      DrawDesignVolFlowRate = GetScheduleMaxValue(WaterThermalTank(WaterThermalTankNum)%FlowRateSchedule) &
+                              * WaterThermalTank(WaterThermalTankNum)%MassFlowRateMax &
+                              / rho 
+
+      If (SizeVolume) THEN
+        tmpTankVolume      =   &
+          WaterThermalTank(WaterThermalTankNum)%Sizing%TankDrawTime  &  ! hours
+                                                * DrawDesignVolFlowRate & ! m3/s
+                                                * SecInHour  !  (3600 s/1 hour)
+        WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                             WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      If (SizeMaxCapacity) THEN
+        IF (WaterThermalTank(WaterThermalTankNum)%Sizing%RecoveryTime > 0.0d0) THEN
+          rho = GetDensityGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+          Cp  = GetSpecificHeatGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+
+          tmpMaxCapacity =  ( WaterThermalTank(WaterThermalTankNum)%Volume & ! m3
+                                                * rho & ! kg/m3
+                                                * Cp  &  ! J/Kg/K
+                                                * (Tfinish - Tstart)) & !  K
+                                              / (WaterThermalTank(WaterThermalTankNum)%Sizing%RecoveryTime * SecInHour) ! seconds
+        ELSE
+          CALL ShowFatalError('SizeStandAloneWaterHeater: Tank="'//TRIM(WaterThermalTank(WaterThermalTankNum)%Name)//  &
+            '", requested sizing for max capacity but entered Recovery Time is zero.')
+        ENDIF
+        WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+
+    CASE (SizeResidentialMin)
+      ! assume can propagate rules for gas to other fuels.
+      FuelTypeIsLikeGas = .FALSE.
+      IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Gas')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Diesel')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Gasoline')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Coal')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'FuelOil#1')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'FuelOil#2')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Propane')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Steam')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'OtherFuel1')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'OtherFuel2')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'DistrictHeating')) THEN
+        FuelTypeIsLikeGas = .TRUE.
+      ENDIF
+
+      IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms == 1 ) THEN
+        IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+          IF (SizeVolume)      tmpTankVolume   = 20.0D0 * GalTocubicMeters
+          IF (SizeMaxCapacity) tmpMaxCapacity  = 2.5D0 * 1000.0D0  !2.5 kW
+        ELSE IF (FuelTypeIsLikeGas) THEN
+          IF (SizeVolume)      tmpTankVolume  = 20.0D0 * GalTocubicMeters
+          IF (SizeMaxCapacity) tmpMaxCapacity = 27.0D0 * kBtuPerHrToWatts !27kBtu/hr
+        ENDIF
+
+      ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms == 2 ) THEN
+        IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms <= 1.5D0) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            IF (SizeVolume)      tmpTankVolume  = 30.0D0 * GalTocubicMeters
+            IF (SizeMaxCapacity) tmpMaxCapacity = 3.5D0 * 1000.0D0  !3.5 kW
+          ELSE IF (FuelTypeIsLikeGas) THEN
+            IF (SizeVolume)      tmpTankVolume  = 30.0D0 * GalTocubicMeters
+            IF (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ELSE IF ((WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms > 1.5D0) &
+                 .and. (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms < 3.0D0)) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 4.5D0 * 1000.0D0  !4.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 30.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms >= 3.0D0) then
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ENDIF
+      ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms == 3 ) THEN
+        IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms <= 1.5D0) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 4.5D0 * 1000.0D0  !4.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 30.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ELSE IF ((WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms > 1.5D0) &
+                 .and. (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms < 3.0D0)) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            IF (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            IF (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms >= 3.0D0) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 38.0D0 * kBtuPerHrToWatts !38 kBtu/hr
+          ENDIF
+        ENDIF
+      ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms == 4 ) THEN
+        IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms <= 1.5D0) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 36.0D0 * kBtuPerHrToWatts !36 kBtu/hr
+          ENDIF
+        ELSE IF ((WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms > 1.5D0) &
+                 .and. (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms < 3.0D0)) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 40.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 38.0D0 * kBtuPerHrToWatts !38 kBtu/hr
+          ENDIF
+        ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBathrooms >= 3.0D0) THEN
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+            If (SizeVolume)      tmpTankVolume  = 66.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+          ELSE IF (FuelTypeIsLikeGas ) THEN
+            If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+            If (SizeMaxCapacity) tmpMaxCapacity = 38.0D0 * kBtuPerHrToWatts !38 kBtu/hr
+          ENDIF
+        ENDIF
+      ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms == 5 ) THEN
+        If (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+          If (SizeVolume)      tmpTankVolume  = 66.0D0 * GalTocubicMeters
+          If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+        ELSE IF (FuelTypeIsLikeGas ) THEN
+          If (SizeVolume)      tmpTankVolume = 50.0D0 * GalTocubicMeters
+          If (SizeMaxCapacity) tmpMaxCapacity = 47.0D0 * kBtuPerHrToWatts !47 kBtu/hr
+        endif
+      ELSE IF (WaterThermalTank(WaterThermalTankNum)%Sizing%NumberOfBedrooms >= 6 ) THEN
+        If (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Electric') ) THEN
+          If (SizeVolume)      tmpTankVolume  = 66.0D0 * GalTocubicMeters
+          If (SizeMaxCapacity) tmpMaxCapacity = 5.5D0 * 1000.0D0  !5.5 kW
+        ELSE IF (FuelTypeIsLikeGas ) THEN
+          If (SizeVolume)      tmpTankVolume  = 50.0D0 * GalTocubicMeters
+          If (SizeMaxCapacity) tmpMaxCapacity = 50.0D0 * kBtuPerHrToWatts !50 kBtu/hr
+        ENDIF
+      ENDIF
+      IF (SizeVolume ) THEN
+         WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+         CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                 WaterThermalTank(WaterThermalTankNum)%Name, &
+                                'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      IF (SizeMaxCapacity ) THEN
+         WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+         CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+         WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+
+    CASE (SizePerPerson)
+      ! how to get number of people?
+
+      SumPeopleAllZones = SUM(Zone%TotOccupants)
+      IF (SizeVolume) THEN
+        tmpTankVolume =   &
+           WaterThermalTank(WaterThermalTankNum)%sizing%TankCapacityPerPerson &
+                                                           * SumPeopleAllZones
+      ENDIF
+      IF (SizeMaxCapacity) THEN
+        rho = GetDensityGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        Cp  = GetSpecificHeatGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        tmpMaxCapacity  = SumPeopleAllZones   &
+                            * WaterThermalTank(WaterThermalTankNum)%sizing%RecoveryCapacityPerPerson & !m3/hr/person
+                                 * (Tfinish - Tstart) & ! delta T  in K
+                                 * (1.0D0 / SecInHour)  & !  1 hr/ 3600 s
+                                 * rho &  ! kg/m3
+                                 * Cp  ! J/Kg/k
+      ENDIF
+
+      IF (SizeVolume ) THEN
+        WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                                'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      IF (SizeMaxCapacity ) THEN
+        WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                              'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+
+    CASE (SizePerFloorArea)
+
+      SumFloorAreaAllZones = SUM(Zone%FloorArea)
+      IF (SizeVolume) THEN
+        tmpTankVolume =   &
+             WaterThermalTank(WaterThermalTankNum)%sizing%TankCapacityPerArea &
+                                                           * SumFloorAreaAllZones
+      ENDIF
+
+      IF (SizeMaxCapacity) THEN
+        rho = GetDensityGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        Cp  = GetSpecificHeatGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        tmpMaxCapacity     = SumFloorAreaAllZones   & ! m2
+                                              * WaterThermalTank(WaterThermalTankNum)%sizing%RecoveryCapacityPerArea & !m3/hr/m2
+                                              * (Tfinish - Tstart) & ! delta T  in K
+                                              * (1.0D0 / SecInHour)  & !  1 hr/ 3600 s
+                                              * rho &  ! kg/m3
+                                              * Cp  ! J/Kg/k
+      ENDIF
+      IF (SizeVolume) THEN
+        WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                               'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      IF (SizeMaxCapacity) THEN
+        WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,  &
+                                                 WaterThermalTank(WaterThermalTankNum)%Name, &
+                               'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+    CASE (SizePerUnit)
+
+      If (SizeVolume) tmpTankVolume  =   &
+           WaterThermalTank(WaterThermalTankNum)%sizing%TankCapacityPerUnit &
+                                         * WaterThermalTank(WaterThermalTankNum)%sizing%NumberOfUnits
+
+      If (SizeMaxCapacity) THEN
+        rho = GetDensityGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        Cp  = GetSpecificHeatGlycol('WATER', ((Tfinish + Tstart)/2.0D0), DummyWaterIndex, 'SizeStandAloneWaterHeater')
+        tmpMaxCapacity =   &
+           WaterThermalTank(WaterThermalTankNum)%sizing%NumberOfUnits   &
+                                            * WaterThermalTank(WaterThermalTankNum)%sizing%RecoveryCapacityPerUnit & !m3/hr/ea
+                                            * (Tfinish - Tstart) & ! delta T  in K
+                                            * (1.0D0 / SecInHour)  & !  1 hr/ 3600 s
+                                            * rho &  ! kg/m3
+                                            * Cp ! J/Kg/k
+      ENDIF
+
+      IF ( SizeVolume ) THEN
+        WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,  &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      IF ( SizeMaxCapacity ) THEN
+        WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,  &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+    CASE (SizePerSolarColArea)
+      WaterThermalTank(WaterThermalTankNum)%sizing%TotalSolarCollectorArea = 0.0D0
+      DO CollectorNum = 1, NumOfCollectors
+        WaterThermalTank(WaterThermalTankNum)%sizing%TotalSolarCollectorArea =   &
+           WaterThermalTank(WaterThermalTankNum)%sizing%TotalSolarCollectorArea &
+                                           + Surface( Collector(CollectorNum)%Surface )%Area !
+      ENDDO
+
+      IF (SizeVolume) tmpTankVolume =   &
+         WaterThermalTank(WaterThermalTankNum)%sizing%TotalSolarCollectorArea &
+                                           * WaterThermalTank(WaterThermalTankNum)%sizing%TankCapacityPerCollectorArea
+      IF (SizeMaxCapacity) tmpMaxCapacity = 0.0D0
+      IF (SizeVolume ) THEN
+        WaterThermalTank(WaterThermalTankNum)%Volume = tmpTankVolume
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Tank Volume [m3]', WaterThermalTank(WaterThermalTankNum)%Volume )
+      ENDIF
+      IF (SizeMaxCapacity ) THEN
+        WaterThermalTank(WaterThermalTankNum)%MaxCapacity = tmpMaxCapacity
+        CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type,   &
+                                WaterThermalTank(WaterThermalTankNum)%Name, &
+                             'Maximum Heater Capacity [W]', WaterThermalTank(WaterThermalTankNum)%MaxCapacity )
+      ENDIF
+
+    END SELECT
+
+
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SizeStandAloneWaterHeater
 
 SUBROUTINE UpdateWaterThermalTank(WaterThermalTankNum)
 

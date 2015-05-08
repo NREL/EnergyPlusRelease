@@ -1855,7 +1855,11 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         ! get the maximum output of the fcu
         CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
         ! calculate the PLR, if load greater than output, PLR = 1 (output = max)
-        If(QUnitOutMax .Ne. 0.0d0) PLR = ABS (QZnReq/QUnitOutMax)
+        If(QUnitOutMax .Ne. 0.0d0) THEN
+          PLR = ABS (QZnReq/QUnitOutMax)
+        ELSE
+          PLR = 1.0d0
+        ENDIF
         if (PLR .gt. 1.0d0) PLR = 1.0d0
 
         ! adjust the PLR to meet the heating load calling Calc4PipeFanCoil repeatedly with the PLR adjusted

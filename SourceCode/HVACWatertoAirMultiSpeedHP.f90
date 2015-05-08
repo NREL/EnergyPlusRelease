@@ -4592,6 +4592,7 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   REAL(r64)     :: LoadDueToDefrost   = 0.0d0         ! Additional load due to defrost
   REAL(r64)     :: CrankcaseHeatingPower  = 0.0d0     ! power due to crankcase heater
   REAL(r64)     :: DefrostEIRTempModFac   = 0.0d0     ! EIR modifier for defrost (function of entering wetbulb, outside drybulb)
+  REAL(r64)     :: TotRatedCapacity   = 0.0d0         ! total rated capacity at the given speed and speed ratio for defrosting 
 
   MaxSpeed = VarSpeedCoil(DXCoilNum)%NumofSpeeds
 
@@ -4706,6 +4707,7 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
     END IF
 
     QLoadTotal = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+    TotRatedCapacity = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) ! for defrosting power cal
 
     EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
     EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
@@ -4803,9 +4805,12 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
     QLoadTotal = QLoadTotal2*SpeedRatio + (1.0d0 - SpeedRatio ) * QLoadTotal1
     Winput = Winput2*SpeedRatio + (1.0d0 - SpeedRatio ) * Winput1
     QWasteHeat = QWasteHeat2*SpeedRatio + (1.0d0 - SpeedRatio ) * QWasteHeat1
+    TotRatedCapacity =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal)*SpeedRatio + (1.0d0 - SpeedRatio ) * &
+                       VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal - 1) 
   END IF
 
   VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = 0.0d0 !necessary to clear zero for water source coils
+  VarSpeedCoil(DXCoilNum)%DefrostPower =  0.0d0 !clear the defrost power 
   IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
     ! Calculating adjustment factors for defrost
     ! Calculate delta w through outdoor coil by assuming a coil temp of 0.82*DBT-9.7(F) per DOE2.1E
@@ -4829,18 +4834,20 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
            FractionalDefrostTime = 1.0d0 / (1.0d0 + 0.01446d0 / OutdoorCoildw)
            HeatingCapacityMultiplier = 0.875d0 * ( 1.0d0 - FractionalDefrostTime)
            InputPowerMultiplier = 0.954d0 * ( 1.0d0 - FractionalDefrostTime)
-         END IF
-
+         END IF    
+         ! correction fractional defrost time shorten by runtime fraction
+         FractionalDefrostTime = RuntimeFrac * FractionalDefrostTime
+         
          IF (FractionalDefrostTime .GT. 0.0d0) THEN
     ! Calculate defrost adjustment factors depending on defrost control strategy
            IF (VarSpeedCoil(DXCoilNum)%DefrostStrategy .EQ. ReverseCycle) THEN
              LoadDueToDefrost = (0.01d0 * FractionalDefrostTime) * &
                                 (7.222d0 - OutdoorDryBulb) * &
-                                (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(MaxSpeed)/1.01667d0)
+                                (TotRatedCapacity/1.01667d0)
              DefrostEIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%DefrostEIRFT,&
                                     MAX(15.555d0,LoadSideInletWBTemp),MAX(15.555d0,OutdoorDryBulb))
              VarSpeedCoil(DXCoilNum)%DefrostPower =  DefrostEIRTempModFac * &
-                                               (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(MaxSpeed) &
+                                               (TotRatedCapacity &
                                                /1.01667d0)* FractionalDefrostTime
            ELSE ! Defrost strategy is resistive
              VarSpeedCoil(DXCoilNum)%DefrostPower = VarSpeedCoil(DXCoilNum)%DefrostCapacity &

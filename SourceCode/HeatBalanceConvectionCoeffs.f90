@@ -2331,7 +2331,9 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyVertWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyVertWallEqNum == HcInt_UserCurve) THEN
         ! A3 , \field Simple Bouyancy Vertical Wall User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyVertWallUserCurveNum = GetCurveIndex(cAlphaArgs(3))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyVertWallUserCurveNum = FindItemInList(cAlphaArgs(3), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
+ 
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//', invalid value')
           CALL ShowContinueError(' Invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(cAlphaArgs(3)))
@@ -2354,7 +2356,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableHorizEqNum == HcInt_UserCurve) THEN
         ! A5 , \field Simple Bouyancy Stable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(5))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableHorizUserCurveNum = FindItemInList(cAlphaArgs(5), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
@@ -2377,7 +2380,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableHorizEqNum == HcInt_UserCurve) THEN
         ! A7 , \field Simple Bouyancy Unstable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(7))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableHorizUserCurveNum = FindItemInList(cAlphaArgs(7), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
@@ -2400,7 +2404,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableTiltedEqNum == HcInt_UserCurve) THEN
         ! A9 , \field Simple Bouyancy Stable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(9))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableTiltedUserCurveNum = FindItemInList(cAlphaArgs(9), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyStableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
@@ -2423,7 +2428,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableTiltedEqNum == HcInt_UserCurve) THEN
         ! A11, \field Simple Bouyancy Unstable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(11))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableTiltedUserCurveNum = FindItemInList(cAlphaArgs(11), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyUnstableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
@@ -2446,7 +2452,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%SimpleBouyWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyWindowsEqNum == HcInt_UserCurve) THEN
         ! A13, \field Simple Bouyancy Windows Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%SimpleBouyWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(13))
+        InsideFaceAdaptiveConvectionAlgo%SimpleBouyWindowsUserCurveNum = FindItemInList(cAlphaArgs(13), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%SimpleBouyWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13)))
@@ -2469,7 +2476,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolVertWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolVertWallEqNum == HcInt_UserCurve) THEN
         !  A15, \field Floor Heat Ceiling Cool Vertical Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolVertWallUserCurveNum = GetCurveIndex(cAlphaArgs(15))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolVertWallUserCurveNum = FindItemInList(cAlphaArgs(15), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(15))//'='//TRIM(cAlphaArgs(15)))
@@ -2493,7 +2501,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableHorizEqNum == HcInt_UserCurve) THEN
         !  A17, \field Floor Heat Ceiling Cool Stable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(17))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableHorizUserCurveNum = FindItemInList(cAlphaArgs(17), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(17))//'='//TRIM(cAlphaArgs(17)))
@@ -2516,7 +2525,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableHorizEqNum == HcInt_UserCurve) THEN
         ! A19, \field Floor Heat Ceiling Cool Unstable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(19))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableHorizUserCurveNum = FindItemInList(cAlphaArgs(19), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(19))//'='//TRIM(cAlphaArgs(19)))
@@ -2539,7 +2549,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolHeatedFloorEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolHeatedFloorEqNum == HcInt_UserCurve) THEN
         ! A21, \field Floor Heat Ceiling Cool Heated Floor Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolHeatedFloorUserCurveNum = GetCurveIndex(cAlphaArgs(21))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolHeatedFloorUserCurveNum = FindItemInList(cAlphaArgs(21), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolHeatedFloorUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(21))//'='//TRIM(cAlphaArgs(21)))
@@ -2562,7 +2573,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolChilledCeilingEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolChilledCeilingEqNum == HcInt_UserCurve) THEN
         ! A23, \field Floor Heat Ceiling Cool Chilled Ceiling Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolChilledCeilingUserCurveNum = GetCurveIndex(cAlphaArgs(23))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolChilledCeilingUserCurveNum = FindItemInList(cAlphaArgs(23), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolChilledCeilingUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(23))//'='//TRIM(cAlphaArgs(23)))
@@ -2585,7 +2597,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableTiltedEqNum == HcInt_UserCurve) THEN
         !   A25, \field Floor Heat Ceiling Cool Stable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(25))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableTiltedUserCurveNum = FindItemInList(cAlphaArgs(25), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolStableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(25))//'='//TRIM(cAlphaArgs(25)))
@@ -2608,7 +2621,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableTiltedEqNum == HcInt_UserCurve) THEN
         !   A27, \field Floor Heat Ceiling Cool Unstable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(27))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableTiltedUserCurveNum = FindItemInList(cAlphaArgs(27), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolUnstableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(27))//'='//TRIM(cAlphaArgs(27)))
@@ -2631,7 +2645,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolWindowsEqNum == HcInt_UserCurve) THEN
         !    A29, \field Floor Heat Ceiling Cool Window Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(29))
+        InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolWindowsUserCurveNum = FindItemInList(cAlphaArgs(29), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%FloorHeatCeilingCoolWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(29))//'='//TRIM(cAlphaArgs(29)))
@@ -2654,7 +2669,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatVertWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatVertWallEqNum == HcInt_UserCurve) THEN
         !    A31, \field Wall Panel Heating Vertical Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatVertWallUserCurveNum = GetCurveIndex(cAlphaArgs(31))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatVertWallUserCurveNum = FindItemInList(cAlphaArgs(31), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(31))//'='//TRIM(cAlphaArgs(31)))
@@ -2677,7 +2693,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatHeatedWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatHeatedWallEqNum == HcInt_UserCurve) THEN
         !   A33, \field Wall Panel Heating Heated Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatHeatedWallUserCurveNum = GetCurveIndex(cAlphaArgs(33))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatHeatedWallUserCurveNum = FindItemInList(cAlphaArgs(33), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatHeatedWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(33))//'='//TRIM(cAlphaArgs(33)))
@@ -2700,7 +2717,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableHorizEqNum == HcInt_UserCurve) THEN
         !   A35, \field Wall Panel Heating Stable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(35))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableHorizUserCurveNum = FindItemInList(cAlphaArgs(35), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(35))//'='//TRIM(cAlphaArgs(35)))
@@ -2724,7 +2742,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableHorizEqNum == HcInt_UserCurve) THEN
         !  A37, \field Wall Panel Heating Unstable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(37))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableHorizUserCurveNum = FindItemInList(cAlphaArgs(37), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(37))//'='//TRIM(cAlphaArgs(37)))
@@ -2747,7 +2766,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableTiltedEqNum == HcInt_UserCurve) THEN
         !  A39, \field Wall Panel Heating Stable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(39))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableTiltedUserCurveNum = FindItemInList(cAlphaArgs(39), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatStableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(39))//'='//TRIM(cAlphaArgs(39)))
@@ -2770,7 +2790,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableTiltedEqNum == HcInt_UserCurve) THEN
         !  A41, \field Wall Panel Heating Unstable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(41))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableTiltedUserCurveNum = FindItemInList(cAlphaArgs(41), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatUnstableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(41))//'='//TRIM(cAlphaArgs(41)))
@@ -2793,7 +2814,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%WallPanelHeatWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatWindowsEqNum == HcInt_UserCurve) THEN
         !  A43, \field Wall Panel Heating Window Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(43))
+        InsideFaceAdaptiveConvectionAlgo%WallPanelHeatWindowsUserCurveNum = FindItemInList(cAlphaArgs(43), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%WallPanelHeatWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(43))//'='//TRIM(cAlphaArgs(43)))
@@ -2816,7 +2838,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallEqNum == HcInt_UserCurve) THEN
         ! A45, \field Convective Zone Heater Vertical Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallUserCurveNum = GetCurveIndex(cAlphaArgs(45))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallUserCurveNum = FindItemInList(cAlphaArgs(45), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(45))//'='//TRIM(cAlphaArgs(45)))
@@ -2839,7 +2862,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallNearHeaterEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallNearHeaterEqNum == HcInt_UserCurve) THEN
         ! A47, \field Convective Zone Heater Vertical Walls Near Heater Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallNearHeaterUserCurveNum = GetCurveIndex(cAlphaArgs(47))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallNearHeaterUserCurveNum = FindItemInList(cAlphaArgs(47), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatVertWallNearHeaterUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(47))//'='//TRIM(cAlphaArgs(47)))
@@ -2862,7 +2886,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableHorizEqNum == HcInt_UserCurve) THEN
         ! A49, \field Convective Zone Heater Stable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(49))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableHorizUserCurveNum = FindItemInList(cAlphaArgs(49), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(49))//'='//TRIM(cAlphaArgs(49)))
@@ -2885,7 +2910,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableHorizEqNum == HcInt_UserCurve) THEN
         !  A51, \field Convective Zone Heater Unstable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(51))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableHorizUserCurveNum = FindItemInList(cAlphaArgs(51), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(51))//'='//TRIM(cAlphaArgs(51)))
@@ -2908,7 +2934,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableTiltedEqNum == HcInt_UserCurve) THEN
         !  A53, \field Convective Zone Heater Stable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(53))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableTiltedUserCurveNum = FindItemInList(cAlphaArgs(53), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatStableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(53))//'='//TRIM(cAlphaArgs(53)))
@@ -2931,7 +2958,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableTiltedEqNum == HcInt_UserCurve) THEN
         !  A55, \field Convective Zone Heater Unstable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(55))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableTiltedUserCurveNum = FindItemInList(cAlphaArgs(55), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatUnstableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(55))//'='//TRIM(cAlphaArgs(55)))
@@ -2954,7 +2982,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatWindowsEqNum == HcInt_UserCurve) THEN
         !   A57, \field Convective Zone Heater Windows Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(57))
+        InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatWindowsUserCurveNum = FindItemInList(cAlphaArgs(57), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ConvectiveHeatWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(57))//'='//TRIM(cAlphaArgs(57)))
@@ -2977,7 +3006,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%CentralAirWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%CentralAirWallEqNum == HcInt_UserCurve) THEN
         !   A59, \field Central Air Diffuser Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%CentralAirWallUserCurveNum = GetCurveIndex(cAlphaArgs(59))
+        InsideFaceAdaptiveConvectionAlgo%CentralAirWallUserCurveNum = FindItemInList(cAlphaArgs(59), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%CentralAirWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(59))//'='//TRIM(cAlphaArgs(59)))
@@ -3000,7 +3030,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%CentralAirCeilingEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%CentralAirCeilingEqNum == HcInt_UserCurve) THEN
         !   A61, \field Central Air Diffuser Ceiling Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%CentralAirCeilingUserCurveNum = GetCurveIndex(cAlphaArgs(61))
+        InsideFaceAdaptiveConvectionAlgo%CentralAirCeilingUserCurveNum = FindItemInList(cAlphaArgs(61), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%CentralAirCeilingUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(61))//'='//TRIM(cAlphaArgs(61)))
@@ -3023,7 +3054,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%CentralAirFloorEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%CentralAirFloorEqNum == HcInt_UserCurve) THEN
         !  A63, \field Central Air Diffuser Floor Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%CentralAirFloorUserCurveNum = GetCurveIndex(cAlphaArgs(63))
+        InsideFaceAdaptiveConvectionAlgo%CentralAirFloorUserCurveNum = FindItemInList(cAlphaArgs(63), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%CentralAirFloorUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(63))//'='//TRIM(cAlphaArgs(63)))
@@ -3046,7 +3078,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%CentralAirWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%CentralAirWindowsEqNum == HcInt_UserCurve) THEN
         !   A65, \field Central Air Diffuser Window Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%CentralAirWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(65))
+        InsideFaceAdaptiveConvectionAlgo%CentralAirWindowsUserCurveNum = FindItemInList(cAlphaArgs(65), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%CentralAirWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(65))//'='//TRIM(cAlphaArgs(65)))
@@ -3069,7 +3102,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircVertWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircVertWallEqNum == HcInt_UserCurve) THEN
         !   A67, \field Mechanical Zone Fan Circulation Vertical Wall Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircVertWallUserCurveNum = GetCurveIndex(cAlphaArgs(67))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircVertWallUserCurveNum = FindItemInList(cAlphaArgs(67), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(67))//'='//TRIM(cAlphaArgs(67)))
@@ -3093,7 +3127,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableHorizEqNum == HcInt_UserCurve) THEN
         !   A69, \field Mechanical Zone Fan Circulation Stable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(69))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableHorizUserCurveNum = FindItemInList(cAlphaArgs(69), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(69))//'='//TRIM(cAlphaArgs(69)))
@@ -3116,7 +3151,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableHorizEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableHorizEqNum == HcInt_UserCurve) THEN
         !   A71, \field Mechanical Zone Fan Circulation Unstable Horizontal Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableHorizUserCurveNum = GetCurveIndex(cAlphaArgs(71))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableHorizUserCurveNum = FindItemInList(cAlphaArgs(71), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(71))//'='//TRIM(cAlphaArgs(71)))
@@ -3139,7 +3175,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableTiltedEqNum == HcInt_UserCurve) THEN
         !  A73, \field Mechanical Zone Fan Circulation Stable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(73))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableTiltedUserCurveNum = FindItemInList(cAlphaArgs(73), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircStableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(73))//'='//TRIM(cAlphaArgs(73)))
@@ -3162,7 +3199,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableTiltedEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableTiltedEqNum == HcInt_UserCurve) THEN
         !  A75, \field Mechanical Zone Fan Circulation Unstable Tilted Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableTiltedUserCurveNum = GetCurveIndex(cAlphaArgs(75))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableTiltedUserCurveNum = FindItemInList(cAlphaArgs(75), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircUnstableTiltedUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(75))//'='//TRIM(cAlphaArgs(75)))
@@ -3185,7 +3223,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%ZoneFanCircWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircWindowsEqNum == HcInt_UserCurve) THEN
         !  A77, \field Mechanical Zone Fan Circulation Window Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(77))
+        InsideFaceAdaptiveConvectionAlgo%ZoneFanCircWindowsUserCurveNum = FindItemInList(cAlphaArgs(77), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%ZoneFanCircWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(77))//'='//TRIM(cAlphaArgs(77)))
@@ -3208,7 +3247,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedBouyAssistingFlowWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedBouyAssistingFlowWallEqNum == HcInt_UserCurve) THEN
         !  A79, \field Mixed Regime Bouyancy Assisting Flow on Walls Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedBouyAssistingFlowWallUserCurveNum = GetCurveIndex(cAlphaArgs(79))
+        InsideFaceAdaptiveConvectionAlgo%MixedBouyAssistingFlowWallUserCurveNum = FindItemInList(cAlphaArgs(79), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedBouyAssistingFlowWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(79))//'='//TRIM(cAlphaArgs(79)))
@@ -3231,7 +3271,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedBouyOppossingFlowWallEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedBouyOppossingFlowWallEqNum == HcInt_UserCurve) THEN
         !  A81, \field Mixed Regime Bouyancy Oppossing Flow on Walls Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedBouyOppossingFlowWallUserCurveNum = GetCurveIndex(cAlphaArgs(81))
+        InsideFaceAdaptiveConvectionAlgo%MixedBouyOppossingFlowWallUserCurveNum = FindItemInList(cAlphaArgs(81), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedBouyOppossingFlowWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(81))//'='//TRIM(cAlphaArgs(81)))
@@ -3254,7 +3295,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedStableFloorEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedStableFloorEqNum == HcInt_UserCurve) THEN
         !  A83, \field Mixed Regime Stable Floor Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedStableFloorUserCurveNum = GetCurveIndex(cAlphaArgs(83))
+        InsideFaceAdaptiveConvectionAlgo%MixedStableFloorUserCurveNum = FindItemInList(cAlphaArgs(83), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedStableFloorUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(83))//'='//TRIM(cAlphaArgs(83)))
@@ -3277,7 +3319,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedUnstableFloorEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedUnstableFloorEqNum == HcInt_UserCurve) THEN
         !  A85, \field Mixed Regime Unstable Floor Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedUnstableFloorUserCurveNum = GetCurveIndex(cAlphaArgs(85))
+        InsideFaceAdaptiveConvectionAlgo%MixedUnstableFloorUserCurveNum = FindItemInList(cAlphaArgs(85), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedUnstableFloorUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(85))//'='//TRIM(cAlphaArgs(85)))
@@ -3300,7 +3343,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedStableCeilingEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedStableCeilingEqNum == HcInt_UserCurve) THEN
         !  A87, \field Mixed Regime Stable Ceiling Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedStableCeilingUserCurveNum = GetCurveIndex(cAlphaArgs(87))
+        InsideFaceAdaptiveConvectionAlgo%MixedStableCeilingUserCurveNum = FindItemInList(cAlphaArgs(87), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedStableCeilingUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(87))//'='//TRIM(cAlphaArgs(87)))
@@ -3323,7 +3367,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedUnstableCeilingEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedUnstableCeilingEqNum == HcInt_UserCurve) THEN
         !  A89, \field Mixed Regime Unstable Ceiling Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedUnstableCeilingUserCurveNum = GetCurveIndex(cAlphaArgs(89))
+        InsideFaceAdaptiveConvectionAlgo%MixedUnstableCeilingUserCurveNum = FindItemInList(cAlphaArgs(89), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedUnstableCeilingUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(89))//'='//TRIM(cAlphaArgs(89)))
@@ -3346,7 +3391,8 @@ SUBROUTINE GetUserConvectionCoefficients
       InsideFaceAdaptiveConvectionAlgo%MixedWindowsEqNum = IntConvectionValue(Loop1)
       IF (InsideFaceAdaptiveConvectionAlgo%MixedWindowsEqNum == HcInt_UserCurve) THEN
         !   A91; \field Mixed Regime Window Equation User Curve Name
-        InsideFaceAdaptiveConvectionAlgo%MixedWindowsUserCurveNum = GetCurveIndex(cAlphaArgs(91))
+        InsideFaceAdaptiveConvectionAlgo%MixedWindowsUserCurveNum = FindItemInList(cAlphaArgs(91), &
+                                                             HcInsideUserCurve%Name , TotInsideHcUserCurves )
         IF (InsideFaceAdaptiveConvectionAlgo%MixedWindowsUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(91))//'='//TRIM(cAlphaArgs(91)))
@@ -3383,7 +3429,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HWindWallWindwardEqNum  = MoreSpecificExtWindConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HWindWallWindwardEqNum == HcExt_UserCurve) THEN
         !  A3 , \field Wind Convection Windward Equation Vertical Wall User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HWindWallWindwardUserCurveNum  = GetCurveIndex(cAlphaArgs(3))
+        OutsideFaceAdaptiveConvectionAlgo%HWindWallWindwardUserCurveNum  = FindItemInList(cAlphaArgs(3), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HWindWallWindwardUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
@@ -3406,7 +3453,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HWindWallLeewardEqNum  = MoreSpecificExtWindConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HWindWallLeewardEqNum == HcExt_UserCurve) THEN
         ! A5 , \field Wind Convection Leeward Vertical Wall Equation User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HWindWallLeewardUserCurveNum  = GetCurveIndex(cAlphaArgs(5))
+        OutsideFaceAdaptiveConvectionAlgo%HWindWallLeewardUserCurveNum  = FindItemInList(cAlphaArgs(5), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HWindWallLeewardUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
@@ -3429,7 +3477,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HWindHorizRoofEqNum  = MoreSpecificExtWindConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HWindHorizRoofEqNum == HcExt_UserCurve) THEN
         !  A7 , \field Wind Convection Horizontal Roof User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HWindHorizRoofUserCurveNum  = GetCurveIndex(cAlphaArgs(7))
+        OutsideFaceAdaptiveConvectionAlgo%HWindHorizRoofUserCurveNum  = FindItemInList(cAlphaArgs(7), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HWindHorizRoofUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
@@ -3452,7 +3501,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HNatVertWallEqNum  = SpecificExtNatConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HNatVertWallEqNum == HcExt_UserCurve) THEN
         !  A9 , \field Natural Convection Vertical Wall Equation User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HNatVertWallUserCurveNum  = GetCurveIndex(cAlphaArgs(9))
+        OutsideFaceAdaptiveConvectionAlgo%HNatVertWallUserCurveNum  = FindItemInList(cAlphaArgs(9), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HNatVertWallUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
@@ -3475,7 +3525,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizEqNum  = SpecificExtNatConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizEqNum == HcExt_UserCurve) THEN
         !  A11, \field Natural Convection Stable Horizontal Equation User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum  = GetCurveIndex(cAlphaArgs(12))
+        OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum  = FindItemInList(cAlphaArgs(11), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
@@ -3498,7 +3549,8 @@ SUBROUTINE GetUserConvectionCoefficients
       OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizEqNum  = SpecificExtNatConvectionValue(Loop1)
       IF (OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizEqNum == HcExt_UserCurve) THEN
         ! A13; \field Natural Convection Unstable Horizontal Equation User Curve Name
-        OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum  = GetCurveIndex(cAlphaArgs(13))
+        OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum  = FindItemInList(cAlphaArgs(13), &
+                                                             HcOutsideUserCurve%Name , TotOutsideHcUserCurves )
         IF (OutsideFaceAdaptiveConvectionAlgo%HNatStableHorizUserCurveNum == 0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', invalid value')
           CALL ShowContinueError('Invalid Name choice Entered, for '//TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13)))

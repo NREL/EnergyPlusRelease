@@ -723,13 +723,23 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
                  cCMO_BBRadiator_Water//'="'// &
                  TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
             CALL ShowContinueError('Iteration limit exceeded in calculating coil UA')
+            IF (UAAutosize) THEN 
               ErrorsFound = .TRUE.
+            ELSE
+              CALL ShowContinueError('Could not calculate design value for comparison to user value, and the simulation continues')
+              UA = 0.0d0
+            ENDIF
           ELSE IF (SolFla == -2) THEN
             CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
                  cCMO_BBRadiator_Water//'="'// &
                  TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
             CALL ShowContinueError('Bad starting values for UA')
+            IF (UAAutosize) THEN 
               ErrorsFound = .TRUE.
+            ELSE
+              CALL ShowContinueError('Could not calculate design value for comparison to user value, and the simulation continues')
+              UA = 0.0d0
+            ENDIF
           END IF
             UADes = UA !Baseboard(BaseboardNum)%UA = UA
         ELSE
@@ -741,6 +751,7 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
           CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID, &
                                   'Design Size U-Factor Times Area Value [W/K]',UADes)
         ELSE ! Hard-sized with sizing data
+          Baseboard(BaseboardNum)%UA = UAUser ! need to put this back as HWBaseboardUAResidual will have reset it, CR9377
           IF (UAUser > 0.0d0 .AND. UADes > 0.0d0) THEN
             CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID, &
                                   'Design Size U-Factor Times Area Value [W/K]',UADes, &

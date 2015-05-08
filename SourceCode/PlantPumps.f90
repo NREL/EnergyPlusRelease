@@ -109,6 +109,8 @@ MODULE Pumps
     REAL(r64)         :: MinVolFlowRate         = 0.0d0   ! For a Variable Flow Pump this is the minimum capacity during operation.
     REAL(r64)         :: MassFlowRateMin        = 0.0d0   ! For a Variable Flow Pump this is the minimum capacity during operation.
     REAL(r64)         :: NomPumpHead            = 0.0d0   ! design nominal head pressure of Pump, [Pa]
+    LOGICAL           :: EMSPressureOverrideOn  = .FALSE. ! if true, EMS is calling to override pump pressure
+    REAL(r64)         :: EMSPressureOverrideValue = 0.0d0 ! EMS value to use for pressure [Pa]
     REAL(r64)         :: NomPowerUse            = 0.0d0   ! design nominal capacity of Pump
     REAL(r64)         :: MotorEffic             = 0.0d0   ! efficiency of the motor
     REAL(r64)         :: PumpEffic              = 0.0d0   ! efficiency of the pump
@@ -958,6 +960,8 @@ SUBROUTINE GetPumpInput()
                                   PumpEquip(PumpNum)%MassFlowRateMax  )
      CALL SetupEMSActuator('Pump', PumpEquip(PumpNum)%Name, 'Pump Mass Flow Rate' , '[kg/s]', &
                                   PumpEquip(PumpNum)%EMSMassFlowOverrideOn, PumpEquip(PumpNum)%EMSMassFlowValue )
+     CALL SetupEMSActuator('Pump',  PumpEquip(PumpNum)%Name, 'Pump Pressure Rise', '[Pa]', &
+                                  PumpEquip(PumpNum)%EMSPressureOverrideOn, PumpEquip(PumpNum)%EMSPressureOverrideValue )
    ENDIF
 
    IF (PumpEquip(PumpNum)%HeatLossesToZone) THEN
@@ -1701,6 +1705,19 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
       Power = VolFlowRate * PlantLoop(PumpEquip(PumpNum)%LoopNum)%PressureDrop / TotalEffic
     END IF
   END IF
+
+  ! if user has specified a pressure value, then use it, same as for pressure-based simulation
+  IF (PumpEquip(PumpNum)%EMSPressureOverrideOn) THEN
+    TotalEffic = PumpEquip(PumpNum)%PumpEffic * PumpEquip(PumpNum)%MotorEffic
+    !Efficiency errors are caught previously, but it doesn't hurt to add another catch before dividing by zero!!!
+    IF (TotalEffic == 0.0d0) THEN
+      CALL ShowSevereError(RoutineName//' Plant pump simulation encountered a pump with zero efficiency: '// &
+                            PumpEquip(PumpNum)%Name)
+      CALL ShowContinueError('Check efficiency inputs for this pump component.')
+      CALL ShowFatalError('Errors in plant calculation would result in divide-by-zero cause program termination.')
+    END IF
+    Power = VolFlowRate * PumpEquip(PumpNum)%EMSPressureOverrideValue / TotalEffic
+  ENDIF
 
  !****************************!
  !***** CALCULATE POWER (4) **!

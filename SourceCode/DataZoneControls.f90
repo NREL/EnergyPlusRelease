@@ -192,7 +192,7 @@ PUBLIC ! Everything private unless explicitly made public
   LOGICAL, ALLOCATABLE, DIMENSION(:)   :: StageZoneLogic      ! Logical array, A zone with staged thermostat = .true.
   REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: OccRoomTSetPointHeat ! occupied heating set point for optimum start period
   REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: OccRoomTSetPointCool ! occupied cooling set point for optimum start period
-
+  LOGICAL :: GetZoneAirStatsInputFlag = .TRUE.  ! True when need to get input
 !     NOTICE
 !
 !     Copyright © 1996-2013 The Board of Trustees of the University of Illinois

@@ -1167,7 +1167,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       USE InputProcessor
       USE ReportSizingManager, ONLY: ReportSizingOutput
       USE Psychrometrics, ONLY: PsyCpAirFnWTdb, RhoH2O, CpHw, CpCw, PsyHFnTdbW
-      USE General,             ONLY: RoundSigDigits 
+      USE General,             ONLY: RoundSigDigits
 
       IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1190,15 +1190,15 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       REAL(r64)           :: OutletHumRat
       REAL(r64)           :: DesignLoad
       LOGICAL             :: IsAutosize              ! Indicator to autosize
-      REAL(r64)           :: MaxHeatVolFlowRateDes   ! Autosized maximum heating air flow for reporting 
-      REAL(r64)           :: MaxHeatVolFlowRateUser  ! Hardsized maximum heating air flow for reporting 
-      REAL(r64)           :: MaxCoolVolFlowRateDes   ! Autosized maximum cooling air flow for reporting 
-      REAL(r64)           :: MaxCoolVolFlowRateUser  ! Hardsized maximum cooling air flow for reporting 
-      REAL(r64)           :: MaxHeatSensCapDes       ! Autosized maximum sensible heating capacity for reporting 
+      REAL(r64)           :: MaxHeatVolFlowRateDes   ! Autosized maximum heating air flow for reporting
+      REAL(r64)           :: MaxHeatVolFlowRateUser  ! Hardsized maximum heating air flow for reporting
+      REAL(r64)           :: MaxCoolVolFlowRateDes   ! Autosized maximum cooling air flow for reporting
+      REAL(r64)           :: MaxCoolVolFlowRateUser  ! Hardsized maximum cooling air flow for reporting
+      REAL(r64)           :: MaxHeatSensCapDes       ! Autosized maximum sensible heating capacity for reporting
       REAL(r64)           :: MaxHeatSensCapUser      ! Hardsized maximum sensible heating capacity for reporting
       REAL(r64)           :: MaxCoolTotCapDes        ! Autosized maximum sensible cooling capacity for reporting
       REAL(r64)           :: MaxCoolTotCapUser       ! Hardsized maximum sensible cooling capacity for reporting
-      
+
       IsAutosize = .FALSE.
       MaxHeatVolFlowRateDes = 0.0d0
       MaxHeatVolFlowRateUser = 0.0d0
@@ -1213,26 +1213,26 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ((PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRate) .OR. &
            (PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRateAndCapacity))) THEN
         IsAutosize = .TRUE.
-      END IF  
+      END IF
 
       IF (CurZoneEqNum > 0) THEN
-        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
-          IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0) THEN  
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+          IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0) THEN
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                         'User-Specified Maximum Heating Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxHeatVolFlowRate)
           END IF
-        ELSE 
+        ELSE
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MaxHeatVolFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
           IF (MaxHeatVolFlowRateDes < SmallAirVolFlow) THEN
             MaxHeatVolFlowRateDes = 0.0d0
           END IF
           IF (IsAutosize) THEN
-            PurchAir(PurchAirNum)%MaxHeatVolFlowRate = MaxHeatVolFlowRateDes  
+            PurchAir(PurchAirNum)%MaxHeatVolFlowRate = MaxHeatVolFlowRateDes
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatVolFlowRateDes)
           ELSE
-            IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0 .AND. MaxHeatVolFlowRateDes > 0.0d0) THEN  
+            IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0 .AND. MaxHeatVolFlowRateDes > 0.0d0) THEN
               MaxHeatVolFlowRateUser = PurchAir(PurchAirNum)%MaxHeatVolFlowRate
               CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatVolFlowRateDes, &
@@ -1250,7 +1250,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                   CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
                 END IF
               ENDIF
-            END IF 
+            END IF
           END IF
         END IF
       END IF
@@ -1261,15 +1261,15 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            (PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRateAndCapacity) .OR. &
            (PurchAir(PurchAirNum)%OutdoorAir .AND. PurchAir(PurchAirNum)%EconomizerType .NE. NoEconomizer))) THEN
         IsAutosize = .TRUE.
-      END IF  
+      END IF
 
       IF (CurZoneEqNum > 0) THEN
-        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
-          IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0) THEN  
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+          IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0) THEN
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                         'User-Specified Maximum Cooling Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxCoolVolFlowRate)
           END IF
-        ELSE 
+        ELSE
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MaxCoolVolFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
           IF (MaxCoolVolFlowRateDes < SmallAirVolFlow) THEN
@@ -1280,7 +1280,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Cooling Air Flow Rate [m3/s]', MaxCoolVolFlowRateDes)
           ELSE
-            IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0 .AND. MaxCoolVolFlowRateDes > 0.0d0) THEN  
+            IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0 .AND. MaxCoolVolFlowRateDes > 0.0d0) THEN
               MaxCoolVolFlowRateUser = PurchAir(PurchAirNum)%MaxCoolVolFlowRate
               CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Cooling Air Flow Rate [m3/s]', MaxCoolVolFlowRateDes, &
@@ -1298,7 +1298,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                 CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
               END IF
               ENDIF
-            END IF 
+            END IF
           END IF
         END IF
       END IF
@@ -1308,15 +1308,15 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ((PurchAir(PurchAirNum)%HeatingLimit == LimitCapacity) .OR. &
            (PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRateAndCapacity))) THEN
         IsAutosize = .TRUE.
-      END IF  
+      END IF
 
       IF (CurZoneEqNum > 0) THEN
-        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
-          IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0) THEN  
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+          IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0) THEN
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                         'User-Specified Maximum Sensible Heating Capacity [W]', PurchAir(PurchAirNum)%MaxHeatSensCap)
           END IF
-        ELSE 
+        ELSE
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MixedAirTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
           OutletTemp   = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
@@ -1329,20 +1329,22 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             MaxHeatSensCapDes = 0.0d0
           END IF
           IF (IsAutosize) THEN
-            PurchAir(PurchAirNum)%MaxHeatSensCap = MaxHeatSensCapDes  
+            PurchAir(PurchAirNum)%MaxHeatSensCap = MaxHeatSensCapDes
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Sensible Heating Capacity [W]', MaxHeatSensCapDes)
             ! If there is OA, check if sizing calcs have OA>0, throw warning if not
             IF ((PurchAir(PurchAirNum)%OutdoorAir) .AND. (FinalZoneSizing(CurZoneEqNum)%MinOA == 0.0)) THEN
               CALL ShowWarningError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
                     TRIM(PurchAir(PurchAirNum)%Name))
-              CALL ShowContinueError('There is outdoor air specified in this object, but the design outdoor air flow rate for this ')
-              CALL ShowContinueError('zone is zero. The Maximum Sensible Heating Capacity will be autosized for zero outdoor air flow. ')
+              CALL ShowContinueError('There is outdoor air specified in this object, '//  &
+                 'but the design outdoor air flow rate for this ')
+              CALL ShowContinueError('zone is zero. The Maximum Sensible Heating Capacity will be '//  &
+                 'autosized for zero outdoor air flow. ')
               CALL ShowContinueError('Check the outdoor air specifications in the Sizing:Zone object for zone '// &
                                      TRIM(FinalZoneSizing(CurZoneEqNum)%ZoneName)//'.')
             END IF
           ELSE
-            IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0 .AND. MaxHeatSensCapDes > 0.0d0) THEN  
+            IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0 .AND. MaxHeatSensCapDes > 0.0d0) THEN
               MaxHeatSensCapUser = PurchAir(PurchAirNum)%MaxHeatSensCap
               CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Sensible Heating Capacity [W]', MaxHeatSensCapDes, &
@@ -1360,7 +1362,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                   CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
                 END IF
               ENDIF
-            END IF 
+            END IF
           END IF
         END IF
       END IF
@@ -1370,15 +1372,15 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ((PurchAir(PurchAirNum)%CoolingLimit == LimitCapacity) .OR. &
            (PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRateAndCapacity))) THEN
         IsAutosize = .TRUE.
-      END IF  
+      END IF
 
       IF (CurZoneEqNum > 0) THEN
-        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
-          IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0) THEN  
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+          IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0) THEN
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                         'User-Specified Maximum Heating Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxCoolTotCap)
           END IF
-        ELSE 
+        ELSE
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MixedAirTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
           OutletTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
@@ -1392,20 +1394,22 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             MaxCoolTotCapDes = 0.0d0
           END IF
           IF (IsAutosize) THEN
-            PurchAir(PurchAirNum)%MaxCoolTotCap = MaxCoolTotCapDes 
+            PurchAir(PurchAirNum)%MaxCoolTotCap = MaxCoolTotCapDes
             CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Total Cooling Capacity [W]', MaxCoolTotCapDes)
             ! If there is OA, check if sizing calcs have OA>0, throw warning if not
             IF ((PurchAir(PurchAirNum)%OutdoorAir) .AND. (FinalZoneSizing(CurZoneEqNum)%MinOA == 0.0)) THEN
-              CALL ShowWarningError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+              CALL ShowWarningError('SizePurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
                     TRIM(PurchAir(PurchAirNum)%Name))
-              CALL ShowContinueError('There is outdoor air specified in this object, but the design outdoor air flow rate for this ')
-              CALL ShowContinueError('zone is zero. The Maximum Total Cooling Capacity will be autosized for zero outdoor air flow. ')
+              CALL ShowContinueError('There is outdoor air specified in this object, '//  &
+                 'but the design outdoor air flow rate for this ')
+              CALL ShowContinueError('zone is zero. The Maximum Total Cooling Capacity will be autosized '//  &
+                 'for zero outdoor air flow. ')
               CALL ShowContinueError('Check the outdoor air specifications in the Sizing:Zone object for zone '// &
                                      TRIM(FinalZoneSizing(CurZoneEqNum)%ZoneName)//'.')
             END IF
           ELSE
-            IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0 .AND. MaxCoolTotCapDes > 0.0d0) THEN  
+            IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0 .AND. MaxCoolTotCapDes > 0.0d0) THEN
               MaxCoolTotCapUser = PurchAir(PurchAirNum)%MaxCoolTotCap
               CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
                               'Design Size Maximum Total Cooling Capacity [W]', MaxCoolTotCapDes, &
@@ -1423,7 +1427,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                   CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
                 END IF
               ENDIF
-            END IF 
+            END IF
           END IF
         END IF
       END IF

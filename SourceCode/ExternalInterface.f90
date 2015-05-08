@@ -140,6 +140,7 @@
         INTEGER                            :: LenWorkingFolder_wLib=0          ! Length of working folder with libraries trimmed
         TYPE (C_PTR)                       :: fmiComponent                     ! FMU instance
         INTEGER                            :: fmiStatus  ! Status of fmi
+        INTEGER                            :: Index      ! Index of FMU
         ! Variable Types structure for fmu input variables
         TYPE (fmuInputVariableType), &
         DIMENSION(:), ALLOCATABLE  :: fmuInputVariable
@@ -1015,52 +1016,43 @@
     INTEGER :: i, j, k       ! Loop counter
 
 
-   INTERFACE
-    INTEGER FUNCTION fmiGetReal(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, valRef, &
-    fmuVariableValue, numOutputs, modelID, sizemodelID) BIND (C, NAME="fmiEPlusGetReal")
+    INTERFACE
+    INTEGER FUNCTION fmiGetReal(fmiComponent, valRef, &
+    fmuVariableValue, numOutputs, index) BIND (C, NAME="fmiEPlusGetReal")
     ! Function called to get real values from FMU outputs
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
     INTEGER(kind=C_INT), DIMENSION(*)    :: valRef                       ! Parameter fmiValueReference
     REAL (kind=C_DOUBLE), DIMENSION(*)   :: fmuVariableValue             ! FMU output variables
     INTEGER(kind=C_INT)                  :: numOutputs                   ! Number of input variables
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of the FMU
     END FUNCTION fmiGetReal
     END INTERFACE
 
 
     INTERFACE
-    INTEGER FUNCTION fmiSetReal(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, valRef, &
-    fmuVariableValue, numInputs, modelID, sizemodelID) BIND (C, NAME="fmiEPlusSetReal")
+    INTEGER FUNCTION fmiSetReal(fmiComponent, valRef, &
+    fmuVariableValue, numInputs, index) BIND (C, NAME="fmiEPlusSetReal")
     ! Function called to set real values to FMU inputs
-    USE ISO_C_BINDING, ONLY: C_INT, C_DOUBLE, C_PTR, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*)      :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                       :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_DOUBLE, C_PTR
     TYPE (C_PTR)                              :: fmiComponent                ! Pointer to FMU instance
     INTEGER(kind=C_INT) , DIMENSION(*)        :: valRef                      ! Parameter fmiValueReference
     REAL (kind=C_DOUBLE), DIMENSION(*)        :: fmuVariableValue            ! FMU input variables
     INTEGER(kind=C_INT)                       :: numInputs                   ! Number of input variables
-    CHARACTER(kind=C_CHAR), DIMENSION(*)      :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                       :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                       :: index                        ! Index of the FMU
     END FUNCTION fmiSetReal
     END INTERFACE
 
     INTERFACE
-    INTEGER FUNCTION fmiDoStep(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, &
-    curCommPoint, commStepSize, newStep, modelID, sizemodelID) BIND (C, NAME="fmiEPlusDoStep")
+    INTEGER FUNCTION fmiDoStep(fmiComponent, curCommPoint, &
+    commStepSize, newStep, index) BIND (C, NAME="fmiEPlusDoStep")
     !  Function called to do one step of the co-simulation
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*)       :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                        :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                               :: fmiComponent               ! Pointer to FMU instance
     REAL(kind=C_DOUBLE)                        :: curCommPoint               ! Current communication point
     REAL(kind=C_DOUBLE)                        :: commStepSize               ! Communication step size
     INTEGER (C_INT)                            :: newStep
-    CHARACTER(kind=C_CHAR), DIMENSION(*)       :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                        :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                        :: index                        ! Index of the FMU
     END FUNCTION fmiDoStep
     END INTERFACE
 
@@ -1088,12 +1080,11 @@
                 ! Get from FMUs, values that will be set in EnergyPlus (Schedule)
 
                 FMU(i)%Instance(j)%fmiStatus = &
-                fmiGetReal (FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib,FMU(i)%Instance(j)%fmiComponent, &
+                fmiGetReal (FMU(i)%Instance(j)%fmiComponent, &
                 FMU(i)%Instance(j)%fmuOutputVariableSchedule%ValueReference, &
                 FMU(i)%Instance(j)%fmuOutputVariableSchedule%RealVarValue, &
                 FMU(i)%Instance(j)%NumOutputVariablesSchedule, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                FMU(i)%Instance(j)%Index)
 
                 IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                     CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to get outputs')
@@ -1107,12 +1098,11 @@
 
                 ! Get from FMUs, values that will be set in EnergyPlus (Variable)
                 FMU(i)%Instance(j)%fmiStatus = &
-                fmiGetReal (FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
+                fmiGetReal (FMU(i)%Instance(j)%fmiComponent, &
                 FMU(i)%Instance(j)%fmuOutputVariableVariable%ValueReference, &
                 FMU(i)%Instance(j)%fmuOutputVariableVariable%RealVarValue, &
                 FMU(i)%Instance(j)%NumOutputVariablesVariable, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                FMU(i)%Instance(j)%Index)
 
                 IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                     CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to get outputs')
@@ -1125,12 +1115,11 @@
 
                 ! Get from FMUs, values that will be set in EnergyPlus (Actuator)
                 FMU(i)%Instance(j)%fmiStatus = &
-                fmiGetReal (FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
+                fmiGetReal (FMU(i)%Instance(j)%fmiComponent, &
                 FMU(i)%Instance(j)%fmuOutputVariableActuator%ValueReference, &
                 FMU(i)%Instance(j)%fmuOutputVariableActuator%RealVarValue, &
                 FMU(i)%Instance(j)%NumOutputVariablesActuator, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                FMU(i)%Instance(j)%Index)
 
                 IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                     CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to get outputs')
@@ -1179,29 +1168,27 @@
             END IF
 
             IF (.NOT.FlagReIni) THEN
-              FMU(i)%Instance(j)%fmiStatus = &
-              fmiSetReal(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-              FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-              FMU(i)%Instance(j)%fmuInputVariable%ValueReference, &
-              FMU(i)%Instance(j)%eplusOutputVariable%RTSValue, FMU(i)%Instance(j)%NumInputVariablesInIDF, &
-              FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
-              IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-                CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to set inputs')
-                CALL ShowContinueError ('in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
-                CALL ShowContinueError ('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
-                ErrorsFound = .true.
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                CALL StopExternalInterfaceIfError
-              END IF
+                FMU(i)%Instance(j)%fmiStatus = &
+                fmiSetReal(FMU(i)%Instance(j)%fmiComponent, &
+                FMU(i)%Instance(j)%fmuInputVariable%ValueReference, &
+                FMU(i)%Instance(j)%eplusOutputVariable%RTSValue, FMU(i)%Instance(j)%NumInputVariablesInIDF, &
+                FMU(i)%Instance(j)%Index)
+                IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
+                    CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to set inputs')
+                    CALL ShowContinueError ('in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
+                    CALL ShowContinueError ('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
+                    ErrorsFound = .true.
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    CALL StopExternalInterfaceIfError
+                END IF
             END IF
             !   END IF
             ! END DO
 
             ! Call and simulate the FMUs to get values at the corresponding timestep.
             FMU(i)%Instance(j)%fmiStatus = &
-            fmiDoStep(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-            FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-            tComm, hStep, fmiTrue, FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+            fmiDoStep(FMU(i)%Instance(j)%fmiComponent, &
+            tComm, hStep, fmiTrue, FMU(i)%Instance(j)%Index)
             IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                 CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to')
                 CALL ShowContinueError('do the coSimulation with instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -1259,41 +1246,30 @@
     INTEGER :: i, j         ! Loop counter
 
     INTERFACE
-    TYPE (C_PTR) FUNCTION fmiInstantiateSlave (fmuWorkingFolder, sizefmuWorkingFolder, &
-    fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, timeOut, &
-    visible, interactive, loggingon,  modelID, sizemodelID, &
-    modelGUID, sizemodelGUID) BIND (C, NAME="fmiEPlusInstantiateSlave")
+    TYPE (C_PTR) FUNCTION fmiInstantiateSlave (fmuWorkFolder, sizeFmuWorkFolder, &
+    timeOut, & visible, interactive, loggingon, index) BIND (C, NAME="fmiEPlusInstantiateSlave")
     ! Function called to Instantiate FMU
 
-    USE ISO_C_BINDING, ONLY: C_INT, C_CHAR, C_PTR, C_DOUBLE, C_SHORT
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder             ! FMU working folder
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder         ! Size of the fmuWorkingFolder trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_CHAR, C_PTR, C_DOUBLE
+    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkFolder                 ! FMU resource folder
+    INTEGER(kind=C_INT)                  :: sizeFmuWorkFolder             ! Size of the FMU resource folder trimmed
     REAL(kind = C_DOUBLE)                :: timeOut                      ! timeOut in milli seconds
     INTEGER(C_INT)                       :: visible !
     INTEGER(C_INT)                       :: interactive !
     INTEGER(C_INT)                       :: loggingon !
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of FMU modelID
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelGUID                    ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelGUID                ! Size of FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of FMU
     END FUNCTION fmiInstantiateSlave
     END INTERFACE
 
     INTERFACE
-    INTEGER FUNCTION fmiInitializeSlave(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, tStart, &
-    fmiTrue, tStop, modelID, sizemodelID)BIND (C, NAME="fmiEPlusInitializeSlave")
+    INTEGER FUNCTION fmiInitializeSlave(fmiComponent, tStart, fmiTrue, tStop, index)BIND (C, NAME="fmiEPlusInitializeSlave")
     ! Function called to initialize FMU
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
     REAL(kind=C_DOUBLE)                  :: tStart                       ! Starttime for co-simulation
     REAL(kind=C_DOUBLE)                  :: tStop                        ! Stoptime for co-simulation
     INTEGER (kind = C_INT)               :: fmiTrue                      ! Flag set to true for initialization
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of FMU 
     END FUNCTION fmiInitializeSlave
     END INTERFACE
 
@@ -1302,11 +1278,8 @@
         DO j = 1, FMU(i)%NumInstances
             FMU(i)%Instance(j)%fmiComponent = &
             fmiInstantiateSlave(FMU(i)%Instance(j)%WorkingFolder, &
-            FMU(i)%Instance(j)%LenWorkingFolder, FMU(i)%Instance(j)%WorkingFolder_wLib, &
-            FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%TimeOut, FMU(i)%Visible, &
-            FMU(i)%Interactive, FMU(i)%LoggingOn, &
-            FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID, &
-            FMU(i)%Instance(j)%modelGUID, FMU(i)%Instance(j)%LenModelGUID)
+            FMU(i)%Instance(j)%LenWorkingFolder, FMU(i)%TimeOut, FMU(i)%Visible, &
+            FMU(i)%Interactive, FMU(i)%LoggingOn, FMU(i)%Instance(j)%Index)
             IF (.NOT.(C_ASSOCIATED(FMU(i)%Instance(j)%fmiComponent))) THEN
                 CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to instantiate')
                 CALL ShowContinueError('instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
@@ -1320,9 +1293,8 @@
     ! Initialize FMUs
     DO i = 1, NumFMUObjects
         DO j = 1, FMU(i)%NumInstances
-            FMU(i)%Instance(j)%fmiStatus = fmiInitializeSlave(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-            FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-            tStart, fmiTrue, tStop, FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+            FMU(i)%Instance(j)%fmiStatus = fmiInitializeSlave(FMU(i)%Instance(j)%fmiComponent, &
+            tStart, fmiTrue, tStop, FMU(i)%Instance(j)%Index)
             IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
                 CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to initialize')
                 CALL ShowContinueError('instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
@@ -1372,27 +1344,23 @@
     INTEGER :: i, j         ! Loop counter
 
     INTERFACE
-    INTEGER FUNCTION fmiInitializeSlave(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, tStart, &
-    fmiTrue, tStop, modelID, sizemodelID)BIND (C, NAME="fmiEPlusInitializeSlave")
+    INTEGER FUNCTION fmiInitializeSlave(fmiComponent, tStart, &
+    fmiTrue, tStop, index)BIND (C, NAME="fmiEPlusInitializeSlave")
     ! Function called to initialize FMU
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
     REAL(kind=C_DOUBLE)                  :: tStart                       ! Starttime for co-simulation
     REAL(kind=C_DOUBLE)                  :: tStop                        ! Stoptime for co-simulation
     INTEGER (kind = C_INT)               :: fmiTrue                      ! Flag set to true for initialization
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of FMU
     END FUNCTION fmiInitializeSlave
     END INTERFACE
 
     ! Initialize FMUs
     DO i = 1, NumFMUObjects
         DO j = 1, FMU(i)%NumInstances
-            FMU(i)%Instance(j)%fmiStatus = fmiInitializeSlave(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-            FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-            tStart, fmiTrue, tStop, FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+            FMU(i)%Instance(j)%fmiStatus = fmiInitializeSlave(FMU(i)%Instance(j)%fmiComponent, &
+            tStart, fmiTrue, tStop, FMU(i)%Instance(j)%Index)
 
             IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
                 CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to initialize')
@@ -1442,15 +1410,11 @@
     INTEGER :: i, j, k         ! Loop counter
 
     INTERFACE
-    INTEGER(C_INT) FUNCTION fmiFreeSlaveInstance(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, &
-    fmiComponent, modelID, sizemodelID) BIND (C, NAME="fmiEPlusFreeSlave")
+    INTEGER(C_INT) FUNCTION fmiFreeSlaveInstance(fmiComponent, index) BIND (C, NAME="fmiEPlusFreeSlave")
     ! Function called to free FMU
-    USE ISO_C_BINDING, ONLY: C_PTR, C_INT, C_CHAR
+    USE ISO_C_BINDING, ONLY: C_PTR, C_INT
     TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! FMU name
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of FMU 
     END FUNCTION fmiFreeSlaveInstance
     END INTERFACE
     !----Needs to have function that allows to terminates FMU. Was not defined in version 1.0 -- fixme
@@ -1459,9 +1423,7 @@
             IF (FMU(i)%Instance(j)%fmiStatus .NE. fmiFatal) THEN
                 ! Cleanup slaves
                 FMU(i)%Instance(j)%fmiStatus = &
-                fmiFreeSlaveInstance(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                fmiFreeSlaveInstance(FMU(i)%Instance(j)%fmiComponent, FMU(i)%Instance(j)%Index)
             END IF
             ! check if fmiComponent has been freed
             IF (.NOT.(C_ASSOCIATED(FMU(i)%Instance(j)%fmiComponent))) THEN
@@ -1475,76 +1437,6 @@
     END DO
 
     END SUBROUTINE TerminateResetFreeFMUImport
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE ResetFMU()
-
-    ! SUBROUTINE INFORMATION:
-    !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
-    !       DATE WRITTEN   08Aug2011
-    !       MODIFIED       na
-    !       RE-ENGINEERED  na
-
-    ! PURPOSE OF THIS SUBROUTINE:
-    ! This routine terminates the FMUs instances
-
-    ! METHODOLOGY EMPLOYED:
-
-    ! REFERENCES:
-    ! na
-
-    ! USE STATEMENTS:
-
-
-    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-    ! SUBROUTINE ARGUMENT DEFINITIONS:
-    ! na
-
-    ! SUBROUTINE PARAMETER DEFINITIONS:
-
-    ! INTERFACE BLOCK SPECIFICATIONS:
-    ! na
-
-    ! DERIVED TYPE DEFINITIONS:
-
-    ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-    INTEGER :: i, j         ! Loop counter
-
-    INTERFACE
-    INTEGER(C_INT) FUNCTION fmiResetSlaveInstance(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, &
-    fmiComponent, modelID, sizemodelID) BIND (C, NAME="fmiEPlusResetSlave")
-    ! Function called to free FMU
-    USE ISO_C_BINDING, ONLY: C_PTR, C_INT, C_CHAR
-    TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! FMU name
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of FMU modelID
-    END FUNCTION fmiResetSlaveInstance
-    END INTERFACE
-
-    DO i = 1, NumFMUObjects
-        DO j = 1, FMU(i)%NumInstances
-            IF (FMU(i)%Instance(j)%fmiStatus .NE. fmiFatal) THEN
-                ! Cleanup slaves
-                FMU(i)%Instance(j)%fmiStatus = &
-                fmiResetSlaveInstance(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
-            END IF
-            IF (FMU(i)%Instance(j)%fmiStatus .EQ. fmiError) THEN
-                CALL ShowSevereError('ExternalInterface/ResetFMU: Error when trying to')
-                CALL ShowContinueError('reset instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
-                CALL ShowContinueError('Error Code = '//TRIM(TrimSigDigits(FMU(i)%Instance(j)%fmiStatus))//'.')
-                ErrorsFound = .true.
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                CALL StopExternalInterfaceIfError
-            END IF
-        END DO
-    END DO
-
-    END SUBROUTINE ResetFMU
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE InitExternalInterfaceFMUImport()
@@ -1584,15 +1476,14 @@
 
     ! DERIVED TYPE DEFINITIONS:
     INTERFACE
-    INTEGER(C_INT) FUNCTION getfmiVersion(fmuWorkingFolder, sizefmuWorkingFolder, modelID, sizemodelID, &
-    fmiVersionNumber) BIND (C, NAME="getfmiEPlusVersion")
+    INTEGER(C_INT) FUNCTION getfmiVersion(fmuWorkingFolder, sizefmuWorkingFolder, &
+    fmiVersionNumber, index) BIND (C, NAME="getfmiEPlusVersion")
     ! Function called to get FMI version number
     USE ISO_C_BINDING, ONLY: C_CHAR, C_INT
     CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder         ! FMU working folder
     INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                  ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID              ! Size of fmu modelID
     CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmiVersionNumber         ! FMI version number
+    INTEGER(kind=C_INT)                  :: index                    ! Index of FMU
     END FUNCTION getfmiVersion
     END INTERFACE
 
@@ -1609,29 +1500,26 @@
     END INTERFACE
 
     INTERFACE
-    INTEGER(C_INT) FUNCTION getValueReferenceByNameFMUInputVariables(fmuWorkingFolder, sizefmuWorkingFolder, &
-    variableName, sizevariableName) BIND (C, NAME="getValueReferenceByNameFMUInputVariables")
+    INTEGER(C_INT) FUNCTION getValueReferenceByNameFMUInputVariables(variableName, sizevariableName, index) & 
+    BIND (C, NAME="getValueReferenceByNameFMUInputVariables")
     ! Function called to get value reference by name of FMU input variables
     USE ISO_C_BINDING, ONLY: C_CHAR, C_INT
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder         ! FMU working folder
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
     CHARACTER(C_CHAR), DIMENSION(*)      :: variableName             ! FMU variable name
     INTEGER(kind=C_INT)                  :: sizevariableName         ! Size of the fmuVariableName trimmed
+    INTEGER(kind=C_INT)                  :: index                    ! Index of FMU
     END FUNCTION getValueReferenceByNameFMUInputVariables
     END INTERFACE
 
     INTERFACE
-    INTEGER(C_INT) FUNCTION getValueReferenceByNameFMUOutputVariables(fmuWorkingFolder, sizefmuWorkingFolder, &
-    variableName, sizevariableName) BIND (C, NAME="getValueReferenceByNameFMUOutputVariables")
+    INTEGER(C_INT) FUNCTION getValueReferenceByNameFMUOutputVariables(variableName, sizevariableName, index) &
+    BIND (C, NAME="getValueReferenceByNameFMUOutputVariables")
     ! Function called to get value reference by name of FMU output variables
     USE ISO_C_BINDING, ONLY: C_CHAR, C_INT
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder         ! FMU working folder
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
     CHARACTER(C_CHAR), DIMENSION(*)      :: variableName             ! FMU variable name
     INTEGER(kind=C_INT)                  :: sizevariableName         ! Size of the fmuVariableName trimmed
+    INTEGER(kind=C_INT)                  :: index                    ! Index of FMU
     END FUNCTION getValueReferenceByNameFMUOutputVariables
     END INTERFACE
-
 
     INTERFACE
     INTEGER (C_INT) FUNCTION addFMURootFolderName(fmuOutputWorkingFolder, fmuWorkingFolder, sizefmuWorkingFolder) &
@@ -1646,14 +1534,12 @@
 
 
     INTERFACE
-    INTEGER (C_INT) FUNCTION model_ID_GUID(fmuWorkingFolder, sizefmuWorkingFolder, modelID, modelGUID, &
+    INTEGER (C_INT) FUNCTION model_ID_GUID(fmuWorkingFolder, sizefmuWorkingFolder,&
     numInputs, numOutputs) BIND (C, NAME="model_ID_GUID")
     ! Function called to get model ID as well as model GUID
     USE ISO_C_BINDING, ONLY: C_CHAR, C_INT, C_PTR
     CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder         ! FMU working folder
     INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                  ! FMU modelID
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelGUID                ! FMU modelGUID
     INTEGER(kind=C_INT)                  :: numInputs                ! Number of FMU inputs
     INTEGER(kind=C_INT)                  :: numOutputs               ! Number of FMU outputs
     END FUNCTION model_ID_GUID
@@ -1661,14 +1547,13 @@
 
     INTERFACE
     INTEGER(C_INT) FUNCTION addLibPathCurrentWorkingFolder(fmuWorkingFolder_wLib, fmuWorkingFolder, &
-    sizefmuWorkingFolder, modelID, sizemodelID) BIND (C, NAME="addLibPathCurrentWorkingFolder")
+    sizefmuWorkingFolder, index) BIND (C, NAME="addLibPathCurrentWorkingFolder")
     ! Function called to build path to the .dll/.so of the FMU
     USE ISO_C_BINDING, ONLY: C_CHAR, C_INT
     CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib    ! Path to binaries
     CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder         ! FMU working folder
     INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                  ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID              ! Size of fmu modelID
+    INTEGER(kind=C_INT)                  :: index                    ! Index of fmu
     END FUNCTION addLibPathCurrentWorkingFolder
     END INTERFACE
 
@@ -1692,7 +1577,6 @@
     !INTEGER :: keyIndex ! Array index for
     CHARACTER(len=MaxNameLength), DIMENSION(1):: NamesOfKeys      ! Specific key name
     INTEGER :: retValue
-    INTEGER :: retValID
     INTEGER :: retValfmiVersion
     INTEGER :: retValfmiPathLib
     CHARACTER(len=MaxNameLength), DIMENSION(5)::           NameListInstances
@@ -1763,7 +1647,6 @@
 
         ! check for dups that aren't the same file
         ! this is windows code...
-#ifdef WINDOWS
         DO j=1,NumFMUObjects
             DO k=2,NumFMUObjects
                 IF (.not. SameString(strippedFileName(j),strippedFileName(k))) CYCLE
@@ -1779,55 +1662,6 @@
                 ErrorsFound=.true.
             ENDDO
         ENDDO
-#elif defined LINUX
-        DO j=1,NumFMUObjects
-            DO k=2,NumFMUObjects
-                IF (strippedFileName(j) /= strippedFileName(k)) CYCLE
-                ! base file names are the same
-                IF (fullFileName(j) /= fullFileName(k)) CYCLE
-                CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:')
-                CALL ShowContinueError('duplicate file names (but not same file) entered.')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(k))//'"')
-                CALL ShowContinueError('...name collision but not same file name.')
-                ErrorsFound=.true.
-            ENDDO
-        ENDDO
-#elif defined MAC
-        DO j=1,NumFMUObjects
-            DO k=2,NumFMUObjects
-                IF (strippedFileName(j) /= strippedFileName(k)) CYCLE
-                ! base file names are the same
-                IF (fullFileName(j) /= fullFileName(k)) CYCLE
-                CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:')
-                CALL ShowContinueError('duplicate file names (but not same file) entered.')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(k))//'"')
-                CALL ShowContinueError('...name collision but not same file name.')
-                ErrorsFound=.true.
-            ENDDO
-        ENDDO
-#else
-        DO j=1,NumFMUObjects
-            DO k=2,NumFMUObjects
-                IF (.not. SameString(strippedFileName(j),strippedFileName(k))) CYCLE
-                ! base file names are the same
-                IF (SameString(fullFileName(j),fullFileName(k))) CYCLE
-                CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:')
-                CALL ShowContinueError('duplicate file names (but not same file) entered.')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
-                CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
-                CALL ShowContinueError('...   full file name="'//trim(fullFileName(k))//'"')
-                CALL ShowContinueError('...name collision but not same file name.')
-                ErrorsFound=.true.
-            ENDDO
-        ENDDO
-#endif
         IF (ErrorsFound) THEN
             DEALLOCATE(strippedFileName)
             DEALLOCATE(fullFileName)
@@ -1910,11 +1744,12 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     CALL StopExternalInterfaceIfError
                 END IF
+
                 ! determine modelID and modelGUID of all FMU instances
-                retValID = model_ID_GUID (FMU(i)%Instance(j)%WorkingFolder,  FMU(i)%Instance(j)%LenWorkingFolder, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%modelGUID, FMU(i)%Instance(j)%NumInputVariablesInFMU, &
+                FMU(i)%Instance(j)%Index = model_ID_GUID (FMU(i)%Instance(j)%WorkingFolder, & 
+                FMU(i)%Instance(j)%LenWorkingFolder, & FMU(i)%Instance(j)%NumInputVariablesInFMU, &
                 FMU(i)%Instance(j)%NumOutputVariablesInFMU)
-                IF ( retValID .NE. 0 ) THEN
+                IF ( FMU(i)%Instance(j)%Index .LT. 0 ) THEN
                     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
                     CALL ShowContinueError('get the model ID and model GUID')
                     CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
@@ -1923,17 +1758,11 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     CALL StopExternalInterfaceIfError
                 END IF
-                
-                ! get the length of modelID trimmed
-                FMU(i)%Instance(j)%LenModelID=LEN_TRIM(FMU(i)%Instance(j)%modelID)
-                
-                ! get the length of modelGUID trimmed
-                FMU(i)%Instance(j)%LenModelGUID=LEN_TRIM(FMU(i)%Instance(j)%modelGUID)
 
                 ! get the path to the binaries
                 retValfmiPathLib = addLibPathCurrentWorkingFolder (FMU(i)%Instance(j)%WorkingFolder_wLib, &
                 FMU(i)%Instance(j)%WorkingFolder, FMU(i)%Instance(j)%LenWorkingFolder, &
-                FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                FMU(i)%Instance(j)%Index)
                 IF ( retValfmiPathLib .NE. 0 ) THEN
                     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
                     CALL ShowContinueError('get the path to the binaries of instance')
@@ -1943,14 +1772,14 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     CALL StopExternalInterfaceIfError
                 END IF
-                
+
                 ! get the length of the working folder with libraries
                 FMU(i)%Instance(j)%LenWorkingFolder_wLib = LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib))
-                
+
                 ! determine the FMI version
                 retValfmiVersion = getfmiVersion (FMU(i)%Instance(j)%WorkingFolder_wLib,  &
-                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%modelID, &
-                FMU(i)%Instance(j)%LenModelID, FMU(i)%Instance(j)%fmiVersionNumber)
+                FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiVersionNumber, &
+                FMU(i)%Instance(j)%Index)
                 IF ( retValfmiVersion .NE. 0 ) THEN
                     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
                     CALL ShowContinueError('load FMI functions library of instance')
@@ -2006,9 +1835,8 @@
                             FMU(i)%Instance(j)%checkfmuInputVariable(k)%Name   = FMU(i)%Instance(j)%fmuInputVariable(k)%Name
                         ENDIF
                         FMU(i)%Instance(j)%fmuInputVariable(k)%ValueReference = &
-                        getValueReferenceByNameFMUInputVariables(FMU(i)%Instance(j)%WorkingFolder, &
-                        FMU(i)%Instance(j)%LenWorkingFolder, FMU(i)%Instance(j)%fmuInputVariable(k)%Name,&
-                        LEN (TRIM(FMU(i)%Instance(j)%fmuInputVariable(k)%Name)))
+                        getValueReferenceByNameFMUInputVariables(FMU(i)%Instance(j)%fmuInputVariable(k)%Name,&
+                        LEN (TRIM(FMU(i)%Instance(j)%fmuInputVariable(k)%Name)), FMU(i)%Instance(j)%Index)
 
                         IF (FMU(i)%Instance(j)%fmuInputVariable(k)%ValueReference .EQ. -999) THEN
                             CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
@@ -2114,9 +1942,8 @@
                         FMU(i)%Instance(j)%eplusInputVariableSchedule(k)%InitialValue = rNumericArgs(1)
                         ! get the value reference by using the FMU name and the variable name.
                         FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%ValueReference = &
-                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%WorkingFolder, &
-                        FMU(i)%Instance(j)%LenWorkingFolder,FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name, &
-                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name)))
+                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name, &
+                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name)), FMU(i)%Instance(j)%Index)
                         IF (FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%ValueReference .EQ. -999) THEN
                             CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to '// &
                             'get the value reference of the FMU output variable')
@@ -2193,9 +2020,8 @@
 
                         ! get the value reference by using the FMU name and the variable name.
                         FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%ValueReference = &
-                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%WorkingFolder, &
-                        FMU(i)%Instance(j)%LenWorkingFolder, FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name, &
-                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name)))
+                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name, &
+                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name)), FMU(i)%Instance(j)%Index)
                         IF (FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%ValueReference .EQ. -999) THEN
                             CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
                             'to get the value reference of the FMU output variable')
@@ -2275,9 +2101,8 @@
 
                         ! get the value reference by using the FMU name and the variable name.
                         FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%ValueReference = &
-                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%WorkingFolder, &
-                        FMU(i)%Instance(j)%LenWorkingFolder, FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name, &
-                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name)))
+                        getValueReferenceByNameFMUOutputVariables(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name, &
+                        LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name)), FMU(i)%Instance(j)%Index)
                         IF (FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%ValueReference .EQ. -999) THEN
                             CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
                             'to get the value reference of the FMU output variable')
@@ -2527,51 +2352,42 @@
     ! DERIVED TYPE DEFINITIONS
 
     INTERFACE
-    INTEGER FUNCTION fmiGetReal(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, valRef, &
-    fmuVariableValue, numOutputs, modelID, sizemodelID) BIND (C, NAME="fmiEPlusGetReal")
+    INTEGER FUNCTION fmiGetReal(fmiComponent, valRef, &
+    fmuVariableValue, numOutputs, index) BIND (C, NAME="fmiEPlusGetReal")
     ! Function called to get real values from FMU outputs
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                         :: fmiComponent                 ! Pointer to FMU instance
     INTEGER(kind=C_INT), DIMENSION(*)    :: valRef                       ! Parameter fmiValueReference
     REAL (kind=C_DOUBLE), DIMENSION(*)   :: fmuVariableValue             ! FMU output variables
     INTEGER(kind=C_INT)                  :: numOutputs                   ! Number of input variables
-    CHARACTER(kind=C_CHAR), DIMENSION(*) :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                  :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                  :: index                        ! Index of the FMU 
     END FUNCTION fmiGetReal
     END INTERFACE
 
 
     INTERFACE
-    INTEGER FUNCTION fmiSetReal(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, valRef, &
-    fmuVariableValue, numInputs, modelID, sizemodelID) BIND (C, NAME="fmiEPlusSetReal")
+    INTEGER FUNCTION fmiSetReal(fmiComponent, valRef, &
+    fmuVariableValue, numInputs, index) BIND (C, NAME="fmiEPlusSetReal")
     ! Function called to set real values to FMU inputs
-    USE ISO_C_BINDING, ONLY: C_INT, C_DOUBLE, C_PTR, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*)      :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                       :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_DOUBLE, C_PTR
     TYPE (C_PTR)                              :: fmiComponent                ! Pointer to FMU instance
     INTEGER(kind=C_INT) , DIMENSION(*)        :: valRef                      ! Parameter fmiValueReference
     REAL (kind=C_DOUBLE), DIMENSION(*)        :: fmuVariableValue            ! FMU input variables
     INTEGER(kind=C_INT)                       :: numInputs                   ! Number of input variables
-    CHARACTER(kind=C_CHAR), DIMENSION(*)      :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                       :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                       :: index                       ! Index of the FMU 
     END FUNCTION fmiSetReal
     END INTERFACE
 
     INTERFACE
-    INTEGER FUNCTION fmiDoStep(fmuWorkingFolder_wLib, sizefmuWorkingFolder_wLib, fmiComponent, &
-    curCommPoint, commStepSize, newStep, modelID, sizemodelID) BIND (C, NAME="fmiEPlusDoStep")
+    INTEGER FUNCTION fmiDoStep(fmiComponent, &
+    curCommPoint, commStepSize, newStep, index) BIND (C, NAME="fmiEPlusDoStep")
     !  Function called to do one step of the co-simulation
-    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE, C_CHAR
-    CHARACTER(kind=C_CHAR), DIMENSION(*)       :: fmuWorkingFolder_wLib        ! Path to binaries
-    INTEGER(kind=C_INT)                        :: sizefmuWorkingFolder_wLib    ! Size of the fmuWorkingFolder_wLib trimmed
+    USE ISO_C_BINDING, ONLY: C_INT, C_PTR, C_DOUBLE
     TYPE (C_PTR)                               :: fmiComponent               ! Pointer to FMU instance
     REAL(kind=C_DOUBLE)                        :: curCommPoint               ! Current communication point
     REAL(kind=C_DOUBLE)                        :: commStepSize               ! Communication step size
     INTEGER (C_INT)                            :: newStep
-    CHARACTER(kind=C_CHAR), DIMENSION(*)       :: modelID                      ! FMU modelID
-    INTEGER(kind=C_INT)                        :: sizemodelID                  ! Size of the FMU modelID
+    INTEGER(kind=C_INT)                        :: index                        ! Index of the FMU
     END FUNCTION fmiDoStep
     END INTERFACE
 
@@ -2635,6 +2451,7 @@
 
             ! instantiate and initialize the unpack fmus
             CALL InstantiateInitializeFMUImport ()
+
             ! allocate memory for a temporary FMU that will be used at the end of the warmup
             ALLOCATE(FMUTemp(NumFMUObjects))
             DO i =1, NumFMUObjects
@@ -2649,6 +2466,7 @@
                     ALLOCATE(FMUTemp(i)%Instance(j)%fmuOutputVariableActuator(FMU(i)%Instance(j)%NumOutputVariablesActuator))
                 END DO
             END DO
+
             CALL GetSetVariablesAndDoStepFMUImport ()
             tComm = tComm + hStep
             FirstCallWUp = .FALSE.
@@ -2710,12 +2528,11 @@
                 ! Set the values that have been saved in the FMUs-- saveFMUStateVariables ()
                 DO i = 1, NumFMUObjects
                     DO j = 1, FMU(i)%NumInstances
-                        FMU(i)%Instance(j)%fmiStatus = fmiSetReal(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                        FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
+                        FMU(i)%Instance(j)%fmiStatus = fmiSetReal(FMU(i)%Instance(j)%fmiComponent, &
                         FMU(i)%Instance(j)%fmuInputVariable%ValueReference, &
                         FMUTemp(i)%Instance(j)%eplusOutputVariable%RTSValue, &
                         FMUTemp(i)%Instance(j)%NumInputVariablesInIDF, &
-                        FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                        FMU(i)%Instance(j)%Index)
                         IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                             CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying '// &
                             'to set an input value in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2755,12 +2572,11 @@
             ! Set the values that have been saved in the FMUs-- saveFMUStateVariables ()
             DO i = 1, NumFMUObjects
                 DO j = 1, FMU(i)%NumInstances
-                    FMU(i)%Instance(j)%fmiStatus = fmiSetReal(FMU(i)%Instance(j)%WorkingFolder_wLib, &
-                    FMU(i)%Instance(j)%LenWorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
+                    FMU(i)%Instance(j)%fmiStatus = fmiSetReal(FMU(i)%Instance(j)%fmiComponent, &
                     FMUTemp(i)%Instance(j)%fmuInputVariable%ValueReference, &
                     FMUTemp(i)%Instance(j)%eplusOutputVariable%RTSValue, &
                     FMUTemp(i)%Instance(j)%NumInputVariablesInIDF, &
-                    FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%LenModelID)
+                    FMU(i)%Instance(j)%Index)
 
                     IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
                         CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: ')

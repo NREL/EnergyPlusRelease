@@ -4119,11 +4119,11 @@ SUBROUTINE InitializeZoneSizingTable
     INTEGER :: result
 
     result = SQLiteExecuteCommandMacro('CREATE TABLE ZoneSizes (ZoneName TEXT, LoadType TEXT, ' &
-        //'DesLoad REAL, CalcDesFlow REAL, UserDesFlow REAL, DesDayName TEXT, PeakHrMin TEXT, ' &
+        //'CalcDesLoad REAL, UserDesLoad REAL, CalcDesFlow REAL, UserDesFlow REAL, DesDayName TEXT, PeakHrMin TEXT, ' &
         //'PeakTemp REAL, PeakHumRat REAL, CalcOutsideAirFlow REAL' &
         //');')
 
-    result = SQLitePrepareStatementMacro(ZoneSizingInsertStmt, 'INSERT INTO ZoneSizes VALUES(?,?,?,?,?,?,?,?,?,?);')
+    result = SQLitePrepareStatementMacro(ZoneSizingInsertStmt, 'INSERT INTO ZoneSizes VALUES(?,?,?,?,?,?,?,?,?,?,?);')
 
 END SUBROUTINE InitializeZoneSizingTable
 

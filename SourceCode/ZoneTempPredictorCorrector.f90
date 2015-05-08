@@ -163,8 +163,6 @@ INTEGER :: NumDualFangerHeatCoolControls   =0
 ! Number of zone with staged controlled objects
 INTEGER :: NumStageCtrZone                 =0
 
-LOGICAL :: GetZoneAirInputFlag = .TRUE.  ! True when need to get input
-
 REAL(r64),DIMENSION(:),ALLOCATABLE  :: ZoneSetPointLast
 REAL(r64),DIMENSION(:),ALLOCATABLE  :: TempIndZnLd
 REAL(r64),DIMENSION(:),ALLOCATABLE  :: TempDepZnLd
@@ -248,9 +246,9 @@ SUBROUTINE ManageZoneAirUpdates(UpdateType, ZoneTempChange, ShortenTimeStepSys, 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 !unused1208  INTEGER :: zoneloop
 
-  IF (GetZoneAirInputFlag) THEN
+  IF (GetZoneAirStatsInputFlag) THEN
     CALL GetZoneAirSetpoints
-    GetZoneAirInputFlag = .FALSE.
+    GetZoneAirStatsInputFlag = .FALSE.
   END IF
 
   CALL InitZoneAirSetpoints
@@ -5543,9 +5541,9 @@ FUNCTION VerifyThermostatInZone(ZoneName) RESULT (HasThermostat)
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
           ! na
 
-  IF (GetZoneAirInputFlag) THEN
+  IF (GetZoneAirStatsInputFlag) THEN
     CALL GetZoneAirSetpoints
-    GetZoneAirInputFlag = .FALSE.
+    GetZoneAirStatsInputFlag = .FALSE.
   END IF
   IF (NumTempControlledZones > 0) THEN
     IF (FindItemInList(ZoneName,TempControlledZone%ZoneName,NumTempControlledZones) > 0) THEN

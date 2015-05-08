@@ -453,6 +453,8 @@ SUBROUTINE SimCentralGroundSourceHeatPump(WrapperName,EquipFlowCtrl, CompIndex,L
                                WrapperReport(WrapperNum)%GLHEmdot, FirstIteration)
 
       ! Use the first chiller heater's evaporator capacity ratio to determine dominant load
+    SimulClgDominant = .FALSE.
+    SimulHtgDominant = .FALSE.  
     IF (Wrapper(WrapperNum)%WrapperCoolingLoad > 0 .AND. Wrapper(WrapperNum)%WrapperHeatingLoad > 0) THEN
       SimulLoadRatio = Wrapper(WrapperNum)%WrapperCoolingLoad / Wrapper(WrapperNum)%WrapperHeatingLoad
       IF (SimulLoadRatio > Wrapper(WrapperNum)%Chillerheater(1)%ClgHtgToCoolingCapRatio) THEN
@@ -3629,10 +3631,6 @@ SUBROUTINE CalcWrapperModel(WrapperNum,MyLoad,Runflag,FirstIteration,EquipFlowCt
           ELSE
             HWOutletTemp = HWInletTemp
           END IF
-
-!        IF (HWOutletTemp > 61) THEN
-!           a=1
-!         End IF
 
           ! Calculate condenser outlet temperature
           IF(GLHEInletMassFlowRate > 0.d0) THEN

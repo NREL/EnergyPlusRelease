@@ -264,6 +264,7 @@ REAL(r64)        :: timeInYear      =0.0d0
 
 ! Flags for predefined tabular reports
 LOGICAL   ::    displayTabularBEPS =.false.
+LOGICAL   ::    displayLEEDSummary =.false.
 LOGICAL   ::    displayTabularCompCosts =.false. !added BTG 5/6/04 for component cost summary
 LOGICAL   ::    displayTabularVeriSum = .false.  !added JG 2006-06-28 for input verification and summary report
 LOGICAL   ::    displayComponentSizing = .false.
@@ -1810,6 +1811,10 @@ IF (NumTabularPredefined .EQ. 1) THEN
       displayZoneComponentLoadSummary = .TRUE.
       WriteTabularFiles=.true.
       nameFound=.true.
+    ELSEIF (SameString(AlphArray(iReport),'LEEDSummary')) then
+      displayLEEDSummary = .TRUE.
+      WriteTabularFiles=.true.
+      nameFound=.true.
     ELSEIF (SameString(AlphArray(iReport),'EnergyMeters')) then
       WriteTabularFiles=.true.
       nameFound=.true.
@@ -1926,7 +1931,7 @@ IF (ErrorsFound) THEN
   CALL ShowFatalError(CurrentModuleObject//': Preceding errors cause termination.')
 ENDIF
 ! if the BEPS report has been called for than initialize its arrays
-IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSummary) THEN
+IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSummary .or. displayLEEDSummary) THEN
 ! initialize the resource type names
   resourceTypeNames(1)  = 'Electricity'
   resourceTypeNames(2)  = 'Gas'
@@ -4093,7 +4098,7 @@ REAL(r64), external :: GetCurrentMeterValue
 
 ! if no beps report is called then skip
 
-IF ((displayTabularBEPS) .AND. (IndexTypeKey .EQ. stepTypeZone)) THEN
+IF ((displayTabularBEPS .or. displayLEEDSummary) .AND. (IndexTypeKey .EQ. stepTypeZone)) THEN
   ! add the current time to the total elapsed time
   !FOLLOWING LINE MOVED TO UPDATETABULARREPORTS because used even when beps is not called
   !gatherElapsedTimeBEPS = gatherElapsedTimeBEPS + TimeStepZone
@@ -6942,15 +6947,17 @@ REAL(r64)                                      :: leedSiteMisc = 0.0d0
 REAL(r64)                                      :: leedSiteTotal = 0.0d0
 REAL(r64)                                      :: unconvert
 
-IF (displayTabularBEPS) THEN
+IF (displayTabularBEPS .or. displayLEEDSummary) THEN
   ! show the headers of the report
-  CALL WriteReportHeaders('Annual Building Utility Performance Summary','Entire Facility',isAverage)
-  ! show the number of hours that the table applies to
-  CALL writeTextLine('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours',.TRUE.)
-  IF (gatherElapsedTimeBEPS .LT. 8759.0d0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
-    CALL writeTextLine('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.',.TRUE.)
-  END IF
-  CALL writeTextLine('',.TRUE.)
+  IF (displayTabularBEPS) THEN
+    CALL WriteReportHeaders('Annual Building Utility Performance Summary','Entire Facility',isAverage)
+    ! show the number of hours that the table applies to
+    CALL writeTextLine('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours',.TRUE.)
+    IF (gatherElapsedTimeBEPS .LT. 8759.0d0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
+      CALL writeTextLine('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.',.TRUE.)
+    END IF
+    CALL writeTextLine('',.TRUE.)
+  ENDIF
   ! determine building floor areas
   CALL DetermineBuildingFloorArea
   ! collapse the gatherEndUseBEPS array to the resource groups displayed
@@ -7320,12 +7327,14 @@ IF (displayTabularBEPS) THEN
   END IF
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('Site and Source Energy')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Site and Source Energy')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Site and Source Energy')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -7470,12 +7479,14 @@ IF (displayTabularBEPS) THEN
   END IF
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('Site to Source Energy Conversion Factors')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Site to Source Energy Conversion Factors')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Site to Source Energy Conversion Factors')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -7511,12 +7522,14 @@ IF (displayTabularBEPS) THEN
   tableBody(3,1)  = TRIM(RealToStr(convBldgGrossFloorArea - convBldgCondFloorArea,2))
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('Building Area')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Building Area')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Building Area')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -7833,12 +7846,14 @@ IF (displayTabularBEPS) THEN
       CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','District Heat')
   END SELECT
   ! heading for the entire sub-table
-  CALL writeSubtitle('End Uses')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.FALSE., footnote)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('End Uses')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.FALSE., footnote)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'End Uses')
+  ENDIF
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
   DEALLOCATE(columnWidth)
@@ -7966,12 +7981,14 @@ IF (displayTabularBEPS) THEN
   END DO
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('End Uses By Subcategory')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('End Uses By Subcategory')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'End Uses By Subcategory')
+  ENDIF
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
   DEALLOCATE(columnWidth)
@@ -8053,12 +8070,14 @@ IF (displayTabularBEPS) THEN
     END DO
   END IF
   ! heading for the entire sub-table
-  CALL writeSubtitle('Utility Use Per Conditioned Floor Area')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Utility Use Per Conditioned Floor Area')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Utility Use Per Conditioned Floor Area')
+  ENDIF
   !
   !---- Normalized by Total Area Sub-Table
   !
@@ -8071,12 +8090,14 @@ IF (displayTabularBEPS) THEN
     END DO
   END IF
   ! heading for the entire sub-table
-  CALL writeSubtitle('Utility Use Per Total Floor Area')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Utility Use Per Total Floor Area')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Utility Use Per Total Floor Area')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -8151,12 +8172,14 @@ IF (displayTabularBEPS) THEN
   END IF
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('Electric Loads Satisfied')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Electric Loads Satisfied')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Electric Loads Satisfied')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -8230,12 +8253,14 @@ IF (displayTabularBEPS) THEN
   END IF
 
   ! heading for the entire sub-table
-  CALL writeSubtitle('On-Site Thermal Sources')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('On-Site Thermal Sources')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'On-Site Thermal Sources')
+  ENDIF
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -8334,12 +8359,14 @@ IF (displayTabularBEPS) THEN
 !
 
 !  ! heading for the entire sub-table
-  CALL writeSubtitle('Water Source Summary')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Water Source Summary')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Water Source Summary')
+  ENDIF
 
 !
   DEALLOCATE(columnHead)
@@ -8350,42 +8377,44 @@ IF (displayTabularBEPS) THEN
   !
   !---- Comfort and Setpoint Not Met Sub-Table
   !
-  ALLOCATE(rowHead(2))
-  ALLOCATE(columnHead(1))
-  ALLOCATE(columnWidth(1))
-  columnWidth = 14 !array assignment - same for all columns
-  ALLOCATE(tableBody(2,1))
+  IF (displayTabularBEPS) THEN
+    ALLOCATE(rowHead(2))
+    ALLOCATE(columnHead(1))
+    ALLOCATE(columnWidth(1))
+    columnWidth = 14 !array assignment - same for all columns
+    ALLOCATE(tableBody(2,1))
 
-  CALL writeSubtitle('Setpoint Not Met Criteria')
+    CALL writeSubtitle('Setpoint Not Met Criteria')
 
-  curNameWithSIUnits = 'Degrees [deltaC]'
-  curNameAndUnits = curNameWithSIUnits
-  IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-    CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+    curNameWithSIUnits = 'Degrees [deltaC]'
+    curNameAndUnits = curNameWithSIUnits
+    IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+      CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+    ENDIF
+    columnHead(1)=curNameAndUnits
+
+    rowHead(1)  = 'Tolerance for Zone Heating Setpoint Not Met Time'
+    rowHead(2)  = 'Tolerance for Zone Cooling Setpoint Not Met Time'
+
+    IF (unitsStyle .NE. unitsStyleInchPound) THEN
+      tableBody(1,1)  = TRIM(RealToStr(abs(deviationFromSetPtThresholdHtg),2))
+      tableBody(2,1)  = TRIM(RealToStr(deviationFromSetPtThresholdClg,2))
+    ELSE
+      tableBody(1,1)  = TRIM(RealToStr(ConvertIPDelta(indexUnitConv,abs(deviationFromSetPtThresholdHtg)),2))
+      tableBody(2,1)  = TRIM(RealToStr(ConvertIPDelta(indexUnitConv,deviationFromSetPtThresholdClg),2))
+    ENDIF
+
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                        'AnnualBuildingUtilityPerformanceSummary',&
+                                        'Entire Facility',&
+                                        'Setpoint Not Met Criteria')
+
+    DEALLOCATE(columnHead)
+    DEALLOCATE(rowHead)
+    DEALLOCATE(columnWidth)
+    DEALLOCATE(tableBody)
   ENDIF
-  columnHead(1)=curNameAndUnits
-
-  rowHead(1)  = 'Tolerance for Zone Heating Setpoint Not Met Time'
-  rowHead(2)  = 'Tolerance for Zone Cooling Setpoint Not Met Time'
-
-  IF (unitsStyle .NE. unitsStyleInchPound) THEN
-    tableBody(1,1)  = TRIM(RealToStr(abs(deviationFromSetPtThresholdHtg),2))
-    tableBody(2,1)  = TRIM(RealToStr(deviationFromSetPtThresholdClg,2))
-  ELSE
-    tableBody(1,1)  = TRIM(RealToStr(ConvertIPDelta(indexUnitConv,abs(deviationFromSetPtThresholdHtg)),2))
-    tableBody(2,1)  = TRIM(RealToStr(ConvertIPDelta(indexUnitConv,deviationFromSetPtThresholdClg),2))
-  ENDIF
-
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
-                                      'AnnualBuildingUtilityPerformanceSummary',&
-                                      'Entire Facility',&
-                                      'Setpoint Not Met Criteria')
-
-  DEALLOCATE(columnHead)
-  DEALLOCATE(rowHead)
-  DEALLOCATE(columnWidth)
-  DEALLOCATE(tableBody)
 
   ALLOCATE(rowHead(3))
   ALLOCATE(columnHead(1))
@@ -8393,7 +8422,9 @@ IF (displayTabularBEPS) THEN
   columnWidth = 14 !array assignment - same for all columns
   ALLOCATE(tableBody(3,1))
 
-  CALL writeSubtitle('Comfort and Setpoint Not Met Summary')
+  IF (displayTabularBEPS) THEN
+    CALL writeSubtitle('Comfort and Setpoint Not Met Summary')
+  ENDIF
 
   columnHead(1) = 'Facility [Hours]'
 
@@ -8410,11 +8441,13 @@ IF (displayTabularBEPS) THEN
   CALL PreDefTableEntry(pdchLeedAmData,'Number of hours not met',TRIM(RealToStr(TotalNotMetOccupiedForABUPS,2)))
   tableBody(3,1)  = TRIM(RealToStr(TotalTimeNotSimpleASH55EitherForABUPS,2))
 
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
-  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+  IF (displayTabularBEPS) THEN
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
                                       'Comfort and Setpoint Not Met Summary')
+  ENDIF
 
 
   DEALLOCATE(columnHead)
@@ -8430,7 +8463,9 @@ IF (displayTabularBEPS) THEN
   !
   !---- End Notes
   !
-  CALL writeTextLine('Note 1: An asterisk (*) indicates that the feature is not yet implemented.')
+  IF (displayTabularBEPS) THEN
+    CALL writeTextLine('Note 1: An asterisk (*) indicates that the feature is not yet implemented.')
+  ENDIF
   !CALL writeTextLine('Note 2: The source energy conversion factors used are: ')
   !CALL writeTextLine('        1.05 for all fuels, 1 for district, and 3 for electricity.')
 END IF
@@ -12322,7 +12357,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
 
     !Peak Design Sensible Load
     tableBody(8,1) = TRIM(RealToStr((CalcFinalZoneSizing(iZone)%DesCoolLoad / mult) * powerConversion,2))
-    
+
     !Estimated Instant + Delayed Sensible Load
     tableBody(9,1) = TRIM(RealToStr(grandTotalRow(cSensInst) + grandTotalRow(cSensDelay),2))
 

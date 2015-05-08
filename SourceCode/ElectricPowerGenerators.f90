@@ -2027,13 +2027,17 @@ If (myonetimeflag) then
        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     ENDIF
-
-    MicroCHP(GeneratorNum)%ZoneName     = AlphArray(3) !  A3 Zone Name
-    MicroCHP(GeneratorNum)%ZoneID   = FindItemInList(MicroCHP(GeneratorNum)%ZoneName, Zone%Name, NumOfZones)
-    IF (MicroCHP(GeneratorNum)%ZoneID == 0 ) THEN
-       CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-       ErrorsFound = .true.
+ 
+    IF (.NOT. lAlphaFieldBlanks(3) ) THEN
+      MicroCHP(GeneratorNum)%ZoneName     = AlphArray(3) !  A3 Zone Name
+      MicroCHP(GeneratorNum)%ZoneID   = FindItemInList(MicroCHP(GeneratorNum)%ZoneName, Zone%Name, NumOfZones)
+      IF (MicroCHP(GeneratorNum)%ZoneID == 0 ) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        ErrorsFound = .true.
+      ENDIF
+    ELSE
+      MicroCHP(GeneratorNum)%ZoneID  =  0
     ENDIF
     MicroCHP(GeneratorNum)%PlantInletNodeName  = AlphArray(4)  !  A4 Cooling Water Inlet Node Name
     MicroCHP(GeneratorNum)%PlantOutletNodeName = AlphArray(5) !  A5 Cooling Water Outlet Node Name
@@ -2165,12 +2169,14 @@ If (myonetimeflag) then
      CALL SetupOutputVariable('Generator Zone Radiation Heat Transfer Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossRadiat, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
-     CALL SetupZoneInternalGain(MicroCHP(GeneratorNum)%ZoneID, &
+     IF (MicroCHP(GeneratorNum)%ZoneID > 0) THEN
+       CALL SetupZoneInternalGain(MicroCHP(GeneratorNum)%ZoneID, &
                    'Generator:MicroCHP',  &
                    MicroCHP(GeneratorNum)%Name, &
                    IntGainTypeOf_GeneratorMicroCHP,    &
                    ConvectionGainRate    = MicroCHP(GeneratorNum)%Report%SkinLossConvect, &
                    ThermalRadiationGainRate = MicroCHP(GeneratorNum)%Report%SkinLossRadiat)
+     ENDIF
 
   END DO
 
@@ -2434,6 +2440,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
   USE DataPlant,       ONLY: PlantLoop
   USE PlantUtilities,  ONLY: SetComponentFlowRate
+  USE DataEnvironment, ONLY: OutDryBulbTemp
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2487,6 +2494,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   REAL(r64)    :: Teng    = 0.0d0
   REAL(r64)    :: ThermEff = 0.0d0
   REAL(r64)    :: Cp = 0.d0 ! local fluid specific heat
+  REAL(r64)    :: thisAmbientTemp = 0.d0
 
   LOGICAL :: EnergyBalOK ! check for balance to exit loop
 
@@ -2503,6 +2511,11 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   Tcwout =  MicroCHP(GeneratorNum)%A42Model%Tcwout
   dt = TimeStepSys *  SecInHour
 
+  IF (MicroCHP(GeneratorNum)%ZoneID > 0) THEN
+    thisAmbientTemp = MAT(MicroCHP(GeneratorNum)%ZoneID)
+  ELSE ! outdoor location, no zone
+    thisAmbientTemp = OutDryBulbTemp
+  ENDIF
 
   Select CASE (CurrentOpMode)
 
@@ -2633,34 +2646,35 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
       MdotFuelMax = NdotFuel * FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
 
-      If (Teng > MAT(MicroCHP(GeneratorNum)%ZoneID) ) Then
+      If (Teng > thisAmbientTemp ) Then
         MdotFuelWarmup = MdotFuelMax + MicroCHP(GeneratorNum)%A42Model%kf *  MdotFuelMax *  &
-                           (  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) &
-                            / (Teng -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) )
-         ! check that numerical answer didn't blow up beyond limit, and reset if it did
+                            (  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  thisAmbientTemp ) &
+                            / (Teng -  thisAmbientTemp ) )
+          ! check that numerical answer didn't blow up beyond limit, and reset if it did
         IF (MdotFuelWarmup > MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax) THEN
-             MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
+              MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
         ENDIF
-      ELSEIF (Teng < MAT(MicroCHP(GeneratorNum)%ZoneID))  Then
+      ELSEIF (Teng < thisAmbientTemp)  Then
         MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
       ELSE ! equal would divide by zero
         MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
       ENDIF
 
-      If (MicroCHP(GeneratorNum)%A42Model%TnomEngOp > MAT(MicroCHP(GeneratorNum)%ZoneID) ) Then
+      If (MicroCHP(GeneratorNum)%A42Model%TnomEngOp > thisAmbientTemp ) Then
         Pnetss = Pmax * MicroCHP(GeneratorNum)%A42Model%kp *  &
-                          ( (Teng -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) &
-                           /  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) )
-      ELSEIF (MicroCHP(GeneratorNum)%A42Model%TnomEngOp < MAT(MicroCHP(GeneratorNum)%ZoneID))  Then
+                          ( (Teng -  thisAmbientTemp ) &
+                            /  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  thisAmbientTemp ) )
+      ELSEIF (MicroCHP(GeneratorNum)%A42Model%TnomEngOp < thisAmbientTemp)  Then
         Pnetss = Pmax
       ELSE ! equal would divide by zero
         Pnetss = Pmax
       ENDIF
 
-      If ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp < MAT(MicroCHP(GeneratorNum)%ZoneID)) then
-         !this case where zone is super hot and more than engine op. temp.
-         !  never going to get here because E+ zones don't like to be over 50C. (and no cogen devices should operate below 50C)
-      ENDIF
+      !If ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp < thisAmbientTemp) then
+      !    !this case where zone is super hot and more than engine op. temp.
+      !    !  never going to get here because E+ zones don't like to be over 50C. (and no cogen devices should operate below 50C)
+      !ENDIF
+
 
       MdotFuel = MdotFuelWarmup
       NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
@@ -2772,26 +2786,26 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
       MdotFuelMax = NdotFuel * FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
 
-      IF (Teng > MAT(MicroCHP(GeneratorNum)%ZoneID) ) Then
+      IF (Teng > thisAmbientTemp ) Then
         MdotFuelWarmup = MdotFuelMax + MicroCHP(GeneratorNum)%A42Model%kf *  MdotFuelMax *  &
-                           (  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) &
-                            / (Teng -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) )
+                           (  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  thisAmbientTemp ) &
+                            / (Teng - thisAmbientTemp ) )
 
          ! check that numerical answer didn't blow up beyond limit, and reset if it did
         IF (MdotFuelWarmup > MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax) THEN
              MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
         ENDIF
-        If (MicroCHP(GeneratorNum)%A42Model%TnomEngOp > MAT(MicroCHP(GeneratorNum)%ZoneID) ) Then
+        If (MicroCHP(GeneratorNum)%A42Model%TnomEngOp > thisAmbientTemp ) Then
           Pnetss = Pmax * MicroCHP(GeneratorNum)%A42Model%kp *  &
-                          ( (Teng -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) &
-                           /  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  MAT(MicroCHP(GeneratorNum)%ZoneID) ) )
-        ELSEIF (MicroCHP(GeneratorNum)%A42Model%TnomEngOp < MAT(MicroCHP(GeneratorNum)%ZoneID))  Then
+                          ( (Teng -  thisAmbientTemp ) &
+                           /  ( MicroCHP(GeneratorNum)%A42Model%TnomEngOp -  thisAmbientTemp ) )
+        ELSEIF (MicroCHP(GeneratorNum)%A42Model%TnomEngOp < thisAmbientTemp)  Then
           Pnetss = Pmax
         ELSE ! equal would divide by zero
           Pnetss = Pmax
         ENDIF
 
-      ELSEIF (Teng < MAT(MicroCHP(GeneratorNum)%ZoneID))  Then
+      ELSEIF (Teng < thisAmbientTemp)  Then
         MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
       ELSE ! equal would divide by zero
         MdotFuelWarmup = MicroCHP(GeneratorNum)%A42Model%Rfuelwarmup * MdotFuelMax
@@ -2807,7 +2821,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     ENDIF
 
     Teng = FuncDetermineEngineTemp(Tcwout, MicroCHP(GeneratorNum)%A42Model%MCeng, MicroCHP(GeneratorNum)%A42Model%UAhx,&
-                              MicroCHP(GeneratorNum)%A42Model%UAskin, MAT(MicroCHP(GeneratorNum)%ZoneID), Qgenss, &
+                              MicroCHP(GeneratorNum)%A42Model%UAskin, thisAmbientTemp, Qgenss, &
                               MicroCHP(GeneratorNum)%A42Model%TengLast, dt )
 
     Cp     = GetSpecificHeatGlycol(PlantLoop(MicroCHP(GeneratorNum)%CWLoopNum)%FluidName, &
@@ -2820,7 +2834,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
 
      ! form balance and exit once met.
     EnergyBalOK = CheckMicroCHPThermalBalance(MicroCHP(GeneratorNum)%A42Model%MaxElecPower, Tcwin, Tcwout, Teng,  &
-                              MAT(MicroCHP(GeneratorNum)%ZoneID), MicroCHP(GeneratorNum)%A42Model%UAhx, &
+                              thisAmbientTemp, MicroCHP(GeneratorNum)%A42Model%UAhx, &
                               MicroCHP(GeneratorNum)%A42Model%UAskin, Qgenss, MicroCHP(GeneratorNum)%A42Model%MCeng, &
                               MicroCHP(GeneratorNum)%A42Model%MCcw , Mdotcw * Cp  )
 
@@ -2840,7 +2854,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   MicroCHP(GeneratorNum)%A42Model%Tcwout    = Tcwout
   MicroCHP(GeneratorNum)%A42Model%Tcwin     = Tcwin
   MicroCHP(GeneratorNum)%A42Model%MdotAir   = MdotAir
-  MicroCHP(GeneratorNum)%A42Model%QdotSkin  = MicroCHP(GeneratorNum)%A42Model%UAskin*(Teng - MAT(MicroCHP(GeneratorNum)%ZoneID))
+  MicroCHP(GeneratorNum)%A42Model%QdotSkin  = MicroCHP(GeneratorNum)%A42Model%UAskin*(Teng - thisAmbientTemp)
 
   MicroCHP(GeneratorNum)%A42Model%OpMode = CurrentOpMode
 

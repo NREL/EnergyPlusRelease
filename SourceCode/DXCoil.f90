@@ -7112,7 +7112,8 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
                                   'Design Size Rated Low Speed Air Flow Rate [m3/s]', RatedAirVolFlowRate2Des, &
                                   'User-Specified Rated Low Speed Air Flow Rate [m3/s]', RatedAirVolFlowRate2User)
             IF (DisplayExtraWarnings) THEN
-              IF ((ABS(RatedAirVolFlowRate2Des - RatedAirVolFlowRate2User)/RatedAirVolFlowRate2User) > AutoVsHardSizingThreshold) THEN
+              IF ((ABS(RatedAirVolFlowRate2Des - RatedAirVolFlowRate2User)/RatedAirVolFlowRate2User) >   &
+                      AutoVsHardSizingThreshold) THEN
                 CALL ShowMessage('SizeDxCoil: Potential issue with equipment sizing for ' &
                                       //TRIM(DXCoil(DXCoilNum)%DXCoilType)//' '//TRIM(DXCoil(DXCoilNum)%Name))
                 CALL ShowContinueError('User-Specified Rated Low Speed Air Flow Rate of '// &

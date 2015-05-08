@@ -51,7 +51,7 @@ PRIVATE
 
           ! MODULE VARIABLE DECLARATIONS:
 
-LOGICAL :: GetZoneAirInputFlag = .TRUE.  ! True when need to get input
+LOGICAL :: GetZoneAirContamInputFlag = .TRUE.  ! True when need to get input
 INTEGER :: TotGCGenConstant    = 0       ! Number of constant generic contaminant sources and sinks
 INTEGER :: TotGCGenPDriven     = 0       ! Number of pressure driven generic contaminant sources and sinks
 INTEGER :: TotGCGenCutoff      = 0       ! Number of cutoff model generic contaminant sources and sinks
@@ -119,10 +119,10 @@ SUBROUTINE ManageZoneContaminanUpdates(UpdateType, ShortenTimeStepSys,   &
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 !unused1208  INTEGER :: zoneloop
 
-  IF (GetZoneAirInputFlag) THEN
+  IF (GetZoneAirContamInputFlag) THEN
     If (Contaminant%GenericContamSimulation) CALL GetZoneContaminanInputs
     CALL GetZoneContaminanSetpoints
-    GetZoneAirInputFlag = .FALSE.
+    GetZoneAirContamInputFlag = .FALSE.
   END IF
 
   IF (.NOT. Contaminant%SimulateContaminants) Return

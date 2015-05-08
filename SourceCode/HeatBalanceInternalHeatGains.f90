@@ -628,221 +628,224 @@ SUBROUTINE GetInternalHeatGainsInput
 
           END DO
 
-          ! Set the default value of MRTCalcType as 'ZoneAveraged'
-          People(Loop)%MRTCalcType = ZoneAveraged
+          IF (UsingThermalComfort) THEN
 
-          ! MRT Calculation Type and Surface Name
-          SELECT CASE (AlphaName(7))
+            ! Set the default value of MRTCalcType as 'ZoneAveraged'
+            People(Loop)%MRTCalcType = ZoneAveraged
 
-              CASE ('ZONEAVERAGED')
-                People(Loop)%MRTCalcType = ZoneAveraged
+            ! MRT Calculation Type and Surface Name
+            SELECT CASE (AlphaName(7))
 
-              CASE ('SURFACEWEIGHTED')
-                People(Loop)%MRTCalcType = SurfaceWeighted
-                People(Loop)%SurfacePtr = FindIteminList(AlphaName(8),Surface%Name,TotSurfaces)
-                IF (People(Loop)%SurfacePtr == 0) THEN
-                  IF (Item1 == 1) THEN
+                CASE ('ZONEAVERAGED')
+                  People(Loop)%MRTCalcType = ZoneAveraged
+
+                CASE ('SURFACEWEIGHTED')
+                  People(Loop)%MRTCalcType = SurfaceWeighted
+                  People(Loop)%SurfacePtr = FindIteminList(AlphaName(8),Surface%Name,TotSurfaces)
+                  IF (People(Loop)%SurfacePtr == 0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                     '", '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(7))//  &
+                                     ' invalid Surface Name='//TRIM(AlphaName(8)))
+                      ErrorsFound=.true.
+                    ENDIF
+                  ELSEIF (Surface(People(Loop)%SurfacePtr)%Zone /= People(Loop)%ZonePtr) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                   '", '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(7))//  &
-                                   ' invalid Surface Name='//TRIM(AlphaName(8)))
+                                   '", Surface referenced in '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(8))//  &
+                                   ' in different zone.')
+                    CALL ShowContinueError('Surface is in Zone='//TRIM(Zone(Surface(People(Loop)%SurfacePtr)%Zone)%Name)// &
+                                     ' and '//TRIM(CurrentModuleObject)//' is in Zone='//TRIM(AlphaName(2)))
                     ErrorsFound=.true.
                   ENDIF
-                ELSEIF (Surface(People(Loop)%SurfacePtr)%Zone /= People(Loop)%ZonePtr) THEN
+
+                CASE ('ANGLEFACTOR')
+                  People(Loop)%MRTCalcType = AngleFactor
+                  People(Loop)%AngleFactorListName = AlphaName(8)
+
+                CASE (Blank) ! Blank input field--just ignore this
+                    IF (MustInpSch .and. Item1 == 1)   &
+                       CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                   '", blank '//TRIM(cAlphaFieldNames(7)))
+
+                CASE DEFAULT ! An invalid keyword was entered--warn but ignore
+                    IF (MustInpSch .and. Item1 == 1)  THEN
+                      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                  '", invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(7)))
+                      CALL ShowContinueError('...Valid values are "ZoneAveraged", "SurfaceWeighted", "AngleFactor".')
+                    ENDIF
+            END SELECT
+
+            IF (.not. lAlphaFieldBlanks(9)) THEN
+              People(Loop)%WorkEffPtr  = GetScheduleIndex(AlphaName(9))
+              IF (People(Loop)%WorkEffPtr == 0) THEN
+                IF (Item1 == 1) THEN
                   CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                 '", Surface referenced in '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(8))//  &
-                                 ' in different zone.')
-                  CALL ShowContinueError('Surface is in Zone='//TRIM(Zone(Surface(People(Loop)%SurfacePtr)%Zone)%Name)// &
-                                   ' and '//TRIM(CurrentModuleObject)//' is in Zone='//TRIM(AlphaName(2)))
+                                       '", invalid '//TRIM(cAlphaFieldNames(9))//' entered='//TRIM(AlphaName(9)))
                   ErrorsFound=.true.
                 ENDIF
-
-              CASE ('ANGLEFACTOR')
-                People(Loop)%MRTCalcType = AngleFactor
-                People(Loop)%AngleFactorListName = AlphaName(8)
-
-              CASE (Blank) ! Blank input field--just ignore this
-                  IF (MustInpSch .and. Item1 == 1)   &
-                     CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                 '", blank '//TRIM(cAlphaFieldNames(7)))
-
-              CASE DEFAULT ! An invalid keyword was entered--warn but ignore
-                  IF (MustInpSch .and. Item1 == 1)  THEN
+              ELSE  ! check min/max on schedule
+                SchMin=GetScheduleMinValue(People(Loop)%WorkEffPtr)
+                SchMax=GetScheduleMaxValue(People(Loop)%WorkEffPtr)
+                IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                  IF (SchMin < 0.0d0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                         '", '//TRIM(cAlphaFieldNames(9))//', minimum is < 0.0')
+                      CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//  &
+                                         '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
+                      ErrorsFound=.true.
+                    ENDIF
+                  ENDIF
+                  IF (SchMax < 0.0d0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                         '", '//TRIM(cAlphaFieldNames(9))//', maximum is < 0.0')
+                      CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//  &
+                                         '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
+                      ErrorsFound=.true.
+                    ENDIF
+                  ENDIF
+                ENDIF
+                IF (SchMax > 1.0d0) THEN
+                  IF (Item1 == 1) THEN
                     CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                '", invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphaName(7)))
-                    CALL ShowContinueError('...Valid values are "ZoneAveraged", "SurfaceWeighted", "AngleFactor".')
+                                       '", '//TRIM(cAlphaFieldNames(9))//', maximum is > 1.0')
+                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//'"; '//  &
+                                    'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
+                                     trim(RoundSigDigits(SchMax,1))//'] Work Efficiency.')
                   ENDIF
-          END SELECT
-
-          IF (.not. lAlphaFieldBlanks(9)) THEN
-            People(Loop)%WorkEffPtr  = GetScheduleIndex(AlphaName(9))
-            IF (People(Loop)%WorkEffPtr == 0) THEN
+                ENDIF
+              ENDIF
+            ELSEIF (MustInpSch) THEN
               IF (Item1 == 1) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(9))//' entered='//TRIM(AlphaName(9)))
-                ErrorsFound=.true.
-              ENDIF
-            ELSE  ! check min/max on schedule
-              SchMin=GetScheduleMinValue(People(Loop)%WorkEffPtr)
-              SchMax=GetScheduleMaxValue(People(Loop)%WorkEffPtr)
-              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
-                IF (SchMin < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(9))//', minimum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//  &
-                                       '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-                IF (SchMax < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(9))//', maximum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//  &
-                                       '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-              ENDIF
-              IF (SchMax > 1.0d0) THEN
-                IF (Item1 == 1) THEN
-                  CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", '//TRIM(cAlphaFieldNames(9))//', maximum is > 1.0')
-                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//'"; '//  &
-                                  'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
-                                   trim(RoundSigDigits(SchMax,1))//'] Work Efficiency.')
-                ENDIF
-              ENDIF
-            ENDIF
-          ELSEIF (MustInpSch) THEN
-            IF (Item1 == 1) THEN
-              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                   '", blank '//TRIM(cAlphaFieldNames(9))//' is required for this item.')
-              ErrorsFound=.true.
-            ENDIF
-          ENDIF
-
-      IF (.not. lAlphaFieldBlanks(10) .or. AlphaName(10) /= ' ') THEN
-        SELECT CASE (AlphaName(10))
-          CASE('CLOTHINGINSULATIONSCHEDULE')
-            People(Loop)%ClothingType = 1
-            People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
-            IF (People(Loop)%ClothingPtr == 0) THEN
-              IF (Item1 == 1) THEN
-                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
-                ErrorsFound=.true.
-              ENDIF
-            ELSE  ! check min/max on schedule
-              SchMin=GetScheduleMinValue(People(Loop)%ClothingPtr)
-              SchMax=GetScheduleMaxValue(People(Loop)%ClothingPtr)
-              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
-                IF (SchMin < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(12))//', minimum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
-                                       '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-                IF (SchMax < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(12))//', maximum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
-                                       '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-              ENDIF
-              IF (SchMax > 2.0d0) THEN
-                IF (Item1 == 1) THEN
-                  CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", '//TRIM(cAlphaFieldNames(12))//', maximum is > 2.0')
-                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//'"; '//  &
-                                  'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
-                                   trim(RoundSigDigits(SchMax,1))//'] Clothing.')
-                ENDIF
-              ENDIF
-            ENDIF
-
-          CASE('DYNAMICCLOTHINGMODELASHRAE55')
-            People(Loop)%ClothingType = 2
-
-          CASE('CALCULATIONMETHODSCHEDULE')
-            People(Loop)%ClothingType = 3
-            People(Loop)%ClothingMethodPtr  = GetScheduleIndex(AlphaName(11))
-            IF (People(Loop)%ClothingMethodPtr == 0) THEN
-              IF (Item1 == 1) THEN
-                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(11))//' entered='//TRIM(AlphaName(11)))
+                                     '", blank '//TRIM(cAlphaFieldNames(9))//' is required for this item.')
                 ErrorsFound=.true.
               ENDIF
             ENDIF
-            IF (CheckScheduleValue(People(Loop)%ClothingMethodPtr,1)) THEN
-              People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
-              IF (People(Loop)%ClothingPtr == 0) THEN
+
+            IF (.not. lAlphaFieldBlanks(10) .or. AlphaName(10) /= ' ') THEN
+              SELECT CASE (AlphaName(10))
+                CASE('CLOTHINGINSULATIONSCHEDULE')
+                  People(Loop)%ClothingType = 1
+                  People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
+                  IF (People(Loop)%ClothingPtr == 0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                           '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
+                      ErrorsFound=.true.
+                    ENDIF
+                  ELSE  ! check min/max on schedule
+                    SchMin=GetScheduleMinValue(People(Loop)%ClothingPtr)
+                    SchMax=GetScheduleMaxValue(People(Loop)%ClothingPtr)
+                    IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                      IF (SchMin < 0.0d0) THEN
+                        IF (Item1 == 1) THEN
+                          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                             '", '//TRIM(cAlphaFieldNames(12))//', minimum is < 0.0')
+                          CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
+                                             '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
+                          ErrorsFound=.true.
+                        ENDIF
+                      ENDIF
+                      IF (SchMax < 0.0d0) THEN
+                        IF (Item1 == 1) THEN
+                          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                             '", '//TRIM(cAlphaFieldNames(12))//', maximum is < 0.0')
+                          CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
+                                             '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
+                          ErrorsFound=.true.
+                        ENDIF
+                      ENDIF
+                    ENDIF
+                    IF (SchMax > 2.0d0) THEN
+                      IF (Item1 == 1) THEN
+                        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                           '", '//TRIM(cAlphaFieldNames(12))//', maximum is > 2.0')
+                        CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//'"; '//  &
+                                        'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
+                                         trim(RoundSigDigits(SchMax,1))//'] Clothing.')
+                      ENDIF
+                    ENDIF
+                  ENDIF
+
+                CASE('DYNAMICCLOTHINGMODELASHRAE55')
+                  People(Loop)%ClothingType = 2
+
+                CASE('CALCULATIONMETHODSCHEDULE')
+                  People(Loop)%ClothingType = 3
+                  People(Loop)%ClothingMethodPtr  = GetScheduleIndex(AlphaName(11))
+                  IF (People(Loop)%ClothingMethodPtr == 0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                           '", invalid '//TRIM(cAlphaFieldNames(11))//' entered='//TRIM(AlphaName(11)))
+                      ErrorsFound=.true.
+                    ENDIF
+                  ENDIF
+                  IF (CheckScheduleValue(People(Loop)%ClothingMethodPtr,1)) THEN
+                    People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
+                    IF (People(Loop)%ClothingPtr == 0) THEN
+                      IF (Item1 == 1) THEN
+                        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                           '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
+                        ErrorsFound=.true.
+                      ENDIF
+                    ENDIF
+                  ENDIF
+
+                CASE DEFAULT
+                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(People(Loop)%Name)//  &
+                                       '", invalid '//TRIM(cAlphaFieldNames(10))//', value  ='//  &
+                                       TRIM(AlphaName(10)))
+                    CALL ShowContinueError('...Valid values are "ClothingInsulationSchedule",'//   &
+                                           '"DynamicClothingModelASHRAE55a", "CalculationMethodSchedule".')
+                    ErrorsFound=.true.
+              END SELECT
+            ENDIF
+
+            IF (.not. lAlphaFieldBlanks(13)) THEN
+              People(Loop)%AirVelocityPtr  = GetScheduleIndex(AlphaName(13))
+              IF (People(Loop)%AirVelocityPtr == 0) THEN
                 IF (Item1 == 1) THEN
                   CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
+                                       '", invalid '//TRIM(cAlphaFieldNames(13))//' entered='//TRIM(AlphaName(13)))
                   ErrorsFound=.true.
                 ENDIF
+              ELSE  ! check min/max on schedule
+                SchMin=GetScheduleMinValue(People(Loop)%AirVelocityPtr)
+                SchMax=GetScheduleMaxValue(People(Loop)%AirVelocityPtr)
+                IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                  IF (SchMin < 0.0d0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                         '", '//TRIM(cAlphaFieldNames(13))//', minimum is < 0.0')
+                      CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
+                                         '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
+                      ErrorsFound=.true.
+                    ENDIF
+                  ENDIF
+                  IF (SchMax < 0.0d0) THEN
+                    IF (Item1 == 1) THEN
+                      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                         '", '//TRIM(cAlphaFieldNames(13))//', maximum is < 0.0')
+                      CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
+                                         '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
+                      ErrorsFound=.true.
+                    ENDIF
+                  ENDIF
+                ENDIF
               ENDIF
-            ENDIF
-
-          CASE DEFAULT
-              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(People(Loop)%Name)//  &
-                                 '", invalid '//TRIM(cAlphaFieldNames(10))//', value  ='//  &
-                                 TRIM(AlphaName(10)))
-              CALL ShowContinueError('...Valid values are "ClothingInsulationSchedule",'//   &
-                                     '"DynamicClothingModelASHRAE55a", "CalculationMethodSchedule".')
-              ErrorsFound=.true.
-        END SELECT
-      ENDIF
-
-
-          IF (.not. lAlphaFieldBlanks(13)) THEN
-            People(Loop)%AirVelocityPtr  = GetScheduleIndex(AlphaName(13))
-            IF (People(Loop)%AirVelocityPtr == 0) THEN
+            ELSEIF (MustInpSch) THEN
               IF (Item1 == 1) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(13))//' entered='//TRIM(AlphaName(13)))
+                                     '", blank '//TRIM(cAlphaFieldNames(13))//' is required for this item.')
                 ErrorsFound=.true.
               ENDIF
-            ELSE  ! check min/max on schedule
-              SchMin=GetScheduleMinValue(People(Loop)%AirVelocityPtr)
-              SchMax=GetScheduleMaxValue(People(Loop)%AirVelocityPtr)
-              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
-                IF (SchMin < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(13))//', minimum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
-                                       '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-                IF (SchMax < 0.0d0) THEN
-                  IF (Item1 == 1) THEN
-                    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(13))//', maximum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
-                                       '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
-                    ErrorsFound=.true.
-                  ENDIF
-                ENDIF
-              ENDIF
             ENDIF
-          ELSEIF (MustInpSch) THEN
-            IF (Item1 == 1) THEN
-              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                   '", blank '//TRIM(cAlphaFieldNames(13))//' is required for this item.')
-              ErrorsFound=.true.
-            ENDIF
-          ENDIF
 
-        END IF  ! ...end of thermal comfort data IF-THEN block
+          ENDIF ! usingthermalcomfort block
+
+        END IF  ! ...end of thermal comfort data IF-THEN block  (NumAlphas > 6)
 
         IF (People(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 

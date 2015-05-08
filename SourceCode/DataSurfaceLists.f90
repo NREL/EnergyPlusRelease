@@ -94,7 +94,7 @@ SUBROUTINE GetSurfaceListsInputs
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, FindItemInList, GetObjectDefMaxArgs, VerifyName
   USE DataHeatBalance,          ONLY : Zone, Construct
   USE DataGlobals,              ONLY : NumOfZones
-
+  USE General,                  ONLY: RoundSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -224,8 +224,11 @@ SUBROUTINE GetSurfaceListsInputs
         SurfList(Item)%SurfFlowFrac(SurfNum) = Numbers(SurfNum)
         IF (SurfList(Item)%SurfFlowFrac(SurfNum) < SurfListMinFlowFrac) THEN
               CALL ShowSevereError('The Flow Fraction for Surface '//TRIM(SurfList(Item)%SurfName(SurfNum))// &
-                                   ' in Surface Group '//TRIM(SurfList(Item)%Name)//' is zero')
-              CALL ShowContinueError('...Zero flow fractions are not allowed. Remove this surface from the surface group.')
+                                   ' in Surface Group '//TRIM(SurfList(Item)%Name)//' is too low' )
+              CALL ShowContinueError('Flow fraction of '//TRIM(RoundSigDigits(SurfList(Item)%SurfFlowFrac(SurfNum),6 )) &
+                                     //' is less than minimum criteria = '//TRIM(RoundSigDigits(SurfListMinFlowFrac,6)))
+              CALL ShowContinueError('Zero or extremely low flow fractions are not allowed. ' &
+                                    // 'Remove this surface from the surface group or combine small surfaces together.')
               ErrorsFound = .TRUE.
         END IF
         SumOfAllFractions = SumOfAllFractions + SurfList(Item)%SurfFlowFrac(SurfNum)

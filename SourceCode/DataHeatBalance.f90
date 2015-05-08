@@ -3259,7 +3259,7 @@ FUNCTION ComputeNominalUwithConvCoeffs(numSurf,isValid) RESULT(NominalUwithConvC
           ! USE STATEMENTS:
   USE DataSurfaces, ONLY: Surface, SurfaceClass_Wall, SurfaceClass_Floor, &
                           SurfaceClass_Roof, ExternalEnvironment,&
-                          Ground,GroundFCfactorMethod
+                          Ground,GroundFCfactorMethod, SurfaceClass_Door
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3290,12 +3290,26 @@ FUNCTION ComputeNominalUwithConvCoeffs(numSurf,isValid) RESULT(NominalUwithConvC
     CASE (Ground,GroundFCfactorMethod)
       outsideFilm = 0.0d0       ! No outside film when underground
     CASE DEFAULT
-      outsideFilm = 0.0810106d0 ! All semi-exterior surfaces
+      IF (Surface(numSurf)%ExtBoundCond > 0) THEN !interzone partition
+        !use companion surface in adjacent zone
+        SELECT CASE (Surface(Surface(numSurf)%ExtBoundCond )%class)
+        CASE (SurfaceClass_Wall,SurfaceClass_Door)  ! Interior:  vertical, still air, Rcin = 0.68 ft2-F-hr/BTU
+          outsideFilm = 0.1197548d0
+        CASE (SurfaceClass_Floor) ! Interior:  horizontal, still air, heat flow downward, Rcin = 0.92 ft2-F-hr/BTU
+          outsideFilm = 0.1620212d0
+        CASE (SurfaceClass_Roof)  ! Interior:  horizontal, still air, heat flow upward, Rcin = 0.61 ft2-F-hr/BTU
+          outsideFilm = 0.1074271d0
+        CASE DEFAULT
+          outsideFilm = 0.0810106d0 ! All semi-exterior surfaces
+        END SELECT
+      ELSE
+        outsideFilm = 0.0810106d0 ! All semi-exterior surfaces
+      ENDIF
   END SELECT
   ! interior conditions
   IF (NominalU(Surface(numSurf)%Construction) > 0.0d0) THEN
     SELECT CASE (Surface(numSurf)%class)
-      CASE (SurfaceClass_Wall)  ! Interior:  vertical, still air, Rcin = 0.68 ft2-F-hr/BTU
+      CASE (SurfaceClass_Wall,SurfaceClass_Door)  ! Interior:  vertical, still air, Rcin = 0.68 ft2-F-hr/BTU
         insideFilm = 0.1197548d0
       CASE (SurfaceClass_Floor) ! Interior:  horizontal, still air, heat flow downward, Rcin = 0.92 ft2-F-hr/BTU
         insideFilm = 0.1620212d0

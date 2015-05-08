@@ -42,6 +42,7 @@ PRIVATE ! Everything private unless explicitly made public
 
           ! MODULE VARIABLE DECLARATIONS:
 LOGICAL, SAVE :: GetEMSUserInput = .TRUE.  ! Flag to prevent input from being read multiple times
+Logical, SAVE :: ZoneThermostatActuatorsHaveBeenSetup = .FALSE. 
 LOGICAL, SAVE :: FinishProcessingUserInput = .TRUE. ! Flag to indicate still need to process input
 
           ! SUBROUTINE SPECIFICATIONS:
@@ -364,7 +365,8 @@ SUBROUTINE InitEMS (iCalledFrom)
                          emsCallFromZoneSizing, emsCallFromSystemSizing, emsCallFromUserDefinedComponentModel
   USE DataInterfaces, ONLY: ShowFatalError
   USE RuntimeLanguageProcessor, ONLY: InitializeRuntimeLanguage, SetErlValueNumber
-  USE ScheduleManager, ONLY : GetCurrentScheduleValue
+  USE ScheduleManager,  ONLY : GetCurrentScheduleValue
+  USE DataZoneControls, ONLY: GetZoneAirStatsInputFlag
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -392,12 +394,16 @@ SUBROUTINE InitEMS (iCalledFrom)
   IF (GetEMSUserInput) THEN
     CALL SetupZoneInfoAsInternalDataAvail
     CALL SetupWindowShadingControlActuators
-    CALL SetupThermostatActuators
     CALL SetupSurfaceConvectionActuators
     CALL SetupSurfaceConstructionActuators
     CALL SetupSurfaceOutdoorBoundaryConditionActuators
     CALL GetEMSInput
     GetEMSUserInput = .FALSE.
+  ENDIF
+
+  IF (.NOT. GetZoneAirStatsInputFlag .AND. .NOT. ZoneThermostatActuatorsHaveBeenSetup) THEN
+    CALL SetupThermostatActuators
+    ZoneThermostatActuatorsHaveBeenSetup = .TRUE.
   ENDIF
 
   ! need to delay setup of HVAC actuator until after the systems input has been processed (if present)
@@ -517,7 +523,7 @@ SUBROUTINE GetEMSInput
                          emsCallFromBeforeHVACManagers, emsCallFromAfterHVACManagers,  emsCallFromHVACIterationLoop, &
                          emsCallFromEndZoneTimestepBeforeZoneReporting, emsCallFromEndZoneTimestepAfterZoneReporting, &
                          emsCallFromEndSystemTimestepBeforeHVACReporting, emsCallFromEndSystemTimestepAfterHVACReporting, &
-                         emsCallFromComponentGetInput, emsCallFromUserDefinedComponentModel
+                         emsCallFromComponentGetInput, emsCallFromUserDefinedComponentModel, emsCallFromUnitarySystemSizing
   USE DataInterfaces, ONLY: ShowSevereError, ShowWarningError, ShowFatalError, SetupOutputVariable, ShowContinueError
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList, MakeUpperCase, SameString,   &
      GetObjectDefMaxArgs
@@ -903,6 +909,8 @@ SUBROUTINE GetEMSInput
         EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromComponentGetInput
       CASE ('USERDEFINEDCOMPONENTMODEL')
         EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromUserDefinedComponentModel
+      CASE ('UNITARYSYSTEMSIZING')
+        EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromUnitarySystemSizing
       CASE DEFAULT
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))

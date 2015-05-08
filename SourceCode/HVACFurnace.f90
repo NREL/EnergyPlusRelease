@@ -1237,6 +1237,12 @@ SUBROUTINE GetFurnaceInput
                 CALL ShowContinueError('...schedule values must be (>0., <=1.)')
                 ErrorsFound=.TRUE.
               END IF
+            ELSE IF(lAlphaBlanks(5) .AND. Furnace(FurnaceNum)%FanType_Num /= FanType_SimpleOnOff)THEN
+              CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
+              CALL ShowContinueError(TRIM(cAlphaFields(7))//' = '//TRIM(Alphas(7)))
+              CALL ShowContinueError('Fan type must be Fan:OnOff when '//  &
+                                   TRIM(cAlphaFields(5))//' = Blank.')
+              ErrorsFound=.TRUE.
             END IF
 
           ENDIF ! IF (IsNotOK) THEN
@@ -1798,6 +1804,12 @@ SUBROUTINE GetFurnaceInput
                 CALL ShowContinueError('...schedule values must be (>0., <=1.)')
                 ErrorsFound=.TRUE.
               END IF
+            ELSE IF(lAlphaBlanks(5) .AND. Furnace(FurnaceNum)%FanType_Num /= FanType_SimpleOnOff)THEN
+              CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
+              CALL ShowContinueError(TRIM(cAlphaFields(7))//' = '//TRIM(Alphas(7)))
+              CALL ShowContinueError('Fan type must be Fan:OnOff when '//  &
+                                   TRIM(cAlphaFields(5))//' = Blank.')
+              ErrorsFound=.TRUE.
             END IF
 
           ENDIF ! IF (IsNotOK) THEN
@@ -3375,6 +3387,13 @@ SUBROUTINE GetFurnaceInput
           ErrorsFound=.TRUE.
         ELSEIF (lAlphaBlanks(15)) THEN
           Furnace(FurnaceNum)%OpMode = CycFanCycCoil
+          IF(Furnace(FurnaceNum)%FanType_Num /= FanType_SimpleOnOff)THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
+            CALL ShowContinueError(TRIM(cAlphaFields(6))//' = '//TRIM(Alphas(6)))
+            CALL ShowContinueError('Fan type must be Fan:OnOff when '//  &
+                                   TRIM(cAlphaFields(15))//' = Blank.')
+            ErrorsFound=.TRUE.
+          END IF
         ENDIF
 
         IF (Furnace(FurnaceNum)%FanType_Num == FanType_SimpleConstVolume)THEN
@@ -4228,6 +4247,13 @@ SUBROUTINE GetFurnaceInput
           ErrorsFound=.TRUE.
         ELSEIF (lAlphaBlanks(16)) THEN
           Furnace(FurnaceNum)%OpMode = CycFanCycCoil
+          IF(Furnace(FurnaceNum)%FanType_Num /= FanType_SimpleOnOff)THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
+            CALL ShowContinueError(TRIM(cAlphaFields(6))//' = '//TRIM(Alphas(6)))
+            CALL ShowContinueError('Fan type must be Fan:OnOff when '//  &
+                                   TRIM(cAlphaFields(16))//' = Blank.')
+            ErrorsFound=.TRUE.
+          END IF
         ENDIF
 
         ! add the Dehumidification Type
@@ -5938,6 +5964,8 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
   USE WatertoAirheatPumpSimple,  ONLY: SimWatertoAirHPSimple
   USE VariableSpeedCoils,        ONLY: SimVariableSpeedCoils, VarSpeedCoil
   USE ReportSizingManager,       ONLY: ReportSizingOutput
+  USE EMSManager,                ONLY: ManageEMS
+  USE DataGlobals,               ONLY: emsCallFromUnitarySystemSizing
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -5962,6 +5990,8 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
   REAL(r64) :: MulSpeedFlowScale ! variable speed air flow scaling factor
   LOGICAL :: ErrFound ! flag returned from mining functions
   REAL(r64) :: BranchFlow ! branch volumetric flow rate [m3/s]
+
+  CALL ManageEMS(emsCallFromUnitarySystemSizing) ! calling point
 
   ThisCtrlZoneNum = 0
   DXCoolCap = 0.0d0

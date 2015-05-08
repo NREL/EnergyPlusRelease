@@ -778,7 +778,7 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
     CALL SetupOutputVariable('Site Horizontal Infrared Radiation Rate per Area [W/m2]',HorizIRSky,'Zone','Average','Environment')
     CALL SetupOutputVariable('Site Diffuse Solar Radiation Rate per Area [W/m2]',DifSolarRad,'Zone','Average','Environment')
     CALL SetupOutputVariable('Site Direct Solar Radiation Rate per Area [W/m2]',BeamSolarRad,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Site Precipitation Depth [m]',LiquidPrecipitation,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Precipitation Depth [m]',LiquidPrecipitation,'Zone','Sum','Environment')
     CALL SetupOutputVariable('Site Ground Reflected Solar Radiation Rate per Area [W/m2]', &
                                  GndSolarRad,'Zone','Average','Environment')
     CALL SetupOutputVariable('Site Ground Temperature [C]',GroundTemp,'Zone','Average','Environment')
@@ -2634,6 +2634,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
   REAL(r64), SAVE :: LastHrLiquidPrecip
   REAL(r64), SAVE :: NextHrBeamSolarRad
   REAL(r64), SAVE :: NextHrDifSolarRad
+  REAL(r64), SAVE :: NextHrLiquidPrecip
   LOGICAL :: RecordDateMatch
   INTEGER :: JDay5Start,JDay5End,Loop,TWeekDay
 
@@ -3107,7 +3108,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
          ! default if rain but none on weather file
         IF (TomorrowIsRain(Hour,CurTimeStep) .and.   &
             TomorrowLiquidPrecip(Hour,CurTimeStep) == 0.0d0)   &
-            TomorrowLiquidPrecip(Hour,CurTimeStep)=2.0d0/REAL(NumOfTimeStepInHour,r64) ! 2mm in an hour ~ .08 inch
+            TomorrowLiquidPrecip(Hour,CurTimeStep)=2.0d0 ! 2mm in an hour ~ .08 inch
 
         Missing%DryBulb=DryBulb
         Missing%DewPoint=DewPoint
@@ -3182,6 +3183,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
       END IF
       NextHrBeamSolarRad=Wthr%BeamSolarRad(NxtHour)
       NextHrDifSolarRad=Wthr%DifSolarRad(NxtHour)
+      NextHrLiquidPrecip=Wthr%LiquidPrecip(NxtHour)
 
       DO TS=1,NumOfTimeStepInHour
 
@@ -3236,6 +3238,8 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
 
         TomorrowLiquidPrecip(Hour,TS)   = LastHrLiquidPrecip*WtPrevHour        &
                                           + Wthr%LiquidPrecip(Hour)*WtNow
+        TomorrowLiquidPrecip(Hour,TS)   = TomorrowLiquidPrecip(Hour,TS)/REAL(NumOfTimeStepInHour,r64)
+
         TomorrowIsRain(Hour,TS)         = (TomorrowLiquidPrecip(Hour,TS) >= .8d0/REAL(NumOfTimeStepInHour,r64))  !Wthr%IsRain(Hour)
         TomorrowIsSnow(Hour,TS)         = Wthr%IsSnow(Hour)
       ENDDO  ! End of TS Loop
