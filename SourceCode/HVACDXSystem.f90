@@ -1,4 +1,11 @@
-Module HVACDXSystem
+! note that there are two modules in this file
+
+!  HVACDXSystem is for cooling DX coils
+
+!  HVACDXHeatPumpSystem is for heating DX coils
+
+
+MODULE HVACDXSystem
   ! Module containing the DXCoolingSystem simulation routines
 
   ! MODULE INFORMATION:
@@ -61,11 +68,11 @@ TYPE DXCoolingConditions
   INTEGER                      :: CoolingCoilIndex   =0
   INTEGER      :: DXCoolingCoilInletNodeNum          =0
   INTEGER      :: DXCoolingCoilOutletNodeNum         =0
-  Integer      :: DXSystemControlNodeNum             =0   ! the node number of the node with the set point
+  Integer      :: DXSystemControlNodeNum             =0   ! the node number of the node with the setpoint
   REAL(r64)    :: DesiredOutletTemp                  =0.0 ! the temperature at the unit outlet node needed
-                                                          ! to meet the supply air set point.
+                                                          ! to meet the supply air setpoint.
   REAL(r64)    :: DesiredOutletHumRat                =1.0 ! the humidity ratio at the unit outlet node needed
-                                                          ! to meet the supply air set point.
+                                                          ! to meet the supply air setpoint.
   REAL(r64)    :: PartLoadFrac                       =0.0 ! part load fraction for current time step (single speed)
   REAL(r64)    :: SpeedRatio                         =0.0 ! current compressor speed ratio (variable speed)
   REAL(r64)    :: CycRatio                           =0.0 ! cycling part load ratio (variable speed)
@@ -388,14 +395,14 @@ SUBROUTINE GetDXCoolingSystemInput
 
           ! Flow
 
-    CurrentModuleObject='AirLoopHVAC:UnitaryCoolOnly'
+    CurrentModuleObject='CoilSystem:Cooling:DX'
     NumDXSystem = GetNumObjectsFound(TRIM(CurrentModuleObject))
 
     ALLOCATE(DXCoolingSystem(NumDXSystem))
     ALLOCATE(CheckEquipName(NumDXSystem))
     CheckEquipName=.true.
 
-    CALL GetObjectDefMaxArgs('AirLoopHVAC:UnitaryCoolOnly',TotalArgs,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs('CoilSystem:Cooling:DX',TotalArgs,NumAlphas,NumNums)
 
     ALLOCATE(Alphas(NumAlphas))
     Alphas=' '
@@ -569,12 +576,12 @@ SUBROUTINE GetDXCoolingSystemInput
       DO DXSystemNum=1,NumDXSystem
         ! Setup Report variables for the DXCoolingSystem that is not reported in the components themselves
         IF (SameString(DXCoolingSystem(DXSystemNum)%CoolingCoilType,'Coil:Cooling:DX:Twospeed') ) THEN
-          CALL SetupOutputVariable('DXSystem Cycling Part-Load Ratio []',DXCoolingSystem(DXSystemNum)%CycRatio, &
+          CALL SetupOutputVariable('Coil System Cycling Part Load Ratio []',DXCoolingSystem(DXSystemNum)%CycRatio, &
                                 'System','Average',DXCoolingSystem(DXSystemNum)%Name)
-          CALL SetupOutputVariable('DXSystem Compressor Speed Ratio []',DXCoolingSystem(DXSystemNum)%SpeedRatio, &
+          CALL SetupOutputVariable('Coil System Compressor Speed Ratio []',DXCoolingSystem(DXSystemNum)%SpeedRatio, &
                                 'System','Average',DXCoolingSystem(DXSystemNum)%Name)
         ELSE
-          CALL SetupOutputVariable('DXSystem Part-Load Ratio []',DXCoolingSystem(DXSystemNum)%PartLoadFrac, &
+          CALL SetupOutputVariable('Coil System Part Load Ratio []',DXCoolingSystem(DXSystemNum)%PartLoadFrac, &
                                 'System','Average',DXCoolingSystem(DXSystemNum)%Name)
         END IF
       END DO
@@ -670,14 +677,14 @@ IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
           CALL ShowSevereError(TRIM(DXCoolingSystem(DXSysIndex)%DXCoolingSystemType)//&
                                ': Missing temperature setpoint for DX unit= ' //TRIM(DXCoolingSystem(DXSysIndex)%Name))
-          CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+          CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the unit control node.')
           SetPointErrorFlag = .TRUE.
         ELSE
           CALL CheckIfNodeSetpointManagedByEMS(ControlNode,iTemperatureSetpoint, SetpointErrorFlag)
           IF (SetpointErrorFlag) THEN
             CALL ShowSevereError(TRIM(DXCoolingSystem(DXSysIndex)%DXCoolingSystemType)//&
                                ': Missing temperature setpoint for DX unit= ' //TRIM(DXCoolingSystem(DXSysIndex)%Name))
-            CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+            CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the unit control node.')
             CALL ShowContinueError('  or use an EMS actuator to establish a temperature setpoint at the unit control node.')
           ENDIF
         ENDIF
@@ -688,7 +695,7 @@ IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
           CALL ShowSevereError(TRIM(DXCoolingSystem(DXSysIndex)%DXCoolingSystemType)//&
                                ': Missing humidity ratio setpoint (HUMRATMAX) for DX unit= ' &
                                           //TRIM(DXCoolingSystem(DXSysIndex)%Name))
-          CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+          CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the unit control node.')
           SetPointErrorFlag = .TRUE.
         ELSE
           CALL CheckIfNodeSetpointManagedByEMS(ControlNode,iHumidityRatioMaxSetpoint, SetpointErrorFlag)
@@ -696,7 +703,7 @@ IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
             CALL ShowSevereError(TRIM(DXCoolingSystem(DXSysIndex)%DXCoolingSystemType)//&
                                ': Missing maximum humidity ratio setpoint (HUMRATMAX) for DX unit= ' &
                                          //TRIM(DXCoolingSystem(DXSysIndex)%Name))
-            CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+            CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the unit control node.')
             CALL ShowContinueError('  or use an EMS actuator to establish a maximum humidity ratio setpoint.')
           ENDIF
         ENDIF
@@ -733,7 +740,7 @@ IF (ControlNode.EQ.0) THEN
   DXCoolingSystem(DXSystemNum)%DesiredOutletHumRat = 1.0
 ELSE IF (ControlNode.EQ.OutNode) THEN
   DXCoolingSystem(DXSystemNum)%DesiredOutletTemp = Node(ControlNode)%TempSetPoint
-  !  If HumRatMax is zero, then there is no request from SET POINT MANAGER:SINGLE ZONE MAX HUM
+  !  If HumRatMax is zero, then there is no request from SetpointManager:SingleZone:Humidity:Maximum
   IF ((DXCoolingSystem(DXSystemNum)%DehumidControlType .NE. DehumidControl_None) .AND. &
       (Node(ControlNode)%HumRatMax .GT. 0.0)) THEN
     DXCoolingSystem(DXSystemNum)%DesiredOutletHumRat = Node(ControlNode)%HumRatMax
@@ -812,10 +819,10 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
   CHARACTER(len=MaxNameLength)  :: CompName  ! Name of the DX cooling coil
   REAL(r64)           :: NoOutput            ! Sensible capacity (outlet - inlet) when the compressor is off
   REAL(r64)           :: FullOutput          ! Sensible capacity (outlet - inlet) when the compressor is on
-  REAL(r64)           :: ReqOutput           ! Sensible capacity (outlet - inlet) required to meet load or set point temperature
+  REAL(r64)           :: ReqOutput           ! Sensible capacity (outlet - inlet) required to meet load or setpoint temperature
   Integer             :: InletNode           ! Inlet node number of the DX cooling coil
   Integer             :: OutletNode          ! Outlet node number of the DX cooling coil
-  Integer             :: ControlNode         ! The node number where a set point is placed to control the DX cooling coil
+  Integer             :: ControlNode         ! The node number where a setpoint is placed to control the DX cooling coil
   REAL(r64)           :: PartLoadFrac        ! The part-load fraction of the compressor
   REAL(r64)           :: SpeedRatio          ! SpeedRatio = (CompressorSpeed - CompressorSpeedMin) /
                                              !              (CompressorSpeedMax - CompressorSpeedMin)
@@ -960,8 +967,8 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
             END IF
           END IF
 
-!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity set point,
-!         else use operating humidity ratio to test against humidity set point
+!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity setpoint,
+!         else use operating humidity ratio to test against humidity setpoint
           IF (PartLoadFrac .EQ. 0.0)THEN
             OutletHumRatDXCoil = NoLoadHumRatOut
           ELSE
@@ -1007,7 +1014,7 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
                       ,DXCoolingSystem(DXSystemNum)%DXCoilLatPLRIterIndex,PartLoadFrac,PartLoadFrac)
                 END IF
               ELSE IF (SolFla == -2) THEN
-!               RegulaFalsi returns PLR = minPLR when a solution can not be found, recalculate PartLoadFrac.
+!               RegulaFalsi returns PLR = minPLR when a solution cannot be found, recalculate PartLoadFrac.
                 IF(NoLoadHumRatOut-FullLoadHumRatOut .NE. 0.0)THEN
                   PartLoadFrac = (NoLoadHumRatOut-DesOutHumRat)/(NoLoadHumRatOut-FullLoadHumRatOut)
                 ELSE
@@ -1192,8 +1199,8 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
             END IF
           END IF
 
-!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity set point,
-!         else use operating humidity ratio to test against humidity set point
+!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity setpoint,
+!         else use operating humidity ratio to test against humidity setpoint
           IF (PartLoadFrac .EQ. 0.0)THEN
             OutletHumRatDXCoil = NoLoadHumRatOut
           ELSE
@@ -1671,8 +1678,8 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
             ELSE
               OutletTempDXCoil = DXCoilOutletTemp(DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
               OutletHumRatDXCoil = DXCoilOutletHumRat(DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
-              ! if sensible load and set point can not be met, set PLR = 1. If no sensible load and
-              ! latent load exists and set point can not be met, set PLR = 1.
+              ! if sensible load and setpoint cannot be met, set PLR = 1. If no sensible load and
+              ! latent load exists and setpoint cannot be met, set PLR = 1.
               IF ((OutletTempDXCoil >= DesOutTemp .AND. SensibleLoad .and. DXCoolingSystem(DXSystemNum)%RunOnSensibleLoad) .OR. &
                   (OutletHumRatDXCoil >= DesOutHumRat .AND. &
                   .NOT. SensibleLoad .AND. LatentLoad .AND. DXCoolingSystem(DXSystemNum)%RunOnLatentLoad)) THEN
@@ -1762,8 +1769,8 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
 
 
 !         If humidity setpoint is not satisfied and humidity control type is CoolReheat, then run to meet latent load
-!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity set point,
-!         else use operating humidity ratio to test against humidity set point
+!         If system does not operate to meet sensible load, use no load humidity ratio to test against humidity setpoint,
+!         else use operating humidity ratio to test against humidity setpoint
           IF (PartLoadFrac .EQ. 0.0)THEN
               OutletHumRatDXCoil = NoLoadHumRatOut
           ELSE
@@ -2400,7 +2407,7 @@ END FUNCTION HXAssistedCoolCoilHRResidual
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -2423,4 +2430,848 @@ END FUNCTION HXAssistedCoolCoilHRResidual
 !
 
 End Module HVACDXSystem
+
+!******************************************************************************************************
+
+MODULE HVACDXHeatPumpSystem
+  ! Module containing the DXHeatPumpSystem simulation routines
+
+  ! MODULE INFORMATION:
+  !       AUTHOR         Brent Griffith (derived from HVACDXSystem.f90 by R.Liesen)
+  !       DATE WRITTEN   May 2011
+  !                      
+  !       RE-ENGINEERED  na
+
+  ! PURPOSE OF THIS MODULE:
+  ! To encapsulate the data and algorithms required to
+  ! manage the DX Heat Pump System System Component
+  ! this wraps heat pump air-heating coils in coil-only wrapper with no fans. 
+
+  ! METHODOLOGY EMPLOYED:
+  !
+
+  ! REFERENCES:
+
+
+  ! OTHER NOTES:
+  !
+
+  ! USE STATEMENTS:
+  ! Use statements for data only modules
+USE DataPrecisionGlobals
+USE DataLoopNode
+USE DataGlobals
+USE DataHVACGlobals
+USE DataInterfaces
+
+  ! Use statements for access to subroutines in other modules
+USE ScheduleManager
+
+IMPLICIT NONE         ! Enforce explicit typing of all variables
+
+PRIVATE ! Everything private unless explicitly made public
+
+  !MODULE PARAMETER DEFINITIONS
+REAL(r64), PARAMETER :: MinAirMassFlow = 0.001d0
+! Compressor operation
+INTEGER, PARAMETER :: On =  1              ! normal compressor operation
+INTEGER, PARAMETER :: Off = 0              ! signal DXCoil that compressor shouldn't run
+
+
+
+  ! DERIVED TYPE DEFINITIONS
+
+TYPE DXHeatPumpSystemStruct
+  CHARACTER(len=MaxNameLength) :: DXHeatPumpSystemType=' ' ! Type of DXHeatingSystem
+  CHARACTER(len=MaxNameLength) :: Name               =' ' ! Name of the DXHeatingSystem
+  INTEGER                      :: SchedPtr           =0
+  CHARACTER(len=MaxNameLength) :: HeatPumpCoilType    =' ' !
+  INTEGER                      :: HeatPumpCoilType_Num=0
+  CHARACTER(len=MaxNameLength) :: HeatPumpCoilName    =' ' !
+  INTEGER                      :: HeatPumpCoilIndex   =0
+  INTEGER      :: DXHeatPumpCoilInletNodeNum          =0
+  INTEGER      :: DXHeatPumpCoilOutletNodeNum         =0
+  Integer      :: DXSystemControlNodeNum             =0   ! the node number of the node with the set point
+  REAL(r64)    :: DesiredOutletTemp                  =0.0 ! the temperature at the unit outlet node needed
+                                                          ! to meet the supply air set point.
+
+  REAL(r64)    :: PartLoadFrac                       =0.0 ! part load fraction for current time step (single speed)
+  REAL(r64)    :: SpeedRatio                         =0.0 ! current compressor speed ratio (variable speed)
+  REAL(r64)    :: CycRatio                           =0.0 ! cycling part load ratio (variable speed)
+  INTEGER      :: FanOpMode                          =0   ! Fan operating mode (see parameter above)
+
+! Warning message variables
+
+
+
+  INTEGER      :: DXCoilSensPLRIter                   =0   ! used in DXCoil calculations
+  INTEGER      :: DXCoilSensPLRIterIndex              =0   ! used in DXCoil calculations
+  INTEGER      :: DXCoilSensPLRFail                   =0   ! used in DXCoil calculations
+  INTEGER      :: DXCoilSensPLRFailIndex              =0   ! used in DXCoil calculations
+
+! When the Dx system is a part of Outdoor Air Unit
+  REAL(r64)    :: OAUnitSetTemp                        =0.0 ! set
+
+END TYPE DXHeatPumpSystemStruct
+
+!MODULE VARIABLE DECLARATIONS:
+INTEGER :: NumDXHeatPumpSystems=0   ! The Number of DXHeatPumpSystems found in the Input
+LOGICAL :: EconomizerFlag=.FALSE. ! holds air loop economizer status
+
+! Make this type allocatable
+TYPE (DXHeatPumpSystemStruct), ALLOCATABLE, DIMENSION(:) :: DXHeatPumpSystem
+LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
+
+! Subroutine Specifications for the Module
+          ! Driver/Manager Routines
+PUBLIC  SimDXHeatPumpSystem
+
+          ! Get Input routines for module
+PRIVATE GetDXHeatPumpSystemInput
+
+PRIVATE InitDXHeatPumpSystem
+
+          ! Update routine to check convergence and update nodes
+PRIVATE ControlDXHeatingSystem
+
+PRIVATE DXHeatingCoilResidual
+
+
+
+CONTAINS
+
+! MODULE SUBROUTINES:
+!*************************************************************************
+SUBROUTINE SimDXHeatPumpSystem(DXHeatPumpSystemName, FirstHVACIteration, AirLoopNum,CompIndex,OAUnitNum,OAUCoilOutTemp,QTotOut)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Brent Griffith (derived from HVACDXSystem.f90 by R.Liesen)
+          !       DATE WRITTEN   May 2011
+
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine manages DXHeatPumpSystem component simulation.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DXCoils,          ONLY: SimDXCoil 
+  USE General,          ONLY: TrimSigDigits
+  USE DataAirLoop,      ONLY: AirLoopControlInfo
+  USE InputProcessor,   ONLY: FindItemInList
+  USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: DXHeatPumpSystemName ! Name of DXSystem:Airloop object
+  LOGICAL, INTENT(IN)          :: FirstHVACIteration  ! True when first HVAC iteration
+  INTEGER, INTENT(IN)          :: AirLoopNum          ! Primary air loop number
+  INTEGER, INTENT(INOUT)       :: CompIndex           ! Index to CoilSystem:Heating:DX object
+  INTEGER, INTENT(IN), OPTIONAL:: OAUnitNum           ! If the system is an equipment of OutdoorAirUnit
+  REAL(r64), INTENT(IN), OPTIONAL :: OAUCoilOutTemp   ! the coil inlet temperature of OutdoorAirUnit
+  REAL(r64), INTENT(INOUT), OPTIONAL :: QTotOut       ! the total cooling output of unit
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DEFINITIONS:
+          ! na
+
+          ! FLOW:
+
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength)  :: CompName              ! Name of CoilSystem:Heating:DX object
+  INTEGER                       :: DXSystemNum           ! Index to CoilSystem:Heating:DX object
+  LOGICAL,SAVE                  :: GetInputFlag = .True. ! Flag to get input only once
+  LOGICAL                       :: HXUnitOn              ! Flag to control HX for HXAssisted Cooling Coil
+  REAL(r64)                     :: AirMassFlow           ! DX System air mass flow rate
+  INTEGER                       :: InletNodeNum          ! DX System inlet node number
+  INTEGER                       :: OutletNodeNum         ! DX System outlet node number
+
+    ! Obtains and Allocates DX Cooling System related parameters from input file
+  IF (GetInputFlag) THEN  !First time subroutine has been entered
+        !Get the DXCoolingSystem input
+    CALL GetDXHeatPumpSystemInput
+    GetInputFlag=.false.
+  End If
+
+    ! Find the correct DXSystemNumber
+  IF (CompIndex == 0) THEN
+    DXSystemNum = FindItemInList(DXHeatPumpSystemName,DXHeatPumpSystem%Name,NumDXHeatPumpSystems)
+    IF (DXSystemNum == 0) THEN
+      CALL ShowFatalError('SimDXHeatPumpSystem: DXUnit not found='//TRIM(DXHeatPumpSystemName))
+    ENDIF
+    CompIndex=DXSystemNum
+  ELSE
+    DXSystemNum=CompIndex
+    IF (DXSystemNum > NumDXHeatPumpSystems .or. DXSystemNum < 1) THEN
+      CALL ShowFatalError('SimDXHeatPumpSystem:  Invalid CompIndex passed='//  &
+                          TRIM(TrimSigDigits(DXSystemNum))// &
+                          ', Number of DX Units='//TRIM(TrimSigDigits(NumDXHeatPumpSystems))//  &
+                          ', DX Unit name='//TRIM(DXHeatPumpSystemName))
+    ENDIF
+    IF (CheckEquipName(DXSystemNum)) THEN
+      IF (DXHeatPumpSystemName /= DXHeatPumpSystem(DXSystemNum)%Name) THEN
+        CALL ShowFatalError('SimDXHeatPumpSystem: Invalid CompIndex passed='//  &
+                            TRIM(TrimSigDigits(DXSystemNum))// &
+                            ', DX Unit name='//TRIM(DXHeatPumpSystemName)//', stored DX Unit Name for that index='//  &
+                            TRIM(DXHeatPumpSystem(DXSystemNum)%Name))
+      ENDIF
+      CheckEquipName(DXSystemNum)=.false.
+    ENDIF
+  ENDIF
+
+  IF (PRESENT(OAUnitNum)) THEN
+    CALL InitDXHeatPumpSystem(DXSystemNum,AirLoopNum,OAUnitNum=OAUnitNum,OAUCoilOutTemp=OAUCoilOutTemp)
+  ELSE
+    CALL InitDXHeatPumpSystem(DXSystemNum,AirLoopNum)
+  ENDIF
+
+  !Call the series of components that simulate a DX Heating System
+   ! Control the DX Heating System
+  CALL ControlDXHeatingSystem(DXSystemNum, FirstHVACIteration)
+
+    ! simulate DX Heating System
+  CompName = DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilName
+
+    SELECT CASE(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilType_Num)
+
+    CASE (CoilDX_HeatingEmpirical) ! COIL:DX:COOLINGBYPASSFACTOREMPIRICAL
+
+      CALL SimDXCoil(CompName,On,FirstHVACIteration, DXHeatPumpSystem(DXSystemNum)%PartLoadFrac,  &
+         DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilIndex, &
+         DXHeatPumpSystem(DXSystemNum)%FanOpMode)
+
+
+    CASE DEFAULT
+      CALL ShowFatalError('SimDXCoolingSystem: Invalid DX Heating System/Coil='//  &
+                          TRIM(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilType))
+
+  END SELECT
+  ! set econo lockout flag
+    ! set econo lockout flag
+  IF (AirLoopNum /=-1) THEN ! IF the sysem is not an equipment of outdoor air unit
+
+  IF ( (DXHeatPumpSystem(DXSystemNum)%PartLoadFrac > 0.0 ) .AND. &
+       AirLoopControlInfo(AirLoopNum)%CanLockoutEconoWithCompressor) THEN
+       AirLoopControlInfo(AirLoopNum)%ReqstEconoLockoutWithCompressor = .TRUE.
+  ELSE
+    AirLoopControlInfo(AirLoopNum)%ReqstEconoLockoutWithCompressor = .FALSE.
+  END IF
+  END IF
+
+  IF(PRESENT(QTotOut))THEN
+    InletNodeNum  = DXHeatPumpSystem(DXSystemNum)%DXHeatPumpCoilInletNodeNum
+    OutletNodeNum = DXHeatPumpSystem(DXSystemNum)%DXHeatPumpCoilOutletNodeNum
+    AirMassFlow = Node(OutletNodeNum)%MassFlowRate
+    QTotOut = AirMassFlow * (Node(InletNodeNum)%Enthalpy - Node(OutletNodeNum)%Enthalpy)
+  END IF
+
+  RETURN
+
+END SUBROUTINE SimDXHeatPumpSystem
+
+! Get Input Section of the Module
+!******************************************************************************
+SUBROUTINE GetDXHeatPumpSystemInput
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Brent Griffith (derived from HVACDXSystem.f90 by R.Liesen)
+          !       DATE WRITTEN   May 2011
+          !
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Obtains input data for system and stores it in System data structures
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses "Get" routines to read in data.
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+    USE InputProcessor
+    USE NodeInputManager,      ONLY: GetOnlySingleNode
+    USE DataHeatBalance,       ONLY: Zone
+    USE BranchNodeConnections, ONLY: SetUpCompSets, TestCompSet
+    USE HVACHXAssistedCoolingCoil,  ONLY: GetHXDXCoilName
+    USE DataIPShortCuts
+    USE DXCoils,               ONLY: GetCoilInletNode, GetCoilOutletNode, SetCoilSystemHeatingDXFlag
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+    INTEGER :: DXSystemNum      ! The DXHeatingSystem that you are currently loading input into
+    INTEGER :: NumAlphas
+    INTEGER :: NumNums
+    INTEGER :: IOSTAT
+    CHARACTER(len=*), PARAMETER    :: RoutineName='GetDXHeatPumpSystemInput: ' ! include trailing blank space
+    LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
+    LOGICAL :: IsNotOK               ! Flag to verify name
+    LOGICAL :: IsBlank               ! Flag for blank name
+    Integer :: DXHeatSysNum
+    LOGICAL :: FanErrorsFound        ! flag returned on fan operating mode check
+    LOGICAL :: DXErrorsFound         ! flag returned on DX coil name check
+    CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in getting objects
+    CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: Alphas         ! Alpha input items for object
+    CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAlphaFields   ! Alpha field names
+    CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cNumericFields ! Numeric field names
+    REAL(r64), ALLOCATABLE, DIMENSION(:) :: Numbers           ! Numeric input items for object
+    LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lAlphaBlanks      ! Logical array, alpha field input BLANK = .true.
+    LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
+    INTEGER                              :: TotalArgs=0       ! Total number of alpha and numeric arguments (max) for a
+                                                              !  certain object in the input file
+
+          ! Flow
+
+    CurrentModuleObject='CoilSystem:Heating:DX'
+    NumDXHeatPumpSystems = GetNumObjectsFound(TRIM(CurrentModuleObject))
+
+    ALLOCATE(DXHeatPumpSystem(NumDXHeatPumpSystems))
+    ALLOCATE(CheckEquipName(NumDXHeatPumpSystems))
+    CheckEquipName=.true.
+
+    CALL GetObjectDefMaxArgs('CoilSystem:Heating:DX',TotalArgs,NumAlphas,NumNums)
+
+    ALLOCATE(Alphas(NumAlphas))
+    Alphas=' '
+    ALLOCATE(cAlphaFields(NumAlphas))
+    cAlphaFields=' '
+    ALLOCATE(cNumericFields(NumNums))
+    cNumericFields=' '
+    ALLOCATE(Numbers(NumNums))
+    Numbers=0.0
+    ALLOCATE(lAlphaBlanks(NumAlphas))
+    lAlphaBlanks=.TRUE.
+    ALLOCATE(lNumericBlanks(NumNums))
+    lNumericBlanks=.TRUE.
+
+
+      ! Get the data for the DX Cooling System
+      DO DXHeatSysNum = 1,  NumDXHeatPumpSystems
+
+        CALL GetObjectItem(TRIM(CurrentModuleObject),DXHeatSysNum,Alphas,NumAlphas, &
+                     Numbers,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
+                     AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
+
+        IsNotOK=.false.
+        IsBlank=.false.
+        CALL VerifyName(Alphas(1),DXHeatPumpSystem%Name,DXHeatSysNum-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+        IF (IsNotOK) THEN
+          ErrorsFound=.true.
+          IF (IsBlank) Alphas(1) ='xxxxx'
+        ENDIF
+        DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpSystemType = CurrentModuleObject ! push Object Name into data array
+        DXHeatPumpSystem(DXHeatSysNum)%Name            = Alphas(1)
+        DXHeatPumpSystem(DXHeatSysNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
+        IF (DXHeatPumpSystem(DXHeatSysNum)%SchedPtr == 0) THEN
+          IF (lAlphaBlanks(2)) THEN
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
+                 ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+          ELSE
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
+               ' entered ='//TRIM(Alphas(2))// &
+               ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+          END IF
+          ErrorsFound=.true.
+        END IF
+        
+        IF (SameString(Alphas(3),'Coil:Heating:DX:SingleSpeed'))  THEN
+
+          DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType = Alphas(3)
+          DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType_Num=CoilDX_HeatingEmpirical
+
+          DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName = Alphas(4)
+
+        ELSE
+          CALL ShowSevereError('Invalid entry for '//TRIM(cAlphaFields(3))//' :'//TRIM(Alphas(3)))
+          CALL ShowContinueError('In '//TRIM(CurrentModuleObject)//'="'//TRIM(DXHeatPumpSystem(DXHeatSysNum)%Name)//'".')
+          ErrorsFound=.true.
+        END IF
+
+        DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilInletNodeNum      = GetCoilInletNode(  &
+                                                                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType, &
+                                                                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName, &
+                                                                           ErrorsFound )
+        
+        DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilOutletNodeNum     = GetCoilOutletNode(  &
+                                                                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType, &
+                                                                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName, &
+                                                                           ErrorsFound )
+
+        DXHeatPumpSystem(DXHeatSysNum)%DXSystemControlNodeNum = DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilOutletNodeNum
+        
+        CALL TestCompSet(TRIM(CurrentModuleObject),DXHeatPumpSystem(DXHeatSysNum)%Name,  &
+                                                   NodeID(DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilInletNodeNum), &
+                                                   NodeID(DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilOutletNodeNum) ,&
+                                                   'Air Nodes')
+
+        CALL ValidateComponent(DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType,DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName, &
+                               IsNotOK,TRIM(CurrentModuleObject))
+        IF (IsNotOK) THEN
+          CALL ShowContinueError('In '//TRIM(CurrentModuleObject)//' = "'//TRIM(DXHeatPumpSystem(DXHeatSysNum)%Name)//'".')
+          ErrorsFound=.true.
+        ENDIF
+
+        CALL SetUpCompSets(DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpSystemType, &
+                           DXHeatPumpSystem(DXHeatSysNum)%Name, &
+                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType, &
+                           DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName, &
+                           NodeID(DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilInletNodeNum), &
+                           NodeID(DXHeatPumpSystem(DXHeatSysNum)%DXHeatPumpCoilOutletNodeNum) )
+
+
+        ! Supply air fan operating mode defaulted to constant fan cycling coil/compressor
+        DXHeatPumpSystem(DXHeatSysNum)%FanOpMode = ContFanCycCoil
+        
+        CALL SetCoilSystemHeatingDXFlag(DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilType, &
+                                   DXHeatPumpSystem(DXHeatSysNum)%HeatPumpCoilName)
+
+      END DO  !End of the DX System Loop
+
+
+      IF (ErrorsFound) THEN
+        CALL ShowFatalError(RoutineName//'Errors found in input.  Program terminates.')
+      ENDIF
+
+      DO DXHeatSysNum=1,NumDXHeatPumpSystems
+        ! Setup Report variables for the DXHeatingSystem that is not reported in the components themselves
+        CALL SetupOutputVariable('Coil System Part Load Ratio []',DXHeatPumpSystem(DXHeatSysNum)%PartLoadFrac, &
+                                'System','Average',DXHeatPumpSystem(DXHeatSysNum)%Name)
+      END DO
+
+      DEALLOCATE(Alphas)
+      DEALLOCATE(cAlphaFields)
+      DEALLOCATE(cNumericFields)
+      DEALLOCATE(Numbers)
+      DEALLOCATE(lAlphaBlanks)
+      DEALLOCATE(lNumericBlanks)
+
+  RETURN
+
+END SUBROUTINE GetDXHeatPumpSystemInput
+
+
+! End of Get Input subroutines for the Module
+!******************************************************************************
+
+! Beginning of Initialization subroutines for the Module
+! *****************************************************************************
+
+SUBROUTINE InitDXHeatPumpSystem(DXSystemNum,AirLoopNum,OAUnitNum,OAUCoilOutTemp)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Brent Griffith (derived from HVACDXSystem.f90 by R.Liesen)
+          !
+          !       DATE WRITTEN   May 2011
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is for initializations of the DX heat pump Systems.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses the status flags to trigger initializations.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataHVACGlobals, ONLY: DoSetPointTest
+  USE DataAirLoop,     ONLY: AirLoopControlInfo
+  USE EMSManager,      ONLY: iTemperatureSetpoint, CheckIfNodeSetpointManagedByEMS, iHumidityRatioMaxSetpoint
+  USE DataGlobals,     ONLY: AnyEnergyManagementSystemInModel
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN) :: DXSystemNum ! number of the current DX Sys being simulated
+  INTEGER, INTENT (IN) :: AirLoopNum  ! number of the current air loop being simulated
+  INTEGER, INTENT (IN), OPTIONAL :: OAUnitNum  ! number of the current outdoor air unit being simulated
+  REAL(r64), INTENT(IN), OPTIONAL :: OAUCoilOutTemp    ! the coil inlet temperature of OutdoorAirUnit
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  Integer             :: OutNode ! outlet node number
+  INTEGER             :: ControlNode ! control node number
+  INTEGER             :: DXSysIndex
+!  LOGICAL,SAVE        :: MyOneTimeFlag = .true.
+  LOGICAL,SAVE        :: MySetPointCheckFlag = .TRUE.
+  INTEGER             :: OutdoorAirUnitNum ! "ONLY" for ZoneHVAC:OutdoorAirUnit
+  REAL(r64)           :: OAUCoilOutletTemp  ! "ONLY" for zoneHVAC:OutdoorAirUnit
+          ! FLOW:
+
+!  IF (MyOneTimeFlag) THEN
+!
+!    MyOneTimeFlag = .false.
+!  END IF
+  IF (PRESENT(OAUnitNum)) THEN ! This Dx system is component of ZoneHVAC:OutdoorAirUnit
+    OutdoorAirUnitNum=OAUnitNum
+    OAUCoilOutletTemp=OAUCoilOutTemp
+  END IF
+
+  IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
+    DO DXSysIndex=1,NumDXHeatPumpSystems
+      ControlNode = DXHeatPumpSystem(DXSysIndex)%DXSystemControlNodeNum
+      IF (ControlNode > 0) THEN
+        IF (AirLoopNum .EQ.-1) THEN                           ! Outdoor Air Unit
+          Node(ControlNode)%TempSetPoint = OAUCoilOutletTemp  ! Set the coil outlet temperature
+        ELSE IF (AirLoopNum /= -1) THEN ! Not an outdoor air unit
+
+          IF (Node(ControlNode)%TempSetPoint == SensedNodeFlagValue) THEN
+            IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+              CALL ShowSevereError(TRIM(DXHeatPumpSystem(DXSysIndex)%DXHeatPumpSystemType)//&
+                               ': Missing temperature setpoint for DX unit= ' //TRIM(DXHeatPumpSystem(DXSysIndex)%Name))
+              CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+              SetPointErrorFlag = .TRUE.
+            ELSE
+              CALL CheckIfNodeSetpointManagedByEMS(ControlNode,iTemperatureSetpoint, SetpointErrorFlag)
+              IF (SetpointErrorFlag) THEN
+                CALL ShowSevereError(TRIM(DXHeatPumpSystem(DXSysIndex)%DXHeatPumpSystemType)//&
+                               ': Missing temperature setpoint for DX unit= ' //TRIM(DXHeatPumpSystem(DXSysIndex)%Name))
+                CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the unit control node.')
+                CALL ShowContinueError('  or use an EMS actuator to establish a temperature setpoint at the unit control node.')
+              ENDIF
+            ENDIF
+          END IF
+        END IF
+      END IF
+    END DO
+    MySetPointCheckFlag = .FALSE.
+  END IF
+
+! These initializations are done every iteration
+IF (AirLoopNum .EQ.-1) THEN ! This IF-Then routine is just for ZoneHVAC:OUTDOORAIRUNIT
+
+  DXHeatPumpSystem(DXSystemNum)%DesiredOutletTemp =OAUCoilOutletTemp
+
+ELSEIF (AirLoopNum /=-1) THEN ! Not Outdoor Air Unit
+  ControlNode = DXHeatPumpSystem(DXSystemNum)%DXSystemControlNodeNum
+  EconomizerFlag = AirLoopControlInfo(AirLoopNum)%EconoActive
+  DXHeatPumpSystem(DXSystemNum)%DesiredOutletTemp = Node(ControlNode)%TempSetPoint
+
+END IF
+RETURN
+END SUBROUTINE InitDXHeatPumpSystem
+
+! End of Initialization subroutines for the Module
+! *****************************************************************************
+
+! Beginning of Calculation subroutines for the DXCoolingSystem Module
+! *****************************************************************************
+
+SUBROUTINE ControlDXHeatingSystem(DXSystemNum, FirstHVACIteration )
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Brent Griffith (derived from ControlDXSystem by Richard Liesen)
+          !       DATE WRITTEN   Jan 2012
+          !       MODIFIED       Richard Raustad, FSEC Nov 2003
+          !                      Feb 2005 M. J. Witte, GARD Analytics, Inc.
+          !                        Add dehumidification controls and support for multimode DX coil
+          !                      Jan 2008 R. Raustad, FSEC. Added coolreheat to all coil types
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !  This subroutine updates the System outlet nodes.
+
+          ! METHODOLOGY EMPLOYED:
+          !  Data is moved from the System data structure to the System outlet nodes.
+
+          ! REFERENCES:
+          !  na
+
+          ! USE STATEMENTS:
+  USE ScheduleManager
+  USE DataEnvironment, ONLY: OutBaroPress
+  USE DataHVACGlobals, ONLY: TempControlTol
+  USE InputProcessor,  ONLY: FindItemInList
+  USE Psychrometrics , ONLY: PsyHFnTdbW, PsyTdpFnWPb
+  USE General,         ONLY: SolveRegulaFalsi, RoundSigDigits
+  USE DXCoils,         ONLY: SimDXCoil, DXCoilOutletTemp
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,  INTENT(In)    :: DXSystemNum             ! index to DXSystem
+  LOGICAL,  INTENT(In)    :: FirstHVACIteration      ! First HVAC iteration flag
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER          :: MaxIte    = 500     ! Maximum number of iterations for solver
+  REAL(r64), PARAMETER :: Acc       = 1.d-3   ! Accuracy of solver result
+  REAL(r64), PARAMETER :: HumRatAcc = 1.d-6   ! Accuracy of solver result
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          !  na
+
+          ! DERIVED TYPE DEFINITIONS
+          !  na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength)  :: CompName  ! Name of the DX cooling coil
+  REAL(r64)           :: NoOutput            ! Sensible capacity (outlet - inlet) when the compressor is off
+  REAL(r64)           :: FullOutput          ! Sensible capacity (outlet - inlet) when the compressor is on
+  REAL(r64)           :: ReqOutput           ! Sensible capacity (outlet - inlet) required to meet load or set point temperature
+  Integer             :: InletNode           ! Inlet node number of the DX cooling coil
+  Integer             :: OutletNode          ! Outlet node number of the DX cooling coil
+  Integer             :: ControlNode         ! The node number where a set point is placed to control the DX cooling coil
+  REAL(r64)           :: PartLoadFrac        ! The part-load fraction of the compressor
+
+  REAL(r64)           :: DesOutTemp          ! Desired outlet temperature of the DX cooling coil
+  REAL(r64)           :: OutletTempDXCoil    ! Actual outlet temperature of the DX cooling coil
+
+  INTEGER             :: SolFla              ! Flag of solver
+  REAL(r64), DIMENSION(5)  :: Par                 ! Parameter array passed to solver
+  LOGICAL             :: SensibleLoad        ! True if there is a sensible cooling load on this system
+  LOGICAL             :: LatentLoad          ! True if there is a latent   cooling load on this system
+  INTEGER             :: FanOpMode           ! Supply air fan operating mode
+  REAL(r64)           :: TempMinPLR          ! Used to find latent PLR when max iterations exceeded
+  REAL(r64)           :: TempMaxPLR          ! Used to find latent PLR when max iterations exceeded
+  REAL(r64)           :: TempOutletTempDXCoil   ! Used to find latent PLR when max iterations exceeded
+
+      ! Set local variables
+      ! Retrieve the load on the controlled zone
+  OutletNode   = DXHeatPumpSystem(DXSystemNum)%DXHeatPumpCoilOutletNodeNum
+  InletNode    = DXHeatPumpSystem(DXSystemNum)%DXHeatPumpCoilInletNodeNum
+  ControlNode  = DXHeatPumpSystem(DXSystemNum)%DXSystemControlNodeNum
+  DesOutTemp   = DXHeatPumpSystem(DXSystemNum)%DesiredOutletTemp
+  CompName     = DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilName
+  FanOpMode    = DXHeatPumpSystem(DXSystemNum)%FanOpMode
+
+  PartLoadFrac = 0.0
+
+  SensibleLoad = .FALSE.
+
+  ! If DXHeatingSystem is scheduled on and there is flow
+  If((GetCurrentScheduleValue(DXHeatPumpSystem(DXSystemNum)%SchedPtr) > 0.d0) .AND. &
+     (Node(InletNode)%MassFlowRate .gt. MinAirMassFlow)) THEN
+
+    ! Determine if there is a sensible load on this system
+    IF((Node(InletNode)%Temp < Node(ControlNode)%TempSetPoint) .AND. &
+       (Node(InletNode)%Temp < DesOutTemp) .AND. &
+       (ABS(Node(InletNode)%Temp - DesOutTemp) .gt. TempControlTol) ) SensibleLoad = .TRUE.
+
+
+    ! If DXHeatingSystem runs with a heating load then set PartLoadFrac on Heating System 
+    IF (SensibleLoad ) THEN
+      SELECT CASE(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilType_Num)
+
+        CASE (CoilDX_HeatingEmpirical)  ! Coil:Heating:DX:SingleSpeed
+
+          ! Get no load result
+          PartLoadFrac = 0.0
+          CALL SimDXCoil(CompName,On,FirstHVACIteration,PartLoadFrac,DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilIndex,FanOpMode)
+          NoOutput = Node(InletNode)%MassFlowRate *  &
+                       (PsyHFnTdbW(Node(OutletNode)%Temp,Node(OutletNode)%HumRat)  &
+                        - PsyHFnTdbW(Node(InletNode)%Temp,Node(OutletNode)%HumRat))
+
+          ! Get full load result
+          PartLoadFrac = 1.0
+          CALL SimDXCoil(CompName,On,FirstHVACIteration,PartLoadFrac,DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilIndex,FanOpMode)
+
+          FullOutput = Node(InletNode)%MassFlowRate *  &
+                       (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
+                        - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
+
+          ReqOutput = Node(InletNode)%MassFlowRate *  &
+                       (PsyHFnTdbW(DXHeatPumpSystem(DXSystemNum)%DesiredOutletTemp,Node(InletNode)%HumRat) - &
+                        PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
+
+!         IF NoOutput is higher than (more heating than required) or very near the ReqOutput, do not run the compressor
+          IF ((NoOutput-ReqOutput) > Acc) THEN
+            PartLoadFrac = 0.0
+!         If the FullOutput is greater than (insufficient heating) or very near the ReqOutput,
+!         run the compressor at PartLoadFrac = 1.
+          ELSE IF ((FullOutput - ReqOutput) < Acc) THEN
+            PartLoadFrac = 1.0
+!         Else find the PLR to meet the load
+          ELSE
+!           OutletTempDXCoil is the full capacity outlet temperature at PartLoadFrac = 1 from the CALL above. If this temp is
+!           greater than the desired outlet temp, then run the compressor at PartLoadFrac = 1, otherwise find the operating PLR.
+            OutletTempDXCoil = DXCoilOutletTemp(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilIndex)
+            IF (OutletTempDXCoil < DesOutTemp) THEN
+              PartLoadFrac = 1.0
+            ELSE
+              Par(1) = REAL(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilIndex,r64)
+              Par(2) = DesOutTemp
+              Par(3) = 1.d0  !OnOffAirFlowFrac assume = 1.0 for continuous fan dx system
+              Par(5) = REAL(FanOpMode,r64)
+              CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, PartLoadFrac, DXHeatingCoilResidual, 0.0d0,   &
+                                            1.0d0, Par)
+              IF (SolFla == -1) THEN
+                IF(.NOT. WarmupFlag)THEN
+                  IF(DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRIter .LT. 1)THEN
+                    DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRIter = DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRIter+1
+                    CALL ShowWarningError(TRIM(DXHeatPumpSystem(DXSystemNum)%DXHeatPumpSystemType)// &
+                                          ' - Iteration limit exceeded calculating DX unit sensible '// &
+                                          'part-load ratio for unit = '//TRIM(DXHeatPumpSystem(DXSystemNum)%Name))
+                    CALL ShowContinueError('Estimated part-load ratio  = '//RoundSigDigits((ReqOutput/FullOutput),3))
+                    CALL ShowContinueError('Calculated part-load ratio = '//RoundSigDigits(PartLoadFrac,3))
+                    CALL ShowContinueErrorTimeStamp('The calculated part-load ratio will be used and the simulation'// &
+                                                    ' continues. Occurrence info: ')
+                  ELSE
+                    CALL ShowRecurringWarningErrorAtEnd(TRIM(DXHeatPumpSystem(DXSystemNum)%DXHeatPumpSystemType)//' "'&
+                      //TRIM(DXHeatPumpSystem(DXSystemNum)%Name)//'" - Iteration limit exceeded calculating'// &
+                      ' sensible part-load ratio error continues. Sensible PLR statistics follow.' &
+                      ,DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRIterIndex,PartLoadFrac,PartLoadFrac)
+                  END IF
+                END IF
+              ELSE IF (SolFla == -2) THEN
+                PartLoadFrac = ReqOutput/FullOutput
+                IF(.NOT. WarmupFlag)THEN
+                  IF(DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRFail .LT. 1)THEN
+                    DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRFail = DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRFail+1
+                    CALL ShowWarningError(TRIM(DXHeatPumpSystem(DXSystemNum)%DXHeatPumpSystemType)//' - DX unit sensible part-'// &
+                                    'load ratio calculation failed: part-load ratio limits exceeded, for unit = '// &
+                                     TRIM(DXHeatPumpSystem(DXSystemNum)%Name))
+                    CALL ShowContinueError('Estimated part-load ratio = '//RoundSigDigits(PartLoadFrac,3))
+                    CALL ShowContinueErrorTimeStamp('The estimated part-load ratio will be used and the simulation'// &
+                                                    ' continues. Occurrence info: ')
+                  ELSE
+                    CALL ShowRecurringWarningErrorAtEnd(TRIM(DXHeatPumpSystem(DXSystemNum)%DXHeatPumpSystemType)//' "'&
+                      //TRIM(DXHeatPumpSystem(DXSystemNum)%Name)//'" - DX unit sensible part-load ratio calculation'// &
+                      ' failed error continues. Sensible PLR statistics follow.' &
+                      ,DXHeatPumpSystem(DXSystemNum)%DXCoilSensPLRFailIndex,PartLoadFrac,PartLoadFrac)
+                  END IF
+                END IF
+
+              END IF
+            END IF
+          END IF
+
+          IF(PartLoadFrac.GT.1.0) THEN
+            PartLoadFrac = 1.0
+          ELSEIF(PartLoadFrac < 0.0) THEN
+            PartLoadFrac = 0.0
+          END IF
+
+
+        CASE DEFAULT
+          CALL ShowFatalError('ControlDXHeatingSystem: Invalid DXHeatPumpSystem coil type = '//  &
+                              TRIM(DXHeatPumpSystem(DXSystemNum)%HeatPumpCoilType))
+
+      END SELECT
+    END IF ! End of cooling load type (sensible or latent) if block
+  END IF   ! End of If DXheatingSystem is scheduled on and there is flow
+  !Set the final results
+  DXHeatPumpSystem(DXSystemNum)%PartLoadFrac = PartLoadFrac
+
+
+RETURN
+END Subroutine ControlDXHeatingSystem
+
+
+FUNCTION DXHeatingCoilResidual(PartLoadFrac, Par) RESULT (Residuum)
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   June 2006
+          !       MODIFIED
+          !       RE-ENGINEERED
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Calculates residual function (desired outlet temp - actual outlet temp)
+          ! DX Coil output depends on the part load ratio which is being varied to zero the residual.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Calls CalcDoe2DXCoil to get outlet temperature at the given cycling ratio
+          ! and calculates the residual as defined above
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+  USE DXCoils, ONLY: DXCoilOutletTemp, CalcDXHeatingCoil
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+    REAL(r64), INTENT(IN)  :: PartLoadFrac               ! Compressor cycling ratio (1.0 is continuous, 0.0 is off)
+    REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! Par(1) = DX coil number
+                                                    ! Par(2) = desired air outlet temperature [C]
+    REAL(r64)         :: Residuum                   ! Residual to be minimized to zero
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: CoilIndex        ! Index of this coil
+  REAL(r64)    :: OutletAirTemp    ! Outlet air temperature [C]
+  REAL(r64)    :: OnOffAirFlowFrac ! Ratio of compressor ON to compressor OFF air mass flow rate
+
+  CoilIndex        = INT(Par(1))
+  OnOffAirFlowFrac = Par(3)
+
+  CALL CalcDXHeatingCoil(CoilIndex,PartLoadFrac,ContFanCycCoil,OnOffAirFlowFrac)
+
+  OutletAirTemp = DXCoilOutletTemp(CoilIndex)
+  Residuum      = Par(2) - OutletAirTemp
+
+  RETURN
+END FUNCTION DXHeatingCoilResidual
+
+END MODULE HVACDXHeatPumpSystem
+
+!        End of Calculation subroutines for the DXCoolingSystem Module
+! *****************************************************************************
+
+
+!     NOTICE
+!
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     and The Regents of the University of California through Ernest Orlando Lawrence
+!     Berkeley National Laboratory.  All rights reserved.
+!
+!     Portions of the EnergyPlus software package have been developed and copyrighted
+!     by other individuals, companies and institutions.  These portions have been
+!     incorporated into the EnergyPlus software package under license.   For a complete
+!     list of contributors, see "Notice" located in EnergyPlus.f90.
+!
+!     NOTICE: The U.S. Government is granted for itself and others acting on its
+!     behalf a paid-up, nonexclusive, irrevocable, worldwide license in this data to
+!     reproduce, prepare derivative works, and perform publicly and display publicly.
+!     Beginning five (5) years after permission to assert copyright is granted,
+!     subject to two possible five year renewals, the U.S. Government is granted for
+!     itself and others acting on its behalf a paid-up, non-exclusive, irrevocable
+!     worldwide license in this data to reproduce, prepare derivative works,
+!     distribute copies to the public, perform publicly and display publicly, and to
+!     permit others to do so.
+!
+!     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
+!
+
 

@@ -41,12 +41,14 @@ REAL(r64), PARAMETER :: TempControlTol = 0.1d0 ! temperature control tolerance f
 REAL(r64), PARAMETER :: SmallAirVolFlow = 0.001d0
 REAL(r64), PARAMETER :: SmallWaterVolFlow = 1.d-9
 REAL(r64), PARAMETER :: BlankNumeric = -99999.d0 ! indicates numeric input field was blank
+REAL(r64), PARAMETER :: RetTempMax = 60.0d0  ! maximum return air temperature [deg C]
+REAL(r64), PARAMETER :: RetTempMin = -30.0d0 ! minimum return air temperature [deg C]
 ! The following parameters are used for system availability status
 INTEGER, PARAMETER :: NoAction = 0
 INTEGER, PARAMETER :: ForceOff = 1
 INTEGER, PARAMETER :: CycleOn = 2
 INTEGER, PARAMETER :: CycleOnZoneFansOnly = 3
-! The following parameters describe the set point types in TempControlType(ActualZoneNum)
+! The following parameters describe the setpoint types in TempControlType(ActualZoneNum)
 INTEGER, PARAMETER :: SingleHeatingSetPoint = 1
 INTEGER, PARAMETER :: SingleCoolingSetPoint = 2
 INTEGER, PARAMETER :: SingleHeatCoolSetPoint = 3
@@ -116,11 +118,16 @@ INTEGER, PARAMETER :: CoilVRF_Cooling                 = 21
 INTEGER, PARAMETER :: CoilVRF_Heating                 = 22
 
 INTEGER, PARAMETER :: CoilPerfDX_CoolByPassEmpirical  = 23
+INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPVSEquationFit  = 24
+INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPVSEquationFit  = 25
+
 
 
 ! Water to air HP coil types
 INTEGER, PARAMETER :: WatertoAir_Simple               = 1
 INTEGER, PARAMETER :: WatertoAir_ParEst               = 2
+INTEGER, PARAMETER :: WatertoAir_VarSpeedEquationFit  = 3
+INTEGER, PARAMETER :: WatertoAir_VarSpeedLooUpTable = 4
 
 
 CHARACTER(len=*), PARAMETER, DIMENSION(NumAllCoilTypes) :: cAllCoilTypes=  &
@@ -244,11 +251,12 @@ REAL(r64)     :: DXElecCoolingPower   = 0.0 ! Electric power consumed by DX cool
 REAL(r64)     :: DXElecHeatingPower   = 0.0 ! Electric power consumed by DX heating coil last DX simulation
 REAL(r64)     :: ElecHeatingCoilPower = 0.0 ! Electric power consumed by electric heating coil
 REAL(r64)     :: AirToAirHXElecPower  = 0.0 ! Electric power consumed by Heat Exchanger:Air To Air (Generic or Flat Plate)
-                                          ! from last simulation in HeatRecovery.f90
+                                            ! from last simulation in HeatRecovery.f90
 REAL(r64)     :: UnbalExhMassFlow = 0.0     ! unbalanced zone exhaust from a zone equip component [kg/s]
+REAL(r64)     :: PlenumInducedMassFlow = 0.0 ! secondary air mass flow rate induced from a return plenum [kg/s]
 LOGICAL  :: TurnFansOn = .FALSE.       ! If true overrides fan schedule and cycles fans on
 LOGICAL  :: TurnFansOff = .FALSE.      ! If True overides fan schedule and TurnFansOn and forces fans off
-LOGICAL  :: SetPointErrorFlag = .FALSE. ! True if any needed set points not set; if true, program terminates
+LOGICAL  :: SetPointErrorFlag = .FALSE. ! True if any needed setpoints not set; if true, program terminates
 LOGICAL  :: DoSetPointTest = .FALSE.    ! True one time only for sensed node setpoint test
 LOGICAL  :: NightVentOn = .FALSE.             ! set TRUE in SimAirServingZone if night ventilation is happening
 
@@ -287,7 +295,7 @@ LOGICAL,  PUBLIC :: SimNonZoneEquipmentFlag       ! True when non-zone equipment
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -112,6 +112,7 @@ PUBLIC GetHXCoilType
 PUBLIC GetHXCoilTypeAndName
 PUBLIC GetCoilMaxWaterFlowRate
 PUBLIC VerifyHeatExchangerParent
+PUBLIC GetActualDXCoilIndex
 
 CONTAINS
 
@@ -824,7 +825,7 @@ SUBROUTINE CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp
 ! First call to RegulaFalsi uses PLR=0. Nodes are typically setup at full output on this call.
 ! A large number of iterations are required to get to result (~36 iterations to get to PLR=0 node conditions).
 ! Reset node data to minimize iteration. This initialization reduces the number of iterations by 50%.
-! CAUTION: Do not use Node(x) = Node(y) here, this can overwrite the coil outlet node set point.
+! CAUTION: Do not use Node(x) = Node(y) here, this can overwrite the coil outlet node setpoint.
   IF(PartLoadRatio .EQ. 0.0) THEN
     Node(HXAssistedCoil(HXAssistedCoilNum)%HXExhaustAirInletNodeNum)%Temp = &
         Node(HXAssistedCoil(HXAssistedCoilNum)%HXAssistedCoilInletNodeNum)%Temp
@@ -1572,6 +1573,74 @@ FUNCTION GetHXDXCoilName(CoilType,CoilName,ErrorsFound) RESULT(DXCoilName)
 
 END FUNCTION GetHXDXCoilName
 
+FUNCTION GetActualDXCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(DXCoilIndex)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   February 2006
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given coil and returns the cooling coil name.  If
+          ! incorrect coil type or name is given, errorsfound is returned as true and the name
+          ! is returned as blank
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItem
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  INTEGER                      :: DXCoilIndex  ! returned index of DX cooling coil
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  ! Obtains and allocates HXAssistedCoolingCoil related parameters from input file
+  IF (GetCoilsInputFlag) THEN  ! First time subroutine has been called, get input data
+    ! Get the HXAssistedCoolingCoil input
+    CALL GetHXAssistedCoolingCoilInput
+    GetCoilsInputFlag=.false. ! Set logic flag to disallow getting the input data on future calls to this subroutine
+  End If
+
+  IF(TotalNumHXAssistedCoils .GT. 0)THEN
+    WhichCoil=FindItem(CoilName,HXAssistedCoil%Name,TotalNumHXAssistedCoils)
+  ELSE
+    WhichCoil=0
+  END IF
+
+  IF (WhichCoil /= 0) THEN
+    ! this should be the index to the DX cooling coil object, not the HXAssisted object
+    DXCoilIndex=HXAssistedCoil(WhichCoil)%CoolingCoilIndex
+  ELSE
+    CALL ShowSevereError('Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    DXCoilIndex = 0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetActualDXCoilIndex
+
 FUNCTION GetHXCoilType(CoilType,CoilName,ErrorsFound) RESULT(CoolingCoilType)
 
           ! FUNCTION INFORMATION:
@@ -1866,7 +1935,7 @@ END FUNCTION VerifyHeatExchangerParent
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

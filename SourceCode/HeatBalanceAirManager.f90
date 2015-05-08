@@ -339,7 +339,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
        'Zone','Average',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Operative Temperature [C]',ZnAirRpt(Loop)%OperativeTemp,  &
        'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Mean Air Humidity Ratio []',ZnAirRpt(Loop)%MeanAirHumRat,  &
+    CALL SetupOutputVariable('Zone Mean Air Dewpoint Temperature [C]',ZnAirRpt(Loop)%MeanAirDewpointTemp,  &
+       'Zone','Average',Zone(Loop)%Name)
+    CALL SetupOutputVariable('Zone Mean Air Humidity Ratio [kgWater/kgDryAir]',ZnAirRpt(Loop)%MeanAirHumRat,  &
        'Zone','Average',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Air Balance Internal Convective Gains Rate [W]',ZnAirRpt(Loop)%SumIntGains,  &
        'System','Average',Zone(Loop)%Name)
@@ -435,7 +437,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
       ZoneAirBalance(Loop)%BalanceMethod = AirBalanceNone
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = '//TRIM(ZoneAirBalance(Loop)%Name)//': This Zone ('// &
         TRIM(cAlphaArgs(2))//') is controlled by AvailabilityManager:HybridVentilation with Simple Airflow Control Type option.')
-      CALL ShowContinueError('Air balance method type QUADRATURE and Simple Airflow Control Type can not co-exist. ' &
+      CALL ShowContinueError('Air balance method type QUADRATURE and Simple Airflow Control Type cannot co-exist. ' &
         //'The NONE method is assigned')
     End If
 
@@ -3507,6 +3509,8 @@ SUBROUTINE ReportZoneMeanAirTemp
   USE DataHeatBalance, ONLY: MRT
   USE DataZoneControls, ONLY: AnyOpTempControl, TempControlledZone
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
+  USE Psychrometrics, ONLY: PsyTdpFnWPb
+  USE DataEnvironment, ONLY: OutBaroPress
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3534,6 +3538,7 @@ SUBROUTINE ReportZoneMeanAirTemp
     ZnAirRpt(ZoneLoop)%MeanAirTemp = ZTAV(ZoneLoop)
     ZnAirRpt(ZoneLoop)%MeanAirHumRat = ZoneAirHumRatAvg(ZoneLoop)
     ZnAirRpt(ZoneLoop)%OperativeTemp = 0.5d0*(ZTAV(ZoneLoop)+MRT(ZoneLoop))
+    ZnAirRpt(ZoneLoop)%MeanAirDewpointTemp = PsyTdpFnWPb(ZnAirRpt(ZoneLoop)%MeanAirHumRat,OutBaroPress)
 
     ! if operative temperature control is being used, then radiative fraction/weighting
     !  might be defined by user to be something different than 0.5, even scheduled over simulation period
@@ -3562,7 +3567,7 @@ END SUBROUTINE ReportZoneMeanAirTemp
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -43,6 +43,7 @@ INTEGER, PARAMETER :: SingleDuctCBVAVReheat=10
 INTEGER, PARAMETER :: SingleDuctCBVAVNoReheat=11
 INTEGER, PARAMETER :: SingleDuctConstVolCooledBeam=12
 INTEGER, PARAMETER :: DualDuctVAVOutdoorAir=13
+INTEGER, PARAMETER :: SingleDuctUserDefined=14
 
   ! DERIVED TYPE DEFINITIONS
 TYPE ZoneAirEquip
@@ -78,7 +79,7 @@ INTEGER                                        :: NumAirDistUnits=0
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

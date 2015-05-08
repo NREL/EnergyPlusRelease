@@ -141,7 +141,7 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
   INTEGER ThisOne                ! Indicator for this Name
 !  CHARACTER(len=20) :: CaseNodeFluidType
   CHARACTER(len=20) :: cNodeFluidType
-  CHARACTER(len=30) :: ConnectionType
+  CHARACTER(len=32) :: ConnectionType
   INTEGER Loop
   INTEGER FluidStreamNum         ! Fluid stream number passed to RegisterNodeConnection
 
@@ -177,6 +177,7 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
         IF (Node(NodeNumbers(Loop))%FluidType == NodeType_Unknown) THEN
           Node(NodeNumbers(Loop))%FluidType=NodeFluidType
         ENDIF
+        NodeRef(NodeNumbers(Loop))=NodeRef(NodeNumbers(Loop))+1
       ENDDO
     ELSE
       ThisOne=AssignNodeNumber(Name,NodeFluidType,ErrorsFound)
@@ -343,18 +344,19 @@ SUBROUTINE SetupNodeVarsForReporting
    ! Setup Report variables for the Nodes for HVAC Reporting, CurrentModuleObject='Node Name'
           CALL SetupOutputVariable('System Node Temp[C]', Node(NumNode)%Temp,'System','Average',NodeID(NumNode))
           CALL SetupOutputVariable('System Node MassFlowRate[kg/s]', Node(NumNode)%MassFlowRate,'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Humidity Ratio[]', Node(NumNode)%HumRat,'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Humidity Ratio[kgWater/kgDryAir]', Node(NumNode)%HumRat,'System','Average',  &
+             NodeID(NumNode))
           CALL SetupOutputVariable('System Node Setpoint Temp[C]', Node(NumNode)%TempSetPoint,'System','Average',NodeID(NumNode))
           CALL SetupOutputVariable('System Node Setpoint Temp Hi[C]', Node(NumNode)%TempSetPointHi,'System','Average',  &
                                                                       NodeID(NumNode))
           CALL SetupOutputVariable('System Node Setpoint Temp Lo[C]', Node(NumNode)%TempSetPointLo,'System','Average',  &
                                                                       NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio[]', Node(NumNode)%HumRatSetPoint,'System','Average',  &
-                                                                      NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Min[]', Node(NumNode)%HumRatMin,'System','Average',  &
-                                                                      NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Max[]', Node(NumNode)%HumRatMax,'System','Average',  &
-                                                                      NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio[kgWater/kgDryAir]', Node(NumNode)%HumRatSetPoint,  &
+             'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Min[kgWater/kgDryAir]', Node(NumNode)%HumRatMin,  &
+             'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Max[kgWater/kgDryAir]', Node(NumNode)%HumRatMax,  &
+             'System','Average',NodeID(NumNode))
           CALL SetupOutputVariable('System Node Relative Humidity[%]', MoreNodeInfo(NumNode)%RelHumidity,'System','Average',  &
                                            NodeID(NumNode))
           CALL SetupOutputVariable('System Node Pressure[Pa]', Node(NumNode)%Press,'System','Average',  &
@@ -374,6 +376,8 @@ SUBROUTINE SetupNodeVarsForReporting
           CALL SetupOutputVariable('System Node Enthalpy[J/kg]', MoreNodeInfo(NumNode)%ReportEnthalpy, 'System', &
                                    'Average', NodeID(NumNode))
           CALL SetupOutputVariable('System Node Wetbulb Temp[C]', MoreNodeInfo(NumNode)%WetbulbTemp, 'System', &
+                                   'Average', NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Dewpoint Temperature[C]', MoreNodeInfo(NumNode)%AirDewpointTemp, 'System', &
                                    'Average', NodeID(NumNode))
           CALL SetupOutputVariable('System Node Quality[]', Node(NumNode)%Quality,  &
                                    'System','Average',NodeID(NumNode))
@@ -405,7 +409,10 @@ SUBROUTINE SetupNodeVarsForReporting
             CALL SetupOutputVariable('System Node Carbon Dioxide Concentration [ppm]', Node(NumNode)%CO2,'System', &
                                     'Average',NodeID(NumNode))
           End If
-
+          IF (Contaminant%GenericContamSimulation) Then
+            CALL SetupOutputVariable('System Node Generic Contaminant Concentration [ppm]', Node(NumNode)%GenContam,'System', &
+                                    'Average',NodeID(NumNode))
+          End If
         ENDDO
       ENDIF
       NodeVarsSetup=.true.
@@ -760,7 +767,7 @@ FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFl
   INTEGER                 :: NumNodes
   INTEGER, ALLOCATABLE, DIMENSION(:), SAVE  :: NodeNums
   INTEGER                 :: FluidType
-  CHARACTER(len=30)       :: ConnectionType
+  CHARACTER(len=32)       :: ConnectionType
   LOGICAL, SAVE :: firsttime=.true.
   INTEGER :: NumParams
   INTEGER :: NumAlphas
@@ -1053,7 +1060,8 @@ SUBROUTINE CalcMoreNodeInfo
 
           ! USE STATEMENTS:
   USE DataEnvironment, ONLY: StdBaroPress,OutBaroPress,StdRhoAir
-  USE Psychrometrics,  ONLY: PsyRhoAirFnPbTdbW,RhoH2O,PsyHFnTdbW,CpCw,PsyTwbFnTdbWPb,PsyRhFnTdbWPb
+  USE Psychrometrics,  ONLY: PsyRhoAirFnPbTdbW,RhoH2O,PsyHFnTdbW,CpCw,PsyTwbFnTdbWPb,PsyRhFnTdbWPb,  &
+                             PsyTdpFnWPb
   USE DataGlobals ,    ONLY: InitConvTemp
   USE DataInterfaces,  ONLY: ShowWarningError,ShowContinueErrorTimeStamp
   USE OutputProcessor, ONLY: ReqReportVariables,ReqRepVars,NumOfReqVariables
@@ -1084,8 +1092,11 @@ SUBROUTINE CalcMoreNodeInfo
   INTEGER, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeWetbulbSchedPtr
   LOGICAL, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeRelHumidityRepReq
   INTEGER, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeRelHumiditySchedPtr
+  LOGICAL, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeDewpointRepReq
+  INTEGER, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeDewpointSchedPtr
   LOGICAL       :: ReportWetbulb
   LOGICAL       :: ReportRelHumidity
+  LOGICAL       :: ReportDewpoint
   REAL(r64)     :: SteamDensity
   REAL(r64)     :: EnthSteamInDry
   REAL(r64)     :: RhoAirCurrent ! temporary value for current air density f(baro, db , W)
@@ -1100,10 +1111,14 @@ SUBROUTINE CalcMoreNodeInfo
     ALLOCATE(NodeWetbulbSchedPtr(NumOfNodes))
     ALLOCATE(NodeRelHumidityRepReq(NumOfNodes))
     ALLOCATE(NodeRelHumiditySchedPtr(NumOfNodes))
+    ALLOCATE(NodeDewpointRepReq(NumOfNodes))
+    ALLOCATE(NodeDewpointSchedPtr(NumOfNodes))
     NodeWetbulbRepReq = .FALSE.
     NodeWetbulbSchedPtr = 0
     NodeRelHumidityRepReq = .FALSE.
     NodeRelHumiditySchedPtr = 0
+    NodeDewpointRepReq = .FALSE.
+    NodeDewpointSchedPtr = 0
 
     DO iNode=1,NumOfNodes
       DO iReq=1,NumOfReqVariables
@@ -1125,12 +1140,23 @@ SUBROUTINE CalcMoreNodeInfo
         END IF
       END DO
     END DO
+    DO iNode=1,NumOfNodes
+      DO iReq=1,NumOfReqVariables
+        IF ( SameString(ReqRepVars(iReq)%VarName,'System Node Dewpoint Temperature') .AND. &
+             ( SameString(ReqRepVars(iReq)%Key,NodeID(iNode)) .OR. SameString(ReqRepVars(iReq)%Key,Blank) ) ) THEN
+          NodeDewpointRepReq(iNode) = .TRUE.
+          NodeDewpointSchedPtr(iNode) = ReqRepVars(iReq)%SchedPtr
+          EXIT
+        END IF
+      END DO
+    END DO
     MyOneTimeFlag = .FALSE.
   END IF
   DO iNode=1,NumOfNodes
     NodeReportingString = 'NodeReportingCalc:'//NodeID(iNode)
     ReportWetbulb = .FALSE.
     ReportRelHumidity = .FALSE.
+    ReportDewpoint = .false.
     IF ( NodeWetbulbRepReq(iNode) .AND. NodeWetbulbSchedPtr(iNode) > 0) THEN
       ReportWetbulb = (GetCurrentScheduleValue(NodeWetbulbSchedPtr(iNode)) > 0.0)
     ELSE IF ( NodeWetbulbRepReq(iNode) .AND. NodeWetbulbSchedPtr(iNode) == 0) THEN
@@ -1140,6 +1166,11 @@ SUBROUTINE CalcMoreNodeInfo
       ReportRelHumidity = (GetCurrentScheduleValue(NodeRelHumiditySchedPtr(iNode)) > 0.0)
     ELSE IF ( NodeRelHumidityRepReq(iNode) .AND. NodeRelHumiditySchedPtr(iNode) == 0) THEN
       ReportRelHumidity = .TRUE.
+    END IF
+    IF ( NodeDewpointRepReq(iNode) .AND. NodeDewpointSchedPtr(iNode) > 0) THEN
+      ReportDewpoint = (GetCurrentScheduleValue(NodeDewpointSchedPtr(iNode)) > 0.0)
+    ELSE IF ( NodeDewpointRepReq(iNode) .AND. NodeDewpointSchedPtr(iNode) == 0) THEN
+      ReportDewpoint = .TRUE.
     END IF
     ! calculate the volume flow rate
     IF (Node(iNode)%FluidType == NodeType_Air) THEN
@@ -1156,6 +1187,11 @@ SUBROUTINE CalcMoreNodeInfo
       ELSE
         MoreNodeInfo(iNode)%WetbulbTemp = 0.0
       END IF
+      IF (ReportDewpoint) THEN
+        MoreNodeInfo(iNode)%AirDewpointTemp=PsyTdpFnWPb(Node(iNode)%HumRat,OutBaroPress)
+      ELSE
+        MoreNodeInfo(iNode)%AirDewpointTemp=0.0
+      ENDIF
       IF (ReportRelHumidity) THEN
         ! if Node%Press was reliable could be used here.
         ! following routines don't issue psych errors and may be more reliable.
@@ -1318,7 +1354,7 @@ END SUBROUTINE CheckMarkedNodes
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

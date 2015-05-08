@@ -106,8 +106,8 @@ TYPE ElectricEIRChillerSpecs
   REAL(r64)         :: DesignHeatRecVolFlowRate  = 0.0 ! Design water volumetric flow rate through heat recovery loop [m3/s]
   REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0 ! Design water mass flow rate through heat recovery loop [kg/s]
   REAL(r64)         :: SizFac                    = 0.0 ! sizing factor
-  REAL(r64)         :: BasinHeaterPowerFTempDiff = 0.0 ! Basin heater capacity per degree C below set point (W/C)
-  REAL(r64)         :: BasinHeaterSetPointTemp   = 0.0 ! Set point temperature for basin heater operation (C)
+  REAL(r64)         :: BasinHeaterPowerFTempDiff = 0.0 ! Basin heater capacity per degree C below setpoint (W/C)
+  REAL(r64)         :: BasinHeaterSetPointTemp   = 0.0 ! setpoint temperature for basin heater operation (C)
   LOGICAL           :: HeatRecActive         = .False. ! True when entered Heat Rec Vol Flow Rate > 0
   INTEGER           :: HeatRecInletNodeNum       = 0   ! Node number for the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum      = 0   ! Node number for the heat recovery outlet side of the condenser
@@ -208,7 +208,8 @@ CONTAINS
 !*************************************************************************
 
 SUBROUTINE SimElectricEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, CompIndex,LoopNum, RunFlag,FirstIteration, &
-                              InitLoopEquip,MyLoad,MaxCap,MinCap,OptCap,GetSizingFactor,SizingFactor)
+                                 InitLoopEquip,MyLoad,MaxCap,MinCap,OptCap,GetSizingFactor,SizingFactor,  &
+                                 TempCondInDesign,TempEvapOutDesign)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   June 2004
@@ -248,6 +249,8 @@ SUBROUTINE SimElectricEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, Co
   INTEGER, INTENT(IN)          :: LoopNum          ! plant loop index pointer
   LOGICAL, INTENT(IN)          :: GetSizingFactor  ! TRUE when just the sizing factor is requested
   REAL(r64), INTENT(INOUT)     :: SizingFactor     ! sizing factor
+  REAL(r64), INTENT(INOUT)     :: TempCondInDesign
+  REAL(r64), INTENT(INOUT)     :: TempEvapOutDesign
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -295,6 +298,8 @@ SUBROUTINE SimElectricEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, Co
 
 
   IF (InitLoopEquip) THEN
+    TempEvapOutDesign  = ElectricEIRChiller(EIRChillNum)%TempRefEvapOut
+    TempCondInDesign   = ElectricEIRChiller(EIRChillNum)%TempRefCondIn
     CALL InitElectricEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
     CALL SizeElectricEIRChiller(EIRChillNum)
     IF (LoopNum == ElectricEIRChiller(EIRChillNum)%CWLoopNum) THEN
@@ -898,7 +903,7 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
   LOGICAL, INTENT(IN)  :: FirstHVACIteration  ! Initialize variables when TRUE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  INTEGER, PARAMETER   :: SupplySideLoopNum = 2
+          ! na
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           !  na
@@ -1005,13 +1010,14 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
       CALL ShowFatalError('InitElectricEIRChiller: Program terminated due to previous condition(s).')
     ENDIF
 
-    IF (ElectricEIRChiller(EIRChillNum)%VariableFlow) Then 
+    IF (ElectricEIRChiller(EIRChillNum)%VariableFlow) Then
       ! reset flow priority
       PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElectricEIRChiller(EIRChillNum)%CWLoopSideNum)% &
           Branch(ElectricEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElectricEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
               = LoopFlowStatus_NeedyIfLoopOn
       ! check if setpoint on outlet node
-      IF (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) THEN
+      IF ((Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
+          (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue) ) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
           IF (.NOT. ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
             CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
@@ -1031,7 +1037,7 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
                                           TRIM(ElectricEIRChiller(EIRChillNum)%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
-              CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the chiller evaporator outlet node ')
+              CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
               ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
@@ -1043,6 +1049,8 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
         ElectricEIRChiller(EIRChillNum)%VariableFlowSetToLoop = .TRUE.
         Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
+        Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
+          Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
       ENDIF
     ENDIF
     MyFlag(EIRChillNum)=.FALSE.
@@ -1125,6 +1133,8 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
          Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
+    Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
+         Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
   IF (FirstHVACIteration) THEN
@@ -1207,10 +1217,11 @@ SUBROUTINE SizeElectricEIRChiller(EIRChillNum)
 
           ! USE STATEMENTS:
   USE DataSizing
-  USE DataPlant,   ONLY: PlantLoop, PlantSizesOkayToFinalize
+  USE DataPlant,   ONLY: PlantLoop, PlantSizesOkayToFinalize, TypeOf_Chiller_ElectricEIR
   USE PlantUtilities,     ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE OutputReportPredefined
+  USE StandardRatings,   ONLY: CalcChillerIPLV
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1238,6 +1249,14 @@ SUBROUTINE SizeElectricEIRChiller(EIRChillNum)
   REAL(r64)           :: tmpNomCap ! local nominal capacity cooling power
   REAL(r64)           :: tmpEvapVolFlowRate ! local evaporator design volume flow rate
   REAL(r64)           :: tmpCondVolFlowRate ! local condenser design volume flow rate
+  LOGICAL, SAVE       :: MyOneTimeFlag = .TRUE.
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFlag   ! TRUE in order to calculate IPLV
+
+  IF (MyOneTimeFlag) THEN
+    ALLOCATE(MyFlag(NumElectricEIRChillers))
+    MyFlag = .TRUE.
+    MyOneTimeFlag = .FALSE.
+  END IF
 
   PltSizNum = 0
   PltSizCondNum = 0
@@ -1340,6 +1359,18 @@ SUBROUTINE SizeElectricEIRChiller(EIRChillNum)
   CALL RegisterPlantCompDesignFlow(ElectricEIRChiller(EIRChillNum)%CondInletNodeNum,tmpCondVolFlowRate)
 
   IF (PlantSizesOkayToFinalize) THEN
+    IF (MyFlag(EIRChillNum)) THEN
+      CALL CalcChillerIPLV(ElectricEIRChiller(EIRChillNum)%Name, &
+                           TypeOf_Chiller_ElectricEIR,           &
+                           ElectricEIRChiller(EIRChillNum)%RefCap, &
+                           ElectricEIRChiller(EIRChillNum)%RefCOP, &
+                           ElectricEIRChiller(EIRChillNum)%CondenserType, &
+                           ElectricEIRChiller(EIRChillNum)%ChillerCapFT, &
+                           ElectricEIRChiller(EIRChillNum)%ChillerEIRFT, &
+                           ElectricEIRChiller(EIRChillNum)%ChillerEIRFPLR, &
+                           ElectricEIRChiller(EIRChillNum)%MinUnLoadRat)
+      MyFlag(EIRChillNum) = .FALSE.
+    ENDIF
     !create predefined report
     equipName = ElectricEIRChiller(EIRChillNum)%Name
     CALL PreDefTableEntry(pdchMechType,equipName,'Chiller:Electric:EIR')
@@ -1376,9 +1407,9 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
   USE DataHVACGlobals, ONLY : SmallLoad, SysTimeElapsed, TimeStepSys
   USE General,         ONLY : RoundSigDigits, CreateSysTimeIntervalString
   USE CurveManager,    ONLY : CurveValue
-  USE DataPlant,       ONLY : ControlType_SeriesActive,MassFlowTol,DeltaTemptol, PlantLoop, &
-                              SimPlantEquipTypes, TypeOf_Chiller_ElectricEIR, CompSetPtBasedSchemeType, &
-                              CriteriaType_MassFlowRate
+  USE DataPlant,       ONLY : DeltaTemptol, PlantLoop, SimPlantEquipTypes, TypeOf_Chiller_ElectricEIR,  &
+                              CompSetPtBasedSchemeType, CriteriaType_MassFlowRate, SingleSetpoint, DualSetpointDeadband
+  USE DataBranchAirLoopPlant, ONLY: ControlType_SeriesActive, MassFlowTolerance
   USE DataEnvironment, ONLY : EnvironmentName, CurMnDy
   USE PlantUtilities,  ONLY : SetComponentFlowRate, PullCompInterconnectTrigger
 
@@ -1584,19 +1615,32 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
                                      CriteriaType_MassFlowRate, &
                                      CondMassFlowRate)
 
-    IF (CondMassFlowRate < MassFlowTol) RETURN
+    IF (CondMassFlowRate < MassFlowTolerance) RETURN
 
   END IF
 
-  IF ((ElectricEIRChiller(EIRChillNum)%VariableFlow) .OR. &
-      (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
-               == CompSetPtBasedSchemeType)          .OR. &
-      (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
-       ! there will be a valid setpoint on outlet
-     EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
-  ELSE ! use plant loop overall setpoint 
-    EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
-  ENDIF
+  SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetpoint)
+    IF ((ElectricEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+       EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
+    ENDIF
+  CASE (DualSetpointDeadband)
+    IF ((ElectricEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+       EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPointHi
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPointHi
+    ENDIF
+  END SELECT
   ! Get capacity curve info with respect to CW setpoint and entering condenser water temps
   ChillerCapFT = CurveValue(ElectricEIRChiller(EIRChillNum)%ChillerCapFT, &
                             EvapOutletTempSetpoint,CondInletTemp)
@@ -1627,31 +1671,6 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
   ! Available chiller capacity as a function of temperature
   AvailChillerCap = ChillerRefCap*ChillerCapFT
 
-!  IF (PlantLoop(PlantLoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0) THEN
-!    EvapMassFlowRate =  MIN(EvapMassFlowRateMax,Node(EvapInletNode)%MassFlowRateMaxAvail)   !CRBranchPump
-!    EvapMassFlowRate =  MAX(EvapMassFlowRate,Node(EvapInletNode)%MassFlowRateMinAvail)      !CRBranchPump
-!!   Some other component set the flow to 0. No reason to continue with calculations.
-!    IF(EvapMassFlowRate == 0.0d0)THEN
-!      MyLoad = 0.0d0
-!      ElectricEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
-!      RETURN
-!    END IF
-!
-!  ELSE
-!    EvapMassFlowRate = Node(EvapInletNode)%MassFlowRate
-!!   Some other component set the flow to 0. No reason to continue with calculations.
-!    IF(EvapMassFlowRate == 0.0d0)THEN
-!      MyLoad = 0.0d0
-!      IF (ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN
-!        CALL CalcBasinHeaterPower(ElectricEIRChiller(EIRChillNum)%BasinHeaterPowerFTempDiff,&
-!                              ElectricEIRChiller(EIRChillNum)%BasinHeaterSchedulePtr,&
-!                              ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
-!      ENDIF
-!      ElectricEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
-!      RETURN
-!    END IF
-!  END IF
-
  !Only perform this check for temperature setpoint control
   IF (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpschemeType ==   &
         CompSetPtBasedSchemeType) THEN
@@ -1661,9 +1680,15 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
                              Node(EvapInletNode)%Temp,                      &
                              PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%FluidIndex, &
                              'CalcElectricEIRChillerModel')
-
-    TempLoad = EvapMassFlowRate * Cp * &
-               (Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint)
+    EvapMassFlowRate = Node(EvapInletNode)%MassFlowRate
+    SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
+    CASE (SingleSetpoint)
+      TempLoad = EvapMassFlowRate * Cp * &
+                 (Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint)
+    CASE (DualSetpointDeadband)
+      TempLoad = EvapMassFlowRate * Cp * &
+                 (Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPointHi)
+    END SELECT
     TempLoad = MAX(0.0d0,TempLoad)
 
     ! MyLoad is capped at minimum PLR * RefCap, adjust load to actual water side load because this chiller can cycle
@@ -1685,208 +1710,200 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
                               PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%FluidIndex, &
                              'CalcElectricEIRChillerModel')
 
-  ! If FlowLock is False (0), the chiller sets the plant loop mdot
-  ! If FlowLock is True (1),  the new resolved plant loop mdot is used
-  IF (PlantLoop(PlantLoopNum)%Loopside(LoopSideNum)%FlowLock ==0) THEN
-       !- Subcooling is possible for load based operation, because there is not necessarily an outlet setpoint temperature
-       !- For temp set pt ctrl, we will set it to false initially
-       !- Thus it is the opposite of the temp set point control flag
 
-       !PossibleSubCooling = .NOT. PlantLoop(PlantLoopNum)%TempSetPtCtrl
-       IF(PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType ==   &
-            CompSetPtBasedSchemeType)THEN
-         ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .FALSE.
-       ELSE
-         ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
-       ENDIF
-       ! Set evaporator heat transfer rate
-       QEvaporator = AvailChillerCap * PartLoadRat
+   IF(PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType ==   &
+        CompSetPtBasedSchemeType)THEN
+     ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .FALSE.
+   ELSE
+     ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
+   ENDIF
+   ! Set evaporator heat transfer rate
+   QEvaporator = AvailChillerCap * PartLoadRat
 
-       ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-       IF(ElectricEIRChiller(EIRChillNum)%ConstantFlow)THEN
-          ! Set the evaporator mass flow rate to design
-          ! Start by assuming max (design) flow
-          EvapMassFlowRate = EvapMassFlowRateMax
-          ! Use SetComponentFlowRate to decide actual flow
-          Call SetComponentFlowRate( EvapMassFlowRate,  &
-                              EvapInletNode , EvapOutletNode  , &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
-                              ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
-                              ElectricEIRChiller(EIRChillNum)%CWCompNum)
-          IF (EvapMassFlowRate /= 0.0D0) THEN
-            EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
-          ELSE
-            EvapDeltaTemp = 0.0D0
-          ENDIF
-          ! Evaluate outlet temp based on delta
-          EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
-
-       ELSEIF(ElectricEIRChiller(EIRChillNum)%VariableFlow)THEN
-
-          ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
-          EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint
-          IF (EvapDeltaTemp /= 0) THEN
-            ! Calculate desired flow to request based on load
-            EvapMassFlowRate = ABS(QEvaporator/Cp/EvapDeltaTemp)
-            IF((EvapMassFlowRate - EvapMassFlowRateMax) .GT. MassFlowTol) &
-                  ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
-            !Check to see if the Maximum is exceeded, if so set to maximum
-            EvapMassFlowRate = MIN(EvapMassFlowRateMax, EvapMassFlowRate)
-            ! Use SetComponentFlowRate to decide actual flow
-            Call SetComponentFlowRate( EvapMassFlowRate,  &
-                              EvapInletNode , EvapOutletNode  , &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
-                              ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
-                              ElectricEIRChiller(EIRChillNum)%CWCompNum)
-            ! Should we recalculate this with the corrected setpoint?
-            EvapOutletTemp = Node(EvapOutletNode)%TempSetPoint
-            QEvaporator = MAX(0.0d0,(EvapMassFlowRate*Cp*EvapDeltaTemp))
-          ELSE
-            ! Try to request zero flow
-            EvapMassFlowRate=0.0
-            ! Use SetComponentFlowRate to decide actual flow
-            Call SetComponentFlowRate( EvapMassFlowRate,  &
-                              EvapInletNode , EvapOutletNode  , &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
-                              ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
-                              ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
-                              ElectricEIRChiller(EIRChillNum)%CWCompNum)
-            ! No deltaT since component is not running
-            EvapOutletTemp = Node(EvapInletNode)%Temp
-            QEvaporator = 0.0
-            PartLoadRat = 0.0
-            ChillerPartLoadRatio = PartLoadRat
-
-            ! DSU? so what if the delta T is zero?  On FlowLock==0, the inlet temp could = setpoint, right?
-            IF (ElectricEIRChiller(EIRChillNum)%DeltaTErrCount < 1 .AND. .NOT. WarmupFlag) THEN
-              ElectricEIRChiller(EIRChillNum)%DeltaTErrCount=ElectricEIRChiller(EIRChillNum)%DeltaTErrCount+1
-              CALL ShowWarningError('Evaporator DeltaTemp = 0 in mass flow calculation (Tevapin = Tsetpoint).')
-              CALL ShowContinueErrorTimeStamp(' ')
-            ELSE IF (.NOT. WarmupFlag) THEN
-              ElectricEIRChiller(EIRChillNum)%ChillerCapFTError = ElectricEIRChiller(EIRChillNum)%ChillerCapFTError + 1
-              CALL ShowRecurringWarningErrorAtEnd('CHILLER:ELECTRIC:EIR "' &
-                                        //TRIM(ElectricEIRChiller(EIRChillNum)%Name)//'":'//&
-                  ' Evaporator DeltaTemp = 0 in mass flow calculation warning continues...' &
-                  , ElectricEIRChiller(EIRChillNum)%DeltaTErrCountIndex, EvapDeltaTemp, EvapDeltaTemp)
-            END IF
-
-          END IF
-       END IF  !End of Constant Variable Flow If Block
-
-  ELSE  ! If FlowLock is True
-
-      EvapMassFlowRate = Node(EvapInletNode)%MassFlowRate
+   ! Either set the flow to the Constant value or caluclate the flow for the variable volume
+   IF(ElectricEIRChiller(EIRChillNum)%ConstantFlow)THEN
+      ! Set the evaporator mass flow rate to design
+      ! Start by assuming max (design) flow
+      EvapMassFlowRate = EvapMassFlowRateMax
+      ! Use SetComponentFlowRate to decide actual flow
       Call SetComponentFlowRate( EvapMassFlowRate,  &
-                                 EvapInletNode , EvapOutletNode  , &
-                                 ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
-                                 ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
-                                 ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
-                                 ElectricEIRChiller(EIRChillNum)%CWCompNum)
-!       Some other component set the flow to 0. No reason to continue with calculations.
-      IF(EvapMassFlowRate == 0.0d0)THEN
-        MyLoad = 0.0d0
-        IF (ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN
-          CALL CalcBasinHeaterPower(ElectricEIRChiller(EIRChillNum)%BasinHeaterPowerFTempDiff,&
-                              ElectricEIRChiller(EIRChillNum)%BasinHeaterSchedulePtr,&
-                              ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
-        ENDIF
-        ElectricEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
-        RETURN
-      END IF
-      IF(ElectricEIRChiller(EIRChillNum)%PossibleSubCooling) THEN
-        QEvaporator = ABS(MyLoad)
+                          EvapInletNode , EvapOutletNode  , &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
+                          ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
+                          ElectricEIRChiller(EIRChillNum)%CWCompNum)
+      IF (EvapMassFlowRate /= 0.0D0) THEN
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
-        EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       ELSE
-       EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTempSetpoint
-       QEvaporator = MAX(0.0d0,(EvapMassFlowRate*Cp*EvapDeltaTemp))
-       EvapOutletTemp = EvapOutletTempSetpoint
-      END IF
-      !Check that the Evap outlet temp honors both plant loop temp low limit and also the chiller low limit
-       IF(EvapOutletTemp .LT. TempLowLimitEout) THEN
-        IF((Node(EvapInletNode)%Temp - TempLowLimitEout) .GT. DeltaTemptol) THEN
-         EvapOutletTemp = TempLowLimitEout
-         EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
-         QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
-        ELSE
-         EvapOutletTemp = Node(EvapInletNode)%Temp
-         EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
-         QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
-        END IF
-       END IF
-       IF(EvapOutletTemp .LT. Node(EvapOutletNode)%TempMin) THEN
-        IF((Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempMin) .GT. DeltaTemptol) THEN
-         EvapOutletTemp = Node(EvapOutletNode)%TempMin
-         EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
-         QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
-        ELSE
-         EvapOutletTemp = Node(EvapInletNode)%Temp
-         EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
-         QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
-        END IF
-       END IF
-      ! If load exceeds the distributed load set to the distributed load
-      IF(QEvaporator > ABS(MyLoad)) THEN
-        IF(EvapMassFlowRate > MassFlowTol) THEN
-            QEvaporator = ABS(MyLoad)
-            EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
-            EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
-        ELSE
-            QEvaporator = 0.0
-            EvapOutletTemp = Node(EvapInletNode)%Temp
-        END IF
-      END IF
+        EvapDeltaTemp = 0.0D0
+      ENDIF
+      ! Evaluate outlet temp based on delta
+      EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
 
-      ! Checks QEvaporator on the basis of the machine limits.
-      IF(QEvaporator > (AvailChillerCap * MaxPartLoadRat))THEN
-        IF(EvapMassFlowRate > MassFlowTol) THEN
-           QEvaporator = AvailChillerCap * MaxPartLoadRat
-           EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
-           ! evaporator outlet temperature is allowed to float upwards (recalculate AvailChillerCap? iterate?)
-           EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
-        ELSE
-           QEvaporator = 0.0
-           EvapOutletTemp = Node(EvapInletNode)%Temp
-        END IF
+   ELSEIF(ElectricEIRChiller(EIRChillNum)%VariableFlow)THEN
 
-      END IF
-
-      IF(AvailChillerCap .GT. 0.0)THEN
-        PartLoadRat = MAX(0.0d0,MIN((QEvaporator/AvailChillerCap),MaxPartLoadRat))
+      ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
+      SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
+      CASE (SingleSetpoint)
+        EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint
+      CASE (DualSetpointDeadband)
+        EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPointHi
+      END SELECT
+      
+      IF (EvapDeltaTemp /= 0) THEN
+        ! Calculate desired flow to request based on load
+        EvapMassFlowRate = ABS(QEvaporator/Cp/EvapDeltaTemp)
+        IF((EvapMassFlowRate - EvapMassFlowRateMax) .GT. MassFlowTolerance) &
+              ElectricEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
+        !Check to see if the Maximum is exceeded, if so set to maximum
+        EvapMassFlowRate = MIN(EvapMassFlowRateMax, EvapMassFlowRate)
+        ! Use SetComponentFlowRate to decide actual flow
+        Call SetComponentFlowRate( EvapMassFlowRate,  &
+                          EvapInletNode , EvapOutletNode  , &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
+                          ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
+                          ElectricEIRChiller(EIRChillNum)%CWCompNum)
+        ! Should we recalculate this with the corrected setpoint?
+        SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
+        CASE (SingleSetpoint)
+          EvapOutletTemp = Node(EvapOutletNode)%TempSetPoint
+        CASE (DualSetpointDeadband)
+          EvapOutletTemp = Node(EvapOutletNode)%TempSetPointHi
+        END SELECT
+        QEvaporator = MAX(0.0d0,(EvapMassFlowRate*Cp*EvapDeltaTemp))
       ELSE
+        ! Try to request zero flow
+        EvapMassFlowRate=0.0
+        ! Use SetComponentFlowRate to decide actual flow
+        Call SetComponentFlowRate( EvapMassFlowRate,  &
+                          EvapInletNode , EvapOutletNode  , &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopNum,     &
+                          ElectricEIRChiller(EIRChillNum)%CWLoopSideNum, &
+                          ElectricEIRChiller(EIRChillNum)%CWBranchNum,   &
+                          ElectricEIRChiller(EIRChillNum)%CWCompNum)
+        ! No deltaT since component is not running
+        EvapOutletTemp = Node(EvapInletNode)%Temp
+        QEvaporator = 0.0
         PartLoadRat = 0.0
-      END IF
+        ChillerPartLoadRatio = PartLoadRat
 
-      ! Chiller cycles below minimum part load ratio, FRAC = amount of time chiller is ON during this time step
-      IF (PartLoadRat .LT. MinPartLoadRat) FRAC = MIN(1.0d0,(PartLoadRat/MinPartLoadRat))
-
-      ! set the module level variable used for reporting FRAC
-      ChillerCyclingRatio = FRAC
-
-      ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
-      IF(AvailChillerCap .GT. 0.0)THEN
-        PartLoadRat = MAX(PartLoadRat,MinUnLoadRat)
-      ELSE
-        PartLoadRat = 0.0
-      END IF
-
-       ! set the module level variable used for reporting PLR
-      ChillerPartLoadRatio = PartLoadRat
-
-      ! calculate the load due to false loading on chiller over and above water side load
-      ChillerFalseLoadRate = (AvailChillerCap * PartLoadRat * FRAC) - QEvaporator
-      IF(ChillerFalseLoadRate .LT. SmallLoad) THEN
-       ChillerFalseLoadRate = 0.0
-      END IF
-      IF(QEvaporator == 0.0d0 .AND. ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN
-         CALL CalcBasinHeaterPower(ElectricEIRChiller(EIRChillNum)%BasinHeaterPowerFTempDiff,&
-                                   ElectricEIRChiller(EIRChillNum)%BasinHeaterSchedulePtr,&
-                                   ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
+        ! DSU? so what if the delta T is zero?  On FlowLock==0, the inlet temp could = setpoint, right?
+        IF (ElectricEIRChiller(EIRChillNum)%DeltaTErrCount < 1 .AND. .NOT. WarmupFlag) THEN
+          ElectricEIRChiller(EIRChillNum)%DeltaTErrCount=ElectricEIRChiller(EIRChillNum)%DeltaTErrCount+1
+          CALL ShowWarningError('Evaporator DeltaTemp = 0 in mass flow calculation (Tevapin = Tsetpoint).')
+          CALL ShowContinueErrorTimeStamp(' ')
+        ELSE IF (.NOT. WarmupFlag) THEN
+          ElectricEIRChiller(EIRChillNum)%ChillerCapFTError = ElectricEIRChiller(EIRChillNum)%ChillerCapFTError + 1
+          CALL ShowRecurringWarningErrorAtEnd('CHILLER:ELECTRIC:EIR "' &
+                                    //TRIM(ElectricEIRChiller(EIRChillNum)%Name)//'":'//&
+              ' Evaporator DeltaTemp = 0 in mass flow calculation warning continues...' &
+              , ElectricEIRChiller(EIRChillNum)%DeltaTErrCountIndex, EvapDeltaTemp, EvapDeltaTemp)
+        END IF
 
       END IF
-  END IF  ! This is the end of the FlowLock Block
+   END IF  !End of Constant Variable Flow If Block
+
+  IF(EvapMassFlowRate == 0.0d0)THEN
+    MyLoad = 0.0d0
+    IF (ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN
+      CALL CalcBasinHeaterPower(ElectricEIRChiller(EIRChillNum)%BasinHeaterPowerFTempDiff,&
+                          ElectricEIRChiller(EIRChillNum)%BasinHeaterSchedulePtr,&
+                          ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
+    ENDIF
+    ElectricEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
+    RETURN
+  END IF
+  IF(ElectricEIRChiller(EIRChillNum)%PossibleSubCooling) THEN
+    QEvaporator = ABS(MyLoad)
+    EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
+    EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
+  ELSE
+    EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTempSetpoint
+    QEvaporator = MAX(0.0d0,(EvapMassFlowRate*Cp*EvapDeltaTemp))
+    EvapOutletTemp = EvapOutletTempSetpoint
+  END IF
+ !Check that the Evap outlet temp honors both plant loop temp low limit and also the chiller low limit
+  IF(EvapOutletTemp .LT. TempLowLimitEout) THEN
+    IF((Node(EvapInletNode)%Temp - TempLowLimitEout) .GT. DeltaTemptol) THEN
+      EvapOutletTemp = TempLowLimitEout
+      EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
+      QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
+    ELSE
+      EvapOutletTemp = Node(EvapInletNode)%Temp
+      EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
+      QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
+    END IF
+  END IF
+  IF(EvapOutletTemp .LT. Node(EvapOutletNode)%TempMin) THEN
+    IF((Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempMin) .GT. DeltaTemptol) THEN
+      EvapOutletTemp = Node(EvapOutletNode)%TempMin
+      EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
+      QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
+    ELSE
+      EvapOutletTemp = Node(EvapInletNode)%Temp
+      EvapDeltaTemp = Node(EvapInletNode)%Temp - EvapOutletTemp
+      QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
+    END IF
+  END IF
+  ! If load exceeds the distributed load set to the distributed load
+  IF(QEvaporator > ABS(MyLoad)) THEN
+    IF(EvapMassFlowRate > MassFlowTolerance) THEN
+      QEvaporator = ABS(MyLoad)
+      EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
+      EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
+    ELSE
+      QEvaporator = 0.0
+      EvapOutletTemp = Node(EvapInletNode)%Temp
+    END IF
+  END IF
+
+  ! Checks QEvaporator on the basis of the machine limits.
+  IF(QEvaporator > (AvailChillerCap * MaxPartLoadRat))THEN
+    IF(EvapMassFlowRate > MassFlowTolerance) THEN
+      QEvaporator = AvailChillerCap * MaxPartLoadRat
+      EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
+       ! evaporator outlet temperature is allowed to float upwards (recalculate AvailChillerCap? iterate?)
+      EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
+    ELSE
+      QEvaporator = 0.0
+      EvapOutletTemp = Node(EvapInletNode)%Temp
+    END IF
+
+  END IF
+
+  IF(AvailChillerCap .GT. 0.0)THEN
+    PartLoadRat = MAX(0.0d0,MIN((QEvaporator/AvailChillerCap),MaxPartLoadRat))
+  ELSE
+    PartLoadRat = 0.0
+  END IF
+
+  ! Chiller cycles below minimum part load ratio, FRAC = amount of time chiller is ON during this time step
+  IF (PartLoadRat .LT. MinPartLoadRat) FRAC = MIN(1.0d0,(PartLoadRat/MinPartLoadRat))
+
+  ! set the module level variable used for reporting FRAC
+  ChillerCyclingRatio = FRAC
+
+  ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
+  IF(AvailChillerCap .GT. 0.0)THEN
+    PartLoadRat = MAX(PartLoadRat,MinUnLoadRat)
+  ELSE
+    PartLoadRat = 0.0
+  END IF
+
+   ! set the module level variable used for reporting PLR
+  ChillerPartLoadRatio = PartLoadRat
+
+  ! calculate the load due to false loading on chiller over and above water side load
+  ChillerFalseLoadRate = (AvailChillerCap * PartLoadRat * FRAC) - QEvaporator
+  IF(ChillerFalseLoadRate .LT. SmallLoad) THEN
+    ChillerFalseLoadRate = 0.0
+  END IF
+  IF(QEvaporator == 0.0d0 .AND. ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN
+    CALL CalcBasinHeaterPower(ElectricEIRChiller(EIRChillNum)%BasinHeaterPowerFTempDiff,&
+                               ElectricEIRChiller(EIRChillNum)%BasinHeaterSchedulePtr,&
+                               ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
+  END IF
 
   ChillerEIRFT   = CurveValue(ElectricEIRChiller(EIRChillNum)%ChillerEIRFT,EvapOutletTemp,CondInletTemp)
   IF(ChillerEIRFT .LT. 0.0)THEN
@@ -1937,25 +1954,25 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
   QCondenser = Power*ElectricEIRChiller(EIRChillNum)%OpenMotorEff + QEvaporator + ChillerFalseLoadRate
 
   IF (ElectricEIRChiller(EIRChillNum)%CondenserType == WaterCooled) THEN
-     IF (CondMassFlowRate > MassFlowTol) THEN
+    IF (CondMassFlowRate > MassFlowTolerance) THEN
        ! If Heat Recovery specified for this vapor compression chiller, then Qcondenser will be adjusted by this subroutine
-       IF(ElectricEIRChiller(EIRChillNum)%HeatRecActive) CALL EIRChillerHeatRecovery(EIRChillNum,QCondenser, &
+      IF(ElectricEIRChiller(EIRChillNum)%HeatRecActive) CALL EIRChillerHeatRecovery(EIRChillNum,QCondenser, &
                                                                CondMassFlowRate,CondInletTemp,QHeatRecovered)
-       Cp  = GetSpecificHeatGlycol(PlantLoop(ElectricEIRChiller(EIRChillNum)%CDLoopNum)%FluidName,  &
+        Cp  = GetSpecificHeatGlycol(PlantLoop(ElectricEIRChiller(EIRChillNum)%CDLoopNum)%FluidName,  &
                                  CondInletTemp,                      &
                                  PlantLoop(ElectricEIRChiller(EIRChillNum)%CDLoopNum)%FluidIndex, &
                                  'CalcElectricEIRChillerModel')
 
-       CondOutletTemp = QCondenser/CondMassFlowRate/Cp + CondInletTemp
-     ELSE
-       CALL ShowSevereError('CalcElectricEIRChillerModel: Condenser flow = 0, for ElectricEIRChiller='//  &
+        CondOutletTemp = QCondenser/CondMassFlowRate/Cp + CondInletTemp
+    ELSE
+      CALL ShowSevereError('CalcElectricEIRChillerModel: Condenser flow = 0, for ElectricEIRChiller='//  &
                             TRIM(ElectricEIRChiller(EIRChillNum)%Name))
-       CALL ShowContinueErrorTimeStamp(' ')
+      CALL ShowContinueErrorTimeStamp(' ')
        !DSU? maybe this could be handled earlier, check if this component has a load and an evap flow rate
        ! then if cond flow is zero, just make a request to the condenser,
        ! then just say it couldn't run until condenser loop wakes up.
        !CALL ShowFatalError('Program Terminates due to previous error condition.')
-     END IF
+    END IF
   ELSE !Air Cooled or Evap Cooled
     !don't care about outlet temp for Air-Cooled or Evap Cooled and there is no CondMassFlowRate and would divide by zero
      ! If Heat Recovery specified for this vapor compression chiller, then Qcondenser will be adjusted by this subroutine
@@ -2474,7 +2491,8 @@ CONTAINS
 !*************************************************************************
 
 SUBROUTINE SimReformulatedEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, CompIndex,LoopNum,RunFlag,FirstIteration, &
-                              InitLoopEquip,MyLoad,MaxCap,MinCap,OptCap,GetSizingFactor,SizingFactor)
+                              InitLoopEquip,MyLoad,MaxCap,MinCap,OptCap,GetSizingFactor,SizingFactor,  &
+                              TempCondInDesign,TempEvapOutDesign )
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu
           !       DATE WRITTEN   July 2004
@@ -2515,6 +2533,8 @@ SUBROUTINE SimReformulatedEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl
   INTEGER, INTENT(IN)          :: LoopNum          ! plant loop index pointer
   LOGICAL, INTENT(IN)          :: GetSizingFactor  ! TRUE when just the sizing factor is requested
   REAL(r64), INTENT(INOUT)     :: SizingFactor     ! sizing factor
+  REAL(r64), INTENT(INOUT)     :: TempCondInDesign
+  REAL(r64), INTENT(INOUT)     :: TempEvapOutDesign
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -2562,6 +2582,8 @@ SUBROUTINE SimReformulatedEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl
 
 
   IF (InitLoopEquip) THEN
+    TempEvapOutDesign  = ElecReformEIRChiller(EIRChillNum)%TempRefEvapOut
+    TempCondInDesign   = ElecReformEIRChiller(EIRChillNum)%TempRefCondIn
     CALL InitElecReformEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
     CALL SizeElecReformEIRChiller(EIRChillNum)
     IF (LoopNum == ElecReformEIRChiller(EIRChillNum)%CWLoopNum) THEN
@@ -2997,7 +3019,7 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
   LOGICAL, INTENT(IN)  :: FirstHVACIteration  ! Initialize variables when TRUE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  INTEGER, PARAMETER   :: SupplySideLoopNum = 2
+          ! na
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           !  na
@@ -3106,13 +3128,14 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
 
 
 
-    IF (ElecReformEIRChiller(EIRChillNum)%VariableFlow) Then 
+    IF (ElecReformEIRChiller(EIRChillNum)%VariableFlow) Then
       ! reset flow priority
       PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElecReformEIRChiller(EIRChillNum)%CWLoopSideNum)% &
           Branch(ElecReformEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElecReformEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
               = LoopFlowStatus_NeedyIfLoopOn
       ! check if setpoint on outlet node
-      IF (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) THEN
+      IF ((Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
+          (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
           IF (.NOT. ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
             CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
@@ -3132,7 +3155,7 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
                                           TRIM(ElecReformEIRChiller(EIRChillNum)%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
-              CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the chiller evaporator outlet node ')
+              CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
               ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
@@ -3144,6 +3167,8 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
         ElecReformEIRChiller(EIRChillNum)%VariableFlowSetToLoop = .TRUE.
         Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
+        Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
+          Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
       ENDIF
     ENDIF
     MyFlag(EIRChillNum)=.FALSE.
@@ -3228,6 +3253,8 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
          Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
+    Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
+         Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
   IF (FirstHVACIteration) THEN
@@ -3307,12 +3334,13 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
 
           ! USE STATEMENTS:
   USE DataSizing
-  USE DataPlant,    ONLY: PlantLoop, PlantSizesOkayToFinalize
+  USE DataPlant,    ONLY: PlantLoop, PlantSizesOkayToFinalize, TypeOf_Chiller_ElectricReformEIR
   USE PlantUtilities, ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE CurveManager, ONLY: CurveValue, GetCurveMinMaxValues
   USE OutputReportPredefined
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE StandardRatings,   ONLY: CalcChillerIPLV
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3356,6 +3384,14 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
   REAL(r64)           :: tmpNomCap ! local nominal capacity cooling power
   REAL(r64)           :: tmpEvapVolFlowRate ! local evaporator design volume flow rate
   REAL(r64)           :: tmpCondVolFlowRate ! local condenser design volume flow rate
+  LOGICAL, SAVE       :: MyOneTimeFlag = .TRUE.
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFlag   ! TRUE in order to calculate IPLV
+
+  IF (MyOneTimeFlag) THEN
+    ALLOCATE(MyFlag(NumElecReformEIRChillers))
+    MyFlag = .TRUE.
+    MyOneTimeFlag = .FALSE.
+  END IF
 
   PltSizNum = 0
   PltSizCondNum = 0
@@ -3469,7 +3505,22 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
   CALL RegisterPlantCompDesignFlow(ElecReformEIRChiller(EIRChillNum)%CondInletNodeNum,tmpCondVolFlowRate)
 
   IF (PlantSizesOkayToFinalize) THEN
-    !create predefined report
+    IF (MyFlag(EIRChillNum)) THEN
+      CALL CalcChillerIPLV(ElecReformEIRChiller(EIRChillNum)%Name, &
+                           TypeOf_Chiller_ElectricReformEIR,           &
+                           ElecReformEIRChiller(EIRChillNum)%RefCap, &
+                           ElecReformEIRChiller(EIRChillNum)%RefCOP, &
+                           ElecReformEIRChiller(EIRChillNum)%CondenserType, &
+                           ElecReformEIRChiller(EIRChillNum)%ChillerCapFT, &
+                           ElecReformEIRChiller(EIRChillNum)%ChillerEIRFT, &
+                           ElecReformEIRChiller(EIRChillNum)%ChillerEIRFPLR, &
+                           ElecReformEIRChiller(EIRChillNum)%MinUnLoadRat, &
+                           ElecReformEIRChiller(EIRChillNum)%EvapVolFlowRate, &
+                           ElecReformEIRChiller(EIRChillNum)%CDLoopNum, &
+                           ElecReformEIRChiller(EIRChillNum)%OpenMotorEff)
+     MyFlag(EIRChillNum) = .FALSE.
+   ENDIF
+   !create predefined report
     equipName = ElecReformEIRChiller(EIRChillNum)%Name
     CALL PreDefTableEntry(pdchMechType,equipName,'Chiller:Electric:ReformulatedEIR')
     CALL PreDefTableEntry(pdchMechNomEff,equipName,ElecReformEIRChiller(EIRChillNum)%RefCOP)
@@ -3647,7 +3698,7 @@ SUBROUTINE ControlReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteratio
                              ShowRecurringWarningErrorAtEnd, ShowContinueError
  USE DataHVACGlobals, ONLY : SmallLoad
  USE CurveManager,    ONLY : GetCurveMinMaxValues
- USE DataPlant,       ONLY : ControlType_SeriesActive
+ USE DataBranchAirLoopPlant, ONLY: ControlType_SeriesActive
  USE General,         ONLY : SolveRegulaFalsi
 
  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -4115,9 +4166,9 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
   USE DataHVACGlobals, ONLY : SmallLoad, SysTimeElapsed, TimeStepSys
   USE General,         ONLY : RoundSigDigits, CreateSysTimeIntervalString
   USE CurveManager,    ONLY : CurveValue
-  USE DataPlant,       ONLY : ControlType_SeriesActive,MassFlowTol,DeltaTemptol,PlantLoop, &
-                              SimPlantEquipTypes, TypeOf_Chiller_ElectricReformEIR, CompSetPtBasedSchemeType, &
-                              CriteriaType_MassFlowRate
+  USE DataPlant,       ONLY : DeltaTemptol,PlantLoop, SimPlantEquipTypes, TypeOf_Chiller_ElectricReformEIR,  &
+                              CompSetPtBasedSchemeType, CriteriaType_MassFlowRate, SingleSetpoint, DualSetpointDeadband
+  USE DataBranchAirLoopPlant, ONLY: ControlType_SeriesActive, MassFlowTolerance
   USE DataEnvironment, ONLY : EnvironmentName, CurMnDy
   USE PlantUtilities,  ONLY : SetComponentFlowRate, PullCompInterconnectTrigger
 
@@ -4252,8 +4303,8 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
         CondMassFlowRate = Node(CondInletNode)%MassFlowrate
       ENDIF
     ENDIF
-    
-    
+
+
     RETURN
    END IF
 
@@ -4286,20 +4337,33 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
                                      CriteriaType_MassFlowRate, &
                                      CondMassFlowRate)
 
-    IF (CondMassFlowRate < MassFlowTol) RETURN
+    IF (CondMassFlowRate < MassFlowTolerance) RETURN
 
   END IF
   FRAC    = 1.0
 
-  IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
-      (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
-               == CompSetPtBasedSchemeType)          .OR. &
-      (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
-       ! there will be a valid setpoint on outlet
-     EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
-  ELSE ! use plant loop overall setpoint 
-    EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
-  ENDIF
+  SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetpoint)
+    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+      EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
+    ENDIF
+  CASE (DualSetpointDeadband)
+    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+      EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPointHi
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPointHi
+    ENDIF
+  END SELECT
 
   ! Get capacity curve info with respect to CW setpoint and leaving condenser water temps
   ChillerCapFT = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerCapFT, &
@@ -4419,11 +4483,17 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
           ENDIF
           EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
        ELSEIF(ElecReformEIRChiller(EIRChillNum)%VariableFlow)THEN
-          ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
-          EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint
+          SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetpoint)
+            ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
+            EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPoint
+          CASE (DualSetpointDeadband)
+            EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPointHi
+          END SELECT
+          
           IF (EvapDeltaTemp /= 0) THEN
             EvapMassFlowRate = MAX(0.0d0,(QEvaporator/Cp/EvapDeltaTemp))
-            IF((EvapMassFlowRate - EvapMassFlowRateMax) .GT. MassFlowTol) &
+            IF((EvapMassFlowRate - EvapMassFlowRateMax) .GT. MassFlowTolerance) &
                   ElecReformEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
             !Check to see if the Maximum is exceeded, if so set to maximum
             EvapMassFlowRate = MIN(EvapMassFlowRateMax, EvapMassFlowRate)
@@ -4435,13 +4505,18 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
                               ElecReformEIRChiller(EIRChillNum)%CWBranchNum,   &
                               ElecReformEIRChiller(EIRChillNum)%CWCompNum)
             ! Should we recalculate this with the corrected setpoint?
-            EvapOutletTemp = Node(EvapOutletNode)%TempSetPoint
+            SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
+            CASE (SingleSetpoint)
+              EvapOutletTemp = Node(EvapOutletNode)%TempSetPoint
+            CASE (DualSetpointDeadband)
+              EvapOutletTemp = Node(EvapOutletNode)%TempSetPointHi
+            END SELECT
             QEvaporator = MAX(0.0d0,(EvapMassFlowRate*Cp*EvapDeltaTemp))
           ELSE
             ! Try to request zero flow
             EvapMassFlowRate=0.0
             ! Use SetComponentFlowRate to decide actual flow
-            Call SetComponentFlowRate( EvapMassFlowRate,  &
+            CALL SetComponentFlowRate( EvapMassFlowRate,  &
                               EvapInletNode , EvapOutletNode  , &
                               ElecReformEIRChiller(EIRChillNum)%CWLoopNum,     &
                               ElecReformEIRChiller(EIRChillNum)%CWLoopSideNum, &
@@ -4515,7 +4590,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
       END IF
       ! If load exceeds the distributed load set to the distributed load
       IF(QEvaporator > ABS(MyLoad)) THEN
-        IF(EvapMassFlowRate > MassFlowTol) THEN
+        IF(EvapMassFlowRate > MassFlowTolerance) THEN
             QEvaporator = ABS(MyLoad)
             EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
             EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
@@ -4527,7 +4602,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
 
       ! Checks QEvaporator on the basis of the machine limits.
       IF(QEvaporator > (AvailChillerCap * MaxPartLoadRat))THEN
-        IF(EvapMassFlowRate > MassFlowTol) THEN
+        IF(EvapMassFlowRate > MassFlowTolerance) THEN
            QEvaporator = AvailChillerCap * MaxPartLoadRat
            EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
            ! evaporator outlet temperature is allowed to float upwards (recalculate AvailChillerCap? iterate?)
@@ -4579,7 +4654,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
   QCondenser = Power*ElecReformEIRChiller(EIRChillNum)%OpenMotorEff + QEvaporator + ChillerFalseLoadRate
 
 !  Currently only water cooled chillers are allowed for the reformulated EIR chiller model
-  IF (CondMassFlowRate > MassFlowTol) THEN
+  IF (CondMassFlowRate > MassFlowTolerance) THEN
     ! If Heat Recovery specified for this vapor compression chiller, then Qcondenser will be adjusted by this subroutine
     IF(ElecReformEIRChiller(EIRChillNum)%HeatRecActive) CALL ReformEIRChillerHeatRecovery(EIRChillNum,QCondenser, &
                                                              CondMassFlowRate,CondInletTemp,QHeatRecovered)
@@ -4619,7 +4694,7 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
   USE DataInterfaces,  ONLY : ShowWarningError, ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd, &
                               ShowContinueError
   USE CurveManager,    ONLY : CurveValue
-  USE DataPlant,       ONLY : PlantLoop, CompSetPtBasedSchemeType
+  USE DataPlant,       ONLY : PlantLoop, CompSetPtBasedSchemeType, SingleSetpoint, DualSetpointDeadband
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4650,7 +4725,7 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
   REAL(r64)  :: EIRFPLRPLRmax         ! Maximum PLR allowed by EIRFPLR curve
   INTEGER    :: PlantLoopNum          ! Plant loop which contains the current chiller
   INTEGER    :: LoopSideNum           ! Plant loop side which contains the current chiller (usually supply side)
-  INTEGER    :: BranchNum 
+  INTEGER    :: BranchNum
   INTEGER    :: CompNum
 
 ! Do not print out warnings if chiller not operating or FirstIteration/WarmupFlag/FlowLock
@@ -4658,7 +4733,7 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
   LoopSideNum    = ElecReformEIRChiller(EIRChillNum)%CWLoopSideNum
   BranchNum      = ElecReformEIRChiller(EIRChillNum)%CWBranchNum
   CompNum        = ElecReformEIRChiller(EIRChillNum)%CWCompNum
-  
+
   IF (FirstIteration .OR. WarmupFlag .OR. PlantLoop(PlantLoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0) RETURN
 
   EvapOutletNode = ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum
@@ -4800,15 +4875,28 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
     END IF
   END IF
 
-  IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
-      (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
-               == CompSetPtBasedSchemeType)          .OR. &
-      (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
-       ! there will be a valid setpoint on outlet
-    EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
-  ELSE ! use plant loop overall setpoint 
-    EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
-  ENDIF
+  SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetpoint)
+    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+      EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPoint
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
+    ENDIF
+  CASE (DualSetpointDeadband)
+    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+        (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
+                 == CompSetPtBasedSchemeType)          .OR. &
+        (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
+         ! there will be a valid setpoint on outlet
+      EvapOutletTempSetpoint = Node(EvapOutletNode)%TempSetPointHi
+    ELSE ! use plant loop overall setpoint
+      EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPointHi
+    ENDIF
+  END SELECT
   ChillerCapFT = CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerCapFT, &
                             EvapOutletTempSetpoint,CondOutletTemp)
 
@@ -4882,7 +4970,7 @@ END MODULE ChillerReformulatedEIR
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -33,8 +33,8 @@ PRIVATE
           ! MODULE PARAMETER DEFINITIONS:
     !Common Pipe Recirc Flow Directions
   INTEGER, PARAMETER               :: NoRecircFlow      = 0
-  INTEGER, PARAMETER               :: PrimaryRecirc     = 1       ! flow from Supply-outlet/Demand-inlet to Supply-inlet/demand-outlet
-  INTEGER, PARAMETER               :: SecondaryRecirc   = 2        ! flow from Supply-inlet/Demand-oulet to Supply-outlet/demand-inlet
+  INTEGER, PARAMETER               :: PrimaryRecirc     = 1  ! flow from Supply-outlet/Demand-inlet to Supply-inlet/demand-outlet
+  INTEGER, PARAMETER               :: SecondaryRecirc   = 2  ! flow from Supply-inlet/Demand-oulet to Supply-outlet/demand-inlet
 
   INTEGER, PARAMETER               :: FlowTypeNotSet = 9
   INTEGER, PARAMETER               :: ConstantFlow = 10
@@ -59,8 +59,8 @@ TYPE, PUBLIC :: CommonPipeData
   REAL(r64)                        :: PriOutTemp            = 0.0d0   ! Temperature at primary outlet node
   REAL(r64)                        :: SecInTemp             = 0.0d0   ! Temperature at secondary inlet node
   REAL(r64)                        :: SecOutTemp            = 0.0d0   ! Temperature at secondary outlet node
-  REAL(r64)                        :: PriInletSetPoint      = 0.0d0   ! Set point at Primary inlet node
-  REAL(r64)                        :: SecInletSetPoint      = 0.0d0   ! Set point at Secondary inlet node
+  REAL(r64)                        :: PriInletSetPoint      = 0.0d0   ! Setpoint at Primary inlet node
+  REAL(r64)                        :: SecInletSetPoint      = 0.0d0   ! Setpoint at Secondary inlet node
   LOGICAL                          :: PriInletControlled    = .FALSE. !True if Primary inlet node is controlled
   LOGICAL                          :: SecInletControlled    = .FALSE. !True if secondary inlet is controlled
   REAL(r64)                        :: PriFlowRequest        = 0.d0    ! total flow request on supply side.
@@ -198,6 +198,10 @@ SUBROUTINE UpdateHVACInterface(OutletNode,InletNode,OutOfToleranceFlag)
 
   IF (Contaminant%CO2Simulation) Then
     Node(InletNode)%CO2 = Node(OutletNode)%CO2
+  End If
+
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(InletNode)%GenContam = Node(OutletNode)%GenContam
   End If
 
   RETURN
@@ -493,10 +497,10 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
         !--half of loop mass.  The other half is accounted for at the other half loop interface
         !--pump heat.  Pump heat for a single loop setpoint with pumps only on the supply side is added at the supply side inlet.
         !   Pump heat for a dual setpoint loop is added to each loop side inlet
-        !  The previous tank temperature value is used to prevent accumulation of pump heat during iterations while recalculating 
+        !  The previous tank temperature value is used to prevent accumulation of pump heat during iterations while recalculating
         ! tank conditions each call.
         ! Analytical solution for ODE, formulated for both final tank temp and average tank temp.
-        
+
 
   TimeStepSeconds = TimeStepSys * SecInHour
   MassFlowRate = Node(TankInletNode)%MassFlowRate
@@ -534,7 +538,7 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
 
     ! update report variable
   PlantLoop(LoopNum)%LoopSide(TankOutletLoopSide)%LoopSideInlet_TankTemp = TankAverageTemp
-  
+
   TankOutletTemp = TankAverageTemp
 
   RETURN
@@ -646,7 +650,7 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIt
   Cp = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,  &
                              LastTankOutletTemp, &
                              PlantLoop(loopNum)%FluidIndex,'UpdateCommonPipe')
-                             
+
     !set the fraction of loop mass assigned to each half loop outlet capacitance ('tank') calculation
 
     !calculate new loop inlet temperature.  The calculation is a simple 'tank' (thermal capacitance) calculation that includes:
@@ -657,8 +661,8 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIt
     !The placement of the 'tank' for common pipes is *after* the outlet node and *before* the flow split or flow mixing.
     !This requires no logical check in the code since for purposes of temperature calculations, it is identical to the
     !no common pipe case.
-    ! calculation is separated because for common pipe, a different split for mass fraction is applied 
-    ! The pump heat source is swapped around here compared to no common pipe (so pump heat sort stays on its own side). 
+    ! calculation is separated because for common pipe, a different split for mass fraction is applied
+    ! The pump heat source is swapped around here compared to no common pipe (so pump heat sort stays on its own side).
   TimeStepSeconds = TimeStepSys * SecInHour
   MassFlowRate = Node(TankInletNode)%MassFlowRate
   PumpHeat = PlantLoop(LoopNum)%LoopSide(TankInletLoopSide)%TotalPumpHeat
@@ -735,6 +739,7 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
   USE DataGlobals,    ONLY : BeginEnvrnFlag
   USE DataLoopNode,    ONLY: Node
   USE DataPlant
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
           !SUBROUTINE ARGUMENT DEFINITIONS
   INTEGER, INTENT(IN)    :: LoopNum          !plant loop number
@@ -784,11 +789,11 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
   IF (.NOT. BeginEnvrnFlag) THEN
     MyEnvrnFlag(LoopNum)=.TRUE.
   END IF
-  
+
   ! every time inits
   MdotSec      = Node(NodeNumSecOut)%MassFlowRate
   MdotPri      = Node(NodeNumPriOut)%MassFlowRate
-  
+
   IF (LoopSide == SupplySide) THEN
     TempSecOutTankOut = TankOutletTemp
     TempPriOutTankOut = PlantLoop(LoopNum)%LoopSide(DemandSide)%LoopSideInlet_TankTemp
@@ -796,11 +801,11 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
     TempPriOutTankOut = TankOutletTemp
     TempSecOutTankOut = PlantLoop(LoopNum)%LoopSide(SupplySide)%LoopSideInlet_TankTemp
   ENDIF
-  
+
   ! first do mass balances and find common pipe flow rate and direction
   IF (MdotPri > MdotSec) THEN
     MdotPriRCLeg = MdotPri - MdotSec
-    IF (MdotPriRCLeg <  MassFlowTol) THEN
+    IF (MdotPriRCLeg <  MassFlowTolerance) THEN
       MdotPriRCLeg = 0.d0
       CPFlowDir = NoRecircFlow
     ELSE
@@ -810,7 +815,7 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
     CommonPipeTemp = TempPriOutTankOut
   ELSEIF (MdotPri < MdotSec) THEN
     MdotSecRCLeg = MdotSec - MdotPri
-    IF (MdotSecRCLeg < MassFlowTol) THEN
+    IF (MdotSecRCLeg < MassFlowTolerance) THEN
       MdotSecRCLeg = 0.d0
       CPFlowDir = NoRecircFlow
     ELSE
@@ -822,11 +827,11 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
     MdotPriRCLeg = 0.d0
     MdotSecRCLeg = 0.d0
     CPFlowDir = NoRecircFlow
-    CommonPipeTemp = (TempPriOutTankOut + TempSecOutTankOut) / 2.d0 
+    CommonPipeTemp = (TempPriOutTankOut + TempSecOutTankOut) / 2.d0
   ENDIF
-  
+
   ! now calculate inlet temps
-  
+
   IF (MdotSec > 0.d0) THEN
     TempSecInlet = (MdotPri*TempPriOutTankOut + MdotSecRCLeg*TempSecOutTankOut - MdotPriRCLeg * TempPriOutTankOut) &
                    / (MdotSec)
@@ -846,13 +851,13 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
   PlantCommonPipe(LoopNum)%FlowDir = CPFlowDir
   Node(NodeNumSecIn)%Temp = TempSecInlet
   Node(NodeNumPriIn)%Temp = TempPriInlet
-  
+
  IF (LoopSide == SupplySide) THEN
    MixedOutletTemp = TempPriInlet
  ELSE
    MixedOutletTemp = TempSecInlet
  ENDIF
-  
+
   RETURN
 
 END SUBROUTINE ManageSingleCommonPipe
@@ -877,8 +882,8 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
 
           ! USE STATEMENTS:
   USE DataGlobals,    ONLY : BeginEnvrnFlag
-  USE DataPlant,      ONLY : PlantLoop, SupplySide, DemandSide, TotNumLoops, MassFlowTol, DeltaTemptol, &
-                             PlantReport
+  USE DataPlant,      ONLY : PlantLoop, SupplySide, DemandSide, TotNumLoops, DeltaTemptol, PlantReport
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode,   ONLY : Node
   USE PlantUtilities, ONLY : SetActuatedBranchFlowRate
 
@@ -931,7 +936,7 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
   INTEGER    :: NodeNumSecOut = 0
   INTEGER    :: NodeNumPriIn  = 0
   INTEGER    :: NodeNumSecIn  = 0
-  
+
   INTEGER    :: MaxIterLimitCaseA = 8
   INTEGER    :: MaxIterLimitCaseB = 4
 
@@ -969,7 +974,7 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
   MdotSec      = Node(NodeNumSecOut)%MassFlowRate ! assume known and fixed by demand side operation
   TempCPPrimaryCntrlSetpoint   = Node(NodeNumPriIn)%TempSetpoint
   TempCPSecondaryCntrlSetpoint = Node(NodeNumSecIn)%TempSetpoint
-  
+
   ! 6 unknowns follow, fill with current values
   MdotPriToSec = PlantCommonPipe(LoopNum)%PriToSecFlow
   MdotPriRCLeg = PlantCommonPipe(LoopNum)%PriCPLegFlow
@@ -989,6 +994,7 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
   ! determine current case
   ! which side is being updated
   ! commonpipe control point is the inlet of one of the half loops
+  CurCallingCase=0
   IF (LoopSide == SupplySide) THEN !update primary inlet
     IF ( PlantLoop(loopnum)%Loopside(SupplySide)%InletNodeSetPt .AND.  &
         .NOT. PlantLoop(loopnum)%Loopside(DemandSide)%InletNodeSetPt ) THEN
@@ -1002,7 +1008,7 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
   ELSE ! update secondary inlet
     IF (PlantLoop(loopnum)%Loopside(SupplySide)%InletNodeSetPt .AND.  &
         .NOT. PlantLoop(loopnum)%Loopside(DemandSide)%InletNodeSetPt ) THEN
-      CurCallingCase    = SupplyLedSecondaryInletUpdate 
+      CurCallingCase    = SupplyLedSecondaryInletUpdate
 
 
     ELSEIF (.NOT. PlantLoop(loopnum)%Loopside(SupplySide)%InletNodeSetPt .AND.  &
@@ -1014,123 +1020,126 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
 
   SELECT CASE (CurCallingCase)
 
-  CASE (SupplyLedPrimaryInletUpdate, SupplyLedSecondaryInletUpdate)
-   ! CASE A, Primary/Supply Led 
-      ! six equations and six unknowns (although one has a setpoint)
-    DO loop = 1, MaxIterLimitCaseA
+    CASE (SupplyLedPrimaryInletUpdate, SupplyLedSecondaryInletUpdate)
+     ! CASE A, Primary/Supply Led
+        ! six equations and six unknowns (although one has a setpoint)
+      DO loop = 1, MaxIterLimitCaseA
 
-      ! eq 1
-      IF (ABS(TempSecOutTankOut -  TempCPPrimaryCntrlSetpoint )  > DeltaTemptol) THEN
-        MdotPriToSec = MdotPriRCLeg * (TempCPPrimaryCntrlSetpoint - TempPriOutTankOut) &
-                                 / ( TempSecOutTankOut -  TempCPPrimaryCntrlSetpoint)
-        IF (MdotPriToSec < MassFlowTol) MdotPriToSec = 0.d0
-        IF (MdotPriToSec > MdotSec) MdotPriToSec = MdotSec
-      ELSE
-        MdotPriToSec = MdotSec !  what to do (?) 
-      ENDIF
-      ! eq. 5
-      MdotPriRCLeg = MdotPri - MdotPriToSec
-      IF (MdotPriRCLeg < MassFlowTol) MdotPriRCLeg = 0.d0
-      
-      ! eq. 4
-      MdotSecRCLeg = MdotSec - MdotPriToSec
-      IF (MdotSecRCLeg < MassFlowTol) MdotSecRCLeg = 0.d0
-      
-      ! eq  6
-      IF ((MdotPriToSec + MdotSecRCLeg) > MassFlowTol) THEN
-        TempSecInlet = (MdotPriToSec * TempPriOutTankOut + MdotSecRCLeg * TempSecOutTankOut) &
-                      / (MdotPriToSec + MdotSecRCLeg)
-      ELSE
-        TempSecInlet = TempPriOutTankOut
-      ENDIF
-      
-      ! eq. 3
-      IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
-         !  .AND. FirstHVACIteration 
-           .AND. (CurCallingCase == SupplyLedPrimaryInletUpdate) )THEN
-        ! MdotPri is a variable to be calculated and flow request needs to be made
-        IF (ABS(TempCPPrimaryCntrlSetpoint  ) > DeltaTemptol) THEN
-!          Do loop2 = 1, MaxIterLimitCaseA
-!            MdotPri = (MdotSec *  TempSecInlet +  MdotPriRCLeg *TempPriOutTankOut - MdotSecRCLeg * TempSecOutTankOut )  &
-!                          /  (TempPriOutTankOut )
-            
-            MdotPri = (MdotPriRCLeg * TempPriOutTankOut + MdotPriToSec * TempSecOutTankOut) &
-                        / (TempCPPrimaryCntrlSetpoint)
-          
-       !   ENDDO
-          IF (MdotPri < MassFlowTol) MdotPri = 0.d0
+        ! eq 1
+        IF (ABS(TempSecOutTankOut -  TempCPPrimaryCntrlSetpoint )  > DeltaTemptol) THEN
+          MdotPriToSec = MdotPriRCLeg * (TempCPPrimaryCntrlSetpoint - TempPriOutTankOut) &
+                                   / ( TempSecOutTankOut -  TempCPPrimaryCntrlSetpoint)
+          IF (MdotPriToSec < MassFlowTolerance) MdotPriToSec = 0.d0
+          IF (MdotPriToSec > MdotSec) MdotPriToSec = MdotSec
         ELSE
-          MdotPri = MdotSec
+          MdotPriToSec = MdotSec !  what to do (?)
         ENDIF
-        CALL SetActuatedBranchFlowRate(MdotPri,NodeNumPriIn,LoopNum,SupplySide, 1, .FALSE.)
-      ENDIF
+        ! eq. 5
+        MdotPriRCLeg = MdotPri - MdotPriToSec
+        IF (MdotPriRCLeg < MassFlowTolerance) MdotPriRCLeg = 0.d0
 
-      
-      ! eq. 2
-      IF ((MdotPriToSec + MdotPriRCLeg) > MassFlowTol ) THEN
-        TempPriInlet = (MdotPriToSec * TempSecOutTankOut + MdotPriRCLeg * TempPriOutTankOut) &
-                      / (MdotPriToSec + MdotPriRCLeg)
-      ELSE
-        TempPriInlet = TempSecOutTankOut
-      ENDIF
-      
+        ! eq. 4
+        MdotSecRCLeg = MdotSec - MdotPriToSec
+        IF (MdotSecRCLeg < MassFlowTolerance) MdotSecRCLeg = 0.d0
 
-    ENDDO
-  CASE (DemandLedPrimaryInletUpdate, DemandLedSecondaryInletUpdate)
-    ! case B. Secondary/demand led
-
-      ! six equations and six unknowns (although one has a setpoint)
-    DO Loop = 1, MaxIterLimitCaseB
-      ! eq 1, 
-      IF (ABS(TempPriOutTankOut   - TempSecOutTankOut )  > DeltaTemptol) THEN
-        MdotPriToSec = MdotSec * (TempCPSecondaryCntrlSetpoint - TempSecOutTankOut ) &
-                             / (TempPriOutTankOut   - TempSecOutTankOut )
-        IF (MdotPriToSec < MassFlowTol) MdotPriToSec = 0.d0
-        IF (MdotPriToSec > MdotSec) MdotPriToSec = MdotSec
-      ELSE
-        MdotPriToSec = MdotSec
-      ENDIF
-
-      ! eq. 2, 
-      IF ((MdotPriToSec + MdotPriRCLeg) > MassFlowTol ) THEN
-        TempPriInlet = (MdotPriToSec * TempSecOutTankOut + MdotPriRCLeg * TempPriOutTankOut) &
-                      / (MdotPriToSec + MdotPriRCLeg)
-      ELSE
-        TempPriInlet = TempSecOutTankOut
-      ENDIF
-
-      ! eq. 3
-      IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
-          !  .AND. FirstHVACIteration  &
-            .AND. (CurCallingCase == DemandLedPrimaryInletUpdate)) THEN
-        ! MdotPri is a variable to be calculated and flow request made
-        IF (ABS(TempPriOutTankOut - TempPriInlet ) > DeltaTemptol) THEN
-          MdotPri = MdotSec * ( TempCPSecondaryCntrlSetpoint -  TempSecOutTankOut )  &
-                        /  (TempPriOutTankOut - TempPriInlet )
-          IF (MdotPri < MassFlowTol) MdotPri = 0.d0
+        ! eq  6
+        IF ((MdotPriToSec + MdotSecRCLeg) > MassFlowTolerance) THEN
+          TempSecInlet = (MdotPriToSec * TempPriOutTankOut + MdotSecRCLeg * TempSecOutTankOut) &
+                        / (MdotPriToSec + MdotSecRCLeg)
         ELSE
-          MdotPri = MdotSec
+          TempSecInlet = TempPriOutTankOut
         ENDIF
-        CALL SetActuatedBranchFlowRate(MdotPri,NodeNumPriIn,LoopNum,SupplySide, 1, .FALSE.)
-      ENDIF
-      
-      ! eq. 4
-      MdotSecRCLeg = MdotSec - MdotPriToSec
-      IF (MdotSecRCLeg < MassFlowTol) MdotSecRCLeg = 0.d0
-      
-      ! eq. 5
-      MdotPriRCLeg = MdotPri - MdotPriToSec
-      IF (MdotPriRCLeg < MassFlowTol) MdotPriRCLeg = 0.d0
-      
-      ! eq  6
-      IF ((MdotPriToSec + MdotSecRCLeg) > MassFlowTol) THEN
-        TempSecInlet = (MdotPriToSec * TempPriOutTankOut + MdotSecRCLeg * TempSecOutTankOut) &
-                      / (MdotPriToSec + MdotSecRCLeg)
-      ELSE
-        TempSecInlet = TempPriOutTankOut
-      ENDIF
 
-    ENDDO
+        ! eq. 3
+        IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
+           !  .AND. FirstHVACIteration
+             .AND. (CurCallingCase == SupplyLedPrimaryInletUpdate) )THEN
+          ! MdotPri is a variable to be calculated and flow request needs to be made
+          IF (ABS(TempCPPrimaryCntrlSetpoint  ) > DeltaTemptol) THEN
+  !          Do loop2 = 1, MaxIterLimitCaseA
+  !            MdotPri = (MdotSec *  TempSecInlet +  MdotPriRCLeg *TempPriOutTankOut - MdotSecRCLeg * TempSecOutTankOut )  &
+  !                          /  (TempPriOutTankOut )
+
+              MdotPri = (MdotPriRCLeg * TempPriOutTankOut + MdotPriToSec * TempSecOutTankOut) &
+                          / (TempCPPrimaryCntrlSetpoint)
+
+         !   ENDDO
+            IF (MdotPri < MassFlowTolerance) MdotPri = 0.d0
+          ELSE
+            MdotPri = MdotSec
+          ENDIF
+          CALL SetActuatedBranchFlowRate(MdotPri,NodeNumPriIn,LoopNum,SupplySide, 1, .FALSE.)
+        ENDIF
+
+
+        ! eq. 2
+        IF ((MdotPriToSec + MdotPriRCLeg) > MassFlowTolerance ) THEN
+          TempPriInlet = (MdotPriToSec * TempSecOutTankOut + MdotPriRCLeg * TempPriOutTankOut) &
+                        / (MdotPriToSec + MdotPriRCLeg)
+        ELSE
+          TempPriInlet = TempSecOutTankOut
+        ENDIF
+
+
+      ENDDO
+    CASE (DemandLedPrimaryInletUpdate, DemandLedSecondaryInletUpdate)
+      ! case B. Secondary/demand led
+
+        ! six equations and six unknowns (although one has a setpoint)
+      DO Loop = 1, MaxIterLimitCaseB
+        ! eq 1,
+        IF (ABS(TempPriOutTankOut   - TempSecOutTankOut )  > DeltaTemptol) THEN
+          MdotPriToSec = MdotSec * (TempCPSecondaryCntrlSetpoint - TempSecOutTankOut ) &
+                               / (TempPriOutTankOut   - TempSecOutTankOut )
+          IF (MdotPriToSec < MassFlowTolerance) MdotPriToSec = 0.d0
+          IF (MdotPriToSec > MdotSec) MdotPriToSec = MdotSec
+        ELSE
+          MdotPriToSec = MdotSec
+        ENDIF
+
+        ! eq. 2,
+        IF ((MdotPriToSec + MdotPriRCLeg) > MassFlowTolerance ) THEN
+          TempPriInlet = (MdotPriToSec * TempSecOutTankOut + MdotPriRCLeg * TempPriOutTankOut) &
+                        / (MdotPriToSec + MdotPriRCLeg)
+        ELSE
+          TempPriInlet = TempSecOutTankOut
+        ENDIF
+
+        ! eq. 3
+        IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
+            !  .AND. FirstHVACIteration  &
+              .AND. (CurCallingCase == DemandLedPrimaryInletUpdate)) THEN
+          ! MdotPri is a variable to be calculated and flow request made
+          IF (ABS(TempPriOutTankOut - TempPriInlet ) > DeltaTemptol) THEN
+            MdotPri = MdotSec * ( TempCPSecondaryCntrlSetpoint -  TempSecOutTankOut )  &
+                          /  (TempPriOutTankOut - TempPriInlet )
+            IF (MdotPri < MassFlowTolerance) MdotPri = 0.d0
+          ELSE
+            MdotPri = MdotSec
+          ENDIF
+          CALL SetActuatedBranchFlowRate(MdotPri,NodeNumPriIn,LoopNum,SupplySide, 1, .FALSE.)
+        ENDIF
+
+        ! eq. 4
+        MdotSecRCLeg = MdotSec - MdotPriToSec
+        IF (MdotSecRCLeg < MassFlowTolerance) MdotSecRCLeg = 0.d0
+
+        ! eq. 5
+        MdotPriRCLeg = MdotPri - MdotPriToSec
+        IF (MdotPriRCLeg < MassFlowTolerance) MdotPriRCLeg = 0.d0
+
+        ! eq  6
+        IF ((MdotPriToSec + MdotSecRCLeg) > MassFlowTolerance) THEN
+          TempSecInlet = (MdotPriToSec * TempPriOutTankOut + MdotSecRCLeg * TempSecOutTankOut) &
+                        / (MdotPriToSec + MdotSecRCLeg)
+        ELSE
+          TempSecInlet = TempPriOutTankOut
+        ENDIF
+
+      ENDDO
+
+    CASE DEFAULT
+!???      CALL ShowFatalError('ManageTwoWayCommonPipe: Calling Case Fall Through')
 
   END SELECT
 
@@ -1168,7 +1177,7 @@ SUBROUTINE SetupCommonPipes
           ! USE STATEMENTS:
   USE DataPlant
   USE DataInterfaces
-  
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1192,7 +1201,7 @@ SUBROUTINE SetupCommonPipes
     SELECT CASE (PlantLoop(CurLoopNum)%CommonPipeType)
       CASE (CommonPipe_No)
         PlantCommonPipe(CurLoopNum)%CommonPipeType     = CommonPipe_No
-        
+
       CASE (CommonPipe_Single)!Uncontrolled ('single') common pipe
         PlantCommonPipe(CurLoopNum)%CommonPipeType     = CommonPipe_Single
         CALL SetupOutputVariable('Common Pipe Mass Flow Rate [Kg/s]', &
@@ -1201,16 +1210,16 @@ SUBROUTINE SetupCommonPipes
           PlantCommonPipe(CurLoopNum)%Temp,'System','Average',PlantLoop(CurLoopNum)%Name)
         CALL SetupOutputVariable('Common Pipe Flow Direction []', &
           PlantCommonPipe(CurLoopNum)%FlowDir,'System','Average',PlantLoop(CurLoopNum)%Name)
-        
+
         IF (PlantLoop(CurLoopNum)%LoopSide(SupplySide)%Branch(1)%Comp(1)%TypeOf_Num == TypeOf_PumpVariableSpeed) THEN
          ! If/when the model supports variable-pumping primary, this can be removed.
           CALL ShowWarningError('SetupCommonPipes: detected variable speed pump on supply inlet of CommonPipe plant loop')
           CALL ShowContinueError('Occurs on plant loop name = '//TRIM(PlantLoop(CurLoopNum)%Name) )
           CALL ShowContinueError('The common pipe model does not support varying the flow rate on the primary/supply side')
           CALL ShowContinueError('The primary/supply side will operate as if constant speed, and the simulation continues')
-         
+
         ENDIF
-        
+
       CASE (CommonPipe_TwoWay)!Controlled ('two-way') common pipe
         PlantCommonPipe(CurLoopNum)%CommonPipeType     = CommonPipe_TwoWay
         CALL SetupOutputVariable('Primary Side Common Pipe Mass Flow Rate [Kg/s]', &
@@ -1221,7 +1230,7 @@ SUBROUTINE SetupCommonPipes
            PlantCommonPipe(CurLoopNum)%PriToSecFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
         CALL SetupOutputVariable('Secondary to Primary Mass Flow Rate [Kg/s]', &
            PlantCommonPipe(CurLoopNum)%SecToPriFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
-           
+
         ! check type of pump on supply side inlet
         IF (PlantLoop(CurLoopNum)%LoopSide(SupplySide)%Branch(1)%Comp(1)%TypeOf_Num == TypeOf_PumpConstantSpeed) THEN
              PlantCommonPipe(CurLoopNum)%SupplySideInletPumpType = ConstantFlow
@@ -1232,7 +1241,7 @@ SUBROUTINE SetupCommonPipes
           CALL ShowContinueError('Occurs on plant loop name = '//TRIM(PlantLoop(CurLoopNum)%Name) )
           CALL ShowContinueError('The common pipe model does not support varying the flow rate on the primary/supply side')
           CALL ShowContinueError('The primary/supply side will operate as if constant speed, and the simulation continues')
-             
+
         ENDIF
         ! check type of pump on demand side inlet
          IF (PlantLoop(CurLoopNum)%LoopSide(DemandSide)%Branch(1)%Comp(1)%TypeOf_Num == TypeOf_PumpConstantSpeed) THEN
@@ -1240,7 +1249,7 @@ SUBROUTINE SetupCommonPipes
          ELSEIF (PlantLoop(CurLoopNum)%LoopSide(DemandSide)%Branch(1)%Comp(1)%TypeOf_Num == TypeOf_PumpVariableSpeed) THEN
              PlantCommonPipe(CurLoopNum)%DemandSideInletPumpType = VariableFlow
          ENDIF
-         
+
     END SELECT
   END DO
 
@@ -1254,7 +1263,7 @@ END SUBROUTINE SetupCommonPipes
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

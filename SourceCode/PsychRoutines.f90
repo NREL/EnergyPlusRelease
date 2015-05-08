@@ -1,6 +1,11 @@
-#define EP_psych_errors
-!!!!#define EP_psych_stats
+#ifdef EP_nocache_Psychrometrics
+#undef EP_cache_PsyTwbFnTdbWPb
+#else
 #define EP_cache_PsyTwbFnTdbWPb
+#endif
+#define EP_psych_errors
+! the following defines would only be used in special instances and not for release.
+!!!!#define EP_psych_stats
 !!!!#define generatetestdata
 Module Psychrometrics
  ! Module containing the Psychometric simulation routines
@@ -182,13 +187,13 @@ SUBROUTINE ShowPsychrometricSummary
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+#ifdef EP_psych_stats
   INTEGER :: EchoInputFile  ! found unit number for "eplusout.audit"
   INTEGER, EXTERNAL :: FindUnitNumber
   INTEGER :: Loop
   REAL(r64) :: AverageIterations
-  character(len=30) :: istring
+  CHARACTER(len=32) :: istring
 
-#ifdef EP_psych_stats
   EchoInputFile=FindUnitNumber('eplusout.audit')
   IF (EchoInputFile == 0) RETURN
   IF (ANY(NumTimesCalled>0)) THEN
@@ -239,7 +244,7 @@ function PsyRhoAirFnPbTdbW(pb,tdb,dw,calledfrom)  result(rhoair)
           ! FUNCTION ARGUMENT DEFINITIONS:
       REAL(r64), intent(in)  :: pb     ! barometric pressure (Pascals)
       REAL(r64), intent(in)  :: tdb    ! dry bulb temperature (Celsius)
-      REAL(r64), intent(in)  :: dw      ! humidity ratio (kg water vapor/kg dry air)
+      REAL(r64), intent(in)  :: dw      ! humidity ratio (kgWater/kgDryAir)
       character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages) !unused1208
       REAL(r64)         :: rhoair ! result=> density of air
 
@@ -286,7 +291,7 @@ function PsyCpAirFnWTdb(dw,T,calledfrom) result(cpa)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
-      REAL(r64), intent(in)  :: dw    ! humidity ratio {kg/kg-dry-air}
+      REAL(r64), intent(in)  :: dw    ! humidity ratio {kgWater/kgDryAir}
       REAL(r64), intent(in)  :: T    ! input temperature {Celsius}
       character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages)
       REAL(r64)         :: cpa  ! result => heat capacity of air {J/kg-C}
@@ -340,7 +345,7 @@ function PsyHfgAirFnWTdb(w,T,calledfrom) result(hfg)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
-      REAL(r64), intent(in)  :: w    ! humidity ratio {kg/kg-dry-air} !unused1208
+      REAL(r64), intent(in)  :: w    ! humidity ratio {kgWater/kgDryAir} !unused1208
       REAL(r64), intent(in)  :: T    ! input temperature {Celsius}
       character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages) !unused1208
       REAL(r64)         :: hfg  ! result => heat of vaporization for moist air {J/kg}
@@ -400,7 +405,7 @@ function PsyHgAirFnWTdb(w,T,calledfrom) result(hg)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
-      REAL(r64), intent(in)  :: w   ! humidity ratio {kg/kg-dry-air} !unused1208
+      REAL(r64), intent(in)  :: w   ! humidity ratio {kgWater/kgDryAir} !unused1208
       REAL(r64), intent(in)  :: T   ! input temperature {Celsius}
       character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages) !unused1208
       REAL(r64)         :: hg  ! enthalpy of the gas {units?}
@@ -2596,7 +2601,7 @@ END FUNCTION RhoH2O
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

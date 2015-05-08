@@ -136,11 +136,12 @@ SUBROUTINE  ManageSizing
   SysSizingRunDone = .FALSE.
   ZoneSizingRunDone = .FALSE.
   curName='Unknown'
-  CALL GetOARequirements  ! get the OA requirements object
-  CALL GetSizingParams    ! get the building level sizing paramets
-  CALL GetZoneSizingInput ! get the Zone Sizing input
-  CALL GetSystemSizingInput ! get the System Sizing input
-  CALL GetPlantSizingInput  ! get the Plant Sizing input
+  CALL GetOARequirements      ! get the OA requirements object
+  CALL GetZoneAirDistribution ! get zone air distribution objects
+  CALL GetSizingParams        ! get the building level sizing paramets
+  CALL GetZoneSizingInput     ! get the Zone Sizing input
+  CALL GetSystemSizingInput   ! get the System Sizing input
+  CALL GetPlantSizingInput    ! get the Plant Sizing input
 
   ! okay, check sizing inputs vs desires vs requirements
   IF (DoZoneSizing .or. DoSystemSizing) THEN
@@ -766,6 +767,161 @@ SUBROUTINE GetOARequirements
 
 END SUBROUTINE GetOARequirements
 
+SUBROUTINE GetZoneAirDistribution
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         T. Hong - LBNL
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Obtains input data for the zone air distribution objects and stores it in
+          ! appropriate data structure.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses InputProcessor "Get" routines to obtain data.
+          ! This object requires only a name where the default values are assumed
+          ! if subsequent fields are not entered.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectDefMaxArgs, GetObjectItem, VerifyName, SameString
+  USE ScheduleManager, ONLY: GetScheduleIndex, CheckScheduleValueMinMax
+  USE DataIPShortCuts
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirDistribution: ' ! include trailing blank space
+
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumAlphas        ! Number of Alphas for each GetObjectItem call
+  INTEGER :: NumNumbers       ! Number of Numbers for each GetObjectItem call
+  INTEGER :: TotalArgs        ! Total number of alpha and numeric arguments (max) for a
+  INTEGER :: IOStatus         ! Used in GetObjectItem
+  INTEGER :: ZADIndex
+  LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
+  LOGICAL :: IsNotOK                 ! Flag to verify name
+  LOGICAL :: IsBlank                 ! Flag for blank name
+
+    CHARACTER(Len=MaxNameLength)  :: CurrentModuleObject      ! for ease in getting objects
+    CHARACTER(Len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: Alphas         ! Alpha input items for object
+    CHARACTER(Len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAlphaFields   ! Alpha field names
+    CHARACTER(Len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cNumericFields ! Numeric field names
+    REAL(r64), ALLOCATABLE, DIMENSION(:) :: Numbers           ! Numeric input items for object
+    LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lAlphaBlanks      ! Logical array, alpha field input BLANK = .true.
+    LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
+
+  CurrentModuleObject='DesignSpecification:ZoneAirDistribution'
+  NumZoneAirDistribution = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
+
+    ALLOCATE(Alphas(NumAlphas))
+    Alphas=' '
+    ALLOCATE(cAlphaFields(NumAlphas))
+    cAlphaFields=' '
+    ALLOCATE(cNumericFields(NumNumbers))
+    cNumericFields=' '
+    ALLOCATE(Numbers(NumNumbers))
+    Numbers=0.0
+    ALLOCATE(lAlphaBlanks(NumAlphas))
+    lAlphaBlanks=.true.
+    ALLOCATE(lNumericBlanks(NumNumbers))
+    lNumericBlanks=.true.
+
+  IF (NumZoneAirDistribution .GT. 0) THEN
+    ALLOCATE(ZoneAirDistribution(NumZoneAirDistribution))
+
+    !Start Loading the zone air distribution input
+    DO ZADIndex = 1,  NumZoneAirDistribution
+
+      CALL GetObjectItem(TRIM(CurrentModuleObject),ZADIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
+                   AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
+
+      CALL VerifyName(Alphas(1),ZoneAirDistribution%Name,ZADIndex-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.true.
+        IF (IsBlank) Alphas(1)='xxxxx'
+      ENDIF
+
+      ZoneAirDistribution(ZADIndex)%Name = Alphas(1)
+
+      ! Zone Air Distribution Effectiveness in Cooling Mode
+      IF(NumNumbers .GT. 0)THEN
+        ZoneAirDistribution(ZADIndex)%ZoneADEffCooling = Numbers(1)
+      ELSE
+        ! default value
+        ZoneAirDistribution(ZADIndex)%ZoneADEffCooling = 1.0
+      END IF
+
+      ! Zone Air Distribution Effectiveness in Heating Mode
+      IF(NumNumbers .GT. 1)THEN
+        ZoneAirDistribution(ZADIndex)%ZoneADEffHeating = Numbers(2)
+      ELSE
+        ! default value
+        ZoneAirDistribution(ZADIndex)%ZoneADEffHeating = 1.0
+      END IF
+
+      ! Zone Secondary Recirculation Fraction
+      IF(NumNumbers .GT. 2)THEN
+        ZoneAirDistribution(ZADIndex)%ZoneSecondaryRecirculation = Numbers(3)
+      ELSE
+        ! default value
+        ZoneAirDistribution(ZADIndex)%ZoneSecondaryRecirculation = 0.0
+      END IF
+
+      IF(NumAlphas .GT. 1)THEN
+        IF(.NOT. lAlphaBlanks(2))THEN
+          ZoneAirDistribution(ZADIndex)%ZoneADEffSchName = Alphas(2)
+          ZoneAirDistribution(ZADIndex)%ZoneADEffSchPtr = GetScheduleIndex(Alphas(2))
+          IF(ZoneAirDistribution(ZADIndex)%ZoneADEffSchPtr .GT. 0) THEN
+            IF (.NOT.CheckScheduleValueMinMax(ZoneAirDistribution(ZADIndex)%ZoneADEffSchPtr,'>',0.0D0)) THEN
+              CAll ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(ZoneAirDistribution(ZADIndex)%Name)//'",')
+              CALL ShowContinueError('Error found in '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)) )
+              CALL ShowContinueError('Schedule values must be >0.0)')
+              ErrorsFound=.true.
+            END IF
+          ELSE
+            CAll ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(ZoneAirDistribution(ZADIndex)%Name)//'",')
+            CALL ShowContinueError('...Not Found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+            ErrorsFound=.TRUE.
+          END IF
+        END IF
+      END IF
+
+    END DO
+
+    DEALLOCATE(Alphas)
+    DEALLOCATE(cAlphaFields)
+    DEALLOCATE(cNumericFields)
+    DEALLOCATE(Numbers)
+    DEALLOCATE(lAlphaBlanks)
+    DEALLOCATE(lNumericBlanks)
+
+    IF (ErrorsFound) THEN
+      CALL ShowFatalError(RoutineName//'Errors found in input.  Preceding condition(s) cause termination.')
+    ENDIF
+
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE GetZoneAirDistribution
+
 SUBROUTINE GetSizingParams
 
           ! SUBROUTINE INFORMATION:
@@ -942,6 +1098,7 @@ SUBROUTINE GetZoneSizingInput
   INTEGER :: NumZoneLists
   TYPE (GlobalMiscObject), ALLOCATABLE, DIMENSION(:) :: SizingZoneObjects
   INTEGER OAIndex ! Index of design specification object
+  INTEGER ObjIndex ! Index of zone air distribution effectiveness object name
 
   cCurrentModuleObject='Sizing:Zone'
   NumSizingZoneStatements=GetNumObjectsFound(TRIM(cCurrentModuleObject))
@@ -1091,10 +1248,10 @@ SUBROUTINE GetZoneSizingInput
              ZoneSizingInput(ZoneSizIndex)%DesOAFlowPPer = OARequirements(OAIndex)%OAFlowPerPerson
              ZoneSizingInput(ZoneSizIndex)%DesOAFlowPerArea = OARequirements(OAIndex)%OAFlowPerArea
              ZoneSizingInput(ZoneSizIndex)%DesOAFlow = OARequirements(OAIndex)%OAFlowPerZone
+             ZoneSizingInput(ZoneSizIndex)%ZoneDesignSpecOAIndex = OAIndex
            ELSE
              CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(2))//'="'//  &
                 TRIM(cAlphaArgs(2))//'".')
-             CALL ShowContinueError('.. invalid OA item='//TRIM(cAlphaArgs(1)))
              ErrorsFound=.true.
            ENDIF
          ELSE ! If no design spec object specified, i.e. no OA, then set OA method to Flow/Person as default but flows to 0
@@ -1283,42 +1440,27 @@ SUBROUTINE GetZoneSizingInput
           ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(14)
         ENDIF
 
-!  N15;\field Design Zone Air Distribution Effectiveness in Cooling Mode
-!      \type real
-!      \minimum> 0
-!      \default 1
-        IF (lNumericFieldBlanks(15)) THEN
-          IF (rNumericArgs(15) <= 0.0) THEN  ! in case someone changes the default in the IDD
-            ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = 1.0
+!  A5, \field Zone Air Distribution Object Name
+        IF (.NOT. lAlphaFieldBlanks(5)) THEN
+          ZoneSizingInput(ZoneSizIndex)%ZoneAirDistEffObjName = cAlphaArgs(5)
+          ObjIndex=FindItemInList(ZoneSizingInput(ZoneSizIndex)%ZoneAirDistEffObjName,  &
+             ZoneAirDistribution%Name,numZoneAirDistribution)
+          IF (ObjIndex > 0) THEN
+            ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = ZoneAirDistribution(ObjIndex)%ZoneADEffCooling
+            ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = ZoneAirDistribution(ObjIndex)%ZoneADEffHeating
+            ZoneSizingInput(ZoneSizIndex)%ZoneSecondaryRecirculation = ZoneAirDistribution(ObjIndex)%ZoneSecondaryRecirculation
+            ZoneSizingInput(ZoneSizIndex)%ZoneAirDistributionIndex = ObjIndex
           ELSE
-            ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = rNumericArgs(15)
+            ! generate a warning message
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(5))//'="'//  &
+                TRIM(cAlphaArgs(5))//'" not found.')
+            ErrorsFound=.true.
           ENDIF
-        ELSEIF (rNumericArgs(15) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(15))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(15),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
-          ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = rNumericArgs(15)
-        ENDIF
-
-!  N16;\field Design Zone Air Distribution Effectiveness in Heating Mode
-!      \type real
-!      \minimum> 0
-!      \default 1
-        IF (lNumericFieldBlanks(16)) THEN
-          IF (rNumericArgs(16) <= 0.0) THEN  ! in case someone changes the default in the IDD
-            ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = 1.0
-          ELSE
-            ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = rNumericArgs(16)
-          ENDIF
-        ELSEIF (rNumericArgs(16) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(16))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(16),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
-          ErrorsFound=.true.
-        ELSE
-          ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = rNumericArgs(16)
+          ! assume defaults
+          ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = 1.0
+          ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = 1.0
+          ZoneSizingInput(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
         ENDIF
 
         SELECT CASE(TRIM(cAlphaArgs(3)))
@@ -1406,7 +1548,9 @@ SUBROUTINE GetZoneAndZoneListNames(ErrorsFound,NumZones,ZoneNames,NumZoneLists,Z
   INTEGER :: NumAlphas
   INTEGER :: NumNumbers
   INTEGER :: IOStatus
+  LOGICAL :: InErrFlag   ! Preserve (no current use) the input status of ErrorsFound
 
+  InErrFlag=ErrorsFound
   cCurrentModuleObject='Zone'
   NumZones=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(ZoneNames(NumZones))
@@ -1584,6 +1728,9 @@ SUBROUTINE GetSystemSizingInput
     ELSE
       SysSizInput(SysSizIndex)%DesOutAirVolFlow = rNumericArgs(1)
     ENDIF
+    IF (SysSizInput(SysSizIndex)%DesOutAirVolFlow == autosize) THEN
+      SysSizInput(SysSizIndex)%OAAutosized = .TRUE.
+    END IF
 
 !  N2, \field Minimum System Air Flow Ratio
 !      \required-field
@@ -1644,6 +1791,21 @@ SUBROUTINE GetSystemSizingInput
     ELSE
       SysSizInput(SysSizIndex)%DesHeatAirFlow = rNumericArgs(12)
     ENDIF
+!  N13;\field Maximum Zone Outdoor Air Fraction
+!      \type real
+!      \default 1.0
+!      \minimum> 0.0
+!      \units dimensionless
+    IF (lNumericFieldBlanks(13)) THEN
+      SysSizInput(SysSizIndex)%MaxZoneOAFraction = 0.0
+    ELSEIF (rNumericArgs(13) < 0.0) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(13))//': '//  &
+         TRIM(RoundSigDigits(rNumericArgs(13),2)))
+      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      ErrorsFound=.true.
+    ELSE
+      SysSizInput(SysSizIndex)%MaxZoneOAFraction = rNumericArgs(13)
+    ENDIF
     SELECT CASE(TRIM(cAlphaArgs(6)))
       CASE('DESIGNDAY')
         SysSizInput(SysSizIndex)%CoolAirDesMethod = FromDDCalc
@@ -1669,6 +1831,10 @@ SUBROUTINE GetSystemSizingInput
         SysSizInput(SysSizIndex)%SystemOAMethod = 1
       CASE('VENTILATIONRATEPROCEDURE')
         SysSizInput(SysSizIndex)%SystemOAMethod = 2
+        IF(SysSizInput(SysSizIndex)%DesOutAirVolFlow > 0) THEN
+          CALL ShowWarningError(TRIM(cCurrentModuleObject)//  &
+               '- Design Outdoor Airflow Rate value will be overridden since SystemOAMethod is set to VRP')
+        END IF
       CASE DEFAULT
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(8))//': '//TRIM(cAlphaArgs(8)))
         CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
@@ -1776,6 +1942,10 @@ SUBROUTINE GetPlantSizingInput
         CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
         ErrorsFound=.true.
     END SELECT
+
+    CALL SetupEMSInternalVariable('Plant Design Volume Flow Rate',  &
+                                    PlantSizData(PltSizIndex)%PlantLoopName, '[m3/s]', &
+                                    PlantSizData(PltSizIndex)%DesVolFlowRate )
   END DO
 
   IF (ErrorsFound) THEN
@@ -1975,7 +2145,7 @@ SUBROUTINE ReportZoneSizing(ZoneName,LoadType,CalcDesLoad,UserDesLoad,CalcDesFlo
     990 FORMAT('! <Zone Sizing Information>, Zone Name, Load Type, Calc Des Load {W}, User Des Load {W}, ',  &
         'Calc Des Air Flow Rate {m3/s}, ', &
         'User Des Air Flow Rate {m3/s}, Design Day Name, Date/Time of Peak, Temperature at Peak {C}, ', &
-        'Humidity Ratio at Peak {kgWater/kgAir}, Floor Area {m2}, # Occupants, Calc Outdoor Air Flow Rate {m3/s}')
+        'Humidity Ratio at Peak {kgWater/kgDryAir}, Floor Area {m2}, # Occupants, Calc Outdoor Air Flow Rate {m3/s}')
     991 FORMAT(' Zone Sizing Information',13(', ',A))
 
     RETURN
@@ -2047,7 +2217,7 @@ END SUBROUTINE ReportSysSizing
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

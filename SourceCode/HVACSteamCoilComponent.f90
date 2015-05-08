@@ -31,7 +31,7 @@ MODULE SteamCoils
  USE Psychrometrics
  USE FluidProperties
  USE DataEnvironment, ONLY: StdBaroPress
- USE DataPlant,       ONLY: TypeOf_CoilSteamAirHeating, ScanPlantLoopsForObject, PlantLoop
+ USE DataPlant,       ONLY: TypeOf_CoilSteamAirHeating, ScanPlantLoopsForObject, PlantLoop, MyPlantSizingIndex
 
 
 
@@ -154,6 +154,7 @@ END INTERFACE GetCoilAirOutletNode
  PUBLIC  GetCoilCapacity
  PUBLIC  GetTypeOfCoil
  PUBLIC  GetSteamCoilIndex
+ Public  GetSteamCoilControlNodeNum
 
 CONTAINS
 
@@ -546,7 +547,7 @@ CONTAINS
      IF (errFlag) THEN
        CALL ShowFatalError('InitSteamCoil: Program terminated for previous conditions.')
      ENDIF
-     MyPlantScanFlag(CoilNum) = .FALSE. 
+     MyPlantScanFlag(CoilNum) = .FALSE.
    ENDIF
 
    IF ( .NOT. SysSizingCalc .AND. MySizeFlag(CoilNum)) THEN
@@ -689,7 +690,7 @@ CONTAINS
    USE DataSizing
    USE PlantUtilities,   ONLY: RegisterPlantCompDesignFlow
    USE FluidProperties,  ONLY: GetSatEnthalpyRefrig,GetSatDensityRefrig
-   USE BranchInputManager, ONLY: MyPlantSizingIndex
+ !  USE BranchInputManager, ONLY: MyPlantSizingIndex
    USE ReportSizingManager, ONLY: ReportSizingOutput
 
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1118,10 +1119,10 @@ CONTAINS
           ! Max Heat Transfer
           QSteamCoilMaxHT= SteamCoil(CoilNum)%MaxSteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
 
-          ! Coil Load in case of temperature set point
+          ! Coil Load in case of temperature setpoint
           QCoilCap=CapacitanceAir*(TempSetPoint-TempAirIn)
 
-          ! Check to see if set point above enetering temperature. If not, set
+          ! Check to see if setpoint above enetering temperature. If not, set
           ! output to zero.
           IF(QCoilCap .LE. 0.0) THEN
               QCoilCap = 0.0
@@ -1178,7 +1179,7 @@ CONTAINS
               SteamCoil(CoilNum)%InletSteamMassFlowRate  = SteamMassFlowRate
 
           ELSE
-              ! Temp air out is temperature Set Point
+              ! Temp air out is temperature Setpoint
               TempAirOut=TempSetPoint
 
               ! In practice Sensible & Superheated heat transfer is negligible compared to latent part.
@@ -1329,14 +1330,14 @@ CONTAINS
    Node(AirOutletNode)%Temp         = SteamCoil(CoilNum)%OutletAirTemp
    Node(AirOutletNode)%HumRat       = SteamCoil(CoilNum)%OutletAirHumRat
    Node(AirOutletNode)%Enthalpy     = SteamCoil(CoilNum)%OutletAirEnthalpy
-  
+
    CALL SafeCopyPlantNode(SteamInletNode, SteamOutletNode)
 
    ! Set the outlet Steam nodes for the Coil
 !   Node(SteamOutletNode)%MassFlowRate = SteamCoil(CoilNum)%OutletSteamMassFlowRate
    Node(SteamOutletNode)%Temp         = SteamCoil(CoilNum)%OutletSteamTemp
    Node(SteamOutletNode)%Enthalpy     = SteamCoil(CoilNum)%OutletWaterEnthalpy
-   Node(SteamOutletNode)%Quality             = SteamCoil(CoilNum)%OutletSteamQuality   
+   Node(SteamOutletNode)%Quality             = SteamCoil(CoilNum)%OutletSteamQuality
    !Node(SteamInletNode)%MassFlowRate  = SteamCoil(CoilNum)%OutletSteamMassFlowRate
 
    ! Set the outlet nodes for properties that just pass through & not used
@@ -1365,6 +1366,9 @@ CONTAINS
 
    IF (Contaminant%CO2Simulation) Then
      Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
+   End If
+   IF (Contaminant%GenericContamSimulation) Then
+     Node(AirOutletNode)%GenContam = Node(AirInletNode)%GenContam
    End If
 
    RETURN
@@ -2256,12 +2260,81 @@ FUNCTION GetTypeOfCoil(CoilIndex,CoilName,ErrorsFound) RESULT(TypeOfCoil)
 
 END FUNCTION GetTypeOfCoil
 
+FUNCTION GetSteamCoilControlNodeNum(CoilType,CoilName,ErrorFlag) RESULT(NodeNumber)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B. Nigusse, FSEC
+          !       DATE WRITTEN   January 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the steam coils and returns the steam control node number.  If
+          ! incorrect coil type or name is given, errorsfound is returned as true and node number is returned
+          ! as zero.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItem, SameString
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorFlag    ! set to true if problem
+  INTEGER                      :: NodeNumber   ! returned node number of matched coil
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  ! Obtains and Allocates SteamCoil related parameters from input file
+  IF (GetSteamCoilsInputFlag) THEN  !First time subroutine has been entered
+      CALL GetSteamCoilInput
+      GetSteamCoilsInputFlag=.false.
+  End If
+   
+  WhichCoil=0
+  NodeNumber=0
+  IF (SameString(CoilType,'Coil:Heating:Steam')) THEN
+    WhichCoil=FindItem(CoilName,SteamCoil%Name,NumSteamCoils)   
+    IF (WhichCoil /= 0) THEN
+      NodeNumber=SteamCoil(WhichCoil)%TempSetPointNodeNum
+    ENDIF    
+  ELSE
+    WhichCoil=0
+  ENDIF
+
+  IF (WhichCoil == 0) THEN
+    CALL ShowSevereError('GetSteamCoilControlNodeNum: Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+    ErrorFlag=.true.
+    NodeNumber=0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetSteamCoilControlNodeNum
+
         ! End of Utility subroutines for the SteamCoil Module
 
 ! *****************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

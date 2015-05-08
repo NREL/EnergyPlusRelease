@@ -15,8 +15,8 @@ MODULE Humidifiers
   ! METHODOLOGY EMPLOYED:
   ! The humidifier encompasses not just the component but also its
   ! control. The humidifier adds moisture to its air inlet to meet
-  ! the HumRatMin set point at its exit node. The HumRatMin is set by
-  ! an external set point manager.
+  ! the HumRatMin setpoint at its exit node. The HumRatMin is set by
+  ! an external setpoint manager.
 
   ! REFERENCES: ASHRAE HVAC 2 Toolkit, page 4-112
 
@@ -67,7 +67,7 @@ MODULE Humidifiers
     REAL(r64)                    :: AirOutHumRat      =0.0 ! outlet air humidity ratio [kg water / kg air]
     REAL(r64)                    :: AirOutEnthalpy    =0.0 ! outlet air specific enthalpy [J/kg]
     REAL(r64)                    :: AirOutMassFlowRate=0.0 ! outlet air mass flow rate [kg/s]
-    REAL(r64)                    :: HumRatSet         =0.0 ! humidity ratio set point [kg water / kg air]
+    REAL(r64)                    :: HumRatSet         =0.0 ! humidity ratio setpoint [kg water / kg air]
     REAL(r64)                    :: WaterAdd          =0.0 ! water output (and consumption) [kg/s]
     REAL(r64)                    :: ElecUseEnergy     =0.0 ! electricity consumption [J]
     REAL(r64)                    :: ElecUseRate       =0.0 ! electricity consumption [W]
@@ -94,6 +94,7 @@ MODULE Humidifiers
   PRIVATE ControlHumidifier
   PRIVATE GetHumidifierInput
   PRIVATE InitHumidifier
+  PRIVATE SizeHumidifier
   PRIVATE CalcElecSteamHumidifier
   PRIVATE UpdateReportWaterSystem
   PRIVATE UpdateHumidifier
@@ -418,6 +419,8 @@ SUBROUTINE InitHumidifier(HumNum)
   USE InputProcessor, ONLY: SameString
   USE DataGlobals,    ONLY: AnyEnergyManagementSystemInModel
   USE EMSManager,     ONLY: iHumidityRatioMinSetpoint, CheckIfNodeSetpointManagedByEMS
+  USE FluidProperties, ONLY: GetSatEnthalpyRefrig, GetSpecificHeatGlycol, FindGlycol, FindRefrigerant
+  USE General,         ONLY: RoundSigDigits  
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -425,7 +428,7 @@ SUBROUTINE InitHumidifier(HumNum)
   INTEGER, INTENT (IN) :: HumNum ! number of the current humidifier being simulated
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: CalledFrom='Humidifier:InitHumidifier'
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -437,34 +440,46 @@ SUBROUTINE InitHumidifier(HumNum)
   INTEGER             :: InNode ! inlet node number
   INTEGER             :: OutNode ! outlet node number
   INTEGER             :: NumHum
+  INTEGER             :: RefrigerantIndex ! refiferant index
+  INTEGER             :: WaterIndex       ! fluid type index  
+  REAL(r64)           :: NominalPower     ! Nominal power input to humidifier, W
+  REAL(r64)           :: WaterSpecHeat    ! specific heat of water , J/kgK
+  REAL(r64)           :: SteamSatEnthalpy ! enthalpy of saturated steam at 100C, J/kg
+  REAL(r64)           :: WaterSatEnthalpy ! enthalpy of saturated water at 100C, J/kg    
 
   LOGICAL,SAVE        :: MyOneTimeFlag = .TRUE.
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag
   LOGICAL,SAVE        :: MySetPointCheckFlag = .TRUE.
-
+  LOGICAL, ALLOCATABLE,SAVE, DIMENSION(:) :: MySizeFlag
 
   ! do one time initializations
   IF (MyOneTimeFlag) THEN
     ! initialize the environment and sizing flags
     ALLOCATE(MyEnvrnFlag(NumHumidifiers))
+    ALLOCATE(MySizeFlag(NumHumidifiers))
     MyEnvrnFlag = .TRUE.
 
     MyOneTimeFlag = .FALSE.
+    MySizeFlag    = .TRUE.
 
   END IF
+  
+  ! do sizing calculation
+  IF ( MySizeFlag(HumNum) ) THEN  
+    Call SizeHumidifier(HumNum)     
+    MySizeFlag(HumNum) =.FALSE.    
+  ENDIF  
 
   IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
     DO NumHum = 1, NumHumidifiers
       OutNode = Humidifier(NumHum)%AirOutNode
-      IF (Humidifier(NumHum)%HumType_Code == Humidifier_Steam_Electric) THEN
-          Humidifier(NumHum)%NomCap = RhoH2O(InitConvTemp)*Humidifier(NumHum)%NomCapVol
-      END IF
+        
       IF (OutNode > 0) THEN
         IF (Node(OutNode)%HumRatMin == SensedNodeFlagValue) THEN
           IF (.NOT. AnyEnergyManagementSystemInModel) THEN
             CALL ShowSevereError('Humidifiers: Missing humidity setpoint for '// &
                             trim(HumidifierType(Humidifier(NumHum)%HumType_Code))//' = '//TRIM(Humidifier(HumNum)%Name))
-            CALL ShowContinueError('  use a Set Point Manager with Control Variable = "MinimumHumidityRatio" to establish'//  &
+            CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "MinimumHumidityRatio" to establish'//  &
                                    'a setpoint at the humidifier outlet node.')
             CALL ShowContinueError('  expecting it on Node="'//trim(NodeID(OutNode))//'".')
             SetPointErrorFlag = .TRUE.
@@ -473,7 +488,7 @@ SUBROUTINE InitHumidifier(HumNum)
             IF (SetpointErrorFlag) THEN
               CALL ShowSevereError('Humidifiers: Missing humidity setpoint for '// &
                             trim(HumidifierType(Humidifier(NumHum)%HumType_Code))//' = '//TRIM(Humidifier(HumNum)%Name))
-              CALL ShowContinueError('  use a Set Point Manager with Control Variable = "MinimumHumidityRatio" to establish'//  &
+              CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "MinimumHumidityRatio" to establish'//  &
                                    'a setpoint at the humidifier outlet node.')
               CALL ShowContinueError('  expecting it on Node="'//trim(NodeID(OutNode))//'".')
               CALL ShowContinueError('  or use an EMS actuator to control minimum humidity ratio to establish'//  &
@@ -485,15 +500,7 @@ SUBROUTINE InitHumidifier(HumNum)
     END DO
     MySetPointCheckFlag = .FALSE.
   END IF
-
-  ! Do the Begin Environment initializations
-  IF (BeginEnvrnFlag .and. MyEnvrnFlag(HumNum)) THEN
-    IF (Humidifier(HumNum)%HumType_Code == Humidifier_Steam_Electric) THEN
-      Humidifier(HumNum)%NomCap = RhoH2O(InitConvTemp)*Humidifier(HumNum)%NomCapVol
-    END IF
-  END IF
-
-
+      
   IF (.not. BeginEnvrnFlag) THEN
     MyEnvrnFlag(HumNum)=.TRUE.
   ENDIF
@@ -516,6 +523,94 @@ SUBROUTINE InitHumidifier(HumNum)
 
 END SUBROUTINE InitHumidifier
 
+SUBROUTINE SizeHumidifier(HumNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bereket Nigusse, UCF/FSEC, 
+          !       DATE WRITTEN   March, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is for for sizing electric steam humidifier nominal electric power.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses user sepecified nominal capacity in m3/s and water enthalpy change required to 
+          ! vaporize water from a reference temperature of 20.0C. to steam at 100.0C.
+          !  m_dot = Nominal Capacity [m3/s] * Density of water at 5.05 [kg/m3]
+          !  Nominal Capacity =  m_dot [kg/s] * delta_enthalpy [J/kg] 
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE Psychrometrics,      ONlY: RhoH2O
+  USE FluidProperties,     ONLY: GetSatEnthalpyRefrig, GetSpecificHeatGlycol, FindGlycol, FindRefrigerant
+  USE General,             ONLY: RoundSigDigits
+  USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE DataSizing,          ONLY: Autosize
+  
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN) :: HumNum ! number of the current humidifier being sized
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: CalledFrom='Humidifier:SizeHumidifier'
+  REAL(r64), PARAMETER        :: Tref   =  20.0d0 ! Reference temp of water for rated capacity calac [C]
+  REAL(r64), PARAMETER        :: TSteam = 100.0d0 ! saturated steam temperatur generated by Humidifier [C]
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER             :: NumHum
+  INTEGER             :: RefrigerantIndex ! refiferant index
+  INTEGER             :: WaterIndex       ! fluid type index  
+  REAL(r64)           :: NominalPower     ! Nominal power input to humidifier, W
+  REAL(r64)           :: WaterSpecHeatAvg ! specific heat of water, J/kgK
+  REAL(r64)           :: SteamSatEnthalpy ! enthalpy of saturated steam at 100C, J/kg
+  REAL(r64)           :: WaterSatEnthalpy ! enthalpy of saturated water at 100C, J/kg
+       
+    
+  IF (Humidifier(HumNum)%HumType_Code == Humidifier_Steam_Electric) THEN         
+      Humidifier(HumNum)%NomCap = RhoH2O(InitConvTemp)*Humidifier(HumNum)%NomCapVol
+        
+      RefrigerantIndex = FindRefrigerant('STEAM')
+      WaterIndex = FindGlycol('WATER')          
+      SteamSatEnthalpy = GetSatEnthalpyRefrig('STEAM',TSteam,1.0d0,RefrigerantIndex,CalledFrom)
+      WaterSatEnthalpy = GetSatEnthalpyRefrig('STEAM',TSteam,0.0d0,RefrigerantIndex,CalledFrom)
+      WaterSpecHeatAvg = 0.5d0*(GetSpecificHeatGlycol('WATER',TSteam,WaterIndex,CalledFrom) + &
+                                GetSpecificHeatGlycol('WATER',Tref,WaterIndex,CalledFrom))
+        
+      NominalPower = Humidifier(HumNum)%NomCap &
+                   * ((SteamSatEnthalpy-WaterSatEnthalpy) + WaterSpecHeatAvg*(TSteam-Tref))
+
+      IF (Humidifier(HumNum)%NomPower == AutoSize) THEN
+        Humidifier(HumNum)%NomPower = NominalPower
+        CALL ReportSizingOutput('Humidifier:Steam:Electric',Humidifier(HumNum)%Name, &
+                                'Rated Power [W]', Humidifier(HumNum)%NomPower)                      
+      ELSEIF (Humidifier(HumNum)%NomPower >= 0.0d0 .and. Humidifier(HumNum)%NomCap > 0.0d0) THEN 
+        IF (Humidifier(HumNum)%NomPower <  NominalPower) THEN
+          CALL ShowWarningError('Humidifier:Steam:Electric: specified Rated Power is less than nominal Rated '// &
+                                ' Power for electric steam humidifier = '//TRIM(Humidifier(HumNum)%Name)//'. ')
+          CALL ShowContinueError(' specified Rated Power = '//TRIM(RoundSigDigits(Humidifier(HumNum)%NomPower,2)))
+          CALL ShowContinueError(' while expecting a minimum Rated Power = '//TRIM(RoundSigDigits(NominalPower,2)))
+        ENDIF       
+      ELSE
+        CALL ShowWarningError('Humidifier:Steam:Electric: specified nominal capacity is zero '// &
+                              ' for electric steam humidifier = '//TRIM(Humidifier(HumNum)%Name)//'. ')
+        CALL ShowContinueError(' For zero rated capacity humidifier the rated power is zero.')           
+      ENDIF
+  END IF
+
+  RETURN
+
+END SUBROUTINE SizeHumidifier
+
 SUBROUTINE ControlHumidifier(HumNum,WaterAddNeeded)
 
           ! SUBROUTINE INFORMATION:
@@ -528,7 +623,7 @@ SUBROUTINE ControlHumidifier(HumNum,WaterAddNeeded)
           ! This subroutine sets the output required from the humidifier
 
           ! METHODOLOGY EMPLOYED:
-          ! Uses a minimum humidity set point and water mass balance to calculate moisture addition needed
+          ! Uses a minimum humidity setpoint and water mass balance to calculate moisture addition needed
 
           ! REFERENCES:
           ! na
@@ -832,6 +927,9 @@ SUBROUTINE UpdateHumidifier(HumNum)
   IF (Contaminant%CO2Simulation) Then
     Node(OutNode)%CO2 = Node(InNode)%CO2
   End If
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(OutNode)%GenContam = Node(InNode)%GenContam
+  End If
 
   RETURN
 
@@ -884,7 +982,7 @@ END SUBROUTINE ReportHumidifier
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

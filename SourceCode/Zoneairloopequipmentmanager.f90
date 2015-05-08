@@ -345,6 +345,8 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
                                 TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum)))
             ErrorsFound=.true.
           END IF
+        ELSEIF (SameString(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum),'AirTerminal:SingleDuct:UserDefined')) THEN
+          AirDistUnit(AirDistUnitNum)%EquipType_Num(AirDistCompUnitNum)=SingleDuctUserDefined
         ELSE
           CALL ShowSevereError('Error found in '//TRIM(CurrentModuleObject)//' = '//TRIM(AirDistUnit(AirDistUnitNum)%Name))
           CALL ShowContinueError('Invalid '//TRIM(cAlphaFields(3))//' = '//  &
@@ -488,6 +490,7 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
   USE Psychrometrics, ONLY:PsyCpAirFnWTdb
   USE HVACSingleDuctInduc, ONLY: SimIndUnit
   USE HVACCooledBeam, ONLY: SimCoolBeam
+  USE UserDefinedComponents, ONLY: SimAirTerminalUserDefined
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -620,6 +623,11 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
                              ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
                              AirDistUnit(AirDistUnitNum)%EquipIndex(AirDistCompNum), NonAirSysOutput)
 
+          CASE (SingleDuctUserDefined)
+            CALL SimAirTerminalUserDefined(AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompNum),FirstHVACIteration, &
+                                    ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
+                                           AirDistUnit(AirDistUnitNum)%EquipIndex(AirDistCompNum))
+            
           CASE DEFAULT
             CALL ShowSevereError('Error found in ZoneHVAC:AirDistributionUnit='//TRIM(AirDistUnit(AirDistUnitNum)%Name))
             CALL ShowContinueError('Invalid Component='//TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompNum)))
@@ -759,7 +767,7 @@ END SUBROUTINE ReportZoneAirLoopEquipment
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

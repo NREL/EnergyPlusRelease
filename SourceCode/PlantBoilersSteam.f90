@@ -23,14 +23,14 @@ MODULE BoilerSteam
   USE DataLoopNode
   USE DataHVACGlobals
   USE General,         ONLY: TrimSigDigits
-  USE DataPlant,       ONLY: MassFlowTol
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE
 
   PRIVATE ! All private unless defined public
 
    ! MODULE PARAMETER DEFINITIONS
-!    REAL(r64), PARAMETER  :: massflowtol    = .001d0    ! kg/s - minimum significant mass flow rate
+   ! na
 
    ! DERIVED TYPE DEFINITIONS
   TYPE BoilerSpecs
@@ -435,7 +435,8 @@ SUBROUTINE InitBoiler(BoilerNum)
 
   USE FluidProperties, ONLY : GetSatDensityRefrig, GetSatEnthalpyRefrig, GetSatSpecificHeatRefrig
   USE DataPlant,       ONLY : TypeOf_Boiler_Steam, ScanPlantLoopsForObject, PlantLoop, &
-                              PlantSizesOkayToFinalize, PlantSizeNotComplete
+                              PlantSizesOkayToFinalize, PlantSizeNotComplete, &
+                              SingleSetpoint, DualSetpointDeadband
   USE PlantUtilities,  ONLY : InitComponentNodes
   USE EMSManager,      ONLY : iTemperatureSetpoint, CheckIfNodeSetpointManagedByEMS
   USE DataGlobals,     ONLY : AnyEnergyManagementSystemInModel
@@ -531,9 +532,10 @@ SUBROUTINE InitBoiler(BoilerNum)
 !        BoilerMassFlowMaxAvail = 0.0
 !        BoilerMassFlowMinAvail = 0.0
 
-    IF (Node(Boiler(BoilerNum)%BoilerOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) THEN
+    IF ((Node(Boiler(BoilerNum)%BoilerOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
+        (Node(Boiler(BoilerNum)%BoilerOutletNodeNum)%TempSetPointLo == SensedNodeFlagValue)) THEN
       IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-        IF (.NOT. Boiler(BoilerNum)%MissingSetpointErrDone) THEN 
+        IF (.NOT. Boiler(BoilerNum)%MissingSetpointErrDone) THEN
           CALL ShowWarningError('Missing temperature setpoint for Boiler:Steam = ' // &
                                           TRIM(Boiler(BoilerNum)%Name) )
           CALL ShowContinueError(' A temperature setpoint is needed at the outlet node of the boiler,' // &
@@ -546,11 +548,11 @@ SUBROUTINE InitBoiler(BoilerNum)
         FatalError = .FALSE. ! but not really fatal yet, but should be.
         CALL CheckIfNodeSetpointManagedByEMS(Boiler(BoilerNum)%BoilerOutletNodeNum,iTemperatureSetpoint, FatalError)
         IF (FatalError) THEN
-          IF (.NOT. Boiler(BoilerNum)%MissingSetpointErrDone) THEN 
+          IF (.NOT. Boiler(BoilerNum)%MissingSetpointErrDone) THEN
             CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode Boiler named ' // &
                                           TRIM(Boiler(BoilerNum)%Name) )
             CALL ShowContinueError(' A temperature setpoint is needed at the outlet node of the boiler.')
-            CALL ShowContinueError(' Use a Set Point Manager to establish a setpoint at the boiler outlet node ')
+            CALL ShowContinueError(' Use a Setpoint Manager to establish a setpoint at the boiler outlet node ')
             CALL ShowContinueError(' or use an EMS actuator to establish a setpoint at the boiler outlet node.')
             CALL ShowContinueError(' The overall loop setpoint will be assumed for this boiler. The simulation continues...')
             Boiler(BoilerNum)%MissingSetpointErrDone = .TRUE.
@@ -570,10 +572,17 @@ SUBROUTINE InitBoiler(BoilerNum)
 
   IF (Boiler(BoilerNum)%UseLoopSetpoint) THEN
 !  At some point, need to circle back and get from plant data structure instead of node
-! fix for clumsy old input that worked because loop setpoint was spread. 
+! fix for clumsy old input that worked because loop setpoint was spread.
 !  could be removed with transition, testing , model change, period of being obsolete.
-     Node(BoilerOutletNode)%TempSetPoint =                        &
-          Node(PlantLoop(Boiler(BoilerNum)%LoopNum)%TempSetPointNodeNum)%TempSetPoint
+    SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+    CASE (SingleSetPoint)
+      Node(BoilerOutletNode)%TempSetPoint =                        &
+           Node(PlantLoop(Boiler(BoilerNum)%LoopNum)%TempSetPointNodeNum)%TempSetPoint
+    CASE (DualSetPointDeadBand)
+      Node(BoilerOutletNode)%TempSetPointLo =                        &
+           Node(PlantLoop(Boiler(BoilerNum)%LoopNum)%TempSetPointNodeNum)%TempSetPointLo
+    END SELECT
+
   END IF
 
   RETURN
@@ -632,7 +641,7 @@ SUBROUTINE SizeBoiler(BoilerNum)
   REAL(r64)           :: CpWater   ! Heat capacity of condensed steam
   CHARACTER(len=MaxNameLength) :: equipName
   REAL(r64)           :: tmpNomCap ! local nominal capacity cooling power
-  
+
   PltSizNum = 0
   ErrorsFound = .FALSE.
   tmpNomCap = Boiler(BoilerNum)%NomCap
@@ -706,7 +715,8 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
       ! USE STATEMENTS:
        USE General, ONLY: RoundSigDigits
        USE FluidProperties, ONLY: GetSatPressureRefrig, GetSatSpecificHeatRefrig, GetSatEnthalpyRefrig
-       USE DataPlant, ONLY: ControlType_SeriesActive, PlantLoop
+       USE DataPlant, ONLY: PlantLoop, SingleSetpoint, DualSetpointDeadband
+       USE DataBranchAirLoopPlant, ONLY : ControlType_SeriesActive
        USE PlantUtilities, ONLY: SetComponentFlowRate
 
        IMPLICIT NONE
@@ -762,11 +772,16 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
       BoilerMassFlowRateMax = Boiler(BoilerNum)%DesMassFlowRate
       BoilerMaxPress        = Boiler(BoilerNum)%BoilerMaxOperPress
       BoilerEff             = Boiler(BoilerNum)%Effic
-      BoilerOutletTemp      = Node(BoilerOutletNode)%TempSetPoint
+
       QualitySteam          = Node(BoilerInletNode)%Quality
       LoopNum               = Boiler(BoilerNum)%LoopNum
       LoopSideNum           = Boiler(BoilerNum)%LoopSideNum
-
+      SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+      CASE (SingleSetPoint)
+        BoilerOutletTemp      = Node(BoilerOutletNode)%TempSetPoint
+      CASE (DualSetPointDeadBand)
+        BoilerOutletTemp      = Node(BoilerOutletNode)%TempSetPointLo
+      END SELECT
     !If the specified load is 0.0 or the boiler should not run then we leave this subroutine.Before leaving
     !if the component control is SERIESACTIVE we set the component flow to inlet flow so that flow resolver
     !will not shut down the branch
@@ -800,8 +815,13 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
       IF (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock==0) THEN
         ! Calculate the flow for the boiler
-        BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPoint-Node(BoilerInletNode)%Temp
-
+        
+        SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+        CASE (SingleSetPoint)
+          BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPoint-Node(BoilerInletNode)%Temp
+        CASE (DualSetPointDeadBand)
+          BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPointLo-Node(BoilerInletNode)%Temp
+        END SELECT
         BoilerOutletTemp = BoilerDeltaTemp + Node(BoilerInletNode)%Temp
 
         EnthSteamOutDry=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,1.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
@@ -826,13 +846,20 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
         ! Set the boiler flow rate from inlet node and then check performance
         BoilerMassFlowRate = Node(BoilerInletNode)%MassFlowRate
         ! Assume that it can meet the setpoint
-        BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPoint-Node(BoilerInletNode)%Temp
-
+        SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+        CASE (SingleSetPoint)
+          BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPoint-Node(BoilerInletNode)%Temp
+        CASE (DualSetPointDeadBand)
+          BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPointLo-Node(BoilerInletNode)%Temp
+        END SELECT
         !If boiler outlet temp is already greater than setpoint than it does not need to operate this iteration
         IF(BoilerDeltaTemp < 0.0) THEN
-
-          BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
-
+          SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetPoint)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
+          CASE (DualSetPointDeadBand)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPointLo
+          END SELECT
           EnthSteamOutDry=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,1.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
           EnthSteamOutWet=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,0.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
 
@@ -842,7 +869,12 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
         ELSE
 
-          BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
+          SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetPoint)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
+          CASE (DualSetPointDeadBand)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPointLo
+          END SELECT
 
           EnthSteamOutDry=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,1.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
           EnthSteamOutWet=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,0.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
@@ -852,7 +884,7 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
           ! Calculate the boiler load with the specified flow rate.
           BoilerLoad = ABS(BoilerMassFlowRate*LatentEnthSteam)+  &
                            ABS(BoilerMassFlowRate*CpWater*BoilerDeltaTemp)
-          !BoilerOutletTemp = Node(BoilerOutletNode)%TempSetPoint
+
         END IF
 
         ! If load exceeds the distributed load set to the distributed load
@@ -860,7 +892,12 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
           BoilerLoad = MyLoad
 
           ! Reset later , here just for calculating latent heat
-          BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
+          SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetPoint)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPoint
+          CASE (DualSetPointDeadBand)
+            BoilerOutletTemp=Node(BoilerOutletNode)%TempSetPointLo
+          END SELECT
 
           EnthSteamOutDry=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,1.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
 
@@ -881,7 +918,7 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
         ! Checks Boiler Load on the basis of the machine limits.
         IF(BoilerLoad > BoilerNomCap)THEN
-          IF(BoilerMassFlowRate > MassFlowTol) THEN
+          IF(BoilerMassFlowRate > MassFlowTolerance) THEN
             BoilerLoad = BoilerNomCap
 
             EnthSteamOutDry=GetSatEnthalpyRefrig('STEAM',BoilerOutletTemp,1.0d0,Boiler(BoilerNum)%FluidIndex,'CalcBoilerModel')
@@ -990,7 +1027,7 @@ SUBROUTINE UpdateBoilerRecords(MyLoad,RunFlag,Num,FirstHVACIteration)
     ELSE
       !set node temperatures
       CALL SafeCopyPlantNode(BoilerInletNode, BoilerOutletNode)
-      Node(BoilerOutletNode)%Temp           = BoilerOutletTemp    !Node(BoilerOutletNode)%TempSetPoint
+      Node(BoilerOutletNode)%Temp           = BoilerOutletTemp
       BoilerReport(Num)%BoilerOutletTemp    = BoilerOutletTemp
       BoilerReport(Num)%BoilerLoad          = BoilerLoad
       BoilerReport(Num)%FuelUsed            = FuelUsed
@@ -1023,7 +1060,7 @@ END SUBROUTINE UpdateBoilerRecords
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

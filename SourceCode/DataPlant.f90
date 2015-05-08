@@ -76,19 +76,6 @@ REAL(r64), PARAMETER :: CriteriaDelta_MassFlowRate     = 0.001d0
 REAL(r64), PARAMETER :: CriteriaDelta_Temperature      = 0.010d0
 REAL(r64), PARAMETER :: CriteriaDelta_HeatTransferRate = 0.100d0
 
-! Parameters for flow Control Types for branch flow resolution inside splitter/mixers
-INTEGER, PARAMETER :: ControlType_Unknown      = 0
-INTEGER, PARAMETER :: ControlType_Active       = 1      ! 'Active'
-INTEGER, PARAMETER :: ControlType_Passive      = 2      ! 'Passive'
-INTEGER, PARAMETER :: ControlType_SeriesActive = 3      ! 'SeriesActive'
-INTEGER, PARAMETER :: ControlType_Bypass       = 4      ! 'Bypass
-CHARACTER(len=*), PARAMETER, DIMENSION(0:4) :: cControlType=  &
-                                    (/'Unknown     ',  &
-                                      'Active      ',  &
-                                      'Passive     ',  &
-                                      'SeriesActive',  &
-                                      'Bypass      '/)
-
 ! Parameters for loop flow request priority,
 !     used in logic to deal with Node%MassFlowRequest for determining overall loop flow rate
 INTEGER, PARAMETER :: LoopFlowStatus_Unknown              = 21  ! component's status is not yet set
@@ -98,7 +85,8 @@ INTEGER, PARAMETER :: LoopFlowStatus_NeedyAndTurnsLoopOn  = 22  ! component is a
 INTEGER, PARAMETER :: LoopFlowStatus_NeedyIfLoopOn        = 23  !  component is a "winner" for loop flow requests
                                                                 ! but doesn't normally get the loop going to start with
                                                                 !  once loop is going, may increase needs, non-zero minimums
-INTEGER, PARAMETER :: LoopFlowStatus_TakesWhatGets        = 24  ! component is a "loser" for loop flow requests, but if the loop is on it
+INTEGER, PARAMETER :: LoopFlowStatus_TakesWhatGets        = 24  ! component is a "loser" for loop flow requests,
+                                                                ! but if the loop is on it
                                                                 ! it does make flow requests (for s/m resolution)
 
 !Parameters for component character wrt how load gets met (or not)
@@ -109,7 +97,12 @@ INTEGER, PARAMETER :: HowMet_PassiveCap                   = 52  ! Passive machin
 INTEGER, PARAMETER :: HowMet_ByNominalCap                 = 53  ! MaxLoad, MinLoad, OptLoad should work
 INTEGER, PARAMETER :: HowMet_ByNominalCapLowOutLimit      = 54  ! MaxLoad, MinLoad, OptLoad but with low limit temp on outlet
 INTEGER, PARAMETER :: HowMet_ByNominalCapHiOutLimit       = 55  ! MaxLoad, MinLoad, OptLoad but with high limit temp on outlet
+INTEGER, PARAMETER :: HowMet_ByNominalCapFreeCoolCntrl    = 56  ! HowMet_ByNominalCap with free cool shutdown
+INTEGER, PARAMETER :: HowMet_ByNominalCapLowOutLimitFreeCoolCntrl = 57 ! HowMet_ByNominalCapLowOutLimit with free cool shutdown
 
+INTEGER, PARAMETER :: FreeCoolControlMode_WetBulb = 1 ! HeatExchanger:Hydronic model control type mode, outdoor wetbulb sensor
+INTEGER, PARAMETER :: FreeCoolControlMode_DryBulb = 2 ! HeatExchanger:Hydronic model control type mode, outdoor drybulb sensor
+INTEGER, PARAMETER :: FreeCoolControlMode_Loop    = 3 ! HeatExchanger:Hydronic model control type mode, loop setpoint sensor
 
 ! Parameters for use in Loop Demand Calculation Schemes
 INTEGER, PARAMETER :: SingleSetPoint           = 1      ! Uses a single temp setpoint to calculate loop demand
@@ -142,7 +135,6 @@ INTEGER, PARAMETER :: NonIntegrated            = 2
 INTEGER, PARAMETER :: None                     = 3
 
 ! Parameters for tolerance
-REAL(r64), PARAMETER :: MassFlowTol            = .0000001d0  ! minimum significant mass flow rate (kg/s)
 REAL(r64), PARAMETER :: LoopDemandtol          = .1d0    ! minimum significant loop cooling or heating demand
 REAL(r64), PARAMETER :: DeltaTemptol           = .0001d0 ! minimum significant loop temperature difference
 
@@ -174,12 +166,6 @@ INTEGER,          PARAMETER    :: PressureCall_Init         = -1
 INTEGER,          PARAMETER    :: PressureCall_Calc         = -2
 INTEGER,          PARAMETER    :: PressureCall_Update       = -3
 
-! Pressure Curve Type: None, pressure, or generic curve (if generic it will be a postive value which is the curve manager index)
-INTEGER,          PARAMETER    :: PressureCurve_Error       = -1
-INTEGER,          PARAMETER    :: PressureCurve_None        = 0
-INTEGER,          PARAMETER    :: PressureCurve_Pressure    = 1
-INTEGER,          PARAMETER    :: PressureCurve_Generic     = 2
-
 ! Pressure Simulation Types
 INTEGER,          PARAMETER    :: Press_NoPressure             = 1   !Nothing for that particular loop
 INTEGER,          PARAMETER    :: Press_PumpPowerCorrection    = 2   !Only updating the pump power
@@ -190,164 +176,178 @@ CHARACTER(len=MaxNameLength), PARAMETER    :: PressureSimType(4)      = (/'NONE 
                                                                           'LOOPFLOWCORRECTION ',    &
                                                                           'PRESSURESIMULATION '/)
 ! Parameters for Component/Equipment Types  (ref: TypeOf in CompData)
-INTEGER, PARAMETER :: NumSimPlantEquipTypes=77
+INTEGER, PARAMETER :: NumSimPlantEquipTypes=84
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: SimPlantEquipTypes=  &
-      (/'BOILER:HOTWATER                                       ', & !01
-        'BOILER:STEAM                                          ', & !02
-        'CHILLER:ABSORPTION                                    ', & !03
-        'CHILLER:ABSORPTION:INDIRECT                           ', & !04
-        'CHILLER:COMBUSTIONTURBINE                             ', & !05
-        'CHILLER:CONSTANTCOP                                   ', & !06
-        'CHILLERHEATER:ABSORPTION:DIRECTFIRED                  ', & !07
-        'CHILLER:ELECTRIC                                      ', & !08
-        'CHILLER:ELECTRIC:EIR                                  ', & !09
-        'CHILLER:ELECTRIC:REFORMULATEDEIR                      ', & !10
-        'CHILLER:ENGINEDRIVEN                                  ', & !11
-        'COOLINGTOWER:SINGLESPEED                              ', & !12
-        'COOLINGTOWER:TWOSPEED                                 ', & !13
-        'COOLINGTOWER:VARIABLESPEED                            ', & !14
-        'GENERATOR:FUELCELL:EXHAUSTGASTOWATERHEATEXCHANGER     ', & !15
-        'HEATEXCHANGER:HYDRONIC                                ', & !16
-        'HEATEXCHANGER:WATERSIDEECONOMIZER                     ', & !17
-        'WATERHEATER:HEATPUMP                                  ', & !18
-        'HEATPUMP:WATERTOWATER:EQUATIONFIT:COOLING             ', & !19
-        'HEATPUMP:WATERTOWATER:EQUATIONFIT:HEATING             ', & !20
-        'HEATPUMP:WATERTOWATER:PARAMETERESTIMATION:COOLING     ', & !21
-        'HEATPUMP:WATERTOWATER:PARAMETERESTIMATION:HEATING     ', & !22
-        'PIPE:ADIABATIC                                        ', & !23
-        'PIPE:ADIABATIC:STEAM                                  ', & !24
-        'PIPE:OUTDOOR                                          ', & !25
-        'PIPE:INDOOR                                           ', & !26
-        'PIPE:UNDERGROUND                                      ', & !27
-        'DISTRICTCOOLING                                       ', & !28
-        'DISTRICTHEATING                                       ', & !29
-        'THERMALSTORAGE:ICE:DETAILED                           ', & !30
-        'THERMALSTORAGE:ICE:SIMPLE                             ', & !31
-        'TEMPERINGVALVE                                        ', & !32
-        'WATERHEATER:MIXED                                     ', & !33
-        'WATERHEATER:STRATIFIED                                ', & !34
-        'PUMP:VARIABLESPEED                                    ', & !35
-        'PUMP:CONSTANTSPEED                                    ', & !36
-        'PUMP:VARIABLESPEED:CONDENSATE                         ', & !37
-        'HEADEREDPUMPS:VARIABLESPEED                           ', & !38
-        'HEADEREDPUMPS:CONSTANTSPEED                           ', & !39
-        'WATERUSE:CONNECTIONS                                  ', & !40 ! demand side component
-        'COIL:COOLING:WATER                                    ', & !41 ! demand side component
-        'COIL:COOLING:WATER:DETAILEDGEOMETRY                   ', & !42 ! demand side component
-        'COIL:HEATING:WATER                                    ', & !43 ! demand side component
-        'COIL:HEATING:STEAM                                    ', & !44 ! demand side component
-        'SOLARCOLLECTOR:FLATPLATE:WATER                        ', & !45 ! demand side component
-        'LOADPROFILE:PLANT                                     ', & !46 ! demand side component'
-        'GROUNDHEATEXCHANGER:VERTICAL                          ', & !47
-        'GROUNDHEATEXCHANGER:SURFACE                           ', & !48
-        'GROUNDHEATEXCHANGER:POND                              ', & !49
-        'HEATEXCHANGER:PLATE                                   ', & !50
-        'GENERATOR:MICROTURBINE                                ', & !51
-        'GENERATOR:INTERNALCOMBUSTIONENGINE                    ', & !52
-        'GENERATOR:COMBUSTIONTURBINE                           ', & !53
-        'GENERATOR:MICROCHP                                    ', & !54
-        'GENERATOR:FUELCELL:STACKCOOLER                        ', & !55
-        'FLUIDCOOLER:SINGLESPEED                               ', & !56
-        'FLUIDCOOLER:TWOSPEED                                  ', & !57
-        'EVAPORATIVEFLUIDCOOLER:SINGLESPEED                    ', & !58
-        'EVAPORATIVEFLUIDCOOLER:TWOSPEED                       ', & !59
-        'THERMALSTORAGE:CHILLEDWATER:MIXED                     ', & !60
-        'THERMALSTORAGE:CHILLEDWATER:STRATIFIED                ', & !61
-        'SOLARCOLLECTOR:FLATPLATE:PHOTOVOLTAICTHERMAL          ', & !62
-        'ZONEHVAC:BASEBOARD:CONVECTIVE:WATER                   ', & !63
-        'ZONEHVAC:BASEBOARD:RADIANTCONVECTIVE:STEAM            ', & !64
-        'ZONEHVAC:BASEBOARD:RADIANTCONVECTIVE:WATER            ', & !65
-        'ZONEHVAC:LOWTEMPERATURERADIANT:VARIABLEFLOW           ', & !66
-        'ZONEHVAC:LOWTEMPERATURERADIANT:CONSTANTFLOW           ', & !67
-        'AIRTERMINAL:SINGLEDUCT:CONSTANTVOLUME:COOLEDBEAM      ', & !68
-        'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT           ', & !69
-        'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT           ', & !70
-        'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION   ', & !71
-        'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION   ', & !72
-        'REFRIGERATION:CONDENSER:WATERCOOLED                   ', & !73
-        'REFRIGERATION:COMPRESSORRACK                          ', & !74
-        'AIRLOOPHVAC:UNITARYHEATPUMP:AIRTOAIR:MULTISPEED       ', & !75
-        'CHILLERHEATER:ABSORPTION:DOUBLEEFFECT                 ', & !76
-        'PIPINGSYSTEM:UNDERGROUND:PIPECIRCUIT                  '/)  !77
+      (/'BOILER:HOTWATER                                         ', & !01
+        'BOILER:STEAM                                            ', & !02
+        'CHILLER:ABSORPTION                                      ', & !03
+        'CHILLER:ABSORPTION:INDIRECT                             ', & !04
+        'CHILLER:COMBUSTIONTURBINE                               ', & !05
+        'CHILLER:CONSTANTCOP                                     ', & !06
+        'CHILLERHEATER:ABSORPTION:DIRECTFIRED                    ', & !07
+        'CHILLER:ELECTRIC                                        ', & !08
+        'CHILLER:ELECTRIC:EIR                                    ', & !09
+        'CHILLER:ELECTRIC:REFORMULATEDEIR                        ', & !10
+        'CHILLER:ENGINEDRIVEN                                    ', & !11
+        'COOLINGTOWER:SINGLESPEED                                ', & !12
+        'COOLINGTOWER:TWOSPEED                                   ', & !13
+        'COOLINGTOWER:VARIABLESPEED                              ', & !14
+        'GENERATOR:FUELCELL:EXHAUSTGASTOWATERHEATEXCHANGER       ', & !15
+        'HEATEXCHANGER:HYDRONIC                                  ', & !16
+        'HEATEXCHANGER:WATERSIDEECONOMIZER                       ', & !17
+        'WATERHEATER:HEATPUMP                                    ', & !18
+        'HEATPUMP:WATERTOWATER:EQUATIONFIT:COOLING               ', & !19
+        'HEATPUMP:WATERTOWATER:EQUATIONFIT:HEATING               ', & !20
+        'HEATPUMP:WATERTOWATER:PARAMETERESTIMATION:COOLING       ', & !21
+        'HEATPUMP:WATERTOWATER:PARAMETERESTIMATION:HEATING       ', & !22
+        'PIPE:ADIABATIC                                          ', & !23
+        'PIPE:ADIABATIC:STEAM                                    ', & !24
+        'PIPE:OUTDOOR                                            ', & !25
+        'PIPE:INDOOR                                             ', & !26
+        'PIPE:UNDERGROUND                                        ', & !27
+        'DISTRICTCOOLING                                         ', & !28
+        'DISTRICTHEATING                                         ', & !29
+        'THERMALSTORAGE:ICE:DETAILED                             ', & !30
+        'THERMALSTORAGE:ICE:SIMPLE                               ', & !31
+        'TEMPERINGVALVE                                          ', & !32
+        'WATERHEATER:MIXED                                       ', & !33
+        'WATERHEATER:STRATIFIED                                  ', & !34
+        'PUMP:VARIABLESPEED                                      ', & !35
+        'PUMP:CONSTANTSPEED                                      ', & !36
+        'PUMP:VARIABLESPEED:CONDENSATE                           ', & !37
+        'HEADEREDPUMPS:VARIABLESPEED                             ', & !38
+        'HEADEREDPUMPS:CONSTANTSPEED                             ', & !39
+        'WATERUSE:CONNECTIONS                                    ', & !40 ! demand side component
+        'COIL:COOLING:WATER                                      ', & !41 ! demand side component
+        'COIL:COOLING:WATER:DETAILEDGEOMETRY                     ', & !42 ! demand side component
+        'COIL:HEATING:WATER                                      ', & !43 ! demand side component
+        'COIL:HEATING:STEAM                                      ', & !44 ! demand side component
+        'SOLARCOLLECTOR:FLATPLATE:WATER                          ', & !45 ! demand side component
+        'LOADPROFILE:PLANT                                       ', & !46 ! demand side component'
+        'GROUNDHEATEXCHANGER:VERTICAL                            ', & !47
+        'GROUNDHEATEXCHANGER:SURFACE                             ', & !48
+        'GROUNDHEATEXCHANGER:POND                                ', & !49
+        'HEATEXCHANGER:PLATE                                     ', & !50
+        'GENERATOR:MICROTURBINE                                  ', & !51
+        'GENERATOR:INTERNALCOMBUSTIONENGINE                      ', & !52
+        'GENERATOR:COMBUSTIONTURBINE                             ', & !53
+        'GENERATOR:MICROCHP                                      ', & !54
+        'GENERATOR:FUELCELL:STACKCOOLER                          ', & !55
+        'FLUIDCOOLER:SINGLESPEED                                 ', & !56
+        'FLUIDCOOLER:TWOSPEED                                    ', & !57
+        'EVAPORATIVEFLUIDCOOLER:SINGLESPEED                      ', & !58
+        'EVAPORATIVEFLUIDCOOLER:TWOSPEED                         ', & !59
+        'THERMALSTORAGE:CHILLEDWATER:MIXED                       ', & !60
+        'THERMALSTORAGE:CHILLEDWATER:STRATIFIED                  ', & !61
+        'SOLARCOLLECTOR:FLATPLATE:PHOTOVOLTAICTHERMAL            ', & !62
+        'ZONEHVAC:BASEBOARD:CONVECTIVE:WATER                     ', & !63
+        'ZONEHVAC:BASEBOARD:RADIANTCONVECTIVE:STEAM              ', & !64
+        'ZONEHVAC:BASEBOARD:RADIANTCONVECTIVE:WATER              ', & !65
+        'ZONEHVAC:LOWTEMPERATURERADIANT:VARIABLEFLOW             ', & !66
+        'ZONEHVAC:LOWTEMPERATURERADIANT:CONSTANTFLOW             ', & !67
+        'AIRTERMINAL:SINGLEDUCT:CONSTANTVOLUME:COOLEDBEAM        ', & !68
+        'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT             ', & !69
+        'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT             ', & !70
+        'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION     ', & !71
+        'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION     ', & !72
+        'REFRIGERATION:CONDENSER:WATERCOOLED                     ', & !73
+        'REFRIGERATION:COMPRESSORRACK                            ', & !74
+        'AIRLOOPHVAC:UNITARYHEATPUMP:AIRTOAIR:MULTISPEED         ', & !75
+        'CHILLERHEATER:ABSORPTION:DOUBLEEFFECT                   ', & !76
+        'PIPINGSYSTEM:UNDERGROUND:PIPECIRCUIT                    ', &  !77
+        'SOLARCOLLECTOR:INTEGRALCOLLECTORSTORAGE                 ', & !78
+        'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', & !79
+        'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', & !80
+        'PLANTCOMPONENT:USERDEFINED                              ', & !81
+        'COIL:USERDEFINED                                        ', & !82
+        'ZONEHVAC:FORCEDAIR:USERDEFINED                          ', & !83
+        'AIRTERMINAL:SINGLEDUCT:USERDEFINED                      '/)  !84
 
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ccSimPlantEquipTypes=  &
-      (/'Boiler:HotWater                                       ', & !01
-        'Boiler:Steam                                          ', & !02
-        'Chiller:Absorption                                    ', & !03
-        'Chiller:Absorption:Indirect                           ', & !04
-        'Chiller:CombustionTurbine                             ', & !05
-        'Chiller:ConstantCOP                                   ', & !06
-        'ChillerHeater:Absorption:DirectFired                  ', & !07
-        'Chiller:Electric                                      ', & !08
-        'Chiller:Electric:EIR                                  ', & !09
-        'Chiller:Electric:ReformulatedEIR                      ', & !10
-        'Chiller:EngineDriven                                  ', & !11
-        'CoolingTower:SingleSpeed                              ', & !12
-        'CoolingTower:TwoSpeed                                 ', & !13
-        'CoolingTower:VariableSpeed                            ', & !14
-        'Generator:Fuelcell:ExhaustGastoWaterHeatExchanger     ', & !15
-        'HeatExchanger:Hydronic                                ', & !16
-        'HeatExchanger:WatersideEconomizer                     ', & !17
-        'WaterHeater:Heatpump                                  ', & !18
-        'Heatpump:WatertoWater:Equationfit:Cooling             ', & !19
-        'Heatpump:WatertoWater:Equationfit:Heating             ', & !20
-        'Heatpump:WatertoWater:ParameterEstimation:Cooling     ', & !21
-        'Heatpump:WatertoWater:ParameterEstimation:Heating     ', & !22
-        'Pipe:Adiabatic                                        ', & !23
-        'Pipe:Adiabatic:Steam                                  ', & !24
-        'Pipe:Outdoor                                          ', & !25
-        'Pipe:Indoor                                           ', & !26
-        'Pipe:Underground                                      ', & !27
-        'DistrictCooling                                       ', & !28
-        'DistrictHeating                                       ', & !29
-        'ThermalStorage:Ice:Detailed                           ', & !30
-        'ThermalStorage:Ice:Simple                             ', & !31
-        'TemperingValve                                        ', & !32
-        'WaterHeater:Mixed                                     ', & !33
-        'WaterHeater:Stratified                                ', & !34
-        'Pump:VariableSpeed                                    ', & !35
-        'Pump:ConstantSpeed                                    ', & !36
-        'Pump:VariableSpeed:Condensate                         ', & !37
-        'HeaderedPumps:VariableSpeed                           ', & !38
-        'HeaderedPumps:ConstantSpeed                           ', & !39
-        'WaterUse:Connections                                  ', & !40 ! demand side component
-        'Coil:Cooling:Water                                    ', & !41 Demand Side Component
-        'Coil:Cooling:Water:DetailedGeometry                   ', & !42 Demand Side Component
-        'Coil:Heating:Water                                    ', & !43 Demand Side Component
-        'Coil:Heating:Steam                                    ', & !44 Demand Side Component
-        'Solarcollector:Flatplate:Water                        ', & !45 Demand Side Component
-        'LoadProfile:Plant                                     ', & !46 Demand Side Component'
-        'GroundHeatExchanger:Vertical                          ', & !47
-        'GroundHeatExchanger:Surface                           ', & !48
-        'GroundHeatExchanger:Pond                              ', & !49
-        'HeatExchanger:Plate                                   ', & !50
-        'Generator:Microturbine                                ', & !51
-        'Generator:InternalCombustionEngine                    ', & !52
-        'Generator:CombustionTurbine                           ', & !53
-        'Generator:Microchp                                    ', & !54
-        'Generator:Fuelcell:StackCooler                        ', & !55
-        'FluidCooler:SingleSpeed                               ', & !56
-        'FluidCooler:TwoSpeed                                  ', & !57
-        'EvaporativeFluidCooler:SingleSpeed                    ', & !58
-        'EvaporativeFluidCooler:TwoSpeed                       ', & !59
-        'ThermalStorage:ChilledWater:Mixed                     ', & !60
-        'ThermalStorage:ChilledWater:Stratified                ', & !61
-        'SolarCollector:FlatPlate:PhotovoltaicThermal          ', & !62
-        'ZoneHVAC:Baseboard:Convective:Water                   ', & !63
-        'ZoneHVAC:Baseboard:RadiantConvective:Steam            ', & !64
-        'ZoneHVAC:Baseboard:RadiantConvective:Water            ', & !65
-        'ZoneHVAC:LowTemperatureRadiant:VariableFlow           ', & !66
-        'ZoneHVAC:LowTemperatureRadiant:ConstantFlow           ', & !67
-        'AirTerminal:SingleDuct:ConstantVolume:CooledBeam      ', & !68
-        'Coil:Heating:WaterToAirHeatPump:EquationFit           ', & !69
-        'Coil:Cooling:WaterToAirHeatPump:EquationFit           ', & !70
-        'Coil:Heating:WaterToAirHeatPump:ParameterEstimation   ', & !71
-        'Coil:Cooling:WaterToAirHeatPump:ParameterEstimation   ', & !72
-        'Refrigeration:Condenser:WaterCooled                   ', & !73
-        'Refrigeration:CompressorRack                          ', & !74
-        'AirLoopHVAC:UnitaryHeatPump:AirToAir:MultiSpeed       ', & !75
-        'ChillerHeater:Absorption:DoubleEffect                 ', & !76
-        'PipingSystem:Underground:PipeCircuit                  '/)  !77
+      (/'Boiler:HotWater                                         ', & !01
+        'Boiler:Steam                                            ', & !02
+        'Chiller:Absorption                                      ', & !03
+        'Chiller:Absorption:Indirect                             ', & !04
+        'Chiller:CombustionTurbine                               ', & !05
+        'Chiller:ConstantCOP                                     ', & !06
+        'ChillerHeater:Absorption:DirectFired                    ', & !07
+        'Chiller:Electric                                        ', & !08
+        'Chiller:Electric:EIR                                    ', & !09
+        'Chiller:Electric:ReformulatedEIR                        ', & !10
+        'Chiller:EngineDriven                                    ', & !11
+        'CoolingTower:SingleSpeed                                ', & !12
+        'CoolingTower:TwoSpeed                                   ', & !13
+        'CoolingTower:VariableSpeed                              ', & !14
+        'Generator:Fuelcell:ExhaustGastoWaterHeatExchanger       ', & !15
+        'HeatExchanger:Hydronic                                  ', & !16
+        'HeatExchanger:WatersideEconomizer                       ', & !17
+        'WaterHeater:Heatpump                                    ', & !18
+        'Heatpump:WatertoWater:Equationfit:Cooling               ', & !19
+        'Heatpump:WatertoWater:Equationfit:Heating               ', & !20
+        'Heatpump:WatertoWater:ParameterEstimation:Cooling       ', & !21
+        'Heatpump:WatertoWater:ParameterEstimation:Heating       ', & !22
+        'Pipe:Adiabatic                                          ', & !23
+        'Pipe:Adiabatic:Steam                                    ', & !24
+        'Pipe:Outdoor                                            ', & !25
+        'Pipe:Indoor                                             ', & !26
+        'Pipe:Underground                                        ', & !27
+        'DistrictCooling                                         ', & !28
+        'DistrictHeating                                         ', & !29
+        'ThermalStorage:Ice:Detailed                             ', & !30
+        'ThermalStorage:Ice:Simple                               ', & !31
+        'TemperingValve                                          ', & !32
+        'WaterHeater:Mixed                                       ', & !33
+        'WaterHeater:Stratified                                  ', & !34
+        'Pump:VariableSpeed                                      ', & !35
+        'Pump:ConstantSpeed                                      ', & !36
+        'Pump:VariableSpeed:Condensate                           ', & !37
+        'HeaderedPumps:VariableSpeed                             ', & !38
+        'HeaderedPumps:ConstantSpeed                             ', & !39
+        'WaterUse:Connections                                    ', & !40 ! demand side component
+        'Coil:Cooling:Water                                      ', & !41 Demand Side Component
+        'Coil:Cooling:Water:DetailedGeometry                     ', & !42 Demand Side Component
+        'Coil:Heating:Water                                      ', & !43 Demand Side Component
+        'Coil:Heating:Steam                                      ', & !44 Demand Side Component
+        'Solarcollector:Flatplate:Water                          ', & !45 Demand Side Component
+        'LoadProfile:Plant                                       ', & !46 Demand Side Component'
+        'GroundHeatExchanger:Vertical                            ', & !47
+        'GroundHeatExchanger:Surface                             ', & !48
+        'GroundHeatExchanger:Pond                                ', & !49
+        'HeatExchanger:Plate                                     ', & !50
+        'Generator:Microturbine                                  ', & !51
+        'Generator:InternalCombustionEngine                      ', & !52
+        'Generator:CombustionTurbine                             ', & !53
+        'Generator:Microchp                                      ', & !54
+        'Generator:Fuelcell:StackCooler                          ', & !55
+        'FluidCooler:SingleSpeed                                 ', & !56
+        'FluidCooler:TwoSpeed                                    ', & !57
+        'EvaporativeFluidCooler:SingleSpeed                      ', & !58
+        'EvaporativeFluidCooler:TwoSpeed                         ', & !59
+        'ThermalStorage:ChilledWater:Mixed                       ', & !60
+        'ThermalStorage:ChilledWater:Stratified                  ', & !61
+        'SolarCollector:FlatPlate:PhotovoltaicThermal            ', & !62
+        'ZoneHVAC:Baseboard:Convective:Water                     ', & !63
+        'ZoneHVAC:Baseboard:RadiantConvective:Steam              ', & !64
+        'ZoneHVAC:Baseboard:RadiantConvective:Water              ', & !65
+        'ZoneHVAC:LowTemperatureRadiant:VariableFlow             ', & !66
+        'ZoneHVAC:LowTemperatureRadiant:ConstantFlow             ', & !67
+        'AirTerminal:SingleDuct:ConstantVolume:CooledBeam        ', & !68
+        'Coil:Heating:WaterToAirHeatPump:EquationFit             ', & !69
+        'Coil:Cooling:WaterToAirHeatPump:EquationFit             ', & !70
+        'Coil:Heating:WaterToAirHeatPump:ParameterEstimation     ', & !71
+        'Coil:Cooling:WaterToAirHeatPump:ParameterEstimation     ', & !72
+        'Refrigeration:Condenser:WaterCooled                     ', & !73
+        'Refrigeration:CompressorRack                            ', & !74
+        'AirLoopHVAC:UnitaryHeatPump:AirToAir:MultiSpeed         ', & !75
+        'ChillerHeater:Absorption:DoubleEffect                   ', & !76
+        'PipingSystem:Underground:PipeCircuit                    ', & !77
+        'SolarCollector:IntegralCollectorStorage                 ', & !78
+        'Coil:Heating:WaterToAirHeatPump:VariableSpeedEquationFit', & !79
+        'Coil:Cooling:WaterToAirHeatPump:VariableSpeedEquationFit', & !80
+        'PlantComponent:UserDefined                              ', & !81
+        'Coil:UserDefined                                        ', & !82
+        'ZoneHVAC:ForcedAir:UserDefined                          ', & !83
+        'AirTerminal:SingleDuct:UserDefined                      '/)  !84
 
 INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
  (/LoopType_Plant,     &     ! 01  BOILER:HOTWATER
@@ -426,7 +426,14 @@ INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
    LoopType_Both,      &     ! 74  Refrigeration:CompressorRack
    LoopType_Plant,     &     ! 75  AirLoopHVAC:UnitaryHeatPump:AirToAir:MultiSpeed
    LoopType_Plant,     &     ! 76  CHILLERHEATER:ABSORPTION:DOUBLEEFFECT
-   LoopType_Both       /)    ! 77  PipingSystem:Underground:PipeCircuit
+   LoopType_Both,      &     ! 77  PipingSystem:Underground:PipeCircuit
+   LoopType_Both,      &     ! 78  SolarCollector:IntegralCollectorStorage
+   LoopType_Both,      &     ! 79  Coil:Heating:WaterToAirHeatPump:VariableSpeedEquationFit
+   LoopType_Both,      &     ! 80  Coil:Cooling:WaterTOAIRHeatPump:VariableSpeedEquationFit
+   LoopType_Both,      &     ! 81  PlantComponent:UserDefined
+   LoopType_Both,      &     ! 82  Coil:UserDefined
+   LoopType_Both,      &     ! 83  ZoneHVAC:ForcedAir:UserDefined
+   LoopType_Both       /)    ! 84  AirTerminal:SingleDuct:UserDefined
 
 INTEGER, PARAMETER :: TypeOf_Other                       = -1
 INTEGER, PARAMETER :: TypeOf_Boiler_Simple               =  1
@@ -506,32 +513,40 @@ INTEGER, PARAMETER :: TypeOf_RefrigerationWaterCoolRack  = 74
 INTEGER, PARAMETER :: TypeOf_MultiSpeedHeatPumpRecovery  = 75
 INTEGER, PARAMETER :: TypeOf_Chiller_ExhFiredAbsorption  = 76
 INTEGER, PARAMETER :: TypeOf_PipingSystemPipeCircuit     = 77
+INTEGER, PARAMETER :: TypeOf_SolarCollectorICS           = 78
+INTEGER, PARAMETER :: TypeOf_CoilVSWAHPHeatingEquationFit= 79
+INTEGER, PARAMETER :: TypeOf_CoilVSWAHPCoolingEquationFit= 80
+INTEGER, PARAMETER :: TypeOf_PlantComponentUserDefined   = 81
+INTEGER, PARAMETER :: TypeOf_CoilUserDefined             = 82
+INTEGER, PARAMETER :: TypeOf_ZoneHVACAirUserDefined      = 83
+INTEGER, PARAMETER :: TypeOf_AirTerminalUserDefined      = 84
 
 ! Parameters for General Equipment Types
-INTEGER, PARAMETER :: NumGeneralEquipTypes               = 21
+INTEGER, PARAMETER :: NumGeneralEquipTypes               = 22
 CHARACTER(len=*), PARAMETER, &
      DIMENSION(NumGeneralEquipTypes) :: GeneralEquipTypes   =   &
-                   (/'BOILER                 ',  &
-                     'CHILLER                ',  &
-                     'COOLINGTOWER           ',  &
-                     'GENERATOR              ',  &
-                     'HEATEXCHANGER          ',  &
-                     'HEATPUMP               ',  &
-                     'PIPE                   ',  &
-                     'PUMP                   ',  &
-                     'DISTRICT               ',  &
-                     'THERMALSTORAGE         ',  &
-                     'TEMPERINGVALVE         ',  &
-                     'WATERHEATER            ',  &
-                     'WATERUSE               ',  &
-                     'DEMANDCOIL             ',  &
-                     'SOLARCOLLECTOR         ',  &
-                     'LOADPROFILE            ',  &
-                     'FLUIDCOOLER            ',  &
-                     'EVAPORATIVEFLUIDCOOLER ', &
-                     'GROUNDHEATEXCHANGER    ', &
-                     'ZONEHVACDEMAND         ', &
-                     'REFRIGERATION          '/)
+                   (/'BOILER                ',  &
+                     'CHILLER               ',  &
+                     'COOLINGTOWER          ',  &
+                     'GENERATOR             ',  &
+                     'HEATEXCHANGER         ',  &
+                     'HEATPUMP              ',  &
+                     'PIPE                  ',  &
+                     'PUMP                  ',  &
+                     'DISTRICT              ',  &
+                     'THERMALSTORAGE        ',  &
+                     'TEMPERINGVALVE        ',  &
+                     'WATERHEATER           ',  &
+                     'WATERUSE              ',  &
+                     'DEMANDCOIL            ',  &
+                     'SOLARCOLLECTOR        ',  &
+                     'LOADPROFILE           ',  &
+                     'FLUIDCOOLER           ',  &
+                     'EVAPORATIVEFLUIDCOOLER', &
+                     'GROUNDHEATEXCHANGER   ', &
+                     'ZONEHVACDEMAND        ', &
+                     'REFRIGERATION         ', &
+                     'PLANTCOMPONENT        '/)
 
 INTEGER, PARAMETER :: GenEquipTypes_Boiler               =  1
 INTEGER, PARAMETER :: GenEquipTypes_Chiller              =  2
@@ -554,20 +569,21 @@ INTEGER, PARAMETER :: GenEquipTypes_EvapFluidCooler      = 18
 INTEGER, PARAMETER :: GenEquipTypes_GroundHeatExchanger  = 19
 INTEGER, PARAMETER :: GenEquipTypes_ZoneHVACDemand       = 20
 INTEGER, PARAMETER :: GenEquipTypes_Refrigeration        = 21
+INTEGER, PARAMETER :: GenEquipTypes_PlantComponent       = 22
 
 CHARACTER(len=*), PARAMETER, DIMENSION (0:11) :: OpSchemeTypes = &
-                   (/'Load Range Based Operation                        ',   &  ! long since Deprecated, remove?
-                     'PLANTEQUIPMENTOPERATION:HEATINGLOAD               ',   &
-                     'PLANTEQUIPMENTOPERATION:COOLINGLOAD               ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORWETBULB            ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORDRYBULB            ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORDEWPOINT           ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORRELATIVEHUMIDITY   ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORDRYBULBDIFFERENCE  ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORWETBULBDIFFERENCE  ',   &
-                     'PLANTEQUIPMENTOPERATION:OUTDOORDEWPOINTDIFFERENCE ',   &
-                     'PLANTEQUIPMENTOPERATION:COMPONENTSETPOINT         ',   &
-                     'PLANTEQUIPMENTOPERATION:UNCONTROLLED              '/)
+                   (/'Load Range Based Operation                       ',   &  ! long since Deprecated, remove?
+                     'PLANTEQUIPMENTOPERATION:HEATINGLOAD              ',   &
+                     'PLANTEQUIPMENTOPERATION:COOLINGLOAD              ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORWETBULB           ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORDRYBULB           ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORDEWPOINT          ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORRELATIVEHUMIDITY  ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORDRYBULBDIFFERENCE ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORWETBULBDIFFERENCE ',   &
+                     'PLANTEQUIPMENTOPERATION:OUTDOORDEWPOINTDIFFERENCE',   &
+                     'PLANTEQUIPMENTOPERATION:COMPONENTSETPOINT        ',   &
+                     'PLANTEQUIPMENTOPERATION:UNCONTROLLED             '/)
 
   ! DERIVED TYPE DEFINITIONS:
 TYPE SplitterData
@@ -660,12 +676,18 @@ TYPE CompData
   TYPE(OpSchemePtrData), &
        ALLOCATABLE, DIMENSION(:)   :: OpScheme                     ! Pointers to component on lists
   REAL(r64)                        :: EquipDemand           = 0.0d0   ! Component load request based on inlet temp and outlet SP
-  LOGICAL                          :: EMSCtrl               = .FALSE.
-  REAL(r64)                        :: EMSValue              = 0.0d0
+  LOGICAL                          :: EMSLoadOverrideOn     = .FALSE. ! EMS is calling to override load dispatched to component
+  REAL(r64)                        :: EMSLoadOverrideValue  = 0.0d0   ! EMS value to use for load when overridden [W] always positive.
   INTEGER                          :: HowLoadServed         = HowMet_Unknown ! nature of component in terms of how it can meet load
-  REAL(r64)                        :: MinOutletTemp         = 0.0     ! Component lower limit temperature
-  REAL(r64)                        :: MaxOutletTemp         = 0.0     ! Component upper limit temperature
+  REAL(r64)                        :: MinOutletTemp         = 0.0     ! Component exit lower limit temperature
+  REAL(r64)                        :: MaxOutletTemp         = 0.0     ! Component exit upper limit temperature
+  LOGICAL                          :: FreeCoolCntrlShutDown = .FALSE. ! true if component was shut down because of free cooling
+  REAL(r64)                        :: FreeCoolCntrlMinCntrlTemp   = 0.D0  ! current control temp value for free cooling controls
+  INTEGER                          :: FreeCoolCntrlMode     = 0 ! type of sensor used for free cooling controls
+  INTEGER                          :: FreeCoolCntrlNodeNum  = 0 ! chiller condenser inlet node number for free cooling controls
   INTEGER                          :: IndexInLoopSidePumps  = 0       ! If I'm a pump, this tells my index in PL(:)%LS(:)%Pumps
+  REAL(r64)                        :: TempDesCondIn         = 0
+  REAL(r64)                        :: TempDesEvapOut        = 0
 END TYPE CompData
 
 TYPE BranchData
@@ -673,7 +695,9 @@ TYPE BranchData
   INTEGER                          :: ControlType           = 0
   REAL(r64)                        :: MinVolFlowRate        = 0.0d0
   REAL(r64)                        :: MaxVolFlowRate        = 0.0d0
-  REAL(r64)                        :: Requestedmassflow     = 0.0d0
+  REAL(r64)                        :: RequestedMassFlow     = 0.0d0
+  LOGICAL                          :: HasConstantSpeedBranchPump = .FALSE. ! true if branch has a constant speed branch pump
+  REAL(r64)                        :: ConstantSpeedBranchMassFlow = 0.d0 ! nominal flow rate if constant speed branch pump on
   INTEGER                          :: BranchLevel           = 0
   INTEGER                          :: FlowErrCount          = 0       ! For recurring error counting
   INTEGER                          :: FlowErrIndex          = 0       ! For recurring error index
@@ -683,8 +707,8 @@ TYPE BranchData
   LOGICAL                          :: IsByPass              = .FALSE.
   INTEGER                          :: PumpIndex             = 0
   real(r64)                        :: PumpSizFac            = 1.0d0
-  LOGICAL                          :: EMSCtrl               = .FALSE.
-  REAL(r64)                        :: EMSValue              = 0.0d0
+  LOGICAL                          :: EMSCtrlOverrideOn     = .FALSE. ! if true, EMS is calling to override branch operation avail
+  REAL(r64)                        :: EMSCtrlOverrideValue  = 0.0d0   ! value set by EMS system for branch override controls
   TYPE(CompData), &
        ALLOCATABLE, DIMENSION(:)   :: Comp                            ! Component type list
   LOGICAL                          :: HasPressureComponents = .FALSE.
@@ -731,7 +755,7 @@ TYPE OperationData                          ! DSU
   INTEGER                          :: CurListPtr            = 0       ! points to the current equipment list
   TYPE(EquipOpList), &
        ALLOCATABLE, DIMENSION(:)   :: EquipList                       ! Component type list
-
+  INTEGER                          :: EquipListNumForLastStage = 0    ! points to the equipment list with the highest upper limit
   CHARACTER(len=MaxNameLength)     :: ReferenceNodeName     = ' '     ! DELTA CTRL ONLY--for calculation of delta Temp
   INTEGER                          :: ReferenceNodeNumber              ! DELTA CTRL ONLY--for calculation of delta Temp
 END TYPE OperationData                        ! DSU
@@ -837,6 +861,9 @@ TYPE PlantLoopData
   INTEGER                          :: FluidType             = 0       ! Type of fluid in the loop
   INTEGER                          :: FluidIndex            = 0       ! Index for Fluid in FluidProperties
   INTEGER                          :: MFErrIndex            = 0       ! for recurring mass flow errors
+  INTEGER                          :: MFErrIndex1           = 0       ! for recurring mass flow errors
+  INTEGER                          :: MFErrIndex2           = 0       ! for recurring mass flow errors
+                                                                      ! (see CheckPlantMixerSplitterConsistency)
   ! Loop Operating Setpoints and Limits
 
   INTEGER                          :: TempSetPointNodeNum   = 0       ! Node Number for Loop Temp SP associated with SP manager
@@ -1105,7 +1132,7 @@ REAL(r64)                          :: EconLoadMet           = 0.0d0   ! Load met
 INTEGER                            :: TotNumLoops           = 0       ! number of plant and condenser loops
 INTEGER                            :: TotNumHalfLoops       = 0       ! number of half loops (2 * TotNumLoops)
 LOGICAL                            :: PlantSizeNotComplete  = .TRUE.
-LOGICAL                            :: PlantSizesOkayToFinalize = .FALSE. ! true when plant sizing is finishing and it is okay to save results
+LOGICAL                            :: PlantSizesOkayToFinalize = .FALSE. ! true if plant sizing is finishing and can save results
 
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: EconBranchNum                   ! Branch num on which economizer is placed
@@ -1180,6 +1207,7 @@ USE DataGlobals
 USE DataInterfaces, ONLY: ShowSevereError, ShowFatalError, ShowContinueError
 USE InputProcessor, ONLY : SameString
 USE General,        ONLY : RoundSigDigits
+USE BranchInputManager, ONLY: AuditBranches
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1216,17 +1244,12 @@ INTEGER,  OPTIONAL,  INTENT(IN)   :: SingleLoopSearch
   LOGICAL     :: FoundCompName
   INTEGER     :: StartingLoopNum
   INTEGER     :: EndingLoopNum
-  logical :: printsteps
+!  logical :: printsteps
 
   FoundCount = 0
 
   FoundComponent = .FALSE.
   FoundCompName  = .false.
-  if (compname == 'GASBWKESSEL') THEN
-    printsteps=.true.
-  ELSE
-    printsteps=.false.
-  ENDIF
   StartingLoopNum = 1
   EndingLoopNum   = TotNumLoops
   IF ( PRESENT ( SingleLoopSearch ) ) THEN
@@ -1277,15 +1300,16 @@ INTEGER,  OPTIONAL,  INTENT(IN)   :: SingleLoopSearch
   IF (.NOT. FoundComponent) THEN
     IF (CompType >= 1 .and. CompType <= NumSimPlantEquipTypes) THEN
       IF (.not. PRESENT(SingleLoopSearch)) THEN
-      CALL ShowSevereError('Plant Component '//trim(ccSimPlantEquipTypes(CompType))//' called "'//trim(CompName)//  &
+        CALL ShowSevereError('Plant Component '//trim(ccSimPlantEquipTypes(CompType))//' called "'//trim(CompName)//  &
          '" was not found on any plant loops.')
+        CALL AuditBranches(.true.,ccSimPlantEquipTypes(CompType),CompName)
       ELSE
         CALL ShowSevereError('Plant Component '//trim(ccSimPlantEquipTypes(CompType))//' called "'//trim(CompName)//  &
            '" was not found on plant loop="'//trim(PlantLoop(SingleLoopSearch)%Name)//'".')
       ENDIF
       IF (PRESENT(InletNodeNumber)) THEN
-      IF (FoundCompName) THEN
-        CALL ShowContinueError('Looking for matching inlet Node="'//trim(NodeID(InletNodeNumber))//'".')
+        IF (FoundCompName) THEN
+          CALL ShowContinueError('Looking for matching inlet Node="'//trim(NodeID(InletNodeNumber))//'".')
         ENDIF
       ENDIF
       IF (PRESENT(SingleLoopSearch)) THEN
@@ -1465,7 +1489,7 @@ SUBROUTINE SetAllPlantSimFlagsToValue(Value)
    ! Quickly sets all sim flags of a certain type (loop type/side) to a value
    !
    ! USE STATEMENTS:
- USE DataHVACGlobals, ONLY : NumPlantLoops, NumCondLoops
+   ! na
 
  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1532,7 +1556,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
   END IF
 
   ! We can also make use of the TypeOfs to exit early
-  IF (.NOT. PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType == GenEquipTypes_Pump) &
+  IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType /=   &
+       GenEquipTypes_Pump) &
     RETURN
 
   ! Loop across all the loops on this loop/loopside, and check the branch/comp location
@@ -1540,13 +1565,14 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
     IF (      (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Pumps(PumpCtr)%BranchNum == BranchNum) &
         .AND. (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Pumps(PumpCtr)%CompNum == CompNum) ) THEN
       GetLoopSidePumpIndex = PumpCtr
-      RETURN
+      EXIT
     END IF
   END DO
 
  RETURN
 
 END FUNCTION GetLoopSidePumpIndex
+
 
 SUBROUTINE ShowBranchesOnLoop(LoopNum)
 
@@ -1612,9 +1638,104 @@ SUBROUTINE ShowBranchesOnLoop(LoopNum)
 
 END SUBROUTINE ShowBranchesOnLoop
 
+FUNCTION MyPlantSizingIndex(CompType,CompName,NodeNumIn,NodeNumOut,ErrorsFound,SupressErrors) RESULT(MyPltSizNum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   July 2008
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Identify the correct Plant Sizing object for demand-side components such as heating and
+          ! cooling coils.
+
+
+          ! METHODOLOGY EMPLOYED:
+          ! This function searches all plant loops for a component whose input and
+          ! output nodes match the desired input & output nodes. This plant loop index is then used
+          ! to search the Plant Sizing array for the matching Plant Sizing object.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItemInList
+  USE DataSizing, ONLY: NumPltSizInput, PlantSizData
+  USE DataInterfaces, ONLY: ShowWarningError, ShowSevereError, ShowContinueError
+!  USE DataPlant, ONLY: PlantLoop, ScanPlantLoopsForNodeNum
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CompType      ! component description
+  CHARACTER(len=*), INTENT(IN) :: CompName      ! user name of component
+  INTEGER, INTENT(IN) :: NodeNumIn      ! component water inlet node
+  INTEGER, INTENT(IN) :: NodeNumOut     ! component water outlet node
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if there's an error
+  LOGICAL, OPTIONAL, INTENT(IN):: SupressErrors ! used for WSHP's where condenser loop may not be on a plant loop
+  INTEGER                      :: MyPltSizNum  ! returned plant sizing index
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+
+  INTEGER                      :: MyPltLoopNum
+  INTEGER                      :: PlantLoopNum
+  INTEGER                      :: DummyLoopSideNum
+  INTEGER                      :: DummyBranchNum
+  LOGICAL                      :: PrintErrorFlag
+
+  MyPltLoopNum = 0
+  MyPltSizNum = 0
+  ErrorsFound = .false.
+  IF(PRESENT(SupressErrors))THEN
+    PrintErrorFlag = SupressErrors
+  ELSE
+    PrintErrorFlag = .TRUE.
+  END IF
+
+  CALL ScanPlantLoopsForNodeNum('MyPlantSizingIndex', NodeNumIn, PlantLoopNum, DummyLoopSideNum, DummyBranchNum )
+
+  IF (PlantLoopNum > 0) THEN
+    MyPltLoopNum = PlantLoopNum
+  ELSE
+    MyPltLoopNum = 0
+  END IF
+
+  IF (MyPltLoopNum > 0) THEN
+    IF (NumPltSizInput > 0) THEN
+      MyPltSizNum = FindItemInList(PlantLoop(MyPltLoopNum)%Name,PlantSizData%PlantLoopName,NumPltSizInput)
+    ENDIF
+    IF (MyPltSizNum == 0) THEN
+      IF (PrintErrorFlag) THEN
+        Call ShowSevereError('MyPlantSizingIndex: Could not find ' //TRIM(PlantLoop(MyPltLoopNum)%Name) &
+                                 //' in Sizing:Plant objects.')
+        Call ShowContinueError('...reference Component Type="'//trim(CompType)//'", Name="'//trim(CompName)//'".')
+      ENDIF
+      ErrorsFound=.true.
+    ENDIF
+  ELSE
+    IF(PrintErrorFlag)THEN
+      Call ShowWarningError('Could not find ' //TRIM(CompType)//' with name '//TRIM(CompName)//' on any plant loop')
+    END IF
+    ErrorsFound=.true.
+  END IF
+
+  RETURN
+
+END FUNCTION MyPlantSizingIndex
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

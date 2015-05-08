@@ -195,8 +195,8 @@ SUBROUTINE GetPlantProfileInput
   INTEGER                        :: NumAlphas             ! Number of Alphas for each GetObjectItem call
   INTEGER                        :: NumNumbers            ! Number of Numbers for each GetObjectItem call
   INTEGER                        :: ProfileNum            ! PLANT LOAD PROFILE (PlantProfile) object number
-  CHARACTER(len=MaxNameLength)   :: FoundBranchName
-  INTEGER                        :: BranchControlType
+!  CHARACTER(len=MaxNameLength)   :: FoundBranchName
+!  INTEGER                        :: BranchControlType
 
           ! FLOW:
   cCurrentModuleObject = 'LoadProfile:Plant'
@@ -487,7 +487,7 @@ END SUBROUTINE ReportPlantProfile
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

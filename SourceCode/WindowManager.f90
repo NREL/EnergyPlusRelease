@@ -43,7 +43,6 @@ USE DataHeatBalFanSys
 USE DataGlobals
 USE DataSurfaces
 USE DataInterfaces
-!USE Vectors
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
 
@@ -584,6 +583,16 @@ DO ConstrNum = 1,TotConstructs
       ! TH 8/26/2010, CR 8206
       ! If there is spectral data for between-glass shades or blinds, calc the average spectral properties for use.
       IF (BGFlag) THEN
+        ! 5/16/2012 CR 8793. Add warning message for the glazing defined with full spectral data.
+        CALL ShowWarningError('Window glazing material "'//TRIM(Material(LayPtr)%Name)// &
+          '" was defined with full spectral data and has been converted to average spectral data')
+        CALL ShowContinueError('due to its use with between-glass shades or blinds of the window construction "'// &
+          TRIM(Construct(ConstrNum)%Name) // '".')
+        CALL ShowContinueError('All occurrences of this glazing material will be modeled as SpectralAverage.')
+        CALL ShowContinueError('If this material is also used in other window constructions'// &
+          '  without between-glass shades or blinds,')
+        CALL ShowContinueError('then make a duplicate material (with new name) if you want to model those windows '//  &
+           ' (and reference the new material) using the full spectral data.')
         ! calc Trans, TransVis, ReflectSolBeamFront, ReflectSolBeamBack, ReflectVisBeamFront, ReflectVisBeamBack
         !  assuming wlt same as wle
         CALL SolarSprectrumAverage(t, tmpTrans)
@@ -1484,7 +1493,7 @@ SUBROUTINE W5InitGlassParameters
           ! na
 
           ! USE STATEMENTS:
-          ! na
+USE General, ONLY: RoundSigDigits
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1509,10 +1518,9 @@ REAL(r64)         :: GlWidth                 ! Width of glazed part of window {m
 INTEGER           :: NumHorDividers          ! Number of horizontal divider elements
 INTEGER           :: NumVertDividers         ! Number of vertical divider elements
 INTEGER           :: BaseSurfNum             ! Base surface number
-!INTEGER           :: ConstrNumSh             ! Shaded window construction number
-!CHARACTER(len=30) :: ShadingType             ! Window shading type
 INTEGER :: ShadingType             ! Window shading type
 INTEGER           :: MatNum                  ! Material number
+INTEGER   :: DifOverrideCount        ! Count the number of SolarDiffusing material overrides
 
           ! FLOW
 
@@ -1617,16 +1625,42 @@ DO SurfNum = 1,TotSurfaces
   END IF
 END DO
 
-! Set SolarDiffusing to true for exterior windows that have a contstruction with an innermost diffusing glass layer
+! Set SolarDiffusing to true for exterior windows that have a construction with an innermost diffusing glass layer
+DifOverrideCount=0
 DO SurfNum = 1,TotSurfaces
   SurfaceWindow(SurfNum)%SolarDiffusing = .false.
   IF(Surface(SurfNum)%Class == SurfaceClass_Window .AND. Surface(SurfNum)%ExtBoundCond == ExternalEnvironment .AND. &
-     Surface(SurfNum)%WindowShadingControlPtr == 0 .AND. Surface(SurfNum)%StormWinConstruction == 0) THEN
+     Surface(SurfNum)%StormWinConstruction == 0) THEN
     ConstrNum = Surface(SurfNum)%Construction
     MatNum = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
-    IF(Material(MatNum)%SolarDiffusing) SurfaceWindow(SurfNum)%SolarDiffusing = .true.
+    IF(Material(MatNum)%SolarDiffusing) THEN
+      IF (Surface(SurfNum)%WindowShadingControlPtr == 0) THEN
+        SurfaceWindow(SurfNum)%SolarDiffusing = .true.
+      ELSE  ! There is a shading control
+!        IF (WindowShadingControl(Surface(SurfNum)%WindowShadingControlPtr)%ShadingType == SwitchableGlazing) THEN
+!          SurfaceWindow(SurfNum)%SolarDiffusing = .true.
+!        ELSE
+          SurfaceWindow(SurfNum)%SolarDiffusing = .false.
+          DifOverrideCount=DifOverrideCount+1
+          IF (DisplayExtraWarnings) THEN
+            CALL ShowWarningError('W5InitGlassParameters: Window="'//trim(Surface(SurfNum)%Name)//  &
+               '" has interior material with Solar Diffusing=Yes, but existing Window Shading Device sets Diffusing=No.')
+          ENDIF
+!        ENDIF
+      ENDIF
+    ENDIF
   END IF
 END DO
+
+IF (DifOverrideCount > 0) THEN
+  IF (.not. DisplayExtraWarnings) THEN
+    CALL ShowWarningError('W5InitGlassParameters: '//trim(RoundSigDigits(DifOverrideCount))//  &
+       ' Windows had Solar Diffusing=Yes overridden by presence of Window Shading Device.')
+  ELSE
+    CALL ShowMessage('W5InitGlassParameters: '//trim(RoundSigDigits(DifOverrideCount))//  &
+       ' Windows had Solar Diffusing=Yes overridden by presence of Window Shading Device.')
+  ENDIF
+ENDIF
 
 DO IPhi = 1, 10
   CosPhiIndepVar(IPhi) = COS((IPhi-1)*10.*DegToRadians)
@@ -2147,6 +2181,7 @@ hcin = HConvIn(SurfNum)  ! Room-side surface convective film conductance
 SELECT CASE (Surface(SurfNum)%TAirRef)
     CASE (ZoneMeanAirTemp)
         RefAirTemp = MAT(ZoneNum)
+        TempEffBulkAir(SurfNum) = RefAirTemp
     CASE (AdjacentAirTemp)
         RefAirTemp = TempEffBulkAir(SurfNum)
     CASE (ZoneSupplyAirTemp)
@@ -2175,10 +2210,17 @@ SELECT CASE (Surface(SurfNum)%TAirRef)
             SumSysMCpT = SumSysMCpT + MassFlowRate * CpAir * NodeTemp
         END DO
         ! a weighted average of the inlet temperatures.
-        RefAirTemp = SumSysMCpT/SumSysMCp
+        IF (SumSysMCp > 0.0d0) THEN
+          RefAirTemp = SumSysMCpT/SumSysMCp
+        ELSE
+          RefAirTemp = NodeTemp
+        ENDIF
+        TempEffBulkAir(SurfNum) = RefAirTemp
+
     CASE DEFAULT
         ! currently set to mean air temp but should add error warning here
         RefAirTemp = MAT(ZoneNum)
+        TempEffBulkAir(SurfNum) = RefAirTemp
 END SELECT
 
 Tin = RefAirTemp + TKelvin  ! Inside air temperature
@@ -2354,13 +2396,14 @@ IF(SurfNumAdj > 0) THEN  ! Interzone window
   SELECT CASE (Surface(SurfNumAdj)%TAirRef)
     CASE (ZoneMeanAirTemp)
         RefAirTemp = MAT(ZoneNumAdj)
+        TempEffBulkAir(SurfNumAdj) = RefAirTemp
     CASE (AdjacentAirTemp)
         RefAirTemp = TempEffBulkAir(SurfNumAdj)
     CASE (ZoneSupplyAirTemp)
         ! determine ZoneEquipConfigNum for this zone
-        ZoneEquipConfigNum = ZoneNum
+        ZoneEquipConfigNum = ZoneNumAdj
         ! check whether this zone is a controlled zone or not
-        IF (.NOT. Zone(ZoneNum)%IsControlled) THEN
+        IF (.NOT. Zone(ZoneNumAdj)%IsControlled) THEN
           CALL ShowFatalError('Zones must be controlled for Ceiling-Diffuser Convection model. No system serves zone '//  &
                              TRIM(Zone(ZoneNum)%Name))
           RETURN
@@ -2375,11 +2418,17 @@ IF(SurfNumAdj > 0) THEN  ! Interzone window
             SumSysMCp = SumSysMCp + MassFlowRate * CpAir
             SumSysMCpT = SumSysMCpT + MassFlowRate * CpAir * NodeTemp
         END DO
-        ! a weighted average of the inlet temperatures.
-        RefAirTemp = SumSysMCpT/SumSysMCp
+        IF (SumSysMCp > 0.0d0) THEN
+          ! a weighted average of the inlet temperatures.
+          RefAirTemp = SumSysMCpT/SumSysMCp
+        ELSE
+          RefAirTemp = NodeTemp
+        ENDIF
+        TempEffBulkAir(SurfNumAdj) = RefAirTemp
     CASE DEFAULT
         ! currently set to mean air temp but should add error warning here
         RefAirTemp = MAT(ZoneNumAdj)
+        TempEffBulkAir(SurfNumAdj) = RefAirTemp
   END SELECT
 
   Tout = RefAirTemp + TKelvin  ! outside air temperature
@@ -2517,17 +2566,17 @@ END IF
 
 !update exterior environment surface heat loss reporting
 Tsout                          = SurfOutsideTemp + TKelvin
-QdotConvOutRep(SurfNum)        = Surface(SurfNum)%Area * hcout *(Tsout - Tout)
-QdotConvOutRepPerArea(SurfNum) = hcout *(Tsout - Tout)
+QdotConvOutRep(SurfNum)        = - Surface(SurfNum)%Area * hcout *(Tsout - Tout)
+QdotConvOutRepPerArea(SurfNum) = - hcout *(Tsout - Tout)
 QConvOutReport(SurfNum)        = QdotConvOutRep(SurfNum)* SecInHour * TimeStepZone
 
-QdotRadOutRep(SurfNum) = Surface(SurfNum)%Area * SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + &
+QdotRadOutRep(SurfNum) = - Surface(SurfNum)%Area * SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + &
                                  Surface(SurfNum)%ViewFactorGroundIR) * sigma * (Tsout**4 - tout**4) &
-                          + Surface(SurfNum)%Area *SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  &
+                          -  Surface(SurfNum)%Area *SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  &
                                 * sigma * (Tsout**4 - SkyTempKelvin**4)
-QdotRadOutRepPerArea(SurfNum) =SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + Surface(SurfNum)%ViewFactorGroundIR) &
+QdotRadOutRepPerArea(SurfNum) =- SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + Surface(SurfNum)%ViewFactorGroundIR) &
                           * sigma * (Tsout**4 - tout**4) &
-                          + SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  * sigma * (Tsout**4 - SkyTempKelvin**4)
+                          - SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  * sigma * (Tsout**4 - SkyTempKelvin**4)
 QRadOutReport(SurfNum) =  QdotRadOutRep(SurfNum) * SecInHour * TimeStepZone
 
 RETURN
@@ -3427,7 +3476,7 @@ IF(errtemp < 10*errtemptol) THEN
                                Construct(ConstrNumSh)%TransDiff)
   END IF
   WinHeatGain(SurfNum) = WinHeatGain(SurfNum) - QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area * TransDiff
-  WinLossSWZoneToOutWinRep(SurfNum) = QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area * TransDiff
+  WinLossSWZoneToOutWinRep(SurfNum) = QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area * TransDiff  ! shouldn't this be + outward flowing fraction of absorbed SW?
 
   IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn.OR. &
      ShadeFlag==BGShadeOn.OR.ShadeFlag==BGBlindOn.OR.ShadeFlag==ExtScreenOn) THEN
@@ -4881,6 +4930,9 @@ SUBROUTINE TransAndReflAtPhi(cs,tf0,rf0,rb0,tfp,rfp,rbp,SimpleGlazingSystem, Sim
           ! REFERENCES:
           ! ASHRAE Handbook of Fundamentals, 2001, pp. 30.20-23,
           ! "Optical Properties of Single Glazing Layers."
+
+   USE General, ONLY: SafeDivide
+
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -4897,84 +4949,80 @@ SUBROUTINE TransAndReflAtPhi(cs,tf0,rf0,rb0,tfp,rfp,rbp,SimpleGlazingSystem, Sim
     REAL(r64), INTENT(IN)   :: SimpleGlazingU          ! U-factor value to use in alternate model for simple glazing system
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)         :: tfp1,tfp2                   ! Transmittance at cs for each polarization
-  REAL(r64)         :: rfp1,rfp2                   ! Front reflectance at cs for each polarization
-  REAL(r64)         :: rbp1,rbp2                   ! Back reflectance at cs for each polarization
-  REAL(r64)         :: betaf,betab                 ! Intermediate variables
-  REAL(r64)         :: t0f,t0b,r0f,r0b,abf,abb     ! Intermediate variables
-  REAL(r64)         :: ngf,ngb                     ! Front and back index of refraction
-  REAL(r64)         :: cgf,cgb                     ! Intermediate variables
-  REAL(r64)         :: rpf1,rpb1,tpf1,tpb1         ! Front and back air/glass interface reflectivity
-                                                   !  and transmittivity for first polarization
-  REAL(r64)         :: rpf2,rpb2,tpf2,tpb2         ! Front and back air/glass interface reflectivity
-                                                   !  and transmittivity for second polarization
-  REAL(r64)         :: tcl,rcl                     ! Transmittance and reflectance for clear glass
-  REAL(r64)         :: tbnz,rbnz                   ! Transmittance and reflectance for bronze glass
-  REAL(r64)         :: expmabfdivcgf
-  REAL(r64)         :: expm2abfdivcgf
-  REAL(r64)         :: expmabbdivcgb
-!  REAL(r64)         :: IncidenceAngle              ! angle of incidence wrt normal
-!  REAL(r64)         :: CoefFuncSHGC                ! intermediate coefficient that is function of SHGC
-!  REAL(r64)         :: f1
-!  REAL(r64)         :: f2
-!  REAL(r64)         :: Rfit_o
-  REAL(r64)         :: TransCurveA ! result for curve A for Transmission as a function of angle
-  REAL(r64)         :: TransCurveB ! result for curve B for Transmission as a function of angle
-  REAL(r64)         :: TransCurveC ! result for curve C for Transmission as a function of angle
-  REAL(r64)         :: TransCurveD ! result for curve D for Transmission as a function of angle
-  REAL(r64)         :: TransCurveE ! result for curve E for Transmission as a function of angle
-  REAL(r64)         :: TransCurveF ! result for curve F for Transmission as a function of angle
-  REAL(r64)         :: TransCurveG ! result for curve G for Transmission as a function of angle
-  REAL(r64)         :: TransCurveH ! result for curve H for Transmission as a function of angle
-  REAL(r64)         :: TransCurveI ! result for curve I for Transmission as a function of angle
-  REAL(r64)         :: TransCurveJ ! result for curve J for Transmission as a function of angle
-  REAL(r64)         :: ReflectCurveA ! result for curve A for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveB ! result for curve B for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveC ! result for curve C for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveD ! result for curve D for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveE ! result for curve E for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveF ! result for curve F for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveG ! result for curve G for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveH ! result for curve H for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveI ! result for curve I for Reflectance as a function of angle
-  REAL(r64)         :: ReflectCurveJ ! result for curve J for Reflectance as a function of angle
+  REAL(r64) :: tfp1,tfp2                   ! Transmittance at cs for each polarization
+  REAL(r64) :: rfp1,rfp2                   ! Front reflectance at cs for each polarization
+  REAL(r64) :: rbp1,rbp2                   ! Back reflectance at cs for each polarization
+  REAL(r64) :: betaf,betab                 ! Intermediate variables
+  REAL(r64) :: t0f,t0b,r0f,r0b,abf,abb     ! Intermediate variables
+  REAL(r64) :: ngf,ngb                     ! Front and back index of refraction
+  REAL(r64) :: cgf,cgb                     ! Intermediate variables
+  REAL(r64) :: rpf1,rpb1,tpf1,tpb1         ! Front and back air/glass interface reflectivity
+                                           !  and transmittivity for first polarization
+  REAL(r64) :: rpf2,rpb2,tpf2,tpb2         ! Front and back air/glass interface reflectivity
+                                           !  and transmittivity for second polarization
+  REAL(r64) :: tcl,rcl                     ! Transmittance and reflectance for clear glass
+  REAL(r64) :: tbnz,rbnz                   ! Transmittance and reflectance for bronze glass
+  REAL(r64) :: expmabfdivcgf
+  REAL(r64) :: expm2abfdivcgf
+  REAL(r64) :: expmabbdivcgb
+  REAL(r64) :: TransCurveA ! result for curve A for Transmission as a function of angle
+  REAL(r64) :: TransCurveB ! result for curve B for Transmission as a function of angle
+  REAL(r64) :: TransCurveC ! result for curve C for Transmission as a function of angle
+  REAL(r64) :: TransCurveD ! result for curve D for Transmission as a function of angle
+  REAL(r64) :: TransCurveE ! result for curve E for Transmission as a function of angle
+  REAL(r64) :: TransCurveF ! result for curve F for Transmission as a function of angle
+  REAL(r64) :: TransCurveG ! result for curve G for Transmission as a function of angle
+  REAL(r64) :: TransCurveH ! result for curve H for Transmission as a function of angle
+  REAL(r64) :: TransCurveI ! result for curve I for Transmission as a function of angle
+  REAL(r64) :: TransCurveJ ! result for curve J for Transmission as a function of angle
+  REAL(r64) :: ReflectCurveA ! result for curve A for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveB ! result for curve B for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveC ! result for curve C for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveD ! result for curve D for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveE ! result for curve E for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveF ! result for curve F for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveG ! result for curve G for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveH ! result for curve H for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveI ! result for curve I for Reflectance as a function of angle
+  REAL(r64) :: ReflectCurveJ ! result for curve J for Reflectance as a function of angle
 
-  REAL(r64)         :: TransCurveFGHI ! average of curves F, G, H, and I
-  REAL(r64)         :: ReflectCurveFGHI ! average of curves F, G, H, and I
-  REAL(r64)         :: TransCurveFH ! average of curves F and H
-  REAL(r64)         :: ReflectCurveFH ! average of curves F and H
-  REAL(r64)         :: TransCurveBDCD ! average of curves B, D, C, and D (again)
-  REAL(r64)         :: ReflectCurveBDCD ! average of curves B, D, C, and D (again)
-  REAL(r64)         :: TransTmp ! temporary value for normalized transmission (carry out of if blocks)
-  REAL(r64)         :: ReflectTmp ! temporary value for normalized reflectance (carry out of if blocks)
+  REAL(r64) :: TransCurveFGHI ! average of curves F, G, H, and I
+  REAL(r64) :: ReflectCurveFGHI ! average of curves F, G, H, and I
+  REAL(r64) :: TransCurveFH ! average of curves F and H
+  REAL(r64) :: ReflectCurveFH ! average of curves F and H
+  REAL(r64) :: TransCurveBDCD ! average of curves B, D, C, and D (again)
+  REAL(r64) :: ReflectCurveBDCD ! average of curves B, D, C, and D (again)
+  REAL(r64) :: TransTmp ! temporary value for normalized transmission (carry out of if blocks)
+  REAL(r64) :: ReflectTmp ! temporary value for normalized reflectance (carry out of if blocks)
+  real(r64) :: testval    ! temporary value for calculations
            ! FLOW
 
   IF (SimpleGlazingSystem) Then ! use alternate angular dependence model for block model of simple glazing input
 
-    TransCurveA = 1.4703D-02*cs**4.0D0 + 1.4858D0*cs**3.0D0   - 3.852D0*cs**2.0D0 + 3.3549D0*cs   - 1.4739D-03
-    TransCurveB = 5.5455D-01*cs**4.0D0 + 3.563D-02*cs**3.0D0 - 2.4157D0*cs**2.0D0 + 2.8305D0*cs   - 2.0373D-03
-    TransCurveC = 7.7087D-01*cs**4.0D0 - 6.3831D-01*cs**3.0D0 - 1.5755D0*cs**2.0D0 + 2.4482D0*cs   - 2.042D-03
-    TransCurveD = 3.4624D-01*cs**4.0D0 + 3.9626D-01*cs**3.0D0 - 2.5819D0*cs**2.0D0 + 2.845D0*cs   - 2.8036D-04
-    TransCurveE = 2.8825D0*cs**4.0D0   - 5.8734D0*cs**3.0D0   + 2.4887D0*cs**2.0D0 + 1.510D0*cs   - 2.5766D-03
-    TransCurveF = 3.0254D0*cs**4.0D0   - 6.3664D0*cs**3.0D0   + 3.1371D0*cs**2.0D0 + 1.213D0*cs   - 1.3667D-03
-    TransCurveG = 3.2292D0*cs**4.0D0   - 6.844D0*cs**3.0D0   + 3.5351D0*cs**2.0D0 + 1.0881D0*cs   - 2.8905D-03
-    TransCurveH = 3.3341D0*cs**4.0D0   - 7.1306D0*cs**3.0D0   + 3.8287D0*cs**2.0D0 + 9.7663D-01*cs - 2.9521D-03
-    TransCurveI = 3.1464D0*cs**4.0D0   - 6.8549D0*cs**3.0D0   + 3.9311D0*cs**2.0D0 + 7.85950D-01*cs - 2.9344E-03
-    TransCurveJ = 3.744D0*cs**4.0D0   - 8.8364D0*cs**3.0D0   + 6.0178D0*cs**2.0D0 + 8.4071D-02*cs + 4.825D-04
+    TransCurveA = 1.4703D-02*cs**4 + 1.4858D0*cs**3   - 3.852D0*cs**2 + 3.3549D0*cs   - 1.4739D-03
+    TransCurveB = 5.5455D-01*cs**4 + 3.563D-02*cs**3 - 2.4157D0*cs**2 + 2.8305D0*cs   - 2.0373D-03
+    TransCurveC = 7.7087D-01*cs**4 - 6.3831D-01*cs**3 - 1.5755D0*cs**2 + 2.4482D0*cs   - 2.042D-03
+    TransCurveD = 3.4624D-01*cs**4 + 3.9626D-01*cs**3 - 2.5819D0*cs**2 + 2.845D0*cs   - 2.8036D-04
+    TransCurveE = 2.8825D0*cs**4   - 5.8734D0*cs**3   + 2.4887D0*cs**2 + 1.510D0*cs   - 2.5766D-03
+    TransCurveF = 3.0254D0*cs**4   - 6.3664D0*cs**3   + 3.1371D0*cs**2 + 1.213D0*cs   - 1.3667D-03
+    TransCurveG = 3.2292D0*cs**4   - 6.844D0*cs**3   + 3.5351D0*cs**2 + 1.0881D0*cs   - 2.8905D-03
+    TransCurveH = 3.3341D0*cs**4   - 7.1306D0*cs**3   + 3.8287D0*cs**2 + 9.7663D-01*cs - 2.9521D-03
+    TransCurveI = 3.1464D0*cs**4   - 6.8549D0*cs**3   + 3.9311D0*cs**2 + 7.85950D-01*cs - 2.9344E-03
+    TransCurveJ = 3.744D0*cs**4   - 8.8364D0*cs**3   + 6.0178D0*cs**2 + 8.4071D-02*cs + 4.825D-04
     TransCurveFGHI = (TransCurveF + TransCurveG + TransCurveH + TransCurveI) / 4.0D0
     TransCurveFH = (TransCurveF + TransCurveH) / 2.0D0
     TransCurveBDCD = (TransCurveB + TransCurveD + TransCurveC + TransCurveD) / 4.0D0
 
-    ReflectCurveA =  1.6322D+01*cs**4.0D0 - 5.7819D+01*cs**3.0D0 + 7.9244D+01*cs**2.0D0 - 5.0081D+01*cs + 1.3335D+01
-    ReflectCurveB =  4.0478D+01*cs**4.0D0 - 1.1934D+02*cs**3.0D0 + 1.3477D+02*cs**2.0D0 - 7.0973D+01*cs + 1.6112D+01
-    ReflectCurveC =  5.749D+01*cs**4.0D0 - 1.6451D+02*cs**3.0D0 + 1.780D+02*cs**2.0D0 - 8.8748D+01*cs + 1.8839D+01
-    ReflectCurveD =  5.7139D0*cs**4.0D0   - 1.6666D+01*cs**3.0D0 + 1.8627D+01*cs**2.0D0 - 9.7561D0*cs   + 3.0743D0
-    ReflectCurveE = -5.4884D-01*cs**4.0D0 - 6.4976D0*cs**3.0D0   + 2.11990D+01*cs**2.0D0 - 2.0971D+01*cs + 7.8138D0
-    ReflectCurveF =  4.2902D0*cs**4.0D0   - 1.2671D+01*cs**3.0D0 + 1.4656D+01*cs**2.0D0 - 8.1534D0*cs   + 2.8711D0
-    ReflectCurveG =  2.174D+01*cs**4.0D0 - 6.4436D+01*cs**3.0D0 + 7.4893D+01*cs**2.0D0 - 4.1792D+01*cs + 1.0624D+01
-    ReflectCurveH =  4.3405D0*cs**4.0D0   - 1.280D+01*cs**3.0D0 + 1.4777D+01*cs**2.0D0 - 8.2034D0*cs   + 2.8793D0
-    ReflectCurveI =  4.1357D+01*cs**4.0D0 - 1.1775D+02*cs**3.0D0 + 1.2756D+02*cs**2.0D0 - 6.4373D+01*cs + 1.426D+01
-    ReflectCurveJ =  4.4901D0*cs**4.0D0   - 1.2658D+01*cs**3.0D0 + 1.3969D+01*cs**2.0D0 - 7.501D0 *cs  + 2.6928D0
+    ReflectCurveA =  1.6322D+01*cs**4 - 5.7819D+01*cs**3 + 7.9244D+01*cs**2 - 5.0081D+01*cs + 1.3335D+01
+    ReflectCurveB =  4.0478D+01*cs**4 - 1.1934D+02*cs**3 + 1.3477D+02*cs**2 - 7.0973D+01*cs + 1.6112D+01
+    ReflectCurveC =  5.749D+01*cs**4 - 1.6451D+02*cs**3 + 1.780D+02*cs**2 - 8.8748D+01*cs + 1.8839D+01
+    ReflectCurveD =  5.7139D0*cs**4   - 1.6666D+01*cs**3 + 1.8627D+01*cs**2 - 9.7561D0*cs   + 3.0743D0
+    ReflectCurveE = -5.4884D-01*cs**4 - 6.4976D0*cs**3   + 2.11990D+01*cs**2 - 2.0971D+01*cs + 7.8138D0
+    ReflectCurveF =  4.2902D0*cs**4   - 1.2671D+01*cs**3 + 1.4656D+01*cs**2 - 8.1534D0*cs   + 2.8711D0
+    ReflectCurveG =  2.174D+01*cs**4 - 6.4436D+01*cs**3 + 7.4893D+01*cs**2 - 4.1792D+01*cs + 1.0624D+01
+    ReflectCurveH =  4.3405D0*cs**4   - 1.280D+01*cs**3 + 1.4777D+01*cs**2 - 8.2034D0*cs   + 2.8793D0
+    ReflectCurveI =  4.1357D+01*cs**4 - 1.1775D+02*cs**3 + 1.2756D+02*cs**2 - 6.4373D+01*cs + 1.426D+01
+    ReflectCurveJ =  4.4901D0*cs**4   - 1.2658D+01*cs**3 + 1.3969D+01*cs**2 - 7.501D0 *cs  + 2.6928D0
     ReflectCurveFGHI = (ReflectCurveF + ReflectCurveG + ReflectCurveH + ReflectCurveI) / 4.0D0
     ReflectCurveFH = (ReflectCurveF + ReflectCurveH) / 2.0D0
     ReflectCurveBDCD = (ReflectCurveB + ReflectCurveD + ReflectCurveC + ReflectCurveD) / 4.0D0
@@ -5235,90 +5283,95 @@ SUBROUTINE TransAndReflAtPhi(cs,tf0,rf0,rb0,tfp,rfp,rbp,SimpleGlazingSystem, Sim
     rbp = rb0
   ELSE
 
-      betaf = tf0**2 - rf0**2 + 2*rf0 + 1.
-      betab = tf0**2 - rb0**2 + 2*rb0 + 1.
-      r0f = (betaf-sqrt(betaf**2-4.*(2.-rf0)*rf0))/(2.*(2.-rf0))
-      r0b = (betab-sqrt(betab**2-4.*(2.-rb0)*rb0))/(2.*(2.-rb0))
+    betaf = tf0**2 - rf0**2 + 2*rf0 + 1.
+    betab = tf0**2 - rb0**2 + 2*rb0 + 1.
+    r0f = (betaf-sqrt(betaf**2-4.*(2.-rf0)*rf0))/(2.*(2.-rf0))
+    r0b = (betab-sqrt(betab**2-4.*(2.-rb0)*rb0))/(2.*(2.-rb0))
 
-      IF (abs(r0f-r0b)/(r0f+r0b).LT.0.001d0) THEN
+    testval=safedivide(abs(r0f-r0b),(r0f+r0b))
 
-           ! UNCOATED GLASS
-
-        t0f  = 1.-r0f
-        t0b  = 1.-r0b
-        abf  = log(r0f*tf0/(rf0-r0f))
-        abb  = log(r0b*tf0/(rb0-r0b))
-        ngf  = (1.+sqrt(r0f))/(1.-sqrt(r0f))
-        ngb  = (1.+sqrt(r0b))/(1.-sqrt(r0b))
-        cgf  = sqrt(1.-(1.-cs*cs)/(ngf**2))
-        cgb  = sqrt(1.-(1.-cs*cs)/(ngb**2))
-        rpf1 = ((ngf*cs-cgf)/(ngf*cs+cgf))**2
-        rpf2 = ((ngf*cgf-cs)/(ngf*cgf+cs))**2
-        tpf1 = 1 - rpf1
-        tpf2 = 1 - rpf2
-        rpb1 = ((ngb*cs-cgb)/(ngb*cs+cgb))**2
-        rpb2 = ((ngb*cgb-cs)/(ngb*cgb+cs))**2
-        tpb1 = 1 - rpf1
-        tpb2 = 1 - rpf2
-        expmabfdivcgf=exp(-abf/cgf)
-        expm2abfdivcgf=exp(-2.*abf/cgf)
-        if (tpf1 /= 0.0) then
-          tfp1 = tpf1**2*expmabfdivcgf/(1.-rpf1**2*expm2abfdivcgf)
-        else
-          tfp1 = 0.0
-        endif
-        rfp1 = rpf1*(1.+tfp1*expmabfdivcgf)
-        if (tpf2 /= 0.0) then
-          tfp2 = tpf2**2*expmabfdivcgf/(1.-rpf2**2*expm2abfdivcgf)
-        else
-          tfp2 = 0.0
-        endif
-        rfp2 = rpf2*(1.+tfp2*expmabfdivcgf)
-        tfp  = 0.5*(tfp1+tfp2)
-        rfp  = 0.5*(rfp1+rfp2)
-        expmabbdivcgb=exp(-abb/cgb)
-        rbp1 = rpb1*(1.+tfp1*expmabbdivcgb)
-        rbp2 = rpb2*(1.+tfp2*expmabbdivcgb)
-        rbp  = 0.5*(rbp1+rbp2)
-
-      ELSE
-
-          ! COATED GLASS
-
-        IF (tf0.GT.0.645d0) THEN
-              ! Use clear glass angular distribution.
-              ! Normalized clear glass transmittance and reflectance distribution
-          IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
-            tcl = 1.0
-            rcl = 0.0
-          ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
-            tcl = 0.0
-            rcl = 1.0
-          ELSE
-            tcl =  -0.0015d0 + ( 3.355d0+(-3.840d0+( 1.460d0  +0.0288d0*cs)*cs)*cs)*cs
-            rcl =   0.999d0  + (-0.563d0+( 2.043d0+(-2.532d0  +1.054d0 *cs)*cs)*cs)*cs-tcl
-          END IF
-          tfp = tf0*tcl
-          rfp = rf0*(1.-rcl)+rcl
-          rbp = rb0*(1.-rcl)+rcl
+    IF (testval.LT.0.001d0) THEN
+         ! UNCOATED GLASS
+      t0f=r0f*tf0
+      t0b=r0b*tf0
+      if (t0f > 0.0) then
+        abf  = log(safedivide(r0f*tf0,(rf0-r0f)))
+      else
+        abf=0.0
+      endif
+      if (t0b >0.0) then
+        abb  = log(safedivide(r0b*tf0,(rb0-r0b)))
+      else
+        abb = 0.0
+      endif
+      ngf  = (1.+sqrt(r0f))/(1.-sqrt(r0f))
+      ngb  = (1.+sqrt(r0b))/(1.-sqrt(r0b))
+      cgf  = sqrt(1.-(1.-cs*cs)/(ngf**2))
+      cgb  = sqrt(1.-(1.-cs*cs)/(ngb**2))
+      rpf1 = (safedivide((ngf*cs-cgf),(ngf*cs+cgf)))**2
+      rpf2 = (safedivide((ngf*cgf-cs),(ngf*cgf+cs)))**2
+      tpf1 = 1 - rpf1
+      tpf2 = 1 - rpf2
+      rpb1 = (safedivide((ngb*cs-cgb),(ngb*cs+cgb)))**2
+      rpb2 = (safedivide((ngb*cgb-cs),(ngb*cgb+cs)))**2
+      tpb1 = 1 - rpf1
+      tpb2 = 1 - rpf2
+      expmabfdivcgf=exp(safedivide(-abf,cgf))
+      expm2abfdivcgf=exp(safedivide(-2.*abf,cgf))
+      if (tpf1 /= 0.0) then
+        tfp1 = tpf1**2*expmabfdivcgf/(1.-rpf1**2*expm2abfdivcgf)
+      else
+        tfp1 = 0.0
+      endif
+      rfp1 = rpf1*(1.+tfp1*expmabfdivcgf)
+      if (tpf2 /= 0.0) then
+        tfp2 = tpf2**2*expmabfdivcgf/(1.-rpf2**2*expm2abfdivcgf)
+      else
+        tfp2 = 0.0
+      endif
+      rfp2 = rpf2*(1.+tfp2*expmabfdivcgf)
+      tfp  = 0.5*(tfp1+tfp2)
+      rfp  = 0.5*(rfp1+rfp2)
+      expmabbdivcgb=exp(safedivide(-abb,cgb))
+      rbp1 = rpb1*(1.+tfp1*expmabbdivcgb)
+      rbp2 = rpb2*(1.+tfp2*expmabbdivcgb)
+      rbp  = 0.5*(rbp1+rbp2)
+    ELSE
+        ! COATED GLASS
+      IF (tf0.GT.0.645d0) THEN
+            ! Use clear glass angular distribution.
+            ! Normalized clear glass transmittance and reflectance distribution
+        IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
+          tcl = 1.0
+          rcl = 0.0
+        ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
+          tcl = 0.0
+          rcl = 1.0
         ELSE
-             ! Use bronze glass angular distribution.
-             ! Normalized bronze tinted glass transmittance and reflectance distribution
-          IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
-            tbnz = 1.0
-            rbnz = 0.0
-          ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
-            tbnz = 0.0
-            rbnz = 1.0
-          ELSE
-            tbnz = -0.002d0  + ( 2.813d0+(-2.341d0+(-0.05725d0+0.599d0 *cs)*cs)*cs)*cs
-            rbnz =  0.997d0  + (-1.868d0+( 6.513d0+(-7.862d0  +3.225d0 *cs)*cs)*cs)*cs-tbnz
-          END IF
-          tfp = tf0*tbnz
-          rfp = rf0*(1.d0-rbnz)+rbnz
-          rbp = rb0*(1.d0-rbnz)+rbnz
+          tcl =  -0.0015d0 + ( 3.355d0+(-3.840d0+( 1.460d0  +0.0288d0*cs)*cs)*cs)*cs
+          rcl =   0.999d0  + (-0.563d0+( 2.043d0+(-2.532d0  +1.054d0 *cs)*cs)*cs)*cs-tcl
         END IF
+        tfp = tf0*tcl
+        rfp = rf0*(1.-rcl)+rcl
+        rbp = rb0*(1.-rcl)+rcl
+      ELSE
+           ! Use bronze glass angular distribution.
+           ! Normalized bronze tinted glass transmittance and reflectance distribution
+        IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
+          tbnz = 1.0
+          rbnz = 0.0
+        ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
+          tbnz = 0.0
+          rbnz = 1.0
+        ELSE
+          tbnz = -0.002d0  + ( 2.813d0+(-2.341d0+(-0.05725d0+0.599d0 *cs)*cs)*cs)*cs
+          rbnz =  0.997d0  + (-1.868d0+( 6.513d0+(-7.862d0  +3.225d0 *cs)*cs)*cs)*cs-tbnz
+        END IF
+        tfp = tf0*tbnz
+        rfp = rf0*(1.d0-rbnz)+rbnz
+        rbp = rb0*(1.d0-rbnz)+rbnz
       END IF
+    END IF
 
   END IF
 
@@ -6936,7 +6989,7 @@ SUBROUTINE ReportGlass
           ! na
 
           ! USE STATEMENTS:
-  USE General, ONLY: POLYF, ScanForReports
+  USE General, ONLY: POLYF, ScanForReports, RoundSigDigits
                      ! InterpBlind ! Blind profile angle interpolation function
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -6997,7 +7050,7 @@ SUBROUTINE ReportGlass
 !
 !                                      Write Descriptions
 
-    Write(OutputFileInits,'(A)') '! <WindowConstruction>,Construction Name,#Layers,'//  &
+    Write(OutputFileInits,'(A)') '! <WindowConstruction>,Construction Name,Index,#Layers,'//  &
                              'Roughness,Conductance {W/m2-K},SHGC,'// &
                              'Solar Transmittance at Normal Incidence,Visible Transmittance at Normal Incidence'
     IF( (TotSimpleWindow > 0) .OR. (W5GlsMat > 0) .OR. (W5GlsMatAlt > 0) ) &
@@ -7006,13 +7059,6 @@ SUBROUTINE ReportGlass
                                'Visible Transmittance, Front Visible Reflectance,Back Visible Reflectance,' //  &
                                'Infrared Transmittance, Front Thermal Emissivity, Back Thermal Emissivity,' //  &
                                'Conductivity {W/m-K},Dirt Factor,Solar Diffusing'
-     ! following is old eio format, revised to be in IDF syntax for reporting from simple window model.
-!    Write(OutputFileInits,'(A)') '! <Material:WindowGlass>,Material Name,Thickness {m},Conductivity {W/m-K},'//  &
-!                             'SolarTransmittance,VisibleTransmittance,'//  &
-!                             'ThermalFrontAbsorptance,ThermalBackAbsorptance,'//  &
-!                             'SolarFrontReflectance,SolarBackReflectance,'//   &
-!                             'VisibleFrontReflectance,VisibleBackReflectance,'//  &
-!                             'GlassTransDirtFactor,SolarDiffusing'
     IF ( (W5GasMat > 0) .OR. (W5GasMatMixture > 0) ) &
       Write(OutputFileInits,'(A)') '! <WindowMaterial:Gas>,Material Name,GasType,Thickness {m}'
     IF(TotShades .GT. 0) &
@@ -7065,64 +7111,65 @@ SUBROUTINE ReportGlass
       Construct(ThisNum)%SummerSHGC = SHGCSummer
       Construct(ThisNum)%VisTransNorm = TransVisNorm
 
-      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),Construct(ThisNum)%TotLayers,                  &
-                               TRIM(Roughness(Construct(ThisNum)%OutsideRoughness)),                           &
-                               NominalConductanceWinter,SHGCSummer,                                            &
-                               TransSolNorm,TransVisNorm
+      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),trim(RoundSigDigits(ThisNum)),   &
+                               trim(RoundSigDigits(Construct(ThisNum)%TotLayers)),              &
+                               trim(Roughness(Construct(ThisNum)%OutsideRoughness)),            &
+                               trim(RoundSigDigits(NominalConductanceWinter,3)),                &
+                               trim(RoundSigDigits(SHGCSummer,3)),                              &
+                               trim(RoundSigDigits(TransSolNorm,3)),                            &
+                               trim(RoundSigDigits(TransVisNorm,3))
 
   !    Write(OutputFileConstrainParams, 705)  TRIM(Construct(ThisNum)%Name), SHGCSummer ,TransVisNorm
 
- 700  FORMAT(' WindowConstruction,',A,',',I4,',',A,4(',',F8.3))
- !701  FORMAT(' WindowMaterial:Glazing,',A,11(',',F7.3),',',A)
- 702  FORMAT(' WindowMaterial:Gas,',A,',',A,5(',',ES11.3))
- 703  FORMAT(' WindowMaterial:Shade,',A,',',F7.3,',',ES11.3,4(',',F7.3))
- 704  FORMAT(' WindowMaterial:Blind,',A,3(',',F7.4),4(',',F7.3))
- !705  FORMAT(' WindowConstruction,',A, 2(',',F9.4))
- 706  FORMAT(' WindowMaterial:Screen,',A,',',F8.5,',',ES11.3,8(',',F7.3))
- 707  FORMAT(' WindowMaterial:Glazing,',A,',',A,',',A, 12(',',F9.5),',',A )
+ 700  FORMAT(' WindowConstruction',8(',',A))
+ 702  FORMAT(' WindowMaterial:Gas',3(',',A))
+ 703  FORMAT(' WindowMaterial:Shade,',7(',',A))
+ 704  FORMAT(' WindowMaterial:Blind',8(',',A))
+ 706  FORMAT(' WindowMaterial:Screen',11(',',A))
+ 707  FORMAT(' WindowMaterial:Glazing',16(',',A))
 
       DO I=1,Construct(ThisNum)%TotLayers
         Layer=Construct(ThisNum)%LayerPoint(I)
         SELECT CASE (Material(Layer)%Group)
-    !    CASE (WindowGlass)
-    !      SolarDiffusing = 'No'
-    !      IF(Material(Layer)%SolarDiffusing) SolarDiffusing = 'Yes'
-    !      Write(OutputFileInits,701) TRIM(Material(Layer)%Name),Material(Layer)%Thickness,Material(Layer)%Conductivity,  &
-    !                                 Material(Layer)%Trans,Material(Layer)%TransVis,                                     &
-    !                                 Material(Layer)%AbsorpThermalFront,Material(Layer)%AbsorpThermalBack,               &
-    !                                 Material(Layer)%ReflectSolBeamFront,Material(Layer)%ReflectSolBeamBack,             &
-    !                                 Material(Layer)%ReflectVisBeamFront,Material(Layer)%ReflectVisBeamBack,             &
-    !                                 Material(Layer)%GlassTransDirtFactor,SolarDiffusing
         CASE (WindowGas)
           Write(OutputFileInits,702) TRIM(Material(Layer)%Name),TRIM(GasTypeName(Material(Layer)%GasType(1))), &
-                                           Material(Layer)%Thickness
+                                           trim(RoundSigDigits(Material(Layer)%Thickness,3))
 
         !!fw CASE(WindowGasMixture)
 
         CASE (Shade)
-          Write(OutputFileInits,703) TRIM(Material(Layer)%Name),Material(Layer)%Thickness,Material(Layer)%Conductivity,  &
-                                     Material(Layer)%AbsorpThermal,                                                      &
-                                     Material(Layer)%Trans,Material(Layer)%TransVis,                                     &
-                                     Material(Layer)%ReflectShade
-
-        CASE (Screen)
-          IF(Material(Layer)%ScreenDataPtr .GT. 0)&
-          Write(OutputFileInits,706) TRIM(Material(Layer)%Name),Material(Layer)%Thickness,Material(Layer)%Conductivity,  &
-                                     Material(Layer)%AbsorpThermal,                                                      &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%BmBmTrans,                            &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%ReflectSolBeamFront,                  &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%ReflectVisBeamFront,                  &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%DifReflect,                           &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%DifReflectVis,                        &
-                                     SurfaceScreens(Material(Layer)%ScreenDataPtr)%ScreenDiameterToSpacingRatio,         &
-                                     Material(Layer)%WinShadeToGlassDist
+          Write(OutputFileInits,703) TRIM(Material(Layer)%Name),                             &
+                                     trim(RoundSigDigits(Material(Layer)%Thickness,3)),      &
+                                     trim(RoundSigDigits(Material(Layer)%Conductivity,3)),   &
+                                     trim(RoundSigDigits(Material(Layer)%AbsorpThermal,3)),  &
+                                     trim(RoundSigDigits(Material(Layer)%Trans,3)),          &
+                                     trim(RoundSigDigits(Material(Layer)%TransVis,3)),       &
+                                     trim(RoundSigDigits(Material(Layer)%ReflectShade,3))
 
         CASE (WindowBlind)
           BlNum = Material(Layer)%BlindDataPtr
-          Write(OutputFileInits,704) TRIM(Material(Layer)%Name),Blind(BlNum)%SlatWidth,Blind(BlNum)%SlatSeparation, &
-                                     Blind(BlNum)%SlatThickness,Blind(BlNum)%SlatAngle,  &
-                                     Blind(BlNum)%SlatTransSolBeamDiff,Blind(BlNum)%SlatFrontReflSolBeamDiff, &
-                                     Blind(BlNum)%BlindToGlassDist
+          Write(OutputFileInits,704) TRIM(Material(Layer)%Name),                                    &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatWidth,4)),                &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatSeparation,4)),           &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatThickness,4)),            &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatAngle,3)),                &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatTransSolBeamDiff,3)),     &
+                                     trim(RoundSigDigits(Blind(BlNum)%SlatFrontReflSolBeamDiff,3)), &
+                                     trim(RoundSigDigits(Blind(BlNum)%BlindToGlassDist,3))
+        CASE (Screen)
+          IF(Material(Layer)%ScreenDataPtr .GT. 0)&
+          Write(OutputFileInits,706) TRIM(Material(Layer)%Name),                                                        &
+                    trim(RoundSigDigits(Material(Layer)%Thickness,5)),                                                  &
+                    trim(RoundSigDigits(Material(Layer)%Conductivity,3)),                                               &
+                    trim(RoundSigDigits(Material(Layer)%AbsorpThermal,3)),                                              &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%BmBmTrans,3)),                    &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%ReflectSolBeamFront,3)),          &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%ReflectVisBeamFront,3)),          &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%DifReflect,3)),                   &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%DifReflectVis,3)),                &
+                    trim(RoundSigDigits(SurfaceScreens(Material(Layer)%ScreenDataPtr)%ScreenDiameterToSpacingRatio,3)), &
+                    trim(RoundSigDigits(Material(Layer)%WinShadeToGlassDist,3))
+
 
         CASE (WindowGlass, WindowSimpleGlazing)
           SolarDiffusing = 'No'
@@ -7134,12 +7181,19 @@ SUBROUTINE ReportGlass
             SpectralDataName = SpectralData(Material(Layer)%GlassSpectralDataPtr)%Name
           ENDIF
           Write(OutputFileInits,707) TRIM(Material(Layer)%Name),TRIM(OpticalDataType), Trim(SpectralDataName), &
-                                     Material(Layer)%Thickness, Material(Layer)%Trans, Material(Layer)%ReflectSolBeamFront, &
-                                     Material(Layer)%ReflectSolBeamBack, Material(Layer)%TransVis,                          &
-                                     Material(Layer)%ReflectVisBeamFront, Material(Layer)%ReflectVisBeamBack,               &
-                                     Material(Layer)%TransThermal,Material(Layer)%AbsorpThermalFront,                       &
-                                     Material(Layer)%AbsorpThermalBack, Material(Layer)%Conductivity,                       &
-                                     Material(Layer)%GlassTransDirtFactor,SolarDiffusing
+                                     trim(RoundSigDigits(Material(Layer)%Thickness,5)),                        &
+                                     trim(RoundSigDigits(Material(Layer)%Trans,5)),                            &
+                                     trim(RoundSigDigits(Material(Layer)%ReflectSolBeamFront,5)),              &
+                                     trim(RoundSigDigits(Material(Layer)%ReflectSolBeamBack,5)),               &
+                                     trim(RoundSigDigits(Material(Layer)%TransVis,5)),                         &
+                                     trim(RoundSigDigits(Material(Layer)%ReflectVisBeamFront,5)),              &
+                                     trim(RoundSigDigits(Material(Layer)%ReflectVisBeamBack,5)),               &
+                                     trim(RoundSigDigits(Material(Layer)%TransThermal,5)),                     &
+                                     trim(RoundSigDigits(Material(Layer)%AbsorpThermalFront,5)),               &
+                                     trim(RoundSigDigits(Material(Layer)%AbsorpThermalBack,5)),                &
+                                     trim(RoundSigDigits(Material(Layer)%Conductivity,5)),                     &
+                                     trim(RoundSigDigits(Material(Layer)%GlassTransDirtFactor,5)),             &
+                                     trim(SolarDiffusing)
 
         END SELECT
       ENDDO
@@ -8466,7 +8520,7 @@ END SUBROUTINE LUBKSB
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

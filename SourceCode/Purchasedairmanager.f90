@@ -813,7 +813,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                                   PurchAir(PurchAirNum)%EMSOverrideOAMdotOn, PurchAir(PurchAirNum)%EMSValueOAMassFlowRate )
           CALL SetupEMSActuator('Ideal Loads Air System', PurchAir(PurchAirNum)%Name, 'Air Temperature' , '[C]', &
                                   PurchAir(PurchAirNum)%EMSOverrideSupplyTempOn, PurchAir(PurchAirNum)%EMSValueSupplyTemp )
-          CALL SetupEMSActuator('Ideal Loads Air System', PurchAir(PurchAirNum)%Name, 'Air Humidity Ratio' , '[kg/kg]', &
+          CALL SetupEMSActuator('Ideal Loads Air System', PurchAir(PurchAirNum)%Name, 'Air Humidity Ratio' , '[kgWater/kgDryAir]', &
                                   PurchAir(PurchAirNum)%EMSOverrideSupplyHumRatOn, PurchAir(PurchAirNum)%EMSValueSupplyHumRat )
 
         ENDIF
@@ -1204,7 +1204,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
          INTEGER   :: InNodeNum         ! Ideal loads supply node to zone
-         INTEGER   :: ExhNodeNum        ! Ideal loads exhaust node from zone
+!         INTEGER   :: ExhNodeNum        ! Ideal loads exhaust node from zone
          INTEGER   :: ZoneNodeNum       ! Zone air node
          INTEGER   :: OANodeNum         ! Outdoor air inlet node
          INTEGER   :: RecircNodeNum     ! Return air or zone exhaust node
@@ -1245,8 +1245,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
          REAL(r64) :: MixedAirHumRat    ! Mixed air humidity ratio [kg H2O/kg Air]
          REAL(r64) :: MixedAirEnthalpy  ! Mixed air enthalpy [J/kg]
          REAL(r64) :: CpAir        ! Specific heat [J/kg-C] reused in multiple places
-         REAL(r64) :: SpecHumOut   ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
-         REAL(r64) :: SpecHumIn    ! Specific humidity ratio of inlet [zone] air (kg moisture / kg moist air)
+!         REAL(r64) :: SpecHumOut   ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
+!         REAL(r64) :: SpecHumIn    ! Specific humidity ratio of inlet [zone] air (kg moisture / kg moist air)
 
            ! Sign convention: SysOutputProvided <0 Supply air is heated on entering zone (zone is cooled)
            !                  SysOutputProvided >0 Supply air is cooled on entering zone (zone is heated)
@@ -1266,7 +1266,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
          CoolTotOutput = 0.0d0
          HeatSensOutput = 0.0d0
          LatOutput = 0.0d0
-         
+
 
             ! default unit to ON
          UnitOn = .TRUE.
@@ -1334,7 +1334,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                OAVolFlowRate = OAMassFlowRate / StdRhoAir
                IF (PurchAir(PurchAirNum)%OAFlowMaxCoolOutputError < 1) THEN
                  PurchAir(PurchAirNum)%OAFlowMaxCoolOutputError = PurchAir(PurchAirNum)%OAFlowMaxCoolOutputError + 1
-                 Call ShowWarningError(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'//TRIM(PurchAir(PurchAirNum)%Name)//'"'& 
+                 Call ShowWarningError(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'//TRIM(PurchAir(PurchAirNum)%Name)//'"'&
                                        //' Requested outdoor air flow rate = '//TRIM(TrimSigDigits(OAVolFlowRate,5)) &
                                        //' [m3/s] exceeds limit.')
                  CALL ShowContinueError(' Will be reduced to the Maximum Cooling Air Flow Rate = ' &
@@ -1386,7 +1386,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  SupplyMassFlowRateForCool = QZnCoolSP/CPAir/DeltaT
                ENDIF
              ENDIF
-             
+
                  ! Mass flow rate to meet dehumidification load, if applicable, at Minimum Cooling Supply Humidity Ratio
              SupplyMassFlowRateForDehum = 0.0d0
              IF (CoolOn) THEN
@@ -1398,7 +1398,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  ENDIF
                ENDIF
              ENDIF
-             
+
                  ! Mass flow rate to meet humidification load, if applicable, at Maximum Heating Supply Humidity Ratio
                  ! This section is the cooling section, so humidification should activate only if humidification control = humidistat
                  !   and if dehumidification control = humidistat or none
@@ -1429,7 +1429,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                   .AND. (PurchAir(PurchAirNum)%MaxCoolMassFlowRate .GT. 0.0d0)) THEN
                SupplyMassFlowRate = MIN(SupplyMassFlowRate,PurchAir(PurchAirNum)%MaxCoolMassFlowRate)
              END IF
-             
+
              IF (SupplyMassFlowRate <= VerySmallMassFlow) SupplyMassFlowRate = 0.0d0
 
              ! Calculate mixed air conditions
@@ -1463,7 +1463,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    SupplyTemp = MIN(SupplyTemp,MixedAirTemp)
                  END IF ! Capacity limit exceeded
                END IF
-                 
+
                ! Set supply humidity ratio for cooling/dehumidification
                SupplyHumRat = MixedAirHumRat
                SELECT CASE(PurchAir(PurchAirNum)%DehumidCtrlType)
@@ -1476,6 +1476,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    CoolSensOutput = SupplyMassFlowRate * CpAir * (MixedAirTemp - SupplyTemp)
                    CoolTotOutput = CoolSensOutput/PurchAir(PurchAirNum)%CoolSHR
                    SupplyEnthalpy = MixedAirEnthalpy - CoolTotOutput/SupplyMassFlowRate
+                   !  Limit for overdrying (avoid Pysch errors which occur if SupplyEnthalpy is too low for SupplyTemp)
+                   SupplyEnthalpy = MAX(SupplyEnthalpy,PsyHFnTdbW(SupplyTemp,0.00001D0, 'CalcPurchAirLoads'))
                    SupplyHumRat = MIN(SupplyHumRat,PsyWFnTdbH(SupplyTemp,SupplyEnthalpy, 'CalcPurchAirLoads'))
                    ! Apply min cooling humidity ratio limit
                    SupplyHumRat = MAX(SupplyHumRat, PurchAir(PurchAirNum)%MinCoolSuppAirHumRat)
@@ -1506,7 +1508,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    END IF
                  END IF
                END IF
-             
+
                !   Limit supply humidity ratio to saturation at supply outlet temp
                SupplyHumRatOrig = SupplyHumRat
                SupplyHumRatSat  = PsyWFnTdbRhPb(SupplyTemp,1.0d0,OutBaroPress, 'CalcPurchAirLoads')
@@ -1533,6 +1535,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                          SupplyTemp = MixedAirTemp - CoolSensOutput/(CPAir*SupplyMassFlowRate)
                          ! This is the cooling mode, so SupplyTemp can't be more than MixedAirTemp
                          SupplyTemp = MIN(SupplyTemp,MixedAirTemp)
+                         !  Limit for overdrying (avoid Pysch errors which occur if SupplyEnthalpy is too low for SupplyTemp)
+                         SupplyEnthalpy = MAX(SupplyEnthalpy,PsyHFnTdbW(SupplyTemp,0.00001D0, 'CalcPurchAirLoads'))
                          SupplyHumRat = PsyWFnTdbH(SupplyTemp,SupplyEnthalpy, 'CalcPurchAirLoads')
                        CASE(Humidistat)
                          ! Keep supply temp and adjust humidity ratio to reduce load
@@ -1608,7 +1612,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                OAVolFlowRate = OAMassFlowRate / StdRhoAir
                IF (PurchAir(PurchAirNum)%OAFlowMaxHeatOutputError < 1) THEN
                  PurchAir(PurchAirNum)%OAFlowMaxHeatOutputError = PurchAir(PurchAirNum)%OAFlowMaxHeatOutputError + 1
-                 Call ShowWarningError(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'//TRIM(PurchAir(PurchAirNum)%Name)//'"'& 
+                 Call ShowWarningError(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'//TRIM(PurchAir(PurchAirNum)%Name)//'"'&
                                        //' Requested outdoor air flow rate = '//TRIM(TrimSigDigits(OAVolFlowRate,5)) &
                                        //' [m3/s] exceeds limit.')
                  CALL ShowContinueError(' Will be reduced to the Maximum Heating Air Flow Rate = ' &
@@ -1635,9 +1639,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  SupplyMassFlowRateForHeat = QZnHeatSP/CPAir/DeltaT
                ENDIF
              ENDIF
-             
+
                  ! Mass flow rate to meet dehumidification load, if applicable, at Minimum Cooling Supply Humidity Ratio
-                 ! This section is the heating/deadband section, so dehumidification should activate 
+                 ! This section is the heating/deadband section, so dehumidification should activate
                  !   only if dehumidification control = humidistat
                  !   and if humidification control = humidistat or none or if operating in deadband mode
              SupplyMassFlowRateForDehum = 0.0d0
@@ -1654,7 +1658,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  ENDIF
                ENDIF
              ENDIF
-             
+
                  ! Mass flow rate to meet humidification load, if applicable, at Maximum Heating Supply Humidity Ratio
              SupplyMassFlowRateForHumid = 0.0d0
              IF (HeatOn) THEN
@@ -1755,7 +1759,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                SupplyEnthalpy = PsyHFnTdbW(SupplyTemp,SupplyHumRat, 'CalcPurchAirLoads')
 
                  ! Check supply humidity ratio for dehumidification (SupplyHumRatForHumid should always be < SupplyHumRatForDehum)
-                 ! This section is the heating/deadband section, so dehumidification should activate 
+                 ! This section is the heating/deadband section, so dehumidification should activate
                  !   only if dehumidification control = humidistat
                  !   and if humidification control = humidistat or none or if operating in deadband mode
                IF (CoolOn) THEN
@@ -1785,8 +1789,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    END IF
                  END IF
                END IF
-                 
-                 
+
+
                  !   Limit supply humidity ratio to saturation at supply outlet temp
                SupplyHumRatOrig = SupplyHumRat
                SupplyHumRat = MIN(SupplyHumRat,PsyWFnTdbRhPb(SupplyTemp,1.0d0,OutBaroPress, 'CalcPurchAirLoads'))
@@ -1853,13 +1857,14 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  PurchAir(PurchAirNum)%SaturationOutputError = PurchAir(PurchAirNum)%SaturationOutputError + 1
                  Call ShowWarningError(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'//TRIM(PurchAir(PurchAirNum)%Name)//'"'&
                                        //' Supply humidity ratio = '//TRIM(TrimSigDigits(SupplyHumRatOrig,5)) &
-                                       //' exceeds saturation limit '//TRIM(TrimSigDigits(SupplyHumRatSat,5))//' [kg/kg]')
+                                       //' exceeds saturation limit '//TRIM(TrimSigDigits(SupplyHumRatSat,5))//  &
+                                       ' [kgWater/kgDryAir]')
                  CALL ShowContinueError(' Simulation continuing . . . ')
                  CALL ShowContinueErrorTimeStamp(' ')
                ELSE
                  CALL ShowRecurringWarningErrorAtEnd(TRIM(PurchAir(PurchAirNum)%cObjectName)//' "'&
                        //TRIM(PurchAir(PurchAirNum)%Name)//'"'//&
-                       ' Supply humidity ratio exceeds saturation limit warning continues, delta max/min [kg/kg]...' &
+                       ' Supply humidity ratio exceeds saturation limit warning continues, delta max/min [kgWater/kgDryAir]...' &
                        , PurchAir(PurchAirNum)%SaturationOutputIndex, DeltaHumRat, DeltaHumRat)
                END IF
              END IF
@@ -1884,8 +1889,20 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                PurchAir(PurchAirNum)%OALatOutput = 0.0d0
              ENDIF
              IF (Contaminant%CO2Simulation) THEN
-               Node(InNodeNum)%CO2 = ((SupplyMassFlowRate - OAMassFlowRate)*Node(RecircNodeNum)%CO2 + &
+               IF (PurchAir(PurchAirNum)%OutdoorAir) THEN
+                 Node(InNodeNum)%CO2 = ((SupplyMassFlowRate - OAMassFlowRate)*Node(RecircNodeNum)%CO2 + &
                     OAMassFlowRate*Node(OANodeNum)%CO2) / SupplyMassFlowRate
+               Else
+                 Node(InNodeNum)%CO2 = Node(RecircNodeNum)%CO2
+               End If
+             END IF
+             IF (Contaminant%GenericContamSimulation) THEN
+               IF (PurchAir(PurchAirNum)%OutdoorAir) THEN
+                 Node(InNodeNum)%GenContam = ((SupplyMassFlowRate - OAMassFlowRate)*Node(RecircNodeNum)%GenContam + &
+                    OAMassFlowRate*Node(OANodeNum)%GenContam) / SupplyMassFlowRate
+               Else
+                 Node(InNodeNum)%GenContam = Node(RecircNodeNum)%GenContam
+               End If
              END IF
            ELSE ! SupplyMassFlowRate = 0.0
              SysOutputProvided  = 0.0d0
@@ -1900,6 +1917,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
              IF (Contaminant%CO2Simulation) THEN
                Node(InNodeNum)%CO2        = Node(ZoneNodeNum)%CO2
+             END IF
+             IF (Contaminant%GenericContamSimulation) THEN
+               Node(InNodeNum)%GenContam  = Node(ZoneNodeNum)%GenContam
              END IF
            END IF
 
@@ -1921,6 +1941,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            IF (Contaminant%CO2Simulation) THEN
              Node(InNodeNum)%CO2        = Node(ZoneNodeNum)%CO2
            END IF
+           IF (Contaminant%GenericContamSimulation) THEN
+             Node(InNodeNum)%GenContam  = Node(ZoneNodeNum)%GenContam
+           END IF
 
            Node(InNodeNum)%MassFlowRate = 0.0d0
            IF (PurchAir(PurchAirNum)%OutdoorAir) Node(OANodeNum)%MassFlowRate = 0.0d0
@@ -1936,6 +1959,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            PurchAir(PurchAirNum)%OALatOutput = 0.0d0
 
          END IF
+ 
+         PurchAir(PurchAirNum)%OutdoorAirMassFlowRate = OAMassFlowRate
 
          RETURN
 
@@ -2046,7 +2071,6 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           OAMassFlowRate = 0.0d0
         END IF
         PurchAir(PurchAirNum)%MinOAMassFlowRate = OAMassFlowRate
-        PurchAir(PurchAirNum)%OutdoorAirMassFlowRate = OAMassFlowRate
 
         RETURN
 
@@ -2311,7 +2335,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       ELSE
         PurchAir(PurchAirNum)%OALatCoolRate = 0.0d0
       ENDIF
-      
+
       PurchAir(PurchAirNum)%OATotHeatRate = PurchAir(PurchAirNum)%OASenHeatRate + PurchAir(PurchAirNum)%OALatHeatRate
       PurchAir(PurchAirNum)%OATotCoolRate = PurchAir(PurchAirNum)%OASenCoolRate + PurchAir(PurchAirNum)%OALatCoolRate
 
@@ -2351,7 +2375,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       PurchAir(PurchAirNum)%HtRecLatCoolEnergy = PurchAir(PurchAirNum)%HtRecLatCoolRate * ReportingConstant
       PurchAir(PurchAirNum)%HtRecTotHeatEnergy = PurchAir(PurchAirNum)%HtRecTotHeatRate * ReportingConstant
       PurchAir(PurchAirNum)%HtRecTotCoolEnergy = PurchAir(PurchAirNum)%HtRecTotCoolRate * ReportingConstant
-      
+
       RETURN
     END SUBROUTINE ReportPurchasedAir
 
@@ -2405,7 +2429,7 @@ FUNCTION GetPurchasedAirOutAirMassFlow(PurchAirNum) RESULT(OutAirMassFlow)
 END FUNCTION GetPurchasedAirOutAirMassFlow
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

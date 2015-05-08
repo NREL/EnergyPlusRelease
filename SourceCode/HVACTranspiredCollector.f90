@@ -772,7 +772,7 @@ SUBROUTINE InitTranspiredCollector(UTSCNum)
             IF (.NOT. AnyEnergyManagementSystemInModel) THEN
               CALL ShowSevereError('Missing temperature setpoint for UTSC ' // &
                                 TRIM(UTSC(UTSCUnitNum)%Name))
-              CALL ShowContinueError(' use a Set Point Manager to establish a setpoint at the unit control node.')
+              CALL ShowContinueError(' use a Setpoint Manager to establish a setpoint at the unit control node.')
               SetpointErrorFlag = .TRUE.
             ELSE
              ! need call to EMS to check node
@@ -780,7 +780,7 @@ SUBROUTINE InitTranspiredCollector(UTSCNum)
               IF (SetpointErrorFlag) THEN
                 CALL ShowSevereError('Missing temperature setpoint for UTSC ' // &
                                 TRIM(UTSC(UTSCUnitNum)%Name))
-                CALL ShowContinueError(' use a Set Point Manager to establish a setpoint at the unit control node.')
+                CALL ShowContinueError(' use a Setpoint Manager to establish a setpoint at the unit control node.')
                 CALL ShowContinueError('Or add EMS Actuator to provide temperature setpoint at this node')
               ENDIF
             ENDIF
@@ -1523,7 +1523,7 @@ END SUBROUTINE GetUTSCTsColl
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -1061,6 +1061,7 @@ IF (MyPlantScanFlag(UnitVentNum) .AND. ALLOCATED(PlantLoop)) THEN
                                           UnitVent(UnitVentNum)%HWCompNum,  &
                                           errFlag=errFlag)
     IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(UnitVent(UnitVentNum)%Name)//'", type=ZoneHVAC:UnitVentilator')
       CALL ShowFatalError('InitUnitVentilator: Program terminated due to previous condition(s).')
     ENDIF
 
@@ -1079,6 +1080,7 @@ IF (MyPlantScanFlag(UnitVentNum) .AND. ALLOCATED(PlantLoop)) THEN
                                           UnitVent(UnitVentNum)%CWCompNum,  &
                                           errFlag=errFlag)
     IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(UnitVent(UnitVentNum)%Name)//'", type=ZoneHVAC:UnitVentilator')
       CALL ShowFatalError('InitUnitVentilator: Program terminated due to previous condition(s).')
     ENDIF
 
@@ -1305,12 +1307,13 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
           ! USE STATEMENTS:
   USE DataSizing
   USE InputProcessor
+  USE General,        ONLY: TrimSigDigits
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,     ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXDXCoilName, GetHXCoilType
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
+!  USE BranchInputManager, ONLY: MyPlantSizingIndex
   USE FluidProperties, ONLY: GetSpecificHeatGlycol, GetDensityGlycol
-  USE DataPlant,       ONLY: PlantLoop
+  USE DataPlant,       ONLY: PlantLoop, MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1335,6 +1338,8 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
   REAL(r64)           :: CoilOutTemp
   REAL(r64)           :: CoilOutHumRat
   REAL(r64)           :: CoilInHumRat
+  REAL(r64)           :: CoilInEnthalpy
+  REAL(r64)           :: CoilOutEnthalpy
   REAL(r64)           :: DesCoilLoad
   REAL(r64)           :: TempSteamIn
   REAL(r64)           :: EnthSteamInDry
@@ -1545,6 +1550,31 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
           UnitVent(UnitVentNum)%MaxVolColdWaterFlow = DesCoilLoad / &
                                                      ( PlantSizData(PltSizCoolNum)%DeltaT * &
                                                      Cp * rho )
+          IF(UnitVent(UnitVentNum)%MaxVolColdWaterFlow .LT. 0.d0)THEN
+            CALL ShowContinueError('Autosizing of water flow resulted in negative value.')
+            CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
+                               //TRIM(UnitVent(UnitVentNum)%Name))
+            CALL ShowContinueError('...Sizing information found during sizing simulation:')
+            CALL ShowContinueError('...Coil inlet temperature      = '//TRIM(TrimSigDigits(CoilInTemp,3))//' C')
+            CALL ShowContinueError('...Coil inlet humidity ratio   = '//TRIM(TrimSigDigits(CoilInHumRat,6))//' kg/kg')
+            CoilInEnthalpy = PsyHFnTdbW(CoilInTemp, CoilInHumRat)
+            CALL ShowContinueError('...Coil inlet enthalpy         = '//TRIM(TrimSigDigits(CoilInEnthalpy,3))//' J/kg')
+            CALL ShowContinueError('...Sizing information from sizing object:')
+            CALL ShowContinueError('...Coil outlet temperature     = '//TRIM(TrimSigDigits(CoilOutTemp,3))//' C')
+            CALL ShowContinueError('...Coil outlet humidity ratio  = '//TRIM(TrimSigDigits(CoilOutHumRat,6))//' kg/kg')
+            CoilOutEnthalpy = PsyHFnTdbW(CoilOutTemp, CoilOutHumRat)
+            CALL ShowContinueError('...Coil outlet enthalpy         = '//TRIM(TrimSigDigits(CoilOutEnthalpy,3))//' J/kg')
+            IF(CoilOutEnthalpy .GT. CoilInEnthalpy)THEN
+              CALL ShowContinueError('...Coil outlet air enthalpy is greater than coil inlet air enthalpy.')
+            END IF
+            CALL ShowContinueError('...Calculated coil design load = '//TRIM(TrimSigDigits(DesCoilLoad,3))//' W')
+            CALL ShowContinueError('...Calculated water flow rate  = '// &
+                                   TRIM(TrimSigDigits(UnitVent(UnitVentNum)%MaxVolColdWaterFlow,3))//' m3/s')
+            CALL ShowContinueError('...Water flow rate will be set to 0. Check sizing inputs for zone and plant,'// &
+                                   ' inputs for water cooling coil object, and design day specifications.')
+            CALL ShowContinueError('...Consider autosizing all inputs if not already doing so.')
+            UnitVent(UnitVentNum)%MaxVolColdWaterFlow = 0.0
+          END IF
         ELSE
           UnitVent(UnitVentNum)%MaxVolColdWaterFlow = 0.0
         END IF
@@ -2023,8 +2053,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
                                  CompErrIndex=UnitVent(UnitVentNum)%CompErrIndex, &
                                  LoopNum     = UnitVent(UnitVentNum)%HWLoopNum,   &
                                  LoopSide    = UnitVent(UnitVentNum)%HWLoopSide,  &
-                                 BranchIndex = UnitVent(UnitVentNum)%HWBranchNum, &
-                                 CompIndex   = UnitVent(UnitVentNum)%HWCompNum)
+                                 BranchIndex = UnitVent(UnitVentNum)%HWBranchNum)
 
         CASE (Heating_GasCoilType,Heating_ElectricCoilType,Heating_SteamCoilType)
 
@@ -2208,8 +2237,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
                                CompErrIndex=UnitVent(UnitVentNum)%CompErrIndex, &
                                LoopNum     = UnitVent(UnitVentNum)%CWLoopNum,   &
                                LoopSide    = UnitVent(UnitVentNum)%CWLoopSide,  &
-                               BranchIndex = UnitVent(UnitVentNum)%CWBranchNum, &
-                               CompIndex   = UnitVent(UnitVentNum)%CWCompNum)
+                               BranchIndex = UnitVent(UnitVentNum)%CWBranchNum)
 
       END IF
 
@@ -2489,6 +2517,10 @@ SUBROUTINE SimUnitVentOAMixer(UnitVentNum)
     Node(AirRelNode)%CO2 = Node(InletNode)%CO2
     Node(OAMixOutNode)%CO2 = OAFraction*Node(OutsideAirNode)%CO2+(1.0-OAFraction)*Node(InletNode)%CO2
   END IF
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(AirRelNode)%GenContam = Node(InletNode)%GenContam
+    Node(OAMixOutNode)%GenContam = OAFraction*Node(OutsideAirNode)%GenContam+(1.0-OAFraction)*Node(InletNode)%GenContam
+  END IF
 
   RETURN
 
@@ -2751,7 +2783,7 @@ END FUNCTION GetUnitVentilatorReturnAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

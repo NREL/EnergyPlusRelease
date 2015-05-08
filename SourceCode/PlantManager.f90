@@ -28,6 +28,7 @@ USE DataPrecisionGlobals
 USE DataGlobals
 USE DataHVACGlobals
 USE DataPlant
+USE DataBranchAirLoopPlant
 USE DataLoopNode
 USE DataInterfaces
 USE FluidProperties
@@ -153,7 +154,7 @@ SUBROUTINE ManagePlantLoops(FirstHVACIteration,SimAirLoops,SimZoneEquipment,SimN
   LOGICAL              :: SimHalfLoopFlag
   INTEGER              :: HalfLoopNum
   INTEGER              :: CurntMinPlantSubIterations
-  
+
   IF ( ANY(PlantLoop%CommonPipeType == CommonPipe_Single) .OR. &
              ANY(PlantLoop%CommonPipeType == CommonPipe_TwoWay) )  THEN
     CurntMinPlantSubIterations = MAX(7, MinPlantSubIterations)
@@ -177,7 +178,7 @@ SUBROUTINE ManagePlantLoops(FirstHVACIteration,SimAirLoops,SimZoneEquipment,SimN
       LoopSide     = PlantCallingOrderInfo(HalfLoopNum)%LoopSide
       OtherSide    = 3 - LoopSide !will give us 1 if loopside is 2, or 2 if loopside is 1
       SimHalfLoopFlag  = PlantLoop(LoopNum)%LoopSide(LoopSide)%SimLoopSideNeeded !set half loop sim flag
-      
+
       IF (SimHalfLoopFlag .OR. IterPlant <= CurntMinPlantSubIterations) THEN
 
         CALL PlantHalfLoopSolver(FirstHVACIteration, LoopSide, LoopNum, PlantLoop(LoopNum)%LoopSide(OtherSide)%SimLoopSideNeeded)
@@ -517,7 +518,7 @@ SUBROUTINE GetPlantLoopData
       IF(PlantLoop(LoopNum)%Loopside(DemandSide)%InletNodeSetPt .AND. &
         PlantLoop(LoopNum)%Loopside(SupplySide)%InletNodeSetPt) THEN
        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alpha(1))//'", Invalid condition.')
-       CALL ShowContinueError('While using a two way common pipe there can be set point on only one node other '//  &
+       CALL ShowContinueError('While using a two way common pipe there can be setpoint on only one node other '//  &
          'than Plant Supply Outlet node.')
        CALL ShowContinueError('Currently both Plant Demand inlet and plant supply inlet have setpoints.')
        CALL ShowContinueError('Select one of the two nodes and rerun the simulation.')
@@ -526,7 +527,7 @@ SUBROUTINE GetPlantLoopData
       IF(.NOT. PlantLoop(LoopNum)%Loopside(DemandSide)%InletNodeSetPt .AND. &
         .NOT. PlantLoop(LoopNum)%Loopside(SupplySide)%InletNodeSetPt) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alpha(1))//'", Invalid condition.')
-        CALL ShowContinueError('While using a two way common pipe there must be a set point in addition to '//  &
+        CALL ShowContinueError('While using a two way common pipe there must be a setpoint in addition to '//  &
             'the Plant Supply Outlet node.')
         CALL ShowContinueError('Currently neither plant demand inlet nor plant supply inlet have setpoints.')
         CALL ShowContinueError('Select one of the two nodes and rerun the simulation.')
@@ -986,6 +987,14 @@ SUBROUTINE GetPlantInput
             ELSEIF (LoopSideNum == SupplySide) THEN
               TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UncontrolledOpSchemeType
             ENDIF
+          ELSEIF (SameString(CompTypes(CompNum),'SolarCollector:IntegralCollectorStorage')) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_SolarCollectorICS
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_SolarCollector
+            IF (LoopSideNum == DemandSide) THEN
+              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
+            ELSEIF (LoopSideNum == SupplySide) THEN
+              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UncontrolledOpSchemeType
+            ENDIF
           ELSEIF (SameString(CompTypes(CompNum),'LoadProfile:Plant')) THEN
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_PlantLoadProfile
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_LoadProfile
@@ -1242,6 +1251,14 @@ SUBROUTINE GetPlantInput
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_CoilWAHPCoolingEquationFit
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_DemandCoil
             TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'Coil:Heating:WaterToAirHeatPump:VariableSpeedEquationFit') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_CoilVSWAHPHeatingEquationFit
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_DemandCoil
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'Coil:Cooling:WaterToAirHeatPump:VariableSpeedEquationFit') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_CoilVSWAHPCoolingEquationFit
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_DemandCoil
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
           ELSEIF (SameString(CompTypes(CompNum), 'Coil:Heating:WaterToAirHeatPump:ParameterEstimation') ) THEN
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_CoilWAHPHeatingParamEst
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_DemandCoil
@@ -1258,11 +1275,28 @@ SUBROUTINE GetPlantInput
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_RefrigerationWaterCoolRack
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_Refrigeration
             TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'PlantComponent:UserDefined') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = Typeof_PlantComponentUserDefined
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'Coil:UserDefined') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = Typeof_CoilUserDefined
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'ZoneHVAC:ForcedAir:UserDefined') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_ZoneHVACAirUserDefined
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'AirTerminal:SingleDuct:UserDefined') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_AirTerminalUserDefined
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
           ELSE
            !discover unsupported equipment on branches.
-            CALL ShowSevereError('GetPlantInput: trying to process a component type that is not supported, dev note')
-            CALL ShowContinueError('Component Type ='//TRIM(CompTypes(CompNum)) )
-
+            CALL ShowSevereError('GetPlantInput: Branch="'//trim(BranchNames(BranchNum))//'", invalid component on branch.')
+            CALL ShowContinueError('...invalid component type="'//trim(CompTypes(CompNum))//  &
+               '", name="'//trim(CompNames(CompNum))//'".')
+!            ErrorsFound=.true.
           ENDIF
 
           TempLoop%Branch(BranchNum)%Comp(CompNum)%Name        = CompNames(CompNum)
@@ -1340,8 +1374,8 @@ SUBROUTINE GetPlantInput
 
         ! Not sure why we can't do steam with branch pumps, but this is moved here from the Demand Calc procedure
 !DSU?        IF(PlantLoop(LoopNum)%FluidType==NodeType_Steam) Then
-!          !STEAM: Plant Loop Fluid Type is Steam: Calc loop Demand For STEAM can not be done with branch pumps
-!          CALL ShowSevereError('FluidType=STEAM:Branch Pumps can not be used in a STEAM Loop')
+!          !STEAM: Plant Loop Fluid Type is Steam: Calc loop Demand For STEAM cannot be done with branch pumps
+!          CALL ShowSevereError('FluidType=STEAM:Branch Pumps cannot be used in a STEAM Loop')
 !          CALL ShowContinueError('Occurs in PlantLoop='//TRIM(PlantLoop(LoopNum)%Name))
 !          CALL ShowFatalError('Program terminates due to above conditions.')
 !        END IF
@@ -1449,9 +1483,11 @@ SUBROUTINE GetPlantInput
 
           DO Outlet = 1,  TempLoop%Splitter(SplitNum-1)%TotalOutletNodes
             IF (SplitOutBranch(Outlet)) CYCLE
-            CALL ShowSevereError('Splitter Output Branch not found, Splitter='//TRIM(TempLoop%Splitter(SplitNum-1)%Name))
+            CALL ShowSevereError('Splitter Outlet Branch not found, Splitter='//TRIM(TempLoop%Splitter(SplitNum-1)%Name))
             CALL ShowContinueError('Splitter Branch Outlet node name='//TRIM(TempLoop%Splitter(SplitNum-1)%NodeNameOut(Outlet)))
             CALL ShowContinueError('In Loop='//TRIM(TempLoop%Name))
+            CALL ShowContinueError('Loop BranchList='//trim(TempLoop%BranchList))
+            CALL ShowContinueError('Loop ConnectorList='//trim(TempLoop%ConnectList))
             ErrorsFound=.true.
           ENDDO
 
@@ -1528,6 +1564,8 @@ SUBROUTINE GetPlantInput
             CALL ShowSevereError('Mixer Inlet Branch not found, Mixer='//TRIM(TempLoop%Mixer(MixNum-1)%Name))
             CALL ShowContinueError('Mixer Branch Inlet name='//TRIM(TempLoop%Mixer(MixNum-1)%NodeNameIn(Inlet)))
             CALL ShowContinueError('In Loop='//TRIM(TempLoop%Name))
+            CALL ShowContinueError('Loop BranchList='//trim(TempLoop%BranchList))
+            CALL ShowContinueError('Loop ConnectorList='//trim(TempLoop%ConnectList))
             ErrorsFound=.true.
           ENDDO
 
@@ -1692,18 +1730,21 @@ SUBROUTINE GetPlantInput
                             'District')) THEN
             GeneralEquipType=GenEquipTypes_Purchased
           ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
-                            'GROUNDHEATEXCHANGER:VERTICAL')) THEN
+                            'GroundHeatExchanger:Vertical')) THEN
             GeneralEquipType=GenEquipTypes_GroundHeatExchanger
           ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
-                            'GROUNDHEATEXCHANGER:SURFACE')) THEN
+                            'GroundHeatExchanger:Surface')) THEN
             GeneralEquipType=GenEquipTypes_GroundHeatExchanger
           ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
-                            'GROUNDHEATEXCHANGER:POND')) THEN
+                            'GroundHeatExchanger:Pond')) THEN
             GeneralEquipType=GenEquipTypes_GroundHeatExchanger
           ELSE
-            CALL ShowSevereError('GetPlantInput: Invalid Equipment type='//  &
-                 TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf))
-            CALL ShowContinueError('Occurs in PlantLoop='//TRIM(PlantLoop(LoopNum)%Name))
+            CALL ShowSevereError('GetPlantInput: PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//'" invalid equipment type.')
+            CALL ShowContinueError('...on Branch="'//trim(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Name)//'".')
+            CALL ShowContinueError('...Equipment type="'//  &
+                 TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf)//'".')
+            CALL ShowContinueError('...Equipment name="'//  &
+                 TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name)//'".')
             ErrorsFound=.true.
           ENDIF
         ENDIF
@@ -1718,10 +1759,13 @@ SUBROUTINE GetPlantInput
               .not. SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf(1:12),  &
                                'HeaderedPump')) THEN
             ! Error.  May have already been flagged under General
-            IF (GeneralEquipType == 0) THEN
-              CALL ShowSevereError('GetPlantInput: Invalid Equipment type='//  &
-                   TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf))
-              CALL ShowContinueError('Occurs in PlantLoop='//TRIM(PlantLoop(LoopNum)%Name))
+            IF (GeneralEquipType /= 0) THEN  ! if GeneralEquipmentType == 0, then already flagged
+              CALL ShowSevereError('GetPlantInput: PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//'" invalid equipment type.')
+              CALL ShowContinueError('...on Branch="'//trim(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Name)//'".')
+              CALL ShowContinueError('...Equipment type="'//  &
+                   TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf)//'".')
+              CALL ShowContinueError('...Equipment name="'//  &
+                   TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name)//'".')
               ErrorsFound=.true.
             ENDIF
           ENDIF
@@ -2119,7 +2163,7 @@ SUBROUTINE InitializeLoops(FirstHVACIteration)
   INTEGER            :: CompNum                    ! plant side component counter
   INTEGER            :: SensedNode
 
-  REAL(r64)          :: LoopSetPointTemp           ! the loop control or set point temperature
+  REAL(r64)          :: LoopSetPointTemp           ! the loop control or setpoint temperature
 
   LOGICAL            :: ErrorsFound=.false.
   LOGICAL            :: FinishSizingFlag
@@ -2162,7 +2206,7 @@ SUBROUTINE InitializeLoops(FirstHVACIteration)
 !*****************************************************************
   IF (MySetPointCheckFlag .AND. DoSetPointTest) THEN
 
-    ! check for missing set points
+    ! check for missing setpoints
     DO LoopNum = 1, TotNumLoops
       LoopSetPointTemp = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
 
@@ -2320,6 +2364,8 @@ SUBROUTINE InitializeLoops(FirstHVACIteration)
         DO BranchNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches
           DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad =0.d0
+            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .FALSE.
+            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available             = .FALSE.
           ENDDO
         ENDDO
       ENDDO
@@ -2383,12 +2429,12 @@ SUBROUTINE ReInitPlantLoopsAtFirstHVACIteration
   INTEGER            :: LoopNum                    ! plant loop counter
   INTEGER            :: LoopIn
   REAL(r64)          :: LoopMaxMassFlowRate        ! maximum allowable loop mass flow rate
-  REAL(r64)          :: LoopSetPointTemp           ! the loop control or set point temperature
+  REAL(r64)          :: LoopSetPointTemp           ! the loop control or setpoint temperature
   REAL(r64)          :: LoopMaxTemp                ! maximum allowable loop temperature
   REAL(r64)          :: LoopMinTemp                ! minimum allowable loop temperature
-  REAL(r64)          :: LoopSetPointTempLo           ! the loop control or set point temperature
-  REAL(r64)          :: LoopSetPointTempHi           ! the loop control or set point temperature
-  REAL(r64)          :: SecondaryLoopSetPointTemp  ! loop set point temperature for common pipes with different secondary setpt
+  REAL(r64)          :: LoopSetPointTempLo           ! the loop control or setpoint temperature
+  REAL(r64)          :: LoopSetPointTempHi           ! the loop control or setpoint temperature
+  REAL(r64)          :: SecondaryLoopSetPointTemp  ! loop setpoint temperature for common pipes with different secondary setpt
   INTEGER            :: LoopSideNum
   INTEGER            :: BranchNum                  ! branch loop counter
   INTEGER            :: OpNum                      ! operation scheme counter
@@ -2403,6 +2449,8 @@ SUBROUTINE ReInitPlantLoopsAtFirstHVACIteration
   REAL(r64)          :: StartEnthalpy
   REAL(r64)          :: Cp
   REAL(r64)          :: rho
+  REAL(r64)          :: LoopSetPointTemperatureHi
+  REAL(R64)          :: LoopSetPointTemperatureLo
 
   !*****************************************************************
   !BEGIN ENVIRONMENT INITS
@@ -2411,10 +2459,34 @@ SUBROUTINE ReInitPlantLoopsAtFirstHVACIteration
 
     DO LoopNum = 1, TotNumLoops
       DO LoopSideNum = DemandSide, SupplySide
-        LoopSetPointTemp = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
+
+        SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+
+        CASE (SingleSetPoint)
+          LoopSetPointTemp = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
+
+        CASE (DualSetPointDeadBand)
+          ! Get the range of setpoints
+          LoopSetPointTemperatureHi = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetpointHi
+          LoopSetPointTemperatureLo = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetpointLo
+          LoopSetPointTemp = (LoopSetPointTemperatureLo + LoopSetPointTemperatureHi) /2.d0
+        END SELECT
+
+        IF ((PlantLoop(LoopNum)%CommonPipeType == CommonPipe_TwoWay) .AND. (LoopSideNum == DemandSide) .AND. &
+            (PlantLoop(LoopNum)%LoopSide(DemandSide)%InletNodeSetPt)) THEN ! get a second setpoint for secondaryLoop
+          ! if the plant loop is two common pipe configured for temperature control on secondary side inlet, then
+          ! we want to initialize the demand side of the loop using that setpoint
+          LoopSetPointTemp = Node(PlantLoop(LoopNum)%LoopSide(DemandSide)%NodeNumIn)%TempSetPoint
+        ENDIF
+
             ! Check the Loop Setpoint and make sure it is bounded by the Loop Max and Min
         LoopMaxTemp = PlantLoop(LoopNum)%MaxTemp
         LoopMinTemp = PlantLoop(LoopNum)%MinTemp
+
+        ! trap for -999 and set to average of limits if so
+        IF (LoopSetPointTemp == SensedNodeFlagValue) THEN
+          LoopSetPointTemp = (LoopMinTemp + LoopMaxTemp) / 2.d0
+        ENDIF
             ! Check it against the loop temperature limits
         LoopSetPointTemp = Min(LoopMaxTemp, LoopSetPointTemp)
         LoopSetPointTemp = Max(LoopMinTemp, LoopSetPointTemp)
@@ -2452,7 +2524,7 @@ SUBROUTINE ReInitPlantLoopsAtFirstHVACIteration
           LoopMinMassFlowRate = PlantLoop(loopnum)%MinVolFlowRate * rho
 
         END IF
-              !use saturated liquid of steam at the loop set point temp as the starting enthalpy for a water loop
+              !use saturated liquid of steam at the loop setpoint temp as the starting enthalpy for a water loop
         IF(PlantLoop(LoopNum)%FluidType==NodeType_Steam) Then
           SteamDensity=GetSatDensityRefrig('STEAM',SteamTemp,1.0d0,PlantLoop(LoopNum)%FluidIndex,'PlantManager:InitializeLoop')
           LoopMaxMassFlowRate = PlantLoop(loopnum)%MaxVolFlowRate * SteamDensity
@@ -2478,6 +2550,8 @@ SUBROUTINE ReInitPlantLoopsAtFirstHVACIteration
 
             Node(ComponentInlet)%MassFlowRate         = 0.0d0
             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad = 0.0
+            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .FALSE.
+            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .FALSE.
             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%RequestedMassFlow =0.0
 
 
@@ -3101,7 +3175,7 @@ SUBROUTINE SizePlantLoop(LoopNum, OkayToFinish)
           PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%NodeNumOut) CYCLE
       DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%TotalComponents
         CALL SimPlantEquip(LoopNum,SupplySide,BranchNum,CompNum,.TRUE.,InitLoopEquip, GetCompSizFac)
-        BranchSizFac = BranchSizFac + PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%SizFac
+        BranchSizFac = MAX(BranchSizFac , PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%SizFac)
       END DO
       LoopSizFac = LoopSizFac + BranchSizFac
       MaxSizFac = MAX(MaxSizFac, BranchSizFac)
@@ -3847,7 +3921,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_TakesWhatGets
+                         = LoopFlowStatus_NeedyIfLoopOn
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
           CASE (TypeOf_HPWaterPEHeating ) !                 = 22
@@ -3858,7 +3932,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_TakesWhatGets
+                         = LoopFlowStatus_NeedyIfLoopOn
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
           CASE (TypeOf_Pipe ) !                             = 23
@@ -3941,11 +4015,11 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCapHiOutLimit
           CASE (TypeOf_TS_IceDetailed ) !                   = 30
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
           CASE (TypeOf_TS_IceSimple  ) !                    = 31
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
           CASE (TypeOf_ValveTempering  ) !                  = 32
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
@@ -4194,6 +4268,18 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_NoneDemand
+          CASE ( TypeOf_CoilVSWAHPHeatingEquationFit )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyAndTurnsLoopOn
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_NoneDemand
+          CASE ( TypeOf_CoilVSWAHPCoolingEquationFit )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyAndTurnsLoopOn
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_NoneDemand
           CASE ( TypeOf_CoilWAHPHeatingParamEst )
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -4229,6 +4315,27 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
+          CASE ( TypeOf_SolarCollectorICS ) !         = 78
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                = LoopFlowStatus_NeedyAndTurnsLoopOn
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
+          CASE ( Typeof_PlantComponentUserDefined )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
+          CASE ( Typeof_CoilUserDefined )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
+          CASE ( TypeOf_ZoneHVACAirUserDefined )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
+          CASE ( TypeOf_AirTerminalUserDefined )
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
           CASE DEFAULT
             Call ShowSevereError('SetBranchControlTypes: Caught unexpected equipment type of number')
 
@@ -4377,7 +4484,7 @@ END SUBROUTINE CheckIfAnyPlant
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

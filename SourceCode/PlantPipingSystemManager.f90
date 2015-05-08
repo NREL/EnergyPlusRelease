@@ -109,8 +109,6 @@ MODULE PlantPipingSystemsManager
     !   Error checking                             !
     PRIVATE CheckForOutOfRangeTemps                !
     !   Other utilities                            !
-    PRIVATE GetAvailableNeighborCountForThisCell   !
-    PRIVATE GetAvailableNeighborsForThisCell       !
     !   Cartesian cell property routines           !
     PRIVATE Width                                  !
     PRIVATE Height                                 !
@@ -2134,116 +2132,6 @@ END FUNCTION
 !*********************************************************************************************!
 
 !*********************************************************************************************!
-INTEGER FUNCTION GetAvailableNeighborCountForThisCell(DomainNum, c) RESULT (RetVal)
-
-      ! FUNCTION INFORMATION:
-      !       AUTHOR         Edwin Lee
-      !       DATE WRITTEN   Summer 2011
-      !       MODIFIED       na
-      !       RE-ENGINEERED  na
-
-      ! PURPOSE OF THIS FUNCTION:
-      ! <description>
-
-      ! METHODOLOGY EMPLOYED:
-      ! <description>
-
-    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-      ! FUNCTION ARGUMENT DEFINITIONS:
-    INTEGER, INTENT(IN) :: DomainNum
-    TYPE(CartesianCell), INTENT(IN) :: c
-
-      ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-    INTEGER :: x
-    INTEGER :: y
-    INTEGER :: z
-
-    x = c%X_index
-    y = c%Y_index
-    z = c%Z_index
-    RetVal = 0
-
-    IF(x>0) RetVal = RetVal + 1
-    IF(x<UBOUND(PipingSystemDomains(DomainNum)%Cells,1)) RetVal = RetVal + 1
-    IF(y>0) RetVal = RetVal + 1
-    IF(y<UBOUND(PipingSystemDomains(DomainNum)%Cells,2)) RetVal = RetVal + 1
-    IF(z>0) RetVal = RetVal + 1
-    IF(z<UBOUND(PipingSystemDomains(DomainNum)%Cells,3)) RetVal = RetVal + 1
-
-    RETURN
-
-END FUNCTION
-!*********************************************************************************************!
-
-!*********************************************************************************************!
-!Use GetAvailableNeighborCountForThisCell to first get the size of the array coming back!
-FUNCTION GetAvailableNeighborsForThisCell(DomainNum, c) RESULT (RetVal)
-
-      ! FUNCTION INFORMATION:
-      !       AUTHOR         Edwin Lee
-      !       DATE WRITTEN   Summer 2011
-      !       MODIFIED       na
-      !       RE-ENGINEERED  na
-
-      ! PURPOSE OF THIS FUNCTION:
-      ! <description>
-
-      ! METHODOLOGY EMPLOYED:
-      ! <description>
-
-    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-      ! FUNCTION ARGUMENT DEFINITIONS:
-    INTEGER, INTENT(IN) :: DomainNum
-    TYPE(CartesianCell), INTENT(IN) :: c
-
-      ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-    INTEGER :: x
-    INTEGER :: y
-    INTEGER :: z
-    INTEGER :: Ctr
-
-      ! FUNCTION RETURN VALUE DELCARATION
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: RetVal
-
-    x = c%X_index
-    y = c%Y_index
-    z = c%Z_index
-    RetVal = 0
-    Ctr = -1
-
-    IF(x>0) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_NegativeX
-    END IF
-    IF(x<UBOUND(PipingSystemDomains(DomainNum)%Cells,1)) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_PositiveX
-    END IF
-    IF(y>0) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_NegativeY
-    END IF
-    IF(y<UBOUND(PipingSystemDomains(DomainNum)%Cells,2)) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_PositiveY
-    END IF
-    IF(z>0) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_NegativeZ
-    END IF
-    IF(z<UBOUND(PipingSystemDomains(DomainNum)%Cells,3)) THEN
-        Ctr = Ctr + 1
-        RetVal(Ctr) = Direction_PositiveZ
-    END IF
-
-    RETURN
-
-END FUNCTION
-!*********************************************************************************************!
-
-!*********************************************************************************************!
 REAL(r64) FUNCTION Width(c) RESULT (RetVal)
 
       ! FUNCTION INFORMATION:
@@ -4084,7 +3972,6 @@ SUBROUTINE GetCellWidths(DomainNum, g)
           ! FUNCTION ARGUMENT DEFINITIONS:
     INTEGER, INTENT(IN) :: DomainNum
     TYPE(GridRegion) :: g
-    REAL(r64), ALLOCATABLE, DIMENSION(:) :: RetVal
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
     TYPE(DistributionStructure) :: ThisMesh
@@ -4094,6 +3981,8 @@ SUBROUTINE GetCellWidths(DomainNum, g)
     INTEGER :: I
     REAL(r64) :: CellWidth
     INTEGER :: SubIndex
+    REAL(r64), ALLOCATABLE, DIMENSION(:) :: RetVal
+    INTEGER :: RetMaxIndex
 !write(outputfiledebug,*) ' regiontype=',g%RegionType
     !'determine which mesh "direction" we are going to be using
 
@@ -4115,8 +4004,10 @@ SUBROUTINE GetCellWidths(DomainNum, g)
 !write(outputfiledebug,*) 'thismesh%regionmeshcount=',ThisMesh%RegionMeshCount
     IF (ThisMesh%RegionMeshCount > 0) THEN
       ALLOCATE(RetVal(0:ThisMesh%RegionMeshCount-1))
+      RetMaxIndex=ThisMesh%RegionMeshCount-1
     ELSE
       ALLOCATE(RetVal(0:0))
+      RetMaxIndex=0
     ENDIF
 
     GridWidth = g%Max - g%Min
@@ -4158,7 +4049,7 @@ SUBROUTINE GetCellWidths(DomainNum, g)
 
     END IF
 
-    g%CellWidths=RetVal
+    g%CellWidths(0:RetMaxIndex)=RetVal(0:RetMaxIndex)
     DEALLOCATE(RetVal)
 !END FUNCTION
 END SUBROUTINE
@@ -4920,7 +4811,7 @@ REAL(r64) FUNCTION GetBasementWallHeatFlux(DomainNum) RESULT (RetVal)
         RunningSummation = RunningSummation + QdotConvOutRepPerArea(SurfacePointer)
     END DO
 
-    RetVal = RunningSummation / NumSurfaces
+    RetVal = -RunningSummation / NumSurfaces ! heat flux is negative here
 
   RETURN
 
@@ -4970,7 +4861,7 @@ REAL(r64) FUNCTION GetBasementFloorHeatFlux(DomainNum) RESULT (RetVal)
         RunningSummation = RunningSummation + QdotConvOutRepPerArea(SurfacePointer)
     END DO
 
-    RetVal = RunningSummation / NumSurfaces
+    RetVal = -RunningSummation / NumSurfaces   ! heat flux is negative here
 
   RETURN
 
@@ -7074,7 +6965,7 @@ END SUBROUTINE
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

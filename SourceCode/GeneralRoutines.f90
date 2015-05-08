@@ -1,8 +1,7 @@
 SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq, &
                              ActuatedNode,MaxFlow,MinFlow,TempInNode,TempOutNode, &
                              ControlOffSet,AirMassFlow,Action,ControlCompTypeNum, &
-                             CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex, &
-                             CompIndex )
+                             CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard J. Liesen
@@ -63,7 +62,6 @@ INTEGER, INTENT (IN), OPTIONAL   :: EquipIndex      ! Identifier for equipment o
 INTEGER, INTENT (IN), OPTIONAL   :: LoopNum ! for plant components, plant loop index
 INTEGER, INTENT (IN), OPTIONAL   :: LoopSide ! for plant components, plant loop side index
 INTEGER, INTENT (IN), OPTIONAL   :: BranchIndex ! for plant components, plant branch index
-INTEGER, INTENT (IN), OPTIONAL   :: CompIndex ! for plant components, plant component index
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !Iteration maximum for reheat control
@@ -333,7 +331,7 @@ Do While (.Not. Converged)
    ELSE IF (Action .eq. iReverseAction) THEN
      Denom = -MAX(ABS(QZnReq),100.d0)
    ELSE
-     CALL ShowFatalError('Illegal Action argument in Subroutine ControlCompOutput')
+     CALL ShowFatalError('ControlCompOutput: Illegal Action argument =['//trim(TrimSigDigits(Action))//']')
    END IF
  END IF
 
@@ -419,7 +417,7 @@ Do While (.Not. Converged)
 
 
    CASE DEFAULT
-     CALL ShowFatalError('Invalid unit for Controlled Component Output='//TRIM(CompType))
+     CALL ShowFatalError('ControlCompOutput: Illegal Component Number argument =['//trim(TrimSigDigits(SimCompNum))//']')
 
  END SELECT
 
@@ -675,7 +673,9 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   USE DataHeatBalSurface, ONLY: TH
   USE DataHeatBalance , ONLY: Material, Construct, QRadSWOutIncident
   USE ConvectionCoefficients, ONLY: InitExteriorConvectionCoeff
-
+  USE SolarCollectors,        ONLY: Collector
+  USE DataGlobals,            ONLY: BeginEnvrnFlag
+  
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -754,6 +754,12 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   REAL(r64)  :: LocalOutDryBulbTemp ! OutDryBulbTemp for here
   REAL(r64)  :: LocalWetBulbTemp ! OutWetBulbTemp for here
   REAL(r64)  :: LocalOutHumRat ! OutHumRat for here
+  LOGICAL    :: ICSCollectorIsOn  =.FALSE.  ! ICS collector has OSCM on 
+  INTEGER    :: CollectorNum         ! current solar collector index
+  REAL(r64)  :: ICSWaterTemp         ! ICS solar collector water temp
+  REAL(r64)  :: ICSULossbottom       ! ICS solar collector bottom loss Conductance
+  LOGICAL, SAVE  :: MyICSEnvrnFlag = .TRUE.  ! Local environment flag for ICS
+    
 
   LocalOutDryBulbTemp = Sum(Surface(SurfPtrARR)%Area * Surface(SurfPtrARR)%OutDryBulbTemp) &
                         / Sum(Surface(SurfPtrARR)%Area)
@@ -804,8 +810,26 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
     ELSE
        HPlenARR(thisSurf) = Sigma*AbsExt*AbsThermSurf*(TsBaffK**4 - TsoK**4)/(TsBaffK - TsoK)
     ENDIF
+    ! Added for ICS collector OSCM
+    IF ( Surface(SurfPtr)%IsICS ) THEN
+         ICSCollectorIsOn = .TRUE.
+         CollectorNum = Surface(SurfPtr)%ICSPtr 
+    ENDIF    
   ENDDO
 
+  IF (ICSCollectorIsOn) THEN
+   IF(BeginEnvrnFlag .AND. MyICSEnvrnFlag) THEN 
+     ICSULossbottom = 0.40d0
+     ICSWaterTemp = 20.0d0
+   ELSE 
+     ICSULossbottom = Collector(CollectorNum)%UbLoss
+     ICSWaterTemp = Collector(CollectorNum)%TempOfWater  
+     MyICSEnvrnFlag = .FALSE.
+   ENDIF   
+  ENDIF
+  IF ( .NOT. BeginEnvrnFlag )THEN
+      MyICSEnvrnFlag = .TRUE.
+  ENDIF    
   If (A == 0.0) then  ! should have been caught earlier
 
   ENDIF
@@ -855,11 +879,15 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   MdotVent = VdotVent * RhoAir
 
   !now calculate baffle temperature
-
-  TsBaffle = (Isc*SolAbs + HExt*Tamb + HrAtm*Tamb + HrSky*SkyTemp + HrGround*Tamb + HrPlen*Tso + &
-            Hcplen*TaGap  + QdotSource) &
-            /(HExt + HrAtm + HrSky + HrGround + Hrplen + Hcplen)
-
+  IF ( .NOT. ICSCollectorIsOn ) THEN
+     TsBaffle = (Isc*SolAbs + HExt*Tamb + HrAtm*Tamb + HrSky*SkyTemp + HrGround*Tamb + HrPlen*Tso + &
+                Hcplen*TaGap  + QdotSource) &
+                /(HExt + HrAtm + HrSky + HrGround + Hrplen + Hcplen)
+  ELSE
+      
+     TsBaffle = (ICSULossbottom*ICSWaterTemp + HrPlen*Tso +  Hcplen*TaGap  + QdotSource) &
+              / (ICSULossbottom + Hrplen + Hcplen)
+  ENDIF
   !now calculate gap air temperature
 
   TaGap = (HcPlen*A*Tso + MdotVent*CpAir*Tamb + HcPlen*A*TsBaffle) / (HcPlen*A + MdotVent*CpAir + HcPlen*A)
@@ -987,7 +1015,7 @@ SUBROUTINE CalcBasinHeaterPower(Capacity,SchedulePtr,SetPointTemp,Power)
           ! METHODOLOGY EMPLOYED:
           ! Checks to see whether schedule for basin heater exists or not. If the schedule exists,
           ! the basin heater is operated for the schedule specified otherwise the heater runs
-          ! for the entire simulation timestep whenever the outdoor temperature is below set point
+          ! for the entire simulation timestep whenever the outdoor temperature is below setpoint
           ! and water is not flowing through the evaporative cooled equipment.
 
           ! REFERENCES:
@@ -1002,8 +1030,8 @@ SUBROUTINE CalcBasinHeaterPower(Capacity,SchedulePtr,SetPointTemp,Power)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER  ,INTENT(IN)  :: SchedulePtr    ! Pointer to basin heater schedule
-  REAL(r64),INTENT(IN)  :: Capacity       ! Basin heater capacity per degree C below set point (W/C)
-  REAL(r64),INTENT(IN)  :: SetPointTemp   ! Set point temperature for basin heater operation (C)
+  REAL(r64),INTENT(IN)  :: Capacity       ! Basin heater capacity per degree C below setpoint (W/C)
+  REAL(r64),INTENT(IN)  :: SetPointTemp   ! setpoint temperature for basin heater operation (C)
   REAL(r64),INTENT(OUT) :: Power          ! Basin heater power (W)
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -1018,7 +1046,7 @@ SUBROUTINE CalcBasinHeaterPower(Capacity,SchedulePtr,SetPointTemp,Power)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)  :: BasinHeaterSch                  ! Schedule for basin heater operation
   Power = 0.0d0
-  ! Operate basin heater anytime outdoor temperature is below set point and water is not flowing through the equipment
+  ! Operate basin heater anytime outdoor temperature is below setpoint and water is not flowing through the equipment
   ! IF schedule exists, basin heater performance can be scheduled OFF
   IF(SchedulePtr .GT. 0)THEN
     BasinHeaterSch     = GetCurrentScheduleValue(SchedulePtr)
@@ -1026,7 +1054,7 @@ SUBROUTINE CalcBasinHeaterPower(Capacity,SchedulePtr,SetPointTemp,Power)
       Power = MAX(0.0d0,Capacity * (SetPointTemp-OutDryBulbTemp))
     END IF
   ELSE
-  ! IF schedule does not exist, basin heater operates anytime outdoor dry-bulb temp is below set point
+  ! IF schedule does not exist, basin heater operates anytime outdoor dry-bulb temp is below setpoint
     IF(Capacity .GT. 0.0d0)THEN
       Power = MAX(0.0d0,Capacity * (SetPointTemp-OutDryBulbTemp))
     END IF
@@ -1068,27 +1096,17 @@ SUBROUTINE TestAirPathIntegrity(ErrFound)
           ! na
 
           ! INTERFACE BLOCK SPECIFICATIONS
-        !COMPILER-GENERATED INTERFACE MODULE: Thu Sep 29 07:54:46 2011
           INTERFACE
-            SUBROUTINE TESTRETURNAIRPATHINTEGRITY(ERRFOUND,NUMSAPNODES, &
-     &NUMRAPNODES,VALRETAPATHS,VALSUPAPATHS)
-              LOGICAL(KIND=4), INTENT(INOUT) :: ERRFOUND
-              INTEGER(KIND=4) :: NUMSAPNODES(:,:)
-              INTEGER(KIND=4) :: NUMRAPNODES(:,:)
-              INTEGER(KIND=4) :: VALRETAPATHS(:,:)
-              INTEGER(KIND=4) :: VALSUPAPATHS(:,:)
-            END SUBROUTINE TESTRETURNAIRPATHINTEGRITY
+            SUBROUTINE TestReturnAirPathIntegrity(ErrFound,ValRetAPaths)
+              LOGICAL(KIND=4), INTENT(INOUT) :: ErrFound
+              INTEGER(KIND=4) :: ValRetAPaths(:,:)
+            END SUBROUTINE TestReturnAirPathIntegrity
           END INTERFACE
         !COMPILER-GENERATED INTERFACE MODULE: Thu Sep 29 07:54:46 2011
           INTERFACE
-            SUBROUTINE TESTSUPPLYAIRPATHINTEGRITY(ERRFOUND,NUMSAPNODES, &
-     &NUMRAPNODES,VALRETAPATHS,VALSUPAPATHS)
-              LOGICAL(KIND=4), INTENT(INOUT) :: ERRFOUND
-              INTEGER(KIND=4) :: NUMSAPNODES(:,:)
-              INTEGER(KIND=4) :: NUMRAPNODES(:,:)
-              INTEGER(KIND=4) :: VALRETAPATHS(:,:)
-              INTEGER(KIND=4) :: VALSUPAPATHS(:,:)
-            END SUBROUTINE TESTSUPPLYAIRPATHINTEGRITY
+            SUBROUTINE TestSupplyAirPathIntegrity(ErrFound)
+              LOGICAL(KIND=4), INTENT(INOUT) :: ErrFound
+            END SUBROUTINE TestSupplyAirPathIntegrity
           END INTERFACE
 
           ! DERIVED TYPE DEFINITIONS
@@ -1117,9 +1135,9 @@ SUBROUTINE TestAirPathIntegrity(ErrFound)
   ValRetAPaths=0
   ValSupAPaths=0
 
-  CALL TestSupplyAirPathIntegrity(ErrFlag,NumSAPNodes,NumRAPNodes,ValRetAPaths,ValSupAPaths)
+  CALL TestSupplyAirPathIntegrity(ErrFlag)
   IF (ErrFlag) ErrFound=.true.
-  CALL TestReturnAirPathIntegrity(ErrFlag,NumSAPNodes,NumRAPNodes,ValRetAPaths,ValSupAPaths)
+  CALL TestReturnAirPathIntegrity(ErrFlag,ValRetAPaths)
   IF (ErrFlag) ErrFound=.true.
 
   ! Final tests, look for duplicate nodes
@@ -1158,7 +1176,7 @@ SUBROUTINE TestAirPathIntegrity(ErrFound)
 
 END SUBROUTINE TestAirPathIntegrity
 
-SUBROUTINE TestSupplyAirPathIntegrity(ErrFound,NumSAPNodes,NumRAPNodes,ValRetAPaths,ValSupAPaths)
+SUBROUTINE TestSupplyAirPathIntegrity(ErrFound)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -1192,10 +1210,6 @@ SUBROUTINE TestSupplyAirPathIntegrity(ErrFound,NumSAPNodes,NumRAPNodes,ValRetAPa
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   LOGICAL, INTENT(INOUT) :: ErrFound
-  INTEGER, DIMENSION(:,:) :: ValRetAPaths
-  INTEGER, DIMENSION(:,:) :: NumRAPNodes
-  INTEGER, DIMENSION(:,:) :: ValSupAPaths
-  INTEGER, DIMENSION(:,:) :: NumSAPNodes
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1459,7 +1473,7 @@ SUBROUTINE TestSupplyAirPathIntegrity(ErrFound,NumSAPNodes,NumRAPNodes,ValRetAPa
 
 END SUBROUTINE TestSupplyAirPathIntegrity
 
-SUBROUTINE TestReturnAirPathIntegrity(ErrFound,NumSAPNodes,NumRAPNodes,ValRetAPaths,ValSupAPaths)
+SUBROUTINE TestReturnAirPathIntegrity(ErrFound,ValRetAPaths)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -1521,9 +1535,6 @@ SUBROUTINE TestReturnAirPathIntegrity(ErrFound,NumSAPNodes,NumRAPNodes,ValRetAPa
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   LOGICAL, INTENT(INOUT) :: ErrFound
   INTEGER, DIMENSION(:,:) :: ValRetAPaths
-  INTEGER, DIMENSION(:,:) :: NumRAPNodes
-  INTEGER, DIMENSION(:,:) :: ValSupAPaths
-  INTEGER, DIMENSION(:,:) :: NumSAPNodes
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1885,7 +1896,7 @@ END SUBROUTINE TestReturnAirPathIntegrity
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

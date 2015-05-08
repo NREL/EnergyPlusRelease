@@ -161,8 +161,9 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
           ! USE STATEMENTS:
           ! na
   USE DataLoopNode,         ONLY : Node, NodeID, NumOfNodes
-  USE DataPlant,            ONLY : PlantLoop, MassFlowTol, DemandOpSchemeType, FlowUnlocked, &
-                                   FlowLocked, PlantSizesOkayToFinalize,ControlType_SeriesActive
+  USE DataPlant,            ONLY : PlantLoop, DemandOpSchemeType, FlowUnlocked, &
+                                   FlowLocked, PlantSizesOkayToFinalize
+  USE DataBranchAirLoopPlant, ONLY : ControlType_SeriesActive, MassFlowTolerance
   USE DataInterfaces,       ONLY : ShowFatalError, ShowContinueError, ShowSevereError,ShowContinueErrorTimeStamp
   USE General,              ONLY : RoundSigDigits
   USE DataSizing,           ONLY : AutoSize
@@ -196,6 +197,7 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
   INTEGER       :: CompInletNodeNum
   INTEGER       :: CompOutletNodeNum
   INTEGER       :: CompNum
+  REAL(r64)     :: SeriesBranchHighFlowRequest ! local temporary used for sweeping across components on a branch
 
   IF (OneTimeDiagSetup) THEN
     ALLOCATE(NodeErrorMsgIssued(NumOfNodes) )
@@ -223,7 +225,7 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
   IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompIndex)%CurOpSchemeType == DemandOpSchemeType) THEN
       ! store flow request on inlet node
 
-    Node(InletNode)%MassFlowRateRequest = CompFlow
+    Node(InletNode)%MassFlowRateRequest   = CompFlow
 
     Node(OutletNode)%MassFlowRateMinAvail = MAX(Node(InletNode)%MassFlowRateMinAvail ,Node(InletNode)%MassFlowRateMin)
     !virtual 2-way valve (was tried but it clamps down demand side component's flow options so they can't find proper solutions)
@@ -264,6 +266,14 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
       Node(InletNode)%MassFlowRate = Node(OutletNode)%MassFlowRate
     ELSE !bound the flow by Min/Max available and hardware limits
       IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompIndex)%FlowCtrl == ControlType_SeriesActive) THEN
+        ! determine highest flow request for all the components on the branch
+        SeriesBranchHighFlowRequest = 0.d0
+        DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
+          CompInletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumIn
+          SeriesBranchHighFlowRequest = MAX(Node(CompInletNodeNum)%MassFlowRateRequest, SeriesBranchHighFlowRequest)
+        ENDDO
+        !take higher of branch max flow request and this new flow request
+        CompFlow = MAX(CompFlow, SeriesBranchHighFlowRequest)
         ! multiple components on the branch
         DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
           CompInletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumIn
@@ -318,7 +328,7 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
 
   IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompIndex)%CurOpSchemeType == DemandOpSchemeType) THEN
     IF ((MdotOldRequest > 0.d0) .AND. (CompFlow > 0.d0)) THEN ! sure that not coming back from a no flow reset
-      IF (ABS(MdotOldRequest - Node(InletNode)%MassFlowRateRequest) > MassFlowTol) THEN !demand component changed its flow request
+      IF (ABS(MdotOldRequest - Node(InletNode)%MassFlowRateRequest) > MassFlowTolerance) THEN !demand comp changed its flow request
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimLoopSideNeeded = .TRUE.
       ENDIF
     ENDIF
@@ -350,7 +360,8 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
           ! USE STATEMENTS:
           ! na
   USE DataLoopNode,         ONLY : Node
-  USE DataPlant,            ONLY : PlantLoop, FlowUnlocked, FlowLocked,MassFlowTol
+  USE DataPlant,            ONLY : PlantLoop, FlowUnlocked, FlowLocked
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE DataInterfaces,       ONLY : ShowFatalError, ShowSevereError, ShowContinueErrorTimeStamp,&
                                    ShowContinueError
   USE DataSizing,           ONLY : AutoSize
@@ -380,8 +391,6 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER  :: CompNum
   INTEGER  :: NodeNum
-  REAL(R64) :: minConstraint
-  REAL(r64) :: maxConstraint
   REAL(r64) :: MdotOldRequest
 
           ! FLOW:
@@ -390,7 +399,8 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
   Node(ActuatedNode)%MassFlowRateRequest = CompFlow
   IF (LoopNum > 0 .AND. LoopSideNum > 0 .AND. (.NOT. ResetMode)) THEN
     IF ((MdotOldRequest > 0.d0) .AND. (CompFlow > 0.d0)) THEN ! sure that not coming back from a no flow reset
-      IF (ABS(MdotOldRequest - Node(ActuatedNode)%MassFlowRateRequest) > MassFlowTol) THEN
+      IF ( (ABS(MdotOldRequest - Node(ActuatedNode)%MassFlowRateRequest) > MassFlowTolerance) .AND. &
+           (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == FlowUnlocked)) THEN
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimLoopSideNeeded = .TRUE.
       ENDIF
     ENDIF
@@ -398,7 +408,7 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
           !Set loop flow rate
 
   IF (LoopNum > 0 .AND. LoopSideNum > 0 ) THEN
-    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == 0)THEN
+    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == FlowUnlocked)THEN
       IF (PlantLoop(LoopNum)%MaxVolFlowRate == AutoSize)THEN !still haven't sized the plant loop
         Node(ActuatedNode)%MassFlowRate = CompFlow
       ELSE !bound the flow by Min/Max available across entire branch
@@ -433,11 +443,13 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
         ENDDO
       END IF
 
-    ELSEIF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == 1)THEN
+    ELSEIF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == FlowLocked)THEN
 
       CompFlow =  Node(ActuatedNode)%MassFlowRate
-      IF (((CompFlow - Node(ActuatedNode)%MassFlowRateMaxAvail) > MassFlowTol) .OR. &
-           ((Node(ActuatedNode)%MassFlowRateMinAvail - CompFlow) > MassFlowTol)) THEN
+      ! do not change requested flow rate either
+      Node(ActuatedNode)%MassFlowRateRequest = MdotOldRequest
+      IF (((CompFlow - Node(ActuatedNode)%MassFlowRateMaxAvail) > MassFlowTolerance) .OR. &
+           ((Node(ActuatedNode)%MassFlowRateMinAvail - CompFlow) > MassFlowTolerance)) THEN
         CALL ShowSevereError('SetActuatedBranchFlowRate: Flow rate is out of range') !DEBUG error...should never get here
         CALL ShowContinueErrorTimeStamp(' ')
         CALL ShowContinueError('Component flow rate [kg/s] = '//TRIM(RoundSigDigits(CompFlow,8)) )
@@ -471,111 +483,82 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
   RETURN
 END SUBROUTINE SetActuatedBranchFlowRate             !DSU3
 
-!SUBROUTINE RequestActuatedBranchFlowRate(CompFlowHigh, CompFlowLow,ActuatedNode,LoopNum,LoopSideNum, BranchNum)    !DSU3
-!
-!          ! SUBROUTINE INFORMATION:
-!          !       AUTHOR         B. Griffith
-!          !       DATE WRITTEN   Feb 2010
-!          !       MODIFIED       na
-!          !       RE-ENGINEERED  na
-!
-!          ! PURPOSE OF THIS SUBROUTINE:
-!          ! general purpse worker routine to set plant node variables for node
-!          ! and all nodes on the branch.  Used by HVAC water coil controller, that do not
-!          !  distinguish single component and have no inlet-outlet pair
-!          !  only a actuated noded of no clear position.
-!          !  this routine requests flow on entire branch
-!
-!          ! METHODOLOGY EMPLOYED:
-!          ! "Request" flow on node and branch while honoring constraints on actuated node
-!          ! called during FirstHVACIteration, reset node MassFlowRateMaxAvail and MassFlowRateMinAVail
-!
-!          ! REFERENCES:
-!          ! na
-!
-!          ! USE STATEMENTS:
-!          ! na
-!  USE DataLoopNode,         ONLY : Node
-!  USE DataPlant,            ONLY : PlantLoop, FlowUnlocked, FlowLocked,MassFlowTol
-!  USE DataInterfaces,       ONLY: ShowFatalError, ShowSevereError, ShowContinueErrorTimeStamp,&
-!                                  ShowContinueError
-!  USE DataSizing,           ONLY: AutoSize
-!  USE General,              ONLY: RoundSigDigits
-!  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-!
-!          ! SUBROUTINE ARGUMENT DEFINITIONS:
-!  REAL(r64), INTENT(IN) :: CompFlowHigh
-!  REAL(r64), INTENT(IN) :: CompFlowLow
-!  INTEGER, INTENT(IN) :: ActuatedNode
-!  INTEGER, INTENT(IN) :: LoopNum
-!  INTEGER, INTENT(IN) :: LoopSideNum
-!  INTEGER, INTENT(IN) :: BranchNum
-!
-!          ! SUBROUTINE PARAMETER DEFINITIONS:
-!          ! na
-!
-!          ! INTERFACE BLOCK SPECIFICATIONS
-!          ! na
-!
-!          ! DERIVED TYPE DEFINITIONS
-!          ! na
-!
-!          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-!  INTEGER  :: CompNum
-!  INTEGER  :: NodeNum
-!  REAL(r64) :: CompFlow
-!          ! FLOW:
-!
-!          !Set loop flow rate
-!
-!  IF (LoopNum > 0 .AND. LoopSideNum > 0 ) THEN
-!    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == FlowUnlocked)THEN
-!      IF (PlantLoop(LoopNum)%MaxVolFlowRate == AutoSize)THEN !still haven't sized the plant loop
-!        Node(ActuatedNode)%MassFlowRateMinAvail = CompFlowLow
-!        Node(ActuatedNode)%MassFlowRateMaxAvail = CompFlowHigh
-!      ELSE !bound the flow by Min/Max available
-!        Node(ActuatedNode)%MassFlowRateMinAvail = MAX(Node(ActuatedNode)%MassFlowRateMin , CompFlowLow )
-!
-!        Node(ActuatedNode)%MassFlowRateMaxAvail = MIN(Node(ActuatedNode)%MassFlowRateMax, CompFlowHigh)
-!      END IF
-!    ELSEIF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Flowlock == FlowLocked)THEN
-!      !just check if bound?
-!      CompFlow =  Node(ActuatedNode)%MassFlowRate
-!      IF (((CompFlow - Node(ActuatedNode)%MassFlowRateMaxAvail) > MassFlowTol) .OR. &
-!           ((Node(ActuatedNode)%MassFlowRateMinAvail - CompFlow) > MassFlowTol)) THEN
-!        CALL ShowSevereError('RequestActuatedBranchFlowRate: Flow rate is out of range') !DEBUG error...should never get here
-!        CALL ShowContinueErrorTimeStamp(' ')
-!        CALL ShowContinueError('Component flow rate [kg/s] = '//TRIM(RoundSigDigits(CompFlow,8)) )
-!        CALL ShowContinueError('Node maximum flow rate available [kg/s] = ' &
-!                                 //TRIM(RoundSigDigits(Node(ActuatedNode)%MassFlowRateMaxAvail,8)) )
-!        CALL ShowContinueError('Node minimum flow rate available [kg/s] = '&
-!                                 //TRIM(RoundSigDigits(Node(ActuatedNode)%MassFlowRateMinAvail,8)) )
-!      ENDIF
-!    ELSE
-!      CALL ShowFatalError('RequestActuatedBranchFlowRate: Flowlock out of range') !DEBUG error...should never get here
-!    ENDIF
-!
-!
-!    Do CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
-!      NodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn
-!      Node(NodeNum)%MassFlowRateMinAvail  = Node(ActuatedNode)%MassFlowRateMinAvail
-!      Node(NodeNum)%MassFlowRateMaxAvail  = Node(ActuatedNode)%MassFlowRateMaxAvail
-!      NodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumOut
-!      Node(NodeNum)%MassFlowRateMinAvail  = Node(ActuatedNode)%MassFlowRateMinAvail
-!      Node(NodeNum)%MassFlowRateMaxAvail  = Node(ActuatedNode)%MassFlowRateMaxAvail
-!
-!    ENDDO
-!
-!  ELSE
-!    ! early in simulation before plant loops are setup and found
-!    Node(ActuatedNode)%MassFlowRateMinAvail = CompFlowLow
-!    Node(ActuatedNode)%MassFlowRateMaxAvail = CompFlowHigh
-!  ENDIF
-!
-!  RETURN
-!END SUBROUTINE RequestActuatedBranchFlowRate             !DSU3
+REAL(r64) FUNCTION RegulateCondenserCompFlowReqOp(LoopNum, LoopSideNum, BranchNum, CompNum, TentativeFlowRequest) RESULT(FlowVal)
 
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
 
+          ! PURPOSE OF THIS FUNCTION:
+          ! This functino will do some intelligent flow request logic for condenser equipment.
+          ! Some condenser equipment (gruond heat exchangers, etc.) may not have a meaningful load value
+          !  since this is an environment heat transfer component.
+          ! The runflag is set, but may not be properly set, and the component may still request flow even
+          !  when it doesn't need to.
+          ! This function will do a little more advanced logic than just checking runflag to determine whether
+          !  to request any flow
+
+          ! METHODOLOGY EMPLOYED:
+          ! Query run flag and myLoad
+          ! If run flag is OFF, then the component should actually be OFF, and tentative flow request will be zeroed
+          ! If the run flag is ON, then check the control type to determine if MyLoad is a meaningful value
+          ! If it is meaningful then determine whether to do flow request based on myload
+          ! If not then we will have no choice but to leave the flow request alone (uncontrolled operation?)
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPlant, ONLY: PlantLoop, HeatingRBOpSchemeType, CoolingRBOpSchemeType, CompSetPtBasedSchemeType
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+    INTEGER   :: LoopNum
+    INTEGER   :: LoopSideNum
+    INTEGER   :: BranchNum
+    INTEGER   :: CompNum
+    REAL(R64) :: TentativeFlowRequest
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+    REAL(r64), PARAMETER :: ZeroLoad = 0.0001d0
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+    REAL(r64) :: CompCurLoad
+    LOGICAL   :: CompRunFlag
+    INTEGER   :: CompOpScheme
+
+    CompCurLoad = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad
+    CompRunFlag = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON
+    CompOpScheme = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType
+
+    IF (CompRunFlag) THEN
+
+        SELECT CASE (CompOpScheme)
+
+        CASE (HeatingRBOpSchemeType, CoolingRBOpSchemeType, CompSetPtBasedSchemeType) ! These provide meaningful myload values
+            IF (ABS(CompCurLoad) > ZeroLoad) THEN
+                FlowVal = TentativeFlowRequest
+            ELSE !no load
+                FlowVal = 0.0d0
+            END IF
+
+        CASE DEFAULT ! Types that don't provide meaningful myload values
+            FlowVal = TentativeFlowRequest
+
+        END SELECT
+
+    ELSE !runflag OFF
+
+        FlowVal = 0.0d0
+
+    END IF
+
+  RETURN
+
+END FUNCTION
 
 SUBROUTINE UpdatePlantMixer(LoopNum,LoopSideNum,MixNum)
 
@@ -700,6 +683,83 @@ SUBROUTINE UpdatePlantMixer(LoopNum,LoopSideNum,MixNum)
   RETURN
 END SUBROUTINE UpdatePlantMixer
 
+FUNCTION AnyPlantSplitterMixerLacksContinuity() RESULT (NeedToReSimulate)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Similiar to CheckPlantMixerSplitterConsistency, but used to decide if plant needs to iterate again
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPlant, ONLY : TotNumLoops, PlantLoop, DemandSide, SupplySide, &
+                        CriteriaDelta_MassFlowRate
+  USE DataLoopNode, ONLY : Node
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  LOGICAL :: NeedToReSimulate
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: LoopNum
+  INTEGER :: SplitterInletNode
+  INTEGER :: LoopSide
+  INTEGER :: NumSplitterOutlets
+  INTEGER :: OutletNum
+  INTEGER :: BranchNum
+  INTEGER :: LastNodeOnBranch
+  REAL(r64) :: SumOutletFlow
+  REAL(r64) :: AbsDifference
+
+
+  NeedToReSimulate = .FALSE.
+
+  DO LoopNum = 1, TotNumLoops
+    DO LoopSide = DemandSide,SupplySide
+      IF (PlantLoop(LoopNum)%LoopSide(LoopSide)%SplitterExists) THEN
+        SplitterInletNode = PlantLoop(LoopNum)%LoopSide(LoopSide)%Splitter(1)%NodeNumIn
+        ! loop across branch outlet nodes and check mass continuity
+        NumSplitterOutlets = PlantLoop(LoopNum)%LoopSide(LoopSide)%Splitter(1)%TotalOutletNodes
+        SumOutletFlow = 0.d0
+        DO OutletNum = 1, NumSplitterOutlets
+          BranchNum        = PlantLoop(LoopNum)%LoopSide(LoopSide)%Splitter(1)%BranchNumOut(OutletNum)
+          LastNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSide)%Branch(branchNum)%NodeNumOut
+          SumOutletFlow = SumOutletFlow + Node(LastNodeOnBranch)%MassFlowRate
+        ENDDO
+        AbsDifference=ABS(Node(SplitterInletNode)%MassFlowRate - SumOutletFlow)
+        IF (AbsDifference > CriteriaDelta_MassFlowRate) THEN
+          NeedToReSimulate =  .TRUE.
+          RETURN
+        ENDIF
+      ENDIF
+    ENDDO
+  ENDDO
+
+
+  RETURN
+
+END FUNCTION AnyPlantSplitterMixerLacksContinuity
+
+
 SUBROUTINE CheckPlantMixerSplitterConsistency(LoopNum,LoopSideNum,SplitNum, MixNum,FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
@@ -719,7 +779,8 @@ SUBROUTINE CheckPlantMixerSplitterConsistency(LoopNum,LoopSideNum,SplitNum, MixN
 
           ! USE STATEMENTS:
   USE DataLoopNode,         ONLY : Node
-  USE DataPlant,            ONLY : PlantLoop, SupplySide, DemandSide, MassFlowTol
+  USE DataPlant,            ONLY : PlantLoop, SupplySide, DemandSide, CriteriaDelta_MassFlowRate
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE DataInterfaces,       ONLY : ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp
   USE DataGlobals,          ONLY : WarmupFlag, DoingSizing
   USE General,              ONLY : RoundSigDigits
@@ -744,32 +805,110 @@ SUBROUTINE CheckPlantMixerSplitterConsistency(LoopNum,LoopSideNum,SplitNum, MixN
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER  :: MixerOutletNode
   INTEGER  :: SplitterInletNode
+  REAL(r64) :: AbsDifference
+  INTEGER  :: NumSplitterOutlets
+  REAL(r64) :: SumOutletFlow
+  INTEGER   :: OutletNum
+  INTEGER   :: BranchNum
+  INTEGER   :: LastNodeOnBranch
 
 
   IF(.NOT. PlantLoop(LoopNum)%LoopHasConnectionComp) THEN
-   IF (.not. DoingSizing .and. .not. WarmupFlag .and. PlantLoop(LoopNum)%LoopSide(LoopSideNum)%MixerExists .and. &
-      .not. FirstHVACIteration) THEN
+    IF (.not. DoingSizing .and. .not. WarmupFlag .and. PlantLoop(LoopNum)%LoopSide(LoopSideNum)%MixerExists .and. &
+        .not. FirstHVACIteration) THEN
           ! Find mixer outlet node number
-    MixerOutletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%NodeNumOut
+      MixerOutletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%NodeNumOut
           ! Find splitter inlet node number
-    SplitterInletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%NodeNumIn
+      SplitterInletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%NodeNumIn
 
 
-    IF (ABS(Node(SplitterInletNode)%MassFlowRate - Node(MixerOutletNode)%MassFlowRate) > MassFlowTol) THEN
-      CALL ShowSevereError('plant flows do not resolve -- splitter inlet flow does not match mixer outlet flow ')
-      CALL ShowContinueErrorTimeStamp(' ')
-      CALL ShowContinueError('PlantLoop name= '//trim(PlantLoop(LoopNum)%Name) )
-      CALL ShowContinueError('Plant Connector:Mixer name= '//trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%Name) )
-      CALL ShowContinueError('Mixer outlet mass flow rate= '//  &
-                                trim(RoundSigDigits(Node(MixerOutletNode)%MassFlowRate,6))//' {kg/s}')
-      CALL ShowContinueError('Plant Connector:Splitter name= '//  &
-                                trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%Name) )
-      CALL ShowContinueError('Splitter inlet mass flow rate= '//  &
-                                trim(RoundSigDigits(Node(SplitterInletNode)%MassFlowRate,6))//' {kg/s}')
-      CALL showFatalError('CheckPlantMixerSplitterConsistency: Simulation terminated because of problems in plant flow resolver')
+      AbsDifference=ABS(Node(SplitterInletNode)%MassFlowRate - Node(MixerOutletNode)%MassFlowRate)
+      IF (AbsDifference > MassFlowTolerance) THEN
+        IF (PlantLoop(LoopNum)%MFErrIndex1 == 0) THEN
+          CALL ShowSevereMessage('Plant flows do not resolve -- splitter inlet flow does not match mixer outlet flow ')
+          CALL ShowContinueErrorTimeStamp(' ')
+          CALL ShowContinueError('PlantLoop name= '//trim(PlantLoop(LoopNum)%Name) )
+          CALL ShowContinueError('Plant Connector:Mixer name= '//trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%Name) )
+          CALL ShowContinueError('Mixer outlet mass flow rate= '//  &
+                                    trim(RoundSigDigits(Node(MixerOutletNode)%MassFlowRate,6))//' {kg/s}')
+          CALL ShowContinueError('Plant Connector:Splitter name= '//  &
+                                    trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%Name) )
+          CALL ShowContinueError('Splitter inlet mass flow rate= '//  &
+                                    trim(RoundSigDigits(Node(SplitterInletNode)%MassFlowRate,6))//' {kg/s}')
+          CALL ShowContinueError('Difference in two mass flow rates= '//  &
+                                    trim(RoundSigDigits(AbsDifference,6))//' {kg/s}')
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('Plant Flows (Loop='//trim(PlantLoop(LoopNum)%Name)//  &
+           ') splitter inlet flow not match mixer outlet flow',PlantLoop(LoopNum)%MFErrIndex1,    &
+           ReportMaxOf=AbsDifference,ReportMinOf=AbsDifference,ReportMaxUnits='kg/s',ReportMinUnits='kg/s')
+        IF (AbsDifference > MassFlowTolerance*10.0d0) THEN
+          CALL ShowSevereError('Plant flows do not resolve -- splitter inlet flow does not match mixer outlet flow ')
+          CALL ShowContinueErrorTimeStamp(' ')
+          CALL ShowContinueError('PlantLoop name= '//trim(PlantLoop(LoopNum)%Name) )
+          CALL ShowContinueError('Plant Connector:Mixer name= '//trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%Name) )
+          CALL ShowContinueError('Mixer outlet mass flow rate= '//  &
+                                    trim(RoundSigDigits(Node(MixerOutletNode)%MassFlowRate,6))//' {kg/s}')
+          CALL ShowContinueError('Plant Connector:Splitter name= '//  &
+                                    trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%Name) )
+          CALL ShowContinueError('Splitter inlet mass flow rate= '//  &
+                                    trim(RoundSigDigits(Node(SplitterInletNode)%MassFlowRate,6))//' {kg/s}')
+          CALL ShowContinueError('Difference in two mass flow rates= '//  &
+                                    trim(RoundSigDigits(AbsDifference,6))//' {kg/s}')
+          CALL ShowFatalError('CheckPlantMixerSplitterConsistency: '//  &
+                 'Simulation terminated because of problems in plant flow resolver')
+        ENDIF
+      ENDIF
+
+      ! now check inside s/m to see if there are problems
+
+      ! loop across branch outlet nodes and check mass continuity
+      NumSplitterOutlets = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%TotalOutletNodes
+      SumOutletFlow = 0.d0
+    !  SumInletFlow  = 0.d0
+      DO OutletNum = 1, NumSplitterOutlets
+        BranchNum        = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(OutletNum)
+        LastNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(branchNum)%NodeNumOut
+        SumOutletFlow = SumOutletFlow + Node(LastNodeOnBranch)%MassFlowRate
+      !  FirstNodeOnBranch= PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(branchNum)%NodeNumIn
+      !  SumInletFlow = SumInletFlow + Node(FirstNodeOnBranch)%MassFlowRate
+      ENDDO
+      AbsDifference=ABS(Node(SplitterInletNode)%MassFlowRate - SumOutletFlow)
+      IF (AbsDifference > CriteriaDelta_MassFlowRate) THEN
+        IF (PlantLoop(LoopNum)%MFErrIndex2 == 0) THEN
+          CALL ShowSevereMessage('Plant flows do not resolve -- splitter inlet flow does not match branch outlet flows')
+          CALL ShowContinueErrorTimeStamp(' ')
+          CALL ShowContinueError('PlantLoop name= '//trim(PlantLoop(LoopNum)%Name) )
+          CALL ShowContinueError('Plant Connector:Mixer name= '//trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%Name) )
+          CALL ShowContinueError('Sum of Branch outlet mass flow rates= '//  &
+                                    trim(RoundSigDigits(SumOutletFlow,6))//' {kg/s}')
+          CALL ShowContinueError('Plant Connector:Splitter name= '//  &
+                                    trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%Name) )
+          CALL ShowContinueError('Splitter inlet mass flow rate= '//  &
+                                    trim(RoundSigDigits(Node(SplitterInletNode)%MassFlowRate,6))//' {kg/s}')
+          CALL ShowContinueError('Difference in two mass flow rates= '//  &
+                                    trim(RoundSigDigits(AbsDifference,6))//' {kg/s}')
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('Plant Flows (Loop='//trim(PlantLoop(LoopNum)%Name)//  &
+           ') splitter inlet flow does not match branch outlet flows',PlantLoop(LoopNum)%MFErrIndex2,    &
+           ReportMaxOf=AbsDifference,ReportMinOf=AbsDifference,ReportMaxUnits='kg/s',ReportMinUnits='kg/s')
+!        IF (AbsDifference > CriteriaDelta_MassFlowRate*10.0d0) THEN
+!          CALL ShowSevereError('Plant flows do not resolve -- splitter inlet flow does not match branch outlet flows')
+!          CALL ShowContinueErrorTimeStamp(' ')
+!          CALL ShowContinueError('PlantLoop name= '//trim(PlantLoop(LoopNum)%Name) )
+!          CALL ShowContinueError('Plant Connector:Mixer name= '//trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%Name) )
+!          CALL ShowContinueError('Sum of Branch outlet mass flow rates= '//  &
+!                                    trim(RoundSigDigits(SumOutletFlow,6))//' {kg/s}')
+!          CALL ShowContinueError('Plant Connector:Splitter name= '//  &
+!                                    trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%Name) )
+!          CALL ShowContinueError('Splitter inlet mass flow rate= '//  &
+!                                    trim(RoundSigDigits(Node(SplitterInletNode)%MassFlowRate,6))//' {kg/s}')
+!          CALL ShowContinueError('Difference in two mass flow rates= '//  &
+!                                    trim(RoundSigDigits(AbsDifference,6))//' {kg/s}')
+!          CALL ShowFatalError('CheckPlantMixerSplitterConsistency: Simulation terminated because of problems in plant flow resolver')
+!        ENDIF
+      ENDIF
 
     ENDIF
-   ENDIF
   END IF
 
   RETURN
@@ -798,7 +937,7 @@ SUBROUTINE CheckForRunawayPlantTemps(LoopNum,LoopSideNum)
 
           ! USE STATEMENTS:
   USE DataLoopNode,         ONLY : Node, NodeID
-  USE DataPlant,            ONLY : PlantLoop, SupplySide, DemandSide, MassFlowTol, PlantReport, ShowBranchesOnLoop
+  USE DataPlant,            ONLY : PlantLoop, SupplySide, DemandSide, PlantReport, ShowBranchesOnLoop
   USE DataInterfaces,       ONLY : ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp, &
                                    ShowRecurringWarningErrorAtEnd
   USE DataGlobals,          ONLY : WarmupFlag, DoingSizing
@@ -962,7 +1101,7 @@ SUBROUTINE CheckForRunawayPlantTemps(LoopNum,LoopSideNum)
     CALL ShowContinueError('  Capacity, Operation Scheme, Mass flow problems, Pump Heat building up over time.')
     CALL ShowContinueError('  Try a shorter runperiod to stop before it fatals and look at')
     CALL ShowContinueError('    lots of node time series data to see what is going wrong.')
-    CALL ShowContinueError('  If this is happening during Warmup, you can use Output:Diagnotistics,ReportDuringWarmup;')
+    CALL ShowContinueError('  If this is happening during Warmup, you can use Output:Diagnostics,ReportDuringWarmup;')
     CALL ShowContinueError('  This is detected at the loop level, but the typical problems are in the components.')
     CALL ShowFatalError('CheckForRunawayPlantTemps: Simulation terminated because of run away plant temperatures, too '//  &
        trim(hotcold))
@@ -1346,7 +1485,8 @@ SUBROUTINE UpdateChillerComponentCondenserSide(LoopNum, LoopSide, TypeOfNum,    
           ! na
 
           ! USE STATEMENTS:
-  USE DataPlant,      ONLY: PlantLoop, MassFlowTol
+  USE DataPlant,      ONLY: PlantLoop
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode ,  ONLY: Node
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
 
@@ -1403,7 +1543,7 @@ SUBROUTINE UpdateChillerComponentCondenserSide(LoopNum, LoopSide, TypeOfNum,    
 
   IF (DidAnythingChange .OR. FirstHVACIteration) THEN
    ! use current mass flow rate and inlet temp from Node and recalculate outlet temp
-    IF (Node(InletNodeNum)%MassFlowRate > MassFlowTol) THEN
+    IF (Node(InletNodeNum)%MassFlowRate > MassFlowTolerance) THEN
           ! update node outlet conditions
       Cp = GetSpecificHeatGlycol(PlantLoop(LoopNum)%FluidName, ModelInletTemp, &
                        PlantLoop(LoopNum)%FluidIndex, 'UpdateChillerComponentCondenserSide')
@@ -1457,7 +1597,8 @@ SUBROUTINE UpdateComponentHeatRecoverySide(LoopNum, LoopSide, TypeOfNum,        
           ! na
 
           ! USE STATEMENTS:
-  USE DataPlant,      ONLY: PlantLoop, MassFlowTol
+  USE DataPlant,      ONLY: PlantLoop
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode ,  ONLY: Node
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
 
@@ -1487,7 +1628,7 @@ SUBROUTINE UpdateComponentHeatRecoverySide(LoopNum, LoopSide, TypeOfNum,        
   LOGICAL :: DidAnythingChange = .FALSE. ! set to true if conditions changed
   INTEGER :: OtherLoopNum  ! local loop pointer for remote connected loop
   INTEGER :: OtherLoopSide ! local loop side pointer for remote connected loop
-  INTEGER :: CountConnectedLoops ! local total number of connected loops
+!  INTEGER :: CountConnectedLoops ! local total number of connected loops
   INTEGER :: ConnectLoopNum  ! local do loop counter
   REAL(r64) :: Cp ! local fluid specific heat
 
@@ -1514,7 +1655,7 @@ SUBROUTINE UpdateComponentHeatRecoverySide(LoopNum, LoopSide, TypeOfNum,        
 
   IF (DidAnythingChange .OR. FirstHVACIteration) THEN
    ! use current mass flow rate and inlet temp from Node and recalculate outlet temp
-    IF (Node(InletNodeNum)%MassFlowRate > MassFlowTol) THEN
+    IF (Node(InletNodeNum)%MassFlowRate > MassFlowTolerance) THEN
           ! update node outlet conditions
       Cp = GetSpecificHeatGlycol(PlantLoop(LoopNum)%FluidName, ModelInletTemp, &
                        PlantLoop(LoopNum)%FluidIndex, 'UpdateComponentHeatRecoverySide')
@@ -1597,7 +1738,7 @@ SUBROUTINE UpdateAbsorberChillerComponentGeneratorSide(LoopNum, LoopSide, TypeOf
   LOGICAL :: DidAnythingChange = .FALSE. ! set to true if conditions changed
   INTEGER :: OtherLoopNum  ! local loop pointer for remote connected loop
   INTEGER :: OtherLoopSide ! local loop side pointer for remote connected loop
-  INTEGER :: CountConnectedLoops ! local total number of connected loops
+!  INTEGER :: CountConnectedLoops ! local total number of connected loops
   INTEGER :: ConnectLoopNum  ! local do loop counter
 
   DidAnythingChange = .FALSE.
@@ -1905,7 +2046,8 @@ SUBROUTINE RegisterPlantCompDesignFlow(ComponentInletNodeNum,DesPlantFlow)
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER,   INTENT(IN)   :: ComponentInletNodeNum ! the component's water inlet node number (condenser side for water / water compoennts)
+  INTEGER,   INTENT(IN)   :: ComponentInletNodeNum ! the component's water inlet node number
+                                                   ! (condenser side for water / water components)
   REAL(r64), INTENT(IN)   :: DesPlantFlow          ! the component's design fluid volume flow rate [m3/s]
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -2028,7 +2170,7 @@ SUBROUTINE SafeCopyPlantNode( InletNodeNum, OutletNodeNum, LoopNum, OutletTemp )
   Node(OutletNodeNum)%Temp                 = Node(InletNodeNum)%Temp
   Node(OutletNodeNum)%MassFlowRate         = Node(InletNodeNum)%MassFlowRate
   Node(OutletNodeNum)%Quality              = Node(InletNodeNum)%Quality
-  Node(OutletNodeNum)%Enthalpy             = Node(InletNodeNum)%Enthalpy  ! should we have routines that keep this current with temp?
+  Node(OutletNodeNum)%Enthalpy             = Node(InletNodeNum)%Enthalpy  ! should have routines that keep this current with temp?
 
   Node(OutletNodeNum)%TempMin              = Node(InletNodeNum)%TempMin
   Node(OutletNodeNum)%TempMax              = Node(InletNodeNum)%TempMax
@@ -2366,7 +2508,7 @@ END FUNCTION CheckPlantConvergence
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -699,6 +699,15 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 
     ! If we later add a designannualirrigation and a nominalannualirrigation variable (for scaling) those
     ! would be assigned here... as with the Rainfall...
+    Irrigation%IrrigationThreshold=0.4d0
+    IF (Irrigation%ModeID == IrrSmartSched .and. NumNumbers > 0) THEN
+      IF (rNumericArgs(1) > 100.d0 .or. rNumericArgs(1) < 0.0d0) THEN
+        CALL ShowSevereError('Irrigation threshold for '//TRIM(cCurrentModuleObject)//' object has values > 100 or < 0.')
+        errorsFound = .true.
+      ELSE
+        Irrigation%IrrigationThreshold=rNumericArgs(1)/100.d0
+      endif
+    ENDIF
 
   ENDIF ! NumIrrigation ==1
 
@@ -1806,7 +1815,7 @@ END SUBROUTINE ReportWaterManager
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

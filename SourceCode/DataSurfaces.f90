@@ -250,6 +250,9 @@ TYPE SurfaceData
 
   CHARACTER(len=MaxNameLength) :: Name         = ' ' ! User supplied name of the surface (must be unique)
   INTEGER :: Construction                      = 0   ! Pointer to the construction in the Construct derived type
+  LOGICAL :: EMSConstructionOverrideON         = .FALSE. ! if true, EMS is calling to override the construction value
+  INTEGER :: EMSConstructionOverrideValue      = 0 ! pointer value to use for Construction when overridden
+  INTEGER :: ConstructionStoredInputValue      = 0 ! holds the original value for Construction per surface input
   INTEGER :: Class                             =0
 
           ! Geometry related parameters
@@ -322,7 +325,9 @@ TYPE SurfaceData
           ! Optional parameters specific to shadowing surfaces and subsurfaces (detached shading, overhangs, wings, etc.)
   INTEGER :: SchedShadowSurfIndex              = 0   ! Schedule for a shadowing (sub)surface
   LOGICAL :: ShadowSurfSchedVaries             = .false. ! true if the scheduling (transmittance) on a shading surface varies.
-  LOGICAL :: ShadowingSurf                     = .FALSE. ! True if a surface is a shadowing surface
+  LOGICAL :: ShadowingSurf                     = .false. ! True if a surface is a shadowing surface
+  LOGICAL :: IsTransparent                     = .false. ! True if the schedule values are always 1.0 (or the minimum is 1.0)
+  REAL(r64) :: SchedMinValue                   = 0.0d0   ! Schedule minimum value.
 
           ! Optional parameters specific to solar reflection from surfaces
   REAL(r64)    :: ShadowSurfDiffuseSolRefl     = 0.0 ! Diffuse solar reflectance of opaque portion
@@ -383,6 +388,8 @@ TYPE SurfaceData
   LOGICAL :: ExtCavityPresent              = .false. ! true if there is an exterior vented cavity on surface
   INTEGER :: ExtCavNum                     = 0        ! index for this surface in ExtVentedCavity structure (if any)
   LOGICAL :: IsPV                          = .false.  ! true if this is a photovoltaic surface (dxf output)
+  LOGICAL :: IsICS                         = .false.  ! true if this is an ICS collector
+  INTEGER :: ICSPtr                        = 0        ! Index to ICS collector
 
   ! TH added 3/26/2010
   LOGICAL :: MirroredSurf                  = .false.  ! Ture if it is a mirrored surface
@@ -408,6 +415,9 @@ TYPE SurfaceData
   LOGICAL   :: IntConvSurfGetsRadiantHeat= .FALSE.
   LOGICAL   :: IntConvSurfHasActiveInIt  = .FALSE.
   LOGICAL   :: PartOfVentSlabOrRadiantSurface = .false. ! surface cannot be part of both a radiant surface & ventilated slab group
+  ! LG added 1/6/12
+  REAL(r64) :: GenericContam             = 0.d0 ! [ppm] Surface generic contaminant as a storage term for
+                                                ! the surface diffusion model
 END TYPE SurfaceData
 
 TYPE SurfaceWindowCalc          ! Calculated window-related values
@@ -719,7 +729,7 @@ END TYPE
 TYPE WindowShadingControlData
   CHARACTER(len=MaxNameLength) :: Name= ' ' ! User supplied name of this set of shading control data
   INTEGER :: ShadingType   = WSC_ST_NoShade ! Shading type (InteriorShade, SwitchableGlazing,
-!  CHARACTER(len=30) :: ShadingType    = ' ' ! Shading type (InteriorShade, SwitchableGlazing,
+!  CHARACTER(len=32) :: ShadingType    = ' ' ! Shading type (InteriorShade, SwitchableGlazing,
                                             !  ExteriorShade,InteriorBlind,ExteriorBlind,BetweenGlassShade,
                                             !  BetweenGlassBlind, or ExteriorScreen)
   INTEGER :: ShadedConstruction       = 0   ! Pointer to the shaded construction (for ShadingType=ExteriorScreen,InteriorShade,
@@ -771,20 +781,20 @@ TYPE WindowShadingControlData
                                 !                                         prev. time step cooling rate > 0
   INTEGER  :: Schedule                = 0   ! Pointer to schedule of 0 and 1 values: 0 => window is not shaded;
                                             !  1 => window is shaded if Type=Schedule or Type = ScheduleAnd...
-                                            ! and set point is exceeded.
-  REAL(r64)     :: SetPoint            = 0.0 ! Control set point (dimension depends on Trigger:
+                                            ! and setpoint is exceeded.
+  REAL(r64)     :: SetPoint            = 0.0 ! Control setpoint (dimension depends on Trigger:
                                             !  W/m2 of window area for solar on window,
                                             !  W/m2 of ground area for horizontal solar,
                                             !  deg C for air temp, W for zone heating and
                                             !  cooling rate). Not used for Shading Control Type =
                                             !  MeetDaylightIlluminanceSetpoint or OnIfHighGlare.
-  REAL(r64)     :: SetPoint2           = 0.0 ! Second control set point for control types that take two set points.
+  REAL(r64)     :: SetPoint2           = 0.0 ! Second control setpoint for control types that take two setpoints.
                                             !   Dimension is deg C or W/m2.
   LOGICAL  :: ShadingControlIsScheduled = .false. ! True if shading control has a schedule
   LOGICAL  :: GlareControlIsActive  = .false. ! True if shading control to reduce daylight glare is active
   INTEGER  :: SlatAngleSchedule       = 0   ! Pointer to schedule of slat angle values between 0.0 and 180.0 degrees
   INTEGER  :: SlatAngleControlForBlinds = 0 ! Takes one of the following values that specifies
-!  CHARACTER(len=30) :: SlatAngleControlForBlinds = ' ' ! Takes one of the following values that specifies
+!  CHARACTER(len=32) :: SlatAngleControlForBlinds = ' ' ! Takes one of the following values that specifies
                          !  how slat angle is controled in a blind when ShadingType =
                          !  InteriorBlind, ExteriorBlind or BetweenGlassBlind.
                          !  FixedSlatAngle: the slat angle is fixed at the constant value given in the
@@ -822,9 +832,17 @@ TYPE OSCMData
   CHARACTER(len=MaxNameLength) :: Name  = ' ' ! Name of OSCM
   CHARACTER(len=MaxNameLength) :: Class = ' ' ! type of Model for OSCM
   REAL(r64) :: TConv     = 20.0d0 ! Temperature of bulk air at other side face (degrees C)
+  LOGICAL   :: EMSOverrideOnTConv = .FALSE. ! if true then EMS calling for convection bulk air temp override
+  REAL(r64) :: EMSOverrideTConvValue = 0.d0 ! value for convection air temp when overridden
   REAL(r64) :: Hconv     = 4.0d0 ! Convection coefficient (W/m2-K)
+  LOGICAL   :: EMSOverrideOnHConv = .FALSE. ! if true then EMS calling for convection coef override
+  REAL(r64) :: EMSOverrideHConvValue = 0.D0 ! value to use for convection coef when overridden
   REAL(r64) :: TRad      = 20.0d0 ! Effective temperature of surfaces exposed to other side face (degrees C)
+  LOGICAL   :: EMSOverrideOnTRad = .FALSE. ! if true then EMS calling for radiation temp override
+  REAL(r64) :: EMSOverrideTRadValue = 0.d0 ! value to use for rad temp when overridden
   REAL(r64) :: Hrad      = 4.0d0 ! Linearized Radiation coefficient (W/m2-K)
+  LOGICAL   :: EMSOverrideOnHrad = .FALSE. ! if true then EMS calling for radiation coef override
+  REAL(R64) :: EMSOverrideHradValue = 0.d0 ! value to use for rad coef when overridden
 END TYPE
 
 TYPE ConvectionCoefficient
@@ -888,7 +906,6 @@ END TYPE ExtVentedCavityStruct
 
           ! MODULE VARIABLE DECLARATIONS:
 TYPE (SurfaceData),        ALLOCATABLE, DIMENSION(:) :: Surface
-
 TYPE (SurfaceWindowCalc),  ALLOCATABLE, DIMENSION(:) :: SurfaceWindow
 TYPE (FrameDividerProperties), ALLOCATABLE, DIMENSION(:) :: FrameDivider
 TYPE (StormWindowData), ALLOCATABLE, DIMENSION(:) :: StormWindow
@@ -995,10 +1012,10 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGainConvShadeToZoneRep ! component of
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGainIRShadeToZoneRep   ! component of WinHeatGain net IR to zone from front shade (W)
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGapConvHtFlowRep !Convective heat flow from gap in airflow window (W)
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondGainRep !Equals Opaq Surf Ins Face Cond
-                                                                   ! when Opaq Surf Ins Face Cond >= 0
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondLossRep !Equals -Opaq Surf Ins Face Cond
-                                                                   ! when Opaq Surf Ins Face Cond  < 0
+!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondGainRep !Equals Opaq Surf Ins Face Cond
+!                                                                   ! when Opaq Surf Ins Face Cond >= 0
+!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondLossRep !Equals -Opaq Surf Ins Face Cond
+!                                                                   ! when Opaq Surf Ins Face Cond  < 0
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinShadingAbsorbedSolar ! Exterior beam plus diffuse solar absorbed by
                                                                 !  window shading device (W)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinSysSolTransmittance ! Effective solar transmittance of window + shading device,
@@ -1121,7 +1138,7 @@ END FUNCTION cSurfaceClass
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -47,7 +47,8 @@ USE ScheduleManager, ONLY: GetScheduleIndex
 USE DataSurfaces, ONLY: TotSurfaces,FrameDivider,FrameDividerProperties,CalcSolRefl,SurfaceWindow,StormWindow,TotStormWin,  &
                         DividedLite,Suspended,ShadingTransmittanceVaries
 USE WindowManager, ONLY:W5LsqFit
-USE DataContaminantBalance, ONLY: Contaminant, ZoneAirCO2, ZoneAirCO2Temp, ZoneAirCO2Avg, OutdoorCO2
+USE DataContaminantBalance, ONLY: Contaminant, ZoneAirCO2, ZoneAirCO2Temp, ZoneAirCO2Avg, OutdoorCO2, &
+                                  ZoneAirGC, ZoneAirGCTemp, ZoneAirGCAvg, OutdoorGC
 USE ScheduleManager, ONLY: GetCurrentScheduleValue
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
@@ -59,8 +60,22 @@ PRIVATE
 CHARACTER(len=*), PARAMETER :: Blank=' '
 CHARACTER(len=*), PARAMETER :: fmtA="(A)"
 
+CHARACTER(len=*), DIMENSION(2), PARAMETER :: PassFail=(/'Fail','Pass'/)
+
   ! DERIVED TYPE DEFINITIONS
-  ! na
+TYPE WarmupConvergence
+  INTEGER,DIMENSION(4) :: PassFlag   = 2     ! one flag (1=Fail), (2=Pass) for each of the 4 conditions of convergence from
+                                             ! warmup (PassFlag(1)=Max Temp, PassFlag(2)=Min Temp, PassFlag(3)=Max Heat Load
+                                             ! PassFlag(4)=Max Cool Load)
+  ! Following are stored test values for temperature and loads convergence
+  REAL(r64) :: TestMaxTempValue      =0.0d0  ! Max Temperature convergence value=ABS(MaxTempPrevDay(ZoneNum)-MaxTempZone(ZoneNum))
+  REAL(r64) :: TestMinTempValue      =0.0d0  ! Min Temperature convergence value=ABS(MinTempPrevDay(ZoneNum)-MinTempZone(ZoneNum))
+  REAL(r64) :: TestMaxHeatLoadValue  =0.0d0  ! Max Heat Load convergence value=
+                                             !  ABS((MaxHeatLoadZone(ZoneNum)-MaxHeatLoadPrevDay(ZoneNum))/MaxHeatLoadZone(ZoneNum))
+  REAL(r64) :: TestMaxCoolLoadValue  =0.0d0  ! Max Cool Load convergence value=
+                                             !  ABS((MaxCoolLoadZone(ZoneNum)-MaxCoolLoadPrevDay(ZoneNum))/MaxCoolLoadZone(ZoneNum))
+END TYPE
+
 
   ! MODULE VARIABLE DECLARATIONS:
 
@@ -90,8 +105,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:)   :: TempZoneRptStdDev  !Zone air temperatu
 REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: LoadZoneRpt        !Zone load to report (average over all warmup days)
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: LoadZoneRptStdDev  !Zone load to report (std dev over all warmup days)
 REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MaxLoadZoneRpt     !Maximum zone load for reporting calcs
-INTEGER,   ALLOCATABLE, DIMENSION(:,:) :: PassFlag           !Pass or no pass on convergence.
 INTEGER :: CountWarmupDayPoints                              !Count of warmup timesteps (to achieve warmup)
+TYPE(WarmUpConvergence), ALLOCATABLE, DIMENSION(:)  :: WarmupConvergenceValues
 
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject ! to assist in getting input
 
@@ -364,6 +379,9 @@ SUBROUTINE CheckUsedConstructions(ErrorsFound)
   INTEGER :: Status
   INTEGER :: CNum
   INTEGER :: ONum
+  LOGICAL :: InErrFlag   ! Preserve (no current use) the input status of ErrorsFound
+
+  InErrFlag=ErrorsFound
 
   ! Needs to account for Pipe:HeatTransfer/indoor, etc constructions.
   DO ONum=1,NumConstrObjects
@@ -513,7 +531,6 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
     INTEGER                         :: IOStat
     INTEGER                         :: NumObjects
     INTEGER                         :: TMP
-    CHARACTER(len=20) StringOut
     INTEGER :: NumEMPDMat
     INTEGER :: NumPCMat
     INTEGER :: NumVTCMat
@@ -627,20 +644,30 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
        AlphaName(3)=TRIM(AlphaName(3))//'-invalid'
      ENDIF
         ! Maximum Number of Warmup Days
-     MaxNumberOfWarmupDays=BuildingNumbers(4)
-     IF (MaxNumberOfWarmupDays <= 0) THEN
-       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
-          ' invalid, ['//  &
-          TRIM(RoundSigDigits(MaxNumberOfWarmupDays))//'], 25 will be used')
-       MaxNumberOfWarmupDays=25
+     IF (.not. lNumericFieldBlanks(4)) THEN
+       MaxNumberOfWarmupDays=BuildingNumbers(4)
+       IF (MaxNumberOfWarmupDays <= 0) THEN
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
+            ' invalid, ['//  &
+            TRIM(RoundSigDigits(MaxNumberOfWarmupDays))//'], '//  &
+            trim(RoundSigDIgits(DefaultMaxNumberOfWarmupDays))//' will be used')
+         MaxNumberOfWarmupDays=DefaultMaxNumberOfWarmupDays
+       ENDIF
+     ELSE
+       MaxNumberOfWarmupDays=DefaultMaxNumberOfWarmupDays
      ENDIF
         ! Minimum Number of Warmup Days
-     MinNumberOfWarmupDays=BuildingNumbers(5)
-     IF (MinNumberOfWarmupDays <= 0) THEN
-       CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(3))//  &
-          ' invalid, ['//  &
-          TRIM(RoundSigDigits(MinNumberOfWarmupDays))//'], 6 will be used')
-       MinNumberOfWarmupDays=6
+     IF (.not. lNumericFieldBlanks(5)) THEN
+       MinNumberOfWarmupDays=BuildingNumbers(5)
+       IF (MinNumberOfWarmupDays <= 0) THEN
+         CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(3))//  &
+            ' invalid, ['//  &
+            TRIM(RoundSigDigits(MinNumberOfWarmupDays))//'], '//  &
+            trim(RoundSigDIgits(DefaultMinNumberOfWarmupDays))//' will be used')
+         MinNumberOfWarmupDays=DefaultMinNumberOfWarmupDays
+       ENDIF
+     ELSE
+       MinNumberOfWarmupDays=DefaultMinNumberOfWarmupDays
      ENDIF
      IF (MinNumberOfWarmupDays > MaxNumberOfWarmupDays) THEN
        CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
@@ -651,12 +678,17 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
      ENDIF
      IF (MinNumberOfWarmupDays < 6) THEN
        CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
-          ' invalid. '//  &
-                 'Experience has shown that most files will converge within 6 warmup days. ')
-       CALL ShowContinueError('...Choosing less than 6 warmup days may have adverse effects on the simulation results, '//  &
-                 'particularly design day simulations. ')
-       CALL ShowContinueError('...Users should only alter this parameter if they are certain that '// &
-                 'less than 6 warmup days is appropriate for a particular file. ')
+          ' potentially invalid. '//  &
+          'Experience has shown that most files will converge within '//trim(RoundSigDigits(DefaultMaxNumberOfWarmupDays))//  &
+          ' warmup days. ')
+       CALL ShowContinueError('...Choosing less than '//trim(RoundSigDigits(DefaultMinNumberOfWarmupDays))//  &
+          ' warmup days may have adverse effects on the simulation results, '//  &
+          'particularly design day simulations. ')
+       CALL ShowContinueError('...Users should only alter this default if they are certain that '// &
+                 'less than '//trim(RoundSigDigits(DefaultMinNumberOfWarmupDays))//  &
+                ' warmup days is appropriate for a particular file. ')
+       CALL ShowContinueError('...Verify that convergence to desired results are achieved. You can report values'//  &
+                 ' during warmup days to ascertain convergence.')
      ENDIF
    ELSE
      CALL ShowSevereError(RoutineName//' A '//TRIM(CurrentModuleObject)//' Object must be entered.')
@@ -664,6 +696,8 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
      BuildingName='NOT ENTERED'
      AlphaName(2)='NOT ENTERED'
      AlphaName(3)='NOT ENTERED'
+     MaxNumberOfWarmupDays=DefaultMaxNumberOfWarmupDays
+     MinNumberOfWarmupDays=DefaultMinNumberOfWarmupDays
    ENDIF
 
 ! Write Building Information to the initialization output file
@@ -673,11 +707,10 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
           ' Loads Convergence Tolerance Value,Temperature Convergence Tolerance Value, ', &
           ' Solar Distribution,Maximum Number of Warmup Days,Minimum Number of Warmup Days')
 
-   Write(StringOut,*) MinNumberOfWarmupDays
-   StringOut=ADJUSTL(StringOut)
-   Write(OutputFileInits,720) TRIM(BuildingName),BuildingAzimuth,TRIM(AlphaName(2)),LoadsConvergTol,TempConvergTol,  &
-          TRIM(AlphaName(3)),MaxNumberOfWarmupDays,TRIM(StringOut)
-720 Format(' Building Information, ',A,',',F8.3,',',A,',',F10.5,',',F10.5,',',A,',',I5,',',A)
+   Write(OutputFileInits,720) TRIM(BuildingName),trim(RoundSigDigits(BuildingAzimuth,3)),TRIM(AlphaName(2)),  &
+          trim(RoundSigDigits(LoadsConvergTol,5)),trim(RoundSigDigits(TempConvergTol,5)),  &
+          TRIM(AlphaName(3)),trim(RoundSigDigits(MaxNumberOfWarmupDays)),trim(RoundSigDigits(MinNumberOfWarmupDays))
+720 Format(' Building Information',8(',',A))
    ! Above should be validated...
 
    CurrentModuleObject='SurfaceConvectionAlgorithm:Inside'
@@ -848,6 +881,11 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
      IF (NumNumber > 0) THEN
        MaxSurfaceTempLimit=BuildingNumbers(1)
        MaxSurfaceTempLimitBeforeFatal=MaxSurfaceTempLimit*2.5d0
+       IF (MaxSurfaceTempLimit < MinSurfaceTempLimit) THEN
+       ELSEIF (MaxSurfaceTempLimit < 0.0d0) THEN
+         MaxSurfaceTempLimit=DefaultSurfaceTempLimit
+         MaxSurfaceTempLimitBeforeFatal=MaxSurfaceTempLimit*2.5d0
+       ENDIF
      ENDIF
 
      IF ( .NOT. lNumericFieldBlanks(2)) THEN
@@ -860,7 +898,7 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
    ELSE
      SolutionAlgo = UseCTF
      AlphaName(1)='ConductionTransferFunction'
-     MaxSurfaceTempLimit=200.d0
+     MaxSurfaceTempLimit=DefaultSurfaceTempLimit
      MaxSurfaceTempLimitBeforeFatal=MaxSurfaceTempLimit*2.5d0
    ENDIF
 
@@ -1046,32 +1084,69 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
               '. The default choice is assigned = NO')
        END SELECT
      End If
-     If (NumAlpha .EQ. 1) Then
+     If (NumAlpha .EQ. 1 .AND. Contaminant%CO2Simulation) Then
        If (Contaminant%CO2Simulation) Then
          CALL ShowSevereError(TRIM(CurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//' is required and not given.')
          ErrorsFound=.true.
        End If
-     ElseIf (NumAlpha > 1) Then
+     ElseIf (NumAlpha > 1 .AND. Contaminant%CO2Simulation) Then
        Contaminant%CO2OutdoorSchedPtr = GetScheduleIndex(AlphaName(2))
        IF (Contaminant%CO2OutdoorSchedPtr == 0) THEN
          CALL ShowSevereError(TRIM(CurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//' not found: '//TRIM(AlphaName(2)))
          ErrorsFound=.true.
        ENDIF
      End If
+     If (NumAlpha > 2) Then
+       SELECT CASE (AlphaName(3))
+         CASE ('YES')
+           Contaminant%GenericContamSimulation = .TRUE.
+           If (.NOT. Contaminant%CO2Simulation) Contaminant%SimulateContaminants = .TRUE.
+         CASE ('NO')
+           Contaminant%GenericContamSimulation = .FALSE.
+         CASE DEFAULT
+           Contaminant%GenericContamSimulation = .FALSE.
+           AlphaName(3)='NO'
+           CALL ShowWarningError(TRIM(CurrentModuleObject)//': Invalid input of '//TRIM(cAlphaFieldNames(3))//  &
+              '. The default choice is assigned = NO')
+       END SELECT
+       If (NumAlpha .EQ. 3 .AND. Contaminant%GenericContamSimulation) Then
+         If (Contaminant%GenericContamSimulation) Then
+           CALL ShowSevereError(TRIM(CurrentModuleObject)//', '//TRIM(cAlphaFieldNames(4))//' is required and not given.')
+           ErrorsFound=.true.
+         End If
+       ElseIf (NumAlpha > 3 .AND. Contaminant%GenericContamSimulation) Then
+         Contaminant%GenericContamOutdoorSchedPtr = GetScheduleIndex(AlphaName(4))
+         IF (Contaminant%GenericContamOutdoorSchedPtr == 0) THEN
+           CALL ShowSevereError(TRIM(CurrentModuleObject)//', '//TRIM(cAlphaFieldNames(4))//' not found: '//TRIM(AlphaName(4)))
+           ErrorsFound=.true.
+         ENDIF
+       End If
+     End If
    ELSE
      Contaminant%SimulateContaminants = .FALSE.
      Contaminant%CO2Simulation = .FALSE.
+     Contaminant%GenericContamSimulation = .FALSE.
      AlphaName(1)='NO'
+     AlphaName(3)='NO'
    ENDIF
 
    Write(OutputFileInits,728)
-   If (Contaminant%SimulateContaminants) Then
+   If (Contaminant%SimulateContaminants .AND. Contaminant%CO2Simulation) Then
      Write(OutputFileInits,730) 'Yes',TRIM(AlphaName(1))
    ELSE
      Write(OutputFileInits,730) 'No','N/A'
    END IF
 728 Format('! <Zone Air Contaminant Balance Simulation>, Simulation {Yes/No}, Carbon Dioxide Concentration')
-730 Format(' Zone Air Contaminant Balance Simulation, ',A,',',A)
+730 Format(' Zone Air Carbon Dioxide Balance Simulation, ',A,',',A)
+
+   Write(OutputFileInits,729)
+   If (Contaminant%SimulateContaminants .AND. Contaminant%GenericContamSimulation) Then
+     Write(OutputFileInits,731) 'Yes',TRIM(AlphaName(3))
+   ELSE
+     Write(OutputFileInits,731) 'No','N/A'
+   END IF
+729 Format('! <Zone Air Contaminant Balance Simulation>, Simulation {Yes/No}, Generic Contaminant Concentration')
+731 Format(' Zone Air Generic Contaminant Balance Simulation, ',A,',',A)
 
 
   RETURN
@@ -1342,14 +1417,14 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
     Material(MaterNum)%Group=RegularMaterial
     Material(MaterNum)%Name = '~FC_Concrete'
-    Material(MaterNum)%Thickness     = 0.15
-    Material(MaterNum)%Conductivity  = 1.95
-    Material(MaterNum)%Density       = 2240.0
-    Material(MaterNum)%SpecHeat      = 900.0
+    Material(MaterNum)%Thickness     = 0.15d0
+    Material(MaterNum)%Conductivity  = 1.95d0
+    Material(MaterNum)%Density       = 2240.0d0
+    Material(MaterNum)%SpecHeat      = 900.0d0
     Material(MaterNum)%Roughness = MediumRough
-    Material(MaterNum)%AbsorpSolar = 0.7
-    Material(MaterNum)%AbsorpThermal = 0.9
-    Material(MaterNum)%AbsorpVisible = 0.7
+    Material(MaterNum)%AbsorpSolar = 0.7d0
+    Material(MaterNum)%AbsorpThermal = 0.9d0
+    Material(MaterNum)%AbsorpVisible = 0.7d0
     NominalR(MaterNum) = Material(MaterNum)%Thickness / Material(MaterNum)%Conductivity
     Material(MaterNum)%Resistance = NominalR(MaterNum)
 
@@ -1483,7 +1558,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       Material(MaterNum)%Resistance    = MaterialProps(1)
       Material(MaterNum)%ROnly         = .true.
     ELSE
-      Material(MaterNum)%Resistance = .01
+      Material(MaterNum)%Resistance = .01d0
     ENDIF
     IF (MaterialNumProp >= 2) THEN
       Material(MaterNum)%AbsorpThermal = MaterialProps(2)
@@ -2701,6 +2776,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   IF (AnyEnergyManagementSystemInModel) THEN ! setup surface property EMS actuators
 
     DO MaterNum=1,TotMaterials
+      IF (Material(MaterNum)%Group /= RegularMaterial) CYCLE
       CALL SetupEMSActuator('Material', Material(MaterNum)%Name, &
                             'Surface Property Solar Absorptance', '[ ]', &
                             Material(MaterNum)%AbsorpSolarEMSOverrideOn , &
@@ -2747,7 +2823,7 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
   LOGICAL, INTENT(INOUT) :: ErrorsFound  ! set to true if errors found in input
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetWindowGlassSpectralData: '
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -2798,16 +2874,18 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
     SpectralData(Loop)%Name = SpecDataNames(1)
     TotLam = SpecDataNumProp/4
     IF (MOD(SpecDataNumProp,4) /= 0) THEN
-      CALL ShowWarningError('GetWindowGlassSpectralData: '//trim(CurrentModuleObject)//  &
-         ' set '//trim(SpecDataNames(1))//' not even multiple of 4 items (Wavelength,Trans,ReflFront,ReflBack)')
-      CALL ShowContinueError('... remainder items will be set to 0.0')
+      CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid set.')
+      CALL ShowContinueError('... set not even multiple of 4 items (Wavelength,Trans,ReflFront,ReflBack),'//  &
+                             'number of items in dataset = '//trim(TrimSigDigits(SpecDataNumProp)))
+      CALL ShowContinueError('... remainder after div by 4 = '//trim(TrimSigDigits(MOD(SpecDataNumProp,4)))//  &
+                               ', remainder items will be set to 0.0')
       SpecDataProps(SpecDataNumProp+1:MIN(SpecDataNumProp+4,MaxSpectralDataElements*4))=0.0
     ENDIF
     IF(TotLam > MaxSpectralDataElements) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError('GetWindowGlassSpectralData: More than '//trim(TrimSigDigits(MaxSpectralDataElements))//   &
-                 ' (Wavelength,Trans,ReflFront,ReflBack) entries in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+      CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid set.')
+      CALL ShowContinueError('... More than max ['//trim(TrimSigDigits(MaxSpectralDataElements))//   &
+                 '] (Wavelength,Trans,ReflFront,ReflBack) entries in set.')
       CYCLE
     END IF
     SpectralData(Loop)%NumOfWavelengths = TotLam
@@ -2836,54 +2914,44 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
       IF(LamNum < TotLam) THEN
         IF (SpectralData(Loop)%WaveLength(LamNum+1) <= Lam) THEN
           ErrorsFound = .true.
-          CALL ShowSevereError('GetWindowGlassSpectralData: Wavelengths not in increasing order in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid set.')
+          CALL ShowContinueError('... Wavelengths not in increasing order. '//  &
+                        'at wavelength#='//trim(TrimSigDigits(LamNum))//', value=['//trim(TrimSigDigits(Lam,4))//  &
+                        '], next is ['//trim(TrimSigDigits(SpectralData(Loop)%WaveLength(LamNum+1),4))//'].')
         END IF
       END IF
 
       IF(Lam < 0.1d0 .OR. Lam > 4.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError('GetWindowGlassSpectralData: A wavelength is not in the range 0.1 to 4.0 microns in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid value.')
+        CALL ShowContinueError('... A wavelength is not in the range 0.1 to 4.0 microns; '//  &
+                          'at wavelength#='//trim(TrimSigDigits(LamNum))//', value=['//trim(TrimSigDigits(Lam,4))//  &
+                 '].')
       END IF
-
-!      IF(Tau >= 1.0) THEN
-!        ErrorsFound = .true.
-!        CALL ShowSevereError('GetWindowGlassSpectralData: A transmittance is >= 1.0 in '//  &
-!                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
-!      END IF
-!
-!      IF(RhoF <= 0.0 .OR. RhoF >= 1.0 .OR. RhoB <= 0.0 .OR. RhoB >= 1.0) THEN
-!        ErrorsFound = .true.
-!        CALL ShowSevereError('GetWindowGlassSpectralData: A reflectance is <= 0.0 or >= 1.0 in '//  &
-!                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
-!      END IF
-!
-!      IF((Tau + RhoF) >= 1.0 .OR. (Tau + RhoB) >= 1.0) THEN
-!        ErrorsFound = .true.
-!        CALL ShowSevereError('GetWindowGlassSpectralData: Transmittance + reflectance) >= 1.0 for an entry in '//  &
-!                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
-!      END IF
 
     ! TH 2/15/2011. CR 8343
     ! IGDB (International Glazing Database) does not meet the above strict restrictions.
     !  Relax rules to allow directly use of spectral data from IGDB
-      IF(Tau > 1.01) THEN
+      IF(Tau > 1.01d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError('GetWindowGlassSpectralData: A transmittance is > 1.0 in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid value.')
+        CALL ShowContinueError('... A transmittance is > 1.0; '//  &
+           'at wavelength#='//trim(TrimSigDigits(LamNum))//', value=['//trim(TrimSigDigits(Tau,4))//'].')
       END IF
 
-      IF(RhoF < 0.0 .OR. RhoF > 1.01 .OR. RhoB < 0.0 .OR. RhoB > 1.01) THEN
+      IF(RhoF < 0.0d0 .OR. RhoF > 1.01d0 .OR. RhoB < 0.0d0 .OR. RhoB > 1.01d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError('GetWindowGlassSpectralData: A reflectance is < 0.0 or > 1.0 in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid value.')
+        CALL ShowContinueError('... A reflectance is < 0.0 or > 1.0; '//  &
+           'at wavelength#='//trim(TrimSigDigits(LamNum))//', value=['//trim(TrimSigDigits(RhoF,4))//'].')
       END IF
 
-      IF((Tau + RhoF) > 1.01 .OR. (Tau + RhoB) > 1.01) THEN
+      IF((Tau + RhoF) > 1.01d0 .OR. (Tau + RhoB) > 1.01d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError('GetWindowGlassSpectralData: Transmittance + reflectance) > 1.0 for an entry in '//  &
-                 TRIM(CurrentModuleObject)//' set '//TRIM(SpecDataNames(1)))
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(SpecDataNames(1))//'" invalid value.')
+        CALL ShowContinueError('... Transmittance + reflectance) > 1.0 for an entry; '//  &
+              'at wavelength#='//trim(TrimSigDigits(LamNum))//', value(Tau+RhoF)=['//trim(TrimSigDigits((Tau + RhoF),4))//  &
+              '], value(Tau+RhoB)=['//trim(TrimSigDigits((Tau + RhoB),4))//'].')
       END IF
 
     END DO
@@ -3828,7 +3896,6 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
     TempZoneRpt=0.0
     LoadZoneRpt=0.0
     MaxLoadZoneRpt=0.0
-    PassFlag=2
     CountWarmupDayPoints=0
 
     DO Num=1,10
@@ -4014,6 +4081,15 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
     ALLOCATE(ZoneAirCO2Avg(NumOfZones))
     ZoneAirCO2Avg=OutdoorCO2
   END IF
+  IF (Contaminant%GenericContamSimulation) Then
+    OutdoorGC = GetCurrentScheduleValue(Contaminant%GenericContamOutdoorSchedPtr)
+    ALLOCATE(ZoneAirGC(NumOfZones))
+    ZoneAirGC=OutdoorGC
+    ALLOCATE(ZoneAirGCTemp(NumOfZones))
+    ZoneAirGCTemp=OutdoorGC
+    ALLOCATE(ZoneAirGCAvg(NumOfZones))
+    ZoneAirGCAvg=OutdoorGC
+  END IF
   ALLOCATE(MaxTempPrevDay(NumofZones))
            MaxTempPrevDay = 0.0
   ALLOCATE(MinTempPrevDay(NumofZones))
@@ -4029,7 +4105,7 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
   ALLOCATE(MaxTempZone(NumofZones))
            MaxTempZone = -9999.d0
   ALLOCATE(MinTempZone(NumofZones))
-           MinTempZone = -9999.d0
+           MinTempZone = 1000.d0
   ALLOCATE(TempZonePrevDay(NumofZones))
            TempZonePrevDay = 0.0
   ALLOCATE(LoadZonePrevDay(NumofZones))
@@ -4052,8 +4128,7 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
            LoadZoneRpt=0.0
   ALLOCATE(MaxLoadZoneRpt(NumOfTimeStepInHour*24,NumofZones))
            MaxLoadZoneRpt=0.0
-  ALLOCATE(PassFlag(4,NumOfZones))
-           PassFlag=2
+  ALLOCATE(WarmupConvergenceValues(NumOfZones))
   ALLOCATE(TempZoneRptStdDev(NumOfTimeStepInHour*24))
   ALLOCATE(LoadZoneRptStdDev(NumOfTimeStepInHour*24))
 
@@ -4091,7 +4166,7 @@ SUBROUTINE RecKeepHeatBalance   ! Heat Balance Record Keeping Manager
 
           ! USE STATEMENTS:
   USE General, ONLY: RoundSigDigits
-  USE DataSystemVariables, ONLY: DeveloperFlag
+  USE DataSystemVariables, ONLY: ReportDetailedWarmupConvergence
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4147,7 +4222,7 @@ SUBROUTINE RecKeepHeatBalance   ! Heat Balance Record Keeping Manager
       LoadZoneRpt(CountWarmupDayPoints,ZoneNum)=WarmupLoadDiff(ZoneNum)
       MaxLoadZoneRpt(CountWarmupDayPoints,ZoneNum)=LoadZone(ZoneNum)
 
-      IF (DeveloperFlag) THEN  ! only do this detailed thing when DeveloperFlag is on
+      IF (ReportDetailedWarmupConvergence) THEN  ! only do this detailed thing when requested by user is on
           ! Write Warmup Convergence Information to the initialization output file
         IF (FirstWarmupWrite) THEN
           Write(OutputFileInits,732)
@@ -4163,8 +4238,8 @@ SUBROUTINE RecKeepHeatBalance   ! Heat Balance Record Keeping Manager
   END DO
 
   731 Format(' Warmup Convergence Information, ',A,',',A,',',A,',',A,',',A)
-  732 Format('! <Warmup Convergence Information>,Zone Name,Time Step,Hour of Day,Warmup Temperature Difference,'  &
-         'Warmup Load Difference')
+  732 Format('! <Warmup Convergence Information>,Zone Name,Time Step,Hour of Day,Warmup Temperature Difference {deltaC},'  &
+         'Warmup Load Difference {W}')
 
   ! There is no hourly record keeping in the heat balance.
 
@@ -4208,7 +4283,6 @@ SUBROUTINE CheckWarmupConvergence
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: MinLoad = 100.d0     ! Minimum laods for convergence check
                                                ! To avoid big percentage difference in low load situations
-  INTEGER,   PARAMETER :: WarmupDefault = 6    ! Warmup days default
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -4217,80 +4291,77 @@ SUBROUTINE CheckWarmupConvergence
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: CnvrgChecksPassed ! Counts convergence checks satisfied for exiting warmup loop
-  INTEGER :: CnvrgChecksFailed    ! Counts convergence checkes failed for exiting warmup loop
-  CHARACTER(len=20) :: cYesNo
   INTEGER :: ZoneNum
   LOGICAL,SAVE :: WarmupConvergenceWarning=.false.
+  LOGICAL,SAVE :: SizingWarmupConvergenceWarning=.false.
+  LOGICAL :: ConvergenceChecksFailed
 
           ! Convergence criteria for warmup days:
           ! Perform another warmup day unless both the % change in loads and
           ! absolute change in zone temp min & max are less than their criteria.
 
-  CnvrgChecksPassed=0
-  CnvrgChecksFailed=0
+  ConvergenceChecksFailed=.false.
 
-  IF (NumofZones <= 0) THEN
+  IF (NumofZones <= 0) THEN ! if there are no zones, immediate convergence
       WarmupFlag=.FALSE.
   ELSE
     DO ZoneNum=1,NumofZones
 
-      IF (ABS(MaxTempPrevDay(ZoneNum)-MaxTempZone(ZoneNum)) <= TempConvergTol) CnvrgChecksPassed = CnvrgChecksPassed + 1
+      WarmupConvergenceValues(ZoneNum)%TestMaxTempValue=ABS(MaxTempPrevDay(ZoneNum)-MaxTempZone(ZoneNum))
+      WarmupConvergenceValues(ZoneNum)%TestMinTempValue=ABS(MinTempPrevDay(ZoneNum)-MinTempZone(ZoneNum))
+      IF (WarmupConvergenceValues(ZoneNum)%TestMaxTempValue <= TempConvergTol) THEN
+        WarmupConvergenceValues(ZoneNum)%PassFlag(1)=2
+      ELSE
+        ConvergenceChecksFailed=.true.
+        WarmupConvergenceValues(ZoneNum)%PassFlag(1)=1
+      ENDIF
 
-      IF (ABS(MinTempPrevDay(ZoneNum)-MinTempZone(ZoneNum)) <= TempConvergTol) CnvrgChecksPassed = CnvrgChecksPassed + 1
+      IF (WarmupConvergenceValues(ZoneNum)%TestMinTempValue <= TempConvergTol) THEN
+        WarmupConvergenceValues(ZoneNum)%PassFlag(2)=2
+      ELSE
+        ConvergenceChecksFailed=.true.
+        WarmupConvergenceValues(ZoneNum)%PassFlag(2)=1
+      ENDIF
 
       IF (MaxHeatLoadZone(ZoneNum) > 1.0d-4) THEN  ! make sure load big enough to divide
         MaxHeatLoadZone(ZoneNum) = ABS(Max(MaxHeatLoadZone(ZoneNum),MinLoad))
-        IF (ABS((MaxHeatLoadZone(ZoneNum)-MaxHeatLoadPrevDay(ZoneNum))/MaxHeatLoadZone(ZoneNum)) <= LoadsConvergTol) THEN
-          CnvrgChecksPassed = CnvrgChecksPassed + 1
+        WarmupConvergenceValues(ZoneNum)%TestMaxHeatLoadValue=  &
+           ABS((MaxHeatLoadZone(ZoneNum)-MaxHeatLoadPrevDay(ZoneNum))/MaxHeatLoadZone(ZoneNum))
+        IF (WarmupConvergenceValues(ZoneNum)%TestMaxHeatLoadValue <= LoadsConvergTol) THEN
+          WarmupConvergenceValues(ZoneNum)%PassFlag(3)=2
+        ELSE
+          ConvergenceChecksFailed=.true.
+          WarmupConvergenceValues(ZoneNum)%PassFlag(3)=1
         END IF
       ELSE
-        CnvrgChecksPassed = CnvrgChecksPassed + 1
+        WarmupConvergenceValues(ZoneNum)%PassFlag(3)=2
       END IF
 
       IF (MaxCoolLoadZone(ZoneNum) > 1.0d-4) THEN
         MaxCoolLoadZone(ZoneNum) = ABS(Max(MaxCoolLoadZone(ZoneNum),MinLoad))
-        IF (ABS((MaxCoolLoadZone(ZoneNum)-MaxCoolLoadPrevDay(ZoneNum))/MaxCoolLoadZone(ZoneNum)) <= LoadsConvergTol) THEN
-          CnvrgChecksPassed = CnvrgChecksPassed + 1
+        WarmupConvergenceValues(ZoneNum)%TestMaxCoolLoadValue=  &
+           ABS((MaxCoolLoadZone(ZoneNum)-MaxCoolLoadPrevDay(ZoneNum))/MaxCoolLoadZone(ZoneNum))
+        IF (WarmupConvergenceValues(ZoneNum)%TestMaxCoolLoadValue <= LoadsConvergTol) THEN
+          WarmupConvergenceValues(ZoneNum)%PassFlag(4)=2
+        ELSE
+          ConvergenceChecksFailed=.true.
+          WarmupConvergenceValues(ZoneNum)%PassFlag(4)=1
         END IF
       ELSE
-        CnvrgChecksPassed = CnvrgChecksPassed + 1
+        WarmupConvergenceValues(ZoneNum)%PassFlag(4)=2
       END IF
 
-          ! If all 4 convergence checks have been passed for all individual zones, then CnvrgChecksPassed
-          ! will equal 4 times the number of total zones and the warmup period may end
-
-      IF (MinNumberOfwarmupDays < WarmupDefault) THEN
-        IF (DayOfSim == MinNumberOfwarmupDays) THEN
-          WarmupFlag=.FALSE.
-        END IF
-      ELSE
-        IF (CnvrgChecksPassed == 4*NumofZones .AND. DayOfSim >= MinNumberOfwarmupDays) THEN
-          WarmupFlag=.FALSE.
-        END IF
-      END IF
-
-          ! Limit the number of warmup days, regardless of the number of zones
-          ! in the building, to some arbitrary value based on common sense and
-          ! experience with the (I)BLAST program.  If too many warmup days were
-          ! required, notify the program user.
-
-      IF ((DayOfSim >= MaxNumberOfWarmupDays).AND.(WarmupFlag)) THEN
-        IF (MaxNumberOfWarmupDays < 25) THEN
-          CALL ShowWarningError('CheckWarmupConvergence: User supplied maximum warmup days='//  &
-            TRIM(RoundSigDigits(MaxNumberOfWarmupDays))//' is insufficient; setting to 25.')
-          MaxNumberOfWarmupDays=25
-        ENDIF
-      ENDIF
-
-      IF ((DayOfSim >= MaxNumberOfWarmupDays).AND.(WarmupFlag)) THEN
+      IF (DayOfSim >= MaxNumberOfWarmupDays .and. WarmupFlag) THEN
             ! Check convergence for individual zone
-        IF ((CnvrgChecksFailed+CnvrgChecksPassed) < (4*ZoneNum)) THEN
+        IF (SUM(WarmupConvergenceValues(ZoneNum)%PassFlag) /= 8) THEN ! pass=2 * 4 values for convergence
           CALL ShowSevereError('CheckWarmupConvergence: Loads Initialization, Zone="'//TRIM(Zone(ZoneNum)%Name)//  &
             '" did not converge after '//TRIM(RoundSigDigits(MaxNumberOfWarmupDays))//' warmup days.')
-          IF (.not. WarmupConvergenceWarning) THEN
-            CALL ShowContinueError('See Warmup Convergence Information in .eio file for details')
+          IF (.not. WarmupConvergenceWarning .and. .not. DoingSizing) THEN
+            CALL ShowContinueError('See Warmup Convergence Information in .eio file for details.')
             WarmupConvergenceWarning=.true.
+          ELSEIF (.not. SizingWarmupConvergenceWarning .and. DoingSizing) THEN
+            CALL ShowContinueError('Warmup Convergence failing during sizing.')
+            SizingWarmupConvergenceWarning=.true.
           ENDIF
           IF (RunPeriodEnvironment) THEN
             CALL ShowContinueError('...Environment(RunPeriod)="'//TRIM(EnvironmentName)//'"')
@@ -4298,74 +4369,67 @@ SUBROUTINE CheckWarmupConvergence
             CALL ShowContinueError('...Environment(SizingPeriod)="'//TRIM(EnvironmentName)//'"')
           ENDIF
 
-          IF (ABS(MaxTempPrevDay(ZoneNum)-MaxTempZone(ZoneNum)) <= TempConvergTol) THEN
-            cYesNo=' - Pass Convergence'
-          ELSE
-            cYesNo=' - Fail Convergence'
-            PassFlag(1,ZoneNum)=1
-          ENDIF
           CALL ShowContinueError('..Max Temp Comparison = '//  &
-                       TRIM(RoundSigDigits(ABS(MaxTempPrevDay(ZoneNum)-MaxTempZone(ZoneNum)),2))//  &
-                       ' vs Temperature Convergence Tolerance='//TRIM(RoundSigDigits(TempConvergTol,2))//TRIM(cYesNo))
-          IF (ABS(MinTempPrevDay(ZoneNum)-MinTempZone(ZoneNum)) <= TempConvergTol) THEN
-            cYesNo=' - Pass Convergence'
-          ELSE
-            cYesNo=' - Fail Convergence'
-            PassFlag(2,ZoneNum)=1
-          ENDIF
+                       TRIM(RoundSigDigits(WarmupConvergenceValues(ZoneNum)%TestMaxTempValue,2))//  &
+                       ' vs Temperature Convergence Tolerance='//TRIM(RoundSigDigits(TempConvergTol,2))//  &
+                       ' - '//PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(1))//' Convergence')
           CALL ShowContinueError('..Min Temp Comparison = '//  &
-                       TRIM(RoundSigDigits(ABS(MinTempPrevDay(ZoneNum)-MinTempZone(ZoneNum)),2))//  &
-                       ' vs Temperature Convergence Tolerance='//TRIM(RoundSigDigits(TempConvergTol,2))//TRIM(cYesNo))
-          IF (MaxHeatLoadZone(ZoneNum) > 1.0d-4) THEN
-            IF (ABS((MaxHeatLoadZone(ZoneNum)-MaxHeatLoadPrevDay(ZoneNum))/MaxHeatLoadZone(ZoneNum)) <= LoadsConvergTol) THEN
-               cYesNo=' - Pass Convergence'
-            ELSE
-               cYesNo=' - Fail Convergence'
-              PassFlag(3,ZoneNum)=1
-            ENDIF
-            CALL ShowContinueError('..Max Heat Load Comparison = '//    &
-                TRIM(RoundSigDigits(ABS((MaxHeatLoadZone(ZoneNum)-MaxHeatLoadPrevDay(ZoneNum))/MaxHeatLoadZone(ZoneNum)),4))//  &
-                ' vs Loads Convergence Tolerance='//TRIM(RoundSigDigits(LoadsConvergTol,2))//TRIM(cYesNo))
-          ELSE
-            PassFlag(3,ZoneNum)=2
-          ENDIF
-          IF (MaxCoolLoadZone(ZoneNum) > 1.0d-4) THEN
-            IF (ABS((MaxCoolLoadZone(ZoneNum)-MaxCoolLoadPrevDay(ZoneNum))/MaxCoolLoadZone(ZoneNum)) <= LoadsConvergTol) THEN
-              cYesNo=' - Pass Convergence'
-            ELSE
-              cYesNo=' - Fail Convergence'
-              PassFlag(4,ZoneNum)=1
-            ENDIF
+                       TRIM(RoundSigDigits(WarmupConvergenceValues(ZoneNum)%TestMinTempValue,2))//  &
+                       ' vs Temperature Convergence Tolerance='//TRIM(RoundSigDigits(TempConvergTol,2))//  &
+                       ' - '//PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(2))//' Convergence')
+          CALL ShowContinueError('..Max Heat Load Comparison = '//    &
+                TRIM(RoundSigDigits(WarmupConvergenceValues(ZoneNum)%TestMaxHeatLoadValue,4))//  &
+                ' vs Loads Convergence Tolerance='//TRIM(RoundSigDigits(LoadsConvergTol,2))//  &
+                ' - '//PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(3))//' Convergence')
             CALL ShowContinueError('..Max Cool Load Comparison = '// &
-               TRIM(RoundSigDigits(ABS((MaxCoolLoadZone(ZoneNum)-MaxCoolLoadPrevDay(ZoneNum))/MaxCoolLoadZone(ZoneNum)),4))//  &
-               ' vs Loads Convergence Tolerance='//TRIM(RoundSigDigits(LoadsConvergTol,2))//TRIM(cYesNo))
-          ELSE
-            PassFlag(4,ZoneNum)=2
-          ENDIF
+                TRIM(RoundSigDigits(WarmupConvergenceValues(ZoneNum)%TestMaxCoolLoadValue,4))//  &
+               ' vs Loads Convergence Tolerance='//TRIM(RoundSigDigits(LoadsConvergTol,2))//  &
+               ' - '//PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(4))//' Convergence')
         END IF
 
-            ! Count convergence fails
-      CnvrgChecksFailed=(4*ZoneNum)-CnvrgChecksPassed
-
-      IF (ZoneNum==NumofZones) THEN  !  I don't get this one?
-        WarmupFlag=.FALSE.
       END IF
-
-    END IF
 
           ! Transfer current daily max and min loads and temperatures to the
           ! variables containing the last day's values
-    MaxHeatLoadPrevDay(ZoneNum)=MaxHeatLoadZone(ZoneNum)
-    MaxCoolLoadPrevDay(ZoneNum)=MaxCoolLoadZone(ZoneNum)
-    MaxTempPrevDay(ZoneNum)=MaxTempZone(ZoneNum)
-    MinTempPrevDay(ZoneNum)=MinTempZone(ZoneNum)
+      MaxHeatLoadPrevDay(ZoneNum)=MaxHeatLoadZone(ZoneNum)
+      MaxCoolLoadPrevDay(ZoneNum)=MaxCoolLoadZone(ZoneNum)
+      MaxTempPrevDay(ZoneNum)=MaxTempZone(ZoneNum)
+      MinTempPrevDay(ZoneNum)=MinTempZone(ZoneNum)
 
-    MaxHeatLoadZone(ZoneNum)=-9999.d0
-    MaxCoolLoadZone(ZoneNum)=-9999.d0
-    MaxTempZone(ZoneNum)=-9999.d0
-    MinTempZone(ZoneNum)=1000.d0
+      MaxHeatLoadZone(ZoneNum)=-9999.d0
+      MaxCoolLoadZone(ZoneNum)=-9999.d0
+      MaxTempZone(ZoneNum)=-9999.d0
+      MinTempZone(ZoneNum)=1000.d0
 
     END DO
+
+          ! Limit the number of warmup days, regardless of the number of zones
+          ! in the building, to some arbitrary value based on common sense and
+          ! experience with the (I)BLAST program.  If too many warmup days were
+          ! required, notify the program user.
+
+    IF ((DayOfSim >= MaxNumberOfWarmupDays) .and. WarmupFlag .and. ConvergenceChecksFailed) THEN
+      IF (MaxNumberOfWarmupDays < DefaultMaxNumberOfWarmupDays) THEN
+        CALL ShowSevereError('CheckWarmupConvergence: User supplied maximum warmup days='//  &
+          TRIM(RoundSigDigits(MaxNumberOfWarmupDays))//' is insufficient.')
+        CALL ShowContinueError('Suggest setting maximum number of warmup days to at least '//  &
+           trim(RoundSigDigits(DefaultMaxNumberOfWarmupDays))//'.')
+      ENDIF
+    ENDIF
+
+          ! Set warmup flag to true depending on value of ConvergenceChecksFailed (true=fail)
+          ! and minimum number of warmup days
+    IF (.not. ConvergenceChecksFailed .and. DayOfSim >= MinNumberOfWarmupDays) THEN
+      WarmupFlag=.false.
+    ELSEIF (.not. ConvergenceChecksFailed .and. DayOfSim < MinNumberOfWarmupDays) THEN
+      WarmupFlag=.true.
+    END IF
+
+          ! If max warmup days reached and still warmupflag, then go to non-warmup state.
+          ! prior messages will have been displayed
+    IF ((DayOfSim >= MaxNumberOfWarmupDays) .and. WarmupFlag) THEN
+      WarmupFlag=.false.
+    ENDIF
 
   END IF
 
@@ -4399,7 +4463,7 @@ SUBROUTINE ReportWarmupConvergence
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  CHARACTER(len=*), DIMENSION(2), PARAMETER :: PassFail=(/'Fail','Pass'/)
+          ! na
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -4420,7 +4484,7 @@ SUBROUTINE ReportWarmupConvergence
 
     IF (.not. WarmupFlag) THEN   ! Report out average/std dev
         ! Write Warmup Convervence Information to the initialization output file
-      IF (FirstWarmupWrite) THEN
+      IF (FirstWarmupWrite .and. NumOfZones > 0) THEN
         Write(OutputFileInits,730)
         FirstWarmupWrite=.false.
       ENDIF
@@ -4457,10 +4521,12 @@ SUBROUTINE ReportWarmupConvergence
                                    trim(EnvHeader)//' '//trim(EnvironmentName),  &
                                    trim(RoundSigDigits(AverageZoneTemp,10)),  &
                                    trim(RoundSigDigits(StdDevZoneTemp,10)),   &
-                                   trim(PassFail(PassFlag(1,ZoneNum))),trim(PassFail(PassFlag(2,ZoneNum))),  &
+                                   trim(PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(1))),  &
+                                   trim(PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(2))),  &
                                    trim(RoundSigDigits(AverageZoneLoad,10)),  &
                                    trim(RoundSigDigits(StdDevZoneLoad,10)),  &
-                                   trim(PassFail(PassFlag(3,ZoneNum))),trim(PassFail(PassFlag(4,ZoneNum)))
+                                   trim(PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(3))),  &
+                                   trim(PassFail(WarmupConvergenceValues(ZoneNum)%PassFlag(4)))
       ENDDO
 
     END IF
@@ -4507,7 +4573,7 @@ SUBROUTINE ReportHeatBalance  ! Heat Balance Reporting Manager
   USE ScheduleManager, ONLY: ReportScheduleValues
   USE NodeInputManager, ONLY: CalcMoreNodeInfo
   USE EconomicTariff, ONLY: UpdateUtilityBills        !added for computing annual utility costs
-  USE DataSystemVariables, ONLY: ReportDuringWarmup
+  USE DataSystemVariables, ONLY: ReportDuringWarmup, UpdateDataDuringWarmupExternalInterface ! added for FMI
   USE DataReportingFlags
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -4560,6 +4626,8 @@ SUBROUTINE ReportHeatBalance  ! Heat Balance Reporting Manager
     END IF
     CALL CalcMoreNodeInfo
     CALL UpdateDataandReport(ZoneTSReporting)
+  ELSEIF (UpdateDataDuringWarmupExternalInterface) THEN ! added for FMI
+      CALL UpdateDataandReport(ZoneTSReporting)
   END IF
           ! There is no hourly reporting in the heat balance.
 
@@ -6381,7 +6449,7 @@ END SUBROUTINE SetupSimpleWindowGlazingSystem
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

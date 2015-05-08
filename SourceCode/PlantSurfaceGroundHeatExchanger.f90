@@ -604,7 +604,7 @@ SUBROUTINE InitSurfaceGroundHeatExchanger(SurfaceGHENum,RunFlag)
   USE InputProcessor,  ONLY : SameString
   USE DataPlant,       ONLY : TypeOf_GrndHtExchgSurface, PlantLoop, ScanPlantLoopsForObject
   USE FluidProperties, ONLY : GetDensityGlycol
-  USE PlantUtilities,  ONLY : InitComponentNodes, SetComponentFlowRate, RegisterPlantCompDesignFlow
+  USE PlantUtilities,  ONLY : InitComponentNodes,SetComponentFlowRate,RegisterPlantCompDesignFlow,RegulateCondenserCompFlowReqOp
 
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -787,14 +787,12 @@ SUBROUTINE InitSurfaceGroundHeatExchanger(SurfaceGHENum,RunFlag)
 
   ! If loop operation is controlled by an environmental variable (DBtemp, WBtemp, etc)
   ! then shut branch down when equipment is not scheduled to run.
-  IF (.not. Runflag) then
-    DesignFlow = 0.0
-  ELSE
-  ! If the loop operation is controlled by "loop demand" or is 'uncontrolled',
-  ! then run the branch whenever the pump is on and
-  !calc a design flow based on typical max pipe velocity
-    DesignFlow = SurfaceGHE(SurfaceGHENum)%DesignMassFlowRate
-  ENDIF
+      DesignFlow = RegulateCondenserCompFlowReqOp(SurfaceGHE(SurfaceGHENum)%LoopNum,&
+                                                  SurfaceGHE(SurfaceGHENum)%LoopSideNum,&
+                                                  SurfaceGHE(SurfaceGHENum)%BranchNum,&
+                                                  SurfaceGHE(SurfaceGHENum)%CompNum,     &
+                                                  SurfaceGHE(SurfaceGHENum)%DesignMassFlowRate)
+
 
   CALL SetComponentFlowRate(DesignFlow, &
                               SurfaceGHE(SurfaceGHENum)%InletNodeNum,&
@@ -2149,7 +2147,7 @@ END SUBROUTINE ReportSurfaceGroundHeatExchngr
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

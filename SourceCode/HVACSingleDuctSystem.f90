@@ -115,7 +115,7 @@ TYPE SysDesignParams
   REAL(r64)    :: ControllerOffset            = 0.0D0 !
   REAL(r64)    :: MaxReheatTemp               = 0.0D0 ! C
   LOGICAL      :: MaxReheatTempSetByUser      = .FALSE.
-  INTEGER      :: DamperHeatingAction         = 0.0 !! 1=NORMAL;  2=REVERSE ACTION
+  INTEGER      :: DamperHeatingAction         = 0     !! 1=NORMAL;  2=REVERSE ACTION
   REAL(r64)    :: DamperPosition              = 0.0D0 !
   INTEGER      :: ADUNum                      = 0   ! index of corresponding air distribution unit
   INTEGER      :: FluidIndex                  = 0   ! Refrigerant index
@@ -355,6 +355,7 @@ SUBROUTINE GetSysInput
     USE DataHeatBalance
     USE DataSizing,        ONLY: OARequirements, NumOARequirements
     USE DataPlant,         ONLY: TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
+    USE DataGlobals,       ONLY: DoZoneSizing
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -381,6 +382,8 @@ SUBROUTINE GetSysInput
     INTEGER :: NumNoRHCBVAVSys = 0
     INTEGER :: NumAlphas = 0
     INTEGER :: NumNums = 0
+    INTEGER :: NumZoneSiz
+    INTEGER :: ZoneSizIndex
     INTEGER :: IOSTAT
     INTEGER :: ZoneNum                 ! Index to actual zone number
     LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
@@ -1500,6 +1503,29 @@ SUBROUTINE GetSysInput
         ENDIF
       END DO
 
+
+      ! Error check to see if a single duct air terminal is assigned to zone that has zone secondary recirculation
+      ! specified in the Sizing:Zone object
+      
+      NumZoneSiz = GetNumObjectsFound("Sizing:Zone")
+      IF (NumZoneSiz > 0) THEN
+        DO SysIndex=1,NumSys
+          SizLoop: DO ZoneSizIndex = 1, NumZoneSiz
+            IF (DoZoneSizing) THEN
+              IF (FinalZoneSizing(ZoneSizIndex)%ActualZoneNum == Sys(SysIndex)%ActualZoneNum) THEN
+                IF (FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation > 0.0d0) THEN
+                  CALL ShowWarningError(RoutineName//'A zone secondary recirculation fraction is specified for zone served by ')
+                  CALL ShowContinueError('...terminal unit "'//TRIM(Sys(SysIndex)%SysName)//'" , that indicates a single path system')
+                  CALL ShowContinueError('...The zone secondary recirculation for that zone was set to 0.0')
+                  FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
+                  EXIT SizLoop
+                END IF
+              END IF
+            END IF
+          END DO SizLoop
+        END DO
+      END IF
+      
     DEALLOCATE(Alphas)
     DEALLOCATE(cAlphaFields)
     DEALLOCATE(cNumericFields)
@@ -1550,7 +1576,7 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
   USE PlantUtilities,     ONLY: InitComponentNodes
   USE DataGlobals,        ONLY: AnyPlantInModel
   USE HeatingCoils,       ONLY: GetHeatingCoilCapacity=>GetCoilCapacity
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1580,9 +1606,9 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
   REAL(r64) :: SteamDensity
   REAL(r64) :: rho
   LOGICAL   :: errFlag
-  
+
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: PlantLoopScanFlag
-  
+
           ! FLOW:
 
 
@@ -1612,8 +1638,9 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
                                    Sys(SysNum)%HWBranchIndex,        &
                                    Sys(SysNum)%HWCompIndex,          &
                                    errFlag=errFlag)
-                                   
+
       IF (errFlag) THEN
+        CALL ShowContinueError('Reference Unit="'//trim(Sys(SysNum)%SysName)//'", type='//trim(Sys(SysNum)%SysType))
         CALL ShowFatalError('InitSys: Program terminated for previous conditions.')
       ENDIF
 
@@ -1677,7 +1704,7 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
     Sys(SysNum)%HeatAirMassFlowRateMax = Sys(SysNum)%MaxHeatAirVolFlowRate * StdRhoAir
     Node(InletNode)%MassFlowRateMax = Sys(SysNum)%MaxAirVolFlowRate * StdRhoAir
     MassFlowDiff(SysNum) = 1.0d-10 * Sys(SysNum)%AirMassFlowRateMax
- 
+
     IF (Sys(SysNum)%HWLoopNum > 0 .AND. &
           Sys(SysNum)%ReheatComp_Num .NE. HCoilType_SteamAirHeating ) THEN !protect early calls before plant is setup
       rho = GetDensityGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName,  &
@@ -1687,7 +1714,7 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
     ELSE
       rho = 1000.d0
     ENDIF
-    
+
     Sys(SysNum)%MaxReheatWaterFlow = rho * Sys(SysNum)%MaxReheatWaterVolFlow
     Sys(SysNum)%MinReheatWaterFlow = rho * Sys(SysNum)%MinReheatWaterVolFlow
 
@@ -1743,7 +1770,7 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
                                    Sys(SysNum)%HWLoopSide,           &
                                    Sys(SysNum)%HWBranchIndex,        &
                                    Sys(SysNum)%HWCompIndex)
-             
+
         END IF
     END IF
     ! Find air loop associated with terminal unit
@@ -1848,12 +1875,12 @@ SUBROUTINE SizeSys(SysNum)
   USE InputProcessor
   USE WaterCoils,          ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,          ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
-  USE BranchInputManager,  ONLY: MyPlantSizingIndex
-  USE General,             ONLY: SafeDivide, TrimSigDigits
-  USE DataHeatBalance,     ONLY: Zone
+!  USE BranchInputManager,  ONLY: MyPlantSizingIndex
+  USE General,             ONLY: SafeDivide, TrimSigDigits, RoundSigDigits
+!unused  USE DataHeatBalance,     ONLY: Zone
   USE DataGlobals,         ONLY: AutoCalculate
   USE ReportSizingManager, ONLY: ReportSizingOutput
-  USE DataPlant,           ONLY: PlantLoop
+  USE DataPlant,           ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1891,7 +1918,8 @@ SUBROUTINE SizeSys(SysNum)
   LOGICAL             :: PlantSizingErrorsFound
   REAL(r64)           :: rho ! local fluid density
   REAL(r64)           :: Cp  ! local fluid specific heat
-  INTEGER             :: DummyWaterIndex = 1 
+  INTEGER             :: DummyWaterIndex = 1
+  REAL(r64)           :: UserInputMaxHeatAirVolFlowRate = 0.0  ! user input for MaxHeatAirVolFlowRate
 
   PltSizHeatNum = 0
   DesMassFlow = 0.0
@@ -1926,32 +1954,14 @@ SUBROUTINE SizeSys(SysNum)
       CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                               'Maximum Heating Air Flow Rate [m3/s]', Sys(SysNum)%MaxHeatAirVolFlowRate)
     END IF
+    
+    UserInputMaxHeatAirVolFlowRate = 0.0
+    
+  ELSE
+  
+    UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate 
 
   END IF
-
-  IF(Sys(SysNum)%MaxAirVolFlowRateDuringReheat == Autocalculate)THEN
-     Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(0.002032*Sys(SysNum)%ZoneFloorArea, &
-                                                     Sys(SysNum)%MaxAirVolFlowRate)
-    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-               'Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
-               Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%ZoneFloorArea)
-  END IF
-
-  IF(Sys(SysNum)%MaxAirVolFractionDuringReheat == Autocalculate)THEN
-    IF(Sys(SysNum)%MaxAirVolFlowRate .GT. 0.0D0)THEN
-     Sys(SysNum)%MaxAirVolFractionDuringReheat = MIN(1.0D0,(0.002032*Sys(SysNum)%ZoneFloorArea/ &
-                                                     Sys(SysNum)%MaxAirVolFlowRate))
-    ELSE
-     Sys(SysNum)%MaxAirVolFractionDuringReheat = 0.0D0
-    END IF
-    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-         'Maximum Flow Fraction during Reheat []', Sys(SysNum)%MaxAirVolFractionDuringReheat)
-  END IF
-
-  ! use the larger of the two reheat flow rate methods for the simulated maximum flow during reheat
-  Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
-                  Sys(SysNum)%MaxAirVolFractionDuringReheat * Sys(SysNum)%MaxAirVolFlowRate)
-  Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(Sys(SysNum)%MaxAirVolFlowRateDuringReheat,Sys(SysNum)%MaxAirVolFlowRate)
 
   IF (Sys(SysNum)%ZoneMinAirFracMethod == ScheduledMinFrac) Then
     ! need a value for sizing.
@@ -1982,14 +1992,83 @@ SUBROUTINE SizeSys(SysNum)
 
   END IF
 
-  IF (CurZoneEqNum > 0) THEN
-    IF (Sys(SysNum)%SysType_Num == SingleDuctVAVReheatVSFan) THEN
-      TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(Sys(SysNum)%MaxHeatAirVolFlowRate, &
-                                              (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac))
-    ELSE
-      TermUnitSizing(CurZoneEqNum)%AirVolFlow = Sys(SysNum)%MaxAirVolFlowRate
-    END IF
+  IF(Sys(SysNum)%MaxAirVolFlowRateDuringReheat == Autocalculate)THEN
+    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(0.002032*Sys(SysNum)%ZoneFloorArea, &
+                                                     Sys(SysNum)%MaxAirVolFlowRate)
+    ! apply limit based on min stop
+    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) )
+    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+               'Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
+               Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%ZoneFloorArea)
   END IF
+
+  IF(Sys(SysNum)%MaxAirVolFractionDuringReheat == Autocalculate)THEN
+    IF(Sys(SysNum)%MaxAirVolFlowRate .GT. 0.0D0)THEN
+      Sys(SysNum)%MaxAirVolFractionDuringReheat = MIN(1.0D0,(0.002032*Sys(SysNum)%ZoneFloorArea/ &
+                                                     Sys(SysNum)%MaxAirVolFlowRate))
+      ! apply limit based on min stop
+      Sys(SysNum)%MaxAirVolFractionDuringReheat = MAX(Sys(SysNum)%MaxAirVolFractionDuringReheat, &
+                                                      Sys(SysNum)%ZoneMinAirFrac )
+    ELSE
+      Sys(SysNum)%MaxAirVolFractionDuringReheat = 0.0D0
+    END IF
+    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+         'Maximum Flow Fraction during Reheat []', Sys(SysNum)%MaxAirVolFractionDuringReheat)
+  END IF
+
+  ! use the larger of the two reheat flow rate methods for the simulated maximum flow during reheat
+  Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                  Sys(SysNum)%MaxAirVolFractionDuringReheat * Sys(SysNum)%MaxAirVolFlowRate)
+  Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(Sys(SysNum)%MaxAirVolFlowRateDuringReheat,Sys(SysNum)%MaxAirVolFlowRate)
+
+
+
+  IF (CurZoneEqNum > 0) THEN
+    TermUnitSizing(CurZoneEqNum)%ReheatMult = 1.0D0
+    IF (ZoneSizingRunDone) THEN
+      IF (Sys(SysNum)%SysType_Num == SingleDuctVAVReheatVSFan) THEN
+        TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(UserInputMaxHeatAirVolFlowRate, &
+                                                      CalcFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow * &
+                                                      CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor, &
+                                                      Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac)
+      ELSE
+        TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(CalcFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow * &
+                                                      CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor, &
+                                                      Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac)
+      END IF
+    ELSE
+      IF (Sys(SysNum)%SysType_Num == SingleDuctVAVReheatVSFan) THEN
+        TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(Sys(SysNum)%MaxHeatAirVolFlowRate, &
+                                                      Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac)
+      ELSE IF (Sys(SysNum)%SysType_Num == SingleDuctConstVolReheat) THEN
+        TermUnitSizing(CurZoneEqNum)%AirVolFlow = Sys(SysNum)%MaxAirVolFlowRate
+      ELSE
+        IF (Sys(SysNum)%DamperHeatingAction == ReverseAction) THEN
+          IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0) THEN
+            TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) )
+          ELSE
+            TermUnitSizing(CurZoneEqNum)%AirVolFlow = Sys(SysNum)%MaxAirVolFlowRate
+          END IF
+        ELSE
+          TermUnitSizing(CurZoneEqNum)%AirVolFlow = Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac
+        END IF
+      END IF
+    END IF
+    IF (TermUnitSizing(CurZoneEqNum)%AirVolFlow > SmallAirVolFlow) THEN
+      IF (Sys(SysNum)%DamperHeatingAction == ReverseAction .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0) THEN
+        TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) ) &
+                                                             / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+      ELSE
+        TermUnitSizing(CurZoneEqNum)%ReheatMult =  Sys(SysNum)%MaxAirVolFlowRate / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+      END IF
+      TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(1.0D0,TermUnitSizing(CurZoneEqNum)%ReheatMult)
+    ELSE
+      TermUnitSizing(CurZoneEqNum)%ReheatMult =  1.0D0
+    END IF 
+  END IF    
 
   IF ((Sys(SysNum)%MaxReheatWaterVolFlow == AutoSize).or.(Sys(SysNum)%MaxReheatSteamVolFlow == AutoSize)) THEN
 
@@ -2015,12 +2094,12 @@ SUBROUTINE SizeSys(SysNum)
           DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                           * DesMassFlow * (CoilOutTemp-CoilInTemp)
           IF (DesCoilLoad >= SmallLoad) THEN
-          
+
             rho = GetDensityGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
                                    60.d0, &
                                    PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
                                    'SizeSys')
-            
+
             Cp  = GetSpecificHeatGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
                                    60.d0, &
                                    PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
@@ -2064,7 +2143,7 @@ SUBROUTINE SizeSys(SysNum)
              EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
              LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
              SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
-             
+
              Cp = GetSpecificHeatGlycol('WATER', &
                                         PlantSizData(PltSizHeatNum)%ExitTemp, &
                                         DummyWaterIndex, &
@@ -2102,6 +2181,24 @@ SUBROUTINE SizeSys(SysNum)
     END IF
   END IF
 
+
+  IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.d0) THEN
+    ! check for inconsistent dual max input 
+    IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat < (Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate) ) THEN
+      CALL ShowWarningError('Air Terminal Unit flow limits are not consistent, minimum flow limit is larger than reheat maximum')
+      CALL ShowContinueError('Air Terminal Unit name = '//TRIM(Sys(SysNum)%SysName))
+      CALL ShowContinueError('Maximum terminal flow during reheat = '  &
+            //TRIM(RoundSigDigits(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, 6))//' [m3/s] or flow fraction = ' &
+            //TRIM(RoundSigDigits((Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%MaxAirVolFlowRate ),4)) )
+      CALL ShowContinueError('Minimum terminal flow = '  &
+            //TRIM(RoundSigDigits((Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate), 6))//' [m3/s] or flow fraction = '&
+            //TRIM(RoundSigDigits(Sys(SysNum)%ZoneMinAirFrac,4)) )
+      CALL ShowContinueError('The reheat maximum flow limit will be replaced by the minimum limit, and the simulation continues')
+      Sys(SysNum)%MaxAirVolFlowRateDuringReheat = (Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate)
+    ENDIF
+  ENDIF
+
+
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Preceding sizing errors cause program termination')
   END IF
@@ -2124,6 +2221,9 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           !       MODIFIED       Fred Buhl: added reverse action damper heating action: August 2001
           !                      KHL/TH 7/2010: revise to support dual max
           !                      FB/KHL/TH 9/2010: added maximum supply air temperature leaving reheat coil
+          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor 
+          !                                 air fraction - a TRACE feature
+          !                      Brent Griffith, 5/2012, general cleanup, fix negatives CR 8767, fix phantom coil flows CR 8854
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2136,22 +2236,23 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           ! na
 
           ! USE STATEMENTS:
-   USE DataZoneEnergyDemands
-   USE DataHeatBalFanSys, ONLY: Mat
-   USE WaterCoils,        ONLY:SimulateWaterCoilComponents
-   USE HeatingCoils,      ONLY:SimulateHeatingCoilComponents
-   USE SteamCoils,        ONLY: SimulateSteamCoilComponents
-   USE DataDefineEquip,   ONLY: AirDistUnit
-   USE DataAirLoop,       ONLY: AirLoopControlInfo
-   USE PlantUtilities,    ONLY: SetActuatedBranchFlowRate
+  USE DataZoneEnergyDemands
+!unused   USE DataHeatBalFanSys, ONLY: Mat
+  USE WaterCoils,        ONLY:SimulateWaterCoilComponents
+  USE HeatingCoils,      ONLY:SimulateHeatingCoilComponents
+  USE SteamCoils,        ONLY: SimulateSteamCoilComponents
+  USE DataDefineEquip,   ONLY: AirDistUnit
+!unused   USE DataAirLoop,       ONLY: AirLoopControlInfo
+  USE PlantUtilities,    ONLY: SetActuatedBranchFlowRate
+  USE DataHVACGlobals,   ONLY: SmallLoad
 
-   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-   INTEGER, INTENT(IN) :: SysNum
-   INTEGER, INTENT(IN) :: ZoneNum
-   INTEGER, INTENT (IN):: ZoneNodeNum
-   LOGICAL, INTENT (IN):: FirstHVACIteration
+  INTEGER, INTENT(IN) :: SysNum
+  INTEGER, INTENT(IN) :: ZoneNum
+  INTEGER, INTENT(IN) :: ZoneNodeNum
+  LOGICAL, INTENT(IN) :: FirstHVACIteration
 
 
 
@@ -2164,38 +2265,38 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-   REAL(r64) :: MassFlow    ! [kg/sec]   Total Mass Flow Rate from Hot & Cold Inlets
-   REAL(r64) :: QTotLoad    ! [Watts] Remaining load required for this zone
-   REAL(r64) :: QZnReq      ! [Watts] Load calculated for heating coil
-   REAL(r64) :: QToHeatSetPt  ! [W]  remaining load to heating setpoint
-   Integer   :: ADUNum        ! index of air distribution unit for this terminal unit
-   REAL(r64) :: CpAirZn
-   REAL(r64) :: CpAirSysIn
-   REAL(r64) :: DeltaTemp
-   Integer   :: SysOutletNode  ! The node number of the terminal unit outlet node
-   Integer   :: SysInletNode   ! the node number of the terminal unit inlet node
-   Integer   :: WaterControlNode   !This is the Actuated Reheat Control Node
-   REAL(r64) :: MaxFlowWater  !This is the value passed to the Controller depending if FirstHVACIteration or not
-   REAL(r64) :: MinFlowWater  !This is the value passed to the Controller depending if FirstHVACIteration or not
-   REAL(r64) :: QActualHeating    ! the heating load seen by the reheat coil
-   REAL(r64) :: QHeatingDelivered ! the actual output from heating coil
-   REAL(r64) :: LeakLoadMult      ! load multiplier to adjust for downstream leaks
-   REAL(r64) :: MinFlowFrac       ! minimum flow fraction (and minimum damper position)
-   REAL(r64) :: MinAirMassFlowRevAct=0.0 ! minimum air mass flow rate used in "reverse action" air mass flow rate calculation
-   REAL(r64) :: MaxAirMassFlowRevAct=0.0 ! maximum air mass flow rate used in "reverse action" air mass flow rate calculation
-   REAL(r64) :: MassFlowBasedOnOA ! supply air mass flow rate based on zone OA requirements
-   REAL(r64) :: AirLoopOAFrac     ! fraction of outside air entering air loop
-   REAL(r64) :: DummyMdot  ! temporary mass flow rate argument
+  REAL(r64) :: MassFlow    ! [kg/sec]   Total Mass Flow Rate from Hot & Cold Inlets
+  REAL(r64) :: QTotLoad    ! [Watts] Remaining load required for this zone
+  REAL(r64) :: QZnReq      ! [Watts] Load calculated for heating coil
+  REAL(r64) :: QToHeatSetPt  ! [W]  remaining load to heating setpoint
+  INTEGER   :: ADUNum        ! index of air distribution unit for this terminal unit
+  REAL(r64) :: CpAirZn
+  REAL(r64) :: CpAirSysIn
+  REAL(r64) :: DeltaTemp
+  INTEGER   :: SysOutletNode  ! The node number of the terminal unit outlet node
+  INTEGER   :: SysInletNode   ! the node number of the terminal unit inlet node
+  INTEGER   :: WaterControlNode   !This is the Actuated Reheat Control Node
+  REAL(r64) :: MaxFlowWater  !This is the value passed to the Controller depending if FirstHVACIteration or not
+  REAL(r64) :: MinFlowWater  !This is the value passed to the Controller depending if FirstHVACIteration or not
+  REAL(r64) :: QActualHeating    ! the heating load seen by the reheat coil
+  REAL(r64) :: QHeatingDelivered ! the actual output from heating coil
+  REAL(r64) :: LeakLoadMult      ! load multiplier to adjust for downstream leaks
+  REAL(r64) :: MinFlowFrac       ! minimum flow fraction (and minimum damper position)
+  REAL(r64) :: MinAirMassFlowRevAct=0.0 ! minimum air mass flow rate used in "reverse action" air mass flow rate calculation
+  REAL(r64) :: MaxAirMassFlowRevAct=0.0 ! maximum air mass flow rate used in "reverse action" air mass flow rate calculation
+  REAL(r64) :: MassFlowBasedOnOA ! supply air mass flow rate based on zone OA requirements
+  REAL(r64) :: AirLoopOAFrac     ! fraction of outside air entering air loop
+  REAL(r64) :: DummyMdot  ! temporary mass flow rate argument
 
-   REAL(r64) :: ZoneTemp = 0.0D0         ! zone air temperature [C]
-   REAL(r64) :: MaxHeatTemp = 0.0D0      ! maximum supply air temperature [C]
-   REAL(r64) :: MassFlowReq = 0.0D0      ! air mass flow rate required to meet the coil heating load [W]
-   REAL(r64) :: MassFlowActual = 0.0D0   ! air mass flow rate actually used [W]
-   REAL(r64) :: QZoneMax = 0.0D0         ! maximum zone heat addition rate given constraints of MaxHeatTemp and max
+  REAL(r64) :: ZoneTemp = 0.0D0         ! zone air temperature [C]
+  REAL(r64) :: MaxHeatTemp = 0.0D0      ! maximum supply air temperature [C]
+  REAL(r64) :: MaxDeviceAirMassFlowReheat = 0.0D0      ! air mass flow rate required to meet the coil heating load [W]
+  REAL(r64) :: MassFlowReqToLimitLeavingTemp = 0.0D0   ! air mass flow rate actually used [W]
+  REAL(r64) :: QZoneMaxRHTempLimit = 0.0D0         ! maximum zone heat addition rate given constraints of MaxHeatTemp and max
                                          ! available air mass flow rate [W]
-   REAL(r64) :: MinMassAirFlow = 0.0D0   ! the air flow rate during heating for normal acting damper
-   REAL(r64) :: QZoneMax2 = 0.0D0        ! temporary variable
-
+  REAL(r64) :: MinMassAirFlow = 0.0D0   ! the air flow rate during heating for normal acting damper
+  REAL(r64) :: QZoneMax2 = 0.0D0        ! temporary variable
+   
    ! Note to the perplexed
    !
    ! The SINGLE DUCT:VAV:REHEAT terminal unit originally contained 2 components: a damper
@@ -2207,411 +2308,399 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    ! Sys(SysNum)%ReheatAirOutletNode is the outlet node of the terminal unit and the heating coil
 
    ! The calculated load from the Heat Balance
-   ADUNum = Sys(SysNum)%ADUNum
-   LeakLoadMult = AirDistUnit(ADUNum)%LeakLoadMult
-   QTotLoad=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired * LeakLoadMult
-   QToHeatSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP * LeakLoadMult
-   SysOutletNode = Sys(SysNum)%ReheatAirOutletNode
-   SysInletNode = Sys(SysNum)%InletNodeNum
-   CpAirZn = PsyCpAirFnWTdb(Node(ZoneNodeNum)%HumRat,Node(ZoneNodeNum)%Temp)
-   MinFlowFrac = Sys(SysNum)%ZoneMinAirFrac
-   MassFlowBasedOnOA = 0.0d0
-   ZoneTemp = Node(ZoneNodeNum)%Temp
-   MinMassAirFlow = MinFlowFrac * StdRhoAir * Sys(SysNum)%MaxAirVolFlowRate
-
+  ADUNum = Sys(SysNum)%ADUNum
+  LeakLoadMult = AirDistUnit(ADUNum)%LeakLoadMult
+  QTotLoad=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired * LeakLoadMult
+  QToHeatSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP * LeakLoadMult
+  SysOutletNode = Sys(SysNum)%ReheatAirOutletNode
+  SysInletNode = Sys(SysNum)%InletNodeNum
+  CpAirZn = PsyCpAirFnWTdb(Node(ZoneNodeNum)%HumRat,Node(ZoneNodeNum)%Temp)
+  MinFlowFrac = Sys(SysNum)%ZoneMinAirFrac
+  MassFlowBasedOnOA = 0.0d0
+  ZoneTemp = Node(ZoneNodeNum)%Temp
+  MinMassAirFlow = MinFlowFrac * StdRhoAir * Sys(SysNum)%MaxAirVolFlowRate
+   
    !Then depending on if the Load is for heating or cooling it is handled differently.  First
    ! the massflow rate for cooling is determined to meet the entire load.  Then
    ! if the massflow is below the minimum or greater than the Max it is set to either the Min
    ! or the Max as specified for the VAV model.
-   If( (QTotLoad < 0.0) .AND. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. &
-      (TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) ) Then
+  If( (QTotLoad < 0.d0) .AND. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. &
+      (TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) ) THEN
      ! Calculate the flow required for cooling
-     CpAirSysIn = PsyCpAirFnWTdb(SysInlet(SysNum)%AirHumRat,SysInlet(SysNum)%AirTemp)
-     DeltaTemp = CpAirSysIn*SysInlet(SysNum)%AirTemp - CpAirZn*ZoneTemp
+    CpAirSysIn = PsyCpAirFnWTdb(SysInlet(SysNum)%AirHumRat,SysInlet(SysNum)%AirTemp)
+    DeltaTemp = CpAirSysIn*SysInlet(SysNum)%AirTemp - CpAirZn*ZoneTemp
 
      !Need to check DeltaTemp and ensure that it is not zero
-     If(DeltaTemp .ne. 0.0) Then
-        MassFlow= QTotLoad/DeltaTemp
-     Else
-        MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-     End If
-
+    If (DeltaTemp .ne. 0.0) THEN
+      MassFlow= QTotLoad/DeltaTemp
+    ELSE
+      MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
+    END IF
+     
+     ! Apply the zone maximum outdoor air fraction FOR VAV boxes - a TRACE feature
+    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+      MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
+    ENDIF
+     
      ! calculate supply air flow rate based on user specified OA requirement
-     CALL CalcOAMassFlow(SysNum, MassFlowBasedOnOA, AirLoopOAFrac)
-     MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
+    CALL CalcOAMassFlow(SysNum, MassFlowBasedOnOA, AirLoopOAFrac)
+    MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
 
      ! used for normal acting damper
-     MinMassAirFlow = MAX(MinMassAirFlow, MassFlowBasedOnOA)
-     MinMassAirFlow = MAX(MinMassAirFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
-     MinMassAirFlow = MIN(MinMassAirFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
+    MinMassAirFlow = MAX(MinMassAirFlow, MassFlowBasedOnOA)
+    MinMassAirFlow = MAX(MinMassAirFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
+    MinMassAirFlow = MIN(MinMassAirFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
 
      ! limit the OA based supply air flow rate based on optional user input
      !Check to see if the flow is < the Min or > the Max air Fraction to the zone; then set to min or max
-     MassFlow = MAX(MassFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
-     MassFlow = MIN(MassFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
+    MassFlow = MAX(MassFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
+    MassFlow = MIN(MassFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
 
-   Else If ((SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. (QTotLoad >= 0.0 .OR. &
-             TempControlType(ZoneNum) .EQ. SingleHeatingSetPoint) ) Then
+  ELSE IF ((SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. (QTotLoad >= 0.d0 .OR. &
+             TempControlType(ZoneNum) .EQ. SingleHeatingSetPoint) ) THEN
 !     IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction .AND. SysInlet(SysNum)%AirMassFlowRateMinAvail <= SmallMassFlow) THEN
        ! special case for heating: reverse action and damper allowed to close - set the minimum flow rate to a small but nonzero value
 !       MassFlow = 0.01d0*SysInlet(SysNum)%AirMassFlowRateMaxAvail
 !     ELSE
        ! usual case for heating: set the air mass flow rate to the minimum
-       MassFlow = SysInlet(SysNum)%AirMassFlowRateMinAvail
+    MassFlow = SysInlet(SysNum)%AirMassFlowRateMinAvail
 !     END IF
 
+     ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
+    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+      MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
+    ENDIF
+
      ! calculate supply air flow rate based on user specified OA requirement
-     CALL CalcOAMassFlow(SysNum, MassFlowBasedOnOA, AirLoopOAFrac)
-     MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
+    CALL CalcOAMassFlow(SysNum, MassFlowBasedOnOA, AirLoopOAFrac)
+    MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
 
      !Check to see if the flow is < the Min or > the Max air Fraction to the zone; then set to min or max
-     IF(MassFlow <= SysInlet(SysNum)%AirMassFlowRateMinAvail) Then
-       MassFlow = SysInlet(SysNum)%AirMassFlowRateMinAvail
-     Else If(MassFlow >= SysInlet(SysNum)%AirMassFlowRateMaxAvail) Then
-       MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-     End If
+    IF(MassFlow <= SysInlet(SysNum)%AirMassFlowRateMinAvail) THEN
+      MassFlow = SysInlet(SysNum)%AirMassFlowRateMinAvail
+    ELSE IF (MassFlow >= SysInlet(SysNum)%AirMassFlowRateMaxAvail) THEN
+      MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
+    END IF
 
-   Else
+  ELSE
      ! System is Off set massflow to 0.0
-     MassFlow = 0.0
-     AirLoopOAFrac = 0.0D0
-   End If
+    MassFlow = 0.0
+    AirLoopOAFrac = 0.0D0
+  END IF
 
    ! look for bang-bang condition: flow rate oscillating between 2 values during the air loop / zone
    ! equipment iteration. If detected, set flow rate to previous value.
-   IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
+  IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
           (ABS(MassFlow-MassFlow3(SysNum)) < MassFlowDiff(SysNum)) ) .AND. &
           (ABS(MassFlow-MassFlow1(SysNum)) >= MassFlowDiff(SysNum)) ) THEN
-     IF (MassFlow > 0.0) MassFlow = MassFlow1(SysNum)
-   END IF
+    IF (MassFlow > 0.0) MassFlow = MassFlow1(SysNum)
+  END IF
 
    !Move data to the damper outlet node
-   SysOutlet(SysNum)%AirTemp         = SysInlet(SysNum)%AirTemp
-   SysOutlet(SysNum)%AirHumRat       = SysInlet(SysNum)%AirHumRat
-   SysOutlet(SysNum)%AirMassFlowRate = MassFlow
-   SysOutlet(SysNum)%AirMassFlowRateMaxAvail = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-   SysOutlet(SysNum)%AirMassFlowRateMinAvail = SysInlet(SysNum)%AirMassFlowRateMinAvail
-   SysOutlet(SysNum)%AirEnthalpy             = SysInlet(SysNum)%AirEnthalpy
+  SysOutlet(SysNum)%AirTemp         = SysInlet(SysNum)%AirTemp
+  SysOutlet(SysNum)%AirHumRat       = SysInlet(SysNum)%AirHumRat
+  SysOutlet(SysNum)%AirMassFlowRate = MassFlow
+  SysOutlet(SysNum)%AirMassFlowRateMaxAvail = SysInlet(SysNum)%AirMassFlowRateMaxAvail
+  SysOutlet(SysNum)%AirMassFlowRateMinAvail = SysInlet(SysNum)%AirMassFlowRateMinAvail
+  SysOutlet(SysNum)%AirEnthalpy             = SysInlet(SysNum)%AirEnthalpy
 
-   ! Calculate the Damper Position when there is a Max air flow specified.
-   If(SysInlet(SysNum)%AirMassFlowRateMaxAvail == 0.0) Then
-     Sys(SysNum)%DamperPosition = 0.0
-   Else if (SysInlet(SysNum)%AirMassFlowRateMaxAvail > SysInlet(SysNum)%AirMassFlowRateMinAvail) Then
-     Sys(SysNum)%DamperPosition = ((MassFlow-SysInlet(SysNum)%AirMassFlowRateMinAvail) / &
-                                   (SysInlet(SysNum)%AirMassFlowRateMaxAvail-SysInlet(SysNum)%AirMassFlowRateMinAvail)) * &
-                                  (1.0d0-MinFlowFrac) + MinFlowFrac
-   Else
-     Sys(SysNum)%DamperPosition = 1.0
-   End If
+!   ! Calculate the Damper Position when there is a Max air flow specified.
+!  If (MassFlow == 0.0) THEN
+!    Sys(SysNum)%DamperPosition = 0.0
+!  ELSE IF (SysInlet(SysNum)%AirMassFlowRateMaxAvail > SysInlet(SysNum)%AirMassFlowRateMinAvail) THEN
+!    Sys(SysNum)%DamperPosition = ((MassFlow-SysInlet(SysNum)%AirMassFlowRateMinAvail) / &
+!                                   (SysInlet(SysNum)%AirMassFlowRateMaxAvail-SysInlet(SysNum)%AirMassFlowRateMinAvail)) * &
+!                                  (1.0d0-MinFlowFrac) + MinFlowFrac
+!  ELSE
+!    Sys(SysNum)%DamperPosition = 1.0
+!  END IF
+  
+  IF (MassFlow == 0.d0) THEN
+    Sys(SysNum)%DamperPosition = 0.d0
+  ELSEIF ((MassFlow > 0.d0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
+    Sys(SysNum)%DamperPosition =  MassFlow / Sys(SysNum)%AirMassFlowRateMax
+  ELSEIF (MassFlow == Sys(SysNum)%AirMassFlowRateMax) THEN
+    Sys(SysNum)%DamperPosition = 1.d0
+  ENDIF
 
    !Need to make sure that the damper outlets are passed to the coil inlet
-   Call UpdateSys(SysNum)
+  CALL UpdateSys(SysNum)
 
    ! At the current air mass flow rate, calculate heating coil load
-   QActualHeating = QToHeatSetPt - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp) ! reheat needed
+  QActualHeating = QToHeatSetPt - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp) ! reheat needed
 
    ! do the reheat calculation if there's some air nass flow (or the damper action is "reverse action"), the flow is <= minimum ,
    ! there's a heating requirement, and there's a thermostat with a heating setpoint
    ! Reverse damper option is working only for water coils for now.
-   If((MassFlow > SmallMassFlow .OR. Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) .AND. &
-!      (MassFlow <= SysInlet(SysNum)%AirMassFlowRateMinAvail) .AND. &
-      (QActualHeating > 0.0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) Then
+  IF((MassFlow > SmallMassFlow ) .AND. &
+      (QActualHeating > 0.0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) THEN
      ! At this point we know that there is a heating requirement: i.e., the heating coil needs to
      ! be activated (there's a zone heating load or there's a reheat requirement). There are 3 possible
      ! situations: 1) the coil load can be met by variable temperature air (below the max heat temp) at
      ! the minimum air mass flow rate; 2) the coil load can be met by variable air flow rate with the air
-     ! temperature fixed at the max heat temp; 3) the load can not be met (we will run at max air temp and
+     ! temperature fixed at the max heat temp; 3) the load cannot be met (we will run at max air temp and
      ! max air flow rate). We check for condition 2 by assuming the air temperatute is at the max heat temp
      ! and solving for the air mass flow rate that will meet the load. If the flow rate is between the min and
      ! max we are in condition 2.
 
-     QZoneMax2 = QToHeatSetPt
+    QZoneMax2 = QToHeatSetPt
 
-   IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
+    ! fill dual-max reheat flow limit, if any
+    IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
+      IF (Sys(SysNum)%AirMassFlowDuringReheatMax > 0.0D0 ) THEN
+        MaxDeviceAirMassFlowReheat = Sys(SysNum)%AirMassFlowDuringReheatMax
+      ELSE
+        MaxDeviceAirMassFlowReheat = Sys(SysNum)%AirMassFlowRateMax
+      END IF
+    ELSE
+      MaxDeviceAirMassFlowReheat = Sys(SysNum)%AirMassFlowRateMax
+    END IF
 
-     MaxHeatTemp = Sys(SysNum)%MaxReheatTemp
-     MassFlowReq = QToHeatSetPt/(CpAirZn*(MaxHeatTemp - ZoneTemp))
+    ! determine flow based on leaving reheat temperature limit
+    IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
 
-     IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
-       IF(Sys(SysNum)%AirMassFlowDuringReheatMax .GT. 0.0D0 .AND. QActualHeating > 0.0D0 .AND. &
-          Sys(SysNum)%ReheatComp_Num .GT. 0 .AND. ((TempControlType(ZoneNum) == SingleHeatCoolSetPoint) .OR. &
-          (TempControlType(ZoneNum) == DualSetPointWithDeadBand)))THEN
-         MaxAirMassFlowRevAct = MIN(SysInlet(SysNum)%AirMassFlowRateMaxAvail, &
-                                MAX(MassFlowBasedOnOA,Sys(SysNum)%AirMassFlowDuringReheatMax))
-         MaxAirMassFlowRevAct = MAX(MaxAirMassFlowRevAct,SysInlet(SysNum)%AirMassFlowRateMinAvail)
-       END IF
-     END IF
+      MaxHeatTemp = Sys(SysNum)%MaxReheatTemp
+      IF (QToHeatSetPt > SmallLoad) THEN ! zone has a postive load to heating setpoint
+        MassFlowReqToLimitLeavingTemp = QToHeatSetPt/(CpAirZn*(MaxHeatTemp - ZoneTemp))
+      ELSE
+        MassFlowReqToLimitLeavingTemp = 0.d0
+      ENDIF
+    ENDIF
 
-     If(Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
-       QZoneMax = CpAirZn*MaxAirMassFlowRevAct*(MaxHeatTemp - ZoneTemp)
-     ELSE
-       QZoneMax = CpAirZn*MinMassAirFlow*(MaxHeatTemp - ZoneTemp)
-     END IF
+    ! (re)apply limits to find air mass flow
+    MassFlow = MAX(MassFlow, MassFlowReqToLimitLeavingTemp)
+    MassFlow = MIN(MassFlow, MaxDeviceAirMassFlowReheat)
+    MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
+    MassFlow = MIN(MassFlow, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
+    MassFlow = MAX(MassFlow, SysInlet(SysNum)%AirMassFlowRateMinAvail)
 
-     ! temporary variable
-     QZoneMax2 = MIN(QZoneMax,QToHeatSetPt)
+    ! now make any corrections to heating coil loads
+    IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
+      QZoneMaxRHTempLimit = CpAirZn*MassFlow*(MaxHeatTemp - ZoneTemp)
+      QZoneMax2 = MIN(QZoneMaxRHTempLimit,QToHeatSetPt)
+    ENDIF
 
-     IF (MassFlowReq <= MinMassAirFlow .or. Sys(SysNum)%DamperHeatingAction .NE. ReverseAction) THEN
-       MassFlowActual = MinMassAirFlow
-     ELSE IF (MassFlowReq >= SysInlet(SysNum)%AirMassFlowRateMaxAvail) THEN
-       MassFlowActual = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-     ELSE
-       MassFlowActual = MassFlowReq
-     END IF
+    SysOutlet(SysNum)%AirMassFlowRate = MassFlow
 
-     ! apply dual-max limit for heating
-     IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
-       IF(Sys(SysNum)%AirMassFlowDuringReheatMax .GT. 0.0D0 .AND. QActualHeating > 0.0D0 .AND. &
-          Sys(SysNum)%ReheatComp_Num .GT. 0 .AND. ((TempControlType(ZoneNum) == SingleHeatCoolSetPoint) .OR. &
-          (TempControlType(ZoneNum) == DualSetPointWithDeadBand)))THEN
-         IF (MassFlowActual .GT. MaxAirMassFlowRevAct) THEN
-           MassFlowActual = MaxAirMassFlowRevAct
-         END IF
-       END IF
-     END IF
-
-     ! reset terminal unit air mass flow to new value.
-     MassFlow = MassFlowActual
-
-   END IF     ! IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
-
-     SysOutlet(SysNum)%AirMassFlowRate = MassFlow
-
-     !  reset OA report variable
-     MinAirMassFlowRevAct = SysInlet(SysNum)%AirMassFlowRateMinAvail
-
-     Call UpdateSys(SysNum)
+    CALL UpdateSys(SysNum)
 
      ! Now do the heating coil calculation for each heating coil type
-     SELECT CASE(Sys(SysNum)%ReheatComp_Num)     ! Reverse damper option is working only for water coils for now.
+    SELECT CASE(Sys(SysNum)%ReheatComp_Num)     ! Reverse damper option is working only for water coils for now.
 
-       ! hot water heating coil
-       CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
+     ! hot water heating coil
+    CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
+       ! Determine the load required to pass to the Component controller
+       ! Although this equation looks strange (using temp instead of deltaT), it is corrected later in ControlCompOutput
+       ! and is working as-is, temperature setpoints are maintained as expected.
+      QZnReq = QZoneMax2 + MassFlow*CpAirZn*ZoneTemp
+
+       ! Initialize hot water flow rate to zero.
+      DummyMdot = 0.d0
+      CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
+            Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
+      !On the first HVAC iteration the system values are given to the controller, but after that
+      ! the demand limits are in place and there needs to be feedback to the Zone Equipment
+      IF (FirstHVACIteration) THEN
+        MaxFlowWater = Sys(SysNum)%MaxReheatWaterFlow
+        MinFlowWater = Sys(SysNum)%MinReheatWaterFlow
+      ELSE
+        WaterControlNode = Sys(SysNum)%ReheatControlNode
+        MaxFlowWater = Node(WaterControlNode)%MassFlowRateMaxAvail
+        MinFlowWater = Node(WaterControlNode)%MassFlowRateMinAvail
+      ENDIF
+
+       ! Simulate the reheat coil at constant air flow. Control by varying the
+       ! hot water flow rate.
+       !FB use QActualHeating, change ControlCompOutput to use new
+      CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,         &
+                          CompType=Sys(SysNum)%ReheatComp,             &
+                          CompNum=Sys(SysNum)%ReheatComp_Index,        &
+                          FirstHVACIteration=FirstHVACIteration,       &
+                          QZnReq=QZnReq,                               &
+                          ActuatedNode=Sys(SysNum)%ReheatControlNode,  &
+                          MaxFlow=MaxFlowWater,                        &
+                          MinFlow=MinFlowWater,                        &
+                          TempOutNode=SysOutletNode,                   &
+                          ControlOffSet=Sys(SysNum)%ControllerOffset,  &
+                          AirMassFlow=Massflow,                        &
+                          ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
+                          CompErrIndex=Sys(SysNum)%CompErrIndex,       &
+                          LoopNum     = Sys(SysNum)%HWLoopNum,         &
+                          LoopSide    = Sys(SysNum)%HWLoopSide,        &
+                          BranchIndex = Sys(SysNum)%HWBranchIndex)
+
+       ! If reverse action damper and the hot water flow is at maximum, simulate the
+       ! hot water coil with fixed (maximum) hot water flow but allow the air flow to
+       ! vary up to the maximum (air damper opens to try to meet zone load)
+      IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
+        IF (Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate .EQ. MaxFlowWater) THEN
+          ! fill limits for air flow for controller
+          MinAirMassFlowRevAct = Sys(SysNum)%AirMassFlowRateMax * Sys(SysNum)%ZoneMinAirFrac
+          MinAirMassFlowRevAct = MIN(MinAirMassFlowRevAct, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
+          MinAirMassFlowRevAct = MAX(MinAirMassFlowRevAct, SysInlet(SysNum)%AirMassFlowRateMinAvail)
+
+          MaxAirMassFlowRevAct = Sys(SysNum)%AirMassFlowRateMax
+          MaxAirMassFlowRevAct = MIN(MaxAirMassFlowRevAct,MaxDeviceAirMassFlowReheat)
+          MaxAirMassFlowRevAct = MAX(MaxAirMassFlowRevAct, MinAirMassFlowRevAct)
+          MaxAirMassFlowRevAct = MIN(MaxAirMassFlowRevAct, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
+          
+
+          Node(Sys(SysNum)%OutletNodeNum)%MassFlowRateMaxAvail = MaxAirMassFlowRevAct  ! suspect, check how/if used in ControlCompOutput
+          CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,                  &
+                                  CompType=Sys(SysNum)%ReheatComp,                  &
+                                  CompNum=Sys(SysNum)%ReheatComp_Index,             &
+                                  FirstHVACIteration=FirstHVACIteration,            &
+                                  QZnReq= QZoneMax2 ,                               &  ! why not QZnReq  ?
+                                  ActuatedNode=Sys(SysNum)%OutletNodeNum,           &
+                                  MaxFlow=MaxAirMassFlowRevAct, &
+                                  MinFlow=MinAirMassFlowRevAct,                     &
+                                  TempOutNode=SysOutletNode,                        &
+                                  TempInNode=ZoneNodeNum,                           &
+                                  ControlOffSet=Sys(SysNum)%ControllerOffset,       &
+                                  ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
+                                  CompErrIndex=Sys(SysNum)%CompErrIndex )
+                                  ! air flow controller, not on plant, don't pass plant topology info
+           ! reset terminal unit inlet air mass flow to new value.
+          Node(Sys(SysNum)%OutletNodeNum)%MassFlowRateMaxAvail = SysInlet(SysNum)%AirMassFlowRateMaxAvail
+          MassFlow = Node(SysOutletNode)%MassFlowRate
+
+          !         ! look for bang-bang condition: flow rate oscillating between 2 values during the air loop / zone
+          !         ! equipment iteration. If detected, set flow rate to previous value and recalc HW flow.
+          IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
+              (ABS(MassFlow-MassFlow3(SysNum)) < MassFlowDiff(SysNum)) ) .AND. &
+              (ABS(MassFlow-MassFlow1(SysNum)) >= MassFlowDiff(SysNum)) ) THEN
+            IF (MassFlow > 0.0) MassFlow = MassFlow1(SysNum)
+            SysOutlet(SysNum)%AirMassFlowRate = MassFlow
+            CALL UpdateSys(SysNum)
+
+               ! Although this equation looks strange (using temp instead of deltaT), it is corrected later in ControlCompOutput
+               ! and is working as-is, temperature setpoints are maintained as expected.
+            QZnReq = QZoneMax2 + MassFlow*CpAirZn*ZoneTemp
+            CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,         &
+                                  CompType=Sys(SysNum)%ReheatComp,             &
+                                  CompNum=Sys(SysNum)%ReheatComp_Index,        &
+                                  FirstHVACIteration=FirstHVACIteration,       &
+                                  QZnReq=QZnReq,                               &
+                                  ActuatedNode=Sys(SysNum)%ReheatControlNode,  &
+                                  MaxFlow=MaxFlowWater,                        &
+                                  MinFlow=MinFlowWater,                        &
+                                  TempOutNode=SysOutletNode,                   &
+                                  ControlOffSet=Sys(SysNum)%ControllerOffset,  &
+                                  AirMassFlow=Massflow,                        &
+                                  ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
+                                  CompErrIndex=Sys(SysNum)%CompErrIndex,            &
+                                  LoopNum     = Sys(SysNum)%HWLoopNum,              &
+                                  LoopSide    = Sys(SysNum)%HWLoopSide,             &
+                                  BranchIndex = Sys(SysNum)%HWBranchIndex)
+          END IF
+
+          SysOutlet(SysNum)%AirMassFlowRate = MassFlow
+           ! reset OA report variable
+          CALL UpdateSys(SysNum)
+        END IF     ! IF (Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate .EQ. MaxFlowWater) THEN
+      END IF     ! IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
+
+      ! Recalculate the Damper Position.
+    IF (MassFlow == 0.d0) THEN
+      Sys(SysNum)%DamperPosition = 0.d0
+    ELSEIF ((MassFlow > 0.d0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
+      Sys(SysNum)%DamperPosition =  MassFlow / Sys(SysNum)%AirMassFlowRateMax
+    ELSEIF (MassFlow == Sys(SysNum)%AirMassFlowRateMax) THEN
+      Sys(SysNum)%DamperPosition = 1.d0
+    ENDIF
+
+    CASE(HCoilType_SteamAirHeating) ! ! COIL:STEAM:AIRHEATING
          ! Determine the load required to pass to the Component controller
-         ! Although this equation looks strange (using temp instead of deltaT), it is corrected later in ControlCompOutput
-         ! and is working as-is, temperature setpoints are maintained as expected.
-         QZnReq = QZoneMax2 + MassFlow*CpAirZn*ZoneTemp
-
-         ! Initialize hot water flow rate to zero.
-         DummyMdot = 0.d0
-         CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
-              Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
-        !On the first HVAC iteration the system values are given to the controller, but after that
-        ! the demand limits are in place and there needs to be feedback to the Zone Equipment
-         If(FirstHVACIteration)Then
-            MaxFlowWater = Sys(SysNum)%MaxReheatWaterFlow
-            MinFlowWater = Sys(SysNum)%MinReheatWaterFlow
-         Else
-            WaterControlNode = Sys(SysNum)%ReheatControlNode
-            MaxFlowWater = Node(WaterControlNode)%MassFlowRateMaxAvail
-            MinFlowWater = Node(WaterControlNode)%MassFlowRateMinAvail
-         EndIf
-
-         ! Simulate the reheat coil at constant air flow. Control by varying the
-         ! hot water flow rate.
-!FB use QActualHeating, change ControlCompOutput to use new
-         CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,         &
-                            CompType=Sys(SysNum)%ReheatComp,             &
-                            CompNum=Sys(SysNum)%ReheatComp_Index,        &
-                            FirstHVACIteration=FirstHVACIteration,       &
-                            QZnReq=QZnReq,                               &
-                            ActuatedNode=Sys(SysNum)%ReheatControlNode,  &
-                            MaxFlow=MaxFlowWater,                        &
-                            MinFlow=MinFlowWater,                        &
-                            TempOutNode=SysOutletNode,                   &
-                            ControlOffSet=Sys(SysNum)%ControllerOffset,  &
-                            AirMassFlow=Massflow,                        &
-                            ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
-                            CompErrIndex=Sys(SysNum)%CompErrIndex,       &
-                            LoopNum     = Sys(SysNum)%HWLoopNum,         &
-                            LoopSide    = Sys(SysNum)%HWLoopSide,        &
-                            BranchIndex = Sys(SysNum)%HWBranchIndex,     &
-                            CompIndex   = Sys(SysNum)%HWCompIndex)
-
-         ! If reverse action damper and the hot water flow is at maximum, simulate the
-         ! hot water coil with fixed (maximum) hot water flow but allow the air flow to
-         ! vary up to the maximum (air damper opens to try to meet zone load)
-         IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
-           IF (Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate .EQ. MaxFlowWater) THEN
-
-             MaxAirMassFlowRevAct = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-             ! limit maximum air flow rate during reheat based on optional user input
-             IF(Sys(SysNum)%AirLoopNum .GT. 0)THEN
-
-! old code
-!               IF(Sys(SysNum)%AirMassFlowDuringReheatMax .GT. 0.0D0 .AND. QToHeatSetPt > 0.0D0 .AND. &
-!                  AirLoopControlInfo(Sys(SysNum)%AirLoopNum)%CoolingActiveFlag .AND. &
-!                  Sys(SysNum)%ReheatComp_Num .GT. 0 .AND. &
-!                  TempControlType(ZoneNum) .GT. SingleCoolingSetPoint)THEN
-
-              ! KHL/TH 8/3/2010, implement the dual-max control for the VAV reheat box with reverse acting damper and
-              !  when there is heating load on the reheat coil
-              !Maximum air flow during reheat applies to both SingleHeatCoolSetPoint=3 and DualSetPointWithDeadBand = 4
-               IF(Sys(SysNum)%AirMassFlowDuringReheatMax .GT. 0.0D0 .AND. QActualHeating > 0.0D0 .AND. &
-                  Sys(SysNum)%ReheatComp_Num .GT. 0 .AND. ((TempControlType(ZoneNum) == SingleHeatCoolSetPoint) .OR. &
-                  (TempControlType(ZoneNum) == DualSetPointWithDeadBand)))THEN
-                 MaxAirMassFlowRevAct = MIN(SysInlet(SysNum)%AirMassFlowRateMaxAvail, &
-                                            MAX(MassFlowBasedOnOA,Sys(SysNum)%AirMassFlowDuringReheatMax))
-                 MaxAirMassFlowRevAct = MAX(MaxAirMassFlowRevAct,SysInlet(SysNum)%AirMassFlowRateMinAvail)
-               END IF
-             END IF
-             Node(Sys(SysNum)%OutletNodeNum)%MassFlowRateMaxAvail = MaxAirMassFlowRevAct
-             CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,                  &
-                                    CompType=Sys(SysNum)%ReheatComp,                  &
-                                    CompNum=Sys(SysNum)%ReheatComp_Index,             &
-                                    FirstHVACIteration=FirstHVACIteration,            &
-                                    QZnReq=QZoneMax2,                                 &
-                                    ActuatedNode=Sys(SysNum)%OutletNodeNum,           &
-                                    MaxFlow=MaxAirMassFlowRevAct, &
-                                    MinFlow=MinAirMassFlowRevAct,                     &
-                                    TempOutNode=SysOutletNode,                        &
-                                    TempInNode=ZoneNodeNum,                           &
-                                    ControlOffSet=Sys(SysNum)%ControllerOffset,       &
-                                    ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
-                                    CompErrIndex=Sys(SysNum)%CompErrIndex )
-                                    ! air flow controller, not on plant, don't pass plant topology info
-             ! reset terminal unit inlet air mass flow to new value.
-             Node(Sys(SysNum)%OutletNodeNum)%MassFlowRateMaxAvail = SysInlet(SysNum)%AirMassFlowRateMaxAvail
-             MassFlow = Node(SysOutletNode)%MassFlowRate
-             SysOutlet(SysNum)%AirMassFlowRate = MassFlow
-             ! reset OA report variable
-             Call UpdateSys(SysNum)
-           END IF     ! IF (Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate .EQ. MaxFlowWater) THEN
-         END IF     ! IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
-
-           ! look for bang-bang condition: flow rate oscillating between 2 values during the air loop / zone
-           ! equipment iteration. If detected, set flow rate to previous value and recalc HW flow.
-         IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
-            (ABS(MassFlow-MassFlow3(SysNum)) < MassFlowDiff(SysNum)) ) .AND. &
-            (ABS(MassFlow-MassFlow1(SysNum)) >= MassFlowDiff(SysNum)) ) THEN
-             MassFlow = MassFlow1(SysNum)
-             SysOutlet(SysNum)%AirMassFlowRate = MassFlow
-             Call UpdateSys(SysNum)
-
-             ! Although this equation looks strange (using temp instead of deltaT), it is corrected later in ControlCompOutput
-             ! and is working as-is, temperature setpoints are maintained as expected.
-             QZnReq = QZoneMax2 + MassFlow*CpAirZn*ZoneTemp
-             CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,         &
-                                CompType=Sys(SysNum)%ReheatComp,             &
-                                CompNum=Sys(SysNum)%ReheatComp_Index,        &
-                                FirstHVACIteration=FirstHVACIteration,       &
-                                QZnReq=QZnReq,                               &
-                                ActuatedNode=Sys(SysNum)%ReheatControlNode,  &
-                                MaxFlow=MaxFlowWater,                        &
-                                MinFlow=MinFlowWater,                        &
-                                TempOutNode=SysOutletNode,                   &
-                                ControlOffSet=Sys(SysNum)%ControllerOffset,  &
-                                AirMassFlow=Massflow,                        &
-                                ControlCompTypeNum=Sys(SysNum)%ControlCompTypeNum, &
-                                CompErrIndex=Sys(SysNum)%CompErrIndex,            &
-                                LoopNum     = Sys(SysNum)%HWLoopNum,              &
-                                LoopSide    = Sys(SysNum)%HWLoopSide,             &
-                                BranchIndex = Sys(SysNum)%HWBranchIndex,          &
-                                CompIndex   = Sys(SysNum)%HWCompIndex)
-           END IF
-           ! Recalculate the Damper Position.
-           If(SysInlet(SysNum)%AirMassFlowRateMaxAvail == 0.0) Then
-             Sys(SysNum)%DamperPosition = 0.0
-           Else if (SysInlet(SysNum)%AirMassFlowRateMaxAvail > SysInlet(SysNum)%AirMassFlowRateMinAvail) Then
-             Sys(SysNum)%DamperPosition = ((MassFlow-SysInlet(SysNum)%AirMassFlowRateMinAvail) / &
-                    (SysInlet(SysNum)%AirMassFlowRateMaxAvail-SysInlet(SysNum)%AirMassFlowRateMinAvail)) * &
-                    (1.0d0-MinFlowFrac) + MinFlowFrac
-           Else
-             Sys(SysNum)%DamperPosition = 1.0
-           End If
-
-       CASE(HCoilType_SteamAirHeating) ! ! COIL:STEAM:AIRHEATING
-         ! Determine the load required to pass to the Component controller
-         QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
+      QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
 
          ! Simulate reheat coil for the VAV system
-         CALL SimulateSteamCoilComponents (CompName=Sys(SysNum)%ReheatName,        &
+      CALL SimulateSteamCoilComponents (CompName=Sys(SysNum)%ReheatName,        &
                                            CompIndex=Sys(SysNum)%ReheatComp_Index, &
                                            FirstHVACIteration=FirstHVACIteration,  &
                                            QCoilReq=QZnReq)
 
-       CASE(HCoilType_Electric) ! COIL:ELECTRIC:HEATING
+    CASE(HCoilType_Electric) ! COIL:ELECTRIC:HEATING
          ! Determine the load required to pass to the Component controller
-         QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
+      QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
 
          ! Simulate reheat coil for the VAV system
-         CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,        &
+      CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,        &
                                             CompIndex=Sys(SysNum)%ReheatComp_Index, &
                                             FirstHVACIteration=FirstHVACIteration,  &
                                             QCoilReq=QZnReq)
 
-       CASE(HCoilType_Gas) ! COIL:GAS:HEATING
+    CASE(HCoilType_Gas) ! COIL:GAS:HEATING
          ! Determine the load required to pass to the Component controller
-         QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
+      QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp - ZoneTemp)
 
          ! Simulate reheat coil for the VAV system
-         CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
+      CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
                                             CompIndex=Sys(SysNum)%ReheatComp_Index, &
                                             FirstHVACIteration=FirstHVACIteration, &
                                             QCoilReq=QZnReq,QCoilActual=QHeatingDelivered)
 
-       CASE(HCoilType_None) ! blank
+    CASE(HCoilType_None) ! blank
          ! I no reheat is defined then assume that the damper is the only component.
          ! If something else is there that is not a reheat coil or a blank then give the error message
 
-       CASE DEFAULT
-         CALL ShowFatalError('Invalid Reheat Component='//TRIM(Sys(SysNum)%ReheatComp))
-     END SELECT
+    CASE DEFAULT
+      CALL ShowFatalError('Invalid Reheat Component='//TRIM(Sys(SysNum)%ReheatComp))
+    END SELECT
 
    !the COIL is OFF the properties are calculated for this special case.
-   Else
-     SELECT CASE(Sys(SysNum)%ReheatComp_Num)
+  ELSE
+    SELECT CASE(Sys(SysNum)%ReheatComp_Num)
 
-       CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
+    CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
          ! Simulate reheat coil for the Const Volume system
         ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0  !DSU
-         DummyMdot = 0.d0
-         CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
+      DummyMdot = 0.d0
+      CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
          !call the reheat coil with the NO FLOW condition to make sure that the Node values
          ! are passed through to the coil outlet correctly
-         CALL SimulateWaterCoilComponents(Sys(SysNum)%ReheatName,FirstHVACIteration,  &
+      CALL SimulateWaterCoilComponents(Sys(SysNum)%ReheatName,FirstHVACIteration,  &
                                                  CompIndex=Sys(SysNum)%ReheatComp_Index)
-       CASE(HCoilType_SteamAirHeating) ! COIL:STEAM:AIRHEATING
+    CASE(HCoilType_SteamAirHeating) ! COIL:STEAM:AIRHEATING
          ! Simulate reheat coil for the VAV system
-         CALL SimulateSteamCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
+      CALL SimulateSteamCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
                                             FirstHVACIteration=FirstHVACIteration, &
                                             QCoilReq=0.0d0,       &
                                             CompIndex=Sys(SysNum)%ReheatComp_Index)
 
 
-       CASE(HCoilType_Electric) ! COIL:ELECTRIC:HEATING
+    CASE(HCoilType_Electric) ! COIL:ELECTRIC:HEATING
          ! Simulate reheat coil for the VAV system
-         CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
+      CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
                                             FirstHVACIteration=FirstHVACIteration, &
                                             QCoilReq=0.0d0,       &
                                             CompIndex=Sys(SysNum)%ReheatComp_Index)
 
-       CASE(HCoilType_Gas) ! COIL:GAS:HEATING
+    CASE(HCoilType_Gas) ! COIL:GAS:HEATING
          ! Simulate reheat coil for the VAV system
-         CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
+      CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
                                             FirstHVACIteration=FirstHVACIteration, &
                                             QCoilReq=0.0d0,       &
                                             CompIndex=Sys(SysNum)%ReheatComp_Index)
-       CASE(HCoilType_None) ! blank
+    CASE(HCoilType_None) ! blank
          ! If no reheat is defined then assume that the damper is the only component.
          ! If something else is that is not a reheat coil or a blank then give the error message
 
-       CASE DEFAULT
-         CALL ShowFatalError('Invalid Reheat Component='//TRIM(Sys(SysNum)%ReheatComp))
-     END SELECT
+    CASE DEFAULT
+      CALL ShowFatalError('Invalid Reheat Component='//TRIM(Sys(SysNum)%ReheatComp))
+    END SELECT
 
-   End IF
+  END IF
 
 !  set OA report variable
-   Sys(SysNum)%OutdoorAirFlowRate = (MassFlow/StdRhoAir) * AirLoopOAFrac
+  Sys(SysNum)%OutdoorAirFlowRate = (MassFlow/StdRhoAir) * AirLoopOAFrac
 
    ! push the flow rate history
-   MassFlow3(SysNum) = MassFlow2(SysNum)
-   MassFlow2(SysNum) = MassFlow1(SysNum)
-   MassFlow1(SysNum) = MassFlow
+  MassFlow3(SysNum) = MassFlow2(SysNum)
+  MassFlow2(SysNum) = MassFlow1(SysNum)
+  MassFlow1(SysNum) = MassFlow
 
- RETURN
+  RETURN
 END SUBROUTINE SimVAV
 
 SUBROUTINE CalcOAMassFlow(SysNum, SAMassFlow, AirLoopOAFrac)
@@ -2756,12 +2845,12 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           ! USE STATEMENTS:
    USE DataZoneEnergyDemands
    USE DataHVACGlobals,      ONLY: SmallLoad
-   USE DataHeatBalFanSys,    ONLY: Mat
+!unused   USE DataHeatBalFanSys,    ONLY: Mat
    USE WaterCoils,           ONLY: SimulateWaterCoilComponents
    USE HeatingCoils,         ONLY: SimulateHeatingCoilComponents
    USE SteamCoils,           ONLY: SimulateSteamCoilComponents
    USE DataDefineEquip,      ONLY: AirDistUnit
-   USE DataHeatBalFanSys,    ONLY: ZoneThermostatSetPointHi, ZoneThermostatSetPointLo
+!unused   USE DataHeatBalFanSys,    ONLY: ZoneThermostatSetPointHi, ZoneThermostatSetPointLo
    USE PlantUtilities,       ONLY: SetActuatedBranchFlowRate
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -2783,7 +2872,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
    REAL(r64)    :: MassFlow         ! Total Mass Flow Rate from Hot & Cold Inlets [kg/sec]
-   REAL(r64)    :: QTotLoad         ! Total load based on thermostat set point temperature [Watts]
+   REAL(r64)    :: QTotLoad         ! Total load based on thermostat setpoint temperature [Watts]
    REAL(r64)    :: QZnReq           ! Total load to be met by terminal heater [Watts]
    REAL(r64)    :: QToHeatSetPt     ! Remaining load to heating setpoint [W]
    REAL(r64)    :: QSupplyAir       ! Zone load met by VAVHeatandCool system
@@ -2804,7 +2893,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    REAL(r64) :: MaxHeatTemp = 0.0D0      ! maximum supply air temperature [C]
    REAL(r64) :: MassFlowReq = 0.0D0      ! air mass flow rate required to meet the coil heating load [W]
    REAL(r64) :: MassFlowActual = 0.0D0   ! air mass flow rate actually used [W]
-   REAL(r64) :: QZoneMax = 0.0D0         ! maximum zone heat addition rate given constraints of MaxHeatTemp and max 
+   REAL(r64) :: QZoneMax = 0.0D0         ! maximum zone heat addition rate given constraints of MaxHeatTemp and max
                                          ! available air mass flow rate [W]
    REAL(r64) :: MinMassAirFlow = 0.0D0   ! the air flow rate during heating for normal acting damper
    REAL(r64) :: QZoneMax2 = 0.0D0        ! temporary variable
@@ -2888,42 +2977,45 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
      ! be activated (there's a zone heating load or there's a reheat requirement). There are 3 possible
      ! situations: 1) the coil load can be met by variable temperature air (below the max heat temp) at
      ! the minimum air mass flow rate; 2) the coil load can be met by variable air flow rate with the air
-     ! temperature fixed at the max heat temp; 3) the load can not be met (we will run at max air temp and
+     ! temperature fixed at the max heat temp; 3) the load cannot be met (we will run at max air temp and
      ! max air flow rate). We check for condition 2 by assuming the air temperatute is at the max heat temp
      ! and solving for the air mass flow rate that will meet the load. If the flow rate is between the min and
      ! max we are in condition 2.
 
      QZoneMax2 = QToHeatSetPt
 
-   IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
+     IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
 
-     MaxHeatTemp = Sys(SysNum)%MaxReheatTemp
-     MassFlowReq = QToHeatSetPt/(CpAirZn*(MaxHeatTemp - ZoneTemp))
+       MaxHeatTemp = Sys(SysNum)%MaxReheatTemp
+       IF (QToHeatSetPt > SmallLoad) THEN ! zone has a postive load to heating setpoint
+         MassFlowReq = QToHeatSetPt/(CpAirZn*(MaxHeatTemp - ZoneTemp))
+       ELSE
+         MassFlowReq = MassFlow
+       ENDIF
 
-     QZoneMax3 = CpAirZn * (MaxHeatTemp - ZoneTemp) * MassFlow
+       QZoneMax3 = CpAirZn * (MaxHeatTemp - ZoneTemp) * MassFlow
 
-     MassFlowActual = MassFlow
+       MassFlowActual = MassFlow
 
-     IF (QZoneMax3 < QToHeatSetPt) THEN
-       MassFlowActual = MassFlowReq
-       ! QZoneMax3 = CpAirZn * (MaxHeatTemp - ZoneTemp) * MassFlowActual
-     END IF
+       IF (QZoneMax3 < QToHeatSetPt) THEN
+         MassFlowActual = MassFlowReq
+         ! QZoneMax3 = CpAirZn * (MaxHeatTemp - ZoneTemp) * MassFlowActual
+       END IF
 
-     IF (MassFlowActual <= MinMassAirFlow) THEN
-       MassFlowActual = MinMassAirFlow
-     ELSE IF (MassFlowActual >= Sys(Sysnum)%AirMassFlowRateMax) THEN
-       MassFlowActual = Sys(Sysnum)%AirMassFlowRateMax
-     END IF
+       IF (MassFlowActual <= MinMassAirFlow) THEN
+         MassFlowActual = MinMassAirFlow
+       ELSE IF (MassFlowActual >= Sys(Sysnum)%AirMassFlowRateMax) THEN
+         MassFlowActual = Sys(Sysnum)%AirMassFlowRateMax
+       END IF
 
-     QZoneMax = CpAirZn*MassFlowActual*(MaxHeatTemp - ZoneTemp)
+       QZoneMax = CpAirZn*MassFlowActual*(MaxHeatTemp - ZoneTemp)
 
-     ! temporary variable
-     QZoneMax2 = MIN(QZoneMax,QToHeatSetPt)
+       ! temporary variable
+       QZoneMax2 = MIN(QZoneMax,QToHeatSetPt)
 
-     ! reset terminal unit air mass flow to new value.
-     MassFlow = MassFlowActual
+       MassFlow = MassFlowActual
 
-   END IF     ! IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
+     END IF     ! IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
 
      SysOutlet(SysNum)%AirMassFlowRate = MassFlow
 
@@ -2973,8 +3065,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
                             CompErrIndex=Sys(SysNum)%CompErrIndex, &
                             LoopNum     = Sys(SysNum)%HWLoopNum,              &
                             LoopSide    = Sys(SysNum)%HWLoopSide,             &
-                            BranchIndex = Sys(SysNum)%HWBranchIndex,          &
-                            CompIndex   = Sys(SysNum)%HWCompIndex)
+                            BranchIndex = Sys(SysNum)%HWBranchIndex)
 
 
          ! If reverse action damper and the hot water flow is at maximum, simulate the
@@ -3025,8 +3116,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
                                 CompErrIndex=Sys(SysNum)%CompErrIndex, &
                                 LoopNum     = Sys(SysNum)%HWLoopNum,              &
                                 LoopSide    = Sys(SysNum)%HWLoopSide,             &
-                                BranchIndex = Sys(SysNum)%HWBranchIndex,          &
-                                CompIndex   = Sys(SysNum)%HWCompIndex)
+                                BranchIndex = Sys(SysNum)%HWBranchIndex)
 
            END IF
            ! recalculate damper position
@@ -3088,7 +3178,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
          DummyMdot = 0.d0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
-         
+
          !call the reheat coil with the NO FLOW condition to make sure that the Node values
          ! are passed through to the coil outlet correctly
          CALL SimulateWaterCoilComponents(Sys(SysNum)%ReheatName,FirstHVACIteration,  &
@@ -3610,7 +3700,7 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
           ! USE STATEMENTS:
    USE DataZoneEnergyDemands
-   USE DataHeatBalFanSys, ONLY: Mat
+!unused   USE DataHeatBalFanSys, ONLY: Mat
    USE WaterCoils,   ONLY:SimulateWaterCoilComponents
    USE HeatingCoils, ONLY:SimulateHeatingCoilComponents
    USE SteamCoils,   ONLY:SimulateSteamCoilComponents
@@ -3727,8 +3817,7 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
                             CompErrIndex=Sys(SysNum)%CompErrIndex, &
                             LoopNum     = Sys(SysNum)%HWLoopNum,              &
                             LoopSide    = Sys(SysNum)%HWLoopSide,             &
-                            BranchIndex = Sys(SysNum)%HWBranchIndex,          &
-                            CompIndex   = Sys(SysNum)%HWCompIndex)
+                            BranchIndex = Sys(SysNum)%HWBranchIndex)
 
        CASE(HCoilType_SteamAirHeating) ! COIL:STEAM:STEAMAIRHEATING
          ! Determine the load required to pass to the Component controller
@@ -3773,7 +3862,7 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
          DummyMdot = 0.d0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE.)
-         
+
          !call the reheat coil with the NO FLOW condition to make sure that the Node values
          ! are passed through to the coil outlet correctly
          CALL SimulateWaterCoilComponents(Sys(SysNum)%ReheatName,FirstHVACIteration,  &
@@ -4330,6 +4419,10 @@ SUBROUTINE UpdateSys(SysNum)
     Node(OutletNode)%CO2 = Node(InletNode)%CO2
   End If
 
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(OutletNode)%GenContam = Node(InletNode)%GenContam
+  End If
+
   RETURN
 END Subroutine UpdateSys
 
@@ -4448,7 +4541,7 @@ END SUBROUTINE GetHVACSingleDuctSysIndex
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

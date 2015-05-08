@@ -92,8 +92,8 @@ INTEGER, PUBLIC, parameter  ::  unitsStyleInchPound        = 4
 INTEGER, parameter  ::  isAverage                     = 1
 INTEGER, parameter  ::  isSum                         = 2
 
-INTEGER, parameter  ::  stepTypeZone               = 1
-INTEGER, parameter  ::  stepTypeHVAC               = 2
+INTEGER, parameter  ::  stepTypeZone               = ZoneTSReporting
+INTEGER, parameter  ::  stepTypeHVAC               = HVACTSReporting
 
 ! BEPS Report Related Variables
 ! From Report:Table:Predefined - BEPS
@@ -289,9 +289,9 @@ INTEGER, DIMENSION(numResourceTypes)            :: ffSchedIndex = 0
 INTEGER, DIMENSION(numEndUses,numResourceTypes) :: meterNumEndUseBEPS =0
 INTEGER, ALLOCATABLE, DIMENSION(:,:,:)          :: meterNumEndUseSubBEPS
 ! arrays that hold the names of the resource and end uses
-CHARACTER(LEN=30), DIMENSION(numResourceTypes)  :: resourceTypeNames =' '
-CHARACTER(LEN=30), DIMENSION(numSourceTypes)    :: sourceTypeNames   =' '
-CHARACTER(LEN=30), DIMENSION(numEndUses)        :: endUseNames       =' '
+CHARACTER(len=32), DIMENSION(numResourceTypes)  :: resourceTypeNames =' '
+CHARACTER(len=32), DIMENSION(numSourceTypes)    :: sourceTypeNames   =' '
+CHARACTER(len=32), DIMENSION(numEndUses)        :: endUseNames       =' '
 ! arrays that hold the actual values for the year
 REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBEPS   =0.0
 REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBySourceBEPS =0.0
@@ -384,7 +384,7 @@ INTEGER,PUBLIC :: maxUniqueKeyCount=0
 
 
 ! SUBROUTINE SPECIFICATIONS FOR MODULE PrimaryPlantLoops
-PUBLIC     UpdateTabularReports
+ PUBLIC       UpdateTabularReports
  PRIVATE      GetInputTabularMonthly
  PRIVATE      GetInputTabularTimeBins
  PRIVATE      GetInputTabularStyle
@@ -407,25 +407,26 @@ PUBLIC     UpdateTabularReports
  PRIVATE      WriteCompCostTable
  PRIVATE      WriteComponentSizing
  PRIVATE      WriteSurfaceShadowing
-PUBLIC       WriteReportHeaders
-PUBLIC       writeSubtitle
-PUBLIC       WriteTable
-PRIVATE      WriteTableOfContents
-PUBLIC      DetermineBuildingFloorArea
-PUBLIC       RealToStr
-PUBLIC       IntToStr
-PUBLIC     OpenOutputTabularFile
-PUBLIC     CloseOutputTabularFile
-PUBLIC     isInQuadrilateral
-PUBLIC     AddTOCEntry
-PRIVATE    FillWeatherPredefinedEntries
-PRIVATE    FillRemainingPredefinedEntries
-PRIVATE    SetupUnitConversions
-PUBLIC     LookupSItoIP
-PUBLIC     ConvertIP
-PUBLIC     GetUnitConversion
-PUBLIC     StrToReal
-PUBLIC     GetColumnUsingTabs
+ PUBLIC       WriteReportHeaders
+ PUBLIC       writeSubtitle
+ PUBLIC       WriteTable
+ PRIVATE      WriteTableOfContents
+ PUBLIC      DetermineBuildingFloorArea
+ PUBLIC       RealToStr
+ PUBLIC       IntToStr
+ PUBLIC     OpenOutputTabularFile
+ PUBLIC     CloseOutputTabularFile
+ PUBLIC     isInQuadrilateral
+ PUBLIC     AddTOCEntry
+ PRIVATE    FillWeatherPredefinedEntries
+ PRIVATE    FillRemainingPredefinedEntries
+ PRIVATE    SetupUnitConversions
+ PUBLIC     LookupSItoIP
+ PUBLIC     ConvertIP
+ PUBLIC     GetUnitConversion
+ PUBLIC     StrToReal
+ PUBLIC     GetColumnUsingTabs
+ PUBLIC     DateToString
 !PRIVATE      DateToStr
 
 CONTAINS
@@ -1704,6 +1705,9 @@ IF (NumTabularPredefined .EQ. 1) THEN
       displaySourceEnergyEndUseSummary = .TRUE.
       WriteTabularFiles=.true.
       nameFound=.true.
+    ELSEIF (SameString(AlphArray(iReport),'EnergyMeters')) then
+      WriteTabularFiles=.true.
+      nameFound=.true.
     ELSEIF (SameString(AlphArray(iReport),'AllSummary')) then
       WriteTabularFiles=.true.
       displayTabularBEPS = .TRUE.
@@ -1962,7 +1966,7 @@ namedMonthly(6)%title = 'SpaceGainComponentsAtCoolingPeakMonthly'
 namedMonthly(7)%title = 'EnergyConsumptionElectricityNaturalGasMonthly'
 namedMonthly(8)%title = 'EnergyConsumptionElectricityGeneratedPropaneMonthly'
 namedMonthly(9)%title = 'EnergyConsumptionDieselFuelOilMonthly'
-namedMonthly(10)%title = 'Energy Consumption  - District Heating & Cooling Monthly'
+namedMonthly(10)%title = 'EnergyConsumptionDistrictHeatingCoolingMonthly'
 namedMonthly(11)%title = 'EnergyConsumptionCoalGasolineMonthly'
 namedMonthly(12)%title = 'EndUseEnergyConsumptionElectricityMonthly'
 namedMonthly(13)%title = 'EndUseEnergyConsumptionNaturalGasMonthly'
@@ -2048,6 +2052,11 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER :: curReport
 
+! ----------------------------------------------------------------------------------------
+! If any variable are added to these reports they also need to be added to the
+! AddVariablesForMonthlyReport routine in InputProcessor.
+! ----------------------------------------------------------------------------------------
+
 IF (NamedMonthly(1)%show) THEN
   curReport = AddMonthlyReport('ZoneCoolingSummaryMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Cooling Energy','',aggTypeSumOrAvg)
@@ -2055,7 +2064,7 @@ IF (NamedMonthly(1)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
   CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
   CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain Rate','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
   CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
 END IF
@@ -2133,7 +2142,7 @@ IF (NamedMonthly(9)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'FuelOil#2:Facility','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(10)%show) THEN
-  curReport = AddMonthlyReport('Energy Consumption - District Heating & Cooling Monthly',2)
+  curReport = AddMonthlyReport('EnergyConsumptionDistrictHeatingCoolingMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'DistrictCooling:Facility','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'DistrictCooling:Facility','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'DistrictHeating:Facility','',aggTypeSumOrAvg)
@@ -2524,20 +2533,11 @@ IF (NamedMonthly(49)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Ltg Power Multiplier from Daylighting','',aggTypeMinimumDuringHoursShown)
   CALL AddMonthlyFieldSetInput(curReport,'Daylight Illum at Ref Point 1','',aggTypeSumOrAverageHoursShown)
   CALL AddMonthlyFieldSetInput(curReport,'Glare Index at Ref Point 1','',aggTypeSumOrAverageHoursShown)
-
-  !added TH 12/2/2008
   CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Glare Index Setpoint at Ref Point 1','', aggTypeSumOrAvg)
-
-  !added TH 7/6/2009
   CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Daylight Illuminance Setpoint at Ref Point 1','', aggTypeSumOrAvg)
-
   CALL AddMonthlyFieldSetInput(curReport,'Daylight Illum at Ref Point 2','',aggTypeSumOrAverageHoursShown)
   CALL AddMonthlyFieldSetInput(curReport,'Glare Index at Ref Point 2','',aggTypeSumOrAverageHoursShown)
-
-  !added TH 12/2/2008
   CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Glare Index Setpoint at Ref Point 2','', aggTypeSumOrAvg)
-
-  !added TH 7/6/2009
   CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Daylight Illuminance Setpoint at Ref Point 2','', aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(50)%show) THEN
@@ -3325,6 +3325,7 @@ SUBROUTINE GatherMonthlyResultsForTimestep(IndexTypeKey)
           ! USE STATEMENTS:
 USE DataHVACGlobals, ONLY: TimeStepSys,SysTimeElapsed
 USE DataEnvironment, ONLY: Month, DayOfMonth
+USE General, ONLY: EncodeMonDayHrMin,DetermineMinuteForReporting
 
 IMPLICIT NONE
 
@@ -3429,8 +3430,9 @@ DO iTable = 1, MonthlyTablesCount
       newDuration = 0
       activeNewValue = .FALSE.
       ! the current timestamp
-      minuteCalculated = (CurrentTime - INT(CurrentTime))*60
-      IF (IndexTypeKey .EQ. stepTypeHVAC) minuteCalculated = minuteCalculated + SysTimeElapsed * 60
+      minuteCalculated = DetermineMinuteForReporting(IndexTypeKey)
+!      minuteCalculated = (CurrentTime - INT(CurrentTime))*60
+!      IF (IndexTypeKey .EQ. stepTypeHVAC) minuteCalculated = minuteCalculated + SysTimeElapsed * 60
 !      minuteCalculated = INT((TimeStep-1) * TimeStepZone * 60) + INT((SysTimeElapsed + TimeStepSys) * 60)
       CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,minuteCalculated)
       ! perform the selected aggregation type
@@ -3988,6 +3990,7 @@ SUBROUTINE GatherPeakDemandForTimestep(IndexTypeKey)
 USE OutputProcessor, ONLY: EndUseCategory
 USE DataStringGlobals, ONLY: CharComma, CharTab, CharSpace
 USE DataEnvironment, ONLY: Month, DayOfMonth
+USE General, ONLY: EncodeMonDayHrMin,DetermineMinuteForReporting
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4023,7 +4026,8 @@ IF ((displayDemandEndUse) .AND. (IndexTypeKey .EQ. stepTypeZone)) THEN
       IF (curDemandValue .GT. gatherDemandTotal(iResource)) THEN
         gatherDemandTotal(iResource) = curDemandValue
         ! save the time that the peak demand occured
-        minuteCalculated = (CurrentTime - INT(CurrentTime))*60
+!        minuteCalculated = (CurrentTime - INT(CurrentTime))*60
+        minuteCalculated = DetermineMinuteForReporting(IndexTypeKey)
         CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,minuteCalculated)
         gatherDemandTimeStamp(iResource)= timestepTimeStamp
         ! if new peak demand is set, then gather all of the end use values at this particular
@@ -4136,6 +4140,7 @@ USE LowTempRadiantSystem, ONLY: HydrRadSys, NumOfHydrLowTempRadSys, &
 USE DataEnvironment, ONLY: Month, DayOfMonth
 USE OutputReportPredefined, ONLY: pdrSensibleGain, reportName
 USE DataHVACGlobals, ONLY: TimeStepSys,SysTimeElapsed
+USE General, ONLY: EncodeMonDayHrMin,DetermineMinuteForReporting
 
 
 IMPLICIT NONE
@@ -4167,9 +4172,6 @@ REAL(r64) :: bldgClPk = 0.0
 REAL(r64) :: timeStepRatio = 0.0
 LOGICAL, SAVE :: firstTime=.true.
 
-REAL(r64) ActualTimeS  ! Start of current interval (HVAC time step)
-REAL(r64) ActualTimeE  ! End of current interval (HVAC time step)
-INTEGER ActualTimeHrS
 integer ActualTimeMin
 
 
@@ -4309,10 +4311,11 @@ DO iZone = 1, NumOfZones
     IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)) .GT. ZonePreDefRep(iZone)%htPeak) THEN
       ZonePreDefRep(iZone)%htPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)
       !determine timestamp
-      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
-      ActualtimeE = ActualTimeS+TimeStepSys
-      ActualTimeHrS=INT(ActualTimeS)
-      ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+!      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
+!      ActualtimeE = ActualTimeS+TimeStepSys
+!      ActualTimeHrS=INT(ActualTimeS)
+!      ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+      ActualTimeMin=DetermineMinuteForReporting(IndexTypeKey)
       CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
       ZonePreDefRep(iZone)%htPtTimeStamp = timestepTimeStamp
       !HVAC Input Sensible Air Heating
@@ -4389,10 +4392,11 @@ DO iZone = 1, NumOfZones
     IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone)) .LT. ZonePreDefRep(iZone)%clPeak) THEN
       ZonePreDefRep(iZone)%clPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone)
       !determine timestamp
-      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
-      ActualtimeE = ActualTimeS+TimeStepSys
-      ActualTimeHrS=INT(ActualTimeS)
-      ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+!      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
+!      ActualtimeE = ActualTimeS+TimeStepSys
+!      ActualTimeHrS=INT(ActualTimeS)
+!      ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+      ActualTimeMin=DetermineMinuteForReporting(IndexTypeKey)
       CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
       ZonePreDefRep(iZone)%clPtTimeStamp = timestepTimeStamp
       !HVAC Input Sensible Air Heating
@@ -4482,10 +4486,11 @@ END DO
 IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
   BuildingPreDefRep%htPeak =  bldgHtPk
   !determine timestamp
-  ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
-  ActualtimeE = ActualTimeS+TimeStepSys
-  ActualTimeHrS=INT(ActualTimeS)
-  ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+!  ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
+!  ActualtimeE = ActualTimeS+TimeStepSys
+!  ActualTimeHrS=INT(ActualTimeS)
+!  ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+  ActualTimeMin=DetermineMinuteForReporting(IndexTypeKey)
   CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
   BuildingPreDefRep%htPtTimeStamp = timestepTimeStamp
   !reset building level results to zero prior to accumulating across zones
@@ -4571,10 +4576,11 @@ END IF
 IF (bldgClPk .LT. BuildingPreDefRep%clPeak) THEN
   BuildingPreDefRep%clPeak =  bldgClPk
   !determine timestamp
-  ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
-  ActualtimeE = ActualTimeS+TimeStepSys
-  ActualTimeHrS=INT(ActualTimeS)
-  ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+!  ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
+!  ActualtimeE = ActualTimeS+TimeStepSys
+!  ActualTimeHrS=INT(ActualTimeS)
+!  ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+  ActualTimeMin=DetermineMinuteForReporting(IndexTypeKey)
   CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
   BuildingPreDefRep%clPtTimeStamp = timestepTimeStamp
   !reset building level results to zero prior to accumulating across zones
@@ -4712,8 +4718,9 @@ SUBROUTINE FillWeatherPredefinedEntries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          !   Read the STAT file for the active weather file
-          !   and summarize in a predefined report.
+          !   Read the STAT file for the active weather file and summarize in a predefined report.
+          !   The stat file that is attached may have several formats -- from evolution of the
+          !   stat file from the weather converter (or others that produce a similar stat file).
 
           ! METHODOLOGY EMPLOYED:
           !   na
@@ -4727,6 +4734,33 @@ IMPLICIT NONE
           ! SUBROUTINE PARAMETER DEFINITIONS:
 CHARACTER(len=1), PARAMETER :: degChar='°'
 
+! LineTypes for reading the stat file
+INTEGER, PARAMETER :: StatisticsLine=1
+INTEGER, PARAMETER :: LocationLine=2
+INTEGER, PARAMETER :: LatLongLine=3
+INTEGER, PARAMETER :: ElevationLine=4
+INTEGER, PARAMETER :: StdPressureLine=5
+INTEGER, PARAMETER :: DataSourceLine=6
+INTEGER, PARAMETER :: WMOStationLine=7
+INTEGER, PARAMETER :: DesignConditionsLine=8
+INTEGER, PARAMETER :: heatingConditionsLine=9
+INTEGER, PARAMETER :: coolingConditionsLine=10
+INTEGER, PARAMETER :: stdHDDLine=11
+INTEGER, PARAMETER :: stdCDDLine=12
+INTEGER, PARAMETER :: maxDryBulbLine=13
+INTEGER, PARAMETER :: minDryBulbLine=14
+INTEGER, PARAMETER :: maxDewPointLine=15
+INTEGER, PARAMETER :: minDewPointLine=16
+INTEGER, PARAMETER :: wthHDDLine=17
+INTEGER, PARAMETER :: wthCDDLine=18
+INTEGER, PARAMETER :: KoppenLine=19
+INTEGER, PARAMETER :: KoppenDes1Line=20
+INTEGER, PARAMETER :: KoppenDes2Line=21
+INTEGER, PARAMETER :: AshStdLine=22
+INTEGER, PARAMETER :: AshStdDes1Line=23
+INTEGER, PARAMETER :: AshStdDes2Line=24
+INTEGER, PARAMETER :: AshStdDes3Line=25
+
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
 
@@ -4739,7 +4773,8 @@ INTEGER, EXTERNAL :: GetNewUnitNumber  ! External  function to "get" a unit numb
 CHARACTER(len=200) :: lineIn
 INTEGER :: statFile
 LOGICAL :: fileExists
-INTEGER :: lineCount = 0
+INTEGER :: lineType = 0
+INTEGER :: lineTypeinterim = 0
 INTEGER :: readStat
 LOGICAL :: isASHRAE
 LOGICAL :: iscalc
@@ -4760,12 +4795,23 @@ CHARACTER(2) :: ashZone   !ashrae climate zone
 CHARACTER(len=MaxNameLength) :: curNameWithSIUnits
 CHARACTER(len=MaxNameLength) :: curNameAndUnits
 INTEGER :: indexUnitConv
+CHARACTER(len=10) :: storeASHRAEHDD
+CHARACTER(len=10) :: storeASHRAECDD
+LOGICAL :: heatingDesignlinepassed
+LOGICAL :: coolingDesignlinepassed
+LOGICAL :: desConditionlinepassed
 
 INQUIRE(file='in.stat',EXIST=fileExists)
 readStat=0
 isASHRAE=.false.
 iscalc=.false.
 isKoppen=.false.
+heatingDesignlinepassed=.false.
+coolingDesignlinepassed=.false.
+desConditionlinepassed=.false.
+storeASHRAEHDD=' '
+storeASHRAECDD=' '
+lineTypeinterim=0
 IF (fileExists) THEN
   statFile = GetNewUnitNumber()
   OPEN (unit=statFile, file='in.stat', action='READ', iostat=readStat)
@@ -4773,32 +4819,74 @@ IF (fileExists) THEN
     CALL ShowFatalError('FillWeatherPredefinedEntries: Could not open file "in.stat" for input (read).')
   ENDIF
   DO WHILE (readStat == 0) !end of file, or error
-    lineCount = lineCount + 1
+    lineType=lineTypeinterim
     READ(UNIT=statFile,FMT='(A)',IOSTAT=readStat) lineIn
     ! reconcile line with different versions of stat file
-    lnPtr=INDEX(lineIn,'Maximum Dry Bulb')
-    if (lnPtr > 0) lineCount=39
-    lnPtr=INDEX(lineIn,'Minimum Dry Bulb')
-    if (lnPtr > 0) lineCount=40
-    lnPtr=INDEX(lineIn,'Maximum Dew Point')
-    if (lnPtr > 0) lineCount=88
-    lnPtr=INDEX(lineIn,'Minimum Dew Point')
-    if (lnPtr > 0) lineCount=89
-    lnPtr=INDEX(lineIn,'heating degree-days (10°C baseline)')
-    if (lnPtr > 0) lineCount=249
-    lnPtr=INDEX(lineIn,'cooling degree-days (18°C baseline)')
-    if (lnPtr > 0) lineCount=251
-    lnPtr=INDEX(lineIn,'(Köppen classification)')
-    if (lnPtr > 0) lineCount=254
-    lnPtr=INDEX(lineIn,'ASHRAE Standards')
-    if (lnPtr > 0) lineCount=260
+    ! v7.1 added version as first line.
+    lineIn=ADJUSTL(lineIn)
+    if (lineIn(1:10) == 'Statistics') then
+      lineType=StatisticsLine
+    elseif (lineIn(1:8) == 'Location') then
+      lineType=LocationLine
+    elseif (lineIn(1:1) == '{') then
+      lineType=LatLongLine
+    elseif (lineIn(1:9) == 'Elevation') then
+      lineType=ElevationLine
+    elseif (lineIn(1:17) == 'Standard Pressure') then
+      lineType=StdPressureLine
+    elseif (lineIn(1:11) == 'Data Source') then
+      lineType=DataSourceLine
+    elseif (lineIn(1:11) == 'WMO Station') then
+      lineType=WMOStationLine
+    elseif (INDEX(lineIn,'Design Conditions') > 0) then
+      if (.not. desConditionlinepassed) then
+        desConditionlinepassed=.true.
+        lineType=DesignConditionsLine
+      endif
+    elseif (lineIn(2:8) == 'Heating') then
+      if (.not. heatingDesignlinepassed) then
+        heatingDesignlinepassed=.true.
+        lineType=heatingConditionsLine
+      endif
+    elseif (lineIn(2:8) == 'Cooling') then
+      if (.not. coolingDesignlinepassed) then
+        coolingDesignlinepassed=.true.
+        lineType=coolingConditionsLine
+      endif
+    elseif (INDEX(lineIn,'(standard) heating degree-days (10°C baseline)') > 0) then
+      lineType=stdHDDLine
+    elseif (INDEX(lineIn,'(standard) cooling degree-days (18.3°C baseline)') > 0) then
+      lineType=stdCDDLine
+    elseif (INDEX(lineIn,'Maximum Dry Bulb') > 0) then
+      lineType=maxDryBulbLine
+    elseif (INDEX(lineIn,'Minimum Dry Bulb') > 0) then
+      lineType=minDryBulbLine
+    elseif (INDEX(lineIn,'Maximum Dew Point') > 0) then
+      lineType=maxDewPointLine
+    elseif (INDEX(lineIn,'Minimum Dew Point') > 0) then
+      lineType=minDewPointLine
+    elseif (INDEX(lineIn,'(wthr file) heating degree-days (10°C baseline)') > 0 .or. &
+            INDEX(lineIn,'heating degree-days (10°C baseline)') > 0) then
+      lineType=wthHDDLine
+    elseif (INDEX(lineIn,'(wthr file) cooling degree-days (18°C baseline)') > 0 .or. &
+            INDEX(lineIn,'cooling degree-days (18°C baseline)') > 0) then
+      lineType=wthCDDLine
+    endif
+    ! these not part of big if/else because sequential
+    if (lineType == KoppenDes1Line .and. isKoppen) lineType=KoppenDes2Line
+    if (lineType == KoppenLine .and. isKoppen) lineType=KoppenDes1Line
+    if (INDEX(lineIn,'(Köppen classification)') > 0) lineType=KoppenLine
+    if (lineType == AshStdDes2Line) lineType=AshStdDes3Line
+    if (lineType == AshStdDes1Line) lineType=AshStdDes2Line
+    if (lineType == AshStdLine) lineType=AshStdDes1Line
+    if (INDEX(lineIn,'ASHRAE Standards') > 0) lineType=AshStdLine
 
-    SELECT CASE (lineCount)
-      CASE (1) ! Statistics for USA_CA_San.Francisco_TMY2
-        CALL PreDefTableEntry(pdchWthrVal, 'Reference', lineIn(17:))
-      CASE (2) ! Location -- SAN_FRANCISCO CA USA
-        CALL PreDefTableEntry(pdchWthrVal, 'Site:Location', lineIn(13:))
-      CASE (3) !      {N 37° 37'} {W 122° 22'} {GMT -8.0 Hours}
+    SELECT CASE (lineType)
+      CASE (StatisticsLine) ! Statistics for USA_CA_San.Francisco_TMY2
+        CALL PreDefTableEntry(pdchWthrVal, 'Reference', lineIn(16:))
+      CASE (LocationLine) ! Location -- SAN_FRANCISCO CA USA
+        CALL PreDefTableEntry(pdchWthrVal, 'Site:Location', lineIn(12:))
+      CASE (LatLongLine) !      {N 37° 37'} {W 122° 22'} {GMT -8.0 Hours}
         ! find the {}
         sposlt=INDEX(lineIn,'{')
         eposlt=INDEX(lineIn,'}')
@@ -4827,24 +4915,23 @@ IF (fileExists) THEN
         ELSE
           CALL PreDefTableEntry(pdchWthrVal, 'Time Zone', 'not found')
         ENDIF
-      CASE (4) ! Elevation --     5m above sea level
-        IF (INDEX(lineIn,'Elevation') <=0) CYCLE
-        lnPtr=index(lineIn(14:),'m')
-        curNameWithSIUnits = 'Elevation (m) '//lineIn(14+lnPtr+1:)
+      CASE (ElevationLine) ! Elevation --     5m above sea level
+        lnPtr=index(lineIn(13:),'m')
+        curNameWithSIUnits = 'Elevation (m) '//lineIn(13+lnPtr+1:)
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(14:14+lnPtr-2))),1)))
+             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(13:13+lnPtr-2))),1)))
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameWithSIUnits), lineIn(14:14+lnPtr-2))
+          CALL PreDefTableEntry(pdchWthrVal, trim(curNameWithSIUnits), lineIn(13:13+lnPtr-2))
         ENDIF
-      CASE (5) ! Standard Pressure at Elevation -- 101265Pa
-        CALL PreDefTableEntry(pdchWthrVal, 'Standard Pressure at Elevation', lineIn(36:))
-      CASE (6) ! Data Source -- TMY2-23234
-        CALL PreDefTableEntry(pdchWthrVal, 'Data Source', lineIn(17:))
-      CASE (8) ! WMO Station 724940
-        CALL PreDefTableEntry(pdchWthrVal, 'WMO Station', lineIn(14:))
-      CASE (10) !  - Using Design Conditions from "Climate Design Data 2005 ASHRAE Handbook"
+      CASE (StdPressureLine) ! Standard Pressure at Elevation -- 101265Pa
+        CALL PreDefTableEntry(pdchWthrVal, 'Standard Pressure at Elevation', lineIn(35:))
+      CASE (DataSourceLine) ! Data Source -- TMY2-23234
+        CALL PreDefTableEntry(pdchWthrVal, 'Data Source', lineIn(16:))
+      CASE (WMOStationLine) ! WMO Station 724940
+        CALL PreDefTableEntry(pdchWthrVal, 'WMO Station', lineIn(13:))
+      CASE (DesignConditionsLine) !  - Using Design Conditions from "Climate Design Data 2005 ASHRAE Handbook"
         ashPtr=INDEX(lineIn,'ASHRAE')
         IF (ashPtr .GT. 0) THEN
           isASHRAE = .TRUE.
@@ -4860,7 +4947,7 @@ IF (fileExists) THEN
           iscalc = .true.
           CALL PreDefTableEntry(pdchWthrVal, 'Weather File Design Conditions ', 'Calculated from the weather file')
         END IF
-      CASE (19) !  winter design conditions
+      CASE (heatingConditionsLine) !  winter/heating design conditions
         IF (iscalc) THEN
           IF (isASHRAE) THEN
             IF (ashDesYear == '2001') THEN
@@ -4915,7 +5002,7 @@ IF (fileExists) THEN
             ENDIF
           ENDIF
         ENDIF
-      CASE (23) !  summer design conditions
+      CASE (coolingConditionsLine) !  summer/cooling design conditions
         IF (iscalc) THEN
           IF (isASHRAE) THEN
             IF (ashDesYear == '2001') THEN
@@ -4984,92 +5071,145 @@ IF (fileExists) THEN
             ENDIF
           END IF
         ENDIF
-      CASE (39) !   - Maximum Dry Bulb temperature of  35.6°C on Jul  9
-        IF (INDEX(lineIn,'Maximum Dry Bulb') <=0) CYCLE
+      CASE (stdHDDLine) !  - 1745 annual (standard) heating degree-days (10°C baseline)
+        storeASHRAEHDD=lineIn(3:6)
+      CASE (stdCDDLine) !  -  464 annual (standard) cooling degree-days (18.3°C baseline)
+        storeASHRAECDD=lineIn(3:6)
+      CASE (maxDryBulbLine) !   - Maximum Dry Bulb temperature of  35.6°C on Jul  9
+        sposlt=INDEX(lineIn,'of')
+        eposlt=INDEX(lineIn,degChar)
+        sposlt=sposlt+2
+        eposlt=eposlt-1
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
           curNameWithSIUnits = 'Maximum Dry Bulb Temperature (C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(38:42))),1))//degchar)
+             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Temperature (C)', lineIn(38:43))
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt))
         ENDIF
-        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Occurs on', lineIn(49:))
-      CASE (40) !   - Minimum Dry Bulb temperature of -22.8°C on Jan  7
-        IF (INDEX(lineIn,'Minimum Dry Bulb') <=0) CYCLE
+        sposlt=INDEX(lineIn,'on')
+        sposlt=sposlt+2
+        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Occurs on', lineIn(sposlt:))
+      CASE (minDryBulbLine) !   - Minimum Dry Bulb temperature of -22.8°C on Jan  7
+        sposlt=INDEX(lineIn,'of')
+        eposlt=INDEX(lineIn,degChar)
+        sposlt=sposlt+2
+        eposlt=eposlt-1
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
           curNameWithSIUnits = 'Minimum Dry Bulb Temperature (C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(38:42))),1))//degchar)
+             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Temperature (C)', lineIn(38:43))
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt))
         ENDIF
-        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Occurs on', lineIn(49:))
-      CASE (88) !   - Maximum Dew Point temperature of  25.6°C on Aug  4
-        IF (INDEX(lineIn,'Maximum Dew Point') <=0) CYCLE
+        sposlt=INDEX(lineIn,'on')
+        sposlt=sposlt+2
+        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Occurs on', lineIn(sposlt:))
+      CASE (maxDewPointLine) !   - Maximum Dew Point temperature of  25.6°C on Aug  4
+        sposlt=INDEX(lineIn,'of')
+        eposlt=INDEX(lineIn,degChar)
+        sposlt=sposlt+2
+        eposlt=eposlt-1
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
           curNameWithSIUnits = 'Maximum Dew Point Temperature (C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(39:43))),1))//degchar)
+             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Temperature (C)', lineIn(39:44))
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Temperature (C)', lineIn(sposlt:eposlt))
         ENDIF
-        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Occurs on', lineIn(49:))
-      CASE (89) !   - Minimum Dew Point temperature of -28.9°C on Dec 31
-        IF (INDEX(lineIn,'Minimum Dew Point') <=0) CYCLE
+        sposlt=INDEX(lineIn,'on')
+        sposlt=sposlt+2
+        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Occurs on', lineIn(sposlt:))
+      CASE (minDewPointLine) !   - Minimum Dew Point temperature of -28.9°C on Dec 31
+        sposlt=INDEX(lineIn,'of')
+        eposlt=INDEX(lineIn,degChar)
+        sposlt=sposlt+2
+        eposlt=eposlt-1
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
           curNameWithSIUnits = 'Minimum Dew Point Temperature (C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(39:43))),1))//degchar)
+             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Temperature (C)', lineIn(39:44))
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Temperature (C)', lineIn(sposlt:eposlt))
         ENDIF
-        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Occurs on', lineIn(49:))
-      CASE (249) !  - 1745 annual heating degree-days (10°C baseline)
-        IF (INDEX(lineIn,'heating degree-days (10°C baseline)') <=0) CYCLE
+        sposlt=INDEX(lineIn,'on')
+        sposlt=sposlt+2
+        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Occurs on', lineIn(sposlt:))
+      CASE (wthHDDLine) !  - 1745 (wthr file) annual heating degree-days (10°C baseline)
+        IF (storeASHRAEHDD /= ' ') THEN
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Standard Heating Degree-Days - base 50°(C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(storeASHRAEHDD)),1)))
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Heating Degree-Days (base 10°C)', storeASHRAEHDD)
+          ENDIF
+        ELSE
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Heating Degree-Days (base 50°F)', 'not found')
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Heating Degree-Days (base 10°C)', 'not found')
+          ENDIF
+        ENDIF
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Heating Degree-Days - base 50°(C)'
+          curNameWithSIUnits = 'Weather File Heating Degree-Days - base 50°(C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(7:11))),1)))
+             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Heating Degree-Days (base 10°C)', lineIn(7:11))
+          CALL PreDefTableEntry(pdchWthrVal, 'Weather File Heating Degree-Days (base 10°C)', lineIn(3:6))
         ENDIF
-      CASE (251) !  -  464 annual cooling degree-days (18°C baseline)
-        IF (INDEX(lineIn,'cooling degree-days (18°C baseline)') <=0) CYCLE
+      CASE (wthCDDLine) !  -  464 (wthr file) annual cooling degree-days (18°C baseline)
+        IF (storeASHRAECDD /= ' ') THEN
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Standard Cooling Degree-Days - base 65°(C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(storeASHRAECDD)),1)))
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Cooling Degree-Days (base 18.3°C)', storeASHRAECDD)
+          ENDIF
+        ELSE
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Cooling Degree-Days (base 65°F)', 'not found')
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Standard Cooling Degree-Days (base 18.3°C)', 'not found')
+          ENDIF
+        ENDIF
         IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Cooling Degree-Days - base 64.4°(C)'
+          curNameWithSIUnits = 'Weather File Cooling Degree-Days - base 64.4°(C)'
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(7:11))),1)))
+             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
         ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Cooling Degree-Days (base 18°C)', lineIn(7:11))
+          CALL PreDefTableEntry(pdchWthrVal, 'Weather File Cooling Degree-Days (base 18°C)', lineIn(3:6))
         ENDIF
-      CASE (254) ! - Climate type "BSk" (Köppen classification)
-        IF (INDEX(lineIn,'(Köppen classification)') <=0) CYCLE
+      CASE (KoppenLine) ! - Climate type "BSk" (Köppen classification)
         IF (INDEX(lineIn,'not shown') == 0) THEN
           isKoppen=.true.
-          IF (lineIn(20:20) .EQ. '"') THEN
-            CALL PreDefTableEntry(pdchWthrVal, 'Köppen Classification', lineIn(18:19))
+          IF (lineIn(19:19) .EQ. '"') THEN  ! two character classification
+            CALL PreDefTableEntry(pdchWthrVal, 'Köppen Classification', lineIn(17:18))
           ELSE
-            CALL PreDefTableEntry(pdchWthrVal, 'Köppen Classification', lineIn(18:20))
+            CALL PreDefTableEntry(pdchWthrVal, 'Köppen Classification', lineIn(17:19))
           END IF
         ELSE
           isKoppen=.false.
-          CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', lineIn(4:))
+          CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', lineIn(3:))
         ENDIF
-      CASE (255) ! - Tropical monsoonal or tradewind-coastal (short dry season, lat. 5-25°)
+      CASE (KoppenDes1Line) ! - Tropical monsoonal or tradewind-coastal (short dry season, lat. 5-25°)
         IF (isKoppen) THEN
-          CALL PreDefTableEntry(pdchWthrVal, 'Köppen Description', lineIn(4:))
+          CALL PreDefTableEntry(pdchWthrVal, 'Köppen Description', lineIn(3:))
         ENDIF
-      CASE (256) ! - Unbearably humid periods in summer, but passive cooling is possible
+      CASE (KoppenDes2Line) ! - Unbearably humid periods in summer, but passive cooling is possible
         IF (isKoppen) THEN
           IF (LEN_TRIM(lineIn) .GT. 3) THEN ! avoid blank lines
-            IF (lineIn(4:5) .NE. '**') THEN  ! avoid line with warning
-              CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', lineIn(4:))
+            IF (lineIn(3:4) .NE. '**') THEN  ! avoid line with warning
+              CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', lineIn(3:))
             ELSE
               CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', '')
             END IF
@@ -5077,9 +5217,10 @@ IF (fileExists) THEN
             CALL PreDefTableEntry(pdchWthrVal, 'Köppen Recommendation', '')
           END IF
         ENDIF
-      CASE (260,261,262,263) !  - Climate type "1A" (ASHRAE Standards 90.1-2004 and 90.2-2004 Climate Zone)**
+      CASE (AshStdLine,AshStdDes1Line,AshStdDes2Line,AshStdDes3Line)
+                  !  - Climate type "1A" (ASHRAE Standards 90.1-2004 and 90.2-2004 Climate Zone)**
         IF (INDEX(lineIn,'Standards') .GT. 0) THEN
-          ashZone = lineIn(18:19)
+          ashZone = lineIn(17:18)
           if (ashZone(2:2) == '"') ashZone(2:2)=' '
           CALL PreDefTableEntry(pdchWthrVal, 'ASHRAE Climate Zone', ashZone)
           IF (ashZone .EQ. '1A') THEN
@@ -5120,6 +5261,14 @@ IF (fileExists) THEN
         END IF
     END SELECT
     LineIn = ''
+    lineTypeinterim=0
+    if (lineType == AshStdDes3Line) lineTypeinterim=0
+    if (lineType == AshStdDes2Line) lineTypeinterim=AshStdDes2Line
+    if (lineType == AshStdDes1Line) lineTypeinterim=AshStdDes1Line
+    if (lineType == AshStdLine) lineTypeinterim=AshStdLine
+    if (lineType == KoppenDes2Line) lineTypeinterim=0
+    if (lineType == KoppenDes1Line) lineTypeinterim=KoppenDes1Line
+    if (lineType == KoppenLine) lineTypeinterim=KoppenLine
   END DO
   CLOSE(UNIT=statFile)
 ENDIF
@@ -5258,7 +5407,7 @@ REAL(r64) :: totalOtherRem = 0.0
 
 convertJtoGJ = 1.0d0/1000000000.0d0
 StartOfWeek = RunPeriodStartDayOfWeek
-IF (StartOfWeek .EQ. 0) StartOfWeek = 1 !if the first day of the week has not been set yet, assume monday
+IF (StartOfWeek .EQ. 0) StartOfWeek = 2 !if the first day of the week has not been set yet, assume monday
 
 !Interior Connected Lighting Power
 consumptionTotal = 0.0
@@ -5281,8 +5430,8 @@ DO iLight = 1, TotLights
     HrsPerWeek = 24 * 7 * Lights(iLight)%SumConsumption/(Lights(iLight)%DesignLevel * gatherElapsedTimeBEPS * SecInHour)
     CALL PreDefTableEntry(pdchInLtFullLoadHrs,Lights(iLight)%Name,HrsPerWeek)
   END IF
-  CALL PreDefTableEntry(pdchInLtConsump,Lights(iLight)%Name,Lights(iLight)%SumConsumption/1000000000)
-  consumptionTotal = consumptionTotal + Lights(iLight)%SumConsumption/1000000000
+  CALL PreDefTableEntry(pdchInLtConsump,Lights(iLight)%Name,Lights(iLight)%SumConsumption/1000000000.d0)
+  consumptionTotal = consumptionTotal + Lights(iLight)%SumConsumption/1000000000.d0
 END DO
 CALL PreDefTableEntry(pdchInLtConsump,'Interior Lighting Total',consumptionTotal)
 
@@ -5304,8 +5453,8 @@ DO iLight = 1, NumExteriorLights
        (ExteriorLights(iLight)%DesignLevel * gatherElapsedTimeBEPS * SecInHour)
     CALL PreDefTableEntry(pdchExLtFullLoadHrs,ExteriorLights(iLight)%Name,HrsPerWeek)
   END IF
-  CALL PreDefTableEntry(pdchExLtConsump,ExteriorLights(iLight)%Name,ExteriorLights(iLight)%SumConsumption/1000000000)
-  consumptionTotal = consumptionTotal + ExteriorLights(iLight)%SumConsumption/1000000000
+  CALL PreDefTableEntry(pdchExLtConsump,ExteriorLights(iLight)%Name,ExteriorLights(iLight)%SumConsumption/1000000000.d0)
+  consumptionTotal = consumptionTotal + ExteriorLights(iLight)%SumConsumption/1000000000.d0
 END DO
 CALL PreDefTableEntry(pdchExLtConsump,'Exterior Lighting Total',consumptionTotal)
 
@@ -6221,6 +6370,8 @@ INTEGER, parameter  ::  colPurchCool          = 4
 INTEGER, parameter  ::  colPurchHeat          = 5
 INTEGER, parameter  ::  colWater              = 6
 
+REAL(r64), parameter :: SmallValue = 1.d-14
+
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
 
@@ -6272,7 +6423,7 @@ REAL(r64)                                      :: convBldgCondFloorArea
 CHARACTER(len=MaxNameLength) :: curNameWithSIUnits
 CHARACTER(len=MaxNameLength) :: curNameAndUnits
 INTEGER :: indexUnitConv
-CHARACTER(len=50)                             :: tableString
+CHARACTER(len=52)                             :: tableString
 
 
 IF (displayTabularBEPS) THEN
@@ -6511,7 +6662,7 @@ IF (displayTabularBEPS) THEN
   if (fuelfactorsused(7)) then
     TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsSource(7)
   else
-    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsBEPS(11)*sourceFactorFuelOil1
+    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsBEPS(11)*sourceFactorFuelOil2
   endif
   ! propane
   if (fuelfactorsused(8)) then
@@ -6570,7 +6721,7 @@ IF (displayTabularBEPS) THEN
   if (fuelfactorsused(7)) then
     netSourceEnergyUse=netSourceEnergyUse+gatherTotalsSource(7)
   else
-    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsBEPS(11)*sourceFactorFuelOil1
+    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsBEPS(11)*sourceFactorFuelOil2
   endif
   ! propane
   if (fuelfactorsused(8)) then
@@ -6667,18 +6818,22 @@ IF (displayTabularBEPS) THEN
 !  tableBody(10,1) = TRIM(RealToStr(sourceFactorFuelOil2 ,3))
 !  tableBody(11,1) = TRIM(RealToStr(sourceFactorPropane ,3))
 
-  IF (ffSchedUsed(1)) THEN
-    tableBody(1,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(1)/gatherTotalsBEPS(1),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(1))) // "')"
-  ELSE
+  IF (.not. ffSchedUsed(1)) THEN
     tableBody(1,1)  = TRIM(RealToStr(sourceFactorElectric,3))
+  ELSEIF (gatherTotalsBEPS(1) > SmallValue) THEN
+    tableBody(1,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(1)/gatherTotalsBEPS(1),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(1))) // '")'
+  ELSE
+    tableBody(1,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(2)) THEN
-    tableBody(2,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(2)/gatherTotalsBEPS(2),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(2))) // "')"
-  ELSE
+  IF (.not. ffSchedUsed(2)) THEN
     tableBody(2,1)  = TRIM(RealToStr(sourceFactorNaturalGas, 3))
+  ELSEIF (gatherTotalsBEPS(2) > SmallValue) THEN
+    tableBody(2,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(2)/gatherTotalsBEPS(2),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(2))) // '")'
+  ELSE
+    tableBody(2,1)  = 'N/A'
   END IF
 
   tableBody(3,1)  = TRIM(RealToStr(sourceFactorElectric/ efficiencyDistrictCooling,3)) ! District Cooling
@@ -6687,46 +6842,58 @@ IF (displayTabularBEPS) THEN
 
   tableBody(5,1)  = TRIM(RealToStr(sourceFactorSteam ,3)) ! Steam
 
-  IF (ffSchedUsed(6)) THEN
-    tableBody(6,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(6)/gatherTotalsBEPS(6),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(6))) // "')"
-  ELSE
+  IF (.not. ffSchedUsed(6)) THEN
     tableBody(6,1)  = TRIM(RealToStr(sourceFactorGasoline ,3))
+  ELSEIF (gatherTotalsBEPS(6) > SmallValue) THEN
+    tableBody(6,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(6)/gatherTotalsBEPS(6),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(6))) // '")'
+  ELSE
+    tableBody(6,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(8)) THEN
-    tableBody(7,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(8)/gatherTotalsBEPS(8),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(8))) // "')"
-  ELSE
+  IF (.not. ffSchedUsed(8)) THEN
     tableBody(7,1)  = TRIM(RealToStr(sourceFactorDiesel ,3))
+  ELSEIF (gatherTotalsBEPS(8) > SmallValue) THEN
+    tableBody(7,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(8)/gatherTotalsBEPS(8),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(8))) // '")'
+  ELSE
+    tableBody(7,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(9)) THEN
-    tableBody(8,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(9)/gatherTotalsBEPS(9),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(9))) //"')"
-  ELSE
+  IF (.not. ffSchedUsed(9)) THEN
     tableBody(8,1)  = TRIM(RealToStr(sourceFactorCoal ,3))
+  ELSEIF (gatherTotalsBEPS(9) > SmallValue) THEN
+    tableBody(8,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(9)/gatherTotalsBEPS(9),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(9))) //'")'
+  ELSE
+    tableBody(8,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(10)) THEN
-    tableBody(9,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(10)/gatherTotalsBEPS(10),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(10))) //"')"
-  ELSE
+  IF (.not. ffSchedUsed(10)) THEN
     tableBody(9,1)  = TRIM(RealToStr(sourceFactorFuelOil1 ,3))
+  ELSEIF (gatherTotalsBEPS(10) > SmallValue) THEN
+    tableBody(9,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(10)/gatherTotalsBEPS(10),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(10))) //'")'
+  ELSE
+    tableBody(9,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(11)) THEN
-    tableBody(10,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(11)/gatherTotalsBEPS(11),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(11))) //"')"
-  ELSE
+  IF (.not. ffSchedUsed(11)) THEN
     tableBody(10,1)  = TRIM(RealToStr(sourceFactorFuelOil2 ,3))
+  ELSEIF (gatherTotalsBEPS(11) > SmallValue) THEN
+    tableBody(10,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(11)/gatherTotalsBEPS(11),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(11))) //'")'
+  ELSE
+    tableBody(10,1)  = 'N/A'
   END IF
 
-  IF (ffSchedUsed(12)) THEN
-    tableBody(11,1)  = "Effective Factor = " // TRIM(RealToStr(gatherTotalsBySourceBEPS(12)/gatherTotalsBEPS(12),3)) // &
-                         " (calculated using schedule '" // TRIM(GetScheduleName(ffSchedIndex(12))) //"')"
-  ELSE
+  IF (.not. ffSchedUsed(12)) THEN
     tableBody(11,1)  = TRIM(RealToStr(sourceFactorPropane ,3))
+  ELSEIF (gatherTotalsBEPS(12) > SmallValue) THEN
+    tableBody(11,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(12)/gatherTotalsBEPS(12),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(12))) //'")'
+  ELSE
+    tableBody(11,1)  = 'N/A'
   END IF
 
   ! heading for the entire sub-table
@@ -7423,8 +7590,8 @@ IF (displayTabularBEPS) THEN
 
   columnHead(1) = 'Facility [Hours]'
 
-  rowHead(1)  = 'Time Set Point Not Met During Occupied Heating'
-  rowHead(2)  = 'Time Set Point Not Met During Occupied Cooling'
+  rowHead(1)  = 'Time Setpoint Not Met During Occupied Heating'
+  rowHead(2)  = 'Time Setpoint Not Met During Occupied Cooling'
   rowHead(3)  = 'Time Not Comfortable Based on Simple ASHRAE 55-2004'
 
   tableBody(1,1)  = TRIM(RealToStr(TotalNotMetHeatingOccupiedForABUPS,2))
@@ -7685,7 +7852,7 @@ IF (displaySourceEnergyEndUseSummary) THEN
     CASE (unitsStyleInchPound)
       columnHead(1) = 'Source Electricity [kBtu/ft2]'
       columnHead(2) = 'Source Natural Gas [kBtu/ft2]'
-      columnHead(3) = 'Source Other Fuel [kBtu/ft^2]'
+      columnHead(3) = 'Source Other Fuel [kBtu/ft2]'
       columnHead(4) = 'Source District Cooling [kBtu/ft2]'
       columnHead(5) = 'Source District Heating [kBtu/ft2]'
     CASE DEFAULT
@@ -8526,10 +8693,12 @@ REAL(r64) :: frameWidth
 REAL(r64) :: frameArea
 
 LOGICAL :: zoneIsCond
+LOGICAL :: usezoneFloorArea
 
 INTEGER :: grandTotal = 1
 INTEGER :: condTotal = 2
 INTEGER :: uncondTotal = 3
+INTEGER :: notpartTotal = 4
 INTEGER :: iTotal
 CHARACTER(len=MaxNameLength) :: SIunit = ''
 INTEGER :: unitConvIndex = 0
@@ -8543,13 +8712,13 @@ CHARACTER(len=MaxNameLength) :: m3_unitName = ''
 CHARACTER(len=MaxNameLength) :: Wm2_unitName = ''
 
 !zone summary total
-REAL(r64), DIMENSION(3) :: zstArea = 0.0
-REAL(r64), DIMENSION(3) :: zstVolume = 0.0
-REAL(r64), DIMENSION(3) :: zstWallArea = 0.0
-REAL(r64), DIMENSION(3) :: zstWindowArea = 0.0
-REAL(r64), DIMENSION(3) :: zstLight = 0.0
-REAL(r64), DIMENSION(3) :: zstPeople = 0.0
-REAL(r64), DIMENSION(3) :: zstPlug = 0.0
+REAL(r64), DIMENSION(4) :: zstArea = 0.0
+REAL(r64), DIMENSION(4) :: zstVolume = 0.0
+REAL(r64), DIMENSION(4) :: zstWallArea = 0.0
+REAL(r64), DIMENSION(4) :: zstWindowArea = 0.0
+REAL(r64), DIMENSION(4) :: zstLight = 0.0
+REAL(r64), DIMENSION(4) :: zstPeople = 0.0
+REAL(r64), DIMENSION(4) :: zstPlug = 0.0
 
 ! misc
 REAL(r64) :: pdiff
@@ -8937,27 +9106,30 @@ IF (displayTabularVeriSum) THEN
   !
   CALL writeSubtitle('PERFORMANCE')
 
-  ALLOCATE(rowHead(NumOfZones + 3))
-  ALLOCATE(columnHead(9))
-  ALLOCATE(columnWidth(9))
+  ALLOCATE(rowHead(NumOfZones + 4))
+  ALLOCATE(columnHead(10))
+  ALLOCATE(columnWidth(10))
   columnWidth = 14 !array assignment - same for all columns
-  ALLOCATE(tableBody(NumOfZones + 3,9))
+  ALLOCATE(tableBody(NumOfZones + 4,10))
 
   columnHead(1) = 'Area ' // TRIM(m2_unitName)
   columnHead(2) = 'Conditioned (Y/N)'
-  columnHead(3) = 'Volume ' // TRIM(m3_unitName)
-  columnHead(4) = 'Multipliers'
-  columnHead(5) = 'Gross Wall Area ' // TRIM(m2_unitName)
-  columnHead(6) = 'Window Glass Area ' // TRIM(m2_unitName)
-  columnHead(7) = 'Lighting ' // TRIM(Wm2_unitName)
-  columnHead(8) = 'People '  // TRIM(m2_unitName) // ' per person'
-  columnHead(9) = 'Plug and Process ' // TRIM(Wm2_unitName)
+  columnHead(3) = 'Part of Total Floor Area (Y/N)'
+  columnHead(4) = 'Volume ' // TRIM(m3_unitName)
+  columnHead(5) = 'Multipliers'
+  columnHead(6) = 'Gross Wall Area ' // TRIM(m2_unitName)
+  columnHead(7) = 'Window Glass Area ' // TRIM(m2_unitName)
+  columnHead(8) = 'Lighting ' // TRIM(Wm2_unitName)
+  columnHead(9) = 'People '  // TRIM(m2_unitName(1:Len_Trim(m2_unitName)-1)) //  &
+     ' per person'//m2_unitName(Len_Trim(m2_unitName):Len_Trim(m2_unitName))
+  columnHead(10) = 'Plug and Process ' // TRIM(Wm2_unitName)
 
   rowHead  = ''
 
   rowHead(NumOfZones + grandTotal) = 'Total'
   rowHead(NumOfZones + condTotal) = 'Conditioned Total'
   rowHead(NumOfZones + uncondTotal) = 'Unconditioned Total'
+  rowHead(NumOfZones + notpartTotal) = 'Not Part of Total'
 
   tableBody = ''
 
@@ -8971,11 +9143,18 @@ IF (displayTabularVeriSum) THEN
       tableBody(iZone,2) = 'No'
       zoneIsCond = .FALSE.
     END IF
+    IF (Zone(iZone)%isPartOfTotalArea)   THEN
+      tableBody(iZone,3) = 'Yes'
+      usezoneFloorArea = .TRUE.
+    ELSE
+      tableBody(iZone,3) = 'No'
+      usezoneFloorArea = .FALSE.
+    END IF
     tableBody(iZone,1) = TRIM(RealToStr(Zone(iZone)%FloorArea * m2_unitConv,2))
-    tableBody(iZone,3) = TRIM(RealToStr(Zone(iZone)%Volume * m3_unitConv,2))
-    tableBody(iZone,4) = TRIM(RealToStr(mult,2))
-    tableBody(iZone,5) = TRIM(RealToStr(Zone(iZone)%ExtGrossWallArea * m2_unitConv,2))
-    tableBody(iZone,6) = TRIM(RealToStr(Zone(iZone)%ExtWindowArea * m2_unitConv,2))
+    tableBody(iZone,4) = TRIM(RealToStr(Zone(iZone)%Volume * m3_unitConv,2))
+    tableBody(iZone,5) = TRIM(RealToStr(mult,2))
+    tableBody(iZone,6) = TRIM(RealToStr(Zone(iZone)%ExtGrossWallArea * m2_unitConv,2))
+    tableBody(iZone,7) = TRIM(RealToStr(Zone(iZone)%ExtWindowArea * m2_unitConv,2))
     ! lighting density
     totLightPower = 0
     DO iLight = 1, TotLights
@@ -8983,8 +9162,8 @@ IF (displayTabularVeriSum) THEN
         totLightPower = totLightPower + Lights(iLight)%DesignLevel
       END IF
     END DO
-    IF (Zone(iZone)%FloorArea .GT. 0) THEN
-      tableBody(iZone,7) = TRIM(RealToStr(Wm2_unitConv * totLightPower / Zone(iZone)%FloorArea,4))
+    IF (Zone(iZone)%FloorArea .GT. 0 .and. usezoneFloorArea) THEN
+      tableBody(iZone,8) = TRIM(RealToStr(Wm2_unitConv * totLightPower / Zone(iZone)%FloorArea,4))
     END IF
     ! people density
     totNumPeople = 0
@@ -8994,7 +9173,7 @@ IF (displayTabularVeriSum) THEN
       END IF
     END DO
     IF (totNumPeople .GT. 0) THEN
-      tableBody(iZone,8) = TRIM(RealToStr(Zone(iZone)%FloorArea * m2_unitConv / totNumPeople,2))
+      tableBody(iZone,9) = TRIM(RealToStr(Zone(iZone)%FloorArea * m2_unitConv / totNumPeople,2))
     END IF
     ! plug and process density
     totPlugProcess =  0
@@ -9018,18 +9197,28 @@ IF (displayTabularVeriSum) THEN
         totPlugProcess = totPlugProcess + ZoneHWEq(iPlugProc)%DesignLevel
       END IF
     END DO
-    IF (Zone(iZone)%FloorArea .GT. 0) THEN
-      tableBody(iZone,9) = TRIM(RealToStr(totPlugProcess * Wm2_unitConv / Zone(iZone)%FloorArea,4))
+    IF (Zone(iZone)%FloorArea .GT. 0 .and. useZoneFloorArea) THEN
+      tableBody(iZone,10) = TRIM(RealToStr(totPlugProcess * Wm2_unitConv / Zone(iZone)%FloorArea,4))
     END IF
     !total rows for conditioned, unconditioned, and total
-    zstArea(grandTotal) = zstArea(grandTotal) + mult * Zone(iZone)%FloorArea
-    zstVolume(grandTotal) = zstVolume(grandTotal) + mult * Zone(iZone)%Volume
-    zstWallArea(grandTotal) = zstWallArea(grandTotal) + mult * Zone(iZone)%ExtGrossWallArea
-    zstWindowArea(grandTotal) = zstWindowArea(grandTotal) + mult * Zone(iZone)%ExtWindowArea
-    zstLight(grandTotal) = zstLight(grandTotal) + mult * totLightPower
-    zstPeople(grandTotal) = zstPeople(grandTotal) + mult * totNumPeople
-    zstPlug(grandTotal) = zstPlug(grandTotal) + mult * totPlugProcess
-    IF (zoneIsCond) THEN
+    IF (usezoneFloorArea) THEN
+      zstArea(grandTotal) = zstArea(grandTotal) + mult * Zone(iZone)%FloorArea
+      zstVolume(grandTotal) = zstVolume(grandTotal) + mult * Zone(iZone)%Volume
+      zstWallArea(grandTotal) = zstWallArea(grandTotal) + mult * Zone(iZone)%ExtGrossWallArea
+      zstWindowArea(grandTotal) = zstWindowArea(grandTotal) + mult * Zone(iZone)%ExtWindowArea
+      zstLight(grandTotal) = zstLight(grandTotal) + mult * totLightPower
+      zstPeople(grandTotal) = zstPeople(grandTotal) + mult * totNumPeople
+      zstPlug(grandTotal) = zstPlug(grandTotal) + mult * totPlugProcess
+    ELSE
+      zstArea(notpartTotal) = zstArea(notpartTotal) + mult * Zone(iZone)%FloorArea
+      zstVolume(notpartTotal) = zstVolume(notpartTotal) + mult * Zone(iZone)%Volume
+      zstWallArea(notpartTotal) = zstWallArea(notpartTotal) + mult * Zone(iZone)%ExtGrossWallArea
+      zstWindowArea(notpartTotal) = zstWindowArea(notpartTotal) + mult * Zone(iZone)%ExtWindowArea
+      zstLight(notpartTotal) = zstLight(notpartTotal) + mult * totLightPower
+      zstPeople(notpartTotal) = zstPeople(notpartTotal) + mult * totNumPeople
+      zstPlug(notpartTotal) = zstPlug(notpartTotal) + mult * totPlugProcess
+    ENDIF
+    IF (zoneIsCond .and. usezoneFloorArea) THEN
       zstArea(condTotal) = zstArea(condTotal) + mult * Zone(iZone)%FloorArea
       zstVolume(condTotal) = zstVolume(condTotal) + mult * Zone(iZone)%Volume
       zstWallArea(condTotal) = zstWallArea(condTotal) + mult * Zone(iZone)%ExtGrossWallArea
@@ -9037,7 +9226,7 @@ IF (displayTabularVeriSum) THEN
       zstLight(condTotal) = zstLight(condTotal) + mult * totLightPower
       zstPeople(condTotal) = zstPeople(condTotal) + mult * totNumPeople
       zstPlug(condTotal) = zstPlug(condTotal) + mult * totPlugProcess
-    ELSE
+   ELSEIF (.not. zoneIsCond) THEN
       zstArea(uncondTotal) = zstArea(uncondTotal) + mult * Zone(iZone)%FloorArea
       zstVolume(uncondTotal) = zstVolume(uncondTotal) + mult * Zone(iZone)%Volume
       zstWallArea(uncondTotal) = zstWallArea(uncondTotal) + mult * Zone(iZone)%ExtGrossWallArea
@@ -9045,19 +9234,27 @@ IF (displayTabularVeriSum) THEN
       zstLight(uncondTotal) = zstLight(uncondTotal) + mult * totLightPower
       zstPeople(uncondTotal) = zstPeople(uncondTotal) + mult * totNumPeople
       zstPlug(uncondTotal) = zstPlug(uncondTotal) + mult * totPlugProcess
+    ELSE
+      zstArea(notpartTotal) = zstArea(notpartTotal) + mult * Zone(iZone)%FloorArea
+      zstVolume(notpartTotal) = zstVolume(notpartTotal) + mult * Zone(iZone)%Volume
+      zstWallArea(notpartTotal) = zstWallArea(notpartTotal) + mult * Zone(iZone)%ExtGrossWallArea
+      zstWindowArea(notpartTotal) = zstWindowArea(notpartTotal) + mult * Zone(iZone)%ExtWindowArea
+      zstLight(notpartTotal) = zstLight(notpartTotal) + mult * totLightPower
+      zstPeople(notpartTotal) = zstPeople(notpartTotal) + mult * totNumPeople
+      zstPlug(notpartTotal) = zstPlug(notpartTotal) + mult * totPlugProcess
     END IF
   END DO
-  DO iTotal = 1, 3
+  DO iTotal = 1, 4
     tableBody(NumOfZones + iTotal,1) = TRIM(RealToStr(zstArea(iTotal) * m2_unitConv,2))
-    tableBody(NumOfZones + iTotal,3) = TRIM(RealToStr(zstVolume(iTotal) * m3_unitConv,2))
-    tableBody(NumOfZones + iTotal,5) = TRIM(RealToStr(zstWallArea(iTotal) * m2_unitConv,2))
-    tableBody(NumOfZones + iTotal,6) = TRIM(RealToStr(zstWindowArea(iTotal) * m2_unitConv,2))
+    tableBody(NumOfZones + iTotal,4) = TRIM(RealToStr(zstVolume(iTotal) * m3_unitConv,2))
+    tableBody(NumOfZones + iTotal,6) = TRIM(RealToStr(zstWallArea(iTotal) * m2_unitConv,2))
+    tableBody(NumOfZones + iTotal,7) = TRIM(RealToStr(zstWindowArea(iTotal) * m2_unitConv,2))
     IF (zstArea(iTotal) .NE. 0) THEN
-      tableBody(NumOfZones + iTotal,7) = TRIM(RealToStr(zstLight(iTotal) * Wm2_unitConv / zstArea(iTotal),4))
-      tableBody(NumOfZones + iTotal,9) = TRIM(RealToStr(zstPlug(iTotal) * Wm2_unitConv / zstArea(iTotal),4))
+      tableBody(NumOfZones + iTotal,8) = TRIM(RealToStr(zstLight(iTotal) * Wm2_unitConv / zstArea(iTotal),4))
+      tableBody(NumOfZones + iTotal,10) = TRIM(RealToStr(zstPlug(iTotal) * Wm2_unitConv / zstArea(iTotal),4))
     END IF
     IF (zstPeople(iTotal) .NE. 0) THEN
-      tableBody(NumOfZones + iTotal,8) = TRIM(RealToStr(zstArea(iTotal) * m2_unitConv / zstPeople(iTotal),2))
+      tableBody(NumOfZones + iTotal,9) = TRIM(RealToStr(zstArea(iTotal) * m2_unitConv / zstPeople(iTotal),2))
     END IF
   END DO
 
@@ -9096,7 +9293,7 @@ SUBROUTINE WriteAdaptiveComfortTable
           !
 
           ! USE STATEMENTS:
-  USE DataHeatBalance, ONLY: People, NumPeopleStatements
+  USE DataHeatBalance, ONLY: People, TotPeople
   USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
 
 
@@ -9124,10 +9321,10 @@ SUBROUTINE WriteAdaptiveComfortTable
   INTEGER :: i
   INTEGER, ALLOCATABLE, DIMENSION(:) :: peopleInd ! Index the relevant people
 
-  IF (displayAdaptiveComfort .AND. NumPeopleStatements > 0 ) THEN
-    ALLOCATE(peopleInd(NumPeopleStatements))
+  IF (displayAdaptiveComfort .AND. TotPeople > 0 ) THEN
+    ALLOCATE(peopleInd(TotPeople))
 
-    DO i=1,NumPeopleStatements
+    DO i=1,TotPeople
       IF (People(i)%AdaptiveASH55 .or. People(i)%AdaptiveCEN15251) THEN
         numPeopleAdaptive = numPeopleAdaptive + 1
         peopleInd(numPeopleAdaptive) = i
@@ -10628,6 +10825,8 @@ FUNCTION DateToString(codedDate) RESULT (stringOut)
           !   Convert the coded date format into a usable
           !   string
 
+USE General, ONLY: DecodeMonDayHrMin
+
 IMPLICIT NONE
 
 INTEGER, INTENT(IN)  :: codedDate   ! word containing encoded month, day, hour, minute
@@ -10785,11 +10984,11 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           !    na
-UnitConvSize = 85
+UnitConvSize = 91
 ALLOCATE(UnitConv(UnitConvSize))
 UnitConv(1)%siName = '%'
 UnitConv(2)%siName = '°C'
-UnitConv(3)%siName = '0=OFF,1=ON'
+UnitConv(3)%siName = '0=OFF 1=ON'
 UnitConv(4)%siName = '0-NO  1-YES'
 UnitConv(5)%siName = '1-YES 0-NO'
 UnitConv(6)%siName = 'A'
@@ -10872,10 +11071,16 @@ UnitConv(82)%siName = 'W-S/M3'
 UnitConv(83)%siName = '~~$~~/m2'
 UnitConv(84)%siName = 'GJ'
 UnitConv(85)%siName = 'GJ'
+UnitConv(86)%siName = 'GJ'
+UnitConv(87)%siName = 'GJ'
+UnitConv(88)%siName = 'GJ'
+UnitConv(89)%siName = 'GJ'
+UnitConv(90)%siName = 'GJ'
+UnitConv(91)%siName = 'Invalid/Undefined'
 
 UnitConv(1)%ipName = '%'
 UnitConv(2)%ipName = 'F'
-UnitConv(3)%ipName = '0=Off,1=On'
+UnitConv(3)%ipName = '0=Off 1=On'
 UnitConv(4)%ipName = '0-No  1-Yes'
 UnitConv(5)%ipName = '1-Yes 0-No'
 UnitConv(6)%ipName = 'A'
@@ -10958,6 +11163,12 @@ UnitConv(82)%ipName = 'W-min/gal'
 UnitConv(83)%ipName = '~~$~~/ft2'
 UnitConv(84)%ipName = 'kBtu'
 UnitConv(85)%ipName = 'kWh'
+UnitConv(86)%ipName = 'kWh'
+UnitConv(87)%ipName = 'therm'
+UnitConv(88)%ipName = 'MMBtu'
+UnitConv(89)%ipName = 'Wh'
+UnitConv(90)%ipName = 'ton-hrs'
+UnitConv(91)%ipName = 'Invalid/Undefined'
 
 UnitConv(1)%mult = 1.d0
 UnitConv(2)%mult = 1.8d0
@@ -11044,6 +11255,12 @@ UnitConv(82)%mult = 1.0d0/15852d0
 UnitConv(83)%mult = 1.0d0/10.764961d0
 UnitConv(84)%mult = 0.00000094845d0 * 1000000000d0
 UnitConv(85)%mult = 0.000000277778d0 * 1000000000d0
+UnitConv(86)%mult = 0.000000277778d0 * 1000000000d0
+UnitConv(87)%mult = 0.0000000094845d0 * 1000000000d0
+UnitConv(88)%mult = 0.00000000094845d0 * 1000000000d0
+UnitConv(89)%mult = 0.000277777777777778d0 * 1000000000d0
+UnitConv(90)%mult = 0.0000000789847d0 * 1000000000d0
+UnitConv(91)%mult = 1.0d0
 
 
 UnitConv(2)%offset = 32.d0
@@ -11061,6 +11278,9 @@ UnitConv(67)%hint = 'ELEC'
 UnitConv(70)%hint = 'COOL'
 UnitConv(82)%hint = 'WATER'
 UnitConv(85)%hint = 'CONSUMP'
+UnitConv(86)%hint = 'ELEC'
+UnitConv(87)%hint = 'GAS'
+UnitConv(90)%hint = 'COOL'
 
 UnitConv(19)%several = .TRUE.
 UnitConv(20)%several = .TRUE.
@@ -11099,6 +11319,11 @@ UnitConv(81)%several = .TRUE.
 UnitConv(82)%several = .TRUE.
 UnitConv(84)%several = .TRUE.
 UnitConv(85)%several = .TRUE.
+UnitConv(86)%several = .TRUE.
+UnitConv(87)%several = .TRUE.
+UnitConv(88)%several = .TRUE.
+UnitConv(89)%several = .TRUE.
+UnitConv(90)%several = .TRUE.
 END SUBROUTINE SetupUnitConversions
 
 SUBROUTINE LookupSItoIP(stringInWithSI,unitConvIndex,stringOutWithIP)
@@ -11499,7 +11724,7 @@ END FUNCTION getSpecificUnitDivider
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of
 !     Berkeley National Laboratory.  All rights reserved.
 !

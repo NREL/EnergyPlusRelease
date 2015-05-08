@@ -274,6 +274,7 @@ SUBROUTINE CalcTempDistModel(ZoneNum)
     USE InputProcessor  ,    ONLY : FindItem
     Use OutputReportTabular, ONLY : IntToStr
     USE FluidProperties,     ONLY : FindArrayIndex ! routine should be moved to a general module rather than FluidProperties
+    USE General,             ONLY : FindNumberinList
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -303,7 +304,6 @@ SUBROUTINE CalcTempDistModel(ZoneNum)
 !unused    REAL(r64)  :: fractBtwn
 !unused    REAL(r64)  :: tmpDeltaTai
 
-    INTEGER, EXTERNAL :: FindNumberinList
 
   !first determine availability
   AvailTest = GetCurrentScheduleValue(AirPatternZoneInfo(ZoneNum)%AvailSchedID)
@@ -380,6 +380,7 @@ SUBROUTINE FigureSurfMapPattern(PattrnID, ZoneNum)
           ! na
 
           ! USE STATEMENTS:
+  USE General, ONLY: FindNumberinList
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -400,7 +401,6 @@ SUBROUTINE FigureSurfMapPattern(PattrnID, ZoneNum)
   REAL(r64)     :: Tmean
   INTEGER  :: found
   INTEGER  :: i
-  INTEGER, EXTERNAL :: FindNumberinList
 
   Tmean = AirPatternZoneInfo(ZoneNum)%TairMean
 
@@ -965,9 +965,14 @@ END SUBROUTINE FigureConstGradPattern
                                            AirFlowWindow_Destination_ReturnAir
     USE DataHeatBalance,            ONLY : Zone, TempEffBulkAir, ZoneIntGain, RefrigCaseCredit
     USE DataZoneEquipment,          ONLY : ZoneEquipConfig
-    USE DataHeatBalFanSys,          ONLY : MAT, ZT, TempZoneThermostatSetpoint, TempTstatAir, SysDepZoneLoads
-    USE InputProcessor        ,     ONLY : FindItem
-    USE Psychrometrics, ONLY:PsyHFnTdbW, PsyCpAirFnWTdb, PsyRhoAirFnPbTdbW, PsyHgAirFnWTdb
+    USE DataHeatBalFanSys,          ONLY : MAT, ZT, TempZoneThermostatSetpoint, TempTstatAir, SysDepZoneLoads, &
+                                           ZoneLatentGain
+    USE InputProcessor,             ONLY : FindItem
+    USE Psychrometrics,             ONLY:PsyHFnTdbW, PsyCpAirFnWTdb, PsyRhoAirFnPbTdbW, PsyHgAirFnWTdb
+    USE InternalHeatGains,          ONLY : SumAllReturnAirConvectionGains, SumAllReturnAirLatentGains
+    USE DataHVACGlobals,            ONLY : RetTempMax, RetTempMin
+    USE DataGlobals,                ONLY : ZoneSizingCalc
+
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1000,6 +1005,7 @@ END SUBROUTINE FigureConstGradPattern
   REAL(r64)      :: H2OHtOfVap       ! Heat of vaporization of water (W/kg)
   REAL(r64)      :: RhoAir           ! Density of air (Kg/m3)
   REAL(r64)      :: ZoneMult
+  REAL(r64)      :: SumRetAirLatentGainRate
 
           ! FLOW:
 
@@ -1023,12 +1029,11 @@ END SUBROUTINE FigureConstGradPattern
     ZoneNode   = AirPatternZoneInfo(ZoneNum)%ZoneNodeID
     ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
      !RETURN AIR HEAT GAIN from the Lights statement; this heat gain is stored in
-     ! ZoneIntGain(HeatBalanceZoneNum)%QLTCRA in the Heat Balance calc.
-     QRetAir = ZoneIntGain(ZoneNum)%QLTCRA + ZoneIntGain(ZoneNum)%T_QLTCRA
      ! Add sensible heat gain from refrigerated cases with under case returns
-     QRetAir = QRetAir + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC
+    CALL SumAllReturnAirConvectionGains(ZoneNum, QRetAir)
 
-     CpAir   = PsyCpAirFnWTdb(Node(ZoneNode)%HumRat, Node(ZoneNode)%Temp)
+
+    CpAir   = PsyCpAirFnWTdb(Node(ZoneNode)%HumRat, Node(ZoneNode)%Temp)
 
      ! Need to add the energy to the return air from lights and from airflow windows. Where the heat
      ! is added depends on if there is system flow or not.  If there is system flow the heat is added
@@ -1069,7 +1074,19 @@ END SUBROUTINE FigureConstGradPattern
          END IF
          ! Add heat-to-return from lights
          TempRetAir = TempRetAir + QRetAir/(MassFlowRA * CpAir)
-         Node(ReturnNode)%Temp = TempRetAir
+         IF (TempRetAir > RetTempMax) THEN
+           Node(ReturnNode)%Temp = RetTempMax
+           IF (.not. ZoneSizingCalc) THEN 
+             SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + CpAir*MassFlowRA*(TempRetAir-RetTempMax)
+           END IF
+         ELSE IF (TempRetAir < RetTempMin) THEN
+           Node(ReturnNode)%Temp = RetTempMin
+           IF (.not. ZoneSizingCalc) THEN 
+             SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + CpAir*MassFlowRA*(TempRetAir-RetTempMin)
+           END IF
+         ELSE
+           Node(ReturnNode)%Temp = TempRetAir
+         END IF
        ELSE  ! No return air flow
          ! Assign all heat-to-return from window gap airflow to zone air
          IF(WinGapFlowToRA > 0.0) &
@@ -1094,18 +1111,25 @@ END SUBROUTINE FigureConstGradPattern
      ! humidity ratio
      IF (.NOT. Zone(ZoneNum)%NoHeatToReturnAir) THEN
        IF (MassFlowRA > 0) THEN
-         Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat + (RefrigCaseCredit(ZoneNum)%LatCaseCreditToHVAC / &
+         CALL SumAllReturnAirLatentGains(ZoneNum, SumRetAirLatentGainRate)
+         Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat + (SumRetAirLatentGainRate / &
                                  (H2OHtOfVap * MassFlowRA * RhoAir))
        ELSE
        ! If no mass flow rate exists, include the latent HVAC case credit with the latent Zone case credit
          Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat
          RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone = RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone + &
                                                                RefrigCaseCredit(ZoneNum)%LatCaseCreditToHVAC
+                  ! shouldn't the HVAC term be zeroed out then?
+         CALL SumAllReturnAirLatentGains(ZoneNum, SumRetAirLatentGainRate)
+         ZoneLatentGain(ZoneNum) = ZoneLatentGain(ZoneNum) + SumRetAirLatentGainRate
        END IF
      ELSE
        Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat
        RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone = RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone + &
                                                                RefrigCaseCredit(ZoneNum)%LatCaseCreditToHVAC
+         ! shouldn't the HVAC term be zeroed out then?
+       CALL SumAllReturnAirLatentGains(ZoneNum, SumRetAirLatentGainRate)
+       ZoneLatentGain(ZoneNum) = ZoneLatentGain(ZoneNum) + SumRetAirLatentGainRate
      END IF
 
      Node(ReturnNode)%Enthalpy = PsyHFnTdbW(Node(ReturnNode)%Temp,Node(ReturnNode)%HumRat)
@@ -1139,7 +1163,7 @@ END SUBROUTINE SetSurfHBDataForTempDistModel
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

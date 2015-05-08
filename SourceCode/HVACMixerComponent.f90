@@ -625,6 +625,19 @@ SUBROUTINE UpdateAirMixer(MixerNum)
     End If
   End If
 
+  IF (Contaminant%GenericContamSimulation) Then
+    If(MixerCond(MixerNum)%OutletMassFlowRate .gt. 0.d0) Then
+      ! Generic contaminant balance to get outlet air CO2
+      Node(OutletNode)%GenContam = 0.0d0
+      DO InletNodeNum = 1, MixerCond(MixerNum)%NumInletNodes
+        Node(OutletNode)%GenContam = Node(OutletNode)%GenContam + Node(MixerCond(MixerNum)%InletNode(InletNodeNum))%GenContam * &
+              MixerCond(MixerNum)%InletMassFlowRate(InletNodeNum) / MixerCond(MixerNum)%OutletMassFlowRate
+      END DO
+    Else
+      Node(OutletNode)%GenContam = Node(InletNode)%GenContam
+    End If
+  End If
+
   RETURN
 END Subroutine UpdateAirMixer
 
@@ -685,7 +698,7 @@ END Subroutine ReportMixer
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -31,7 +31,7 @@ MODULE HeatPumpWaterToWaterHEATING
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength, BeginSimFlag,InitconvTemp,BeginEnvrnFlag, HourOfDay, KelvinConv,  &
                               TimeStep,TimeStepZone,DayOfSim,WarmupFlag,SecInHour
-USE DataInterfaces, ONLY: ShowSevereError, ShowWarningError, ShowFatalError, ShowContinueError, SetupOutputVariable
+USE DataInterfaces
 USE DataLoopNode
 
   ! Use statements for access to subroutines in other modules
@@ -253,7 +253,7 @@ SUBROUTINE SimHPWatertoWaterHEATING(GSHPType, GSHPName, CompIndex,FirstHVACItera
                                      TypeOf_HPWaterEFHeating,                     &
                                      GSHP(GSHPNum)%SourceSideInletNodeNum,  &
                                      GSHP(GSHPNum)%SourceSideOutletNodeNum, &
-                                     GSHPReport(GSHPNum)%QSource,             &
+                                     - GSHPReport(GSHPNum)%QSource,             &
                                      GSHPReport(GSHPNum)%SourceSideWaterInletTemp,     &
                                      GSHPReport(GSHPNum)%SourceSideWaterOutletTemp,    &
                                      GSHPReport(GSHPNum)%SourceSidemdot,          &
@@ -669,7 +669,8 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
   USE DataHVACGlobals, ONLY : TimeStepSys ,SysTimeElapsed, FirstTimeStepSysFlag
   USE FluidProperties
   USE General,         ONLY: TrimSigDigits
-  USE DataPlant,       ONLY: PlantLoop, MassFlowTol
+  USE DataPlant,       ONLY: PlantLoop
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE PlantUtilities,  ONLY: SetComponentFlowRate
 
   IMPLICIT NONE
@@ -887,8 +888,8 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
     LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
     SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
     !if there's no flow, turn the "heat pump off"
-    IF(LoadSideWaterMassFlowRate < MassFlowTol .OR. &
-         SourceSideWaterMassFlowRate < MassFlowTol)THEN
+    IF(LoadSideWaterMassFlowRate < MassFlowTolerance .OR. &
+         SourceSideWaterMassFlowRate < MassFlowTolerance)THEN
         LoadSideWaterMassFlowRate = 0.d0
         Call SetComponentFlowRate(LoadSideWaterMassFlowRate, &
               LoadSideInletNode, LoadSideOutletNode, &
@@ -1045,6 +1046,7 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
     IF(ABS((QLoad - initialQLoad)/(initialQLoad+SmallNum)) < HeatBalTol .OR. IterationCount>IterationLimit) THEN
       IF(IterationCount>IterationLimit)then
         CALL ShowWarningError(ModuleCompName//' did not converge')
+        CALL ShowContinueErrorTimeStamp('  ')
         CALL ShowContinueError('Heatpump Name = '//TRIM(GSHP(GSHPNum)%Name))
         WRITE(ErrString,*) ABS(100.0*(QLoad - initialQLoad)/(initialQLoad+SmallNum))
         CALL ShowContinueError('Heat Inbalance (%)             = '//TRIM(ADJUSTL(ErrString)))
@@ -1275,7 +1277,7 @@ MODULE HeatPumpWaterToWaterCOOLING
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength, BeginSimFlag,InitconvTemp,BeginEnvrnFlag, HourOfDay,   &
                               TimeStep,TimeStepZone,DayOfSim,WarmupFlag,SecInHour
-USE DataInterfaces, ONLY: ShowSevereError, ShowWarningError, ShowFatalError, ShowContinueError, SetupOutputVariable
+USE DataInterfaces
 USE DataLoopNode
 
   ! Use statements for access to subroutines in other modules
@@ -1950,7 +1952,8 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
   USE DataHVACGlobals, ONLY : TimeStepSys ,SysTimeElapsed,FirstTimeStepSysFlag
   USE FluidProperties
   USE General,         ONLY : TrimSigDigits
-  USE DataPlant,       ONLY : PlantLoop, MassFlowTol
+  USE DataPlant,       ONLY : PlantLoop
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE PlantUtilities,  ONLY : SetComponentFlowRate
 
   IMPLICIT NONE
@@ -2066,7 +2069,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
 
       ! Normal pump operation
       TIMEIF: IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
-        IF(ABS(MyLoad) > 0.0 ) THEN !.AND. LoadSideWaterMassFlowRate > MassFlowTol )THEN
+        IF(ABS(MyLoad) > 0.0 ) THEN !.AND. LoadSideWaterMassFlowRate > MassFlowTolerance )THEN
           GSHP(GSHPNum)%isOn = .TRUE.
           GSHP(GSHPNum)%MustRun = .TRUE.
         ELSE
@@ -2158,8 +2161,8 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
     LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
     SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
     !if there's no flow, turn the "heat pump off"
-    IF(LoadSideWaterMassFlowRate < MassFlowTol .OR. &
-      SourceSideWaterMassFlowRate < MassFlowTol)THEN
+    IF(LoadSideWaterMassFlowRate < MassFlowTolerance .OR. &
+      SourceSideWaterMassFlowRate < MassFlowTolerance)THEN
         LoadSideWaterMassFlowRate = 0.d0
         Call SetComponentFlowRate(LoadSideWaterMassFlowRate, &
               LoadSideInletNode, LoadSideOutletNode, &
@@ -2227,6 +2230,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
       CALL ShowSevereError(ModuleCompName//'="'//trim(GSHPName)//'" Cooling Source Side Pressure Less than the Design Minimum')
       CALL ShowContinueError('Cooling Source Side Pressure='//TRIM(TrimSigDigits(SourceSidePressure,2))//  &
                              ' and user specified Design Minimum Pressure='//TRIM(TrimSigDigits(LowPressCutOff,2)))
+      CALL ShowContinueErrorTimeStamp('  ')
       CALL ShowFatalError('Preceding Conditions cause termination.')
     END IF
 
@@ -2234,6 +2238,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
       CALL ShowSevereError(ModuleCompName//'="'//trim(GSHPName)//'" Cooling Load Side Pressure greater than the Design Maximum')
       CALL ShowContinueError('Cooling Load Side Pressure='//TRIM(TrimSigDigits(LoadSidePressure,2))//  &
                              ' and user specified Design Maximum Pressure='//TRIM(TrimSigDigits(HighPressCutOff,2)))
+      CALL ShowContinueErrorTimeStamp('  ')
       CALL ShowFatalError('Preceding Conditions cause termination.')
     END IF
     ! Determine Suction Pressure at compressor inlet
@@ -2245,6 +2250,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
       CALL ShowSevereError(ModuleCompName//'="'//trim(GSHPName)//'" Cooling Suction Pressure Less than the Design Minimum')
       CALL ShowContinueError('Cooling Suction Pressure='//TRIM(TrimSigDigits(SuctionPr,2))//  &
                              ' and user specified Design Minimum Pressure='//TRIM(TrimSigDigits(LowPressCutOff,2)))
+      CALL ShowContinueErrorTimeStamp('  ')
       CALL ShowFatalError('Preceding Conditions cause termination.')
     END IF
 
@@ -2252,6 +2258,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
       CALL ShowSevereError(ModuleCompName//'="'//trim(GSHPName)//'" Cooling Discharge Pressure greater than the Design Maximum')
       CALL ShowContinueError('Cooling Discharge Pressure='//TRIM(TrimSigDigits(DischargePr,2))//  &
                              ' and user specified Design Maximum Pressure='//TRIM(TrimSigDigits(HighPressCutOff,2)))
+      CALL ShowContinueErrorTimeStamp('  ')
       CALL ShowFatalError('Preceding Conditions cause termination.')
     END IF
 
@@ -2320,7 +2327,8 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
     ! convergence and iteration limit check
     IF(ABS((QSource - initialQSource)/(initialQSource+SmallNum)) < HeatBalTol .OR. IterationCount>IterationLimit) THEN
       IF(IterationCount>IterationLimit)then
-        CALL ShowWarningError('HeatPump:WaterToWater Cooling did not converge')
+        CALL ShowWarningError('HeatPump:WaterToWater:ParameterEstimation, Cooling did not converge')
+        CALL ShowContinueErrorTimeStamp('  ')
         CALL ShowContinueError('Heatpump Name = '//TRIM(GSHP(GSHPNum)%Name))
         WRITE(ErrString,*) ABS(100.0*(QSource - initialQSource)/(initialQSource+SmallNum))
         CALL ShowContinueError('Heat Inbalance (%)             = '//TRIM(ADJUSTL(ErrString)))
@@ -2334,7 +2342,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
         CALL ShowContinueError('Load-side mass flow rate       = '//TRIM(ADJUSTL(ErrString)))
         WRITE(ErrString,*) SourceSideWaterInletTemp
         CALL ShowContinueError('Source-side inlet temperature  = '//TRIM(ADJUSTL(ErrString)))
-        WRITE(ErrString,*) SourceSideWaterInletTemp
+        WRITE(ErrString,*) LoadSideWaterInletTemp
         CALL ShowContinueError('Load-side inlet temperature    = '//TRIM(ADJUSTL(ErrString)))
 
       END IF
@@ -2517,16 +2525,16 @@ IMPLICIT NONE
     GSHPReport(GSHPNum)%LoadSideWaterOutletTemp   = Node(LoadSideOutletNode)%Temp
 
   END IF
-    Node(SourceSideInletNode)%MassFlowRate = SourceSideWaterMassFlowRate
-    Node(SourceSideOutletNode)%MassFlowRate = SourceSideWaterMassFlowRate
-
-    Node(LoadSideInletNode)%MassFlowRate = LoadSideWaterMassFlowRate
-    Node(LoadSideOutletNode)%MassFlowRate = LoadSideWaterMassFlowRate
-
-    Node(SourceSideOutletNode)%MassFlowRateMaxAvail = Node(SourceSideInletNode)%MassFlowRateMaxAvail
-    Node(SourceSideOutletNode)%MassFlowRateMinAvail = Node(SourceSideInletNode)%MassFlowRateMinAvail
-    Node(LoadSideOutletNode)%MassFlowRateMaxAvail = Node(LoadSideInletNode)%MassFlowRateMaxAvail
-    Node(LoadSideOutletNode)%MassFlowRateMinAvail = Node(LoadSideInletNode)%MassFlowRateMinAvail
+!    Node(SourceSideInletNode)%MassFlowRate = SourceSideWaterMassFlowRate
+!    Node(SourceSideOutletNode)%MassFlowRate = SourceSideWaterMassFlowRate
+!
+!    Node(LoadSideInletNode)%MassFlowRate = LoadSideWaterMassFlowRate
+!    Node(LoadSideOutletNode)%MassFlowRate = LoadSideWaterMassFlowRate
+!
+!    Node(SourceSideOutletNode)%MassFlowRateMaxAvail = Node(SourceSideInletNode)%MassFlowRateMaxAvail
+!    Node(SourceSideOutletNode)%MassFlowRateMinAvail = Node(SourceSideInletNode)%MassFlowRateMinAvail
+!    Node(LoadSideOutletNode)%MassFlowRateMaxAvail = Node(LoadSideInletNode)%MassFlowRateMaxAvail
+!    Node(LoadSideOutletNode)%MassFlowRateMinAvail = Node(LoadSideInletNode)%MassFlowRateMinAvail
 RETURN
 END SUBROUTINE UpdateGSHPRecords
 
@@ -2819,7 +2827,7 @@ SUBROUTINE SimHPWatertoWaterSimple(GSHPType, GSHPTypeNum, GSHPName, GSHPNum, Fir
                                      TypeOf_HPWaterEFHeating,                     &
                                      GSHP(GSHPNum)%SourceSideInletNodeNum,  &
                                      GSHP(GSHPNum)%SourceSideOutletNodeNum, &
-                                     GSHPReport(GSHPNum)%QSource,             &
+                                     - GSHPReport(GSHPNum)%QSource,             &
                                      GSHPReport(GSHPNum)%SourceSideInletTemp,     &
                                      GSHPReport(GSHPNum)%SourceSideOutletTemp,    &
                                      GSHPReport(GSHPNum)%SourceSideMassFlowRate,          &
@@ -4014,7 +4022,7 @@ END MODULE HeatPumpWaterToWaterSimple
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

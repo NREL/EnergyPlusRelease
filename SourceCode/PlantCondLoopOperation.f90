@@ -57,15 +57,17 @@ PUBLIC     InitLoadDistribution
      !Load Distribution/Calculation Routines
 PRIVATE    DistributePlantLoad
 PRIVATE    FindCompSPLoad
-PUBLIC     GetCurrentPlantItemLoad
+
      !ON/OFF Utility Routines
 PRIVATE    TurnOnPlantLoopPipes
 PUBLIC     TurnOffLoopEquipment
 PUBLIC     TurnOffLoopSideEquipment
-PUBLIC     TurnOnOffPlantItem
+
      !PLANT EMS Utility Routines
 PRIVATE    ActivateEMSControls
 PUBLIC     SetupPlantEMSActuators
+PRIVATE    AdjustChangeInLoadByEMSControls
+
 CONTAINS
 
           ! MODULE SUBROUTINES:
@@ -144,8 +146,12 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
   INTEGER                           :: NumEquipLists    !number of equipment lists
     !Error control flags
   LOGICAL                           :: foundlist        !equipment list found
-  INTEGER , SAVE                    :: ErrCount = 0     !number of errors
-  CHARACTER(len=20)                 :: CharErrOut       !Error message
+  LOGICAL                           :: UpperLimitTooLow  ! error processing
+  REAL(r64)                         :: HighestRange      ! error processing
+  INTEGER, SAVE                     :: TooLowIndex=0     ! error processing
+  INTEGER, SAVE                     :: NotTooLowIndex=0  ! error processing
+  !INTEGER , SAVE                    :: ErrCount = 0     !number of errors
+  !CHARACTER(len=20)                 :: CharErrOut       !Error message
 
     !Shut down equipment and return if so instructed by LoopShutdownFlag
   IF(LoopShutdownFlag)THEN
@@ -188,7 +194,7 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
       RangeVariable = LoopDemand
     CASE(CoolingRBOpSchemeType)
       ! For zero demand, we need to clean things out before we leave
-      IF (LoopDemand > SmallLoad) THEN
+      IF (LoopDemand > (-1.d0 * SmallLoad)) THEN
         CALL InitLoadDistribution(FirstHVACIteration)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = 0.d0
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%On     = .FALSE.
@@ -225,16 +231,28 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
   ELSE !it's a range based control type with multiple equipment lists
     CurListNum = 0
     DO ListNum = 1,NumEquipLists
-          !set pointers to 'PlantLoop()%OpScheme()...'structure
+          !setpointers to 'PlantLoop()%OpScheme()...'structure
       ListPtr = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%  &
             OpScheme(CurCompLevelOpNum)%EquipList(ListNum)%ListPtr
       RangeHiLimit=PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListPtr)%RangeUpperLimit
       RangeLoLimit=PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListPtr)%RangeLowerLimit
       !these limits are stored with absolute values, but the LoopDemand can be negative for cooling
       TestRangeVariable = ABS(RangeVariable)
-      IF (TestRangeVariable <  RangeLoLimit .OR. TestRangeVariable >  RangeHiLimit) CYCLE
-      CurListNum = ListNum
-      EXIT
+      
+      !trying to do something where the last stage still runs the equipment but at the hi limit.
+      
+      IF (TestRangeVariable <  RangeLoLimit .OR. TestRangeVariable >  RangeHiLimit) THEN
+        IF ((TestRangeVariable >  RangeHiLimit) .AND. ListPtr == (PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipListNumForLastStage)) THEN
+          ! let this go thru, later AdjustChangeInLoadForLastStageUpperRangeLimit will cap dispatch to RangeHiLimit
+          CurListNum = ListNum
+          EXIT
+        ELSE
+         CYCLE
+        ENDIF
+      ELSE
+        CurListNum = ListNum
+        EXIT
+      ENDIF
     ENDDO
 
     IF (CurListNum > 0)THEN
@@ -825,6 +843,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
               CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                           '", found a negative value for an upper limit in '// &
                          TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+              ErrorsFound=.true.
             ENDIF
 
             SELECT CASE (TRIM(CurrentModuleObject)) ! different op schemes have different lower limit check values
@@ -836,6 +855,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
                 CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                             '", found a negative value for a lower limit in '// &
                            TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+                ErrorsFound=.true.
               ENDIF
             CASE DEFAULT
               ! others should not be less than -70
@@ -843,6 +863,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
                 CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                             '", found too low of a value for a lower limit in '// &
                            TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+                ErrorsFound=.true.
               ENDIF
             END SELECT
 
@@ -851,6 +872,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
               CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                           '", found a lower limit that is higher than an upper limit in '// &
                          TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+              ErrorsFound=.true.
             ENDIF
 
             CALL LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
@@ -864,6 +886,13 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
                          TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
     ErrorsFound=.true.
   ENDIF
+
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(cAlphaFields)
+  DEALLOCATE(cNumericFields)
+  DEALLOCATE(NumArray)
+  DEALLOCATE(lAlphaBlanks)
+  DEALLOCATE(lNumericBlanks)
 
   RETURN
 
@@ -981,13 +1010,18 @@ SUBROUTINE FindDeltaTempRangeInput(CurrentModuleObject,NumSchemes,LoopNum,Scheme
         PlantLoop(LoopNum)%OpScheme(SchemeNum)%ReferenceNodeNumber =   &
                  GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
                  NodeType_Water,NodeConnectionType_Sensor, 1, ObjectIsNotParent)
-        !For DO Loop below -- Check for lower limit > upper limit.
-        !Earlier, ...%RangeUpperLimit = ABS(NumArray(ListNum*2)) which did not seem right
-        !as the minimum can be as low as -70 for the temp difference objects. Same for ...%RangeUpperLimit
+        !For DO Loop below -- Check for lower limit > upper limit.(invalid)
         DO ListNum = 1, NumEquipLists
           PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeLowerLimit  = NumArray(ListNum*2-1)
           PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeUpperLimit  = NumArray(ListNum*2)
           PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%name= AlphArray(ListNum+2)
+          IF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeLowerLimit > &
+                PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%RangeUpperLimit  ) THEN
+            CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
+                      '", found a lower limit that is higher than an upper limit in '// &
+                       TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+            ErrorsFound=.true.
+          ENDIF
           CALL LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
         END DO
       ENDIF
@@ -998,6 +1032,13 @@ SUBROUTINE FindDeltaTempRangeInput(CurrentModuleObject,NumSchemes,LoopNum,Scheme
                          TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
     ErrorsFound = .true.
   ENDIF
+
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(cAlphaFields)
+  DEALLOCATE(cNumericFields)
+  DEALLOCATE(NumArray)
+  DEALLOCATE(lAlphaBlanks)
+  DEALLOCATE(lNumericBlanks)
 
   RETURN
 
@@ -1044,7 +1085,7 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
   INTEGER :: MachineNum
   INTEGER :: PELists
   INTEGER :: CELists
-  INTEGER :: NumLists
+!  INTEGER :: NumLists
   INTEGER :: NumAlphas
   INTEGER :: NumNums
   INTEGER :: IOSTAT
@@ -1054,8 +1095,9 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
   CHARACTER(len=MaxNameLength), SAVE, DIMENSION(:), ALLOCATABLE :: EquipListsNameList
   INTEGER, SAVE,  DIMENSION(:), ALLOCATABLE :: EquipListsTypeList
   INTEGER, SAVE,  DIMENSION(:), ALLOCATABLE :: EquipListsIndexList
-  INTEGER :: Index
-  
+  INTEGER :: iIndex
+  LOGICAL :: firstblank
+
   IF (MyOneTimeFlag) THEN
     ! assemble mapping between list names and indices one time
     PELists = GetNumObjectsFound('PlantEquipmentList')
@@ -1065,48 +1107,109 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
       ALLOCATE(EquipListsNameList(TotNumLists))
       ALLOCATE(EquipListsTypeList(TotNumLists))
       ALLOCATE(EquipListsIndexList(TotNumLists))
-    
+
       !First load PlantEquipmentList info
       IF (PELists > 0) THEN
         CurrentModuleObject = 'PlantEquipmentList'
         DO Num = 1,PELists
-          Index = Num
+          iIndex = Num
           CALL GetObjectItem(TRIM(CurrentModuleObject),Num,cAlphaArgs,NumAlphas, &
-                rNumericArgs,NumNums,IOSTAT)
-          EquipListsNameList(Index) = cAlphaArgs(1)
-          EquipListsTypeList(Index) = LoopType_Plant
-          EquipListsIndexList(Index) = Num
+                           rNumericArgs,NumNums,IOSTAT, &
+                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
+                           AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+          EquipListsNameList(iIndex) = cAlphaArgs(1)
+          EquipListsTypeList(iIndex) = LoopType_Plant
+          EquipListsIndexList(iIndex) = Num
+          MachineNum=2
+          DO WHILE (MachineNum <= NumAlphas)
+            firstblank=.false.
+            IF (lAlphaFieldBlanks(MachineNum) .or. lAlphaFieldBlanks(MachineNum+1)) THEN
+              IF (lAlphaFieldBlanks(MachineNum)) THEN
+                CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid component specification.')
+                CALL ShowContinueError(trim(cAlphaFieldNames(MachineNum))//' is blank.')
+                firstblank=.true.
+                ErrorsFound=.true.
+              ENDIF
+              IF (lAlphaFieldBlanks(MachineNum+1)) THEN
+                IF (.not. firstblank) THEN
+                  CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid component specification.')
+                ENDIF
+                CALL ShowContinueError(trim(cAlphaFieldNames(MachineNum+1))//' is blank.')
+                ErrorsFound=.true.
+              ENDIF
+            ELSE
+              CALL ValidateComponent(cAlphaArgs(MachineNum),cAlphaArgs(MachineNum+1),IsNotOK,TRIM(CurrentModuleObject))
+              IF (IsNotOK) THEN
+                CALL ShowContinueError(TRIM(CurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", Input Error.')
+                ErrorsFound = .true.
+              ENDIF
+            ENDIF
+            MachineNum=MachineNum+2
+          ENDDO
         ENDDO
       ENDIF
       IF (CELists > 0) THEN
         CurrentModuleObject = 'CondenserEquipmentList'
         DO Num = 1,CELists
-          Index = Num + PELists
+          iIndex = Num + PELists
           CALL GetObjectItem(TRIM(CurrentModuleObject),Num,cAlphaArgs,NumAlphas, &
-                rNumericArgs,NumNums,IOSTAT)
-          EquipListsNameList(Index) = cAlphaArgs(1)
-          EquipListsTypeList(Index) = LoopType_Condenser
-          EquipListsIndexList(Index) = Num
+                           rNumericArgs,NumNums,IOSTAT, &
+                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
+                           AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+          EquipListsNameList(iIndex) = cAlphaArgs(1)
+          EquipListsTypeList(iIndex) = LoopType_Condenser
+          EquipListsIndexList(iIndex) = Num
+          MachineNum=2
+          DO WHILE (MachineNum <= NumAlphas)
+            firstblank=.false.
+            IF (lAlphaFieldBlanks(MachineNum) .or. lAlphaFieldBlanks(MachineNum+1)) THEN
+              IF (lAlphaFieldBlanks(MachineNum)) THEN
+                CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid component specification.')
+                CALL ShowContinueError(trim(cAlphaFieldNames(MachineNum))//' is blank.')
+                firstblank=.true.
+                ErrorsFound=.true.
+              ENDIF
+              IF (lAlphaFieldBlanks(MachineNum+1)) THEN
+                IF (.not. firstblank) THEN
+                  CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid component specification.')
+                ENDIF
+                CALL ShowContinueError(trim(cAlphaFieldNames(MachineNum+1))//' is blank.')
+                ErrorsFound=.true.
+              ENDIF
+            ELSE
+              CALL ValidateComponent(cAlphaArgs(MachineNum),cAlphaArgs(MachineNum+1),IsNotOK,TRIM(CurrentModuleObject))
+              IF (IsNotOK) THEN
+                CALL ShowContinueError(TRIM(CurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", Input Error.')
+                ErrorsFound = .true.
+              ENDIF
+            ENDIF
+            MachineNum=MachineNum+2
+          ENDDO
         ENDDO
       ENDIF
+    ENDIF
+    IF (ErrorsFound) THEN
+      CALL ShowFatalError('LoadEquipList/GetEquipmentLists: Failed due to preceding errors.')
     ENDIF
     MyOneTimeFlag = .FALSE.
   ENDIF
 
-  FoundIntendedList = .FALSE. 
+  FoundIntendedList = .FALSE.
   ! find name in set of possible list
   DO Num = 1, TotNumLists
     IF(SameString(TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%name), TRIM(EquipListsNameList(Num)))) THEN
-      FoundIntendedList = .TRUE. 
+      FoundIntendedList = .TRUE.
       ! get object item for real this time
       SELECT CASE (EquipListsTypeList(num))
       CASE (LoopType_Plant)
         CurrentModuleObject = 'PlantEquipmentList'
-      CASE (LoopType_Condenser) 
+      CASE (LoopType_Condenser)
         CurrentModuleObject = 'CondenserEquipmentList'
       END SELECT
       CALL GetObjectItem(TRIM(CurrentModuleObject),EquipListsIndexList(Num),cAlphaArgs,NumAlphas, &
-                rNumericArgs,NumNums,IOSTAT)
+                           rNumericArgs,NumNums,IOSTAT, &
+                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
+                           AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%NumComps      = (NumAlphas - 1)/2
       IF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%NumComps .GT. 0) THEN
         ALLOCATE (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%Comp &
@@ -1114,21 +1217,16 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
         DO MachineNum = 1, PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%NumComps
           PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%Comp(MachineNum)%TypeOf = cAlphaArgs(MachineNum*2)
           PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%Comp(MachineNum)%Name = cAlphaArgs(MachineNum*2+1)
-          CALL ValidateComponent(cAlphaArgs(MachineNum*2),cAlphaArgs(MachineNum*2+1),IsNotOK,TRIM(CurrentModuleObject))
-          IF (IsNotOK) THEN
-            CALL ShowContinueError('Input error in '//TRIM(CurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'".')
-            ErrorsFound = .true.
-          ENDIF
         END DO !MachineList
       ENDIF
     ENDIF
-  ENDDO 
-  
+  ENDDO
+
   IF (.NOT. FoundIntendedList) THEN
-    CALL ShowSevereError('Failed to find PlantEquipmentList or CondenserEquipmentList object named = ' &
+    CALL ShowSevereError('LoadEquipList: Failed to find PlantEquipmentList or CondenserEquipmentList object named = ' &
                        //TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%name) )
     ErrorsFound = .true.
-  
+
   ENDIF
 RETURN
 END SUBROUTINE LoadEquipList
@@ -1141,7 +1239,7 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Load component set point based input into PLANTLOOP data structure
+          ! Load component setpoint based input into PLANTLOOP data structure
 
           ! METHODOLOGY EMPLOYED:
           ! calls the Input Processor to retrieve data from input file.
@@ -1338,7 +1436,7 @@ TYPE (OpSchemePtrData),          ALLOCATABLE, DIMENSION(:) :: TempCompOpscheme
   LOGICAL                           :: FoundScheme
   LOGICAL                           :: FoundSchemeMatch
 !  LOGICAL, SAVE                     :: FirstHVACInitsDone = .FALSE.
-  LOGICAL, SAVE                     :: MyEnvrnFlag = .TRUE.
+!  LOGICAL, SAVE                     :: MyEnvrnFlag = .TRUE.
   INTEGER                           :: ThisTypeOfNum
   INTEGER                           :: CompOpNum
   INTEGER                           :: OldNumOpSchemes
@@ -1350,6 +1448,7 @@ TYPE (OpSchemePtrData),          ALLOCATABLE, DIMENSION(:) :: TempCompOpscheme
   LOGICAL,SAVE                      :: GetPlantOpInput  =.TRUE.      !successful Get Input
   LOGICAL                           :: errFlag1
   LOGICAL                           :: errFlag2
+  REAL(r64)                         :: HighestRange
   errFlag2 = .FALSE.
         !Get Input
   IF (GetPlantOpInput)THEN
@@ -1457,7 +1556,8 @@ IF (MyOneTimeFlag) THEN
             PlantLoop(DummyLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%OpScheme(1)%EquipList(1)%CompPtr =   &
                EquipNum
 
-          ELSEIF (PlantLoop(DummyLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NumOpSchemes > 0) THEN ! already an op scheme
+          ELSEIF (PlantLoop(DummyLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NumOpSchemes > 0) THEN
+             ! already an op scheme
             OldNumOpSchemes = PlantLoop(DummyLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NumOpSchemes
             ! create and store complete copy of old opScheme structure
             ALLOCATE(TempCompOpscheme(OldNumOpSchemes))
@@ -1568,6 +1668,26 @@ IF (MyOneTimeFlag) THEN
     ENDDO
   ENDDO
 
+  ! fill out information on which equipment list is the "last" meaning it has the highest upper limit for load range
+  DO LoopNum = 1, TotNumLoops
+    DO OpNum =1, PlantLoop(LoopNum)%NumOpschemes
+      ! skip non-load based op schemes
+      IF ((PlantLoop(LoopNum)%Opscheme(OpNum)%OpSchemeType  /= HeatingRBOpSchemeType) .AND. &
+          (PlantLoop(LoopNum)%Opscheme(OpNum)%OpSchemeType  /= CoolingRBOpSchemeType) )  CYCLE
+      HighestRange = 0.d0
+      DO ListNum = 1,PlantLoop(LoopNum)%Opscheme(OpNum)%NumEquipLists
+        HighestRange = MAX(HighestRange, PlantLoop(LoopNum)%OpScheme(OpNum)%EquipList(ListNum)%RangeUpperLimit)
+      ENDDO  !List
+      DO ListNum = 1,PlantLoop(LoopNum)%Opscheme(OpNum)%NumEquipLists
+        IF (HighestRange == PlantLoop(LoopNum)%OpScheme(OpNum)%EquipList(ListNum)%RangeUpperLimit) THEN
+          PlantLoop(LoopNum)%OpScheme(OpNum)%EquipListNumForLastStage = ListNum
+        ENDIF
+      ENDDO
+    ENDDO  !operation scheme
+
+  ENDDO  !loop
+
+
    MyOneTimeFlag = .FALSE.
 ENDIF
 
@@ -1582,7 +1702,7 @@ IF (FirstHVACIteration )THEN
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .TRUE.
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .TRUE.
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad =0.d0
-          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSCtrl = .FALSE.
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn = .FALSE.
             !  Zero out the old curopschemeptr so that we don't get 'carry-over' when we update schedules
           IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType.NE.DemandOpSchemeType .and. &
              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType.NE.PumpOpSchemeType .and. &
@@ -1735,9 +1855,13 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
           ! this is for some components like cooling towers don't have well defined OptLoad
           ChangeInLoad = ABS(RemLoopDemand)
         ENDIF
-        
+
+        CALL AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurSchemePtr, ListPtr, ChangeInLoad)
+
+        CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
+
         CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
-        
+
         ChangeInLoad= MAX(0.0d0,ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
 
@@ -1795,6 +1919,10 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
           ChangeInLoad = ABS(RemLoopDemand)
         ENDIF
 
+        CALL AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurSchemePtr, ListPtr, ChangeInLoad)
+
+        CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
+
         CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
 
         ChangeInLoad = MAX(0.0d0, ChangeInLoad)
@@ -1820,6 +1948,11 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
           ! this is for some components like cooling towers don't have well defined MaxLoad
           ChangeInLoad = ABS(RemLoopDemand)
         ENDIF
+
+        CALL AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurSchemePtr, ListPtr, ChangeInLoad)
+
+        CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
+
         CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
         ChangeInLoad = MAX(0.0d0, ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
@@ -1862,21 +1995,72 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
   RETURN
 END SUBROUTINE DistributePlantLoad
 
+SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurOpSchemePtr, CurEquipListPtr, ChangeInLoad)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   May 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! if this is the last stage for a load based operation, then limit load to upper range
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)      :: LoopNum         ! component topology
+  INTEGER, INTENT(IN)      :: CurOpSchemePtr  ! currect active operation scheme 
+  INTEGER, INTENT(IN)      :: CurEquipListPtr ! current equipment list
+  REAL(r64), INTENT(INOUT) :: ChangeInLoad    ! positive magnitude of load change
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)  :: RangeHiLimit
+          
+  IF (PlantLoop(LoopNum)%OpScheme(CurOpSchemePtr)%EquipListNumForLastStage == CurEquipListPtr) THEN ! at final last stage
+    
+    RangeHiLimit = PlantLoop(LoopNum)%OpScheme(CurOpSchemePtr)%EquipList(CurEquipListPtr)%RangeUpperLimit
+    ChangeInLoad = MIN(ChangeInLoad, RangeHiLimit)
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit
+
+
 SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         B. Griffith
           !       DATE WRITTEN   Nov 2011
-          !       MODIFIED       na
+          !       MODIFIED       March 2012, B. Griffith add controls for free cooling heat exchanger overrides of chillers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! central place to apply limits to machine load dispatch based on how the machine serves loads
 
           ! METHODOLOGY EMPLOYED:
-          ! Components are machines on plant equipment operation lists.  Need to make adjustments to the 
-          ! load dispatch to account for limits and floating capacities. 
-          ! 
+          ! Components are machines on plant equipment operation lists.  Need to make adjustments to the
+          ! load dispatch to account for limits and floating capacities.
+          !
 
           ! REFERENCES:
           ! na
@@ -1884,7 +2068,7 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
           ! USE STATEMENTS:
 !  USE EconomizerHeatExchanger,  ONLY: GetEconHeatExchangerCurrentCapacity
   USE DataLoopNode, ONLY: Node
-
+  USE DataEnvironment, ONLY : OutDryBulbTemp, OutWetBulbTemp
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1894,7 +2078,7 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
   INTEGER, INTENT(IN)  :: CompNum ! component topology
   REAL(r64), INTENT(INOUT) :: ChangeInLoad ! positive magnitude of load change
   LOGICAL, INTENT(IN)  :: FirstHVACIteration
-  
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1908,11 +2092,14 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
   REAL(r64)                :: CurMassFlowRate = 0.d0
   REAL(r64)                :: ToutLowLimit    = 0.d0
   REAL(r64)                :: ToutHiLimit     = 0.d0
+  REAL(r64)                :: TinLowLimit     = 0.d0
   REAL(r64)                :: Tinlet          = 0.d0
+  REAL(r64)                :: Tsensor         = 0.d0
   REAL(r64)                :: CurSpecHeat     = 0.d0
   REAL(r64)                :: QdotTmp         = 0.d0
-          
-          
+  INTEGER                  :: ControlNodeNum  = 0
+
+
   !start of bad band-aid, need a general and comprehensive approach for determining current capacity of all kinds of equipment
      ! Need to truncate the load down in case outlet temperature will hit a lower/upper limit
   SELECT CASE(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%HowLoadServed)
@@ -1933,6 +2120,72 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
       ChangeInLoad = MIN(ChangeInLoad,QdotTmp)
     ENDIF
 
+  CASE(HowMet_ByNominalCapFreeCoolCntrl)
+    ! for chillers with free cooling shutdown (HeatExchanger:Hydronic currently)
+      ! determine if free cooling controls shut off chiller
+    TinLowLimit   = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlMinCntrlTemp
+   SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlMode)
+    CASE (FreeCoolControlMode_WetBulb)
+      Tsensor = OutWetBulbTemp
+    CASE (FreeCoolControlMode_DryBulb)
+      Tsensor = OutDryBulbTemp
+    CASE (FreeCoolControlMode_Loop)
+      ControlNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlNodeNum
+      IF (ControlNodeNum > 0) THEN
+        Tsensor = Node(ControlNodeNum)%TempLastTimestep ! use lagged value for stability
+      ELSE
+        Tsensor = 23.d0
+      ENDIF
+    END SELECT
+
+    IF (Tsensor < TinLowLimit) THEN ! turn off chiller to initiate free cooling
+      ChangeInLoad = 0.d0
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .FALSE.
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .TRUE.
+    ELSE
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .TRUE.
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .FALSE.
+    ENDIF
+
+  CASE(HowMet_ByNominalCapLowOutLimitFreeCoolCntrl)
+    ! for chillers with free cooling shutdown (HeatExchanger:Hydronic currently)
+      ! determine if free cooling controls shut off chiller
+    TinLowLimit   = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlMinCntrlTemp
+    SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlMode)
+    CASE (FreeCoolControlMode_WetBulb)
+      Tsensor = OutWetBulbTemp
+    CASE (FreeCoolControlMode_DryBulb)
+      Tsensor = OutDryBulbTemp
+    CASE (FreeCoolControlMode_Loop)
+      ControlNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlNodeNum
+      IF (ControlNodeNum > 0) THEN
+        Tsensor = Node(ControlNodeNum)%TempLastTimestep ! use lagged value for stability
+      ELSE
+        Tsensor = 23.d0
+      ENDIF
+    END SELECT
+
+    IF (Tsensor < TinLowLimit) THEN ! turn off chiller to initiate free cooling
+      ChangeInLoad = 0.d0
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .FALSE.
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .TRUE.
+    ELSE
+      !- Retrieve data from the plant loop data structure
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .TRUE.
+      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%FreeCoolCntrlShutDown = .FALSE.
+      CurMassFlowRate = Node(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn)%MassFlowRate
+      ToutLowLimit    = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MinOutletTemp
+      Tinlet          = Node(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn)%Temp
+      CurSpecHeat     = GetSpecificHeatGlycol(PlantLoop(LoopNum)%FluidName,Tinlet,PlantLoop(LoopNum)%FluidIndex, &
+                                              'PlantCondLoopOperation:DistributePlantLoad')
+      QdotTmp         = CurMassFlowRate*CurSpecHeat*(Tinlet-ToutLowLimit)
+
+  !        !- Don't correct if Q is zero, as this could indicate a component which this hasn't been implemented or not yet turned on
+      IF(CurMassFlowRate > 0.d0) THEN
+        ChangeInLoad = MIN(ChangeInLoad,QdotTmp)
+      ENDIF
+    ENDIF
+
   CASE(HowMet_ByNominalCapHiOutLimit) ! boilers with upper limit on outlet temperature
     !- Retrieve data from the plant loop data structure
     CurMassFlowRate = Node(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn)%MassFlowRate
@@ -1947,9 +2200,9 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
     ENDIF
 
   CASE (HowMet_PassiveCap) ! need to estimate current capacity if more or less passive devices ??
-  
+
 !    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == TypeOf_WaterSideEconHtExchg) THEN
-!      ! need to determine current capacity of free cooling heat exchanger. 
+!      ! need to determine current capacity of free cooling heat exchanger.
 !      IF (.NOT. FirstHVACIteration) THEN
 !        IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%LoadProvided  &
 !             > PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad) THEN ! device could not keep up
@@ -1957,7 +2210,7 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
 !          ChangeInLoad = MIN(ChangeInLoad,QdotTmp)
 !        ENDIF
 !      ENDIF
-!      
+!
 !    ENDIF
 
   CASE DEFAULT
@@ -2013,6 +2266,8 @@ INTEGER, INTENT(IN)         :: OpNum  !index for Plant()%loopside()%branch()%com
   INTEGER                  :: SetPtNode
   INTEGER                  :: NumEquipLists
   REAL(r64)                :: rho
+  REAL(r64)                :: CurrentDemandForCoolingOp
+  REAL(r64)                :: CurrentDemandForHeatingOp
 
         !find the pointer to the 'PlantLoop()%OpScheme()'...data structure
   NumEquipLists = PlantLoop(LoopNum)%loopside(LoopSideNum)%branch(BranchNum)%comp(CompNum)%opscheme(OpNum)%NumEquipLists
@@ -2033,8 +2288,6 @@ INTEGER, INTENT(IN)         :: OpNum  !index for Plant()%loopside()%branch()%com
   DemandNode    = PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%DemandNodeNum
   SetPtNode     = PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%SetPointNodeNum
   TempIn        = Node(DemandNode)%Temp
-  TempSetPt     = Node(SetPtNode)%TempSetPoint
-
   rho   = GetDensityGlycol(PlantLoop(LoopNum)%FluidName,  &
                            TempIn, &
                            PlantLoop(LoopNum)%FluidIndex,&
@@ -2043,17 +2296,43 @@ INTEGER, INTENT(IN)         :: OpNum  !index for Plant()%loopside()%branch()%com
   DemandMdot    = PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%SetPointFlowRate * rho
   !DSU?  DemandMDot is a constant design flow rate, next based on actual current flow rate for accurate current demand?
   ActualMdot    = Node(DemandNode)%MassFlowRate
+  CurSpecHeat     = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,TempIn,PlantLoop(loopNum)%FluidIndex, &
+                                            'FindCompSPLoad')
   IF ((ActualMdot > 0.d0) .AND. (ActualMdot /= DemandMdot)) THEN
     DemandMdot = ActualMdot
   ENDIF
+
+  SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetpoint)
+    TempSetPt     = Node(SetPtNode)%TempSetPoint
+  CASE (DualSetpointDeadband)
+    IF (PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%CtrlTypeNum == CoolingOp) THEN
+      TempSetPt     = Node(SetPtNode)%TempSetPointHi
+    ELSEIF(PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%CtrlTypeNum == HeatingOP) THEN
+      TempSetPt     = Node(SetPtNode)%TempSetPointLo
+    ELSEIF(PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EquipList(ListPtr)%Comp(CompPtr)%CtrlTypeNum == DualOP)  THEN
+      CurrentDemandForCoolingOp = DemandMdot*CurSpecHeat*(Node(SetPtNode)%TempSetPointHi - TempIn)
+      CurrentDemandForHeatingOp = DemandMdot*CurSpecHeat*(Node(SetPtNode)%TempSetPointLo - TempIn)
+      IF ((CurrentDemandForCoolingOp < 0.d0) .AND. (CurrentDemandForHeatingOp <= 0.d0)) THEN ! cooling
+        TempSetPt     = Node(SetPtNode)%TempSetPointHi
+      ELSEIF ((CurrentDemandForCoolingOp >= 0.d0) .AND. (CurrentDemandForHeatingOp > 0.d0)) THEN ! heating
+        TempSetPt     = Node(SetPtNode)%TempSetPointLo
+      ELSE ! deadband
+        TempSetPt     = TempIn
+      ENDIF
+
+    ENDIF
+
+  END SELECT
+
+
 
   IF(TempSetPt == SensedNodeFlagValue) THEN
      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad = 0.d0
      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EquipDemand = 0.d0
   ELSE
-    CurSpecHeat     = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,TempIn,PlantLoop(loopNum)%FluidIndex, &
-                                            'FindCompSPLoad')
+
     CompDemand = (DemandMdot*CurSpecHeat*(TempSetPt - TempIn))
 
     IF(ABS(CompDemand) < LoopDemandTol) CompDemand = 0.d0
@@ -2105,90 +2384,6 @@ INTEGER, INTENT(IN)         :: OpNum  !index for Plant()%loopside()%branch()%com
   RETURN
 END SUBROUTINE FindCompSPLoad
 
-SUBROUTINE GetCurrentPlantItemLoad(CompType,CompName, CurrentLoad, ItemNotFound, LoopNum, LoopSideNum,BranchNum, MachineOnBranch)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Simon Rees
-          !       DATE WRITTEN   March 2003
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! To allow models that interface with other models directly (e.g. free cooling
-          ! heat exchanger) to request current plant component myload
-
-          ! METHODOLOGY EMPLOYED:
-          ! Just search through the plant supply side data structure until the component
-          ! with given name and type is found. Return 'MyLoad' value from Plantsideloop
-          ! data structure.
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-USE DataHVACGlobals, ONLY: NumPlantLoops,NumCondLoops
-
-  IMPLICIT NONE
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN)       :: CompType
-  CHARACTER(len=*), INTENT(IN)       :: CompName
-  REAL(r64), INTENT(OUT)             :: CurrentLoad
-  LOGICAL, INTENT(OUT)               :: ItemNotFound
-  INTEGER, INTENT(INOUT)             :: LoopNum             ! loop counter
-  INTEGER, INTENT(INOUT)             :: LoopSideNum         ! loop sidecounter
-  INTEGER, INTENT(INOUT)             :: BranchNum           ! branch counter
-  INTEGER, INTENT(INOUT)             :: MachineOnBranch     ! component counter
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          ! na
-
-  ItemNotFound    = .TRUE.
-  CurrentLoad = 0.0
-
-  IF (LoopNum /= 0 .and. BranchNum /= 0 .and. MachineOnBranch /= 0) THEN
-    IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%Name == CompName .AND.   &
-       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%TypeOf == CompType) THEN
-      ItemNotFound=.false.
-    ENDIF
-  ENDIF
-
-  IF (.not. ItemNotFound) THEN
-    CurrentLoad = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%Myload
-    ItemNotFound = .FALSE.
-  ELSE
-    PlantLoops: &
-    DO LoopNum = 1, TotNumLoops
-      ! search for specified component on loop
-      DO BranchNum =1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches
-        DO MachineOnBranch = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
-          ! test if this is the component we want
-          IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%Name == CompName .AND.   &
-             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%TypeOf == CompType) THEN
-            ! set the component on and active in the plant supply side data structure
-            CurrentLoad = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%Myload
-            ItemNotFound = .FALSE.
-            EXIT PlantLoops
-          END IF
-        END DO ! machines on branch
-      END DO   ! branches
-    END DO  PlantLoops ! loops
-    IF (ItemNotFound) THEN
-      MachineOnBranch=0
-      LoopNum=0
-      BranchNum=0
-    ENDIF
-  END IF
-
-  RETURN
-
-END SUBROUTINE GetCurrentPlantItemLoad
 
 ! End Load Calculation/Distribution Section of the Plant Loop Module
 !******************************************************************************
@@ -2390,85 +2585,6 @@ SUBROUTINE TurnOffLoopSideEquipment(LoopNum,LoopSideNum)
   RETURN
 END SUBROUTINE TurnOffLoopSideEquipment
 
-SUBROUTINE TurnOnOffPlantItem(CompType,CompName, ItemNotFound, ItemNotTurnedOnOff, LoopNum,LoopSideNum,   &
-   BranchNum, MachineOnBranch, TurnOnOrOff)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Simon Rees
-          !       DATE WRITTEN   March 2003
-          !       MODIFIED       D.Fisher Aug 2010
-          !                      Edwin lee Aug 2010 to allow turn on/off in same routine, remove FlowCtrl comments
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! To allow models that interface with other models directly (e.g. free cooling
-          ! heat exchanger) to request a particular piece of equipment is turned on or off
-
-          ! METHODOLOGY EMPLOYED:
-          ! Just search through the plant supply side data structure until the component
-          ! with given name and type is found.
-          ! If Turning ON, Change 'ON' variable to TRUE
-          ! If Turning ON, Change 'ON' variable to FALSE
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant, ONLY: ScanPlantLoopsForObject
-  USE InputProcessor, ONLY: FindItem
-
-          ! ENFORCE EXPLICIT VARIABLE DECLARATION
-  IMPLICIT NONE
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN)       :: CompType
-  CHARACTER(len=*), INTENT(IN)       :: CompName
-  LOGICAL, INTENT(OUT)               :: ItemNotFound
-  LOGICAL, INTENT(OUT)               :: ItemNotTurnedOnOff
-  INTEGER, INTENT(INOUT)             :: LoopNum             ! loop counter
-  INTEGER, INTENT(INOUT)             :: LoopSideNum             ! loop counter
-  INTEGER, INTENT(INOUT)             :: BranchNum           ! branch counter
-  INTEGER, INTENT(INOUT)             :: MachineOnBranch     ! component counter
-  LOGICAL, INTENT(IN)                :: TurnOnOrOff         ! If .TRUE., we are turning comp ON, otherwise OFF
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: SearchHits
-  INTEGER :: ThisTypeOfNum
-
-  ItemNotFound    = .TRUE.
-  ItemNotTurnedOnOff = .TRUE.
-
-  IF (LoopNum /= 0 .and. BranchNum /= 0 .and. MachineOnBranch /= 0) THEN
-    IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%Name == CompName .AND.   &
-       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%TypeOf == CompType) THEN
-      ItemNotFound=.false.
-    ENDIF
-  ENDIF
-
-  IF (.not. ItemNotFound) THEN
-    ! set the component on and active in the plant supply side data structure
-    PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%ON = TurnOnOrOff
-    ItemNotFound = .FALSE.
-    ItemNotTurnedOnOff = .FALSE.
-  ELSE
-    ThisTypeOfNum = FindItem(CompType, SimPlantEquipTypes, SIZE(SimPlantEquipTypes))
-    CALL ScanPlantLoopsForObject(CompName, ThisTypeOfNum, LoopNum, LoopSideNum, BranchNum,   &
-       MachineOnBranch, CountMatchPlantLoops=SearchHits)
-    IF (SearchHits .GT. 0) THEN
-      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(MachineOnBranch)%ON = TurnOnOrOff
-      ItemNotFound = .FALSE.
-      ItemNotTurnedOnOff = .FALSE.
-    ELSE
-      MachineOnBranch=0
-      LoopNum=0
-      BranchNum=0
-    END IF
-  END IF
-
- RETURN
-
-END SUBROUTINE TurnOnOffPlantItem
-
 ! End Plant Loop ON/OFF Utility Subroutines
 !******************************************************************************
 
@@ -2499,8 +2615,7 @@ USE DataInterfaces, ONLY: SetupEMSActuator
           ! SUBROUTINE ARGUMENT DEFINITIONS
 
           ! SUBROUTINE PARAMETER DEFINITIONS
- INTEGER, PARAMETER           :: SupplySide =1
- INTEGER, PARAMETER           :: DemandSide =2
+          ! na
 
           ! SUBROUTINE VARIABLE DEFINITIONS
  CHARACTER(len=MaxNameLength) :: ActuatorType
@@ -2535,13 +2650,29 @@ USE DataInterfaces, ONLY: SetupEMSActuator
 
      DO LoopSideNum = 1, 2
        DO BranchNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches
+         IF (LoopSideNum == SupplySide) THEN
+           ActuatorName = 'Supply Side Branch'
+           UniqueIDName   = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Name
+           ActuatorType  = 'On/Off Supervisory'
+           CALL SetupEMSActuator(ActuatorName,  UniqueIDName, ActuatorType, Units, &
+                                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideOn, &
+                                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideValue)
+         ELSEIF (LoopSideNum == DemandSide) THEN
+           ActuatorName = 'Demand Side Branch'
+           UniqueIDName   = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Name
+           ActuatorType  = 'On/Off Supervisory'
+           CALL SetupEMSActuator(ActuatorName,  UniqueIDName, ActuatorType, Units, &
+                                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideOn, &
+                                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideValue)
+         ENDIF
          DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
-            ActuatorName = 'Plant Component '//Trim(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf)
+            ActuatorName = 'Plant Component ' &
+                  //Trim(ccSimPlantEquipTypes(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num))
             UniqueIDName   = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Name
             ActuatorType  = 'On/Off Supervisory'
-            CALL SetupEMSActuator(ActuatorName,  UniqueIDName, ActuatorType, Units, &
-                                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSCtrl, &
-                                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSValue)
+            CALL SetupEMSActuator(ActuatorName,  UniqueIDName, ActuatorType, '[W]', &
+                                     PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn, &
+                                     PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue)
          END DO
        END DO
      END DO
@@ -2588,8 +2719,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
  LOGICAL,INTENT(INOUT)      :: LoopShutdownFlag
 
           ! SUBROUTINE PARAMETER DEFINITIONS
- INTEGER, PARAMETER         :: SupplySide =1
- INTEGER, PARAMETER         :: DemandSide =2
+          ! na
 
           ! SUBROUTINE VARIABLE DEFINITIONS
  REAL(r64)                  :: CurMassFlowRate
@@ -2597,7 +2727,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
  REAL(r64)                  :: Tinlet
  REAL(r64)                  :: CurSpecHeat
  REAL(r64)                  :: QTemporary
- REAL(r64)                  :: ChangeInLoad
+!unused REAL(r64)                  :: ChangeInLoad
 
   !MODULE VARIABLE DECLARATIONS:
 
@@ -2608,8 +2738,10 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
          CALL TurnOffLoopEquipment(LoopNum)
          RETURN
        ELSE
-         !do nothing:  can't turn all loop equip. ON with loop switch
+         LoopShutdownFlag = .FALSE.
        ENDIF
+     ELSE
+       LoopShutdownFlag = .FALSE.
      ENDIF
 
         !Half-loop control
@@ -2622,9 +2754,9 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
        ENDIF
      ENDIF
 
-     IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSCtrl)THEN
+     IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn)THEN
            !EMSValue <= 0 turn component OFF
-       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSValue <= 0.0)THEN
+       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue <= 0.0)THEN
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .FALSE.
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad =0.0
@@ -2636,7 +2768,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad = &
          MIN(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Maxload, &
            (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Maxload * &
-           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSValue))
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue))
 
            ! Check lower/upper temperature limit for chillers
          SELECT CASE(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num)
@@ -2653,7 +2785,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
              !- Don't correct if Q is zero, as this could indicate a component which this hasn't been implemented
              IF(QTemporary.GT.0.0)THEN
 
-               ChangeInLoad = MIN(ChangeInLoad,QTemporary)
+!unused               ChangeInLoad = MIN(ChangeInLoad,QTemporary)
                ! DSU?  weird ems thing here?
                IF ( ABS(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad) >  &
                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Maxload  ) THEN
@@ -2682,12 +2814,78 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
 RETURN
 END SUBROUTINE ActivateEMSControls
 
+SUBROUTINE AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! modify load dispatch if EMS controls are in place for a specific component
+
+          ! METHODOLOGY EMPLOYED:
+          ! Check if Loop Side is shutdown
+          !  then check if branch is shutdown
+          ! then  check if component is overridden and use the value if it is.
+          ! take ABS() of EMS value to ensure sign is correct.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+ INTEGER,INTENT(IN)         :: LoopNum
+ INTEGER,INTENT(IN)         :: LoopSideNum
+ INTEGER,INTENT(IN)         :: BranchNum
+ INTEGER,INTENT(IN)         :: CompNum
+ REAL(r64), INTENT(INOUT)   :: ChangeInLoad ! positive magnitude of load change
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  IF ((PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSCtrl) .AND. &
+      (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSValue <= 0.d0)) THEN
+    ChangeInLoad = 0.d0
+    RETURN
+  ENDIF
+
+  IF ((PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideOn) .AND. &
+      (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideValue <= 0.d0)) THEN
+    ChangeInLoad = 0.d0
+    RETURN
+  ENDIF
+
+  IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn) THEN
+    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue == 0.d0) THEN
+      ChangeInLoad = 0.d0
+    ENDIF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE AdjustChangeInLoadByEMSControls
+
+
 !*END PLANT EMS CONTROL ROUTINES!
 !******************************************************************************
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

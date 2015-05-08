@@ -59,8 +59,9 @@ PUBLIC          ! By definition, all variables which are placed in this data
   INTEGER, PARAMETER :: BBElectric_Num = 23
   INTEGER, PARAMETER :: VRFTerminalUnit_Num = 24
   INTEGER, PARAMETER :: RefrigerationAirChillerSet_Num = 25
+  INTEGER, PARAMETER :: UserDefinedZoneHVACForcedAir_Num = 26
 !
-  INTEGER, PARAMETER :: TotalNumZoneEquipType = 25
+  INTEGER, PARAMETER :: TotalNumZoneEquipType = 26
   ! **NOTE**... if you add another zone equipment object, then increment
   ! TotalNumZoneEquipType above to match the total number of zone equipment types
 ! End zone equip objects
@@ -171,7 +172,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                                                       ! =2 if central sysis in constant fan mode.
     LOGICAL                                :: ZonalSystemOnly=.FALSE. ! TRUE if served by a zonal system (only)
     LOGICAL                                 :: IsControlled =.false.  ! True when this is a controlled zone.
-    REAL(r64)                              :: ZoneExh          = 0 ! zone exhaust (unbalanced) mass flow rate [kg/s]
+    REAL(r64)                              :: ZoneExh          = 0    ! zone exhaust (unbalanced) mass flow rate [kg/s]
+    REAL(r64)                              :: PlenumMassFlow   = 0.0  ! zone air mass flow rate induced from plenum [kg/s]
                         ! AirDistUnitCool and AirDistUnitHeat
                         ! do not correspond with the AIR DISTRIBUTION UNIT object in the zone equipment list.
                         ! AirDistUnitCool/AirDistUnitHeat, may represent a DIRECT AIR object,
@@ -185,7 +187,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                                                                    ! plenum (simple duct leakage model)
     LOGICAL                                :: InFloorActiveElement = .FALSE. !Convection adapation, true if zone has in-floor HVAC
     LOGICAL                                :: InWallActiveElement  = .FALSE. !Convection adapation, true if zone has in-wall HVAC
-    LOGICAL                                :: InCeilingActiveElement = .FALSE. !Convection adapation, true when zone has in-ceiling HVAC
+    LOGICAL                                :: InCeilingActiveElement = .FALSE. !Convection adapation,
+                                                                               ! true when zone has in-ceiling HVAC
   END TYPE EquipConfiguration
 
   TYPE EquipmentData  !data for an individual component
@@ -269,7 +272,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
   INTEGER :: NumSupplyAirPaths      =0
   INTEGER :: NumReturnAirPaths      =0
   LOGICAL :: ZoneEquipInputsFilled = .FALSE.
-  LOGICAL :: ZoneEquipSimulatedOnce = .FALSE. 
+  LOGICAL :: ZoneEquipSimulatedOnce = .FALSE.
+  INTEGER :: NumofZoneEquipLists  = 0 ! The Number of Zone Equipment List objects
   INTEGER, ALLOCATABLE :: ZoneEquipAvail(:)
 
   TYPE (EquipConfiguration), ALLOCATABLE, DIMENSION(:) :: ZoneEquipConfig
@@ -404,7 +408,6 @@ LOGICAL       :: IsBlank               ! Flag for blank name
 LOGICAL :: NodeListError
 LOGICAL :: UniqueNodeError
 INTEGER :: NumOfControlledZones ! The number of Controlled Zone Equip Configuration objects
-INTEGER :: NumofZoneEquipLists  ! The Number of Zone Equipment List objects
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject   ! Object type for getting and error messages
 CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAlphaFields   ! Alpha field names
 CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cNumericFields ! Numeric field names
@@ -747,6 +750,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
         CASE('ZONEHVAC:REFRIGERATIONCHILLERSET') ! Refrigeration chiller designed for warehouse applications
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=RefrigerationAirChillerSet_Num
 
+        CASE('ZONEHVAC:FORCEDAIR:USERDEFINED')
+          ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=UserDefinedZoneHVACForcedAir_Num
+
         CASE DEFAULT
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
           CALL ShowContinueError('..Invalid Equipment Type = '//TRIM(ZoneEquipList(ControlledZoneNum)%EquipType(ZoneEquipTypeNum)))
@@ -819,8 +825,8 @@ END DO ! end loop over controlled zones
 
 !map ZoneEquipConfig%EquipListIndex to ZoneEquipList%Name
 
-DO ControlledZoneLoop = 1,NumOfControlledZones
-    found = FindItemInList(ZoneEquipList(ControlledZoneLoop)%Name, ZoneEquipConfig%EquipListName, NumOfControlledZones)
+DO ControlledZoneLoop = 1,NumOfZones
+    found = FindItemInList(ZoneEquipList(ControlledZoneLoop)%Name, ZoneEquipConfig%EquipListName, NumOfZones)
     IF (Found > 0) ZoneEquipConfig(found)%EquipListIndex = ControlledZoneLoop
 END DO ! end loop over controlled zones
 
@@ -1234,7 +1240,7 @@ END FUNCTION GetReturnAirNodeForZone
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

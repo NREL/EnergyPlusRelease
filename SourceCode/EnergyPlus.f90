@@ -3,7 +3,7 @@
 
 !      NOTICE
 
-!      Copyright © 1996-2011 The Board of Trustees of the University of Illinois and The Regents of the
+!      Copyright © 1996-2012 The Board of Trustees of the University of Illinois and The Regents of the
 !      University of California through Ernest Orlando Lawrence Berkeley National Laboratory.  All rights
 !      reserved.
 
@@ -168,6 +168,7 @@ USE DataStringGlobals
 USE DataGlobals
 USE DataInterfaces
 USE DataSystemVariables
+USE DataTimings
 USE DataEnvironment, ONLY: IgnoreSolarRadiation, IgnoreBeamRadiation, IgnoreDiffuseRadiation
           ! routine modules
 USE InputProcessor
@@ -205,28 +206,31 @@ USE Psychrometrics, ONLY: ShowPsychrometricSummary
 !
 !                           INITIALIZE VARIABLES
 !
-      CALL CPU_TIME(Time_Start)
+                             Time_Start=epElapsedTime()
+#ifdef EP_Detailed_Timings
+                             CALL epStartTime('EntireRun=')
+#endif
       CALL CreateCurrentDateTimeString(CurrentDateTime)
       VerString=TRIM(VerString)//','//TRIM(CurrentDateTime)
       cEnvValue=' '
       CALL Get_Environment_Variable(DDOnlyEnvVar,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
-      DDOnly=(cEnvValue(1:1)=='Y')
+      DDOnly=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(ReverseDDEnvVar,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
-      ReverseDD=(cEnvValue(1:1)=='Y')
+      ReverseDD=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(FullAnnualSimulation,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
-      FullAnnualRun=(cEnvValue(1:1)=='Y')
+      FullAnnualRun=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cDisplayAllWarnings,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
-      DisplayAllWarnings=(cEnvValue(1:1)=='Y')
+      DisplayAllWarnings=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
       IF (DisplayAllWarnings) THEN
         DisplayAllWarnings=.true.
         DisplayExtraWarnings=.true.
@@ -238,55 +242,55 @@ USE Psychrometrics, ONLY: ShowPsychrometricSummary
       CALL Get_Environment_Variable(cDisplayExtraWarnings,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DisplayExtraWarnings=(cEnvValue(1:1)=='Y')
+        DisplayExtraWarnings=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cDisplayUnusedObjects,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DisplayUnusedObjects=(cEnvValue(1:1)=='Y')
+        DisplayUnusedObjects=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cDisplayUnusedSchedules,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DisplayUnusedSchedules=(cEnvValue(1:1)=='Y')
+        DisplayUnusedSchedules=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cDisplayZoneAirHeatBalanceOffBalance,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DisplayZoneAirHeatBalanceOffBalance=(cEnvValue(1:1)=='Y')
+        DisplayZoneAirHeatBalanceOffBalance=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cDisplayAdvancedReportVariables,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DisplayAdvancedReportVariables=(cEnvValue(1:1)=='Y')
+        DisplayAdvancedReportVariables=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cReportDuringWarmup,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        ReportDuringWarmup=(cEnvValue(1:1)=='Y')
+        ReportDuringWarmup=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cIgnoreSolarRadiation,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        IgnoreSolarRadiation=(cEnvValue(1:1)=='Y')
+        IgnoreSolarRadiation=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cMinimalSurfaceVariables,cEnvValue)
       cEnvValue=MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        CreateMinimalSurfaceVariables=(cEnvValue(1:1)=='Y')
+        CreateMinimalSurfaceVariables=(cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cSortIDD,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        SortedIDD = (cEnvValue(1:1)=='Y')
+        SortedIDD = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(MinReportFrequencyEnvVar,cEnvValue)
@@ -298,51 +302,56 @@ USE Psychrometrics, ONLY: ShowPsychrometricSummary
       CALL Get_Environment_Variable(cDeveloperFlag,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        DeveloperFlag = (cEnvValue(1:1)=='Y')
+        DeveloperFlag = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cIgnoreBeamRadiation,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        IgnoreBeamRadiation = (cEnvValue(1:1)=='Y')
+        IgnoreBeamRadiation = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cIgnoreDiffuseRadiation,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        IgnoreDiffuseRadiation = (cEnvValue(1:1)=='Y')
+        IgnoreDiffuseRadiation = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cSutherlandHodgman,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        SutherlandHodgman = (cEnvValue(1:1)=='Y')
+        SutherlandHodgman = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(cMinimalShadowing,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        lMinimalShadowing = (cEnvValue(1:1)=='Y')
+        lMinimalShadowing = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
+
+      cEnvValue=' '
+      CALL Get_Environment_Variable(cTimingFlag,cEnvValue)
+      cEnvValue = MakeUPPERCase(cEnvValue)
+      IF (cEnvValue /= Blank) &
+        TimingFlag = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       ! Initialize env flags for air loop simulation debugging
       cEnvValue=' '
       CALL Get_Environment_Variable(TrackAirLoopEnvVar,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        TrackAirLoopEnvFlag  = (cEnvValue(1:1)=='Y')
+        TrackAirLoopEnvFlag  = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(TraceAirLoopEnvVar,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        TraceAirLoopEnvFlag  = (cEnvValue(1:1)=='Y')
+        TraceAirLoopEnvFlag  = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       cEnvValue=' '
       CALL Get_Environment_Variable(TraceHVACControllerEnvVar,cEnvValue)
       cEnvValue = MakeUPPERCase(cEnvValue)
       IF (cEnvValue /= Blank) &
-        TraceHVACControllerEnvFlag  = (cEnvValue(1:1)=='Y')
-      INQUIRE(File='Energy+.ini',EXIST=EPlusINI)
+        TraceHVACControllerEnvFlag  = (cEnvValue(1:1)=='Y' .or. cEnvValue(1:1)=='T')  ! Yes or True
 
       INQUIRE(File='eplusout.end',EXIST=FileExists)
       IF (FileExists) THEN
@@ -403,11 +412,6 @@ USE Psychrometrics, ONLY: ShowPsychrometricSummary
        CALL ShowFatalError('EnergyPlus: Could not open file "eplusout.dbg" for output (write).')
       ENDIF
 
-      ! Set up some globals:
-      EXP1_Value=EXP(1.0d0)
-      PI_SQRT=SQRT(PI)
-      PKON=2.0d0/PI_SQRT
-
         !Call ProcessInput to produce the IDF file which is read by all of the
         ! Get input routines in the rest of the simulation
 
@@ -425,11 +429,6 @@ USE Psychrometrics, ONLY: ShowPsychrometricSummary
       CALL ReportOrphanFluids
       CALL ReportOrphanSchedules
 
-
- 999  CONTINUE
-
-      CALL CPU_TIME(Time_Finish)
-      Elapsed_Time=Time_Finish-Time_Start
       CALL EndEnergyPlus
 !
 

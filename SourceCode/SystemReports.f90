@@ -1305,10 +1305,11 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
                 DemandSideConnect(ArrayCount)%CompNum = DemandSideCompNum
 
                 found = .FALSE.
-                DO Index = 1, LoopCount
+                DO Index = 1, SIZE(LoopStack)
                   IF(DemandSideLoopNum ==  LoopStack(Index)%LoopNum .AND. &
                      DemandSideLoopType ==LoopStack(Index)%LoopType)THEN
                      found = .TRUE.
+                     EXIT
                   END IF
                 END DO
                 IF(.NOT. found)THEN
@@ -1359,10 +1360,11 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
                 DemandSideConnect(ArrayCount)%CompNum = DemandSideCompNum
 
                 found = .FALSE.
-                DO Index = 1, LoopCount
+                DO Index = 1, SIZE(LoopStack)
                   IF(DemandSideLoopNum ==  LoopStack(Index)%LoopNum .AND. &
                      DemandSideLoopType ==LoopStack(Index)%LoopType)THEN
                      found = .TRUE.
+                     EXIT
                   END IF
                 END DO
                 IF(.NOT. found)THEN
@@ -4586,6 +4588,7 @@ SELECT CASE(CompType)
        'COIL:COOLING:DX:MULTISPEED', &
        'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT', &
        'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION', &
+       'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
        'COILSYSTEM:COOLING:WATER:HEATEXCHANGERASSISTED', &
        'COIL:COOLING:WATER:DETAILEDGEOMETRY', &
        'COIL:COOLING:WATER')
@@ -4604,6 +4607,7 @@ SELECT CASE(CompType)
        'COIL:HEATING:DX:MULTISPEED', &
        'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT', &
        'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION', &
+       'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
        'COIL:HEATING:STEAM', &
        'COIL:HEATING:GAS', &
        'COIL:HEATING:DESUPERHEATER')
@@ -4629,13 +4633,40 @@ SELECT CASE(CompType)
          CASE DEFAULT
        END SELECT
 
+  CASE ('COIL:USERDEFINED')
 
+    IF(CompLoadFlag) THEN
+      IF (CompLoad < 0.d0) THEN
+        SysCCCompCLNG(AirLoopNum) = SysCCCompCLNG(AirLoopNum) + ABS(CompLoad)
+      ELSE
+        SysHCCompHTNG(AirLoopNum) = SysHCCompHTNG(AirLoopNum) + ABS(CompLoad)
+      ENDIF
+    ENDIF
+    SELECT CASE(EnergyType)
+      CASE (iRT_PlantLoopHeatingDemand, iRT_DistrictHeating)
+            SysHCCompH2OHOT(AirLoopNum)    = SysHCCompH2OHOT(AirLoopNum) + CompEnergy
+      CASE (iRT_PlantLoopCoolingDemand, iRT_DistrictCooling)
+            SysCCCompH2OCOLD(AirLoopNum) = SysCCCompH2OCOLD(AirLoopNum) + CompEnergy
+      CASE (iRT_Steam)
+            SysHCCompSteam(AirLoopNum)     = SysHCCompSteam(AirLoopNum) + CompEnergy
+      CASE (iRT_Electricity)
+        IF (CompLoad < 0.d0) THEN
+          SysCCCompElec(AirLoopNum) = SysCCCompElec(AirLoopNum) + CompEnergy
+        ELSE
+          SysHCCompElec(AirLoopNum)      = SysHCCompElec(AirLoopNum) + CompEnergy
+        ENDIF
+      CASE (iRT_Natural_Gas, iRT_Propane)
+             SysHCCompGas(AirLoopNum)       = SysHCCompGas(AirLoopNum) + CompEnergy
+    END SELECT
+    
 !DX Systems
   CASE('AIRLOOPHVAC:UNITARYHEATPUMP:AIRTOAIR')
        CONTINUE !All energy transfers accounted for in subcomponent models
   CASE('AIRLOOPHVAC:UNITARYHEATPUMP:WATERTOAIR')
        CONTINUE !All energy transfers accounted for in subcomponent models
-  CASE('AIRLOOPHVAC:UNITARYCOOLONLY')
+  CASE('COILSYSTEM:COOLING:DX')
+       CONTINUE !All energy transfers accounted for in subcomponent models
+  CASE('COILSYSTEM:HEATING:DX')
        CONTINUE !All energy transfers accounted for in subcomponent models
   CASE('AIRLOOPHVAC:UNITARY:FURNACE:HEATONLY')
        CONTINUE !All energy transfers accounted for in subcomponent models
@@ -4741,6 +4772,10 @@ SELECT CASE(CompType)
 !        CASE (iRT_Electricity)
 !              SolarCollectorElec(AirLoopNum) = SolarCollectorElec(AirLoopNum) + CompEnergy
 !      END SELECT
+
+  CASE('AIRTERMINAL:SINGLEDUCT:USERDEFINED')
+    CONTINUE ! User component model energy use should be accounted for here
+    
 
 ! Recurring warning for unaccounted equipment types
 ! (should never happen, when this does happen enter appropriate equipment CASE statement above)
@@ -5110,8 +5145,8 @@ SUBROUTINE ReportMaxVentilationLoads
       !mechnical ventilation
       ZonePreDefRep(ActualZoneNum)%MechVentVolTotal = ZonePreDefRep(ActualZoneNum)%MechVentVolTotal + &
         ZoneOAVolCrntRho(CtrlZoneNum)
-      IF (ZoneOAVolCrntRho(CtrlZoneNum) .LT. ZonePreDefRep(ActualZoneNum)%MechVentVolMin) THEN
-        ZonePreDefRep(ActualZoneNum)%MechVentVolMin = ZoneOAVolCrntRho(CtrlZoneNum)
+      IF ((ZoneOAVolCrntRho(CtrlZoneNum) / TimeStepSys) .LT. ZonePreDefRep(ActualZoneNum)%MechVentVolMin) THEN
+        ZonePreDefRep(ActualZoneNum)%MechVentVolMin = ZoneOAVolCrntRho(CtrlZoneNum) / TimeStepSys
       END IF
       !infiltration
       ZonePreDefRep(ActualZoneNum)%InfilVolTotal = ZonePreDefRep(ActualZoneNum)%InfilVolTotal + &
@@ -5803,7 +5838,7 @@ END SUBROUTINE ReportAirLoopConnections
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -189,6 +189,7 @@ TYPE IrrigationDataStruct
  INTEGER                     :: IrrSchedID = 0
  REAL(r64)                   :: ScheduledAmount = 0.0d0
  REAL(r64)                   :: ActualAmount = 0.0d0
+ REAL(r64)                   :: IrrigationThreshold = 0.4d0  ! percent at which no irrigation happens (smart schedule)
 END TYPE IrrigationDataStruct
 
           ! MODULE VARIABLE DECLARATIONS:
@@ -202,15 +203,15 @@ LOGICAL    :: WaterSystemGetInputCalled = .FALSE.  ! set true once input data go
 LOGICAL    :: AnyIrrigationInModel   = .FALSE. ! control flag set true if irrigation input for ecoroof DJS PSU Dec 2006
 
 
-TYPE(SiteRainFallDataStruct)                                  :: RainFall=SiteRainFallDataStruct(0,0.0d0,0,0.0d0,0.0d0,0.0d0)
-TYPE(IrrigationDataStruct)                                    :: Irrigation=IrrigationDataStruct(0,0,0.0d0,0.0d0)
+TYPE(SiteRainFallDataStruct)       :: RainFall=SiteRainFallDataStruct(0,0.0d0,0,0.0d0,0.0d0,0.0d0)
+TYPE(IrrigationDataStruct)         :: Irrigation=IrrigationDataStruct(0,0,0.0d0,0.0d0,0.4d0)
 TYPE(StorageTankDataStruct),       DIMENSION(:) , ALLOCATABLE :: WaterStorage
 TYPE(RainfallCollectorDataStruct), DIMENSION(:), ALLOCATABLE :: RainCollector
 TYPE(GroundwaterWellDataStruct),   DIMENSION(:), ALLOCATABLE :: GroundwaterWell
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

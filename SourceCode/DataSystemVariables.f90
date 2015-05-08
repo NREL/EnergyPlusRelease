@@ -33,7 +33,9 @@ PUBLIC          ! By definition, all variables which are placed in this data
           ! MODULE PARAMETER DEFINITIONS:
   INTEGER, PARAMETER :: iASCII_CR=13      ! endline value when just CR instead of CR/LF
   INTEGER, PARAMETER :: iUnicode_end=0    ! endline value when Unicode file
+  CHARACTER(len=1), PARAMETER :: tabchar=CHAR(9)
   INTEGER, PARAMETER :: GoodIOStatValue=0 ! good value for IOStat during reads/writes
+  INTEGER, PARAMETER :: MaxTimingStringLength=250 ! string length for timing string array
 
   CHARACTER(len=*),  PARAMETER :: DDOnlyEnvVar='DDONLY'                ! Only run design days
   CHARACTER(len=*),  PARAMETER :: ReverseDDEnvVar='REVERSEDD'          ! Reverse DD during run
@@ -53,9 +55,13 @@ PUBLIC          ! By definition, all variables which are placed in this data
   CHARACTER(len=*),  PARAMETER :: cSutherlandHodgman='SutherlandHodgman'
   CHARACTER(len=*),  PARAMETER :: cMinimalSurfaceVariables='CreateMinimalSurfaceVariables'
   CHARACTER(len=*),  PARAMETER :: cMinimalShadowing='MinimalShadowing'
+  CHARACTER(len=*),  PARAMETER :: cNumThreads='OMP_NUM_THREADS'
+  CHARACTER(len=*),  PARAMETER :: cepNumThreads='EP_OMP_NUM_THREADS'
+  CHARACTER(len=*),  PARAMETER :: cNumActiveSims='cntActv'
   CHARACTER(len=*),  PARAMETER :: cInputPath1='epin'  ! EP-Launch setting.  Full path + project name
   CHARACTER(len=*),  PARAMETER :: cInputPath2='input_path'  ! RunEplus.bat setting.  Full path
   CHARACTER(len=*),  PARAMETER :: cProgramPath='program_path'
+  CHARACTER(len=*),  PARAMETER :: cTimingFlag='TimingFlag'
   CHARACTER(LEN=*),  PARAMETER :: TrackAirLoopEnvVar='TRACK_AIRLOOP' ! To generate a file with runtime statistics
                                                                      ! for each controller on each air loop
   CHARACTER(LEN=*),  PARAMETER :: TraceAirLoopEnvVar='TRACE_AIRLOOP'  ! To generate a trace file with the converged
@@ -76,6 +82,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
   LOGICAL :: ReverseDD=.false.           ! TRUE if reverse design days (reordering sizingperiod:*) are to be run.
   LOGICAL :: FullAnnualRun=.false.       ! TRUE if full annual simulation is to be run.
   LOGICAL :: DeveloperFlag=.false.       ! TRUE if developer flag is turned on. (turns on more displays to console)
+  LOGICAL :: TimingFlag=.false.          ! TRUE if timing flag is turned on. (turns on more timing displays to console)
   LOGICAL :: SutherlandHodgman=.true.    ! TRUE if SutherlandHodgman algorithm for polygon clipping is to be used.
   LOGICAL :: DetailedSkyDiffuseAlgorithm=.false.  ! use detailed diffuse shading algorithm for sky (shading transmittance varies)
   LOGICAL :: TrackAirLoopEnvFlag=.FALSE. ! If TRUE generates a file with runtime statistics for each HVAC
@@ -84,7 +91,10 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                          ! HVAC controllers on each air loop at each call to SimAirLoop()
   LOGICAL :: TraceHVACControllerEnvFlag=.FALSE. ! If TRUE generates a trace file for each individual HVAC
                                                 ! controller with all controller iterations
-  LOGICAL :: ReportDuringWarmup=.false.
+  LOGICAL :: ReportDuringWarmup=.false.  ! True when the report outputs even during warmup
+  LOGICAL :: ReportDetailedWarmupConvergence=.false.  ! True when the detailed warmup convergence is requested
+  LOGICAL :: UpdateDataDuringWarmupExternalInterface=.false.   ! variable sets in the external interface.
+                                                               ! This update the value during the warmup added for FMI
   REAL(r64)   :: Elapsed_Time=0.0d0          ! For showing elapsed time at end of run
   REAL(r64)   :: Time_Start=0.0d0            ! Call to CPU_Time for start time of simulation
   REAL(r64)   :: Time_Finish=0.0d0           ! Call to CPU_Time for end time of simulation
@@ -97,6 +107,18 @@ PUBLIC          ! By definition, all variables which are placed in this data
   CHARACTER(len=255) :: envinputpath2=' '
   CHARACTER(len=255) :: envprogrampath=' '
   LOGICAL :: TestAllPaths=.false.
+  INTEGER :: iEnvSetThreads = 1
+  LOGICAL :: lEnvSetThreadsInput=.false.
+  INTEGER :: iepEnvSetThreads = 1
+  LOGICAL :: lepSetThreadsInput=.false.
+  INTEGER :: iIDFSetThreads = 1
+  LOGICAL :: lIDFSetThreadsInput=.false.
+  INTEGER :: inumActiveSims = 1
+  LOGICAL :: lnumActiveSims=.false.
+  INTEGER :: MaxNumberOfThreads = 1
+  INTEGER :: NumberIntRadThreads = 1
+  INTEGER :: iNominalTotSurfaces = 0
+  LOGICAL :: Threading=.false.
 
 CONTAINS
 
@@ -140,7 +162,7 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL :: FileExist
-  INTEGER EchoInputFile  ! found unit number for "eplusout.audit"
+  INTEGER, SAVE :: EchoInputFile  ! found unit number for "eplusout.audit"
   INTEGER, EXTERNAL :: FindUnitNumber
   LOGICAL, SAVE :: firstTime=.true.
   INTEGER :: pos
@@ -157,6 +179,7 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
     CALL Get_Environment_Variable(cInputPath2,envinputpath2)
     programpath=blank
     CALL Get_Environment_Variable(cProgramPath,programpath)
+    firsttime=.false.
   ENDIF
 
   CheckedFileName=blank
@@ -231,10 +254,9 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
 
 end subroutine CheckForActualFileName
 
-
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

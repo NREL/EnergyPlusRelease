@@ -42,8 +42,7 @@ PUBLIC ! Everything private unless explicitly made public
       SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq, &
                                    ActuatedNode,MaxFlow,MinFlow,TempInNode,TempOutNode, &
                                    ControlOffSet,AirMassFlow,Action,ControlCompTypeNum, &
-                                   CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex, &
-                                   CompIndex )
+                                   CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex)
         USE DataPrecisionGlobals
 
         CHARACTER(len=*), INTENT (IN)           :: CompName            ! The component Name
@@ -65,7 +64,6 @@ PUBLIC ! Everything private unless explicitly made public
         INTEGER, INTENT (IN), OPTIONAL          :: LoopNum             ! for plant components, plant loop index
         INTEGER, INTENT (IN), OPTIONAL          :: LoopSide            ! for plant components, plant loop side index
         INTEGER, INTENT (IN), OPTIONAL          :: BranchIndex         ! for plant components, plant branch index
-        INTEGER, INTENT (IN), OPTIONAL          :: CompIndex           ! for plant components, plant component index
       END SUBROUTINE ControlCompOutput
 
 
@@ -273,7 +271,7 @@ PUBLIC ! Everything private unless explicitly made public
       REAL(r64)                :: resultVal    ! value returned
     END FUNCTION
   END INTERFACE
-  
+
   INTERFACE GetInternalVariableValueExternalInterface !CR - 8481 fix - 08/19/2011
     FUNCTION GetInternalVariableValueExternalInterface(varType, keyVarIndex) RESULT (resultVal)
       USE DataPrecisionGlobals
@@ -342,9 +340,30 @@ PUBLIC ! Everything private unless explicitly made public
     END SUBROUTINE CalcHeatBalanceInsideSurf
   END INTERFACE
 
+INTERFACE SetupZoneInternalGain
+  SUBROUTINE SetupZoneInternalGain(ZoneNum, cComponentObject , cComponentName, &
+                                   IntGainComp_TypeOfNum, ConvectionGainRate , &
+                                   ReturnAirConvectionGainRate, ThermalRadiationGainRate, &
+                                   LatentGainRate, ReturnAirLatentGainRate, &
+                                   CarbonDioxideGainRate, GenericContamGainRate)
+    USE DataPrecisionGlobals
+    INTEGER,           INTENT(IN) :: ZoneNum
+    CHARACTER(len=*),  INTENT(IN) :: cComponentObject ! class name for device contributing internal gain
+    CHARACTER(len=*),  INTENT(IN) :: cComponentName  ! user unique name for device
+    INTEGER         ,  INTENT(IN) :: IntGainComp_TypeOfNum ! integer identify for device
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ConvectionGainRate          ! target convection gain value (W)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ReturnAirConvectionGainRate ! target return air sensible gain (W)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ThermalRadiationGainRate  ! target IR radiation gain value (W)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: LatentGainRate           ! target latent (energy) gain value (W)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ReturnAirLatentGainRate ! target return air latent gain (W)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: CarbonDioxideGainRate ! target CO2 gain value (m3/s)
+    REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: GenericContamGainRate ! target generic air contaminant value (m3/s)
+  END SUBROUTINE
+END INTERFACE
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

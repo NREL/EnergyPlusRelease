@@ -82,6 +82,7 @@ INTEGER, PARAMETER :: emsCallFromSetupSimulation                      = 13 ! ide
                                                                            ! this is for input processing only
 INTEGER, PARAMETER :: emsCallFromExternalInterface                    = 14 ! Indentify where EMS called from
 INTEGER, PARAMETER :: emsCallFromComponentGetInput                    = 15  ! EMS called from end of get input for a component
+INTEGER, PARAMETER :: emsCallFromUserDefinedComponentModel            = 16  ! EMS called from inside a custom user component model
 
           ! DERIVED TYPE DEFINITIONS:
           ! na
@@ -151,13 +152,12 @@ LOGICAL :: KickOffSizing=.false.      ! Kick off sizing -- meaning run each envi
 LOGICAL :: AnyEnergyManagementSystemInModel=.FALSE.  ! true if there is any EMS or Erl in model.  otherwise false
 LOGICAL :: AnyPlantInModel = .FALSE. ! true if there are any plant or condenser loops in model, otherwise false
 INTEGER :: CacheIPErrorFile    =0 ! Cache IP errors until IDF processing done.
-REAL(r64) :: EXP1_Value=0.0d0  ! value of EXP(1), i.e., 2.71828182845905
-REAL(r64) :: PKON=0.0d0        ! value of 2.0/SQRT(PI), i.e. 1.12837916709551
-REAL(r64) :: PI_SQRT           ! value of SQRT(PI)
+LOGICAL :: AnyIdealCondEntSetPointInModel=.FALSE.  ! true if there is any ideal condenser entering set point manager in model. 
+LOGICAL :: RunOptCondEntTemp =.FALSE. ! true if the ideal condenser entering set point optimization is running
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

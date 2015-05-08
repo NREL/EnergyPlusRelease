@@ -237,7 +237,9 @@ SUBROUTINE ProcessScheduleInput
 !  CHARACTER(len=20) CFld1        ! Character field for error message
   INTEGER NumHrDaySchedules      ! Number of "hourly" dayschedules
   INTEGER NumIntDaySchedules     ! Number of "interval" dayschedules
-  INTEGER NumExternalInterfaceSchedules ! Number of "ExternalInterface" "compact" Schedules
+  INTEGER NumExternalInterfaceSchedules ! Number of "PtolemyServer ExternalInterface" "compact" Schedules
+  INTEGER NumExternalInterfaceFunctionalMockupUnitSchedules ! Number of "FunctionalMockupUnit ExternalInterface"
+                                                            ! "compact" Schedules ! added for FMI
   INTEGER NumLstDaySchedules     ! Number of "list" dayschedules
   INTEGER NumRegDaySchedules     ! Number of hourly+interval+list dayschedules
   INTEGER NumRegWeekSchedules    ! Number of "regular" Weekschedules
@@ -252,7 +254,7 @@ SUBROUTINE ProcessScheduleInput
   LOGICAL, ALLOCATABLE, DIMENSION(:,:) :: SetMinuteValue  ! Temporary for processing interval schedules
   INTEGER NumFields
   INTEGER SCount
-  LOGICAL RptSchedule
+!  LOGICAL RptSchedule
   INTEGER RptLevel
   INTEGER CurMinute
   INTEGER MinutesPerItem
@@ -274,7 +276,7 @@ SUBROUTINE ProcessScheduleInput
   CHARACTER(len=25) ExtraField
   INTEGER UntilFld
   INTEGER xxcount
-  REAL(r64) tempval
+!  REAL(r64) tempval
   LOGICAL :: FullYearSet=.false.
   CHARACTER(len=MaxNameLength) :: CurrentThrough=blank
   CHARACTER(len=MaxNameLength) :: LastFor=blank
@@ -384,6 +386,14 @@ SUBROUTINE ProcessScheduleInput
   ENDIF
   CurrentModuleObject='ExternalInterface:Schedule'
   NumExternalInterfaceSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  ! added for FMI
+  IF (NumCptSchedules > 0) THEN
+    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    MaxNums=MAX(MaxNums,NumNumbers)
+    MaxAlps=MAX(MaxAlps,NumAlphas+1)
+  ENDIF
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Schedule'
+  NumExternalInterfaceFunctionalMockupUnitSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
   IF (NumCptSchedules > 0) THEN
     CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
@@ -442,13 +452,20 @@ SUBROUTINE ProcessScheduleInput
   ! add week and day schedules for each ExternalInterface:Schedule schedule
   AddWeekSch = AddWeekSch + NumExternalInterfaceSchedules * 366 !number of days/year because need a week for each day
   AddDaySch = AddDaySch + NumExternalInterfaceSchedules  !one day schedule for ExternalInterface to update during run time
+  ! added for FMI
+  ! add week and day schedules for each ExternalInterface:FunctionalMockupUnit:Schedule
+  AddWeekSch = AddWeekSch + NumExternalInterfaceFunctionalMockupUnitSchedules * 366 !number of days/year
+                                                                                    !because need a week for each day
+  AddDaySch = AddDaySch + NumExternalInterfaceFunctionalMockupUnitSchedules  ! one day schedule for ExternalInterface
+                                                                             ! to update during run time
 
 
   ! include additional schedules in with count
   NumRegDaySchedules=NumHrDaySchedules+NumIntDaySchedules+NumLstDaySchedules
   NumDaySchedules=NumRegDaySchedules+AddDaySch
   NumWeekSchedules=NumRegWeekSchedules+NumCptWeekSchedules+AddWeekSch
-  NumSchedules = NumRegSchedules + NumCptSchedules + NumCommaFileSchedules + NumConstantSchedules + NumExternalInterfaceSchedules
+  NumSchedules = NumRegSchedules + NumCptSchedules + NumCommaFileSchedules + NumConstantSchedules + NumExternalInterfaceSchedules &
+                   + NumExternalInterfaceFunctionalMockupUnitSchedules
 
 !!  Most initializations in the schedule data structures are taken care of in
 !!  the definitions (see above)
@@ -764,7 +781,7 @@ SUBROUTINE ProcessScheduleInput
       ErrorsFound=.true.
       CYCLE
     ENDIF
-    MinutesPerItem=Numbers(1)
+    MinutesPerItem=INT(Numbers(1))
     NumExpectedItems=1440/MinutesPerItem
     IF ((NumNumbers-1) /= NumExpectedItems) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
@@ -973,10 +990,10 @@ SUBROUTINE ProcessScheduleInput
         ErrorsFound=.true.
       ELSE
         ! Process for month, day
-        StartMonth=Numbers(NumPointer+1)
-        StartDay=Numbers(NumPointer+2)
-        EndMonth=Numbers(NumPointer+3)
-        EndDay=Numbers(NumPointer+4)
+        StartMonth=INT(Numbers(NumPointer+1))
+        StartDay=INT(Numbers(NumPointer+2))
+        EndMonth=INT(Numbers(NumPointer+3))
+        EndDay=INT(Numbers(NumPointer+4))
         NumPointer=NumPointer+4
         StartPointer=JulianDay(StartMonth,StartDay,1)
         EndPointer=JulianDay(EndMonth,EndDay,1)
@@ -1242,7 +1259,7 @@ Until:  DO
               SCount=1
               CurMinute=MinutesPerTimeStep
               DO TS=1,NumOfTimeStepInHour
-                tempval=SUM(MinuteValue(Hr,SCount:CurMinute))/REAL(MinutesPerTimeStep,r64)
+!                tempval=SUM(MinuteValue(Hr,SCount:CurMinute))/REAL(MinutesPerTimeStep,r64)
                 DaySchedule(AddDaySch)%TSValue(Hr,TS)=SUM(MinuteValue(Hr,SCount:CurMinute))/REAL(MinutesPerTimeStep,r64)
                 SCount=CurMinute+1
                 CurMinute=CurMinute+MinutesPerTimeStep
@@ -1388,7 +1405,7 @@ Until:  DO
     ENDIF
 
     CALL CheckForActualFileName(Alphas(3),FileExists,TempFullFileName)
-    
+
 !    INQUIRE(file=Alphas(3),EXIST=FileExists)
     StripCR=.false.
     IF (.not. FileExists) THEN
@@ -1622,11 +1639,74 @@ Until:  DO
     IsNotOK=.false.
     IsBlank=.false.
 
-    CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,LoopIndex-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name') ! Bug fix
     IF (IsNotOK) THEN
       ErrorsFound=.true.
       IF (IsBlank) Alphas(1)='xxxxx'
     ENDIF
+    SchNum=SchNum+1
+    Schedule(SchNum)%Name=Alphas(1)
+
+    ! Validate ScheduleType
+    CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
+    IF (CheckIndex == 0) THEN
+        IF (.not. lAlphaBlanks(2)) THEN
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+             '", '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//  &
+             '" not found -- will not be validated')
+        ELSE
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+             '", Blank '//TRIM(cAlphaFields(2))//' input -- will not be validated.')
+        ENDIF
+    ELSE
+      Schedule(SchNum)%ScheduleTypePtr=CheckIndex
+    ENDIF
+    AddWeekSch=AddWeekSch+1
+    WeekSchedule(AddWeekSch)%Name=TRIM(Alphas(1))
+    WeekSchedule(AddWeekSch)%Used=.true.
+    DO Hr=1,366
+      Schedule(SchNum)%WeekSchedulePointer(Hr)=AddWeekSch
+    ENDDO
+    AddDaySch=AddDaySch+1
+    DaySchedule(AddDaySch)%Name=TRIM(Alphas(1))
+    DaySchedule(AddDaySch)%ScheduleTypePtr=Schedule(SchNum)%ScheduleTypePtr
+    DaySchedule(AddDaySch)%Used=.true.
+    DO Hr = 1, MaxDayTypes
+      WeekSchedule(AddWeekSch)%DaySchedulePointer(Hr) = AddDaySch
+    END DO
+!   Initialize the ExternalInterface day schedule for the ExternalInterface compact schedule.
+!   It will be overwritten during run time stepping after the warm up period
+    IF (NumNumbers<1) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+         '", initial value is not numeric or is missing. Fix idf file.')
+      NumErrorFlag=.true.
+    ENDIF
+    CALL ExternalInterfaceSetSchedule(AddDaySch, Numbers(1))
+
+  ENDDO
+  ! added for FMI
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Schedule'
+  DO LoopIndex=1,NumExternalInterfaceFunctionalMockupUnitSchedules
+
+    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
+                   AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
+                   AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
+    IsNotOK=.false.
+    IsBlank=.false.
+
+    IF (NumExternalInterfaceSchedules .GE. 1) THEN
+     CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank, 'The schedule object with the name "' &
+              //TRIM(Alphas(1))//'" is defined as an ExternalInterface:Schedule and ' &
+              //'ExternalInterface:FunctionalMockupUnit:To:Schedule. This will cause the schedule to be overwritten' &
+              //' by PtolemyServer and FunctionalMockUpUnit.')
+    ELSE
+      CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    END IF
+      IF (IsNotOK) THEN
+        ErrorsFound=.true.
+        IF (IsBlank) Alphas(1)='xxxxx'
+      ENDIF
+   ! END IF
     SchNum=SchNum+1
     Schedule(SchNum)%Name=Alphas(1)
 
@@ -1689,11 +1769,11 @@ Until:  DO
     CurrentModuleObject='Output:Schedules'
     NumFields=GetNumObjectsFound(TRIM(CurrentModuleObject))
 
-    RptSchedule=.false.
+!    RptSchedule=.false.
     RptLevel=1
     DO Count=1,NumFields
       CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,Status)
-      RptSchedule=.true.
+!      RptSchedule=.true.
 
       SELECT CASE (Alphas(1))
 
@@ -1802,9 +1882,9 @@ SUBROUTINE ReportScheduleDetails(LevelOfDetail)
   CHARACTER(len=100) :: SchDFmtdata=' '
   CHARACTER(len=3) :: YesNo1
   CHARACTER(len=3) :: YesNo2
-  CHARACTER(len=30) :: Num1
-  CHARACTER(len=30) :: Num2
-  CHARACTER(len=30), ALLOCATABLE, DIMENSION(:,:)  :: RoundTSValue
+  CHARACTER(len=32) :: Num1
+  CHARACTER(len=32) :: Num2
+  CHARACTER(len=32), ALLOCATABLE, DIMENSION(:,:)  :: RoundTSValue
 
   ALLOCATE(ShowMinute(NumOfTimeStepInHour))
   ALLOCATE(TimeHHMM(NumOfTimeStepInHour*24))
@@ -4448,7 +4528,7 @@ END FUNCTION GetNumberOfSchedules
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

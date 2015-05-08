@@ -501,7 +501,8 @@ SUBROUTINE InitPondGroundHeatExchanger(PondGHENum,FirstHVACIteration,RunFlag)
   USE DataLoopNode,    ONLY: Node
   USE DataEnvironment, ONLY: GroundTemp_Deep, OutDryBulbTempAt
   USE DataPlant,       ONLY: TypeOf_GrndHtExchgPond, ScanPlantLoopsForObject
-  USE PlantUtilities,  ONLY: SetComponentFlowRate, InitComponentNodes, RegisterPlantCompDesignFlow
+  USE PlantUtilities,  ONLY: SetComponentFlowRate, InitComponentNodes, RegisterPlantCompDesignFlow, &
+                             RegulateCondenserCompFlowReqOp
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -615,13 +616,12 @@ SUBROUTINE InitPondGroundHeatExchanger(PondGHENum,FirstHVACIteration,RunFlag)
   PastPondTemp     = PondGHE(PondGHENum)%PastBulkTemperature
 
 
-  IF(.not. Runflag) then
-    DesignFlow = 0.0
-  ELSE
-  ! If the loop operation is controlled by "loop demand" or is 'uncontrolled',
-  ! then run the branch whenever the pump is on and
-    DesignFlow =  PondGHE(PondGHENum)%DesignMassFlowRate
-  END IF
+    DesignFlow = RegulateCondenserCompFlowReqOp(PondGHE(PondGHENum)%LoopNum,&
+                                                PondGHE(PondGHENum)%LoopSideNum,&
+                                                PondGHE(PondGHENum)%BranchNum,&
+                                                PondGHE(PondGHENum)%CompNum,     &
+                                                PondGHE(PondGHENum)%DesignMassFlowRate)
+
 
   CALL SetComponentFlowRate(DesignFlow, &
                                PondGHE(PondGHENum)%InletNodeNum,&
@@ -1263,7 +1263,7 @@ END SUBROUTINE ReportPondGroundHeatExchanger
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

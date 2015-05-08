@@ -56,56 +56,47 @@ TYPE IntWinAdjZoneExtWinStruct ! nested structure for ZoneDaylight
 END TYPE IntWinAdjZoneExtWinStruct
 
 TYPE ZoneDaylightCalc
-  INTEGER :: DaylightType               = 0   ! Type of Daylighting (1=Detailed, 2=DElight)
+  INTEGER  :: DaylightType               = 0   ! Type of Daylighting (1=Detailed, 2=DElight)
   INTEGER  :: TotalDaylRefPoints        = 0   ! Number of detailed daylighting reference points in a zone (0,1 or 2)
-  INTEGER  :: TotalMapRefPoints         = 0   ! Number of illuminance map reference points in this zone (up to 100)
   INTEGER  :: TotalDElightRefPts        = 0   ! Number of DElight daylighting reference points in a zone (0,1 or 2) - RJH
   REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: DaylRefPtAbsCoord ! =0.0 ! X,Y,Z coordinates of all daylighting reference points
                                                         ! in absolute coordinate system (m)
                                                         ! Points 1 and 2 are the control reference points
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapRefPtAbsCoord  ! X,Y,Z coordinates of all illuminance map reference points
-                                                        ! in absolute coordinate system (m)
-                                                        ! Points 1 and 2 are the control reference points
   LOGICAL(kind=1), ALLOCATABLE, DIMENSION(:) :: DaylRefPtInBounds  ! True when coordinates are in bounds of zone coordinates
-  LOGICAL(kind=1), ALLOCATABLE, DIMENSION(:) :: MapRefPtInBounds  ! True when coordinates are in bounds of zone coordinates
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: FracZoneDaylit ! =0.0  ! Fraction of zone controlled by each reference point
-  REAL(r64), ALLOCATABLE, DIMENSION(:) :: IllumSetPoint  ! =0.0  ! Illuminance set point at each reference point (lux)
+  REAL(r64), ALLOCATABLE, DIMENSION(:) :: IllumSetPoint  ! =0.0  ! Illuminance setpoint at each reference point (lux)
   INTEGER  :: LightControlType          = 1   ! Lighting control type (same for all reference points)
                                               ! (1=continuous, 2=stepped, 3=continuous/off)
-  REAL(r64)     :: ViewAzimuthForGlare       =0.0  ! View direction relative to window for glare calculation (deg)
+  REAL(r64):: ViewAzimuthForGlare       =0.0  ! View direction relative to window for glare calculation (deg)
   INTEGER  :: MaxGlareallowed           = 0   ! Maximum allowable discomfort glare index
-  REAL(r64)     :: MinPowerFraction          = 0.0 ! Minimum fraction of power input that continuous dimming system can dim down to
-  REAL(r64)     :: MinLightFraction          =0.0  ! Minimum fraction of light output that continuous dimming system can dim down to
+  REAL(r64):: MinPowerFraction          = 0.0 ! Minimum fraction of power input that continuous dimming system can dim down to
+  REAL(r64):: MinLightFraction          =0.0  ! Minimum fraction of light output that continuous dimming system can dim down to
   INTEGER  :: LightControlSteps         = 0   ! Number of levels (excluding zero) of stepped control system
-  REAL(r64)     :: LightControlProbability   = 0.0 ! For manual control of stepped systems, probability that lighting will
+  REAL(r64):: LightControlProbability   = 0.0 ! For manual control of stepped systems, probability that lighting will
   INTEGER  :: TotalExtWindows           = 0   ! Total number of exterior windows in the zone
-  REAL(r64)     :: AveVisDiffReflect         =0.0  ! Area-weighted average inside surface visible reflectance of zone
+  REAL(r64):: AveVisDiffReflect         =0.0  ! Area-weighted average inside surface visible reflectance of zone
   REAL(r64),ALLOCATABLE, Dimension (:) :: RefPtPowerReductionFactor !=1.0  ! Electric power reduction factor at reference points
                                                                   ! due to daylighting
-  REAL(r64) :: ZonePowerReductionFactor      =1.0  ! Electric power reduction factor for entire zone due to daylighting
+  REAL(r64):: ZonePowerReductionFactor      =1.0  ! Electric power reduction factor for entire zone due to daylighting
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: DaylIllumAtRefPt  !=0.0 ! Daylight illuminance at reference points (lux)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: GlareIndexAtRefPt !=0.0 ! Glare index at reference points
-  REAL(r64), ALLOCATABLE, DIMENSION(:) :: DaylIllumAtMapPt  ! Daylight illuminance at illuminance map points (lux)
-  REAL(r64), ALLOCATABLE, DIMENSION(:) :: GlareIndexAtMapPt ! Glare index at illuminance map points
-  REAL(r64), ALLOCATABLE, DIMENSION(:) :: DaylIllumAtMapPtHr  ! Daylight illuminance at illuminance map points (lux) - report avg hr
-  REAL(r64), ALLOCATABLE, DIMENSION(:) :: GlareIndexAtMapPtHr ! Glare index at illuminance map points - report avg hr
   INTEGER, ALLOCATABLE, DIMENSION(:) :: AdjIntWinZoneNums ! List of zone numbers of adjacent zones that have exterior windows and
                                      ! share one or more interior windows with target zone
-  INTEGER :: NumOfIntWinAdjZones        = 0   ! Number of adjacent zones that have exterior windows and share one or
+  INTEGER  :: NumOfIntWinAdjZones        = 0   ! Number of adjacent zones that have exterior windows and share one or
                                               ! more interior windows with target zone
-  INTEGER :: NumOfIntWinAdjZoneExtWins  = 0   ! number of exterior windows associated with zone via interior windows
+  INTEGER  :: NumOfIntWinAdjZoneExtWins  = 0   ! number of exterior windows associated with zone via interior windows
   TYPE(IntWinAdjZoneExtWinStruct), ALLOCATABLE, DIMENSION(:) &  ! nested structure
                                      :: IntWinAdjZoneExtWin ! info about exterior window associated with zone via interior window
-  INTEGER :: NumOfDayltgExtWins         = 0   ! Number of associated exterior windows providing daylight to this zone
+  INTEGER  :: NumOfDayltgExtWins         = 0   ! Number of associated exterior windows providing daylight to this zone
   INTEGER, ALLOCATABLE, DIMENSION(:) ::  DayltgExtWinSurfNums  ! List of surface numbers of zone's exterior windows or
                                                 ! exterior windows in adjacent zones sharing interior windows with the zone
   INTEGER, ALLOCATABLE, DIMENSION(:) ::  DayltgFacPtrsForExtWins ! Zone's daylighting factor pointers.
                                                                  ! Entries in this list have a one-to-one
                                                                  ! correspondence with the DayltgExtWinSurfNums list
-  REAL(r64) :: MinIntWinSolidAng             =0.0 ! Minimum solid angle subtended by an interior window in a zone
-  REAL(r64) :: TotInsSurfArea                =0.0 ! Total inside surface area of a daylit zone (m2)
-  REAL(r64) :: FloorVisRefl                  =0.0 ! Area-weighted visible reflectance of floor of a daylit zone
-  REAL(r64) :: InterReflIllFrIntWins         =0.0 ! Inter-reflected illuminance due to beam and diffuse solar passing
+  REAL(r64):: MinIntWinSolidAng             =0.0 ! Minimum solid angle subtended by an interior window in a zone
+  REAL(r64):: TotInsSurfArea                =0.0 ! Total inside surface area of a daylit zone (m2)
+  REAL(r64):: FloorVisRefl                  =0.0 ! Area-weighted visible reflectance of floor of a daylit zone
+  REAL(r64):: InterReflIllFrIntWins         =0.0 ! Inter-reflected illuminance due to beam and diffuse solar passing
                                              !  through a zone's interior windows (lux)
   REAL(r64),ALLOCATABLE, DIMENSION(:) :: BacLum          ! =0.0 ! Background luminance at each reference point (cd/m2)
   REAL(r64), ALLOCATABLE, DIMENSION(:,:)     :: SolidAngAtRefPt !(MaxRefPoints,50)
@@ -113,11 +104,6 @@ TYPE ZoneDaylightCalc
   REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: IllumFromWinAtRefPt !(MaxRefPoints,2,50)
   REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: BackLumFromWinAtRefPt  !(MaxRefPoints,2,50)
   REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: SourceLumFromWinAtRefPt  !(MaxRefPoints,2,50)
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:)     :: SolidAngAtMapPt !(MaxRefPoints,50)
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:)     :: SolidAngAtMapPtWtd !(MaxRefPoints,50)
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: IllumFromWinAtMapPt !(MaxRefPoints,2,50)
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: BackLumFromWinAtMapPt  !(MaxRefPoints,2,50)
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)   :: SourceLumFromWinAtMapPt  !(MaxRefPoints,2,50)
   ! Allocatable daylight factor arrays
   ! Arguments for Dayl---Sky are:
   !  1: Daylit window number (1 to NumOfDayltgExtWins)
@@ -151,6 +137,8 @@ TYPE ZoneDaylightCalc
 
   ! True if at least one adjacent zone, sharing one or more interior windows, has daylighting control
   LOGICAL :: AdjZoneHasDayltgCtrl = .false.
+  INTEGER :: MapCount             = 0  ! Number of maps assigned to Zone
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneToMap  ! Pointers to maps allocated to Zone
 END TYPE ZoneDaylightCalc
 
 TYPE IllumMapData
@@ -170,9 +158,50 @@ TYPE IllumMapData
   INTEGER                      :: HeaderXLineLength = 0   ! actual length of this X header line
 END TYPE
 
+TYPE MapCalcData
+  INTEGER  :: TotalMapRefPoints = 0   ! Number of illuminance map reference points in this zone (up to 100)
+  INTEGER  :: Zone               =0    ! Pointer to zone being mapped
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapRefPtAbsCoord  ! X,Y,Z coordinates of all illuminance map reference points
+                                                        ! in absolute coordinate system (m)
+                                                        ! Points 1 and 2 are the control reference points
+  LOGICAL(kind=1), ALLOCATABLE, DIMENSION(:) :: MapRefPtInBounds  ! True when coordinates are in bounds of zone coordinates
+  REAL(r64), ALLOCATABLE, DIMENSION(:)     :: DaylIllumAtMapPt  ! Daylight illuminance at illuminance map points (lux)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)     :: GlareIndexAtMapPt ! Glare index at illuminance map points
+        ! following Hr - report avg hr
+  REAL(r64), ALLOCATABLE, DIMENSION(:)     :: DaylIllumAtMapPtHr  ! Daylight illuminance at illuminance map points (lux)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)     :: GlareIndexAtMapPtHr ! Glare index at illuminance map points
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:)   :: SolidAngAtMapPt !(MaxRefPoints,50)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:)   :: SolidAngAtMapPtWtd !(MaxRefPoints,50)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:) :: IllumFromWinAtMapPt !(MaxRefPoints,2,50)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:) :: BackLumFromWinAtMapPt  !(MaxRefPoints,2,50)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:) :: SourceLumFromWinAtMapPt  !(MaxRefPoints,2,50)
+  !  1: Daylit window number (1 to NumOfDayltgExtWins)
+  !  2: Reference point number (1 to MaxRefPoints)
+  !  3: Sky type (1 to 4; 1 = clear, 2 = clear turbid, 3 = intermediate, 4 = overcast
+  !  4: Shading index (1 to MaxSlatAngs+1; 1 = bare window; 2 = with shade, or, if blinds
+  !      2 = first slat position, 3 = second position, ..., MaxSlatAngs+1 = last position)
+  !  5: Sun position index (1 to 24)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: DaylIllFacSky
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: DaylSourceFacSky
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: DaylBackFacSky
+  ! Arguments for Dayl---Sun are:
+  !  1: Daylit window number (1 to NumOfDayltgExtWins)
+  !  2: Reference point number (1 to MaxRefPoints)
+  !  3: Shading index (1 to MaxShadeIndex; 1 = no shade; 2 = with shade, or, if blinds
+  !      2 = first slat position, 3 = second position, ..., MaxSlatAngs+1 = last position)
+  !  4: Sun position index (1 to 24)
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylIllFacSun
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylIllFacSunDisk
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylSourceFacSun
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylSourceFacSunDisk
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylBackFacSun
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:,:,:) :: DaylBackFacSunDisk
+END TYPE
+
           ! MODULE VARIABLE TYPE DECLARATIONS:
-TYPE (ZoneDaylightCalc),   ALLOCATABLE, DIMENSION(:) :: ZoneDaylight
-TYPE (IllumMapData),       ALLOCATABLE, DIMENSION(:) :: IllumMap
+TYPE (ZoneDaylightCalc), ALLOCATABLE, DIMENSION(:) :: ZoneDaylight
+TYPE (IllumMapData),     ALLOCATABLE, DIMENSION(:) :: IllumMap
+TYPE (MapCalcData),      ALLOCATABLE, DIMENSION(:) :: IllumMapCalc
 
           ! INTERFACE BLOCK SPECIFICATIONS: na
 
@@ -188,7 +217,7 @@ LOGICAL :: DFSReportAllShadowCalculationDays = .false.
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

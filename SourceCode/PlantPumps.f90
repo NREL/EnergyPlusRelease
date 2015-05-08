@@ -130,6 +130,9 @@ MODULE Pumps
     LOGICAL           :: HasVFD                 = .FALSE.
     TYPE(PumpVFDControlData) :: VFD
     LOGICAL           :: OneTimePressureWarning = .TRUE.
+    LOGICAL           :: HeatLossesToZone       = .FALSE. ! if true then pump losses added to surrounding zone
+    INTEGER           :: ZoneNum                = 0       ! index for zone surrounding pump
+    REAL(r64)         :: SkinLossRadFraction    = 0.d0    ! radiative split for skin losses to zone
   END TYPE PumpSpecs
 
   TYPE ReportVars
@@ -139,6 +142,10 @@ MODULE Pumps
     REAL(r64)         :: PumpHeattoFluidEnergy        = 0.0  !Pump Energy dissipated into fluid stream
     REAL(r64)         :: OutletTemp                   = 0.0  !Pump outlet temperature
     REAL(r64)         :: ShaftPower                   = 0.0  !Power input at the shaft
+    REAL(r64)         :: ZoneTotalGainRate            = 0.d0 ! total pump skin losses to zone (W)
+    REAL(r64)         :: ZoneTotalGainEnergy          = 0.d0 ! total pump skin losses to zone energy (J)
+    REAL(r64)         :: ZoneConvGainRate             = 0.d0 ! pump skin losses convecting to zone air (W)
+    REAL(r64)         :: ZoneRadGainRate              = 0.d0 ! pump skin losses radiating to inside of zone (W)
   END TYPE ReportVars
 
             ! MODULE VARIABLE DECLARATIONS:
@@ -282,18 +289,22 @@ SUBROUTINE GetPumpInput()
             !  Energy Calculations, ASHRAE, 1993, pp2-10 to 2-15
 
             ! USE STATEMENTS:
-  USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString
+  USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString, FindItemInList
   USE DataIPShortCuts,       ONLY: lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames, lNumericFieldBlanks, &
                                    cCurrentModuleObject, cAlphaArgs, rNumericArgs
   USE NodeInputManager,      ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet
   USE FluidProperties,       ONLY: GetSatDensityRefrig, GetDensityGlycol
   USE DataSizing,            ONLY: Autosize
-  USE DataInterfaces,        ONLY: SetupOutputVariable, ShowSevereError, ShowWarningError, ShowFatalError
+  USE DataInterfaces
   USE CurveManager,          ONLY: GetCurveType, GetCurveIndex, GetCurveMinMaxValues
   USE DataPlant,             ONLY: TypeOf_PumpVariableSpeed, TypeOf_PumpConstantSpeed, TypeOf_PumpCondensate, &
                                    TypeOf_PumpBankVariableSpeed, TypeOf_PumpBankConstantSpeed
   USE ScheduleManager,       ONLY: GetScheduleIndex,CheckScheduleValueMinMax
+  USE DataHeatBalance,       ONLY: IntGainTypeOf_Pump_VarSpeed, IntGainTypeOf_Pump_ConSpeed, &
+                                   IntGainTypeOf_Pump_Cond, IntGainTypeOf_PumpBank_VarSpeed, &
+                                   IntGainTypeOf_PumpBank_ConSpeed, Zone
+  USE DataGlobals,           ONLY: NumOfZones
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -313,7 +324,7 @@ SUBROUTINE GetPumpInput()
     LOGICAL           :: IsNotOK               ! Flag to verify name
     LOGICAL           :: IsBlank               ! Flag for blank name
     INTEGER           :: TempCurveIndex
-    CHARACTER(len=30) :: TempCurveType
+    CHARACTER(len=32) :: TempCurveType
     INTEGER           :: NumVarSpeedPumps
     INTEGER           :: NumConstSpeedPumps
     INTEGER           :: NumCondensatePumps
@@ -489,6 +500,20 @@ SUBROUTINE GetPumpInput()
       END IF
     END IF
 
+    IF (.NOT. lAlphaFieldBlanks(13)) THEN ! zone named for pump skin losses
+      PumpEquip(PumpNum)%ZoneNum=FindItemInList(cAlphaArgs(13),Zone%Name,NumOfZones)
+      IF (PumpEquip(PumpNum)%ZoneNum > 0) THEN
+        PumpEquip(PumpNum)%HeatLossesToZone = .TRUE.
+        IF (.NOT. lNumericFieldBlanks(12) ) THEN
+          PumpEquip(PumpNum)%SkinLossRadFraction = rNumericArgs(12)
+        ENDIF
+      ELSE
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(13))//'="'//trim(cAlphaArgs(13))//'" not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+    ENDIF
+
     ! Is this really necessary for each pump GetInput loop?
     PumpEquip(PumpNum)%Energy = 0.0
     PumpEquip(PumpNum)%Power = 0.0
@@ -561,7 +586,7 @@ SUBROUTINE GetPumpInput()
       CALL ShowContinueError('Schedule named =['//trim(cAlphaArgs(5))//']. '//  &
          ' was not found and will not be used.')
     ENDIF
-    
+
     ! Input pressure related data such as pressure curve and impeller size/rotational speed
     PumpEquip(PumpNum)%PressureCurve_Name = cAlphaArgs(6)
     IF (TRIM(PumpEquip(PumpNum)%PressureCurve_Name) .EQ. '') THEN
@@ -586,6 +611,20 @@ SUBROUTINE GetPumpInput()
     PumpEquip(PumpNum)%ImpellerDiameter    = rNumericArgs(6)
     PumpEquip(PumpNum)%RotSpeed_RPM        = rNumericArgs(7) ! retrieve the input rotational speed, in revs/min
     PumpEquip(PumPNum)%RotSpeed            = PumpEquip(PumpNum)%RotSpeed_RPM/60.0d0 !convert input[rpm] to calculation units[rps]
+
+    IF (.NOT. lAlphaFieldBlanks(7)) THEN ! zone named for pump skin losses
+      PumpEquip(PumpNum)%ZoneNum=FindItemInList(cAlphaArgs(7),Zone%Name,NumOfZones)
+      IF (PumpEquip(PumpNum)%ZoneNum > 0) THEN
+        PumpEquip(PumpNum)%HeatLossesToZone = .TRUE.
+        IF (.NOT. lNumericFieldBlanks(8) ) THEN
+          PumpEquip(PumpNum)%SkinLossRadFraction = rNumericArgs(8)
+        ENDIF
+      ELSE
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(7))//'="'//trim(cAlphaArgs(7))//'" not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+    ENDIF
 
   END DO
 
@@ -641,6 +680,21 @@ SUBROUTINE GetPumpInput()
     PumpEquip(PumpNum)%PartLoadCoef(2)     = rNumericArgs(7)
     PumpEquip(PumpNum)%PartLoadCoef(3)     = rNumericArgs(8)
     PumpEquip(PumpNum)%PartLoadCoef(4)     = rNumericArgs(9)
+
+    IF (.NOT. lAlphaFieldBlanks(5)) THEN ! zone named for pump skin losses
+      PumpEquip(PumpNum)%ZoneNum=FindItemInList(cAlphaArgs(5),Zone%Name,NumOfZones)
+      IF (PumpEquip(PumpNum)%ZoneNum > 0) THEN
+        PumpEquip(PumpNum)%HeatLossesToZone = .TRUE.
+        IF (.NOT. lNumericFieldBlanks(10) ) THEN
+          PumpEquip(PumpNum)%SkinLossRadFraction = rNumericArgs(10)
+        ENDIF
+      ELSE
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'" not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+    ENDIF
+
     PumpEquip(PumpNum)%MinVolFlowRate      = 0.0
     PumpEquip(PumpNum)%Energy = 0.0
     PumpEquip(PumpNum)%Power = 0.0
@@ -734,6 +788,21 @@ SUBROUTINE GetPumpInput()
     PumpEquip(PumpNum)%PartLoadCoef(4)     = rNumericArgs(10)
     PumpEquip(PumpNum)%MinVolFlowRateFrac  = rNumericArgs(11)
     PumpEquip(PumpNum)%MinVolFlowRate      = PumpEquip(PumpNum)%NomVolFlowRate * PumpEquip(PumpNum)%MinVolFlowRateFrac
+
+    IF (.NOT. lAlphaFieldBlanks(7)) THEN ! zone named for pump skin losses
+      PumpEquip(PumpNum)%ZoneNum=FindItemInList(cAlphaArgs(7),Zone%Name,NumOfZones)
+      IF (PumpEquip(PumpNum)%ZoneNum > 0) THEN
+        PumpEquip(PumpNum)%HeatLossesToZone = .TRUE.
+        IF (.NOT. lNumericFieldBlanks(12) ) THEN
+          PumpEquip(PumpNum)%SkinLossRadFraction = rNumericArgs(12)
+        ENDIF
+      ELSE
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(7))//'="'//trim(cAlphaArgs(7))//'" not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+    ENDIF
+
     PumpEquip(PumpNum)%Energy = 0.0
     PumpEquip(PumpNum)%Power = 0.0
   END DO
@@ -816,6 +885,21 @@ SUBROUTINE GetPumpInput()
 !    PumpEquip(PumpNum)%MinVolFlowRateFrac  = rNumericArgs(11)
 !    PumpEquip(PumpNum)%MinVolFlowRate      = PumpEquip(PumpNum)%NomVolFlowRate * PumpEquip(PumpNum)%MinVolFlowRateFrac
    !DSU?  need a value set for %MinVolFlowRate ?? zero? NomVolFlowRate?
+
+    IF (.NOT. lAlphaFieldBlanks(7)) THEN ! zone named for pump skin losses
+      PumpEquip(PumpNum)%ZoneNum=FindItemInList(cAlphaArgs(7),Zone%Name,NumOfZones)
+      IF (PumpEquip(PumpNum)%ZoneNum > 0) THEN
+        PumpEquip(PumpNum)%HeatLossesToZone = .TRUE.
+        IF (.NOT. lNumericFieldBlanks(7) ) THEN
+          PumpEquip(PumpNum)%SkinLossRadFraction = rNumericArgs(7)
+        ENDIF
+      ELSE
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(7))//'="'//trim(cAlphaArgs(7))//'" not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+    ENDIF
+
     PumpEquip(PumpNum)%MinVolFlowRate      = 0.0
     PumpEquip(PumpNum)%Energy = 0.0
     PumpEquip(PumpNum)%Power = 0.0
@@ -876,6 +960,58 @@ SUBROUTINE GetPumpInput()
                                   PumpEquip(PumpNum)%EMSMassFlowOverrideOn, PumpEquip(PumpNum)%EMSMassFlowValue )
    ENDIF
 
+   IF (PumpEquip(PumpNum)%HeatLossesToZone) THEN
+     ! setup skin loss output vars
+     CALL SetupOutputVariable('Pump Heat Loss to Zone Rate [W]', &
+            PumpEquipReport(PumpNum)%ZoneTotalGainRate,'System','Average',PumpEquip(PumpNum)%Name)
+     CALL SetupOutputVariable('Pump Heat Loss to Zone [J]', &
+            PumpEquipReport(PumpNum)%ZoneTotalGainEnergy,'System','Sum',PumpEquip(PumpNum)%Name)
+     CALL SetupOutputVariable('Pump Convection Heat Loss to Zone Rate [W]', &
+            PumpEquipReport(PumpNum)%ZoneConvGainRate,'System','Average',PumpEquip(PumpNum)%Name)
+     CALL SetupOutputVariable('Pump Radiation Heat Loss to Zone Rate [W]', &
+            PumpEquipReport(PumpNum)%ZoneRadGainRate,'System','Average',PumpEquip(PumpNum)%Name)
+
+     ! setup internal gains
+     SELECT CASE (PumpEquip(PumpNum)%PumpType)
+     CASE (Pump_VarSpeed)
+       CALL SetupZoneInternalGain(PumpEquip(PumpNum)%ZoneNum, &
+             'Pump:VariableSpeed', &
+             PumpEquip(PumpNum)%Name, &
+             IntGainTypeOf_Pump_VarSpeed, &
+             ConvectionGainRate          = PumpEquipReport(PumpNum)%ZoneConvGainRate,&
+             ThermalRadiationGainRate    = PumpEquipReport(PumpNum)%ZoneRadGainRate)
+     CASE (Pump_ConSpeed)
+       CALL SetupZoneInternalGain(PumpEquip(PumpNum)%ZoneNum, &
+             'Pump:ConstantSpeed', &
+             PumpEquip(PumpNum)%Name, &
+             IntGainTypeOf_Pump_ConSpeed, &
+             ConvectionGainRate          = PumpEquipReport(PumpNum)%ZoneConvGainRate,&
+             ThermalRadiationGainRate    = PumpEquipReport(PumpNum)%ZoneRadGainRate)
+     CASE (Pump_Cond)
+       CALL SetupZoneInternalGain(PumpEquip(PumpNum)%ZoneNum, &
+             'Pump:VariableSpeed:Condensate', &
+             PumpEquip(PumpNum)%Name, &
+             IntGainTypeOf_Pump_Cond, &
+             ConvectionGainRate          = PumpEquipReport(PumpNum)%ZoneConvGainRate,&
+             ThermalRadiationGainRate    = PumpEquipReport(PumpNum)%ZoneRadGainRate)
+     CASE (PumpBank_VarSpeed)
+       CALL SetupZoneInternalGain(PumpEquip(PumpNum)%ZoneNum, &
+             'HeaderedPumps:VariableSpeed', &
+             PumpEquip(PumpNum)%Name, &
+             IntGainTypeOf_PumpBank_VarSpeed, &
+             ConvectionGainRate          = PumpEquipReport(PumpNum)%ZoneConvGainRate,&
+             ThermalRadiationGainRate    = PumpEquipReport(PumpNum)%ZoneRadGainRate)
+     CASE (PumpBank_ConSpeed)
+       CALL SetupZoneInternalGain(PumpEquip(PumpNum)%ZoneNum, &
+             'HeaderedPumps:ConstantSpeed', &
+             PumpEquip(PumpNum)%Name, &
+             IntGainTypeOf_PumpBank_ConSpeed, &
+             ConvectionGainRate          = PumpEquipReport(PumpNum)%ZoneConvGainRate,&
+             ThermalRadiationGainRate    = PumpEquipReport(PumpNum)%ZoneRadGainRate)
+     END SELECT
+
+   ENDIF
+
   END DO
 
 
@@ -903,7 +1039,7 @@ SUBROUTINE InitializePumps(PumpNum)
           ! This subroutine does one-time and begin-envrn inits for the pump
 
           ! USE STATEMENTS:
- USE General,             ONLY: RoundSigDigits
+  USE General,             ONLY: RoundSigDigits
   USE DataPlant,           ONLY: ScanPlantLoopsForObject, PlantLoop, LoopFlowStatus_NeedyAndTurnsLoopOn
   USE FluidProperties,     ONLY: GetSatDensityRefrig, GetDensityGlycol
   USE PlantUtilities,      ONLY: InitComponentNodes
@@ -932,8 +1068,6 @@ SUBROUTINE InitializePumps(PumpNum)
   ! Set some variables for convenience
   InletNode         = PumpEquip(PumpNum)%InletNodeNum
   OutletNode        = PumpEquip(PumpNum)%OutletNodeNum
-
-
 
   ! One time inits
   IF (PumpEquip(PumpNum)%PumpOneTimeFlag) THEN
@@ -1028,12 +1162,12 @@ SUBROUTINE InitializePumps(PumpNum)
           !set the maximum flow rate on the outlet node
       mdotMax = PumpEquip(PumpNum)%NomSteamVolFlowRate * SteamDensity
       !mdotMin = PumpEquip(PumpNum)%MinVolFlowRate      * SteamDensity
-      !DSU? On a pump the 'hardware min' (MassFlowRateMin) must be defined as zero and not
-      !DSU? confused with the desired pump operating scheme or the user specified
-      !DSU? 'minimum flow rate'.  The user specified 'minimum flow rate' determines the minumum
-      !DSU? flow rate under normal operating conditions.  For cases when 'MaxAvail' on the pump
-      !DSU? inlet node actually less than the 'minimum flow rate' specified by the user, than a
-      !DSU? loop shutdown must  be triggered.
+      !On a pump the 'hardware min' (MassFlowRateMin) must be defined as zero and not
+      !confused with the desired pump operating scheme or the user specified
+      !'minimum flow rate'.  The user specified 'minimum flow rate' determines the minumum
+      !flow rate under normal operating conditions.  For cases when 'MaxAvail' on the pump
+      !inlet node actually less than the 'minimum flow rate' specified by the user, than a
+      !loop shutdown must  be triggered.
       mdotMin = 0.0
       CALL InitComponentNodes(mdotMin, mdotMax, InletNode, OutletNode, &
                                 PumpEquip(PumpNum)%LoopNum           , &
@@ -1041,7 +1175,6 @@ SUBROUTINE InitializePumps(PumpNum)
                                 PumpEquip(PumpNum)%BranchNum, &
                                 PumpEquip(PumpNum)%CompNum )
       PumpEquip(PumpNum)%MassFlowRateMax = mdotMax
-      !DSU?PumpEquip(PumpNum)%MassFlowRateMin = mdotMin
       PumpEquip(PumpNum)%MassFlowRateMin = PumpEquip(PumpNum)%MinVolFlowRate * SteamDensity
 
 
@@ -1050,8 +1183,8 @@ SUBROUTINE InitializePumps(PumpNum)
                                           InitConvTemp, &
                                           PlantLoop(PumpEquip(PumpNum)%LoopNum)%FluidIndex, RoutineName)
       mdotMax = PumpEquip(PumpNum)%NomVolFlowRate * TempWaterDensity
-      !DSU? mdotMin = PumpEquip(PumpNum)%MinVolFlowRate * TempWaterDensity
-      !DSU? see note above
+      !mdotMin = PumpEquip(PumpNum)%MinVolFlowRate * TempWaterDensity
+      !see note above
       mdotMin = 0.0
       CALL InitComponentNodes(mdotMin, mdotMax, InletNode, OutletNode, &
                                 PumpEquip(PumpNum)%LoopNum           , &
@@ -1059,7 +1192,6 @@ SUBROUTINE InitializePumps(PumpNum)
                                 PumpEquip(PumpNum)%BranchNum, &
                                 PumpEquip(PumpNum)%CompNum )
       PumpEquip(PumpNum)%MassFlowRateMax = mdotMax
-      !DSU? PumpEquip(PumpNum)%MassFlowRateMin = mdotMin
       PumpEquip(PumpNum)%MassFlowRateMin = PumpEquip(PumpNum)%MinVolFlowRate * TempWaterDensity
 
     End If
@@ -1072,15 +1204,17 @@ SUBROUTINE InitializePumps(PumpNum)
     PumpEquipReport(PumpNum)%OutletTemp      = 0.d0
     PumpEquipReport(PumpNum)%PumpMassFlowRate = 0.d0
     PumpEquipReport(PumpNum)%NumPumpsOperating = 0
+    PumpEquipReport(PumpNum)%ZoneTotalGainRate = 0.d0
+    PumpEquipReport(PumpNum)%ZoneTotalGainEnergy = 0.d0
+    PumpEquipReport(PumpNum)%ZoneConvGainRate = 0.d0
+    PumpEquipReport(PumpNum)%ZoneRadGainRate  = 0.d0
 
     PumpEquip(PumpNum)%PumpInitFlag = .FALSE.
-
 
   END IF
 
   ! Reset the local environment flag for the next environment
   IF (.NOT. BeginEnvrnFlag) PumpEquip(PumpNum)%PumpInitFlag = .TRUE.
-
 
   ! zero out module level working variables
   PumpMassFlowRate = 0.d0
@@ -1105,7 +1239,7 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
           !                        July 2001, Rick Strand (implemented new pump controls)
           !                        May 2009, Brent Griffith (added EMS override capability)
           !                        B. Griffith, Nov 2011 Pump control: Intermittent vs Continuous
-          !       RE-ENGINEERED  
+          !       RE-ENGINEERED
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! This subroutine initializes the pump minAvail and maxAvail flow rates, and assigns them to the
@@ -1148,12 +1282,9 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
   REAL(r64)  :: PumpSchedFraction
   REAL(r64)  :: PumpOverridableMaxLimit
   REAL(r64)  :: PumpMassFlowRateMinLimit
-  REAL(r64)  :: TempWaterDensity
-  INTEGER    :: DummyWaterIndex = 1
-  INTEGER    :: PumpControl
-  INTEGER    :: PumpType
   REAL(r64)  :: PumpSchedRPM          !Pump RPM Optional Input
 
+    !Inlet/Outlet Node Numbers
   InletNode         = PumpEquip(PumpNum)%InletNodeNum
   OutletNode        = PumpEquip(PumpNum)%OutletNodeNum
 
@@ -1174,7 +1305,7 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
   PumpMassFlowRateMinLimit = PumpEquip(PumpNum)%MassFlowRateMin
 
     !The pump outlet node Min/MaxAvail
-  PumpMassFlowRateMin=MAX(InletNodeMin,PumpMassFlowRateMinLimit)
+  PumpMassFlowRateMin = MAX(InletNodeMin, PumpMassFlowRateMinLimit)
   PumpMassFlowRateMax = MIN(InletNodeMax, PumpOverridableMaxLimit * PumpSchedFraction)
 
     !Check for conflicts (MaxAvail < MinAvail)
@@ -1200,8 +1331,7 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
           !Evaluate the schedule if it exists and put the fraction into a local variable
           PumpSchedRPM = GetCurrentScheduleValue(PumpEquip(PumpNum)%VFD%ManualRPMSchedIndex)
           !Convert the RPM to rot/sec for calculation routine
-          PumpEquip(PumpNum)%RotSpeed = PumpSchedRPM /60
-  !@k
+          PumpEquip(PumpNum)%RotSpeed = PumpSchedRPM / 60.0d0
           !Resolve the new mass flow rate based on current pressure characteristics
           IF (PlantLoop(PumpEquip(PumpNum)%LoopNum)%UsePressureForPumpCalcs .AND. &
               PlantLoop(PumpEquip(PumpNum)%LoopNum)%PressureSimType == Press_FlowCorrection .AND. &
@@ -1265,7 +1395,6 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
 
   END SELECT
 
-
   ! Override pump operation based on System Availability Managers, should be done elsewhere?  I suppose this should be OK though
   IF(ALLOCATED(PlantAvailMgr))THEN
     IF (PlantAvailMgr(LoopNum)%AvailStatus == ForceOff) THEN
@@ -1311,12 +1440,14 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
           ! Energy Calculations, ASHRAE, 1993, pp2-10 to 2-15
 
           ! USE STATEMENTS:
-  USE PlantUtilities,      ONLY: SetComponentFlowRate
-  USE FluidProperties,  ONLY: GetDensityGlycol, GetSpecificHeatGlycol
-  USE DataPlant, ONLY: MassFlowTol, PlantLoop
-  USE General, ONLY: RoundSigDigits
-  USE ScheduleManager, ONLY: GetCurrentScheduleValue
-  USE DataConvergParams, ONLY: PlantFlowRateToler
+  USE PlantUtilities,         ONLY: SetComponentFlowRate
+  USE FluidProperties,        ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE DataPlant,              ONLY: PlantLoop
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
+  USE General,                ONLY: RoundSigDigits
+  USE ScheduleManager,        ONLY: GetCurrentScheduleValue
+  USE DataConvergParams,      ONLY: PlantFlowRateToler
+  USE DataBranchAirLoopPlant, ONLY: ControlType_SeriesActive
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1339,7 +1470,7 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
   INTEGER   :: InletNode
   INTEGER   :: OutletNode
   REAL(r64) :: LoopDensity
-  INTEGER   :: DummyWaterIndex = 1
+!  INTEGER   :: DummyWaterIndex = 1
   REAL(r64) :: VolFlowRate
   REAL(r64) :: PartLoadRatio
   REAL(r64) :: FracFullLoadPower
@@ -1353,6 +1484,7 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
   REAL(r64) :: RotSpeed_Max
   REAL(r64) :: PumpActualRPMValueOne
   REAL(r64) :: PumpActualRPMValueTwo
+  INTEGER   :: NumBranchesOnThisLoopSide
 
   InletNode   = PumpEquip(PumpNum)%InletNodeNum
   OutletNode  = PumpEquip(PumpNum)%OutletNodeNum
@@ -1369,11 +1501,32 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
   ! Also, on flowlock == locked, we will just use the inlet node flow rate
   ! The flow resolver can take care of argument resolution beyond that.
   ! For a typical situation, the flow request should be within the values of min/max avail, so the pump will get this flow rate.
-  IF (FlowRequest > MassFlowTol) THEN
+  IF (FlowRequest > MassFlowTolerance) THEN
       PumpMassFlowRate = FlowRequest
   ELSE
       PumpMassFlowRate = 0.0d0
   END IF
+
+  ! For variable speed branch pumps, with other components
+  !  on the branch, we are not going to assign a request.
+  ! Other components on this branch will request flow for this branch
+
+!  ! If this is a variable speed pump
+  IF ((PumpEquip(PumpNum)%PumpType == Pump_VarSpeed)     .OR. &
+      (PumpEquip(PumpNum)%PumpType == PumpBank_VarSpeed) .OR. &
+      (PumpEquip(PumpNum)%PumpType == Pump_Cond)) THEN
+
+    IF (PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(PumpEquip(PumpNum)%LoopSideNum)% &
+         Branch(PumpEquip(PumpNum)%BranchNum)%Comp(PumpEquip(PumpNum)%CompNum)%FlowCtrl == ControlType_SeriesActive) THEN
+      PumpMassFlowRate = 0.0d0
+    ENDIF
+
+  END IF
+
+! bound flow request by pump max limit, the Flow Request is total loop flow and if this is a branch pump that is not appropriate
+  PumpMassFlowRate = MIN(PumpEquip(PumpNum)%MassFlowRateMax, PumpMassFlowRate)
+  PumpMassFlowRate = MAX(PumpEquip(PumpNum)%MassFlowRateMin, PumpMassFlowRate)
+
   CALL SetComponentFlowRate(                                &
                             PumpMassFlowRate,               &
                             InletNode,                      &
@@ -1389,8 +1542,8 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
   IF (PlantLoop(PumpEquip(PumpNum)%LoopNum)%UsePressureForPumpCalcs .AND. PumpEquip(PumpNum)%HasVFD) THEN
     RotSpeed_Min =  GetCurrentScheduleValue(PumpEquip(PumpNum)%VFD%MinRPMSchedIndex)
     RotSpeed_Max =  GetCurrentScheduleValue(PumpEquip(PumpNum)%VFD%MaxRPMSchedIndex)
-    IF (PumpEquip(PumpNum)%PumpMassFlowRateMaxRPM < MassFlowTol &
-            .OR. PumpEquip(PumpNum)%PumpMassFlowRateMinRPM < MassFlowTol) THEN
+    IF (PumpEquip(PumpNum)%PumpMassFlowRateMaxRPM < MassFlowTolerance &
+            .OR. PumpEquip(PumpNum)%PumpMassFlowRateMinRPM < MassFlowTolerance) THEN
         PumpEquip(PumpNum)%VFD%PumpActualRPM = 0.0d0
     ELSE
         PumpActualRPMValueOne = (PumpMassFlowRate/PumpEquip(PumpNum)%PumpMassFlowRateMaxRPM) * RotSpeed_Max
@@ -1402,26 +1555,36 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
  !****************************!
  !** DETERMINE IF PUMP IS ON *!
  !****************************!
-  ! Since we don't allow series pumping, if there is ANY flow rate for this pump, THIS PUMP is driving the flow!  Therefore...
-  PumpRunning = (PumpMassFlowRate .GT. MassFlowTol)
+ ! Since we don't allow series pumping, if there is ANY flow rate for this pump, THIS PUMP is driving the flow!  Therefore...
+ PumpRunning = (PumpMassFlowRate .GT. MassFlowTolerance)
 
  !****************************!
  !** UPDATE PUMP BANK USAGE **!
  !****************************!
-!! RR: Unused code, commenting out for now...remove far left comment character to see previous code
-!  ! Need to update some mass flow things for pump banks, not sure about other pump types...
-!  SELECT CASE (PumpEquip(PumpNum)%PumpType)
-!    !CASE (Pump_VarSpeed)
-!    !CASE (Pump_ConSpeed)
-!    !CASE (Pump_Cond)
-!    CASE (PumpBank_VarSpeed)
-!    CASE (PumpBank_ConSpeed)
-!  END SELECT
+ SELECT CASE (PumpEquip(PumpNum)%PumpType)
+ CASE (PumpBank_VarSpeed, PumpBank_ConSpeed)
+    ! previously, pumps did whatever they wanted
+    ! because of this a constant speed pump bank could adjust the flow rate as-desired
+    !  even if it was not allowed
+    ! since pumps now must behave nicely like all other components, the calculation of number
+    !  of running pumps in a pump bank is the same for both bank types
+    ! the pumps are loaded sequentially, and the last pump can have full or non-full part load
+    !  status...this is just how it works now.  The pump cannot *bump* up the flow on the loop
+    !  to make sure the last running pump is fully loaded anymore for constant speed pumps...sorry
+    IF (PumpMassFlowRate >= PumpEquip(PumpNum)%MassFlowRateMax) THEN
+        !running full on
+        NumPumpsRunning = PumpEquip(PumpNum)%NumPumpsInBank
+    ELSE
+        !running at some sort of part load
+        NumPumpsRunning = CEILING((PumpMassFlowRate / (PumpEquip(PumpNum)%MassFlowRateMax) * PumpEquip(PumpNum)%NumPumpsInBank) )
+        NumPumpsRunning = MIN(NumPumpsRunning, PumpEquip(PumpNum)%NumPumpsInBank)
+    END IF
+ END SELECT
 
  !****************************!
  !***** EXIT IF NO FLOW ******!
  !****************************!
-  IF (PumpMassFlowRate <= MassFlowTol) THEN
+  IF (PumpMassFlowRate <= MassFlowTolerance) THEN
     Node(OutletNode)%Temp         = Node(InletNode)%Temp
     Node(OutletNode)%Press        = Node(InletNode)%Press
     Node(OutletNode)%Quality      = Node(InletNode)%Quality
@@ -1449,30 +1612,23 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
 
   ELSE IF(PumpType == PumpBank_ConSpeed .OR. PumpType == PumpBank_VarSpeed) THEN
 
-   IF(PumpType == PumpBank_ConSpeed) THEN
-     NumPumpsFullLoad = NumPumpsRunning
-!     NumPumpsPartLoad = 0
-   ELSE IF(PumpType == PumpBank_VarSpeed) THEN
-     NumPumpsFullLoad = NumPumpsRunning - 1
-!     NumPumpsPartLoad = 1
-   END IF
-   FullLoadVolFlowRate = PumpEquip(PumpNum)%NomVolFlowRate/PumpEquip(PumpNum)%NumPumpsInBank
-   PartLoadVolFlowrate = PumpMassFlowRate/LoopDensity - FullLoadVolFlowRate * NumPumpsFullLoad
-   FullLoadPower       = PumpEquip(PumpNum)%NomPowerUse/PumpEquip(PumpNum)%NumPumpsInBank
-   FullLoadPowerRatio  = PumpEquip(PumpNum)%PartLoadCoef(1)  &
-                        +PumpEquip(PumpNum)%PartLoadCoef(2)  &
-                        +PumpEquip(PumpNum)%PartLoadCoef(3)  &
-                        +PumpEquip(PumpNum)%PartLoadCoef(4)
-   PartLoadRatio       = MIN(1.0d0,(PartLoadVolFlowrate / FullLoadVolFlowRate))
-   IF(PumpType == PumpBank_ConSpeed) THEN
-     FracFullLoadPower = 0.0
-   ELSE IF(PumpType == PumpBank_VarSpeed) THEN
-     FracFullLoadPower =  PumpEquip(PumpNum)%PartLoadCoef(1)                     &
-                        + PumpEquip(PumpNum)%PartLoadCoef(2) * PartLoadRatio     &
-                        + PumpEquip(PumpNum)%PartLoadCoef(3) * PartLoadRatio**2  &
-                        + PumpEquip(PumpNum)%PartLoadCoef(4) * PartLoadRatio**3
-   END IF
-   Power = (FullLoadPowerRatio * NumPumpsFullLoad + FracFullLoadPower) * FullLoadPower
+    ! now just assume the last one is (or is not) running at part load
+    ! if it is actually at full load, the calculations work out to PLR = 1
+    ! for the last pump, so all is OK
+    NumPumpsFullLoad = NumPumpsRunning - 1
+    FullLoadVolFlowRate = PumpEquip(PumpNum)%NomVolFlowRate/PumpEquip(PumpNum)%NumPumpsInBank
+    PartLoadVolFlowrate = PumpMassFlowRate/LoopDensity - FullLoadVolFlowRate * NumPumpsFullLoad
+    FullLoadPower       = PumpEquip(PumpNum)%NomPowerUse/PumpEquip(PumpNum)%NumPumpsInBank
+    FullLoadPowerRatio  = PumpEquip(PumpNum)%PartLoadCoef(1)  &
+                         +PumpEquip(PumpNum)%PartLoadCoef(2)  &
+                         +PumpEquip(PumpNum)%PartLoadCoef(3)  &
+                         +PumpEquip(PumpNum)%PartLoadCoef(4)
+    PartLoadRatio       = MIN(1.0d0,(PartLoadVolFlowrate / FullLoadVolFlowRate))
+    FracFullLoadPower   =  PumpEquip(PumpNum)%PartLoadCoef(1)                     &
+                         + PumpEquip(PumpNum)%PartLoadCoef(2) * PartLoadRatio     &
+                         + PumpEquip(PumpNum)%PartLoadCoef(3) * PartLoadRatio**2  &
+                         + PumpEquip(PumpNum)%PartLoadCoef(4) * PartLoadRatio**3
+    Power = (FullLoadPowerRatio * NumPumpsFullLoad + FracFullLoadPower) * FullLoadPower
 
   END IF
 
@@ -1530,6 +1686,7 @@ SUBROUTINE CalcPumps(PumpNum, FlowRequest, PumpRunning)
  !****************************!
   ! Update data structure variables
   PumpEquip(PumpNum)%Power      = Power
+
   ! Update outlet node conditions
   Node(OutletNode)%Temp         = Node(InletNode)%Temp
   Node(OutletNode)%Press        = Node(InletNode)%Press
@@ -1726,7 +1883,7 @@ SUBROUTINE ReportPumps(PumpNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataPlant, ONLY: MassFlowTol
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1752,7 +1909,7 @@ SUBROUTINE ReportPumps(PumpNum)
   InletNode  = PumpEquip(PumpNum)%InletNodeNum
   OutletNode = PumpEquip(PumpNum)%OutletNodeNum
 
-  IF (PumpMassFlowRate <= MassFlowTol) THEN
+  IF (PumpMassFlowRate <= MassFlowTolerance) THEN
    PumpEquipReport(PumpNum)%PumpMassFlowRate = 0.0
    PumpEquipReport(PumpNum)%PumpHeattoFluid  = 0.0
    PumpEquipReport(PumpNum)%OutletTemp       = Node(OutletNode)%Temp
@@ -1760,6 +1917,10 @@ SUBROUTINE ReportPumps(PumpNum)
    PumpEquip(PumpNum)%Energy                 = 0.0
    PumpEquipReport(PumpNum)%ShaftPower       = 0.0
    PumpEquipReport(PumpNum)%PumpHeattoFluidEnergy = 0.0
+   PumpEquipReport(PumpNum)%ZoneTotalGainRate     = 0.d0
+   PumpEquipReport(PumpNum)%ZoneTotalGainEnergy   = 0.d0
+   PumpEquipReport(PumpNum)%ZoneConvGainRate      = 0.d0
+   PumpEquipReport(PumpNum)%ZoneRadGainRate       = 0.d0
   ELSE
    PumpEquipReport(PumpNum)%PumpMassFlowRate = PumpMassFlowRate
    PumpEquipReport(PumpNum)%PumpHeattoFluid  = PumpHeattoFluid
@@ -1773,6 +1934,12 @@ SUBROUTINE ReportPumps(PumpNum)
    ELSE IF(PumpType == PumpBank_ConSpeed .OR. PumpType == PumpBank_VarSpeed) THEN
     PumpEquipReport(PumpNum)%NumPumpsOperating = NumPumpsRunning
    END IF
+   PumpEquipReport(PumpNum)%ZoneTotalGainRate     = Power - PumpHeattoFluid
+   PumpEquipReport(PumpNum)%ZoneTotalGainEnergy   = PumpEquipReport(PumpNum)%ZoneTotalGainRate * TimeStepSys * SecInHour
+   PumpEquipReport(PumpNum)%ZoneConvGainRate      = (1 - PumpEquip(PumpNum)%SkinLossRadFraction) &
+                                                      * PumpEquipReport(PumpNum)%ZoneTotalGainRate
+   PumpEquipReport(PumpNum)%ZoneRadGainRate       = PumpEquip(PumpNum)%SkinLossRadFraction &
+                                                      * PumpEquipReport(PumpNum)%ZoneTotalGainRate
   END IF
 
   RETURN
@@ -1870,10 +2037,9 @@ Subroutine GetRequiredMassFlowRate(LoopNum, PumpNum, InletNodeMassFlowRate, Actu
 
   USE PlantUtilities,      ONLY: SetComponentFlowRate
   USE FluidProperties,  ONLY: GetDensityGlycol, GetSpecificHeatGlycol
-  USE DataPlant, ONLY: MassFlowTol, Press_FlowCorrection, PlantLoop
+  USE DataPlant, ONLY: Press_FlowCorrection, PlantLoop
   USE General, ONLY: RoundSigDigits
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
-  USE DataPlant, ONLY: MassFlowTol, PlantLoop
   USE PlantPressureSystem, ONLY: ResolveLoopFlowVsPressure
   USE DataLoopNode,     ONLY: Node
 
@@ -1977,7 +2143,7 @@ END SUBROUTINE
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -383,7 +383,7 @@ SUBROUTINE InitAirLoopSplitter(SplitterNum, FirstHVACIteration, FirstCall)
           ! USE STATEMENTS:
   USE DataEnvironment, ONLY : OutBaroPress, OutHumRat
   USE Psychrometrics,  ONly : PsyHFnTdbW
-  USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2
+  USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2, OutdoorGC
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -425,6 +425,9 @@ SUBROUTINE InitAirLoopSplitter(SplitterNum, FirstHVACIteration, FirstCall)
       Node(InletNode)%Press     = OutBaroPress
       IF (Contaminant%CO2Simulation) Then
         Node(InletNode)%CO2 = OutdoorCO2
+      End If
+      IF (Contaminant%GenericContamSimulation) Then
+        Node(InletNode)%GenContam = OutdoorGC
       End If
 
       MyEnvrnFlag = .FALSE.
@@ -669,6 +672,9 @@ SUBROUTINE UpdateSplitter(SplitterNum, SplitterInletChanged, FirstCall)
      IF (Contaminant%CO2Simulation) Then
        Node(OutletNode)%CO2 = Node(InletNode)%CO2
      End If
+     IF (Contaminant%GenericContamSimulation) Then
+       Node(OutletNode)%GenContam = Node(InletNode)%GenContam
+     End If
    END DO
 
  ELSE
@@ -747,7 +753,7 @@ END Subroutine ReportSplitter
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

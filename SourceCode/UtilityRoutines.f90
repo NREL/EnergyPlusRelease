@@ -1,3 +1,5 @@
+#include "Timer.h"
+
 SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
 
           ! SUBROUTINE INFORMATION:
@@ -20,6 +22,7 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
           ! USE STATEMENTS:
   USE DataPrecisionGlobals
   USE DataSystemVariables
+  USE DataTimings
   USE DataErrorTracking
   USE DataInterfaces, ONLY: ShowMessage
   USE General, ONLY: RoundSigDigits
@@ -52,13 +55,13 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER tempfl
   INTEGER, EXTERNAL :: GetNewUnitNumber
-  CHARACTER(len=30) NumWarnings
-  CHARACTER(len=30) NumSevere
-  CHARACTER(len=30) NumWarningsDuringWarmup
-  CHARACTER(len=30) NumSevereDuringWarmup
-  CHARACTER(len=30) NumWarningsDuringSizing
-  CHARACTER(len=30) NumSevereDuringSizing
-  CHARACTER(len=30) Elapsed
+  CHARACTER(len=32) NumWarnings
+  CHARACTER(len=32) NumSevere
+  CHARACTER(len=32) NumWarningsDuringWarmup
+  CHARACTER(len=32) NumSevereDuringWarmup
+  CHARACTER(len=32) NumWarningsDuringSizing
+  CHARACTER(len=32) NumSevereDuringSizing
+  CHARACTER(len=32) Elapsed
   INTEGER Hours   ! Elapsed Time Hour Reporting
   INTEGER Minutes ! Elapsed Time Minute Reporting
   REAL(r64) Seconds ! Elapsed Time Second Reporting
@@ -69,8 +72,8 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
     CALL UpdateSQLiteSimulationRecord(.true.,.false.)
   ENDIF
 
+  AbortProcessing=.true.
   IF (AskForConnectionsReport) THEN
-    AbortProcessing=.true.
     AskForConnectionsReport=.false.   ! Set false here in case any further fatal errors in below processing...
 
     CALL ShowMessage('Fatal error -- final processing.  More error messages may appear.')
@@ -107,6 +110,7 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
   CALL CheckPlantOnAbort
   CALL ShowRecurringErrors
   CALL SummarizeErrors
+  CALL CloseMiscOpenFiles
   NumWarnings=RoundSigDigits(TotalWarningErrors)
   NumWarnings=ADJUSTL(NumWarnings)
   NumSevere=RoundSigDigits(TotalSevereErrors)
@@ -145,8 +149,13 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
     READ(*,*)
   ENDIF
 
-  CALL CPU_TIME(Time_Finish)
-  Elapsed_Time=Time_Finish-Time_Start
+! catch up with timings if in middle
+                             Time_Finish=epElapsedTime()
+                             if (Time_Finish < Time_Start) Time_Finish=Time_Finish+24.0d0*3600.0d0
+                             Elapsed_Time=Time_Finish-Time_Start
+#ifdef EP_Detailed_Timings
+                             CALL epStopTime('EntireRun=')
+#endif
   IF (Elapsed_Time < 0.0) Elapsed_Time=0.0
   Hours=Elapsed_Time/3600.d0
   Elapsed_Time=Elapsed_Time-Hours*3600
@@ -173,7 +182,10 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
                            TRIM(NumSevere)//' Severe Errors;'//' Elapsed Time='//TRIM(Elapsed)
 
   close(tempfl)
-  CALL CloseMiscOpenFiles
+#ifdef EP_Detailed_Timings
+  CALL epSummaryTimes(Time_Finish-Time_Start)
+#endif
+  CALL CloseOutOpenFiles
   ! Close the socket used by ExternalInterface. This call also sends the flag "-1" to the ExternalInterface,
   ! indicating that E+ terminated with an error.
   IF (NumExternalInterfaces > 0) CALL CloseSocket(-1)
@@ -221,12 +233,58 @@ SUBROUTINE CloseMiscOpenFiles
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
 
-      LOGICAL :: exists, opened
-      INTEGER :: UnitNumber
-      INTEGER :: ios
+!      LOGICAL :: exists, opened
+!      INTEGER :: UnitNumber
+!      INTEGER :: ios
 
       CALL CloseReportIllumMaps
       CALL CloseDFSFile
+
+  RETURN
+
+END SUBROUTINE CloseMiscOpenFiles
+
+SUBROUTINE CloseOutOpenFiles
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda K. Lawrie
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine scans potential unit numbers and closes
+          ! any that are still open.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Use INQUIRE to determine if file is open.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+   INTEGER, PARAMETER :: MaxUnitNumber = 1000
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+
+      LOGICAL :: exists, opened
+      INTEGER :: UnitNumber
+      INTEGER :: ios
 
       DO UnitNumber = 1, MaxUnitNumber
          INQUIRE (UNIT = UnitNumber, EXIST = exists,  OPENED = opened, IOSTAT = ios)
@@ -235,7 +293,7 @@ SUBROUTINE CloseMiscOpenFiles
 
   RETURN
 
-END SUBROUTINE CloseMiscOpenFiles
+END SUBROUTINE CloseOutOpenFiles
 
 SUBROUTINE EndEnergyPlus
 
@@ -259,6 +317,7 @@ SUBROUTINE EndEnergyPlus
           ! USE STATEMENTS:
   USE DataPrecisionGlobals
   USE DataSystemVariables
+  USE DataTimings
   USE DataErrorTracking
   USE DataInterfaces, ONLY: ShowMessage
   USE General, ONLY: RoundSigDigits
@@ -283,17 +342,18 @@ SUBROUTINE EndEnergyPlus
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER tempfl
   INTEGER, EXTERNAL :: GetNewUnitNumber
-  CHARACTER(len=30) NumWarnings
-  CHARACTER(len=30) NumSevere
-  CHARACTER(len=30) NumWarningsDuringWarmup
-  CHARACTER(len=30) NumSevereDuringWarmup
-  CHARACTER(len=30) NumWarningsDuringSizing
-  CHARACTER(len=30) NumSevereDuringSizing
-  CHARACTER(len=30) Elapsed
+  CHARACTER(len=32) NumWarnings
+  CHARACTER(len=32) NumSevere
+  CHARACTER(len=32) NumWarningsDuringWarmup
+  CHARACTER(len=32) NumSevereDuringWarmup
+  CHARACTER(len=32) NumWarningsDuringSizing
+  CHARACTER(len=32) NumSevereDuringSizing
+  CHARACTER(len=32) Elapsed
   INTEGER Hours   ! Elapsed Time Hour Reporting
   INTEGER Minutes ! Elapsed Time Minute Reporting
   REAL(r64) Seconds ! Elapsed Time Second Reporting
   INTEGER :: write_stat
+
   IF(WriteOutputToSQLite) THEN
     CALL UpdateSQLiteSimulationRecord(.true.,.true.)
   ENDIF
@@ -301,6 +361,7 @@ SUBROUTINE EndEnergyPlus
   CALL ReportSurfaceErrors
   CALL ShowRecurringErrors
   CALL SummarizeErrors
+  CALL CloseMiscOpenFiles
   NumWarnings=RoundSigDigits(TotalWarningErrors)
   NumWarnings=ADJUSTL(NumWarnings)
   NumSevere=RoundSigDigits(TotalSevereErrors)
@@ -313,6 +374,13 @@ SUBROUTINE EndEnergyPlus
   NumWarningsDuringSizing=ADJUSTL(NumWarningsDuringSizing)
   NumSevereDuringSizing=RoundSigDigits(TotalSevereErrorsDuringSizing)
   NumSevereDuringSizing=ADJUSTL(NumSevereDuringSizing)
+
+                             Time_Finish=epElapsedTime()
+                             if (Time_Finish < Time_Start) Time_Finish=Time_Finish+24.0d0*3600.0d0
+                             Elapsed_Time=Time_Finish-Time_Start
+#ifdef EP_Detailed_Timings
+                             CALL epStopTime('EntireRun=')
+#endif
   Hours=Elapsed_Time/3600.
   Elapsed_Time=Elapsed_Time-Hours*3600
   Minutes=Elapsed_Time/60.
@@ -336,7 +404,10 @@ SUBROUTINE EndEnergyPlus
   write(tempfl,'(A)') 'EnergyPlus Completed Successfully-- '//TRIM(NumWarnings)//' Warning; '//TRIM(NumSevere)//  &
                           ' Severe Errors;'//' Elapsed Time='//TRIM(Elapsed)
   close(tempfl)
-  CALL CloseMiscOpenFiles
+#ifdef EP_Detailed_Timings
+  CALL epSummaryTimes(Time_Finish-Time_Start)
+#endif
+  CALL CloseOutOpenFiles
   ! Close the ExternalInterface socket. This call also sends the flag "1" to the ExternalInterface,
   ! indicating that E+ finished its simulation
   IF (NumExternalInterfaces > 0) CALL CloseSocket(1)
@@ -1739,177 +1810,9 @@ SUBROUTINE ShowRecurringErrors
 
 END SUBROUTINE ShowRecurringErrors
 
-INTEGER FUNCTION FindNumberinList(WhichNumber,ListofItems,NumItems)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Linda K. Lawrie
-          !       DATE WRITTEN   September 2001
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! This function looks up a number(integer) in a similar list of
-          ! items and returns the index of the item in the list, if
-          ! found.
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-          ! na
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: WhichNumber
-  INTEGER, INTENT(IN), DIMENSION(*) :: ListofItems
-  INTEGER, INTENT(IN) :: NumItems
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER Count
-
-  FindNumberinList=0
-
-  DO Count=1,NumItems
-    IF (WhichNumber == ListofItems(Count)) THEN
-      FindNumberinList=Count
-      EXIT
-    ENDIF
-  END DO
-
-  RETURN
-
-END FUNCTION FindNumberinList
-
-SUBROUTINE DecodeMonDayHrMin(Item,Month,Day,Hour,Minute)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Linda Lawrie
-          !       DATE WRITTEN   March 2000
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine decodes the "packed" integer representation of
-          ! the Month, Day, Hour, and Minute.  Packed integers are used to
-          ! save memory allocation.  Original idea for this routine is contained
-          ! in DECMDH, BLAST code, by Jean Baugh.
-
-          ! METHODOLOGY EMPLOYED:
-          ! Using maximum integer concept the original date can be decoded
-          ! from the packed single word.  This relies on 4 byte integer representation
-          ! as a minimum (capable of representing up to 2,147,483,647).
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-          ! na
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN)  :: Item   ! word containing encoded month, day, hour, minute
-                                 ! ((month*100 + day)*100 + hour)*100 + minute
-  INTEGER, INTENT(OUT) :: Month  ! month in integer format (1-12)
-  INTEGER, INTENT(OUT) :: Day    ! day in integer format (1-31)
-  INTEGER, INTENT(OUT) :: Hour   ! hour in integer format (1-24)
-  INTEGER, INTENT(OUT) :: Minute ! minute in integer format (0:59)
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-  INTEGER, PARAMETER :: DecMon=100*100*100
-  INTEGER, PARAMETER :: DecDay=100*100
-  INTEGER, PARAMETER :: DecHr =100
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER TmpItem
-
-  TmpItem=Item
-  Month=TmpItem/DecMon
-  TmpItem=(TmpItem-Month*DecMon)
-  Day=TmpItem/DecDay
-  TmpItem=TmpItem-Day*DecDay
-  Hour=TmpItem/DecHr
-  Minute=MOD(TmpItem,DecHr)
-
-  RETURN
-
-END SUBROUTINE DecodeMonDayHrMin
-
-SUBROUTINE EncodeMonDayHrMin(Item,Month,Day,Hour,Minute)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Linda Lawrie
-          !       DATE WRITTEN   March 2000
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine encodes the "packed" integer representation of
-          ! the Month, Day, Hour, and Minute.  Packed integers are used to
-          ! save memory allocation.  Original idea for this routine is contained
-          ! in DECMDH, BLAST code, by Jean Baugh.
-
-          ! METHODOLOGY EMPLOYED:
-          ! Using maximum integer concept the original date can be decoded
-          ! from the packed single word.  This relies on 4 byte integer representation
-          ! as a minimum (capable of representing up to 2,147,483,647).
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-          ! na
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(OUT) :: Item   ! word containing encoded month, day, hour, minute
-                                 ! ((month*100 + day)*100 + hour)*100 + minute
-  INTEGER, INTENT(IN)  :: Month  ! month in integer format (1:12)
-  INTEGER, INTENT(IN)  :: Day    ! day in integer format (1:31)
-  INTEGER, INTENT(IN)  :: Hour   ! hour in integer format (1:24)
-  INTEGER, INTENT(IN)  :: Minute ! minute in integer format (0:59)
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          ! na
-
-  Item=((Month*100 + Day)*100 + Hour)*100 + Minute
-
-  RETURN
-
-END SUBROUTINE EncodeMonDayHrMin
-
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

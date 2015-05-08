@@ -104,8 +104,8 @@ TYPE Towerspecs
   REAL(r64)  :: DesignRange                     = 0.0 ! Design range temperature (inlet water temp minus outlet water temp (C)
   REAL(r64)  :: MinimumVSAirFlowFrac            = 0.0 ! Min air flow ratio (used for VS tower only, point where free conv occurs)
   REAL(r64)  :: CalibratedWaterFlowRate         = 0.0 ! Water flow ratio required for model calibration
-  REAL(r64)  :: BasinHeaterPowerFTempDiff       = 0.0 ! Basin heater capacity per degree C below set point (W/C)
-  REAL(r64)  :: BasinHeaterSetPointTemp         = 0.0 ! Set point temperature for basin heater operation (C)
+  REAL(r64)  :: BasinHeaterPowerFTempDiff       = 0.0 ! Basin heater capacity per degree C below setpoint (W/C)
+  REAL(r64)  :: BasinHeaterSetPointTemp         = 0.0 ! setpoint temperature for basin heater operation (C)
   REAL(r64)  :: MakeupWaterDrift                = 0.0 ! Makeup water flow rate fraction due to drift
   REAL(r64)  :: FreeConvectionCapacityFraction  = 0.0 ! Percentage of tower capacity in free convection regime
   REAL(r64)  :: TowerMassFlowRateMultiplier     = 0.0 ! Maximum tower flow rate is this multiplier times design flow rate
@@ -430,7 +430,7 @@ SUBROUTINE SimTowers(TowerType,TowerName, CompIndex, RunFlag,InitLoopEquip, &
         IF (InitLoopEquip) THEN
           CALL InitTower(TowerNum, RunFlag)
           CALL SizeTower(TowerNum)
-          MinCap = 0.0 
+          MinCap = 0.0
           MaxCap = SimpleTower(TowerNum)%TowerNominalCapacity * 1.25d0
           OptCap = SimpleTower(TowerNum)%TowerNominalCapacity
           IF (GetSizingFactor) THEN
@@ -449,7 +449,7 @@ SUBROUTINE SimTowers(TowerType,TowerName, CompIndex, RunFlag,InitLoopEquip, &
         IF (InitLoopEquip) THEN
           CALL InitTower(TowerNum, RunFlag)
           CALL SizeTower(TowerNum)
-          MinCap = 0.0 
+          MinCap = 0.0
           MaxCap = SimpleTower(TowerNum)%TowerNominalCapacity * 1.25d0
           OptCap = SimpleTower(TowerNum)%TowerNominalCapacity
           IF (GetSizingFactor) THEN
@@ -468,7 +468,7 @@ SUBROUTINE SimTowers(TowerType,TowerName, CompIndex, RunFlag,InitLoopEquip, &
         IF (InitLoopEquip) THEN
           CALL InitTower(TowerNum, RunFlag)
           CALL SizeTower(TowerNum)
-          MinCap = 0.0 
+          MinCap = 0.0
           MaxCap = SimpleTower(TowerNum)%TowerNominalCapacity * 1.25d0
           OptCap = SimpleTower(TowerNum)%TowerNominalCapacity
           IF (GetSizingFactor) THEN
@@ -1694,7 +1694,7 @@ SUBROUTINE GetTowerInput
        ErrorsFound = .TRUE.
      END IF
 
-!   minimum air flow rate fraction must be >= 0.2 and <= 0.5, below this value the tower fan cycles to maintain the set point
+!   minimum air flow rate fraction must be >= 0.2 and <= 0.5, below this value the tower fan cycles to maintain the setpoint
     SimpleTower(TowerNum)%MinimumVSAirFlowFrac      = NumArray(7)
     SimpleTower(TowerNum)%MinimumVSAirFlowFrac      = NumArray(7)
      IF(NumArray(7) .LT. 0.2d0 .OR. NumArray(7) .GT. 0.5d0) THEN
@@ -2108,7 +2108,7 @@ SUBROUTINE InitTower(TowerNum, RunFlag)
   USE DataPlant,       ONLY: TypeOf_CoolingTower_SingleSpd, TypeOf_CoolingTower_TwoSpd, &
                              TypeOf_CoolingTower_VarSpd, PlantLoop, ScanPlantLoopsForObject, &
                              PlantSizesOkayToFinalize, PlantSizeNotComplete
-  USE PlantUtilities,  ONLY: InitComponentNodes, SetComponentFlowRate
+  USE PlantUtilities,  ONLY: InitComponentNodes, SetComponentFlowRate, RegulateCondenserCompFlowReqOp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2130,7 +2130,7 @@ SUBROUTINE InitTower(TowerNum, RunFlag)
   LOGICAL, SAVE                           :: MyOneTimeFlag = .true.
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: OneTimeFlagForEachTower
-  LOGICAL                                 :: FatalError
+!  LOGICAL                                 :: FatalError
   INTEGER  :: TypeOf_Num
   INTEGER  :: LoopNum
   INTEGER  :: LoopSideNum
@@ -2181,7 +2181,7 @@ SUBROUTINE InitTower(TowerNum, RunFlag)
                                 InitConvTemp, &
                                 PlantLoop(SimpleTower(TowerNum)%LoopNum)%FluidIndex,&
                                 'InitTower')
-  
+
     SimpleTower(TowerNum)%DesWaterMassFlowRate = SimpleTower(TowerNum)%DesignWaterFlowRate * &
                                                   rho
     CALL InitComponentNodes(0.0D0,  SimpleTower(TowerNum)%DesWaterMassFlowRate , &
@@ -2191,7 +2191,7 @@ SUBROUTINE InitTower(TowerNum, RunFlag)
                                     SimpleTower(TowerNum)%LoopSideNum,           &
                                     SimpleTower(TowerNum)%BranchNum,             &
                                     SimpleTower(TowerNum)%CompNum)
-                                                   
+
     MyEnvrnFlag(TowerNum) = .false.
   END IF
 
@@ -2219,17 +2219,16 @@ SUBROUTINE InitTower(TowerNum, RunFlag)
 
   LoopNum     = SimpleTower(TowerNum)%LoopNum
   LoopSideNum = SimpleTower(TowerNum)%LoopSideNum
-  BranchIndex = SimpleTower(TowerNum)%BranchNum 
+  BranchIndex = SimpleTower(TowerNum)%BranchNum
   CompIndex   = SimpleTower(TowerNum)%CompNum
-  IF (.NOT. RunFlag)THEN
-    ! Loop is controlled by environmental flags, shut off branch
-    WaterMassFlowRate = 0.0
-  ELSE
-   ! Loop is 'load range' or 'uncontrolled'
-   ! Set tower flow rate to maximum allowed, let pump (or other component) set flow rate
-   WaterMassFlowRate  = SimpleTower(TowerNum)%DesWaterMassFlowRate * SimpleTower(TowerNum)%TowerMassFlowRateMultiplier
 
-  END IF
+  WaterMassFlowRate = RegulateCondenserCompFlowReqOp(SimpleTower(TowerNum)%LoopNum,               &
+                                                SimpleTower(TowerNum)%LoopSideNum,           &
+                                                SimpleTower(TowerNum)%BranchNum,             &
+                                                SimpleTower(TowerNum)%CompNum,     &
+                                                SimpleTower(TowerNum)%DesWaterMassFlowRate &
+                                                * SimpleTower(TowerNum)%TowerMassFlowRateMultiplier)
+
 
   CALL SetComponentFlowRate(WaterMassFlowRate, &
                                     SimpleTower(TowerNum)%WaterInletNodeNum,     &
@@ -2473,7 +2472,7 @@ SUBROUTINE SizeTower(TowerNum)
                                'SizeTower')
         DesTowerLoad = rho * Cp * tmpDesignWaterFlowRate * PlantSizData(PltSizCondNum)%DeltaT
 
-        ! This conditional statement is to trap when the user specified condenser/tower water design set point
+        ! This conditional statement is to trap when the user specified condenser/tower water design setpoint
         !  temperature is less than design inlet air wet bulb temperature of 25.6 C
         IF ( PlantSizData(PltSizCondNum)%ExitTemp <= 25.6d0 ) THEN
           CALL ShowSevereError('Error when autosizing the UA value for cooling tower = '//TRIM(SimpleTower(TowerNum)%Name)// &
@@ -2910,16 +2909,16 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
           ! counterflow heat exchangers based on Merkel's theory.
           !
           ! The subroutine calculates the period of time required to meet a
-          ! leaving water temperature set point. It assumes that part-load
+          ! leaving water temperature setpoint. It assumes that part-load
           ! operation represents a linear interpolation of two steady-state regimes.
           ! Cyclic losses are neglected. The period of time required to meet the
-          ! leaving water temperature set point is used to determine the required
+          ! leaving water temperature setpoint is used to determine the required
           ! fan power and energy. Free convection regime is also modeled. This
           ! occures when the pump is operating and the fan is off. If free convection
           ! regime cooling is all that is required for a given time step, the leaving
           ! water temperature is allowed to fall below the leaving water temperature
-          ! set point (free cooling). At times when the cooling tower fan is required,
-          ! the leaving water temperature is at or above the set point.
+          ! setpoint (free cooling). At times when the cooling tower fan is required,
+          ! the leaving water temperature is at or above the setpoint.
           !
           ! A RunFlag is passed by the upper level manager to indicate the ON/OFF status,
           ! or schedule, of the cooling tower. If the tower is OFF, outlet water
@@ -2934,14 +2933,14 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
           ! as the entering condition to the cooling tower (air-side). Input deck
           ! parameters are read for the free convection regime (pump ON and fan OFF)
           ! and a leaving water temperature is calculated. If the leaving water temperature
-          ! is at or below the set point, the calculated leaving water temperature is
+          ! is at or below the setpoint, the calculated leaving water temperature is
           ! placed on the outlet node and no fan power is used. If the calculated leaving
-          ! water temperature is above the set point, the cooling tower fan is turned on
+          ! water temperature is above the setpoint, the cooling tower fan is turned on
           ! and design parameters are used to again calculate the leaving water temperature.
-          ! If the calculated leaving water temperature is below the set point, a fan
+          ! If the calculated leaving water temperature is below the setpoint, a fan
           ! run-time fraction is calculated and used to determine fan power. The leaving
-          ! water temperature set point is placed on the outlet node. If the calculated
-          ! leaving water temperature is at or above the set point, the calculated
+          ! water temperature setpoint is placed on the outlet node. If the calculated
+          ! leaving water temperature is at or above the setpoint, the calculated
           ! leaving water temperature is placed on the outlet node and the fan runs at
           ! full power. Water mass flow rate is passed from inlet node to outlet node
           ! with no intervention.
@@ -2957,7 +2956,8 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
           ! ASHRAE HVAC1KIT: A Toolkit for Primary HVAC System Energy Calculation. 1999.
 
           ! USE STATEMENTS:
-  USE DataPlant, ONLY : PlantLoop, MassFlowTol
+  USE DataPlant, ONLY : PlantLoop, SingleSetPoint, DualSetpointDeadband
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3020,12 +3020,13 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
     OutletWaterTemp    = Node(WaterInletNode)%Temp
     LoopNum            = SimpleTower(TowerNum)%LoopNum
     LoopSideNum        = SimpleTower(TowerNum)%LoopSideNum
-    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
-!    ELSE  ! At some point, we can go to component setpoint control on condenser loop
-!      TempSetPoint       = MIN(Node(WaterOutletNode)%TempSetPoint,PlantLoop(LoopNum)%MaxTemp)
-!      TempSetPoint       = MAX(TempSetPoint,PlantLoop(LoopNum)%MinTemp)
-!    ENDIF
-
+    SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+    CASE (SingleSetPoint)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
+    CASE (DualSetPointDeadBand)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
+    END SELECT
+    
     ! Added for fluid bypass. First assume no fluid bypass
     BypassFlag = 0
     BypassFraction = 0.0
@@ -3061,8 +3062,8 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
 
    ! Do not RETURN here if flow rate is less than SmallMassFlow. Check basin heater and then RETURN.
 
-  ! MassFlowTol is a DataPlant parameter to indicate a no flow condition
-    IF(WaterMassFlowRate.LE.MassFlowTol)THEN
+  ! MassFlowTolerance is a parameter to indicate a no flow condition
+    IF(WaterMassFlowRate.LE.MassFlowTolerance)THEN
       ! for multiple cells, we assume that it's a commun bassin
       CALL CalcBasinHeaterPower(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff,&
                                 SimpleTower(TowerNum)%BasinHeaterSchedulePtr,&
@@ -3212,7 +3213,7 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
                                Node(WaterInletNode)%Temp,                                   &
                                PlantLoop(SimpleTower(TowerNum)%LoopNum)%FluidIndex,         &
                                'CalcSingleSpeedTower')
-    
+
     Qactual = WaterMassFlowRate * CpWater * (Node(WaterInletNode)%Temp - OutletWaterTemp)
     AirFlowRateRatio = (AirFlowRate * SimpleTower(TowerNum)%NumCell) / SimpleTower(TowerNum)%HighSpeedAirFlowRate
 
@@ -3238,17 +3239,17 @@ SUBROUTINE CalcTwoSpeedTower(TowerNum)
           ! counterflow heat exchangers based on Merkel's theory.
           !
           ! The subroutine calculates the period of time required to meet a
-          ! leaving water temperature set point. It assumes that part-load
+          ! leaving water temperature setpoint. It assumes that part-load
           ! operation represents a linear interpolation of three steady-state regimes
           ! (high-speed fan operation, low-speed fan operation and free convection regime).
           ! Cyclic losses are neglected. The period of time required to meet the
-          ! leaving water temperature set point is used to determine the required
+          ! leaving water temperature setpoint is used to determine the required
           ! fan power and energy. Free convection regime is also modeled. This
           ! occures when the pump is operating and the fan is off. If free convection
           ! regime cooling is all that is required for a given time step, the leaving
           ! water temperature is allowed to fall below the leaving water temperature
-          ! set point (free cooling). At times when the cooling tower fan is required,
-          ! the leaving water temperature is at or above the set point.
+          ! setpoint (free cooling). At times when the cooling tower fan is required,
+          ! the leaving water temperature is at or above the setpoint.
           !
           ! A RunFlag is passed by the upper level manager to indicate the ON/OFF status,
           ! or schedule, of the cooling tower. If the tower is OFF, outlet water
@@ -3263,20 +3264,20 @@ SUBROUTINE CalcTwoSpeedTower(TowerNum)
           ! as the entering condition to the cooling tower (air-side). Input deck
           ! parameters are read for the free convection regime (pump ON and fan OFF)
           ! and a leaving water temperature is calculated. If the leaving water temperature
-          ! is at or below the set point, the calculated leaving water temperature is
+          ! is at or below the setpoint, the calculated leaving water temperature is
           ! placed on the outlet node and no fan power is used. If the calculated leaving
-          ! water temperature is above the set point, the cooling tower fan is turned on
+          ! water temperature is above the setpoint, the cooling tower fan is turned on
           ! and parameters for low fan speed are used to again calculate the leaving
           ! water temperature. If the calculated leaving water temperature is
-          ! below the set point, a fan run-time fraction (FanModeFrac) is calculated and
-          ! used to determine fan power. The leaving water temperature set point is placed
+          ! below the setpoint, a fan run-time fraction (FanModeFrac) is calculated and
+          ! used to determine fan power. The leaving water temperature setpoint is placed
           ! on the outlet node. If the calculated leaving water temperature is at or above
-          ! the set point, the cooling tower fan is turned on 'high speed' and the routine is
-          ! repeated. If the calculated leaving water temperature is below the set point,
+          ! the setpoint, the cooling tower fan is turned on 'high speed' and the routine is
+          ! repeated. If the calculated leaving water temperature is below the setpoint,
           ! a fan run-time fraction is calculated for the second stage fan and fan power
           ! is calculated as FanModeFrac*HighSpeedFanPower+(1-FanModeFrac)*LowSpeedFanPower.
           ! If the calculated leaving water temperature is above the leaving water temp.
-          ! set point, the calculated leaving water temperature is placed on the outlet
+          ! setpoint, the calculated leaving water temperature is placed on the outlet
           ! node and the fan runs at full power (High Speed Fan Power). Water mass flow
           ! rate is passed from inlet node to outlet node with no intervention.
           !
@@ -3290,7 +3291,8 @@ SUBROUTINE CalcTwoSpeedTower(TowerNum)
           ! ASHRAE HVAC1KIT: A Toolkit for Primary HVAC System Energy Calculation. 1999.
 
           ! USE STATEMENTS:
-  USE DataPlant, ONLY: PlantLoop, MassFlowTol
+  USE DataPlant, ONLY: PlantLoop, SingleSetPoint, DualSetpointDeadband
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3343,16 +3345,17 @@ SUBROUTINE CalcTwoSpeedTower(TowerNum)
     OutletWaterTemp     = Node(WaterInletNode)%Temp
     LoopNum             = SimpleTower(TowerNum)%LoopNum
     LoopSideNum         = SimpleTower(TowerNum)%LoopSideNum
-    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
-!    ELSE  ! At some point, we can go to component setpoint control on condenser loop
-!      TempSetPoint       = MIN(Node(WaterOutletNode)%TempSetPoint,PlantLoop(LoopNum)%MaxTemp)
-!      TempSetPoint       = MAX(TempSetPoint,PlantLoop(LoopNum)%MinTemp)
-!    ENDIF
+    SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+    CASE (SingleSetPoint)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
+    CASE (DualSetPointDeadBand)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
+    END SELECT
 
   ! Do not RETURN here if flow rate is less than SmallMassFlow. Check basin heater and then RETURN.
     IF(PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0)RETURN
-  ! MassFlowTol is a DataPlant parameter to indicate a no flow condition
-    IF(WaterMassFlowRate.LE.MassFlowTol)THEN
+  ! MassFlowTolerance is a parameter to indicate a no flow condition
+    IF(WaterMassFlowRate.LE.MassFlowTolerance)THEN
       CALL CalcBasinHeaterPower(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff,&
                                 SimpleTower(TowerNum)%BasinHeaterSchedulePtr,&
                                 SimpleTower(TowerNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
@@ -3486,7 +3489,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
           ! METHODOLOGY EMPLOYED:
           !
           ! For each simulation time step, a desired range temperature (Twater,inlet-Twater,setpoint) and desired approach
-          ! temperature (Twater,setpoint-Tair,WB) is calculated which meets the outlet water temperature set point. This
+          ! temperature (Twater,setpoint-Tair,WB) is calculated which meets the outlet water temperature setpoint. This
           ! desired range and approach temperature also provides a balance point for the empirical model where:
           !
           ! Tair,WB + Twater,range + Tapproach = Node(WaterInletNode)%Temp
@@ -3499,16 +3502,16 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
           ! If a solution (or balance) is found, these 2 calculation methods are equal. Equation 2 is used to calculate
           ! the outlet water temperature in the free convection regime and at the minimum or maximum fan speed so that
           ! if a solution is not reached, the outlet water temperature is approximately equal to the inlet water temperature
-          ! and the tower fan must be varied to meet the set point. Equation 1 is used when the fan speed is varied between
-          ! the minimum and maximum fan speed to meet the outlet water temperature set point.
+          ! and the tower fan must be varied to meet the setpoint. Equation 1 is used when the fan speed is varied between
+          ! the minimum and maximum fan speed to meet the outlet water temperature setpoint.
           !
-          ! The outlet water temperature in the free convection regime is first calculated to see if the set point is met.
-          ! If the set point is met, the fan is OFF and the outlet water temperature is allowed to float below the set
-          ! point temperature. If the set point is not met, the outlet water temperature is re-calculated at the minimum
-          ! fan speed. If the set point is met, the fan is cycled to exactly meet the outlet water temperature set point.
-          ! If the set point is not met at the minimum fan speed, the outlet water temperature is re-calculated at the
-          ! maximum fan speed. If the set point at the maximum fan speed is not met, the fan runs at maximum speed the
-          ! entire time step. If the set point is met at the maximum fan speed, the fan speed is varied to meet the set point.
+          ! The outlet water temperature in the free convection regime is first calculated to see if the setpoint is met.
+          ! If the setpoint is met, the fan is OFF and the outlet water temperature is allowed to float below the set
+          ! point temperature. If the setpoint is not met, the outlet water temperature is re-calculated at the minimum
+          ! fan speed. If the setpoint is met, the fan is cycled to exactly meet the outlet water temperature setpoint.
+          ! If the setpoint is not met at the minimum fan speed, the outlet water temperature is re-calculated at the
+          ! maximum fan speed. If the setpoint at the maximum fan speed is not met, the fan runs at maximum speed the
+          ! entire time step. If the setpoint is met at the maximum fan speed, the fan speed is varied to meet the setpoint.
           !
           ! If a tower has multiple cells, the specified inputs of or the autosized capacity
           !  and air/water flow rates are for the entire tower. The number of cells to operate
@@ -3531,7 +3534,8 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
   USE DataEnvironment, ONLY: EnvironmentName, CurMnDy
   USE DataGlobals,     ONLY: CurrentTime
   USE General,         ONLY: CreateSysTimeIntervalString
-  USE DataPlant,       ONLY: PlantLoop, MassFlowTol
+  USE DataPlant,       ONLY: PlantLoop, SingleSetPoint, DualSetpointDeadband
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3556,7 +3560,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
   REAL(r64)              :: OutletWaterTempON    ! Outlet water temperature with fan ON at maximum fan speed (C)
   REAL(r64)              :: OutletWaterTempMIN   ! Outlet water temperature with fan at minimum speed (C)
   REAL(r64)              :: CpWater              ! Specific heat of water
-  REAL(r64)              :: TempSetPoint         ! Outlet water temperature set point (C)
+  REAL(r64)              :: TempSetPoint         ! Outlet water temperature setpoint (C)
   REAL(r64)              :: FanCurveValue        ! Output of fan power as a func of air flow rate ratio curve
   REAL(r64)              :: AirDensity           ! Density of air [kg/m3]
   REAL(r64)              :: AirMassFlowRate      ! Mass flow rate of air [kg/s]
@@ -3626,32 +3630,33 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
     Qactual            = 0.0
     CTFanPower         = 0.0
     OutletWaterTemp    = Node(WaterInletNode)%Temp
-  
+
     WaterUsage         = 0.0
     Twb                = SimpleTowerInlet(TowerNum)%AirWetBulb
     TwbCapped          = SimpleTowerInlet(TowerNum)%AirWetBulb
     LoopNum            = SimpleTower(TowerNum)%LoopNum
     LoopSideNum        = SimpleTower(TowerNum)%LoopSideNum
-    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
-!    ELSE ! At some point, we can go to component setpoint control on condenser loop
-!      TempSetPoint       = MIN(Node(WaterOutletNode)%TempSetPoint,PlantLoop(LoopNum)%MaxTemp)
-!      TempSetPoint       = MAX(TempSetPoint,PlantLoop(LoopNum)%MinTemp)
-!    ENDIF
+    SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+    CASE (SingleSetPoint)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
+    CASE (DualSetPointDeadBand)
+      TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
+    END SELECT
 
     Tr                 = Node(WaterInletNode)%Temp - TempSetPoint
     Ta                 = TempSetPoint - SimpleTowerInlet(TowerNum)%AirWetBulb
 
-  ! Do not RETURN here if flow rate is less than MassFlowTol. Check basin heater and then RETURN.
+  ! Do not RETURN here if flow rate is less than MassFlowTolerance. Check basin heater and then RETURN.
     IF(PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0)RETURN
-  ! MassFlowTol is a DataPlant parameter to indicate a no flow condition
-    IF(WaterMassFlowRate.LE.MassFlowTol)THEN
+  ! MassFlowTolerance is a parameter to indicate a no flow condition
+    IF(WaterMassFlowRate.LE.MassFlowTolerance)THEN
       CALL CalcBasinHeaterPower(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff,&
                                 SimpleTower(TowerNum)%BasinHeaterSchedulePtr,&
                                 SimpleTower(TowerNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
       RETURN
     ENDIF
 
-    !loop to increment NumCell if we can not meet the setpoint with the actual number of cells calculated above
+    !loop to increment NumCell if we cannot meet the setpoint with the actual number of cells calculated above
     IncrNumCellFlag = .true.
     DO WHILE (IncrNumCellFlag)
       IncrNumCellFlag = .false.
@@ -3713,7 +3718,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
         Call SimVariableTower(TowerNum, WaterFlowRateRatioCapped, AirFlowRateRatio, TwbCapped, OutletWaterTempMIN)
 
         IF(OutletWaterTempMIN .LT. TempSetPoint)THEN
-!         if set point was exceeded, cycle the fan at minimum air flow to meet the set point temperature
+!         if setpoint was exceeded, cycle the fan at minimum air flow to meet the setpoint temperature
           IF(SimpleTower(TowerNum)%FanPowerfAirFlowCurve .EQ. 0)THEN
             CTFanPower      = AirFlowRateRatio**3 * SimpleTower(TowerNum)%HighSpeedFanPower * NumCellON /   &
                SimpleTower(TowerNum)%NumCell
@@ -3729,7 +3734,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
           AirFlowRateRatio    = (FanCyclingRatio * SimpleTower(TowerNum)%MinimumVSAirFlowFrac) + &
                                 ((1-FanCyclingRatio)*FreeConvectionCapFrac)
         ELSE
-  !       if set point was not met at minimum fan speed, set fan speed to maximum
+  !       if setpoint was not met at minimum fan speed, set fan speed to maximum
           AirFlowRateRatio  = 1.0
 !         fan will not cycle and runs the entire time step
           FanCyclingRatio   = 1.0
@@ -3737,7 +3742,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
           Call SimVariableTower(TowerNum, WaterFlowRateRatioCapped, AirFlowRateRatio, TwbCapped, OutletWaterTemp)
 
           ! Setpoint was met with pump ON and fan ON at full flow
-          ! Calculate the fraction of full air flow to exactly meet the set point temperature
+          ! Calculate the fraction of full air flow to exactly meet the setpoint temperature
 
             Par(1) = TowerNum                          ! Index to cooling tower
   !         cap the water flow rate ratio and inlet air wet-bulb temperature to provide a stable output
@@ -3753,7 +3758,7 @@ SUBROUTINE CalcVariableSpeedTower(TowerNum)
             IF (SolFla == -1) THEN
               IF(.NOT. WarmUpFlag)CALL ShowWarningError('Cooling tower iteration limit exceeded when calculating air flow ' &
                                   //'rate ratio for tower '//TRIM(SimpleTower(TowerNum)%Name))
-!           IF RegulaFalsi can not find a solution then provide detailed output for debugging
+!           IF RegulaFalsi cannot find a solution then provide detailed output for debugging
             ELSE IF (SolFla == -2) THEN
               IF(.NOT. WarmUpFlag) THEN
                 WRITE(OutputChar,OutputFormat)TwbCapped
@@ -4057,6 +4062,7 @@ SUBROUTINE SimVariableTower(TowerNum, WaterFlowRateRatio, AirFlowRateRatio, Twb,
           ! USE STATEMENTS:
           !
   USE General,         ONLY: SolveRegulaFalsi
+  USE DataPlant,  ONLY: SingleSetPoint, DualSetpointDeadband
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4081,6 +4087,7 @@ SUBROUTINE SimVariableTower(TowerNum, WaterFlowRateRatio, AirFlowRateRatio, Twb,
   INTEGER                :: SolFla               ! Flag of solver
   REAL(r64), DIMENSION(4)     :: Par                  ! Parameter array for regula falsi solver
   REAL(r64)              :: Tr                   ! range temperature which results in an energy balance
+  REAL(r64)  :: TempSetPoint ! local temporary for loop setpoint
 
 !   determine tower outlet water temperature
     Par(1) = TowerNum                  ! Index to cooling tower
@@ -4099,10 +4106,14 @@ SUBROUTINE SimVariableTower(TowerNum, WaterFlowRateRatio, AirFlowRateRatio, Twb,
       CALL ShowContinueError('Cooling tower simulation failed to converge for tower '//TRIM(SimpleTower(TowerNum)%Name))
 !    if SolFla = -2, Tr is returned as minimum value (0.001) and outlet temp = inlet temp - 0.001
     ELSE IF (SolFla == -2) THEN ! decide if should run at max flow
-      
+      SELECT CASE (PlantLoop(SimpleTower(TowerNum)%LoopNum)%LoopDemandCalcScheme)
+      CASE (SingleSetPoint)
+        TempSetPoint       = PlantLoop(SimpleTower(TowerNum)%LoopNum)%LoopSide(SimpleTower(TowerNum)%LoopSideNum)%TempSetpoint
+      CASE (DualSetPointDeadBand)
+        TempSetPoint       = PlantLoop(SimpleTower(TowerNum)%LoopNum)%LoopSide(SimpleTower(TowerNum)%LoopSideNum)%TempSetpointHi
+      END SELECT
       IF (SimpleTowerInlet(TowerNum)%WaterTemp >   &
-           (PlantLoop(SimpleTower(TowerNum)%LoopNum)%LoopSide(SimpleTower(TowerNum)%LoopSideNum)%TempSetpoint &
-             + VSTower(SimpleTower(TowerNum)%VSTower)%MaxRangeTemp ) ) THEN ! run flat out
+           (TempSetPoint   + VSTower(SimpleTower(TowerNum)%VSTower)%MaxRangeTemp ) ) THEN ! run flat out
         OutletWaterTemp = SimpleTowerInlet(TowerNum)%WaterTemp - VSTower(SimpleTower(TowerNum)%VSTower)%MaxRangeTemp
       ENDIF
     END IF
@@ -4304,10 +4315,10 @@ SUBROUTINE CheckModelBounds(TowerNum, Twb,Tr, Ta, WaterFlowRateRatio, TwbCapped,
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)         :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)         :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)         :: OutputCharHi       = ' '     ! character string for warning messages
- CHARACTER(len=30)         :: TrimValue          = ' '     ! character string for warning messages
+ CHARACTER(len=32)         :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)         :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)         :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)         :: TrimValue          = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast        = 0.0 ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime         = 0.0 ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast     = 0.0 ! end time of time step for last simulation time step
@@ -4808,7 +4819,7 @@ SUBROUTINE CalculateWaterUseage(TowerNum)
                                 MAX(TairAvg,4.d0), &
                                 PlantLoop(SimpleTower(TowerNum)%LoopNum)%FluidIndex,&
                                 'CalculateWaterUseage')
-       
+
        EvapVdot         = (AirMassFlowRate * (OutSpecificHumRat - InSpecificHumRat)) / rho ! [m3/s]
        IF (EvapVdot < 0.0) EvapVdot = 0.0
      ELSE
@@ -4926,7 +4937,8 @@ SUBROUTINE UpdateTowers(TowerNum)
           ! USE STATEMENTS:
   USE DataEnvironment, ONLY: EnvironmentName, CurMnDy
   USE General, ONLY: TrimSigDigits
-  USE DataPlant, ONLY: PlantLoop, MassFlowTol
+  USE DataPlant, ONLY: PlantLoop
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4995,7 +5007,7 @@ SUBROUTINE UpdateTowers(TowerNum)
    END IF
 
    ! Check if water mass flow rate is small (e.g. no flow) and warn user
-   IF(WaterMassFlowRate .GT. 0.0 .AND. WaterMassFlowRate .LE. MassFlowTol)THEN
+   IF(WaterMassFlowRate .GT. 0.0 .AND. WaterMassFlowRate .LE. MassFlowTolerance)THEN
      SimpleTower(TowerNum)%SmallWaterMassFlowErrorCount = SimpleTower(TowerNum)%SmallWaterMassFlowErrorCount + 1
      IF (SimpleTower(TowerNum)%SmallWaterMassFlowErrorCount < 2) THEN
        CALL ShowWarningError (TRIM(SimpleTower(TowerNum)%TowerType)//' "'//TRIM(SimpleTower(TowerNum)%Name)//'"')
@@ -5127,7 +5139,7 @@ END SUBROUTINE ReportTowers
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

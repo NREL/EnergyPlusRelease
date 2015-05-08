@@ -734,7 +734,7 @@ SUBROUTINE UpdateSQLiteSimulationRecord (completed, completedSuccessfully)
 
     ! PURPOSE OF THIS SUBROUTINE:
     ! This subroutine updates simulation records in the Simulations table.
-    ! A simulation record is first inserted as 
+    ! A simulation record is first inserted as
     ! completed = false and
     ! completedSuccessfully = false
     ! This subroutine updates those records.
@@ -1439,6 +1439,7 @@ SUBROUTINE CreateSQLiteReportVariableDataRecord (recordIndex, timeIndex, value, 
     ! USE STATEMENTS:
     USE ISO_C_FUNCTION_BINDING
     USE DataPrecisionGlobals, ONLY: r64
+    USE General, ONLY: DecodeMonDayHrMin
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4755,6 +4756,7 @@ SUBROUTINE CreateSQLiteMeterRecord (recordIndex, timeIndex, value, reportingInte
     ! USE STATEMENTS:
     USE ISO_C_FUNCTION_BINDING
     USE DataPrecisionGlobals, ONLY: r64
+    USE General, ONLY: DecodeMonDayHrMin
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -5183,8 +5185,8 @@ SUBROUTINE UpdateSQLiteErrorRecord (errorMessage)
 
     ! PURPOSE OF THIS SUBROUTINE:
     ! This subroutine updates error records in the Errors table.
-    ! This is used to append text to an error that continues on 
-    ! to the next line.  The errorMessage is always appended to the 
+    ! This is used to append text to an error that continues on
+    ! to the next line.  The errorMessage is always appended to the
     ! last record inserted into the Errors table.
     !
 
@@ -5536,7 +5538,7 @@ END MODULE SQLiteProcedures
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

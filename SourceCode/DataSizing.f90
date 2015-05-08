@@ -88,7 +88,7 @@ TYPE ZoneSizingInputData
   REAL(r64)             :: CoolDesHumRat            = 0.0d0   ! zone design cooling supply air humidity ratio [kg-H2O/kg-air]
   REAL(r64)             :: HeatDesHumRat            = 0.0d0   ! zone design heating supply air humidity ratio [kg-H2O/kg-air]
   CHARACTER &
-    (len=MaxNameLength) :: DesignSpecOAObjName      = ' '     ! name of the design specification outdoor air object    
+    (len=MaxNameLength) :: DesignSpecOAObjName      = ' '     ! name of the design specification outdoor air object
   INTEGER               :: OADesMethod              = 0       ! choice of how to calculate minimum outside air;
                                                               !  1 = m3/s per person; 2 = m3/s per zone; 3 = m3/s per zone area;
                                                               !  4 = sum of flow from 3 OA input fields;
@@ -114,8 +114,13 @@ TYPE ZoneSizingInputData
                                                               !  (of the cooling design air flow rate)
   REAL(r64)             :: HeatSizingFactor             = 0.0d0   ! the zone heating sizing ratio
   REAL(r64)             :: CoolSizingFactor             = 0.0d0   ! the zone cooling sizing ratio
-  REAL(r64)             :: ZoneADEffCooling             = 0.0d0   ! the zone air distribution effectiveness in cooling mode
-  REAL(r64)             :: ZoneADEffHeating             = 0.0d0   ! the zone air distribution effectiveness in heating mode   
+  REAL(r64)             :: ZoneADEffCooling         = 1.0
+  REAL(r64)             :: ZoneADEffHeating         = 1.0
+  CHARACTER &
+    (len=MaxNameLength) :: ZoneAirDistEffObjName      = ' '     ! name of the zone air distribution effectiveness object name
+  INTEGER               :: ZoneAirDistributionIndex     = 0   ! index to the zone air distribution object
+  INTEGER               :: ZoneDesignSpecOAIndex        = 0   ! index to the zone design spec OA object
+  REAL(r64)             :: ZoneSecondaryRecirculation   = 0.0d0   ! the zone secondary air recirculation fraction
 END TYPE ZoneSizingInputData
 
 TYPE ZoneSizingData
@@ -153,7 +158,7 @@ TYPE ZoneSizingData
   REAL(r64)             :: DesHeatMaxAirFlowFrac    = 0.0d0   ! design heating maximum air flow rate fraction
                                                               !  (of the cooling design air flow rate)
   REAL(r64)             :: HeatSizingFactor             = 0.0d0   ! the zone heating sizing ratio
-  REAL(r64)             :: CoolSizingFactor             = 0.0d0   ! the zone cooling sizing ratio  
+  REAL(r64)             :: CoolSizingFactor             = 0.0d0   ! the zone cooling sizing ratio
   INTEGER               :: ActualZoneNum            = 0       ! index into the Zone data array (in DataHeatBalance)
   INTEGER               :: SupplyAirNode            = 0       ! node number of supply air node
 
@@ -201,17 +206,25 @@ TYPE ZoneSizingData
   REAL(r64)             :: HeatLoad                 = 0.0d0   ! current zone heating load (HVAC time step)
   REAL(r64)             :: CoolLoad                 = 0.0d0   ! current zone heating load (HVAC time step)
   REAL(r64)             :: HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
+  REAL(r64)             :: HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
   REAL(r64)             :: HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
   REAL(r64)             :: CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
+  REAL(r64)             :: CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
   REAL(r64)             :: CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
   REAL(r64)             :: HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
   REAL(r64)             :: CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
+  REAL(r64)             :: HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
+  REAL(r64)             :: CoolOutHumRat            = 0.0d0   ! current outdoor humidity ratio (cooling, time step)
   REAL(r64)             :: ZoneTempAtHeatPeak       = 0.0d0   ! zone temp at max heating [C]
   REAL(r64)             :: ZoneRetTempAtHeatPeak    = 0.0d0   ! zone return temp at max heating [C]
+  REAL(r64)             :: OutTempAtHeatPeak        = 0.0d0   ! outdoor temperature at max heating [C]
   REAL(r64)             :: ZoneTempAtCoolPeak       = 0.0d0   ! zone temp at max cooling [C]
   REAL(r64)             :: ZoneRetTempAtCoolPeak    = 0.0d0   ! zone return temp at max cooling [C]
+  REAL(r64)             :: OutTempAtCoolPeak        = 0.0d0   ! outdoor temperature at max cooling [C]
   REAL(r64)             :: ZoneHumRatAtHeatPeak     = 0.0d0   ! zone humidity ratio at max heating [kg/kg]
   REAL(r64)             :: ZoneHumRatAtCoolPeak     = 0.0d0   ! zone humidity ratio at max cooling [kg/kg]
+  REAL(r64)             :: OutHumRatAtHeatPeak      = 0.0d0   ! outdoor humidity at max heating [kg/kg]
+  REAL(r64)             :: OutHumRatAtCoolPeak      = 0.0d0   ! outdoor humidity at max cooling [kg/kg]
   INTEGER               :: TimeStepNumAtHeatMax     = 0       ! time step number (in day) at Heating peak
   INTEGER               :: TimeStepNumAtCoolMax     = 0       ! time step number (in day) at cooling peak
   INTEGER               :: HeatDDNum                = 0       ! design day index of design day causing heating peak
@@ -230,15 +243,34 @@ TYPE ZoneSizingData
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatLoadSeq        ! daily sequence of zone heating load zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolLoadSeq        ! daily sequence of zone cooling load zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatZoneTempSeq    ! daily sequence of zone temperatures (heating, zone time step)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatOutTempSeq     ! daily sequence of outdoor temperatures (heating, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatZoneRetTempSeq ! daily sequence of zone return temperatures (heating,
                                                               !  zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolZoneTempSeq    ! daily sequence of zone temperatures (cooling, zone time step)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolOutTempSeq     ! daily sequence of outdoor temperatures (cooling, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolZoneRetTempSeq ! daily sequence of zone return temperatures (cooling,
                                                               !  zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatZoneHumRatSeq  ! daily sequence of zone humidity ratios (heating, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolZoneHumRatSeq  ! daily sequence of zone humidity ratios (cooling, zone time step)
-  REAL(r64)             :: ZoneADEffCooling         = 0.0d0   ! the zone air distribution effectiveness in cooling mode
-  REAL(r64)             :: ZoneADEffHeating         = 0.0d0   ! the zone air distribution effectiveness in heating mode   
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatOutHumRatSeq   ! daily sequence of outdoor humidity ratios (heating, zone time step)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolOutHumRatSeq   ! daily sequence of outdoor humidity ratios (cooling, zone time step)
+  REAL(r64)             :: ZoneADEffCooling         = 1.0d0   ! the zone air distribution effectiveness in cooling mode
+  REAL(r64)             :: ZoneADEffHeating         = 1.0d0   ! the zone air distribution effectiveness in heating mode
+  REAL(r64)             :: ZoneSecondaryRecirculation   = 0.0d0   ! the zone secondary air recirculation fraction
+  REAL(r64)             :: ZonePrimaryAirFraction       = 0.0d0   ! the zone primary air fraction for cooling based calculations
+  REAL(r64)             :: ZonePrimaryAirFractionHtg    = 0.0d0   ! the zone primary air fraction for heating based calculations
+  REAL(r64)             :: ZoneOAFracCooling        = 0.0d0   ! OA fraction in cooling mode
+  REAL(r64)             :: ZoneOAFracHeating        = 0.0d0   ! OA fraction in heating mode
+  REAL(r64)             :: TotalOAFromPeople        = 0.0d0   ! Zone OA required due to people
+  REAL(r64)             :: TotalOAFromArea          = 0.0d0   ! Zone OA required based on floor area
+  REAL(r64)             :: TotPeopleInZone          = 0.0d0   ! total number of people in the zone
+  REAL(r64)             :: ZonePeakOccupancy        = 0.0d0   ! zone peak occupancy based on max schedule value
+  REAL(r64)             :: SupplyAirAdjustFactor    = 1.0d0   ! supply air adjustment factor for next time step if OA is capped
+  REAL(r64)             :: ZpzClgByZone             = 0.0d0   ! OA Std 62.1 required fraction in cooling mode
+  REAL(r64)             :: ZpzHtgByZone             = 0.0d0   ! OA Std 62.1 required fraction in heating mode
+  REAL(r64)             :: VozClgByZone             = 0.0d0   ! value of required cooling vent to zone, used in 62.1 tabular report
+  REAL(r64)             :: VozHtgByZone             = 0.0d0   ! value of required heating vent to zone, used in 62.1 tabular report
+
 END TYPE ZoneSizingData
 
 TYPE TermUnitSizingData
@@ -248,6 +280,7 @@ TYPE TermUnitSizingData
   REAL(r64)             :: MaxCWVolFlow             = 0.0d0 ! design Cold Water vol flow for single duct terminal unit [m3/s]
   REAL(r64)             :: MinFlowFrac              = 0.0d0 ! design minimum flow fraction for a terminal unit
   REAL(r64)             :: InducRat                 = 0.0d0 ! design induction ratio for a terminal unit
+  REAL(r64)             :: ReheatMult               = 1.0d0 ! multiplier for reheat coil UA calculation
 END TYPE TermUnitSizingData
 
 TYPE ZoneEqSizingData                                       ! data saved from zone eq component sizing and passed to subcomponents
@@ -281,9 +314,10 @@ TYPE SystemSizingInputData
   INTEGER               :: HeatAirDesMethod         = 0       ! choice of how to get system heating design air flow rates;
                                                               !  1 = calc from des day simulation; 2=m3/s per zone, user input
   REAL(r64)             :: DesHeatAirFlow           = 0.0d0   ! design system heating supply air flow rate [m3/s]
-  INTEGER               :: SystemOAMethod           = 0       ! System Outdoor Air Method; 1 = SOAM_ZoneSum, 2 = SOAM_VRP 
-  REAL(r64)             :: MaxZoneZdCooling         = 0.0d0   ! maximum value of min OA in cooling mode for zones served by system
-  REAL(r64)             :: MaxZoneZdHeating         = 0.0d0   ! maximum value of min OA in heating mode for zones served by system
+  INTEGER               :: SystemOAMethod           = 0       ! System Outdoor Air Method; 1 = SOAM_ZoneSum, 2 = SOAM_VRP
+  REAL(r64)             :: MaxZoneOAFraction        = 0.0d0   ! maximum value of min OA for zones served by system
+  LOGICAL               :: OAAutosized              = .FALSE.  ! Set to true if design OA vol flow is set to 'autosize'
+                                                               ! in Sizing:System
 END TYPE SystemSizingInputData
 
 TYPE SystemSizingData             ! Contains data for system sizing
@@ -382,10 +416,12 @@ TYPE SystemSizingData             ! Contains data for system sizing
                                                                !  [zone time step]
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: SysHeatOutHumRatSeq ! daily sequence of system heating outside humidity ratios
                                                                !   [kg water/kg dry air] [zone time step]
-  INTEGER               :: SystemOAMethod           = 0        ! System Outdoor Air Method; 1 = SOAM_ZoneSum, 2 = SOAM_VRP 
-  REAL(r64)             :: MaxZoneZdCooling         = 0.0d0    ! maximum value of min OA in cooling mode for zones served by system
-  REAL(r64)             :: MaxZoneZdHeating         = 0.0d0    ! maximum value of min OA in heating mode for zones served by system
-
+  INTEGER               :: SystemOAMethod           = 0        ! System Outdoor Air Method; 1 = SOAM_ZoneSum, 2 = SOAM_VRP
+  REAL(r64)             :: MaxZoneOAFraction        = 0.0d0    ! maximum value of min OA for zones served by system
+  REAL(r64)             :: SysUncOA                 = 0.0d0    ! uncorrected system outdoor air flow based on zone people and
+                                                               ! zone area
+  LOGICAL               :: OAAutosized              = .FALSE.  ! Set to true if design OA vol flow is set to 'autosize'
+                                                               ! in Sizing:System
 END TYPE SystemSizingData
 
 TYPE PlantSizingData
@@ -424,12 +460,23 @@ TYPE OARequirementsData
   REAL(r64)    :: MaxOAFractionSchValue  = 0.0D0    !- Maximum value from OAFlow fraction schedule (used for sizing)
 END TYPE OARequirementsData
 
+TYPE ZoneAirDistributionData
+  CHARACTER(len=MaxNameLength) :: Name       = ' '
+  CHARACTER(len=MaxNameLength) :: ZoneADEffSchName = ' '!- Zone air distribution effectiveness schedule name
+  REAL(r64)    :: ZoneADEffCooling           = 1.0D0    !- Zone air distribution effectiveness in cooling mode
+  REAL(r64)    :: ZoneADEffHeating           = 1.0D0    !- Zone air distribution effectiveness in heating mode
+  REAL(r64)    :: ZoneSecondaryRecirculation = 0.0D0    !- Zone air secondary recirculation ratio
+  INTEGER      :: ZoneADEffSchPtr       = 0             !- Zone air distribution effectiveness schedule index
+END TYPE ZoneAirDistributionData
+
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
           ! MODULE VARIABLE DECLARATIONS:
 
 TYPE (OARequirementsData), ALLOCATABLE, DIMENSION(:) :: OARequirements
+
+TYPE (ZoneAirDistributionData), ALLOCATABLE, DIMENSION(:) :: ZoneAirDistribution
 
 TYPE (ZoneSizingInputData),   ALLOCATABLE, DIMENSION(:)   :: ZoneSizingInput      ! Input data for zone sizing
 TYPE (ZoneSizingData),        ALLOCATABLE, DIMENSION(:,:) :: ZoneSizing           ! Data for zone sizing (all data, all design
@@ -454,6 +501,7 @@ TYPE (DesDayWeathData),       ALLOCATABLE, DIMENSION(:)   :: DesDayWeath        
 TYPE (CompDesWaterFlowData),  ALLOCATABLE, DIMENSION(:)   :: CompDesWaterFlow     ! array to store components' design water flow
 
 INTEGER   :: NumOARequirements  = 0       ! Number of OA Requirements objects
+INTEGER   :: NumZoneAirDistribution = 0   ! Number of zone air distribution objects
 INTEGER   :: NumZoneSizingInput = 0       ! Number of Zone Sizing objects
 INTEGER   :: NumSysSizInput     = 0       ! Number of System Sizing objects
 INTEGER   :: NumPltSizInput     = 0       ! Number of Plant Sizing objects
@@ -472,6 +520,7 @@ LOGICAL   :: TermUnitSingDuct   = .FALSE. ! TRUE if a non-induction single duct 
 LOGICAL   :: TermUnitPIU        = .FALSE. ! TRUE if a powered induction terminal unit
 LOGICAL   :: TermUnitIU         = .FALSE. ! TRUE if an unpowered induction terminal unit
 LOGICAL   :: ZoneEqFanCoil      = .FALSE. ! TRUE if a 4 pipe fan coil unit is being simulated
+LOGICAL   :: ZoneEqDXCoil       = .FALSE. ! TRUE if a ZoneHVAC DX coil is being simulated
 LOGICAL   :: ZoneHeatingOnlyFan = .FALSE. ! TRUE if zone unit only does heating and contains a fam (such as Unit Heater)
 LOGICAL   :: SysSizingRunDone   = .FALSE. ! True if a system sizing run is successfully completed.
 LOGICAL   :: ZoneSizingRunDone  = .FALSE. ! True if a zone sizing run has been successfully completed.
@@ -489,7 +538,7 @@ CHARACTER(len=1) :: SizingFileColSep=' '  ! Character to separate columns in siz
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

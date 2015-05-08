@@ -28,6 +28,7 @@ MODULE WindowAC
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
+USE DataSizing
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, OutputFileDebug, SysSizingCalc
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeSTamp, &
                            SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd
@@ -184,7 +185,7 @@ SUBROUTINE SimWindowAC(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOutputPro
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER      :: WindACNum              ! index of window AC unit being simulated
   REAL(r64)    :: QZnReq                 ! zone load (W)
-  REAL(r64)    :: RemainingOutputToCoolingSP !- remaining load to cooling set point (W)
+  REAL(r64)    :: RemainingOutputToCoolingSP !- remaining load to cooling setpoint (W)
 
 
           ! FLOW
@@ -229,6 +230,8 @@ ELSE
   QZnReq = 0.0D0
 END IF
 
+ZoneEqDXCoil = .TRUE.
+
 ! Initialize the window AC unit
 CALL InitWindowAC(WindACNum, QZnReq, ZoneNum, FirstHVACIteration)
 
@@ -236,6 +239,8 @@ CALL SimCyclingWindowAC(WindACNum,ZoneNum,FirstHVACIteration,PowerMet,QZnReq,Lat
 
 ! Report the result of the simulation
 CALL ReportWindowAC(WindACNum)
+
+ZoneEqDXCoil = .TRUE.
 
 RETURN
 END SUBROUTINE SimWindowAC
@@ -265,7 +270,6 @@ SUBROUTINE GetWindowAC
   USE NodeInputManager,      ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: SetUpCompSets
   USE Fans,                  ONLY: GetFanIndex, GetFanVolFlow, GetFanAvailSchPtr, GetFanType
-  USE DataSizing,            ONLY: AutoSize
   USE General,               ONLY: TrimSigDigits
   USE DXCoils,               ONLY: GetDXCoilOutletNode => GetCoilOutletNode
   USE HVACHXAssistedCoolingCoil,  ONLY: GetDXHXAsstdCoilOutletNode => GetCoilOutletNode
@@ -709,7 +713,7 @@ SUBROUTINE InitWindowAC(WindACNum,QZnReq,ZoneNum,FirstHVACIteration)
   LOGICAL,SAVE        :: ZoneEquipmentListChecked = .false.  ! True after the Zone Equipment List has been checked for items
   Integer             :: Loop           ! loop counter
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag  ! one time initialization flag
-  REAL(r64)           :: QToCoolSetPt   ! sensible load to cooling set point (W)
+  REAL(r64)           :: QToCoolSetPt   ! sensible load to cooling setpoint (W)
   REAL(r64)           :: NoCompOutput   ! sensible load delivered with compressor off (W)
   INTEGER             :: AvailStatus    ! Availability status set by system availability manager
 
@@ -827,7 +831,7 @@ IF(WindAC(WindACNum)%OpMode .EQ. ContFanCycCoil .AND. WindAC(WindACNum)%PartLoad
 
   QToCoolSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
 
-! If the unit has a net heating capacity and the zone temp is below the Tstat cooling set point
+! If the unit has a net heating capacity and the zone temp is below the Tstat cooling setpoint
   IF(NoCompOutput .GT. 0.0d0 .AND. QToCoolSetPt .GT. 0.0d0 .AND. CurDeadbandOrSetback(ZoneNum))THEN
     IF(NoCompOutput .GT. QToCoolSetPt)THEN
       QZnReq       = QToCoolSetPt
@@ -858,7 +862,6 @@ SUBROUTINE SizeWindowAC(WindACNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataSizing
   USE InputProcessor
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
@@ -909,6 +912,11 @@ SUBROUTINE SizeWindowAC(WindACNum)
 
     END IF
 
+  END IF
+
+  IF (CurZoneEqNum > 0) THEN
+    ZoneEqSizing(CurZoneEqNum)%OAVolFlow = WindAC(WindACNum)%OutAirVolFlow
+    ZoneEqSizing(CurZoneEqNum)%AirVolFlow = WindAC(WindACNum)%MaxAirVolFlow
   END IF
 
   RETURN
@@ -1279,9 +1287,9 @@ INTEGER :: Iter      ! iteration counter
 REAL(r64) :: DelPLF
 REAL(r64) :: Relax
 
-! DX Cooling HX assisted coils can cycle the heat exchanger, see if coil ON, HX OFF can meet humidity set point if one exists
+! DX Cooling HX assisted coils can cycle the heat exchanger, see if coil ON, HX OFF can meet humidity setpoint if one exists
 IF(WindAC(WindACNum)%DXCoilType_Num == CoilDX_CoolingHXAssisted)THEN
-  ! Check for a set point at the HX outlet node, if it doesn't exist always run the HX
+  ! Check for a setpoint at the HX outlet node, if it doesn't exist always run the HX
   IF(Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .EQ. SensedNodeFlagValue) THEN
     HXUnitOn = .TRUE.
   ELSE
@@ -1321,8 +1329,8 @@ IF (QZnReq  <=  FullOutput .AND. WindAC(WindACNum)%DXCoilType_Num /= CoilDX_Cool
   RETURN
 END IF
 
-! If the QZnReq <= FullOutput and a HXAssisted coil is used, check the node set point for a maximum humidity ratio set piont
-! HumRatMax will either equal -999 if no set point exists or could be 0 if no moisture load is present
+! If the QZnReq <= FullOutput and a HXAssisted coil is used, check the node setpoint for a maximum humidity ratio set piont
+! HumRatMax will either equal -999 if no setpoint exists or could be 0 if no moisture load is present
 IF (QZnReq  <=  FullOutput .AND. WindAC(WindACNum)%DXCoilType_Num == CoilDX_CoolingHXAssisted .AND. &
     Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .LE. 0.0) THEN
   PartLoadFrac = 1.0
@@ -1615,7 +1623,7 @@ END FUNCTION GetWindowACMixedAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

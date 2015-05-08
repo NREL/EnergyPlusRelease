@@ -60,7 +60,7 @@ MODULE GeneratorFuelSupply
           ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataGenerators
-USE DataGlobals, ONLY: MaxNameLength, OutputFileInits
+USE DataGlobals, ONLY: MaxNameLength, OutputFileInits, HoursInDay
 USE DataInterfaces, ONLY: ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError
 
           ! <use statements for access to subroutines in other modules>
@@ -773,7 +773,7 @@ MODULE GeneratorDynamicsManager
 
           ! USE STATEMENTS:
 USE DataGenerators
-USE DataGlobals,    ONLY: CurrentTime, DayOfSim, SecInHour
+USE DataGlobals,    ONLY: CurrentTime, DayOfSim, HoursInDay, SecInHour
 USE DataInterfaces, ONLY: ShowFatalError, ShowContinueError
           ! <use statements for access to subroutines in other modules>
 
@@ -1003,7 +1003,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   LOGICAL :: ConstrainedByPlant ! true if request was altered because of cooling water problem
   LOGICAL :: PLRStartUp  ! true if subtimestep issue involving startup
   LOGICAL :: PLRShutDown
-  INTEGER :: OutletCWnode        = 0 ! cooling water outlet node ID
+!  INTEGER :: OutletCWnode        = 0 ! cooling water outlet node ID
   INTEGER :: InletCWnode         = 0 ! cooling water inlet node ID
   LOGICAL :: InternalFlowControl = .FALSE.
   REAL(r64) :: TcwIn             = 0.0D0 ! inlet cooling water temperature (C)
@@ -1087,7 +1087,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            newOpMode = OpModeWarmUp
            ! generator just started so set start time
            GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastStartUp = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/HoursInDay
 
          ELSE  ! warm up period is less than a single system time step
            newOpMode = OpModeNormal
@@ -1126,7 +1126,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            newOpMode = OpModeCoolDown
                       ! need to reset time of last shut down here
            GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
          ELSE
            newOpMode = OpModeOFF
          ENDIF
@@ -1140,7 +1140,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            newOpMode = OpModeCoolDown
            ! need to reset time of last shut down here
            GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
 
          ELSE
            newOpMode = OpModeStandby
@@ -1154,14 +1154,14 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
          ! compare current time to when warm up is over
           !calculate time for end of warmup period
          CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
          EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastStartUp  &
-                               + GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay/24.0
-         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001)  &
+                               + GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay/HoursInDay
+         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001d0)  &
                 .or. (CurrentFractionalDay > EndingFractionalDay)) THEN
            newOpMode = OpModeNormal
            PLRStartUp = .true.
-           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys / 24.0 )
+           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
            PLRforSubtimestepStartUp = ( (CurrentFractionalDay - EndingFractionalDay ) &
                                       / (CurrentFractionalDay - LastSystemTimeStepFractionalDay) )
          ELSE
@@ -1207,7 +1207,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
          newOpMode = OpModeCoolDown
          ! also, generator just shut down so record shut down time
          GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        ELSE  ! cool down period is less than a single system time step
          If (schedval /= 0.0) then
            newOpMode = OpModeStandBy
@@ -1219,7 +1219,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
 
                   ! also, generator just shut down so record shut down time
          GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        ENDIF
      ELSEIF ((schedval /= 0.0)  .AND. ( RunFlag)) THEN
 
@@ -1235,15 +1235,15 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
        If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
          ! calculate time for end of cool down period
          CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
          EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown  &
-                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/24.0 - ( TimeStepSys / 24.0 )
-         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001)  & ! CurrentFractionalDay == EndingFractionalDay
+                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/HoursInDay - ( TimeStepSys/HoursInDay )
+         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001d0)  & ! CurrentFractionalDay == EndingFractionalDay
                 .or. (CurrentFractionalDay > EndingFractionalDay)) THEN
            newOpMode = opModeOFF
            PLRShutDown = .true.
-           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys / 24.0 )
-           PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)* 24.0  &
+           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
+           PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)*HoursInDay  &
                                         / TimeStepSys
          ELSE ! CurrentFractionalDay > EndingFractionalDay
            newOpMode = opModeCoolDown
@@ -1256,15 +1256,15 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
        If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
          ! calculate time for end of cool down period
          CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
          EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown  &
-                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/24.0 - ( TimeStepSys / 24.0 )
-         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001)  & ! CurrentFractionalDay == EndingFractionalDay
+                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/HoursInDay - ( TimeStepSys /HoursInDay )
+         IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001d0)  & ! CurrentFractionalDay == EndingFractionalDay
                 .or. (CurrentFractionalDay > EndingFractionalDay)) THEN
            newOpMode = OpModeStandby
            PLRShutDown = .true.
-           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys / 24.0 )
-           PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)* 24.0  &
+           LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
+           PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)*HoursInDay  &
                                         / TimeStepSys
          ELSE ! CurrentFractionalDay < EndingFractionalDay
            newOpMode = opModeCoolDown
@@ -1280,18 +1280,18 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
          If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
            ! calculate time for end of cool down period
            CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
            EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown  &
-                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/24.0 - ( TimeStepSys / 24.0 )
-           IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001)  & ! CurrentFractionalDay == EndingFractionalDay
+                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/HoursInDay - ( TimeStepSys/HoursInDay )
+           IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001d0)  & ! CurrentFractionalDay == EndingFractionalDay
                 .or. (CurrentFractionalDay < EndingFractionalDay)) THEN
 
              newOpMode = opModeCoolDown
            ELSE ! CurrentFractionalDay > EndingFractionalDay
              ! could go to warm up or normal now
              PLRShutDown = .true.
-             LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys / 24.0 )
-             PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)* 24.0  &
+             LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
+             PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)*HoursInDay  &
                                         / TimeStepSys
              If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0) then
                newOpMode = opModeNormal
@@ -1312,7 +1312,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
                  newOpMode = OpModeWarmUp
                  ! generator just started so set start time
                  GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastStartUp = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/HoursInDay
 
                ENDIF
              ENDIF
@@ -1329,15 +1329,15 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
 
            ELSEIF (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay > 0.0) then
              CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
              EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown  &
-                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/24.0
-             IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001)  & ! CurrentFractionalDay == EndingFractionalDay
+                               + GeneratorDynamics(DynaCntrlNum)%CoolDownDelay/HoursInDay
+             IF (( ABS(CurrentFractionalDay - EndingFractionalDay) < 0.000001d0)  & ! CurrentFractionalDay == EndingFractionalDay
                 .or. (CurrentFractionalDay > EndingFractionalDay)) THEN
                newOpMode = opModeNormal
                  ! possible PLR on start up.
                PLRStartUp = .true.
-               LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys / 24.0 )
+               LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
                PLRforSubtimestepStartUp = ( (CurrentFractionalDay - EndingFractionalDay ) &
                                       / (CurrentFractionalDay - LastSystemTimeStepFractionalDay) )
              ELSE
@@ -1345,7 +1345,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
                ! set start up time
                ! generator just started so set start time
                GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastStartUp = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime) - TimeStepSys )))/HoursInDay
 
              ENDIF
 
@@ -1638,7 +1638,7 @@ REAL(r64) FUNCTION FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnets
                        MicroCHP(GeneratorNum)%CWLoopNum,     &
                        MicroCHP(GeneratorNum)%CWLoopSideNum, &
                        MicroCHP(GeneratorNum)%CWBranchNum,   &
-                       MicroCHP(GeneratorNum)%CWCompNum) 
+                       MicroCHP(GeneratorNum)%CWCompNum)
   ENDIF
 
   FuncDetermineCWMdotForInternalFlowControl = Mdotcw
@@ -1680,9 +1680,8 @@ MODULE MicroCHPElectricGenerator
 USE DataPrecisionGlobals
 USE DataGenerators
 USE DataLoopNode
-USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, NumOfZones, KelvinConv
-USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowFatalError,  &
-                           ShowContinueError, SetupOutputVariable
+USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, NumOfZones, KelvinConv, HoursInDay
+USE DataInterfaces
 USE DataGlobalConstants, ONLY: iGeneratorFuelCell
 USE GeneratorDynamicsManager
 USE GeneratorFuelSupply
@@ -1842,7 +1841,7 @@ SUBROUTINE GetMicroCHPGeneratorInput
   USE CurveManager,   ONLY : GetCurveCheck, CurveValue
   USE NodeInputManager, ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
-  USE DataHeatBalance,  ONLY: Zone
+  USE DataHeatBalance,  ONLY: Zone, IntGainTypeOf_GeneratorMicroCHP
   USE ScheduleManager, ONLY: GetScheduleIndex
   USE General, ONLY: RoundSigDigits
   USE GeneratorFuelSupply
@@ -2155,8 +2154,12 @@ If (myonetimeflag) then
      CALL SetupOutputVariable('Generator Radiation Heat Loss Rate to Zone [W]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossRadiat, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
-  !   CALL SetupOutputVariable('Micro CHP Model Iterations [ ]' , &
-  !        MicroCHP(GeneratorNum)%Report%SeqSubstIterations, 'System', 'Sum', MicroCHP(GeneratorNum)%Name )
+     CALL SetupZoneInternalGain(MicroCHP(GeneratorNum)%ZoneID, &
+                   'Generator:MicroCHP',  &
+                   MicroCHP(GeneratorNum)%Name, &
+                   IntGainTypeOf_GeneratorMicroCHP,    &
+                   ConvectionGainRate    = MicroCHP(GeneratorNum)%Report%SkinLossConvect, &
+                   ThermalRadiationGainRate = MicroCHP(GeneratorNum)%Report%SkinLossRadiat)
 
   END DO
 
@@ -2188,7 +2191,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
           ! USE STATEMENTS:
   Use DataHVACGlobals, ONLY: SysTimeElapsed, TimeStepSys
   USE DataGlobals    , ONLY: TimeStep, TimeStepZone, SecInHour, BeginEnvrnFlag, HourOfDay, &
-                             SysSizingCalc
+                             SysSizingCalc, HoursInDay
   USE DataPlant,       ONLY: ScanPlantLoopsForObject, TypeOf_Generator_MicroCHP, PlantLoop, &
                              PlantSizeNotComplete, SupplySide, LoopFlowStatus_TakesWhatGets, &
                              PlantSizesOkayToFinalize, DemandSide
@@ -2202,7 +2205,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)    :: GeneratorNum    ! Generator number
-  LOGICAL, INTENT(IN)    :: FirstHVACIteration 
+  LOGICAL, INTENT(IN)    :: FirstHVACIteration
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -2229,7 +2232,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
     ALLOCATE(MySizeFlag(NumMicroCHPs))
     MyEnvrnFlag     = .TRUE.
     MyPlantScanFlag = .TRUE.
-    MySizeFlag      = .TRUE. 
+    MySizeFlag      = .TRUE.
     MyOneTimeFlag = .FALSE.
   END IF
 
@@ -2253,9 +2256,9 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
         PlantLoop(MicroCHP(GeneratorNum)%CWLoopNum)%LoopSide(MicroCHP(GeneratorNum)%CWLoopSideNum)&
           %Branch(MicroCHP(GeneratorNum)%CWBranchNum)%Comp(MicroCHP(GeneratorNum)%CWCompNum)%FlowPriority &
             = LoopFlowStatus_TakesWhatGets
-      
+
       ENDIF
-    
+
     ENDIF
 
     MyPlantScanFlag(GeneratorNum) = .FALSE.
@@ -2280,7 +2283,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
       ELSE
         MicroCHP(GeneratorNum)%PlantMassFlowRateMax =  2.d0 !
       ENDIF
-      
+
     ELSEIF (MicroCHP(GeneratorNum)%CWLoopSideNum == DemandSide) THEN
       MicroCHP(GeneratorNum)%PlantMassFlowRateMax =  2.d0 ! would like to use plant loop max but not ready yet
     ENDIF
@@ -2315,7 +2318,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
     GeneratorDynamics(DynaCntrlNum)%LastOpMode    = OpModeOFF
     GeneratorDynamics(DynaCntrlNum)%FuelMdotLastTimestep = 0.0
     GeneratorDynamics(DynaCntrlNum)%PelLastTimeStep = 0.0
-    
+
     CALL InitComponentNodes( 0.d0, MicroCHP(GeneratorNum)%PlantMassFlowRateMax, &
                                  MicroCHP(GeneratorNum)%PlantInletNodeID,  &
                                  MicroCHP(GeneratorNum)%PlantOutletNodeID, &
@@ -2323,8 +2326,8 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
                                  MicroCHP(GeneratorNum)%CWLoopSideNum, &
                                  MicroCHP(GeneratorNum)%CWBranchNum, &
                                  MicroCHP(GeneratorNum)%CWCompNum )
-    
-    
+
+
   ENDIF
 
   IF (.NOT. BeginEnvrnFlag) THEN
@@ -2393,7 +2396,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   USE DataLoopNode ,   ONLY: Node
   USE DataHeatBalFanSys, ONLY: MAT
   Use DataHVACGlobals, ONLY: SysTimeElapsed, TimeStepSys
-  USE DataGlobals    , ONLY: TimeStep, TimeStepZone, SecInHour
+  USE DataGlobals    , ONLY: TimeStep, TimeStepZone, SecInHour, HoursInDay
   USE CurveManager,    ONLY: CurveValue
   USE DataGlobalConstants
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
@@ -2451,7 +2454,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   REAL(r64)    :: Teng    = 0.0
   REAL(r64)    :: ThermEff = 0.0
   REAL(r64)    :: Cp = 0.d0 ! local fluid specific heat
-  
+
   LOGICAL :: EnergyBalOK ! check for balance to exit loop
 
   DynaCntrlNum = MicroCHP(GeneratorNum)%DynamicsControlID
@@ -2758,7 +2761,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     Teng = FuncDetermineEngineTemp(Tcwout, MicroCHP(GeneratorNum)%A42Model%MCeng, MicroCHP(GeneratorNum)%A42Model%UAhx,&
                               MicroCHP(GeneratorNum)%A42Model%UAskin, MAT(MicroCHP(GeneratorNum)%ZoneID), Qgenss, &
                               MicroCHP(GeneratorNum)%A42Model%TengLast, dt )
-  
+
     Cp     = GetSpecificHeatGlycol(PlantLoop(MicroCHP(GeneratorNum)%CWLoopNum)%FluidName, &
                               TcwIn, &
                               PlantLoop(MicroCHP(GeneratorNum)%CWLoopNum)%FluidIndex, &
@@ -3031,7 +3034,7 @@ SUBROUTINE FigureMicroCHPZoneGains
 !  INTEGER :: thisZone ! index in Zone structure array
   REAL(r64)    :: TotalZoneHeatGain
   INTEGER :: CHPnum
-  INTEGER :: ZoneNum
+!  INTEGER :: ZoneNum
   LOGICAL, SAVE :: MyEnvrnFlag = .TRUE.
 
   IF (NumMicroCHPs == 0) RETURN
@@ -3041,24 +3044,23 @@ SUBROUTINE FigureMicroCHPZoneGains
                        + MicroCHP( CHPnum )%A42Model%QdotSkin
 
     MicroCHP(CHPnum)%A42Model%QdotConvZone = TotalZoneHeatGain * (1 - MicroCHP(CHPnum)%A42Model%RadiativeFraction)
+    MicroCHP(CHPnum)%Report%SkinLossConvect = MicroCHP(CHPnum)%A42Model%QdotConvZone
     MicroCHP(CHPnum)%A42Model%QdotRadZone  = TotalZoneHeatGain * MicroCHP(CHPnum)%A42Model%RadiativeFraction
+    MicroCHP(CHPnum)%Report%SkinLossRadiat = MicroCHP(CHPnum)%A42Model%QdotRadZone
   ENDDO
 
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
-    MicroCHP%A42Model%QdotConvZone = 0.0
-    MicroCHP%A42Model%QdotRadZone = 0.0
+    MicroCHP%Report%SkinLossConvect = 0.d0
+    MicroCHP%Report%SkinLossRadiat  = 0.d0
     MyEnvrnFlag = .FALSE.
   END IF
 
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
-  ! now set the data for use in the zone heat balance.
-  DO CHPnum = 1, NumMicroCHPs
-    IF (MicroCHP(CHPnum)%ZoneID == 0) CYCLE
-    zoneNum = MicroCHP(CHPnum)%ZoneID
-    ZoneIntGain(zoneNum)%QGenConv = MicroCHP(CHPnum)%A42Model%QdotConvZone + ZoneIntGain(zoneNum)%QGenConv
-    ZoneIntGain(zoneNum)%QGenRad  = MicroCHP(CHPnum)%A42Model%QdotRadZone + ZoneIntGain(zoneNum)%QGenRad
-  ENDDO
+  ! this routine needs to do something for zone gains during sizing
+!  IF(DoingSizing)THEN
+
+!  ENDIF
 
   RETURN
 
@@ -3104,21 +3106,21 @@ SUBROUTINE CalcUpdateHeatRecovery(Num, FirstHVACIteration)
   INTEGER :: InNodeNum
   INTEGER :: OutNodeNum
   REAL(r64) :: Cp ! local Specific heat of fluid
-  REAL(r64) :: mdot !local mass flow rate
+!  REAL(r64) :: mdot !local mass flow rate
 
   ! now update water outlet node Changing to Kg/s!
   OutNodeNum = MicroCHP(Num)%PlantOutletNodeID
   InNodeNum  = MicroCHP(Num)%PlantInletNodeID
-  
+
   CAll SafeCopyPlantNode (InNodeNum, OutNodeNum)
-  
+
   Node(OutNodeNum)%Temp = MicroCHP(Num)%A42Model%Tcwout
-  
+
   Cp = GetSpecificHeatGlycol(PlantLoop(MicroCHP(Num)%CWLoopNum)%FluidName, &
                              MicroCHP(Num)%A42Model%Tcwin, &
                              PlantLoop(MicroCHP(Num)%CWLoopNum)%FluidIndex, &
                              'CalcUpdateHeatRecovery')
-  
+
   Node(OutNodeNum)%Enthalpy = MicroCHP(Num)%A42Model%Tcwout * Cp
 
 
@@ -3276,7 +3278,7 @@ SUBROUTINE UpdateMicroCHPGeneratorRecords(Num)
                              MicroCHP(Num)%A42Model%Tcwin, &
                              PlantLoop(MicroCHP(Num)%CWLoopNum)%FluidIndex, &
                              'UpdateMicroCHPGeneratorRecords')
-                             
+
   MicroCHP(Num)%Report%QdotHR         = MicroCHP(Num)%PlantMassFlowRate * Cp &
                                         * (MicroCHP(Num)%A42Model%Tcwout - MicroCHP(Num)%A42Model%Tcwin)
   MicroCHP(Num)%Report%TotalHeatEnergyRec  = MicroCHP(Num)%Report%QdotHR & ! heat recovered energy (J)
@@ -3417,9 +3419,8 @@ MODULE FuelCellElectricGenerator
 USE DataGenerators
 USE DataLoopNode
 USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, NumOfZones, CurrentTime, DayOfSim, SecInHour,   &
-                           BeginEnvrnFlag, InitConvTemp, WarmUpFlag, KelvinConv
-USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowFatalError,  &
-                           ShowContinueError, SetupOutputVariable
+                           BeginEnvrnFlag, InitConvTemp, WarmUpFlag, KelvinConv, HoursInDay
+USE DataInterfaces
 USE DataGlobalConstants, ONLY: iGeneratorFuelCell
 USE GeneratorFuelSupply
 USE GeneratorDynamicsManager
@@ -3587,7 +3588,7 @@ SUBROUTINE GetFuelCellGeneratorInput
   USE CurveManager,   ONLY : GetCurveIndex
   USE NodeInputManager, ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
-  USE DataHeatBalance,  ONLY: Zone
+  USE DataHeatBalance,  ONLY: Zone, IntGainTypeOf_GeneratorFuelCell
   USE ScheduleManager, ONLY: GetScheduleIndex
   USE General, ONLY: RoundSigDigits
   USE DataGlobals, ONLY: DisplayAdvancedReportVariables
@@ -4432,6 +4433,13 @@ If (myonetimeflag) then
      CALL SetupOutputVariable('FuelCell Radiation Heat Loss Rate to Zone [W]' , &
           FuelCell(GeneratorNum)%Report%SkinLossRadiat, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
+     CALL SetupZoneInternalGain(FuelCell(GeneratorNum)%FCPM%zoneID, &
+                     'Generator:FuelCell',  &
+                     FuelCell(GeneratorNum)%Name, &
+                     IntGainTypeOf_GeneratorFuelCell,    &
+                     ConvectionGainRate    = FuelCell(GeneratorNum)%Report%SkinLossConvect, &
+                     ThermalRadiationGainRate = FuelCell(GeneratorNum)%Report%SkinLossRadiat)
+
      IF (DisplayAdvancedReportVariables) THEN ! show extra data originally needed for detailed comparative testing
        CALL SetupOutputVariable('FuelCell Air Temperature at Inlet [C]', &
             FuelCell(GeneratorNum)%Report%TairInlet, 'System', 'Average', FuelCell(GeneratorNum)%Name )
@@ -4646,7 +4654,7 @@ SUBROUTINE CalcFuelCellGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
 
        ! set Day and Time of Last Shut Down
        FuelCell(GeneratorNum)%FCPM%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        FuelCell(GeneratorNum)%FCPM%HasBeenOn = .false.
 
        If (FuelCell(GeneratorNum)%FCPM%ShutDownTime > 0.0) FuelCell(GeneratorNum)%FCPM%DuringShutDown = .true.
@@ -4668,7 +4676,7 @@ SUBROUTINE CalcFuelCellGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
     ! set Day and Time of Last STart Up
 
        FuelCell(GeneratorNum)%FCPM%FractionalDayofLastStartUp = REAL(DayOfSim,r64)  &
-                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                                  + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
 
        FuelCell(GeneratorNum)%FCPM%HasBeenOn = .true.
        FuelCell(GeneratorNum)%FCPM%NumCycles = FuelCell(GeneratorNum)%FCPM%NumCycles + 1 ! increment cycling counter
@@ -5323,7 +5331,7 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
      ENDIF
 
         !losses go into QairIntake
-        FuelCell(Num)%ElecStorage%QairIntake  = tmpPcharge * (1- FuelCell(Num)%ElecStorage%EnergeticEfficCharge)
+        FuelCell(Num)%ElecStorage%QairIntake  = tmpPcharge * (1.0d0 - FuelCell(Num)%ElecStorage%EnergeticEfficCharge)
 
 
     ELSEIF (FuelCell(Num)%ElecStorage%StorageModelMode == LeadAcidBatterManwellMcGowan) THEN
@@ -5370,7 +5378,7 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
         Constrained = .true.
       ENDIF
         !losses go into QairIntake
-      FuelCell(Num)%ElecStorage%QairIntake  = tmpPdraw * (1/FuelCell(Num)%ElecStorage%EnergeticEfficDischarge - 1)
+      FuelCell(Num)%ElecStorage%QairIntake  = tmpPdraw * (1.0d0/FuelCell(Num)%ElecStorage%EnergeticEfficDischarge - 1.0d0)
     ELSEIF (FuelCell(Num)%ElecStorage%StorageModelMode == LeadAcidBatterManwellMcGowan) THEN
       CALL ShowWarningError('ManageElectStorInteractions: Not yet implemented: Lead Acid Battery By Manwell and McGowan 1993 ')
 
@@ -6753,9 +6761,10 @@ SUBROUTINE FigureTransientConstraints(GeneratorNum, Pel, Constrained, PelDiff)
 
      !calculate time for end of start up period
      CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
 
-     EndingFractionalDay = FuelCell(GeneratorNum)%FCPM%FractionalDayofLastStartUp + FuelCell(GeneratorNum)%FCPM%StartUpTime/24.0
+     EndingFractionalDay = FuelCell(GeneratorNum)%FCPM%FractionalDayofLastStartUp +   &
+        FuelCell(GeneratorNum)%FCPM%StartUpTime/HoursInDay
 
      IF (CurrentFractionalDay > EndingFractionalDay) THEN
       !start up period is now over
@@ -6768,9 +6777,10 @@ SUBROUTINE FigureTransientConstraints(GeneratorNum, Pel, Constrained, PelDiff)
 
      !calculate time for end of shut down period
      CurrentFractionalDay = REAL(DayOfSim,r64)  &
-                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/24.0 !
+                            + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay !
 
-     EndingFractionalDay = FuelCell(GeneratorNum)%FCPM%FractionalDayofLastShutDown + FuelCell(GeneratorNum)%FCPM%ShutDownTime/24.0
+     EndingFractionalDay = FuelCell(GeneratorNum)%FCPM%FractionalDayofLastShutDown +   &
+        FuelCell(GeneratorNum)%FCPM%ShutDownTime/HoursInDay
 
      IF (CurrentFractionalDay > EndingFractionalDay) THEN
       !start up period is now over
@@ -7257,7 +7267,7 @@ SUBROUTINE SimFuelCellPlantHeatRecovery(CompType,CompName,CompTypeNum,CompNum,Ru
   USE InputProcessor, ONLY: FindItemInList
   USE DataPlant,      ONLY: TypeOf_Generator_FCExhaust, TypeOf_Generator_FCStackCooler
   USE PlantUtilities, ONLY: UpdateComponentHeatRecoverySide
-  
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -7331,7 +7341,7 @@ SUBROUTINE SimFuelCellPlantHeatRecovery(CompType,CompName,CompTypeNum,CompNum,Ru
                                     FuelCell(CompNum)%Report%HeatRecOutletTemp, &
                                     FuelCell(CompNum)%Report%HeatRecMdot ,  &
                                     FirstHVACIteration)
-  
+
   ENDIF
 
 
@@ -7370,7 +7380,7 @@ SUBROUTINE InitFuelCellGenerators(FCnum )
   USE PlantUtilities,    ONLY: InitComponentNodes, SetComponentFlowRate
   USE DataPlant,         ONLY: ScanPlantLoopsForObject, PlantLoop, TypeOf_Generator_FCExhaust
   USE FluidProperties,   ONLY: GetDensityGlycol
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -7406,11 +7416,11 @@ IF (InitGeneratorOnce) THEN
   MyEnvrnFlag = .TRUE.
   MyWarmupFlag = .FALSE.
   InitGeneratorOnce = .FALSE.
-  MyPlantScanFlag = .TRUE. 
+  MyPlantScanFlag = .TRUE.
 END IF ! end one time setups and inits
 
 IF (MyPlantScanFlag(FCnum) .AND. ALLOCATED(PlantLoop)) THEN
-  errFlag = .FALSE. 
+  errFlag = .FALSE.
   CALL ScanPlantLoopsForObject(FuelCell(FCnum)%NameExhaustHX, &
                                  TypeOf_Generator_FCExhaust, &
                                  FuelCell(FCnum)%CWLoopNum, &
@@ -7421,7 +7431,7 @@ IF (MyPlantScanFlag(FCnum) .AND. ALLOCATED(PlantLoop)) THEN
   IF (errFlag) THEN
     CALL ShowFatalError('InitFuelCellGenerators: Program terminated due to previous condition(s).')
   ENDIF
-  MyPlantScanFlag(FCnum) = .FALSE. 
+  MyPlantScanFlag(FCnum) = .FALSE.
 ENDIF
 
 ! Do the Begin Environment initializations
@@ -7448,7 +7458,7 @@ IF (BeginEnvrnFlag .and. MyEnvrnFlag(FCnum) .AND. .NOT. MyPlantScanFlag(FCnum)) 
                                  FuelCell(FCnum)%CWLoopSideNum, &
                                  FuelCell(FCnum)%CWBranchNum, &
                                  FuelCell(FCnum)%CWCompNum )
-  
+
   MyEnvrnFlag(FCnum) = .FALSE.
   MyWarmupFlag(FCNum) = .TRUE.
 END IF ! end environmental inits
@@ -7482,7 +7492,7 @@ If (FuelCell(FCnum)%TimeElapsed /= TimeElapsed) Then
                                  FuelCell(FCnum)%CWLoopSideNum, &
                                  FuelCell(FCnum)%CWBranchNum, &
                                  FuelCell(FCnum)%CWCompNum )
-                                 
+
   FuelCell(FCnum)%ExhaustHX%WaterMassFlowRate = mdot
   FuelCell(FCnum)%ExhaustHX%WaterInletTemp    = Node(inNode)%Temp
   FuelCell(FCnum)%TimeElapsed = TimeElapsed
@@ -7496,7 +7506,7 @@ ELSE
                                  FuelCell(FCnum)%CWLoopSideNum, &
                                  FuelCell(FCnum)%CWBranchNum, &
                                  FuelCell(FCnum)%CWCompNum )
-  
+
   FuelCell(FCnum)%ExhaustHX%WaterInletTemp    = Node(inNode)%Temp
 ENDIF
 
@@ -7546,11 +7556,13 @@ SUBROUTINE FigureFuelCellZoneGains
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 !unused  INTEGER :: thisZone ! index in Zone structure array
   REAL(r64)    :: TotalZoneHeatGain ! working variable for zone gain [w]
-  INTEGER :: ZoneNum
+!  INTEGER :: ZoneNum
   INTEGER :: FCnum ! number of fuel cell
   LOGICAL, SAVE :: MyEnvrnFlag = .TRUE.
 
   IF (NumFuelCellGenerators == 0) RETURN
+
+  ! this routine needs to do something for zone gains during sizing
 
    !first collect skin losses from different subsystems
   Do FCnum =1, NumFuelCellGenerators
@@ -7587,26 +7599,23 @@ SUBROUTINE FigureFuelCellZoneGains
     END SELECT
 
     FuelCell(FCnum)%QconvZone = TotalZoneHeatGain * (1 - FuelCell(FCnum)%FCPM%RadiativeFract)
+    FuelCell(FCnum)%Report%SkinLossConvect = FuelCell(FCnum)%QconvZone
     FuelCell(FCnum)%QradZone  = TotalZoneHeatGain * FuelCell(FCnum)%FCPM%RadiativeFract
-
+    FuelCell(FCnum)%Report%SkinLossRadiat = FuelCell(FCnum)%QradZone
 
   ENDDO ! over number of Fuel cells
 
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
-    FuelCell%QconvZone = 0.0
-    FuelCell%QradZone = 0.0
+    FuelCell%Report%SkinLossConvect = 0.d0
+    FuelCell%Report%SkinLossRadiat  = 0.d0
     MyEnvrnFlag = .FALSE.
   END IF
 
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
-  ! now set the data for use in the zone heat balance.  QFCConv and QFCRad already initialized in calling routine
-  DO FCnum=1, NumFuelCellGenerators
-    If (FuelCell(FCnum)%FCPM%zoneID == 0) CYCLE
-    ZoneNum = FuelCell(FCnum)%FCPM%zoneID
-    ZoneIntGain(ZoneNum)%QFCConv = FuelCell(FCnum)%QconvZone + ZoneIntGain(ZoneNum)%QFCConv
-    ZoneIntGain(ZoneNum)%QFCRad  = FuelCell(FCnum)%QradZone  + ZoneIntGain(ZoneNum)%QFCRad
-  ENDDO
+!  IF(DoingSizing)THEN
+
+!  ENDIF
 
   RETURN
 
@@ -7696,9 +7705,9 @@ SUBROUTINE CalcUpdateHeatRecovery(Num, FirstHVACIteration)
   ! now update water outlet node Changing to Kg/s!
   OutNodeNum = FuelCell(Num)%ExhaustHX%WaterOutNode
   inNodeNum  = FuelCell(Num)%ExhaustHX%WaterInNode
-  
+
   CALL SafeCopyPlantNode(InNodeNum, OutNodeNum)
-  
+
   Node(OutNodeNum)%Temp     = FuelCell(Num)%ExhaustHX%WaterOutletTemp
   Node(OutNodeNum)%Enthalpy = FuelCell(Num)%ExhaustHX%WaterOutletEnthalpy
 
@@ -8121,7 +8130,7 @@ SUBROUTINE SimICEngineGenerator(GeneratorType,GeneratorName,GeneratorIndex,RunFl
       CheckEquipName(GenNum)=.false.
     ENDIF
   ENDIF
-  
+
   CALL InitICEngineGenerators(GenNum,RunFlag,MyLoad,FirstHVACIteration)
   CALL CalcICEngineGeneratorModel(GenNum,RunFlag,MyLoad,FirstHVACIteration)
   CALL UpdateICEngineGeneratorRecords(RunFlag,GenNum)
@@ -8551,7 +8560,7 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
           !       AUTHOR         Dan Fisher
           !       DATE WRITTEN   Sept. 2000
           !       MODIFIED     na
-          !       RE-ENGINEERED  
+          !       RE-ENGINEERED
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! simulate a IC ENGINE generator using the BLAST model
@@ -8930,7 +8939,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
   REAL(r64)  :: mdot
   REAL(r64)  :: rho
   LOGICAL    :: errFlag
-  
+
           ! FLOW:
 ! Do the one time initializations
   IF (MyOneTimeFlag) THEN
@@ -8944,7 +8953,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
   END IF
   IF (MyPlantScanFlag(GeneratorNum) .AND. ALLOCATED(PlantLoop) &
       .AND. ICEngineGenerator(GeneratorNum)%HeatRecActive) THEN
-    errFlag = .FALSE. 
+    errFlag = .FALSE.
     CALL ScanPlantLoopsForObject(ICEngineGenerator(GeneratorNum)%Name, &
                                  TypeOf_Generator_ICEngine, &
                                  ICEngineGenerator(GeneratorNum)%HRLoopNum, &
@@ -8955,7 +8964,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
     IF (errFlag) THEN
       CALL ShowFatalError('InitICEngineGenerators: Program terminated due to previous condition(s).')
     ENDIF
-                                 
+
     MyPlantScanFlag(GeneratorNum) = .FALSE.
   ENDIF
 
@@ -8971,7 +8980,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
                                      InitConvTemp, &
                                      PlantLoop(ICEngineGenerator(GeneratorNum)%HRLoopNum)%FluidIndex, &
                                      'InitICEngineGenerators')
-                                     
+
     ICEngineGenerator(GeneratorNum)%DesignHeatRecMassFlowRate = rho * ICEngineGenerator(GeneratorNum)%DesignHeatRecVolFlowRate
     ICEngineGenerator(GeneratorNum)%HeatRecMdotDesign = ICEngineGenerator(GeneratorNum)%DesignHeatRecMassFlowRate
 
@@ -8982,7 +8991,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
                                  ICEngineGenerator(GeneratorNum)%HRLoopSideNum, &
                                  ICEngineGenerator(GeneratorNum)%HRBranchNum, &
                                  ICEngineGenerator(GeneratorNum)%HRCompNum )
-    
+
     MySizeAndNodeInitFlag(GeneratorNum) = .FALSE.
   END IF ! end one time inits
 
@@ -9001,7 +9010,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
                                  ICEngineGenerator(GeneratorNum)%HRLoopSideNum, &
                                  ICEngineGenerator(GeneratorNum)%HRBranchNum, &
                                  ICEngineGenerator(GeneratorNum)%HRCompNum )
-    
+
     MyEnvrnFlag(GeneratorNum) = .FALSE.
   END IF ! end environmental inits
 
@@ -9013,7 +9022,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
     IF ( FirstHVACIteration) Then
       IF (RunFlag) THEN
         mdot =  ICEngineGenerator(GeneratorNum)%DesignHeatRecMassFlowRate
-      ELSE 
+      ELSE
         mdot = 0.d0
       ENDIF
       CALL SetComponentFlowRate(mdot, &
@@ -9023,7 +9032,7 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
                                    ICEngineGenerator(GeneratorNum)%HRLoopSideNum, &
                                    ICEngineGenerator(GeneratorNum)%HRBranchNum, &
                                    ICEngineGenerator(GeneratorNum)%HRCompNum )
-       
+
     ELSE
       CALL SetComponentFlowRate(   ICEngineGenerator(GeneratorNum)%HeatRecMdotActual, &
                                    ICEngineGenerator(GeneratorNum)%HeatRecInletNodeNum, &
@@ -9800,7 +9809,7 @@ SUBROUTINE CalcCTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
   IF (CTGenerator(GeneratorNum)%HeatRecActive) THEN
     HeatRecInNode        = CTGenerator(GeneratorNum)%HeatRecInletNodeNum
     HeatRecInTemp = Node(HeatRecInNode)%Temp
-    
+
     HeatRecCp = GetSpecificHeatGlycol(PlantLoop(CTGenerator(GeneratorNum)%HRLoopNum)%FluidName, &
                              HeatRecInTemp, &
                              PlantLoop(CTGenerator(GeneratorNum)%HRLoopNum)%FluidIndex, &
@@ -10017,7 +10026,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
   REAL(r64)  :: mdot
   REAL(r64)  :: rho
   LOGICAL    :: errFlag
-  
+
             ! FLOW:
 
 ! Do the one time initializations
@@ -10034,7 +10043,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
 
   IF (MyPlantScanFlag(GeneratorNum) .AND. ALLOCATED(PlantLoop) &
       .AND. CTGenerator(GeneratorNum)%HeatRecActive) THEN
-    errFlag = .FALSE. 
+    errFlag = .FALSE.
     CALL ScanPlantLoopsForObject(CTGenerator(GeneratorNum)%Name, &
                                  TypeOf_Generator_CTurbine, &
                                  CTGenerator(GeneratorNum)%HRLoopNum, &
@@ -10059,7 +10068,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
                                      InitConvTemp, &
                                      PlantLoop(CTGenerator(GeneratorNum)%HRLoopNum)%FluidIndex, &
                                      'InitICEngineGenerators')
-                                     
+
     CTGenerator(GeneratorNum)%DesignHeatRecMassFlowRate = rho * CTGenerator(GeneratorNum)%DesignHeatRecVolFlowRate
 
     CALL InitComponentNodes(0.0D0,  CTGenerator(GeneratorNum)%DesignHeatRecMassFlowRate,  &
@@ -10069,7 +10078,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
                                  CTGenerator(GeneratorNum)%HRLoopSideNum, &
                                  CTGenerator(GeneratorNum)%HRBranchNum, &
                                  CTGenerator(GeneratorNum)%HRCompNum )
-    
+
     MySizeAndNodeInitFlag(GeneratorNum) = .FALSE.
   END IF ! end one time inits
 
@@ -10088,7 +10097,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
                                  CTGenerator(GeneratorNum)%HRLoopSideNum, &
                                  CTGenerator(GeneratorNum)%HRBranchNum, &
                                  CTGenerator(GeneratorNum)%HRCompNum )
-    
+
     MyEnvrnFlag(GeneratorNum) = .FALSE.
   END IF ! end environmental inits
 
@@ -10100,7 +10109,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
     IF ( FirstHVACIteration) Then
       IF (RunFlag) THEN
         mdot =  CTGenerator(GeneratorNum)%DesignHeatRecMassFlowRate
-      ELSE 
+      ELSE
         mdot = 0.d0
       ENDIF
       CALL SetComponentFlowRate(mdot, &
@@ -10110,7 +10119,7 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
                                    CTGenerator(GeneratorNum)%HRLoopSideNum, &
                                    CTGenerator(GeneratorNum)%HRBranchNum, &
                                    CTGenerator(GeneratorNum)%HRCompNum )
-       
+
     ELSE
       CALL SetComponentFlowRate(   CTGenerator(GeneratorNum)%HeatRecMdot, &
                                    CTGenerator(GeneratorNum)%HeatRecInletNodeNum, &
@@ -11521,7 +11530,7 @@ SUBROUTINE GetMTGeneratorInput
 !   Report combustion air outlet conditions if exhaust air calculations are active
    IF (MTGenerator(GeneratorNum)%ExhAirCalcsActive) THEN
        CALL SetupOutputVariable('Generator Exhaust Air Flow Rate [kg/s]', &
-     MTGeneratorReport(GeneratorNum)%ExhAirMassFlowRate ,'System','Average',MTGenerator(GeneratorNum)%Name)   
+     MTGeneratorReport(GeneratorNum)%ExhAirMassFlowRate ,'System','Average',MTGenerator(GeneratorNum)%Name)
      CALL SetupOutputVariable('Generator Exhaust Air Temperature  [C]', &
        MTGeneratorReport(GeneratorNum)%ExhAirTemperature,'System','Average',MTGenerator(GeneratorNum)%Name)
     ENDIF
@@ -11603,10 +11612,10 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
     MySizeAndNodeInitFlag = .TRUE.
     MyOneTimeFlag         = .FALSE.
   ENDIF
-  
+
   IF (MyPlantScanFlag(GenNum) .AND. ALLOCATED(PlantLoop) &
       .AND. MTGenerator(GenNum)%HeatRecActive) THEN
-    errFlag = .FALSE. 
+    errFlag = .FALSE.
     CALL ScanPlantLoopsForObject(MTGenerator(GenNum)%Name, &
                                  TypeOf_Generator_MicroTurbine, &
                                  MTGenerator(GenNum)%HRLoopNum, &
@@ -11620,7 +11629,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
 
     MyPlantScanFlag(GenNum) = .FALSE.
   ENDIF
-  
+
   IF (MySizeAndNodeInitFlag(GenNum) .AND. (.NOT. MyPlantScanFlag(GenNum)) &
       .AND.  MTGenerator(GenNum)%HeatRecActive ) THEN
 
@@ -11633,7 +11642,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
                                      InitConvTemp, &
                                      PlantLoop(MTGenerator(GenNum)%HRLoopNum)%FluidIndex, &
                                      'InitMTGenerators')
-                                     
+
     MTGenerator(GenNum)%DesignHeatRecMassFlowRate = rho * MTGenerator(GenNum)%RefHeatRecVolFlowRate
     MTGenerator(GenNum)%HeatRecMaxMassFlowRate = rho * MTGenerator(GenNum)%HeatRecMaxVolFlowRate
 
@@ -11644,7 +11653,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
                                  MTGenerator(GenNum)%HRLoopSideNum, &
                                  MTGenerator(GenNum)%HRBranchNum, &
                                  MTGenerator(GenNum)%HRCompNum )
-    
+
     MySizeAndNodeInitFlag(GenNum) = .FALSE.
 
   END IF ! end one time inits
@@ -11730,7 +11739,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
                                  MTGenerator(GenNum)%HRLoopNum, &
                                  MTGenerator(GenNum)%HRLoopSideNum, &
                                  MTGenerator(GenNum)%HRBranchNum, &
-                                 MTGenerator(GenNum)%HRCompNum )   
+                                 MTGenerator(GenNum)%HRCompNum )
       END IF
     ELSE IF (RunFlag .AND. (.NOT. MTGenerator(GenNum)%InternalFlowControl)) THEN
         CALL SetComponentFlowRate(MTGenerator(GenNum)%HeatRecMdot,  &
@@ -11739,7 +11748,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
                                  MTGenerator(GenNum)%HRLoopNum, &
                                  MTGenerator(GenNum)%HRLoopSideNum, &
                                  MTGenerator(GenNum)%HRBranchNum, &
-                                 MTGenerator(GenNum)%HRCompNum )   
+                                 MTGenerator(GenNum)%HRCompNum )
     ENDIF
   END IF
 
@@ -11944,7 +11953,7 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
       PowerFTempElev = 0.0d0
     END IF
 
-!   Calculate available full-load power output. Can not exceed maximum full-load power output.
+!   Calculate available full-load power output. cannot exceed maximum full-load power output.
     FullLoadPowerOutput = MIN((ReferencePowerOutput * PowerFTempElev),MTGenerator(GeneratorNum)%MaxElecPowerOutput)
 !   Also can't be below the minimum full-load power output.
     FullLoadPowerOutput = MAX(FullLoadPowerOutput,MTGenerator(GeneratorNum)%MinElecPowerOutput)
@@ -12178,7 +12187,7 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
                                  HeatRecInTemp, &
                                  PlantLoop(MTGenerator(GeneratorNum)%HRLoopNum)%FluidIndex, &
                                  'CalcMTGeneratorModel')
-      
+
         HeatRecVolFlowRate = HeatRecMdot / rho
         HeatRecRateFFlow  = CurveValue(MTGenerator(GeneratorNum)%HeatRecRateFWaterFlowCurveNum,HeatRecVolFlowRate)
         IF (HeatRecRateFFlow .LT. 0.0d0) THEN
@@ -12433,9 +12442,9 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
           CALL ShowContinueError('...The model has calculated the exhaust air humidity ratio to be less than '&
                             //'the combustion air inlet humidity ratio.')
           CALL ShowContinueError('...Value of exhaust air humidity ratio          =' &
-                                 //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%ExhaustAirHumRat,6))//' kg/kg.')
+                                 //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%ExhaustAirHumRat,6))//' kgWater/kgDryAir.')
           CALL ShowContinueError('...Value of combustion air inlet humidity ratio ='//TRIM(TrimSigDigits(CombustionAirInletW,6))&
-                                 //' kg/kg.')
+                                 //' kgWater/kgDryAir.')
           CALL ShowContinueErrorTimeStamp('... Simulation will continue.')
         ELSE
           CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'// &
@@ -12510,7 +12519,7 @@ SUBROUTINE UpdateMTGeneratorRecords(Num)
   IF (MTGenerator(Num)%ExhAirCalcsActive) THEN
     ExhaustAirNodeNum = MTGenerator(Num)%CombustionAirOutletNodeNum
     CombustAirInletNodeNum = MTGenerator(Num)%CombustionAirInletNodeNum
-       
+
     Node(ExhaustAirNodeNum)%MassFlowRate         = MTGenerator(Num)%ExhaustAirMassFlowRate
     Node(CombustAirInletNodeNum)%MassFlowRate    = MTGenerator(Num)%ExhaustAirMassFlowRate
 
@@ -12616,7 +12625,7 @@ SUBROUTINE GetMTGeneratorExhaustNode(CompType,CompName,ExhaustOutletNodeNum)
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! To pass exhaust outlet number from Micro Turbine to Exhaust fired absorption chiller.
-          ! 
+          !
           ! METHODOLOGY EMPLOYED:
           ! <description>
 
@@ -12661,7 +12670,7 @@ SUBROUTINE GetMTGeneratorExhaustNode(CompType,CompName,ExhaustOutletNodeNum)
   IF (CompNum == 0) THEN
     CALL ShowFatalError('GetMTGeneratorExhaustNode: Unit not found='//TRIM(CompName))
   ELSE
-    ExhaustOutletNodeNum = MTGenerator(CompNum)%CombustionAirOutletNodeNum 
+    ExhaustOutletNodeNum = MTGenerator(CompNum)%CombustionAirOutletNodeNum
   ENDIF
   RETURN
 END SUBROUTINE GetMTGeneratorExhaustNode
@@ -12673,7 +12682,7 @@ END MODULE MicroturbineElectricGenerator
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -7,6 +7,8 @@ MODULE PackagedTerminalHeatPump
   !       DATE WRITTEN   July 2005
   !       MODIFIED       B. Griffith Dec. 2006 added Function call for OA node and moved get input flag up to Module
   !                      B. Griffith, Sept 2010, plant upgrades, fluid properties, for heating coils
+  !                      B. Nigusse, Jan 2012, added hot water and steam heating coils to PTHP and WSHP
+  !                      Bo Shen, ORNL, March 2012, added variable-speed water-source heat pump
   !       RE-ENGINEERED  na
 
   ! PURPOSE OF THIS MODULE:
@@ -29,11 +31,14 @@ MODULE PackagedTerminalHeatPump
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
+USE DataSizing
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, SysSizingCalc, SecInHour, InitConvTemp, NumOfZones
 USE DataInterfaces,  ONLY: SetupOutputVariable, ShowWarningError, ShowRecurringWarningErrorAtEnd, &
-                           ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp
+                           ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp, &
+                           ShowWarningMessage
 USE DataHVACGlobals
 USE DXCoils, ONLY: DXCoilPartLoadRatio
+USE WatertoAirMulSpeeddHP, ONLY:MaxSpedLevels
 
   ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -110,12 +115,15 @@ TYPE PTUnitData
  REAL(r64)                    :: ACHeatCoilCap        = 0.0 ! heating coil capacity for PTAC
  INTEGER                      :: ACHeatCoilIndex      = 0   ! heating coil index number for PTAC
  INTEGER                      :: HWCoilAirInletNode   = 0   ! air outlet node number of HW coil for PTAC
- INTEGER                      :: HWCoilSteamInletNode = 0   ! steam inlet node number of HW coil for PTAC
- CHARACTER(len=MaxNameLength) :: SupHeatCoilName      = ' ' ! name of supplemental heating coil
-!                                                              (Coil:Gas:Heating or Coil:Electric:Heating)
- INTEGER                      :: SupHeatCoilType_Num  = 0   ! numeric equivalent for supplemental heating coil type
+ INTEGER                      :: HWCoilSteamInletNode = 0   ! steam inlet node number of HW coil for PTAC and HP
+ INTEGER                      :: HWCoilSteamOutletNode = 0  ! steam inlet node number of HW coil for PTAC and HP
+ CHARACTER(len=MaxNameLength) :: SuppHeatCoilName     = ' ' ! name of supplemental heating coil
+ INTEGER                      :: SuppHeatCoilType_Num = 0   ! numeric equivalent for supplemental heating coil type
  INTEGER                      :: ACHeatCoilType_Num   = 0   ! numeric equivalent for PTAC heating coil type
- INTEGER                      :: SupHeatCoilIndex     = 0   ! supplemental heater index number
+ INTEGER                      :: SuppHeatCoilIndex    = 0   ! supplemental heater index number
+ INTEGER                      :: SupHeatCoilCap       = 0   ! supplemental heater coil capacity [W]
+ INTEGER                      :: SupCoilAirInletNode  = 0   ! air inlet node for supplemental coil for HP
+ CHARACTER(len=MaxNameLength) :: SuppHeatCoilType     = ' ' ! supplemental heater coil type
  REAL(r64)                    :: MaxSATSupHeat        = 0.0 ! maximum supply air temperature from supplemental heater [C]
  REAL(r64)                    :: MaxOATSupHeat        = 0.0 ! maximum outdoor air temp for supplemental heater operation [C]
  INTEGER :: OpMode            =0 ! mode of operation; 1=cycling fan, cycling compressor, 2=continuous fan, cycling compresor
@@ -156,13 +164,16 @@ TYPE PTUnitData
  INTEGER                      :: LastMode             = 0   ! last mode of operation, coolingmode or heatingmode
  INTEGER                      :: AirFlowControl       = 0   ! fan control mode, UseCompressorOnFlow or UseCompressorOffFlow
  REAL(r64)                    :: CompPartLoadFrac     = 0.0 ! compressor part load ratio
- INTEGER                      :: WaterControlNode     = 0   ! control node for PTAC simple water heating coil
+ INTEGER                      :: HotWaterControlNode  = 0   ! control node for simple water heating coil
  INTEGER                      :: PlantCoilOutletNode  = 0   ! outlet node for water coil
  INTEGER                      :: LoopNum              = 0   ! plant loop index for water heating coil
  INTEGER                      :: LoopSide             = 0   ! plant loop side  index for water heating coil
  INTEGER                      :: BranchNum            = 0   ! plant loop branch index for water heating coil
  INTEGER                      :: CompNum              = 0   ! plant loop component index for water heating coil
- REAL(r64)                    :: MaxHeatCoilFluidFlow = 0.0 ! water or steam mass flow rate for PTAC heating coil [kg/s]
+ REAL(r64)                    :: MaxHeatCoilFluidFlow = 0.0 ! water or steam mass flow rate for heating coil [kg/s]
+ REAL(r64)                    :: MaxSuppCoilFluidFlow = 0.0 ! water or steam mass flow rate supp. heating coil [kg/s]
+ Integer                      :: HotWaterCoilMaxIterIndex   = 0  ! Index to recurring warning message
+ Integer                      :: HotWaterCoilMaxIterIndex2  = 0  ! Index to recurring warning message
  REAL(r64)                    :: ActualFanVolFlowRate = 0.0 ! Volumetric flow rate from fan object
  REAL(r64)                    :: HeatingSpeedRatio    = 1.0 ! Fan speed ratio in heating mode
  REAL(r64)                    :: CoolingSpeedRatio    = 1.0 ! Fan speed ratio in cooling mode
@@ -170,6 +181,26 @@ TYPE PTUnitData
  CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
  Logical                      :: AvailManagerListFound = .FALSE. ! True if availability manager list name is specified
                                                                  ! for PT unit object
+! starting added varibles for variable speed water source heat pump, Bo Shen, ORNL, March 2012
+  INTEGER  :: HeatCoolMode          = 0  ! System operating mode (0 = floating, 1 = cooling, 2 = heating)
+  INTEGER  :: NumOfSpeedCooling     =0   ! The number of speeds for cooling
+  INTEGER  :: NumOfSpeedHeating     =0   ! The number of speeds for heating
+  REAL(r64):: IdleSpeedRatio        = 0  !idle air fan ratio
+  REAL(r64):: IdleVolumeAirRate = 0  ! idle air flow rate
+  REAL(r64):: IdleMassFlowRate      = 0  ! idle air flow rate
+  REAL(r64):: FanVolFlow            = 0  ! fan volumetric flow rate
+  LOGICAL  :: CheckFanFlow      = .TRUE. ! Supply airflow check
+  REAL(r64):: HeatVolumeFlowRate(MaxSpedLevels) = 0 ! Supply air volume flow rate during heating operation
+  REAL(r64):: HeatMassFlowRate(MaxSpedLevels) = 0 ! Supply air mass flow rate during heating operation
+  REAL(r64):: CoolVolumeFlowRate(MaxSpedLevels) = 0  ! Supply air volume flow rate during cooling operation
+  REAL(r64):: CoolMassFlowRate(MaxSpedLevels) = 0  ! Supply air mass flow rate during cooling operation
+  REAL(r64):: MSHeatingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in heating mode
+  REAL(r64):: MSCoolingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in cooling mode
+  INTEGER :: CompSpeedNum
+  REAL(r64)     :: CompSpeedRatio
+  INTEGER :: ErrIndexCyc
+  INTEGER :: ErrIndexVar
+ ! end of the additional variables for variable speed water source heat pump
 END TYPE PTUnitData
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -190,9 +221,11 @@ REAL(r64) :: CompOffFlowRatio   = 0.0     ! fan flow ratio when coil off
 REAL(r64) :: FanSpeedRatio      = 0.0     ! ratio of air flow ratio passed to fan object
 LOGICAL   :: GetPTUnitInputFlag = .TRUE.  ! First time, input is "gotten"
 REAL(r64) :: SaveCompressorPLR  = 0.0     ! holds compressor PLR from active DX coil
-REAL(r64) :: SteamDensity       = 0.0     ! density of steam at 100C, used for PTAC steam heating coils
+REAL(r64) :: SteamDensity       = 0.0     ! density of steam at 100C, used for steam heating coils
 LOGICAL   :: HeatingLoad        = .FALSE. ! defines a heating load on PTUnit
 LOGICAL   :: CoolingLoad        = .FALSE. ! defines a cooling load on PTUnit
+REAL(r64) :: MinWaterFlow       = 0.0     ! minimum water flow for heating [kg/s]
+REAL(r64) :: TempSteamIn        = 100.0   ! steam coil steam inlet temperature
 
   ! SUBROUTINE SPECIFICATIONS FOR MODULE
 
@@ -206,11 +239,21 @@ PRIVATE CalcPTUnit
 PRIVATE SetAverageAirFlow
 PRIVATE ReportPTUnit
 PRIVATE HeatPumpRunFrac
+PRIVATE HotWaterCoilResidual
 
 PUBLIC  GetPTUnitOutAirNode
 PUBLIC  GetPTUnitReturnAirNode
 PUBLIC  GetPTUnitMixedAirNode
 PUBLIC  GetPTUnitZoneInletAirNode
+
+        ! modules for variable speed water-to-air heat pump
+Private SimMSWSHP
+Private SetOnOffMassFlowRateMulSpeed
+Private CalcMSWSHeatPump
+Private SetVSWSHPAirFlow
+Private MSWSHPVarSpeedResidual
+Private MSWSHPCyclingResidual
+Private ControlMSWSHPOutput
 
 CONTAINS
 
@@ -261,8 +304,8 @@ SUBROUTINE SimPackagedTerminalUnit(CompName,ZoneNum,FirstHVACIteration,QUnitOut,
 
   REAL(r64)    :: OnOffAirFlowRatio      ! ratio of compressor ON airflow to average airflow over timestep
   REAL(r64)    :: QZnReq                 ! load to be met by zone equipment
-  REAL(r64)    :: RemainingOutputToHeatingSP ! remaining load to heating set point
-  REAL(r64)    :: RemainingOutputToCoolingSP ! remaining load to cooling set point
+  REAL(r64)    :: RemainingOutputToHeatingSP ! remaining load to heating setpoint
+  REAL(r64)    :: RemainingOutputToCoolingSP ! remaining load to cooling setpoint
 
           ! FLOW
 
@@ -311,6 +354,8 @@ SUBROUTINE SimPackagedTerminalUnit(CompName,ZoneNum,FirstHVACIteration,QUnitOut,
     QZnReq = 0.0D0
   END IF
 
+  ZoneEqDXCoil = .TRUE.
+
   ! Initialize the packaged terminal heat pump
   CALL InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,QZnReq)
 
@@ -318,6 +363,8 @@ SUBROUTINE SimPackagedTerminalUnit(CompName,ZoneNum,FirstHVACIteration,QUnitOut,
 
   ! Report the result of the simulation
   CALL ReportPTUnit(PTUnitNum)
+
+  ZoneEqDXCoil = .FALSE.
 
   RETURN
 END SUBROUTINE SimPackagedTerminalUnit
@@ -328,6 +375,7 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   July 2005
           !       MODIFIED       D. Shirey, Aug 2009 (QLatUnitOut)
+          !       MODIFIED       Bo Shen, March 2012, added switch to variable-speed water-source heat pump
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -342,6 +390,7 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
 
           ! USE STATEMENTS:
           ! na
+  USE Psychrometrics,            ONLY: PsyHFnTdbW       
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -352,7 +401,7 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
   REAL(r64),    INTENT (OUT)   :: QSensUnitOut       ! sensible delivered capacity [W]
   REAL(r64),    INTENT (OUT)   :: QLatUnitOut        ! Latent delivered capacity [kg/s], dehumidification = negative
   REAL(r64),    INTENT (INOUT) :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to AVERAGE airflow over timestep
-  REAL(r64), INTENT (IN)    :: QZnReq            ! cooling/heating needed by zone [W]
+  REAL(r64), INTENT (IN)    :: QZnReq                ! cooling/heating needed by zone [W]
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -374,6 +423,10 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
   REAL(r64) :: SpecHumIn         ! Specific humidity ratio of inlet air (kg moisture / kg moist air)
   INTEGER   :: OpMode            ! operating mode (fan cycling or continious; DX coil always cycles)
   LOGICAL   :: HXUnitOn          ! flag to enable heat exchanger
+  REAL(r64) :: QLatReq           ! latent cooling output needed by zone [W], now is zero
+  REAL(r64) :: QSensUnitOutMul   ! sensible output for the variable speed HP
+  REAL(r64) :: QLatUnitOutMul    ! latent output for the variable speed HP
+  REAL(r64) :: MinHumRat         ! min humidity for calculating sensible capacity of VS WSHP
 
   ! zero the fan, DX coils, and supplemental electric heater electricity consumption
   FanElecPower         = 0.0d0
@@ -381,6 +434,7 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
   DXElecHeatingPower   = 0.0d0
   ElecHeatingCoilPower = 0.0d0
   SaveCompressorPLR    = 0.0d0
+  QLatReq               = 0.0d0
 
   ! initialize local variables
   UnitOn       = .TRUE.
@@ -408,40 +462,56 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
   OnOffFanPartLoadFraction = 1.0d0
 
   IF(UnitOn)THEN
-    CALL ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNum,PartLoadFrac,OnOffAirFlowRatio, &
+   IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN
+     CALL SimMSWSHP(PTUnitNum,ZoneNum, FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlowRatio, OpMode, HXUnitOn )   
+   ELSE
+     CALL ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNum,PartLoadFrac,OnOffAirFlowRatio, &
                              SupHeaterLoad,HXUnitOn)
+   END IF
   ELSE
     PartLoadFrac      = 0.0d0
     OnOffAirFlowRatio = 1.0d0
     SupHeaterLoad     = 0.0d0
+    IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN
+      CALL CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,0,1,0.0d0,PartLoadFrac,QSensUnitOutMul, QLatUnitOutMul, &
+                      0.0d0,0.0d0,OnOffAirFlowRatio,SupHeaterLoad,HXUnitOn )
+    END IF
   END IF
-
-  CALL CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,QSensUnitOut,QZnReq,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
-
+  
   ! calculate delivered capacity
   AirMassFlow = Node(InletNode)%MassFlowRate
+  
+  IF(PTUnit(PTUnitNum)%NumOfSpeedCooling == 0) THEN
+    CALL CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,QSensUnitOut,QZnReq,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+  ELSE 
+    ! calculate delivered capacity
+    MinHumRat = MIN(Node(InletNode)%HumRat,Node(OutletNode)%HumRat)
+    QSensUnitOut   = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
+  END IF
 
   SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
   SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
   QLatUnitOut = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
 
   QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
+  
+  IF(PTUnit(PTUnitNum)%NumOfSpeedCooling == 0) THEN
+      ! report variables
+      IF(PTUnit(PTUnitNum)%UnitType_Num == PTACUnit)THEN
+        PTUnit(PTUnitNum)%CompPartLoadRatio = PartLoadFrac
+      ELSE
+        PTUnit(PTUnitNum)%CompPartLoadRatio = SaveCompressorPLR
+      END IF
 
-  ! report variables
-  IF(PTUnit(PTUnitNum)%UnitType_Num == PTACUnit)THEN
-    PTUnit(PTUnitNum)%CompPartLoadRatio = PartLoadFrac
-  ELSE
-    PTUnit(PTUnitNum)%CompPartLoadRatio = SaveCompressorPLR
-  END IF
-
-  IF (PTUnit(PTUnitNum)%OpMode .EQ. CycFanCycCoil) THEN
-    PTUnit(PTUnitNum)%FanPartLoadRatio = PartLoadFrac
-  ELSE
-    IF (UnitOn) THEN
-      PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
-    ELSE
-      PTUnit(PTUnitNum)%FanPartLoadRatio = 0.0
-    END IF
+      IF (PTUnit(PTUnitNum)%OpMode .EQ. CycFanCycCoil) THEN
+        PTUnit(PTUnitNum)%FanPartLoadRatio = PartLoadFrac
+      ELSE
+        IF (UnitOn) THEN
+          PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
+        ELSE
+          PTUnit(PTUnitNum)%FanPartLoadRatio = 0.0
+        END IF
+      END IF
   END IF
 
   PTUnit(PTUnitNum)%TotCoolEnergyRate  = ABS(MIN(0.0d0, QTotUnitOut))
@@ -473,6 +543,7 @@ SUBROUTINE GetPTUnit
           !       DATE WRITTEN   July 2005
           !       MODIFIED       Chandan Sharma, FSEC, March 2011: Added ZoneHVAC sys avail manager
           !                      Bereket Nigusse, FSEC, April 2011: added OA Mixer object type
+          !       MODIFIED       Bo Shen, ORNL, March 2012, added variable-speed water-source heat pump
           !
           !       RE-ENGINEERED  na
 
@@ -489,7 +560,6 @@ SUBROUTINE GetPTUnit
   USE Fans,                  ONLY: GetFanType, GetFanIndex, GetFanVolFlow, GetFanInletNode, GetFanOutletNode, GetFanAvailSchPtr
   USE MixedAir,              ONLY: GetOAMixerNodeNumbers
   USE General,               ONLY: TrimSigDigits, RoundSigDigits
-  USE DataSizing,            ONLY: AutoSize
   USE DXCoils,               ONLY: GetDXCoolCoilIndex=>GetDXCoilIndex, &
                                    GetDXCoilInletNode=>GetCoilInletNode, GetDXCoilOutletNode=>GetCoilOutletNode, &
                                    GetCoilCondenserInletNode
@@ -515,7 +585,12 @@ SUBROUTINE GetPTUnit
                                       GetWtoAHPSimpleCoilInletNode=>GetCoilInletNode, &
                                       GetWtoAHPSimpleCoilOutletNode=>GetCoilOutletNode,GetWtoAHPSimpleCoilIndex=>GetCoilIndex, &
                                       SetSimpleWSHPData
-
+  USE WatertoAirMulSpeeddHP,    ONLY: GetCoilCapacityMulSpeedWSHP, &
+                                          GetCoilInletNodeMulSpeedWSHP, &
+                                          GetCoilOutletNodeMulSpeedWSHP, &
+                                          GetCoilIndexMulSpeedWSHP, &
+                                          GetCoilAirFlowRateMulSpeedWSHP,&
+                                          SetMulSpeedWSHPData
   USE OutAirNodeManager, ONLY: CheckOutAirNodeNumber
   USE DataZoneEquipment, ONLY: ZoneEquipConfig,PkgTermHPAirToAir_Num, PkgTermHPWaterToAir_Num
   USE SystemAvailabilityManager, ONLY: GetZoneEqAvailabilityManager
@@ -544,13 +619,15 @@ SUBROUTINE GetPTUnit
   INTEGER, DIMENSION(4)          :: OANodeNums  ! Node numbers of OA mixer (OA, EA, RA, MA)
   INTEGER                        :: FanInletNodeNum ! Fan inlet node number
   INTEGER                        :: FanOutletNodeNum ! Fan outlet node number
-  INTEGER                        :: SupHeatInletNodeNum !Supplemental heating coil inlet node number
-  INTEGER                        :: SupHeatOutletNodeNum !Supplemental heating coil outlet node number
+  INTEGER                        :: SuppHeatInletNodeNum !Supplemental heating coil inlet node number
+  INTEGER                        :: SuppHeatOutletNodeNum !Supplemental heating coil outlet node number
   INTEGER                        :: CoolCoilInletNodeNum ! cooling coil inlet node number
   INTEGER                        :: CoolCoilOutletNodeNum ! cooling coil outlet node number
   CHARACTER(len=MaxNameLength)   :: ACHeatCoilName ! name of heating coil
   INTEGER                        :: HeatCoilInletNodeNum ! heating coil inlet node number
   INTEGER                        :: HeatCoilOutletNodeNum ! heating coil outlet node number
+  INTEGER                        :: SuppHeatHWInletNodeNum  !Supplemental heating coil Hot Water inlet node number
+  INTEGER                        :: SuppHeatHWOutletNodeNum !Supplemental heating coil Hot Water outlet node number
   CHARACTER(len=MaxNameLength)   :: CompSetFanInlet, CompSetCoolInlet, CompSetFanOutlet, CompSetCoolOutlet
   CHARACTER(len=MaxNameLength)   :: CompSetHeatInlet, CompSetHeatOutlet, CompSetSupHeatInlet, CompSetSupHeatOutlet
   INTEGER                        :: NumAlphas  ! Number of Alphas for each GetObjectItem call
@@ -566,10 +643,9 @@ SUBROUTINE GetPTUnit
   LOGICAL                        :: ErrFlag = .FALSE. ! Error flag returned during CALL to mining functions
   REAL(r64)                      :: FanVolFlow ! maximum supply air volumetric flow rate of fan
   INTEGER                        :: TempNodeNum ! dummy variable to set up HW coil water inlet node
-  REAL(r64)                      :: TempSteamIn ! dummy variable to set up steam coil steam inlet temperature
   INTEGER                        :: SteamIndex  ! dummy variable to set up steam coil steam inlet density
-  CHARACTER(len=MaxNameLength)   :: SupHeatCoilType ! type of supplemental heating coil
-  CHARACTER(len=MaxNameLength)   :: SupHeatCoilName ! name of supplemental heating coil
+  CHARACTER(len=MaxNameLength)   :: SuppHeatCoilType ! type of supplemental heating coil
+  CHARACTER(len=MaxNameLength)   :: SuppHeatCoilName ! name of supplemental heating coil
   INTEGER                        :: CtrlZone    ! index to loop counter
   INTEGER                        :: NodeNum     ! index to loop counter
   LOGICAL                        :: ZoneNodeNotFound ! used in error checking
@@ -627,12 +703,14 @@ SUBROUTINE GetPTUnit
 
     FanInletNodeNum       = 0
     FanOutletNodeNum      = 0
-    SupHeatInletNodeNum   = 0
-    SupHeatOutletNodeNum  = 0
+    SuppHeatInletNodeNum   = 0
+    SuppHeatOutletNodeNum  = 0
     CoolCoilInletNodeNum  = 0
     CoolCoilOutletNodeNum = 0
     HeatCoilInletNodeNum  = 0
     HeatCoilOutletNodeNum = 0
+    SuppHeatHWInletNodeNum = 0
+    SuppHeatHWOutletNodeNum = 0
 
     CurrentModuleObject = 'ZoneHVAC:PackagedTerminalHeatPump'
     CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
@@ -724,7 +802,7 @@ SUBROUTINE GetPTUnit
 !   only check that SA flow in cooling is >= OA flow in cooling when either or both are not autosized
     IF (PTUnit(PTUnitNum)%CoolOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .AND. &
         PTUnit(PTUnitNum)%CoolOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .NE. AutoSize) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(4))//' can not be greater than '// &
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(4))//' cannot be greater than '// &
                            TRIM(cNumericFields(1)))
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
@@ -741,7 +819,7 @@ SUBROUTINE GetPTUnit
 !   only check that SA flow in heating is >= OA flow in heating when either or both are not autosized
     IF (PTUnit(PTUnitNum)%HeatOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .AND. &
         PTUnit(PTUnitNum)%HeatOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .NE. AutoSize) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(5))//' can not be greater than '// &
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(5))//' cannot be greater than '// &
                            TRIM(cNumericFields(2)))
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
@@ -844,35 +922,101 @@ SUBROUTINE GetPTUnit
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
     END IF
+    SuppHeatCoilType                           = Alphas(13)
+    SuppHeatCoilName                           = Alphas(14)
+    PTUnit(PTUnitNum)%SuppHeatCoilName         = SuppHeatCoilName
+    IF (SameString(Alphas(13),'Coil:Heating:Gas')      .OR. &
+        SameString(Alphas(13),'Coil:Heating:Electric') .OR. &
+        SameString(Alphas(13),'Coil:Heating:Water')    .OR. &
+        SameString(Alphas(13),'Coil:Heating:Steam')) THEN
+        PTUnit(PTUnitNum)%SuppHeatCoilType=SuppHeatCoilType
+       IF (SameString(Alphas(13),'Coil:Heating:Gas') .OR. SameString(Alphas(13),'Coil:Heating:Electric')) THEN
+         IF (SameString(Alphas(13),'Coil:Heating:Gas')) THEN
+            PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingGas
+         ELSEIF (SameString(Alphas(13),'Coil:Heating:Electric')) THEN
+            PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingElectric
+         ENDIF
+         ErrFlag = .FALSE.
+         CALL ValidateComponent(SuppHeatCoilType,SuppHeatCoilName,ErrFlag,  &
+                                TRIM(CurrentModuleObject))
+         IF (ErrFlag) THEN
+           CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'".')
+           ErrorsFound=.TRUE.
+         ELSE
+           CALL GetHeatingCoilIndex(SuppHeatCoilName,PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag)
+           ! Get the Supplemental Heating Coil Node Numbers
+           SuppHeatInletNodeNum = &
+               GetHeatingCoilInletNode(SuppHeatCoilType,SuppHeatCoilName,ErrFlag)
+           SuppHeatOutletNodeNum = &
+               GetHeatingCoilOutletNode(SuppHeatCoilType,SuppHeatCoilName,ErrFlag)
+           IF (ErrFlag) THEN
+             CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'".')
+             ErrorsFound=.TRUE.
+           ENDIF
+        ENDIF
+       ELSEIF (SameString(Alphas(13),'Coil:Heating:Water')) THEN
+         PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingWater
+         ErrFlag = .FALSE.
+         SuppHeatHWInletNodeNum = GetCoilWaterInletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%HotWaterControlNode = SuppHeatHWInletNodeNum
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+         PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate(SuppHeatCoilType,  &
+                                                  PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate(SuppHeatCoilType,  &
+                                                     PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         END IF
+         ErrFlag = .FALSE.
+         SuppHeatInletNodeNum =  GetWaterCoilInletNode('Coil:Heating:Water',PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%SupCoilAirInletNode = SuppHeatInletNodeNum
+         SuppHeatOutletNodeNum = GetWaterCoilOutletNode('Coil:Heating:Water', &
+                                                        PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
 
-    PTUnit(PTUnitNum)%SupHeatCoilName         = Alphas(14)
-    IF (SameString(Alphas(13),'Coil:Heating:Gas') .OR. &
-       SameString(Alphas(13),'Coil:Heating:Electric')) THEN
-       SupHeatCoilType = Alphas(13)
-       IF (SameString(Alphas(13),'Coil:Heating:Gas')) THEN
-         PTUnit(PTUnitNum)%SupHeatCoilType_Num = Coil_HeatingGas
-       ELSEIF (SameString(Alphas(13),'Coil:Heating:Electric')) THEN
-         PTUnit(PTUnitNum)%SupHeatCoilType_Num = Coil_HeatingElectric
+       ELSEIF (SameString(Alphas(13),'Coil:Heating:Steam')) THEN
+         PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingSteam
+         ErrFlag = .FALSE.
+         PTUnit(PTUnitNum)%SuppHeatCoilIndex = GetSTeamCoilIndex(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF (PTUnit(PTUnitNum)%SuppHeatCoilIndex .EQ. 0) THEN
+             CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(14))//' = ' &
+                           //TRIM(PTUnit(PTUnitNum)%SuppHeatCoilName))
+             CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+             ErrorsFound = .TRUE.
+         END IF
+         !IF(ErrFlag)CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+         ErrFlag = .FALSE.
+         SuppHeatHWInletNodeNum = GetSteamCoilSteamInletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%HWCoilSteamInletNode = SuppHeatHWInletNodeNum
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+         PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag)
+         IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+            SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
+            SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetPackagedTerminalHeatPumpInput')
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = &
+                              GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag) * SteamDensity
+         END IF
+         ErrFlag = .FALSE.
+         SuppHeatInletNodeNum = &
+            GetSteamCoilAirInletNode(PTUnit(PTUnitNum)%SuppHeatCoilIndex,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%SupCoilAirInletNode = SuppHeatInletNodeNum
+         SuppHeatOutletNodeNum = GetSteamCoilAirOutletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
        END IF
-
-       ErrFlag = .FALSE.
-       SupHeatInletNodeNum = GetHeatingCoilInletNode(SupHeatCoilType,PTUnit(PTUnitNum)%SupHeatCoilName,ErrFlag)
-       SupHeatOutletNodeNum = GetHeatingCoilOutletNode(SupHeatCoilType,PTUnit(PTUnitNum)%SupHeatCoilName,ErrFlag)
-       IF(ErrFlag)CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
 
     ELSE
       CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(13))//' = '//TRIM(Alphas(13)))
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
-      ErrorsFound = .TRUE.
-    END IF
-
-    ErrFlag = .FALSE.
-    CALL GetHeatingCoilIndex(PTUnit(PTUnitNum)%SupHeatCoilName, PTUnit(PTUnitNum)%SupHeatCoilIndex, ErrFlag)
-    IF(ErrFlag)CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
-
-    IF (PTUnit(PTUnitNum)%SupHeatCoilIndex .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(14))//' = ' &
-                           //TRIM(PTUnit(PTUnitNum)%SupHeatCoilName))
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
     END IF
@@ -947,18 +1091,18 @@ SUBROUTINE GetPTUnit
         CALL ShowContinueError('..Heating coil inlet node name  = '//TRIM(NodeID(HeatCoilInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(HeatCoilOutletNodeNum /= SupHeatInletNodeNum)THEN
+      IF(HeatCoilOutletNodeNum /= SuppHeatInletNodeNum)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
                            '" Heating coil outlet node name must be the same as the supplemental heating coil inlet')
         CALL ShowContinueError(' node name when blow through '//TRIM(cAlphaFields(14))//' is specified.')
         CALL ShowContinueError('..Heating coil outlet node name              = '//TRIM(NodeID(HeatCoilOutletNodeNum)))
-        CALL ShowContinueError('..Supplemental heating coil inlet node name  = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil inlet node name  = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(SupHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
+      IF(SuppHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
                            '" Supplemental heating coil outlet node name must be the same as the heat pumps outlet node name.')
-        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SupHeatOutletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SuppHeatOutletNodeNum)))
         CALL ShowContinueError('..Heat pumps outlet node name                   = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirOutNode)))
         ErrorsFound=.TRUE.
       END IF
@@ -1031,19 +1175,19 @@ SUBROUTINE GetPTUnit
         CALL ShowContinueError('..Fan inlet node name           = '//TRIM(NodeID(FanInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF (SupHeatInletNodeNum /= FanOutletNodeNum) THEN
+      IF (SuppHeatInletNodeNum /= FanOutletNodeNum) THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
                              '" Fan outlet node name must be the same')
         CALL ShowContinueError('as the supplemental heating coil inlet node name when draw through '// &
                                 TRIM(cAlphaFields(15))//' is specified.')
         CALL ShowContinueError('..Fan outlet node = '//TRIM(NodeID(FanOutletNodeNum)))
-        CALL ShowContinueError('..Supplemental heating coil inlet node = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil inlet node = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(SupHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
+      IF(SuppHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
                            '" Supplemental heating coil outlet node name must be the same as the heat pumps outlet node name.')
-        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SupHeatOutletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SuppHeatOutletNodeNum)))
         CALL ShowContinueError('..Heat pumps outlet node name                = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirOutNode)))
         ErrorsFound=.TRUE.
       END IF
@@ -1116,7 +1260,7 @@ SUBROUTINE GetPTUnit
           PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow .NE. AutoSize .AND. &
           PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow .NE. 0.0) THEN
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
-          CALL ShowContinueError('Outdoor air flow rate when compressor is off can not be greater than ' &
+          CALL ShowContinueError('Outdoor air flow rate when compressor is off cannot be greater than ' &
                                  //'supply air flow rate when compressor is off')
           ErrorsFound = .TRUE.
         END IF
@@ -1134,8 +1278,8 @@ SUBROUTINE GetPTUnit
     CompSetCoolOutlet = NodeID(CoolCoilOutletNodeNum)
     CompSetHeatInlet  = NodeID(HeatCoilInletNodeNum)
     CompSetHeatOutlet = NodeID(HeatCoilOutletNodeNum)
-    CompSetSupHeatInlet  = NodeID(SupHeatInletNodeNum)
-    CompSetSupHeatOutlet = NodeID(SupHeatOutletNodeNum)
+    CompSetSupHeatInlet  = NodeID(SuppHeatInletNodeNum)
+    CompSetSupHeatOutlet = NodeID(SuppHeatOutletNodeNum)
 
     ! Add fan to component sets array
     CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
@@ -1151,8 +1295,19 @@ SUBROUTINE GetPTUnit
 
     ! Add supplemental heating coil to component sets array
     CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
-                   SupHeatCoilType,PTUnit(PTUnitNum)%SupHeatCoilName,CompSetSupHeatInlet,CompSetSupHeatOutlet)
+                   SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,CompSetSupHeatInlet,CompSetSupHeatOutlet)
 
+    IF(PTUnit(PTUnitNum)%UnitType_Num .EQ. PTHPUnit)THEN
+      IF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) THEN
+        ! Add heating coil water inlet node as actuator node for coil
+        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%HotWaterControlNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
+                              PTUnit(PTUnitNum)%Name,NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
+      ELSEIF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
+        ! Add heating coil steam inlet node as actualtor node for coil
+        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%HWCoilSteamInletNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
+                             PTUnit(PTUnitNum)%Name, NodeType_Steam,NodeConnectionType_Actuator,1,ObjectIsParent)
+      END IF
+    END IF
     ! Set up component set for OA mixer - use OA node and Mixed air node
     CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
                        PTUnit(PTUnitNum)%OAMixType, PTUnit(PTUnitNum)%OAMixName,NodeID(OANodeNums(1)),NodeID(OANodeNums(4)))
@@ -1167,7 +1322,7 @@ SUBROUTINE GetPTUnit
     CoolCoilOutletNodeNum = 0
     HeatCoilInletNodeNum  = 0
     HeatCoilOutletNodeNum = 0
-    SupHeatInletNodeNum   = 0
+    SuppHeatInletNodeNum   = 0
 
     CurrentModuleObject = 'ZoneHVAC:PackagedTerminalAirConditioner'
     CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
@@ -1259,7 +1414,7 @@ SUBROUTINE GetPTUnit
 !   only check that SA flow in cooling is >= OA flow in cooling when either or both are not autosized
     IF (PTUnit(PTUnitNum)%CoolOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .AND. &
         PTUnit(PTUnitNum)%CoolOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .NE. AutoSize) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(4))//' can not be greater than '// &
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(4))//' cannot be greater than '// &
                            TRIM(cNumericFields(1)))
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
@@ -1276,7 +1431,7 @@ SUBROUTINE GetPTUnit
 !   only check that SA flow in heating is >= OA flow in heating when either or both are not autosized
     IF (PTUnit(PTUnitNum)%HeatOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .AND. &
         PTUnit(PTUnitNum)%HeatOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .NE. AutoSize) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(5))//' can not be greater than '// &
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cNumericFields(5))//' cannot be greater than '// &
                            TRIM(cNumericFields(2)))
       CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
       ErrorsFound = .TRUE.
@@ -1363,7 +1518,7 @@ SUBROUTINE GetPTUnit
        ELSEIF (SameString(Alphas(9),'Coil:Heating:Water')) THEN
          PTUnit(PTUnitNum)%ACHeatCoilType_Num = Coil_HeatingWater
          ErrFlag = .FALSE.
-         PTUnit(PTUnitNum)%WaterControlNode = GetCoilWaterInletNode('Coil:Heating:Water',  &
+         PTUnit(PTUnitNum)%HotWaterControlNode = GetCoilWaterInletNode('Coil:Heating:Water',  &
                                                  ACHeatCoilName,ErrFlag)
          PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
                                                  ACHeatCoilName,ErrFlag)
@@ -1388,7 +1543,6 @@ SUBROUTINE GetPTUnit
          PTUnit(PTUnitNum)%HWCoilSteamInletNode = GetSteamCoilSteamInletNode(PTUnit(PTUnitNum)%ACHeatCoilIndex,ACHeatCoilName, &
                                                   ErrFlag)
          PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%ACHeatCoilIndex,ErrFlag)
-         TempSteamIn= 100.00
          SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
          SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetPackagedTerminalHeatPumpInput')
          IF(PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
@@ -1531,7 +1685,7 @@ SUBROUTINE GetPTUnit
                            '" Heating coil outlet node name must be the same as the air conditioners outlet')
         CALL ShowContinueError(' node name when blow through '//TRIM(cAlphaFields(12))//' is specified.')
         CALL ShowContinueError('..Heating coil outlet node name      = '//TRIM(NodeID(HeatCoilOutletNodeNum)))
-        CALL ShowContinueError('..Air conditioners outlet node name  = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Air conditioners outlet node name  = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
       ! check that PTUnit outlet node is a zone inlet node.
@@ -1610,7 +1764,7 @@ SUBROUTINE GetPTUnit
         CALL ShowContinueError('as the air conditioners outlet node name when draw through '// &
                                TRIM(cAlphaFields(13))//' is specified.')
         CALL ShowContinueError('..Fan outlet node  name             = '//TRIM(NodeID(FanOutletNodeNum)))
-        CALL ShowContinueError('..Air conditioners outlet node name = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Air conditioners outlet node name = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
       ! check that PTUnit outlet node is a zone inlet node.
@@ -1681,7 +1835,7 @@ SUBROUTINE GetPTUnit
           PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow .NE. AutoSize .AND. &
           PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow .NE. 0.0) THEN
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
-          CALL ShowContinueError('Outdoor air flow rate when compressor is off can not be greater than ' &
+          CALL ShowContinueError('Outdoor air flow rate when compressor is off cannot be greater than ' &
                          //'supply air flow rate when compressor is off')
           ErrorsFound = .TRUE.
         END IF
@@ -1718,7 +1872,7 @@ SUBROUTINE GetPTUnit
     IF(PTUnit(PTUnitNum)%UnitType_Num .EQ. PTACUnit)THEN
       IF (PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingWater) THEN
         ! Add heating coil water inlet node as actuator node for coil
-        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%WaterControlNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
+        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%HotWaterControlNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
                               PTUnit(PTUnitNum)%Name,NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
       ELSEIF (PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingSteam) THEN
         ! Add heating coil steam inlet node as actualtor node for coil
@@ -1746,8 +1900,10 @@ SUBROUTINE GetPTUnit
     CoolCoilOutletNodeNum = 0
     HeatCoilInletNodeNum  = 0
     HeatCoilOutletNodeNum = 0
-    SupHeatInletNodeNum   = 0
-    SupHeatOutletNodeNum  = 0
+    SuppHeatInletNodeNum  = 0
+    SuppHeatOutletNodeNum = 0
+    SuppHeatHWInletNodeNum = 0
+    SuppHeatHWOutletNodeNum = 0
 
     CurrentModuleObject = 'ZoneHVAC:WaterToAirHeatPump'
     CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
@@ -1880,6 +2036,28 @@ SUBROUTINE GetPTUnit
         HeatCoilOutletNodeNum=GetWtoAHPSimpleCoilOutletNode(PTUnit(PTUnitNum)%DXHeatCoilType, &
                                                             PTUnit(PTUnitNum)%DXHeatCoilName,ErrFlag)
       ENDIF
+    ELSE IF (Alphas(9) == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' )THEN
+      PTUnit(PTUnitNum)%DXHeatCoilType = Alphas(9)
+      PTUnit(PTUnitNum)%DXHeatCoilType_Num = Coil_HeatingWaterToAirHPVSEquationFit
+      PTUnit(PTUnitNum)%DXHeatCoilName = Alphas(10)
+      CALL ValidateComponent(PTUnit(PTUnitNum)%DXHeatCoilType,PTUnit(PTUnitNum)%DXHeatCoilName,IsNotOK,  &
+                             TRIM(CurrentModuleObject))
+      IF (IsNotOK) THEN
+        CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+        ErrorsFound=.TRUE.
+      ELSE
+        ErrFlag = .FALSE.
+        PTUnit(PTUnitNum)%DXHeatCoilIndex = GetCoilIndexMulSpeedWSHP(PTUnit(PTUnitNum)%DXHeatCoilType, &
+                                                                     PTUnit(PTUnitNum)%DXHeatCoilName,ErrFlag)
+        IF(ErrFlag)THEN
+          CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+          ErrorsFound=.TRUE.
+        END IF
+        HeatCoilInletNodeNum=GetCoilInletNodeMulSpeedWSHP(PTUnit(PTUnitNum)%DXHeatCoilType, &
+                                                          PTUnit(PTUnitNum)%DXHeatCoilName,ErrFlag)
+        HeatCoilOutletNodeNum=GetCoilOutletNodeMulSpeedWSHP(PTUnit(PTUnitNum)%DXHeatCoilType, &
+                                                            PTUnit(PTUnitNum)%DXHeatCoilName,ErrFlag)
+      ENDIF
     ELSE
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'"')
       CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(9))//' = '//TRIM(Alphas(9)))
@@ -1909,6 +2087,28 @@ SUBROUTINE GetPTUnit
         CoolCoilOutletNodeNum=GetWtoAHPSimpleCoilOutletNode(PTUnit(PTUnitNum)%DXCoolCoilType,  &
                                                             PTUnit(PTUnitNum)%DXCoolCoilName,ErrFlag)
       ENDIF
+    ELSE IF (Alphas(11) == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' )THEN
+      PTUnit(PTUnitNum)%DXCoolCoilType = Alphas(11)
+      PTUnit(PTUnitNum)%DXCoolCoilType_Num = Coil_CoolingWaterToAirHPVSEquationFit
+      PTUnit(PTUnitNum)%DXCoolCoilName = Alphas(12)
+      CALL ValidateComponent(PTUnit(PTUnitNum)%DXCoolCoilType,PTUnit(PTUnitNum)%DXCoolCoilName,IsNotOK,  &
+                             TRIM(CurrentModuleObject))
+      IF (IsNotOK) THEN
+        CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+        ErrorsFound=.TRUE.
+      ELSE
+        ErrFlag = .FALSE.
+        PTUnit(PTUnitNum)%DXCoolCoilIndexNum = GetCoilIndexMulSpeedWSHP(PTUnit(PTUnitNum)%DXCoolCoilType, &
+                                                                        PTUnit(PTUnitNum)%DXCoolCoilName,ErrFlag)
+        IF(ErrFlag)THEN
+          CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+          ErrorsFound=.TRUE.
+        END IF
+        CoolCoilInletNodeNum=GetCoilInletNodeMulSpeedWSHP(PTUnit(PTUnitNum)%DXCoolCoilType,  &
+                                                          PTUnit(PTUnitNum)%DXCoolCoilName,ErrFlag)
+        CoolCoilOutletNodeNum=GetCoilOutletNodeMulSpeedWSHP(PTUnit(PTUnitNum)%DXCoolCoilType,  &
+                                                            PTUnit(PTUnitNum)%DXCoolCoilName,ErrFlag)
+      ENDIF
     ELSE
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'"')
       CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(11))//'="'//TRIM(Alphas(11))//'".')
@@ -1923,6 +2123,12 @@ SUBROUTINE GetPTUnit
 !         CALL SetSimpleWSHPData(PTUnit(PTUnitNum)%DXHeatCoilIndex,ErrorsFound, &
 !                                CompanionCoolingCoilNum=PTUnit(PTUnitNum)%DXCoolCoilIndexNum)
       END IF
+    ELSE IF (Alphas(9) == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .AND.   &
+        Alphas(11) == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT') THEN
+      IF(PTUnit(PTUnitNum)%DXHeatCoilIndex .GT. 0 .AND. PTUnit(PTUnitNum)%DXCoolCoilIndexNum .GT. 0)THEN
+         CALL SetMulSpeedWSHPData(PTUnit(PTUnitNum)%DXCoolCoilIndexNum,ErrorsFound, &
+                                CompanionHeatingCoilNum=PTUnit(PTUnitNum)%DXHeatCoilIndex)
+      END IF
     ELSE
       CALL ShowContinueError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'"')
       CALL ShowContinueError('Cooling coil and heating coil should use the equation fit model and be of same general type')
@@ -1931,35 +2137,97 @@ SUBROUTINE GetPTUnit
 
     ! Get supplemental heating coil information
 
-    SupHeatCoilType = Alphas(13)
-    SupHeatCoilName = Alphas(14)
-    ErrFlag = .FALSE.
-    PTUnit(PTUnitNum)%SupHeatCoilType_Num = GetHeatingCoilTypeNum(SupHeatCoilType,SupHeatCoilName,ErrFlag)
-    IF (ErrFlag) THEN
-      CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'"')
-      ErrorsFound=.TRUE.
-    END IF
-
-    IF (PTUnit(PTUnitNum)%SupHeatCoilType_Num == Coil_HeatingGas .OR. &
-        PTUnit(PTUnitNum)%SupHeatCoilType_Num == Coil_HeatingElectric)THEN
-
-      CALL ValidateComponent(SupHeatCoilType,SupHeatCoilName,IsNotOK,  &
-                             TRIM(CurrentModuleObject))
-      IF (IsNotOK) THEN
-        CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
-        ErrorsFound=.TRUE.
-      ELSE
-        CALL GetHeatingCoilIndex(SupHeatCoilName,PTUnit(PTUnitNum)%SupHeatCoilIndex,IsNotOK)
-        ! Get the Supplemental Heating Coil Node Numbers
-        SupHeatInletNodeNum = &
-               GetHeatingCoilInletNode(SupHeatCoilType,SupHeatCoilName,IsNotOK)
-        SupHeatOutletNodeNum = &
-               GetHeatingCoilOutletNode(SupHeatCoilType,SupHeatCoilName,IsNotOK)
-        IF (IsNotOK) THEN
-          CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
-          ErrorsFound=.TRUE.
+    SuppHeatCoilType = Alphas(13)
+    SuppHeatCoilName = Alphas(14)
+    PTUnit(PTUnitNum)%SuppHeatCoilName     = SuppHeatCoilName
+    IF (SameString(Alphas(13),'Coil:Heating:Gas')      .OR. &
+        SameString(Alphas(13),'Coil:Heating:Electric') .OR. &
+        SameString(Alphas(13),'Coil:Heating:Water')    .OR. &
+        SameString(Alphas(13),'Coil:Heating:Steam')) THEN
+        PTUnit(PTUnitNum)%SuppHeatCoilType=SuppHeatCoilType
+       IF (SameString(Alphas(13),'Coil:Heating:Gas') .OR. SameString(Alphas(13),'Coil:Heating:Electric')) THEN
+         IF (SameString(Alphas(13),'Coil:Heating:Gas')) THEN
+            PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingGas
+         ELSEIF (SameString(Alphas(13),'Coil:Heating:Electric')) THEN
+            PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingElectric
+         ENDIF
+         ErrFlag = .FALSE.
+         CALL ValidateComponent(SuppHeatCoilType,SuppHeatCoilName,ErrFlag,  &
+                                TRIM(CurrentModuleObject))
+         IF (ErrFlag) THEN
+           CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'".')
+           ErrorsFound=.TRUE.
+         ELSE
+           CALL GetHeatingCoilIndex(SuppHeatCoilName,PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag)
+           ! Get the Supplemental Heating Coil Node Numbers
+           SuppHeatInletNodeNum = &
+               GetHeatingCoilInletNode(SuppHeatCoilType,SuppHeatCoilName,ErrFlag)
+           SuppHeatOutletNodeNum = &
+               GetHeatingCoilOutletNode(SuppHeatCoilType,SuppHeatCoilName,ErrFlag)
+           IF (ErrFlag) THEN
+             CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'".')
+             ErrorsFound=.TRUE.
+           ENDIF
         ENDIF
-      ENDIF
+       ELSEIF (SameString(Alphas(13),'Coil:Heating:Water')) THEN
+         PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingWater
+         ErrFlag = .FALSE.
+         SuppHeatHWInletNodeNum = GetCoilWaterInletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%HotWaterControlNode = SuppHeatHWInletNodeNum
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+         PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate(SuppHeatCoilType,  &
+                                                  PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate(SuppHeatCoilType,  &
+                                                     PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         END IF
+         ErrFlag = .FALSE.
+         SuppHeatInletNodeNum =  GetWaterCoilInletNode('Coil:Heating:Water',PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%SupCoilAirInletNode = SuppHeatInletNodeNum
+         SuppHeatOutletNodeNum = GetWaterCoilOutletNode('Coil:Heating:Water', &
+                                                        PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+
+       ELSEIF (SameString(Alphas(13),'Coil:Heating:Steam')) THEN
+         PTUnit(PTUnitNum)%SuppHeatCoilType_Num = Coil_HeatingSteam
+         ErrFlag = .FALSE.
+         PTUnit(PTUnitNum)%SuppHeatCoilIndex = GetSTeamCoilIndex(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF (PTUnit(PTUnitNum)%SuppHeatCoilIndex .EQ. 0) THEN
+             CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(14))//' = ' &
+                           //TRIM(PTUnit(PTUnitNum)%SuppHeatCoilName))
+             CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+             ErrorsFound = .TRUE.
+         END IF
+         ErrFlag = .FALSE.
+         SuppHeatHWInletNodeNum = GetSteamCoilSteamInletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%HWCoilSteamInletNode = SuppHeatHWInletNodeNum
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+         PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag)
+         IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+            SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
+            SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetPackagedTerminalHeatPumpInput')
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = &
+                              GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrFlag) * SteamDensity
+         END IF
+         ErrFlag = .FALSE.
+         SuppHeatInletNodeNum = &
+            GetSteamCoilAirInletNode(PTUnit(PTUnitNum)%SuppHeatCoilIndex,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         PTUnit(PTUnitNum)%SupCoilAirInletNode = SuppHeatInletNodeNum
+         SuppHeatOutletNodeNum = GetSteamCoilAirOutletNode(SuppHeatCoilType,PTUnit(PTUnitNum)%SuppHeatCoilName,ErrFlag)
+         IF(ErrFlag)THEN
+           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+           ErrorsFound = .TRUE.
+         END IF
+       END IF
     ELSE
       CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
       CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(13))//' = '//TRIM(Alphas(13)))
@@ -2077,18 +2345,18 @@ SUBROUTINE GetPTUnit
         CALL ShowContinueError('..Heating coil inlet node name  = '//TRIM(NodeID(HeatCoilInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(HeatCoilOutletNodeNum /= SupHeatInletNodeNum)THEN
+      IF(HeatCoilOutletNodeNum /= SuppHeatInletNodeNum)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Heating coil outlet node name must be the same as the supplemental heating coil inlet node name')
         CALL ShowContinueError('..when blow through '//TRIM(cAlphaFields(15))//' is specified.')
         CALL ShowContinueError('..Heating coil outlet node name              = '//TRIM(NodeID(HeatCoilOutletNodeNum)))
-        CALL ShowContinueError('..Supplemental heating coil inlet node name  = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil inlet node name  = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(SupHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
+      IF(SuppHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Supplemental heating coil outlet node name must be the same as the heat pumps outlet node name.')
-        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SupHeatOutletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SuppHeatOutletNodeNum)))
         CALL ShowContinueError('..Heat pumps outlet node name                   = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirOutNode)))
         ErrorsFound=.TRUE.
       END IF
@@ -2174,18 +2442,18 @@ SUBROUTINE GetPTUnit
         CALL ShowContinueError('..Fan inlet node name           = '//TRIM(NodeID(FanInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF (SupHeatInletNodeNum /= FanOutletNodeNum) THEN
+      IF (SuppHeatInletNodeNum /= FanOutletNodeNum) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Fan outlet node name must be the same as the supplemental heating coil inlet node name ')
         CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(15))//' is specified.')
         CALL ShowContinueError('..Fan outlet node = '//TRIM(NodeID(FanOutletNodeNum)))
-        CALL ShowContinueError('..Supplemental heating coil inlet node = '//TRIM(NodeID(SupHeatInletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil inlet node = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
-      IF(SupHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
+      IF(SuppHeatOutletNodeNum /= PTUnit(PTUnitNum)%AirOutNode)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Supplemental heating coil outlet node name must be the same as the heat pumps outlet node name.')
-        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SupHeatOutletNodeNum)))
+        CALL ShowContinueError('..Supplemental heating coil outlet node name = '//TRIM(NodeID(SuppHeatOutletNodeNum)))
         CALL ShowContinueError('..Heat pumps outlet node name                = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirOutNode)))
         ErrorsFound=.TRUE.
       END IF
@@ -2215,8 +2483,8 @@ SUBROUTINE GetPTUnit
     CompSetCoolOutlet = NodeID(CoolCoilOutletNodeNum)
     CompSetHeatInlet  = NodeID(HeatCoilInletNodeNum)
     CompSetHeatOutlet = NodeID(HeatCoilOutletNodeNum)
-    CompSetSupHeatInlet  = NodeID(SupHeatInletNodeNum)
-    CompSetSupHeatOutlet = NodeID(SupHeatOutletNodeNum)
+    CompSetSupHeatInlet  = NodeID(SuppHeatInletNodeNum)
+    CompSetSupHeatOutlet = NodeID(SuppHeatOutletNodeNum)
 
     ! Add fan to component sets array
     CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
@@ -2232,8 +2500,19 @@ SUBROUTINE GetPTUnit
 
     ! Add supplemental heating coil to component sets array
     CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
-                   SupHeatCoilType,SupHeatCoilName,CompSetSupHeatInlet,CompSetSupHeatOutlet)
+                   SuppHeatCoilType,SuppHeatCoilName,CompSetSupHeatInlet,CompSetSupHeatOutlet)
 
+    IF(PTUnit(PTUnitNum)%UnitType_Num .EQ. PTWSHPUnit)THEN
+      IF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) THEN
+        ! Add heating coil water inlet node as actuator node for coil
+        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%HotWaterControlNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
+                              PTUnit(PTUnitNum)%Name,NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
+      ELSEIF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
+        ! Add heating coil steam inlet node as actualtor node for coil
+        TempNodeNum  = GetOnlySingleNode(NodeID(PTUnit(PTUnitNum)%HWCoilSteamInletNode),ErrorsFound,PTUnit(PTUnitNum)%UnitType, &
+                             PTUnit(PTUnitNum)%Name, NodeType_Steam,NodeConnectionType_Actuator,1,ObjectIsParent)
+      END IF
+    END IF
     IF(OANodeNums(1) .GT. 0)THEN
     ! Set up component set for OA mixer - use OA node and Mixed air node
       CALL SetUpCompSets(PTUnit(PTUnitNum)%UnitType, PTUnit(PTUnitNum)%Name, &
@@ -2302,7 +2581,7 @@ SUBROUTINE GetPTUnit
       IF (PTUnit(PTUnitNum)%CoolOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .AND. &
           PTUnit(PTUnitNum)%CoolOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxCoolAirVolFlow .NE. AutoSize) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
-        CALL ShowContinueError('..'//TRIM(cNumericFields(4))//' can not be greater than '// &
+        CALL ShowContinueError('..'//TRIM(cNumericFields(4))//' cannot be greater than '// &
                            TRIM(cNumericFields(1)))
         CALL ShowContinueError('..'//TRIM(cNumericFields(1))//' = ' &
                            //TRIM(TrimSigDigits(Numbers(1),7)))
@@ -2323,7 +2602,7 @@ SUBROUTINE GetPTUnit
       IF (PTUnit(PTUnitNum)%HeatOutAirVolFlow .GT. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .AND. &
           PTUnit(PTUnitNum)%HeatOutAirVolFlow .NE. AutoSize .AND. PTUnit(PTUnitNum)%MaxHeatAirVolFlow .NE. AutoSize) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
-        CALL ShowContinueError('..'//TRIM(cNumericFields(5))//' can not be greater than '// &
+        CALL ShowContinueError('..'//TRIM(cNumericFields(5))//' cannot be greater than '// &
                              TRIM(cNumericFields(2)))
         CALL ShowContinueError('..'//TRIM(cNumericFields(2))//' = ' &
                            //TRIM(TrimSigDigits(Numbers(2),7)))
@@ -2368,6 +2647,14 @@ SUBROUTINE GetPTUnit
          CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
        ENDIF
+    ELSEIF (PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit) THEN
+       ErrFlag=.FALSE.
+       PTUnit(PTUnitNum)%DesignHeatingCapacity =   &
+             GetCoilCapacityMulSpeedWSHP(PTUnit(PTUnitNum)%DXHeatCoilType,PTUnit(PTUnitNum)%DXHeatCoilName,ErrFlag)
+       IF (ErrFlag) THEN
+         CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            ErrorsFound=.TRUE.
+       ENDIF
      ENDIF
      !Set the heat pump heating coil convergence
      PTUnit(PTUnitNum)%HeatConvergenceTol = 0.001d0
@@ -2389,6 +2676,14 @@ SUBROUTINE GetPTUnit
          CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
          ErrorsFound=.TRUE.
        ENDIF
+     ELSEIF (PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit) THEN
+       ErrFlag=.FALSE.
+       PTUnit(PTUnitNum)%DesignCoolingCapacity =   &
+          GetCoilCapacityMulSpeedWSHP(PTUnit(PTUnitNum)%DXCoolCoilType,PTUnit(PTUnitNum)%DXCoolCoilName,ErrFlag)
+       IF (ErrFlag) THEN
+         CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+         ErrorsFound=.TRUE.
+       ENDIF
      ENDIF
      !Set the heat pump cooling coil convergence
      PTUnit(PTUnitNum)%CoolConvergenceTol = 0.001d0
@@ -2406,12 +2701,15 @@ SUBROUTINE GetPTUnit
 
      !Set the heatpump design supplemental heating capacity
      !  Get from coil module.
-     ErrFlag=.FALSE.
-     PTUnit(PTUnitNum)%DesignSuppHeatingCapacity =   &
-        GetHeatingCoilCapacity(SupHeatCoilType,SupHeatCoilName,ErrFlag)
-     IF (ErrFlag) THEN
-       CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
-       ErrorsFound=.TRUE.
+     IF(PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingGas .OR. &
+        PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingElectric)THEN
+         ErrFlag=.FALSE.
+         PTUnit(PTUnitNum)%DesignSuppHeatingCapacity =   &
+            GetHeatingCoilCapacity(SuppHeatCoilType,SuppHeatCoilName,ErrFlag)
+         IF (ErrFlag) THEN
+           CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+           ErrorsFound=.TRUE.
+         ENDIF
      ENDIF
 
      !Set the max outlet temperature for supplemental heating coil
@@ -2579,6 +2877,7 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   July 2005
           !       MODIFIED       Chandan Sharma, FSEC, March 2011: Added ZoneHVAC sys avail manager
+          !       MODIFIED       Bo Shen, ORNL, March 2012, added variable-speed water-source heat pump
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2596,7 +2895,6 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   USE DataEnvironment,      ONLY: StdBaroPress, StdRhoAir
   USE Psychrometrics,       ONLY: PsyRhoAirFnPbTdbW
   USE DataZoneEquipment,    ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList
-  USE DataSizing,           ONLY: AutoSize
   USE HeatingCoils,         ONLY: GetHeatingCoilCapacity=>GetCoilCapacity
   USE SteamCoils,           ONLY: SimulateSteamCoilComponents, GetCoilMaxSteamFlowRate=>GetCoilMaxSteamFlowRate, &
                                   GetSteamCoilCapacity=>GetCoilCapacity
@@ -2609,6 +2907,8 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
                                   PlantLoop
   USE FluidProperties,      ONLY: GetDensityGlycol, GetSatDensityRefrig
   USE PlantUtilities,       ONLY: SetComponentFlowRate, InitComponentNodes
+  USE General,              ONLY: TrimSigDigits
+  USE DataZoneEquipment,    ONLY: ZoneEquipConfig
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2651,10 +2951,18 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   REAL(r64)           :: SupHeaterLoad
   REAL(r64)           :: mdot ! local temporary for mass flow rate (kg/s)
   REAL(r64)           :: rho  ! local for fluid density
-  REAL(r64)           :: TempSteamIn
   INTEGER             :: SteamIndex
   LOGICAL             :: errFlag
   INTEGER             :: AvailStatus    ! Availability status set by system availability manager
+  REAL(r64)           :: LatentOutput            ! no load latent output (coils off) (W)
+  INTEGER             :: NumOfSpeedCooling                ! Number of speeds for cooling
+  INTEGER             :: NumOfSpeedHeating                ! Number of speeds for heating
+  CHARACTER(len=MaxNameLength) :: CurrentModuleObject   ! Object type for getting and error messages
+  INTEGER             ::I                               !loop index
+  
+  InNode  = PTUnit(PTUnitNum)%AirInNode
+  OutNode = PTUnit(PTUnitNum)%AirOutNode
+  
 ! Do the one time initializations
   IF (MyOneTimeFlag) THEN
 
@@ -2684,6 +2992,7 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
                                           PTUnit(PTUnitNum)%CompNum,   &
                                           errFlag=errFlag)
         IF (errFlag) THEN
+          CALL ShowContinueError('Reference Unit="'//trim(PTUnit(PTUnitNum)%Name)//'", type='//trim(PTUnit(PTUnitNum)%UnitType))
           CALL ShowFatalError('InitPTUnit: Program terminated for previous conditions.')
         ENDIF
 
@@ -2711,13 +3020,13 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
                                           PTUnit(PTUnitNum)%CompNum,   &
                                           errFlag=errFlag)
         IF (errFlag) THEN
+          CALL ShowContinueError('Reference Unit="'//trim(PTUnit(PTUnitNum)%Name)//'", type='//trim(PTUnit(PTUnitNum)%UnitType))
           CALL ShowFatalError('InitPTUnit: Program terminated for previous conditions.')
         ENDIF
 
         PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%ACHeatCoilIndex,ErrorsFound)
 
         IF(PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
-          TempSteamIn= 100.00
           SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
           SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitPTUnit')
           PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow =   &
@@ -2732,6 +3041,56 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
                        %Branch(PTUnit(PTUnitNum)%BranchNum)%Comp(PTUnit(PTUnitNum)%CompNum)%NodeNumOut
       MyPlantScanFlag(PTUnitNum) = .FALSE.
 
+    ELSEIF ( (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) .OR. &
+             (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) ) THEN
+      IF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) THEN
+        errFlag=.false.
+        CALL ScanPlantLoopsForObject( PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          TypeOf_CoilWaterSimpleHeating , &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum,   &
+                                          errFlag=errFlag)
+        IF (errFlag) THEN
+          CALL ShowFatalError('InitPTUnit: Program terminated for previous conditions.')
+        ENDIF
+        PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
+                                                 PTUnit(PTUnitNum)%SuppHeatCoilName,ErrorsFound)
+
+        IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+            rho = GetDensityGlycol(PlantLoop(PTUnit(PTUnitNum)%LoopNum)%FluidName, &
+                                   InitConvTemp, &
+                                   PlantLoop(PTUnit(PTUnitNum)%LoopNum)%FluidIndex, &
+                                   'InitPTUnit')
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
+                                                     PTUnit(PTUnitNum)%SuppHeatCoilName,ErrorsFound) * rho
+        END IF
+      ELSEIF (PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
+        errFlag=.false.
+        CALL ScanPlantLoopsForObject( PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          TypeOf_CoilSteamAirHeating , &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum,   &
+                                          errFlag=errFlag)
+        IF (errFlag) THEN
+          CALL ShowFatalError('InitPTUnit: Program terminated for previous conditions.')
+        ENDIF
+        PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrorsFound)
+        IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+          SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
+          SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitPTUnit')
+          PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = &
+                   GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrorsFound) * SteamDensity
+        END IF
+      ENDIF
+         !fill outlet node for coil
+      PTUnit(PTUnitNum)%PlantCoilOutletNode =  &
+            PlantLoop(PTUnit(PTUnitNum)%LoopNum)%LoopSide(PTUnit(PTUnitNum)%LoopSide) &
+                       %Branch(PTUnit(PTUnitNum)%BranchNum)%Comp(PTUnit(PTUnitNum)%CompNum)%NodeNumOut
+      MyPlantScanFlag(PTUnitNum) = .FALSE.
     ELSE ! pthp not connected to plant
       MyPlantScanFlag(PTUnitNum) = .FALSE.
     ENDIF
@@ -2803,8 +3162,107 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   ELSE
     PartLoadFrac = 0.0
   END IF
-
-  CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+  
+  IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1 ) THEN !BoS, variable-speed water source hp
+    !PTUnit(PTUnitNum)%IdleMassFlowRate = RhoAir*PTUnit(PTUnitNum)%IdleVolumeAirRate
+      NumOfSpeedCooling = PTUnit(PTUnitNum)%NumOfSpeedCooling
+      NumOfSpeedHeating = PTUnit(PTUnitNum)%NumOfSpeedHeating
+    ! IF MSHP system was not autosized and the fan is autosized, check that fan volumetric flow rate is greater than MSHP flow rates
+      IF(PTUnit(PTUnitNum)%CheckFanFlow)THEN
+        CurrentModuleObject = 'AirLoopHVAC:UnitaryHeatPump:WaterToAir'
+        CALL GetFanVolFlow(PTUnit(PTUnitNum)%FanIndex,PTUnit(PTUnitNum)%FanVolFlow)
+        IF(PTUnit(PTUnitNum)%FanVolFlow .NE. AutoSize)THEN
+    !     Check fan versus system supply air flow rates
+          IF(PTUnit(PTUnitNum)%FanVolFlow .LT. &
+             PTUnit(PTUnitNum)%CoolVolumeFlowRate(NumOfSpeedCooling))THEN
+            CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
+                            //TRIM(TrimSigDigits(PTUnit(PTUnitNum)%FanVolFlow,7))//' in fan object ' &
+                            //' is less than the MSHP system air flow rate' &
+                            //' when cooling is required ('// &
+            TRIM(TrimSigDigits(PTUnit(PTUnitNum)%CoolVolumeFlowRate(NumOfSpeedCooling),7))//').')
+            CALL ShowContinueError(' The MSHP system flow rate when cooling is required is reset to the' &
+                                  //' fan flow rate and the simulation continues.')
+            CALL ShowContinueError(' Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+            PTUnit(PTUnitNum)%CoolVolumeFlowRate(NumOfSpeedCooling) = PTUnit(PTUnitNum)%FanVolFlow
+            ! Check flow rates in other speeds and ensure flow rates are not above the max flow rate
+            Do i=NumOfSpeedCooling-1,1,-1
+              If (PTUnit(PTUnitNum)%CoolVolumeFlowRate(i) .GT. PTUnit(PTUnitNum)%CoolVolumeFlowRate(i+1)) Then
+                CALL ShowContinueError(' The MSHP system flow rate when cooling is required is reset to the' &
+                     //' flow rate at higher speed and the simulation continues at Speed'//TrimSigDigits(i,0)//'.')
+                CALL ShowContinueError(' Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+                PTUnit(PTUnitNum)%CoolVolumeFlowRate(i) = PTUnit(PTUnitNum)%CoolVolumeFlowRate(i+1)
+              End If
+            End Do
+          END IF
+          IF(PTUnit(PTUnitNum)%FanVolFlow .LT. &
+             PTUnit(PTUnitNum)%HeatVolumeFlowRate(NumOfSpeedHeating))THEN
+            CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
+                            //TRIM(TrimSigDigits(PTUnit(PTUnitNum)%FanVolFlow,7))//' in fan object ' &
+                            //' is less than the MSHP system air flow rate' &
+                            //' when heating is required ('// &
+              TRIM(TrimSigDigits(PTUnit(PTUnitNum)%HeatVolumeFlowRate(NumOfSpeedHeating),7))//').')
+            CALL ShowContinueError(' The MSHP system flow rate when heating is required is reset to the' &
+                                  //' fan flow rate and the simulation continues.')
+            CALL ShowContinueError(' Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+            PTUnit(PTUnitNum)%HeatVolumeFlowRate(NumOfSpeedHeating) = PTUnit(PTUnitNum)%FanVolFlow
+            Do i=NumOfSpeedHeating-1,1,-1
+              If (PTUnit(PTUnitNum)%HeatVolumeFlowRate(i) .GT. PTUnit(PTUnitNum)%HeatVolumeFlowRate(i+1)) Then
+                CALL ShowContinueError(' The MSHP system flow rate when heating is required is reset to the' &
+                     //' flow rate at higher speed and the simulation continues at Speed'//TrimSigDigits(i,0)//'.')
+                CALL ShowContinueError(' Occurs in '//TRIM(CurrentModuleObject)//' system = '//TRIM(PTUnit(PTUnitNum)%Name))
+                PTUnit(PTUnitNum)%HeatVolumeFlowRate(i) = PTUnit(PTUnitNum)%HeatVolumeFlowRate(i+1)
+              End If
+            End Do
+          END IF
+          IF(PTUnit(PTUnitNum)%FanVolFlow .LT. PTUnit(PTUnitNum)%IdleVolumeAirRate .AND. &
+             PTUnit(PTUnitNum)%IdleVolumeAirRate .NE. 0.0)THEN
+            CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
+                       //TRIM(TrimSigDigits(PTUnit(PTUnitNum)%FanVolFlow,7))//' in fan object ' &
+                       //' is less than the MSHP system air flow rate when no ' &
+                       //'heating or cooling is needed ('//TRIM(TrimSigDigits(PTUnit(PTUnitNum)%IdleVolumeAirRate,7))//').')
+            CALL ShowContinueError(' The MSHP system flow rate when no heating or cooling is needed is reset to the' &
+                                  //' fan flow rate and the simulation continues.')
+            CALL ShowContinueError(' Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+            PTUnit(PTUnitNum)%IdleVolumeAirRate = PTUnit(PTUnitNum)%FanVolFlow
+          END IF
+          RhoAir = StdRhoAir
+          ! set the mass flow rates from the reset volume flow rates
+          Do I=1,NumOfSpeedCooling
+            PTUnit(PTUnitNum)%CoolMassFlowRate(i) = RhoAir*PTUnit(PTUnitNum)%CoolVolumeFlowRate(i)
+            IF(PTUnit(PTUnitNum)%FanVolFlow .GT. 0.0d0)THEN
+              PTUnit(PTUnitNum)%MSCoolingSpeedRatio(i) = &
+                  PTUnit(PTUnitNum)%CoolVolumeFlowRate(i)/PTUnit(PTUnitNum)%FanVolFlow
+            END IF
+          End Do
+          Do I=1,NumOfSpeedHeating
+            PTUnit(PTUnitNum)%HeatMassFlowRate(i) = RhoAir*PTUnit(PTUnitNum)%HeatVolumeFlowRate(i)
+            IF(PTUnit(PTUnitNum)%FanVolFlow .GT. 0.0d0)THEN
+              PTUnit(PTUnitNum)%MSHeatingSpeedRatio(i) = &
+                  PTUnit(PTUnitNum)%HeatVolumeFlowRate(i)/PTUnit(PTUnitNum)%FanVolFlow
+            END IF
+          End Do
+          PTUnit(PTUnitNum)%IdleMassFlowRate = RhoAir*PTUnit(PTUnitNum)%IdleVolumeAirRate
+          IF(PTUnit(PTUnitNum)%FanVolFlow .GT. 0.0d0)THEN
+            PTUnit(PTUnitNum)%IdleSpeedRatio = &
+                PTUnit(PTUnitNum)%IdleVolumeAirRate / PTUnit(PTUnitNum)%FanVolFlow
+          END IF
+          ! set the node max and min mass flow rates based on reset volume flow rates
+          Node(InNode)%MassFlowRateMax = MAX(PTUnit(PTUnitNum)%CoolMassFlowRate(NumOfSpeedCooling), &
+                                             PTUnit(PTUnitNum)%HeatMassFlowRate(NumOfSpeedHeating))
+          Node(InNode)%MassFlowRateMaxAvail = MAX(PTUnit(PTUnitNum)%CoolMassFlowRate(NumOfSpeedCooling), &
+                                                  PTUnit(PTUnitNum)%HeatMassFlowRate(NumOfSpeedHeating))
+          Node(InNode)%MassFlowRateMin = 0.0
+          Node(InNode)%MassFlowRateMinAvail = 0.0
+          Node(OutNode) = Node(InNode)
+        END IF
+      END IF
+      
+      PTUnit(PTUnitNum)%CheckFanFlow = .FALSE.
+    
+     CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+  ELSE
+    CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+  END IF
 
 ! Do the Begin Environment initializations
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(PTUnitNum)) THEN
@@ -2839,8 +3297,8 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
     PTUnit(PTUnitNum)%LastMode = HeatingMode
 
 !   set fluid-side hardware limits
-    IF(PTUnit(PTUnitNum)%WaterControlNode .GT. 0)THEN
-       !    If water coil max water flow rate is autosized, simulate once in order to mine max water flow rate
+    IF(PTUnit(PTUnitNum)%HotWaterControlNode .GT. 0)THEN
+       ! If water coil max water flow rate is autosized, simulate once in order to mine max water flow rate
       IF(PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow .EQ. Autosize)THEN
         CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%ACHeatCoilName,FirstHVACIteration, &
                                          PTUnit(PTUnitNum)%ACHeatCoilIndex)
@@ -2858,38 +3316,79 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
       ENDIF
 
       Call InitComponentNodes(0.d0, PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow, &
-                                    PTUnit(PTUnitNum)%WaterControlNode, &
+                                    PTUnit(PTUnitNum)%HotWaterControlNode, &
                                     PTUnit(PTUnitNum)%PlantCoilOutletNode, &
                                     PTUnit(PTUnitNum)%LoopNum, &
                                     PTUnit(PTUnitNum)%LoopSide, &
                                     PTUnit(PTUnitNum)%BranchNum, &
                                     PTUnit(PTUnitNum)%CompNum )
 
-    END IF
+      IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .EQ. Autosize)THEN
+         CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex)
+              CoilMaxVolFlowRate = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
+                                                            PTUnit(PTUnitNum)%SuppHeatCoilName,ErrorsFound)
+         IF(CoilMaxVolFlowRate .NE. Autosize) THEN
+           rho = GetDensityGlycol(PlantLoop(PTUnit(PTUnitNum)%LoopNum)%fluidName, &
+                                 InitConvTemp, &
+                                 PlantLoop(PTUnit(PTUnitNum)%LoopNum)%fluidIndex, &
+                                 ' InitPTUnit')
+           PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = CoilMaxVolFlowRate * rho
+         ENDIF
+      END IF
+      Call InitComponentNodes(0.d0, PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow, &
+                                    PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                    PTUnit(PTUnitNum)%LoopNum, &
+                                    PTUnit(PTUnitNum)%LoopSide, &
+                                    PTUnit(PTUnitNum)%BranchNum, &
+                                    PTUnit(PTUnitNum)%CompNum )
+
+    ENDIF
     IF(PTUnit(PTUnitNum)%HWCoilSteamInletNode .GT. 0)THEN
     !     If steam coil max steam flow rate is autosized, simulate once in order to mine max steam flow rate
       IF(PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow .EQ. Autosize)THEN
-        CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%ACHeatCoilName, &
-                                         FirstHVACIteration,    &
-                                         1.0d0, & !QCoilReq, simulate any load > 0 to get max capacity of steam coil
-                                         PTUnit(PTUnitNum)%ACHeatCoilIndex, QActual)
-        CoilMaxVolFlowRate = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%ACHeatCoilIndex,ErrorsFound)
-        IF(CoilMaxVolFlowRate .NE. Autosize) THEN
-          TempSteamIn= 100.00
-          SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
-          SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitPTUnit')
-          PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow = CoilMaxVolFlowRate * SteamDensity
-        ENDIF
-      ENDIF
-      CALL InitComponentNodes(0.d0, PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow, &
-                                    PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
-                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
-                                    PTUnit(PTUnitNum)%LoopNum, &
-                                    PTUnit(PTUnitNum)%LoopSide, &
-                                    PTUnit(PTUnitNum)%BranchNum, &
-                                    PTUnit(PTUnitNum)%CompNum )
-    END IF
+          CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%ACHeatCoilName, &
+                                           FirstHVACIteration,    &
+                                           1.0d0, & !QCoilReq, simulate any load > 0 to get max capacity of steam coil
+                                           PTUnit(PTUnitNum)%ACHeatCoilIndex, QActual)
+          CoilMaxVolFlowRate = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%ACHeatCoilIndex,ErrorsFound)
 
+          IF(CoilMaxVolFlowRate .NE. Autosize) THEN
+            SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
+            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitPTUnit')
+            PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow = CoilMaxVolFlowRate * SteamDensity
+          ENDIF
+          CALL InitComponentNodes(0.d0, PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow, &
+                                        PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum )
+      END IF
+
+      IF(PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow .EQ. Autosize)THEN
+         CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          FirstHVACIteration,    &
+                                          1.0d0, & !QCoilReq, simulate any load > 0 to get max capacity of steam coil
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual)
+               CoilMaxVolFlowRate = GetCoilMaxSteamFlowRate(PTUnit(PTUnitNum)%SuppHeatCoilIndex,ErrorsFound)
+
+          IF(CoilMaxVolFlowRate .NE. Autosize) THEN
+            SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
+            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitPTUnit')
+            PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow = CoilMaxVolFlowRate * SteamDensity
+          ENDIF
+          CALL InitComponentNodes(0.d0, PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow, &
+                                        PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum )
+      END IF
+    ENDIF
   END IF ! end one time inits
 
   IF (.NOT. BeginEnvrnFlag) THEN
@@ -2917,16 +3416,21 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
     AvailStatus .EQ. CycleOn) .AND. AvailStatus .NE. ForceOff))THEN
 
     SupHeaterLoad = 0.0d0
-    CALL CalcPTUnit(PTUnitNum, FirstHVACIteration, 0.0d0, NoCompOutput, QZnReq, OnOffAirFlowRatio, SupHeaterLoad, .FALSE.)
-
+    IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+     CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,off,1,0.0d0,0.0d0,NoCompOutput, LatentOutput, &
+                          QZnReq, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad, .FALSE.)
+    ELSE
+     CALL CalcPTUnit(PTUnitNum, FirstHVACIteration, 0.0d0, NoCompOutput, QZnReq, OnOffAirFlowRatio, SupHeaterLoad, .FALSE.)
+    END IF 
+    
     QToCoolSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
     QToHeatSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP
 
 !   If the PTUnit has a net cooling capacity (NoCompOutput < 0) and
-!   the zone temp is above the Tstat heating set point (QToHeatSetPt < 0)
+!   the zone temp is above the Tstat heating setpoint (QToHeatSetPt < 0)
     IF(NoCompOutput .LT. 0.0d0 .AND. QToHeatSetPt .LT. 0.0d0)THEN
       IF(NoCompOutput .LT. QToHeatSetPt)THEN
-!       If the net cooling capacity overshoots the heating set point, change mode
+!       If the net cooling capacity overshoots the heating setpoint, change mode
         QZnReq       = QToHeatSetPt
         CoolingLoad  = .FALSE.
 !       Don't set mode TRUE unless mode is allowed. Also check for floating zone.
@@ -2937,24 +3441,38 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
           HeatingLoad = .TRUE.
         END IF
         PartLoadFrac = 1.0d0
-        CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
-        CALL CalcPTUnit(PTUnitNum,FirstHVACIteration,0.0d0,NoCompOutput,QZnReq,OnOffAirFlowRatio,SupHeaterLoad,.FALSE.)
+        IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+          CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+          CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,off,1,0.0d0,0.0d0,NoCompOutput, LatentOutput, &
+                          QZnReq, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad, .FALSE.)
+        ELSE
+          CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          CALL CalcPTUnit(PTUnitNum,FirstHVACIteration,0.0d0,NoCompOutput,QZnReq,OnOffAirFlowRatio,SupHeaterLoad,.FALSE.)
+        END IF
         IF(NoCompOutput .GT. QToHeatSetPt)THEN
 !         If changing operating mode (flow rates) does not overshoot heating setpoint, turn off coil
           QZnReq       = 0.0d0
           HeatingLoad  = .FALSE.
           PartLoadFrac = 0.0d0
-          CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+             CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+          ELSE 
+             CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          END IF
         END IF
       ELSE IF(NoCompOutput .LT. QZnReq)THEN
 !       If the net cooling capacity meets the zone cooling load but does not overshoot heating set piont, turn off coil
         QZnReq       = 0.0d0
         CoolingLoad  = .FALSE.
         PartLoadFrac = 0.0d0
-        CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+        IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+           CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+        ELSE 
+           CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+        END IF
       END IF
     END IF
-!   If the furnace has a net heating capacity and the zone temp is below the Tstat cooling set point
+!   If the furnace has a net heating capacity and the zone temp is below the Tstat cooling setpoint
     IF(NoCompOutput .GT. 0.0d0 .AND. QToCoolSetPt .GT. 0.0d0)THEN
       IF(NoCompOutput .GT. QToCoolSetPt)THEN
         QZnReq       = QToCoolSetPt
@@ -2967,21 +3485,36 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
         END IF
         HeatingLoad  = .FALSE.
         PartLoadFrac = 1.0
-        CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
-        CALL CalcPTUnit(PTUnitNum, FirstHVACIteration, 0.0d0, NoCompOutput, QZnReq, OnOffAirFlowRatio, SupHeaterLoad, .FALSE.)
+        IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+           CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+           CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,off,1,0.0d0,0.0d0,NoCompOutput, LatentOutput, &
+                          QZnReq, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad, .FALSE.)
+        ELSE
+          CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          CALL CalcPTUnit(PTUnitNum, FirstHVACIteration, 0.0d0, NoCompOutput, QZnReq, OnOffAirFlowRatio, SupHeaterLoad, .FALSE.)
+        END IF
+                
         IF(NoCompOutput .LT. QToCoolSetPt)THEN
 !         If changing operating mode (flow rates) does not overshoot cooling setpoint, turn off coil
           QZnReq       = 0.0d0
           CoolingLoad  = .FALSE.
           PartLoadFrac = 0.0d0
-          CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+             CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+          ELSE 
+             CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+          END IF
         END IF
       ELSE IF(NoCompOutput .GT. QZnReq)THEN
 !       If the net heating capacity meets the zone heating load but does not overshoot, turn off coil
         QZnReq       = 0.0d0
         HeatingLoad = .FALSE.
         PartLoadFrac = 0.0d0
-        CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+        IF(PTUnit(PTUnitNum)%NumOfSpeedCooling > 1) THEN 
+           CALL SetOnOffMassFlowRateMulSpeed(PTUnitNum,ZoneNum, FirstHVACIteration, ZoneEquipConfig(ZoneNum)%AirLoopNum, OnOffAirFlowRatio, PTUnit(PTUnitNum)%OpMode, QZnReq, 0.0d0, PartLoadFrac)
+        ELSE 
+           CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
+        END IF
       END IF
     END IF
     ZoneLoad = QZnReq
@@ -2998,7 +3531,7 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
       mdot = PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow
 
       CALL SetComponentFlowRate(mdot, &
-                                   PTUnit(PTUnitNum)%WaterControlNode, &
+                                   PTUnit(PTUnitNum)%HotWaterControlNode, &
                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
                                    PTUnit(PTUnitNum)%LoopNum, &
                                    PTUnit(PTUnitNum)%LoopSide, &
@@ -3009,18 +3542,6 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
       CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%ACHeatCoilName,FirstHVACIteration, &
                                        PTUnit(PTUnitNum)%ACHeatCoilIndex, QActual)
       PTUnit(PTUnitNum)%ACHeatCoilCap = QActual
-
-!     reset air-side and water-side mass flow rate to 0
-      Node(PTUnit(PTUnitNum)%HWCoilAirInletNode)%MassFlowRate = 0.0
-      mdot =  0.d0
-      CALL SetComponentFlowRate(mdot, &
-                                   PTUnit(PTUnitNum)%WaterControlNode, &
-                                   PTUnit(PTUnitNum)%PlantCoilOutletNode, &
-                                   PTUnit(PTUnitNum)%LoopNum, &
-                                   PTUnit(PTUnitNum)%LoopSide, &
-                                   PTUnit(PTUnitNum)%BranchNum, &
-                                   PTUnit(PTUnitNum)%CompNum )
-
 
     END IF ! from IF(PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingWater) THEN
 
@@ -3046,35 +3567,32 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
       PTUnit(PTUnitNum)%ACHeatCoilCap = GetSteamCoilCapacity(PTUnit(PTUnitNum)%ACHeatCoilType, &
                                                                     PTUnit(PTUnitNum)%ACHeatCoilName,ErrorsFound)
 
-!     reset air-side and steam-side mass flow rate to 0
-      Node(PTUnit(PTUnitNum)%HWCoilAirInletNode)%MassFlowRate = 0.0
-      mdot =0.d0
-      CALL SetComponentFlowRate(mdot, &
-                                   PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
-                                   PTUnit(PTUnitNum)%PlantCoilOutletNode, &
-                                   PTUnit(PTUnitNum)%LoopNum, &
-                                   PTUnit(PTUnitNum)%LoopSide, &
-                                   PTUnit(PTUnitNum)%BranchNum, &
-                                   PTUnit(PTUnitNum)%CompNum )
-
     END IF ! from IF(PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingSteam) THEN
 
-  ELSE IF(FirstHVACIteration .AND. PartLoadFrac .EQ. 0.0)THEN
+    IF(PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) THEN
 
-!   Unit is scheduled off, set fluid-side mass flow rates to 0
-    IF(PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingWater) THEN
-      mdot = 0.d0
+      !     set air-side and steam-side mass flow rates
+      Node(PTUnit(PTUnitNum)%SupCoilAirInletNode)%MassFlowRate = CompOnMassFlow
+      mdot = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
       CALL SetComponentFlowRate(mdot, &
-                                   PTUnit(PTUnitNum)%WaterControlNode, &
+                                   PTUnit(PTUnitNum)%HotWaterControlNode, &
                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
                                    PTUnit(PTUnitNum)%LoopNum, &
                                    PTUnit(PTUnitNum)%LoopSide, &
                                    PTUnit(PTUnitNum)%BranchNum, &
-                                   PTUnit(PTUnitNum)%CompNum)
+                                   PTUnit(PTUnitNum)%CompNum )
 
-    END IF
-    IF(PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingSteam) THEN
-      mdot = 0.d0
+      !     simulate water coil to find operating capacity
+      CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                       PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual)
+      PTUnit(PTUnitNum)%SupHeatCoilCap = QActual
+
+    END IF ! from IF(PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingWater) THEN
+    IF(PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
+
+      !     set air-side and steam-side mass flow rates
+      Node(PTUnit(PTUnitNum)%SupCoilAirInletNode)%MassFlowRate = CompOnMassFlow
+      mdot = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
       CALL SetComponentFlowRate(mdot, &
                                    PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
@@ -3083,8 +3601,15 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
                                    PTUnit(PTUnitNum)%BranchNum, &
                                    PTUnit(PTUnitNum)%CompNum )
 
-    END IF
+!     simulate steam coil to find operating capacity
+      CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                       FirstHVACIteration,    &
+                                       1.0d0, & !QCoilReq, simulate any load > 0 to get max capacity of steam coil
+                                       PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual)
+      PTUnit(PTUnitNum)%SupHeatCoilCap = GetSteamCoilCapacity(PTUnit(PTUnitNum)%SuppHeatCoilType, &
+                                                              PTUnit(PTUnitNum)%SuppHeatCoilName,ErrorsFound)
 
+    END IF ! from IF(PTUnit(PTUnitNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
   END IF ! from IF(FirstHVACIteration .AND. PartLoadFrac > 0.0) THEN
 
   CALL SetAverageAirFlow(PTUnitNum, PartLoadFrac, OnOffAirFlowRatio)
@@ -3197,7 +3722,7 @@ SUBROUTINE SizePTUnit(PTUnitNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   July 2005
-          !       MODIFIED       na
+          !       MODIFIED       Bo Shen, ORNL, March 2012, added variable-speed water-source heat pump
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3212,9 +3737,9 @@ SUBROUTINE SizePTUnit(PTUnitNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataSizing
   USE WaterCoils,     ONLY: SetCoilDesFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE WatertoAirMulSpeeddHP,   ONLY: SimWatertoAirHPMulSpeed, WtoADXCoil
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3232,6 +3757,8 @@ SUBROUTINE SizePTUnit(PTUnitNum)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL :: ErrorsFound
+  INTEGER :: Iter !speed iteration count
+  REAL(r64) :: MulSpeedFlowScale !variable speed air flow scaling factor
 
   ErrorsFound=.false.
 
@@ -3354,10 +3881,72 @@ SUBROUTINE SizePTUnit(PTUnitNum)
   CALL SetCoilDesFlow(PTUnit(PTUnitNum)%ACHeatCoilType,PTUnit(PTUnitNum)%ACHeatCoilName,PTUnit(PTUnitNum)%MaxHeatAirVolFlow,&
                        ErrorsFound)
 
+  IF (CurZoneEqNum > 0) THEN
+    ZoneEqSizing(CurZoneEqNum)%OAVolFlow = MAX(PTUnit(PTUnitNum)%CoolOutAirVolFlow,PTUnit(PTUnitNum)%HeatOutAirVolFlow)
+    ZoneEqSizing(CurZoneEqNum)%AirVolFlow = MAX(PTUnit(PTUnitNum)%MaxCoolAirVolFlow,PTUnit(PTUnitNum)%MaxHeatAirVolFlow)
+  END IF
+
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Preceding sizing errors cause program termination')
   END IF
+ 
+ IF (PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit & 
+    .AND. PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit) THEN    
+    
+    CALL SimWatertoAirHPMulSpeed('',PTUnit(PTUnitNum)%DXCoolCoilIndexNum,&
+           0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 )     !conduct the sizing operation in the VS WSHP       
+    PTUnit(PTUnitNum)%NumOfSpeedCooling = WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NumOfSpeeds 
+    
+    MulSpeedFlowScale = WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%RatedAirVolFlowRate/ &
+    WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
+                (WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NormSpedLevel)
+    Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedCooling
+      PTUnit(PTUnitNum)%CoolVolumeFlowRate(Iter) = & 
+            WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%CoolMassFlowRate(Iter) = &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirMassFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%MSCoolingSpeedRatio(Iter) = &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter)/ &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
+            (PTUnit(PTUnitNum)%NumOfSpeedCooling)
+    End Do
 
+    CALL SimWatertoAirHPMulSpeed('',PTUnit(PTUnitNum)%DXHeatCoilIndex,&
+           0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 ) !conduct the sizing operation in the VS WSHP
+     
+    PTUnit(PTUnitNum)%NumOfSpeedHeating = WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NumOfSpeeds 
+     
+    MulSpeedFlowScale = WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%RatedAirVolFlowRate/ &
+    WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NormSpedLevel)
+    Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedHeating
+      PTUnit(PTUnitNum)%HeatVolumeFlowRate(Iter) = &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%HeatMassFlowRate(Iter) = &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirMassFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%MSHeatingSpeedRatio(Iter) = &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
+            WtoADXCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate&
+            (PTUnit(PTUnitNum)%NumOfSpeedHeating)
+    End Do
+    ! intialize idle flow
+   PTUnit(PTUnitNum)%IdleMassFlowRate = & 
+        min(PTUnit(PTUnitNum)%HeatMassFlowRate(1), PTUnit(PTUnitNum)%CoolMassFlowRate(1))
+   PTUnit(PTUnitNum)%IdleSpeedRatio = &
+        min(PTUnit(PTUnitNum)%MSHeatingSpeedRatio(1), PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1))
+   PTUnit(PTUnitNum)%IdleVolumeAirRate = &
+        min(PTUnit(PTUnitNum)%HeatVolumeFlowRate(1), PTUnit(PTUnitNum)%CoolVolumeFlowRate(1))
+
+
+  END IF
+  
   RETURN
 END SUBROUTINE SizePTUnit
 
@@ -3385,6 +3974,9 @@ SUBROUTINE ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNu
   USE HeatingCoils,              ONLY: SimulateHeatingCoilComponents
   USE Psychrometrics,            ONLY: PsyCpAirFnWTdb
   USE DataEnvironment,           ONLY: OutDryBulbTemp
+  USE SteamCoils,                ONLY: SimulateSteamCoilComponents
+  USE WaterCoils,                ONLY: SimulateWaterCoilComponents
+  USE PlantUtilities,            ONLY: SetComponentFlowRate
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3398,6 +3990,7 @@ SUBROUTINE ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNu
   REAL(r64), INTENT (INOUT) :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to AVERAGE airflow over timestep
   REAL(r64), INTENT (INOUT) :: SupHeaterLoad      ! Supplemental heater load [W]
   LOGICAL,   INTENT (INOUT) :: HXUnitOn           ! flag to enable heat exchanger
+  REAL(r64)                 :: mdot               ! coil fluid mass flow rate (kg/s)
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !
@@ -3474,7 +4067,7 @@ SUBROUTINE ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNu
   !    RETURN
     END IF
   ! If the QZnReq >= FullOutput the unit needs to run full out
-    IF (QZnReq  >=  FullOutput .AND. PTUnit(PTUnitNum)%SupHeatCoilIndex .GT. 0) THEN
+    IF (QZnReq  >=  FullOutput .AND. PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0) THEN
       PartLoadFrac = 1.0
   ! may need supplemental heating so don't return in heating mode
   !    RETURN
@@ -3568,10 +4161,10 @@ SUBROUTINE ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNu
 
   END IF
 
-  ! if the DX heating coil can not meet the load, trim with supplemental heater
+  ! if the DX heating coil cannot meet the load, trim with supplemental heater
   ! occurs with constant fan mode when compressor is on or off
   ! occurs with cycling fan mode when compressor PLR is equal to 1
-  IF (HeatingLoad .AND. QZnReq .GT. FullOutput .AND. PTUnit(PTUnitNum)%SupHeatCoilIndex .GT. 0)THEN
+  IF (HeatingLoad .AND. QZnReq .GT. FullOutput .AND. PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
     PartLoadFrac  = 1.0
     IF (OutsideDryBulbTemp .LE. PTUnit(PTUnitNum)%MaxOATSupHeat) THEN
       SupHeaterLoad = QZnReq - FullOutput
@@ -3582,12 +4175,40 @@ SUBROUTINE ControlPTUnitOutput(PTUnitNum,FirstHVACIteration,OpMode,QZnReq,ZoneNu
   END IF
 
 ! check the outlet of the supplemental heater to be lower than the maximum supplemental heater supply air temperature
-  IF(PTUnit(PTUnitNum)%SupHeatCoilIndex .GT. 0)THEN
+  IF(PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
     IF (Node(PTUnit(PTUnitNum)%AirOutNode)%Temp .GT. PTUnit(PTUnitNum)%MaxSATSupHeat .AND. SupHeaterLoad .GT. 0.0) THEN
 
-!     If the supply air temperature is to high, turn off the supplemental heater to recalculate the outlet temperature
-      CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SupHeatCoilName, FirstHVACIteration, 0.0d0,   &
-                                         PTUnit(PTUnitNum)%SupHeatCoilIndex)
+       ! If supply air temperature is to high, turn off the supplemental heater to recalculate the outlet temperature
+       SupHeaterLoad = 0.0d0
+       Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+         Case (Coil_HeatingGas,Coil_HeatingElectric )
+             CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex)
+         Case (Coil_HeatingWater)
+             mdot = 0.d0
+             Call SetComponentFlowRate( mdot , &
+                                        PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum)
+             CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                              PTUnit(PTUnitNum)%SuppHeatCoilIndex, SupHeaterLoad, &
+                                              PTUnit(PTUnitNum)%OpMode, PartLoadFrac)
+         Case (Coil_HeatingSteam)
+             mdot = 0.d0
+             CALL SetComponentFlowRate( mdot , &
+                                        PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum)
+             CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                              FirstHVACIteration, SupHeaterLoad,  &
+                                              PTUnit(PTUnitNum)%SuppHeatCoilIndex)
+       END Select
 
 !     If the outlet temperature is below the maximum supplemental heater supply air temperature, reduce the load passed to
 !     the supplemental heater, otherwise leave the supplemental heater off. If the supplemental heater is to be turned on,
@@ -3612,7 +4233,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   July 2005
-          !       MODIFIED       na
+          !       MODIFIED        B. Nigusse, Jan 2012, added hot water and steam heating coils to PTHP and WSHP
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3635,9 +4256,10 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
   USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
   USE Psychrometrics,            ONLY: PsyHFnTdbW, PsyCpAirFnWTdb
   USE DataEnvironment,           ONLY: OutDryBulbTemp
-  USE DataSizing,                ONLY: Autosize
   USE WatertoAirheatPumpSimple,  ONLY: SimWatertoAirHPSimple
   USE PlantUtilities,            ONLY: SetComponentFlowRate
+  USE General,                   ONLY: SolveRegulaFalsi
+  USE DataHVACGlobals,           ONLY: SmallLoad
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3675,7 +4297,16 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
   REAL(r64):: WSHPRuntimeFrac    ! RTF variable for WSHP's
   LOGICAL  :: PTUnitTurnFansOn   ! TurnFansOn Availalability status as set by SAM
   LOGICAL  :: PTUnitTurnFansOff  ! TurnFansOff Availalability status as set by SAM
-  REAL(r64) :: mdot !local temporary for mass flow rate
+  REAL(r64) :: mdot              !local temporary for mass flow rate
+  REAL(r64) :: MinWaterFlow      ! minimum water mass flow rate
+  REAL(r64) :: PartLoadFraction  ! heating or cooling part load fraction
+  REAL(r64) :: MaxHotWaterFlow   ! coil maximum hot water mass flow rate, kg/s
+  REAL(r64) :: HotWaterMdot      ! actual hot water mass flow rate
+  REAL(r64), DIMENSION(3) :: Par
+  INTEGER   :: SolFlag
+  REAL(r64) :: MinFlow            ! minimum fluid flow rate, kg/s
+  INTEGER   :: ControlCompTypeNum ! temporary component index number
+  REAL(r64), PARAMETER :: ErrTolerance = 0.001    ! convergence limit for hotwater coil
           ! FLOW
 
   PTUnitTurnFansOn  = .FALSE.
@@ -3773,7 +4404,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
         mdot = PTUnit(PTUnitNum)%MaxHeatCoilFluidFlow * PartLoadFrac
 
         CALL SetComponentFlowRate( mdot , &
-                                   PTUnit(PTUnitNum)%WaterControlNode, &
+                                   PTUnit(PTUnitNum)%HotWaterControlNode, &
                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
                                    PTUnit(PTUnitNum)%LoopNum, &
                                    PTUnit(PTUnitNum)%LoopSide, &
@@ -3841,7 +4472,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
       ELSE IF(PTUnit(PTUnitNum)%ACHeatCoilType_Num == Coil_HeatingWater)THEN
         mdot = 0.d0
         Call SetComponentFlowRate( mdot , &
-                                   PTUnit(PTUnitNum)%WaterControlNode, &
+                                   PTUnit(PTUnitNum)%HotWaterControlNode, &
                                    PTUnit(PTUnitNum)%PlantCoilOutletNode, &
                                    PTUnit(PTUnitNum)%LoopNum, &
                                    PTUnit(PTUnitNum)%LoopSide, &
@@ -3863,7 +4494,8 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
         CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%ACHeatCoilName, &
                                          FirstHVACIteration,    &
                                          QCoilReq,                        &
-                                         PTUnit(PTUnitNum)%ACHeatCoilIndex)
+                                         PTUnit(PTUnitNum)%ACHeatCoilIndex, &
+                                         QActual, PTUnit(PTUnitNum)%OpMode, PartLoadFrac)
       END IF
     ELSE
       SELECT CASE(PTUnit(PTUnitNum)%UnitType_Num)
@@ -3891,11 +4523,112 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
       CALL SimulateFanComponents(PTUnit(PTUnitNum)%FanName,FirstHVACIteration,PTUnit(PTUnitNum)%FanIndex,FanSpeedRatio)
     ENDIF
   END IF
-  IF(PTUnit(PTUnitNum)%SupHeatCoilIndex .GT. 0)THEN
-    CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SupHeatCoilName,FirstHVACIteration,SupHeaterLoad,  &
-                                     PTUnit(PTUnitNum)%SupHeatCoilIndex)
-  END IF
+  IF(PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
+     IF ( SupHeaterLoad < SmallLoad ) THEN
+         Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+           Case (Coil_HeatingGas,Coil_HeatingElectric )
+                 CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                    SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex,  &
+                                                    QActual, .TRUE., PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingWater)
+               mdot = 0.0d0
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+               CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingSteam)
+               mdot = 0.0d0
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+               CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          FirstHVACIteration, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                          QActual, PTUnit(PTUnitNum)%OpMode)
+         END Select
+     ELSE
+        Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+           Case (Coil_HeatingGas,Coil_HeatingElectric )
+              CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                 SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                                 QActual, .TRUE., PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingWater)
+               MaxHotWaterFlow = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+               Call SetComponentFlowRate( MaxHotWaterFlow , &
+                                          PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+              QActual = SupHeaterLoad
+              ! simulate the hot water supplemental heating coil
+              CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                               PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual, &
+                                               PTUnit(PTUnitNum)%OpMode)
+              IF( QActual > (SupHeaterLoad + SmallLoad)) THEN
+                  ! control water flow to obtain output matching SupHeaterLoad
+                  SolFlag = 0
+                  MinWaterFlow = 0.0d0
+                  Par(1) = REAL(PTUnitNum,r64)
+                  IF (FirstHVACIteration) THEN
+                    Par(2) = 1.
+                  ELSE
+                    Par(2) = 0.
+                  END IF
+                  Par(3) = SupHeaterLoad
+                  MaxHotWaterFlow = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+                  CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+                                        MinWaterFlow, MaxHotWaterFlow, Par)
+                  IF (SolFlag == -1) THEN
+                    IF (PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex == 0) THEN
+                      CALL ShowWarningMessage('Hot water coil control failed in PTHP '//TRIM(PTUnit(PTUnitNum)%Name))
+                      CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+                    ENDIF
+                    CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in PTHP '//  &
+                       TRIM(PTUnit(PTUnitNum)%Name),PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex)
+                  ELSE IF (SolFlag == -2) THEN
+                    IF (PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
+                      CALL ShowWarningMessage('Hot water coil control failed in PTHP '//TRIM(PTUnit(PTUnitNum)%Name))
+                      CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+                    ENDIF
+                    CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in PTHP '//  &
+                       TRIM(PTUnit(PTUnitNum)%Name),PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex2)
+                  END IF
+                  QActual = SupHeaterLoad
+                  ! simulate the hot water supplemental heating coil
+                  CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                   PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual, &
+                                                   PTUnit(PTUnitNum)%OpMode)
+              ENDIF
+           Case (Coil_HeatingSteam)
+               mdot = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
 
+               ! simulate the steam supplemental heating coil
+               CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          FirstHVACIteration, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                          QActual, PTUnit(PTUnitNum)%OpMode)
+        END Select
+     ENDIF
+  ENDIF
 ! calculate sensible load met using delta enthalpy at a constant (minimum) humidity ratio)
   MinHumRat = MIN(Node(InletNode)%HumRat,Node(OutletNode)%HumRat)
   LoadMet   = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
@@ -4041,6 +4774,81 @@ SUBROUTINE HeatPumpRunFrac(PTUnitNum,PLR,errflag,RuntimeFrac)
 
 END SUBROUTINE HeatPumpRunFrac
 
+FUNCTION HotWaterCoilResidual(HWFlow, Par) RESULT (Residuum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Bereket Nigusse
+          !       DATE WRITTEN   January 2012
+          !       MODIFIED
+          !       RE-ENGINEERED
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Calculates residual function (Actual Coil Output - SupHeaterLoad) / SupHeaterLoad
+          ! the actual coil output depends on the hot water flow rate which is being varied to
+          ! minimize the residual to the tolerance limit specified.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Calls HotWaterCoilResidual, and calculates the residual as defined above.
+          !
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+  USE WaterCoils,     ONLY: SimulateWaterCoilComponents
+  USE PlantUtilities, ONLY: SetComponentFlowRate
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)                         :: HWFlow   ! hot water flow rate in kg/s
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par      ! Par(5) is the requested coil load
+  REAL(r64)                                     :: Residuum ! residual to be minimized to zero
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER               :: PTUnitNum
+  LOGICAL               :: FirstHVACSoln
+  REAL(r64)             :: QCoilActual             ! delivered coild load, W
+  REAL(r64)             :: SupHeaterLoad           ! requested coild load, W
+  REAL(r64)             :: mdot
+
+  PTUnitNum = INT(Par(1))
+  IF (Par(2) > 0.0) THEN
+    FirstHVACSoln = .TRUE.
+  ELSE
+    FirstHVACSoln = .FALSE.
+  END IF
+  SupHeaterLoad =  Par(3)
+  QCoilActual = SupHeaterLoad
+  mdot = HWFlow
+
+  Call SetComponentFlowRate( mdot , &
+                             PTUnit(PTUnitNum)%HotWaterControlNode, &
+                             PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                             PTUnit(PTUnitNum)%LoopNum, &
+                             PTUnit(PTUnitNum)%LoopSide, &
+                             PTUnit(PTUnitNum)%BranchNum, &
+                             PTUnit(PTUnitNum)%CompNum)
+  ! simulate the hot water supplemental heating coil
+  CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACSoln, &
+                                   PTUnit(PTUnitNum)%SuppHeatCoilIndex, QCoilActual, &
+                                   PTUnit(PTUnitNum)%OpMode)
+
+  IF (SupHeaterLoad /= 0.0d0) THEN
+    Residuum = (QCoilActual - SupHeaterLoad)/ SupHeaterLoad
+  ENDIF
+  RETURN
+END FUNCTION HotWaterCoilResidual
+
 REAL(r64) FUNCTION SupSATResidual(TempSupHeater,Par)
           ! FUNCTION INFORMATION:
           !       AUTHOR         Richard Raustad
@@ -4088,8 +4896,8 @@ REAL(r64) FUNCTION SupSATResidual(TempSupHeater,Par)
   ELSE
     FirstHVACIteration = .FALSE.
   END IF
-  CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SupHeatCoilName,FirstHVACIteration,TempSupHeater,  &
-                                         PTUnit(PTUnitNum)%SupHeatCoilIndex)
+  CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration,TempSupHeater,  &
+                                     PTUnit(PTUnitNum)%SuppHeatCoilIndex)
   SupSATResidual = Node(PTUnit(PTUnitNum)%AirOutNode)%Temp - PTUnit(PTUnitNum)%MaxSATSupHeat
 
   RETURN
@@ -4527,9 +5335,1340 @@ INTEGER FUNCTION GetPTUnitMixedAirNode(PTUnitNum)
 
 END FUNCTION GetPTUnitMixedAirNode
 
+!******************************************************************************
+
+SUBROUTINE SimMSWSHP(PTUnitNum,ZoneNum, FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlowRatio, OpMode, HXUnitOn )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:CalcMSHeatPump
+          !       DATE WRITTEN   March, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Simulate a multispeed heat pump; adjust its output to match the
+          ! required system load.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Calls ControlMSHPOutput to obtain the desired unit output
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataZoneEnergyDemands
+  USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataAirLoop, ONLY: AirLoopControlInfo,  AirToZoneNodeInfo
+  USE DataAirSystems,  ONLY: PrimaryAirSystem
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  LOGICAL, INTENT (IN)    :: FirstHVACIteration ! TRUE if 1st HVAC simulation of system timestep
+  INTEGER, INTENT (IN)    :: PTUnitNum      ! number of the current engine driven Heat Pump being simulated
+  REAL(r64),    INTENT (IN)    :: QZnReq             ! required zone load
+  REAL(r64),    INTENT (IN)    :: QLatReq            ! required latent load
+  INTEGER,      INTENT (IN)    :: ZoneNum           ! Controlled zone number
+  REAL(r64),    INTENT (INOUT) :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to AVERAGE airflow over timestep
+  INTEGER, INTENT   (IN)  :: OpMode             ! operating mode: CycFanCycCoil | ContFanCycCoil 
+  LOGICAL,      INTENT (IN)    :: HXUnitOn          ! flag to enable heat exchanger
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)    :: PartLoadFrac = 0.0     ! compressor part load fraction
+  REAL(r64)    :: SpeedRatio = 0.0       ! compressor speed ratio
+  LOGICAL :: UnitOn            ! TRUE if unit is on
+  INTEGER :: OutletNode        ! MSHP air outlet node
+  INTEGER :: InletNode         ! MSHP air inlet node
+  REAL(r64)    :: AirMassFlow       ! air mass flow rate [kg/s]
+  REAL(r64)    :: QTotUnitOut  ! capacity output
+  INTEGER :: SpeedNum   = 1       ! Speed number
+  REAL(r64)    :: SupHeaterLoad ! supplement heater load
+  INTEGER :: AirLoopNumber     ! Index to air loop
+  REAL(r64)    :: SaveMassFlowRate  ! saved inlet air mass flow rate [kg/s]
+  REAL(r64)    :: QSensUnitOut    ! sensible capacity output
+  REAL(r64)    :: QLatUnitOut     ! latent capacity output
+  INTEGER      :: CompOp             ! compressor operation; 1=on, 0=off
+  REAL(r64), SAVE        :: TotalZoneLatentLoad    ! Total ZONE heating load (not including outside air)
+  INTEGER           ::  OutNum
+  INTEGER           ::  TotBranchNum
+  INTEGER           ::  ZoneSideNodeNum
+                                            ! to be removed by furnace/unitary system
+
+  ! zero the fan, DX coils, and supplemental electric heater electricity consumption
+  FanElecPower         = 0.0
+  DXElecHeatingPower   = 0.0
+  DXElecCoolingPower   = 0.0
+  SaveCompressorPLR    = 0.0
+  ElecHeatingCoilPower = 0.0
+
+  ! initialize local variables
+  UnitOn      = .TRUE.
+  CompOp      = 1
+  OutletNode  = PTUnit(PTUnitNum)%AirOutNode
+  InletNode   = PTUnit(PTUnitNum)%AirInNode
+  AirMassFlow = PTUnit(PTUnitNum)%MaxCoolAirMassFlow
+  
+   !Set latent load for heating
+  IF(HeatingLoad)THEN
+      TotalZoneLatentLoad = 0.0
+      PTUnit(PTUnitNum)%HeatCoolMode = HeatingMode
+ !Set latent load for cooling and no sensible load condition
+  ELSE
+      TotalZoneLatentLoad = QLatReq
+      PTUnit(PTUnitNum)%HeatCoolMode = CoolingMode
+  ENDIF
+  
+  If (HeatingLoad) then
+    PTUnit(PTUnitNum)%HeatCoolMode = HeatingMode
+  Else If (CoolingLoad) then
+    PTUnit(PTUnitNum)%HeatCoolMode = CoolingMode
+  Else
+    PTUnit(PTUnitNum)%HeatCoolMode = 0
+  End If
+
+  ! set the on/off flags
+  IF (PTUnit(PTUnitNum)%OPMode == CycFanCycCoil) THEN
+    ! cycling unit only runs if there is a cooling or heating load.
+     IF (ABS(QZnReq) < SmallLoad .OR. AirMassFlow < SmallMassFlow .OR. CurDeadbandOrSetback(ZoneNum)) THEN
+       UnitOn = .FALSE.
+     END IF
+  ELSE IF  (PTUnit(PTUnitNum)%OPMode == ContFanCycCoil) THEN
+    ! continuous unit: fan runs if scheduled on; coil runs only if there is a cooling or heating load
+    IF (AirMassFlow.LT.SmallMassFlow) THEN
+      UnitOn = .FALSE.
+    END IF
+  END IF
+
+  OnOffFanPartLoadFraction = 1.0
+
+  AirLoopNumber = ZoneEquipConfig(ZoneNum)%AirLoopNum
+  SaveMassFlowRate = Node(InletNode)%MassFlowRate
+  IF ( .NOT. FirstHVACIteration .AND. PTUnit(PTUnitNum)%OPMode == CycFanCycCoil .AND. &
+        (QZnReq < 0.0 .OR. TotalZoneLatentLoad > 0.0  ) &
+       .AND. AirLoopControlInfo(AirLoopNumber)%EconoActive) THEN
+       ! for cycling fan, cooling load, check whether furnace can meet load with compressor off
+    CompOp = Off
+    CALL ControlMSWSHPOutput(PTUnitNum,FirstHVACIteration,CompOp,OpMode,QZnReq, TotalZoneLatentLoad,ZoneNum,SpeedNum,SpeedRatio, &
+                         PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+             
+    IF (SpeedNum .EQ. PTUnit(PTUnitNum)%NumOfSpeedCooling .AND. SpeedRatio .EQ. 1.0) THEN
+      ! compressor on (reset inlet air mass flow rate to starting value)
+      Node(InletNode)%MassFlowRate = SaveMassFlowRate
+      CompOp = On
+      CALL ControlMSWSHPOutput(PTUnitNum,FirstHVACIteration,CompOp,OpMode,QZnReq,TotalZoneLatentLoad,ZoneNum,SpeedNum,SpeedRatio, &
+                         PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+    END IF
+  ELSE
+     ! compressor on
+     CompOp      = On
+     CALL ControlMSWSHPOutput(PTUnitNum,FirstHVACIteration,CompOp,OpMode,QZnReq,TotalZoneLatentLoad,ZoneNum,SpeedNum,SpeedRatio, &
+                         PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+  END IF
+  
+  IF(SpeedNum > 1)  THEN 
+    SaveCompressorPLR = 1.0
+  END IF    
+
+  If (PartLoadFrac .eq. 1.0 .and. SaveCompressorPLR < 1.0) then
+    PartLoadFrac = SaveCompressorPLR
+  End If
+  
+  CALL CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
+                      QZnReq,TotalZoneLatentLoad,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+
+  ! calculate delivered capacity
+  AirMassFlow = Node(InletNode)%MassFlowRate
+
+  QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
+   
+   !MUST INTIALIZE THE ZONE SIDE ENTERING MASS FLOW, OTHERWISE, IT WILL MESS UP WITH THE VARIABLE AIR FLOW CONTROL
+  If(.NOT. FirstHVACIteration .AND. AirMassFlow > 0.0 .AND. AirLoopNumber > 0 ) THEN
+      TotBranchNum = PrimaryAirSystem(AirLoopNumber)%NumOutletBranches
+      DO OutNum=1,TotBranchNum
+         ZoneSideNodeNum = AirToZoneNodeInfo(AirLoopNumber)%ZoneEquipSupplyNodeNum(OutNum)
+         Node(ZoneSideNodeNum)%MassFlowRate = AirMassFlow/TotBranchNum !+ 1d-10
+      END DO
+  END IF
+
+  ! report variables
+  PTUnit(PTUnitNum)%CompPartLoadRatio = SaveCompressorPLR
+  IF (PTUnit(PTUnitNum)%OpMode .EQ. CycFanCycCoil) THEN
+    If (SupHeaterLoad >0.0) Then
+      PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
+    Else
+      If (SpeedNum .LT. 2) Then
+        PTUnit(PTUnitNum)%FanPartLoadRatio = PartLoadFrac
+      Else
+        PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
+      End If
+    End If
+  ELSE
+    IF (UnitOn) THEN
+      PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
+    ELSE
+      If (SpeedNum .LT. 2) Then
+        PTUnit(PTUnitNum)%FanPartLoadRatio = PartLoadFrac
+      Else
+        PTUnit(PTUnitNum)%FanPartLoadRatio = 1.0
+      End If
+    END IF
+  END IF
+
+  RETURN
+END SUBROUTINE SimMSWSHP
+!******************************************************************************
+!******************************************************************************
+
+SUBROUTINE ControlMSWSHPOutput(PTUnitNum, FirstHVACIteration,CompOp,OpMode,&
+                QZnReq, QLatReq, ZoneNum,SpeedNum,SpeedRatio,PartLoadFrac, &
+                             OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:ControlMSHPOutput
+          !       DATE WRITTEN   March,  2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Determine the part load fraction at low speed, and speed ratio at high speed for this time step.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Use RegulaFalsi technique to iterate on part-load ratio until convergence is achieved.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General,                   ONLY: SolveRegulaFalsi, RoundSigDigits, TrimSigDigits
+  USE DataGlobals,               ONLY: WarmUpFlag,CurrentTime
+  USE HeatingCoils,              ONLY: SimulateHeatingCoilComponents
+  USE Psychrometrics,            ONLY: PsyCpAirFnWTdb
+  USE SteamCoils,                ONLY: SimulateSteamCoilComponents
+  USE WaterCoils,                ONLY: SimulateWaterCoilComponents
+  USE PlantUtilities,            ONLY: SetComponentFlowRate
+  USE DataEnvironment,           ONLY: OutDryBulbTemp
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,   INTENT    (IN) :: PTUnitNum              ! Unit index in fan coil array
+  LOGICAL, INTENT   (IN)  :: FirstHVACIteration ! flag for 1st HVAC iteration in the time step
+  INTEGER, INTENT   (IN)  :: CompOp             ! compressor operation; 1=on, 0=off
+  INTEGER, INTENT   (IN)  :: OpMode             ! operating mode: CycFanCycCoil | ContFanCycCoil
+  INTEGER, INTENT   (OUT) :: SpeedNum           ! Speed number
+  REAL(r64)   , INTENT   (IN)  :: QZnReq        ! cooling or heating output needed by zone [W]
+  REAL(r64)   , INTENT   (IN)  :: QLatReq       ! latent cooling output needed by zone [W]
+  INTEGER, INTENT   (IN)  :: ZoneNum            ! Index to zone number
+  REAL(r64)   , INTENT   (OUT) :: SpeedRatio         ! unit speed ratio for DX coils
+  REAL(r64)   , INTENT   (OUT) :: PartLoadFrac       ! unit part load fraction
+  REAL(r64)   , INTENT (INOUT) :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to AVERAGE airflow over timestep
+  REAL(r64)   , INTENT (INOUT) :: SupHeaterLoad      ! Supplemental heater load [W]
+  LOGICAL,   INTENT    (IN) :: HXUnitOn             ! flag to enable heat exchanger
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          !
+  INTEGER, PARAMETER :: MaxIte   = 500          ! maximum number of iterations
+  REAL(r64), PARAMETER    :: MinPLF   = 0.0          ! minimum part load factor allowed
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)          :: FullOutput    ! unit full output when compressor is operating [W]
+  REAL(r64)          :: LowOutput     ! unit full output at low speed [W]
+  REAL(r64)          :: TempOutput    ! unit output when iteration limit exceeded [W]
+  REAL(r64)          :: NoCompOutput  ! output when no active compressor [W]
+  REAL(r64)          :: LatOutput     ! latent capacity output
+  REAL(r64)          :: ErrorToler    ! error tolerance
+  INTEGER            :: SolFla        ! Flag of RegulaFalsi solver
+  REAL(r64), DIMENSION(11) :: Par           ! Parameters passed to RegulaFalsi
+  REAL(r64)          :: CpAir         ! air specific heat
+  REAL(r64)          :: QCoilActual   ! coil load actually delivered returned to calling component
+  INTEGER            :: i             ! Speed index
+  INTEGER,SAVE       :: ErrCountCyc=0 ! Counter used to minimize the occurrence of output warnings
+  INTEGER,SAVE       :: ErrCountVar=0 ! Counter used to minimize the occurrence of output warnings
+  REAL(r64)                 :: mdot               ! coil fluid mass flow rate (kg/s)
+
+  ! FLOW
+  SupHeaterLoad = 0.0
+  PartLoadFrac  = 0.0
+  SpeedRatio    = 0.0
+  SpeedNum = 1
+  LatOutput = 0.0
+  ErrorToler = 0.001 !Error tolerance for convergence from input deck
+
+  IF (GetCurrentScheduleValue(PTUnit(PTUnitNum)%SchedPtr) .EQ. 0.0) RETURN
+
+  ! Get result when DX coil is off                    
+  CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,NoCompOutput, LatOutput, &
+                          QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+
+  ! If cooling and NoCompOutput < QZnReq, the coil needs to be off
+  ! If heating and NoCompOutput > QZnReq, the coil needs to be off
+  IF ((QZnReq < 0.0 .AND. NoCompOutput < QZnReq) .OR. (QZnReq > 0.0 .AND. NoCompOutput > QZnReq) & 
+    .OR. (QZnReq == 0 .AND. QLatReq == 0 )) THEN
+    RETURN
+  END IF
+
+  ! Get full load result
+  PartLoadFrac  = 1.0
+  SpeedRatio    = 1.0 
+  If (PTUnit(PTUnitNum)%HeatCoolMode == HeatingMode) Then
+    SpeedNum = PTUnit(PTUnitNum)%NumOfSpeedHeating
+  Else If (PTUnit(PTUnitNum)%HeatCoolMode == CoolingMode) Then
+    SpeedNum = PTUnit(PTUnitNum)%NumOfSpeedCooling
+  ELSE 
+    SpeedNum = 1
+    PartLoadFrac  = 0.0
+  End If
+
+  CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,FullOutput, LatOutput, &
+                          QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+
+  IF(QLatReq < 0.0 ) THEN !dehumidification mode
+  !  ! If the QLatReq <= LatOutput the unit needs to run full out
+    IF (QLatReq <= LatOutput) THEN
+      PartLoadFrac = 1.0
+      SpeedRatio   = 1.0
+      PTUnit(PTUnitNum)%CompPartLoadRatio = PartLoadFrac
+      PTUnit(PTUnitNum)%CompSpeedRatio = SpeedRatio
+      PTUnit(PTUnitNum)%CompSpeedNum = SpeedNum
+      RETURN
+    END IF    
+    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+  ELSE IF (QZnReq .LT. 0.0) THEN
+  ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCompOutput
+  ! Check that this is the case; if not set PartLoadFrac = 0.0 (off) and return
+    IF (FullOutput >= 0.0 .OR. FullOutput >= NoCompOutput) THEN
+      PartLoadFrac = 0.0
+      SpeedRatio   = 0.0
+      SpeedNum = 1
+      RETURN
+    END IF
+!  ! If the QZnReq <= FullOutput the unit needs to run full out
+    IF (QZnReq <= FullOutput) THEN
+      PartLoadFrac = 1.0
+      SpeedRatio   = 1.0
+      PTUnit(PTUnitNum)%CompPartLoadRatio = PartLoadFrac
+      PTUnit(PTUnitNum)%CompSpeedRatio = SpeedRatio
+      PTUnit(PTUnitNum)%CompSpeedNum = SpeedNum
+      RETURN
+    END IF
+    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+  ELSE
+  ! Since we are heating, we expect FullOutput to be > 0 and FullOutput > NoCompOutput
+  ! Check that this is the case; if not set PartLoadFrac = 0.0 (off)
+    IF (FullOutput <= 0.0 .OR. FullOutput <= NoCompOutput) THEN
+      PartLoadFrac = 0.0
+      SpeedRatio   = 0.0
+      SpeedNum = 1
+  ! may need supplemental heating so don't return in heating mode
+    END IF
+    IF (QZnReq  >=  FullOutput) THEN
+      PartLoadFrac = 1.0
+      SpeedRatio   = 1.0
+  ! may need supplemental heating so don't return in heating mode
+    END IF
+    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+  END IF
+
+  ! Calculate the part load fraction
+  IF ((QZnReq .GT. 0.0 .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. 0.0 .AND. QZnReq > FullOutput) &
+     .OR. (QLatReq < 0.0) ) THEN
+
+    Par(1) = PTUnitNum
+    Par(2) = ZoneNum
+    IF (FirstHVACIteration) THEN
+      Par(3) = 1.0
+    ELSE
+      Par(3) = 0.0
+    END IF
+    Par(4) = OpMode
+    Par(5) = QZnReq
+    Par(6) = OnOffAirFlowRatio
+    Par(7) = SupHeaterLoad
+    Par(9) = CompOp
+    Par(10) = 1.0
+    IF(HXUnitOn)THEN
+      Par(11) = 1.0
+    ELSE
+      Par(11) = 0.0
+    END IF
+    ! Check whether the low speed coil can meet the load or not
+    CALL CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,CompOp,1, 0.0d0, 1.0d0,LowOutput, LatOutput,  &
+                        QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+    IF ((QZnReq .GT. 0.0 .AND. QZnReq <= LowOutput) .OR. (QZnReq .LT. 0.0 .AND. QZnReq >= LowOutput) &
+              .OR. (QLatReq < 0.0 .AND. QLatReq > LatOutput)) THEN
+      SpeedRatio = 0.0
+      SpeedNum = 1
+      
+      IF(QLatReq < 0.0) THEN !calculate latent heat residual
+        Par(10) = 0.0
+        Par(5) = QLatReq
+      END IF
+      
+      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, PartLoadFrac, MSWSHPCyclingResidual, 0.0d0, 1.0d0, Par)
+      IF (SolFla == -1) THEN
+        If ( .NOT. WarmupFlag) Then
+          IF (ErrCountCyc .eq. 0) THEN
+            ErrCountCyc = ErrCountCyc+1
+            CALL ShowWarningError('Iteration limit exceeded calculating VS WSHP unit cycling ratio, for unit='// &
+                            TRIM(PTUnit(PTUnitNum)%Name))
+            CALL ShowContinueErrorTimeStamp('Cycling ratio returned='//RoundSigDigits(PartLoadFrac,2))
+          Else
+            ErrCountCyc = ErrCountCyc+1
+            CALL ShowRecurringWarningErrorAtEnd(TRIM(PTUnit(PTUnitNum)%Name)//'":'//&
+          ' Iteration limit warning exceeding calculating DX unit cycling ratio  continues...' &
+          ,PTUnit(PTUnitNum)%ErrIndexCyc , PartLoadFrac, PartLoadFrac)
+          End If
+        End If
+      ELSE IF (SolFla == -2) THEN
+        CALL ShowFatalError('VS WSHP unit cycling ratio calculation failed: cycling limits exceeded, for unit='// &
+                           TRIM(PTUnit(PTUnitNum)%Name))
+      END IF
+    Else
+      ! Check to see which speed to meet the load
+      PartLoadFrac = 1.0
+      SpeedRatio = 1.0 
+      If ((QZnReq .LT. 0.0) .OR. (QLatReq < 0.0)) Then ! Cooling
+        DO I=2,PTUnit(PTUnitNum)%NumOfSpeedCooling
+          CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
+                              QZnReq,QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+          
+          IF(QLatReq < 0.0) THEN
+            IF(QLatReq > LatOutput) THEN
+             SpeedNum = I
+             Exit  
+            END IF      
+          ELSE IF (QZnReq >= TempOutput) THEN
+            SpeedNum = I
+            Exit
+          END IF
+
+        END DO
+      ELSE
+        DO I=2,PTUnit(PTUnitNum)%NumOfSpeedHeating
+          CALL CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
+               QZnReq,QLatReq,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn )
+          If (QZnReq <= TempOutput) Then
+            SpeedNum = I
+            Exit
+          End If
+        END DO
+      END IF
+      Par(8) = SpeedNum
+      
+      IF(QLatReq < 0.0) THEN !calculate latent heat residual
+        Par(10) = 0.0
+        Par(5) = QLatReq
+      END IF
+      
+      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, SpeedRatio, MSWSHPVarSpeedResidual, 1.0d-10, 1.0d0, Par)
+      IF (SolFla == -1) THEN
+        If ( .NOT. WarmupFlag) Then
+          IF (ErrCountVar .eq. 0) THEN
+            ErrCountVar = ErrCountVar+1
+            CALL ShowWarningError('Iteration limit exceeded calculating VS WSHP unit speed ratio, for unit='// &
+                            TRIM(PTUnit(PTUnitNum)%Name))
+            CALL ShowContinueErrorTimeStamp('Speed ratio returned=['//trim(RoundSigDigits(SpeedRatio,2))//'], Speed number =' &
+                                        //trim(RoundSigDigits(SpeedNum,0)))
+          Else
+            ErrCountVar = ErrCountVar+1
+            CALL ShowRecurringWarningErrorAtEnd(TRIM(PTUnit(PTUnitNum)%Name)//'":'//&
+          ' Iteration limit warning exceeding calculating DX unit speed ratio continues...' &
+          ,PTUnit(PTUnitNum)%ErrIndexVar, SpeedRatio, SpeedRatio)
+          End If
+        End If
+      ELSE IF (SolFla == -2) THEN
+        CALL ShowFatalError('VS WSHP unit compressor speed calculation failed: speed limits exceeded, for unit='// &
+                           TRIM(PTUnit(PTUnitNum)%Name))
+      END IF
+    End If
+  End If
+
+  ! if the DX heating coil cannot meet the load, trim with supplemental heater
+  ! occurs with constant fan mode when compressor is on or off
+  ! occurs with cycling fan mode when compressor PLR is equal to 1
+  IF (HeatingLoad .AND. QZnReq .GT. FullOutput .AND. PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
+    PartLoadFrac  = 1.0
+    SpeedRatio  = 1.0
+    SpeedNum = PTUnit(PTUnitNum)%NumOfSpeedHeating !maximum heating speed
+    IF (OutDryBulbTemp .LE. PTUnit(PTUnitNum)%MaxOATSupHeat) THEN
+      SupHeaterLoad = QZnReq - FullOutput
+    ELSE
+      SupHeaterLoad = 0.0
+    END IF
+    CALL CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,CompOp,&
+                SpeedNum,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,QZnReq,  &
+                        QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+  END IF
+
+! check the outlet of the supplemental heater to be lower than the maximum supplemental heater supply air temperature
+  IF(PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
+    IF (Node(PTUnit(PTUnitNum)%AirOutNode)%Temp .GT. PTUnit(PTUnitNum)%MaxSATSupHeat .AND. SupHeaterLoad .GT. 0.0) THEN
+
+       ! If supply air temperature is to high, turn off the supplemental heater to recalculate the outlet temperature
+       SupHeaterLoad = 0.0d0
+       Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+         Case (Coil_HeatingGas,Coil_HeatingElectric )
+             CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex)
+         Case (Coil_HeatingWater)
+             mdot = 0.d0
+             Call SetComponentFlowRate( mdot , &
+                                        PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum)
+             CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                              PTUnit(PTUnitNum)%SuppHeatCoilIndex, SupHeaterLoad, &
+                                              PTUnit(PTUnitNum)%OpMode, PartLoadFrac)
+         Case (Coil_HeatingSteam)
+             mdot = 0.d0
+             CALL SetComponentFlowRate( mdot , &
+                                        PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                        PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                        PTUnit(PTUnitNum)%LoopNum, &
+                                        PTUnit(PTUnitNum)%LoopSide, &
+                                        PTUnit(PTUnitNum)%BranchNum, &
+                                        PTUnit(PTUnitNum)%CompNum)
+             CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                              FirstHVACIteration, SupHeaterLoad,  &
+                                              PTUnit(PTUnitNum)%SuppHeatCoilIndex )
+       END Select
+
+!     If the outlet temperature is below the maximum supplemental heater supply air temperature, reduce the load passed to
+!     the supplemental heater, otherwise leave the supplemental heater off. If the supplemental heater is to be turned on,
+!     use the outlet conditions when the supplemental heater was off (CALL above) as the inlet conditions for the calculation
+!     of supplemental heater load to just meet the maximum supply air temperature from the supplemental heater.
+      IF (Node(PTUnit(PTUnitNum)%AirOutNode)%Temp .LT. PTUnit(PTUnitNum)%MaxSATSupHeat) THEN
+        CpAir = PsyCpAirFnWTdb(Node(PTUnit(PTUnitNum)%AirOutNode)%HumRat,Node(PTUnit(PTUnitNum)%AirOutNode)%Temp)
+        SupHeaterLoad = Node(PTUnit(PTUnitNum)%AirInNode)%MassFlowRate * CpAir * &
+                      (PTUnit(PTUnitNum)%MaxSATSupHeat - Node(PTUnit(PTUnitNum)%AirOutNode)%Temp)
+
+      ELSE
+        SupHeaterLoad = 0.0
+      END IF
+    END IF
+  END IF
+
+  PTUnit(PTUnitNum)%CompPartLoadRatio = PartLoadFrac
+  PTUnit(PTUnitNum)%CompSpeedRatio = SpeedRatio
+  PTUnit(PTUnitNum)%CompSpeedNum = SpeedNum
+
+  RETURN
+END SUBROUTINE ControlMSWSHPOutput
+
+!******************************************************************************
+
+!******************************************************************************
+
+REAL(r64) FUNCTION MSWSHPCyclingResidual(PartLoadFrac,Par)
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:MSHPCyclingResidual
+          !       DATE WRITTEN   March, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          !  Calculates residual function ((ActualOutput - QZnReq)/QZnReq)
+          !  MSHP output depends on the part load ratio which is being varied to zero the residual.
+
+          ! METHODOLOGY EMPLOYED:
+          !  Calls CalcMSHeatPump to get ActualOutput at the given part load ratio
+          !  and calculates the residual as defined above
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)   :: PartLoadFrac ! compressor cycling ratio (1.0 is continuous, 0.0 is off)
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1) = FurnaceNum
+                                                  ! par(2) = Zone Num
+                                                  ! par(3) = FirstHVACIteration
+                                                  ! par(4) = OpMode
+                                                  ! par(5) = QZnReq, load to be met
+                                                  ! par(6) = OnOffAirFlowRatio
+                                                  ! par(7) = SupHeaterLoad
+                                                  
+                                                  ! par(9) = CompOp
+                                                  ! par(10) = 1.0 to meet sensible load
+                                              
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          !  na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          !  na
+
+          ! DERIVED TYPE DEFINITIONS
+          !  na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  LOGICAL :: HXUnitOn             ! flag to enable heat exchanger
+  INTEGER :: PTUnitNum       ! MSHP index
+  INTEGER :: ZoneNum            ! Zone index
+  LOGICAL :: FirstHVACIteration ! FirstHVACIteration flag
+  INTEGER :: OpMode             ! Compressor operating mode
+  REAL(r64)    :: QZnReq             ! zone sensible load (W)
+  REAL(r64)    :: QZnLat             ! zone latent load (W)
+  REAL(r64)    :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to average airflow over timestep
+  REAL(r64)    :: ZoneSensLoadMet       ! delivered sensible capacity of MSHP
+  REAL(r64)    :: ZoneLatLoadMet       ! delivered latent capacity of MSHP
+  REAL(r64)    :: LoadToBeMet      ! sensible or latent load to be met
+  REAL(r64)    :: SupHeaterLoad      ! Supplemental heater load
+  REAL(r64)    :: ResScale        ! Residual scale
+  INTEGER :: CompOp             ! compressor operation; 1=on, 0=off
+
+  PTUnitNum  = INT(Par(1))
+  ZoneNum = INT(Par(2))
+  ! FirstHVACIteration is a logical, Par is REAL(r64), so make 1.0=TRUE and 0.0=FALSE
+  IF(Par(3) .EQ. 1.0)THEN
+    FirstHVACIteration = .TRUE.
+  ELSE
+    FirstHVACIteration = .FALSE.
+  END IF
+  OpMode = INT(Par(4))
+  
+  QZnReq = 0.0d0
+  QZnLat = 0.0d0
+  
+  LoadToBeMet = Par(5)
+  IF(Par(10) .EQ. 1.0d0) THEN
+    QZnReq = Par(5)
+  ELSE
+    QZnLat = Par(5)
+  END IF
+  
+  OnOffAirFlowRatio = Par(6)
+  SupHeaterLoad     = Par(7)
+  CompOp = INT(Par(9))
+  
+  IF(Par(11) > 0.0)THEN
+    HXUnitOn = .TRUE. 
+  ELSE
+   HXUnitOn = .FALSE. 
+  END IF
+
+  CALL CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,CompOp,1,0.0d0,PartLoadFrac,ZoneSensLoadMet, ZoneLatLoadMet,&
+                          QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+                          
+  ResScale = abs(LoadToBeMet)  
+  IF (ResScale < 100.0) THEN 
+    ResScale = 100.0
+  END IF
+  
+  ! Calculate residual based on output calculation flag
+  IF(Par(10) .EQ. 1.0d0) THEN
+    MSWSHPCyclingResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
+  ELSE
+    MSWSHPCyclingResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
+  END IF
+  
+  RETURN
+
+END FUNCTION MSWSHPCyclingResidual
+
+
+!******************************************************************************
+
+REAL(r64) FUNCTION MSWSHPVarSpeedResidual(SpeedRatio,Par)
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Bo Shen, , based on HVACMultiSpeedHeatPump:MSHPVarSpeedgResidual
+          !       DATE WRITTEN   March, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          !  Calculates residual function ((ActualOutput - QZnReq)/QZnReq)
+          !  MSHP output depends on the part load ratio which is being varied to zero the residual.
+
+          ! METHODOLOGY EMPLOYED:
+          !  Calls CalcMSHeatPump to get ActualOutput at the given speed ratio (partload ratio for high speed)
+          !  and calculates the residual as defined above
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)   :: SpeedRatio ! compressor cycling ratio (1.0 is continuous, 0.0 is off)
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1) = MSHPNum
+                                                  ! par(2) = Zone Num
+                                                  ! par(3) = FirstHVACIteration
+                                                  ! par(4) = OpMode
+                                                  ! par(5) = QZnReq
+                                                  ! par(6) = OnOffAirFlowRatio
+                                                  ! par(7) = SupHeaterLoad
+                                                  ! par(8) = SpeedNum
+                                                  ! par(9) = CompOp
+                                                  ! par(10) = 1.0 to meet sensible load
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          !  na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          !  na
+
+          ! DERIVED TYPE DEFINITIONS
+          !  na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  LOGICAL :: HXUnitOn             ! flag to enable heat exchanger
+  INTEGER :: PTUnitNum      ! MSHP index
+  INTEGER :: ZoneNum            ! Zone index
+  LOGICAL :: FirstHVACIteration ! FirstHVACIteration flag
+  INTEGER :: OpMode             ! Compressor operating mode
+  REAL(r64)    :: QZnReq             ! zone load (W)
+  REAL(r64)    :: QZnLat             ! zone latent load (W)
+  REAL(r64)    :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to average airflow over timestep
+  REAL(r64)    :: ZoneSensLoadMet       ! delivered sensible capacity of MSHP
+  REAL(r64)    :: ZoneLatLoadMet       ! delivered latent capacity of MSHP
+  REAL(r64)    :: LoadToBeMet      ! sensible or latent load to be met
+  REAL(r64)    :: SupHeaterLoad      ! Supplemental heater load
+  REAL(r64)    :: ResScale        ! Residual scale
+  INTEGER :: SpeedNum           ! Speed number
+  INTEGER :: CompOp             ! compressor operation; 1=on, 0=off
+
+  PTUnitNum = INT(Par(1))
+  ZoneNum = INT(Par(2))
+  ! FirstHVACIteration is a logical, Par is REAL(r64), so make 1.0=TRUE and 0.0=FALSE
+  IF(Par(3) .EQ. 1.0)THEN
+    FirstHVACIteration = .TRUE.
+  ELSE
+    FirstHVACIteration = .FALSE.
+  END IF
+  OpMode = INT(Par(4))
+  
+  QZnReq = 0.0d0
+  QZnLat = 0.0d0
+  
+  LoadToBeMet = Par(5)
+  IF(Par(10) .EQ. 1.0d0) THEN
+    QZnReq = Par(5)
+  ELSE
+    QZnLat = Par(5)
+  END IF
+  
+  OnOffAirFlowRatio = Par(6)
+  SupHeaterLoad     = Par(7)
+  SpeedNum     = INT(Par(8))
+  CompOp = INT(Par(9))
+  
+  IF(Par(11) > 0.0)THEN
+    HXUnitOn = .TRUE. 
+  ELSE
+   HXUnitOn = .FALSE. 
+  END IF
+
+                       
+  Call CalcMSWSHeatPump(PTUnitNum, ZoneNum, FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,1.0d0,ZoneSensLoadMet, ZoneLatLoadMet, &
+                          QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+                          
+  ResScale = abs(LoadToBeMet)  
+  IF (ResScale < 100.0) THEN 
+    ResScale = 100.0
+  END IF
+
+    ! Calculate residual based on output calculation flag
+  IF(Par(10) .EQ. 1.0d0) THEN
+    MSWSHPVarSpeedResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
+  ELSE
+    MSWSHPVarSpeedResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
+  END IF
+  
+  RETURN
+
+END FUNCTION MSWSHPVarSpeedResidual
+!******************************************************************************
+
+SUBROUTINE CalcMSWSHeatPump(PTUnitNum,ZoneNum, FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,LoadMet, LatentLoadMet, &
+                          QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
+            ! SUBROUTINE INFORMATION:
+            !       AUTHOR:          Bo Shen, based on HVACMultiSpeedHeatPump:CalcMSHeatPump
+            !       DATE WRITTEN:    March 2012
+            !       MODIFIED         na
+            !       RE-ENGINEERED    na
+
+            ! PURPOSE OF THIS SUBROUTINE:
+            !  This routine will calcultes MSHP performance based on given system load
+
+            ! METHODOLOGY EMPLOYED:
+            ! na
+
+            ! REFERENCES: na
+
+            ! USE STATEMENTS:
+  USE Fans,                      ONLY: SimulateFanComponents
+  USE DXCoils,                   ONLY: SimDXCoil
+  USE MixedAir,                  ONLY: SimOAMixer
+  USE HeatingCoils,              ONLY: SimulateHeatingCoilComponents
+  USE SteamCoils,                ONLY: SimulateSteamCoilComponents
+  USE WaterCoils,                ONLY: SimulateWaterCoilComponents
+  USE InputProcessor,            ONLY: SameString
+  USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
+  USE Psychrometrics,            ONLY: PsyHFnTdbW, PsyCpAirFnWTdb
+  USE DataEnvironment,           ONLY: OutDryBulbTemp
+  USE WatertoAirheatPumpSimple,  ONLY: SimWatertoAirHPSimple
+  USE PlantUtilities,            ONLY: SetComponentFlowRate
+  USE General,                   ONLY: SolveRegulaFalsi
+  USE DataHVACGlobals,           ONLY: SmallLoad
+  USE WatertoAirMulSpeeddHP,     ONLY: SimWatertoAirHPMulSpeed, WtoADXCoil
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,   INTENT    (IN) :: PTUnitNum              ! Unit index in fan coil array
+  INTEGER, INTENT (IN)    :: ZoneNum                 ! Zone index
+  LOGICAL,   INTENT    (IN) :: FirstHVACIteration   ! flag for 1st HVAC iteration in the time step
+  REAL(r64), INTENT    (IN) :: PartLoadFrac         ! compressor part load fraction
+  REAL(r64), INTENT   (OUT) :: LoadMet              ! load met by unit (W)
+  REAL(r64), INTENT    (IN) :: QZnReq               ! Zone load (W) unused1208
+  REAL(r64), INTENT (INOUT) :: OnOffAirFlowRatio    ! ratio of compressor ON airflow to AVERAGE airflow over timestep
+  REAL(r64), INTENT (INOUT) :: SupHeaterLoad        ! supplemental heater load (W)
+  LOGICAL,   INTENT    (IN) :: HXUnitOn             ! flag to enable heat exchanger
+  INTEGER, INTENT (IN)    :: SpeedNum             ! Speed number
+  REAL(r64)   , INTENT (IN)    :: SpeedRatio           ! Compressor speed ratio
+  INTEGER, INTENT(IN)     :: CompOp               ! Compressor on/off; 1=on, 0=off
+  REAL(r64), Intent(OUT)   :: LatentLoadMet ! Latent cooling load met (furnace outlet with respect to control zone humidity ratio)
+  REAL(r64)   , INTENT (IN)    :: QLatReq              ! Zone latent load []
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: Blank = ' '        ! subroutine argument when coil index is known
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER  :: OutletNode         ! PTHP air outlet node
+  INTEGER  :: InletNode          ! PTHP air inlet node
+  REAL(r64):: AirMassFlow        ! total supply air mass flow through the PTHP [m3/s]
+  REAL(r64):: MinHumRat          ! minimum humidity ratio for sensible capacity calculation (kg/kg)
+  REAL(r64):: OutsideDryBulbTemp ! Outdoor air temperature at external node height
+  REAL(r64):: QCoilReq           ! load passed to heating coil (W)
+  REAL(r64):: QActual            ! actual heating coil output (W)
+  INTEGER  :: OpMode             ! fan operating mode, CycFanCycCoil or ContFanCycCoil
+  LOGICAL  :: errflag            ! subroutine error flag
+  LOGICAL  :: PTUnitTurnFansOn   ! TurnFansOn Availalability status as set by SAM
+  LOGICAL  :: PTUnitTurnFansOff  ! TurnFansOff Availalability status as set by SAM
+  REAL(r64) :: mdot              !local temporary for mass flow rate
+  REAL(r64) :: MaxHotWaterFlow   ! coil maximum hot water mass flow rate, kg/s
+  REAL(r64) :: HotWaterMdot      ! actual hot water mass flow rate
+  REAL(r64), DIMENSION(3) :: Par
+  INTEGER   :: SolFlag
+  REAL(r64), PARAMETER :: ErrTolerance = 0.001    ! convergence limit for hotwater coil
+          ! FLOW
+
+  PTUnitTurnFansOn  = .FALSE.
+  PTUnitTurnFansOff = .FALSE.
+
+  OutletNode = PTUnit(PTUnitNum)%AirOutNode
+  InletNode = PTUnit(PTUnitNum)%AirInNode
+  OpMode = PTUnit(PTUnitNum)%OpMode
+!  IF(PTUnit(PTUnitNum)%CondenserNodeNum .EQ. 0)THEN
+!    OutsideDryBulbTemp = OutDryBulbTemp
+!  ELSE
+!    OutsideDryBulbTemp = Node(PTUnit(PTUnitNum)%CondenserNodeNum)%Temp
+!  END IF
+
+  OutsideDryBulbTemp = OutDryBulbTemp
+
+  SaveCompressorPLR = 0.0
+  ! Set inlet air mass flow rate based on PLR and compressor on/off air flow rates
+  CALL SetVSWSHPAirFlow(PTUnitNum, ZoneNum, PartLoadFrac,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
+
+  AirMassFlow = Node(InletNode)%MassFlowRate
+  IF(PTUnit(PTUnitNum)%OutsideAirNode .GT. 0)&
+  CALL SimOAMixer(PTUnit(PTUnitNum)%OAMixName,FirstHVACIteration,PTUnit(PTUnitNum)%OAMixIndex)
+
+  IF(PTUnit(PTUnitNum)%AvailManagerListFound)THEN
+    IF(ZoneComp(PTUnit(PTUnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(PTUnitNum)%AvailStatus .EQ. CycleOn) THEN
+      PTUnitTurnFansOn = .TRUE.
+      PTUnitTurnFansOff = .FALSE.
+    ELSEIF(ZoneComp(PTUnit(PTUnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(PTUnitNum)%AvailStatus .EQ. Forceoff) THEN
+      PTUnitTurnFansOn = .FALSE.
+      PTUnitTurnFansOff = .TRUE.
+    ENDIF
+  ENDIF
+
+  ! if blow through, simulate fan then coils
+  IF (PTUnit(PTUnitNum)%FanPlace .EQ. BlowThru) THEN
+    IF (PTUnit(PTUnitNum)%AvailManagerListFound) THEN
+      CALL SimulateFanComponents(PTUnit(PTUnitNum)%FanName,FirstHVACIteration,PTUnit(PTUnitNum)%FanIndex,FanSpeedRatio,&
+                                 PTUnitTurnFansOn,PTUnitTurnFansOff)
+    ELSE
+      CALL SimulateFanComponents(PTUnit(PTUnitNum)%FanName,FirstHVACIteration,PTUnit(PTUnitNum)%FanIndex,FanSpeedRatio)
+    ENDIF
+  END IF
+
+  IF (CoolingLoad .AND. OutsideDryBulbTemp .GT. PTUnit(PTUnitNum)%MinOATCompressor )THEN
+        Call SimWatertoAirHPMulSpeed(Blank,PTUnit(PTUnitNum)%DXCoolCoilIndexNum ,&
+           PTUnit(PTUnitNum)%OpMode,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
+ 
+        SaveCompressorPLR = PartLoadFrac
+  ELSE ! cooling coil is off
+        Call SimWatertoAirHPMulSpeed(Blank,PTUnit(PTUnitNum)%DXCoolCoilIndexNum ,&
+           PTUnit(PTUnitNum)%OpMode,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )       
+  END IF
+  
+  IF (HeatingLoad)THEN
+       Call SimWatertoAirHPMulSpeed(Blank,PTUnit(PTUnitNum)%DXHeatCoilIndex ,&
+           PTUnit(PTUnitNum)%OpMode,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
+       
+       SaveCompressorPLR = PartLoadFrac
+  ELSE
+!   heating coil is off
+      Call SimWatertoAirHPMulSpeed(Blank,PTUnit(PTUnitNum)%DXHeatCoilIndex,&
+           PTUnit(PTUnitNum)%OpMode,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,& 
+           CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )           
+  END IF
+
+  ! if draw through, simulate coils then fan
+  IF (PTUnit(PTUnitNum)%FanPlace .EQ. DrawThru) THEN
+    IF (PTUnit(PTUnitNum)%AvailManagerListFound) THEN
+      CALL SimulateFanComponents(PTUnit(PTUnitNum)%FanName,FirstHVACIteration,PTUnit(PTUnitNum)%FanIndex,FanSpeedRatio,&
+                                 PTUnitTurnFansOn,PTUnitTurnFansOff)
+    ELSE
+      CALL SimulateFanComponents(PTUnit(PTUnitNum)%FanName,FirstHVACIteration,PTUnit(PTUnitNum)%FanIndex,FanSpeedRatio)
+    ENDIF
+  END IF
+  
+  IF(PTUnit(PTUnitNum)%SuppHeatCoilIndex .GT. 0)THEN
+     IF ( SupHeaterLoad < SmallLoad ) THEN
+         Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+           Case (Coil_HeatingGas,Coil_HeatingElectric )
+                 CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                    SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex,  &
+                                                    QActual, .TRUE., PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingWater)
+               mdot = 0.0d0
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+               CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingSteam)
+               mdot = 0.0d0
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+               CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          FirstHVACIteration, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                          QActual, PTUnit(PTUnitNum)%OpMode)
+         END Select
+     ELSE
+        Select Case (PTUnit(PTUnitNum)%SuppHeatCoilType_Num)
+           Case (Coil_HeatingGas,Coil_HeatingElectric )
+              CALL SimulateHeatingCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                 SupHeaterLoad, PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                                 QActual, .TRUE., PTUnit(PTUnitNum)%OpMode)
+           Case (Coil_HeatingWater)
+               MaxHotWaterFlow = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+               Call SetComponentFlowRate( MaxHotWaterFlow , &
+                                          PTUnit(PTUnitNum)%HotWaterControlNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+              QActual = SupHeaterLoad
+              ! simulate the hot water supplemental heating coil
+              CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                               PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual, &
+                                               PTUnit(PTUnitNum)%OpMode)
+              IF( QActual > (SupHeaterLoad + SmallLoad)) THEN
+                  ! control water flow to obtain output matching SupHeaterLoad
+                  SolFlag = 0
+                  MinWaterFlow = 0.0d0
+                  Par(1) = REAL(PTUnitNum,r64)
+                  IF (FirstHVACIteration) THEN
+                    Par(2) = 1.
+                  ELSE
+                    Par(2) = 0.
+                  END IF
+                  Par(3) = SupHeaterLoad
+                  MaxHotWaterFlow = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+                  CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+                                        MinWaterFlow, MaxHotWaterFlow, Par)
+                  IF (SolFlag == -1) THEN
+                    IF (PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex == 0) THEN
+                      CALL ShowWarningMessage('Hot water coil control failed in PTHP '//TRIM(PTUnit(PTUnitNum)%Name))
+                      CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+                    ENDIF
+                    CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in PTHP '//  &
+                       TRIM(PTUnit(PTUnitNum)%Name),PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex)
+                  ELSE IF (SolFlag == -2) THEN
+                    IF (PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
+                      CALL ShowWarningMessage('Hot water coil control failed in PTHP '//TRIM(PTUnit(PTUnitNum)%Name))
+                      CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+                    ENDIF
+                    CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in PTHP '//  &
+                       TRIM(PTUnit(PTUnitNum)%Name),PTUnit(PTUnitNum)%HotWaterCoilMaxIterIndex2)
+                  END IF
+                  QActual = SupHeaterLoad
+                  ! simulate the hot water supplemental heating coil
+                  CALL SimulateWaterCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName,FirstHVACIteration, &
+                                                   PTUnit(PTUnitNum)%SuppHeatCoilIndex, QActual, &
+                                                   PTUnit(PTUnitNum)%OpMode)
+              ENDIF
+           Case (Coil_HeatingSteam)
+               mdot = PTUnit(PTUnitNum)%MaxSuppCoilFluidFlow
+               Call SetComponentFlowRate( mdot , &
+                                          PTUnit(PTUnitNum)%HWCoilSteamInletNode, &
+                                          PTUnit(PTUnitNum)%PlantCoilOutletNode, &
+                                          PTUnit(PTUnitNum)%LoopNum, &
+                                          PTUnit(PTUnitNum)%LoopSide, &
+                                          PTUnit(PTUnitNum)%BranchNum, &
+                                          PTUnit(PTUnitNum)%CompNum)
+
+               ! simulate the steam supplemental heating coil
+               CALL SimulateSteamCoilComponents(PTUnit(PTUnitNum)%SuppHeatCoilName, &
+                                          FirstHVACIteration, SupHeaterLoad, &
+                                          PTUnit(PTUnitNum)%SuppHeatCoilIndex, &
+                                          QActual, PTUnit(PTUnitNum)%OpMode)
+        END Select
+     ENDIF
+  ENDIF
+! calculate sensible load met using delta enthalpy at a constant (minimum) humidity ratio)
+  MinHumRat = MIN(Node(InletNode)%HumRat,Node(OutletNode)%HumRat)
+  LoadMet   = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
+  LatentLoadMet = 0.0 
+RETURN
+END SUBROUTINE CalcMSWSHeatPump
+
+
+SUBROUTINE SetVSWSHPAirFlow(PTUnitNum,ZoneNum, PartLoadRatio,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:SetAverageAirFlow
+          !       DATE WRITTEN   March, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set the average air mass flow rates using the part load fraction of the heat pump for this time step
+          ! Set OnOffAirFlowRatio to be used by DX coils
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataZoneEnergyDemands,      ONLY: CurDeadBandOrSetback
+  USE DataHVACGlobals,            ONLY: MSHPMassFlowRateLow, MSHPMassFlowRateHigh
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)    :: PTUnitNum      ! Unit index
+  INTEGER, INTENT (IN)    :: ZoneNum        ! Zone index
+  REAL(r64)   , INTENT (IN)    :: PartLoadRatio      ! unit part load ratio
+  REAL(r64)   , INTENT (INOUT) :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to average airflow over timestep
+  INTEGER, INTENT (IN),OPTIONAL :: SpeedNum     ! Speed number
+  REAL(r64),    INTENT (IN),OPTIONAL :: SpeedRatio   ! Speed ratio
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVMS TYPE DEFINITIONS
+          ! na
+
+            ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER             :: InletNode           ! inlet node number for PTUnitNum
+  INTEGER             :: OutsideAirNode      ! outside air node number in PTHP loop
+  INTEGER             :: AirRelNode          ! relief air node number in PTHP loop
+  REAL(r64)           :: AverageUnitMassFlow = 0.0 ! average supply air mass flow rate over time step
+  REAL(r64)           :: AverageOAMassFlow = 0.0  ! average outdoor air mass flow rate over time step
+  INTEGER             :: AvailStatus         ! Availability status set by system availability manager
+  
+  MSHPMassFlowRateLow = 0.0             ! Mass flow rate at low speed
+  MSHPMassFlowRateHigh = 0.0            ! Mass flow rate at high speed
+  
+  InletNode      = PTUnit(PTUnitNum)%AirInNode
+  OutsideAirNode = PTUnit(PTUnitNum)%OutsideAirNode
+  AirRelNode     = PTUnit(PTUnitNum)%AirReliefNode
+  AvailStatus    = NoAction
+  
+  AverageOAMassFlow   = (PartLoadRatio * OACompOnMassFlow) + ((1-PartLoadRatio) * OACompOffMassFlow)
+  
+  IF (PTUnit(PTUnitNum)%AvailManagerListFound) THEN
+    AvailStatus = ZoneComp(PTUnit(PTUnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(PTUnitNum)%AvailStatus
+  ENDIF
+  
+ If (Present(SpeedNum)) Then
+      If (HeatingLoad) Then
+        If (SpeedNum .eq. 1) Then
+          CompOnMassFlow = PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum)
+          CompOnFlowRatio = PTUnit(PTUnitNum)%MSHeatingSpeedRatio(SpeedNum)
+          MSHPMassFlowRateLow = PTUnit(PTUnitNum)%HeatMassFlowRate(1)
+          MSHPMassFlowRateHigh = PTUnit(PTUnitNum)%HeatMassFlowRate(1)
+        Else If (SpeedNum .GT. 1) Then
+          CompOnMassFlow = SpeedRatio*PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum) + &
+                           (1.0-SpeedRatio)*PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum-1)
+          CompOnFlowRatio = SpeedRatio*PTUnit(PTUnitNum)%MSHeatingSpeedRatio(SpeedNum) + &
+                           (1.0-SpeedRatio)*PTUnit(PTUnitNum)%MSHeatingSpeedRatio(SpeedNum-1)
+          MSHPMassFlowRateLow = PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum-1)
+          MSHPMassFlowRateHigh = PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum)
+        End If
+      Else If (PTUnit(PTUnitNum)%HeatCoolMode == CoolingMode) Then
+        If (SpeedNum .eq. 1) Then
+          CompOnMassFlow = PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum)
+          CompOnFlowRatio = PTUnit(PTUnitNum)%MSCoolingSpeedRatio(SpeedNum)
+          MSHPMassFlowRateLow = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
+          MSHPMassFlowRateHigh = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
+        Else If (SpeedNum .GT. 1) Then
+          CompOnMassFlow = SpeedRatio*PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum) + &
+                           (1.0-SpeedRatio)*PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum-1)
+          CompOnFlowRatio = SpeedRatio*PTUnit(PTUnitNum)%MSCoolingSpeedRatio(SpeedNum) + &
+                           (1.0-SpeedRatio)*PTUnit(PTUnitNum)%MSCoolingSpeedRatio(SpeedNum-1)
+          MSHPMassFlowRateLow = PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum-1)
+          MSHPMassFlowRateHigh = PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum)
+        End If
+      End If
+  END IF
+
+  ! Set up fan flow rate during compressor off time
+  If (PTUnit(PTUnitNum)%OpMode .EQ. ContFanCycCoil .AND. Present(SpeedNum)) Then
+    IF (PTUnit(PTUnitNum)%AirFlowControl .EQ. UseCompressorOnFlow .AND. CompOnMassFlow > 0.0) THEN
+      IF(SpeedNum == 1) THEN  !LOWEST SPEED USE IDLE FLOW
+        CompOffMassFlow = PTUnit(PTUnitNum)%IdleMassFlowRate
+        CompOffFlowRatio = PTUnit(PTUnitNum)%IdleSpeedRatio
+      Else IF (PTUnit(PTUnitNum)%LastMode .EQ. HeatingMode) THEN
+        CompOffMassFlow = PTUnit(PTUnitNum)%HeatMassFlowRate(SpeedNum)
+        CompOffFlowRatio = PTUnit(PTUnitNum)%MSHeatingSpeedRatio(SpeedNum)
+      ELSE
+        CompOffMassFlow = PTUnit(PTUnitNum)%CoolMassFlowRate(SpeedNum)
+        CompOffFlowRatio = PTUnit(PTUnitNum)%MSCoolingSpeedRatio(SpeedNum)
+      END IF
+    END IF
+  End If
+
+  If (Present(SpeedNum)) Then
+    If (SpeedNum > 1) Then
+      AverageUnitMassFlow = CompOnMassFlow
+      FanSpeedRatio       = CompOnFlowRatio
+    Else
+      AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
+      IF(CompOffFlowRatio .GT. 0.0)THEN
+        FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
+      ELSE
+        FanSpeedRatio     = CompOnFlowRatio
+      END IF
+    End If
+  Else
+    AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
+    IF(CompOffFlowRatio .GT. 0.0)THEN
+      FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
+    ELSE
+      FanSpeedRatio       = CompOnFlowRatio
+    END IF
+  End If 
+  
+  IF ( GetCurrentScheduleValue(PTUnit(PTUnitNum)%SchedPtr) .GT. 0.0d0 &
+     .AND. ((GetCurrentScheduleValue(PTUnit(PTUnitNum)%FanAvailSchedPtr) .GT. 0.0d0 .OR. &
+      AvailStatus .EQ. CycleOn) .AND. AvailStatus .NE. ForceOff))THEN
+
+    Node(InletNode)%MassFlowRate              = AverageUnitMassFlow
+    Node(InletNode)%MassFlowRateMaxAvail      = AverageUnitMassFlow
+    IF(OutsideAirNode .GT. 0)THEN
+      Node(OutsideAirNode)%MassFlowRate         = AverageOAMassFlow
+      Node(OutsideAirNode)%MassFlowRateMaxAvail = AverageOAMassFlow
+      Node(AirRelNode)%MassFlowRate             = AverageOAMassFlow
+      Node(AirRelNode)%MassFlowRateMaxAvail     = AverageOAMassFlow
+    END IF
+    IF (AverageUnitMassFlow .GT. 0.0) THEN
+      OnOffAirFlowRatio                       = CompOnMassFlow / AverageUnitMassFlow
+    ELSE
+      OnOffAirFlowRatio                       = 0.0
+    END IF
+
+  ELSE
+
+    Node(InletNode)%MassFlowRate              = 0.0
+    IF(OutsideAirNode .GT. 0)THEN
+      Node(OutsideAirNode)%MassFlowRate       = 0.0
+      Node(AirRelNode)%MassFlowRate           = 0.0
+    END IF
+    OnOffAirFlowRatio                         = 0.0
+
+  END IF  
+  RETURN
+END SUBROUTINE SetVSWSHPAirFlow
+
+SUBROUTINE SetOnOffMassFlowRateMulSpeed(PTUnitNum, ZoneNum, FirstHVACIteration, &
+        AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bo Shen
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is for initializations of the Furnace Components.
+
+          ! METHODOLOGY EMPLOYED:
+          ! The HeatCool furnace/unitarysystem and air-to-air heat pump may have alternate air flow rates
+          ! in cooling, heating, and when no cooling or heating is needed. Set up the coil (comp) ON and OFF
+          ! air flow rates. Use these flow rates during the Calc routines to set the average mass flow rates
+          ! based on PLR.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General,     ONLY: RoundSigDigits
+  USE DataZoneEnergyDemands, ONLY: CurDeadbandOrSetback
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,   INTENT(IN)    :: PTUnitNum        ! index to furnace
+  INTEGER,   INTENT(IN)    :: ZoneNum           ! index to zone
+  INTEGER,   INTENT(IN)    :: AirLoopNum        ! index to air loop !unused1208
+  REAL(r64), INTENT(INOUT) :: OnOffAirFlowRatio ! ratio of coil on to coil off air flow rate
+  INTEGER,   INTENT(IN)    :: OpMode            ! fan operating mode
+  REAL(r64), INTENT(IN)    :: QZnReq          ! sensible load to be met (W) !unused1208
+  REAL(r64), INTENT(IN)    :: MoistureLoad      ! moisture load to be met (W)
+  REAL(r64), INTENT(INOUT)    :: PartLoadRatio     ! coil part-load ratio
+  LOGICAL, INTENT (IN)    :: FirstHVACIteration   ! Flag for 1st HVAC iteration
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER             :: InNode                           ! Inlet node number in MSHP loop
+  INTEGER             :: OutNode                          ! Outlet node number in MSHP loop
+  
+  InNode  = PTUnit(PTUnitNum)%AirInNode
+  OutNode = PTUnit(PTUnitNum)%AirOutNode
+  
+  CALL SetOnOffMassFlowRate(PTUnitNum, PartLoadRatio, OnOffAirFlowRatio) 
+  !INTIALIZE FIXED SPEED FIRST, AND OVER-WRITE USING MUL-SPEED
+
+          ! FLOW:
+          
+  If (CoolingLoad) then
+    PTUnit(PTUnitNum)%HeatCoolMode = CoolingMode       
+  ELSE If (HeatingLoad) then
+    PTUnit(PTUnitNum)%HeatCoolMode = HeatingMode
+  Else
+    PTUnit(PTUnitNum)%HeatCoolMode = 0
+  End If
+
+  ! Set the inlet node mass flow rate
+  IF (PTUnit(PTUnitNum)%OpMode .EQ. ContFanCycCoil) THEN
+  ! constant fan mode
+    IF ((PTUnit(PTUnitNum)%HeatCoolMode == HeatingMode) .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+      CompOnMassFlow = PTUnit(PTUnitNum)%HeatMassFlowRate(1)
+      CompOnFlowRatio = PTUnit(PTUnitNum)%MSHeatingSpeedRatio(1)
+      PTUnit(PTUnitNum)%LastMode = HeatingMode
+    ELSE IF ((PTUnit(PTUnitNum)%HeatCoolMode == CoolingMode) .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+      CompOnMassFlow = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
+      CompOnFlowRatio = PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1)
+      PTUnit(PTUnitNum)%LastMode = CoolingMode
+    ELSE
+      CompOnMassFlow = PTUnit(PTUnitNum)%IdleMassFlowRate
+      CompOnFlowRatio = PTUnit(PTUnitNum)%IdleSpeedRatio
+    END IF
+    CompOffMassFlow = PTUnit(PTUnitNum)%IdleMassFlowRate
+    CompOffFlowRatio = PTUnit(PTUnitNum)%IdleSpeedRatio
+  ELSE
+  ! cycling fan mode
+    IF ((PTUnit(PTUnitNum)%HeatCoolMode == HeatingMode).AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+      CompOnMassFlow = PTUnit(PTUnitNum)%HeatMassFlowRate(1)
+      CompOnFlowRatio = PTUnit(PTUnitNum)%MSHeatingSpeedRatio(1)
+    ELSE IF ((PTUnit(PTUnitNum)%HeatCoolMode == CoolingMode).AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+      CompOnMassFlow = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
+      CompOnFlowRatio = PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1)
+    ELSE
+      CompOnMassFlow = 0.0
+      CompOnFlowRatio = 0.0
+    END IF
+    CompOffMassFlow = 0.0
+    CompOffFlowRatio = 0.0
+  END IF
+
+  ! Set the inlet node mass flow rate
+  IF (GetCurrentScheduleValue(PTUnit(PTUnitNum)%FanAvailSchedPtr) .gt. 0.0 .AND. CompOnMassFlow .NE. 0.0) THEN
+    OnOffAirFlowRatio = 1.0
+    IF(FirstHVACIteration)THEN
+      Node(InNode)%MassFlowRate = CompOnMassFlow
+      PartLoadRatio            = 0.0
+    ELSE
+      IF (PTUnit(PTUnitNum)%HeatCoolMode /= 0) THEN
+        PartLoadRatio  = 1.0
+      ELSE
+        PartLoadRatio  = 0.0
+      END IF
+    END IF
+  ELSE
+    PartLoadRatio  = 0.0
+    Node(InNode)%MassFlowRate           = 0.0
+    Node(OutNode)%MassFlowRate          = 0.0
+    Node(OutNode)%MassFlowRateMaxAvail  = 0.0
+    OnOffAirFlowRatio      = 1.0
+  END IF
+
+! Set the system mass flow rates
+  CALL SetVSWSHPAirFlow(PTUnitNum, ZoneNum, PartLoadRatio,OnOffAirFlowRatio)
+
+END SUBROUTINE SetOnOffMassFlowRateMulSpeed
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

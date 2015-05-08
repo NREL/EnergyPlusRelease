@@ -312,6 +312,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
 
   ! There are no hourly initializations done in this portion of the surface heat balance
   IF (AnyEnergyManagementSystemInModel) THEN
+    CALL InitEMSControlledConstructions
     CALL InitEMSControlledSurfaceProperties
 
   ENDIF
@@ -364,8 +365,10 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
     ZoneDaylight(NZ)%GlareIndexAtRefPt = 0.0
     ZoneDaylight(NZ)%ZonePowerReductionFactor = 1.0
     ZoneDaylight(NZ)%InterReflIllFrIntWins = 0.0d0             ! inter-reflected illuminance from interior windows
-    ZoneDaylight(NZ)%TimeExceedingGlareIndexSPAtRefPt = 0.0d0
-    ZoneDaylight(NZ)%TimeExceedingDaylightIlluminanceSPAtRefPt = 0.0d0
+    IF (ZoneDaylight(NZ)%TotalDaylRefPoints /= 0) THEN
+      ZoneDaylight(NZ)%TimeExceedingGlareIndexSPAtRefPt = 0.0d0
+      ZoneDaylight(NZ)%TimeExceedingDaylightIlluminanceSPAtRefPt = 0.0d0
+    ENDIF
 
     IF(SunIsUp .AND. ZoneDaylight(NZ)%TotalDaylRefPoints /= 0) THEN
       if (firsttime) CALL DisplayString('Computing Interior Daylighting Illumination')
@@ -540,6 +543,10 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   ENDIF
 
           ! Initialize the temperature history terms for conduction through the surfaces
+  IF ((SolutionAlgo == UseCondFD) .OR. (SolutionAlgo == UseCondFDSimple )) THEN
+    CALL InitHeatBalFiniteDiff
+  ENDIF
+
   CTFConstOutPart  = 0.0
   CTFConstInPart   = 0.0
   CTFTsrcConstPart = 0.0
@@ -600,10 +607,6 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
       CTFTsrcConstPart(SurfNum) = 0.0
 
     END IF
-
-    IF ((SolutionAlgo == UseCondFD) .OR. (SolutionAlgo == UseCondFDSimple )) THEN
-      CALL InitHeatBalFiniteDiff
-    ENDIF
 
   END DO    ! ...end of surfaces DO loop for initializing temperature history terms for the surface heat balances
 
@@ -790,6 +793,7 @@ SUBROUTINE GatherForPredefinedReport
           CALL PreDefTableEntry(pdchFenAzimuth,surfName,curAzimuth)
           isNorth = .FALSE.
           curTilt = Surface(iSurf)%Tilt
+          CALL PreDefTableEntry(pdchFenTilt,surfName,curTilt)
           IF ((curTilt >= 60.d0) .AND. (curTilt < 180.d0)) THEN
             IF ((curAzimuth >= 315.d0) .OR. (curAzimuth < 45.d0)) THEN
               CALL PreDefTableEntry(pdchFenDir,surfName,'N')
@@ -1126,6 +1130,42 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   QdotConvInRepPerArea = 0.d0
   ALLOCATE (QdotConvInRep(TotSurfaces))
   QdotConvInRep = 0.d0
+
+  ALLOCATE ( QRadNetSurfInReport(TotSurfaces))
+  QRadNetSurfInReport   = 0.d0
+  ALLOCATE ( QdotRadNetSurfInRep(TotSurfaces))
+  QdotRadNetSurfInRep   = 0.d0
+  ALLOCATE  ( QdotRadNetSurfInRepPerArea(TotSurfaces))
+  QdotRadNetSurfInRepPerArea  = 0.d0
+
+  ALLOCATE ( QRadSolarInReport(TotSurfaces))
+  QRadSolarInReport   = 0.d0
+  ALLOCATE ( QdotRadSolarInRep(TotSurfaces))
+  QdotRadSolarInRep   = 0.d0
+  ALLOCATE  ( QdotRadSolarInRepPerArea(TotSurfaces))
+  QdotRadSolarInRepPerArea  = 0.d0
+
+  ALLOCATE ( QRadLightsInReport(TotSurfaces))
+  QRadLightsInReport   = 0.d0
+  ALLOCATE ( QdotRadLightsInRep(TotSurfaces))
+  QdotRadLightsInRep   = 0.d0
+  ALLOCATE  ( QdotRadLightsInRepPerArea(TotSurfaces))
+  QdotRadLightsInRepPerArea  = 0.d0
+
+  ALLOCATE ( QRadIntGainsInReport(TotSurfaces))
+  QRadIntGainsInReport   = 0.d0
+  ALLOCATE ( QdotRadIntGainsInRep(TotSurfaces))
+  QdotRadIntGainsInRep   = 0.d0
+  ALLOCATE  ( QdotRadIntGainsInRepPerArea(TotSurfaces))
+  QdotRadIntGainsInRepPerArea  = 0.d0
+
+  ALLOCATE ( QRadHVACInReport(TotSurfaces))
+  QRadHVACInReport   = 0.d0
+  ALLOCATE ( QdotRadHVACInRep(TotSurfaces))
+  QdotRadHVACInRep   = 0.d0
+  ALLOCATE  ( QdotRadHVACInRepPerArea(TotSurfaces))
+  QdotRadHVACInRepPerArea  = 0.d0
+
   ALLOCATE (QConvOutReport(TotSurfaces))
   QConvOutReport = 0.d0
   ALLOCATE (QdotConvOutRepPerArea(TotSurfaces))
@@ -1140,12 +1180,56 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ALLOCATE (QRadOutReport(TotSurfaces))
   QRadOutReport = 0.d0
 
+
   ALLOCATE (OpaqSurfInsFaceConduction(TotSurfaces))
-  OpaqSurfInsFaceConduction=0.0
+  OpaqSurfInsFaceConduction=0.d0
+  ALLOCATE(OpaqSurfInsFaceConductionFlux(TotSurfaces))
+  OpaqSurfInsFaceConductionFlux = 0.d0
   ALLOCATE (OpaqSurfInsFaceCondGainRep(TotSurfaces))
-  OpaqSurfInsFaceCondGainRep=0.0
+  OpaqSurfInsFaceCondGainRep=0.d0
   ALLOCATE (OpaqSurfInsFaceCondLossRep(TotSurfaces))
-  OpaqSurfInsFaceCondLossRep=0.0
+  OpaqSurfInsFaceCondLossRep=0.d0
+  ALLOCATE (OpaqSurfInsFaceConductionEnergy(TotSurfaces))
+  OpaqSurfInsFaceConductionEnergy = 0.d0
+
+  ALLOCATE(SWOutAbsTotalReport(TotSurfaces))
+  SWOutAbsTotalReport=0.0d0
+  ALLOCATE(SWOutAbsEnergyReport(TotSurfaces))
+  SWOutAbsEnergyReport=0.0d0
+
+  ALLOCATE (OpaqSurfOutsideFaceConduction(TotSurfaces))
+  OpaqSurfOutsideFaceConduction       = 0.d0
+  ALLOCATE(OpaqSurfOutsideFaceConductionFlux(TotSurfaces))
+  OpaqSurfOutsideFaceConductionFlux   = 0.d0
+  ALLOCATE (OpaqSurfExtFaceCondGainRep(TotSurfaces))
+  OpaqSurfExtFaceCondGainRep          = 0.d0
+  ALLOCATE (OpaqSurfExtFaceCondLossRep(TotSurfaces))
+  OpaqSurfExtFaceCondLossRep          = 0.d0
+  ALLOCATE (OpaqSurfOutsideFaceConductionEnergy(TotSurfaces))
+  OpaqSurfOutsideFaceConductionEnergy = 0.d0
+
+  ALLOCATE (OpaqSurfAvgFaceCondGainRep(TotSurfaces))
+  OpaqSurfAvgFaceCondGainRep      = 0.d0
+  ALLOCATE (OpaqSurfAvgFaceCondLossRep(TotSurfaces))
+  OpaqSurfAvgFaceCondLossRep      = 0.d0
+  ALLOCATE (OpaqSurfAvgFaceConduction(TotSurfaces))
+  OpaqSurfAvgFaceConduction       = 0.d0
+  ALLOCATE ( OpaqSurfAvgFaceConductionFlux(TotSurfaces))
+  OpaqSurfAvgFaceConductionFlux   = 0.d0
+  ALLOCATE (OpaqSurfAvgFaceConductionEnergy(TotSurfaces))
+  OpaqSurfAvgFaceConductionEnergy = 0.d0
+
+  ALLOCATE ( OpaqSurfStorageGainRep(TotSurfaces))
+  OpaqSurfStorageGainRep  = 0.d0
+  ALLOCATE ( OpaqSurfStorageCondLossRep(TotSurfaces))
+  OpaqSurfStorageCondLossRep  = 0.d0
+  ALLOCATE ( OpaqSurfStorageConduction(TotSurfaces))
+  OpaqSurfStorageConduction  = 0.d0
+  ALLOCATE ( OpaqSurfStorageConductionFlux(TotSurfaces))
+  OpaqSurfStorageConductionFlux  = 0.d0
+  ALLOCATE ( OpaqSurfStorageConductionEnergy(TotSurfaces))
+  OpaqSurfStorageConductionEnergy = 0.d0
+
   ALLOCATE (OpaqSurfInsFaceBeamSolAbsorbed(TotSurfaces))
   OpaqSurfInsFaceBeamSolAbsorbed=0.0
   ALLOCATE (TempSource(TotSurfaces))
@@ -1167,6 +1251,8 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
 
   ALLOCATE (NetLWRadToSurf(TotSurfaces))
   NetLWRadToSurf = 0.0
+  ALLOCATE (QRadSWLightsInAbs(TotSurfaces))
+  QRadSWLightsInAbs = 0.d0
 
   ALLOCATE (RadSysTiHBConstCoef(TotSurfaces))
   RadSysTiHBConstCoef = 0.0
@@ -1224,47 +1310,146 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ! Setup surface report variables CurrentModuleObject='Opaque Surfaces'
   DO Loop=1,TotSurfaces
     IF (.not. Surface(Loop)%HeatTransSurf) CYCLE
-    CALL SetupOutputVariable('Surface Inside Temperature [C]',TempSurfInRep(Loop),'Zone','State',Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Outside Temperature [C]',TempSurfOut(Loop),'Zone','State',Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Int Adjacent Air Temperature [C]',TempEffBulkAir(Loop),'Zone','State',Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Int Convection Coeff [W/m2-K]',HConvIn(Loop),'Zone','State',Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Int Convection Heat Rate [W]', QdotConvInRep(loop), 'Zone', 'State', Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Int Convection Heat Rate per Area [W/m2]', QdotConvInRepPerArea(loop), 'Zone', 'State',  &
-                                                                                 Surface(Loop)%Name)
-    CALL SetupOutputVariable('Surface Int Convection Heat Gain to Air [J]',QConvInReport(loop), 'Zone', 'Sum', Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Temperature [C]',TempSurfInRep(Loop),'Zone','State',Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Outside Face Temperature [C]',TempSurfOut(Loop),'Zone','State',Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Adjacent Air Temperature [C]',TempEffBulkAir(Loop),'Zone','State', &
+                              Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Convection Heat Transfer Coefficient [W/m2-K]',HConvIn(Loop),'Zone', &
+                              'State',Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Convection Heat Gain Rate [W]', QdotConvInRep(loop), 'Zone', 'State', &
+                              Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Convection Heat Gain Rate per Area [W/m2]', QdotConvInRepPerArea(loop), &
+                              'Zone', 'State',  Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Convection Heat Gain Energy [J]',QConvInReport(loop), 'Zone', 'Sum', &
+                              Surface(Loop)%Name)
+
+    CALL SetupOutputVariable('Surface Inside Face Net Surface Thermal Radiation Heat Gain Rate [W]', QdotRadNetSurfInRep(loop), &
+                              'Zone', 'State', Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Net Surface Thermal Radiation Heat Gain Rate per Area [W/m2]', &
+                               QdotRadNetSurfInRepPerArea(loop), 'Zone', 'State', Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Net Surface Thermal Radiation Heat Gain Energy [J]',QRadNetSurfInReport(loop), &
+                               'Zone', 'Sum', Surface(Loop)%Name)
+
+    IF(Surface(Loop)%Class /= SurfaceClass_Window) THEN
+      CALL SetupOutputVariable('Surface Inside Face Solar Radiation Heat Gain Rate [W]',  QdotRadSolarInRep(loop), 'Zone',  &
+                                'State', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Inside Face Solar Radiation Heat Gain Rate per Area [W/m2]',  &
+                                 QdotRadSolarInRepPerArea(loop), 'Zone', 'State',   Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Inside Face Solar Radiation Heat Gain Energy [J]', QRadSolarInReport(loop), &
+                                'Zone', 'Sum', Surface(Loop)%Name)
+
+      CALL SetupOutputVariable('Surface Inside Face Lights Radiation Heat Gain Rate [W]',  QdotRadLightsInRep(loop), &
+                                'Zone', 'State', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Inside Face Lights Radiation Heat Gain Rate per Area [W/m2]',  &
+                                QdotRadLightsInRepPerArea(loop), 'Zone', 'State',  Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Inside Face Lights Radiation Heat Gain Energy [J]', QRadLightsInReport(loop), &
+                                'Zone', 'Sum', Surface(Loop)%Name)
+    ENDIF
+
+    CALL SetupOutputVariable('Surface Inside Face Internal Gains Radiation Heat Gain Rate [W]',  QdotRadIntGainsInRep(loop), &
+                              'Zone', 'State', Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Internal Gains Radiation Heat Gain Rate per Area [W/m2]',  &
+                              QdotRadIntGainsInRepPerArea(loop), 'Zone', 'State',  Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face Internal Gains Radiation Heat Gain Energy [J]', QRadIntGainsInReport(loop), &
+                              'Zone', 'Sum', Surface(Loop)%Name)
+
+    CALL SetupOutputVariable('Surface Inside Face System Radiation Heat Gain Rate [W]',  QdotRadHVACInRep(loop), 'Zone', 'State',&
+                                 Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face System Radiation Heat Gain Rate per Area [W/m2]',  &
+                               QdotRadHVACInRepPerArea(loop), 'Zone', 'State',  Surface(Loop)%Name)
+    CALL SetupOutputVariable('Surface Inside Face System Radiation Heat Gain Energy [J]', QRadHVACInReport(loop), 'Zone', 'Sum', &
+                               Surface(Loop)%Name)
 
     IF (Surface(Loop)%ExtBoundCond == ExternalEnvironment .or. DisplayAdvancedReportVariables) THEN
-      CALL SetupOutputVariable('Surface Ext Outdoor Dry Bulb [C]',Surface(Loop)%OutDryBulbTemp,'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Outdoor Wet Bulb [C]',Surface(Loop)%OutWetBulbTemp,'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Wind Speed [m/s]',Surface(Loop)%WindSpeed,'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Convection Heat Rate [W]', QdotConvOutRep(loop), 'Zone', 'State', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Convection Heat Rate per Area [W/m2]', QdotConvOutRepPerArea(loop), 'Zone', 'State', &
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Dry Bulb Temperature [C]',Surface(Loop)%OutDryBulbTemp,&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Wet Bulb Temperature [C]',Surface(Loop)%OutWetBulbTemp,&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Wind Velocity [m/s]',Surface(Loop)%WindSpeed,&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Convection Heat Gain Rate [W]', QdotConvOutRep(loop), &
+                                'Zone', 'State', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Convection Heat Gain Rate per Area [W/m2]', QdotConvOutRepPerArea(loop),&
+                                'Zone', 'State',   Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Convection Heat Gain Energy [J]',QConvOutReport(loop), 'Zone', 'Sum', &
                                                                                  Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Convection Heat Loss to Outdoors [J]',QConvOutReport(loop), 'Zone', 'Sum', &
-                                                                                 Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Convection Coeff [W/m2-K]',HcExtSurf(Loop),'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Thermal Radiation Heat Rate [W]', QdotRadOutRep(loop),   &
-         'Zone', 'State', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Thermal Radiation Heat Rate per Area [W/m2]', QdotRadOutRepPerArea(loop),  &
-         'Zone', 'State', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Thermal Radiation Heat Loss to Outdoors [J]',QRadOutReport(loop),   &
-         'Zone', 'Sum', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Rad to Air Coeff [W/m2-K]',HAirExtSurf(Loop),'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Rad to Sky Coeff [W/m2-K]',HSkyExtSurf(Loop),'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Ext Rad to Ground Coeff [W/m2-K]',HGrdExtSurf(Loop),'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Convection Heat Transfer Coefficient [W/m2-K]',HcExtSurf(Loop),&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Rate [W]', QdotRadOutRep(loop),   &
+                                'Zone', 'State', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Rate per Area [W/m2]', QdotRadOutRepPerArea(loop),  &
+                                'Zone', 'State', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Energy [J]',QRadOutReport(loop),   &
+                                'Zone', 'Sum', Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Air Heat Transfer Coefficient [W/m2-K]',HAirExtSurf(Loop),&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Sky Heat Transfer Coefficient [W/m2-K]',HSkyExtSurf(Loop),&
+                                'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Ground Heat Transfer Coefficient [W/m2-K]',HGrdExtSurf(Loop),&
+                                'Zone','State',Surface(Loop)%Name)
+      IF(Surface(Loop)%Class /= SurfaceClass_Window) THEN
+        CALL SetupOutputVariable('Surface Outside Face Solar Radiation Heat Gain Rate [W]',  &
+                                  SWOutAbsTotalReport(Loop),'Zone','Average',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Solar Radiation Heat Gain Rate per Area [W/m2]',  &
+                                  QRadSWOutAbs(Loop),'Zone','Average',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Solar Radiation Heat Gain Energy [J]', SWOutAbsEnergyReport(Loop),   &
+                                   'Zone', 'Sum', Surface(Loop)%Name)
+      ENDIF
     ENDIF
     IF(Surface(Loop)%Class==SurfaceClass_Floor .OR. Surface(Loop)%Class==SurfaceClass_Wall .OR.  &
        Surface(Loop)%Class==SurfaceClass_IntMass .or.  &
        Surface(Loop)%Class==SurfaceClass_Roof  .OR. Surface(Loop)%Class==SurfaceClass_Door) THEN
       IF (DisplayAdvancedReportVariables) THEN  !CurrentModuleObject='Opaque Surfaces(Advanced)'
-        CALL SetupOutputVariable('Opaque Surface Inside Face Conduction [W]',OpaqSurfInsFaceConduction(Loop), &
-                          'Zone','State',Surface(Loop)%Name)
-        CALL SetupOutputVariable('Opaque Surface Inside Face Conduction Gain [W]',OpaqSurfInsFaceCondGainRep(Loop), &
-                          'Zone','State',Surface(Loop)%Name)
-        CALL SetupOutputVariable('Opaque Surface Inside Face Conduction Loss [W]',OpaqSurfInsFaceCondLossRep(Loop), &
-                          'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Inside Face Conduction Heat Transfer Rate [W]',OpaqSurfInsFaceConduction(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Inside Face Conduction Heat Gain Rate [W]',OpaqSurfInsFaceCondGainRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Inside Face Conduction Heat Loss Rate [W]',OpaqSurfInsFaceCondLossRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Inside Face Conduction Heat Transfer Rate per Area [W/m2]', &
+                                  OpaqSurfInsFaceConductionFlux(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Inside Face Conduction Heat Transfer Energy [J]', &
+                                   OpaqSurfInsFaceConductionEnergy(Loop), 'Zone', 'Sum', Surface(Loop)%Name)
+
+        CALL SetupOutputVariable('Surface Outside Face Conduction Heat Transfer Rate [W]',OpaqSurfOutsideFaceConduction(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Conduction Heat Gain Rate [W]',OpaqSurfExtFaceCondGainRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Conduction Heat Loss Rate [W]',OpaqSurfExtFaceCondLossRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Conduction Heat Transfer Rate per Area [W/m2]',&
+                                   OpaqSurfOutsideFaceConductionFlux(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Outside Face Conduction Heat Transfer Energy [J]', &
+                                   OpaqSurfOutsideFaceConductionEnergy(Loop), 'Zone', 'Sum', Surface(Loop)%Name)
+
+        CALL SetupOutputVariable('Surface Average Face Conduction Heat Transfer Rate [W]',OpaqSurfAvgFaceConduction(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Average Face Conduction Heat Gain Rate [W]',OpaqSurfAvgFaceCondGainRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Average Face Conduction Heat Loss Rate [W]',OpaqSurfAvgFaceCondLossRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Average Face Conduction Heat Transfer Rate per Area [W/m2]', &
+                                   OpaqSurfAvgFaceConductionFlux(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Average Face Conduction Heat Transfer Energy [J]', &
+                                   OpaqSurfAvgFaceConductionEnergy(Loop), 'Zone', 'Sum', Surface(Loop)%Name)
+
+        CALL SetupOutputVariable('Surface Heat Storage Rate [W]',OpaqSurfStorageConduction(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Heat Storage Gain Rate [W]',OpaqSurfStorageGainRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Heat Storage Loss Rate [W]',OpaqSurfStorageCondLossRep(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Heat Storage Rate per Area [W/m2]',OpaqSurfStorageConductionFlux(Loop), &
+                                  'Zone','State',Surface(Loop)%Name)
+        CALL SetupOutputVariable('Surface Heat Storage Energy [J]', &
+                                   OpaqSurfStorageConductionEnergy(Loop), 'Zone', 'Sum', Surface(Loop)%Name)
+
       ENDIF
         !CurrentModuleObject='Opaque Surfaces'
+
       CALL SetupOutputVariable('Opaque Surface Inside Face Beam Solar Absorbed [W]',OpaqSurfInsFaceBeamSolAbsorbed(Loop), &
                         'Zone','State',Surface(Loop)%Name)
     END IF
@@ -1293,6 +1478,8 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
         CALL SetupOutputVariable('Surface Outside Natural Convection Model Equation Code [ ]', Surface(Loop)%OutConvHnModelEq, &
                               'Zone','Average',Surface(Loop)%Name)
       ENDIF
+      CALL SetupOutputVariable('Surface Construction Index', Surface(Loop)%Construction, &
+                               'Zone','Average',Surface(Loop)%Name)
     ENDIF
 
   ENDDO
@@ -1394,27 +1581,44 @@ SUBROUTINE InitThermalAndFluxHistories
   SumHmARaW= 0.0D0
 
           ! "Bulk" initializations of arrays sized to TotSurfaces
-  SUMH          = 0     ! module level array
+  SUMH          = 0.d0     ! module level array
   TempSurfIn    = 23.d0 ! module level array
   TempSurfInTmp = 23.d0 ! module level array
   HConvIn       = 3.076d0 ! module level array
-  HcExtSurf      = 0.0
-  HAirExtSurf      = 0.0
-  HSkyExtSurf      = 0.0
-  HGrdExtSurf      = 0.0
-  TempSurfOut   = 0.0
-  TempSurfInRep = 0.0
-  QConvInReport = 0.0
-  QdotConvInRep = 0.0
-  QdotConvInRepPerArea = 0.0
-  QConvOutReport = 0.0
-  QdotConvOutRep = 0.0
-  QdotConvOutRepPerArea = 0.0
-  QRadOutReport = 0.0
-  QdotRadOutRep = 0.0
+  HcExtSurf      = 0.d0
+  HAirExtSurf      = 0.d0
+  HSkyExtSurf      = 0.d0
+  HGrdExtSurf      = 0.d0
+  TempSurfOut   = 0.d0
+  TempSurfInRep = 0.d0
+  QConvInReport = 0.d0
+  QdotConvInRep = 0.d0
+  QdotConvInRepPerArea = 0.d0
+  QRadNetSurfInReport  = 0.d0
+  QdotRadNetSurfInRep  = 0.d0
+  QdotRadNetSurfInRepPerArea = 0.d0
+  QRadSolarInReport = 0.d0
+  QdotRadSolarInRep = 0.d0
+  QdotRadSolarInRepPerArea = 0.d0
+  QRadLightsInReport = 0.d0
+  QdotRadLightsInRep = 0.d0
+  QdotRadLightsInRepPerArea = 0.d0
+  QRadIntGainsInReport = 0.d0
+  QdotRadIntGainsInRep = 0.d0
+  QdotRadIntGainsInRepPerArea = 0.d0
+  QRadHVACInReport = 0.d0
+  QdotRadHVACInRep = 0.d0
+  QdotRadHVACInRepPerArea = 0.d0
+  QConvOutReport = 0.d0
+  QdotConvOutRep = 0.d0
+  QdotConvOutRepPerArea = 0.d0
+  QRadOutReport = 0.d0
+  QdotRadOutRep = 0.d0
   QdotRadOutRepPerArea = 0.0
-  OpaqSurfInsFaceConduction = 0.0
-  OpaqSurfInsFaceBeamSolAbsorbed = 0.0
+  OpaqSurfInsFaceConduction = 0.d0
+  OpaqSurfInsFaceConductionFlux = 0.d0
+  OpaqSurfInsFaceConductionEnergy = 0.d0
+  OpaqSurfInsFaceBeamSolAbsorbed = 0.d0
   TempEffBulkAir=23.0d0
   TempTstatAir=23.0d0
 
@@ -1618,6 +1822,7 @@ SUBROUTINE InitSolarHeatGains
 
   QRadSWOutAbs = 0.0
   QRadSWInAbs  = 0.0
+  QRadSWLightsInAbs = 0.d0
   QRadSWwinAbs = 0.0
   InitialDifSolInAbs = 0.0
   InitialDifSolInTrans = 0.0
@@ -1628,6 +1833,8 @@ SUBROUTINE InitSolarHeatGains
   InitialDifSolInAbsReport = 0.0
   InitialDifSolInTransReport = 0.0
   SWInAbsTotalReport = 0.0
+  SWOutAbsTotalReport = 0.d0
+  SWOutAbsEnergyReport = 0.d0
   QRadSWOutIncident = 0.0
   QRadSWOutIncidentBeam = 0.0
   BmIncInsSurfIntensRep = 0.0
@@ -1715,6 +1922,9 @@ SUBROUTINE InitSolarHeatGains
   ZoneOpaqSurfInsFaceCond = 0.0
   ZoneOpaqSurfInsFaceCondGainRep = 0.0
   ZoneOpaqSurfInsFaceCondLossRep = 0.0
+  ZoneOpaqSurfExtFaceCond        = 0.d0
+  ZoneOpaqSurfExtFaceCondGainRep = 0.d0
+  ZoneOpaqSurfExtFaceCondLossRep = 0.d0
   WinShadingAbsorbedSolar = 0.0
   WinSysSolTransmittance = 0.0
   WinSysSolReflectance = 0.0
@@ -1738,6 +1948,8 @@ SUBROUTINE InitSolarHeatGains
   ZoneWinHeatLossRepEnergy = 0.0
   ZnOpqSurfInsFaceCondGnRepEnrg = 0.0
   ZnOpqSurfInsFaceCondLsRepEnrg = 0.0
+  ZnOpqSurfExtFaceCondGnRepEnrg = 0.d0
+  ZnOpqSurfExtFaceCondLsRepEnrg = 0.d0
   WinShadingAbsorbedSolarEnergy = 0.0
   BmIncInsSurfAmountRepEnergy = 0.0
   IntBmIncInsSurfAmountRepEnergy = 0.0
@@ -2295,9 +2507,11 @@ SUBROUTINE InitSolarHeatGains
 
           END IF ! RoughIndexMovInsul <= 0, no movable insulation
 
-          IF (Surface(SurfNum)%HeatTransSurf .AND. Construct(ConstrNum)%TransDiff <= 0.0) & ! Opaque heat transfer surface
+          IF (Surface(SurfNum)%HeatTransSurf .AND. Construct(ConstrNum)%TransDiff <= 0.0) THEN ! Opaque heat transfer surface
             QRadSWOutAbs(SurfNum) = AOSurf(SurfNum) * BeamSolarRad + AbsExt * (SkySolarInc + GndSolarInc)
-
+            SWOutAbsTotalReport(SurfNum) = QRadSWOutAbs(SurfNum) * Surface(SurfNum)%Area
+            SWOutAbsEnergyReport(SurfNum) = SWOutAbsTotalReport(SurfNum) * SecInHour * TimeStepZone
+          ENDIF
         END IF ! Surface(SurfNum)%HeatTransSurf
 
       END IF ! Surface(SurfNum)%ExtSolar
@@ -2364,7 +2578,9 @@ SUBROUTINE InitIntSolarDistribution
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)    :: AbsExt             ! Solar absorptance of outermost layer (or movable insulation if present)
-  REAL(r64)    :: AbsInt, AbsIntSurf ! Inside opaque surface solar absorptance
+  REAL(r64)    :: AbsInt         ! Inside opaque surface solar absorptance
+  REAL(r64)    :: AbsIntSurf    ! Inside opaque surface solar absorptance
+  REAL(r64)    :: AbsIntSurfVis   ! Inside opaque surface visible absorptance
   REAL(r64)    :: HMovInsul          ! Resistance or "h" value of movable insulation (from EvalOutsideMovableInsulation, not used)
   INTEGER :: OtherZoneNum       ! DO loop counter for zones
   INTEGER :: RoughIndexMovInsul ! Roughness index of movable insulation
@@ -2390,13 +2606,16 @@ SUBROUTINE InitIntSolarDistribution
           ! FLOW:
 
   IF (.NOT. ALLOCATED(QS)) ALLOCATE(QS(NumOfZones))
+  IF (.NOT. ALLOCATED(QSLights)) ALLOCATE(QSLights(NumOfZones))
 
-  QS = 0.0
+  QS = 0.d0
+  QSLights = 0.d0
 
           ! COMPUTE TOTAL SHORT-WAVE RADIATION ORIGINATING IN ZONE.
           ! Note: If sun is not up, QS is only internal gains
   DO ZoneNum = 1, NumOfZones
-    QS(ZoneNum) = QD(ZoneNum) + ZoneIntGain(ZoneNum)%QLTSW + ZoneIntGain(ZoneNum)%T_QLTSW
+    QS(ZoneNum) = QD(ZoneNum)  + ZoneIntGain(ZoneNum)%QLTSW
+    QSLights(ZoneNum) = ZoneIntGain(ZoneNum)%QLTSW
   END DO
 
   IF (InterZoneWindow) THEN  ! DO INTERZONE DISTRIBUTION.
@@ -2409,7 +2628,7 @@ SUBROUTINE InitIntSolarDistribution
 
           IF ( (OtherZoneNum /= ZoneNum) .AND.(RecDifShortFromZ(OtherZoneNum)) ) THEN
             QS(ZoneNum) = QS(ZoneNum) + FractDifShortZtoZ(OtherZoneNum,ZoneNum)* &
-                                        (QD(OtherZoneNum)+ZoneIntGain(OtherZoneNum)%QLTSW+ZoneIntGain(OtherZoneNum)%T_QLTSW)
+                                        (QD(OtherZoneNum)+ZoneIntGain(OtherZoneNum)%QLTSW)
             ZoneDifSolFrIntWinsRep(ZoneNum) = ZoneDifSolFrIntWinsRep(ZoneNum) +  &
                                         FractDifShortZtoZ(OtherZoneNum,ZoneNum) * QD(OtherZoneNum)
             ZoneDifSolFrIntWinsRepEnergy(ZoneNum) = ZoneDifSolFrIntWinsRep(ZoneNum) * TimeStepZone * SecInHour
@@ -2442,6 +2661,7 @@ SUBROUTINE InitIntSolarDistribution
           ! COMPUTE CONVECTIVE GAINS AND ZONE FLUX DENSITY.
   DO ZoneNum = 1, NumOfZones
     QS(ZoneNum) = QS(ZoneNum) * FractDifShortZtoZ(ZoneNum,ZoneNum) * VMULT(ZoneNum)
+    QSLights(ZoneNum) = QSLights(ZoneNum) * FractDifShortZtoZ(ZoneNum,ZoneNum) * VMULT(ZoneNum) ! CR 8695, VMULT not based on visible
   END DO
 
           ! COMPUTE RADIANT GAINS ON SURFACES
@@ -2455,11 +2675,13 @@ SUBROUTINE InitIntSolarDistribution
 
     IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
       AbsIntSurf = Construct(ConstrNum)%InsideAbsorpSolar
+      AbsIntSurfVis = Construct(ConstrNum)%InsideAbsorpSolar !to fix CR 8695 change to this = Construct(ConstrNum)%InsideAbsorpVis
       HMovInsul = 0.0
       IF (Surface(SurfNum)%MaterialMovInsulInt.GT.0) &
         CALL EvalInsideMovableInsulation(SurfNum,HMovInsul,AbsInt)
       IF (HMovInsul > 0.0) AbsIntSurf = AbsInt
       QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + QS(ZoneNum)*AbsIntSurf
+      QRadSWLightsInAbs(SurfNum) = QRadSWLightsInAbs(SurfNum) + QSLights(ZoneNum)*AbsIntSurfVis
     ELSE  ! Window
       ConstrNumSh = Surface(SurfNum)%ShadedConstruction
       IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
@@ -2590,6 +2812,8 @@ SUBROUTINE InitIntSolarDistribution
                                *QRadSWOutMvIns(SurfNum)                                            &
                                *((Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpSolar/AbsExt) &
                                  +(1-Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpSolar))
+        SWOutAbsTotalReport(SurfNum) = QRadSWOutAbs(SurfNum) * Surface(SurfNum)%Area
+        SWOutAbsEnergyReport(SurfNum) = SWOutAbsTotalReport(SurfNum) * SecInHour * TimeStepZone
       END IF
 
     END IF
@@ -3312,7 +3536,203 @@ SUBROUTINE InitEMSControlledSurfaceProperties
 
 END SUBROUTINE InitEMSControlledSurfaceProperties
 
+SUBROUTINE InitEMSControlledConstructions
 
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Jan 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! change construction on surface if overriden by EMS
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: TrimSigDigits
+  USE DataRuntimeLanguage, ONLY: EMSConstructActuatorChecked, EMSConstructActuatorIsOkay
+  USE HeatBalFiniteDiffManager, ONLY: ConstructFD
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL, SAVE  :: SurfConstructOverridesPresent = .FALSE.  ! detect if EMS ever used for this and inits need to execute
+  INTEGER :: SurfNum
+
+  IF (ANY(Surface%EMSConstructionOverrideON)) SurfConstructOverridesPresent = .TRUE.
+
+  IF (.NOT. SurfConstructOverridesPresent) RETURN
+
+  DO SurfNum = 1, TotSurfaces
+
+    IF (Surface(SurfNum)%EMSConstructionOverrideON) THEN
+
+      IF( (EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) .AND. &
+          (EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) )  THEN
+
+        Surface(SurfNum)%Construction = Surface(SurfNum)%EMSConstructionOverrideValue
+        Construct(Surface(SurfNum)%Construction)%IsUsed = .TRUE.
+
+      ELSE ! have not checked yet or is not okay, so see if we need to warn about incompatible
+        IF (.NOT. EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) THEN
+          ! check if constructions appear compatible
+
+          IF (Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%TypeIsWindow) THEN ! okay, allways allow windows
+            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+
+          ELSEIF (SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD ) THEN
+            ! compare old construction to new construction and see if terms match
+            ! set as okay and turn false if find a big problem
+            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            IF (Construct(Surface(SurfNum)%Construction)%NumHistories /= &
+                Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%NumHistories) THEN
+              !thow warning, but allow
+              CALL ShowWarningError('InitEMSControlledConstructions: EMS Construction State Actuator may be unrealistic, ' // &
+                                     'incompatible CTF timescales are being used.')
+              CALL ShowContinueError('Construction named = '//TRIM(Construct(Surface(SurfNum)%Construction)%Name)//  &
+                          ' has CTF timesteps = '//TRIM(TrimSigDigits(Construct(Surface(SurfNum)%Construction)%NumHistories)) )
+              CALL ShowContinueError('While construction named = '// &
+                              TRIM(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%Name)//  &
+                          ' has CTF timesteps = ' &
+                           //TRIM(TrimSigDigits(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%NumHistories)) )
+              CALL ShowContinueError('Transient heat transfer modeling may not be valid for surface name = ' &
+                           //TRIM(Surface(SurfNum)%Name)//', and the simulation continues' )
+
+            ENDIF
+            IF (Construct(Surface(SurfNum)%Construction)%NumCTFTerms /= &
+                Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%NumCTFTerms) THEN
+              !thow warning, but allow
+              CALL ShowWarningError('InitEMSControlledConstructions: EMS Construction State Actuator may be unrealistic, ' // &
+                                     'incompatible CTF terms are being used.')
+              CALL ShowContinueError('Construction named = '//TRIM(Construct(Surface(SurfNum)%Construction)%Name)//  &
+                          ' has number of CTF terms = '//TRIM(TrimSigDigits(Construct(Surface(SurfNum)%Construction)%NumCTFTerms)) )
+              CALL ShowContinueError('While construction named = '// &
+                              TRIM(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%Name)//  &
+                          ' has number of CTF terms = ' &
+                           //TRIM(TrimSigDigits(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%NumCTFTerms)) )
+              CALL ShowContinueError('The actuator is allowed but the transient heat transfer modeling may not be valid for' &
+                           //' surface name = ' //TRIM(Surface(SurfNum)%Name)//', and the simulation continues')
+
+            ENDIF
+
+            IF (Construct(Surface(SurfNum)%Construction)%SourceSinkPresent) THEN
+              IF (.NOT. Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%SourceSinkPresent) THEN
+                !thow warning, and do not allow
+                CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not valid.')
+                CALL ShowContinueError('Construction named = '//TRIM(Construct(Surface(SurfNum)%Construction)%Name)//  &
+                            ' has internal source/sink' )
+                CALL ShowContinueError('While construction named = '// &
+                                TRIM(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%Name)//  &
+                            ' is not an internal source/sink construction' )
+                CALL ShowContinueError('This actuator is not allowed for surface name = ' &
+                             //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
+
+                EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
+              ENDIF
+
+            ENDIF
+
+
+            IF (EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) THEN
+              Surface(SurfNum)%Construction = Surface(SurfNum)%EMSConstructionOverrideValue
+            ENDIF
+
+          ELSEIF (SolutionAlgo == UseCondFD) THEN
+            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            IF (ConstructFD(Surface(SurfNum)%Construction)%TotNodes /=  &
+                ConstructFD(Surface(SurfNum)%EMSConstructionOverrideValue)%TotNodes) THEN
+              !thow warning, and do not allow
+              CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not valid.')
+              CALL ShowContinueError('Construction named = '//TRIM(Construct(Surface(SurfNum)%Construction)%Name)//  &
+                          ' has number of finite difference nodes =' &
+                           //TRIM(TrimSigDigits(ConstructFD(Surface(SurfNum)%Construction)%TotNodes)) )
+              CALL ShowContinueError('While construction named = '// &
+                              TRIM(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%Name)//  &
+                           'has number of finite difference nodes =' &
+                           //TRIM(TrimSigDigits(ConstructFD(Surface(SurfNum)%EMSConstructionOverrideValue)%TotNodes)) )
+              CALL ShowContinueError('This actuator is not allowed for surface name = ' &
+                           //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
+
+              EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
+            ENDIF
+
+            IF (Construct(Surface(SurfNum)%Construction)%SourceSinkPresent) THEN
+              IF (.NOT. Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%SourceSinkPresent) THEN
+                !thow warning, and do not allow
+                CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not valid.')
+                CALL ShowContinueError('Construction named = '//TRIM(Construct(Surface(SurfNum)%Construction)%Name)//  &
+                            ' has internal source/sink' )
+                CALL ShowContinueError('While construction named = '// &
+                                TRIM(Construct(Surface(SurfNum)%EMSConstructionOverrideValue)%Name)//  &
+                            ' is not an internal source/sink construction' )
+                CALL ShowContinueError('This actuator is not allowed for surface name = ' &
+                             //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
+
+                EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
+              ENDIF
+
+            ENDIF
+
+            IF (EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) THEN
+              Surface(SurfNum)%Construction = Surface(SurfNum)%EMSConstructionOverrideValue
+            ENDIF
+
+          ELSEIF(SolutionAlgo == UseHAMT) THEN ! don't allow
+            CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not available with ' &
+                                  //'Heat transfer algorithm CombinedHeatAndMoistureFiniteElement.')
+            CALL ShowContinueError('This actuator is not allowed for surface name = ' &
+                             //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
+            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
+
+          ELSEIF(SolutionAlgo == UseCondFDSimple) THEN ! don't allow
+            CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not available with ' &
+                                  //'Heat transfer algorithm ConductionFiniteDifferenceSimplified.')
+            CALL ShowContinueError('This actuator is not allowed for surface name = ' &
+                             //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
+            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
+            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
+
+
+          ENDIF
+
+
+
+        ELSE
+          ! do nothing, has been checked and is not okay with single warning already issued.
+        ENDIF
+
+      ENDIF
+    ELSE
+      Surface(SurfNum)%Construction = Surface(SurfNum)%ConstructionStoredInputValue
+    ENDIF
+
+  ENDDO
+
+
+  RETURN
+
+END SUBROUTINE InitEMSControlledConstructions
 
 ! End Initialization Section of the Module
 !******************************************************************************
@@ -3495,8 +3915,8 @@ SUBROUTINE UpdateThermalHistories
        Surface(SurfNum)%Class==SurfaceClass_Roof  .OR. Surface(SurfNum)%Class==SurfaceClass_Door) THEN
       OpaqSurfInsFaceConduction(SurfNum) = Surface(SurfNum)%Area * QH(SurfNum,1,2)
 !      IF (Surface(SurfNum)%Class/=SurfaceClass_IntMass)  &
-      ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
-              OpaqSurfInsFaceConduction(SurfNum)
+!      ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
+!              OpaqSurfInsFaceConduction(SurfNum)
       OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0
       OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0
       IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0) THEN
@@ -3522,6 +3942,15 @@ SUBROUTINE UpdateThermalHistories
                      -TempSurfIn(SurfNum)*Construct(ConstrNum)%CTFCross(0)     &
                      +QsrcHist(SurfNum,1)*Construct(ConstrNum)%CTFSourceOut(0) & ! Heat source/sink term for radiant systems
                      +CTFConstOutPart(SurfNum)
+
+    IF(Surface(SurfNum)%Class==SurfaceClass_Floor .OR. Surface(SurfNum)%Class==SurfaceClass_Wall .OR.  &
+       Surface(SurfNum)%Class==SurfaceClass_IntMass .or.  &
+       Surface(SurfNum)%Class==SurfaceClass_Roof  .OR. Surface(SurfNum)%Class==SurfaceClass_Door) THEN
+      OpaqSurfOutsideFaceConductionFlux(SurfNum) = - QH(SurfNum,1,1) ! switch sign for balance at outside face
+      OpaqSurfOutsideFaceConduction(SurfNum)     = Surface(SurfNum)%Area * OpaqSurfOutsideFaceConductionFlux(SurfNum)
+
+
+    END IF
 
   END DO    ! ...end of loop over all (heat transfer) surfaces...
 
@@ -3640,15 +4069,7 @@ SUBROUTINE UpdateThermalHistories
 
   END DO    ! ...end of loop over all (heat transfer) surfaces
 
-  DO ZoneNum = 1,NumOfZones
-    IF(ZoneOpaqSurfInsFaceCond(ZoneNum) >= 0.0) THEN
-      ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) = ZoneOpaqSurfInsFaceCond(ZoneNum)
-      ZnOpqSurfInsFaceCondGnRepEnrg(ZoneNum) = ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) * TimeStepZone * SecInHour
-    ELSE
-      ZoneOpaqSurfInsFaceCondLossRep(ZoneNum) = -ZoneOpaqSurfInsFaceCond(ZoneNum)
-      ZnOpqSurfInsFaceCondLsRepEnrg(ZoneNum) = ZoneOpaqSurfInsFaceCondLossRep(ZoneNum) * TimeStepZone * SecInHour
-    END IF
-  END DO
+
 
   RETURN
 
@@ -3781,14 +4202,124 @@ SUBROUTINE ReportSurfaceHeatBalance
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          ! na
+  INTEGER :: SurfNum
+  INTEGER :: ZoneNum
+
   ZoneMRT(1:NumOfZones) = MRT(1:NumOfZones)
 
   CALL ReportSurfaceShading
 
+  ! update inside face radiation reports
+  DO SurfNum = 1, TotSurfaces
+    QdotRadNetSurfInRep(SurfNum)        = NetLWRadToSurf(SurfNum) * Surface(SurfNum)%Area
+    QdotRadNetSurfInRepPerArea(SurfNum) = NetLWRadToSurf(SurfNum)
+    QRadNetSurfInReport(SurfNum)        = QdotRadNetSurfInRep(SurfNum) * SecInHour * TimeStepZone
+
+    IF(Surface(SurfNum)%Class /= SurfaceClass_Window) THEN ! not a window...
+      QdotRadSolarInRepPerArea(SurfNum)   = QRadSWInAbs(SurfNum) - QRadSWLightsInAbs(SurfNum)
+      QdotRadSolarInRep(SurfNum)          = QdotRadSolarInRepPerArea(SurfNum)  * Surface(SurfNum)%Area
+      QRadSolarInReport(SurfNum)          = QdotRadSolarInRep(SurfNum)  * SecInHour * TimeStepZone
+
+      QdotRadLightsInRepPerArea(SurfNum)  = QRadSWLightsInAbs(SurfNum)
+      QdotRadLightsInRep(SurfNum)         = QdotRadLightsInRepPerArea(SurfNum) * Surface(SurfNum)%Area
+      QRadLightsInReport(SurfNum)         = QdotRadLightsInRep(SurfNum) * SecInHour * TimeStepZone
+    ELSE ! can we fill these for windows?
+
+
+    ENDIF
+
+
+    QdotRadIntGainsInRepPerArea(SurfNum)= QRadThermInAbs(SurfNum)
+    QdotRadIntGainsInRep(SurfNum)       = QdotRadIntGainsInRepPerArea(SurfNum) * Surface(SurfNum)%Area
+    QRadIntGainsInReport(SurfNum)       = QdotRadIntGainsInRep(SurfNum) * SecInHour * TimeStepZone
+
+    QdotRadHVACInRepPerArea(SurfNum)    = QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) &
+                                          + QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum)
+    QdotRadHVACInRep(SurfNum)           = QdotRadHVACInRepPerArea(SurfNum)  * Surface(SurfNum)%Area
+    QRadHVACInReport(SurfNum)           = QdotRadHVACInRep(SurfNum)  * SecInHour * TimeStepZone
+
+    IF(Surface(SurfNum)%Class==SurfaceClass_Floor .OR. Surface(SurfNum)%Class==SurfaceClass_Wall .OR.  &
+      Surface(SurfNum)%Class==SurfaceClass_IntMass .or.  &
+      Surface(SurfNum)%Class==SurfaceClass_Roof  .OR. Surface(SurfNum)%Class==SurfaceClass_Door) THEN
+
+      ! inside face conduction updates
+      OpaqSurfInsFaceConductionEnergy(SurfNum) = OpaqSurfInsFaceConduction(SurfNum) * SecInHour * TimeStepZone
+      ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
+              OpaqSurfInsFaceConduction(SurfNum)
+      OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0
+      OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0
+      IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0) THEN
+        OpaqSurfInsFaceCondGainRep(SurfNum) = OpaqSurfInsFaceConduction(SurfNum)
+      ELSE
+        OpaqSurfInsFaceCondLossRep(SurfNum) = -OpaqSurfInsFaceConduction(SurfNum)
+      END IF
+
+      ! outside face conduction updates
+      OpaqSurfOutsideFaceConductionEnergy   = OpaqSurfOutsideFaceConduction(SurfNum) * SecInHour * TimeStepZone
+      ZoneOpaqSurfExtFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfExtFaceCond(Surface(SurfNum)%Zone) + &
+              OpaqSurfOutsideFaceConduction(SurfNum)
+      OpaqSurfExtFaceCondGainRep(SurfNum) = 0.d0
+      OpaqSurfExtFaceCondLossRep(SurfNum) = 0.d0
+      IF(OpaqSurfOutsideFaceConduction(SurfNum) >= 0.d0) THEN
+        OpaqSurfExtFaceCondGainRep(SurfNum) = OpaqSurfOutsideFaceConduction(SurfNum)
+      ELSE
+        OpaqSurfExtFaceCondLossRep(SurfNum) = -OpaqSurfOutsideFaceConduction(SurfNum)
+      END IF
+
+      ! do average surface conduction updates
+
+      OpaqSurfAvgFaceConduction(SurfNum) = (OpaqSurfInsFaceConduction(SurfNum) - OpaqSurfOutsideFaceConduction(SurfNum)) / 2.d0
+      OpaqSurfAvgFaceConductionFlux(SurfNum) = (OpaqSurfInsFaceConductionFlux(SurfNum) &
+                                                - OpaqSurfOutsideFaceConductionFlux(SurfNum)) / 2.d0
+      OpaqSurfAvgFaceConductionEnergy(SurfNum) = OpaqSurfAvgFaceConduction(SurfNum) * SecInHour * TimeStepZone
+      OpaqSurfAvgFaceCondGainRep(SurfNum) = 0.d0
+      OpaqSurfAvgFaceCondLossRep(SurfNum) = 0.d0
+      IF (OpaqSurfAvgFaceConduction(SurfNum) >= 0.d0) THEN
+        OpaqSurfAvgFaceCondGainRep(SurfNum) = OpaqSurfAvgFaceConduction(SurfNum)
+      ELSE
+        OpaqSurfAvgFaceCondLossRep(SurfNum) = - OpaqSurfAvgFaceConduction(SurfNum)
+      ENDIF
+
+      ! do surface storage rate updates
+      OpaqSurfStorageConductionFlux(SurfNum) = - (OpaqSurfInsFaceConductionFlux(SurfNum) + OpaqSurfOutsideFaceConductionFlux(SurfNum))
+      OpaqSurfStorageConduction(SurfNum) = - (OpaqSurfInsFaceConduction(SurfNum) + OpaqSurfOutsideFaceConduction(SurfNum))
+      OpaqSurfStorageConductionEnergy(SurfNum) = OpaqSurfStorageConduction(SurfNum) * SecInHour * TimeStepZone
+      OpaqSurfStorageGainRep(SurfNum) = 0.d0
+      OpaqSurfStorageCondLossRep(SurfNum) = 0.d0
+      IF (OpaqSurfStorageConduction(SurfNum) >= 0.d0 ) THEN
+        OpaqSurfStorageGainRep(SurfNum) = OpaqSurfStorageConduction(SurfNum)
+      ELSE
+        OpaqSurfStorageCondLossRep(SurfNum) = - OpaqSurfStorageConduction(SurfNum)
+      ENDIF
+
+    ENDIF ! opaque heat transfer surfaces.
+
+  ENDDO ! loop over surfaces
+
+
+  DO ZoneNum = 1,NumOfZones
+    IF(ZoneOpaqSurfInsFaceCond(ZoneNum) >= 0.0) THEN
+      ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) = ZoneOpaqSurfInsFaceCond(ZoneNum)
+      ZnOpqSurfInsFaceCondGnRepEnrg(ZoneNum)  = ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) * TimeStepZone * SecInHour
+    ELSE
+      ZoneOpaqSurfInsFaceCondLossRep(ZoneNum) = -ZoneOpaqSurfInsFaceCond(ZoneNum)
+      ZnOpqSurfInsFaceCondLsRepEnrg(ZoneNum)  = ZoneOpaqSurfInsFaceCondLossRep(ZoneNum) * TimeStepZone * SecInHour
+    END IF
+
+    IF(ZoneOpaqSurfExtFaceCond(ZoneNum) >= 0.0) THEN
+      ZoneOpaqSurfExtFaceCondGainRep(ZoneNum) = ZoneOpaqSurfExtFaceCond(ZoneNum)
+      ZnOpqSurfExtFaceCondGnRepEnrg(ZoneNum)  = ZoneOpaqSurfExtFaceCondGainRep(ZoneNum) * TimeStepZone * SecInHour
+    ELSE
+      ZoneOpaqSurfExtFaceCondLossRep(ZoneNum) = - ZoneOpaqSurfExtFaceCond(ZoneNum)
+      ZnOpqSurfExtFaceCondLsRepEnrg(ZoneNum)  = ZoneOpaqSurfExtFaceCondLossRep(ZoneNum) * TimeStepZone * SecInHour
+    ENDIF
+  END DO ! loop over zones
+
   RETURN
 
 END SUBROUTINE ReportSurfaceHeatBalance
+
+
 
 ! End of Reporting subroutines for the HB Module
 ! *****************************************************************************
@@ -4121,6 +4652,11 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ! First, set up the outside convection coefficient and the exterior temperature
           ! boundary condition for the surface
       OPtr=Surface(SurfNum)%OSCMPtr
+      ! EMS overrides
+      IF (OSCM(OPtr)%EMSOverrideOnTConv) OSCM(OPtr)%TConv = OSCM(OPtr)%EMSOverrideTConvValue
+      IF (OSCM(OPtr)%EMSOverrideOnHConv) OSCM(OPtr)%HConv = OSCM(OPtr)%EMSOverrideHConvValue
+      IF (OSCM(OPtr)%EMSOverrideOnTRad)  OSCM(OPtr)%TRad  = OSCM(OPtr)%EMSOverrideTRadValue
+      IF (OSCM(OPtr)%EMSOverrideOnHrad)  OSCM(OPtr)%Hrad  = OSCM(OPtr)%EMSOverrideHradValue
       HcExtSurf(SurfNum) = OSCM(OPtr)%Hconv
 
       TempExt  = OSCM(OPtr)%TConv
@@ -4315,13 +4851,13 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
     END SELECT
 
     !fill in reporting values for outside face
-    QdotConvOutRep(SurfNum)        = Surface(SurfNum)%Area * HcExtSurf(SurfNum) *(TH(SurfNum,1,1) &
+    QdotConvOutRep(SurfNum)        = - Surface(SurfNum)%Area * HcExtSurf(SurfNum) *(TH(SurfNum,1,1) &
                                                                - Surface(SurfNum)%OutDryBulbTemp)
 
     IF (Surface(SurfNum)%OSCMPtr > 0) THEN !Optr is set above in this case, use OSCM boundary data
-        QdotConvOutRepPerArea(SurfNum) = OSCM(OPtr)%Hconv *(TH(SurfNum,1,1) - OSCM(OPtr)%Tconv)
+        QdotConvOutRepPerArea(SurfNum) = - OSCM(OPtr)%Hconv *(TH(SurfNum,1,1) - OSCM(OPtr)%Tconv)
     ELSE
-        QdotConvOutRepPerArea(SurfNum) = HcExtSurf(SurfNum) *(TH(SurfNum,1,1) - Surface(SurfNum)%OutDryBulbTemp)
+        QdotConvOutRepPerArea(SurfNum) = - HcExtSurf(SurfNum) *(TH(SurfNum,1,1) - Surface(SurfNum)%OutDryBulbTemp)
     END IF
 
     QConvOutReport(SurfNum)        = QdotConvOutRep(SurfNum)* SecInHour * TimeStepZone
@@ -4409,8 +4945,8 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   REAL(r64), PARAMETER :: IterDampConst = 5.0d0         ! Damping constant for inside surface temperature iterations
   INTEGER,   PARAMETER :: ItersReevalConvCoeff = 30   ! Number of iterations between inside convection coefficient reevaluations
   REAL(r64), PARAMETER :: MaxAllowedDelTemp = 0.002d0   ! Convergence criteria for inside surface temperatures
-  INTEGER,   PARAMETER :: MaxIterations = 100         ! Maximum number of iterations allowed for inside surface temps
-  INTEGER,   PARAMETER :: IterationsForCondFDRelaxChange = 90 ! number of iterations for inside temps that triggers a change
+  INTEGER,   PARAMETER :: MaxIterations = 500         ! Maximum number of iterations allowed for inside surface temps
+  INTEGER,   PARAMETER :: IterationsForCondFDRelaxChange = 5 ! number of iterations for inside temps that triggers a change
                                                               ! in the CondFD relaxation factor.
   INTEGER,   PARAMETER :: MinEMPDIterations = 4       ! Minimum number of iterations required for EMPD solution
 
@@ -4704,7 +5240,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                         -Construct(ConstrNum)%CTFCross(0)  &  ! Conduction term (both partition sides same temp)
                                         +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
               if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
-                 TempSurfInTmp(SurfNum) = TempSurfInSat    ! Surface temp can not be below dew point
+                 TempSurfInTmp(SurfNum) = TempSurfInSat    ! Surface temp cannot be below dew point
               end if
            End If
         Else If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) Then
@@ -4797,7 +5333,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                           /( Construct(ConstrNum)%CTFInside(0) &  ! Coefficient for conduction (current time)
                                             +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
                   if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
-                     TempSurfInTmp(SurfNum) = TempSurfInSat ! Surface temp can not be below dew point
+                     TempSurfInTmp(SurfNum) = TempSurfInSat ! Surface temp cannot be below dew point
                   end if
                End If
 
@@ -4982,8 +5518,9 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       TempSurfInRep(SurfNum) = TempSurfIn(SurfNum)
       TempSurfOut(SurfNum)   = TH(SurfNum,1,1)  ! For reporting
 
-      QdotConvInRep(surfNum) = Surface(SurfNum)%Area * HConvIn(SurfNum) * (TempSurfIn(SurfNum)-RefAirTemp(SurfNum))
-      QdotConvInRepPerArea(surfNum) = HConvIn(SurfNum) * (TempSurfIn(SurfNum)-RefAirTemp(SurfNum))
+      ! sign convention is positive means energy going into inside face from the air.
+      QdotConvInRep(surfNum) = - Surface(SurfNum)%Area * HConvIn(SurfNum) * (TempSurfIn(SurfNum)-RefAirTemp(SurfNum))
+      QdotConvInRepPerArea(surfNum) = - HConvIn(SurfNum) * (TempSurfIn(SurfNum)-RefAirTemp(SurfNum))
       QConvInReport(surfNum)          =  QdotConvInRep(surfNum)* SecInHour * TimeStepZone
 
       IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN ! Tubular daylighting device
@@ -5223,13 +5760,20 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
     ELSE
       IF (MaxDelTemp <= MaxAllowedDelTempCondFD) Converged = .TRUE.
 
+!Feb2012      IF ((InsideSurfIterations > IterationsForCondFDRelaxChange) .and. (.NOT. Converged) .AND.   &
+!Feb2012          (.NOT. CondFDVariableProperties) ) THEN
+!Feb2012          ! adjust relaxation factor down, assume large number of iterations is result of instability
+!Feb2012        CondFDRelaxFactor = CondFDRelaxFactor * 0.9d0
+!Feb2012        IF (CondFDRelaxFactor < 0.2d0) CondFDRelaxFactor = 0.2d0
 
-      IF ((InsideSurfIterations > IterationsForCondFDRelaxChange) .and. (.NOT. Converged) .AND.   &
-          (.NOT. CondFDVariableProperties) ) THEN
+  ! resets relaxation factor to speed up iterations when under-relaxatation is not needed.
+      IF (InsideSurfIterations <=1) THEN
+        CondFDRelaxFactor=CondFDRelaxFactorInput
+      ENDIF
+      IF ((InsideSurfIterations > IterationsForCondFDRelaxChange) .and. .not. Converged) THEN
           ! adjust relaxation factor down, assume large number of iterations is result of instability
         CondFDRelaxFactor = CondFDRelaxFactor * 0.9d0
-        IF (CondFDRelaxFactor < 0.2d0) CondFDRelaxFactor = 0.2d0
-
+        IF (CondFDRelaxFactor < 0.1d0) CondFDRelaxFactor = 0.1d0
       ENDIF
 
     ENDIF
@@ -5619,13 +6163,13 @@ SUBROUTINE CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
       END IF    ! ...end of outside heat balance cases IF-THEN block
 
    ! multiply out linearized radiation coeffs for reporting
-   QdotRadOutRep(SurfNum) = Surface(SurfNum)%Area &
+   QdotRadOutRep(SurfNum) = - Surface(SurfNum)%Area &
                             * ( HSkyExtSurf(SurfNum)*(TH(SurfNum,1,1) - SkyTemp ) &
                               +  (HAirExtSurf(SurfNum))*(TH(SurfNum,1,1) - TempExt) &
                               +  HGrdExtSurf(SurfNum)*(TH(SurfNum,1,1) - OutDryBulbTemp) )
-   QdotRadOutRepPerArea(SurfNum) =    HSkyExtSurf(SurfNum)*(TH(SurfNum,1,1)- SkyTemp ) &
+   QdotRadOutRepPerArea(SurfNum) =   - (HSkyExtSurf(SurfNum)*(TH(SurfNum,1,1)- SkyTemp ) &
                                    +  (HAirExtSurf(SurfNum))*(TH(SurfNum,1,1) - TempExt) &
-                                   +  HGrdExtSurf(SurfNum)*(TH(SurfNum,1,1)- OutDryBulbTemp)
+                                   +  HGrdExtSurf(SurfNum)*(TH(SurfNum,1,1)- OutDryBulbTemp))
    QRadOutReport(SurfNum) =  QdotRadOutRep(SurfNum) * SecInHour * TimeStepZone
           ! Set the radiant system heat balance coefficients if this surface is also a radiant system
   IF (Construct(ConstrNum)%SourceSinkPresent) THEN
@@ -5804,7 +6348,7 @@ END SUBROUTINE CalcExteriorVentedCavity
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

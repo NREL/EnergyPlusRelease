@@ -29,9 +29,9 @@ MODULE HVACControllers
   !       MODIFIED       May 2006, Dimitri Curtil (LBNL)
   !                      - Added mechanism to monitor min/max bounds to ensure that they remain invariant
   !                        between successive controller iterations.
-  !                      - Modified setpoint calculation to force the set point to be computed only once.
+  !                      - Modified setpoint calculation to force the setpoint to be computed only once.
   !                      - Modified setpoint calculation for TEMPandHUMRAT control strategy to
-  !                        force the set point to be computed once the air loop has been evaluated with
+  !                        force the setpoint to be computed once the air loop has been evaluated with
   !                        the max actuated value.
   !       MODIFIED       June 2006, Dimitri Curtil (LBNL)
   !                      - Renamed parameter variables so as to use lower caps.
@@ -57,7 +57,7 @@ MODULE HVACControllers
   !    the various controllers.
   ! 2. Then the actuated variable for each controller is computed iteratively using
   !    root finding techniques that aim at forcing the sensed variable to be
-  !    "equal" (within the user-specified tolerance) to the desired set point.
+  !    "equal" (within the user-specified tolerance) to the desired setpoint.
   !    This step is achieved by calling ManageController() with the iControllerOpIterate
   !    operation code.
   ! 3. Finally, after all controllers have been successfully simulated,  the subroutine has
@@ -215,7 +215,7 @@ PRIVATE
     ! Sensed variable
     ! --------------------
     INTEGER      :: SensedNode = 0    ! The sensed node number from the grid
-    LOGICAL      :: IsSetPointDefinedFlag = .FALSE. ! If TRUE indicates that the set point has been defined and can
+    LOGICAL      :: IsSetPointDefinedFlag = .FALSE. ! If TRUE indicates that the setpoint has been defined and can
                                                     ! be used to compute DeltaSensed
     REAL(r64)    :: SetPointValue = 0.0d0 ! Desired setpoint; set in the SetPoint Manager or computed in Init() routine
     REAL(r64)    :: SensedValue = 0.0d0 ! The sensed control variable of any type
@@ -362,6 +362,7 @@ SUBROUTINE ManageControllers( &
   USE DataSystemVariables
   USE InputProcessor, ONLY: FindItemInList
   USE General,        ONLY: TrimSigDigits
+  USE DataPlant,      ONLY: PlantLoop, FlowLocked
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -441,6 +442,21 @@ SUBROUTINE ManageControllers( &
   ENDIF
   ! Find the correct ControllerNumber with the AirLoop & CompNum from AirLoop Derived Type
   !ControlNum = AirLoopEquip(AirLoopNum)%ComponentOfTypeNum(CompNum)
+
+  ! detect if plant is locked and flow cannot change
+  IF (ControllerProps(ControlNum)%ActuatedNodePlantLoopNum > 0) THEN
+  
+    IF (PlantLoop(ControllerProps(ControlNum)%ActuatedNodePlantLoopNum)% &
+       LoopSide(ControllerProps(ControlNum)%ActuatedNodePlantLoopSide)%Flowlock == FlowLocked) THEN
+    ! plant is rigid so controller cannot change anything. 
+           ! Update the current Controller to the outlet nodes
+      CALL UpdateController(ControlNum)
+
+      IsConvergedFlag = .TRUE.
+      RETURN
+    ENDIF
+
+  ENDIF 
 
   ! Detect if speculative warm restart is supported by this computer
   IF ( PRESENT(AllowWarmRestartFlag) ) THEN
@@ -905,7 +921,7 @@ SUBROUTINE ResetController(ControlNum, FirstHVACIteration, DoWarmRestartFlag, Is
   ControllerProps(ControlNum)%SensedValue   = 0.0d0
   ControllerProps(ControlNum)%ActuatedValue = 0.0d0
 
-  ! Reset set point-related quantities
+  ! Reset setpoint-related quantities
   ControllerProps(ControlNum)%SetPointValue = 0.0d0
   ControllerProps(ControlNum)%IsSetPointDefinedFlag = .FALSE.
 
@@ -1011,11 +1027,11 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MySizeFlag
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyPlantIndexsFlag
   LOGICAL, SAVE       :: MySetPointCheckFlag = .TRUE.
-  ! Supply Air Temp Set Point when 'TemperatureAndHumidityRatio' control is used
+  ! Supply Air Temp Setpoint when 'TemperatureAndHumidityRatio' control is used
   REAL(r64), SAVE          :: HumidityControlTempSetPoint
   ! Difference between SA dry-bulb and dew-point temperatures
   REAL(r64)           :: ApproachTemp
-  ! Desired dew point temperature set point for 'TemperatureAndHumidityRatio' control
+  ! Desired dew point temperature setpoint for 'TemperatureAndHumidityRatio' control
   REAL(r64)           :: DesiredDewPoint
   REAL(r64)           :: rho !local fluid density
 
@@ -1032,7 +1048,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
   END IF
 
   IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
-    ! check for missing set points
+    ! check for missing setpoints
     DO ControllerIndex=1,NumControllers
       SensedNode = ControllerProps(ControllerIndex)%SensedNode
       SELECT CASE(ControllerProps(ControllerIndex)%ControlVar)
@@ -1043,7 +1059,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
                                     TRIM(ControllerProps(ControllerIndex)%ControllerType)//' Name="'// &
                                     TRIM(ControllerProps(ControllerIndex)%ControllerName) // '"')
               CALL ShowContinueError('Node Referenced (by Controller)='//TRIM(NodeID(SensedNode)))
-              CALL ShowContinueError('  use a Set Point Manager with Control Variable = "Temperature" to establish '//  &
+              CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "Temperature" to establish '//  &
                                      'a setpoint at the controller sensed node.')
               SetPointErrorFlag = .TRUE.
             ELSE
@@ -1054,13 +1070,13 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
                                     TRIM(ControllerProps(ControllerIndex)%ControllerType)//' Name="'// &
                                     TRIM(ControllerProps(ControllerIndex)%ControllerName) // '"')
                 CALL ShowContinueError('Node Referenced (by Controller)='//TRIM(NodeID(SensedNode)))
-                CALL ShowContinueError('  use a Set Point Manager with Control Variable = "Temperature" to establish '//  &
+                CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "Temperature" to establish '//  &
                                      'a setpoint at the controller sensed node.')
                 CALL ShowContinueError('Or add EMS Actuator to provide temperature setpoint at this node')
               ENDIF
             ENDIF
           ELSE
-!           Warn if humidity set point is detected (only for cooling coils) and control varible is TEMP.
+!           Warn if humidity setpoint is detected (only for cooling coils) and control varible is TEMP.
             IF (Node(SensedNode)%HumRatMax /= SensedNodeFlagValue .AND.   &
                            ControllerProps(ControllerIndex)%Action==iReverseAction) THEN
               CALL ShowWarningError('HVACControllers: controller type='//TRIM(ControllerProps(ControllerIndex)%ControllerType)// &
@@ -1104,7 +1120,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
                                     TRIM(ControllerProps(ControllerIndex)%ControllerType)//' Name="'// &
                                     TRIM(ControllerProps(ControllerIndex)%ControllerName) // '"')
               CALL ShowContinueError('Node Referenced (by Controller)='//TRIM(NodeID(SensedNode)))
-              CALL ShowContinueError('  use a Set Point Manager with Control Variable = "Temperature" to establish '//  &
+              CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "Temperature" to establish '//  &
                                      'a setpoint at the controller sensed node.')
               SetPointErrorFlag = .TRUE.
             ELSE
@@ -1115,7 +1131,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
                                     TRIM(ControllerProps(ControllerIndex)%ControllerType)//' Name="'// &
                                     TRIM(ControllerProps(ControllerIndex)%ControllerName) // '"')
                 CALL ShowContinueError('Node Referenced (by Controller)='//TRIM(NodeID(SensedNode)))
-                CALL ShowContinueError('  use a Set Point Manager with Control Variable = "Temperature" to establish '//  &
+                CALL ShowContinueError('  use a Setpoint Manager with Control Variable = "Temperature" to establish '//  &
                                      'a setpoint at the controller sensed node.')
                 CALL ShowContinueError('Or add EMS Actuator to provide temperature setpoint at this node')
               ENDIF
@@ -1320,7 +1336,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
           IF (ControllerProps(ControlNum)%NextActuatedValue == RootFinders(ControlNum)%MaxPoint%X) THEN
             ! Calculate the approach temperature (difference between SA dry-bulb temp and SA dew point temp)
             ApproachTemp = Node(SensedNode)%Temp - PsyTdpFnWPb(Node(SensedNode)%HumRat,OutBaroPress)
-            ! Calculate the dew point temperature at the SA humidity ratio set point
+            ! Calculate the dew point temperature at the SA humidity ratio setpoint
             DesiredDewPoint = PsyTdpFnWPb(Node(SensedNode)%HumRatMax,OutBaroPress)
             ! Adjust the calculated dew point temperature by the approach temp
             HumidityControlTempSetPoint = DesiredDewPoint + ApproachTemp
@@ -1397,9 +1413,9 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
       )
   END SELECT
 
-  ! Compute residual for control function using desired set point value and current sensed value
+  ! Compute residual for control function using desired setpoint value and current sensed value
   !
-  ! NOTE: The delta sensed value might be wrong if the set point has not yet been computed.
+  ! NOTE: The delta sensed value might be wrong if the setpoint has not yet been computed.
   !       Make sure not to use it until the setpoint has been computed.
   IF ( ControllerProps(ControlNum)%IsSetPointDefinedFlag ) THEN
     ControllerProps(ControlNum)%DeltaSensed = ControllerProps(ControlNum)%SensedValue &
@@ -1654,7 +1670,7 @@ SUBROUTINE CalcSimpleController(ControlNum, FirstHVACIteration, IsConvergedFlag,
 
   ! Process current iterate and compute next candidate if needed
   ! We assume that after the first controller iteration:
-  ! - the set point is defined
+  ! - the setpoint is defined
   ! - the min and max available bounds are defined
   !
   ! NOTE: Not explicitly checked but the air mass flow rate must remain constant across successive
@@ -1945,7 +1961,7 @@ SUBROUTINE FindRootSimpleController(ControlNum, FirstHVACIteration, IsConvergedF
      !    'FindRootSimpleController: Controller action='//TRIM(ActionTypes(ControllerProps(ControlNum)%Action)) &
      !  )
      !  CALL ShowContinueError( &
-     !    'FindRootSimpleController: Controller set point='// &
+     !    'FindRootSimpleController: Controller setpoint='// &
      !    TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,NumSigDigits)) &
      !  )
      !  CALL ShowContinueError( &
@@ -1972,28 +1988,28 @@ SUBROUTINE FindRootSimpleController(ControlNum, FirstHVACIteration, IsConvergedF
         CALL ShowContinueError('  Actuator will be set to maximum action')
         CALL ShowContinueError( 'Controller control type='// TRIM(ControlVariableTypes(ControllerProps(ControlNum)%ControlVar)) )
         IF (ControllerProps(ControlNum)%ControlVar == iTemperature) THEN
-          CALL ShowContinueError('Controller temperature set point = '//  &
+          CALL ShowContinueError('Controller temperature setpoint = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,2))//' [C]')
           CALL ShowContinueError('Controller sensed temperature = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SensedValue,2))//' [C]')
         ELSE IF (ControllerProps(ControlNum)%ControlVar == iHumidityRatio) THEN
-          CALL ShowContinueError('Controller humidity ratio set point = '//  &
+          CALL ShowContinueError('Controller humidity ratio setpoint = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,2))// &
                                  ' [kg-H2O/kg-air]')
           CALL ShowContinueError('Controller sensed humidity ratio = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SensedValue,2))// &
                                  ' [kg-H2O/kg-air]')
         ELSE IF (ControllerProps(ControlNum)%ControlVar == iTemperatureAndHumidityRatio) THEN
-          CALL ShowContinueError('Controller temperature set point = '//  &
+          CALL ShowContinueError('Controller temperature setpoint = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,2))//' [C]')
           CALL ShowContinueError('Controller sensed temperature = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SensedValue,2))//' [C]')
-          CALL ShowContinueError('Controller humidity ratio set point = '//  &
+          CALL ShowContinueError('Controller humidity ratio setpoint = '//  &
                 TRIM(TrimSigDigits(Node(ControllerProps(ControlNum)%SensedNode)%HumRatMax,2))//' [kg-H2O/kg-air]')
           CALL ShowContinueError('Controller sensed humidity ratio = '//  &
                 TRIM(TrimSigDigits(Node(ControllerProps(ControlNum)%SensedNode)%HumRat,2))//' [kg-H2O/kg-air]')
         ELSE IF (ControllerProps(ControlNum)%ControlVar == iFlow) THEN
-          CALL ShowContinueError('Controller mass flow rate set point = '//  &
+          CALL ShowContinueError('Controller mass flow rate setpoint = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,2))//' [kg/s]')
           CALL ShowContinueError('Controller sensed mass flow rate = '//  &
                     TRIM(TrimSigDigits(ControllerProps(ControlNum)%SensedValue,2))//' [kg/s]')
@@ -2184,7 +2200,7 @@ SUBROUTINE CheckSimpleController(ControlNum, IsConvergedFlag)
       ! Equivalent to:
       ! IF ((ABS(ControllerProps(ControlNum)%DeltaSensed) .LE. ControllerProps(ControlNum)%Offset)) THEN
       !
-      ! NOTE: If set point has changed since last call, then the following test will most likely fail.
+      ! NOTE: If setpoint has changed since last call, then the following test will most likely fail.
       IF ( CheckRootFinderConvergence( RootFinders(ControlNum), ControllerProps(ControlNum)%DeltaSensed ) ) THEN
         ! Indicate convergence with base value (used to compute DeltaSensed!)
         IsConvergedFlag = .TRUE.
@@ -3411,7 +3427,7 @@ SUBROUTINE TraceAirLoopController( TraceFileUnit, ControlNum )
     TRIM(TrimSigDigits(ControllerProps(ControlNum)%NumCalcCalls)), ',', & ! number of Sim() calls since last reset
     TRIM(TrimSigDigits(Node(ActuatedNode)%MassFlowRate,10)), ',', &          ! X = actuated variable
     TRIM(TrimSigDigits(Node(SensedNode)%Temp,10)), ',', &                    ! Y = sensed variable
-    TRIM(TrimSigDigits(Node(SensedNode)%TempSetPoint,10)), ','               ! desired set point
+    TRIM(TrimSigDigits(Node(SensedNode)%TempSetPoint,10)), ','               ! desired setpoint
 
   RETURN
 END SUBROUTINE  TraceAirLoopController
@@ -3613,7 +3629,7 @@ SUBROUTINE TraceIndividualController( &
       ! Convergence analysis
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%ActuatedValue,10)), ',',        & ! X
       TRIM(TrimSigDigits(Node(SensedNode)%Temp,10)), ',',                            & ! Y
-      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! set point
+      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! setpoint
       ' ', ',',                                              & ! DeltaSensed = Y - YRoot
       ' ', ',',                                              & ! Offset
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%Mode)), ',',                 & ! Mode
@@ -3635,7 +3651,7 @@ SUBROUTINE TraceIndividualController( &
       ! Convergence analysis
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%ActuatedValue,10)), ',',        & ! X
       TRIM(TrimSigDigits(Node(SensedNode)%Temp,10)), ',',                            & ! Y
-      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! set point
+      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! setpoint
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%DeltaSensed,10)), ',',          & ! DeltaSensed = Y - YRoot
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%Offset,10)), ',',               & ! Offset
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%Mode)), ',',                 & ! Mode
@@ -3657,7 +3673,7 @@ SUBROUTINE TraceIndividualController( &
       ! Convergence analysis
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%ActuatedValue,10)), ',',        & ! X
       TRIM(TrimSigDigits(Node(SensedNode)%Temp,10)), ',',                            & ! Y
-      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! set point
+      TRIM(TrimSigDigits(ControllerProps(ControlNum)%SetPointValue,10)), ',',        & ! setpoint
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%DeltaSensed,10)), ',',          & ! DeltaSensed = Y - YRoot
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%Offset,10)), ',',               & ! Offset
       TRIM(TrimSigDigits(ControllerProps(ControlNum)%Mode)), ',',                 & ! Mode
@@ -3712,7 +3728,7 @@ FUNCTION CreateHVACTimeString() RESULT(OutputString)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
-  CHARACTER(len=30) :: OutputString
+  CHARACTER(len=32) :: OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -3723,7 +3739,7 @@ FUNCTION CreateHVACTimeString() RESULT(OutputString)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  CHARACTER(len=30) Buffer
+  CHARACTER(len=32) Buffer
 
 
   Buffer = CreateTimeString(GetCurrentHVACTime())
@@ -3803,7 +3819,7 @@ FUNCTION MakeHVACTimeIntervalString() RESULT(OutputString)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
-  CHARACTER(LEN=50) :: OutputString
+  CHARACTER(LEN=52) :: OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -4001,7 +4017,7 @@ END SUBROUTINE CheckCoilWaterInletNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

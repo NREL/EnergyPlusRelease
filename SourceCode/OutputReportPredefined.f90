@@ -2,7 +2,7 @@ MODULE OutputReportPredefined
 
 ! MODULE INFORMATION:
 !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
-!    DATE WRITTEN   August 2006 
+!    DATE WRITTEN   August 2006
 !    MODIFIED       na
 !    RE-ENGINEERED  na
 !
@@ -51,6 +51,8 @@ INTEGER :: pdstMech
 INTEGER :: pdchMechType
 INTEGER :: pdchMechNomCap
 INTEGER :: pdchMechNomEff
+INTEGER :: pdchMechIPLVSI
+INTEGER :: pdchMechIPLVIP
 ! Fan subtable
 INTEGER :: pdstFan
 INTEGER :: pdchFanType
@@ -92,6 +94,15 @@ INTEGER :: pdchDXCoolCoilEERIP       ! EER value in IP unit at AHRI std. 340/360
 INTEGER :: pdchDXCoolCoilIEERSI      ! IEER value in SI unit at AHRI std. 340/360 conditions [W/W]
 INTEGER :: pdchDXCoolCoilIEERIP      ! IEER value in IP unit at AHRI std. 340/360 conditions [W/W]
 
+! DX Heating Coil subtable
+INTEGER :: pdstDXHeatCoil            !
+INTEGER :: pdchDXHeatCoilType        ! DX Heating coil type
+INTEGER :: pdchDXHeatCoilHighCap
+INTEGER :: pdchDXHeatCoilLowCap
+INTEGER :: pdchDXHeatCoilHSPFSI      ! HSPF value in SI unit at AHRI std. 340/360 conditions [W/W]
+INTEGER :: pdchDXHeatCoilHSPFIP      ! HSPF value in IP unit at AHRI std. 340/360 conditions [Btu/W-hr]
+INTEGER :: pdchDXHeatCoilRegionNum   ! Region number for which HSPF is calculated
+
 ! Heating Coil subtable
 INTEGER :: pdstHeatCoil
 INTEGER :: pdchHeatCoilType
@@ -132,6 +143,7 @@ INTEGER :: pdchFenDividerConductance
 INTEGER :: pdchFenSwitchable
 INTEGER :: pdchFenParent
 INTEGER :: pdchFenAzimuth
+INTEGER :: pdchFenTilt
 INTEGER :: pdchFenDir
 INTEGER :: pdstDoor
 INTEGER :: pdchDrCons
@@ -290,6 +302,65 @@ INTEGER :: pdchHVACcntVal
 INTEGER :: pdstFieldCnt
 INTEGER :: pdchFieldCntVal
 
+! Energy Meters Report
+INTEGER :: pdrEnergyMeters
+
+INTEGER :: pdstEMelecvalues
+INTEGER :: pdchEMelecannual
+INTEGER :: pdchEMelecminvalue
+INTEGER :: pdchEMelecminvaluetime
+INTEGER :: pdchEMelecmaxvalue
+INTEGER :: pdchEMelecmaxvaluetime
+
+INTEGER :: pdstEMgasvalues
+INTEGER :: pdchEMgasannual
+INTEGER :: pdchEMgasminvalue
+INTEGER :: pdchEMgasminvaluetime
+INTEGER :: pdchEMgasmaxvalue
+INTEGER :: pdchEMgasmaxvaluetime
+
+INTEGER :: pdstEMcoolvalues
+INTEGER :: pdchEMcoolannual
+INTEGER :: pdchEMcoolminvalue
+INTEGER :: pdchEMcoolminvaluetime
+INTEGER :: pdchEMcoolmaxvalue
+INTEGER :: pdchEMcoolmaxvaluetime
+
+INTEGER :: pdstEMwatervalues
+INTEGER :: pdchEMwaterannual
+INTEGER :: pdchEMwaterminvalue
+INTEGER :: pdchEMwaterminvaluetime
+INTEGER :: pdchEMwatermaxvalue
+INTEGER :: pdchEMwatermaxvaluetime
+
+INTEGER :: pdstEMotherJvalues
+INTEGER :: pdchEMotherJannual
+INTEGER :: pdchEMotherJminvalue
+INTEGER :: pdchEMotherJminvaluetime
+INTEGER :: pdchEMotherJmaxvalue
+INTEGER :: pdchEMotherJmaxvaluetime
+
+INTEGER :: pdstEMotherKGvalues
+INTEGER :: pdchEMotherKGannual
+INTEGER :: pdchEMotherKGminvalue
+INTEGER :: pdchEMotherKGminvaluetime
+INTEGER :: pdchEMotherKGmaxvalue
+INTEGER :: pdchEMotherKGmaxvaluetime
+
+INTEGER :: pdstEMotherM3values
+INTEGER :: pdchEMotherM3annual
+INTEGER :: pdchEMotherM3minvalue
+INTEGER :: pdchEMotherM3minvaluetime
+INTEGER :: pdchEMotherM3maxvalue
+INTEGER :: pdchEMotherM3maxvaluetime
+
+INTEGER :: pdstEMotherLvalues
+INTEGER :: pdchEMotherLannual
+INTEGER :: pdchEMotherLminvalue
+INTEGER :: pdchEMotherLminvaluetime
+INTEGER :: pdchEMotherLmaxvalue
+INTEGER :: pdchEMotherLmaxvaluetime
+
 ! Sensible Heat Gas Component Report
 INTEGER :: pdrSensibleGain
 !annual
@@ -348,6 +419,104 @@ INTEGER :: pdchSHGSHtWindRem
 INTEGER :: pdchSHGSHtIzaRem
 INTEGER :: pdchSHGSHtInfilRem
 INTEGER :: pdchSHGSHtOtherRem
+!Standard62Report
+INTEGER :: pdrStd62 
+INTEGER :: pdstS62sysVentReqCool 
+INTEGER :: pdchS62svrClSumVpz 
+INTEGER :: pdchS62svrClPs 
+INTEGER :: pdchS62svrClSumPz 
+INTEGER :: pdchS62svrClD 
+INTEGER :: pdchS62svrClVou 
+INTEGER :: pdchS62svrClVps 
+INTEGER :: pdchS62svrClXs 
+INTEGER :: pdchS62svrClEv 
+INTEGER :: pdchS62svrClVot 
+INTEGER :: pdchS62svrClPercOA 
+
+INTEGER :: pdstS62sysVentReqHeat 
+INTEGER :: pdchS62svrHTSumVpz 
+INTEGER :: pdchS62svrHtPs 
+INTEGER :: pdchS62svrHtSumPz 
+INTEGER :: pdchS62svrHtD 
+INTEGER :: pdchS62svrHtVou 
+INTEGER :: pdchS62svrHtVps 
+INTEGER :: pdchS62svrHtXs 
+INTEGER :: pdchS62svrHtEv 
+INTEGER :: pdchS62svrHtVot 
+INTEGER :: pdchS62svrHtPercOA 
+
+INTEGER :: pdstS62znVentPar 
+INTEGER :: pdchS62zvpAlN
+INTEGER :: pdchS62zvpRp 
+INTEGER :: pdchS62zvpPz 
+INTEGER :: pdchS62zvpRa 
+INTEGER :: pdchS62zvpAz 
+INTEGER :: pdchS62zvpVbz 
+INTEGER :: pdchS62zvpClEz 
+INTEGER :: pdchS62zvpClVoz 
+INTEGER :: pdchS62zvpHtEz 
+INTEGER :: pdchS62zvpHtVoz 
+
+INTEGER :: pdstS62sysVentPar 
+INTEGER :: pdchS62svpRp 
+INTEGER :: pdchS62svpPz 
+INTEGER :: pdchS62svpRa 
+INTEGER :: pdchS62svpAz 
+INTEGER :: pdchS62svpVbz 
+INTEGER :: pdchS62svpClVoz 
+INTEGER :: pdchS62svpHtVoz 
+
+INTEGER :: pdstS62znCoolDes 
+INTEGER :: pdchS62zcdAlN
+INTEGER :: pdchS62zcdBox
+INTEGER :: pdchS62zcdVpz 
+INTEGER :: pdchS62zcdVps 
+INTEGER :: pdchS62zcdVsec
+INTEGER :: pdchS62zcdVdz 
+INTEGER :: pdchS62zcdVpzmin 
+INTEGER :: pdchS62zcdVozclg 
+INTEGER :: pdchS62zcdZpz 
+INTEGER :: pdchS62zcdEp 
+INTEGER :: pdchS62zcdEr 
+INTEGER :: pdchS62zcdFa 
+INTEGER :: pdchS62zcdFb 
+INTEGER :: pdchS62zcdFc 
+INTEGER :: pdchS62zcdEvz 
+
+INTEGER :: pdstS62sysCoolDes 
+INTEGER :: pdchS62scdVpz 
+INTEGER :: pdchS62scdVps 
+INTEGER :: pdchS62scdVsec
+INTEGER :: pdchS62scdVdz 
+INTEGER :: pdchS62scdVpzmin 
+INTEGER :: pdchS62scdVozclg 
+INTEGER :: pdchS62scdEvz 
+
+INTEGER :: pdstS62znHeatDes 
+INTEGER :: pdchS62zhdAlN
+INTEGER :: pdchS62zhdBox
+INTEGER :: pdchS62zhdVpz 
+INTEGER :: pdchS62zhdVps 
+INTEGER :: pdchS62zhdVsec
+INTEGER :: pdchS62zhdVdz 
+INTEGER :: pdchS62zhdVpzmin 
+INTEGER :: pdchS62zhdVozhtg 
+INTEGER :: pdchS62zhdZpz 
+INTEGER :: pdchS62zhdEp 
+INTEGER :: pdchS62zhdEr 
+INTEGER :: pdchS62zhdFa 
+INTEGER :: pdchS62zhdFb 
+INTEGER :: pdchS62zhdFc 
+INTEGER :: pdchS62zhdEvz 
+
+INTEGER :: pdstS62sysHeatDes 
+INTEGER :: pdchS62shdVpz 
+INTEGER :: pdchS62shdVps 
+INTEGER :: pdchS62shdVsec
+INTEGER :: pdchS62shdVdz 
+INTEGER :: pdchS62shdVpzmin 
+INTEGER :: pdchS62shdVozhtg 
+INTEGER :: pdchS62shdEvz 
 
 ! Internal data structures to store information provided by calls
 
@@ -452,6 +621,7 @@ SUBROUTINE SetPredefinedTables
           ! na
 
           ! USE STATEMENTS:
+USE DataGlobals, ONLY: DoZoneSizing, DoSystemSizing
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -515,6 +685,7 @@ pdchFenDividerConductance =  newPreDefColumn(pdstFen,'Divider Conductance [W/m2-
 pdchFenSwitchable = newPreDefColumn(pdstFen,'Shade Control')
 pdchFenParent = newPreDefColumn(pdstFen,'Parent Surface')
 pdchFenAzimuth =    newPreDefColumn(pdstFen,'Azimuth [deg]')
+pdchFenTilt =    newPreDefColumn(pdstFen,'Tilt [deg]')
 pdchFenDir =     newPreDefColumn(pdstFen,'Cardinal Direction')
 
 pdstIntFen =    newPreDefSubTable(pdrEnvelope,'Interior Fenestration')
@@ -609,6 +780,8 @@ pdstMech = newPreDefSubTable(pdrEquip,'Central Plant')
 pdchMechType =      newPreDefColumn(pdstMech,'Type')
 pdchMechNomCap =    newPreDefColumn(pdstMech,'Nominal Capacity [W]')
 pdchMechNomEff =    newPreDefColumn(pdstMech,'Nominal Efficiency [W/W]')
+pdchMechIPLVSI =    newPreDefColumn(pdstMech,'IPLV in SI Units [W/W]')
+pdchMechIPLVIP =    newPreDefColumn(pdstMech,'IPLV in IP Units [Btu/W-h]')
 
 ! Ok Constant                        Object Name                            Module                   Example File
 ! -- ------------------------------- -------------------------------------- ------------------------ -----------------
@@ -664,6 +837,13 @@ pdchDXCoolCoilEERIP = newPreDefColumn(pdstDXCoolCoil,'EER in IP Units [Btu/W-h]'
 pdchDXCoolCoilIEERSI = newPreDefColumn(pdstDXCoolCoil,'IEER in SI Units [W/W]')
 pdchDXCoolCoilIEERIP = newPreDefColumn(pdstDXCoolCoil,'IEER in IP Units [Btu/W-h]')
 
+pdstDXHeatCoil          = newPreDefSubTable(pdrEquip,'DX Heating Coils')
+pdchDXHeatCoilType      = newPreDefColumn(pdstDXHeatCoil,'DX Heating Coil Type')
+pdchDXHeatCoilHighCap   = newPreDefColumn(pdstDXHeatCoil,'High Temperature Heating (net) Rating Capacity [W]')
+pdchDXHeatCoilLowCap    = newPreDefColumn(pdstDXHeatCoil,'Low Temperature Heating (net) Rating Capacity [W]')
+pdchDXHeatCoilHSPFSI    = newPreDefColumn(pdstDXHeatCoil,'HSPF in SI Units [W/W]')
+pdchDXHeatCoilHSPFIP    = newPreDefColumn(pdstDXHeatCoil,'HSPF in IP Units [Btu/W-h]')
+pdchDXHeatCoilRegionNum = newPreDefColumn(pdstDXHeatCoil,'Region Number')
 
 pdstHeatCoil = newPreDefSubTable(pdrEquip,'Heating Coils')
 
@@ -806,6 +986,79 @@ pdchHVACcntVal =  newPreDefColumn(pdstHVACcnt,'Count')
 pdstFieldCnt = newPreDefSubTable(pdrObjCnt,'Input Fields')
 pdchFieldCntVal =  newPreDefColumn(pdstFieldCnt,'Count')
 
+! Energy Meters report
+pdrEnergyMeters = newPreDefReport('EnergyMeters','Meters')
+
+!pdstEMvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values')
+!pdchEMannual = newPreDefColumn(pdstEMvalues,'Annual Value [GJ]')
+!pdchEMminvalue = newPreDefColumn(pdstEMvalues,'Minimum Value [J]')
+!pdchEMminvaluetime = newPreDefColumn(pdstEMvalues,'Timestamp of Minimum')
+!pdchEMmaxvalue = newPreDefColumn(pdstEMvalues,'Maximum Value [J]')
+!pdchEMmaxvaluetime = newPreDefColumn(pdstEMvalues,'Timestamp of Maximum')
+! Electricity Sub Table
+pdstEMelecvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Electricity')
+pdchEMelecannual = newPreDefColumn(pdstEMelecvalues,'Electricity Annual Value [GJ]')
+pdchEMelecminvalue = newPreDefColumn(pdstEMelecvalues,'Electricity Minimum Value [W]')
+pdchEMelecminvaluetime = newPreDefColumn(pdstEMelecvalues,'Timestamp of Minimum')
+pdchEMelecmaxvalue = newPreDefColumn(pdstEMelecvalues,'Electricity Maximum Value [W]')
+pdchEMelecmaxvaluetime = newPreDefColumn(pdstEMelecvalues,'Timestamp of Maximum')
+
+! Gas Sub Table
+pdstEMgasvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Gas')
+pdchEMgasannual = newPreDefColumn(pdstEMgasvalues,'Gas Annual Value [GJ]')
+pdchEMgasminvalue = newPreDefColumn(pdstEMgasvalues,'Gas Minimum Value [W]')
+pdchEMgasminvaluetime = newPreDefColumn(pdstEMgasvalues,'Timestamp of Minimum')
+pdchEMgasmaxvalue = newPreDefColumn(pdstEMgasvalues,'Gas Maximum Value [W]')
+pdchEMgasmaxvaluetime = newPreDefColumn(pdstEMgasvalues,'Timestamp of Maximum')
+
+! Cool SubTable
+pdstEMcoolvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Cooling')
+pdchEMcoolannual = newPreDefColumn(pdstEMcoolvalues,'Cooling Annual Value [GJ]')
+pdchEMcoolminvalue = newPreDefColumn(pdstEMcoolvalues,'Cooling Minimum Value [W]')
+pdchEMcoolminvaluetime = newPreDefColumn(pdstEMcoolvalues,'Timestamp of Minimum')
+pdchEMcoolmaxvalue = newPreDefColumn(pdstEMcoolvalues,'Cooling Maximum Value [W]')
+pdchEMcoolmaxvaluetime = newPreDefColumn(pdstEMcoolvalues,'Timestamp of Maximum')
+
+! Water SubTable
+pdstEMwatervalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Water')
+pdchEMwaterannual = newPreDefColumn(pdstEMwatervalues,'Annual Value [m3]')
+pdchEMwaterminvalue = newPreDefColumn(pdstEMwatervalues,'Minimum Value [m3/s]')
+pdchEMwaterminvaluetime = newPreDefColumn(pdstEMwatervalues,'Timestamp of Minimum')
+pdchEMwatermaxvalue = newPreDefColumn(pdstEMwatervalues,'Maximum Value [m3/s]')
+pdchEMwatermaxvaluetime = newPreDefColumn(pdstEMwatervalues,'Timestamp of Maximum')
+
+! Other KG SubTable
+pdstEMotherKGvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Other by Weight/Mass')
+pdchEMotherKGannual = newPreDefColumn(pdstEMotherKGvalues,'Annual Value [kg]')
+pdchEMotherKGminvalue = newPreDefColumn(pdstEMotherKGvalues,'Minimum Value [kg/s]')
+pdchEMotherKGminvaluetime = newPreDefColumn(pdstEMotherKGvalues,'Timestamp of Minimum')
+pdchEMotherKGmaxvalue = newPreDefColumn(pdstEMotherKGvalues,'Maximum Value [kg/s]')
+pdchEMotherKGmaxvaluetime = newPreDefColumn(pdstEMotherKGvalues,'Timestamp of Maximum')
+
+! Other M3 SubTable
+pdstEMotherM3values = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Other Volumetric')
+pdchEMotherM3annual = newPreDefColumn(pdstEMotherM3values,'Annual Value [m3]')
+pdchEMotherM3minvalue = newPreDefColumn(pdstEMotherM3values,'Minimum Value [m3/s]')
+pdchEMotherM3minvaluetime = newPreDefColumn(pdstEMotherM3values,'Timestamp of Minimum')
+pdchEMotherM3maxvalue = newPreDefColumn(pdstEMotherM3values,'Maximum Value [m3/s]')
+pdchEMotherM3maxvaluetime = newPreDefColumn(pdstEMotherM3values,'Timestamp of Maximum')
+
+! Other M3 SubTable
+pdstEMotherLvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Other Liquid/Gas')
+pdchEMotherLannual = newPreDefColumn(pdstEMotherLvalues,'Annual Value [L]')
+pdchEMotherLminvalue = newPreDefColumn(pdstEMotherLvalues,'Minimum Value [L]')
+pdchEMotherLminvaluetime = newPreDefColumn(pdstEMotherLvalues,'Timestamp of Minimum')
+pdchEMotherLmaxvalue = newPreDefColumn(pdstEMotherLvalues,'Maximum Value [L]')
+pdchEMotherLmaxvaluetime = newPreDefColumn(pdstEMotherLvalues,'Timestamp of Maximum')
+
+! Other J SubTable
+pdstEMotherJvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values - Other')
+pdchEMotherJannual = newPreDefColumn(pdstEMotherJvalues,'Annual Value [GJ]')
+pdchEMotherJminvalue = newPreDefColumn(pdstEMotherJvalues,'Minimum Value [W]')
+pdchEMotherJminvaluetime = newPreDefColumn(pdstEMotherJvalues,'Timestamp of Minimum')
+pdchEMotherJmaxvalue = newPreDefColumn(pdstEMotherJvalues,'Maximum Value [W]')
+pdchEMotherJmaxvaluetime = newPreDefColumn(pdstEMotherJvalues,'Timestamp of Maximum')
+
 ! Sensible Heat Gas Component Report
 pdrSensibleGain = newPreDefReport('SensibleHeatGainSummary','SHGS')
 
@@ -868,6 +1121,116 @@ pdchSHGSHtIzaRem    =   newPreDefColumn(pdstSHGSpkHt,'Interzone Air Transfer Hea
 pdchSHGSHtInfilRem  =   newPreDefColumn(pdstSHGSpkHt,'Infiltration Heat Removal [W]')
 pdchSHGSHtOtherRem  =   newPreDefColumn(pdstSHGSpkHt,'Opaque Surface Conduction and Other Heat Removal [W]')
 
+
+!Standard62Report
+IF (DoZoneSizing .OR. DoSystemSizing) THEN
+  pdrStd62 = newPreDefReport('Standard62.1Summary','Std62')
+
+  pdstS62sysVentReqCool = newPreDefSubTable(pdrStd62, 'System Ventilation Requirements for Cooling')
+
+  pdchS62svrClSumVpz =    newPreDefColumn(pdstS62sysVentReqCool,'Sum of Zone Primary Air Flow - Vpz-sum [m3/s]')
+  pdchS62svrClPs =        newPreDefColumn(pdstS62sysVentReqCool,'System Population - Ps')
+  pdchS62svrClSumPz =     newPreDefColumn(pdstS62sysVentReqCool,'Sum of Zone Population - Pz-sum')
+  pdchS62svrClD =         newPreDefColumn(pdstS62sysVentReqCool,'Occupant Diversity - D')
+  pdchS62svrClVou =       newPreDefColumn(pdstS62sysVentReqCool,'Uncorrected Outdoor Air Intake Airflow - Vou [m3/s]')
+  pdchS62svrClVps =       newPreDefColumn(pdstS62sysVentReqCool,'System Primary Airflow - Vps [m3/s]')
+  pdchS62svrClXs =        newPreDefColumn(pdstS62sysVentReqCool,'Average Outdoor Air Fraction - Xs')
+  pdchS62svrClEv =        newPreDefColumn(pdstS62sysVentReqCool,'System Ventilation Efficiency - Ev')
+  pdchS62svrClVot =       newPreDefColumn(pdstS62sysVentReqCool,'Outdoor Air Intake Flow - Vot [m3/s]')
+  pdchS62svrClPercOA =    newPreDefColumn(pdstS62sysVentReqCool,'Percent Outdoor Air - %OA')
+
+  pdstS62sysVentReqHeat = newPreDefSubTable(pdrStd62, 'System Ventilation Requirements for Heating')
+
+  pdchS62svrHTSumVpz =    newPreDefColumn(pdstS62sysVentReqHeat,'Sum of Zone Primary Air Flow - Vpz-sum [m3/s]')
+  pdchS62svrHtPs =        newPreDefColumn(pdstS62sysVentReqHeat,'System Population - Ps')
+  pdchS62svrHtSumPz =     newPreDefColumn(pdstS62sysVentReqHeat,'Sum of Zone Population - Pz-sum')
+  pdchS62svrHtD =         newPreDefColumn(pdstS62sysVentReqHeat,'Occupant Diversity - D')
+  pdchS62svrHtVou =       newPreDefColumn(pdstS62sysVentReqHeat,'Uncorrected Outdoor Air Intake Airflow - Vou [m3/s]')
+  pdchS62svrHtVps =       newPreDefColumn(pdstS62sysVentReqHeat,'System Primary Airflow - Vps [m3/s]')
+  pdchS62svrHtXs =        newPreDefColumn(pdstS62sysVentReqHeat,'Average Outdoor Air Fraction - Xs')
+  pdchS62svrHtEv =        newPreDefColumn(pdstS62sysVentReqHeat,'System Ventilation Efficiency - Ev')
+  pdchS62svrHtVot =       newPreDefColumn(pdstS62sysVentReqHeat,'Outdoor Air Intake Flow Vot [m3/s]')
+  pdchS62svrHtPercOA =    newPreDefColumn(pdstS62sysVentReqHeat,'Percent Outdoor Air - %OA')
+
+  pdstS62znVentPar =      newPreDefSubTable(pdrStd62, 'Zone Ventilation Parameters')
+
+  pdchS62zvpAlN =         newPreDefColumn(pdstS62znVentPar,'AirLoop Name')
+  pdchS62zvpRp =          newPreDefColumn(pdstS62znVentPar,'People Outdoor Air Rate - Rp [m3/s-person]')
+  pdchS62zvpPz =          newPreDefColumn(pdstS62znVentPar,'Zone Population - Pz')
+  pdchS62zvpRa =          newPreDefColumn(pdstS62znVentPar,'Area Outdoor Air Rate - Ra [m3/s-m2]')
+  pdchS62zvpAz =          newPreDefColumn(pdstS62znVentPar,'Zone Floor Area - Az [m2]')
+  pdchS62zvpVbz =         newPreDefColumn(pdstS62znVentPar,'Breathing Zone Outdoor Airflow - Vbz [m3/s]')
+  pdchS62zvpClEz =        newPreDefColumn(pdstS62znVentPar,'Cooling Zone Air Distribution Effectiveness - Ez-clg')
+  pdchS62zvpClVoz =       newPreDefColumn(pdstS62znVentPar,'Cooling Zone Outdoor Airflow - Voz-clg [m3/s]')
+  pdchS62zvpHtEz =        newPreDefColumn(pdstS62znVentPar,'Heating Zone Air Distribution Effectiveness - Ez-htg')
+  pdchS62zvpHtVoz =       newPreDefColumn(pdstS62znVentPar,'Heating Zone Outdoor Airflow - Voz-htg [m3/s]')
+
+  pdstS62sysVentPar =     newPreDefSubTable(pdrStd62, 'System Ventilation Parameters')
+
+  pdchS62svpRp =          newPreDefColumn(pdstS62sysVentPar,'People Outdoor Air Rate - Rp [m3/s-person]')
+  pdchS62svpPz =          newPreDefColumn(pdstS62sysVentPar,'Sum of Zone Population - Pz-sum')
+  pdchS62svpRa =          newPreDefColumn(pdstS62sysVentPar,'Area Outdoor Air Rate - Ra [m3/s-m2]')
+  pdchS62svpAz =          newPreDefColumn(pdstS62sysVentPar,'Sum of Zone Floor Area - Az-sum [m2]')
+  pdchS62svpVbz =         newPreDefColumn(pdstS62sysVentPar,'Breathing Zone Outdoor Airflow - Vbz [m3/s]')
+  pdchS62svpClVoz =       newPreDefColumn(pdstS62sysVentPar,'Cooling Zone Outdoor Airflow - Voz-clg [m3/s]')
+  pdchS62svpHtVoz =       newPreDefColumn(pdstS62sysVentPar,'Heating Zone Outdoor Airflow - Voz-htg [m3/s]')
+
+  pdstS62znCoolDes =      newPreDefSubTable(pdrStd62, 'Zone Ventilation Calculations for Cooling Design')
+
+  pdchS62zcdAlN =         newPreDefColumn(pdstS62znCoolDes,'AirLoop Name')
+  pdchS62zcdBox =         newPreDefColumn(pdstS62znCoolDes,'Box Type')
+  pdchS62zcdVpz =         newPreDefColumn(pdstS62znCoolDes,'Zone Primary Airflow - Vpz [m3/s]')
+  !pdchS62zcdVps =         newPreDefColumn(pdstS62znCoolDes,'System Primary Airflow - Vps [m3/s]')
+  !pdchS62zcdVsec =        newPreDefColumn(pdstS62znCoolDes,'Secondary Fan Airflow - Vsec [m3/s]')
+  pdchS62zcdVdz =         newPreDefColumn(pdstS62znCoolDes,'Zone Discharge Airflow - Vdz [m3/s]')
+  pdchS62zcdVpzmin =      newPreDefColumn(pdstS62znCoolDes,'Minimum Zone Primary Airflow - Vpz-min [m3/s]')
+  pdchS62zcdVozclg =      newPreDefColumn(pdstS62znCoolDes,'Zone Outdoor Airflow Cooling - Voz-clg [m3/s]')
+  pdchS62zcdZpz =         newPreDefColumn(pdstS62znCoolDes,'Primary Outdoor Air Fraction - Zpz')
+  pdchS62zcdEp =          newPreDefColumn(pdstS62znCoolDes,'Primary Air Fraction - Ep')
+  pdchS62zcdEr =          newPreDefColumn(pdstS62znCoolDes,'Secondary Recirculation Fraction- Er')
+  pdchS62zcdFa =          newPreDefColumn(pdstS62znCoolDes,'Supply Air Fraction- Fa')
+  pdchS62zcdFb =          newPreDefColumn(pdstS62znCoolDes,'Mixed Air Fraction - Fb')
+  pdchS62zcdFc =          newPreDefColumn(pdstS62znCoolDes,'Outdoor Air Fraction - Fc')
+  pdchS62zcdEvz =         newPreDefColumn(pdstS62znCoolDes,'Zone Ventilation Efficiency - Evz')
+
+  pdstS62sysCoolDes =     newPreDefSubTable(pdrStd62, 'System Ventilation Calculations for Cooling Design')
+
+  pdchS62scdVpz =         newPreDefColumn(pdstS62sysCoolDes,'Sum of Zone Primary Airflow - Vpz-sum [m3/s]')
+  pdchS62scdVps =         newPreDefColumn(pdstS62sysCoolDes,'System Primary Airflow - Vps [m3/s]')
+  !pdchS62scdVsec =        newPreDefColumn(pdstS62sysCoolDes,'Secondary Fan Airflow - Vsec [m3/s]')
+  pdchS62scdVdz =         newPreDefColumn(pdstS62sysCoolDes,'Sum of Zone Discharge Airflow - Vdz-sum [m3/s]')
+  pdchS62scdVpzmin =      newPreDefColumn(pdstS62sysCoolDes,'Sum of Min Zone Primary Airflow - Vpz-min [m3/s]')
+  pdchS62scdVozclg =      newPreDefColumn(pdstS62sysCoolDes,'Zone Outdoor Airflow Cooling - Voz-clg [m3/s]')
+  pdchS62scdEvz =         newPreDefColumn(pdstS62sysCoolDes,'Zone Ventilation Efficiency - Evz-min')
+
+  pdstS62znHeatDes =      newPreDefSubTable(pdrStd62, 'Zone Ventilation Calculations for Heating Design')
+
+  pdchS62zhdAlN =         newPreDefColumn(pdstS62znHeatDes,'AirLoop Name')
+  pdchS62zhdBox =         newPreDefColumn(pdstS62znHeatDes,'Box Type')
+  pdchS62zhdVpz =         newPreDefColumn(pdstS62znHeatDes,'Zone Primary Airflow - Vpz [m3/s]')
+  !pdchS62zhdVps =         newPreDefColumn(pdstS62znHeatDes,'System Primary Airflow - Vps [m3/s]')
+  !pdchS62zhdVsec =        newPreDefColumn(pdstS62znHeatDes,'Secondary Fan Airflow - Vsec [m3/s]')
+  pdchS62zhdVdz =         newPreDefColumn(pdstS62znHeatDes,'Zone Discharge Airflow - Vdz [m3/s]')
+  pdchS62zhdVpzmin =      newPreDefColumn(pdstS62znHeatDes,'Minimum Zone Primary Airflow - Vpz-min [m3/s]')
+  pdchS62zhdVozhtg =      newPreDefColumn(pdstS62znHeatDes,'Zone Outdoor Airflow Heating - Voz-htg [m3/s]')
+  pdchS62zhdZpz =         newPreDefColumn(pdstS62znHeatDes,'Primary Outdoor Air Fraction - Zpz')
+  pdchS62zhdEp =          newPreDefColumn(pdstS62znHeatDes,'Primary Air Fraction - Ep')
+  pdchS62zhdEr =          newPreDefColumn(pdstS62znHeatDes,'Secondary Recirculation Fraction- Er')
+  pdchS62zhdFa =          newPreDefColumn(pdstS62znHeatDes,'Supply Air Fraction- Fa')
+  pdchS62zhdFb =          newPreDefColumn(pdstS62znHeatDes,'Mixed Air Fraction - Fb')
+  pdchS62zhdFc =          newPreDefColumn(pdstS62znHeatDes,'Outdoor Air Fraction - Fc')
+  pdchS62zhdEvz =         newPreDefColumn(pdstS62znHeatDes,'Zone Ventilation Efficiency - Evz')
+
+  pdstS62sysHeatDes =     newPreDefSubTable(pdrStd62, 'System Ventilation Calculations for Heating Design')
+
+  pdchS62shdVpz =         newPreDefColumn(pdstS62sysHeatDes,'Sum of Zone Primary Airflow - Vpz-sum [m3/s]')
+  pdchS62shdVps =         newPreDefColumn(pdstS62sysHeatDes,'System Primary Airflow - Vps [m3/s]')
+  !pdchS62shdVsec =        newPreDefColumn(pdstS62sysHeatDes,'Secondary Fan Airflow - Vsec [m3/s]')
+  pdchS62shdVdz =         newPreDefColumn(pdstS62sysHeatDes,'Sum of Zone Discharge Airflow - Vdz-sum [m3/s]')
+  pdchS62shdVpzmin =      newPreDefColumn(pdstS62sysHeatDes,'Sum of Min Zone Primary Airflow - Vpz-min [m3/s]')
+  pdchS62shdVozhtg =      newPreDefColumn(pdstS62sysHeatDes,'Zone Outdoor Airflow Heating - Voz-htg [m3/s]')
+  pdchS62shdEvz =         newPreDefColumn(pdstS62sysHeatDes,'Zone Ventilation Efficiency - Evz-min')
+END IF
 END SUBROUTINE SetPredefinedTables
 
 SUBROUTINE RealPreDefTableEntry(columnIndex,objName,tableEntryReal,numSigDigits)
@@ -1425,7 +1788,7 @@ END FUNCTION newPreDefColumn
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

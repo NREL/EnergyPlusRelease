@@ -56,11 +56,11 @@ INTEGER, PARAMETER :: Zhang_Huang           =1  ! Design Day solar model Zhang H
 INTEGER, PARAMETER :: SolarModel_Schedule   =2  ! Design Day solar model (beam and diffuse) from user entered schedule
 INTEGER, PARAMETER :: ASHRAE_Tau            =3  ! Design Day solar model ASHRAE tau (per 2009 HOF)
 
-INTEGER, PARAMETER :: DDHumIndType_Wetbulb  = 0 ! Design Day Humidity Indicating Type = Wetbulb (default)
-INTEGER, PARAMETER :: DDHumIndType_Dewpoint = 1 ! Design Day Humidity Indicating Type = Dewpoint
-INTEGER, PARAMETER :: DDHumIndType_Enthalpy = 2 ! Design Day Humidity Indicating Type = Enthalpy
-INTEGER, PARAMETER :: DDHumIndType_HumRatio = 3 ! Design Day Humidity Indicating Type = Humidity Ratio
-INTEGER, PARAMETER :: DDHumIndType_Schedule = 4 ! Design Day Humidity Indicating Type = relhum schedule
+INTEGER, PARAMETER :: DDHumIndType_Wetbulb   =0 ! Design Day Humidity Indicating Type = Wetbulb (default)
+INTEGER, PARAMETER :: DDHumIndType_Dewpoint  =1 ! Design Day Humidity Indicating Type = Dewpoint
+INTEGER, PARAMETER :: DDHumIndType_Enthalpy  =2 ! Design Day Humidity Indicating Type = Enthalpy
+INTEGER, PARAMETER :: DDHumIndType_HumRatio  =3 ! Design Day Humidity Indicating Type = Humidity Ratio
+INTEGER, PARAMETER :: DDHumIndType_RelHumSch =4 ! Design Day Humidity Indicating Type = relhum schedule
 INTEGER, PARAMETER :: DDHumIndType_WBProfDef =5 ! Design Day Humidity Indicating Type = Wetbulb default profile
 INTEGER, PARAMETER :: DDHumIndType_WBProfDif =6 ! Design Day Humidity Indicating Type = Wetbulb difference profile
 INTEGER, PARAMETER :: DDHumIndType_WBProfMul =7 ! Design Day Humidity Indicating Type = Wetbulb multiplier profile
@@ -76,12 +76,17 @@ INTEGER, PARAMETER :: WP_DryBulbDelta          = 2 ! User entered DryBulb differ
 INTEGER, PARAMETER :: WP_DewPointDelta         = 3 ! User entered Dewpoint difference Schedule value for Weather Property
 INTEGER, PARAMETER :: WP_SkyTAlgorithmA        = 4 ! place holder
 
+INTEGER, PARAMETER :: GregorianToJulian        = 1 ! JGDate argument for Gregorian to Julian Date conversion
+INTEGER, PARAMETER :: JulianToGregorian        = 2 ! JGDate argument for Julian to Gregorian Date conversion
+
 REAL(r64),  PARAMETER :: Sigma=5.6697d-8 ! Stefan-Boltzmann constant
 REAL(r64),  PARAMETER :: TKelvin=KelvinConv  ! conversion from Kelvin to Celsius
-CHARACTER(len=*),  PARAMETER :: Blank=' '
 
+CHARACTER(len=*),  PARAMETER :: Blank=' '
 CHARACTER(len=*),  PARAMETER, DIMENSION(7) :: DaysOfWeek=(/"SUNDAY   ","MONDAY   ","TUESDAY  ", &
                                                            "WEDNESDAY","THURSDAY ","FRIDAY   ","SATURDAY "/)
+
+LOGICAL :: Debugout=.false.
 
           ! DERIVED TYPE DEFINITIONS:
 
@@ -93,9 +98,13 @@ TYPE EnvironmentData
   INTEGER :: StartJDay                  = 0       ! Day of year of first day of environment
   INTEGER :: StartMonth                 = 0
   INTEGER :: StartDay                   = 0
+  INTEGER :: StartYear                  = 0
+  INTEGER :: StartDate                  = 0
   INTEGER :: EndMonth                   = 0
   INTEGER :: EndDay                     = 0
   INTEGER :: EndJDay                    = 0
+  INTEGER :: EndYear                    = 0
+  INTEGER :: EndDate                    = 0
   INTEGER :: DayOfWeek                  = 0       ! Starting Day of Week for the (Weather) RunPeriod (User Input)
   LOGICAL :: UseDST                     = .false. ! True if DaylightSavingTime is used for this RunPeriod
   LOGICAL :: UseHolidays                = .false. ! True if Holidays are used for this RunPeriod (from WeatherFile)
@@ -103,8 +112,17 @@ TYPE EnvironmentData
   LOGICAL :: UseRain                    = .true.  ! True if Rain from weather file should be used (set rain to true)
   LOGICAL :: UseSnow                    = .true.  ! True if Snow from weather file should be used (set Snow to true)
   INTEGER, DIMENSION(12) :: MonWeekDay  = 0
+  LOGICAL :: SetWeekDays                =.false.  ! true when weekdays will be reset (after first year or on repeat)
   INTEGER :: NumSimYears                = 1 ! Total Number of times this period to be performed
+  INTEGER :: CurrentCycle               = 0 ! Current cycle through weather file in NumSimYears repeats
   INTEGER :: WP_Type1                   = 0 ! WeatherProperties SkyTemperature Pointer
+  INTEGER :: CurrentYear                = 0       ! Current year
+  LOGICAL :: IsLeapYear                 =.false.  ! True if current year is leap year.
+  LOGICAL :: RollDayTypeOnRepeat        =.true.   ! If repeating run period, increment day type on repeat.
+  LOGICAL :: TreatYearsAsConsecutive    =.true.   ! When year rolls over, increment year and recalculate Leap Year
+  LOGICAL :: MatchYear                  = .false. ! for actual weather will be true
+  LOGICAL :: ActualWeather              = .false. ! true when using actual weather data
+  INTEGER :: RawSimDays                 = 0       ! number of basic sim days.
 END TYPE EnvironmentData
 
 TYPE DesignDayData
@@ -142,9 +160,11 @@ TYPE RunPeriodData
   INTEGER :: StartMonth                 = 1
   INTEGER :: StartDay                   = 1
   INTEGER :: StartDate                  = 0       ! Calculated start date (Julian) for a weather file run period
+  INTEGER :: StartYear                  = 0       ! entered in "consecutive"/real runperiod object
   INTEGER :: EndMonth                   = 12
   INTEGER :: EndDay                     = 31
   INTEGER :: EndDate                    = 0       ! Calculated end date (Julian) for a weather file run period
+  INTEGER :: EndYear                    = 0       ! entered in "consecutive"/real runperiod object
   INTEGER :: DayOfWeek                  = 0       ! Day of Week that the RunPeriod will start on (User Input)
   LOGICAL :: UseDST                     = .false. ! True if DaylightSavingTime is used for this RunPeriod
   LOGICAL :: UseHolidays                = .false. ! True if Holidays are used for this RunPeriod (from WeatherFile)
@@ -152,7 +172,12 @@ TYPE RunPeriodData
   LOGICAL :: UseRain                    = .true.  ! True if Rain from weather file should be used (set rain to true)
   LOGICAL :: UseSnow                    = .true.  ! True if Snow from weather file should be used (set Snow to true)
   INTEGER, DIMENSION(12) :: MonWeekDay  = 0
-  INTEGER :: NumSimYears                = 1 ! Total Number of years of simualtion to be performed
+  INTEGER :: NumSimYears                = 1       ! Total Number of years of simulation to be performed
+  INTEGER :: BeginYear                  = 0       ! Start year entered in regular RunPeriod object
+  LOGICAL :: IsLeapYear                 =.false.  ! True if Begin Year is leap year.
+  LOGICAL :: RollDayTypeOnRepeat        =.true.   ! If repeating run period, increment day type on repeat.
+  LOGICAL :: TreatYearsAsConsecutive    =.true.   ! When year rolls over, increment year and recalculate Leap Year
+  LOGICAL :: ActualWeather              = .false. ! true when using actual weather data
 END TYPE RunPeriodData
 
 TYPE DayWeatherVariables                ! Derived Type for Storing Weather "Header" Data
@@ -190,8 +215,10 @@ TYPE DataPeriodData
   INTEGER :: WeekDay                    = 0
   INTEGER :: StMon                      = 0
   INTEGER :: StDay                      = 0
+  INTEGER :: StYear                     = 0
   INTEGER :: EnMon                      = 0
   INTEGER :: EnDay                      = 0
+  INTEGER :: EnYear                     = 0
   INTEGER :: NumDays                    = 0
   INTEGER, DIMENSION(12) :: MonWeekDay  = 0
   INTEGER :: DataStJDay                 = 0
@@ -330,6 +357,8 @@ INTEGER :: WaterMainsTempsSchedule = 0        ! Water mains temperature schedule
 REAL(r64) :: WaterMainsTempsAnnualAvgAirTemp = 0.0 ! Annual average outdoor air temperature (C)
 REAL(r64) :: WaterMainsTempsMaxDiffAirTemp = 0.0   ! Maximum difference in monthly average outdoor air temperatures (deltaC)
 LOGICAL :: wthFCGroundTemps=.false.
+REAL(r64) :: RainAmount=0.0d0
+REAL(r64) :: SnowAmount=0.0d0
 
 TYPE (DayWeatherVariables) :: TodayVariables=       &  ! Today's daily weather variables
     DayWeatherVariables(               & ! Derived Type for Storing Weather "Header" Data
@@ -377,7 +406,6 @@ TYPE (SpecialDayData), ALLOCATABLE, DIMENSION(:) :: SpecialDays
 INTEGER, DIMENSION(366) :: SpecialDayTypes  =0  ! To hold holiday types given in input file
 INTEGER, DIMENSION(366) :: WeekDayTypes     =0  ! To hold Week day types using specified first day
 INTEGER, DIMENSION(366) :: DSTIndex         =0  ! To hold DST Index based on weather file or input
-!INTEGER, DIMENSION(7)   :: WeekDayCount     =0  ! Count of week days per month
 
 INTEGER :: NumDataPeriods=0
 TYPE (DataPeriodData), ALLOCATABLE, DIMENSION(:) :: DataPeriods
@@ -388,12 +416,12 @@ LOGICAL :: UseDaylightSaving=.true.   ! True if user says to use Weather File sp
 LOGICAL :: UseSpecialDays=.true.      ! True if user says to use Weather File specified Special Days for current RunPeriod
 LOGICAL :: UseRainValues=.true.       ! True if rain values from weather file are to be used
 LOGICAL :: UseSnowValues=.true.       ! True if snow values from weather file are to be used
-LOGICAL :: LeapYear=.false.           ! True if EPW Leap Years are observed
 LOGICAL :: EPWDaylightSaving=.false.  ! True if a DaylightSaving Time Period is input (EPW files)
 LOGICAL :: IDFDaylightSaving=.false.  ! True if a DaylightSaving Time Period is input (IDF files)
-LOGICAL :: DaylightSaving=.false.     ! True if a DaylightSavingPeriod should be used
+LOGICAL :: DaylightSavingIsActive=.false.     ! True if a DaylightSavingPeriod should be used for Environment
+LOGICAL :: WFAllowsLeapYears=.false.  ! True if the Weather File (WF) header has "Yes" for Leap Years
 INTEGER :: WFLeapYearInd=0 ! Indicator for current Weather file "Leap Year", used in DayOfYear calculations and others.
-INTEGER, DIMENSION(12) :: EndDayOfMonth=(/31,28,31,30,31,30,31,31,30,31,30,31/)
+INTEGER :: curSimDayforEndofRunPeriod=0  ! normal=number days in sim, but different when repeating runperiods or multi-year files
 INTEGER :: Envrn=0                ! Counter for environments
 INTEGER :: NumOfEnvrn=0           ! Number of environments to be simulated
 INTEGER :: NumEPWTypExtSets=0       ! Number of Typical/Extreme on weather file.
@@ -401,6 +429,8 @@ INTEGER :: NumWPSkyTemperatures=0   ! Number of WeatherProperty:SkyTemperature i
 
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TodayIsRain         ! Rain indicator, true=rain
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TodayIsSnow         ! Snow indicator, true=snow
+REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayRainAmount     ! ficitious indicator of Rain
+REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodaySnowAmount     ! ficitious indicator of Snow
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayOutDryBulbTemp   ! Dry bulb temperature of outside air
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayOutWetBulbTemp   ! Wet bulb temperature of outside air
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayOutDewPointTemp  ! Dew Point Temperature of outside air
@@ -418,6 +448,8 @@ REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayLiquidPrecip     ! Liquid Precip
 
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TomorrowIsRain         ! Rain indicator, true=rain
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TomorrowIsSnow         ! Snow indicator, true=snow
+REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TomorrowRainAmount     ! ficitious indicator of Rain
+REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TomorrowSnowAmount     ! ficitious indicator of Snow
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TomorrowOutDryBulbTemp   ! Dry bulb temperature of outside air
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TomorrowOutDewPointTemp  ! Dew Point Temperature of outside air
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TomorrowOutBaroPress     ! Barometric pressure of outside air
@@ -452,12 +484,14 @@ LOGICAL :: StripCR=.false.  ! If true, strip last character (<cr> off each EPW l
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: Interpolation       ! Interpolation values based on Number of Time Steps in Hour
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SolarInterpolation  ! Solar Interpolation values based on
                                                                    !      Number of Time Steps in Hour
+INTEGER, DIMENSION(12) :: EndDayOfMonth=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 LOGICAL :: ErrorInWeatherFile = .false.   ! Set to TRUE when there is a problem with dates
-
-
+INTEGER :: LeapYearAdd=0                  ! Set during environment if leap year is active (adds 1 to number days in Feb)
+LOGICAL :: DatesShouldBeReset = .false.   ! True when weekdays should be reset
+LOGICAL :: StartDatesCycleShouldBeReset = .false.  ! True when start dates on repeat should be reset
+LOGICAL :: Jan1DatesShouldBeReset = .false.    ! True if Jan 1 should signal reset of dates
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE WeatherManager
-
 PUBLIC  ManageWeather
 PUBLIC  GetNextEnvironment
 PUBLIC  ResetEnvironmentCounter
@@ -478,7 +512,7 @@ PRIVATE CheckLocationValidity
 PRIVATE CheckWeatherFileValidity
 PRIVATE ReportOutputFileHeaders
 PRIVATE ReportWeatherAndTimeInformation
-PUBLIC  ProcessDateString
+!PUBLIC  ProcessDateString
 ! Get Input from Input File
 PRIVATE ReadUserWeatherInput
 PRIVATE GetRunPeriodData
@@ -637,7 +671,7 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
                                                & '! <Environment:Daylight Saving>, Daylight Saving Indicator, Source,',        &
                                                        &   ' Start Date, End Date',/,                                          &
                                                & '! <Environment:WarmupDays>, NumberofWarmupDays')"
-  CHARACTER(len=*), PARAMETER :: EnvNameFormat="('Environment',5(',',A),',',I3,6(',',A))"
+  CHARACTER(len=*), PARAMETER :: EnvNameFormat="('Environment',12(',',A))"
   CHARACTER(len=*), PARAMETER :: EnvDSTNFormat="('Environment:Daylight Saving,No,',A)"
   CHARACTER(len=*), PARAMETER :: EnvDSTYFormat="('Environment:Daylight Saving,Yes',3(',',A))"
   CHARACTER(len=*), PARAMETER :: EnvSpDyFormat="('Environment:Special Days',4(',',A),',',I3)"
@@ -659,38 +693,42 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
   LOGICAL, SAVE   :: GetInputFlag=.TRUE.   ! Set to true before execution starts
   LOGICAL, SAVE   :: FirstCall=.true.
   LOGICAL, SAVE   :: PrntEnvHeaders=.true.
-  INTEGER Loop
-  INTEGER Loop1
-  CHARACTER(len=10) StDate
-  CHARACTER(len=10) EnDate
-  INTEGER NumDays
-  INTEGER DSTActStMon
-  INTEGER DSTActStDay
-  INTEGER DSTActEnMon
-  INTEGER DSTActEnDay
-  INTEGER RunStJDay
-  INTEGER RunEnJDay
-  LOGICAL OkRun
-  INTEGER ThisWeekDay
-  INTEGER TWeekDay
+  INTEGER :: Loop
+  INTEGER :: Loop1
+  CHARACTER(len=10) :: StDate
+  CHARACTER(len=10) :: EnDate
+  CHARACTER(len=10) :: string
+  CHARACTER(len=10) :: cTotalEnvDays
+  INTEGER :: NumDays
+  INTEGER :: DSTActStMon
+  INTEGER :: DSTActStDay
+  INTEGER :: DSTActEnMon
+  INTEGER :: DSTActEnDay
+  INTEGER :: RunStJDay
+  INTEGER :: RunEnJDay
+  LOGICAL :: OkRun
+  INTEGER :: ThisWeekDay
+  INTEGER :: TWeekDay
   INTEGER, DIMENSION(12) :: MonWeekDay
   INTEGER, DIMENSION(12) :: ActEndDayOfMonth
-  INTEGER ThisDay
-  INTEGER JDay
-  INTEGER JDay1
-  CHARACTER(len=20) Source
-  CHARACTER(len=3) ApWkRule
-  CHARACTER(len=3) AlpUseDST
-  CHARACTER(len=3) AlpUseSpec
-  CHARACTER(len=3) AlpUseRain
-  CHARACTER(len=3) AlpUseSnow
+  INTEGER :: ThisDay
+  INTEGER :: JDay
+  INTEGER :: JDay1
+  INTEGER :: JDay5Start
+  INTEGER :: JDay5End
+  CHARACTER(len=20) :: Source
+  CHARACTER(len=3) :: ApWkRule
+  CHARACTER(len=3) :: AlpUseDST
+  CHARACTER(len=3) :: AlpUseSpec
+  CHARACTER(len=3) :: AlpUseRain
+  CHARACTER(len=3) :: AlpUseSnow
   CHARACTER(len=100) :: kindOfRunPeriod
   REAL(r64) :: GrossApproxAvgDryBulb
 
   IF (GetInputFlag) THEN
 
     CALL SetUpInterpolationValues
-    TimeStepFraction=1./REAL(NumOfTimeStepInHour,r64)
+    TimeStepFraction=1.d0/REAL(NumOfTimeStepInHour,r64)
 
     CALL OpenWeatherFile(ErrorsFound)   ! moved here because of possibility of special days on EPW file
     CALL CloseWeatherFile
@@ -751,7 +789,7 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
     CALL SetupOutputVariable('Outdoor Dry Bulb [C]',OutDryBulbTemp,'Zone','Average','Environment')
     CALL SetupOutputVariable('Outdoor Dew Point [C]',OutDewPointTemp,'Zone','Average','Environment')
     CALL SetupOutputVariable('Outdoor Wet Bulb [C]',OutWetBulbTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Humidity Ratio [kgWater/kgAir]',OutHumRat,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Outdoor Humidity Ratio [kgWater/kgDryAir]',OutHumRat,'Zone','Average','Environment')
     CALL SetupOutputVariable('Outdoor Relative Humidity [%]',OutRelHum,'Zone','Average','Environment')
     CALL SetupOutputVariable('Outdoor Barometric Pressure [Pa]',OutBaroPress,'Zone','Average','Environment')
     CALL SetupOutputVariable('Wind Speed [m/s]',WindSpeed,'Zone','Average','Environment')
@@ -807,6 +845,7 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
 
   CALL CloseWeatherFile  ! will only close if opened.
   Envrn=Envrn+1
+  DatesShouldBeReset=.false.
   IF (Envrn > NumOfEnvrn) THEN
     Available=.false.
     Envrn = 0
@@ -849,10 +888,13 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
     ELSEIF ((KindOfSim == ksRunPeriodWeather) .and. (.not. WeatherFileExists .and. .not. DoWeathSim)) THEN
       Available=.false.
       Envrn = 0
+    ELSEIF ((KindOfSim == ksRunPeriodWeather) .and. DoingSizing) THEN
+      Available=.false.
+      Envrn = 0
     ENDIF
-    IF (.not. ErrorsFound .and. Envrn > 0) THEN
+
+    IF (.not. ErrorsFound .and. Available .and. Envrn > 0) THEN
       EnvironmentName = Environment(Envrn)%Title
-      RunPeriodEnvironment=.true.
       CurEnvirNum = Envrn
       RunPeriodStartDayOfWeek=0
       IF ( (DoDesDaySim .and. (KindOfSim /= ksRunPeriodWeather)) .or. ((KindOfSim == ksRunPeriodWeather) .and. DoWeathSim) ) THEN
@@ -865,37 +907,151 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
 
         CASE (ksRunPeriodWeather,ksRunPeriodDesign)
           kindOfRunPeriod = Environment(Envrn)%cKindOfEnvrn
+          IF (KindOfSim == ksRunPeriodWeather) THEN
+            RunPeriodEnvironment=.true.
+          ELSE
+            RunPeriodEnvironment=.false.
+          ENDIF
           ActEndDayOfMonth=EndDayOfMonth
-          ActEndDayOfMonth(2)=ActEndDayOfMonth(2)+WFLeapYearInd
+          CurrentYearIsLeapYear=Environment(Envrn)%IsLeapYear
+          IF (CurrentYearIsLeapYear .and. WFAllowsLeapYears) THEN
+            LeapYearAdd=1
+          ELSE
+            LeapYearAdd=0
+          ENDIF
+          IF (CurrentYearIsLeapYear) THEN
+            ActEndDayOfMonth(2)=EndDayOfMonth(2)+LeapYearAdd
+          ENDIF
           UseDaylightSaving=Environment(Envrn)%UseDST
           UseSpecialDays=Environment(Envrn)%UseHolidays
           UseRainValues=Environment(Envrn)%UseRain
           UseSnowValues=Environment(Envrn)%UseSnow
-          WRITE(StDate,DateFormat) Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay
-          WRITE(EnDate,DateFormat) Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay
-          EnvironmentStartEnd=TRIM(StDate)//' - '//TRIM(EnDate)
+
           OkRun=.false.
           ThisWeekDay=0
           DO Loop=1,NumDataPeriods
-            RunStJDay=JulianDay(DataPeriods(Loop)%StMon,DataPeriods(Loop)%StDay,WFLeapYearInd)
-            RunEnJDay=JulianDay(DataPeriods(Loop)%EnMon,DataPeriods(Loop)%EnDay,WFLeapYearInd)
-            IF (.not. BetweenDates(Environment(Envrn)%StartJDay,RunStJDay,RunEnJDay)) CYCLE
-            IF (.not. BetweenDates(Environment(Envrn)%EndJDay,RunStJDay,RunEnJDay)) CYCLE
-            OkRun=.true.
-            IF (RunStJDay > Environment(Envrn)%StartJDay) THEN
-              NumDays=RunStJDay-Environment(Envrn)%StartJDay
-            ELSE
-              NumDays=Environment(Envrn)%StartJDay-RunStJDay
+            IF (.not. Environment(Envrn)%ActualWeather) THEN
+              RunStJDay=JulianDay(DataPeriods(Loop)%StMon,DataPeriods(Loop)%StDay,LeapYearAdd)
+              RunEnJDay=JulianDay(DataPeriods(Loop)%EnMon,DataPeriods(Loop)%EnDay,LeapYearAdd)
+              IF (.not. BetweenDates(Environment(Envrn)%StartJDay,RunStJDay,RunEnJDay)) CYCLE
+              IF (.not. BetweenDates(Environment(Envrn)%EndJDay,RunStJDay,RunEnJDay)) CYCLE
+              OkRun=.true.
+              IF (RunStJDay > Environment(Envrn)%StartJDay) THEN
+                NumDays=RunStJDay-Environment(Envrn)%StartJDay
+              ELSE
+                NumDays=Environment(Envrn)%StartJDay-RunStJDay
+              ENDIF
+              ThisWeekDay=MOD(DataPeriods(Loop)%WeekDay+NumDays-1,7)+1
+              EXIT
+            ELSE  ! Actual Weather
+              RunStJDay=DataPeriods(Loop)%DataStJDay
+              RunEnJDay=DataPeriods(Loop)%DataEnJDay
+              IF (.not. BetweenDates(Environment(Envrn)%StartDate,RunStJDay,RunEnJDay)) CYCLE
+              IF (.not. BetweenDates(Environment(Envrn)%EndDate,RunStJDay,RunEnJDay)) CYCLE
+              OkRun=.true.
+              IF (RunStJDay > Environment(Envrn)%StartDate) THEN
+                NumDays=RunStJDay-Environment(Envrn)%StartDate
+              ELSE
+                NumDays=Environment(Envrn)%StartDate-RunStJDay
+              ENDIF
+              ThisWeekDay=MOD(DataPeriods(Loop)%WeekDay+NumDays-1,7)+1
+              EXIT
             ENDIF
-            ThisWeekDay=MOD(DataPeriods(Loop)%WeekDay+NumDays-1,7)+1
-            EXIT
           ENDDO
 
+          IF (.not. OkRun) THEN
+            WRITE(StDate,DateFormat) DataPeriods(1)%StMon,DataPeriods(1)%StDay
+            WRITE(EnDate,DateFormat) DataPeriods(1)%EnMon,DataPeriods(1)%EnDay
+            CALL ShowSevereError(RoutineName//'Runperiod (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//  &
+                                    ') requested not within DataPeriod(s) from Weather File')
+            IF (DataPeriods(1)%StYear > 0) THEN
+              string=RoundSigDigits(DataPeriods(1)%StYear)
+              StDate=trim(StDate)//'/'//string
+            ENDIF
+            IF (DataPeriods(1)%EnYear > 0) THEN
+              string=RoundSigDigits(DataPeriods(1)%EnYear)
+              EnDate=trim(EnDate)//'/'//string
+            ENDIF
+            IF (NumDataPeriods == 1) THEN
+              CALL ShowContinueError('Weather Data Period (Start='//TRIM(StDate)//',End='//TRIM(EnDate))
+            ELSE
+              CALL ShowContinueError('Multiple Weather Data Periods 1st (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//')')
+            ENDIF
+            CALL ShowFatalError(RoutineName//'Program terminates due to preceding condition.')
+          ENDIF
+
+          ! Following builds Environment start/end for ASHRAE 55 warnings
+          WRITE(StDate,DateFormat) Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay
+          WRITE(EnDate,DateFormat) Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay
+          IF (Environment(Envrn)%ActualWeather) THEN
+            string=RoundSigDigits(Environment(Envrn)%StartYear)
+            StDate=trim(StDate)//'/'//string
+            string=RoundSigDigits(Environment(Envrn)%EndYear)
+            EnDate=trim(EnDate)//'/'//string
+          ELSEIF (Environment(Envrn)%CurrentYear > 0 .and. Environment(Envrn)%TreatYearsAsConsecutive) THEN
+            string=RoundSigDigits(Environment(Envrn)%CurrentYear)
+            StDate=trim(StDate)//'/'//string
+            string=RoundSigDigits(Environment(Envrn)%CurrentYear+Environment(Envrn)%NumSimYears)
+            EnDate=trim(EnDate)//'/'//string
+          ENDIF
+          EnvironmentStartEnd=TRIM(StDate)//' - '//TRIM(EnDate)
+
+          IF (DoWeatherInitReporting) THEN
+            IF (Environment(Envrn)%UseDST) THEN
+              AlpUseDST='Yes'
+            ELSE
+              AlpUseDST='No'
+            ENDIF
+            IF (Environment(Envrn)%UseHolidays) THEN
+              AlpUseSpec='Yes'
+            ELSE
+              AlpUseSpec='No'
+            ENDIF
+            IF (Environment(Envrn)%ApplyWeekendRule) THEN
+              ApWkRule='Yes'
+            ELSE
+              ApWkRule='No'
+            ENDIF
+            IF (Environment(Envrn)%UseRain) THEN
+              AlpUseRain='Yes'
+            ELSE
+              AlpUseRain='No'
+            ENDIF
+            IF (Environment(Envrn)%UseSnow) THEN
+              AlpUseSnow='Yes'
+            ELSE
+              AlpUseSnow='No'
+            ENDIF
+            cTotalEnvDays=RoundSigDigits(Environment(Envrn)%TotalDays)
+            IF (Environment(Envrn)%DayOfWeek == 0) THEN  ! Uses Weather file start
+              WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),TRIM(kindOfRunPeriod),  &
+                                         TRIM(StDate),TRIM(EnDate),TRIM(ValidDayNames(ThisWeekDay)),  &
+                                         trim(cTotalEnvDays),'UseWeatherFile',          &
+                                         AlpUseDST,AlpUseSpec,ApWkRule,AlpUseRain,AlpUseSnow
+              TWeekDay=ThisWeekDay
+              MonWeekDay=DataPeriods(Loop)%MonWeekDay
+            ELSE
+              WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),TRIM(kindOfRunPeriod),  &
+                                         TRIM(StDate),TRIM(EnDate),TRIM(ValidDayNames(Environment(Envrn)%DayOfWeek)),  &
+                                         trim(cTotalEnvDays),'Use RunPeriod Specified Day',   &
+                                         AlpUseDST,AlpUseSpec,ApWkRule,AlpUseRain,AlpUseSnow
+              TWeekDay=Environment(Envrn)%DayOfWeek
+              MonWeekDay=Environment(Envrn)%MonWeekDay
+            ENDIF
+          ELSE  ! just in case
+            IF (Environment(Envrn)%DayOfWeek == 0) THEN  ! Uses Weather file start
+              TWeekDay=ThisWeekDay
+              MonWeekDay=DataPeriods(Loop)%MonWeekDay
+            ELSE
+              TWeekDay=Environment(Envrn)%DayOfWeek
+              MonWeekDay=Environment(Envrn)%MonWeekDay
+            ENDIF
+          ENDIF
+
           IF (.not. DoingSizing .and. .not. KickOffSimulation) THEN
-            IF ( (KindOfSim == ksRunPeriodWeather .and. DoWeathSim) .or.  &
-                 (KindOfSim == ksRunPeriodWeather .and. DoWeathSim) ) THEN
+            IF ( (KindOfSim == ksRunPeriodWeather .and. DoWeathSim) ) THEN
               IF (AdaptiveComfortRequested_ASH55 .or. AdaptiveComfortRequested_CEN15251) THEN
-                IF (WFLeapYearInd /= 0) THEN
+                IF (WFAllowsLeapYears) THEN
                   CALL ShowSevereError(RoutineName//  &
                      'AdaptiveComfort Reporting does not work correctly with leap years in weather files.')
                   ErrorsFound=.true.
@@ -906,8 +1062,8 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
                   ErrorsFound=.true.
                 ENDIF
                 IF (DataPeriods(1)%StMon == 1 .and. DataPeriods(1)%StDay == 1) THEN
-                  RunStJDay=JulianDay(DataPeriods(1)%StMon,DataPeriods(1)%StDay,WFLeapYearInd)
-                  RunEnJDay=JulianDay(DataPeriods(1)%EnMon,DataPeriods(1)%EnDay,WFLeapYearInd)
+                  RunStJDay=JulianDay(DataPeriods(1)%StMon,DataPeriods(1)%StDay,LeapYearAdd)
+                  RunEnJDay=JulianDay(DataPeriods(1)%EnMon,DataPeriods(1)%EnDay,LeapYearAdd)
                   IF (RunEnJDay-RunStJDay+1 /= 365) THEN
                     CALL ShowSevereError(RoutineName//  &
                        'AdaptiveComfort Reporting does not work correctly with weather files that do not contain 365 days.')
@@ -927,269 +1083,116 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
               ENDIF
             ENDIF
           ENDIF
-          IF (.not. OkRun) THEN
-            CALL ShowSevereError(RoutineName//'Runperiod (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//  &
-                                    ') requested not within DataPeriod(s) from Weather File')
-            WRITE(StDate,DateFormat) DataPeriods(1)%StMon,DataPeriods(1)%StDay
-            WRITE(EnDate,DateFormat) DataPeriods(1)%EnMon,DataPeriods(1)%EnDay
-            IF (NumDataPeriods == 1) THEN
-              CALL ShowContinueError('Weather Data Period (Start='//TRIM(StDate)//',End='//TRIM(EnDate))
-            ELSE
-              CALL ShowContinueError('Multiple Weather Data Periods 1st (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//')')
-            ENDIF
-            CALL ShowFatalError(RoutineName//'Program terminates due to preceding condition.')
-          ENDIF
-
-          IF (Environment(Envrn)%DayOfWeek == 0) THEN  ! Uses Weather file start
-            IF (DoWeatherInitReporting) THEN
-              IF (Environment(Envrn)%UseDST) THEN
-                AlpUseDST='Yes'
-              ELSE
-                AlpUseDST='No'
-              ENDIF
-              IF (Environment(Envrn)%UseHolidays) THEN
-                AlpUseSpec='Yes'
-              ELSE
-                AlpUseSpec='No'
-              ENDIF
-              IF (Environment(Envrn)%ApplyWeekendRule) THEN
-                ApWkRule='Yes'
-              ELSE
-                ApWkRule='No'
-              ENDIF
-              IF (Environment(Envrn)%UseRain) THEN
-                AlpUseRain='Yes'
-              ELSE
-                AlpUseRain='No'
-              ENDIF
-              IF (Environment(Envrn)%UseSnow) THEN
-                AlpUseSnow='Yes'
-              ELSE
-                AlpUseSnow='No'
-              ENDIF
-              WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),TRIM(kindOfRunPeriod),  &
-                                         TRIM(StDate),TRIM(EnDate),TRIM(ValidDayNames(ThisWeekDay)),  &
-                                         Environment(Envrn)%TotalDays,'UseWeatherFile',          &
-                                         AlpUseDST,AlpUseSpec,ApWkRule,AlpUseRain,AlpUseSnow
-            ENDIF
-            TWeekDay=ThisWeekDay
-            MonWeekDay=DataPeriods(Loop)%MonWeekDay
-          ELSE
-            IF (DoWeatherInitReporting) THEN
-              IF (Environment(Envrn)%UseDST) THEN
-                AlpUseDST='Yes'
-              ELSE
-                AlpUseDST='No'
-              ENDIF
-              IF (Environment(Envrn)%UseHolidays) THEN
-                AlpUseSpec='Yes'
-              ELSE
-                AlpUseSpec='No'
-              ENDIF
-              IF (Environment(Envrn)%ApplyWeekendRule) THEN
-                ApWkRule='Yes'
-              ELSE
-                ApWkRule='No'
-              ENDIF
-              IF (Environment(Envrn)%UseRain) THEN
-                AlpUseRain='Yes'
-              ELSE
-                AlpUseRain='No'
-              ENDIF
-              IF (Environment(Envrn)%UseSnow) THEN
-                AlpUseSnow='Yes'
-              ELSE
-                AlpUseSnow='No'
-              ENDIF
-              WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),TRIM(kindOfRunPeriod),  &
-                                         TRIM(StDate),TRIM(EnDate),TRIM(ValidDayNames(Environment(Envrn)%DayOfWeek)),  &
-                                         Environment(Envrn)%TotalDays,'Use RunPeriod Specified Day',   &
-                                         AlpUseDST,AlpUseSpec,ApWkRule,AlpUseRain,AlpUseSnow
-            ENDIF
-            TWeekDay=Environment(Envrn)%DayOfWeek
-            MonWeekDay=Environment(Envrn)%MonWeekDay
-          ENDIF
 
           ! Only need to set Week days for Run Days
           RunPeriodStartDayOfWeek=TWeekDay
           WeekDayTypes=0
-          Loop=Environment(Envrn)%StartJDay
+          JDay5Start=JulianDay(Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,LeapYearAdd)
+          JDay5End=JulianDay(Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,LeapYearAdd)
+          IF (JDay5End >= JDay5Start) THEN
+            curSimDayforEndofRunPeriod=DayOfSim+(JDay5End-JDay5Start)+LeapYearAdd
+          ELSE
+            curSimDayforEndofRunPeriod=DayOfSim+JulianDay(12,31,LeapYearAdd)-JDay5Start+JDay5End
+          ENDIF
+          Loop=JDay5Start
           DO
             WeekDayTypes(Loop)=TWeekDay
             TWeekDay=MOD(TWeekDay,7)+1
             Loop=Loop+1
             IF (Loop > 366) Loop=1
-            IF (Loop == Environment(Envrn)%EndJDay) EXIT
+            IF (Loop == JDay5End) EXIT
           ENDDO
 
-          Source=Blank
           IF (UseDaylightSaving) THEN
             IF (EPWDaylightSaving) THEN
-              Source='WeatherFile'
-              DaylightSaving=.true.
+              DaylightSavingIsActive=.true.
             ENDIF
           ELSE
-            DaylightSaving=.false.
-            Source='RunPeriod Object'
+            DaylightSavingIsActive=.false.
           ENDIF
           IF (IDFDaylightSaving) THEN
-            Source='InputFile'
-            DaylightSaving=.true.
+            DaylightSavingIsActive=.true.
           ENDIF
-          IF (DaylightSaving) THEN
-            IF (DST%StDateType == MonthDay) THEN
-              DSTActStMon=DST%StMon
-              DSTActStDay=DST%StDay
-            ELSEIF (DST%StDateType == NthDayInMonth) THEN
-              ThisDay=DST%StWeekday-MonWeekDay(DST%StMon)+1
-              DO WHILE (ThisDay < 0)
-                ThisDay=ThisDay+7
-              ENDDO
-              ThisDay=ThisDay+7*(DST%StDay-1)
-              IF (ThisDay > ActEndDayOfMonth(DST%StMon)) THEN
-                CALL ShowFatalError(RoutineName//'Determining DST: DST Start Date, Nth Day of Month, not enough Nths')
-              ENDIF
-              DSTActStMon=DST%StMon
-              DSTActStDay=ThisDay
-            ELSE ! LastWeekDayInMonth
-              ThisDay=DST%StWeekday-MonWeekDay(DST%StMon)+1
-              DO WHILE (ThisDay+7 <= ActEndDayOfMonth(DST%StMon))
-                ThisDay=ThisDay+7
-              ENDDO
-              DSTActStMon=DST%StMon
-              DSTActStDay=ThisDay
-            ENDIF
-            IF (DST%EnDateType == MonthDay) THEN
-              DSTActEnMon=DST%EnMon
-              DSTActEnDay=DST%EnDay
-            ELSEIF (DST%EnDateType == NthDayInMonth) THEN
-              ThisDay=DST%EnWeekday-MonWeekDay(DST%EnMon)+1
-              DO WHILE (ThisDay < 0)
-                ThisDay=ThisDay+7
-              ENDDO
-              ThisDay=ThisDay+7*(DST%EnDay-1)
-              IF (ThisDay > ActEndDayOfMonth(DST%EnMon)) THEN
-                CALL ShowFatalError(RoutineName//'Determining DST: DST End Date, Nth Day of Month, not enough Nths')
-              ENDIF
-              DSTActEnMon=DST%EnMon
-              DSTActEnDay=ThisDay
-            ELSE ! LastWeekDayInMonth
-              ThisDay=DST%EnWeekday-MonWeekDay(DST%EnMon)+1
-              DO WHILE (ThisDay+7 <= ActEndDayOfMonth(DST%EnMon))
-                ThisDay=ThisDay+7
-              ENDDO
-              DSTActEnMon=DST%EnMon
-              DSTActEnDay=ThisDay
-            ENDIF
+          Environment(Envrn)%SetWeekDays=.false.
+          IF (Environment(Envrn)%ActualWeather) THEN
+            curSimDayforEndofRunPeriod=Environment(Envrn)%TotalDays
+          ENDIF
+          IF (DaylightSavingIsActive) THEN
+            CALL SetDSTDateRanges(MonWeekDay,DSTIndex,DSTActStMon,DSTActStDay,DSTActEnMon,DSTActEnDay)
           ENDIF
 
-        ! Create special days and daylight saving calendars as appropriate
-          SpecialDayTypes=0
-          DO Loop=1,NumSpecialDays
-            IF (SpecialDays(Loop)%WthrFile .and. .not. UseSpecialDays) CYCLE
-            IF (SpecialDays(Loop)%DateType <= MonthDay) THEN
-              JDay=JulianDay(SpecialDays(Loop)%Month,SpecialDays(Loop)%Day,WFLeapYearInd)
-              IF (SpecialDays(Loop)%Duration == 1 .and. Environment(Envrn)%ApplyWeekendRule) THEN
-                IF (WeekDayTypes(JDay) == 1) THEN
-                  ! Sunday, must go to Monday
-                  JDay=JDay+1
-                  IF (JDay == 366 .and. WFLeapYearInd == 0) JDay=1
-                ELSEIF (WeekDayTypes(JDay) == 7) THEN
-                  JDay=JDay+1
-                  IF (JDay == 366 .and. WFLeapYearInd == 0) JDay=1
-                  JDay=JDay+1
-                  IF (JDay == 366 .and. WFLeapYearInd == 0) JDay=1
-                ENDIF
-              ENDIF
-              CALL InvJulianDay(JDay,SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay,WFLeapYearInd)
-            ELSEIF (SpecialDays(Loop)%DateType == NthDayInMonth) THEN
-              IF (SpecialDays(Loop)%WeekDay >= MonWeekDay(SpecialDays(Loop)%Month)) THEN
-                ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1
-              ELSE
-                ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1+7
-              ENDIF
-              ThisDay=ThisDay+7*(SpecialDays(Loop)%Day-1)
-              IF (ThisDay > ActEndDayOfMonth(SpecialDays(Loop)%Month)) THEN
-                CALL ShowFatalError(RoutineName//'Special Day Date, Nth Day of Month, not enough Nths, for SpecialDay='//  &
-                                     TRIM(SpecialDays(Loop)%Name))
-              ENDIF
-              SpecialDays(Loop)%ActStMon=SpecialDays(Loop)%Month
-              SpecialDays(Loop)%ActStDay=ThisDay
-              JDay=JulianDay(SpecialDays(Loop)%Month,ThisDay,WFLeapYearInd)
-            ELSE ! LastWeekDayInMonth
-              ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1
-              DO WHILE (ThisDay+7 <= ActEndDayOfMonth(SpecialDays(Loop)%Month))
-                ThisDay=ThisDay+7
-              ENDDO
-              SpecialDays(Loop)%ActStMon=SpecialDays(Loop)%Month
-              SpecialDays(Loop)%ActStDay=ThisDay
-              JDay=JulianDay(SpecialDays(Loop)%Month,ThisDay,WFLeapYearInd)
-            ENDIF
-            IF (SpecialDayTypes(JDay) /= 0)   &
-               CALL ShowWarningError(RoutineName//'Special Day definition ('//TRIM(SpecialDays(Loop)%Name)//  &
-                                          ') is overwriting previously entered special day period')
-            JDay1=JDay-1
-            DO Loop1=0,SpecialDays(Loop)%Duration-1
-              JDay1=JDay1+1
-              IF (JDay1 == 366 .and. WFLeapYearInd == 0) JDay1=1
-              IF (JDay1 == 367) JDay1=1
-              SpecialDayTypes(JDay1)=SpecialDays(Loop)%DayType
+          CALL SetSpecialDayDates(MonWeekDay)
 
-            ENDDO
-          ENDDO
+          IF (Environment(Envrn)%StartMonth /= 1 .or. Environment(Envrn)%StartDay /= 1) THEN
+            StartDatesCycleShouldBeReset=.true.
+            Jan1DatesShouldBeReset=.true.
+          ENDIF
 
-          DSTIndex=0
-          IF (DaylightSaving) THEN
-            JDay=JulianDay(DSTActStMon,DSTActStDay,WFLeapYearInd)
-            JDay1=JulianDay(DSTActEnMon,DSTActEnDay,WFLeapYearInd)
-            IF (JDay1 >= JDay) THEN
-              DSTIndex(JDay:JDay1)=1
-            ELSE
-              DSTIndex(JDay:366)=1
-              DSTIndex(1:JDay1)=1
-            ENDIF
+          IF (Environment(Envrn)%StartMonth == 1 .and. Environment(Envrn)%StartDay == 1) THEN
+            StartDatesCycleShouldBeReset=.false.
+            Jan1DatesShouldBeReset=.true.
+          ENDIF
+
+          IF (Environment(Envrn)%ActualWeather) THEN
+            StartDatesCycleShouldBeReset=.false.
+            Jan1DatesShouldBeReset=.true.
           ENDIF
 
           ! Report Actual Dates for Daylight Saving and Special Days
           IF (.not. KickoffSimulation) THEN
-            IF (DaylightSaving .AND. DoWeatherInitReporting) THEN
+            Source=Blank
+            IF (UseDaylightSaving) THEN
+              IF (EPWDaylightSaving) THEN
+                Source='WeatherFile'
+              ENDIF
+            ELSE
+              Source='RunPeriod Object'
+            ENDIF
+            IF (IDFDaylightSaving) THEN
+              Source='InputFile'
+            ENDIF
+            IF (DaylightSavingIsActive .AND. DoWeatherInitReporting) THEN
               WRITE(StDate,DateFormat) DSTActStMon,DSTActStDay
               WRITE(EnDate,DateFormat) DSTActEnMon,DSTActEnDay
               WRITE(OutputFileInits,EnvDSTYFormat) TRIM(Source),TRIM(StDate),TRIM(EnDate)
             ELSE IF (DoOutputReporting) THEN
               WRITE(OutputFileInits,EnvDSTNFormat) TRIM(Source)
             ENDIF
+            DO Loop=1,NumSpecialDays
+              IF (SpecialDays(Loop)%WthrFile .and. UseSpecialDays .and. DoWeatherInitReporting) THEN
+                WRITE(StDate,DateFormat) SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay
+                WRITE(OutputFileInits,EnvSpDyFormat) TRIM(SpecialDays(Loop)%Name),    &
+                                                     TRIM(SpecialDayNames(SpecialDays(Loop)%DayType)),  &
+                                                     'WeatherFile',TRIM(StDate),SpecialDays(Loop)%Duration
+              ENDIF
+              IF (.not. SpecialDays(Loop)%WthrFile .and. DoWeatherInitReporting) THEN
+                WRITE(StDate,DateFormat) SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay
+                WRITE(OutputFileInits,EnvSpDyFormat) TRIM(SpecialDays(Loop)%Name),    &
+                                                     TRIM(SpecialDayNames(SpecialDays(Loop)%DayType)),  &
+                                                     'InputFile',TRIM(StDate),SpecialDays(Loop)%Duration
+              ENDIF
+            ENDDO
           ENDIF
-          DO Loop=1,NumSpecialDays
-            IF (SpecialDays(Loop)%WthrFile .and. UseSpecialDays .and. DoWeatherInitReporting) THEN
-              WRITE(StDate,DateFormat) SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay
-              WRITE(OutputFileInits,EnvSpDyFormat) TRIM(SpecialDays(Loop)%Name),    &
-                                                   TRIM(SpecialDayNames(SpecialDays(Loop)%DayType)),  &
-                                                   'WeatherFile',TRIM(StDate),SpecialDays(Loop)%Duration
-            ENDIF
-            IF (.not. SpecialDays(Loop)%WthrFile .and. DoWeatherInitReporting) THEN
-              WRITE(StDate,DateFormat) SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay
-              WRITE(OutputFileInits,EnvSpDyFormat) TRIM(SpecialDays(Loop)%Name),    &
-                                                   TRIM(SpecialDayNames(SpecialDays(Loop)%DayType)),  &
-                                                   'InputFile',TRIM(StDate),SpecialDays(Loop)%Duration
-            ENDIF
-          ENDDO
+
         CASE (ksDesignDay) ! Design Day
+          RunPeriodEnvironment=.false.
           WRITE(StDate,DateFormat) DesDayInput(Envrn)%Month,DesDayInput(Envrn)%DayOfMonth
           EnDate=StDate
           IF (DesDayInput(Envrn)%DayType <= 7 .and. DoWeatherInitReporting) THEN
             WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),'SizingPeriod:DesignDay',TRIM(StDate),  &
-               TRIM(EnDate),TRIM(DaysOfWeek(DesDayInput(Envrn)%DayType)),1,'N/A','N/A','N/A','N/A','N/A','N/A'
+               TRIM(EnDate),TRIM(DaysOfWeek(DesDayInput(Envrn)%DayType)),'1','N/A','N/A','N/A','N/A','N/A','N/A'
           ELSE IF (DoWeatherInitReporting) THEN
             WRITE(OutputFileInits,EnvNameFormat) TRIM(Environment(Envrn)%Title),'SizingPeriod:DesignDay',TRIM(StDate),  &
-               TRIM(EnDate),TRIM(SpecialDayNames(DesDayInput(Envrn)%DayType - 7)),1,'N/A','N/A','N/A','N/A','N/A','N/A'
+               TRIM(EnDate),TRIM(SpecialDayNames(DesDayInput(Envrn)%DayType - 7)),'1','N/A','N/A','N/A','N/A','N/A','N/A'
           ENDIF
           IF (DesDayInput(Envrn)%DSTIndicator == 0 .and. DoWeatherInitReporting) THEN
             WRITE(OutputFileInits,EnvDSTNFormat) 'SizingPeriod:DesignDay'
           ELSE IF (DoWeatherInitReporting) THEN
             WRITE(OutputFileInits,EnvDSTYFormat) 'SizingPeriod:DesignDay',TRIM(StDate),TRIM(EnDate)
           ENDIF
+
         END SELECT
+
       ENDIF
     ENDIF  ! ErrorsFound
   ENDIF
@@ -1204,6 +1207,615 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
   RETURN
 
 END SUBROUTINE GetNextEnvironment
+
+SUBROUTINE SetupWeekDaysByMonth(StMon,StDay,StWeekDay,WeekDays)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   August 2000
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine calculates the weekday for each month based on the start date and
+          ! weekday specified for that date.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: StMon
+  INTEGER, INTENT(IN) :: StDay
+  INTEGER, INTENT(IN) :: StWeekDay
+  INTEGER, INTENT(INOUT), DIMENSION(12) :: Weekdays
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER Loop
+  INTEGER CurWeekDay
+
+  ! Set 1st day of Start Month
+  CurWeekDay=StWeekDay
+  DO Loop=1,StDay-1
+    CurWeekDay=CurWeekDay-1
+    IF (CurWeekDay == 0) CurWeekDay=7
+  ENDDO
+
+  WeekDays(StMon)=CurWeekDay
+  DO Loop=StMon+1,12
+
+    SELECT CASE(Loop)
+    CASE(2)
+      CurWeekDay=CurWeekDay+EndDayOfMonth(1)
+      DO WHILE (CurWeekDay > 7)
+        CurWeekDay=CurWeekDay-7
+      ENDDO
+      WeekDays(Loop)=CurWeekDay
+
+    CASE(3)
+      CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)+LeapYearAdd
+      DO WHILE (CurWeekDay > 7)
+        CurWeekDay=CurWeekDay-7
+      ENDDO
+      WeekDays(Loop)=CurWeekDay
+
+    CASE(4:12)
+      CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)
+      DO WHILE (CurWeekDay > 7)
+        CurWeekDay=CurWeekDay-7
+      ENDDO
+      WeekDays(Loop)=CurWeekDay
+
+    END SELECT
+  ENDDO
+
+  IF (ANY(WeekDays == 0)) THEN
+    ! need to start at StMon and go backwards.
+    ! EndDayOfMonth is also "days" in month.  (without leapyear day in February)
+    CurWeekDay=StWeekDay
+    DO Loop=1,StDay-1
+      CurWeekDay=CurWeekDay-1
+      IF (CurWeekDay == 0) CurWeekDay=7
+    ENDDO
+
+    DO Loop=StMon-1,1,-1
+
+      SELECT CASE(Loop)
+
+      CASE(1)
+        CurWeekDay=CurWeekDay-EndDayOfMonth(1)
+        DO WHILE (CurWeekDay <= 0)
+          CurWeekDay=CurWeekDay+7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+
+      CASE(2)
+        CurWeekDay=CurWeekDay-EndDayOfMonth(2)+LeapYearAdd
+        DO WHILE (CurWeekDay <= 0)
+          CurWeekDay=CurWeekDay+7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+
+      CASE(3:12)
+        CurWeekDay=CurWeekDay-EndDayOfMonth(Loop)
+        DO WHILE (CurWeekDay <= 0)
+          CurWeekDay=CurWeekDay+7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+      END SELECT
+
+    ENDDO
+
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SetupWeekDaysByMonth
+
+SUBROUTINE ResetWeekDaysByMonth(WeekDays,LeapYearAdd,StartMonth,StartMonthDay,EndMonth,EndMonthDay,Rollover,MidSimReset)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine resets the weekday for each month based on the current weekday
+          ! and previous weekdays per month.
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(INOUT), DIMENSION(12) :: Weekdays
+  INTEGER, INTENT(IN) :: LeapYearAdd
+  INTEGER, INTENT(IN) :: StartMonth
+  INTEGER, INTENT(IN) :: StartMonthDay
+  INTEGER, INTENT(IN) :: EndMonth
+  INTEGER, INTENT(IN) :: EndMonthDay
+  LOGICAL, INTENT(IN) :: Rollover
+  LOGICAL, INTENT(IN),OPTIONAL :: MidSimReset
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER, DIMENSION(12) :: WeekdaysCopy
+  INTEGER Loop
+  INTEGER CurWeekDay
+  LOGICAL ResetMidSimulation
+
+  ResetMidSimulation=.false.
+  IF (PRESENT(MidSimReset)) ResetMidSimulation=MidSimReset
+
+
+  WeekdaysCopy=WeekDays
+  IF (.not. ResetMidSimulation) THEN
+    IF (Rollover) THEN
+      IF (StartMonth == 1) THEN
+        CurWeekDay=Weekdays(12)+EndDayOfMonth(12)+StartMonthDay-1
+      ELSE
+        CurWeekDay=WeekDays(EndMonth)+EndMonthDay
+      ENDIF
+    ELSE  ! restart at same as before
+      CurWeekDay=Weekdays(StartMonth)
+    ENDIF
+    DO WHILE (CurWeekDay > 7)
+      CurWeekDay=CurWeekDay-7
+    ENDDO
+
+    Weekdays=0
+    Weekdays(StartMonth)=CurWeekDay
+    DO Loop=StartMonth+1,12
+      SELECT CASE(Loop)
+      CASE(2)
+        CurWeekDay=CurWeekDay+EndDayOfMonth(1)
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+
+      CASE(3)
+        CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)+LeapYearAdd
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+
+      CASE(4:12)
+        CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+      END SELECT
+    ENDDO
+
+    IF (ANY(WeekDays == 0)) THEN
+      ! need to start at StMon and go backwards.
+      ! EndDayOfMonth is also "days" in month.  (without leapyear day in February)
+      CurWeekDay=WeekDays(StartMonth)
+      DO Loop=1,StartMonthDay-1
+        CurWeekDay=CurWeekDay-1
+        IF (CurWeekDay == 0) CurWeekDay=7
+      ENDDO
+
+      DO Loop=StartMonth-1,1,-1
+
+        SELECT CASE(Loop)
+
+        CASE(1)
+          CurWeekDay=CurWeekDay-EndDayOfMonth(1)
+          DO WHILE (CurWeekDay <= 0)
+            CurWeekDay=CurWeekDay+7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+
+        CASE(2)
+          CurWeekDay=CurWeekDay-EndDayOfMonth(2)+LeapYearAdd
+          DO WHILE (CurWeekDay <= 0)
+            CurWeekDay=CurWeekDay+7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+
+        CASE(3:12)
+          CurWeekDay=CurWeekDay-EndDayOfMonth(Loop)
+          DO WHILE (CurWeekDay <= 0)
+            CurWeekDay=CurWeekDay+7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+        END SELECT
+
+      ENDDO
+
+    ENDIF
+
+  ELSE
+    IF (Rollover) THEN
+      IF (StartMonth == 1) THEN
+        CurWeekDay=Weekdays(12)+EndDayOfMonth(12)+StartMonthDay-1
+      ELSE
+        CurWeekDay=WeekDays(EndMonth)+EndMonthDay
+      ENDIF
+    ELSE  ! restart at same as before
+      CurWeekDay=Weekdays(StartMonth)
+    ENDIF
+    DO WHILE (CurWeekDay > 7)
+      CurWeekDay=CurWeekDay-7
+    ENDDO
+    WeekDays=0
+    IF (StartMonth /= 1) THEN
+      CurWeekDay=WeekDaysCopy(12)+EndDayOfMonth(12)
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(1)=CurWeekDay
+      CurWeekDay=CurWeekDay+EndDayOfMonth(1)
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(2)=CurWeekDay
+        CurWeekDay=CurWeekDay+EndDayOfMonth(2)+LeapYearAdd
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(3)=CurWeekDay
+      DO Loop=4,12
+        CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)
+        DO WHILE (CurWeekDay > 7)
+          CurWeekDay=CurWeekDay-7
+        ENDDO
+        WeekDays(Loop)=CurWeekDay
+      ENDDO
+    ELSE
+      Weekdays=0
+      Weekdays(StartMonth)=CurWeekDay
+      DO Loop=StartMonth+1,12
+        SELECT CASE(Loop)
+        CASE(2)
+          CurWeekDay=CurWeekDay+EndDayOfMonth(1)
+          DO WHILE (CurWeekDay > 7)
+            CurWeekDay=CurWeekDay-7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+
+        CASE(3)
+          CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)+LeapYearAdd
+          DO WHILE (CurWeekDay > 7)
+            CurWeekDay=CurWeekDay-7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+
+        CASE(4:12)
+          CurWeekDay=CurWeekDay+EndDayOfMonth(Loop-1)
+          DO WHILE (CurWeekDay > 7)
+            CurWeekDay=CurWeekDay-7
+          ENDDO
+          WeekDays(Loop)=CurWeekDay
+        END SELECT
+      ENDDO
+
+      IF (ANY(WeekDays == 0)) THEN
+        ! need to start at StMon and go backwards.
+        ! EndDayOfMonth is also "days" in month.  (without leapyear day in February)
+        CurWeekDay=WeekDays(StartMonth)
+        DO Loop=1,StartMonthDay-1
+          CurWeekDay=CurWeekDay-1
+          IF (CurWeekDay == 0) CurWeekDay=7
+        ENDDO
+
+        DO Loop=StartMonth-1,1,-1
+
+          SELECT CASE(Loop)
+
+          CASE(1)
+            CurWeekDay=CurWeekDay-EndDayOfMonth(1)
+            DO WHILE (CurWeekDay <= 0)
+              CurWeekDay=CurWeekDay+7
+            ENDDO
+            WeekDays(Loop)=CurWeekDay
+
+          CASE(2)
+            CurWeekDay=CurWeekDay-EndDayOfMonth(2)+LeapYearAdd
+            DO WHILE (CurWeekDay <= 0)
+              CurWeekDay=CurWeekDay+7
+            ENDDO
+            WeekDays(Loop)=CurWeekDay
+
+          CASE(3:12)
+            CurWeekDay=CurWeekDay-EndDayOfMonth(Loop)
+            DO WHILE (CurWeekDay <= 0)
+              CurWeekDay=CurWeekDay+7
+            ENDDO
+            WeekDays(Loop)=CurWeekDay
+          END SELECT
+
+        ENDDO
+
+      ENDIF
+    ENDIF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE ResetWeekDaysByMonth
+
+SUBROUTINE SetDSTDateRanges(MonWeekDay,DSTIndex,DSTActStMon,DSTActStDay,DSTActEnMon,DSTActEnDay)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! With multiple year weather files (or repeating weather files that rollover day),
+          ! need to set DST (Daylight Saving Time) dates at start of environment or year.
+          ! DST is only projected for one year.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: JulianDay
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(INOUT),DIMENSION(:) :: MonWeekDay  ! Weekday of each day 1 of month
+  INTEGER, INTENT(INOUT),DIMENSION(:) :: DSTIndex    ! DST Index for each julian day (1:366)
+  INTEGER, OPTIONAL :: DSTActStMon
+  INTEGER, OPTIONAL :: DSTActStDay
+  INTEGER, OPTIONAL :: DSTActEnMon
+  INTEGER, OPTIONAL :: DSTActEnDay
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='SetDSTDateRanges: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ActStartMonth  ! Actual Start Month
+  INTEGER :: ActStartDay    ! Actual Start Day of Month
+  INTEGER :: ActEndMonth    ! Actual End Month
+  INTEGER :: ActEndDay      ! Actual End Day of Month
+  INTEGER :: ThisDay        ! Day of Month
+  INTEGER :: JDay
+  INTEGER :: JDay1
+  LOGICAL :: ErrorsFound
+  INTEGER, DIMENSION(12) :: ActEndDayOfMonth
+
+  ErrorsFound=.false.
+  ActEndDayOfMonth=EndDayOfMonth
+  ActEndDayOfMonth(2)=EndDayOfMonth(2)+LeapYearAdd
+  IF (DST%StDateType == MonthDay) THEN
+    ActStartMonth =DST%StMon
+    ActStartDay   =DST%StDay
+  ELSEIF (DST%StDateType == NthDayInMonth) THEN
+    ThisDay=DST%StWeekday-MonWeekDay(DST%StMon)+1
+    DO WHILE (ThisDay <= 0)
+      ThisDay=ThisDay+7
+    ENDDO
+    ThisDay=ThisDay+7*(DST%StDay-1)
+    IF (ThisDay > ActEndDayOfMonth(DST%StMon)) THEN
+      CALL ShowSevereError(RoutineName//'Determining DST: DST Start Date, Nth Day of Month, not enough Nths')
+      ErrorsFound=.true.
+    ELSE
+      ActStartMonth =DST%StMon
+      ActStartDay   =ThisDay
+    ENDIF
+  ELSE ! LastWeekDayInMonth
+    ThisDay=DST%StWeekday-MonWeekDay(DST%StMon)+1
+    DO WHILE (ThisDay+7 <= ActEndDayOfMonth(DST%StMon))
+      ThisDay=ThisDay+7
+    ENDDO
+    ActStartMonth =DST%StMon
+    ActStartDay   =ThisDay
+  ENDIF
+
+  IF (DST%EnDateType == MonthDay) THEN
+    ActEndMonth =DST%EnMon
+    ActEndDay   =DST%EnDay
+  ELSEIF (DST%EnDateType == NthDayInMonth) THEN
+    ThisDay=DST%EnWeekday-MonWeekDay(DST%EnMon)+1
+    DO WHILE (ThisDay <= 0)
+      ThisDay=ThisDay+7
+    ENDDO
+    ThisDay=ThisDay+7*(DST%EnDay-1)
+    IF (ThisDay > ActEndDayOfMonth(DST%EnMon)) THEN
+      CALL ShowSevereError(RoutineName//'Determining DST: DST End Date, Nth Day of Month, not enough Nths')
+      ErrorsFound=.true.
+    ELSE
+      ActEndMonth =DST%EnMon
+      ActEndDay   =ThisDay
+    ENDIF
+  ELSE ! LastWeekDayInMonth
+    ThisDay=DST%EnWeekday-MonWeekDay(DST%EnMon)+1
+    DO WHILE (ThisDay+7 <= ActEndDayOfMonth(DST%EnMon))
+      ThisDay=ThisDay+7
+    ENDDO
+    ActEndMonth =DST%EnMon
+    ActEndDay   =ThisDay
+  ENDIF
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Program terminates due to preceding condition(s).')
+  ENDIF
+
+  IF (PRESENT(DSTActStMon)) THEN
+    DSTActStMon=ActStartMonth
+    DSTActStDay=ActStartDay
+    DSTActEnMon=ActEndMonth
+    DSTActEnDay=ActEndDay
+  ENDIF
+
+  DSTIndex=0
+  JDay =JulianDay(ActStartMonth,ActStartDay,LeapYearAdd)
+  JDay1=JulianDay(ActEndMonth,ActEndDay,LeapYearAdd)
+  IF (JDay1 >= JDay) THEN
+    DSTIndex(JDay:JDay1)=1
+  ELSE
+    DSTIndex(JDay:366)=1
+    DSTIndex(1:JDay1)=1
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SetDSTDateRanges
+
+SUBROUTINE SetSpecialDayDates(MonWeekDay)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! With multiple year weather files (or repeating weather files that rollover day),
+          ! need to set Special Day dates at start of environment or year.
+          ! Special Days are only projected for one year.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: InvJulianDay,JulianDay
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(INOUT),DIMENSION(:) :: MonWeekDay  ! Weekday of each day 1 of month
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='SetSpecialDayDates: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Loop
+  INTEGER :: ThisDay
+  INTEGER :: JDay
+  INTEGER :: JDay1
+  INTEGER :: Loop1
+  LOGICAL :: ErrorsFound
+  INTEGER, DIMENSION(12) :: ActEndDayOfMonth
+
+  ErrorsFound=.false.
+  ActEndDayOfMonth=EndDayOfMonth
+  ActEndDayOfMonth(2)=EndDayOfMonth(2)+LeapYearAdd
+  SpecialDayTypes=0
+  DO Loop=1,NumSpecialDays
+    IF (SpecialDays(Loop)%WthrFile .and. .not. UseSpecialDays) CYCLE
+    IF (SpecialDays(Loop)%DateType <= MonthDay) THEN
+      JDay=JulianDay(SpecialDays(Loop)%Month,SpecialDays(Loop)%Day,LeapYearAdd)
+      IF (SpecialDays(Loop)%Duration == 1 .and. Environment(Envrn)%ApplyWeekendRule) THEN
+        IF (WeekDayTypes(JDay) == 1) THEN
+          ! Sunday, must go to Monday
+          JDay=JDay+1
+          IF (JDay == 366 .and. LeapYearAdd == 0) JDay=1
+        ELSEIF (WeekDayTypes(JDay) == 7) THEN
+          JDay=JDay+1
+          IF (JDay == 366 .and. LeapYearAdd == 0) JDay=1
+          JDay=JDay+1
+          IF (JDay == 366 .and. LeapYearAdd == 0) JDay=1
+        ENDIF
+      ENDIF
+      CALL InvJulianDay(JDay,SpecialDays(Loop)%ActStMon,SpecialDays(Loop)%ActStDay,LeapYearAdd)
+    ELSEIF (SpecialDays(Loop)%DateType == NthDayInMonth) THEN
+      IF (SpecialDays(Loop)%WeekDay >= MonWeekDay(SpecialDays(Loop)%Month)) THEN
+        ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1
+      ELSE
+        ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1+7
+      ENDIF
+      ThisDay=ThisDay+7*(SpecialDays(Loop)%Day-1)
+      IF (ThisDay > ActEndDayOfMonth(SpecialDays(Loop)%Month)) THEN
+        CALL ShowSevereError(RoutineName//'Special Day Date, Nth Day of Month, not enough Nths, for SpecialDay='//  &
+                             TRIM(SpecialDays(Loop)%Name))
+        ErrorsFound=.true.
+        CYCLE
+      ENDIF
+      SpecialDays(Loop)%ActStMon=SpecialDays(Loop)%Month
+      SpecialDays(Loop)%ActStDay=ThisDay
+      JDay=JulianDay(SpecialDays(Loop)%Month,ThisDay,LeapYearAdd)
+    ELSE ! LastWeekDayInMonth
+      ThisDay=SpecialDays(Loop)%Weekday-MonWeekDay(SpecialDays(Loop)%Month)+1
+      DO WHILE (ThisDay+7 <= ActEndDayOfMonth(SpecialDays(Loop)%Month))
+        ThisDay=ThisDay+7
+      ENDDO
+      SpecialDays(Loop)%ActStMon=SpecialDays(Loop)%Month
+      SpecialDays(Loop)%ActStDay=ThisDay
+      JDay=JulianDay(SpecialDays(Loop)%Month,ThisDay,LeapYearAdd)
+    ENDIF
+    IF (SpecialDayTypes(JDay) /= 0) THEN
+       CALL ShowWarningError(RoutineName//'Special Day definition ('//TRIM(SpecialDays(Loop)%Name)//  &
+                                  ') is overwriting previously entered special day period')
+       IF (UseSpecialDays) THEN
+         CALL ShowContinueError('...This could be caused by definitions on the Weather File.')
+       ENDIF
+       CALL ShowContinueError('...This could be caused by duplicate definitions in the Input File.')
+    ENDIF
+    JDay1=JDay-1
+    DO Loop1=0,SpecialDays(Loop)%Duration-1
+      JDay1=JDay1+1
+      IF (JDay1 == 366 .and. LeapYearAdd == 0) JDay1=1
+      IF (JDay1 == 367) JDay1=1
+      SpecialDayTypes(JDay1)=SpecialDays(Loop)%DayType
+    ENDDO
+  ENDDO
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Program terminates due to preceding condition(s).')
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SetSpecialDayDates
 
 SUBROUTINE InitializeWeather(PrintEnvrnStamp)
 
@@ -1247,6 +1859,10 @@ SUBROUTINE InitializeWeather(PrintEnvrnStamp)
   INTEGER FirstSimDayofYear          ! Variable which tells when to skip the day in a multi year simulation.
 
   LOGICAL,SAVE :: FirstCall=.true.  ! Some things should only be done once
+!  LOGICAL, SAVE :: SetYear=.true.
+  INTEGER :: JDay5Start
+  INTEGER :: JDay5End
+  INTEGER :: TWeekDay
 
           ! FLOW:
 
@@ -1347,25 +1963,25 @@ SUBROUTINE InitializeWeather(PrintEnvrnStamp)
 
     IF ( (.NOT.WarmupFlag) .AND. (Environment(Envrn)%KindOfEnvrn /= ksDesignDay) ) THEN
       IF (DayOfSim < NumOfDayInEnvrn) THEN
-        IF(Environment(Envrn)%EndJDay > Environment(Envrn)%StartJDay) THEN
-         IF(DayOfSim == (ABS(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay)+1)*YearofSim) THEN
-           YearofSim = YearofSim + 1
-           FirstSimDayofYear = 1
-           CALL ReadWeatherForDay(FirstSimDayofYear,Envrn,.false.)  ! Read tomorrow's weather
-         ELSE
-           CALL ReadWeatherForDay(DayOfSim+1,Envrn,.false.)  ! Read tomorrow's weather
-         ENDIF
-        ELSEIF(Environment(Envrn)%EndJDay <= Environment(Envrn)%StartJDay) THEN
-          IF(DayOfSim ==(JulianDay(12,31,WFLeapYearInd)-Environment(Envrn)%StartJDay+1+Environment(Envrn)%EndJDay)*YearofSim) THEN
-           YearofSim = YearofSim + 1
-           FirstSimDayofYear = 1
-           CALL ReadWeatherForDay(FirstSimDayofYear,Envrn,.false.)  ! Read tomorrow's weather
-          ELSE
-           CALL ReadWeatherForDay(DayOfSim+1,Envrn,.false.)  ! Read tomorrow's weather
-          END IF
-        END IF
-       END IF
-     END IF
+        IF (DayOfSim == curSimDayforEndofRunPeriod) THEN
+          curSimDayforEndofRunPeriod=curSimDayforEndofRunPeriod+Environment(Envrn)%RawSimDays
+          IF (StartDatesCycleShouldBeReset) THEN
+            CALL ResetWeekDaysByMonth(Environment(Envrn)%MonWeekDay,LeapYearAdd,  &
+                 Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,  &
+                 Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,Environment(Envrn)%RollDayTypeOnRepeat)
+            IF (DaylightSavingIsActive) THEN
+              CALL SetDSTDateRanges(Environment(Envrn)%MonWeekDay,DSTIndex)
+            ENDIF
+            CALL SetSpecialDayDates(Environment(Envrn)%MonWeekDay)
+          ENDIF
+          YearofSim = YearofSim + 1
+          FirstSimDayofYear = 1
+          CALL ReadWeatherForDay(FirstSimDayofYear,Envrn,.false.)  ! Read tomorrow's weather
+        ELSE
+          CALL ReadWeatherForDay(DayOfSim+1,Envrn,.false.)  ! Read tomorrow's weather
+        ENDIF
+      END IF
+    END IF
 
 
     IF (DayOfMonth == EndDayOfMonth(Month)) THEN
@@ -1379,7 +1995,98 @@ SUBROUTINE InitializeWeather(PrintEnvrnStamp)
     HolidayIndexTomorrow=TomorrowVariables%HolidayIndex
     YearTomorrow=TomorrowVariables%Year
 
+    IF (Environment(Envrn)%KindOfEnvrn == ksRunPeriodWeather) THEN
+      IF (Month == 1 .and. DayOfMonth == 1 .and. Environment(Envrn)%ActualWeather) THEN
+        IF (DatesShouldBeReset) THEN
+          IF (Environment(Envrn)%TreatYearsAsConsecutive) THEN
+            Environment(Envrn)%CurrentYear=Environment(Envrn)%CurrentYear + 1
+            Environment(Envrn)%IsLeapYear=IsLeapYear(Environment(Envrn)%CurrentYear)
+            CurrentYearIsLeapYear=Environment(Envrn)%IsLeapYear
+            IF (CurrentYearIsLeapYear) THEN
+              IF (WFAllowsLeapYears) THEN
+                LeapYearAdd=1
+              ELSE
+                LeapYearAdd=0
+              ENDIF
+            ELSE
+              LeapYearAdd=0
+            ENDIF
+! need to reset MonWeekDay and WeekDayTypes
+            IF (.not. CurrentYearIsLeapYear) THEN
+              JDay5Start=JulianDay(Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,0)
+              JDay5End=JulianDay(Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,0)
+            ELSE
+              JDay5Start=JulianDay(Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,LeapYearAdd)
+              JDay5End=JulianDay(Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,LeapYearAdd)
+            ENDIF
+            IF (.not. Environment(Envrn)%ActualWeather) &
+               curSimDayforEndofRunPeriod=DayOfSim+Environment(Envrn)%RawSimDays+LeapYearAdd-1
+
+            Loop=JDay5Start
+            TWeekDay=DayOfWeek
+            DO
+              WeekDayTypes(Loop)=TWeekDay
+              TWeekDay=MOD(TWeekDay,7)+1
+              Loop=Loop+1
+              IF (Loop > 366) Loop=1
+              IF (Loop == JDay5End) EXIT
+            ENDDO
+            CALL ResetWeekDaysByMonth(Environment(Envrn)%MonWeekDay,LeapYearAdd,  &
+                 Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,  &
+                 Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,Environment(Envrn)%RollDayTypeOnRepeat)
+            IF (DaylightSavingIsActive) THEN
+              CALL SetDSTDateRanges(Environment(Envrn)%MonWeekDay,DSTIndex)
+            ENDIF
+            CALL SetSpecialDayDates(Environment(Envrn)%MonWeekDay)
+          ENDIF
+        ENDIF
+      ELSEIF ((Month == 1 .and. DayOfMonth == 1) .and.  DatesShouldBeReset .and.  &
+              (Jan1DatesShouldBeReset) ) THEN
+        IF (Environment(Envrn)%TreatYearsAsConsecutive) THEN
+          Environment(Envrn)%CurrentYear=Environment(Envrn)%CurrentYear + 1
+          Environment(Envrn)%IsLeapYear=IsLeapYear(Environment(Envrn)%CurrentYear)
+          CurrentYearIsLeapYear=Environment(Envrn)%IsLeapYear
+          IF (CurrentYearIsLeapYear .and. .not. WFAllowsLeapYears) CurrentYearIsLeapYear=.false.
+          IF (DayOfSim < curSimDayForEndOfRunPeriod .and. CurrentYearIsLeapYear)   &
+             curSimDayforEndofRunPeriod=curSimDayforEndofRunPeriod+1
+        ENDIF
+        IF (CurrentYearIsLeapYear) THEN
+          IF (WFAllowsLeapYears) THEN
+            LeapYearAdd=1
+          ELSE
+            LeapYearAdd=0
+          ENDIF
+        ELSE
+          LeapYearAdd=0
+        ENDIF
+
+        IF (DayOfSim < curSimDayForEndOfRunPeriod) THEN
+          IF (Environment(Envrn)%RollDayTypeOnRepeat .or. CurrentYearIsLeapYear) THEN
+            CALL ResetWeekDaysByMonth(Environment(Envrn)%MonWeekDay,LeapYearAdd,  &
+               Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,  &
+               Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,Environment(Envrn)%RollDayTypeOnRepeat,.true.)
+          ELSE
+            CALL ResetWeekDaysByMonth(Environment(Envrn)%MonWeekDay,LeapYearAdd,  &
+               Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,  &
+               Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,Environment(Envrn)%RollDayTypeOnRepeat,.false.)
+          ENDIF
+          IF (DaylightSavingIsActive) THEN
+            CALL SetDSTDateRanges(Environment(Envrn)%MonWeekDay,DSTIndex)
+          ENDIF
+          CALL SetSpecialDayDates(Environment(Envrn)%MonWeekDay)
+        ENDIF
+      ENDIF
+!      SetYear=.false.
+    ENDIF
   END IF    ! ... end of BeginDayFlag IF-THEN block.
+
+  IF (.not. BeginDayFlag .and. .not. WarmupFlag .and.   &
+      (Month /= Environment(Envrn)%StartMonth .or. DayOfMonth /= Environment(Envrn)%StartDay)   &
+       .and. .not. DatesShouldBeReset .and.  &
+       Environment(Envrn)%KindOfEnvrn == ksRunPeriodWeather) THEN
+!    SetYear=.true.
+    DatesShouldBeReset=.true.
+  ENDIF
 
   IF (EndEnvrnFlag .and. (Environment(Envrn)%KindOfEnvrn /= ksDesignDay) ) THEN
     REWIND(WeatherFileUnitNumber)
@@ -1502,6 +2209,7 @@ SUBROUTINE SetCurrentWeather
           !       MODIFIED       Aug94 (LKL) Fixed improper weighting
           !                      Nov98 (FCW) Added call to get exterior illuminances
           !                      Jan02 (FCW) Changed how ground reflectance for daylighting is set
+          !                      Mar12 (LKL) Changed settings for leap years/ current years.
           !       RE-ENGINEERED  Apr97,May97 (RKS)
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1551,6 +2259,7 @@ SUBROUTINE SetCurrentWeather
   REAL(r64) TempDPVal
 
           ! FLOW:
+
 
   NextHour = HourOfDay+1
 
@@ -1602,11 +2311,8 @@ SUBROUTINE SetCurrentWeather
   ENDIF
 
   ! Humidity Ratio and Wet Bulb are derived
-!  write(outputfiledebug,*) 'set weather=',outdrybulbtemp,outrelhumvalue,outbaropress
   OutHumRat      = PsyWFnTdbRhPb(OutDryBulbTemp,OutRelHumValue,OutBaroPress, 'SetCurrentWeather')
-!  write(outputfiledebug,*) 'set weather, outhumrat=',outhumrat
   OutWetBulbTemp = PsyTwbFnTdbWPb(OutDryBulbTemp,OutHumRat,OutBaroPress)
-!  write(outputfiledebug,*) 'set weather, outwetbulbtemp=',outwetbulbtemp
   IF (OutDryBulbTemp < OutWetBulbTemp)  THEN
     OutWetBulbTemp=OutDryBulbTemp
     TempVal=PsyWFnTdbTwbPb(OutDryBulbTemp,OutWetBulbTemp,OutBaroPress)
@@ -1631,12 +2337,16 @@ SUBROUTINE SetCurrentWeather
   IF (EMSBeamSolarRadOverrideOn)  BeamSolarRad = EMSBeamSolarRadOverrideValue
   LiquidPrecipitation = TodayLiquidPrecip(HourOfDay,TimeStep)
 
-  IsRain=(TodayIsRain(HourOfDay,TimeStep) .or. LiquidPrecipitation > 0.0)
-  IF (IsRain .and. LiquidPrecipitation == 0.0) LiquidPrecipitation=1.5d0  ! default if rain but none on weather file
-  IsSnow=TodayIsSnow(HourOfDay,TimeStep)
-
-  IF (.not. UseRainValues) IsRain=.false.
-  IF (.not. UseSnowValues) IsSnow=.false.
+  IF (UseRainValues) THEN
+    IsRain=TodayIsRain(HourOfDay,TimeStep) !.or. LiquidPrecipitation >= .8d0)  ! > .8 mm
+  ELSE
+    IsRain=.false.
+  ENDIF
+  IF (UseSnowValues) THEN
+    IsSnow=TodayIsSnow(HourOfDay,TimeStep)
+  ELSE
+    IsSnow=.false.
+  ENDIF
 
   IF (IsSnow) THEN
     GndReflectance = MAX(MIN(GndReflectance*SnowGndRefModifier,1.0d0),0.0d0)
@@ -1734,7 +2444,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda K. Lawrie
           !       DATE WRITTEN   April 1999
-          !       MODIFIED       na
+          !       MODIFIED       March 2012; add actual weather read.
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1837,8 +2547,8 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
   REAL(r64), SAVE :: LastHrLiquidPrecip
   REAL(r64), SAVE :: NextHrBeamSolarRad
   REAL(r64), SAVE :: NextHrDifSolarRad
-!unused0909  INTEGER :: WP1_Ptr
-
+  LOGICAL :: RecordDateMatch
+  INTEGER :: JDay5Start,JDay5End,Loop,TWeekDay
 
   IF (DayToRead == 1) THEN
 
@@ -1882,6 +2592,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
                     WindDir,WindSpeed,TotalSkyCover,OpaqueSkyCover,Visibility,CeilHeight,          &
                     PresWeathObs,PresWeathConds,PrecipWater,AerosolOptDepth,SnowDepth,             &
                     DaysSinceLastSnow,Albedo,LiquidPrecip)
+
            ENDIF
          ENDIF
       IF (ReadStatus /= 0) THEN
@@ -1895,7 +2606,16 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
       IF (CurDayOfWeek <= 7) THEN
         CurDayOfWeek=MOD(CurDayOfWeek,7)+1
       ENDIF
-      IF (WMonth == Environment(Environ)%StartMonth .and. WDay == Environment(Environ)%StartDay) THEN
+      IF (WMonth == Environment(Environ)%StartMonth .and. WDay == Environment(Environ)%StartDay .and.   &
+          .not. Environment(Environ)%MatchYear) THEN
+        RecordDateMatch=.true.
+      ELSEIF (WMonth == Environment(Environ)%StartMonth .and. WDay == Environment(Environ)%StartDay .and.   &
+          Environment(Environ)%MatchYear .and. WYear == Environment(Environ)%StartYear) THEN
+        RecordDateMatch=.true.
+      ELSE
+        RecordDateMatch=.false.
+      ENDIF
+      IF (RecordDateMatch) THEN
         BACKSPACE(WeatherFileUnitNumber)
         Ready=.true.
         IF (CurDayOfWeek <= 7) THEN
@@ -1953,19 +2673,29 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
       ENDIF
     ENDDO
 
-    ! Positioned to proper day
-    IF (Environment(Environ)%DayOfWeek /= 0) THEN
-      IF (Environment(Environ)%DayOfWeek <= 7) THEN
-        CurDayOfWeek=Environment(Environ)%DayOfWeek-1
+   ! Positioned to proper day
+    IF (.not. KickOffSimulation .and. .not. DoingSizing .and. Environment(Environ)%KindOfEnvrn == ksRunPeriodWeather) THEN
+      Environment(Environ)%CurrentCycle=Environment(Environ)%CurrentCycle+1
+      IF (.not. Environment(Environ)%RollDayTypeOnRepeat) THEN
+        CALL SetDayOfWeekInitialValues(Environment(Environ)%DayOfWeek,CurDayOfWeek,UseDayOfWeek)
+        IF (DaylightSavingIsActive) THEN
+          CALL SetDSTDateRanges(Environment(Envrn)%MonWeekDay,DSTIndex)
+        ENDIF
+          CALL SetSpecialDayDates(Environment(Envrn)%MonWeekDay)
+      ELSEIF (Environment(Environ)%CurrentCycle == 1) THEN
+        CALL SetDayOfWeekInitialValues(Environment(Environ)%DayOfWeek,CurDayOfWeek,UseDayOfWeek)
+        Environment(Environ)%SetWeekDays=.true.
+        IF (DaylightSavingIsActive) THEN
+          CALL SetDSTDateRanges(Environment(Envrn)%MonWeekDay,DSTIndex)
+        ENDIF
+          CALL SetSpecialDayDates(Environment(Envrn)%MonWeekDay)
       ELSE
-        CurDayOfWeek=Environment(Environ)%DayOfWeek
+        CurDayOfWeek=DayOfWeekTomorrow
       ENDIF
-      UseDayOfWeek=.false.
     ELSE
-      UseDayOfWeek=.true.
+      CALL SetDayOfWeekInitialValues(Environment(Environ)%DayOfWeek,CurDayOfWeek,UseDayOfWeek)
     ENDIF
   ENDIF
-
 
   TryAgain=.true.
   SkipThisDay=.false.
@@ -2084,22 +2814,23 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         IF (LiquidPrecip < 0.0d0) LiquidPrecip=999.d0
 
         IF (Hour == 1 .and. CurTimeStep == 1) THEN
-          IF (WMonth == 2 .and. WDay == 29 .and. .not. LeapYear) THEN
+          IF (WMonth == 2 .and. WDay == 29 .and. (.not. CurrentYearIsLeapYear .or. .not. WFAllowsLeapYears)) THEN
             EndDayOfMonth(2)=28
             SkipThisDay=.true.
             TryAgain=.true.
             CYCLE
-          ELSEIF (WMonth == 2 .and. WDay == 29 .and. LeapYear) THEN
+          ELSEIF (WMonth == 2 .and. WDay == 29 .and. CurrentYearIsLeapYear .and. WFAllowsLeapYears) THEN
             TryAgain=.false.
             SkipThisDay=.false.
           ELSE
             TryAgain=.false.
             SkipThisDay=.false.
           ENDIF
+
           TomorrowVariables%Year=WYear
           TomorrowVariables%Month=WMonth
           TomorrowVariables%DayOfMonth=WDay
-          TomorrowVariables%DayOfYear=JulianDay(WMonth,Wday,WFLeapYearInd)
+          TomorrowVariables%DayOfYear=JulianDay(WMonth,Wday,LeapYearAdd)
           CALL CalculateDailySolarCoeffs(TomorrowVariables%DayOfYear,A,B,C,AVSC,TomorrowVariables%EquationOfTime, &
                                          TomorrowVariables%SinSolarDeclinAngle,TomorrowVariables%CosSolarDeclinAngle)
           IF (CurDayOfWeek <= 7) THEN
@@ -2208,6 +2939,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         IF (LiquidPrecip >= 999.d0) THEN
           LiquidPrecip=Missing%LiquidPrecip
           Missed%LiquidPrecip=Missed%LiquidPrecip+1
+          LiquidPrecip=0.0d0
         ENDIF
 
 
@@ -2277,6 +3009,11 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
           TomorrowIsRain(Hour,CurTimeStep) = .false.
         ENDIF
         TomorrowIsSnow(Hour,CurTimeStep) = (SnowDepth > 0.0d0)
+
+         ! default if rain but none on weather file
+        IF (TomorrowIsRain(Hour,CurTimeStep) .and.   &
+            TomorrowLiquidPrecip(Hour,CurTimeStep) == 0.0)   &
+            TomorrowLiquidPrecip(Hour,CurTimeStep)=2.0d0     ! 2mm in an hour ~ .08 inch
 
         Missing%DryBulb=DryBulb
         Missing%DewPoint=DewPoint
@@ -2405,7 +3142,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
 
         TomorrowLiquidPrecip(Hour,TS)   = LastHrLiquidPrecip*WtPrevHour        &
                                           + Wthr%LiquidPrecip(Hour)*WtNow
-        TomorrowIsRain(Hour,TS)         = Wthr%IsRain(Hour)
+        TomorrowIsRain(Hour,TS)         = (TomorrowLiquidPrecip(Hour,TS) >= .8d0)  !Wthr%IsRain(Hour)
         TomorrowIsSnow(Hour,TS)         = Wthr%IsSnow(Hour)
       ENDDO  ! End of TS Loop
 
@@ -2455,6 +3192,63 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
   ENDIF
 
   RETURN
+
+CONTAINS
+  SUBROUTINE SetDayOfWeekInitialValues(EnvironDayOfWeek,CurDayOfWeek,UseDayOfWeek)
+
+            ! SUBROUTINE INFORMATION:
+            !       AUTHOR         Linda Lawrie
+            !       DATE WRITTEN   March 2012
+            !       MODIFIED       na
+            !       RE-ENGINEERED  na
+
+            ! PURPOSE OF THIS SUBROUTINE:
+            ! Set of begin day of week for an environment.  Similar sets but slightly different
+            ! conditions.  Improve code readability by having three routine calls instead of three
+            ! IF blocks.
+
+            ! METHODOLOGY EMPLOYED:
+            ! na
+
+            ! REFERENCES:
+            ! na
+
+            ! USE STATEMENTS:
+            ! na
+
+    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+            ! SUBROUTINE ARGUMENT DEFINITIONS:
+    INTEGER, INTENT(IN)    :: EnvironDayOfWeek ! Starting Day of Week for the (Weather) RunPeriod (User Input)
+    INTEGER, INTENT(INOUT) :: CurDayOfWeek     ! Current Day of Week
+    LOGICAL, INTENT(INOUT) :: UseDayOfWeek     ! hmmm does not appear to be used anywhere.
+
+            ! SUBROUTINE PARAMETER DEFINITIONS:
+            ! na
+
+            ! INTERFACE BLOCK SPECIFICATIONS:
+            ! na
+
+            ! DERIVED TYPE DEFINITIONS:
+            ! na
+
+            ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+            ! na
+
+    IF (EnvironDayOfWeek /= 0) THEN
+      IF (EnvironDayOfWeek <= 7) THEN
+        CurDayOfWeek=EnvironDayOfWeek-1
+      ELSE
+        CurDayOfWeek=EnvironDayOfWeek
+      ENDIF
+      UseDayOfWeek=.false.
+    ELSE
+      UseDayOfWeek=.true.
+    ENDIF
+
+  RETURN
+
+  END SUBROUTINE SetDayOfWeekInitialValues
 
 END SUBROUTINE ReadEPlusWeatherForDay
 
@@ -2547,7 +3341,7 @@ SUBROUTINE InterpretWeatherDataLine(Line,ErrorFound,WYear,WMonth,WDay,Whour,WMin
   REAL(r64) RDay
   REAL(r64) RHour
   REAL(r64) RMinute
-  CHARACTER(len=30) DateError
+  CHARACTER(len=32) DateError
   REAL(r64)       :: RField21
   INTEGER Count
   INTEGER, SAVE :: LCount=0
@@ -2890,6 +3684,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    WRITE(CurMnDy,MnDyFmt) DesDayInput(EnvrnNum)%Month,DesDayInput(EnvrnNum)%DayOfMonth
    EnvironmentName=DesDayInput(EnvrnNum)%Title
    RunPeriodEnvironment=.false.
+          ! Following builds Environment start/end for ASHRAE 55 warnings
    EnvironmentStartEnd=TRIM(CurMnDy)//' - '//TRIM(CurMnDy)
 
    ! Check that barometric pressure is within range
@@ -2955,7 +3750,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
        StringOut='Enthalpy,'//trim(RoundSigDigits(DesDayInput(Envrn)%HumIndValue,2))//' {kJ/kg},'
      ELSEIF (DesDayInput(Envrn)%HumIndType == DDHumIndType_HumRatio) THEN
        StringOut='HumidityRatio,'//trim(RoundSigDigits(DesDayInput(Envrn)%HumIndValue,4))//' {},'
-     ELSEIF (DesDayInput(Envrn)%HumIndType == DDHumIndType_Schedule) THEN
+     ELSEIF (DesDayInput(Envrn)%HumIndType == DDHumIndType_RelHumSch) THEN
        StringOut='Schedule,<schedule values from 0.0 to 100.0 {percent},'
      ELSEIF (DesDayInput(Envrn)%HumIndType == DDHumIndType_WBProfDef) THEN
        StringOut='WetBulbProfileDefaultMultipliers,'//trim(RoundSigDigits(DesDayInput(Envrn)%HumIndValue,2))//' {C},'
@@ -3019,7 +3814,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
 
    CASE (DDHumIndType_Dewpoint)
      HumidityRatio=PsyWFnTdpPb(DesDayInput(EnvrnNum)%HumIndValue,          &
-                          DesDayInput(EnvrnNum)%PressBarom)
+                          DesDayInput(EnvrnNum)%PressBarom,'SetUpDesignDay:PsyWFnTdpPb')
      ConstantHumidityRatio=.true.
 
    CASE (DDHumIndType_HumRatio)
@@ -3027,10 +3822,11 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
      ConstantHumidityRatio=.true.
 
    CASE (DDHumIndType_Enthalpy)
-     HumidityRatio=PsyWFnTdbH(DesDayInput(EnvrnNum)%MaxDryBulb,DesDayInput(EnvrnNum)%HumIndValue*1000.)
+     HumidityRatio=PsyWFnTdbH(DesDayInput(EnvrnNum)%MaxDryBulb,DesDayInput(EnvrnNum)%HumIndValue*1000.,  &
+        'SetUpDesignDay:PsyWFnTdbH')
      ConstantHumidityRatio=.true.
 
-   CASE (DDHumIndType_Schedule)
+   CASE (DDHumIndType_RelHumSch)
      ! nothing to do -- DDHumIndModifier already contains the scheduled Relative Humidity
      ConstantHumidityRatio=.false.
      TomorrowOutRelHum=DDHumIndModifier( EnvrnNum,:,:)
@@ -3158,7 +3954,12 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
        IF (Environment(EnvrnNum)%WP_Type1 == 0) THEN
          TDewK=MIN(TomorrowOutDryBulbTemp(Hour,TS),TomorrowOutDewPointTemp(Hour,TS))+TKelvin
          ESky= (.787d0 +.764d0*LOG((TDewK)/TKelvin))*(1.d0 + .0224d0*OSky - 0.0035d0*(OSky**2) + .00028d0*(OSky**3))
+         TomorrowHorizIRSky(Hour,TS)=Esky*Sigma*(TomorrowOutDryBulbTemp(Hour,TS)+TKelvin)**4
          TomorrowSkyTemp(Hour,TS)=(TomorrowOutDryBulbTemp(Hour,TS)+TKelvin)*(ESky**.25d0)-TKelvin
+       ELSE
+         TDewK=MIN(TomorrowOutDryBulbTemp(Hour,TS),TomorrowOutDewPointTemp(Hour,TS))+TKelvin
+         ESky= (.787d0 +.764d0*LOG((TDewK)/TKelvin))*(1.d0 + .0224d0*OSky - 0.0035d0*(OSky**2) + .00028d0*(OSky**3))
+         TomorrowHorizIRSky(Hour,TS)=Esky*Sigma*(TomorrowOutDryBulbTemp(Hour,TS)+TKelvin)**4
        ENDIF
 
        ! Generate solar values for timestep
@@ -3296,7 +4097,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
 END SUBROUTINE SetUpDesignDay
 
 !------------------------------------------------------------------------------
-REAL(r64) FUNCTION AirMass( CosZen)
+REAL(r64) FUNCTION AirMass(CosZen)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         C Barnaby
@@ -3321,7 +4122,7 @@ REAL(r64) FUNCTION AirMass( CosZen)
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-    REAL(r64), INTENT( IN) :: CosZen    ! COS( solar zenith), 0 - 1
+    REAL(r64), INTENT(IN) :: CosZen    ! COS( solar zenith), 0 - 1
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -3336,15 +4137,15 @@ REAL(r64) FUNCTION AirMass( CosZen)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     REAL(r64) :: SunAltD
 
-    IF (CosZen <= 0.001) THEN
+    IF (CosZen <= 0.001d0) THEN
         AirMass = 37.07837343d0   ! limit value calc'd with Excel
                                 !  value increases little as CosZen -> 0
-    ELSE IF (CosZen >= 1.) THEN
+    ELSE IF (CosZen >= 1.d0) THEN
         AirMass = 1.d0
     ELSE
         ! note: COS( Zen) = SIN( Alt)
         SunAltD = ASIN( CosZen) / DegToRadians      ! altitude, degrees
-        AirMass = 1.d0/(CosZen + 0.50572d0*( 6.07995d0 + SunAltD)**(-1.6364d0))
+        AirMass = 1.d0/(CosZen + 0.50572d0 * (6.07995d0 + SunAltD)**(-1.6364d0))
     END IF
 END FUNCTION AirMass
 !------------------------------------------------------------------------------
@@ -3398,8 +4199,8 @@ SUBROUTINE ASHRAETauModel( ETR, CosZen, TauB, TauD, IDirN, IDifH, IGlbH)
         IDifH = 0.
         IGlbH = 0.
     ELSE
-        AB = 1.219 - 0.043*TauB - 0.151*TauD - 0.204*TauB*TauD
-        AD = 0.202 + 0.852*TauB - 0.007*Taud - 0.357*TauB*TauD
+        AB = 1.219d0 - 0.043d0*TauB - 0.151d0*TauD - 0.204d0*TauB*TauD
+        AD = 0.202d0 + 0.852d0*TauB - 0.007d0*Taud - 0.357d0*TauB*TauD
         M = AirMass( CosZen)
         IDirN = ETR * EXP( -TauB * M**AB)
         IDifH = ETR * EXP( -TauD * M**AD)
@@ -4506,6 +5307,8 @@ SUBROUTINE ReadUserWeatherInput
    LOGICAL :: ErrorsFound=.false.
    Integer :: RPD1
    Integer :: RPD2
+   Integer :: RP    ! number of run periods
+   Integer :: RPAW  ! number of run periods, actual weather
 
 
           ! FLOW:
@@ -4514,7 +5317,9 @@ SUBROUTINE ReadUserWeatherInput
       TotDesDays=GetNumObjectsFound('SizingPeriod:DesignDay')
       RPD1=GetNumObjectsFound('SizingPeriod:WeatherFileDays')
       RPD2=GetNumObjectsFound('SizingPeriod:WeatherFileConditionType')
-      TotRunPers=GetNumObjectsFound('RunPeriod')
+      RP=GetNumObjectsFound('RunPeriod')
+      RPAW=GetNumObjectsFound('RunPeriod:CustomRange')
+      TotRunPers=RP+RPAW
       NumOfEnvrn=TotDesDays+TotRunPers+RPD1+RPD2
       IF (TotRunPers > 0) THEN
         WeathSimReq=.true.
@@ -4596,6 +5401,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
           !       AUTHOR         Richard Liesen
           !       DATE WRITTEN   October 1997
           !       MODIFIED       February 1999, Add multiple run periods, Change name.
+          !                      March 2012, LKL, Add features to object; New "actual weather" object;
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -4609,7 +5415,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList, GetObjectItem, SameString, VerifyName
+  USE InputProcessor, ONLY: FindItemInList, GetObjectItem, SameString, VerifyName, GetNumObjectsFound
   USE General, ONLY: JulianDay,TrimSigDigits
   USE DataSystemVariables
   USE DataIPShortCuts
@@ -4638,14 +5444,20 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
   LOGICAL :: IsBlank               ! Flag for blank name
   INTEGER :: Count
   TYPE (EnvironmentData), ALLOCATABLE, DIMENSION(:) :: TempEnvironment ! Environment data
+  Integer :: RP    ! number of run periods
+  Integer :: RPAW  ! number of run periods, actual weather
+  Integer :: Ptr
 
          ! FLOW:
+  RP=GetNumObjectsFound('RunPeriod')
+  RPAW=GetNumObjectsFound('RunPeriod:CustomRange')
+
    !Call Input Get routine to retrieve annual run data
   ALLOCATE (RunPeriodInput(TotRunPers))
 
   cCurrentModuleObject='RunPeriod'
   count=0
-  DO Loop=1,TotRunPers
+  DO Loop=1,RP
     CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -4664,158 +5476,379 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
     RunPeriodInput(Loop)%Title=cAlphaArgs(1)
 
    !set the start and end day of month from user input
-       RunPeriodInput(Loop)%StartMonth = Int(rNumericArgs(1))
-       RunPeriodInput(Loop)%StartDay = Int(rNumericArgs(2))
-       RunPeriodInput(Loop)%EndMonth   = Int(rNumericArgs(3))
-       RunPeriodInput(Loop)%EndDay   = Int(rNumericArgs(4))
+   ! N1 , \field Begin Month
+   ! N2 , \field Begin Day of Month
+   ! N3 , \field End Month
+   ! N4 , \field End Day of Month
+    RunPeriodInput(Loop)%StartMonth = Int(rNumericArgs(1))
+    RunPeriodInput(Loop)%StartDay = Int(rNumericArgs(2))
+    RunPeriodInput(Loop)%EndMonth   = Int(rNumericArgs(3))
+    RunPeriodInput(Loop)%EndDay   = Int(rNumericArgs(4))
 
-       IF (INT(rNumericArgs(5))==0) THEN
-        RunPeriodInput(Loop)%NumSimYears = 1
-       ELSE
-        RunPeriodInput(Loop)%NumSimYears = INT(rNumericArgs(5))
-       ENDIF
+    !  N5,  \field Number of Times Runperiod to be Repeated
+    IF (INT(rNumericArgs(5))==0) THEN
+      RunPeriodInput(Loop)%NumSimYears = 1
+    ELSE
+      RunPeriodInput(Loop)%NumSimYears = INT(rNumericArgs(5))
+    ENDIF
 
-       IF (FullAnnualRun .and. Loop == 1) THEN
-         RunPeriodInput(Loop)%StartMonth = 1
-         RunPeriodInput(Loop)%StartDay = 1
-         RunPeriodInput(Loop)%EndMonth   = 12
-         RunPeriodInput(Loop)%EndDay   = 31
-       ENDIF
+    !  N6;  \field Start Year
+    IF (INT(rNumericArgs(6))==0) THEN
+      RunPeriodInput(Loop)%BeginYear = autocalculate
+      RunPeriodInput(Loop)%TreatYearsAsConsecutive = .false.
+    ELSE
+      RunPeriodInput(Loop)%BeginYear = INT(rNumericArgs(6))
+      RunPeriodInput(Loop)%TreatYearsAsConsecutive = .true.
+    ENDIF
+
+    IF (FullAnnualRun .and. Loop == 1) THEN
+      RunPeriodInput(Loop)%StartMonth = 1
+      RunPeriodInput(Loop)%StartDay = 1
+      RunPeriodInput(Loop)%EndMonth   = 12
+      RunPeriodInput(Loop)%EndDay   = 31
+    ENDIF
 
 
-   SELECT CASE (RunPeriodInput(Loop)%StartMonth)
+    SELECT CASE (RunPeriodInput(Loop)%StartMonth)
 
-    CASE (1,3,5,7,8,10,12)
-      IF (RunPeriodInput(Loop)%StartDay > 31) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+      CASE (1,3,5,7,8,10,12)
+        IF (RunPeriodInput(Loop)%StartDay > 31) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (4,6,9,11)
+        IF (RunPeriodInput(Loop)%StartDay > 30) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (2)
+        IF (RunPeriodInput(Loop)%StartDay > 28+LeapYearAdd) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE DEFAULT
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//  &
+             TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//']')
         ErrorsFound=.true.
-      ENDIF
-    CASE (4,6,9,11)
-      IF (RunPeriodInput(Loop)%StartDay > 30) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+    END SELECT
+
+    SELECT CASE (RunPeriodInput(Loop)%EndMonth)
+
+      CASE (1,3,5,7,8,10,12)
+        IF (RunPeriodInput(Loop)%EndDay > 31) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (4,6,9,11)
+        IF (RunPeriodInput(Loop)%EndDay > 30) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (2)
+        IF (RunPeriodInput(Loop)%EndDay > 28+LeapYearAdd) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE DEFAULT
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+             TRIM(cNumericFieldNames(3))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//']')
         ErrorsFound=.true.
+    END SELECT
+
+    ! A2 , \field Day of Week for Start Day
+    IF (lAlphaFieldBlanks(2) .or. cAlphaArgs(2) == 'USEWEATHERFILE') THEN
+      RunPeriodInput(Loop)%DayOfWeek=0 ! Defaults to Day of Week from Weather File
+    ELSE
+      RunPeriodInput(Loop)%DayOfWeek=FindItemInList(cAlphaArgs(2),DaysOfWeek,7)
+      IF (RunPeriodInput(Loop)%DayOfWeek == 0) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(2))//' invalid (Day of Week) ['//  &
+            TRIM(cAlphaArgs(2))//' for Start is not Valid, DayofWeek from WeatherFile will be used.')
       ENDIF
-    CASE (2)
-      IF (RunPeriodInput(Loop)%StartDay > 28+WFLeapYearInd) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
-        ErrorsFound=.true.
-      ENDIF
-    CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cNumericFieldNames(2))//' invalid=['//  &
-           TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//']')
+    ENDIF
+
+    ! A3,  \field Use Weather File Holidays and Special Days
+    IF (lAlphaFieldBlanks(3) .or. SameString(cAlphaArgs(3),'YES')) THEN
+      RunPeriodInput(Loop)%UseHolidays=.true.
+    ELSEIF (SameString(cAlphaArgs(3),'NO')) THEN
+      RunPeriodInput(Loop)%UseHolidays=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(3))//' invalid ['//TRIM(cAlphaArgs(3))//']')
       ErrorsFound=.true.
-   END SELECT
-   SELECT CASE (RunPeriodInput(Loop)%EndMonth)
+    ENDIF
 
-    CASE (1,3,5,7,8,10,12)
-      IF (RunPeriodInput(Loop)%EndDay > 31) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
-        ErrorsFound=.true.
-      ENDIF
-    CASE (4,6,9,11)
-      IF (RunPeriodInput(Loop)%EndDay > 30) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
-        ErrorsFound=.true.
-      ENDIF
-    CASE (2)
-      IF (RunPeriodInput(Loop)%EndDay > 28+WFLeapYearInd) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
-           TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
-        CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
-             trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
-        ErrorsFound=.true.
-      ENDIF
-    CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cNumericFieldNames(3))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//']')
+    ! A4,  \field Use Weather File Daylight Saving Period
+    IF (lAlphaFieldBlanks(4) .or. SameString(cAlphaArgs(4),'YES')) THEN
+      RunPeriodInput(Loop)%UseDST=.true.
+    ELSEIF (SameString(cAlphaArgs(4),'NO')) THEN
+      RunPeriodInput(Loop)%UseDST=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(4))//' invalid ['//TRIM(cAlphaArgs(4))//']')
       ErrorsFound=.true.
-   END SELECT
+    ENDIF
 
-   IF (lAlphaFieldBlanks(2) .or. cAlphaArgs(2) == 'USEWEATHERFILE') THEN
-     RunPeriodInput(Loop)%DayOfWeek=0 ! Defaults to Day of Week from Weather File
-   ELSE
-     RunPeriodInput(Loop)%DayOfWeek=FindItemInList(cAlphaArgs(2),DaysOfWeek,7)
-     IF (RunPeriodInput(Loop)%DayOfWeek == 0) THEN
-       CALL ShowWarningError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(2))//' invalid (Day of Week) ['//  &
-           TRIM(cAlphaArgs(2))//' for Start is not Valid, DayofWeek from WeatherFile will be used.')
-     ENDIF
-   ENDIF
+    ! A5,  \field Apply Weekend Holiday Rule
+    IF (lAlphaFieldBlanks(5) .or. SameString(cAlphaArgs(5),'YES')) THEN
+      RunPeriodInput(Loop)%ApplyWeekendRule=.true.
+    ELSEIF (SameString(cAlphaArgs(5),'NO')) THEN
+      RunPeriodInput(Loop)%ApplyWeekendRule=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(5))//' invalid ['//TRIM(cAlphaArgs(5))//']')
+      ErrorsFound=.true.
+    ENDIF
 
-   IF (lAlphaFieldBlanks(3) .or. SameString(cAlphaArgs(3),'YES')) THEN
-     RunPeriodInput(Loop)%UseHolidays=.true.
-   ELSEIF (SameString(cAlphaArgs(3),'NO')) THEN
-     RunPeriodInput(Loop)%UseHolidays=.false.
-   ELSE
-     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(3))//' invalid ['//TRIM(cAlphaArgs(3))//']')
-     ErrorsFound=.true.
-   ENDIF
+    ! A6,  \field Use Weather File Rain Indicators
+    IF (lAlphaFieldBlanks(6) .or. SameString(cAlphaArgs(6),'YES')) THEN
+      RunPeriodInput(Loop)%UseRain=.true.
+    ELSEIF (SameString(cAlphaArgs(6),'NO')) THEN
+      RunPeriodInput(Loop)%UseRain=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(6))//' invalid ['//TRIM(cAlphaArgs(6))//']')
+      ErrorsFound=.true.
+    ENDIF
 
-   IF (lAlphaFieldBlanks(4) .or. SameString(cAlphaArgs(4),'YES')) THEN
-     RunPeriodInput(Loop)%UseDST=.true.
-   ELSEIF (SameString(cAlphaArgs(4),'NO')) THEN
-     RunPeriodInput(Loop)%UseDST=.false.
-   ELSE
-     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(4))//' invalid ['//TRIM(cAlphaArgs(4))//']')
-     ErrorsFound=.true.
-   ENDIF
+    ! A7,  \field Use Weather File Snow Indicators
+    IF (lAlphaFieldBlanks(7) .or. SameString(cAlphaArgs(7),'YES')) THEN
+      RunPeriodInput(Loop)%UseSnow=.true.
+    ELSEIF (SameString(cAlphaArgs(7),'NO')) THEN
+      RunPeriodInput(Loop)%UseSnow=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(7))//' invalid ['//TRIM(cAlphaArgs(7))//']')
+      ErrorsFound=.true.
+    ENDIF
 
-   IF (lAlphaFieldBlanks(5) .or. SameString(cAlphaArgs(5),'YES')) THEN
-     RunPeriodInput(Loop)%ApplyWeekendRule=.true.
-   ELSEIF (SameString(cAlphaArgs(5),'NO')) THEN
-     RunPeriodInput(Loop)%ApplyWeekendRule=.false.
-   ELSE
-     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(5))//' invalid ['//TRIM(cAlphaArgs(5))//']')
-     ErrorsFound=.true.
-   ENDIF
+   ! A8,  \field Increment Day of Week on repeat
+   IF (lAlphaFieldBlanks(8) .or. SameString(cAlphaArgs(8),'YES')) THEN
+      RunPeriodInput(Loop)%RollDayTypeOnRepeat=.true.
+    ELSEIF (SameString(cAlphaArgs(8),'NO')) THEN
+      RunPeriodInput(Loop)%RollDayTypeOnRepeat=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//' '//  &
+            TRIM(cAlphaFieldNames(8))//' invalid ['//TRIM(cAlphaArgs(8))//']')
+      ErrorsFound=.true.
+    ENDIF
 
-   IF (lAlphaFieldBlanks(6) .or. SameString(cAlphaArgs(6),'YES')) THEN
-     RunPeriodInput(Loop)%UseRain=.true.
-   ELSEIF (SameString(cAlphaArgs(6),'NO')) THEN
-     RunPeriodInput(Loop)%UseRain=.false.
-   ELSE
-     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(6))//' invalid ['//TRIM(cAlphaArgs(6))//']')
-     ErrorsFound=.true.
-   ENDIF
+    !calculate the annual start and end dates from the user inputted month and day
+    RunPeriodInput(Loop)%StartDate = JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,LeapYearAdd)
+    RunPeriodInput(Loop)%EndDate = JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,LeapYearAdd)
+    RunPeriodInput(Loop)%MonWeekDay=0
+    IF (RunPeriodInput(Loop)%DayOfWeek /= 0 .and. .not. ErrorsFound) THEN
+      CALL SetupWeekDaysByMonth(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,  &
+                                RunPeriodInput(Loop)%DayOfWeek,RunPeriodInput(Loop)%MonWeekDay)
+    ENDIF
+  ENDDO
 
-   IF (lAlphaFieldBlanks(7) .or. SameString(cAlphaArgs(7),'YES')) THEN
-     RunPeriodInput(Loop)%UseSnow=.true.
-   ELSEIF (SameString(cAlphaArgs(7),'NO')) THEN
-     RunPeriodInput(Loop)%UseSnow=.false.
-   ELSE
-     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
-           TRIM(cAlphaFieldNames(7))//' invalid ['//TRIM(cAlphaArgs(7))//']')
-     ErrorsFound=.true.
-   ENDIF
+  cCurrentModuleObject='RunPeriod:CustomRange'
+  count=0
+  DO Ptr=1,RPAW
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),Ptr,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
-   !calculate the annual start and end days from the user inputted month and day
-   RunPeriodInput(Loop)%StartDate = JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,WFLeapYearInd)
-   RunPeriodInput(Loop)%EndDate = JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,WFLeapYearInd)
-   RunPeriodInput(Loop)%MonWeekDay=0
-   IF (RunPeriodInput(Loop)%DayOfWeek /= 0 .and. .not. ErrorsFound) THEN
-     CALL SetupWeekDaysByMonth(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,  &
-                               RunPeriodInput(Loop)%DayOfWeek,RunPeriodInput(Loop)%MonWeekDay)
-   ENDIF
+    IF (.not. lAlphaFieldBlanks(1)) THEN
+      IsNotOK=.false.
+      IsBlank=.false.
+      CALL VerifyName(cAlphaArgs(1),RunPeriodInput%Title,Count,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.true.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+    ENDIF
+
+    Count=Count+1
+    Loop=RP+Ptr
+    RunPeriodInput(Loop)%Title=cAlphaArgs(1)
+
+   !set the start and end day of month from user input
+   ! N1 , \field Begin Month
+   ! N2 , \field Begin Day of Month
+   ! N3,  \field Start Year
+   ! N4 , \field End Month
+   ! N5 , \field End Day of Month
+   ! N6,  \field End Year
+    RunPeriodInput(Loop)%StartMonth = Int(rNumericArgs(1))
+    RunPeriodInput(Loop)%StartDay   = Int(rNumericArgs(2))
+    RunPeriodInput(Loop)%StartYear  = Int(rNumericArgs(3))
+    RunPeriodInput(Loop)%EndMonth   = Int(rNumericArgs(4))
+    RunPeriodInput(Loop)%EndDay     = Int(rNumericArgs(5))
+    RunPeriodInput(Loop)%EndYear    = Int(rNumericArgs(6))
+    RunPeriodInput(Loop)%TreatYearsAsConsecutive = .true.
+
+    IF (FullAnnualRun .and. Loop == 1) THEN
+      RunPeriodInput(Loop)%StartMonth = 1
+      RunPeriodInput(Loop)%StartDay = 1
+      RunPeriodInput(Loop)%EndMonth   = 12
+      RunPeriodInput(Loop)%EndDay   = 31
+    ENDIF
+
+
+    SELECT CASE (RunPeriodInput(Loop)%StartMonth)
+
+      CASE (1,3,5,7,8,10,12)
+        IF (RunPeriodInput(Loop)%StartDay > 31) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (4,6,9,11)
+        IF (RunPeriodInput(Loop)%StartDay > 30) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (2)
+        IF (RunPeriodInput(Loop)%StartDay > 28+LeapYearAdd) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE DEFAULT
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//' '//  &
+             TRIM(cNumericFieldNames(2))//' invalid=['//  &
+             TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartMonth))//']')
+        ErrorsFound=.true.
+    END SELECT
+
+    SELECT CASE (RunPeriodInput(Loop)%EndMonth)
+
+      CASE (1,3,5,7,8,10,12)
+        IF (RunPeriodInput(Loop)%EndDay > 31) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (4,6,9,11)
+        IF (RunPeriodInput(Loop)%EndDay > 30) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE (2)
+        IF (RunPeriodInput(Loop)%EndDay > 28+LeapYearAdd) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
+             TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
+          CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
+               trim(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//'].')
+          ErrorsFound=.true.
+        ENDIF
+      CASE DEFAULT
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+             TRIM(cNumericFieldNames(3))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndMonth))//']')
+        ErrorsFound=.true.
+    END SELECT
+
+    ! A2 , \field Day of Week for Start Day
+    IF (lAlphaFieldBlanks(2) .or. cAlphaArgs(2) == 'USEWEATHERFILE') THEN
+      RunPeriodInput(Loop)%DayOfWeek=0 ! Defaults to Day of Week from Weather File
+    ELSE
+      RunPeriodInput(Loop)%DayOfWeek=FindItemInList(cAlphaArgs(2),DaysOfWeek,7)
+      IF (RunPeriodInput(Loop)%DayOfWeek == 0) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(2))//' invalid (Day of Week) ['//  &
+            TRIM(cAlphaArgs(2))//' for Start is not Valid, DayofWeek from WeatherFile will be used.')
+      ENDIF
+    ENDIF
+
+    ! A3,  \field Use Weather File Holidays and Special Days
+    IF (lAlphaFieldBlanks(3) .or. SameString(cAlphaArgs(3),'YES')) THEN
+      RunPeriodInput(Loop)%UseHolidays=.true.
+    ELSEIF (SameString(cAlphaArgs(3),'NO')) THEN
+      RunPeriodInput(Loop)%UseHolidays=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(3))//' invalid ['//TRIM(cAlphaArgs(3))//']')
+      ErrorsFound=.true.
+    ENDIF
+
+    ! A4,  \field Use Weather File Daylight Saving Period
+    IF (lAlphaFieldBlanks(4) .or. SameString(cAlphaArgs(4),'YES')) THEN
+      RunPeriodInput(Loop)%UseDST=.true.
+    ELSEIF (SameString(cAlphaArgs(4),'NO')) THEN
+      RunPeriodInput(Loop)%UseDST=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(4))//' invalid ['//TRIM(cAlphaArgs(4))//']')
+      ErrorsFound=.true.
+    ENDIF
+
+    ! A5,  \field Apply Weekend Holiday Rule
+    IF (lAlphaFieldBlanks(5) .or. SameString(cAlphaArgs(5),'YES')) THEN
+      RunPeriodInput(Loop)%ApplyWeekendRule=.true.
+    ELSEIF (SameString(cAlphaArgs(5),'NO')) THEN
+      RunPeriodInput(Loop)%ApplyWeekendRule=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(5))//' invalid ['//TRIM(cAlphaArgs(5))//']')
+      ErrorsFound=.true.
+    ENDIF
+
+    ! A6,  \field Use Weather File Rain Indicators
+    IF (lAlphaFieldBlanks(6) .or. SameString(cAlphaArgs(6),'YES')) THEN
+      RunPeriodInput(Loop)%UseRain=.true.
+    ELSEIF (SameString(cAlphaArgs(6),'NO')) THEN
+      RunPeriodInput(Loop)%UseRain=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(6))//' invalid ['//TRIM(cAlphaArgs(6))//']')
+      ErrorsFound=.true.
+    ENDIF
+
+    ! A7,  \field Use Weather File Snow Indicators
+    IF (lAlphaFieldBlanks(7) .or. SameString(cAlphaArgs(7),'YES')) THEN
+      RunPeriodInput(Loop)%UseSnow=.true.
+    ELSEIF (SameString(cAlphaArgs(7),'NO')) THEN
+      RunPeriodInput(Loop)%UseSnow=.false.
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//  &
+            TRIM(cAlphaFieldNames(7))//' invalid ['//TRIM(cAlphaArgs(7))//']')
+      ErrorsFound=.true.
+    ENDIF
+
+    !calculate the annual start and end days from the user inputted month and day
+    RunPeriodInput(Loop)%ActualWeather=.true.
+    CALL JGDate(GregorianToJulian,RunPeriodInput(Loop)%StartDate,  &
+       RunPeriodInput(Loop)%StartYear,RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay)
+    CALL JGDate(GregorianToJulian,RunPeriodInput(Loop)%EndDate,  &
+       RunPeriodInput(Loop)%EndYear,RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay)
+    RunPeriodInput(Loop)%MonWeekDay=0
+    IF (RunPeriodInput(Loop)%DayOfWeek /= 0 .and. .not. ErrorsFound) THEN
+      CALL SetupWeekDaysByMonth(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,  &
+                                RunPeriodInput(Loop)%DayOfWeek,RunPeriodInput(Loop)%MonWeekDay)
+    ENDIF
   ENDDO
 
   IF (TotRunPers == 0 .and. FullAnnualRun) THEN
@@ -4834,8 +5867,8 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
     TotRunPers=1
     WeathSimReq=.true.
     ALLOCATE(RunPeriodInput(TotRunPers))
-    RunPeriodInput(1)%StartDate = JulianDay(RunPeriodInput(1)%StartMonth,RunPeriodInput(1)%StartDay,WFLeapYearInd)
-    RunPeriodInput(1)%EndDate = JulianDay(RunPeriodInput(1)%EndMonth,RunPeriodInput(1)%EndDay,WFLeapYearInd)
+    RunPeriodInput(1)%StartDate = JulianDay(RunPeriodInput(1)%StartMonth,RunPeriodInput(1)%StartDay,LeapYearAdd)
+    RunPeriodInput(1)%EndDate = JulianDay(RunPeriodInput(1)%EndMonth,RunPeriodInput(1)%EndDay,LeapYearAdd)
     RunPeriodInput(1)%MonWeekDay=0
     IF (RunPeriodInput(1)%DayOfWeek /= 0 .and. .not. ErrorsFound) THEN
       CALL SetupWeekDaysByMonth(RunPeriodInput(1)%StartMonth,RunPeriodInput(1)%StartDay,  &
@@ -4951,7 +5984,7 @@ SUBROUTINE GetRunPeriodDesignData(ErrorsFound)
         ErrorsFound=.true.
       ENDIF
     CASE (2)
-      IF (RunPeriodDesignInput(Count)%StartDay > 28+WFLeapYearInd) THEN
+      IF (RunPeriodDesignInput(Count)%StartDay > 28+LeapYearAdd) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object='//TRIM(RunPeriodDesignInput(Count)%Title)//  &
            ' '//TRIM(cNumericFieldNames(2))//' invalid (Day of Month) ['//  &
            TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
@@ -5000,18 +6033,22 @@ SUBROUTINE GetRunPeriodDesignData(ErrorsFound)
 
    !calculate the annual start and end days from the user inputted month and day
    RunPeriodDesignInput(Count)%StartDate = JulianDay(RunPeriodDesignInput(Count)%StartMonth,  &
-                                                      RunPeriodDesignInput(Count)%StartDay,WFLeapYearInd)
+                                                      RunPeriodDesignInput(Count)%StartDay,LeapYearAdd)
    RunPeriodDesignInput(Count)%EndDate   = JulianDay(RunPeriodDesignInput(Count)%EndMonth,  &
-                                                      RunPeriodDesignInput(Count)%EndDay,WFLeapYearInd)
+                                                      RunPeriodDesignInput(Count)%EndDay,LeapYearAdd)
    IF (RunPeriodDesignInput(Count)%StartDate <= RunPeriodDesignInput(Count)%EndDate) THEN
      RunPeriodDesignInput(Count)%TotalDays=(RunPeriodDesignInput(Count)%EndDate-RunPeriodDesignInput(Count)%StartDate+1)   &
                                    * RunPeriodDesignInput(Count)%NumSimYears
    ELSE
-     RunPeriodDesignInput(Count)%TotalDays=(JulianDay(12,31,WFLeapYearInd) -   &
+     RunPeriodDesignInput(Count)%TotalDays=(JulianDay(12,31,LeapYearAdd) -   &
                   RunPeriodDesignInput(Count)%StartDate+1+RunPeriodDesignInput(Count)%EndDate) &
                                    * RunPeriodDesignInput(Count)%NumSimYears
    ENDIF
    RunPeriodDesignInput(Count)%MonWeekDay=0
+    IF (RunPeriodDesignInput(1)%DayOfWeek /= 0 .and. .not. ErrorsFound) THEN
+      CALL SetupWeekDaysByMonth(RunPeriodDesignInput(1)%StartMonth,RunPeriodDesignInput(1)%StartDay,  &
+                                RunPeriodDesignInput(1)%DayOfWeek,RunPeriodDesignInput(1)%MonWeekDay)
+    ENDIF
   ENDDO
 
   cCurrentModuleObject='SizingPeriod:WeatherFileConditionType'
@@ -5326,7 +6363,7 @@ SUBROUTINE CalcSpecialDayTypes
 
     Warn=0
 
-    JDay=JulianDay(SpecialDays(Loop)%Month,SpecialDays(Loop)%Day,WFLeapYearInd)-1
+    JDay=JulianDay(SpecialDays(Loop)%Month,SpecialDays(Loop)%Day,LeapYearAdd)-1
 
     DO Loop1=1,SpecialDays(Loop)%Duration
       JDay=JDay+1
@@ -5481,7 +6518,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
   CHARACTER(len=*), PARAMETER, DIMENSION(0:DDHumIndType_Count-1) :: HumidityIndicatingType=  &
          (/'Wetbulb [C]                        ',  &
            'Dewpoint [C]                       ',  &
-           'Enthalpy [kJ/kg]                   ',  &
+           'Enthalpy [J/kg]                    ',  &
            'Humidity Ratio []                  ',  &
            'Schedule []                        ',  &
            'WetBulbProfileDefaultMultipliers []', &
@@ -5565,99 +6602,166 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     DesDayInput(EnvrnNum)%Title = cAlphaArgs(1)            ! Environment name
     Environment(EnvrnNum)%Title = DesDayInput(EnvrnNum)%Title
 
-    DesDayInput(EnvrnNum)%MaxDryBulb = rNumericArgs(1)       ! Maximum Dry-Bulb Temperature (C)
-    DesDayInput(EnvrnNum)%DailyDBRange = rNumericArgs(2)     ! Daily dry-bulb temperature range (deltaC)
-    DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(3)       ! Humidity Indicating Conditions at Max Dry-Bulb
-    DesDayInput(EnvrnNum)%PressBarom = rNumericArgs(4)       ! Atmospheric/Barometric Pressure (Pascals)
-    DesDayInput(EnvrnNum)%WindSpeed = rNumericArgs(5)        ! Wind Speed (m/s)
-    DesDayInput(EnvrnNum)%WindDir = MOD(rNumericArgs(6),360.d0)! Wind Direction
+    DesDayInput(EnvrnNum)%MaxDryBulb = rNumericArgs(3)       ! Maximum Dry-Bulb Temperature (C)
+    DesDayInput(EnvrnNum)%DailyDBRange = rNumericArgs(4)     ! Daily dry-bulb temperature range (deltaC)
+    DesDayInput(EnvrnNum)%PressBarom = rNumericArgs(9)       ! Atmospheric/Barometric Pressure (Pascals)
+    DesDayInput(EnvrnNum)%WindSpeed = rNumericArgs(10)        ! Wind Speed (m/s)
+    DesDayInput(EnvrnNum)%WindDir = MOD(rNumericArgs(11),360.d0)! Wind Direction
                                                                ! (degrees clockwise from North, N=0, E=90, S=180, W=270)
-    DesDayInput(EnvrnNum)%SkyClear = rNumericArgs(7)         ! Sky Clearness (0 to 1)
-    DesDayInput(EnvrnNum)%RainInd=Int(rNumericArgs(8))       ! Rain Indicator (1 = raining and surfaces are wet, else 0)
-    DesDayInput(EnvrnNum)%RainInd=MIN(MAX(DesDayInput(EnvrnNum)%RainInd,0),1)
-    DesDayInput(EnvrnNum)%SnowInd=Int(rNumericArgs(9))       ! Snow Indicator (1 = snow on ground, else  0)
-    DesDayInput(EnvrnNum)%SnowInd=MIN(MAX(DesDayInput(EnvrnNum)%SnowInd,0),1)
-    DesDayInput(EnvrnNum)%DayOfMonth=Int(rNumericArgs(10))   ! Day of Month ( 1 - 31 )
-    DesDayInput(EnvrnNum)%Month=Int(rNumericArgs(11))        ! Month of Year ( 1 - 12 )
-    DesDayInput(EnvrnNum)%TauB=rNumericArgs(13)              ! beam tau >= 0
-    DesDayInput(EnvrnNum)%TauD=rNumericArgs(14)              ! diffuse tau >= 0
-    DesDayInput(EnvrnNum)%DailyWBRange=rNumericArgs(15)      ! Daily wet-bulb temperature range (deltaC)
+    DesDayInput(EnvrnNum)%Month=Int(rNumericArgs(1))        ! Month of Year ( 1 - 12 )
+    DesDayInput(EnvrnNum)%DayOfMonth=Int(rNumericArgs(2))   ! Day of Month ( 1 - 31 )
+    DesDayInput(EnvrnNum)%TauB=rNumericArgs(12)              ! beam tau >= 0
+    DesDayInput(EnvrnNum)%TauD=rNumericArgs(13)              ! diffuse tau >= 0
+    DesDayInput(EnvrnNum)%DailyWBRange=rNumericArgs(8)      ! Daily wet-bulb temperature range (deltaC)
 
 
-    IF (SameString(cAlphaArgs(3),'WetBulb')) THEN
-      cAlphaArgs(3)='WetBulb'
+    DesDayInput(EnvrnNum)%SkyClear = rNumericArgs(14)         ! Sky Clearness (0 to 1)
+
+    IF (SameString(cAlphaArgs(7),'Yes') .or. SameString(cAlphaArgs(7),'1') ) THEN
+      DesDayInput(EnvrnNum)%RainInd=1
+    ELSEIF (SameString(cAlphaArgs(7),'No') .or. SameString(cAlphaArgs(7),'0') .or. lAlphaFieldBlanks(7)) THEN
+      DesDayInput(EnvrnNum)%RainInd=0
+    ELSE
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
+         '", invalid '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+      CALL ShowContinueError('"No" will be used.')
+      DesDayInput(EnvrnNum)%RainInd=0
+    ENDIF
+
+    IF (SameString(cAlphaArgs(8),'Yes') .or. SameString(cAlphaArgs(8),'1') ) THEN
+      DesDayInput(EnvrnNum)%SnowInd=1
+    ELSEIF (SameString(cAlphaArgs(8),'No') .or. SameString(cAlphaArgs(8),'0') .or. lAlphaFieldBlanks(8)) THEN
+      DesDayInput(EnvrnNum)%SnowInd=0
+    ELSE
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
+         '", invalid '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'".')
+      CALL ShowContinueError('"No" will be used.')
+      DesDayInput(EnvrnNum)%SnowInd=0
+    ENDIF
+
+    IF (SameString(cAlphaArgs(5),'WetBulb')) THEN
+      cAlphaArgs(5)='WetBulb'
+      IF (.not. lNumericFieldBlanks(5)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Wetbulb
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3))//' - Wet-Bulb',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Wet-Bulb',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
                      (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0))
       IF (errflag) THEN
         CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
-    ELSEIF (SameString(cAlphaArgs(3),'DewPoint')) THEN
-      cAlphaArgs(3)='DewPoint'
+    ELSEIF (SameString(cAlphaArgs(5),'DewPoint')) THEN
+      cAlphaArgs(5)='DewPoint'
+      IF (.not. lNumericFieldBlanks(5)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Dewpoint
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3))//' - Dew-Point',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Dew-Point',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
                      (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0))
       IF (errflag) THEN
         CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
-    ELSEIF (SameString(cAlphaArgs(3),'HumidityRatio')) THEN
-      cAlphaArgs(3)='HumidityRatio'
+    ELSEIF (SameString(cAlphaArgs(5),'HumidityRatio')) THEN
+      cAlphaArgs(5)='HumidityRatio'
+      IF (.not. lNumericFieldBlanks(6)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(6)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(6))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_HumRatio
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3))//' - Humidity-Ratio',TRIM(cCurrentModuleObject),'Severe','>= 0',  &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Humidity-Ratio',TRIM(cCurrentModuleObject),'Severe','>= 0',  &
                      (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= .03',(DesDayInput(EnvrnNum)%HumIndValue <=.03d0))
       IF (errflag) THEN
         CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
-    ELSEIF (SameString(cAlphaArgs(3),'Enthalpy')) THEN
-      cAlphaArgs(3)='Enthalpy'
+    ELSEIF (SameString(cAlphaArgs(5),'Enthalpy')) THEN
+      cAlphaArgs(5)='Enthalpy'
+      IF (.not. lNumericFieldBlanks(7)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(7)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(7))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Enthalpy
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3))//' - Enthalpy','SizingPeriod:DesignDay','Severe','>= 0.0',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= 130',(DesDayInput(EnvrnNum)%HumIndValue <=130.d0))
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Enthalpy','SizingPeriod:DesignDay','Severe','>= 0.0',  &
+                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= 130000',(DesDayInput(EnvrnNum)%HumIndValue <=130000.d0))
       IF (errflag) THEN
         CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
-    ELSEIF (SameString(cAlphaArgs(3),'Schedule')) THEN
-      cAlphaArgs(3)='Schedule'
-      DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Schedule
-    ELSEIF (SameString(cAlphaArgs(3),'WetBulbProfileMultiplierSchedule')) THEN
-      cAlphaArgs(3)='WetBulbProfileMultiplierSchedule'
+    ELSEIF (SameString(cAlphaArgs(5),'RelativeHumiditySchedule')) THEN
+      cAlphaArgs(5)='RelativeHumiditySchedule'
+      DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_RelHumSch
+    ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileMultiplierSchedule')) THEN
+      cAlphaArgs(5)='WetBulbProfileMultiplierSchedule'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_WBProfMul
-    ELSEIF (SameString(cAlphaArgs(3),'WetBulbProfileDifferenceSchedule')) THEN
-      cAlphaArgs(3)='WetBulbProfileDifferenceSchedule'
+      IF (.not. lNumericFieldBlanks(5)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
+    ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileDifferenceSchedule')) THEN
+      cAlphaArgs(5)='WetBulbProfileDifferenceSchedule'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_WBProfDif
-    ELSEIF (SameString(cAlphaArgs(3),'WetBulbProfileDefaultMultipliers')) THEN
-      cAlphaArgs(3)='WetBulbProfileDefaultMultipliers'
+      IF (.not. lNumericFieldBlanks(5)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
+    ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileDefaultMultipliers')) THEN
+      cAlphaArgs(5)='WetBulbProfileDefaultMultipliers'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_WBProfDef
+      IF (.not. lNumericFieldBlanks(5)) THEN
+        DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
+        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+      ENDIF
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         ' Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
+         ' Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
       CALL ShowContinueError('WetBulb will be used.')
-      cAlphaArgs(3)='WetBulb'
+      cAlphaArgs(5)='WetBulb'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Wetbulb
     ENDIF
 
     ! resolve humidity schedule if needed
-    IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_Schedule .or. &
+    IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_RelHumSch .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfMul .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
-      IF (lAlphaFieldBlanks(4)) THEN
+      IF (lAlphaFieldBlanks(6)) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' Blank '//TRIM(cAlphaFieldNames(4))//' was specified.')
-        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(3))//' indicates "'// TRIM( cAlphaArgs( 3)) // '".')
+           ' Blank '//TRIM(cAlphaFieldNames(6))//' was specified.')
+        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(3))//'="'// TRIM(cAlphaArgs(3)) // '".')
         ErrorsFound=.true.
       ELSE
-        DesDayInput(EnvrnNum)%HumIndSchPtr=GetDayScheduleIndex( cAlphaArgs(4))
+        DesDayInput(EnvrnNum)%HumIndSchPtr=GetDayScheduleIndex( cAlphaArgs(6))
         IF (DesDayInput(EnvrnNum)%HumIndSchPtr == 0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+             ' Invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
           CALL ShowContinueError('Default Humidity will be used (constant for day using Humidity Indicator Temp).')
           ! reset HumIndType ?
         ELSE
@@ -5666,10 +6770,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
 
           SELECT CASE (DesDayInput(EnvrnNum)%HumIndType)
 
-           CASE (DDHumIndType_Schedule)
+           CASE (DDHumIndType_RelHumSch)
              IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0,'>=',100.0,'<=')) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+             ' Invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
             CALL ShowSevereError('Specified Relative Humidity Values are not within [0.0, 100.0]')
             ErrorsFound=.true.
           ENDIF
@@ -5679,7 +6783,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
              ! multiplier: use schedule value, check 0 <= v <= 1
              IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
                CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-               CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+               CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
                CALL ShowContinueError('..Specified Wet-bulb Profile Range Multiplier Values are not within [0.0, 1.0]')
                ErrorsFound=.true.
         ENDIF
@@ -5687,7 +6791,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
            CASE (DDHumIndType_WBProfDif)
             IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0d0,'>=')) THEN
               CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
               CALL ShowSevereError('Some Wet-bulb Profile Difference Values are < 0.0 [would make max larger].')
         ErrorsFound=.true.
       ENDIF
@@ -5718,10 +6822,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
       IF (DesDayInput(EnvrnNum)%HumIndValue > DesDayInput(EnvrnNum)%MaxDryBulb) THEN
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('  Humidity Indicator Temperature at Max Temp='//  &
+        CALL ShowContinueError('  Humidity Indicator Temperature at Max Temperature='//  &
                    TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%HumIndValue,1))//  &
                    ' > Max DryBulb='//TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%MaxDryBulb,1)))
-        CALL ShowContinueError('  '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
+        CALL ShowContinueError('  '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
         CALL ShowContinueError('  Conditions for day will be set to Relative Humidity = 100%')
         IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_Dewpoint) THEN
           ! dew-point
@@ -5735,25 +6839,25 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ENDIF
 
     ! check DB profile input
-    IF (lAlphaFieldBlanks(5)) THEN
-      cAlphaArgs(5)='DefaultMultipliers'
+    IF (lAlphaFieldBlanks(3)) THEN
+      cAlphaArgs(3)='DefaultMultipliers'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
-    ELSEIF (SameString(cAlphaArgs(5),'Multiplier') .or. SameString(cAlphaArgs(5),'MultiplierSchedule')) THEN
-      cAlphaArgs(5)='MultiplierSchedule'
+    ELSEIF (SameString(cAlphaArgs(3),'Multiplier') .or. SameString(cAlphaArgs(3),'MultiplierSchedule')) THEN
+      cAlphaArgs(3)='MultiplierSchedule'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Multiplier
-    ELSEIF (SameString(cAlphaArgs(5),'Difference') .or. SameString(cAlphaArgs(5),'Delta') .or.   &
-            SameString(cAlphaArgs(5),'DifferenceSchedule') .or. SameString(cAlphaArgs(5),'DeltaSchedule')) THEN
-      cAlphaArgs(5)='DifferenceSchedule'
+    ELSEIF (SameString(cAlphaArgs(3),'Difference') .or. SameString(cAlphaArgs(3),'Delta') .or.   &
+            SameString(cAlphaArgs(3),'DifferenceSchedule') .or. SameString(cAlphaArgs(3),'DeltaSchedule')) THEN
+      cAlphaArgs(3)='DifferenceSchedule'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Difference
-    ELSEIF (SameString(cAlphaArgs(5),'DefaultMultipliers')) THEN
-      cAlphaArgs(5)='DefaultMultipliers'
+    ELSEIF (SameString(cAlphaArgs(3),'DefaultMultipliers')) THEN
+      cAlphaArgs(3)='DefaultMultipliers'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
       ! Validate Temperature - Daily range
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
+      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
       CALL ShowContinueError('..Default Dry-bulb Range modifiers will be used.')
-      cAlphaArgs(5)='DefaultMultipliers'
+      cAlphaArgs(3)='DefaultMultipliers'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
     ENDIF
 
@@ -5761,7 +6865,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Difference) THEN
       testval=DesDayInput(EnvrnNum)%MaxDryBulb-DesDayInput(EnvrnNum)%DailyDBRange
       errflag=.false.
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
                         '<= 70',(testval <=70.d0))
       IF (errflag) THEN
         CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
@@ -5770,25 +6874,25 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ENDIF
 
     IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Default) THEN
-      IF (.not. lAlphaFieldBlanks(6)) THEN
-        DesDayInput(EnvrnNum)%TempRangeSchPtr=GetDayScheduleIndex(cAlphaArgs(6))
+      IF (.not. lAlphaFieldBlanks(4)) THEN
+        DesDayInput(EnvrnNum)%TempRangeSchPtr=GetDayScheduleIndex(cAlphaArgs(4))
         IF (DesDayInput(EnvrnNum)%TempRangeSchPtr == 0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-          CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
+          CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
           CALL ShowContinueError('..Default Dry-bulb Range will be used.')
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%TempRangeSchPtr,DDDBRngModifier(EnvrnNum,:,:))
-          IF (cAlphaArgs(5) == 'MultiplierSchedule') THEN
+          IF (cAlphaArgs(3) == 'MultiplierSchedule') THEN
             IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
               CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
+              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
               CALL ShowContinueError('..Specified Dry-bulb Range Multiplier Values are not within [0.0, 1.0]')
               ErrorsFound=.true.
             ENDIF
           ELSE  ! delta, must be > 0.0
             IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=')) THEN
               CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
+              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
               CALL ShowSevereError('Some Dry-bulb Range Difference Values are < 0.0 [would make max larger].')
               ErrorsFound=.true.
             ENDIF
@@ -5796,7 +6900,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           testval=MAXVAL(DDDBRngModifier(EnvrnNum,:,:))
           testval=DesDayInput(EnvrnNum)%MaxDryBulb-testval
           errflag=.false.
-          CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(6)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
+          CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(4)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
                            '<= 70',(testval <=70.d0))
           IF (errflag) THEN
             CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
@@ -5805,8 +6909,8 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         ENDIF
       ELSE
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' Blank '//TRIM(cAlphaFieldNames(6))//' was specified.')
-        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(5))//' indicates "SCHEDULE".')
+           ' Blank '//TRIM(cAlphaFieldNames(4))//' was specified.')
+        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(3))//' indicates "SCHEDULE".')
         ErrorsFound=.true.
       ENDIF
     ELSE
@@ -5822,64 +6926,64 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ENDDO
     ENDIF
 
-    IF (lAlphaFieldBlanks(7)) THEN
+    IF (lAlphaFieldBlanks(10)) THEN
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_ClearSky
-    ELSEIF (SameString(cAlphaArgs(7),'ASHRAEClearSky') .or. SameString(cAlphaArgs(7),'CLEARSKY')) THEN
+    ELSEIF (SameString(cAlphaArgs(10),'ASHRAEClearSky') .or. SameString(cAlphaArgs(10),'CLEARSKY')) THEN
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_ClearSky
-    ELSEIF (SameString(cAlphaArgs(7),'ZhangHuang')) THEN
+    ELSEIF (SameString(cAlphaArgs(10),'ZhangHuang')) THEN
       DesDayInput(EnvrnNum)%SolarModel = Zhang_Huang
-    ELSEIF (SameString(cAlphaArgs(7), 'ASHRAETau')) THEN
+    ELSEIF (SameString(cAlphaArgs(10), 'ASHRAETau')) THEN
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_Tau
-    ELSEIF (SameString(cAlphaArgs(7),'Schedule')) THEN
+    ELSEIF (SameString(cAlphaArgs(10),'Schedule')) THEN
       DesDayInput(EnvrnNum)%SolarModel = SolarModel_Schedule
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
       CALL ShowContinueError('Model used will be ASHRAE ClearSky')
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_ClearSky
     ENDIF
 
     IF (DesDayInput(EnvrnNum)%SolarModel == SolarModel_Schedule) THEN
-      IF (.not. lAlphaFieldBlanks(8)) THEN
-        DesDayInput(EnvrnNum)%BeamSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(8))
+      IF (.not. lAlphaFieldBlanks(11)) THEN
+        DesDayInput(EnvrnNum)%BeamSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(11))
         IF (DesDayInput(EnvrnNum)%BeamSolarSchPtr == 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' invalid '//TRIM(cAlphaFieldNames(8))//'='//TRIM(cAlphaArgs(8)))
-          CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(7))//' indicates "Schedule".')
+             ' invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
+          CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(10))//' indicates "Schedule".')
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%BeamSolarSchPtr,DDBeamSolarValues(EnvrnNum,:,:))
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%BeamSolarSchPtr,0.0,'>=')) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-               ' invalid '//TRIM(cAlphaFieldNames(8))//'='//TRIM(cAlphaArgs(8)))
+               ' invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
             CALL ShowContinueError('..Specified Values are not >= 0.0')
             ErrorsFound=.true.
           ENDIF
         ENDIF
       ELSE  ! should have entered beam schedule
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' blank '//TRIM(cAlphaFieldNames(8)))
+           ' blank '//TRIM(cAlphaFieldNames(11)))
         CALL ShowContinueError('..All zeroes will be used. (no solar)')
       ENDIF
-      IF (.not. lAlphaFieldBlanks(9)) THEN
-        DesDayInput(EnvrnNum)%DiffuseSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(9))
+      IF (.not. lAlphaFieldBlanks(12)) THEN
+        DesDayInput(EnvrnNum)%DiffuseSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(12))
         IF (DesDayInput(EnvrnNum)%DiffuseSolarSchPtr == 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' invalid '//TRIM(cAlphaFieldNames(8))//'='//TRIM(cAlphaArgs(8)))
-          CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(7))//' indicates "Schedule".')
+             ' invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
+          CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(10))//' indicates "Schedule".')
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,DDDiffuseSolarValues(EnvrnNum,:,:))
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,0.0,'>=')) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-               ' invalid '//TRIM(cAlphaFieldNames(8))//'='//TRIM(cAlphaArgs(8)))
+               ' invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
             CALL ShowContinueError('..Specified Values are not >= 0.0')
             ErrorsFound=.true.
           ENDIF
         ENDIF
       ELSE  ! should have entered diffuse schedule
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' blank '//TRIM(cAlphaFieldNames(9)))
+           ' blank '//TRIM(cAlphaFieldNames(12)))
         CALL ShowContinueError('..All zeroes will be used. (no solar)')
       ENDIF
     ENDIF
@@ -5916,7 +7020,16 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ErrorsFound=.true.
     END SELECT
 
-    DesDayInput(EnvrnNum)%DSTIndicator=Int(rNumericArgs(12)) ! Daylight Saving Time Indicator (0 - no, 1 - yes)
+    IF (SameString(cAlphaArgs(9),'Yes') .or. SameString(cAlphaArgs(9),'1') ) THEN
+      DesDayInput(EnvrnNum)%DSTIndicator=1
+    ELSEIF (SameString(cAlphaArgs(9),'No') .or. SameString(cAlphaArgs(9),'0') .or. lAlphaFieldBlanks(9)) THEN
+      DesDayInput(EnvrnNum)%DSTIndicator=0
+    ELSE
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
+         '", invalid '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'".')
+      CALL ShowContinueError('"No" will be used.')
+      DesDayInput(EnvrnNum)%DSTIndicator=0
+    ENDIF
 
     DesDayInput(EnvrnNum)%DayType=FindItemInList(cAlphaArgs(2),ValidNames,12)
     IF (DesDayInput(EnvrnNum)%DayType == 0) THEN
@@ -5944,7 +7057,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     envTitle = DesDayInput(EnvrnNum)%Title
     CALL PreDefTableEntry(pdchDDmaxDB,envTitle,DesDayInput(EnvrnNum)%MaxDryBulb)
     CALL PreDefTableEntry(pdchDDrange,envTitle,DesDayInput(EnvrnNum)%DailyDBRange)
-    IF (DesDayInput(EnvrnNum)%HumIndType /= DDHumIndType_Schedule) THEN
+    IF (DesDayInput(EnvrnNum)%HumIndType /= DDHumIndType_RelHumSch) THEN
       CALL PreDefTableEntry(pdchDDhumid,envTitle,DesDayInput(EnvrnNum)%HumIndValue)
     ELSE
       CALL PreDefTableEntry(pdchDDhumid,envTitle,'N/A')
@@ -6965,7 +8078,7 @@ REAL(r64)   :: AtmosMoisture           ! Atmospheric moisture (cm of precipitabl
 !              DifSolarRad is the diffuse horizontal irradiance.
 !              BeamSolarRad is the direct normal irradiance.
 !
-      Zeta = 1.041*SunZenith**3
+      Zeta = 1.041d0*SunZenith**3
       SkyClearness = ( (DifSolarRad + BeamSolarRad)/(DifSolarRad + 0.0001d0) + Zeta )/(1.+Zeta)
       AirMass = (1.d0-0.1d0*Elevation/1000.d0) / (SinSunAltitude + 0.15d0/(SunAltitude/DegToRadians + 3.885d0)**1.253d0)
 !
@@ -7131,7 +8244,7 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
   INTEGER Pos
   REAL(r64) Number
   LOGICAL IOStatus
-  INTEGER PMonth,Pday,PWeekDay,DateType
+  INTEGER PMonth,Pday,PWeekDay,PYear,DateType
   INTEGER NumHdArgs
   LOGICAL ErrFlag
   CHARACTER(len=20) ErrNum
@@ -7455,7 +8568,7 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
         IF (TypicalExtremePeriods(Count)%StartJDay <= TypicalExtremePeriods(Count)%EndJDay) THEN
           TypicalExtremePeriods(Count)%TotalDays=TypicalExtremePeriods(Count)%EndJDay-TypicalExtremePeriods(Count)%StartJDay+1
         ELSE
-          TypicalExtremePeriods(Count)%TotalDays=JulianDay(12,31,WFLeapYearInd)-  &
+          TypicalExtremePeriods(Count)%TotalDays=JulianDay(12,31,LeapYearAdd)-  &
                             TypicalExtremePeriods(Count)%StartJDay+1+TypicalExtremePeriods(Count)%EndJDay
         ENDIF
       ENDDO
@@ -7543,10 +8656,12 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
 
           CASE(1)
             IF (Line(1:1) == 'Y') THEN
-              LeapYear=.true.
-              WFLeapYearInd=1
+!              LeapYear=.true.
+              WFAllowsLeapYears=.true.
+              WFLeapYearInd=0 !1
             ELSE
-              LeapYear=.false.
+!              LeapYear=.false.
+              WFAllowsLeapYears=.false.
               WFLeapYearInd=0
             ENDIF
 
@@ -7636,13 +8751,13 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
       DO Count=1,NumEPWTypExtSets
         ! JulianDay (Month,Day,LeapYearValue)
         TypicalExtremePeriods(Count)%StartJDay=JulianDay(TypicalExtremePeriods(Count)%StartMonth,   &
-                                                         TypicalExtremePeriods(Count)%StartDay,WFLeapYearInd)
+                                                         TypicalExtremePeriods(Count)%StartDay,LeapYearAdd)
         TypicalExtremePeriods(Count)%EndJDay=JulianDay(TypicalExtremePeriods(Count)%EndMonth,   &
-                                                         TypicalExtremePeriods(Count)%EndDay,WFLeapYearInd)
+                                                         TypicalExtremePeriods(Count)%EndDay,LeapYearAdd)
         IF (TypicalExtremePeriods(Count)%StartJDay <= TypicalExtremePeriods(Count)%EndJDay) THEN
           TypicalExtremePeriods(Count)%TotalDays=TypicalExtremePeriods(Count)%EndJDay-TypicalExtremePeriods(Count)%StartJDay+1
         ELSE
-          TypicalExtremePeriods(Count)%TotalDays=JulianDay(12,31,WFLeapYearInd)-  &
+          TypicalExtremePeriods(Count)%TotalDays=JulianDay(12,31,LeapYearAdd)-  &
                             TypicalExtremePeriods(Count)%StartJDay+1+TypicalExtremePeriods(Count)%EndJDay
         ENDIF
       ENDDO
@@ -7739,10 +8854,11 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
             CASE(2)
               ! DataPeriod Start Day
               IF (CurCount <= NumDataPeriods) THEN
-                CALL ProcessDateString(Line(1:Pos-1),PMonth,PDay,PWeekDay,DateType,ErrorsFound)
+                CALL ProcessDateString(Line(1:Pos-1),PMonth,PDay,PWeekDay,DateType,ErrorsFound,PYear)
                 IF (DateType == MonthDay) THEN
                   DataPeriods(CurCount)%StMon=PMonth
                   DataPeriods(CurCount)%StDay=PDay
+                  DataPeriods(CurCount)%StYear=PYear
                 ELSE
                   CALL ShowSevereError('Data Periods must be of the form <DayOfYear> or <Month Day> (WeatherFile), found='  &
                                        //TRIM(Line(1:Pos-1)))
@@ -7752,24 +8868,32 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
 
             CASE(3)
               IF (CurCount <= NumDataPeriods) THEN
-                CALL ProcessDateString(Line(1:Pos-1),PMonth,PDay,PWeekDay,DateType,ErrorsFound)
+                CALL ProcessDateString(Line(1:Pos-1),PMonth,PDay,PWeekDay,DateType,ErrorsFound,PYear)
                 IF (DateType == MonthDay) THEN
                   DataPeriods(CurCount)%EnMon=PMonth
                   DataPeriods(CurCount)%EnDay=PDay
+                  DataPeriods(CurCount)%EnYear=PYear
                 ELSE
                   CALL ShowSevereError('Data Periods must be of the form <DayOfYear> or <Month Day>, (WeatherFile) found='  &
                                        //TRIM(Line(1:Pos-1)))
                   ErrorsFound=.true.
                 ENDIF
               ENDIF
-              DataPeriods(CurCount)%DataStJDay=JulianDay(DataPeriods(CurCount)%StMon,DataPeriods(CurCount)%StDay,WFLeapYearInd)
-              DataPeriods(CurCount)%DataEnJDay=JulianDay(DataPeriods(CurCount)%EnMon,DataPeriods(CurCount)%EnDay,WFLeapYearInd)
-              IF (DataPeriods(CurCount)%DataStJDay <= DataPeriods(CurCount)%DataEnJDay) THEN
+              IF (DataPeriods(CurCount)%StYear == 0 .or. DataPeriods(CurCount)%EnYear == 0) THEN
+                DataPeriods(CurCount)%DataStJDay=JulianDay(DataPeriods(CurCount)%StMon,DataPeriods(CurCount)%StDay,LeapYearAdd)
+                DataPeriods(CurCount)%DataEnJDay=JulianDay(DataPeriods(CurCount)%EnMon,DataPeriods(CurCount)%EnDay,LeapYearAdd)
+                IF (DataPeriods(CurCount)%DataStJDay <= DataPeriods(CurCount)%DataEnJDay) THEN
+                  DataPeriods(CurCount)%NumDays=DataPeriods(CurCount)%DataEnJDay-DataPeriods(CurCount)%DataStJDay+1
+                ELSE
+                  DataPeriods(CurCount)%NumDays=(365-DataPeriods(CurCount)%DataStJDay+1)+(DataPeriods(CurCount)%DataEnJDay-1+1)
+                ENDIF
+              ELSE  ! weather file has actual year(s)
+                CALL jgDate(GregorianToJulian,DataPeriods(CurCount)%DataStJDay,  &
+                   DataPeriods(CurCount)%StYear,DataPeriods(CurCount)%StMon,DataPeriods(CurCount)%StDay)
+                CALL jgDate(GregorianToJulian,DataPeriods(CurCount)%DataEnJDay,  &
+                   DataPeriods(CurCount)%EnYear,DataPeriods(CurCount)%EnMon,DataPeriods(CurCount)%EnDay)
                 DataPeriods(CurCount)%NumDays=DataPeriods(CurCount)%DataEnJDay-DataPeriods(CurCount)%DataStJDay+1
-              ELSE
-                DataPeriods(CurCount)%NumDays=(365-DataPeriods(CurCount)%DataStJDay+1)+(DataPeriods(CurCount)%DataEnJDay-1+1)
               ENDIF
-
               ! Have processed the last item for this, can set up Weekdays for months
               DataPeriods(CurCount)%MonWeekDay=0
               IF (.not. ErrorsFound) THEN
@@ -7927,92 +9051,6 @@ SUBROUTINE SkipEPlusWFHeader
   RETURN
 
 END SUBROUTINE SkipEPlusWFHeader
-
-SUBROUTINE SetupWeekDaysByMonth(StMon,StDay,StWeekDay,WeekDays)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Linda Lawrie
-          !       DATE WRITTEN   August 2000
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine calculates the weekday for each month based on the start date and
-          ! weekday specified for that date.
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-          ! na
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: StMon
-  INTEGER, INTENT(IN) :: StDay
-  INTEGER, INTENT(IN) :: StWeekDay
-  INTEGER, INTENT(INOUT), DIMENSION(12) :: Weekdays
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER Loop
-  INTEGER CurWeekDay
-
-  CurWeekDay=StWeekDay
-  DO Loop=1,StDay-1
-    CurWeekDay=CurWeekDay-1
-    IF (CurWeekDay == 0) CurWeekDay=7
-  ENDDO
-
-  WeekDays(StMon)=CurWeekDay
-  DO Loop=StMon+1,12
-
-    SELECT CASE(Loop)
-    CASE(2)
-      CurWeekDay=MOD(CurWeekDay+EndDayOfMonth(1)-1,7)+1
-      WeekDays(Loop)=CurWeekDay
-!        ThisWeekDay=MOD(DataPeriods(Loop)%WeekDay+NumDays-1,7)+1
-
-    CASE(3:12)
-      CurWeekDay=MOD(CurWeekDay+EndDayOfMonth(Loop-1)+WFLeapYearInd-1,7)+1
-      WeekDays(Loop)=CurWeekDay
-    END SELECT
-  ENDDO
-
-  IF (ANY(WeekDays == 0)) THEN
-    ! Going to assume that "year" continues from here.....
-    DO Loop=1,StMon-1
-
-      SELECT CASE(Loop)
-      CASE(2)
-        CurWeekDay=MOD(CurWeekDay+EndDayOfMonth(1)-1,7)+1
-        WeekDays(Loop)=CurWeekDay
-
-      CASE(3:12)
-        CurWeekDay=MOD(CurWeekDay+EndDayOfMonth(Loop-1)+WFLeapYearInd-1,7)+1
-        WeekDays(Loop)=CurWeekDay
-      END SELECT
-
-    ENDDO
-
-  ENDIF
-
-
-  RETURN
-
-END SUBROUTINE SetupWeekDaysByMonth
 
 SUBROUTINE ReportMissing_RangeData
 
@@ -8426,28 +9464,31 @@ SUBROUTINE SetupEnvironmentTypes
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: Loop
+  INTEGER :: Loop1
+  INTEGER :: JDay1
+  INTEGER :: JDay2
 
 
           ! Transfer weather file information to the Environment derived type
       Envrn=TotDesDays+1
+      ! Sizing Periods from Weather File
       DO Loop=1,TotRunDesPers
         Environment(Envrn)%StartMonth=RunPeriodDesignInput(Loop)%StartMonth
         Environment(Envrn)%StartDay=RunPeriodDesignInput(Loop)%StartDay
         Environment(Envrn)%StartJDay=JulianDay(RunPeriodDesignInput(Loop)%StartMonth,  &
-                                                  RunPeriodDesignInput(Loop)%StartDay,WFLeapYearInd)
+                                                  RunPeriodDesignInput(Loop)%StartDay,LeapYearAdd)
         Environment(Envrn)%TotalDays=RunPeriodDesignInput(Loop)%TotalDays
         Environment(Envrn)%EndMonth=RunPeriodDesignInput(Loop)%EndMonth
         Environment(Envrn)%EndDay=RunPeriodDesignInput(Loop)%EndDay
         Environment(Envrn)%EndJDay=JulianDay(RunPeriodDesignInput(Loop)%EndMonth,  &
-                                                RunPeriodDesignInput(Loop)%EndDay,WFLeapYearInd)
+                                                RunPeriodDesignInput(Loop)%EndDay,LeapYearAdd)
         Environment(Envrn)%NumSimYears=RunPeriodDesignInput(Loop)%NumSimYears
         IF (Environment(Envrn)%StartJDay <= Environment(Envrn)%EndJDay) THEN
           Environment(Envrn)%TotalDays=(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay+1)   &
                                         * Environment(Envrn)%NumSimYears
         ELSE
-          Environment(Envrn)%TotalDays=(JulianDay(12,31,  &
-                                        WFLeapYearInd)-Environment(Envrn)%StartJDay+1+Environment(Envrn)%EndJDay) &
-                                        * Environment(Envrn)%NumSimYears
+          Environment(Envrn)%TotalDays=(JulianDay(12,31,LeapYearAdd)  &
+                                -Environment(Envrn)%StartJDay+1+Environment(Envrn)%EndJDay) * Environment(Envrn)%NumSimYears
         ENDIF
         TotRunDesPersDays=TotRunDesPersDays+Environment(Envrn)%TotalDays
         Environment(Envrn)%UseDST=RunPeriodDesignInput(Loop)%UseDST
@@ -8457,25 +9498,93 @@ SUBROUTINE SetupEnvironmentTypes
         Environment(Envrn)%KindOfEnvrn = ksRunPeriodDesign
         Environment(Envrn)%DayOfWeek=RunPeriodDesignInput(Loop)%DayOfWeek
         Environment(Envrn)%MonWeekDay=RunPeriodDesignInput(Loop)%MonWeekDay
+        Environment(Envrn)%SetWeekDays=.false.
         Environment(Envrn)%ApplyWeekendRule=RunPeriodDesignInput(Loop)%ApplyWeekendRule
         Environment(Envrn)%UseRain=RunPeriodDesignInput(Loop)%UseRain
         Environment(Envrn)%UseSnow=RunPeriodDesignInput(Loop)%UseSnow
         Envrn=Envrn+1
       ENDDO
-      DO Loop=1,TotRunPers
+
+      ! RunPeriods from weather file
+      DO Loop=1,TotRunPers  ! Run Periods.
         Environment(Envrn)%StartMonth=RunPeriodInput(Loop)%StartMonth
         Environment(Envrn)%StartDay=RunPeriodInput(Loop)%StartDay
-        Environment(Envrn)%StartJDay=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,WFLeapYearInd)
         Environment(Envrn)%EndMonth=RunPeriodInput(Loop)%EndMonth
         Environment(Envrn)%EndDay=RunPeriodInput(Loop)%EndDay
-        Environment(Envrn)%EndJDay=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,WFLeapYearInd)
         Environment(Envrn)%NumSimYears=RunPeriodInput(Loop)%NumSimYears
-        IF (Environment(Envrn)%StartJDay <= Environment(Envrn)%EndJDay) THEN
-          Environment(Envrn)%TotalDays=(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay+1)   &
-                                        * Environment(Envrn)%NumSimYears
-        ELSE
-          Environment(Envrn)%TotalDays=(JulianDay(12,31,WFLeapYearInd)-Environment(Envrn)%StartJDay+1+Environment(Envrn)%EndJDay) &
-                                        * Environment(Envrn)%NumSimYears
+        IF (RunPeriodInput(Loop)%ActualWeather) THEN
+          Environment(Envrn)%CurrentYear=RunPeriodInput(Loop)%StartYear
+          Environment(Envrn)%IsLeapYear=IsLeapYear(RunPeriodInput(Loop)%StartYear)
+          Environment(Envrn)%TreatYearsAsConsecutive=.true.
+          Environment(Envrn)%StartYear=RunPeriodInput(Loop)%StartYear
+          Environment(Envrn)%EndYear=RunPeriodInput(Loop)%EndYear
+          CALL jgDate(GregorianToJulian,Environment(Envrn)%StartDate,  &
+             Environment(Envrn)%StartYear,Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay)
+          CALL jgDate(GregorianToJulian,Environment(Envrn)%EndDate,  &
+             Environment(Envrn)%EndYear,Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay)
+          Environment(Envrn)%StartJDay=Environment(Envrn)%StartDate
+          Environment(Envrn)%EndJDay=Environment(Envrn)%EndDate
+          Environment(Envrn)%TotalDays=Environment(Envrn)%EndDate-Environment(Envrn)%StartDate + 1
+          Environment(Envrn)%RawSimDays=Environment(Envrn)%EndDate-Environment(Envrn)%StartDate + 1
+          Environment(Envrn)%MatchYear=.true.
+          Environment(Envrn)%ActualWeather=.true.
+        ELSEIF (RunPeriodInput(Loop)%BeginYear < 100) THEN ! std RunPeriod
+          Environment(Envrn)%CurrentYear=0
+          IF (.not. WFAllowsLeapYears) THEN
+            Environment(Envrn)%IsLeapYear=.false.  ! explicit set
+          ELSE
+            Environment(Envrn)%IsLeapYear=.true.  ! explicit set
+          ENDIF
+          Environment(Envrn)%TreatYearsAsConsecutive=.false.
+          Environment(Envrn)%RollDayTypeOnRepeat=RunPeriodInput(Loop)%RollDayTypeOnRepeat
+          Environment(Envrn)%StartJDay=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,LeapYearAdd)
+          Environment(Envrn)%EndJDay=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,LeapYearAdd)
+        ! need message if isleapyear and wfleapyearind=0
+          IF (Environment(Envrn)%StartJDay <= Environment(Envrn)%EndJDay) THEN
+            Environment(Envrn)%RawSimDays=(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay+1)
+            Environment(Envrn)%TotalDays=(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay+1)   &
+                                          * Environment(Envrn)%NumSimYears
+          ELSE
+            Environment(Envrn)%RawSimDays=(JulianDay(12,31,LeapYearAdd)-Environment(Envrn)%StartJDay+1+  &
+                                                    Environment(Envrn)%EndJDay)
+            Environment(Envrn)%TotalDays=(JulianDay(12,31,LeapYearAdd)-Environment(Envrn)%StartJDay+1+  &
+                                                    Environment(Envrn)%EndJDay) &
+                                          * Environment(Envrn)%NumSimYears
+          ENDIF
+
+        ELSE ! Using Runperiod and StartYear option.
+          Environment(Envrn)%CurrentYear=RunPeriodInput(Loop)%BeginYear
+          Environment(Envrn)%IsLeapYear=IsLeapYear(Environment(Envrn)%CurrentYear)
+          Environment(Envrn)%TreatYearsAsConsecutive=.true.
+          Environment(Envrn)%RollDayTypeOnRepeat=RunPeriodInput(Loop)%RollDayTypeOnRepeat
+          Environment(Envrn)%StartJDay=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,LeapYearAdd)
+          Environment(Envrn)%EndJDay=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,LeapYearAdd)
+          Environment(Envrn)%TotalDays=0
+          DO Loop1=1,Environment(Envrn)%NumSimYears
+            IF (.not. IsLeapYear(RunPeriodInput(Loop)%BeginYear-1+Loop1) .or. .not. WFAllowsLeapYears) THEN
+              JDay1=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,0)
+              JDay2=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,0)
+              IF (JDay1 <= JDay2) THEN
+                IF (Loop1 == 1) &
+                  Environment(Envrn)%RawSimDays=(JDay2-Jday1+1)
+                Environment(Envrn)%TotalDays=Environment(Envrn)%TotalDays+(JDay2-Jday1+1)
+              ELSE
+                IF (Loop1 == 1) &
+                   Environment(Envrn)%RawSimDays=JulianDay(12,31,0)-JDay1+1+JDay2
+                Environment(Envrn)%TotalDays=Environment(Envrn)%TotalDays+  &
+                   JulianDay(12,31,0)-JDay1+1+JDay2
+              ENDIF
+            ELSE  ! Leap Year
+              JDay1=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,1)
+              JDay2=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,1)
+              IF (JDay1 <= JDay2) THEN
+                Environment(Envrn)%TotalDays=Environment(Envrn)%TotalDays+(JDay2-Jday1+1)
+              ELSE
+                Environment(Envrn)%TotalDays=Environment(Envrn)%TotalDays+  &
+                   JulianDay(12,31,1)-JDay1+1+JDay2
+              ENDIF
+            ENDIF
+          ENDDO
         ENDIF
         Environment(Envrn)%UseDST=RunPeriodInput(Loop)%UseDST
         Environment(Envrn)%UseHolidays=RunPeriodInput(Loop)%UseHolidays
@@ -8488,6 +9597,7 @@ SUBROUTINE SetupEnvironmentTypes
         Environment(Envrn)%KindOfEnvrn = ksRunPeriodWeather
         Environment(Envrn)%DayOfWeek=RunPeriodInput(Loop)%DayOfWeek
         Environment(Envrn)%MonWeekDay=RunPeriodInput(Loop)%MonWeekDay
+        Environment(Envrn)%SetWeekDays=.false.
         Environment(Envrn)%ApplyWeekendRule=RunPeriodInput(Loop)%ApplyWeekendRule
         Environment(Envrn)%UseRain=RunPeriodInput(Loop)%UseRain
         Environment(Envrn)%UseSnow=RunPeriodInput(Loop)%UseSnow
@@ -8498,9 +9608,202 @@ SUBROUTINE SetupEnvironmentTypes
 
 END SUBROUTINE SetupEnvironmentTypes
 
+FUNCTION IsLeapYear(Year) RESULT(YesNo)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! From entered year returns true (Yes) if it's a leap year, false (no) if not.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: Year
+  LOGICAL :: YesNo
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+    YesNo=.false.
+    IF (MOD(Year,4) == 0) THEN  ! Potential Leap Year
+      IF (.not. (MOD(Year,100) == 0 .and. MOD(Year,400) /= 0)) THEN
+        YesNo=.true.
+      ENDIF
+    ENDIF
+  RETURN
+
+END FUNCTION IsLeapYear
+
+SUBROUTINE JGDate(jflag,jdate,gyyyy,gmm,gdd)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Subroutine JGDate is a gregorian date to actual julian date
+          ! converter.  the advantage of storing a julian date in the
+          ! jdate format rather than a 5 digit format is that any
+          ! number of days can be add or subtracted to jdate and
+          ! that result is a proper julian date.
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! for discussion of this algorithm,
+          ! see cacm, vol 11, no 10, oct 1968, page 657
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER :: jflag   ! indicates direction of conversion,
+                     ! 1 --> gregorian (dd/mm/yyyy) to julian
+                     ! 2 --> julian to gregorian.
+
+  INTEGER :: jdate   ! input/output julian date, typically a 7 or 8 digit integer
+  INTEGER :: gyyyy   ! input/output gregorian year, should be specified as 4 digits
+  INTEGER :: gmm     ! input/output gregorian month
+  INTEGER :: gdd     ! input/output gregorian day
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: tdate   ! integer*4 variable needed for double precision arithmetic
+  INTEGER :: tyyyy   ! integer*4 variable needed for double precision arithmetic
+  INTEGER :: tmm     ! integer*4 variable needed for double precision arithmetic
+  INTEGER :: tdd     ! integer*4 variable needed for double precision arithmetic
+  INTEGER :: l       ! temporary variable used in conversion.
+  INTEGER :: n       ! temporary variable used in conversion.
+
+!
+!                                       gregorian to julian
+!
+      if (jflag == 1) then
+        tyyyy=gyyyy
+        tmm=gmm
+        tdd=gdd
+        l= (tmm - 14) / 12
+        jdate = tdd - 32075 + 1461 * (tyyyy + 4800 + l)/4 + 367 * (tmm - 2 - l*12)/12 - 3 * ((tyyyy + 4900 + l)/100)/4
+
+      elseif (jflag == 2) then
+!
+!                                       julian to gregorian
+!
+        tdate = jdate
+        l = tdate + 68569
+        n = 4*l / 146097
+        l = l - (146097*n + 3) / 4
+        tyyyy = 4000*(l+1) / 1461001
+        l = l- 1461*tyyyy / 4 + 31
+        tmm = 80*l / 2447
+        tdd = l - 2447*tmm / 80
+        l = tmm/11
+        tmm = tmm + 2 - 12*l
+        tyyyy = 100 * (n - 49) + tyyyy + l
+!c
+        gyyyy = tyyyy
+        gdd   = tdd
+        gmm   = tmm
+
+      endif
+!c
+      return
+
+END SUBROUTINE JGDate
+
+FUNCTION CalculateDayOfWeek(JulianDate) RESULT (dayOfWeek)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Using Julian date (from jgdate calc), calculate the correct day of week.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Zeller's algorithm.
+
+          ! REFERENCES:
+          ! http://en.wikipedia.org/wiki/Zeller%27s_congruence
+          ! and other references around the web.
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)    :: JulianDate   ! from JGDate calculation
+  INTEGER                :: dayOfWeek    ! EnergyPlus convention (1=Sunday, 2=Monday, etc)
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Gyyyy  ! Gregorian yyyy
+  INTEGER :: Gmm    ! Gregorian mm
+  INTEGER :: Gdd    ! Gregorian dd
+
+  CALL JGDate(JulianToGregorian,JulianDate,Gyyyy,Gmm,Gdd)
+
+  ! Jan, Feb are 13, 14 months of previous year
+  IF (Gmm < 3) THEN
+    Gmm=Gmm+12
+    Gyyyy=Gyyyy-1
+  ENDIF
+
+  dayOfWeek = MOD(Gdd + (13*(Gmm+1)/5) + Gyyyy + (Gyyyy/4) + 6*(Gyyyy/100) + (Gyyyy/400) , 7)
+  IF (dayOfWeek == 0) dayOfWeek=7
+
+  RETURN
+
+END FUNCTION CalculateDayOfWeek
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

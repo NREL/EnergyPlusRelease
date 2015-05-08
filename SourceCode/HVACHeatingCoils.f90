@@ -711,7 +711,7 @@ SUBROUTINE GetHeatingCoilInput
 
       END DO
 
-! perform error check to make sure duplicate heating sources are not used (i.e. 2 desuperheating coils can not
+! perform error check to make sure duplicate heating sources are not used (i.e. 2 desuperheating coils cannot
 ! use the same heat source). This error check will be expanded in the future to check for duplicates in
 ! desuperheaters used for water heating purposed.
     DO CoilNum = NumElecCoil + NumGasCoil + 1, NumHeatingCoils
@@ -875,12 +875,12 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
   END IF
 
   IF(QCoilRequired == SensedLoadFlagValue .AND. MySPTestFlag(CoilNum))THEN
-!   If the coil is temperature controlled (QCoilReq == -999.0), both a control node and set point are required.
+!   If the coil is temperature controlled (QCoilReq == -999.0), both a control node and setpoint are required.
     IF(.NOT. SysSizingCalc .AND. DoSetPointTest)THEN
 !     3 possibilities here:
 !     1) TempSetPointNodeNum .GT. 0 and TempSetPoint /= SensedNodeFlagValue, this is correct
 !     2) TempSetPointNodeNum .EQ. 0, this is not correct, control node is required
-!     3) TempSetPointNodeNum .GT. 0 and TempSetPoint == SensedNodeFlagValue, this is not correct, missing temperature set point
+!     3) TempSetPointNodeNum .GT. 0 and TempSetPoint == SensedNodeFlagValue, this is not correct, missing temperature setpoint
 !     test 2) here (fatal message)
       IF(ControlNode == 0)THEN
         CALL ShowSevereError(TRIM(cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))// &
@@ -888,7 +888,7 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
         CALL ShowContinueError('... Missing control node for heating coil.')
         CALL ShowContinueError('... enter a control node name in the coil temperature setpoint node field for this'// &
                                  ' heating coil.')
-        CALL ShowContinueError('... use a Set Point Manager to establish a setpoint at the coil temperature setpoint node.')
+        CALL ShowContinueError('... use a Setpoint Manager to establish a setpoint at the coil temperature setpoint node.')
         HeatingCoilFatalError = .TRUE.
 !     test 3) here (fatal message)
       ELSE !IF(ControlNode .GT. 0)THEN
@@ -897,7 +897,7 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
             CALL ShowSevereError(TRIM(cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))// &
                                                ' "'//TRIM(HeatingCoil(CoilNum)%Name)//'"')
             CALL ShowContinueError('... Missing temperature setpoint for heating coil.')
-            CALL ShowContinueError('... use a Set Point Manager to establish a setpoint at the coil temperature setpoint node.')
+            CALL ShowContinueError('... use a Setpoint Manager to establish a setpoint at the coil temperature setpoint node.')
             HeatingCoilFatalError = .TRUE.
           ELSE
             CALL CheckIfNodeSetpointManagedByEMS(ControlNode,iTemperatureSetpoint, HeatingCoilFatalError)
@@ -905,7 +905,7 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
               CALL ShowSevereError(TRIM(cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))// &
                                                  ' "'//TRIM(HeatingCoil(CoilNum)%Name)//'"')
               CALL ShowContinueError('... Missing temperature setpoint for heating coil.')
-              CALL ShowContinueError('... use a Set Point Manager to establish a setpoint at the coil temperature setpoint node.')
+              CALL ShowContinueError('... use a Setpoint Manager to establish a setpoint at the coil temperature setpoint node.')
               CALL ShowContinueError('... or use an EMS Actuator to establish a setpoint at the coil temperature setpoint node.')
             ENDIF
           ENDIF
@@ -927,9 +927,9 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
                                              ' "'//TRIM(HeatingCoil(CoilNum)%Name)//'"')
       CALL ShowContinueError(' The Temperature Setpoint Node Name input is not required for this heating coil because')
       CALL ShowContinueError(' this heating coil is controlled based on the load calculated by the thermostat.')
-      CALL ShowContinueError('... this heating coil is not controlled by using a temperature set point manager.')
-      CALL ShowContinueError('... if a temperature set point is placed at the outlet node of this heating coil, that'//&
-                             ' temperature set point will not be used.')
+      CALL ShowContinueError('... this heating coil is not controlled by using a temperature setpoint manager.')
+      CALL ShowContinueError('... if a temperature setpoint is placed at the outlet node of this heating coil, that'//&
+                             ' temperature setpoint will not be used.')
       CALL ShowContinueError('... leaving the input field "Temperature Setpoint Node Name" blank will'//&
                              ' eliminate this warning.')
     END IF
@@ -1288,7 +1288,7 @@ Subroutine CalcElectricHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLo
      (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap = CapacitanceAir*(TempSetPoint - TempAirIn)
-      ! check to see if set point above enetering temperature. If not, set
+      ! check to see if setpoint above enetering temperature. If not, set
       ! output to zero.
       IF(QCoilCap .LE. 0.0) THEN
         QCoilCap = 0.0
@@ -1436,7 +1436,7 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
      (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap = CapacitanceAir*(TempSetPoint - TempAirIn)
-      ! check to see if set point above enetering temperature. If not, set
+      ! check to see if setpoint above enetering temperature. If not, set
       ! output to zero.
       IF(QCoilCap .LE. 0.0) THEN
         QCoilCap = 0.0
@@ -1555,7 +1555,7 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
           ! amount of heat rejected at the heating source condenser multiplied by the
           ! desuperheater heat reclaim efficiency. This capacity is either applied towards
           ! a requested load (load based control) or applied to the air stream to meet a
-          ! heating set point (temperature based control). This subroutine is similar to
+          ! heating setpoint (temperature based control). This subroutine is similar to
           ! the electric or gas heating coil except that the NominalCapacity is variable
           ! and based on the runtime fraction and heat rejection of the heat source object.
 
@@ -1590,7 +1590,7 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
    REAL(r64) CapacitanceAir  ! MdotCp of air entering the desuperheater heating coil
    REAL(r64) HeatingCoilLoad ! actual load delivered by the desuperheater heating coil [W]
    REAL(r64) QCoilCap        ! available capacity of the desuperheater heating coil [W]
-   REAL(r64) TempSetPoint    ! set point temperature to be met when using temperature based control [C]
+   REAL(r64) TempSetPoint    ! setpoint temperature to be met when using temperature based control [C]
    INTEGER   SourceID        ! waste heat source id number
 
    Effic          = HeatingCoil(CoilNum)%Efficiency
@@ -1663,7 +1663,7 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
      (QCoilReq == SensedLoadFlagValue) .and. (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap     = CapacitanceAir*(TempSetPoint - TempAirIn)
-      ! check to see if set point is above entering air temperature. If not, set output to zero.
+      ! check to see if setpoint is above entering air temperature. If not, set output to zero.
       IF(QCoilCap .LE. 0.0) THEN
         QCoilCap   = 0.0
         TempAirOut = TempAirIn
@@ -1785,6 +1785,10 @@ SUBROUTINE UpdateHeatingCoil(CoilNum)
 
   IF (Contaminant%CO2Simulation) Then
     Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
+  End If
+
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(AirOutletNode)%GenContam = Node(AirInletNode)%GenContam
   End If
 
   RETURN
@@ -1925,7 +1929,7 @@ SUBROUTINE CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItem
+  USE InputProcessor, ONLY: FindItem,SameString
   USE General, ONLY: TrimSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -1958,7 +1962,13 @@ SUBROUTINE CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
   IF (CompIndex == 0) THEN
     CoilNum = FindItem(CompName,HeatingCoil%Name,NumHeatingCoils)
     IF (CoilNum == 0) THEN
-      CALL ShowFatalError('CheckHeatingCoilSchedule: Coil not found='//TRIM(CompName))
+      CALL ShowFatalError('CheckHeatingCoilSchedule: Coil not found="'//TRIM(CompName)//'".')
+    ENDIF
+    IF (.not. SameString(CompType,cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))) THEN
+      CALL ShowSevereError('CheckHeatingCoilSchedule: Coil="'//trim(CompName)//'"')
+      CALL ShowContinueError('...expected type="'//trim(CompType)//'", actual type="'//  &
+         trim(cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))//'".')
+      CALL ShowFatalError('Program terminates due to preceding conditions.')
     ENDIF
     CompIndex=CoilNum
     Value=GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr)  ! not scheduled?
@@ -1971,10 +1981,13 @@ SUBROUTINE CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
                           ', Coil name='//TRIM(CompName))
     ENDIF
     IF (CompName /= HeatingCoil(CoilNum)%Name) THEN
-      CALL ShowFatalError('CheckHeatingCoilSchedule: Invalid CompIndex passed='//  &
+      CALL ShowSevereError('CheckHeatingCoilSchedule: Invalid CompIndex passed='//  &
                           TRIM(TrimSigDigits(CoilNum))// &
                           ', Coil name='//TRIM(CompName)//', stored Coil Name for that index='//  &
                           TRIM(HeatingCoil(CoilNum)%Name))
+      CALL ShowContinueError('...expected type="'//trim(CompType)//'", actual type="'//  &
+         trim(cAllCoilTypes(HeatingCoil(CoilNum)%HCoilType_Num))//'".')
+      CALL ShowFatalError('Program terminates due to preceding conditions.')
     ENDIF
     Value=GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr)  ! not scheduled?
   ENDIF
@@ -2438,7 +2451,7 @@ FUNCTION GetHeatingCoilTypeNum(CoilType,CoilName,ErrorsFound) RESULT(TypeNum)
 
 END FUNCTION GetHeatingCoilTypeNum
 
-FUNCTION GetHeatingCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(CompIndex)
+FUNCTION GetHeatingCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(WhichCoil)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -2466,7 +2479,7 @@ FUNCTION GetHeatingCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(CompIndex)
   CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
   CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
   LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
-  INTEGER                      :: CompIndex    ! returned index number of matched coil
+  INTEGER                      :: WhichCoil    ! returned index number of matched coil
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -2478,7 +2491,6 @@ FUNCTION GetHeatingCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(CompIndex)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: WhichCoil
   INTEGER :: FoundType ! Integer equivalent of coil type
 
   ! Obtains and Allocates HeatingCoil related parameters from input file
@@ -2492,9 +2504,6 @@ FUNCTION GetHeatingCoilIndex(CoilType,CoilName,ErrorsFound) RESULT(CompIndex)
   IF (FoundType == Coil_HeatingElectric .OR. FoundType == Coil_HeatingGas .OR.  &
       FoundType == Coil_HeatingDesuperheater) THEN
     WhichCoil=FindItem(CoilName,HeatingCoil%Name,NumHeatingCoils)
-    IF (WhichCoil /= 0) THEN
-      CompIndex=WhichCoil
-    ENDIF
   ELSE
     WhichCoil=0
   ENDIF
@@ -2583,7 +2592,7 @@ END FUNCTION GetHeatingCoilPLFCurveIndex
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

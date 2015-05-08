@@ -103,6 +103,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
     INTEGER                      :: LoopSideNum        =0
     INTEGER                      :: BranchNum          =0
     INTEGER                      :: CompNum            =0
+    REAL(r64)                    :: DesignMassFlowRate = 0.d0
   END TYPE IceStorageSpecs
 
   TYPE DetailedIceStorageData
@@ -118,6 +119,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
     INTEGER                      :: PlantLoopSideNum   = 0
     INTEGER                      :: PlantBranchNum     = 0
     INTEGER                      :: PlantCompNum       = 0
+    REAL(r64)                    :: DesignMassFlowRate = 0.d0
     INTEGER                      :: MapNum   = 0                ! Number to Map structure
     CHARACTER(len=MaxNameLength) :: DischargeCurveType = ' '    ! Type of discharging equation entered by user (QuadraticLinear)
     CHARACTER(len=MaxNameLength) :: DischargeCurveName = ' '    ! Curve name for discharging (used to find the curve index)
@@ -254,7 +256,7 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
   USE DataGlobals,     ONLY: BeginEnvrnFlag, WarmupFlag
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
-  USE DataPlant,       ONLY: PlantLoop
+  USE DataPlant,       ONLY: PlantLoop, SingleSetpoint, DualSetpointDeadband
 
 
   IMPLICIT NONE
@@ -377,8 +379,13 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
 !DSU? can we now use MyLoad? lets not yet to try to avoid scope creep
 
       TempIn     = Node(InletNodeNum)%Temp
-      TempSetPt  = Node(OutletNodeNum)%TempSetPoint
-      DemandMdot = Node(InletNodeNum)%MassFlowRate
+      SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
+      CASE (SingleSetPoint)
+        TempSetPt  = Node(OutletNodeNum)%TempSetPoint
+      CASE (DualSetPointDeadBand)
+        TempSetPt  = Node(OutletNodeNum)%TempSetPointHi
+      END SELECT
+      DemandMdot = IceStorage(IceNum)%DesignMassFlowRate
       
       Cp = GetSpecificHeatGlycol(PlantLoop(IceStorage(IceNum)%LoopNum)%FluidName, &
                                  TempIn, &
@@ -479,8 +486,10 @@ SUBROUTINE SimDetailedIceStorage
   USE CurveManager,    ONLY : CurveValue
   USE ScheduleManager, ONLY : GetCurrentScheduleValue
   USE FluidProperties, ONLY : GetSpecificHeatGlycol
-  USE DataPlant,       ONLY : PlantLoop
-
+  USE DataPlant,       ONLY : PlantLoop, CommonPipe_TwoWay,  SingleSetpoint, DualSetpointDeadband
+  USE PlantUtilities,  ONLY : SetComponentFlowRate
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
+  
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -514,18 +523,32 @@ SUBROUTINE SimDetailedIceStorage
   REAL(r64)    :: ToutNew        ! Updated outlet temperature from the tank [C]
   REAL(r64)    :: ToutOld        ! Tank outlet temperature from the last iteration [C]
   REAL(r64)    :: Cp             ! local plant fluid specific heat
+  REAL(r64)    :: mdot           ! local mass flow rate for plant connection
 
           ! FLOW:
           ! Set local variables
   NodeNumIn  = DetIceStor(IceNum)%PlantInNodeNum
   NodeNumOut = DetIceStor(IceNum)%PlantOutNodeNum
   TempIn     = Node(NodeNumIn)%Temp
-  TempSetPt  = Node(NodeNumOut)%TempSetPoint
+  SELECT CASE (PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    TempSetPt  = Node(NodeNumOut)%TempSetPoint
+  CASE (DualSetPointDeadBand)
+    TempSetPt  = Node(NodeNumOut)%TempSetPointHi
+  END SELECT
+
   IterNum    = 0
 
           ! Set derived type variables
   DetIceStor(IceNum)%InletTemp     = TempIn
   DetIceStor(IceNum)%MassFlowRate  = Node(NodeNumIn)%MassFlowRate
+
+  !if two-way common pipe and no mass flow and tank is not full, then use design flow rate
+  IF ((PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%CommonPipeType == CommonPipe_TwoWay) .AND. &
+       (ABS(DetIceStor(IceNum)%MassFlowRate) < MassFlowTolerance) .AND. &
+       (DetIceStor(IceNum)%IceFracRemaining < TankChargeToler) ) THEN
+     DetIceStor(IceNum)%MassFlowRate  = DetIceStor(IceNum)%DesignMassFlowRate
+  ENDIF
 
           ! Calculate the current load on the ice storage unit
   Cp = GetSpecificHeatGlycol(PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%FluidName, &
@@ -537,12 +560,22 @@ SUBROUTINE SimDetailedIceStorage
 
           ! Determine what the status is regarding the ice storage unit and the loop level flow
   IF ( (ABS(LocalLoad) <= SmallestLoad) .OR. (GetCurrentScheduleValue(DetIceStor(IceNum)%ScheduleIndex) <= 0) ) THEN
-          ! No REAL(r64) load on the ice storage device or ice storage OFF--bypass all of the flow and leave the tank alone
-    DetIceStor(IceNum)%CompLoad           = 0.0
+          ! No real load on the ice storage device or ice storage OFF--bypass all of the flow and leave the tank alone
+    DetIceStor(IceNum)%CompLoad           = 0.d0
     DetIceStor(IceNum)%OutletTemp         = TempIn
     DetIceStor(IceNum)%TankOutletTemp     = TempIn
-    DetIceStor(IceNum)%BypassMassFlowRate = DetIceStor(IceNum)%MassFlowRate
-    DetIceStor(IceNum)%TankMassFlowRate   = 0.0
+    mdot = 0.d0
+    CALL SetComponentFlowRate(mdot, &
+                            DetIceStor(IceNum)%PlantInNodeNum, &
+                            DetIceStor(IceNum)%PlantOutNodeNum, &
+                            DetIceStor(IceNum)%PlantLoopNum, &
+                            DetIceStor(IceNum)%PlantLoopSideNum, &
+                            DetIceStor(IceNum)%PlantBranchNum, &
+                            DetIceStor(IceNum)%PlantCompNum)
+                                  
+    DetIceStor(IceNum)%BypassMassFlowRate = mdot
+    DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+    DetIceStor(IceNum)%MassFlowRate       = mdot
 
   ELSEIF (LocalLoad < 0.0) THEN
           ! The load is less than zero so we should be charging
@@ -557,10 +590,30 @@ SUBROUTINE SimDetailedIceStorage
       DetIceStor(IceNum)%CompLoad           = 0.0
       DetIceStor(IceNum)%OutletTemp         = TempIn
       DetIceStor(IceNum)%TankOutletTemp     = TempIn
-      DetIceStor(IceNum)%BypassMassFlowRate = DetIceStor(IceNum)%MassFlowRate
-      DetIceStor(IceNum)%TankMassFlowRate   = 0.0
+      mdot = 0.d0
+      CALL SetComponentFlowRate(mdot, &
+                              DetIceStor(IceNum)%PlantInNodeNum, &
+                              DetIceStor(IceNum)%PlantOutNodeNum, &
+                              DetIceStor(IceNum)%PlantLoopNum, &
+                              DetIceStor(IceNum)%PlantLoopSideNum, &
+                              DetIceStor(IceNum)%PlantBranchNum, &
+                              DetIceStor(IceNum)%PlantCompNum)
+                                    
+      DetIceStor(IceNum)%BypassMassFlowRate = mdot
+      DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+      DetIceStor(IceNum)%MassFlowRate       = mdot
 
     ELSE
+      !make flow request so tank will get flow
+      mdot = DetIceStor(IceNum)%DesignMassFlowRate
+      CALL SetComponentFlowRate(mdot, &
+                              DetIceStor(IceNum)%PlantInNodeNum, &
+                              DetIceStor(IceNum)%PlantOutNodeNum, &
+                              DetIceStor(IceNum)%PlantLoopNum, &
+                              DetIceStor(IceNum)%PlantLoopSideNum, &
+                              DetIceStor(IceNum)%PlantBranchNum, &
+                              DetIceStor(IceNum)%PlantCompNum)
+      
           ! We are in charging mode, the temperatures are low enough to charge
           ! the tank, and we have some charging left to do.
           ! Make first guess at Qstar based on the current ice fraction remaining
@@ -674,10 +727,31 @@ SUBROUTINE SimDetailedIceStorage
       DetIceStor(IceNum)%CompLoad           = 0.0
       DetIceStor(IceNum)%OutletTemp         = DetIceStor(IceNum)%InletTemp
       DetIceStor(IceNum)%TankOutletTemp     = DetIceStor(IceNum)%InletTemp
-      DetIceStor(IceNum)%BypassMassFlowRate = DetIceStor(IceNum)%MassFlowRate
-      DetIceStor(IceNum)%TankMassFlowRate   = 0.0
+      mdot = 0.d0
+      CALL SetComponentFlowRate(mdot, &
+                              DetIceStor(IceNum)%PlantInNodeNum, &
+                              DetIceStor(IceNum)%PlantOutNodeNum, &
+                              DetIceStor(IceNum)%PlantLoopNum, &
+                              DetIceStor(IceNum)%PlantLoopSideNum, &
+                              DetIceStor(IceNum)%PlantBranchNum, &
+                              DetIceStor(IceNum)%PlantCompNum)
+                                    
+      DetIceStor(IceNum)%BypassMassFlowRate = mdot
+      DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+      DetIceStor(IceNum)%MassFlowRate       = mdot
 
     ELSE
+    
+          !make flow request so tank will get flow
+      mdot = DetIceStor(IceNum)%DesignMassFlowRate
+      CALL SetComponentFlowRate(mdot, &
+                              DetIceStor(IceNum)%PlantInNodeNum, &
+                              DetIceStor(IceNum)%PlantOutNodeNum, &
+                              DetIceStor(IceNum)%PlantLoopNum, &
+                              DetIceStor(IceNum)%PlantLoopSideNum, &
+                              DetIceStor(IceNum)%PlantBranchNum, &
+                              DetIceStor(IceNum)%PlantCompNum)
+
           ! We are in discharging mode, the temperatures are high enough to discharge
           ! the tank, and we have some discharging left to do.
       IF (TempSetPt < (DetIceStor(IceNum)%FreezingTemp+DeltaTofMin)) THEN
@@ -1200,7 +1274,8 @@ SUBROUTINE InitDetailedIceStorage
 
           ! USE STATEMENTS:
   USE DataGlobals, ONLY : BeginEnvrnFlag
-  USE DataPlant,   ONLY : ScanPlantLoopsForObject, PlantLoop, TypeOf_TS_IceDetailed
+  USE DataPlant,   ONLY : ScanPlantLoopsForObject, PlantLoop, TypeOf_TS_IceDetailed, CommonPipe_TwoWay, &
+                          SupplySide, LoopFlowStatus_NeedyAndTurnsLoopOn
   USE PlantUtilities, ONLY: InitComponentNodes
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1220,11 +1295,14 @@ SUBROUTINE InitDetailedIceStorage
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL,SAVE        :: MyOneTimeFlag = .true.
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyPlantScanFlag
-
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyEnvrnFlag
+  INTEGER :: CompNum ! local do loop index
           ! FLOW:
   IF (MyOneTimeFlag) THEN
     ALLOCATE(MyPlantScanFlag(NumDetIceStorages))
+    ALLOCATE(MyEnvrnFlag(NumDetIceStorages))
     MyPlantScanFlag = .TRUE.
+    MyEnvrnFlag     = .TRUE.
     MyOneTimeFlag   = .FALSE. 
   ENDIF
   
@@ -1240,7 +1318,7 @@ SUBROUTINE InitDetailedIceStorage
     MyPlantScanFlag(IceNum) = .FALSE.
   ENDIF
 
-  IF (BeginEnvrnFlag) THEN  ! Beginning of environment initializations
+  IF (BeginEnvrnFlag .AND. MyEnvrnFlag(IceNum)) THEN  ! Beginning of environment initializations
           ! Make sure all state variables are reset at the beginning of every environment to avoid problems.
           ! The storage unit is assumed to be fully charged at the start of any environment.
           ! The IceNum variable is a module level variable that is already set before this subroutine is called.
@@ -1251,17 +1329,31 @@ SUBROUTINE InitDetailedIceStorage
     DetIceStor(IceNum)%TankOutletTemp      = 0.0
     DetIceStor(IceNum)%DischargeIterErrors = 0
     DetIceStor(IceNum)%ChargeIterErrors    = 0
-    
+    DetIceStor(IceNum)%DesignMassFlowRate  = PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%MaxMassFlowRate
     !no design flow rates for model, assume min is zero and max is plant loop's max
-    CALL InitComponentNodes( 0.0d0, PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%MaxMassFlowRate, &
+    CALL InitComponentNodes( 0.0d0, DetIceStor(IceNum)%DesignMassFlowRate, &
                                   DetIceStor(IceNum)%PlantInNodeNum, &
                                   DetIceStor(IceNum)%PlantOutNodeNum, &
                                   DetIceStor(IceNum)%PlantLoopNum, &
                                   DetIceStor(IceNum)%PlantLoopSideNum, &
                                   DetIceStor(IceNum)%PlantBranchNum, &
                                   DetIceStor(IceNum)%PlantCompNum)
+                                  
+    IF ((PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%CommonPipeType == CommonPipe_TwoWay) .AND. &
+        (DetIceStor(IceNum)%PlantLoopSideNum == SupplySide)) THEN
+      ! up flow priority of other components on the same branch as the Ice tank
+      DO CompNum = 1, PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%LoopSide(SupplySide)% &
+                           Branch(DetIceStor(IceNum)%PlantBranchNum)%TotalComponents
+        PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%LoopSide(SupplySide)% &
+           Branch(DetIceStor(IceNum)%PlantBranchNum)%Comp(CompNum)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
+      ENDDO
+    
+    ENDIF
+                                  
+    MyEnvrnFlag(IceNum) = .FALSE.
   END IF
-
+  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(IceNum) = .TRUE.
+  
           ! Initializations that are done every iteration
           ! Make sure all of the reporting variables are always reset at the start of any iteration
   DetIceStor(IceNum)%CompLoad            = 0.0
@@ -1299,8 +1391,10 @@ SUBROUTINE InitSimpleIceStorage
           ! na
 
           ! USE STATEMENTS:
-  USE DataGlobals, ONLY : BeginEnvrnFlag
-  USE DataPlant, ONLY: TypeOf_TS_IceSimple, PlantLoop, ScanPlantLoopsForObject
+  USE DataGlobals,    ONLY: BeginEnvrnFlag
+  USE DataPlant,      ONLY: TypeOf_TS_IceSimple, PlantLoop, ScanPlantLoopsForObject,CommonPipe_TwoWay, &
+                          SupplySide, LoopFlowStatus_NeedyAndTurnsLoopOn
+  USE PlantUtilities, ONLY: InitComponentNodes
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1319,13 +1413,16 @@ SUBROUTINE InitSimpleIceStorage
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyPlantScanFlag
   LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE.
-  LOGICAL, SAVE                            :: MyEnvrnFlag   = .TRUE. 
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyEnvrnFlag
   LOGICAL :: errFlag
+  INTEGER :: CompNum ! local do loop counter
   
   IF (MyOneTimeFlag) THEN
     ALLOCATE(MyPlantScanFlag(NumIceStorages))
+    ALLOCATE(MyEnvrnFlag(NumIceStorages))
     MyOneTimeFlag = .false.
     MyPlantScanFlag = .TRUE.
+    MyEnvrnFlag     = .TRUE.
   END IF
   
   
@@ -1345,7 +1442,26 @@ SUBROUTINE InitSimpleIceStorage
     MyPlantScanFlag(IceNum)=.FALSE.
   ENDIF
   
-  IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
+  IF (BeginEnvrnFlag .and. MyEnvrnFlag(IceNum)) THEN
+    IceStorage(IceNum)%DesignMassFlowRate = PlantLoop(IceStorage(IceNum)%LoopNum)%MaxMassFlowRate
+    !no design flow rates for model, assume min is zero and max is plant loop's max
+    CALL InitComponentNodes( 0.0d0, IceStorage(IceNum)%DesignMassFlowRate, &
+                                 IceStorage(IceNum)%PltInletNodeNum, &
+                                 IceStorage(IceNum)%PltOutletNodeNum, &
+                                 IceStorage(IceNum)%LoopNum, &
+                                 IceStorage(IceNum)%LoopSideNum, &
+                                 IceStorage(IceNum)%BranchNum, &
+                                 IceStorage(IceNum)%CompNum)
+    IF ((PlantLoop(IceStorage(IceNum)%LoopNum)%CommonPipeType == CommonPipe_TwoWay) .AND. &
+        (IceStorage(IceNum)%LoopSideNum == SupplySide)) THEN
+      ! up flow priority of other components on the same branch as the Ice tank
+      DO CompNum = 1, PlantLoop(IceStorage(IceNum)%LoopNum)%LoopSide(SupplySide)% &
+                           Branch(IceStorage(IceNum)%BranchNum)%TotalComponents
+        PlantLoop(IceStorage(IceNum)%LoopNum)%LoopSide(SupplySide)% &
+           Branch(IceStorage(IceNum)%BranchNum)%Comp(CompNum)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
+      ENDDO
+    
+    ENDIF
     IceStorageReport(IceNum)%MyLoad = 0.0
     IceStorageReport(IceNum)%U = 0.0
     IceStorageReport(IceNum)%Urate            = 0.0
@@ -1358,10 +1474,10 @@ SUBROUTINE InitSimpleIceStorage
     IceStorageReport(IceNum)%ITSInletTemp     = 0.0
     IceStorageReport(IceNum)%ITSOutletTemp    = 0.0
   
-    MyEnvrnFlag = .FALSE.
+    MyEnvrnFlag(IceNum) = .FALSE.
   ENDIF  
   
-  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE. 
+  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(IceNum) = .TRUE. 
   
   ITSNomCap            = IceStorage(IceNum)%ITSNomCap
   InletNodeNum         = IceStorage(IceNum)%PltInletNodeNum
@@ -1486,6 +1602,8 @@ SUBROUTINE CalcIceStorageDormant(IceStorageType,IceNum)
 
           ! USE STATEMENTS:
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
+  USE PlantUtilities, ONLY: SetComponentFlowRate
+  USE DataPlant,      ONLY : PlantLoop, SingleSetpoint, DualSetpointDeadband
 
   IMPLICIT NONE
 
@@ -1515,10 +1633,24 @@ CASE(IceStorageType_Simple)   !by ZG
   Uact = 0.0
 
        ! Provide output results for ITS.
-  ITSMassFlowRate  = 0                        ![kg/s]
+  ITSMassFlowRate  = 0.d0                        ![kg/s]
+  
+  CALL SetComponentFlowRate(ITSMassFlowRate, &
+                            IceStorage(IceNum)%PltInletNodeNum, &
+                            IceStorage(IceNum)%PltOutletNodeNum, &
+                            IceStorage(IceNum)%LoopNum, &
+                            IceStorage(IceNum)%LoopSideNum, &
+                            IceStorage(IceNum)%BranchNum, &
+                            IceStorage(IceNum)%CompNum )
+  
   ITSInletTemp     = Node(InletNodeNum)%Temp  ![C]
   ITSOutletTemp    = ITSInletTemp             ![C]
-  ITSOutletSetPointTemp = Node(OutletNodeNum)%TempSetPoint ![C]
+  SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPoint
+  CASE (DualSetPointDeadBand)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPointHi
+  END SELECT
   ITSCoolingRate   = 0.0                      ![W]
   ITSCoolingEnergy = 0.0                      ![J]
 
@@ -1547,7 +1679,9 @@ SUBROUTINE CalcIceStorageCharge(IceStorageType,IceNum)
   USE DataHVACGlobals, ONLY : TimeStepSys
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
   USE Psychrometrics, ONLY:CPCW
-
+  USE PlantUtilities, ONLY: SetComponentFlowRate
+  USE DataPlant,      ONLY: PlantLoop, SingleSetpoint, DualSetpointDeadband
+  
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1582,10 +1716,24 @@ CASE(IceStorageType_Simple)
   ! Initialize
   !--------------------------------------------------------
        ! Below values for ITS are reported forCharging process.
-  ITSMassFlowRate  = Node(InletNodeNum)%MassFlowRate ![kg/s]
+  ITSMassFlowRate  = IceStorage(IceNum)%DesignMassFlowRate ![kg/s]
+
+  CALL SetComponentFlowRate(ITSMassFlowRate, &
+                            IceStorage(IceNum)%PltInletNodeNum, &
+                            IceStorage(IceNum)%PltOutletNodeNum, &
+                            IceStorage(IceNum)%LoopNum, &
+                            IceStorage(IceNum)%LoopSideNum, &
+                            IceStorage(IceNum)%BranchNum, &
+                            IceStorage(IceNum)%CompNum )
+  
   ITSInletTemp     = Node(InletNodeNum)%Temp  ![C]
   ITSOutletTemp    = ITSInletTemp             ![C]
-  ITSOutletSetPointTemp = Node(OutletNodeNum)%TempSetPoint ![C]
+  SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPoint
+  CASE (DualSetPointDeadBand)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPointHi
+  END SELECT
   ITSCoolingRate   = 0.0                      ![W]
   ITSCoolingEnergy = 0.0                      ![J]
 
@@ -1618,8 +1766,8 @@ CASE(IceStorageType_Simple)
   !--------------------------------------------------------
        ! Set Umin
   Umin = 0.0
-       ! Calculate Umax based on REAL(r64) ITS Max Capacity and remained XCurIceFrac.
-       ! Umax should be equal or larger than 0.02 for REAL(r64)istic purpose by Dion.
+       ! Calculate Umax based on real ITS Max Capacity and remained XCurIceFrac.
+       ! Umax should be equal or larger than 0.02 for realistic purpose by Dion.
   Umax = MAX( MIN( ((1.0d0-EpsLimitForCharge)*QiceMax*TimeInterval/ITSNomCap), (1.0d0-XCurIceFrac-EpsLimitForX) ), 0.0d0 )
 
          ! Cannot charge more than the fraction that is left uncharged
@@ -1803,8 +1951,10 @@ SUBROUTINE CalcIceStorageDischarge(IceStorageType,IceNum,MyLoad,Runflag,FirstIte
   USE DataGlobals, ONLY: HourOfDay,TimeStep,NumOfTimeStepInHour
   USE DataInterfaces, ONLY: ShowFatalError
   USE DataHVACGlobals, ONLY : TimeStepSys
-  USE DataPlant, ONLY:  PlantLoop
+  USE DataPlant, ONLY:  PlantLoop, SingleSetpoint, DualSetpointDeadband
   USE FluidProperties, ONLY: GetDensityGlycol
+  USE PlantUtilities, ONLY: SetComponentFlowRate
+  
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1852,7 +2002,13 @@ CASE(IceStorageType_Simple)
   ITSMassFlowRate  = 0.0
   ITSCoolingRate   = 0.0
   ITSCoolingEnergy = 0.0
-  ITSOutletSetPointTemp = Node(OutletNodeNum)%TempSetPoint ![C]
+
+  SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPoint
+  CASE (DualSetPointDeadBand)
+    ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPointHi
+  END SELECT
 
        ! Initialize processed U values
   Umax = 0.0
@@ -1883,101 +2039,54 @@ CASE(IceStorageType_Simple)
                              Node(InletNodeNum)%Temp, &
                              PlantLoop(LoopNum)%FluidIndex, &
                              'CalcIceStorageDischarge')
-  
-  IF (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock==0) THEN
-  !----------------------------
 
-         ! Calculate Umyload based on MyLoad from E+
-    Umyload = -ABS(MyLoad)*TimeInterval/ITSNomCap
-         ! Calculate Umax and Umin
-    Umax = 0.0
-         ! Calculate Umin based on returned Myload from E+.
-    Umin = MIN( Umyload, 0.0d0 )
+       ! Calculate Umyload based on MyLoad from E+
+  Umyload = -MyLoad*TimeInterval/ITSNomCap
+       ! Calculate Umax and Umin
+       ! Cannot discharge more than the fraction that is left
+  Umax = -IceStorageReport(IceNum)%IceFracRemain/TimeStepSys
+       ! Calculate Umin based on returned Myload from E+.
+  Umin = MIN( Umyload, 0.0d0 )
+       ! Based on Umax and Umin, if necessary to run E+, calculate proper Uact
+       ! U is negative here.
+  Uact = MAX(Umin,Umax)
 
-         ! Based on Umax and Umin, if necessary to run E+, calculate proper Uact.
-! MJW 20 Sep 2005 - Don't understand this specified U stuff, use Umin
+       ! Set ITSInletTemp provided by E+
+  ITSInletTemp  = Node(InletNodeNum)%Temp
+       !The first thing is to set the ITSMassFlowRate
+  ITSMassFlowRate = IceStorage(IceNum)%DesignMassFlowRate ![kg/s]
 
-    Uact = Umin
-!    IF( Umin == 0.0 ) THEN  !(No Capacity of ITS), ITS is OFF.
-!      Uact = 0.0
-!    ELSE IF( Umin > U ) THEN  !(Under Capacity of ITS vs. input U), ITS is OFF. U is NOT accepted.
-!      Uact = Umin
-!    ELSE IF( Umin == U ) THEN  !(Same Capacity of ITS vs. input U)
-!      Uact = Umin
-!    ELSE IF( Umin < U ) THEN   !(Over CAPACITY of ITS vs. input U), U is accepted.
-!      Uact = U
-!    END IF  ! Check Uact for Discharging Process
+  CALL SetComponentFlowRate(ITSMassFlowRate, &
+                          IceStorage(IceNum)%PltInletNodeNum, &
+                          IceStorage(IceNum)%PltOutletNodeNum, &
+                          IceStorage(IceNum)%LoopNum, &
+                          IceStorage(IceNum)%LoopSideNum, &
+                          IceStorage(IceNum)%BranchNum, &
+                          IceStorage(IceNum)%CompNum )
 
-        ! Calculate ITSCoolingRate with selected Uact.
-    ITSCoolingRate = ABS(Uact*ITSNomCap/TimeInterval)
+       ! Qice is calculate input U which is within boundary between Umin and Umax.
+  Qice = Uact*ITSNomCap/TimeInterval
+       ! Qice cannot exceed MaxCap calulated by CalcIceStorageCapacity
+       ! Note Qice is negative here, MaxCap is positive
+  Qice = MAX(Qice, -MaxCap)
 
-         ! Assign In and Out Temperature
-    ITSInletTemp  = Node(InletNodeNum)%Temp
-    DeltaTemp = ABS(ITSInletTemp - Node(OutletNodeNum)%TempSetPoint)
-
-         ! Check DeltaTemp
-    IF( DeltaTemp > TempTol ) THEN
-      ITSMassFlowRate = ABS(ITSCoolingRate/CpFluid/DeltaTemp)
-      ITSOutletTemp    = Node(OutletNodeNum)%TempSetPoint
-    ELSE
-      ITSMassFlowRate = 0.0
-      ITSOutletTemp   = ITSInletTemp
-!      CALL ShowFatalError('DeltaTemp = 0 in SimIceThermalStorage mass flow calculation ')
-    END IF  ! End of Check DeltaTemp
-
-    IF( ITSCoolingRate == 0.0 ) THEN
-      ITSMassFlowRate = 0.0
-      ITSOutletTemp = ITSInletTemp
-    END IF
-
-       ! If FlowLock is True(=1), that is, ITSMassFlowRate is not changed.
-       ! then based on ITSMassFlowRate(see ConstCOPChiller p12), IceStorage cooling rate will be calculated as New cooling rate.
-  !----------------------------
-  ELSE !(FlowLock == 1)
-  !----------------------------
-
-         ! Calculate Umyload based on MyLoad from E+
-    Umyload = -MyLoad*TimeInterval/ITSNomCap
-         ! Calculate Umax and Umin
-         ! Cannot discharge more than the fraction that is left
-    Umax = -IceStorageReport(IceNum)%IceFracRemain/TimeStepSys
-         ! Calculate Umin based on returned Myload from E+.
-    Umin = MIN( Umyload, 0.0d0 )
-         ! Based on Umax and Umin, if necessary to run E+, calculate proper Uact
-         ! U is negative here.
-    Uact = MAX(Umin,Umax)
-
-         ! Set ITSInletTemp provided by E+
-    ITSInletTemp  = Node(InletNodeNum)%Temp
-         !The first thing is to set the ITSMassFlowRate
-         ! not sure where the ITSMassFlowRate set: here or under
-    ITSMassFlowRate = Node(InletNodeNum)%MassFlowRate
-
-         ! Qice is calculate input U which is within boundary between Umin and Umax.
-    Qice = Uact*ITSNomCap/TimeInterval
-         ! Qice cannot exceed MaxCap calulated by CalcIceStorageCapacity
-         ! Note Qice is negative here, MaxCap is positive
-    Qice = MAX(Qice, -MaxCap)
-
-          ! Calculate leaving water temperature
-    IF((Qice .GE. 0.0) .OR. (XCurIceFrac .LE. 0.0)) THEN
-      ITSOutletTemp = ITSInletTemp
-      DeltaTemp     = 0.0
-      Qice          = 0.0
-      Uact          = 0.0
-    ELSE
-      DeltaTemp = Qice/CpFluid/ITSMassFlowRate
-      ITSOutletTemp = ITSInletTemp + DeltaTemp
-       ! Limit leaving temp to be no less than setpoint or freezing temp plus 1C
-      ITSOutletTemp = MAX(ITSOutletTemp, ITSOutletSetPointTemp, (FreezTemp+1))
-       ! Limit leaving temp to be no greater than inlet temp
-      ITSOutletTemp = MIN(ITSOutletTemp, ITSInletTemp)
-      DeltaTemp     = ITSOutletTemp - ITSInletTemp
-      Qice          = DeltaTemp*CpFluid*ITSMassFlowRate
-      Uact          = Qice/(ITSNomCap/TimeInterval)
-    END IF  ! End of leaving temp checks
-
-  END IF  ! End of FlowLock
+        ! Calculate leaving water temperature
+  IF((Qice .GE. 0.0) .OR. (XCurIceFrac .LE. 0.0)) THEN
+    ITSOutletTemp = ITSInletTemp
+    DeltaTemp     = 0.0
+    Qice          = 0.0
+    Uact          = 0.0
+  ELSE
+    DeltaTemp = Qice/CpFluid/ITSMassFlowRate
+    ITSOutletTemp = ITSInletTemp + DeltaTemp
+     ! Limit leaving temp to be no less than setpoint or freezing temp plus 1C
+    ITSOutletTemp = MAX(ITSOutletTemp, ITSOutletSetPointTemp, (FreezTemp+1))
+     ! Limit leaving temp to be no greater than inlet temp
+    ITSOutletTemp = MIN(ITSOutletTemp, ITSInletTemp)
+    DeltaTemp     = ITSOutletTemp - ITSInletTemp
+    Qice          = DeltaTemp*CpFluid*ITSMassFlowRate
+    Uact          = Qice/(ITSNomCap/TimeInterval)
+  END IF  ! End of leaving temp checks
 
        ! Calculate reported U value
   Urate = Uact
@@ -2004,7 +2113,7 @@ SUBROUTINE CalcQiceDischageMax(QiceMin)
           ! REFERENCES:
 
           ! USE STATEMENTS:
-
+  USE DataPlant, ONLY : PlantLoop, SingleSetpoint, DualSetpointDeadband
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2029,7 +2138,12 @@ SUBROUTINE CalcQiceDischageMax(QiceMin)
   ITSInletTemp  = Node(InletNodeNum)%Temp
 
        ! Make ITSOutletTemp as almost same as ITSInletTemp
-  ITSOutletTemp = Node(OutletNodeNum)%TempSetPoint
+  SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    ITSOutletTemp  = Node(OutletNodeNum)%TempSetPoint
+  CASE (DualSetPointDeadBand)
+    ITSOutletTemp  = Node(OutletNodeNum)%TempSetPointHi
+  END SELECT
 
     LogTerm       = (ITSInletTemp - FreezTemp) / (ITSOutletTemp - FreezTemp)
 
@@ -2523,7 +2637,7 @@ END SUBROUTINE ReportDetailedIceStorage
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

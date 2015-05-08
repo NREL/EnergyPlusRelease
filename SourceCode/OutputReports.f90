@@ -277,7 +277,7 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
   USE DataHeatBalance, ONLY: BuildingName,Zone
   USE DataSurfaces
   USE DataSurfaceColors
-  USE DataDaylighting, ONLY: ZoneDaylight
+  USE DataDaylighting, ONLY: ZoneDaylight,TotIllumMaps,IllumMapCalc
   USE DataGlobals, ONLY: DegToRadians,NumOfZones
   USE DataInterfaces, ONLY: ShowWarningError, ShowContinueError, ShowFatalError
   USE DataStringGlobals, ONLY: VerString
@@ -345,6 +345,7 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
   integer :: refpt  ! for daylighting ref points
   integer :: curcolorno ! again for daylighting ref pts
   integer :: write_stat
+  integer :: mapnum
 
   IF (PolygonAction == 'TRIANGULATE3DFACE' .or. PolygonAction == 'TRIANGULATE' .or. PolygonAction == ' ') THEN
     TriangulateFace=.true.
@@ -708,11 +709,14 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
       TempZoneName(pos:pos)='_'
       pos=INDEX(TempZoneName(1:LEN_TRIM(TempZoneName)),':')
     END DO
-    do refpt=1,ZoneDaylight(zones)%TotalMapRefPoints
-      write(unit,710) trim(zone(zones)%Name)//':MapRefPt:'//TRIM(TrimSigDigits(refpt))
-      write(unit,709) trim(TempZoneName),DXFcolorno(curcolorno),zonedaylight(zones)%MapRefPtAbsCoord(refpt,1),  &
-                      zonedaylight(zones)%MapRefPtAbsCoord(refpt,2),             &
-                      zonedaylight(zones)%MapRefPtAbsCoord(refpt,3),.05
+    do mapnum=1,totillummaps
+      if (IllumMapCalc(mapnum)%Zone /= zones) cycle
+      do refpt=1,IllumMapCalc(mapnum)%TotalMapRefPoints
+        write(unit,710) trim(zone(zones)%Name)//':MapRefPt:'//TRIM(TrimSigDigits(refpt))
+        write(unit,709) trim(TempZoneName),DXFcolorno(curcolorno),IllumMapCalc(mapnum)%MapRefPtAbsCoord(refpt,1),  &
+                        IllumMapCalc(mapnum)%MapRefPtAbsCoord(refpt,2),             &
+                        IllumMapCalc(mapnum)%MapRefPtAbsCoord(refpt,3),.05
+      enddo
     enddo
   enddo
 
@@ -1644,13 +1648,14 @@ SUBROUTINE DetailsForSurfaces(RptType)
   character(len=MaxNameLength) :: BaseSurfName
   character(len=MaxNameLength) :: ConstructionName
   character(len=MaxNameLength) :: scheduleName
-  character(len=30) :: IntConvCoeffCalc
-  character(len=30) :: ExtConvCoeffCalc
+  CHARACTER(len=32) :: IntConvCoeffCalc
+  CHARACTER(len=32) :: ExtConvCoeffCalc
   REAL(r64) :: NominalUwithConvCoeffs
-  character(len=30) :: cNominalU
-  character(len=30) :: cNominalUwithConvCoeffs
-  character(len=30) :: cSchedMin
-  character(len=30) :: cSchedMax
+  CHARACTER(len=32) :: cNominalU
+  CHARACTER(len=32) :: cNominalUwithConvCoeffs
+  CHARACTER(len=32) :: cSchedMin
+  CHARACTER(len=32) :: cSchedMax
+  CHARACTER(len=3)  :: SolarDiffusing
   integer fd
 
   if (totsurfaces > 0 .and. .not. allocated(surface)) then
@@ -1706,7 +1711,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
           cSchedMin='0.0'
           cSchedMax='0.0'
         endif
-        write(unit,7044,advance='No') trim(scheduleName),trim(cSchedMin),trim(cSchedMax),  &
+        write(unit,7044,advance='No') trim(scheduleName),trim(cSchedMin),trim(cSchedMax),' ',  &
                                       trim(RoundSigDigits(Surface(surf)%Area,2)),trim(RoundSigDigits(Surface(surf)%GrossArea,2)),  &
                                       trim(RoundSigDigits(Surface(surf)%NetAreaShadowCalc,2)),  &
                                       trim(RoundSigDigits(Surface(surf)%Azimuth,2)),trim(RoundSigDigits(Surface(surf)%Tilt,2)),   &
@@ -1724,7 +1729,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
           cSchedMin='0.0'
           cSchedMax='0.0'
         endif
-        write(unit,7044,advance='No') trim(scheduleName),trim(cSchedMin),trim(cSchedMax),  &
+        write(unit,7044,advance='No') trim(scheduleName),trim(cSchedMin),trim(cSchedMax),' ',  &
                                       trim(RoundSigDigits(Surface(surf)%Area,2)),trim(RoundSigDigits(Surface(surf)%GrossArea,2)), &
                                       trim(RoundSigDigits(Surface(surf)%NetAreaShadowCalc,2)),  &
                                       trim(RoundSigDigits(Surface(surf)%Azimuth,2)),trim(RoundSigDigits(Surface(surf)%Tilt,2)),   &
@@ -1752,6 +1757,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
     write(unit,703) 'Zone_Surfaces',TRIM(Zone(zonenum)%Name),(Zone(zonenum)%SurfaceLast-Zone(zonenum)%SurfaceFirst+1)
     do surf=1,totsurfaces
       if (Surface(surf)%Zone /= zonenum) CYCLE
+      SolarDiffusing=' '
       if (RptType == 10 .or. RptType == 11) then  ! Details and Details with Vertices
         if (Surface(surf)%BaseSurf == surf) then
           BaseSurfName=' '
@@ -1807,6 +1813,11 @@ SUBROUTINE DetailsForSurfaces(RptType)
           IF ((Surface(surf)%class == SurfaceClass_Window) .OR. (Surface(surf)%class == SurfaceClass_TDD_Dome)) THEN
             ! SurfaceClass_Window also covers glass doors and TDD:Diffusers
             cNominalU='N/A'
+            IF (SurfaceWindow(surf)%SolarDiffusing) THEN
+              SolarDiffusing='Yes'
+            ELSE
+              SolarDiffusing='No'
+            ENDIF
           ELSE
             cNominalU=RoundSigDigits(NominalU(Surface(surf)%Construction),3)
           END IF
@@ -1831,7 +1842,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
 !              CALL PreDefTableEntry(pdchOpUfactFilm,Surface(surf)%Name,surface(surf)%UNomFilm)
 !          END SELECT
 !        END IF
-        write(unit,7041,advance='No')trim(ConstructionName),trim(cNominalU),trim(cNominalUwithConvCoeffs),  &
+        write(unit,7041,advance='No')trim(ConstructionName),trim(cNominalU),trim(cNominalUwithConvCoeffs),trim(SolarDiffusing),  &
                             trim(RoundSigDigits(Surface(surf)%Area,2)),trim(RoundSigDigits(Surface(surf)%GrossArea,2)),   &
                             trim(RoundSigDigits(Surface(surf)%NetAreaShadowCalc,2)),  &
                             trim(RoundSigDigits(Surface(surf)%Azimuth,2)),trim(RoundSigDigits(Surface(surf)%Tilt,2)),    &
@@ -1971,36 +1982,26 @@ SUBROUTINE DetailsForSurfaces(RptType)
   700 format('! <Zone/Shading Surfaces>,<Zone Name>/#Shading Surfaces,# Surfaces')
   701 format('! <HeatTransfer/Shading/Frame/Divider_Surface>,Surface Name,Surface Class,Base Surface')
   7011 format(',Construction/Transmittance Schedule,Nominal U (w/o film coefs)/Min Schedule Value,',  &
-             'Nominal U (with film coefs)/Max Schedule Value,', &
+             'Nominal U (with film coefs)/Max Schedule Value,Solar Diffusing,', &
              'Area (Net),Area (Gross),Area (Sunlit Calc),Azimuth,Tilt,~Width,~Height,Reveal,', &
              '<ExtBoundCondition>,<ExtConvCoeffCalc>,<IntConvCoeffCalc>,<SunExposure>,<WindExposure>,', &
              'ViewFactorToGround,ViewFactorToSky,ViewFactorToGround-IR,ViewFactorToSky-IR,#Sides')
   7012 format(',#Sides')
   702 format('! <Units>,,,,')
-  7021 format(',{W/m2-K}/{},{W/m2-K}/{},{m2},{m2},{m2},{deg},{deg},{m},{m},{m},,,,,,,,,,')
+  7021 format(',{W/m2-K}/{},{W/m2-K}/{},{},{m2},{m2},{m2},{deg},{deg},{m},{m},{m},,,,,,,,,,')
   7022 format(',')
   703 format(A,',',A,',',I5)
   704 format(A,'_Surface,',A,',',A,',',A)
-!  7041 format(',',A,',',F8.3,',',F8.3,',',F20.5,',',F20.5,',',F5.1,',',F5.1,',',2(F10.2,','),F6.2)
-!  7041 format(',',A,',',A,',',A,',',F20.5,',',F20.5,',',F20.5,',',F5.1,',',F5.1,',',2(F10.2,','),F6.2)
-  7041 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','),A)
-!  7042 format(',',I2)
+  7041 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','),A)
   7042 format(',',A)
-!  7043 format(',,,,,,,,,,,,,,,,',I2)
-  7043 format(',,,,,,,,,,,,,,,,',A)
-!  7044 format(',,,,',F20.5,',',F20.5,',',F20.5,',',F5.1,',',F5.1,',',2(F10.2,','))
-  7044 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','))
-!  7045 format(',,,,',F20.5,',',A,',',A,',',A,',',A,',',F10.2,',',A)
-  7045 format(',,,,',A,',',A,',',A,',',A,',',A,',',A,',',A)
+  7044 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','))
+  7045 format(',,,,,',A,',',A,',',A,',',A,',',A,',',A,',',A)
   705 format(',',A)
-!  706 format(4(',',F6.2),',',I2)
   706 format(4(',',A),',',A)
-!  7061 format(',,,,,,,,,,',I2)
   7061 format(',,,,,,,,,,',A)
 
   707 format(',{Vertex 1},,,{Vertex 2},,,{Vertex 3},,,{Vertex 4},,,{etc}')
   708 format(4(',X {m},Y {m},Z {m}'))
-!  709 format(3(',',f10.2))
   709 format(3(',',A))
 
   710 format(', Vertices are shown starting at Upper-Left-Corner => Counter-Clockwise => World Coordinates')
@@ -2441,7 +2442,7 @@ END SUBROUTINE VRMLOut
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -18,7 +18,7 @@ MODULE EMSManager
         ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength
-USE DataInterfaces, ONLY: GetInternalVariableValue, ShowFatalError
+USE DataInterfaces, ONLY: GetInternalVariableValue, ShowFatalError, ShowWarningError, ShowContinueError
 USE DataRuntimeLanguage
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
@@ -42,7 +42,7 @@ PRIVATE ! Everything private unless explicitly made public
 
           ! MODULE VARIABLE DECLARATIONS:
 LOGICAL, SAVE :: GetEMSUserInput = .TRUE.  ! Flag to prevent input from being read multiple times
-LOGICAL, SAVE :: FinishProcessingUserInput = .TRUE. ! Flat to indicate still need to process input
+LOGICAL, SAVE :: FinishProcessingUserInput = .TRUE. ! Flag to indicate still need to process input
 
           ! SUBROUTINE SPECIFICATIONS:
 PUBLIC CheckIfAnyEMS
@@ -133,15 +133,35 @@ SUBROUTINE CheckIFAnyEMS
   cCurrentModuleObject = 'EnergyManagementSystem:OutputVariable'
   NumEMSOutputVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
+  cCurrentModuleObject = 'EnergyManagementSystem:MeteredOutputVariable'
+  NumEMSMeteredOutputVariables= GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  cCurrentModuleObject = 'EnergyManagementSystem:CurveOrTableIndexVariable'
+  NumEMSCurveIndices   = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
   cCurrentModuleObject = 'ExternalInterface:Variable'
   NumExternalInterfaceGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  ! added for FMI
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Variable'
+  NumExternalInterfaceFunctionalMockupUnitGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   cCurrentModuleObject = 'ExternalInterface:Actuator'
   NumExternalInterfaceActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
+  ! added for FMI
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
+  NumExternalInterfaceFunctionalMockupUnitActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  cCurrentModuleObject = 'EnergyManagementSystem:ConstructionIndexVariable'
+  NumEMSConstructionIndices = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  ! added for FMI
   IF ((NumSensors + numActuatorsUsed + NumProgramCallManagers + NumErlPrograms + NumErlSubroutines &
-      + NumUserGlobalVariables + NumEMSOutputVariables &
-      + NumExternalInterfaceGlobalVariables + NumExternalInterfaceActuatorsUsed) > 0 ) THEN
+      + NumUserGlobalVariables + NumEMSOutputVariables + NumEMSCurveIndices &
+      + NumExternalInterfaceGlobalVariables + NumExternalInterfaceActuatorsUsed &
+      + NumEMSConstructionIndices + NumEMSMeteredOutputVariables + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed &
+      + NumExternalInterfaceFunctionalMockupUnitGlobalVariables) > 0 ) THEN
     AnyEnergyManagementSystemInModel = .TRUE.
   ELSE
     AnyEnergyManagementSystemInModel = .FALSE.
@@ -158,6 +178,14 @@ SUBROUTINE CheckIFAnyEMS
        CALL ShowFatalError('CheckIFAnyEMS: Could not open file "eplusout.edd" for output (write).')
       ENDIF
     ENDIF
+  ELSE
+    CALL ScanForReports('EnergyManagementSystem', OutputEDDFile)
+    IF (OutputEDDFile) THEN
+      CALL ShowWarningError('CheckIFAnyEMS: No EnergyManagementSystem has been set up in the input file but'//  &
+         ' output is requested.')
+      CALL ShowContinueError('No EDD file will be produced. Refer to EMS Application Guide and/or InputOutput Reference'//  &
+         ' to set up your EnergyManagementSystem.')
+    ENDIF
   ENDIF
 
   RETURN
@@ -165,7 +193,7 @@ SUBROUTINE CheckIFAnyEMS
 END SUBROUTINE CheckIFAnyEMS
 
           ! MODULE SUBROUTINES:
-SUBROUTINE ManageEMS(iCalledFrom)
+SUBROUTINE ManageEMS(iCalledFrom, ProgramManagerToRun)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Peter Graham Ellis
@@ -184,7 +212,8 @@ SUBROUTINE ManageEMS(iCalledFrom)
           ! USE STATEMENTS:
   USE DataGlobals, ONLY: WarmupFlag, DoingSizing, ZoneTSReporting, HVACTSReporting, &
                          KickOffSimulation, AnyEnergyManagementSystemInModel, BeginEnvrnFlag, &
-                         emsCallFromSetupSimulation, emsCallFromExternalInterface, emsCallFromBeginNewEvironment
+                         emsCallFromSetupSimulation, emsCallFromExternalInterface, emsCallFromBeginNewEvironment, &
+                         emsCallFromUserDefinedComponentModel
   USE DataInterfaces, ONLY: ShowFatalError
 
   USE RuntimeLanguageProcessor, ONLY: EvaluateStack, BeginEnvrnInitializeRuntimeLanguage
@@ -194,6 +223,7 @@ SUBROUTINE ManageEMS(iCalledFrom)
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT (IN) :: iCalledFrom ! indicates where subroutine was called from, parameters in DataGlobals.
+  INTEGER, INTENT (IN), OPTIONAL :: ProgramManagerToRun  ! specific program manager to run
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -214,6 +244,7 @@ SUBROUTINE ManageEMS(iCalledFrom)
   TYPE(ErlValueType)        :: ReturnValue  ! local Erl value structure
   LOGICAL  :: AnyProgramRan  ! local logical
   INTEGER  :: tmpInteger
+!  INTEGER  :: ProgramNum
 
   ! FLOW:
   IF ( .NOT. AnyEnergyManagementSystemInModel) RETURN ! quick return if nothing to do
@@ -229,15 +260,24 @@ SUBROUTINE ManageEMS(iCalledFrom)
 
  ! Run the Erl programs depending on calling point.
   AnyProgramRan = .FALSE.
-  DO ProgramManagerNum = 1, NumProgramCallManagers
+  IF (iCalledFrom /= emsCallFromUserDefinedComponentModel) THEN
+    DO ProgramManagerNum = 1, NumProgramCallManagers
 
-    IF (EMSProgramCallManager(ProgramManagerNum)%CallingPoint == iCalledFrom) THEN
-      DO ErlProgramNum = 1, EMSProgramCallManager(ProgramManagerNum)%NumErlPrograms
-        ReturnValue = EvaluateStack(EMSProgramCallManager(ProgramManagerNum)%ErlProgramARR(ErlProgramNum))
-        AnyProgramRan = .TRUE.
+      IF (EMSProgramCallManager(ProgramManagerNum)%CallingPoint == iCalledFrom) THEN
+        DO ErlProgramNum = 1, EMSProgramCallManager(ProgramManagerNum)%NumErlPrograms
+          ReturnValue = EvaluateStack(EMSProgramCallManager(ProgramManagerNum)%ErlProgramARR(ErlProgramNum))
+          AnyProgramRan = .TRUE.
+        ENDDO
+      ENDIF
+    ENDDO
+  ELSE ! call specific program manager
+    IF (PRESENT(ProgramManagerToRun)) THEN
+      DO ErlProgramNum = 1, EMSProgramCallManager(ProgramManagerToRun)%NumErlPrograms
+          ReturnValue = EvaluateStack(EMSProgramCallManager(ProgramManagerToRun)%ErlProgramARR(ErlProgramNum))
+          AnyProgramRan = .TRUE.
       ENDDO
     ENDIF
-  ENDDO
+  ENDIF
 
   IF (iCalledFrom == emsCallFromExternalInterface) THEN
      AnyProgramRan = .TRUE.
@@ -246,7 +286,8 @@ SUBROUTINE ManageEMS(iCalledFrom)
   IF (.NOT. AnyProgramRan) RETURN
 
     ! Set actuated variables with new values
-  DO ActuatorUsedLoop = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed
+  DO ActuatorUsedLoop = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
     ErlVariableNum = EMSActuatorUsed(ActuatorUsedLoop)%ErlVariableNum
     IF (.NOT. (ErlVariableNum >0)) CYCLE ! this can happen for good reason during sizing
 
@@ -308,7 +349,7 @@ SUBROUTINE InitEMS (iCalledFrom)
 
           ! USE STATEMENTS:
   USE DataGlobals, ONLY: WarmupFlag, DoingSizing, KickOffSimulation, BeginEnvrnFlag,  &
-                         emsCallFromZoneSizing, emsCallFromSystemSizing
+                         emsCallFromZoneSizing, emsCallFromSystemSizing, emsCallFromUserDefinedComponentModel
   USE DataInterfaces, ONLY: ShowFatalError
   USE RuntimeLanguageProcessor, ONLY: InitializeRuntimeLanguage, SetErlValueNumber
   USE ScheduleManager, ONLY : GetCurrentScheduleValue
@@ -338,6 +379,10 @@ SUBROUTINE InitEMS (iCalledFrom)
 
   IF (GetEMSUserInput) THEN
     CALL SetupZoneInfoAsInternalDataAvail
+    CALL SetupWindowShadingControlActuators
+    CALL SetupThermostatActuators
+    CALL SetupSurfaceConvectionActuators
+    CALL SetupSurfaceConstructionActuators
     CALL GetEMSInput
     GetEMSUserInput = .FALSE.
   ENDIF
@@ -346,15 +391,16 @@ SUBROUTINE InitEMS (iCalledFrom)
   IF (FinishProcessingUserInput .AND. .NOT. DoingSizing .AND. .NOT. KickOffSimulation) THEN !
     CALL SetupNodeSetpointsAsActuators
     CALL SetupPrimaryAirSystemAvailMgrAsActuators
-    CALL SetupWindowShadingControlActuators
-    CALL SetupThermostatActuators
-    CALL SetupSurfaceConvectionActuators
+!    CALL SetupWindowShadingControlActuators !this is too late for including in sizing, moved to GetEMSUserInput
+!    CALL SetupThermostatActuators !this is too late for including in sizing, moved to GetEMSUserInput
+!    CALL SetupSurfaceConvectionActuators !this is too late for including in sizing, moved to GetEMSUserInput
     FinishProcessingUserInput = .FALSE.
   END IF
 
   CALL InitializeRuntimeLanguage
 
-  IF ((BeginEnvrnFlag) .OR. (iCalledFrom == emsCallFromZoneSizing) .OR. (iCalledFrom == emsCallFromSystemSizing))  THEN
+  IF ((BeginEnvrnFlag) .OR. (iCalledFrom == emsCallFromZoneSizing) .OR. (iCalledFrom == emsCallFromSystemSizing) &
+      .OR. (iCalledFrom == emsCallFromUserDefinedComponentModel) )  THEN
 
     ! another pass at trying to setup input data.
     IF (FinishProcessingUserInput) CALL ProcessEMSInput(.FALSE.)
@@ -458,7 +504,7 @@ SUBROUTINE GetEMSInput
                          emsCallFromBeforeHVACManagers, emsCallFromAfterHVACManagers,  emsCallFromHVACIterationLoop, &
                          emsCallFromEndZoneTimestepBeforeZoneReporting, emsCallFromEndZoneTimestepAfterZoneReporting, &
                          emsCallFromEndSystemTimestepBeforeHVACReporting, emsCallFromEndSystemTimestepAfterHVACReporting, &
-                         emsCallFromComponentGetInput
+                         emsCallFromComponentGetInput, emsCallFromUserDefinedComponentModel
   USE DataInterfaces, ONLY: ShowSevereError, ShowWarningError, ShowFatalError, SetupOutputVariable, ShowContinueError
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList, MakeUpperCase, SameString,   &
      GetObjectDefMaxArgs
@@ -510,9 +556,10 @@ SUBROUTINE GetEMSInput
   INTEGER :: InternVarNum ! do loop counter for internal variables used (outer)
   INTEGER :: InternalVarAvailNum ! do loop counter for internal variables available (inner)
   INTEGER :: Loop ! do loop counter
-  INTEGER                        :: MaxNumAlphas = 0 !argument for call to GetObjectDefMaxArgs
-  INTEGER                        :: MaxNumNumbers = 0 !argument for call to GetObjectDefMaxArgs
-  INTEGER                        :: TotalArgs = 0 !argument for call to GetObjectDefMaxArgs
+  INTEGER :: MaxNumAlphas = 0 !argument for call to GetObjectDefMaxArgs
+  INTEGER :: MaxNumNumbers = 0 !argument for call to GetObjectDefMaxArgs
+  INTEGER :: TotalArgs = 0 !argument for call to GetObjectDefMaxArgs
+  LOGICAL :: errFlag
 
           ! FLOW:
   cCurrentModuleObject = 'EnergyManagementSystem:Sensor'
@@ -586,17 +633,8 @@ SUBROUTINE GetEMSInput
         IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
       END IF
 
-      IF (SCAN(TRIM(cAlphaArgs(1)), ' ') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain spaces')
-        ErrorsFound = .TRUE.
-      ELSEIF (SCAN(TRIM(cAlphaArgs(1)), '-') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain "-" characters')
-        ErrorsFound = .TRUE.
-      ELSE
+      CALL ValidateEMSVariableName(cCurrentModuleObject,cAlphaArgs(1),cAlphaFieldNames(1),errFlag,ErrorsFound)
+      IF (.not. errFlag) THEN
         Sensor(SensorNum)%Name = Trim(cAlphaArgs(1))
 
         ! really needs to check for conflicts with program and function names too...done later
@@ -644,21 +682,29 @@ SUBROUTINE GetEMSInput
 
   cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
 
-  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed > 0) THEN
-    ALLOCATE(EMSActuatorUsed(numActuatorsUsed + NumExternalInterfaceActuatorsUsed))
-
-    DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed
+  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed > 0) THEN
+    ALLOCATE(EMSActuatorUsed(numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed))
+    DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
+                            + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
        ! If we process the ExternalInterface actuators, all we need to do is to change the
        ! name of the module object, and shift the ActuatorNum in GetObjectItem
-       IF ( ActuatorNum > numActuatorsUsed ) THEN
-          cCurrentModuleObject = 'ExternalInterface:Actuator'
-          CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed, cAlphaArgs, NumAlphas, rNumericArgs, &
+       IF ( ActuatorNum <= numActuatorsUsed ) THEN
+         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum, cAlphaArgs, NumAlphas, rNumericArgs, &
                NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-       ELSE
-          CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum, cAlphaArgs, NumAlphas, rNumericArgs, &
+       ELSE IF ( ActuatorNum > numActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed + NumExternalInterfaceActuatorsUsed) THEN
+         cCurrentModuleObject = 'ExternalInterface:Actuator'
+         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed, cAlphaArgs, NumAlphas, rNumericArgs, &
                NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+       ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
+                              + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed) THEN
+         cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
+         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed-NumExternalInterfaceActuatorsUsed, &
+                           cAlphaArgs, NumAlphas, rNumericArgs, &
+                           NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
+                           AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
        END IF
 
       IsNotOK = .FALSE.
@@ -669,17 +715,8 @@ SUBROUTINE GetEMSInput
         IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
       END IF
 
-      IF (SCAN(TRIM(cAlphaArgs(1)), ' ') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain spaces')
-        ErrorsFound = .TRUE.
-      ELSEIF (SCAN(TRIM(cAlphaArgs(1)), '-') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain "-" characters')
-        ErrorsFound = .TRUE.
-      ELSE
+      CALL ValidateEMSVariableName(cCurrentModuleObject,cAlphaArgs(1),cAlphaFieldNames(1),errFlag,ErrorsFound)
+      IF (.not. errFlag) THEN
         EMSActuatorUsed(ActuatorNum)%Name = cAlphaArgs(1)
 
         ! really needs to check for conflicts with program and function names too...
@@ -748,17 +785,8 @@ SUBROUTINE GetEMSInput
         IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
       END IF
 
-      IF (SCAN(TRIM(cAlphaArgs(1)), ' ') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain spaces')
-        ErrorsFound = .TRUE.
-      ELSEIF (SCAN(TRIM(cAlphaArgs(1)), '-') > 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        CALL ShowContinueError('Names used as EMS variables cannot contain "-" characters')
-        ErrorsFound = .TRUE.
-      ELSE
+      CALL ValidateEMSVariableName(cCurrentModuleObject,cAlphaArgs(1),cAlphaFieldNames(1),errFlag,ErrorsFound)
+      IF (.not. errFlag) THEN
         EMSInternalVarsUsed(InternVarNum)%Name = cAlphaArgs(1)
         VariableNum = FindEMSVariable(cAlphaArgs(1), 0)
         IF (VariableNum > 0) THEN
@@ -845,6 +873,8 @@ SUBROUTINE GetEMSInput
         EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromSystemSizing
       CASE ('AFTERCOMPONENTINPUTREADIN')
         EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromComponentGetInput
+      CASE ('USERDEFINEDCOMPONENTMODEL')
+        EMSProgramCallManager(CallManagerNum)%CallingPoint = emsCallFromUserDefinedComponentModel
       CASE DEFAULT
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
@@ -1027,13 +1057,19 @@ SUBROUTINE ProcessEMSInput(reportErrors)
 
   END DO  ! SensorNum
 
-  cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
-  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed
+  ! added for FMI
+  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
      ! If we process the ExternalInterface actuators, all we need to do is to change the
-     ! name of the module object
-     IF ( ActuatorNum > numActuatorsUsed ) THEN
-        cCurrentModuleObject = 'ExternalInterface:Actuator'
-     ENDIF
+
+    IF ( ActuatorNum <= numActuatorsUsed ) THEN
+      cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
+    ELSE IF ( ActuatorNum > numActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed + NumExternalInterfaceActuatorsUsed) THEN
+      cCurrentModuleObject = 'ExternalInterface:Actuator'
+    ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
+                           + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed) THEN
+      cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
+    END IF
+
     IF (EMSActuatorUsed(ActuatorNum)%CheckedOkay) CYCLE
     FoundObjectType = .FALSE.
     FoundObjectName = .FALSE.
@@ -1468,11 +1504,11 @@ SUBROUTINE SetupNodeSetpointsAsActuators
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
                               'Temperature Maximum Setpoint', '[C]', lDummy, Node(LoopNode)%TempMax )
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
-                              'Humidity Ratio Setpoint', '[kgH20/kgAir]', lDummy, Node(LoopNode)%HumRatSetPoint )
+                              'Humidity Ratio Setpoint', '[kgWater/kgDryAir]', lDummy, Node(LoopNode)%HumRatSetPoint )
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
-                              'Humidity Ratio Maximum Setpoint', '[kgH20/kgAir]', lDummy, Node(LoopNode)%HumRatMax )
+                              'Humidity Ratio Maximum Setpoint', '[kgWater/kgDryAir]', lDummy, Node(LoopNode)%HumRatMax )
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
-                              'Humidity Ratio Minimum Setpoint', '[kgH20/kgAir]', lDummy, Node(LoopNode)%HumRatMin )
+                              'Humidity Ratio Minimum Setpoint', '[kgWater/kgDryAir]', lDummy, Node(LoopNode)%HumRatMin )
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
                               'Mass Flow Rate Setpoint', '[kg/s]', lDummy, Node(LoopNode)%MassFlowRateSetPoint )
       CALL SetupEMSActuator ('System Node Setpoint', NodeID(LoopNode), &
@@ -1898,6 +1934,67 @@ SUBROUTINE SetupSurfaceConvectionActuators
 
 END SUBROUTINE SetupSurfaceConvectionActuators
 
+SUBROUTINE SetupSurfaceConstructionActuators
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Jan 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! setup EMS actuators available for surface construction
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces,  ONLY: SetupEMSActuator
+  USE DataSurfaces,    ONLY: Surface, TotSurfaces
+  USE DataHeatBalance, ONLY: TotConstructs
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: SurfNum ! local loop index.
+  DO SurfNum = 1, TotSurfaces
+
+    IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE
+
+    CALL SetupEMSActuator('Surface',  Surface(SurfNum)%Name, &
+                           'Construction State', '[ ]', &
+                           Surface(SurfNum)%EMSConstructionOverrideON, &
+                           Surface(SurfNum)%EMSConstructionOverrideValue)
+  ENDDO
+
+  !Setup error checking storage
+
+  IF (.NOT. ALLOCATED(EMSConstructActuatorChecked)) &
+    ALLOCATE(EMSConstructActuatorChecked(TotSurfaces, TotConstructs))
+  EMSConstructActuatorChecked = .FALSE.
+
+  IF (.NOT. ALLOCATED(EMSConstructActuatorIsOkay)) &
+    ALLOCATE(EMSConstructActuatorIsOkay(TotSurfaces, TotConstructs))
+  EMSConstructActuatorIsOkay = .FALSE.
+
+  RETURN
+
+END SUBROUTINE SetupSurfaceConstructionActuators
 
 
 SUBROUTINE SetupZoneInfoAsInternalDataAvail
@@ -1965,7 +2062,7 @@ END SUBROUTINE SetupZoneInfoAsInternalDataAvail
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

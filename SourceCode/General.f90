@@ -72,6 +72,10 @@ PUBLIC  SafeDivide   ! Prevents divide by zero.
 !PUBLIC  SaveCompDesWaterFlow
 PUBLIC  Invert3By3Matrix  ! Not currently used (June 2004)
 PUBLIC  Iterate
+PUBLIC  EncodeMonDayHrMin
+PUBLIC  DetermineMinuteForReporting
+PUBLIC  DecodeMonDayHrMin
+PUBLIC  FindNumberinList
 PUBLIC  LogicalToInteger
 PUBLIC  CreateHVACTimeIntervalString
 PUBLIC  CreateTimeString
@@ -79,7 +83,7 @@ PUBLIC  GetCurrentHVACTime
 PUBLIC  GetPreviousHVACTime
 PRIVATE ParseTime
 PUBLIC  ScanForReports
-PUBLIC  ErfFunction
+!PUBLIC  ErfFunction
 
 CONTAINS
 
@@ -740,7 +744,7 @@ FUNCTION rTrimSigDigits(RealValue,SigDigits) RESULT(OutputString)
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: RealValue
   INTEGER, INTENT(IN) :: SigDigits
-  CHARACTER(len=30) OutputString
+  CHARACTER(len=32) OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -755,7 +759,7 @@ FUNCTION rTrimSigDigits(RealValue,SigDigits) RESULT(OutputString)
   INTEGER DotPos               ! Position of decimal point in original string
   INTEGER EPos                 ! Position of E in original string format xxEyy
   INTEGER SLen                 ! Length of String (w/o E part)
-  CHARACTER(len=30) String     ! Working string
+  CHARACTER(len=32) String     ! Working string
   CHARACTER(len=10) EString    ! E string retained from original string
   LOGICAL IncludeDot           ! True when decimal point output
 
@@ -819,7 +823,7 @@ FUNCTION iTrimSigDigits(IntegerValue,SigDigits) RESULT(OutputString)
           ! FUNCTION ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN) :: IntegerValue
   INTEGER, INTENT(IN), OPTIONAL :: SigDigits  ! ignored
-  CHARACTER(len=30) OutputString
+  CHARACTER(len=32) OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -831,7 +835,7 @@ FUNCTION iTrimSigDigits(IntegerValue,SigDigits) RESULT(OutputString)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  CHARACTER(len=30) String     ! Working string
+  CHARACTER(len=32) String     ! Working string
 
   WRITE(String,*) IntegerValue
   OutputString=ADJUSTL(String)
@@ -867,7 +871,7 @@ FUNCTION rRoundSigDigits(RealValue,SigDigits) RESULT(OutputString)
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: RealValue
   INTEGER, INTENT(IN) :: SigDigits
-  CHARACTER(len=30) OutputString
+  CHARACTER(len=32) OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
   CHARACTER(len=11) :: DigitChar='01234567890'
@@ -886,7 +890,7 @@ FUNCTION rRoundSigDigits(RealValue,SigDigits) RESULT(OutputString)
   INTEGER TPos1                ! Position of "next" char rounded in Digit string
   INTEGER SPos                 ! Actual string position being replaced
   INTEGER SLen                 ! Length of String (w/o E part)
-  CHARACTER(len=30) String     ! Working string
+  CHARACTER(len=32) String     ! Working string
   CHARACTER(len=10) EString    ! E string retained from original string
   CHARACTER(len=1) TestChar    ! Test character (digit) for rounding, if position in digit string > 5 (digit is 5 or greater)
                                ! then will round
@@ -993,7 +997,7 @@ FUNCTION iRoundSigDigits(IntegerValue,SigDigits) RESULT(OutputString)
           ! FUNCTION ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN) :: IntegerValue
   INTEGER, INTENT(IN), OPTIONAL :: SigDigits  ! ignored
-  CHARACTER(len=30) OutputString
+  CHARACTER(len=32) OutputString
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -1005,7 +1009,7 @@ FUNCTION iRoundSigDigits(IntegerValue,SigDigits) RESULT(OutputString)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  CHARACTER(len=30) String     ! Working string
+  CHARACTER(len=32) String     ! Working string
 
   WRITE(String,*) IntegerValue
   OutputString=ADJUSTL(String)
@@ -1138,7 +1142,7 @@ SUBROUTINE MovingAvg(DataIn,NumDataItems,NumItemsInAvg,SmoothedData)
 
 END SUBROUTINE MovingAvg
 
-SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound)
+SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound,PYear)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -1170,6 +1174,7 @@ SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound)
   INTEGER, INTENT(OUT) :: PWeekDay
   INTEGER, INTENT(OUT) :: DateType      ! DateType found (-1=invalid, 1=month/day, 2=nth day in month, 3=last day in month)
   LOGICAL, INTENT(INOUT) :: ErrorsFound
+  INTEGER, INTENT(OUT), OPTIONAL :: PYear
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1187,6 +1192,7 @@ SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound)
   INTEGER TokenDay
   INTEGER TokenMonth
   INTEGER TokenWeekDay
+  INTEGER TokenYear
 
   FstNum=INT(ProcessNumber(String,ErrFlag))
   DateType=-1
@@ -1205,7 +1211,12 @@ SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound)
     ENDIF
   ELSE
     ! Error when processing as number, try x/x
-    CALL DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekDay,DateType,ErrorsFound)
+    IF (.not. PRESENT(PYear)) THEN
+      CALL DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekDay,DateType,ErrorsFound)
+    ELSE
+      CALL DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekDay,DateType,ErrorsFound,TokenYear)
+      PYear=TokenYear
+    ENDIF
     IF (DateType == 1) THEN
       PDay=TokenDay
       PMonth=TokenMonth
@@ -1221,7 +1232,7 @@ SUBROUTINE ProcessDateString(String,PMonth,PDay,PWeekDay,DateType,ErrorsFound)
 
 END SUBROUTINE ProcessDateString
 
-SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday,DateType,ErrorsFound)
+SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday,DateType,ErrorsFound,TokenYear)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -1255,6 +1266,7 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
   INTEGER, INTENT(OUT) :: TokenWeekDay  ! Value of Weekday field found (1=Sunday, 2=Monday, etc), 0 if none
   INTEGER, INTENT(OUT) :: DateType      ! DateType found (-1=invalid, 1=month/day, 2=nth day in month, 3=last day in month)
   LOGICAL, INTENT(INOUT) :: ErrorsFound   ! Set to true if cannot process this string as a date
+  INTEGER, INTENT(OUT), OPTIONAL :: TokenYear ! Value of Year if one appears to be present and this argument is present
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=1), PARAMETER :: Blank=' '
@@ -1281,8 +1293,10 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
   CHARACTER(len=15), DIMENSION(3) :: Fields
   INTEGER NumField1
   INTEGER NumField2
+  INTEGER NumField3
   LOGICAL ErrFlag
   LOGICAL InternalError
+  LOGICAL :: WkDayInMonth
 
   CurrentString=String
   NumTokens=0
@@ -1291,6 +1305,8 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
   TokenWeekday=0
   DateType=-1
   InternalError=.false.
+  WkDayInMonth=.false.
+  IF (PRESENT(TokenYear)) TokenYear=0
   ! Take out separator characters, other extraneous stuff
 
   DO Loop=1,NumSingleChars
@@ -1306,6 +1322,7 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
     DO WHILE (Pos > 0)
       CurrentString(Pos:Pos+1)='  '
       Pos=INDEX(CurrentString,DoubleChars(Loop))
+      WkDayInMonth=.true.
     ENDDO
   ENDDO
 
@@ -1371,26 +1388,11 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
         ENDIF
       ENDIF
     ELSEIF (Loop == 3) THEN
-      ! Field must be some combination of <num> Weekday Month
-      NumField1=INT(ProcessNumber(Fields(1),ErrFlag))
-      IF (.not. ErrFlag) THEN ! the expected result
-        TokenDay=NumField1
-        TokenWeekDay=FindItemInList(Fields(2)(1:3),Weekdays,7)
-        IF (TokenWeekDay == 0) THEN
-          TokenMonth=FindItemInList(Fields(2)(1:3),Months,12)
-          TokenWeekDay=FindItemInList(Fields(3)(1:3),Weekdays,7)
-          IF (TokenMonth == 0 .or. TokenWeekDay == 0) InternalError=.true.
-        ELSE
-          TokenMonth=FindItemInList(Fields(3)(1:3),Months,12)
-          IF (TokenMonth == 0) InternalError=.true.
-        ENDIF
-        DateType=2
-        NumTokens=3
-        IF (TokenDay < 0 .or. TokenDay > 5) InternalError=.true.
-      ELSE   ! first field was not numeric....
-        IF (Fields(1) == 'LA ') THEN
-          DateType=3
-          NumTokens=3
+      ! Field must be some combination of <num> Weekday Month (if WkDayInMonth true)
+      IF (WkDayInMonth) THEN
+        NumField1=INT(ProcessNumber(Fields(1),ErrFlag))
+        IF (.not. ErrFlag) THEN ! the expected result
+          TokenDay=NumField1
           TokenWeekDay=FindItemInList(Fields(2)(1:3),Weekdays,7)
           IF (TokenWeekDay == 0) THEN
             TokenMonth=FindItemInList(Fields(2)(1:3),Months,12)
@@ -1400,8 +1402,44 @@ SUBROUTINE DetermineDateTokens(String,NumTokens,TokenDay,TokenMonth,TokenWeekday
             TokenMonth=FindItemInList(Fields(3)(1:3),Months,12)
             IF (TokenMonth == 0) InternalError=.true.
           ENDIF
-        ELSE  ! error....
-          CALL ShowSevereError('First date field not numeric, field='//TRIM(String))
+          DateType=2
+          NumTokens=3
+          IF (TokenDay < 0 .or. TokenDay > 5) InternalError=.true.
+        ELSE   ! first field was not numeric....
+          IF (Fields(1) == 'LA ') THEN
+            DateType=3
+            NumTokens=3
+            TokenWeekDay=FindItemInList(Fields(2)(1:3),Weekdays,7)
+            IF (TokenWeekDay == 0) THEN
+              TokenMonth=FindItemInList(Fields(2)(1:3),Months,12)
+              TokenWeekDay=FindItemInList(Fields(3)(1:3),Weekdays,7)
+              IF (TokenMonth == 0 .or. TokenWeekDay == 0) InternalError=.true.
+            ELSE
+              TokenMonth=FindItemInList(Fields(3)(1:3),Months,12)
+              IF (TokenMonth == 0) InternalError=.true.
+            ENDIF
+          ELSE  ! error....
+            CALL ShowSevereError('First date field not numeric, field='//TRIM(String))
+          ENDIF
+        ENDIF
+      ELSE  ! mm/dd/yyyy or yyyy/mm/dd
+        NumField1=INT(ProcessNumber(Fields(1),ErrFlag))
+        NumField2=INT(ProcessNumber(Fields(2),ErrFlag))
+        NumField3=INT(ProcessNumber(Fields(3),ErrFlag))
+        DateType=1
+        ! error detection later..
+        IF (NumField1 > 100) THEN
+          IF (PRESENT(TokenYear)) THEN
+            TokenYear=NumField1
+          ENDIF
+          TokenMonth=NumField2
+          TokenDay=NumField3
+        ELSEIF (NumField3 > 100) THEN
+          IF (PRESENT(TokenYear)) THEN
+            TokenYear=NumField3
+          ENDIF
+          TokenMonth=NumField1
+          TokenDay=NumField2
         ENDIF
       ENDIF
     ELSE
@@ -1747,10 +1785,10 @@ FUNCTION SafeDivide(a, b) RESULT (c)
 
   REAL(r64), PARAMETER :: SMALL=1.D-10
 
-  IF (ABS(b) < SMALL) THEN
-    c = a / SIGN(SMALL, b)
-  ELSE
+  IF (ABS(b) >= SMALL) THEN
     c = a / b
+  ELSE
+    c = a / SIGN(SMALL, b)
   END IF
 END FUNCTION
 
@@ -1981,6 +2019,232 @@ SUBROUTINE ITERATE(ResultX,Tol,X0,Y0,X1,Y1,Iter,Cnvg)
 
 END SUBROUTINE ITERATE
 
+INTEGER FUNCTION FindNumberinList(WhichNumber,ListofItems,NumItems)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda K. Lawrie
+          !       DATE WRITTEN   September 2001
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up a number(integer) in a similar list of
+          ! items and returns the index of the item in the list, if
+          ! found.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: WhichNumber
+  INTEGER, INTENT(IN), DIMENSION(*) :: ListofItems
+  INTEGER, INTENT(IN) :: NumItems
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER Count
+
+  FindNumberinList=0
+
+  DO Count=1,NumItems
+    IF (WhichNumber == ListofItems(Count)) THEN
+      FindNumberinList=Count
+      EXIT
+    ENDIF
+  END DO
+
+  RETURN
+
+END FUNCTION FindNumberinList
+
+SUBROUTINE DecodeMonDayHrMin(Item,Month,Day,Hour,Minute)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2000
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine decodes the "packed" integer representation of
+          ! the Month, Day, Hour, and Minute.  Packed integers are used to
+          ! save memory allocation.  Original idea for this routine is contained
+          ! in DECMDH, BLAST code, by Jean Baugh.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Using maximum integer concept the original date can be decoded
+          ! from the packed single word.  This relies on 4 byte integer representation
+          ! as a minimum (capable of representing up to 2,147,483,647).
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: Item   ! word containing encoded month, day, hour, minute
+                                 ! ((month*100 + day)*100 + hour)*100 + minute
+  INTEGER, INTENT(OUT) :: Month  ! month in integer format (1-12)
+  INTEGER, INTENT(OUT) :: Day    ! day in integer format (1-31)
+  INTEGER, INTENT(OUT) :: Hour   ! hour in integer format (1-24)
+  INTEGER, INTENT(OUT) :: Minute ! minute in integer format (0:59)
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER :: DecMon=100*100*100
+  INTEGER, PARAMETER :: DecDay=100*100
+  INTEGER, PARAMETER :: DecHr =100
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER TmpItem
+
+  TmpItem=Item
+  Month=TmpItem/DecMon
+  TmpItem=(TmpItem-Month*DecMon)
+  Day=TmpItem/DecDay
+  TmpItem=TmpItem-Day*DecDay
+  Hour=TmpItem/DecHr
+  Minute=MOD(TmpItem,DecHr)
+
+  RETURN
+
+END SUBROUTINE DecodeMonDayHrMin
+
+FUNCTION DetermineMinuteForReporting(IndexTypeKey) RESULT(ActualTimeMin)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   January 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! When reporting peaks, minutes are used but not necessarily easily calculated.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Could use the access to the minute as OP (OutputProcessor) does but uses
+          ! external calculation.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPrecisionGlobals
+  USE DataGlobals, ONLY: ZoneTSReporting, HVACTSReporting, TimeStepZone, CurrentTime
+  USE DataHVACGlobals, ONLY: TimeStepSys, SysTimeElapsed
+
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: IndexTypeKey ! kind of reporting, Zone Timestep or System
+  INTEGER             :: ActualTimeMin    ! calculated Minute for reporting
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+  REAL(r64),PARAMETER :: FracToMin=60.0d0
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  real(r64) ActualTimeS  ! Start of current interval (HVAC time step)
+  real(r64) ActualTimeE  ! End of current interval (HVAC time step)
+  integer ActualTimeHrS
+
+  if (IndexTypeKey == HVACTSReporting) then
+    ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
+    ActualtimeE = ActualTimeS+TimeStepSys
+    ActualTimeHrS=INT(ActualTimeS)
+    ActualTimeMin=NINT((ActualtimeE - ActualTimeHrS)*FracToMin)
+  else
+    ActualTimeMin = (CurrentTime - INT(CurrentTime))*FracToMin
+  endif
+
+  RETURN
+
+END FUNCTION DetermineMinuteForReporting
+
+SUBROUTINE EncodeMonDayHrMin(Item,Month,Day,Hour,Minute)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2000
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine encodes the "packed" integer representation of
+          ! the Month, Day, Hour, and Minute.  Packed integers are used to
+          ! save memory allocation.  Original idea for this routine is contained
+          ! in DECMDH, BLAST code, by Jean Baugh.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Using maximum integer concept the original date can be decoded
+          ! from the packed single word.  This relies on 4 byte integer representation
+          ! as a minimum (capable of representing up to 2,147,483,647).
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(OUT) :: Item   ! word containing encoded month, day, hour, minute
+                                 ! ((month*100 + day)*100 + hour)*100 + minute
+  INTEGER, INTENT(IN)  :: Month  ! month in integer format (1:12)
+  INTEGER, INTENT(IN)  :: Day    ! day in integer format (1:31)
+  INTEGER, INTENT(IN)  :: Hour   ! hour in integer format (1:24)
+  INTEGER, INTENT(IN)  :: Minute ! minute in integer format (0:59)
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  Item=((Month*100 + Day)*100 + Hour)*100 + Minute
+
+  RETURN
+
+END SUBROUTINE EncodeMonDayHrMin
+
+
   INTEGER FUNCTION LogicalToInteger( Flag )
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dimitri Curtil
@@ -2147,7 +2411,7 @@ END SUBROUTINE ITERATE
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
             ! FUNCTION ARGUMENT DEFINITIONS:
-    CHARACTER(len=30) :: OutputString
+    CHARACTER(len=32) :: OutputString
 
             ! FUNCTION PARAMETER DEFINITIONS:
             ! na
@@ -2271,7 +2535,7 @@ END SUBROUTINE ITERATE
             ! FUNCTION ARGUMENT DEFINITIONS:
     REAL(r64), INTENT(IN) :: StartTime    ! Start of current interval in seconds
     REAL(r64), INTENT(IN) :: EndTime      ! End of current interval in seconds
-    CHARACTER(len=30)            :: OutputString ! Contains time stamp
+    CHARACTER(len=32)            :: OutputString ! Contains time stamp
 
             ! FUNCTION PARAMETER DEFINITIONS:
             ! na
@@ -2720,117 +2984,10 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 
 END SUBROUTINE ScanForReports
 
-FUNCTION ErfFunction(Var1) RESULT(ErfValue)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Craig Wray, LBNL
-          !       DATE WRITTEN   25Aug2010
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! Given the independent variable, returns the value of the error function
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! Geelen, B.D. 1993. "Technical Note: An Accurate Solution FORTRAN Algorithm for the erf
-          ! and Related Error Functions", Advances in Engineering Software, 18, pp.67-71
-
-          ! USE STATEMENTS:
-   USE DataGlobals, ONLY: PI, EXP1_Value, PKON, PI_SQRT
-
-   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! FUNCTION ARGUMENT DEFINITIONS:
-   REAL(r64), INTENT (IN) :: Var1        ! 1st independent variable (x) [-]
-   REAL(r64)              :: ErfValue    ! Error function result [-]
-
-          ! FUNCTION PARAMETER DEFINITIONS:
-   REAL(r64), PARAMETER ::   F12 = 132.d0 * 3628800.d0 ! Twelve factorial [-]
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-   INTEGER   :: SumTermID !Summation term counter (integer) [-]
-   REAL(r64) :: AN        !Term counter (double precision) [-]
-   REAL(r64) :: FACT      !Factorial number [-]
-   REAL(r64) :: A1        !Numerator term 1 [-]
-   REAL(r64) :: A2        !Numerator term 2 power [-]
-   REAL(r64) :: A3        !Numerator [-]
-   REAL(r64) :: A4        !Denominator [-]
-   REAL(r64) :: A5        !Summation term [-]
-
-   REAL(r64) :: TwoX      !Two times Var1 (X) [-]
-   REAL(r64) :: B1        !Var1 squared[-]
-   REAL(r64) :: B2        !Scalar numerator [-]
-   REAL(r64) :: B3        !Scalar denominator [-]
-   REAL(r64) :: B4        !Series scalar [-]
-   REAL(r64) :: BT1       !Series term 1 [-]
-   REAL(r64) :: BT2       !Series term 2 [-]
-   REAL(r64) :: BT3       !Series term 3 [-]
-   REAL(r64) :: BT4       !Series term 4 [-]
-   REAL(r64) :: BT5       !Series term 5 [-]
-   REAL(r64) :: BT6       !Series term 6 [-]
-   REAL(r64) :: BT7       !Series term 7 [-]
-   REAL(r64) :: BT8       !Series term 8 [-]
-   REAL(r64) :: BT9       !Series term 9 [-]
-   REAL(r64) :: SeriesSum !Sum: 1 + terms 1 through 9 [-]
-
-   !Select region for evaluating functions
-   IF(Var1 < 3.6d0) THEN !Summation solution for 0 <= Var1 < 3.6 (Geelen's equation 16): A-range
-     !Initialize values
-     AN = -1.d0
-     FACT = 1.d0
-     A5 = 0.d0
-
-     DO SumTermID=1,60
-       AN = AN + 1.d0
-       FACT = FACT * AN
-       IF (AN == 0.d0) FACT = 1.d0
-       A1 = (-1.d0)**AN
-       A2 = (2.d0 * AN) + 1.d0
-       A3 = A1 * Var1**A2
-       A4 = FACT * ((2.d0 * AN) + 1.d0)
-       A5 = (A3 / A4) + A5
-     END DO
-     ErfValue = PKON * A5
-
-   ELSE !Series solution (Geelen's equation 22): B-range
-     !Factorial values not combined so that source of terms more clear
-     TwoX = 2.d0 * Var1
-
-     B1 = Var1**2
-     B2 = EXP1_Value**(-B1)
-     B3 = Var1 * PI_SQRT
-     B4 = B2 / B3
-
-     BT1 = 2.d0 /(TwoX**2)
-     BT2 = 24.d0 / (2.d0 * (TwoX**4))
-     BT3 = 720.0d0 / (6.d0 * (TwoX**6))
-     BT4 = 40320.d0 / (24.d0 * (TwoX**8))
-     BT5 = 3628800.d0 / (120.d0 * (TwoX**10))
-     BT6 = F12 / (720.d0 * (TwoX**12.d0))
-     BT7 = (F12 * 182.d0) / (5040.d0 * (TwoX**14))
-     BT8 = (F12 * 240.d0 * 182.d0) / (40320.d0 * (TwoX**16))
-     BT9 = (F12 * 306.d0 * 240.d0 * 182.d0) / (362880.d0 * (TwoX**18))
-     SeriesSum = 1.d0 - BT1 + BT2 - BT3 + BT4 - BT5 + BT6 - BT7 + BT8 - BT9
-
-     ErfValue = 1.d0 - B4 * SeriesSum
-   END IF
-
-RETURN
-END FUNCTION ErfFunction
-
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

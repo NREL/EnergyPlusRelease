@@ -831,6 +831,7 @@ IF (MyPlantScanFlag(FanCoilNum) .AND. ALLOCATED(PlantLoop)) THEN
                                 errFlag=errFlag)
 
   IF (errFlag) THEN
+    CALL ShowContinueError('Reference Unit="'//trim(FanCoil(FanCoilNum)%Name)//'", type='//trim(FanCoil(FanCoilNum)%UnitType))
     CALL ShowFatalError('InitFanCoilUnits: Program terminated for previous conditions.')
   ENDIF
 
@@ -848,6 +849,7 @@ IF (MyPlantScanFlag(FanCoilNum) .AND. ALLOCATED(PlantLoop)) THEN
                                   FanCoil(FanCoilNum)%CWCompNum,     &
                                   errFlag=errFlag)
     IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(FanCoil(FanCoilNum)%Name)//'", type='//trim(FanCoil(FanCoilNum)%UnitType))
       CALL ShowFatalError('InitFanCoilUnits: Program terminated for previous conditions.')
     ENDIF
     FanCoil(FanCoilNum)%ColdPlantOutletNode = &
@@ -998,8 +1000,8 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
   USE General,        ONLY: TrimSigDigits
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXDXCoilName, GetHXCoilType
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
-  USE DataPlant,      ONLY: PlantLoop
+!  USE BranchInputManager, ONLY: MyPlantSizingIndex
+  USE DataPlant,      ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
@@ -1020,12 +1022,13 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER             :: PltSizHeatNum ! index of plant sizing object for 1st heating loop
   INTEGER             :: PltSizCoolNum ! index of plant sizing object for 1st cooling loop
-  REAL(r64)           :: CoilInTemp
-  REAL(r64)           :: CoilOutTemp
-  REAL(r64)           :: CoilOutHumRat
-  REAL(r64)           :: CoilInHumRat
-  LOGICAL             :: ErrorsFound
-  REAL(r64)           :: DesCoilLoad
+  REAL(r64)           :: CoilInTemp    ! design inlet air temperature for coil [C]
+  REAL(r64)           :: CoilOutTemp   ! design outlet air temperature for coil [C]
+  REAL(r64)           :: CoilOutHumRat ! design inlet air humidity ratio for coil [kg/kg]
+  REAL(r64)           :: CoilInHumRat  ! design outlet air humidity ratio for coil [kg/kg]
+  LOGICAL             :: ErrorsFound   ! TRUE if errors foind during sizing
+  REAL(r64)           :: DesCoilLoad   ! coil load used for sizing [W]
+  REAL(r64)           :: FCOAFrac      ! design outside air fraction for the fan coil unit 
   INTEGER             :: CoilWaterInletNode=0
   INTEGER             :: CoilWaterOutletNode=0
   CHARACTER(len=MaxNameLength) :: CoolingCoilName
@@ -1116,17 +1119,19 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
 
       IF (PltSizHeatNum > 0) THEN
         CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-        IF (FanCoil(FanCoilNum)%OutAirVolFlow > 0.0) THEN
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
+        IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow > 0.0) THEN
+          FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow, 1.0d0)
         ELSE
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%ZoneRetTempAtHeatPeak
+          FCOAFrac = 0.0
         END IF
+        CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtHeatPeak + &
+                     (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
         CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-        CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+        CoilOutHumRat =FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat 
         DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
                           * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                           * (CoilOutTemp-CoilInTemp)
-        IF (DesCoilLOad >= SmallLoad) THEN
+        IF (DesCoilLoad >= SmallLoad) THEN
           rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
                          60.d0, &
                          PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidIndex, &
@@ -1176,13 +1181,15 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
 
       IF (PltSizCoolNum > 0) THEN
         CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-        IF (FanCoil(FanCoilNum)%OutAirVolFlow > 0.0) THEN
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
-          CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+        IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow > 0.0) THEN
+          FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
         ELSE
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%ZoneRetTempAtCoolPeak
-          CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
+          FCOAFrac = 0.0
         END IF
+        CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtCoolPeak + &
+                       (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak
+        CoilInHumRat = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutHumRatAtCoolPeak + &
+                        (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
         CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
         CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
         IF (CoilOutHumRat > CoilInHumRat) THEN
@@ -1190,7 +1197,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
             CoilOutHumRat = 0.5*CoilInHumRat
           ELSE
             CoilOutHumRat = CoilInHumRat
-          END IF   
+          END IF
         END IF
         DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
                       * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
@@ -1232,11 +1239,17 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
     CoolingCoilName = FanCoil(FanCoilNum)%CCoilName
     CoolingCoilType = FanCoil(FanCoilNum)%CCoilType
   END IF
-  CALL SetCoilDesFlow(CoolingCoilType,CoolingCoilName,FanCoil(FanCoilNum)%MaxAirVolFlow,&
-                       ErrorsFound)
-  CALL SetCoilDesFlow(FanCoil(FanCoilNum)%HCoilType,FanCoil(FanCoilNum)%HCoilName,FanCoil(FanCoilNum)%MaxAirVolFlow,&
-                       ErrorsFound)
-
+  IF (ZoneSizingRunDone) THEN
+    CALL SetCoilDesFlow(CoolingCoilType,CoolingCoilName,FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow,&
+                        ErrorsFound)
+    CALL SetCoilDesFlow(FanCoil(FanCoilNum)%HCoilType,FanCoil(FanCoilNum)%HCoilName,FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow,&
+                        ErrorsFound)
+  ELSE
+    CALL SetCoilDesFlow(CoolingCoilType,CoolingCoilName,FanCoil(FanCoilNum)%MaxAirVolFlow,&
+                        ErrorsFound)
+    CALL SetCoilDesFlow(FanCoil(FanCoilNum)%HCoilType,FanCoil(FanCoilNum)%HCoilName,FanCoil(FanCoilNum)%MaxAirVolFlow,&
+                        ErrorsFound)
+  END IF
   IF (CurZoneEqNum > 0) THEN
     ZoneEqSizing(CurZoneEqNum)%MaxHWVolFlow = FanCoil(FanCoilNum)%MaxHotWaterVolFlow
     ZoneEqSizing(CurZoneEqNum)%MaxCWVolFlow = FanCoil(FanCoilNum)%MaxColdWaterVolFlow
@@ -1362,8 +1375,26 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
 
     IF (AirMassFlow.LT.SmallMassFlow) UnitOn = .FALSE.
     ! zero the hot & cold water flows
-    Node(FanCoil(FanCoilNum)%ColdControlNode)%MassFlowRate = 0.0
-    Node(FanCoil(FanCoilNum)%HotControlNode)%MassFlowRate = 0.0
+!    Node(FanCoil(FanCoilNum)%ColdControlNode)%MassFlowRate = 0.0
+!    Node(FanCoil(FanCoilNum)%HotControlNode)%MassFlowRate = 0.0
+    mdot = 0.d0
+    CALL SetComponentFlowRate(mdot , &
+                                FanCoil(FanCoilNum)%ColdControlNode, &
+                                FanCoil(FanCoilNum)%ColdPlantOutletNode, &
+                                FanCoil(FanCoilNum)%CWLoopNum, &
+                                FanCoil(FanCoilNum)%CWLoopSide, &
+                                FanCoil(FanCoilNum)%CWBranchNum, &
+                                FanCoil(FanCoilNum)%CWCompNum)
+    mdot = 0.d0
+    CALL SetComponentFlowRate(mdot , &
+                                FanCoil(FanCoilNum)%HotControlNode, &
+                                FanCoil(FanCoilNum)%HotPlantOutletNode, &
+                                FanCoil(FanCoilNum)%HWLoopNum, &
+                                FanCoil(FanCoilNum)%HWLoopSide, &
+                                FanCoil(FanCoilNum)%HWBranchNum, &
+                                FanCoil(FanCoilNum)%HWCompNum)
+
+    
     ! obtain unit output with no active heating/cooling
     CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutNoHC)
     ! get the loads at the coils
@@ -1391,8 +1422,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              CompErrIndex=FanCoil(FanCoilNum)%CompErrIndex, &
                              LoopNum     = FanCoil(FanCoilNum)%CWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%CWLoopSide, &
-                             BranchIndex = FanCoil(FanCoilNum)%CWBranchNum, &
-                             CompIndex   = FanCoil(FanCoilNum)%CWCompNum)
+                             BranchIndex = FanCoil(FanCoilNum)%CWBranchNum)
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
     ELSE IF (UnitOn .and. QCoilHeatSP > 0.0 .and. TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
@@ -1417,8 +1447,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              CompErrIndex=FanCoil(FanCoilNum)%CompErrIndex, &
                              LoopNum     = FanCoil(FanCoilNum)%HWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%HWLoopSide, &
-                             BranchIndex = FanCoil(FanCoilNum)%HWBranchNum, &
-                             CompIndex   = FanCoil(FanCoilNum)%HWCompNum)
+                             BranchIndex = FanCoil(FanCoilNum)%HWBranchNum)
 
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
@@ -2188,7 +2217,7 @@ END FUNCTION GetFanCoilMixedAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

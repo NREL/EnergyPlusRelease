@@ -56,6 +56,7 @@ TYPE TDDPipeData
   REAL(r64)                      :: TransSolIso = 0.0       ! Diffuse isotropic solar transmittance (constant)
   REAL(r64)                      :: TransSolHorizon = 0.0   ! Diffuse horizon solar transmittance (constant)
   REAL(r64)                      :: ExtLength = 0.0         ! Exterior exposed length of pipe
+  REAL(r64), ALLOCATABLE, DIMENSION(:) :: TZoneHeatGain     ! convection gain to transition zones
 
   ! Report variables
   REAL(r64)                      :: TransmittedSolar = 0.0  ! Solar transmitted by the TDD [W]
@@ -98,7 +99,7 @@ INTEGER :: NumOfShelf   =0  ! Number of daylighting shelves in the input file
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

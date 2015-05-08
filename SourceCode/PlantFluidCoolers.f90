@@ -28,7 +28,8 @@ USE DataInterfaces
 USE DataHVACGlobals
 USE DataLoopNode
 USE DataEnvironment, ONLY: StdBaroPress, OutDryBulbTemp, OutHumRat, OutBaroPress, OutWetBulbTemp
-USE DataPlant,       ONLY: PlantLoop, MassFlowTol
+USE DataPlant,       ONLY: PlantLoop
+USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
 
   ! Use statements for access to subroutines in other modules
 USE Psychrometrics,  ONLY: PsyWFnTdbTwbPb, PsyRhoAirFnPbTdbW, PsyHFnTdbRhPb, PsyCpAirFnWTdb, &
@@ -851,7 +852,7 @@ SUBROUTINE InitFluidCooler(FluidCoolerNum, RunFlag)
   USE InputProcessor,  ONLY : SameString
   USE DataPlant,       ONLY : TypeOf_FluidCooler_SingleSpd, TypeOf_FluidCooler_TwoSpd, ScanPlantLoopsForObject, &
                               PlantSizeNotComplete, PlantSizesOkayToFinalize
-  USE PlantUtilities,  ONLY: InitComponentNodes, SetComponentFlowRate
+  USE PlantUtilities,  ONLY: InitComponentNodes, SetComponentFlowRate, RegulateCondenserCompFlowReqOp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -961,15 +962,14 @@ SUBROUTINE InitFluidCooler(FluidCoolerNum, RunFlag)
     LoopSideNum = SimpleFluidCooler(FluidCoolerNum)%LoopSideNum
     BranchIndex = SimpleFluidCooler(FluidCoolerNum)%BranchNum
     CompIndex   = SimpleFluidCooler(FluidCoolerNum)%CompNum
-    IF ( .NOT. RunFlag)THEN
-      ! Loop is controlled by environmental flags, shut off branch
-      WaterMassFlowRate = 0.0
-    ELSE
-     ! Loop is 'load range' or 'uncontrolled'
-     ! Set tower flow rate to maximum allowed, let pump (or other component) set flow rate
-     WaterMassFlowRate  = SimpleFluidCooler(FluidCoolerNum)%DesWaterMassFlowRate * &
-                          SimpleFluidCooler(FluidCoolerNum)%FluidCoolerMassFlowRateMultiplier
-    END IF
+
+    WaterMassFlowRate = RegulateCondenserCompFlowReqOp(SimpleFluidCooler(FluidCoolerNum)%LoopNum,               &
+                                                SimpleFluidCooler(FluidCoolerNum)%LoopSideNum,           &
+                                                SimpleFluidCooler(FluidCoolerNum)%BranchNum,             &
+                                                SimpleFluidCooler(FluidCoolerNum)%CompNum,     &
+                                                SimpleFluidCooler(FluidCoolerNum)%DesWaterMassFlowRate * &
+                                                SimpleFluidCooler(FluidCoolerNum)%FluidCoolerMassFlowRateMultiplier)
+
 
     CALL SetComponentFlowRate(WaterMassFlowRate, &
                               SimpleFluidCooler(FluidCoolerNum)%WaterInletNodeNum,     &
@@ -1072,7 +1072,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
       CALL ShowSevereError('Autosizing error for fluid cooler object = '//TRIM(SimpleFluidCooler(FluidCoolerNum)%Name))
       CALL ShowFatalError('Autosizing of fluid cooler condenser flow rate requires a loop Sizing:Plant object.')
     ENDIF
-    ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design set point
+    ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design setpoint
     ! temperature is less than design inlet air dry bulb temperature
     IF ( PlantSizData(PltSizCondNum)%ExitTemp <= &
                       SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp ) THEN
@@ -1122,7 +1122,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
         IF (PlantSizesOkayToFinalize) SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower = tmpHighSpeedFanPower
       ELSEIF (PltSizCondNum > 0) THEN
         IF (PlantSizData(PltSizCondNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-          ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design set point
+          ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design setpoint
           ! temperature is less than design inlet air dry bulb temperature
           IF ( PlantSizData(PltSizCondNum)%ExitTemp <= &
                             SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp ) THEN
@@ -1185,7 +1185,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
         IF (PlantSizesOkayToFinalize) SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate = tmpHighSpeedAirFlowRate
       ELSEIF (PltSizCondNum > 0) THEN
         IF (PlantSizData(PltSizCondNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-          ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design set point
+          ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design setpoint
           ! temperature is less than design inlet air dry bulb temperature
           IF ( PlantSizData(PltSizCondNum)%ExitTemp <= &
                             SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp ) THEN
@@ -1239,7 +1239,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
   IF (SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA == AutoSize) THEN
     IF (PltSizCondNum > 0) THEN
       IF (PlantSizData(PltSizCondNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-        ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design set point
+        ! This conditional statement is to trap when the user specified Condenser/Fluid Cooler water design setpoint
         ! temperature is less than design inlet air dry bulb temperature
         IF ( PlantSizData(PltSizCondNum)%ExitTemp <= &
                           SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp ) THEN
@@ -1265,8 +1265,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
                                    PlantSizData(PltSizCondNum)%ExitTemp,                      &
                                    PlantLoop(SimpleFluidCooler(FluidCoolerNum)%LoopNum)%FluidIndex, &
                                    'SizeFluidCooler')
-        DesFluidCoolerLoad = rho * Cp &
-                            * SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate * PlantSizData(PltSizCondNum)%DeltaT
+        DesFluidCoolerLoad = rho * Cp * tmpDesignWaterFlowRate * PlantSizData(PltSizCondNum)%DeltaT
         Par(1) = DesFluidCoolerLoad
         Par(2) = REAL(FluidCoolerNum,r64)
         Par(3) = rho * tmpDesignWaterFlowRate ! design water mass flow rate
@@ -1597,10 +1596,10 @@ SUBROUTINE SingleSpeedFluidCooler(FluidCoolerNum)
           ! cross flow heat exchangers (both stream unmixed)based on cooling tower model.
           !
           ! The subroutine calculates the period of time required to meet a
-          ! leaving water temperature set point. It assumes that part-load
+          ! leaving water temperature setpoint. It assumes that part-load
           ! operation represents a linear interpolation of two steady-state regimes.
           ! Cyclic losses are neglected. The period of time required to meet the
-          ! leaving water temperature set point is used to determine the required
+          ! leaving water temperature setpoint is used to determine the required
           ! fan power and energy.
           !
           ! A RunFlag is passed by the upper level manager to indicate the ON/OFF status,
@@ -1614,10 +1613,10 @@ SUBROUTINE SingleSpeedFluidCooler(FluidCoolerNum)
           ! fluid cooler (water-side). The outdoor air dry-bulb temperature is used
           ! as the entering condition to thefluid cooler (air-side).Thefluid cooler
           ! fan is turned on and design parameters are used to calculate the leaving
-          ! water temperature.If the calculated leaving water temperature is below the set point,
+          ! water temperature.If the calculated leaving water temperature is below the setpoint,
           ! a fan run-time fraction is calculated and used to determine fan power. The leaving
-          ! water temperature set point is placed on the outlet node. If the calculated
-          ! leaving water temperature is at or above the set point, the calculated
+          ! water temperature setpoint is placed on the outlet node. If the calculated
+          ! leaving water temperature is at or above the setpoint, the calculated
           ! leaving water temperature is placed on the outlet node and the fan runs at
           ! full power. Water mass flow rate is passed from inlet node to outlet node
           ! with no intervention.
@@ -1628,7 +1627,7 @@ SUBROUTINE SingleSpeedFluidCooler(FluidCoolerNum)
 
           ! USE STATEMENTS:
 !  USE FluidProperties, ONLY : GetSpecificHeatGlycol
-!  USE DataPlant,       ONLY : PlantLoop
+  USE DataPlant,       ONLY : SingleSetpoint, DualSetpointDeadband
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1666,14 +1665,15 @@ SUBROUTINE SingleSpeedFluidCooler(FluidCoolerNum)
   OutletWaterTemp    = Node(WaterInletNode)%Temp
   LoopNum            = SimpleFluidCooler(FluidCoolerNum)%LoopNum
   LoopSideNum        = SimpleFluidCooler(FluidCoolerNum)%LoopSideNum
-  TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
-!  ELSE ! At some point, we can go to component setpoint control on condenser loop
-!    TempSetPoint       = MIN(Node(WaterOutletNode)%TempSetPoint,PlantLoop(LoopNum)%MaxTemp)
-!    TempSetPoint       = MAX(TempSetPoint,PlantLoop(LoopNum)%MinTemp)
-!  ENDIF
+  SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
+  CASE (DualSetPointDeadBand)
+    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
+  END SELECT
 
-!   MassFlowTol is a DataPlant parameter to indicate a no flow condition
-  IF(WaterMassFlowRate .LE. MassFlowTol) RETURN
+!   MassFlowTol is a parameter to indicate a no flow condition
+  IF(WaterMassFlowRate .LE. MassFlowTolerance) RETURN
 
   IF (OutletWaterTemp < TempSetPoint) THEN !already there don't need to run the cooler
     RETURN
@@ -1726,11 +1726,11 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
           ! cross flow heat exchangers (both stream unmixed)based on cooling tower model.
           !
           ! The subroutine calculates the period of time required to meet a
-          ! leaving water temperature set point. It assumes that part-load
+          ! leaving water temperature setpoint. It assumes that part-load
           ! operation represents a linear interpolation of two steady-state regimes
           ! (high-speed fan operation and low-speed fan operation).
           ! Cyclic losses are neglected. The period of time required to meet the
-          ! leaving water temperature set point is used to determine the required
+          ! leaving water temperature setpoint is used to determine the required
           ! fan power and energy.
           !
           ! A RunFlag is passed by the upper level manager to indicate the ON/OFF status,
@@ -1746,16 +1746,16 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
           ! parameters are read for the low fan speed and a leaving water temperature
           ! is calculated.
           !
-          ! If the calculated leaving water temperature is below the set point,
+          ! If the calculated leaving water temperature is below the setpoint,
           ! a fan run-time fraction (FanModeFrac) is calculated and used to determine fan power.
-          ! The leaving water temperature set point is placed on the outlet node.
+          ! The leaving water temperature setpoint is placed on the outlet node.
           ! If the calculated leaving water temperature is at or above
-          ! the set point, the fluid cooler fan is turned on 'high speed' and the routine is
-          ! repeated. If the calculated leaving water temperature is below the set point,
+          ! the setpoint, the fluid cooler fan is turned on 'high speed' and the routine is
+          ! repeated. If the calculated leaving water temperature is below the setpoint,
           ! a fan run-time fraction is calculated for the second stage fan and fan power
           ! is calculated as FanModeFrac*HighSpeedFanPower+(1-FanModeFrac)*LowSpeedFanPower.
           ! If the calculated leaving water temperature is above the leaving water temp.
-          ! set point, the calculated leaving water temperature is placed on the outlet
+          ! setpoint, the calculated leaving water temperature is placed on the outlet
           ! node and the fan runs at full power (High Speed Fan Power). Water mass flow
           ! rate is passed from inlet node to outlet node with no intervention.
 
@@ -1765,7 +1765,7 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
 
           ! USE STATEMENTS:
 !  USE FluidProperties, ONLY : GetSpecificHeatGlycol
-!  USE DataPlant,       ONLY : PlantLoop
+  USE DataPlant,       ONLY : SingleSetpoint, DualSetpointDeadband
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1805,14 +1805,15 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
   FanModeFrac         = 0.0
   LoopNum             = SimpleFluidCooler(FluidCoolerNum)%LoopNum
   LoopSideNum         = SimpleFluidCooler(FluidCoolerNum)%LoopSideNum
-  TempSetPoint        = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
-!  ELSE ! At some point, we can go to component setpoint control on condenser loop
-!    TempSetPoint       = MIN(Node(WaterOutletNode)%TempSetPoint,PlantLoop(LoopNum)%MaxTemp)
-!    TempSetPoint       = MAX(TempSetPoint,PlantLoop(LoopNum)%MinTemp)
-!  ENDIF
+  SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+  CASE (SingleSetPoint)
+    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpoint
+  CASE (DualSetPointDeadBand)
+    TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
+  END SELECT
 
-  ! MassFlowTol is a DataPlant parameter to indicate a no flow condition
-  IF(WaterMassFlowRate .LE. MassFlowTol .OR. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0)RETURN
+  ! MassFlowTol is a parameter to indicate a no flow condition
+  IF(WaterMassFlowRate .LE. MassFlowTolerance .OR. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock .EQ. 0)RETURN
 
   ! set local variable for fluid cooler
   DesignWaterFlowRate     = SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate
@@ -2133,7 +2134,7 @@ SUBROUTINE UpdateFluidCooler(FluidCoolerNum)
    END IF
 
    ! Check if water mass flow rate is small (e.g. no flow) and warn user
-   IF(WaterMassFlowRate .GT. 0.0 .AND. WaterMassFlowRate .LE. MassFlowTol)THEN
+   IF(WaterMassFlowRate .GT. 0.0 .AND. WaterMassFlowRate .LE. MassFlowTolerance)THEN
      SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount =   &
         SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount + 1
      IF (SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount < 2) THEN
@@ -2259,7 +2260,7 @@ END SUBROUTINE ReportFluidCooler
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

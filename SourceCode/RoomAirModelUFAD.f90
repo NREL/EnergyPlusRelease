@@ -972,6 +972,8 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
   USE Psychrometrics,             ONLY: PsyRhoAirFnPbTdbW, PsyCpAirFnWTdb
   USE DataHeatBalFanSys
   USE DataHVACGlobals,            ONLY: TimestepSys, UseZoneTimeStepHistory
+  USE InternalHeatGains,          ONLY: SumInternalConvectionGainsByTypes, SumReturnAirConvectionGainsByTypes
+
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1035,6 +1037,38 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
   INTEGER :: ZoneNodeNum  ! node number of the HVAC zone node
   REAL(r64)   :: TempDepCoef=0.0           ! Formerly CoefSumha, coef in zone temp equation with dimensions of h*A
   REAL(r64)   :: TempIndCoef=0.0           ! Formerly CoefSumhat, coef in zone temp equation with dimensions of h*A(T1
+  INTEGER, DIMENSION(28) :: IntGainTypesOccupied = (/IntGainTypeOf_People, &
+                                                    IntGainTypeOf_WaterHeaterMixed, &
+                                                    IntGainTypeOf_WaterHeaterStratified, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterMixed, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterStratified, &
+                                                    IntGainTypeOf_ElectricEquipment, &
+                                                    IntGainTypeOf_GasEquipment, &
+                                                    IntGainTypeOf_HotWaterEquipment, &
+                                                    IntGainTypeOf_SteamEquipment, &
+                                                    IntGainTypeOf_OtherEquipment, &
+                                                    IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled, &
+                                                    IntGainTypeOf_GeneratorFuelCell, &
+                                                    IntGainTypeOf_WaterUseEquipment, &
+                                                    IntGainTypeOf_GeneratorMicroCHP, &
+                                                    IntGainTypeOf_ElectricLoadCenterTransformer, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterSimple, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterLookUpTable, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageBattery, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageSimple, &
+                                                    IntGainTypeOf_PipeIndoor, &
+                                                    IntGainTypeOf_RefrigerationCase, &
+                                                    IntGainTypeOf_RefrigerationCompressorRack, &
+                                                    IntGainTypeOf_RefrigerationSystemAirCooledCondenser ,&
+                                                    IntGainTypeOf_RefrigerationSystemSuctionPipe, &
+                                                    IntGainTypeOf_RefrigerationSecondaryReceiver, &
+                                                    IntGainTypeOf_RefrigerationSecondaryPipe, &
+                                                    IntGainTypeOf_RefrigerationWalkIn/)
+                                                    
+  INTEGER, DIMENSION(2) :: IntGainTypesUpSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
+                                                        IntGainTypeOf_Lights/)
+  REAL(r64)    :: RetAirGains
 
   ! Exact solution or Euler method
   If (ZoneAirSolutionAlgo .NE. Use3rdOrder) Then
@@ -1072,24 +1106,22 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
   PowerPerPlume = ZoneUCSDUI(UINum)%PowerPerPlume
   ! gains from occupants, task lighting, elec equip, gas equip, other equip, hot water equip, steam equip,
   ! baseboards (nonthermostatic), water heater skin loss
-  ConvGainsOccSubzone = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-                      + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-                      + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-                      + ZoneIntGain(ZoneNum)%WaterThermalTankGain + ZoneIntGain(ZoneNum)%QFCConv &
-                      + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-                      + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv &
-                      + ZoneIntGain(ZoneNum)%PipeHTGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, ConvGainsOccSubzone)
 
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsOccSubzone = ConvGainsOccSubzone + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC + ZoneIntGain(ZoneNum)%T_QLTCRA
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, RetAirGains)
+    ConvGainsOccSubzone = ConvGainsOccSubzone + RetAirGains
   END IF
 
   ! gains from lights (ceiling), tubular daylighting devices, high temp radiant heaters
-  ConvGainsUpSubzone = ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%TDDPipeGain + SumConvHTRadSys(ZoneNum)
+  
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesUpSubzone, ConvGainsUpSubzone)
+  ConvGainsUpSubzone = ConvGainsUpSubzone + SumConvHTRadSys(ZoneNum)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsUpSubzone = ConvGainsUpSubzone + ZoneIntGain(ZoneNum)%QLTCRA
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesUpSubzone, RetAirGains)
+    ConvGainsUpSubzone = ConvGainsUpSubzone + RetAirGains
   END IF
   ConvGains = ConvGainsOccSubzone + ConvGainsUpSubzone + SysDepZoneLoadsLagged(ZoneNum)
   ZoneEquipConfigNum = ZoneUCSDUI(UINum)%ZoneEquipPtr
@@ -1158,9 +1190,9 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
       END IF
       IF (PowerInPlumes .LE. 0.0) EXIT
       Gamma = (TotSysFlow*COS(ThrowAngle))**1.5d0 / (NumberOfPlumes*(NumDiffusersPerPlume*DiffArea)**1.25d0 &
-              * (0.0281d0*0.001d0*PowerInPlumes)**0.5)
+              * (0.0281d0*0.001d0*PowerInPlumes)**0.5d0)
       IF (ZoneUCSDUI(UINum)%CalcTransHeight) THEN
-        HeightFrac = ((NumDiffusersPerPlume*DiffArea)**0.5 * (7.43*log(Gamma) - 1.35) + 0.5*SourceHeight) / CeilingHeight
+        HeightFrac = ((NumDiffusersPerPlume*DiffArea)**0.5d0 * (7.43d0*log(Gamma) - 1.35d0) + 0.5d0*SourceHeight) / CeilingHeight
       ELSE
         HeightFrac = ZoneUCSDUI(UINum)%TransHeight / CeilingHeight
       END IF
@@ -1407,6 +1439,7 @@ SUBROUTINE CalcUCSDUE(ZoneNum)
   USE Psychrometrics,             ONLY: PsyRhoAirFnPbTdbW, PsyCpAirFnWTdb
   USE DataHeatBalFanSys
   USE DataHVACGlobals,            ONLY: TimestepSys, UseZoneTimeStepHistory
+  USE InternalHeatGains,          ONLY: SumInternalConvectionGainsByTypes, SumReturnAirConvectionGainsByTypes
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1471,6 +1504,39 @@ SUBROUTINE CalcUCSDUE(ZoneNum)
   INTEGER :: ZoneNodeNum               ! node number of the HVAC zone node
   REAL(r64)   :: TempDepCoef=0.0           ! Formerly CoefSumha, coef in zone temp equation with dimensions of h*A
   REAL(r64)   :: TempIndCoef=0.0           ! Formerly CoefSumhat, coef in zone temp equation with dimensions of h*A(T1
+  INTEGER, DIMENSION(28) :: IntGainTypesOccupied = (/IntGainTypeOf_People, &
+                                                    IntGainTypeOf_WaterHeaterMixed, &
+                                                    IntGainTypeOf_WaterHeaterStratified, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterMixed, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterStratified, &
+                                                    IntGainTypeOf_ElectricEquipment, &
+                                                    IntGainTypeOf_GasEquipment, &
+                                                    IntGainTypeOf_HotWaterEquipment, &
+                                                    IntGainTypeOf_SteamEquipment, &
+                                                    IntGainTypeOf_OtherEquipment, &
+                                                    IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled, &
+                                                    IntGainTypeOf_GeneratorFuelCell, &
+                                                    IntGainTypeOf_WaterUseEquipment, &
+                                                    IntGainTypeOf_GeneratorMicroCHP, &
+                                                    IntGainTypeOf_ElectricLoadCenterTransformer, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterSimple, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterLookUpTable, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageBattery, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageSimple, &
+                                                    IntGainTypeOf_PipeIndoor, &
+                                                    IntGainTypeOf_RefrigerationCase, &
+                                                    IntGainTypeOf_RefrigerationCompressorRack, &
+                                                    IntGainTypeOf_RefrigerationSystemAirCooledCondenser ,&
+                                                    IntGainTypeOf_RefrigerationSystemSuctionPipe, &
+                                                    IntGainTypeOf_RefrigerationSecondaryReceiver, &
+                                                    IntGainTypeOf_RefrigerationSecondaryPipe, &
+                                                    IntGainTypeOf_RefrigerationWalkIn/)
+                                                    
+  INTEGER, DIMENSION(2) :: IntGainTypesUpSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
+                                                        IntGainTypeOf_Lights/)
+  REAL(r64)   :: RetAirGains
+
 
   ! Exact solution or Euler method
   If (ZoneAirSolutionAlgo .NE. Use3rdOrder) Then
@@ -1512,23 +1578,21 @@ SUBROUTINE CalcUCSDUE(ZoneNum)
   PowerPerPlume = ZoneUCSDUE(UINum)%PowerPerPlume
   ! gains from occupants, task lighting, elec equip, gas equip, other equip, hot water equip, steam equip,
   ! baseboards (nonthermostatic), water heater skin loss
-  ConvGainsOccSubzone = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-                      + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-                      + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-                      + ZoneIntGain(ZoneNum)%WaterThermalTankGain + ZoneIntGain(ZoneNum)%QFCConv &
-                      + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-                      + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv &
-                      + ZoneIntGain(ZoneNum)%PipeHTGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, ConvGainsOccSubzone)
+
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsOccSubzone = ConvGainsOccSubzone + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC + ZoneIntGain(ZoneNum)%T_QLTCRA
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, RetAirGains)
+    ConvGainsOccSubzone = ConvGainsOccSubzone + RetAirGains
   END IF
 
   ! gains from lights (ceiling), tubular daylighting devices, high temp radiant heaters
-  ConvGainsUpSubzone = ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%TDDPipeGain + SumConvHTRadSys(ZoneNum)
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesUpSubzone, ConvGainsUpSubzone)
+  ConvGainsUpSubzone = ConvGainsUpSubzone +  SumConvHTRadSys(ZoneNum)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsUpSubzone = ConvGainsUpSubzone + ZoneIntGain(ZoneNum)%QLTCRA
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesUpSubzone, RetAirGains)
+    ConvGainsUpSubzone = ConvGainsUpSubzone + RetAirGains
   END IF
   ConvGains = ConvGainsOccSubzone + ConvGainsUpSubzone + SysDepZoneLoadsLagged(ZoneNum)
   ZoneEquipConfigNum = ZoneUCSDUE(UINum)%ZoneEquipPtr
@@ -1860,7 +1924,7 @@ END SUBROUTINE CalcUCSDUE
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

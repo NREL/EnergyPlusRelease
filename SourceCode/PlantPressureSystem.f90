@@ -33,6 +33,7 @@ MODULE PlantPressureSystem
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength,Pi
 USE DataInterfaces, ONLY: ShowWarningError,ShowSevereError,ShowFatalError,ShowContinueError,SetupOutputVariable
+USE DataBranchAirLoopPlant
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
 
@@ -42,20 +43,21 @@ PRIVATE ! Everything private unless explicitly made public
           ! MODULE PARAMETER/ENUMERATIONS DEFINITIONS:
 CHARACTER(*), PARAMETER        :: Blank                   = ' '
 
-          ! DERIVED TYPE DEFINITIONS:
-TYPE PlantPressureCurveData
-  CHARACTER(len=MaxNameLength) :: Name                    = Blank
-  REAL(r64)                    :: EquivDiameter           = 0.0d0   !- An effective diameter for calculation of Re & e/D [m]
-  REAL(r64)                    :: MinorLossCoeff          = 0.0d0   !- K factor                                          [-]
-  REAL(r64)                    :: EquivLength             = 0.0d0   !- An effective length to apply friction calculation [m]
-  REAL(r64)                    :: EquivRoughness          = 0.0d0   !- An effective roughness (e) to calculate e/D       [m]
-  LOGICAL                      :: ConstantFpresent        = .FALSE. !- Signal for if a constant value of f was entered
-  REAL(r64)                    :: ConstantF               = 0.0d0   !- Constant value of f (if applicable)               [-]
-END TYPE PlantPressureCurveData
 
-          ! MODULE VARIABLE DECLARATIONS:
-TYPE(PlantPressureCurveData), ALLOCATABLE, DIMENSION(:) :: PressureCurve
-LOGICAL  :: GetInputFlag = .TRUE. !Module level, since GetInput could be called by SIMPRESSUREDROP or by BRANCHINPUTMANAGER
+          ! DERIVED TYPE DEFINITIONS:
+!TYPE, PUBLIC:: PlantPressureCurveData
+!  CHARACTER(len=MaxNameLength) :: Name                    = Blank
+!  REAL(r64)                    :: EquivDiameter           = 0.0d0   !- An effective diameter for calculation of Re & e/D [m]
+!  REAL(r64)                    :: MinorLossCoeff          = 0.0d0   !- K factor                                          [-]
+!  REAL(r64)                    :: EquivLength             = 0.0d0   !- An effective length to apply friction calculation [m]
+!  REAL(r64)                    :: EquivRoughness          = 0.0d0   !- An effective roughness (e) to calculate e/D       [m]
+!  LOGICAL                      :: ConstantFpresent        = .FALSE. !- Signal for if a constant value of f was entered
+!  REAL(r64)                    :: ConstantF               = 0.0d0   !- Constant value of f (if applicable)               [-]
+!END TYPE PlantPressureCurveData
+!
+!          ! MODULE VARIABLE DECLARATIONS:
+!TYPE(PlantPressureCurveData), ALLOCATABLE, DIMENSION(:),PUBLIC :: PressureCurve
+!LOGICAL  :: GetInputFlag = .TRUE. !Module level, since GetInput could be called by SIMPRESSUREDROP or by BRANCHINPUTMANAGER
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE:
 
@@ -63,13 +65,13 @@ LOGICAL  :: GetInputFlag = .TRUE. !Module level, since GetInput could be called 
 PUBLIC  SimPressureDropSystem
 
      ! Initialization routines for module
-PRIVATE GetPressureSystemInput
+!PRIVATE GetPressureSystemInput
 PRIVATE InitPressureDrop
 
      ! Algorithms/Calculation routines for the module
 PRIVATE BranchPressureDrop
-PRIVATE PressureCurveValue
-PRIVATE CalculateMoodyFrictionFactor
+!PRIVATE PressureCurveValue
+!PRIVATE CalculateMoodyFrictionFactor
 
      ! Update routines to check convergence and update nodes
 PRIVATE UpdatePressureDrop
@@ -81,7 +83,7 @@ PRIVATE PassPressureAcrossSplitter
 PRIVATE PassPressureAcrossInterface
 
      ! Public Utility routines
-PUBLIC GetPressureCurveTypeAndIndex
+!PUBLIC GetPressureCurveTypeAndIndex
 PUBLIC ResolveLoopFlowVsPressure
 
 CONTAINS
@@ -129,7 +131,7 @@ SUBROUTINE SimPressureDropSystem(LoopNum, FirstHVACIteration, CallType, LoopSide
           ! na
 
   !Check if we need to get pressure curve input data
-  IF (GetInputFlag) CALL GetPressureSystemInput
+!  IF (GetInputFlag) CALL GetPressureSystemInput
 
   !Exit out of any calculation routines if we don't do pressure simulation for this loop
   IF ((PlantLoop(LoopNum)%PressureSimType == Press_NoPressure) .AND.  &
@@ -153,88 +155,88 @@ END SUBROUTINE SimPressureDropSystem
 
 !=================================================================================================!
 
-SUBROUTINE GetPressureSystemInput()
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Edwin Lee
-          !       DATE WRITTEN   August 2009
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! Currently it just reads the input for pressure curve objects
-
-          ! METHODOLOGY EMPLOYED:
-          ! General EnergyPlus Methodology
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName
-  USE DataIPShortcuts
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-  CHARACTER(len=MaxNameLength), PARAMETER :: CurveObjectName = 'Curve:Functional:PressureDrop'
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER                         ::  NumPressure
-  CHARACTER(len=MaxNameLength),DIMENSION(1) :: Alphas  ! Alpha items for object
-  REAL(r64), DIMENSION(5)         :: Numbers ! Numeric items for object
-  INTEGER                         :: NumAlphas  ! Number of Alphas for each GetObjectItem call
-  INTEGER                         :: NumNumbers ! Number of Numbers for each GetObjectItem call
-  INTEGER                         :: IOStatus   ! Used in GetObjectItem
-  LOGICAL                         :: ErrsFound=.false.  ! Set to true if errors in input, fatal at end of routine
-  LOGICAL                         :: IsNotOK              ! Flag to verify name
-  LOGICAL                         :: IsBlank              ! Flag for blank name
-  INTEGER                         :: CurveNum
-
-  NumPressure = GetNumObjectsFound(CurveObjectName)
-  ALLOCATE(PressureCurve(NumPressure))
-  DO CurveNum = 1, NumPressure
-    CALL GetObjectItem(TRIM(CurveObjectName),CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
-                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-    IsNotOK=.FALSE.
-    IsBlank=.FALSE.
-    CALL VerifyName(Alphas(1),PressureCurve%Name,CurveNum-1,IsNotOK,IsBlank,TRIM(CurveObjectName)//' Name')
-    IF (IsNotOK) THEN
-      ErrsFound=.true.
-      IF (IsBlank) Alphas(1)='xxxxx'
-    ENDIF
-    PressureCurve(CurveNum)%Name      = Alphas(1)
-    PressureCurve(CurveNum)%EquivDiameter  = Numbers(1)
-    PressureCurve(CurveNum)%MinorLossCoeff = Numbers(2)
-    PressureCurve(CurveNum)%EquivLength    = Numbers(3)
-    PressureCurve(CurveNum)%EquivRoughness = Numbers(4)
-    IF (NumNumbers > 4 .AND. .NOT. lNumericFieldBlanks(5)) THEN
-      IF (Numbers(5) .NE. 0.0d0) THEN
-        PressureCurve(CurveNum)%ConstantFpresent   = .TRUE.
-        PressureCurve(CurveNum)%ConstantF          = Numbers(5)
-      END IF
-    END IF
-  END DO
-
-  IF (ErrsFound) THEN
-    CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
-  END IF
-
-  GetInputFlag = .FALSE.
-
-  RETURN
-
-END SUBROUTINE
-
+!SUBROUTINE GetPressureSystemInput()
+!
+!          ! SUBROUTINE INFORMATION:
+!          !       AUTHOR         Edwin Lee
+!          !       DATE WRITTEN   August 2009
+!          !       MODIFIED       na
+!          !       RE-ENGINEERED  na
+!
+!          ! PURPOSE OF THIS SUBROUTINE:
+!          ! Currently it just reads the input for pressure curve objects
+!
+!          ! METHODOLOGY EMPLOYED:
+!          ! General EnergyPlus Methodology
+!
+!          ! REFERENCES:
+!          ! na
+!
+!          ! USE STATEMENTS:
+!  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName
+!  USE DataIPShortcuts
+!
+!  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+!
+!          ! SUBROUTINE ARGUMENT DEFINITIONS:
+!          ! na
+!
+!          ! SUBROUTINE PARAMETER DEFINITIONS:
+!  CHARACTER(len=MaxNameLength), PARAMETER :: CurveObjectName = 'Curve:Functional:PressureDrop'
+!
+!          ! INTERFACE BLOCK SPECIFICATIONS:
+!          ! na
+!
+!          ! DERIVED TYPE DEFINITIONS:
+!          ! na
+!
+!          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+!  INTEGER                         ::  NumPressure
+!  CHARACTER(len=MaxNameLength),DIMENSION(1) :: Alphas  ! Alpha items for object
+!  REAL(r64), DIMENSION(5)         :: Numbers ! Numeric items for object
+!  INTEGER                         :: NumAlphas  ! Number of Alphas for each GetObjectItem call
+!  INTEGER                         :: NumNumbers ! Number of Numbers for each GetObjectItem call
+!  INTEGER                         :: IOStatus   ! Used in GetObjectItem
+!  LOGICAL                         :: ErrsFound=.false.  ! Set to true if errors in input, fatal at end of routine
+!  LOGICAL                         :: IsNotOK              ! Flag to verify name
+!  LOGICAL                         :: IsBlank              ! Flag for blank name
+!  INTEGER                         :: CurveNum
+!
+!  NumPressure = GetNumObjectsFound(CurveObjectName)
+!  ALLOCATE(PressureCurve(NumPressure))
+!  DO CurveNum = 1, NumPressure
+!    CALL GetObjectItem(TRIM(CurveObjectName),CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+!                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+!    IsNotOK=.FALSE.
+!    IsBlank=.FALSE.
+!    CALL VerifyName(Alphas(1),PressureCurve%Name,CurveNum-1,IsNotOK,IsBlank,TRIM(CurveObjectName)//' Name')
+!    IF (IsNotOK) THEN
+!      ErrsFound=.true.
+!      IF (IsBlank) Alphas(1)='xxxxx'
+!    ENDIF
+!    PressureCurve(CurveNum)%Name      = Alphas(1)
+!    PressureCurve(CurveNum)%EquivDiameter  = Numbers(1)
+!    PressureCurve(CurveNum)%MinorLossCoeff = Numbers(2)
+!    PressureCurve(CurveNum)%EquivLength    = Numbers(3)
+!    PressureCurve(CurveNum)%EquivRoughness = Numbers(4)
+!    IF (NumNumbers > 4 .AND. .NOT. lNumericFieldBlanks(5)) THEN
+!      IF (Numbers(5) .NE. 0.0d0) THEN
+!        PressureCurve(CurveNum)%ConstantFpresent   = .TRUE.
+!        PressureCurve(CurveNum)%ConstantF          = Numbers(5)
+!      END IF
+!    END IF
+!  END DO
+!
+!  IF (ErrsFound) THEN
+!    CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
+!  END IF
+!
+!  GetInputFlag = .FALSE.
+!
+!  RETURN
+!
+!END SUBROUTINE
+!
 !=================================================================================================!
 
 SUBROUTINE InitPressureDrop(LoopNum, FirstHVACIteration)
@@ -506,8 +508,8 @@ SUBROUTINE BranchPressureDrop(LoopNum,LoopSideNum,BranchNum)
           ! USE STATEMENTS:
   USE DataLoopNode,    ONLY   :  Node
   USE FluidProperties, ONLY   :  GetDensityGlycol, GetViscosityGlycol
-  USE DataPlant,       ONLY   :  PlantLoop, PressureCurve_None, PressureCurve_Pressure, PressureCurve_Generic
-  USE CurveManager,    ONLY   :  CurveValue
+  USE DataPlant,       ONLY   :  PlantLoop
+  USE CurveManager,    ONLY   :  CurveValue, PressureCurveValue
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -599,170 +601,170 @@ END SUBROUTINE BranchPressureDrop
 
 !=================================================================================================!
 
-REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Viscosity)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Edwin Lee
-          !       DATE WRITTEN   August 2009
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! This will evaluate the pressure drop for components which use pressure information
-
-          ! METHODOLOGY EMPLOYED:
-          ! Friction factor pressure drop equation:
-          ! DP = [f*(L/D) + K] * (rho * V^2) / 2
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant, ONLY : MassFlowTol
-  Use DataGlobals, ONLY : Pi
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! FUNCTION ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN)      ::  PressureCurveIndex
-  REAL(r64), INTENT(IN)    ::  MassFlow
-  REAL(r64), INTENT(IN)    ::  Density
-  REAL(r64), INTENT(IN)    ::  Viscosity
-
-          ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)                ::  Diameter
-  REAL(r64)                ::  MinorLossCoeff
-  REAL(r64)                ::  Length
-  REAL(r64)                ::  Roughness
-  LOGICAL                  ::  IsConstFPresent
-  REAL(r64)                ::  ConstantF
-  REAL(r64)                ::  FrictionFactor
-  REAL(r64)                ::  CrossSectArea
-  REAL(r64)                ::  Velocity
-  REAL(r64)                ::  ReynoldsNumber
-  REAL(r64)                ::  RoughnessRatio
-
-  !Retrieve data from structure
-  Diameter        = PressureCurve(PressureCurveIndex)%EquivDiameter
-  MinorLossCoeff  = PressureCurve(PressureCurveIndex)%MinorLossCoeff
-  Length          = PressureCurve(PressureCurveIndex)%EquivLength
-  Roughness       = PressureCurve(PressureCurveIndex)%EquivRoughness
-  IsConstFPresent = PressureCurve(PressureCurveIndex)%ConstantFPresent
-  ConstantF       = PressureCurve(PressureCurveIndex)%ConstantF
-
-  !Intermediate calculations
-  CrossSectArea         =  (Pi / 4.0d0) * Diameter**2
-  Velocity              =  MassFlow / (Density * CrossSectArea)
-  ReynoldsNumber        =  Density * Diameter * Velocity / Viscosity !assuming mu here
-  RoughnessRatio        =  Roughness / Diameter
-
-  !If we don't have any flow then exit out
-  IF (MassFlow .LT. MassFlowTol) THEN
-    PressureCurveValue = 0.0d0
-    RETURN
-  END IF
-
-  !Calculate the friction factor
-  IF (IsConstFPresent) THEN   !use the constant value
-    FrictionFactor    =  ConstantF
-  ELSE ! must calculate f
-    FrictionFactor    =  CalculateMoodyFrictionFactor(ReynoldsNumber,RoughnessRatio)
-  END IF
-
-  !Pressure drop calculation
-  PressureCurveValue  =  (FrictionFactor * (Length / Diameter) + MinorLossCoeff) * (Density * Velocity**2) / 2.0d0
-
-END FUNCTION PressureCurveValue
-
+!REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Viscosity)
+!
+!          ! FUNCTION INFORMATION:
+!          !       AUTHOR         Edwin Lee
+!          !       DATE WRITTEN   August 2009
+!          !       MODIFIED       na
+!          !       RE-ENGINEERED  na
+!
+!          ! PURPOSE OF THIS FUNCTION:
+!          ! This will evaluate the pressure drop for components which use pressure information
+!
+!          ! METHODOLOGY EMPLOYED:
+!          ! Friction factor pressure drop equation:
+!          ! DP = [f*(L/D) + K] * (rho * V^2) / 2
+!
+!          ! REFERENCES:
+!          ! na
+!
+!          ! USE STATEMENTS:
+!  USE DataPlant, ONLY : MassFlowTol
+!  Use DataGlobals, ONLY : Pi
+!
+!  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+!
+!          ! FUNCTION ARGUMENT DEFINITIONS:
+!  INTEGER, INTENT(IN)      ::  PressureCurveIndex
+!  REAL(r64), INTENT(IN)    ::  MassFlow
+!  REAL(r64), INTENT(IN)    ::  Density
+!  REAL(r64), INTENT(IN)    ::  Viscosity
+!
+!          ! FUNCTION PARAMETER DEFINITIONS:
+!          ! na
+!
+!          ! INTERFACE BLOCK SPECIFICATIONS:
+!          ! na
+!
+!          ! DERIVED TYPE DEFINITIONS:
+!          ! na
+!
+!          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+!  REAL(r64)                ::  Diameter
+!  REAL(r64)                ::  MinorLossCoeff
+!  REAL(r64)                ::  Length
+!  REAL(r64)                ::  Roughness
+!  LOGICAL                  ::  IsConstFPresent
+!  REAL(r64)                ::  ConstantF
+!  REAL(r64)                ::  FrictionFactor
+!  REAL(r64)                ::  CrossSectArea
+!  REAL(r64)                ::  Velocity
+!  REAL(r64)                ::  ReynoldsNumber
+!  REAL(r64)                ::  RoughnessRatio
+!
+!  !Retrieve data from structure
+!  Diameter        = PressureCurve(PressureCurveIndex)%EquivDiameter
+!  MinorLossCoeff  = PressureCurve(PressureCurveIndex)%MinorLossCoeff
+!  Length          = PressureCurve(PressureCurveIndex)%EquivLength
+!  Roughness       = PressureCurve(PressureCurveIndex)%EquivRoughness
+!  IsConstFPresent = PressureCurve(PressureCurveIndex)%ConstantFPresent
+!  ConstantF       = PressureCurve(PressureCurveIndex)%ConstantF
+!
+!  !Intermediate calculations
+!  CrossSectArea         =  (Pi / 4.0d0) * Diameter**2
+!  Velocity              =  MassFlow / (Density * CrossSectArea)
+!  ReynoldsNumber        =  Density * Diameter * Velocity / Viscosity !assuming mu here
+!  RoughnessRatio        =  Roughness / Diameter
+!
+!  !If we don't have any flow then exit out
+!  IF (MassFlow .LT. MassFlowTol) THEN
+!    PressureCurveValue = 0.0d0
+!    RETURN
+!  END IF
+!
+!  !Calculate the friction factor
+!  IF (IsConstFPresent) THEN   !use the constant value
+!    FrictionFactor    =  ConstantF
+!  ELSE ! must calculate f
+!    FrictionFactor    =  CalculateMoodyFrictionFactor(ReynoldsNumber,RoughnessRatio)
+!  END IF
+!
+!  !Pressure drop calculation
+!  PressureCurveValue  =  (FrictionFactor * (Length / Diameter) + MinorLossCoeff) * (Density * Velocity**2) / 2.0d0
+!
+!END FUNCTION PressureCurveValue
+!
 !=================================================================================================!
 
-REAL(r64) FUNCTION CalculateMoodyFrictionFactor(ReynoldsNumber, RoughnessRatio)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Edwin Lee
-          !       DATE WRITTEN   August 2009
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! This will evaluate the moody friction factor based on Reynolds number and roughness ratio
-
-          ! METHODOLOGY EMPLOYED:
-          ! General empirical correlations for friction factor based on Moody Chart data
-
-          ! REFERENCES:
-          ! Haaland, SE (1983). "Simple and Explicit Formulas for the Friction Factor in Turbulent Flow".
-          !   Trans. ASIVIE, J. of Fluids Engineering 103: 89-90.
-
-          ! USE STATEMENTS:
-  USE General, ONLY: RoundSigDigits
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! FUNCTION ARGUMENT DEFINITIONS:
-  REAL(r64), INTENT(IN)    ::  ReynoldsNumber
-  REAL(r64), INTENT(IN)    ::  RoughnessRatio
-
-          ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)                    ::  Term1, Term2, Term3
-  CHARACTER(len=MaxNameLength) ::  RR, Re
-  LOGICAL, SAVE                ::  FrictionFactorErrorHasOccurred = .FALSE.
-
-  !Check for no flow before calculating values
-  IF (ReynoldsNumber .EQ. 0.0d0) THEN
-    CalculateMoodyFrictionFactor = 0.0d0
-    RETURN
-  END IF
-
-  !Check for no roughness also here
-  IF (RoughnessRatio .EQ. 0.0d0) THEN
-    CalculateMoodyFrictionFactor = 0.0d0
-    RETURN
-  END IF
-
-  !Calculate the friction factor
-  Term1 = (RoughnessRatio/3.7d0)**(1.11d0)
-  Term2 = 6.9d0/ReynoldsNumber
-  Term3 = -1.8d0 * LOG10(Term1 + Term2)
-  IF (Term3 .NE. 0.0d0) THEN
-    CalculateMoodyFrictionFactor = Term3 ** (-2.0d0)
-  ELSE
-    IF (.NOT. FrictionFactorErrorHasOccurred) THEN
-      RR=RoundSigDigits(RoughnessRatio,7)
-      Re=RoundSigDigits(ReynoldsNumber,1)
-      CALL ShowSevereError('Plant Pressure System: Error in moody friction factor calculation')
-      CALL ShowContinueError('Current Conditions: Roughness Ratio='//TRIM(RR)//'; Reynolds Number='//TRIM(Re))
-      CALL ShowContinueError('These conditions resulted in an unhandled numeric issue.')
-      CALL ShowContinueError('Please contact EnergyPlus support/development team to raise an alert about this issue')
-      CALL ShowContinueError('This issue will occur only one time.  The friction factor has been reset to 0.04 for calculations')
-      FrictionFactorErrorHasOccurred = .TRUE.
-    END IF
-    CalculateMoodyFrictionFactor = 0.04d0
-  END IF
-
-  RETURN
-
-END FUNCTION CalculateMoodyFrictionFactor
-
-!=================================================================================================!
+!REAL(r64) FUNCTION CalculateMoodyFrictionFactor(ReynoldsNumber, RoughnessRatio)
+!
+!          ! FUNCTION INFORMATION:
+!          !       AUTHOR         Edwin Lee
+!          !       DATE WRITTEN   August 2009
+!          !       MODIFIED       na
+!          !       RE-ENGINEERED  na
+!
+!          ! PURPOSE OF THIS FUNCTION:
+!          ! This will evaluate the moody friction factor based on Reynolds number and roughness ratio
+!
+!          ! METHODOLOGY EMPLOYED:
+!          ! General empirical correlations for friction factor based on Moody Chart data
+!
+!          ! REFERENCES:
+!          ! Haaland, SE (1983). "Simple and Explicit Formulas for the Friction Factor in Turbulent Flow".
+!          !   Trans. ASIVIE, J. of Fluids Engineering 103: 89-90.
+!
+!          ! USE STATEMENTS:
+!  USE General, ONLY: RoundSigDigits
+!
+!  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+!
+!          ! FUNCTION ARGUMENT DEFINITIONS:
+!  REAL(r64), INTENT(IN)    ::  ReynoldsNumber
+!  REAL(r64), INTENT(IN)    ::  RoughnessRatio
+!
+!          ! FUNCTION PARAMETER DEFINITIONS:
+!          ! na
+!
+!          ! INTERFACE BLOCK SPECIFICATIONS:
+!          ! na
+!
+!          ! DERIVED TYPE DEFINITIONS:
+!          ! na
+!
+!          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+!  REAL(r64)                    ::  Term1, Term2, Term3
+!  CHARACTER(len=MaxNameLength) ::  RR, Re
+!  LOGICAL, SAVE                ::  FrictionFactorErrorHasOccurred = .FALSE.
+!
+!  !Check for no flow before calculating values
+!  IF (ReynoldsNumber .EQ. 0.0d0) THEN
+!    CalculateMoodyFrictionFactor = 0.0d0
+!    RETURN
+!  END IF
+!
+!  !Check for no roughness also here
+!  IF (RoughnessRatio .EQ. 0.0d0) THEN
+!    CalculateMoodyFrictionFactor = 0.0d0
+!    RETURN
+!  END IF
+!
+!  !Calculate the friction factor
+!  Term1 = (RoughnessRatio/3.7d0)**(1.11d0)
+!  Term2 = 6.9d0/ReynoldsNumber
+!  Term3 = -1.8d0 * LOG10(Term1 + Term2)
+!  IF (Term3 .NE. 0.0d0) THEN
+!    CalculateMoodyFrictionFactor = Term3 ** (-2.0d0)
+!  ELSE
+!    IF (.NOT. FrictionFactorErrorHasOccurred) THEN
+!      RR=RoundSigDigits(RoughnessRatio,7)
+!      Re=RoundSigDigits(ReynoldsNumber,1)
+!      CALL ShowSevereError('Plant Pressure System: Error in moody friction factor calculation')
+!      CALL ShowContinueError('Current Conditions: Roughness Ratio='//TRIM(RR)//'; Reynolds Number='//TRIM(Re))
+!      CALL ShowContinueError('These conditions resulted in an unhandled numeric issue.')
+!      CALL ShowContinueError('Please contact EnergyPlus support/development team to raise an alert about this issue')
+!      CALL ShowContinueError('This issue will occur only one time.  The friction factor has been reset to 0.04 for calculations')
+!      FrictionFactorErrorHasOccurred = .TRUE.
+!    END IF
+!    CalculateMoodyFrictionFactor = 0.04d0
+!  END IF
+!
+!  RETURN
+!
+!END FUNCTION CalculateMoodyFrictionFactor
+!
+!!=================================================================================================!
 
 SUBROUTINE UpdatePressureDrop(LoopNum)
 
@@ -1232,115 +1234,115 @@ END SUBROUTINE PassPressureAcrossInterface
 
 !=================================================================================================!
 
-SUBROUTINE GetPressureCurveTypeAndIndex(PressureCurveName, PressureCurveType, PressureCurveIndex)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Edwin Lee
-          !       DATE WRITTEN   August 2009
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! Given a curve name, returns the curve type and index
-
-          ! METHODOLOGY EMPLOYED:
-          ! Curve types are:
-          !  PressureCurve_Error       = pressure name was given, but curve is not available
-          !  PressureCurve_None        = no pressure curve for this branch
-          !  PressureCurve_Pressure    = pressure curve based on friction/minor loss
-          !  PressureCurve_Generic     = curvemanager held curve which is function of flow rate
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE InputProcessor, ONLY : FindItemInList
-  USE CurveManager,   ONLY : GetCurveIndex, GetCurveType
-  USE DataPlant,      ONLY : PressureCurve_None, PressureCurve_Pressure, PressureCurve_Generic, PressureCurve_Error
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT (IN)  :: PressureCurveName            ! name of the curve
-  INTEGER, INTENT(INOUT)         :: PressureCurveType
-  INTEGER, INTENT(INOUT)         :: PressureCurveIndex
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER           :: TempCurveIndex
-  LOGICAL           :: FoundCurve
-  CHARACTER(len=30) :: GenericCurveType
-
-  !If input is not gotten, go ahead and get it now
-  IF (GetInputFlag) CALL GetPressureSystemInput
-
-  !Initialize
-  FoundCurve = .FALSE.
-  PressureCurveType = PressureCurve_None
-  PressureCurveIndex = 0
-
-  !Try to retrieve a curve manager object
-  TempCurveIndex = GetCurveIndex(PressureCurveName)
-
-  !See if it is valid
-  IF (TempCurveIndex > 0) THEN
-    !We have to check the type of curve to make sure it is single independent variable type
-    GenericCurveType = GetCurveType(TempCurveIndex)
-    SELECT CASE (GenericCurveType)
-      CASE ('LINEAR', 'QUADRATIC', 'CUBIC', 'QUARTIC', 'EXPONENT')
-        PressureCurveType = PressureCurve_Generic
-        PressureCurveIndex = TempCurveIndex
-      CASE DEFAULT
-        CALL ShowSevereError('Plant Pressure Simulation: Found error for curve: '//PressureCurveName)
-        CALL ShowContinueError('Curve type detected: '//GenericCurveType)
-        CALL ShowContinueError('Generic curves should be single independent variable such that DeltaP = f(mdot)')
-        CALL ShowContinueError(' Therefore they should be of type: Linear, Quadratic, Cubic, Quartic, or Exponent')
-        CALL ShowFatalError('Errors in pressure simulation input cause program termination')
-    END SELECT
-    RETURN
-  END IF
-
-  !Then try to retrieve a pressure curve object
-  IF (ALLOCATED(PressureCurve)) THEN
-    IF (SIZE(PressureCurve) > 0) THEN
-      TempCurveIndex = FindItemInList(PressureCurveName,PressureCurve(1:SIZE(PressureCurve))%Name,SIZE(PressureCurve))
-    ELSE
-      TempCurveIndex = 0
-    END IF
-  END IF
-
-  !See if it is valid
-  IF (TempCurveIndex > 0) THEN
-    PressureCurveType = PressureCurve_Pressure
-    PressureCurveIndex = TempCurveIndex
-    RETURN
-  END IF
-
-  !If we made it here, we didn't find either type of match
-
-  !Last check, see if it is blank:
-  IF (TRIM(PressureCurveName)=='') THEN
-    PressureCurveType = PressureCurve_None
-    RETURN
-  END IF
-
-  !At this point, we had a non-blank user entry with no match
-  PressureCurveType = PressureCurve_Error
-  RETURN
-
-RETURN
-
-END SUBROUTINE
-
-
+!SUBROUTINE GetPressureCurveTypeAndIndex(PressureCurveName, PressureCurveType, PressureCurveIndex)
+!
+!          ! SUBROUTINE INFORMATION:
+!          !       AUTHOR         Edwin Lee
+!          !       DATE WRITTEN   August 2009
+!          !       MODIFIED       na
+!          !       RE-ENGINEERED  na
+!
+!          ! PURPOSE OF THIS SUBROUTINE:
+!          ! Given a curve name, returns the curve type and index
+!
+!          ! METHODOLOGY EMPLOYED:
+!          ! Curve types are:
+!          !  PressureCurve_Error       = pressure name was given, but curve is not available
+!          !  PressureCurve_None        = no pressure curve for this branch
+!          !  PressureCurve_Pressure    = pressure curve based on friction/minor loss
+!          !  PressureCurve_Generic     = curvemanager held curve which is function of flow rate
+!
+!          ! REFERENCES:
+!          ! na
+!
+!          ! USE STATEMENTS:
+!  USE InputProcessor, ONLY : FindItemInList
+!  USE CurveManager,   ONLY : GetCurveIndex, GetCurveType
+!  USE GlobalDataConstants,  ONLY : PressureCurve_None, PressureCurve_Pressure, PressureCurve_Generic, PressureCurve_Error
+!
+!  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+!
+!          ! SUBROUTINE ARGUMENT DEFINITIONS:
+!  CHARACTER(len=*), INTENT (IN)  :: PressureCurveName            ! name of the curve
+!  INTEGER, INTENT(INOUT)         :: PressureCurveType
+!  INTEGER, INTENT(INOUT)         :: PressureCurveIndex
+!
+!          ! SUBROUTINE PARAMETER DEFINITIONS:
+!          ! na
+!
+!          ! INTERFACE BLOCK SPECIFICATIONS
+!          ! na
+!
+!          ! DERIVED TYPE DEFINITIONS
+!          ! na
+!
+!          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+!  INTEGER           :: TempCurveIndex
+!  LOGICAL           :: FoundCurve
+!  CHARACTER(len=32) :: GenericCurveType
+!
+!  !If input is not gotten, go ahead and get it now
+!  IF (GetInputFlag) CALL GetPressureSystemInput
+!
+!  !Initialize
+!  FoundCurve = .FALSE.
+!  PressureCurveType = PressureCurve_None
+!  PressureCurveIndex = 0
+!
+!  !Try to retrieve a curve manager object
+!  TempCurveIndex = GetCurveIndex(PressureCurveName)
+!
+!  !See if it is valid
+!  IF (TempCurveIndex > 0) THEN
+!    !We have to check the type of curve to make sure it is single independent variable type
+!    GenericCurveType = GetCurveType(TempCurveIndex)
+!    SELECT CASE (GenericCurveType)
+!      CASE ('LINEAR', 'QUADRATIC', 'CUBIC', 'QUARTIC', 'EXPONENT')
+!        PressureCurveType = PressureCurve_Generic
+!        PressureCurveIndex = TempCurveIndex
+!      CASE DEFAULT
+!        CALL ShowSevereError('Plant Pressure Simulation: Found error for curve: '//PressureCurveName)
+!        CALL ShowContinueError('Curve type detected: '//GenericCurveType)
+!        CALL ShowContinueError('Generic curves should be single independent variable such that DeltaP = f(mdot)')
+!        CALL ShowContinueError(' Therefore they should be of type: Linear, Quadratic, Cubic, Quartic, or Exponent')
+!        CALL ShowFatalError('Errors in pressure simulation input cause program termination')
+!    END SELECT
+!    RETURN
+!  END IF
+!
+!  !Then try to retrieve a pressure curve object
+!  IF (ALLOCATED(PressureCurve)) THEN
+!    IF (SIZE(PressureCurve) > 0) THEN
+!      TempCurveIndex = FindItemInList(PressureCurveName,PressureCurve(1:SIZE(PressureCurve))%Name,SIZE(PressureCurve))
+!    ELSE
+!      TempCurveIndex = 0
+!    END IF
+!  END IF
+!
+!  !See if it is valid
+!  IF (TempCurveIndex > 0) THEN
+!    PressureCurveType = PressureCurve_Pressure
+!    PressureCurveIndex = TempCurveIndex
+!    RETURN
+!  END IF
+!
+!  !If we made it here, we didn't find either type of match
+!
+!  !Last check, see if it is blank:
+!  IF (TRIM(PressureCurveName)=='') THEN
+!    PressureCurveType = PressureCurve_None
+!    RETURN
+!  END IF
+!
+!  !At this point, we had a non-blank user entry with no match
+!  PressureCurveType = PressureCurve_Error
+!  RETURN
+!
+!RETURN
+!
+!END SUBROUTINE
+!
+!
 !=================================================================================================!
 
 
@@ -1524,7 +1526,7 @@ REAL(r64) FUNCTION ResolveLoopFlowVsPressure(LoopNum, SystemMassFlow, PumpCurveN
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

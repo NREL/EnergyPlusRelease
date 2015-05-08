@@ -66,6 +66,7 @@ MODULE PlantLoopSolver
   PRIVATE PushBranchFlowCharacteristics
   PRIVATE CheckLoopExitNode
   PRIVATE CalcUnmetPlantDemand
+  PRIVATE AdjustPumpFlowRequestByEMSControls
 
  CONTAINS
 
@@ -226,7 +227,7 @@ SUBROUTINE PlantHalfLoopSolver(FirstHVACIteration, LoopSideNum, LoopNum, ReSimOt
   ! Normal "supply side" components will set a mass flow rate on their outlet node to request flow,
   ! while "Demand side" components will set a a mass flow request on their inlet node to request flow.
   PlantLoop(LoopNum)%LoopSide(ThisSide)%FlowLock = FlowUnlocked
-  CALL SimulateAllLoopSideBranches(LoopNum, ThisSide, ThisLoopSideFlow, FirstHVACIteration)
+  CALL SimulateAllLoopSideBranches(LoopNum, ThisSide, ThisLoopSideFlow, FirstHVACIteration, LoopShutDownFlag)
 
   ! DSU? discussion/comments about loop solver/flow resolver interaction
   ! At this point, the components have been simulated.  They should have either:
@@ -265,7 +266,7 @@ SUBROUTINE PlantHalfLoopSolver(FirstHVACIteration, LoopSideNum, LoopNum, ReSimOt
   !  SetFlowRequest routine, but this routine will also set the outlet flow rate
   !  equal to the inlet flow rate, accoridng to flowlock logic.
   PlantLoop(LoopNum)%LoopSide(ThisSide)%FlowLock = FlowLocked
-  CALL SimulateAllLoopSideBranches(LoopNum, ThisSide, ThisLoopSideFlow, FirstHVACIteration)
+  CALL SimulateAllLoopSideBranches(LoopNum, ThisSide, ThisLoopSideFlow, FirstHVACIteration, LoopShutDownFlag)
 
   ! A couple things are specific to which loopside we are on
   IF (LoopSideNum==DemandSide) THEN
@@ -540,14 +541,17 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
             !  to determine what the loopside should flow
 
             ! USE STATEMENTS:
-  USE DataPlant,      ONLY: PlantLoop, CommonPipe_No, LoadRangeBasedMin, LoadRangeBasedMax, MassFlowTol, &
+  USE DataPlant,      ONLY: PlantLoop, CommonPipe_No, LoadRangeBasedMin, LoadRangeBasedMax, &
                             LoopFlowStatus_Unknown, LoopFlowStatus_NeedyAndTurnsLoopOn, &
                             LoopFlowStatus_NeedyIfLoopOn, LoopFlowStatus_TakesWhatGets, TotNumLoops, &
                             GenEquipTypes_Pump,TypeOf_PumpConstantSpeed,TypeOf_PumpBankConstantSpeed, &
-                            SupplySide, CommonPipe_TwoWay, DemandSide, CommonPipe_Single,TypeOf_PumpVariableSpeed
+                            SupplySide, CommonPipe_TwoWay, DemandSide, CommonPipe_Single,TypeOf_PumpVariableSpeed, &
+                            TypeOf_PumpBankVariableSpeed,TypeOf_PumpBankConstantSpeed
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode,   ONLY: Node
   USE Pumps,          ONLY: PumpEquip
   USE PlantUtilities, ONLY: IntegerIsWithinTwoValues
+  USE DataHVACGlobals,ONLY: SmallLoad
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -576,12 +580,15 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
   REAL(r64)                            :: InletBranchRequestNeedIfOn
   REAL(r64), DIMENSION(:), ALLOCATABLE, SAVE :: ParallelBranchRequestsNeedAndTurnOn
   REAL(r64), DIMENSION(:), ALLOCATABLE, SAVE :: ParallelBranchRequestsNeedIfOn
+  REAL(r64), DIMENSION(:, :), ALLOCATABLE, SAVE :: LoadedConstantSpeedBranchFlowRateSteps
+  REAL(r64), DIMENSION(:, :), ALLOCATABLE, SAVE :: NoLoadConstantSpeedBranchFlowRateSteps
   INTEGER                              :: ParallelBranchIndex
   REAL(r64)                            :: OutletBranchRequestNeedAndTurnOn
   REAL(r64)                            :: OutletBranchRequestNeedIfOn
   LOGICAL                              :: ThisSideHasPumps
   LOGICAL                              :: OtherSideHasPumps
   LOGICAL                              :: ThisLoopHasCommonPipe
+  LOGICAL, DIMENSION(2)                :: ThisLoopHasConstantSpeedBranchPumps
   REAL(r64), DIMENSION(2)              :: EachSideFlowRequestNeedAndTurnOn   ! 2 for SupplySide/DemandSide
   REAL(r64), DIMENSION(2)              :: EachSideFlowRequestNeedIfOn       ! 2 for SupplySide/DemandSide
   REAL(r64), DIMENSION(2)              :: EachSideFlowRequestFinal  ! 2 for SupplySide/DemandSide
@@ -589,6 +596,9 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
   LOGICAL, SAVE                        :: AllocatedParallelArray = .FALSE.
   INTEGER                              :: MaxParallelBranchCount
   INTEGER                              :: FlowPriorityStatus
+  REAL(r64)                            :: tmpLoopFlow
+  REAL(r64)                            :: AccumFlowSteps
+  REAL(r64)                            :: MaxBranchPumpLoopSideFlow
 
   !~ One time init for array allocated
   IF (.NOT. AllocatedParallelArray) THEN
@@ -600,11 +610,14 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
     END DO
     ALLOCATE(ParallelBranchRequestsNeedAndTurnOn(MaxParallelBranchCount))
     ALLOCATE(ParallelBranchRequestsNeedIfOn(MaxParallelBranchCount))
+    ALLOCATE(LoadedConstantSpeedBranchFlowRateSteps(2, MaxParallelBranchCount))
+    ALLOCATE(NoLoadConstantSpeedBranchFlowRateSteps(2, MaxParallelBranchCount))
     AllocatedParallelArray = .TRUE.
   END IF
 
   !~ Initialize
   LoopFlow = 0.0d0
+  ThisLoopHasConstantSpeedBranchPumps = .FALSE.
   EachSideFlowRequestNeedAndTurnOn  = 0.0d0
   EachSideFlowRequestNeedIfOn       = 0.0d0
   EachSideFlowRequestFinal          = 0.0d0
@@ -659,8 +672,9 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
            ! special primary side flow request for two way common pipe
            CompIndex = PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%CompNum
            SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%TypeOf_Num)
+            ! remove var speed pumps from this case statement if can set MassFlowRateRequest
+           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed,TypeOf_PumpBankConstantSpeed)
 
-           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed) ! remove var speed pump if can set MassFlowRateRequest
              IF (CompIndex > 0) THEN
                !
                ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
@@ -669,13 +683,13 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
              ThisBranchFlowRequestNeedIfOn    = MAX(ThisBranchFlowRequestNeedIfOn,     &
                                                      Node(NodeToCheckRequest)%MassFlowRateRequest)
            END SELECT
-           
+
          ELSEIF ((BranchCounter == 1) .AND. (LoopSideCounter == SupplySide) &
               .AND. (PlantLoop(LoopNum)%CommonPipeType == CommonPipe_Single)) THEN
            CompIndex = PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%CompNum
            SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%TypeOf_Num)
-
-           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed) ! remove var speed pump if can set MassFlowRateRequest
+            ! remove var speed pumps from this case statement if can set MassFlowRateRequest
+           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed,TypeOf_PumpBankConstantSpeed)
              IF (CompIndex > 0) THEN
                !
                ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
@@ -690,7 +704,19 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
 
            CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpBankConstantSpeed)
              IF (CompIndex > 0) THEN
-               ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+               IF (ParallelBranchIndex >= 1) THEN ! branch pump
+                 IF (ANY(ABS(PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp%MyLoad) > SmallLoad )) THEN
+                   ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+                 ELSEIF (PlantLoop(LoopNum)%CommonPipeType  /= CommonPipe_No) THEN ! common pipe and constant branch pumps
+                   ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+                 ENDIF
+                 ThisLoopHasConstantSpeedBranchPumps(LoopSideCounter) = .TRUE.
+                 PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%HasConstantSpeedBranchPump = .TRUE.
+                 PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%ConstantSpeedBranchMassFlow &
+                            =  PumpEquip(CompIndex)%MassFlowRateMax
+               ELSE ! inlet pump
+                 ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+               ENDIF
              ENDIF
            END SELECT
          ENDIF
@@ -707,6 +733,10 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
         OutletBranchRequestNeedAndTurnOn = ThisBranchFlowRequestNeedAndTurnOn
         OutletBranchRequestNeedIfOn      = ThisBranchFlowRequestNeedIfOn
       END IF
+
+      PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%RequestedMassFlow = &
+                              MAX(ThisBranchFlowRequestNeedIfOn, ThisBranchFlowRequestNeedAndTurnOn)
+
     END DO
     EachSideFlowRequestNeedAndTurnOn(LoopSideCounter) &
          = MAX(InletBranchRequestNeedAndTurnOn, SUM(ParallelBranchRequestsNeedAndTurnOn), OutletBranchRequestNeedAndTurnOn)
@@ -714,8 +744,11 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
          = MAX(InletBranchRequestNeedIfOn, SUM(ParallelBranchRequestsNeedIfOn), OutletBranchRequestNeedIfOn)
   END DO
 
+
+
+
   !~ Now that we have calculated each sides different status's requests, process to find final
-  IF (Sum(EachSideFlowRequestNeedAndTurnOn) < MassFlowTol ) THEN
+  IF (Sum(EachSideFlowRequestNeedAndTurnOn) < MassFlowTolerance ) THEN
     EachSideFlowRequestFinal = 0.0d0
   ELSE ! some flow is needed and loop should try to run
     EachSideFlowRequestFinal(ThisSide) &
@@ -730,7 +763,88 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
 
   IF (PlantLoop(LoopNum)%CommonPipeType == CommonPipe_No) THEN
    !we may or may not have a pump on this side, but the flow request is the larger of the two side's final
-    LoopFlow = MAXVAL(EachSideFlowRequestFinal)
+    IF (.NOT. ANY(ThisLoopHasConstantSpeedBranchPumps)) THEN
+      LoopFlow = MAXVAL(EachSideFlowRequestFinal)
+    ELSE ! account for stepped loop flow rates required of branch pumps
+      
+      ! rules for setting flow when there are constant speed branch pumps. 
+      ! 1. Check if above routines already selected a loop flow rate based on the constant speed branches, if so then just use it
+      IF ((ThisLoopHasConstantSpeedBranchPumps(ThisSide)) .AND. &
+          (EachSideFlowRequestFinal(ThisSide) >= EachSideFlowRequestFinal(OtherSide))) THEN
+        ! okay, just use basic logic
+        LoopFlow = MAXVAL(EachSideFlowRequestFinal)
+      ELSEIF ((ThisLoopHasConstantSpeedBranchPumps(OtherSide)) .AND. &
+          (EachSideFlowRequestFinal(ThisSide) <= EachSideFlowRequestFinal(OtherSide))) THEN 
+        ! okay, just use basic logic
+        LoopFlow = MAXVAL(EachSideFlowRequestFinal)
+      ELSE ! not okay, we have a case that will likely need special correcting
+        !  2. determine which loop side has the stepped data
+        IF ((ThisLoopHasConstantSpeedBranchPumps(ThisSide)) .AND. &
+            (EachSideFlowRequestFinal(ThisSide) < EachSideFlowRequestFinal(OtherSide))) THEN
+          LoopSideCounter = ThisSide
+        ELSEIF ((ThisLoopHasConstantSpeedBranchPumps(OtherSide)) .AND. &
+           (EachSideFlowRequestFinal(OtherSide) < EachSideFlowRequestFinal(ThisSide))) THEN
+          LoopSideCounter = OtherSide
+        ENDIF
+
+        ! 3. step through and find out needed information
+        ! 3a.  search the loop side with branch pumps and find the steps available with non-zero Myloads
+        ! 3b.  search the loop side with branch pumps and find the steps available with zero Myloads
+        LoadedConstantSpeedBranchFlowRateSteps = 0.d0
+        NoLoadConstantSpeedBranchFlowRateSteps = 0.d0
+        ParallelBranchIndex = 0
+        NumBranchesOnThisLoopSide =  PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%TotalBranches
+        DO BranchCounter = 1, NumBranchesOnThisLoopSide
+          IF(BranchCounter > 1 .AND. BranchCounter < NumBranchesOnThisLoopSide) ParallelBranchIndex = ParallelBranchIndex + 1
+          IF (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%HasConstantSpeedBranchPump) THEN
+            IF  (ANY(ABS(PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp%MyLoad) > SmallLoad )) THEN
+              LoadedConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex) = &
+                PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%ConstantSpeedBranchMassFlow
+            ELSE
+              NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex) = &
+                PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%ConstantSpeedBranchMassFlow
+            ENDIF
+          ENDIF
+        ENDDO
+
+        ! 4. allocate which branches to use, 
+        tmpLoopFlow = MAXVAL(EachSideFlowRequestFinal)
+        AccumFlowSteps = 0.d0
+        MaxBranchPumpLoopSideFlow = SUM(LoadedConstantSpeedBranchFlowRateSteps) + SUM(NoLoadConstantSpeedBranchFlowRateSteps)
+        tmpLoopFlow = MIN(tmpLoopFlow, MaxBranchPumpLoopSideFlow)
+        !  4b. first use all the branches with non-zero MyLoad 
+        IF (tmpLoopFlow <= Sum(LoadedConstantSpeedBranchFlowRateSteps)) THEN
+          tmpLoopFlow = Sum(LoadedConstantSpeedBranchFlowRateSteps)
+        ELSE
+          AccumFlowSteps = Sum(LoadedConstantSpeedBranchFlowRateSteps)
+          ParallelBranchIndex = 0
+          DO BranchCounter = 1, NumBranchesOnThisLoopSide
+            IF(BranchCounter > 1 .AND. BranchCounter < NumBranchesOnThisLoopSide) THEN
+              ParallelBranchIndex = ParallelBranchIndex + 1
+            ELSE
+              CYCLE
+            ENDIF
+            IF (NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex) > 0.d0) THEN
+                  !  add in branches with zero MyLoad  in branch input order until satisfied
+              IF ((tmpLoopFlow > AccumFlowSteps) .AND. (tmpLoopFlow <= (AccumFlowSteps + &
+                                                NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)))) THEN
+                !found it set requests and exit
+                tmpLoopFlow = AccumFlowSteps +  NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)
+                PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%RequestedMassFlow &
+                             = NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)
+                LoopFlow = tmpLoopFlow
+                EXIT
+              ELSEIF ((tmpLoopFlow > AccumFlowSteps) .AND. (tmpLoopFlow > (AccumFlowSteps + &
+                                                NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)))) THEN
+                AccumFlowSteps = AccumFlowSteps +  NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)
+                PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%RequestedMassFlow &
+                             = NoLoadConstantSpeedBranchFlowRateSteps(LoopSideCounter, ParallelBranchIndex)
+              ENDIF
+            ENDIF
+          ENDDO
+        ENDIF
+      ENDIF
+    ENDIF
     ThisLoopHasCommonPipe    = .FALSE.
   ELSEIF (PlantLoop(LoopNum)%CommonPipeType == CommonPipe_TwoWay) THEN
     LoopFlow=EachSideFlowRequestFinal(ThisSide)
@@ -755,14 +869,21 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
     OtherSideHasPumps        = .FALSE.
   ENDIF
   IF (ThisLoopHasCommonPipe .AND. .NOT. ThisSideHasPumps) THEN
-    CALL ShowFatalError('SetupLoopFlowRequest: Problem in Plant topology, Common Pipe must have pumps on both sides of loop')
+    CALL ShowSevereError('SetupLoopFlowRequest: Common Pipe must have pumps on both sides of loop')
+    CALL ShowContinueError('Occurs on plant loop name ="'//trim(PlantLoop(LoopNum)%Name)//'"')
+    IF (ThisSide == DemandSide) THEN
+      CALL ShowContinueError('Add a pump to the demand side of the plant loop')
+    ELSEIF (ThisSide == SupplySide) THEN
+      CALL ShowContinueError('Add a pump to the supply side of the plant loop')
+    ENDIF
+    CALL ShowFatalError('Program terminates due to preceding conditions.')
 
-!   DSU? but don't we want to allow this next one to be okay going forward?
-!  ELSE IF (.NOT. ThisLoopHasCommonPipe .AND. ThisSideHasPumps .AND. OtherSideHasPumps) THEN
-!    CALL ShowFatalError('Series pumps not allowed.  Specify a single equivalent pump.')  !
 
   ELSE IF (.NOT. ThisSideHasPumps .AND. .NOT. OtherSideHasPumps) THEN
-    CALL ShowFatalError('SetupLoopFlowRequest: Problem in plant topoloty, no pumps specified on the loop')
+    CALL ShowSevereError('SetupLoopFlowRequest: Problem in plant topology, no pumps specified on the loop')
+    CALL ShowContinueError('Occurs on plant loop name ="'//trim(PlantLoop(LoopNum)%Name)//'"')
+    CALL ShowContinueError('All plant loops require at least one pump')
+    CALL ShowFatalError('Program terminates due to preceding conditions.')
   END IF
 
 
@@ -777,7 +898,7 @@ END SUBROUTINE SetupLoopFlowRequest
 !==================================================================!
 !================== LOOPSIDE BRANCH SIMULATION ====================!
 !==================================================================!
-SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVACIteration)
+SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVACIteration, LoopShutDownFlag)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Edwin Lee
@@ -810,6 +931,7 @@ SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, F
   INTEGER,   INTENT(IN) :: LoopSideNum
   REAL(r64), INTENT(IN) :: ThisLoopSideFlow
   LOGICAL,   INTENT(IN) :: FirstHVACIteration
+  LOGICAL,   INTENT(INOUT) :: LoopShutDownFlag
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER, PARAMETER :: InletBranchOrOneBranchHalfLoop = 1
@@ -844,6 +966,7 @@ SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, F
                                          1,                      &
                                          ThisLoopSideFlow,       &
                                          FirstHVACIteration,     &
+                                         LoopShutDownFlag,       &
                                          StartingNewLoopSidePass &
                                         )
 
@@ -857,7 +980,8 @@ SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, F
                                          2,                    &
                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches - 1, &
                                          ThisLoopSideFlow,     &
-                                         FirstHVACIteration    &
+                                         FirstHVACIteration,   &
+                                         LoopShutDownFlag      &
                                         )
         CALL UpdatePlantMixer(LoopNum,LoopSideNum,1)
 
@@ -868,7 +992,8 @@ SUBROUTINE SimulateAllLoopSideBranches(LoopNum, LoopSideNum, ThisLoopSideFlow, F
                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches, &
                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches, &
                                          ThisLoopSideFlow,     &
-                                         FirstHVACIteration    &
+                                         FirstHVACIteration,   &
+                                         LoopShutDownFlag      &
                                         )
 
     END SELECT
@@ -887,7 +1012,7 @@ END SUBROUTINE SimulateAllLoopSideBranches
 !================ SINGLE BRANCH GROUP SIMULATION ==================!
 !==================================================================!
 SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, LastBranchNum, FlowRequest, &
-                                       FirstHVACIteration, StartingNewLoopSidePass)
+                                       FirstHVACIteration, LoopShutDownFlag, StartingNewLoopSidePass)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Edwin Lee
@@ -928,6 +1053,7 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
   INTEGER,   INTENT(IN)  :: LastBranchNum
   REAL(r64), INTENT(IN)  :: FlowRequest
   LOGICAL,   INTENT(IN)  :: FirstHVACIteration
+  LOGICAL,   INTENT(INOUT)  :: LoopShutDownFlag
   LOGICAL,   INTENT(IN), OPTIONAL :: StartingNewLoopSidePass
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
@@ -949,8 +1075,7 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
   LOGICAL, SAVE        :: EncounteredLRBObjDuringPass1
   LOGICAL, SAVE        :: EncounteredNonLBObjDuringPass2
   LOGICAL, SAVE        :: EncounteredAnyLRBObjects
-  LOGICAL              :: LoopShutDownFlag =.FALSE. !DSU?  This flag should be passed as a argument so loop manager can react.
-                                            !temporarily set here to test ManagePlantLoadDistribution
+
   LOGICAL              :: LoadDistributionWasPerformed
   LOGICAL              :: DummyInit
   LOGICAL, PARAMETER   :: DoNotGetCompSizFac = .FALSE.
@@ -962,8 +1087,8 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
   REAL(r64)                                        :: LoadToLoopSetPoint
   TYPE(Location)                                   :: PumpLocation
 
-  !~ Debug variables
 
+  !~ Debug variables
 
   ! We only need to reallocate the accessible array and reset the LastComponentSimulated if
   !  either is currently NOT allocated, or if we are coming into this routine with a
@@ -1039,9 +1164,17 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
           PumpLocation%LoopSideNum = LoopSideNum
           PumpLocation%BranchNum   = BranchCounter
           PumpLocation%CompNum     = CompCounter
-          CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+          IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%BranchPumpsExist) THEN
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+                                SpecificPumpLocation = PumpLocation, &
+                                SpecificPumpFlowRate = &
+                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchCounter)%RequestedMassFlow)
+          ELSE
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
                                     SpecificPumpLocation = PumpLocation, &
                                     SpecificPumpFlowRate = FlowRequest)
+          ENDIF
+
         CASE (CompSetPtBasedSchemeType)
           CALL ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchCounter, CompCounter, LoadToLoopSetPoint, &
                                              LoadToLoopSetPointThatWasntMet, FirstHVACIteration, LoopShutDownFlag, &
@@ -1107,9 +1240,16 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
           PumpLocation%LoopSideNum = LoopSideNum
           PumpLocation%BranchNum   = BranchCounter
           PumpLocation%CompNum     = CompCounter
-          CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+          IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%BranchPumpsExist) THEN
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+                                SpecificPumpLocation = PumpLocation, &
+                                SpecificPumpFlowRate = &
+                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchCounter)%RequestedMassFlow)
+          ELSE
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
                                     SpecificPumpLocation = PumpLocation, &
                                     SpecificPumpFlowRate = FlowRequest)
+          ENDIF
       END SELECT
 
       !~ If we didn't EXIT early, we must have simulated, so update array
@@ -1151,9 +1291,16 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
           PumpLocation%LoopSideNum = LoopSideNum
           PumpLocation%BranchNum   = BranchCounter
           PumpLocation%CompNum     = CompCounter
-          CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+          IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%BranchPumpsExist) THEN
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
+                                SpecificPumpLocation = PumpLocation, &
+                                SpecificPumpFlowRate = &
+                                          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchCounter)%RequestedMassFlow)
+          ELSE
+            CALL SimulateAllLoopSidePumps(LoopNum, LoopSideNum, &
                                     SpecificPumpLocation = PumpLocation, &
                                     SpecificPumpFlowRate = FlowRequest)
+          ENDIF
         CASE DEFAULT                !~ Typical control equipment
           CALL SimPlantEquip(LoopNum,LoopSideNum,BranchCounter,CompCounter,FirstHVACIteration,DummyInit,DoNotGetCompSizFac)
       END SELECT
@@ -1273,6 +1420,8 @@ SUBROUTINE SimulateAllLoopSidePumps(LoopNum, ThisSide, SpecificPumpLocation, Spe
     PumpCompNum    = PlantLoop(PumpLoopNum)%LoopSide(PumpLoopSideNum)%Pumps(PumpCounter)%CompNum
     PumpOutletNode = PlantLoop(PumpLoopNum)%LoopSide(PumpLoopSideNum)%Pumps(PumpCounter)%PumpOutletNode
 
+    CALL AdjustPumpFlowRequestByEMSControls(PumpLoopNum, PumpLoopSideNum, PumpBranchNum, PumpCompNum, FlowToRequest)
+
     ! Call SimPumps, routine takes a flow request, and returns some info about the status of the pump
     CALL SimPumps(PlantLoop(PumpLoopNum)%LoopSide(PumpLoopSideNum)%Pumps(PumpCounter)%PumpName,     &
                   PumpLoopNum,                                                                      &
@@ -1362,7 +1511,8 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
           ! <description>
 
           ! USE STATEMENTS:
- USE DataPlant,    ONLY: PlantLoop, MassFlowTol, LoopDemandTol, SingleSetPoint, DualSetPointDeadBand
+ USE DataPlant,    ONLY: PlantLoop, LoopDemandTol, SingleSetPoint, DualSetPointDeadBand
+ USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
  USE DataLoopNode, ONLY: Node, NodeType_Water, NodeType_Steam
  USE FluidProperties, ONLY: GetSpecificHeatGlycol, GetSatEnthalpyRefrig
  USE General,         ONLY: RoundSigDigits
@@ -1424,7 +1574,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
 
   END DO
 
-  IF ( SumMdot .LT. MassFlowTol ) THEN
+  IF ( SumMdot .LT. MassFlowTolerance ) THEN
     LoadToLoopSetPoint = 0.0
     RETURN
   END IF
@@ -1571,7 +1721,8 @@ SUBROUTINE UpdateAnyLoopDemandAlterations(LoopNum, LoopSideNum, BranchNum, CompN
           ! USE STATEMENTS:
   USE DataPlant,  ONLY: PlantLoop, DemandOpSchemeType, PumpOpSchemeType, LoadRangeBasedMin, LoadRangeBasedMax, &
                         NoControlOpSchemeType, CompSetPtBasedSchemeType, FreeRejectionOpSchemeType, WSEconOpSchemeType, &
-                        UnknownStatusOpSchemeType, MassFlowTol, FlowUnlocked, FlowLocked
+                        UnknownStatusOpSchemeType, FlowUnlocked, FlowLocked
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode, ONLY: Node
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
 
@@ -1637,7 +1788,7 @@ SUBROUTINE UpdateAnyLoopDemandAlterations(LoopNum, LoopSideNum, BranchNum, CompN
   END IF
 
   ! Leave early if there wasn't a mass flow rate or request
-  IF (ComponentMassFlowRate .LT. MassFlowTol) RETURN
+  IF (ComponentMassFlowRate .LT. MassFlowTolerance) RETURN
 
   ! Get an average temperatre for the property call
   InletTemp   = Node(InletNode)%Temp
@@ -1688,8 +1839,9 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           ! properties.  Finally, Max/MinAvail are reset for the next time step.
 
           ! USE STATEMENTS:
-  USE DataPlant,      ONLY: PlantLoop,ControlType_Unknown,ControlType_Active, ControlType_Passive, &
-                            ControlType_SeriesActive, ControlType_Bypass, MassFlowTol
+  USE DataPlant,      ONLY: PlantLoop, TypeOf_PumpVariableSpeed, TypeOf_PumpBankVariableSpeed
+  USE DataBranchAirLoopPlant, ONLY: ControlType_Unknown,ControlType_Active, ControlType_Passive, &
+                                    ControlType_SeriesActive, ControlType_Bypass, MassFlowTolerance
   USE DataLoopNode,   ONLY: Node
   USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp
   USE General,        ONLY: RoundSigDigits
@@ -1740,6 +1892,9 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
   INTEGER   :: FirstNodeOnBranchOut
   REAL(r64) :: StartingFlowRate
   REAL(r64) :: ThisBranchRequest
+  INTEGER :: CompCounter
+  INTEGER :: CompInletNode
+  INTEGER :: CompOutletNode
 
 ! Error Messages from the old RequestNetworkFlowAndSolve
 
@@ -1834,6 +1989,28 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
       LastNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(branchNum)%NodeNumOut
       FirstNodeOnBranch= PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(branchNum)%NodeNumIn
       BranchFlowReq    = DetermineBranchFlowRequest(LoopNum, LoopSideNum, BranchNum)
+
+      !now, if we are have branch pumps, here is the situation:
+      ! constant speed pumps lock in a flow request on the inlet node
+      ! variable speed pumps which have other components on the branch do not log a request themselves
+      ! the DetermineBranchFlowRequest routine only looks at the branch inlet node
+      ! for variable speed branch pumps then, this won't work because the branch will be requesting zero
+      ! so let's adjust for this here to make sure these branches get good representation
+      DO CompCounter = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
+
+        !if this isn't a variable speed pump then just keep cycling
+        IF ( (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompCounter)%TypeOf_Num &
+              .NE. TypeOf_PumpVariableSpeed) .AND. &
+             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompCounter)%TypeOf_Num &
+              .NE. TypeOf_PumpBankVariableSpeed) ) THEN
+          CYCLE
+        END IF
+
+        CompInletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompCounter)%NodeNumIn
+        BranchFlowReq = MAX(BranchFlowReq, Node(CompInletNode)%MassFLowRateRequest)
+
+      END DO
+
       BranchMinAvail   = Node(LastNodeOnBranch)%MassFlowRateMinAvail
       BranchMaxAvail   = Node(LastNodeOnBranch)%MassFlowRateMaxAvail
 !            !sum the branch flow requests to a total parallel branch flow request
@@ -1898,7 +2075,22 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
 
 
 !IF SUFFICIENT FLOW TO MEET ALL PARALLEL BRANCH FLOW REQUESTS
-    IF (FlowRemaining .GE. TotParallelBranchFlowReq) THEN
+    IF (FlowRemaining < MassFlowTolerance) THEN ! no flow available at all for splitter 
+      DO OutletNum = 1, NumSplitOutlets
+        SplitterBranchOut = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(OutletNum)
+        DO CompCounter = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%TotalComponents
+        
+          FirstNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%NodeNumIn
+          CompInletNode  = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%Comp(CompCounter)%NodeNumIn
+          CompOutletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%Comp(CompCounter)%NodeNumOut
+          Node(CompInletNode)%MassFlowRate          =  0.d0
+          Node(CompInletNode)%MassFlowRateMaxAvail  =  0.d0
+          Node(CompOutletNode)%MassFlowRate         =  0.d0
+          Node(CompOutletNode)%MassFlowRateMaxAvail =  0.d0
+        ENDDO
+      END DO
+      RETURN
+    ELSEIF (FlowRemaining .GE. TotParallelBranchFlowReq) THEN
 
   ! 1) Satisfy flow demand of ACTIVE splitter outlet branches
       DO OutletNum = 1, NumSplitOutlets
@@ -1908,11 +2100,11 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%ControlType == ControlType_SeriesActive) THEN
                           ! branch flow is min of requested flow and remaining flow
           Node(FirstNodeOnBranch)%MassFlowRate = MIN(Node(FirstNodeOnBranch)%MassFlowRate,FlowRemaining)
-          IF(Node(FirstNodeOnBranch)%MassFlowRate < MassFlowTol) Node(FirstNodeOnBranch)%MassFlowRate = 0.0
+          IF(Node(FirstNodeOnBranch)%MassFlowRate < MassFlowTolerance) Node(FirstNodeOnBranch)%MassFlowRate = 0.0
           CALL PushBranchFlowCharacteristics(LoopNum, LoopSideNum, SplitterBranchOut,   &
                                              Node(FirstNodeOnBranch)%MassFlowRate, FirstHVACIteration)
           FlowRemaining = FlowRemaining - Node(FirstNodeOnBranch)%MassFlowRate
-          IF(FlowRemaining < MassFlowTol) FlowRemaining = 0.0
+          IF(FlowRemaining < MassFlowTolerance) FlowRemaining = 0.0
         ENDIF
       END DO
             !IF the active branches take the entire loop flow, return
@@ -2057,7 +2249,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
       END DO
 
     ! 1b) check if flow all apportioned
-      IF(FlowRemaining > MassFlowTol)THEN
+      IF(FlowRemaining > MassFlowTolerance)THEN
           !Call fatal diagnostic error. !The math should work out!
         CALL ShowSevereError('ResolveParallelFlows: Dev note, failed to redistribute restricted flow')
         CALL ShowContinueErrorTimeStamp(' ')
@@ -2148,7 +2340,8 @@ REAL(r64) FUNCTION DetermineBranchFlowRequest(LoopNum, LoopSideNum, BranchNum) R
   USE DataPlant,      ONLY: PlantLoop, LoadRangeBasedMin, LoadRangeBasedMax
   USE DataLoopNode,   ONLY: Node
   USE PlantUtilities, ONLY: BoundValueToNodeMinMaxAvail
-
+  USE DataBranchAirLoopPlant, ONLY : ControlType_SeriesActive
+  
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2186,7 +2379,14 @@ REAL(r64) FUNCTION DetermineBranchFlowRequest(LoopNum, LoopSideNum, BranchNum) R
       OverallFlowRequest = Node(BranchOutletNodeNum)%MassFlowRate
 
     CASE(InletFlowRequest)
-      OverallFlowRequest = Node(BranchInletNodeNum)%MassFlowRateRequest
+      IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%ControlType /= ControlType_SeriesActive) THEN
+        OverallFlowRequest = Node(BranchInletNodeNum)%MassFlowRateRequest
+      ELSE ! is series active, so take largest request of all the component inlet nodes
+        DO CompCounter = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
+          CompInletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompCounter)%NodeNumIn
+          OverallFlowRequest = MAX(OverallFlowRequest, Node(CompInletNode)%MassFlowRateRequest)
+        END DO
+      ENDIF
 
     CASE(MaximumRequest)
       ! Assumes component inlet node is where request is held...could bandaid to include outlet node, but trying not to...
@@ -2255,6 +2455,7 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
 
           ! USE STATEMENTS:
   USE DataPlant    ! Use the entire module to allow all TypeOf's, would be a huge ONLY list
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode, ONLY: Node
   USE PlantUtilities, ONLY: CheckPlantConvergence
 
@@ -2318,6 +2519,8 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
     Node(ComponentOutletNode)%MassFlowRate         = MassFlow
 
     IF (PlantIsRigid) THEN
+      Node(ComponentInletNode)%MassFlowRateMinAvail = MassFlow
+      Node(ComponentInletNode)%MassFlowRateMaxAvail = MassFlow
       Node(ComponentOutletNode)%MassFlowRateMinAvail = MassFlow
       Node(ComponentOutletNode)%MassFlowRateMaxAvail = MassFlow
     END IF
@@ -2326,8 +2529,7 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
     !      for demand components Node(ComponentOutletNode)%MassFlowRateMaxAvail = MaxAvail
 
     !~ If this value matches then we are good to move to the next component
-    IF (ABS(MassFlow - MassFlowRateFound) < MassFlowTol) CYCLE
-
+    IF (ABS(MassFlow - MassFlowRateFound) < CriteriaDelta_MassFlowRate) CYCLE
     !~ Since there is a difference, we have to decide what to do based on the component type:
     !~  For plant connections, don't do anything, it SHOULD work itself out
     !~  For air connections, trip the loopside air flag
@@ -2342,16 +2544,23 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
              TypeOf_CoilWAHPHeatingEquationFit,   &
              TypeOf_CoilWAHPCoolingEquationFit,   &
              TypeOf_CoilWAHPHeatingParamEst,      &
-             TypeOf_CoilWAHPCoolingParamEst )
+             TypeOf_CoilWAHPCoolingParamEst,      &
+             TypeOf_CoilUserDefined ,             &
+             TypeOf_CoilVSWAHPCoolingEquationFit, &
+             TypeOf_CoilVSWAHPHeatingEquationFit)
 
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimAirLoopsNeeded = .TRUE.
+        !sometimes these coils are children in ZoneHVAC equipment
+       ! PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimZoneEquipNeeded= .TRUE.
 
       CASE(  TypeOf_BASEBOARD_CONV_WATER,         & !zone connected components
              TypeOf_BASEBOARD_RAD_CONV_STEAM,     &
              TypeOf_BASEBOARD_RAD_CONV_WATER,     &
              TypeOf_LowTempRadiant_VarFlow,       &
              TypeOf_LowTempRadiant_ConstFlow,     &
-             TypeOf_CooledBeamAirTerminal)
+             TypeOf_CooledBeamAirTerminal,        &
+             TypeOf_ZoneHVACAirUserDefined,       &
+             TypeOf_AirTerminalUserDefined)
 
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimZoneEquipNeeded= .TRUE.
 
@@ -2371,7 +2580,7 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
 
  RETURN
 
-END SUBROUTINE
+END SUBROUTINE PushBranchFlowCharacteristics
 
 !==================================================================!
 !================== REPORT VARIABLE UPDATE ========================!
@@ -2456,7 +2665,8 @@ SUBROUTINE CalcUnmetPlantDemand(LoopNum, LoopSideNum)
 
           ! USE STATEMENTS:
           ! na
-  USE DataPlant,    ONLY : PlantLoop, PlantReport, MassFlowTol, LoopDemandTol, SingleSetPoint, DualSetPointDeadBand
+  USE DataPlant,    ONLY : PlantLoop, PlantReport, LoopDemandTol, SingleSetPoint, DualSetPointDeadBand
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE DataLoopNode, ONLY : Node, NodeType_Water, NodeType_Steam
   USE FluidProperties, ONLY: GetSpecificHeatGlycol, GetSatEnthalpyRefrig
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -2629,7 +2839,8 @@ SUBROUTINE  CheckLoopExitNode(LoopNum,FirstHVACIteration)
   USE DataGlobals,     ONLY: WarmUpFlag, BeginEnvrnFlag
   USE DataInterfaces,  ONLY: ShowWarningError,ShowContinueError,ShowContinueErrorTimeStamp,  &
                              ShowRecurringWarningErrorAtEnd
-  USE DataPlant,       ONLY: PlantLoop, SupplySide,DemandSide, MassFlowTol
+  USE DataPlant,       ONLY: PlantLoop, SupplySide,DemandSide
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
   USE DataLoopNode,    ONLY: Node, NodeID
   USE General,         ONLY: RoundSigDigits
 
@@ -2657,7 +2868,7 @@ SUBROUTINE  CheckLoopExitNode(LoopNum,FirstHVACIteration)
     LoopOutlet = PlantLoop(LoopNum)%LoopSide(SupplySide)%NodeNumOut
           !Check continuity invalid...loop pumps now turned on and off
    If(.not.FirstHvacIteration .and. .not.WarmUpFlag)Then
-    IF (ABS(Node(LoopOutlet)%MassFlowRate-Node(LoopInlet)%MassFlowRate) > MassFlowTol) THEN
+    IF (ABS(Node(LoopOutlet)%MassFlowRate-Node(LoopInlet)%MassFlowRate) > MassFlowTolerance) THEN
       IF (PlantLoop(LoopNum)%MFErrIndex == 0) THEN
         CALL ShowWarningError ('PlantSupplySide: PlantLoop="'//TRIM(PlantLoop(LoopNum)%Name)//  &
            '", Error (CheckLoopExitNode) -- Mass Flow Rate Calculation. '//  &
@@ -2679,6 +2890,69 @@ SUBROUTINE  CheckLoopExitNode(LoopNum,FirstHVACIteration)
 
   RETURN
 END SUBROUTINE CheckLoopExitNode
+
+
+
+SUBROUTINE AdjustPumpFlowRequestByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, FlowToRequest)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Brent Griffith
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! modify flow request to pump simulation if EMS is overriding pump component
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPLant, ONLY : PlantLoop
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+ INTEGER,INTENT(IN)         :: LoopNum
+ INTEGER,INTENT(IN)         :: LoopSideNum
+ INTEGER,INTENT(IN)         :: BranchNum
+ INTEGER,INTENT(IN)         :: CompNum
+ REAL(r64), INTENT(INOUT)   :: FlowToRequest
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  IF ((PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSCtrl) .AND. &
+      (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSValue <= 0.d0)) THEN
+    FlowToRequest = 0.d0
+    RETURN
+  ENDIF
+
+  IF ((PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideOn) .AND. &
+      (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%EMSCtrlOverrideValue <= 0.d0)) THEN
+    FlowToRequest = 0.d0
+    RETURN
+  ENDIF
+
+  IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn) THEN
+    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue == 0.d0) THEN
+      FlowToRequest = 0.d0
+    ENDIF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE AdjustPumpFlowRequestByEMSControls
 !==================================================================!
 !==================================================================!
 !==================================================================!
@@ -2686,7 +2960,7 @@ END SUBROUTINE CheckLoopExitNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

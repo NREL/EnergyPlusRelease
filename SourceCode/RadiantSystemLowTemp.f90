@@ -1806,7 +1806,7 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
 
       Do loop =1, NumOfHydrLowTempRadSys
         IF (MyPlantScanFlagHydr(loop)) CYCLE
-        IF (HydrRadSys(RadSysNum)%HotWaterInNode > 0) THEN
+        IF (HydrRadSys(loop)%HotWaterInNode > 0) THEN
           CALL InitComponentNodes(0.0d0, HydrRadSys(loop)%WaterFlowMaxHeat, &
                             HydrRadSys(loop)%HotWaterInNode, &
                             HydrRadSys(loop)%HotWaterOutNode, &
@@ -1815,7 +1815,7 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
                             HydrRadSys(loop)%HWBranchNum, &
                             HydrRadSys(loop)%HWCompNum  )
         ENDIF
-        IF (HydrRadSys(RadSysNum)%ColdWaterInNode > 0) THEN
+        IF (HydrRadSys(loop)%ColdWaterInNode > 0) THEN
           CALL InitComponentNodes(0.0d0, HydrRadSys(loop)%WaterFlowMaxCool, &
                             HydrRadSys(loop)%ColdWaterInNode, &
                             HydrRadSys(loop)%ColdWaterOutNode, &
@@ -2025,6 +2025,10 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
                                   CFloRadSys(RadSysNum)%CWBranchNum, &
                                   CFloRadSys(RadSysNum)%CWCompNum)
       END IF
+
+    CASE (ElectricSystem)
+
+    CASE DEFAULT
 
   END SELECT
 
@@ -2277,7 +2281,7 @@ SUBROUTINE CalcLowTempHydrRadiantSystem(RadSysNum,LoadMet)
   USE DataLoopNode,      ONLY : Node
   USE ScheduleManager,   ONLY : GetCurrentScheduleValue
   USE PlantUtilities,    ONLY : SetComponentFlowRate
-  USE DataPlant,         ONLY : MassFlowTol
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2406,7 +2410,7 @@ SUBROUTINE CalcLowTempHydrRadiantSystem(RadSysNum,LoadMet)
 
           ! Calculate and limit the water flow rate
     ActWaterFlow = MassFlowFrac*MaxWaterFlow
-    IF (ActWaterFlow < MassFlowTol) ActWaterFlow = 0.d0
+    IF (ActWaterFlow < MassFlowTolerance) ActWaterFlow = 0.d0
     IF (HydrRadSys(RadSysNum)%EMSOverrideOnWaterMdot) ActWaterFlow = HydrRadSys(RadSysNum)%EMSWaterMdotOverrideValue
 
     IF (OperatingMode == HeatingMode) THEN
@@ -2647,7 +2651,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
         Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1. - Ce*Cb ) )
 
         QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - Ck) &
-                              /(1. + (EpsMdotCp*Cl/Surface(SurfNum)%Area) )
+                              /(1.d0 + (EpsMdotCp*Cl/Surface(SurfNum)%Area) )
 
       ELSE IF (SolutionAlgo == UseCondFD) THEN
 
@@ -2975,7 +2979,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
   USE DataHeatBalance,   ONLY : MRT, Zone, ZoneData
   USE DataHeatBalFanSys, ONLY : MAT
   USE DataHVACGlobals,   ONLY : SmallLoad
-  USE DataPlant,         ONLY : MassFlowTol
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE DataLoopNode,      ONLY : Node
   USE FluidProperties,   ONLY : GetSpecificHeatGlycol
   USE ScheduleManager,   ONLY : GetCurrentScheduleValue
@@ -3039,7 +3043,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
       CASE (MRTControl)
         SetpointTemp = MRT(ZoneNum)
       CASE (OperativeControl)
-        SetpointTemp = 0.5*(MAT(ZoneNum)+MRT(ZoneNum))
+        SetpointTemp = 0.5d0*(MAT(ZoneNum)+MRT(ZoneNum))
       CASE (ODBControl)
         SetpointTemp = Zone(ZoneNum)%OutDryBulbTemp
       CASE (OWBControl)
@@ -3461,7 +3465,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
     END IF  ! Operating mode (heating or cooling)
 
           ! Case when system has been shut down because of condensation issues or other limitations:
-    IF (CFloRadSys(RadSysNum)%WaterMassFlowRate < MassFlowTol) THEN
+    IF (CFloRadSys(RadSysNum)%WaterMassFlowRate < MassFlowTolerance) THEN
       CFloRadSys(RadSysNum)%WaterMassFlowRate  = 0.0
       CFloRadSys(RadSysNum)%WaterInjectionRate = 0.0
       CFloRadSys(RadSysNum)%WaterRecircRate    = 0.0
@@ -3552,8 +3556,8 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: CondDeltaTemp  = 1.0   ! How close the surface temperatures can get to the dewpoint temperature of a space
                                             ! before the radiant cooling system shuts off the flow.
-  REAL(r64), PARAMETER :: TempCheckLimit = 0.1   ! Maximum allowed temperature difference between outlet temperature calculations
-  REAL(r64), PARAMETER :: ZeroSystemResp = 0.1   ! Response below which the system response is really zero
+  REAL(r64), PARAMETER :: TempCheckLimit = 0.1d0   ! Maximum allowed temperature difference between outlet temperature calculations
+  REAL(r64), PARAMETER :: ZeroSystemResp = 0.1d0   ! Response below which the system response is really zero
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3932,8 +3936,14 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
           ! We have already iterated once so now we must shut off radiant system
               CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
               WaterMassFlow                           = 0.0
-              Node(WaterNodeIn)%MassFlowRate          = 0.0
-              CFloRadSys(RadSysNum)%WaterMassFlowRate = 0.0
+              CALL SetComponentFlowRate(WaterMassFlow, &
+                                  CFloRadSys(RadSysNum)%ColdWaterInNode, &
+                                  CFloRadSys(RadSysNum)%ColdWaterOutNode, &
+                                  CFloRadSys(RadSysNum)%CWLoopNum, &
+                                  CFloRadSys(RadSysNum)%CWLoopSide, &
+                                  CFloRadSys(RadSysNum)%CWBranchNum, &
+                                  CFloRadSys(RadSysNum)%CWCompNum)
+              CFloRadSys(RadSysNum)%WaterMassFlowRate = WaterMassFlow
               DO RadSurfNum3 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
                 SurfNum2 = CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum3)
                 QRadSysSource(SurfNum2) = 0.0D0
@@ -4917,7 +4927,7 @@ END SUBROUTINE ReportLowTempRadiantSystem
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

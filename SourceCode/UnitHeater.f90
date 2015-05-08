@@ -229,7 +229,7 @@ SUBROUTINE GetUnitHeaterInput
           !       DATE WRITTEN   May 2000
           !       MODIFIED       Chandan Sharma, FSEC, March 2011: Added ZoneHVAC sys avail manager
           !                      Bereket Nigusse, FSEC, April 2011: eliminated input node names
-          !                                                         & added fan object type 
+          !                                                         & added fan object type
           !
           !       RE-ENGINEERED  na
 
@@ -364,7 +364,7 @@ SUBROUTINE GetUnitHeaterInput
 
           ! Fan information:
     UnitHeat(UnitHeatNum)%FanType        = Alphas(5)
-    UnitHeat(UnitHeatNum)%FanName        = Alphas(6)         
+    UnitHeat(UnitHeatNum)%FanName        = Alphas(6)
     UnitHeat(UnitHeatNum)%FanControlType = Alphas(7)
     UnitHeat(UnitHeatNum)%MaxAirVolFlow  = Numbers(1)
 
@@ -381,17 +381,17 @@ SUBROUTINE GetUnitHeaterInput
     CALL ValidateComponent(UnitHeat(UnitHeatNum)%FanType,UnitHeat(UnitHeatNum)%FanName,ErrFlag,TRIM(CurrentModuleObject))
     IF (ErrFlag) THEN
       CALL ShowContinueError('specified in '//TRIM(cCurrentModuleObject)//' = "'//TRIM(UnitHeat(UnitHeatNum)%Name)//'".')
-      ErrorsFound=.TRUE.    
-    ELSE    
+      ErrorsFound=.TRUE.
+    ELSE
       CALL GetFanType(UnitHeat(UnitHeatNum)%FanName,UnitHeat(UnitHeatNum)%FanType_Num, &
-                    ErrFlag,cCurrentModuleObject,UnitHeat(UnitHeatNum)%Name)         
-      
+                    ErrFlag,cCurrentModuleObject,UnitHeat(UnitHeatNum)%Name)
+
       SELECT CASE (UnitHeat(UnitHeatNum)%FanType_Num)
         CASE (FanType_SimpleConstVolume,FanType_SimpleVAV)
           ! Get fan outlet node
            UnitHeat(UnitHeatNum)%FanOutletNode = GetFanOutletNode(UnitHeat(UnitHeatNum)%FanType,&
                                                                   UnitHeat(UnitHeatNum)%FanName,Errflag)
-          IF(ErrFlag)THEN        
+          IF(ErrFlag)THEN
             CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = "' // TRIM(UnitHeat(UnitHeatNum)%Name)//'".')
             ErrorsFound = .TRUE.
           ENDIF
@@ -672,6 +672,7 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
                                           UnitHeat(UnitHeatNum)%HWCompNum,  &
                                           errFlag=errFlag)
       IF (errFlag) THEN
+        CALL ShowContinueError('Reference Unit="'//trim(UnitHeat(UnitHeatNum)%Name)//'", type=ZoneHVAC:UnitHeater')
         CALL ShowFatalError('InitUnitHeater: Program terminated due to previous condition(s).')
       ENDIF
 
@@ -679,9 +680,9 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
             PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%LoopSide(UnitHeat(UnitHeatNum)%HWLoopSide) &
                          %Branch(UnitHeat(UnitHeatNum)%HWBranchNum)%Comp(UnitHeat(UnitHeatNum)%HWCompNum)%NodeNumOut
     ENDIF
-    MyPlantScanFlag(UnitHeatNum) = .FALSE. 
+    MyPlantScanFlag(UnitHeatNum) = .FALSE.
   ELSEIF (MyPlantScanFlag(UnitHeatNum) .AND. .NOT. AnyPlantInModel) THEN
-    MyPlantScanFlag(UnitHeatNum) = .FALSE. 
+    MyPlantScanFlag(UnitHeatNum) = .FALSE.
   ENDIF
   AvailStatus = NoAction
   ! need to check all units to see if they are on Zone Equipment List or issue warning
@@ -830,8 +831,8 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
   USE InputProcessor
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,     ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
-  USE DataPlant,          ONLY: PlantLoop
+!  USE BranchInputManager, ONLY: MyPlantSizingIndex
+  USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE Psychrometrics,     ONLY: CpHW
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
@@ -865,7 +866,7 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
   INTEGER             :: CoilSteamOutletNode=0
   REAL(r64)           :: Cp ! local temporary for fluid specific heat
   REAL(r64)           :: rho ! local temporary for fluid density
-  
+
 
 
   PltSizHeatNum = 0
@@ -1020,7 +1021,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
   USE DataHVACGlobals,    ONLY: ZoneComp, ForceOff, CycleOn, NoAction
   USE DataZoneEquipment,   ONLY: UnitHeater_Num
   USE PlantUtilities, ONLY: SetComponentFlowRate
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1081,7 +1082,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
     HCoilOn                               = .FALSE.
     IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
       mdot = 0.d0 ! try to turn off
-       
+
       CALL SetComponentFlowRate( mdot, &
                                  UnitHeat(UnitHeatNum)%HotControlNode, &
                                  UnitHeat(UnitHeatNum)%HotCoilOutNodeNum, &
@@ -1092,7 +1093,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
     END IF
     IF (UnitHeat(UnitHeatNum)%HCoilType == SteamCoil) THEN
       mdot = 0.d0 ! try to turn off
-       
+
       CALL SetComponentFlowRate( mdot, &
                                  UnitHeat(UnitHeatNum)%HotControlNode, &
                                  UnitHeat(UnitHeatNum)%HotCoilOutNodeNum, &
@@ -1113,7 +1114,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
       HCoilOn                               = .FALSE.
       IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
         mdot = 0.d0 ! try to turn off
-         
+
         CALL SetComponentFlowRate( mdot, &
                                    UnitHeat(UnitHeatNum)%HotControlNode, &
                                    UnitHeat(UnitHeatNum)%HotCoilOutNodeNum, &
@@ -1124,7 +1125,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
       END IF
       IF (UnitHeat(UnitHeatNum)%HCoilType == SteamCoil) THEN
         mdot = 0.d0 ! try to turn off
-         
+
         CALL SetComponentFlowRate( mdot, &
                                    UnitHeat(UnitHeatNum)%HotControlNode, &
                                    UnitHeat(UnitHeatNum)%HotCoilOutNodeNum, &
@@ -1144,7 +1145,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
       HCoilOn = .FALSE.
       IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
         mdot = 0.d0 ! try to turn off
-         
+
         IF (UnitHeat(UnitHeatNum)%HWLoopNum > 0) THEN
           CALL SetComponentFlowRate( mdot, &
                                    UnitHeat(UnitHeatNum)%HotControlNode, &
@@ -1196,8 +1197,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
                                CompErrIndex=UnitHeat(UnitHeatNum)%CompErrIndex,  &
                                LoopNum     = UnitHeat(UnitHeatNum)%HWLoopNum,         &
                                LoopSide    = UnitHeat(UnitHeatNum)%HWLoopSide,        &
-                               BranchIndex = UnitHeat(UnitHeatNum)%HWBranchNum,     &
-                               CompIndex   = UnitHeat(UnitHeatNum)%HWCompNum)
+                               BranchIndex = UnitHeat(UnitHeatNum)%HWBranchNum)
 
 
       CASE (ElectricCoil,GasCoil,SteamCoil)
@@ -1409,7 +1409,7 @@ END SUBROUTINE ReportUnitHeater
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

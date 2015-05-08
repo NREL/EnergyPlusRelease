@@ -541,6 +541,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
   USE DataZoneEquipment,          ONLY: ZoneEquipConfig
   USE Psychrometrics,             ONLY: PsyRhoAirFnPbTdbW, PsyCpAirFnWTdb
   USE DataHVACGlobals,            ONLY: TimestepSys, UseZoneTimeStepHistory
+  USE InternalHeatGains,          ONLY: SumInternalConvectionGainsByTypes, SumReturnAirConvectionGainsByTypes
 
   IMPLICIT         NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -602,6 +603,38 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
   INTEGER       :: FlagApertures
   REAL(r64)     :: TempDepCoef=0.0           ! Formerly CoefSumha, coef in zone temp equation with dimensions of h*A
   REAL(r64)     :: TempIndCoef=0.0           ! Formerly CoefSumhat, coef in zone temp equation with dimensions of h*A(T1
+  INTEGER, DIMENSION(28) :: IntGainTypesOccupied = (/IntGainTypeOf_People, &
+                                                    IntGainTypeOf_WaterHeaterMixed, &
+                                                    IntGainTypeOf_WaterHeaterStratified, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterMixed, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterStratified, &
+                                                    IntGainTypeOf_ElectricEquipment, &
+                                                    IntGainTypeOf_GasEquipment, &
+                                                    IntGainTypeOf_HotWaterEquipment, &
+                                                    IntGainTypeOf_SteamEquipment, &
+                                                    IntGainTypeOf_OtherEquipment, &
+                                                    IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled, &
+                                                    IntGainTypeOf_GeneratorFuelCell, &
+                                                    IntGainTypeOf_WaterUseEquipment, &
+                                                    IntGainTypeOf_GeneratorMicroCHP, &
+                                                    IntGainTypeOf_ElectricLoadCenterTransformer, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterSimple, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterLookUpTable, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageBattery, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageSimple, &
+                                                    IntGainTypeOf_PipeIndoor, &
+                                                    IntGainTypeOf_RefrigerationCase, &
+                                                    IntGainTypeOf_RefrigerationCompressorRack, &
+                                                    IntGainTypeOf_RefrigerationSystemAirCooledCondenser ,&
+                                                    IntGainTypeOf_RefrigerationSystemSuctionPipe, &
+                                                    IntGainTypeOf_RefrigerationSecondaryReceiver, &
+                                                    IntGainTypeOf_RefrigerationSecondaryPipe, &
+                                                    IntGainTypeOf_RefrigerationWalkIn/)
+                                                    
+  INTEGER, DIMENSION(2) :: IntGainTypesMixedSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
+                                                        IntGainTypeOf_Lights/)
+  REAL(r64)   :: RetAirGain
 
   ! Exact solution or Euler method
   If (ZoneAirSolutionAlgo .NE. Use3rdOrder) Then
@@ -638,26 +671,25 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
     ENDIF
   ENDDO
 
-  ConvGainsOccupiedSubzone = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-                      + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-                      + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-                      + ZoneIntGain(ZoneNum)%WaterThermalTankGain + ZoneIntGain(ZoneNum)%QFCConv &
-                      + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-                      + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv &
-                      + ZoneIntGain(ZoneNum)%PipeHTGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone &
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, ConvGainsOccupiedSubzone)
+
+  ConvGainsOccupiedSubzone = ConvGainsOccupiedSubzone &
                       + 0.5*SysDepZoneLoadsLagged(ZoneNum)
 
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsOccupiedSubzone = ConvGainsOccupiedSubzone + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC + &
-                               ZoneIntGain(ZoneNum)%T_QLTCRA
-  END IF
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum,IntGainTypesOccupied, RetAirGain )
+    ConvGainsOccupiedSubzone = ConvGainsOccupiedSubzone + RetAirGain
 
-  ConvGainsMixedSubzone = ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%TDDPipeGain + SumConvHTRadSys(ZoneNum) &
+  END IF
+ 
+  CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesMixedSubzone, ConvGainsMixedSubzone)
+  ConvGainsMixedSubzone = ConvGainsMixedSubzone  + SumConvHTRadSys(ZoneNum) &
                            + 0.5*SysDepZoneLoadsLagged(ZoneNum)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGainsMixedSubzone = ConvGainsMixedSubzone + ZoneIntGain(ZoneNum)%QLTCRA
+    CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesMixedSubzone, RetAirGain)
+    ConvGainsMixedSubzone = ConvGainsMixedSubzone + RetAirGain
   END IF
 
   ConvGains = ConvGainsOccupiedSubzone + ConvGainsMixedSubzone
@@ -1069,7 +1101,7 @@ END SUBROUTINE CalcUCSDDV
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

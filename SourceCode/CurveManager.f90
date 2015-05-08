@@ -28,6 +28,7 @@ MODULE CurveManager
   !                      22Aug2010 Craig Wray, added new curves for fan component model:
   !                          FanPressureRise, ExponentialSkewNormal, Sigmoid, RectangularHyperbola1,
   !                          RectangularHyperbola2, ExponentialDecay
+  !                      March 2012, Atefe Makhmalbaf and Heejin Cho, added a new curve type (QuadLinear)
   !       RE-ENGINEERED  na
 
   ! PURPOSE OF THIS MODULE:
@@ -50,6 +51,7 @@ USE DataPrecisionGlobals
 USE DataGlobals,    ONLY: MaxNameLength, AnyEnergyManagementSystemInModel
 USE DataInterfaces, ONLY: ShowSevereError, ShowWarningError, ShowFatalError, &
                           ShowContinueError, SetupEMSActuator, ShowRecurringWarningErrorAtEnd
+USE DataBranchAirLoopPlant
 
   ! Use statements for access to subroutines in other modules
 
@@ -73,13 +75,14 @@ INTEGER, PARAMETER :: Exponent        = 9
 INTEGER, PARAMETER :: Quartic         = 10
 INTEGER, PARAMETER :: FuncPressDrop   = 11
 INTEGER, PARAMETER :: MultiVariableLookup = 12
-INTEGER, PARAMETER :: FanPressureRise       = 13 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: ExponentialSkewNormal = 14 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: Sigmoid               = 15 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: RectangularHyperbola1 = 16 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: RectangularHyperbola2 = 17 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: ExponentialDecay      = 18 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: DoubleExponentialDecay= 19 !July2011 (new)
+INTEGER, PARAMETER :: FanPressureRise       = 13
+INTEGER, PARAMETER :: ExponentialSkewNormal = 14
+INTEGER, PARAMETER :: Sigmoid               = 15
+INTEGER, PARAMETER :: RectangularHyperbola1 = 16
+INTEGER, PARAMETER :: RectangularHyperbola2 = 17
+INTEGER, PARAMETER :: ExponentialDecay      = 18
+INTEGER, PARAMETER :: DoubleExponentialDecay= 19
+INTEGER, PARAMETER :: QuadLinear            = 20
 
 ! Interpolation Types
 INTEGER, PARAMETER :: LINEARINTERPOLATIONOFTABLE = 1
@@ -93,10 +96,10 @@ INTEGER, PARAMETER :: SINGLELINEINDEPENDENTVARIABLEWITHMATRIX = 1
 INTEGER, PARAMETER :: ASCENDING = 1
 INTEGER, PARAMETER :: DESCENDING = 2
 
-! parameters describing curve/table types
-INTEGER, PARAMETER :: NumAllCurveTypes          = 20
+! parameters describing curve object/table types
+INTEGER, PARAMETER :: NumAllCurveTypes          = 21
 
-! curve/table types (used for warning messages)
+! curve object/table types (used for warning messages)
 INTEGER, PARAMETER :: CurveType_Linear          = 1
 INTEGER, PARAMETER :: CurveType_Quadratic       = 2
 INTEGER, PARAMETER :: CurveType_Cubic           = 3
@@ -117,6 +120,7 @@ INTEGER, PARAMETER :: CurveType_RectangularHyperbola1  = 17
 INTEGER, PARAMETER :: CurveType_RectangularHyperbola2  = 18
 INTEGER, PARAMETER :: CurveType_ExponentialDecay       = 19
 INTEGER, PARAMETER :: CurveType_DoubleExponentialDecay = 20
+INTEGER, PARAMETER :: CurveType_QuadLinear             = 21
 
 CHARACTER(len=*), PARAMETER, PUBLIC, DIMENSION(NumAllCurveTypes) :: cCurveTypes=  &
        (/'Curve:Linear                  ',  &
@@ -138,7 +142,8 @@ CHARACTER(len=*), PARAMETER, PUBLIC, DIMENSION(NumAllCurveTypes) :: cCurveTypes=
          'Curve:RectangularHyperbola1   ',  &
          'Curve:RectangularHyperbola2   ',  &
          'Curve:ExponentialDecay        ',  &
-         'Curve:DoubleExponentialDecay  '/)
+         'Curve:DoubleExponentialDecay  ',  &
+         'Curve:QuadLinear              '/)
 
   ! DERIVED TYPE DEFINITIONS
 Type TriQuadraticCurveDataStruct
@@ -250,7 +255,7 @@ TYPE TableLookupData
 END TYPE TableLookupData
 
   ! MODULE VARIABLE DECLARATIONS:
-TYPE (PerfomanceCurveData), ALLOCATABLE, DIMENSION(:) :: PerfCurve
+TYPE(PerfomanceCurveData), ALLOCATABLE, DIMENSION(:) :: PerfCurve
 TYPE(PerfCurveTableDataStruct),DIMENSION(:), ALLOCATABLE :: PerfCurveTableData
 TYPE(TableDataStruct),DIMENSION(:), ALLOCATABLE :: TableData
 TYPE(TableDataStruct),DIMENSION(:), ALLOCATABLE :: TempTableData
@@ -258,7 +263,7 @@ TYPE(TableDataStruct),DIMENSION(:), ALLOCATABLE :: Temp2TableData
 TYPE(TableLookupData),DIMENSION(:), ALLOCATABLE :: TableLookup
 
 INTEGER                                               :: NumCurves
-LOGICAL,SAVE  :: GetInputFlag = .true.  ! First time, input is "gotten"
+LOGICAL  :: GetCurvesInputFlag = .true.  ! First time, input is "gotten"
 
   ! SUBROUTINE SPECIFICATIONS FOR MODULE
 PUBLIC ResetPerformanceCurveOutput
@@ -277,6 +282,8 @@ PUBLIC GetCurveMinMaxValues
 PUBLIC SetCurveOutputMinMaxValues
 PUBLIC GetCurveName
 PUBLIC InitCurveReporting
+PUBLIC GetPressureCurveTypeAndIndex
+PUBLIC PressureCurveValue
 
 CONTAINS
 
@@ -384,7 +391,7 @@ IF(.NOT. BeginEnvrnFlag)THEN
   MyBeginTimeStepFlag = .TRUE.
 END IF
 
-IF (CurveIndex == 0) THEN
+IF ((CurveIndex <= 0) .OR. (CurveIndex > NumCurves)) THEN
   CALL ShowFatalError('CurveValue: Invalid curve passed.')
 ENDIF
 
@@ -440,7 +447,7 @@ SUBROUTINE GetCurveInput
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, GetObjectDefMaxArgs, FindItemInList,MakeUPPERcase
   USE DataIPShortCuts  ! Data for field names, blank numerics
   USE General, ONLY: RoundSigDigits
-  USE DataGlobals, ONLY: DisplayExtraWarnings, OutputFileInits
+!  USE DataGlobals, ONLY: DisplayExtraWarnings, OutputFileInits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -462,6 +469,7 @@ INTEGER :: NumCubic      ! Number of cubic curve objects in the input data file
 INTEGER :: NumQuartic    ! Number of quartic (4th order polynomial) objects in the input data file
 INTEGER :: NumQuad       ! Number of quadratic curve objects in the input data file
 INTEGER :: NumQuadLinear ! Number of quadratic linear curve objects in the input data file
+INTEGER :: NumQLinear    ! Number of quad linear curve objects in the input data file
 INTEGER :: NumLinear     ! Number of linear curve objects in the input data file
 INTEGER :: NumBicubic    ! Number of bicubic curve objects in the input data file
 INTEGER :: NumTriQuad    ! Number of triquadratic curve objects in the input file
@@ -522,6 +530,7 @@ NumBiQuad     = GetNumObjectsFound('Curve:Biquadratic')
 NumCubic      = GetNumObjectsFound('Curve:Cubic')
 NumQuartic    = GetNumObjectsFound('Curve:Quartic')
 NumQuad       = GetNumObjectsFound('Curve:Quadratic')
+NumQLinear    = GetNumObjectsFound('Curve:QuadLinear')
 NumQuadLinear = GetNumObjectsFound('Curve:QuadraticLinear')
 NumLinear     = GetNumObjectsFound('Curve:Linear')
 NumBicubic    = GetNumObjectsFound('Curve:Bicubic')
@@ -541,7 +550,7 @@ NumTwoVarTab  = GetNumObjectsFound('Table:TwoIndependentVariables')
 NumCurves     = NumBiQuad + NumCubic + NumQuad + NumQuadLinear + NumLinear + NumBicubic &
               + NumTriQuad + NumExponent + NumQuartic + NumOneVarTab + NumTwoVarTab + NumMultVarLookup &
               + NumFanPressRise + NumExpSkewNorm + NumSigmoid + NumRectHyper1 & !cpw22Aug2010
-              + NumRectHyper2 + NumExpDecay + NumDoubleExpDecay !cpw22Aug2010
+              + NumRectHyper2 + NumExpDecay + NumDoubleExpDecay + NumQLinear
 
 ! intermediate count for one and two variable performance tables
 NumTables     = NumOneVarTab + NumTwoVarTab
@@ -1094,6 +1103,105 @@ DO CurveIndex=1,NumTriQuad
 
 END DO
 
+! Loop over quad linear curves and load data
+CurrentModuleObject='Curve:QuadLinear'
+DO CurveIndex=1,NumQLinear
+  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+  CurveNum = CurveNum+1
+  IsNotOK=.FALSE.
+  IsBlank=.FALSE.
+  CALL VerifyName(Alphas(1),PerfCurve%Name,CurveNum-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+  IF (IsNotOK) THEN
+    ErrorsFound=.true.
+    IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  PerfCurve(CurveNum)%Name      = Alphas(1)
+  PerfCurve(CurveNum)%CurveType = QuadLinear
+  PerfCurve(CurveNum)%ObjectType = CurveType_QuadLinear
+  PerfCurve(CurveNum)%InterpolationType = EVALUATECURVETOLIMITS
+  PerfCurve(CurveNum)%Coeff1    = Numbers(1)
+  PerfCurve(CurveNum)%Coeff2    = Numbers(2)
+  PerfCurve(CurveNum)%Coeff3    = Numbers(3)
+  PerfCurve(CurveNum)%Coeff4    = Numbers(4)
+  PerfCurve(CurveNum)%Coeff5    = Numbers(5)
+  PerfCurve(CurveNum)%Var1Min   = Numbers(6)
+  PerfCurve(CurveNum)%Var1Max   = Numbers(7)
+  PerfCurve(CurveNum)%Var2Min   = Numbers(8)
+  PerfCurve(CurveNum)%Var2Max   = Numbers(9)
+  PerfCurve(CurveNum)%Var3Min   = Numbers(10)
+  PerfCurve(CurveNum)%Var3Max   = Numbers(11)
+  PerfCurve(CurveNum)%Var4Min   = Numbers(12)
+  PerfCurve(CurveNum)%Var4Max   = Numbers(13)
+
+  IF(NumNumbers > 13 .AND. .NOT. lNumericFieldBlanks(14))THEN
+    PerfCurve(CurveNum)%CurveMin        = Numbers(14)
+    PerfCurve(CurveNum)%CurveMinPresent = .TRUE.
+  END IF
+  IF(NumNumbers > 14 .AND. .NOT. lNumericFieldBlanks(15))THEN
+    PerfCurve(CurveNum)%CurveMax        = Numbers(15)
+    PerfCurve(CurveNum)%CurveMaxPresent = .TRUE.
+  END IF
+
+  IF (Numbers(6) > Numbers(7)) THEN  ! error
+    CALL ShowSevereError('GetCurveInput: For '//TRIM(CurrentModuleObject)//': '//TRIM(Alphas(1)))
+    CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' ['//TRIM(RoundSigDigits(Numbers(6),2))//'] > '//  &
+       TRIM(cNumericFieldNames(7))//' ['//TRIM(RoundSigDigits(Numbers(7),2))//']')
+    ErrorsFound=.true.
+  ENDIF
+  IF (Numbers(8) > Numbers(9)) THEN  ! error
+    CALL ShowSevereError('GetCurveInput: For '//TRIM(CurrentModuleObject)//': '//TRIM(Alphas(1)))
+    CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' ['//TRIM(RoundSigDigits(Numbers(8),2))//'] > '//  &
+       TRIM(cNumericFieldNames(9))//' ['//TRIM(RoundSigDigits(Numbers(9),2))//']')
+    ErrorsFound=.true.
+  ENDIF
+  IF (Numbers(10) > Numbers(11)) THEN  ! error
+    CALL ShowSevereError('GetCurveInput: For '//TRIM(CurrentModuleObject)//': '//TRIM(Alphas(1)))
+    CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' ['//TRIM(RoundSigDigits(Numbers(10),2))//'] > '//  &
+       TRIM(cNumericFieldNames(11))//' ['//TRIM(RoundSigDigits(Numbers(11),2))//']')
+    ErrorsFound=.true.
+  ENDIF
+    IF (Numbers(12) > Numbers(13)) THEN  ! error
+    CALL ShowSevereError('GetCurveInput: For '//TRIM(CurrentModuleObject)//': '//TRIM(Alphas(1)))
+    CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' ['//TRIM(RoundSigDigits(Numbers(12),2))//'] > '//  &
+       TRIM(cNumericFieldNames(13))//' ['//TRIM(RoundSigDigits(Numbers(13),2))//']')
+    ErrorsFound=.true.
+  ENDIF
+
+
+
+  IF (NumAlphas .GE. 2) THEN
+    IF (.NOT. IsCurveInputTypeValid(Alphas(2))) THEN
+      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(Alphas(1)) //   &
+                            ' the Input Unit Type for W is invalid.')
+    END IF
+  END IF
+  IF (NumAlphas .GE. 3) THEN
+    IF (.NOT. IsCurveInputTypeValid(Alphas(3))) THEN
+      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(Alphas(1)) //   &
+                            ' the Input Unit Type for X is invalid.')
+    END IF
+  END IF
+  IF (NumAlphas .GE. 4) THEN
+    IF (.NOT. IsCurveInputTypeValid(Alphas(4))) THEN
+      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(Alphas(1)) //   &
+                            ' the Input Unit Type for Y is invalid.')
+    END IF
+  END IF
+  IF (NumAlphas .GE. 5) THEN
+    IF (.NOT. IsCurveInputTypeValid(Alphas(5))) THEN
+      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(Alphas(1)) //   &
+                            ' the Input Unit Type for Z is invalid.')
+    END IF
+  END IF
+  IF (NumAlphas .GE. 6) THEN
+    IF (.NOT. IsCurveOutputTypeValid(Alphas(6))) THEN
+      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(Alphas(1)) //   &
+                            ' the Output Unit Type is invalid.')
+    END IF
+  END IF
+
+END DO
 ! Loop over Exponent curves and load data
 CurrentModuleObject='Curve:Exponent'
 DO CurveIndex=1,NumExponent
@@ -2354,6 +2462,16 @@ SUBROUTINE InitCurveReporting
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
             CALL SetupOutputVariable('Performance Curve Input 3 []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
+          CASE(QuadLinear)
+            ! CurrentModuleObject='Curve:QuadLinear'
+            CALL SetupOutputVariable('Performance Curve Input 1',PerfCurve(CurveIndex)%CurveInput1, &
+                  'HVAC','Average',PerfCurve(CurveIndex)%Name)
+            CALL SetupOutputVariable('Performance Curve Input 2',PerfCurve(CurveIndex)%CurveInput2, &
+                  'HVAC','Average',PerfCurve(CurveIndex)%Name)
+            CALL SetupOutputVariable('Performance Curve Input 3',PerfCurve(CurveIndex)%CurveInput3, &
+                  'HVAC','Average',PerfCurve(CurveIndex)%Name)
+            CALL SetupOutputVariable('Performance Curve Input 4',PerfCurve(CurveIndex)%CurveInput4, &
+                  'HVAC','Average',PerfCurve(CurveIndex)%Name)
         END SELECT
     END SELECT
   ! set the output up last so it shows up after the input in the csv file
@@ -3385,7 +3503,7 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: XLAG, YLAG
      RETURN
 END FUNCTION DLAG
 
-REAL(r64) FUNCTION PerformanceCurveObject(CurveIndex,Var1,Var2,Var3) RESULT(CurveValue)
+REAL(r64) FUNCTION PerformanceCurveObject(CurveIndex,Var1,Var2,Var3,Var4) RESULT(CurveValue)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -3408,7 +3526,7 @@ REAL(r64) FUNCTION PerformanceCurveObject(CurveIndex,Var1,Var2,Var3) RESULT(Curv
           ! na
 
           ! USE STATEMENTS:
-  USE General, ONLY: ErfFunction
+          ! na
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3417,6 +3535,7 @@ REAL(r64) FUNCTION PerformanceCurveObject(CurveIndex,Var1,Var2,Var3) RESULT(Curv
   REAL(r64), INTENT (IN)           :: Var1        ! 1st independent variable
   REAL(r64), INTENT (IN), OPTIONAL :: Var2        ! 2nd independent variable
   REAL(r64), INTENT (IN), OPTIONAL :: Var3        ! 3rd independent variable
+  REAL(r64), INTENT (IN), OPTIONAL :: Var4        ! 4th independent variable
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -3432,12 +3551,16 @@ REAL(r64) FUNCTION PerformanceCurveObject(CurveIndex,Var1,Var2,Var3) RESULT(Curv
 REAL(r64) :: V1 ! 1st independent variable after limits imposed
 REAL(r64) :: V2 ! 2nd independent variable after limits imposed
 REAL(r64) :: V3 ! 3rd independent variable after limits imposed
+REAL(r64) :: V4 ! 4th independent variable after limits imposed
 REAL(r64) :: CoeffZ1 ! cpw22Aug2010 Coefficient Z1 in exponential skew normal curve
 REAL(r64) :: CoeffZ2 ! cpw22Aug2010 Coefficient Z2 in exponential skew normal curve
 REAL(r64) :: CoeffZ3 ! cpw22Aug2010 Coefficient Z3 in exponential skew normal curve
 REAL(r64) :: CurveValueNumer ! cpw22Aug2010 Numerator in in exponential skew normal curve
 REAL(r64) :: CurveValueDenom ! cpw22Aug2010 Numerator in in exponential skew normal curve
 REAL(r64) :: CurveValueExp ! cpw22Aug2010 Exponential term in sigmoid curve
+#ifdef nointrinsicERF
+REAL(r64), EXTERNAL :: ERF
+#endif
 
 V1 = MAX(MIN(Var1,PerfCurve(CurveIndex)%Var1Max),PerfCurve(CurveIndex)%Var1Min)
 
@@ -3453,6 +3576,11 @@ ELSE
   V3 = 0.0
 END IF
 
+IF (PRESENT(Var4)) THEN
+  V4 = MAX(MIN(Var4,PerfCurve(CurveIndex)%Var4Max),PerfCurve(CurveIndex)%Var4Min)
+ELSE
+  V4 = 0.0
+END IF
 SELECT CASE (PerfCurve(CurveIndex)%CurveType)
 
   CASE(Linear)
@@ -3462,6 +3590,10 @@ SELECT CASE (PerfCurve(CurveIndex)%CurveType)
   CASE(Quadratic)
 
     CurveValue = PerfCurve(CurveIndex)%Coeff1 + V1*(PerfCurve(CurveIndex)%Coeff2 + V1*PerfCurve(CurveIndex)%Coeff3)
+  CASE(QuadLinear)
+
+    CurveValue = PerfCurve(CurveIndex)%Coeff1 + V1*PerfCurve(CurveIndex)%Coeff2 + V2*PerfCurve(CurveIndex)%Coeff3 &
+                + V3*PerfCurve(CurveIndex)%Coeff4 + V4*PerfCurve(CurveIndex)%Coeff5
 
   CASE(Cubic)
 
@@ -3542,8 +3674,10 @@ SELECT CASE (PerfCurve(CurveIndex)%CurveType)
               - PerfCurve(CurveIndex)%Coeff1) / PerfCurve(CurveIndex)%Coeff2
     CoeffZ3 = -PerfCurve(CurveIndex)%Coeff1 / PerfCurve(CurveIndex)%Coeff2
 
-    CurveValueNumer = EXP(-0.5d0 * CoeffZ1**2) * (1.d0 + SIGN(1.0d0,CoeffZ2) * ErfFunction(ABS(CoeffZ2)/SQRT(2.0d0)))
-    CurveValueDenom = EXP(-0.5d0 * CoeffZ3**2) * (1.d0 + SIGN(1.0d0,CoeffZ3) * ErfFunction(ABS(CoeffZ3)/SQRT(2.0d0)))
+!    CurveValueNumer = EXP(-0.5d0 * CoeffZ1**2) * (1.d0 + SIGN(1.0d0,CoeffZ2) * ErfFunction(ABS(CoeffZ2)/SQRT(2.0d0)))
+!    CurveValueDenom = EXP(-0.5d0 * CoeffZ3**2) * (1.d0 + SIGN(1.0d0,CoeffZ3) * ErfFunction(ABS(CoeffZ3)/SQRT(2.0d0)))
+    CurveValueNumer = EXP(-0.5d0 * CoeffZ1**2) * (1.d0 + SIGN(1.0d0,CoeffZ2) * ERF(ABS(CoeffZ2)/SQRT(2.0d0)))
+    CurveValueDenom = EXP(-0.5d0 * CoeffZ3**2) * (1.d0 + SIGN(1.0d0,CoeffZ3) * ERF(ABS(CoeffZ3)/SQRT(2.0d0)))
     CurveValue =  CurveValueNumer / CurveValueDenom
 
   !cpw22Aug2010 Added Sigmoid curve
@@ -4854,7 +4988,7 @@ LOGICAL FUNCTION IsCurveOutputTypeValid(InOutputType)
   END IF
 END FUNCTION
 
-CHARACTER(len=30) FUNCTION GetCurveType (CurveIndex)
+CHARACTER(len=32) FUNCTION GetCurveType (CurveIndex)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Kenneth Tang
@@ -4897,6 +5031,8 @@ CHARACTER(len=30) FUNCTION GetCurveType (CurveIndex)
       GetCurveType = 'LINEAR'
     CASE(Bilinear)
       GetCurveType = 'BILINEAR'
+    CASE(QuadLinear)
+      GetCurveType = 'QUADLINEAR'
     CASE(Quadratic)
       GetCurveType = 'QUADRATIC'
     CASE(Cubic)
@@ -4913,20 +5049,20 @@ CHARACTER(len=30) FUNCTION GetCurveType (CurveIndex)
       GetCurveType = 'EXPONENT'
     CASE(Quartic)
       GetCurveType = 'QUARTIC'
-    CASE(FanPressureRise)                    !cpw22Aug2010
-      GetCurveType = 'FANPRESSURERISE'       !cpw22Aug2010
-    CASE(ExponentialSkewNormal)              !cpw22Aug2010
-      GetCurveType = 'EXPONENTIALSKEWNORMAL' !cpw22Aug2010
-    CASE(Sigmoid)                            !cpw22Aug2010
-      GetCurveType = 'SIGMOID'               !cpw22Aug2010
-    CASE(RectangularHyperbola1)              !cpw22Aug2010
-      GetCurveType = 'RECTANGULARHYPERBOLA1' !cpw22Aug2010
-    CASE(RectangularHyperbola2)              !cpw22Aug2010
-      GetCurveType = 'RECTANGULARHYPERBOLA2' !cpw22Aug2010
-    CASE(ExponentialDecay)                   !cpw22Aug2010
-      GetCurveType = 'EXPONENTIALDECAY'      !cpw22Aug2010
-    CASE(DoubleExponentialDecay)                   !yktJuly2011
-      GetCurveType = 'DoubleEXPONENTIALDECAY'      !yktJuly2011
+    CASE(FanPressureRise)
+      GetCurveType = 'FANPRESSURERISE'
+    CASE(ExponentialSkewNormal)
+      GetCurveType = 'EXPONENTIALSKEWNORMAL'
+    CASE(Sigmoid)
+      GetCurveType = 'SIGMOID'
+    CASE(RectangularHyperbola1)
+      GetCurveType = 'RECTANGULARHYPERBOLA1'
+    CASE(RectangularHyperbola2)
+      GetCurveType = 'RECTANGULARHYPERBOLA2'
+    CASE(ExponentialDecay)
+      GetCurveType = 'EXPONENTIALDECAY'
+    CASE(DoubleExponentialDecay)
+      GetCurveType = 'DOUBLEEXPONENTIALDECAY'
 
     END SELECT
   ELSE
@@ -5018,9 +5154,10 @@ INTEGER FUNCTION GetCurveIndex(CurveName)
           ! na
 
 ! First time GetCurveIndex is called, get the input for all the performance curves
-IF (GetInputFlag) THEN
+IF (GetCurvesInputFlag) THEN
   CALL GetCurveInput
-  GetInputFlag = .FALSE.
+  CALL GetPressureSystemInput
+  GetCurvesInputFlag = .FALSE.
 END IF
 
 IF (NumCurves > 0) THEN
@@ -5201,9 +5338,366 @@ RETURN
 
 END SUBROUTINE SetCurveOutputMinMaxValues
 
+SUBROUTINE GetPressureSystemInput()
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   August 2009
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Currently it just reads the input for pressure curve objects
+
+          ! METHODOLOGY EMPLOYED:
+          ! General EnergyPlus Methodology
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName
+  USE DataIPShortcuts
+!  USE PlantPressureSystem, ONLY: PlantPressureCurveData, PressureCurve
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=MaxNameLength), PARAMETER :: CurveObjectName = 'Curve:Functional:PressureDrop'
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER                         ::  NumPressure
+  CHARACTER(len=MaxNameLength),DIMENSION(1) :: Alphas  ! Alpha items for object
+  REAL(r64), DIMENSION(5)         :: Numbers ! Numeric items for object
+  INTEGER                         :: NumAlphas  ! Number of Alphas for each GetObjectItem call
+  INTEGER                         :: NumNumbers ! Number of Numbers for each GetObjectItem call
+  INTEGER                         :: IOStatus   ! Used in GetObjectItem
+  LOGICAL                         :: ErrsFound=.false.  ! Set to true if errors in input, fatal at end of routine
+  LOGICAL                         :: IsNotOK              ! Flag to verify name
+  LOGICAL                         :: IsBlank              ! Flag for blank name
+  INTEGER                         :: CurveNum
+
+  NumPressure = GetNumObjectsFound(CurveObjectName)
+  ALLOCATE(PressureCurve(NumPressure))
+  DO CurveNum = 1, NumPressure
+    CALL GetObjectItem(TRIM(CurveObjectName),CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    IsNotOK=.FALSE.
+    IsBlank=.FALSE.
+    CALL VerifyName(Alphas(1),PressureCurve%Name,CurveNum-1,IsNotOK,IsBlank,TRIM(CurveObjectName)//' Name')
+    IF (IsNotOK) THEN
+      ErrsFound=.true.
+      IF (IsBlank) Alphas(1)='xxxxx'
+    ENDIF
+    PressureCurve(CurveNum)%Name      = Alphas(1)
+    PressureCurve(CurveNum)%EquivDiameter  = Numbers(1)
+    PressureCurve(CurveNum)%MinorLossCoeff = Numbers(2)
+    PressureCurve(CurveNum)%EquivLength    = Numbers(3)
+    PressureCurve(CurveNum)%EquivRoughness = Numbers(4)
+    IF (NumNumbers > 4 .AND. .NOT. lNumericFieldBlanks(5)) THEN
+      IF (Numbers(5) .NE. 0.0d0) THEN
+        PressureCurve(CurveNum)%ConstantFpresent   = .TRUE.
+        PressureCurve(CurveNum)%ConstantF          = Numbers(5)
+      END IF
+    END IF
+  END DO
+
+  IF (ErrsFound) THEN
+    CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetPressureSystemInput
+
+SUBROUTINE GetPressureCurveTypeAndIndex(PressureCurveName, PressureCurveType, PressureCurveIndex)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   August 2009
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Given a curve name, returns the curve type and index
+
+          ! METHODOLOGY EMPLOYED:
+          ! Curve types are:
+          !  PressureCurve_Error       = pressure name was given, but curve is not available
+          !  PressureCurve_None        = no pressure curve for this branch
+          !  PressureCurve_Pressure    = pressure curve based on friction/minor loss
+          !  PressureCurve_Generic     = curvemanager held curve which is function of flow rate
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY : FindItemInList
+!  USE CurveManager,   ONLY : GetCurveIndex, GetCurveType
+  USE DataBranchAirLoopPlant,  ONLY : PressureCurve_None, PressureCurve_Pressure, PressureCurve_Generic, PressureCurve_Error
+!  USE PlantPressureSystem, ONLY: PlantPressureCurveData, PressureCurve
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT (IN)  :: PressureCurveName            ! name of the curve
+  INTEGER, INTENT(INOUT)         :: PressureCurveType
+  INTEGER, INTENT(INOUT)         :: PressureCurveIndex
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER           :: TempCurveIndex
+  LOGICAL           :: FoundCurve
+  CHARACTER(len=32) :: GenericCurveType
+
+  !If input is not gotten, go ahead and get it now
+  IF (GetCurvesInputFlag) THEN
+    CALL GetCurveInput
+    CALL GetPressureSystemInput
+    GetCurvesInputFlag=.false.
+  ENDIF
+
+  !Initialize
+  FoundCurve = .FALSE.
+  PressureCurveType = PressureCurve_None
+  PressureCurveIndex = 0
+
+  !Try to retrieve a curve manager object
+  TempCurveIndex = GetCurveIndex(PressureCurveName)
+
+  !See if it is valid
+  IF (TempCurveIndex > 0) THEN
+    !We have to check the type of curve to make sure it is single independent variable type
+    GenericCurveType = GetCurveType(TempCurveIndex)
+    SELECT CASE (GenericCurveType)
+      CASE ('LINEAR', 'QUADRATIC', 'CUBIC', 'QUARTIC', 'EXPONENT')
+        PressureCurveType = PressureCurve_Generic
+        PressureCurveIndex = TempCurveIndex
+      CASE DEFAULT
+        CALL ShowSevereError('Plant Pressure Simulation: Found error for curve: '//PressureCurveName)
+        CALL ShowContinueError('Curve type detected: '//GenericCurveType)
+        CALL ShowContinueError('Generic curves should be single independent variable such that DeltaP = f(mdot)')
+        CALL ShowContinueError(' Therefore they should be of type: Linear, Quadratic, Cubic, Quartic, or Exponent')
+        CALL ShowFatalError('Errors in pressure simulation input cause program termination')
+    END SELECT
+    RETURN
+  END IF
+
+  !Then try to retrieve a pressure curve object
+  IF (ALLOCATED(PressureCurve)) THEN
+    IF (SIZE(PressureCurve) > 0) THEN
+      TempCurveIndex = FindItemInList(PressureCurveName,PressureCurve(1:SIZE(PressureCurve))%Name,SIZE(PressureCurve))
+    ELSE
+      TempCurveIndex = 0
+    END IF
+  END IF
+
+  !See if it is valid
+  IF (TempCurveIndex > 0) THEN
+    PressureCurveType = PressureCurve_Pressure
+    PressureCurveIndex = TempCurveIndex
+    RETURN
+  END IF
+
+  !If we made it here, we didn't find either type of match
+
+  !Last check, see if it is blank:
+  IF (PressureCurveName == ' ') THEN
+    PressureCurveType = PressureCurve_None
+    RETURN
+  END IF
+
+  !At this point, we had a non-blank user entry with no match
+  PressureCurveType = PressureCurve_Error
+  RETURN
+
+RETURN
+
+END SUBROUTINE GetPressureCurveTypeAndIndex
+
+
+REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Viscosity)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   August 2009
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This will evaluate the pressure drop for components which use pressure information
+
+          ! METHODOLOGY EMPLOYED:
+          ! Friction factor pressure drop equation:
+          ! DP = [f*(L/D) + K] * (rho * V^2) / 2
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  Use DataGlobals, ONLY : Pi
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)      ::  PressureCurveIndex
+  REAL(r64), INTENT(IN)    ::  MassFlow
+  REAL(r64), INTENT(IN)    ::  Density
+  REAL(r64), INTENT(IN)    ::  Viscosity
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)                ::  Diameter
+  REAL(r64)                ::  MinorLossCoeff
+  REAL(r64)                ::  Length
+  REAL(r64)                ::  Roughness
+  LOGICAL                  ::  IsConstFPresent
+  REAL(r64)                ::  ConstantF
+  REAL(r64)                ::  FrictionFactor
+  REAL(r64)                ::  CrossSectArea
+  REAL(r64)                ::  Velocity
+  REAL(r64)                ::  ReynoldsNumber
+  REAL(r64)                ::  RoughnessRatio
+
+  !Retrieve data from structure
+  Diameter        = PressureCurve(PressureCurveIndex)%EquivDiameter
+  MinorLossCoeff  = PressureCurve(PressureCurveIndex)%MinorLossCoeff
+  Length          = PressureCurve(PressureCurveIndex)%EquivLength
+  Roughness       = PressureCurve(PressureCurveIndex)%EquivRoughness
+  IsConstFPresent = PressureCurve(PressureCurveIndex)%ConstantFPresent
+  ConstantF       = PressureCurve(PressureCurveIndex)%ConstantF
+
+  !Intermediate calculations
+  CrossSectArea         =  (Pi / 4.0d0) * Diameter**2
+  Velocity              =  MassFlow / (Density * CrossSectArea)
+  ReynoldsNumber        =  Density * Diameter * Velocity / Viscosity !assuming mu here
+  RoughnessRatio        =  Roughness / Diameter
+
+  !If we don't have any flow then exit out
+  IF (MassFlow .LT. MassFlowTolerance) THEN
+    PressureCurveValue = 0.0d0
+    RETURN
+  END IF
+
+  !Calculate the friction factor
+  IF (IsConstFPresent) THEN   !use the constant value
+    FrictionFactor    =  ConstantF
+  ELSE ! must calculate f
+    FrictionFactor    =  CalculateMoodyFrictionFactor(ReynoldsNumber,RoughnessRatio)
+  END IF
+
+  !Pressure drop calculation
+  PressureCurveValue  =  (FrictionFactor * (Length / Diameter) + MinorLossCoeff) * (Density * Velocity**2) / 2.0d0
+
+END FUNCTION PressureCurveValue
+
+REAL(r64) FUNCTION CalculateMoodyFrictionFactor(ReynoldsNumber, RoughnessRatio)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   August 2009
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This will evaluate the moody friction factor based on Reynolds number and roughness ratio
+
+          ! METHODOLOGY EMPLOYED:
+          ! General empirical correlations for friction factor based on Moody Chart data
+
+          ! REFERENCES:
+          ! Haaland, SE (1983). "Simple and Explicit Formulas for the Friction Factor in Turbulent Flow".
+          !   Trans. ASIVIE, J. of Fluids Engineering 103: 89-90.
+
+          ! USE STATEMENTS:
+  USE General, ONLY: RoundSigDigits
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)    ::  ReynoldsNumber
+  REAL(r64), INTENT(IN)    ::  RoughnessRatio
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)                    ::  Term1, Term2, Term3
+  CHARACTER(len=MaxNameLength) ::  RR, Re
+  LOGICAL, SAVE                ::  FrictionFactorErrorHasOccurred = .FALSE.
+
+  !Check for no flow before calculating values
+  IF (ReynoldsNumber .EQ. 0.0d0) THEN
+    CalculateMoodyFrictionFactor = 0.0d0
+    RETURN
+  END IF
+
+  !Check for no roughness also here
+  IF (RoughnessRatio .EQ. 0.0d0) THEN
+    CalculateMoodyFrictionFactor = 0.0d0
+    RETURN
+  END IF
+
+  !Calculate the friction factor
+  Term1 = (RoughnessRatio/3.7d0)**(1.11d0)
+  Term2 = 6.9d0/ReynoldsNumber
+  Term3 = -1.8d0 * LOG10(Term1 + Term2)
+  IF (Term3 .NE. 0.0d0) THEN
+    CalculateMoodyFrictionFactor = Term3 ** (-2.0d0)
+  ELSE
+    IF (.NOT. FrictionFactorErrorHasOccurred) THEN
+      RR=RoundSigDigits(RoughnessRatio,7)
+      Re=RoundSigDigits(ReynoldsNumber,1)
+      CALL ShowSevereError('Plant Pressure System: Error in moody friction factor calculation')
+      CALL ShowContinueError('Current Conditions: Roughness Ratio='//TRIM(RR)//'; Reynolds Number='//TRIM(Re))
+      CALL ShowContinueError('These conditions resulted in an unhandled numeric issue.')
+      CALL ShowContinueError('Please contact EnergyPlus support/development team to raise an alert about this issue')
+      CALL ShowContinueError('This issue will occur only one time.  The friction factor has been reset to 0.04 for calculations')
+      FrictionFactorErrorHasOccurred = .TRUE.
+    END IF
+    CalculateMoodyFrictionFactor = 0.04d0
+  END IF
+
+  RETURN
+
+END FUNCTION CalculateMoodyFrictionFactor
+
+!=================================================================================================!
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

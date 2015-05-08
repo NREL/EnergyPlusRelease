@@ -300,7 +300,7 @@ SUBROUTINE GetZoneAirSetpoints
   USE InputProcessor
   USE ScheduleManager, ONLY: GetScheduleIndex, CheckScheduleValueMinMax, GetScheduleMinValue, GetScheduleMaxValue,  &
                              CheckScheduleValue
-  USE General, ONLY: TrimSigDigits
+  USE General, ONLY: TrimSigDigits, FindNumberInList
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -373,7 +373,6 @@ SUBROUTINE GetZoneAirSetpoints
   INTEGER :: Item
   INTEGER :: Item1
   INTEGER :: ZLItem
-  INTEGER, EXTERNAL :: FindNumberInList
 
           ! FLOW:
   cCurrentModuleObject=cZControlTypes(iZC_TStat)
@@ -1625,7 +1624,7 @@ SUBROUTINE GetZoneAirSetpoints
     ZoneVolCapMultpSens  = 1.d0
     ZoneVolCapMultpMoist = 1.d0
     ZoneVolCapMultpCO2   = 1.d0
-
+    ZoneVolCapMultpGenContam = 1.0d0
   ELSE
     CALL GetObjectItem(trim(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
@@ -1633,13 +1632,14 @@ SUBROUTINE GetZoneAirSetpoints
     ZoneVolCapMultpSens  = rNumericArgs(1)
     ZoneVolCapMultpMoist = rNumericArgs(2)
     ZoneVolCapMultpCO2   = rNumericArgs(3)
+    ZoneVolCapMultpGenContam = rNumericArgs(4)
   END IF
 
   WRITE(OutputFileInits, 700)
-  WRITE(OutputFileInits,701) ZoneVolCapMultpSens, ZoneVolCapMultpMoist, ZoneVolCapMultpCO2
+  WRITE(OutputFileInits,701) ZoneVolCapMultpSens, ZoneVolCapMultpMoist, ZoneVolCapMultpCO2, ZoneVolCapMultpGenContam
 700 FORMAT ('! <Zone Volume Capacitance Multiplier>, Sensible Heat Capacity Multiplier, Moisture Capacity Multiplier, '  &
-                   'Carbon Dioxide Capacity Multiplier ')
-701 FORMAT( 'Zone Volume Capacitance Multiplier,' , F8.3,' ,', F8.3,',', F8.3)
+                   'Carbon Dioxide Capacity Multiplier, Generic Contaminant Capacity Multiplier')
+701 FORMAT( 'Zone Volume Capacitance Multiplier,' , F8.3,' ,', F8.3,',', F8.3,',', F8.3)
 
   cCurrentModuleObject=cZControlTypes(iZC_OTTStat)
   NumOpTempControlledZones =  GetNumObjectsFound(trim(cCurrentModuleObject))
@@ -1717,6 +1717,7 @@ SUBROUTINE GetZoneAirSetpoints
        ELSE
          DO Item=1,TStatObjects(found)%NumOfZones
            TempControlledZoneNum = TStatObjects(found)%TempControlledZoneStartPtr+Item-1
+           IF (NumTempControlledZones == 0) CYCLE
            TempControlledZone(TempControlledZoneNum)%OperativeTempControl = .TRUE.
            IF (SameString(cAlphaArgs(2), 'Scheduled')) THEN
              TempControlledZone(TempControlledZoneNum)%OpTempCntrlModeScheduled=.TRUE.
@@ -3144,7 +3145,8 @@ SUBROUTINE CalcPredictedSystemLoad(ZoneNum)
                                 ', LoadToCoolingSetPoint='//TRIM(RoundSigDigits(LoadToCoolingSetPoint,3)))
          CALL ShowContinueError('Zone TempDepZnLd='//TRIM(RoundSigDigits(TempDepZnLd(ZoneNum),2)))
          CALL ShowContinueError('Zone TempIndZnLd='//TRIM(RoundSigDigits(TempIndZnLd(ZoneNum),2)))
-         CALL ShowContinueError('Zone ThermostatSetPoint='//TRIM(RoundSigDigits(TempZoneThermostatSetPoint(ZoneNum),2)))
+         CALL ShowContinueError('Zone Heating ThermostatSetPoint='//TRIM(RoundSigDigits(ZoneThermostatSetPointLo(ZoneNum),2)))
+         CALL ShowContinueError('Zone Cooling ThermostatSetPoint='//TRIM(RoundSigDigits(ZoneThermostatSetPointHi(ZoneNum),2)))
          CALL ShowContinueError('Zone HeatingSetPointOffset='//TRIM(RoundSigDigits(HeatingSetPointOffset(ZoneNum),2)))
          CALL ShowContinueError('Zone CoolingSetPointOffset='//TRIM(RoundSigDigits(CoolingSetPointOffset(ZoneNum),2)))
          CALL ShowFatalError('Program terminates due to above conditions.')
@@ -3329,9 +3331,6 @@ SUBROUTINE CalcPredictedHumidityRatio(ZoneNum)
     ! Calculate hourly humidity ratio from infiltration + humidity added from latent load
     ! to determine system added/subtracted moisture.
     LatentGain = ZoneLatentGain(ZoneNum) + SumLatentHTRadSys(ZoneNum)
-
-    ! Add zone latent gain (really a "loss") due to refrigerated cases
-    LatentGain = LatentGain + RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone
 
     SysTimeStepInSeconds = SecInHour * TimeStepSys
 
@@ -4203,9 +4202,6 @@ SUBROUTINE CorrectZoneHumRat(ZoneNum)
   ! Calculate hourly humidity ratio from infiltration + humdidity added from latent load + system added moisture
   LatentGain = ZoneLatentGain(ZoneNum) + SumLatentHTRadSys(ZoneNum)
 
-  ! Add zone latent gain (really a "loss") due to refrigerated cases
-  LatentGain = LatentGain + RefrigCaseCredit(ZoneNum)%LatCaseCreditToZone
-
   SysTimeStepInSeconds = SecInHour * TimeStepSys
 
   ! Calculate the coefficients for the 3rd order derivative for final
@@ -4444,6 +4440,7 @@ SUBROUTINE CalcZoneSums(ZoneNum, SumIntGain, SumHA, SumHATsurf, SumHATref, SumMC
   USE DataZoneEquipment, ONLY: ZoneEquipConfig
   USE ZonePlenum, ONLY: ZoneRetPlenCond, ZoneSupPlenCond, NumZoneReturnPlenums, NumZoneSupplyPlenums
   USE DataDefineEquip, ONLY: AirDistUnit, NumAirDistUnits
+  USE InternalHeatGains, ONLY: SumAllInternalConvectionGains, SumAllReturnAirConvectionGains
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4478,6 +4475,7 @@ SUBROUTINE CalcZoneSums(ZoneNum, SumIntGain, SumHA, SumHATsurf, SumHATref, SumMC
   INTEGER             :: ADUNum
   INTEGER             :: ADUInNode
   INTEGER             :: ADUOutNode
+  REAL(r64)           :: RetAirGain
 
           ! FLOW:
   SumIntGain = 0.0
@@ -4490,19 +4488,15 @@ SUBROUTINE CalcZoneSums(ZoneNum, SumIntGain, SumHA, SumHATsurf, SumHATref, SumMC
   SumSysMCpT = 0.0
 
   ! Sum all convective internal gains: SumIntGain
-  SumIntGain = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-    + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-    + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-    + ZoneIntGain(ZoneNum)%TDDPipeGain + ZoneIntGain(ZoneNum)%WaterThermalTankGain + SumConvHTRadSys(ZoneNum) &
-    + ZoneIntGain(ZoneNum)%QFCConv + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-    + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv + ZoneIntGain(ZoneNum)%PipeHTGain &
-    + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone
+
+  CALL SumAllInternalConvectionGains(ZoneNum, SumIntGain)
+  SumIntGain = SumIntGain   + SumConvHTRadSys(ZoneNum)
 
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-   SumIntGain = SumIntGain + ZoneIntGain(ZoneNum)%QLTCRA + ZoneIntGain(ZoneNum)%T_QLTCRA +   &
-                RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC
+    CALL SumAllReturnAirConvectionGains(ZoneNum, RetAirGain)
+    SumIntGain = SumIntGain + RetAirGain
   END IF
 
   ! Sum all non-system air flow, i.e. infiltration, simple ventilation, mixing, earth tube: SumMCp, SumMCpT
@@ -4747,6 +4741,7 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   USE ZonePlenum, ONLY: ZoneRetPlenCond, ZoneSupPlenCond, NumZoneReturnPlenums, NumZoneSupplyPlenums
   USE DataDefineEquip, ONLY: AirDistUnit, NumAirDistUnits
   USE General, ONLY: RoundSigDigits
+  USE InternalHeatGains, ONLY: SumAllInternalConvectionGains, SumAllReturnAirConvectionGains
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4788,6 +4783,7 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   REAL(r64)           :: SumSysMCp
   REAL(r64)           :: SumSysMCpT
   REAL(r64)           :: Threshold
+  REAL(r64)           :: SumRetAirGains
 
   SumIntGains    = 0.0D0    ! Zone sum of convective internal gains
   SumHADTsurfs   = 0.0D0    ! Zone sum of Hc*Area*(Tsurf - Tz)
@@ -4800,18 +4796,13 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   SumSysMCpT     = 0.0d0
 
   ! Sum all convective internal gains: SumIntGain
-  SumIntGains = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-    + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-    + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-    + ZoneIntGain(ZoneNum)%TDDPipeGain + ZoneIntGain(ZoneNum)%WaterThermalTankGain + SumConvHTRadSys(ZoneNum) &
-    + ZoneIntGain(ZoneNum)%QFCConv + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-    + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv + ZoneIntGain(ZoneNum)%PipeHTGain &
-    + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone
+  Call SumAllInternalConvectionGains(ZoneNum, SumIntGains)
+  SumIntGains = SumIntGains  + SumConvHTRadSys(ZoneNum)
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-   SumIntGains = SumIntGains + ZoneIntGain(ZoneNum)%QLTCRA + ZoneIntGain(ZoneNum)%T_QLTCRA +   &
-                RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC
+   Call SumAllReturnAirConvectionGains(ZoneNum, SumRetAirGains)
+   SumIntGains = SumIntGains + SumRetAirGains
   END IF
 
   ! sum non-system air flow transfers between zones
@@ -5897,7 +5888,7 @@ END SUBROUTINE AdjustCoolingSetPointforTempAndHumidityControl
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -726,7 +726,7 @@ SUBROUTINE GetGroundheatExchangerInput
   USE DataIPShortCuts
   USE NodeInputManager, ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet
-  USE General, ONLY: TrimSigDigits
+  USE General, ONLY: TrimSigDigits,RoundSigDigits
   USE DataEnvironment, ONLY: MaxNumberSimYears
   USE PlantUtilities, ONLY: RegisterPlantCompDesignFlow
 
@@ -773,8 +773,9 @@ SUBROUTINE GetGroundheatExchangerInput
     CheckEquipName=.true.
 
     DO GlheNum = 1 , NumVerticalGlhes
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),GlheNum,cAlphaArgs,NumAlphas, &
-                       rNumericArgs,NumNums,IOSTAT)
+        CALL GetObjectItem(TRIM(cCurrentModuleObject),GlheNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
     IsNotOK=.false.
     IsBlank=.false.
@@ -821,11 +822,24 @@ SUBROUTINE GetGroundheatExchangerInput
     VerticalGlhe(GlheNum)%MaxSimYears       = rNumericArgs(14)
     VerticalGlhe(GlheNum)%gReferenceRatio   = rNumericArgs(15)
 
+!   Not many checks
+    IF (VerticalGlhe(GlheNum)%PipeThick >= VerticalGlhe(GlheNum)%PipeOutDia/2.0d0) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(VerticalGlhe(GlheNum)%Name)//  &
+         '", invalid value in field.')
+      CALL ShowContinueError('...'//trim(cNumericFieldNames(13))//'=['//  &
+         trim(RoundSigDigits(VerticalGlhe(GlheNum)%PipeThick,3))//'].')
+      CALL ShowContinueError('...'//trim(cNumericFieldNames(11))//'=['//  &
+         trim(RoundSigDigits(VerticalGlhe(GlheNum)%PipeOutDia,3))//'].')
+      CALL ShowContinueError('...Radius will be <=0.')
+      ErrorsFound=.true.
+    ENDIF
+    
     IF (VerticalGlhe(GlheNum)%MaxSimYears < MaxNumberSimYears) THEN
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//', Max Simulation Years less than RunPeriod Request')
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//trim(VerticalGlhe(GlheNum)%Name)//  &
+         '", invalid value in field.')
+      CALL ShowContinueError('...'//trim(cNumericFieldNames(14))//' less than RunPeriod Request')
       CALL ShowContinueError('Requested input='//TRIM(TrimSigDigits(VerticalGlhe(GlheNum)%MaxSimYears))// &
                              ' will be set to '//TRIM(TrimSigDigits(MaxNumberSimYears)))
-      CALL ShowContinueError('occured in heat exchanger='//TRIM(cAlphaArgs(1)))
       VerticalGlhe(GlheNum)%MaxSimYears=MaxNumberSimYears
     ENDIF
 
@@ -1208,7 +1222,7 @@ SUBROUTINE InitBoreholeHXSimVars(GlheNum,Runflag)
           ! na
 
           ! USE STATEMENTS:
-  USE PlantUtilities, ONLY: InitComponentNodes, SetComponentFlowRate
+  USE PlantUtilities, ONLY: InitComponentNodes, SetComponentFlowRate, RegulateCondenserCompFlowReqOp
   USE DataPlant,      ONLY: PlantLoop, TypeOf_GrndHtExchgVertical, ScanPlantLoopsForObject
   USE FluidProperties, ONLY: GetDensityGlycol
 
@@ -1291,13 +1305,11 @@ SUBROUTINE InitBoreholeHXSimVars(GlheNum,Runflag)
       CurrentSimtime = 0.0
     END IF
 
-  IF (.NOT. RunFlag)THEN
-    ! Loop is controlled by environmental flags, shut off branch
-    MDotActual       = 0.0
-  ELSE
-    ! Loop is 'load range' or 'uncontrolled'
-    MDotActual = VerticalGlhe(GlheNum)%DesignMassFlow
-  END IF
+  MDotActual = RegulateCondenserCompFlowReqOp(VerticalGlhe(GlheNum)%LoopNum,     &
+                                              VerticalGlhe(GlheNum)%LoopSideNum, &
+                                              VerticalGlhe(GlheNum)%BranchNum,   &
+                                              VerticalGlhe(GlheNum)%CompNum,     &
+                                              VerticalGlhe(GlheNum)%DesignMassFlow)
 
   CALL SetComponentFlowRate( MDotActual, &
                                VerticalGlhe(GlheNum)%GlheInletNodeNum, &
@@ -1408,7 +1420,7 @@ END SUBROUTINE UpdateVerticalGroundHeatExchanger
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

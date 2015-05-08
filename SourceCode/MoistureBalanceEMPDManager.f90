@@ -320,7 +320,8 @@ SUBROUTINE InitMoistureBalanceEMPD
        IF (.not. Surface(Loop)%HeatTransSurf) CYCLE
        IF (Surface(Loop)%Class == SurfaceClass_Window) CYCLE
        CALL SetupOutputVariable('Inside Surface Vapor Density [kg/m3]',RhoVapEMPD(Loop),'Zone','State',Trim(Surface(Loop)%Name))
-       CALL SetupOutputVariable('Inside Surface Humidity Ratio []',WSurfEMPD(Loop),'Zone','State',Trim(Surface(Loop)%Name))
+       CALL SetupOutputVariable('Inside Surface Humidity Ratio [kgWater/kgDryAir]',WSurfEMPD(Loop),'Zone','State',  &
+          Trim(Surface(Loop)%Name))
        CALL SetupOutputVariable('Inside Surface Relative Humidity [%]',RHEMPD(Loop),'Zone','State',Trim(Surface(Loop)%Name))
     ENDDO
 
@@ -649,7 +650,7 @@ END SUBROUTINE ReportMoistureBalanceEMPD
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

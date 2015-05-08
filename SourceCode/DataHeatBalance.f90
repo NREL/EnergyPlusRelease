@@ -106,7 +106,9 @@ INTEGER, PARAMETER :: DOE2HcOutside   = 7  ! Only valid for outside use
 INTEGER, PARAMETER :: BLASTHcOutside  = 8  ! Only valid for outside use
 INTEGER, PARAMETER :: AdaptiveConvectionAlgorithm = 9 !
 
-
+          ! Parameters for WarmupDays
+INTEGER, PARAMETER :: DefaultMaxNumberOfWarmupDays=25   ! Default maximum number of warmup days allowed
+INTEGER, PARAMETER :: DefaultMinNumberOfWarmupDays=6    ! Default minimum number of warmup days allowed
 
 
           ! Parameters for Sky Radiance Distribution
@@ -162,6 +164,146 @@ INTEGER, PARAMETER :: VentilationWindAndStack    = 2
            ! Parameters for type of zone air balance model
 INTEGER, PARAMETER :: AirBalanceNone  = 0
 INTEGER, PARAMETER :: AirBalanceQuadrature = 1
+
+
+INTEGER, PARAMETER :: NumZoneIntGainDeviceTypes = 44
+CHARACTER(len=*), PARAMETER, DIMENSION(NumZoneIntGainDeviceTypes) :: ZoneIntGainDeviceTypes= &
+        (/'PEOPLE                                                              ', & !01
+          'LIGHTS                                                              ', & !02
+          'ELECTRICEQUIPMENT                                                   ', & !03
+          'GASEQUIPMENT                                                        ', & !04
+          'HOTWATEREQUIPMENT                                                   ', & !05
+          'STEAMEQUIPMENT                                                      ', & !06
+          'OTHEREQUIPMENT                                                      ', & !07
+          'ZONEBASEBOARD:OUTDOORTEMPERATURECONTROLLED                          ', & !08
+          'ZONECONTAMINANTSOURCEANDSINK:CARBONDIOXIDE                          ', & !09
+          'WATERUSE:EQUIPMENT                                                  ', & !10
+          'DAYLIGHTINGDEVICE:TUBULAR                                           ', & !11
+          'WATERHEATER:MIXED                                                   ', & !12
+          'WATERHEATER:STRATIFIED                                              ', & !13
+          'THERMALSTORAGE:CHILLEDWATER:MIXED                                   ', & !14
+          'THERMALSTORAGE:CHILLEDWATER:STRATIFIED                              ', & !15
+          'GENERATOR:FUELCELL                                                  ', & !16
+          'GENERATOR:MICROCHP                                                  ', & !17
+          'ELECTRICLOADCENTER:TRANSFORMER                                      ', & !18
+          'ELECTRICLOADCENTER:INVERTER:SIMPLE                                  ', & !19
+          'ELECTRICLOADCENTER:INVERTER:FUNCTIONOFPOWER                         ', & !20
+          'ELECTRICLOADCENTER:INVERTER:LOOKUPTABLE                             ', & !21
+          'ELECTRICLOADCENTER:STORAGE:BATTERY                                  ', & !22
+          'ELECTRICLOADCENTER:STORAGE:SIMPLE                                   ', & !23
+          'PIPE:INDOOR                                                         ', & !24
+          'REFRIGERATION:CASE                                                  ', & !25
+          'REFRIGERATION:COMPRESSORRACK                                        ', & !26
+          'REFRIGERATION:SYSTEM:CONDENSER:AIRCOOLED                            ', & !27
+          'REFRIGERATION:TRANSCRITICALSYSTEM:GASCOOLER:AIRCOOLED               ', & !28
+          'REFRIGERATION:SYSTEM:SUCTIONPIPE                                    ', & !29
+          'REFRIGERATION:TRANSCRITICALSYSTEM:SUCTIONPIPEMT                     ', & !30
+          'REFRIGERATION:TRANSCRITICALSYSTEM:SUCTIONPIPELT                     ', & !31
+          'REFRIGERATION:SECONDARYSYSTEM:RECEIVER                              ', & !32
+          'REFRIGERATION:SECONDARYSYSTEM:PIPE                                  ', & !33
+          'REFRIGERATION:WALKIN                                                ', & !34
+          'PUMP:VARIABLESPEED                                                  ', & !35
+          'PUMP:CONSTANTSPEED                                                  ', & !36
+          'PUMP:VARIABLESPEED:CONDENSATE                                       ', & !37
+          'HEADEREDPUMPS:VARIABLESPEED                                         ', & !38
+          'HEADEREDPUMPS:CONSTANTSPEED                                         ', & !39
+          'ZONECONTAMINANTSOURCEANDSINK:GENERICCONTAMINANT                     ', & !40
+          'PLANTCOMPONENT:USERDEFINED                                          ', & !41
+          'COIL:USERDEFINED                                                    ', & !42
+          'ZONEHVAC:FORCEDAIR:USERDEFINED                                      ', & !43
+          'AIRTERMINAL:SINGLEDUCT:USERDEFINED                                  '/)  !44
+
+CHARACTER(len=*), PARAMETER, DIMENSION(NumZoneIntGainDeviceTypes) :: ccZoneIntGainDeviceTypes= &
+        (/'People                                                              ', & !01
+          'Lights                                                              ', & !02
+          'ElectricEquipment                                                   ', & !03
+          'GasEquipment                                                        ', & !04
+          'HotWaterEquipment                                                   ', & !05
+          'SteamEquipment                                                      ', & !06
+          'OtherEquipment                                                      ', & !07
+          'ZoneBaseboard:OutdoorTemperatureControlled                          ', & !08
+          'ZoneContaminantSourceAndSink:CarbonDioxide                          ', & !09
+          'WaterUse:Equipment                                                  ', & !10
+          'DaylightingDevice:Tubular                                           ', & !11
+          'WaterHeater:Mixed                                                   ', & !12
+          'WaterHeater:Stratified                                              ', & !13
+          'ThermalStorage:ChilledWater:Mixed                                   ', & !14
+          'ThermalStorage:ChilledWater:Stratified                              ', & !15
+          'Generator:FuelCell                                                  ', & !16
+          'Generator:MicroCHP                                                  ', & !17
+          'ElectricLoadCenter:Transformer                                      ', & !18
+          'ElectricLoadCenter:Inverter:Simple                                  ', & !19
+          'ElectricLoadCenter:Inverter:FunctionOfPower                         ', & !20
+          'ElectricLoadCenter:Inverter:LookUpTable                             ', & !21
+          'ElectricLoadCenter:Storage:Battery                                  ', & !22
+          'ElectricLoadCenter:Storage:Simple                                   ', & !23
+          'Pipe:Indoor                                                         ', & !24
+          'Refrigeration:Case                                                  ', & !25
+          'Refrigeration:CompressorRack                                        ', & !26
+          'Refrigeration:System:Condenser:AirCooled                            ', & !27
+          'Refrigeration:TranscriticalSystem:GasCooler:AirCooled               ', & !28
+          'Refrigeration:System:SuctionPipe                                    ', & !29
+          'Refrigeration:TranscriticalSystem:SuctionPipeMT                     ', & !30
+          'Refrigeration:TranscriticalSystem:SuctionPipeLT                     ', & !31
+          'Refrigeration:SecondarySystem:Receiver                              ', & !32
+          'Refrigeration:SecondarySystem:Pipe                                  ', & !33
+          'Refrigeration:WalkIn                                                ', & !34
+          'Pump:VariableSpeed                                                  ', & !35
+          'Pump:ConstantSpeed                                                  ', & !36
+          'Pump:VariableSpeed:Condensate                                       ', & !37
+          'HeaderedPumps:VariableSpeed                                         ', & !38
+          'HeaderedPumps:ConstantSpeed                                         ', & !39
+          'ZoneContaminantSourceAndSink:GenericContaminant                     ', & !40
+          'PlantComponent:UserDefined                                          ', & !41
+          'Coil:UserDefined                                                    ', & !42
+          'ZoneHVAC:ForcedAir:UserDefined                                      ', & !43
+          'AirTerminal:SingleDuct:UserDefined                                  '/)  !44
+
+INTEGER, PARAMETER ::  IntGainTypeOf_People                                    = 1
+INTEGER, PARAMETER ::  IntGainTypeOf_Lights                                    = 2
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricEquipment                         = 3
+INTEGER, PARAMETER ::  IntGainTypeOf_GasEquipment                              = 4
+INTEGER, PARAMETER ::  IntGainTypeOf_HotWaterEquipment                         = 5
+INTEGER, PARAMETER ::  IntGainTypeOf_SteamEquipment                            = 6
+INTEGER, PARAMETER ::  IntGainTypeOf_OtherEquipment                            = 7
+INTEGER, PARAMETER ::  IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled = 8
+INTEGER, PARAMETER ::  IntGainTypeOf_ZoneContaminantSourceAndSinkCarbonDioxide = 9
+INTEGER, PARAMETER ::  IntGainTypeOf_WaterUseEquipment                         = 10
+INTEGER, PARAMETER ::  IntGainTypeOf_DaylightingDeviceTubular                  = 11
+INTEGER, PARAMETER ::  IntGainTypeOf_WaterHeaterMixed                          = 12
+INTEGER, PARAMETER ::  IntGainTypeOf_WaterHeaterStratified                     = 13
+INTEGER, PARAMETER ::  IntGainTypeOf_ThermalStorageChilledWaterMixed           = 14
+INTEGER, PARAMETER ::  IntGainTypeOf_ThermalStorageChilledWaterStratified      = 15
+INTEGER, PARAMETER ::  IntGainTypeOf_GeneratorFuelCell                         = 16
+INTEGER, PARAMETER ::  IntGainTypeOf_GeneratorMicroCHP                         = 17
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterTransformer             = 18
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterInverterSimple          = 19
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower = 20
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterInverterLookUpTable     = 21
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterStorageBattery          = 22
+INTEGER, PARAMETER ::  IntGainTypeOf_ElectricLoadCenterStorageSimple           = 23
+INTEGER, PARAMETER ::  IntGainTypeOf_PipeIndoor                                = 24
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationCase                         = 25
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationCompressorRack               = 26
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationSystemAirCooledCondenser     = 27
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationTransSysAirCooledGasCooler   = 28
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationSystemSuctionPipe            = 29
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationTransSysSuctionPipeMT        = 30
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationTransSysSuctionPipeLT        = 31
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationSecondaryReceiver            = 32
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationSecondaryPipe                = 33
+INTEGER, PARAMETER ::  IntGainTypeOf_RefrigerationWalkIn                       = 34
+INTEGER, PARAMETER ::  IntGainTypeOf_Pump_VarSpeed                             = 35
+INTEGER, PARAMETER ::  IntGainTypeOf_Pump_ConSpeed                             = 36
+INTEGER, PARAMETER ::  IntGainTypeOf_Pump_Cond                                 = 37
+INTEGER, PARAMETER ::  IntGainTypeOf_PumpBank_VarSpeed                         = 38
+INTEGER, PARAMETER ::  IntGainTypeOf_PumpBank_ConSpeed                         = 39
+INTEGER, PARAMETER ::  IntGainTypeOf_ZoneContaminantSourceAndSinkGenericContam = 40
+INTEGER, PARAMETER ::  IntGainTypeOf_PlantComponentUserDefined                 = 41
+INTEGER, PARAMETER ::  IntGainTypeOf_CoilUserDefined                           = 42
+INTEGER, PARAMETER ::  IntGainTypeOf_ZoneHVACForcedAirUserDefined              = 43
+INTEGER, PARAMETER ::  IntGainTypeOf_AirTerminalUserDefined                    = 44
+
 
           ! DERIVED TYPE DEFINITIONS:
 
@@ -262,11 +404,6 @@ TYPE MaterialProperties
   REAL(r64) :: EMPDbCoeff   =0.0
   REAL(r64) :: EMPDcCoeff   =0.0
   REAL(r64) :: EMPDdCoeff   =0.0
-  REAL(r64) :: tk1          =0.0  ! Temperature coefficient for thermal conductivity
-  REAL(r64) :: TempEnth(20,2) = -100. !  Temperature enthalpy Function Pairs,TempEnth(1,1)= first Temp
-                              !  TempEnth(1,2) = First Enthalpy, TempEnth(2,1) = secomd Temp, etc.
-  REAL(r64) :: TempCond(20,2) = -100. !  Temperature thermal conductivity Function Pairs,TempCond(1,1)= first Temp
-                              !  Tempcond(1,2) = First conductivity, TempEnth(2,1) = secomd Temp, etc.
 
           ! EcoRoof-Related properties, essentially for the plant layer,
           !    the soil layer uses the same resource as a regular material
@@ -561,7 +698,8 @@ TYPE ZoneData
     REAL(r64) :: NominalInfilVent       =0.0      ! internal infiltration/ventilaton
     REAL(r64) :: NominalMixing          =0.0      ! internal mixing/cross mixing
     LOGICAL   :: TempOutOfBoundsReported=.false.  ! if any temp out of bounds errors, first will show zone details.
-    LOGICAL   :: EnforcedReciprocity=.false.      ! if zone required forced reciprocity -- less out of bounds temperature errors allowed
+    LOGICAL   :: EnforcedReciprocity=.false.      ! if zone required forced reciprocity --
+                                                  !   less out of bounds temperature errors allowed
     INTEGER   :: ZoneMinCO2SchedIndex   =0        ! Index for the schedule the schedule which determines minimum CO2 concentration
     INTEGER   :: ZoneContamControllerSchedIndex   =0   ! Index for this schedule
 END TYPE ZoneData
@@ -607,15 +745,17 @@ TYPE PeopleData
     LOGICAL :: Fanger                            =.false.   ! True when Fanger calculation to be performed
     LOGICAL :: Pierce                            =.false.   ! True when Pierce 2-node calculation to be performed
     LOGICAL :: KSU                               =.false.   ! True when KSU 2-node calculation to be performed
-    LOGICAL :: AdaptiveASH55                     =.false.   ! True when ASHRAE Standard 55 adaptive comfort calculation to be performed
-    LOGICAL :: AdaptiveCEN15251                  =.false.   ! True when CEN Standard 15251 adaptive comfort calculation to be performed
+    LOGICAL :: AdaptiveASH55                     =.false.   ! True when ASHRAE Standard 55 adaptive comfort calculation
+                                                            !   to be performed
+    LOGICAL :: AdaptiveCEN15251                  =.false.   ! True when CEN Standard 15251 adaptive comfort calculation
+                                                            !   to be performed
     INTEGER :: MRTCalcType                             = 0  ! MRT calculation type (See MRT Calculation type parameters)
     INTEGER :: SurfacePtr                              =-1  ! Pointer to the name of surface
     CHARACTER(len=MaxNameLength) :: AngleFactorListName=' ' ! Name of angle factor list
     INTEGER :: AngleFactorListPtr                      =-1  ! Pointer to the name of angle factor list
     REAL(r64) :: UserSpecSensFrac                        =0.0 ! User specified sensible fraction
     LOGICAL :: Show55Warning                    = .false.   ! show the warning messages about ASHRAE 55-2004
-
+    REAL(r64) :: CO2RateFactor                              =0.0 ! Carbon Dioxide Generation Rate [m3/s-W]
 
     ! Report variables
     REAL(r64) :: NumOcc                                     = 0  ! Number of occupants []
@@ -627,6 +767,7 @@ TYPE PeopleData
     REAL(r64) :: SenGainRate                                =0.0 ! Sensible heat gain [W]
     REAL(r64) :: LatGainRate                                =0.0 ! Latent heat gain [W]
     REAL(r64) :: TotGainRate                                =0.0 ! Total heat gain [W]
+    REAL(r64) :: CO2GainRate                                = 0.d0 ! Carbon Dioxide Gain Rate [m3/s]
 
     REAL(r64) :: RadGainEnergy                              =0.0 ! Radiant heat gain [J]
     REAL(r64) :: ConGainEnergy                              =0.0 ! Convective heat gain [J]
@@ -636,7 +777,7 @@ TYPE PeopleData
     ! Air velocity check during run time for thermal comfort control
     INTEGER :: AirVelErrIndex                               = 0  ! Air velocity error index
 !
-    REAL(r64) :: CO2Rate                                    =0.0 ! Carbon Dioxide Generation Rate [m3/s-W]
+
 
 ! For AdaptiveComfort tabular report
     REAL(r64) :: TimeNotMetASH5580 = 0
@@ -697,7 +838,8 @@ TYPE ZoneEquipData  ! Electric, Gas, Other Equipment, CO2
     REAL(r64) :: FractionRadiant              =0.0 ! Percentage (fraction 0.0-1.0) of sensible heat gain that is radiant
     REAL(r64) :: FractionLost                 =0.0 ! Percentage (fraction 0.0-1.0) of sensible heat gain that is lost
     REAL(r64) :: FractionConvected            =0.0 ! Percentage (fraction 0.0-1.0) of sensible heat gain that is convective
-    REAL(r64) :: CO2Rate                      =0.0 ! CO2 rate [m3/s]
+    REAL(r64) :: CO2DesignRate                =0.d0 ! CO2 design Rate [m3/s]
+    REAL(r64) :: CO2RateFactor                =0.d0 ! CO2 rate factor [m3/s/W]
 
     LOGICAL :: ManageDemand               =.FALSE. ! Flag to indicate whether to use demand limiting
     REAL(r64) :: DemandLimit                  =0.0 ! Demand limit set by demand manager [W]
@@ -709,6 +851,7 @@ TYPE ZoneEquipData  ! Electric, Gas, Other Equipment, CO2
     REAL(r64) :: LatGainRate                  =0.0 ! Latent heat gain [W]
     REAL(r64) :: LostRate                     =0.0 ! Lost energy (converted to work) [W]
     REAL(r64) :: TotGainRate                  =0.0 ! Total heat gain [W]
+    REAL(r64) :: CO2GainRate                  = 0.d0 !CO2 gain rate [m3/s]
 
     REAL(r64) :: Consumption                  =0.0 ! Electric/Gas/Fuel consumption [J]
     REAL(r64) :: RadGainEnergy                =0.0 ! Radiant heat gain [J]
@@ -886,8 +1029,28 @@ TYPE MixingData
 
 END TYPE MixingData
 
+TYPE GenericComponentZoneIntGainStruct
+  CHARACTER(len=MaxNameLength) :: CompObjectType = ' '  ! device object class name
+  CHARACTER(len=MaxNameLength) :: CompObjectName = ' '  ! device user unique name
+  INTEGER                      :: CompTypeOfNum  = 0    ! type of internal gain device identifier
+  REAL(r64) , POINTER :: PtrConvectGainRate  ! fortan POINTER to value of convection heat gain rate for device, watts
+  REAL(r64)           :: ConvectGainRate  ! current timestep value of convection heat gain rate for device, watts
+  REAL(r64) , POINTER :: PtrReturnAirConvGainRate ! fortan POINTER to value of return air convection heat gain rate for device, W
+  REAL(r64)           :: ReturnAirConvGainRate ! urrent timestep value of return air convection heat gain rate for device, W
+  REAL(r64) , POINTER :: PtrRadiantGainRate  ! fortan POINTER to value of thermal radiation heat gain rate for device, watts
+  REAL(r64)           :: RadiantGainRate  !  current timestep value of thermal radiation heat gain rate for device, watts
+  REAL(r64) , POINTER :: PtrLatentGainRate ! fortan POINTER to value of moisture gain rate for device, Watts
+  REAL(r64)           :: LatentGainRate !  current timestep value of moisture gain rate for device, Watts
+  REAL(r64) , POINTER :: PtrReturnAirLatentGainRate ! fortan POINTER to value of return air moisture gain rate for device, Watts
+  REAL(r64)           :: ReturnAirLatentGainRate !  current timestep value of return air moisture gain rate for device, Watts
+  REAL(R64) , POINTER :: PtrCarbonDioxideGainRate ! fortan POINTER to value of carbon dioxide gain rate for device
+  REAL(R64)           :: CarbonDioxideGainRate !  current timestep value of carbon dioxide gain rate for device
+  REAL(R64) , POINTER :: PtrGenericContamGainRate ! fortan POINTER to value of generic contaminant gain rate for device
+  REAL(R64)           :: GenericContamGainRate !  current timestep value of generic contaminant gain rate for device
+END TYPE GenericComponentZoneIntGainStruct
+
 TYPE ZoneSimData        ! Calculated data by Zone during each time step/hour
-  REAL(r64) :: NOFOCC  =0.0        !Number of Occupants
+  REAL(r64) :: NOFOCC  =0.0        !Number of Occupants, zone total
   REAL(r64) :: QOCTOT  =0.0        !Total Energy from Occupants
   REAL(r64) :: QOCSEN  =0.0        !Sensible Energy from Occupants
   REAL(r64) :: QOCCON  =0.0        !ENERGY CONVECTED FROM OCCUPANTS (WH)
@@ -900,11 +1063,6 @@ TYPE ZoneSimData        ! Calculated data by Zone during each time step/hour
   REAL(r64) :: QLTCRA  =0.0        !ENERGY CONVECTED TO RETURN AIR FROM LIGHTS
   REAL(r64) :: QLTSW   =0.0        !VISIBLE ENERGY FROM LIGHTS
 
-  REAL(r64) :: T_QLTTOT=0.0        !TOTAL ENERGY INTO LIGHTS (WH) -- task lighting
-  REAL(r64) :: T_QLTCON=0.0        !ENERGY CONVECTED TO SPACE AIR FROM LIGHTS -- task lighting
-  REAL(r64) :: T_QLTRAD=0.0        !ENERGY RADIATED TO SPACE FROM LIGHTS -- task lighting
-  REAL(r64) :: T_QLTCRA=0.0        !ENERGY CONVECTED TO RETURN AIR FROM LIGHTS -- task lighting
-  REAL(r64) :: T_QLTSW =0.0        !VISIBLE ENERGY FROM LIGHTS -- task lighting
 
   REAL(r64) :: QEECON  =0.0        !ENERGY CONVECTED FROM ELECTRIC EQUIPMENT
   REAL(r64) :: QEERAD  =0.0        !ENERCY RADIATED FROM ELECTRIC EQUIPMENT
@@ -934,23 +1092,10 @@ TYPE ZoneSimData        ! Calculated data by Zone during each time step/hour
   REAL(r64) :: QBBCON  =0.0        !ENERGY CONVECTED FROM BASEBOARD HEATING
   REAL(r64) :: QBBRAD  =0.0        !ENERGY RADIATED FROM BASEBOARD HEATING
 
-  REAL(r64) :: FanPower=0.0      ! Ventilation Fan Power
-  REAL(r64) :: MinVentTemp   =0.0  ! Calculated when Ventilation
-  REAL(r64) :: TDDPipeGain   =0.0  ! Energy convected and radiated from tubular daylighting device pipe passing through
-  REAL(r64) :: WaterThermalTankGain = 0.0 ! Energy from water heater skin losses
-  REAL(r64) :: WaterUseSensibleGain = 0.0 ! Energy from water use sensible gains
-  REAL(r64) :: WaterUseLatentGain = 0.0 ! Energy from water use evaporation latent gains
-  REAL(r64) :: QFCConv = 0.0       !Convection energy from fuel cell equipment
-  REAL(r64) :: QFCRad  = 0.0       !Radiation energy from fuel cell equipment
-  REAL(r64) :: QGenConv = 0.0      !Convection energy from generator equipment
-  REAL(r64) :: QGenRad  = 0.0      !Radiation energy from generator equipment
-  REAL(r64) :: QInvertConv = 0.0      !Convection energy from inverter equipment
-  REAL(r64) :: QInvertRad  = 0.0      !Radiation energy from inverter equipment
-  REAL(r64) :: QElecStorConv = 0.0      !Convection energy from electric storage equipment
-  REAL(r64) :: QElecStorRad  = 0.0      !Radiation energy from electric storage equipment
-  REAL(r64) :: QTransformerConv = 0.0      !Convection energy from transformer
-  REAL(r64) :: QTransformerRad  = 0.0      !Radiation energy from transformer
-  REAL(r64) :: PipeHTGain = 0.0    ! Energy from zone pipe heat transfer objects
+  INTEGER    :: NumberOfDevices = 0
+  INTEGER    :: MaxNumberOfDevices = 0
+  TYPE(GenericComponentZoneIntGainStruct), DIMENSION(:), ALLOCATABLE :: Device !
+
 END TYPE ZoneSimData
 
 TYPE WindowBlindProperties
@@ -1147,6 +1292,7 @@ Type :: AirReportVars
   REAL(r64) :: MeanAirTemp         =0.0 ! Mean Air Temperature {C}
   REAL(r64) :: OperativeTemp       =0.0 ! Average of Mean Air Temperature {C} and Mean Radiant Temperature {C}
   REAL(r64) :: MeanAirHumRat       =0.0D0 ! Mean Air Humidity Ratio {kg/kg} (averaged over zone time step)
+  REAL(r64) :: MeanAirDewpointTemp =0.0 ! Mean Air Dewpoint Temperature {C}
   REAL(r64) :: ThermOperativeTemp  =0.0 ! Mix or MRT and MAT for Zone Control:Thermostatic:Operative Temperature {C}
   REAL(r64) :: InfilHeatGain       =0.0 ! Heat Gain {J} due to infiltration
   REAL(r64) :: InfilHeatLoss       =0.0 ! Heat Loss {J} due to infiltration
@@ -1281,56 +1427,6 @@ TYPE ZonePreDefRepType
   REAL(r64) :: SHGSHtInfilRem              = 0.0     ! infiltration removal
   REAL(r64) :: SHGSHtOtherRem              = 0.0     ! opaque surface and other removal
 END TYPE
-TYPE (ZonePreDefRepType),      ALLOCATABLE, DIMENSION(:) :: ZonePreDefRep
-TYPE (ZonePreDefRepType) :: BuildingPreDefRep=  &
-   ZonePreDefRepType(.false.,0.0,0.0,0.0,0.0,9.9d9,0.0,9.9d9,0.0,9.9d9,                   & !
-                  0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,        & ! annual
-                  0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,  & ! peak cooling
-                  0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)    ! peak heating
-
-
-! MODULE VARIABLE Type DECLARATIONS:
-TYPE (ZoneSimData),            ALLOCATABLE, DIMENSION(:) :: ZoneIntGain
-TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: Material
-TYPE (ConstructionData),       ALLOCATABLE, DIMENSION(:) :: Construct
-TYPE (SpectralDataProperties), ALLOCATABLE, DIMENSION(:) :: SpectralData
-TYPE (ZoneData),               ALLOCATABLE, DIMENSION(:) :: Zone
-TYPE (ZoneListData),           ALLOCATABLE, DIMENSION(:) :: ZoneList
-TYPE (ZoneGroupData),          ALLOCATABLE, DIMENSION(:) :: ZoneGroup
-TYPE (PeopleData),             ALLOCATABLE, DIMENSION(:) :: People
-TYPE (LightsData),             ALLOCATABLE, DIMENSION(:) :: Lights
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneElectric
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneGas
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneOtherEq
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneHWEq
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneSteamEq
-TYPE (BBHeatData),             ALLOCATABLE, DIMENSION(:) :: ZoneBBHeat
-TYPE (InfiltrationData),       ALLOCATABLE, DIMENSION(:) :: Infiltration
-TYPE (VentilationData),        ALLOCATABLE, DIMENSION(:) :: Ventilation
-TYPE (ZoneAirBalanceData),     ALLOCATABLE, DIMENSION(:) :: ZoneAirBalance
-TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: Mixing
-TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: CrossMixing
-TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: RefDoorMixing
-TYPE (WindowBlindProperties),  ALLOCATABLE, DIMENSION(:) :: Blind
-TYPE (SurfaceScreenProperties), ALLOCATABLE, DIMENSION(:) :: SurfaceScreens
-TYPE (ScreenTransData),        ALLOCATABLE, DIMENSION(:) :: ScreenTrans
-TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: MaterialSave
-TYPE (ConstructionData),       ALLOCATABLE, DIMENSION(:) :: ConstructSave
-TYPE (ZoneCatEUseData),        ALLOCATABLE, DIMENSION(:) :: ZoneIntEEuse
-TYPE (RefrigCaseCreditData),   ALLOCATABLE, DIMENSION(:) :: RefrigCaseCredit
-TYPE (HeatReclaimRefrigeratedRackData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimRefrigeratedRack
-TYPE (HeatReclaimRefrigCondenserData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimRefrigCondenser
-TYPE (HeatReclaimDXCoilData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimDXCoil
-TYPE (AirReportVars), ALLOCATABLE, DIMENSION(:) :: ZnAirRpt
-TYPE (TCGlazingsType), ALLOCATABLE, DIMENSION(:) :: TCGlazings
-TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneCO2Gen
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: PeopleObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: LightsObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: ZoneElectricObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: ZoneGasObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: HotWaterEqObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: InfiltrationObjects
-TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: VentilationObjects
 
   ! DERIVED TYPE DEFINITIONS:
 TYPE ZoneReportVars  ! Zone level.
@@ -1444,9 +1540,60 @@ TYPE ZoneReportVars  ! Zone level.
   REAL(r64) :: TotTotalHeatGainRate            =0.0
   ! Contaminant
   REAL(r64) :: CO2Rate                         =0.0
+  REAL(r64) :: GCRate                          =0.0
 END TYPE
 
   ! MODULE VARIABLE DECLARATIONS:
+TYPE (ZonePreDefRepType),      ALLOCATABLE, DIMENSION(:) :: ZonePreDefRep
+TYPE (ZonePreDefRepType) :: BuildingPreDefRep=  &
+   ZonePreDefRepType(.false.,0.0,0.0,0.0,0.0,9.9d9,0.0,9.9d9,0.0,9.9d9,                   & !
+                  0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,        & ! annual
+                  0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,  & ! peak cooling
+                  0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)    ! peak heating
+
+
+! MODULE VARIABLE Type DECLARATIONS:
+TYPE (ZoneSimData),            ALLOCATABLE, DIMENSION(:) :: ZoneIntGain
+TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: Material
+TYPE (ConstructionData),       ALLOCATABLE, DIMENSION(:) :: Construct
+TYPE (SpectralDataProperties), ALLOCATABLE, DIMENSION(:) :: SpectralData
+TYPE (ZoneData),               ALLOCATABLE, DIMENSION(:) :: Zone
+TYPE (ZoneListData),           ALLOCATABLE, DIMENSION(:) :: ZoneList
+TYPE (ZoneGroupData),          ALLOCATABLE, DIMENSION(:) :: ZoneGroup
+TYPE (PeopleData),             ALLOCATABLE, DIMENSION(:) :: People
+TYPE (LightsData),             ALLOCATABLE, DIMENSION(:) :: Lights
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneElectric
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneGas
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneOtherEq
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneHWEq
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneSteamEq
+TYPE (BBHeatData),             ALLOCATABLE, DIMENSION(:) :: ZoneBBHeat
+TYPE (InfiltrationData),       ALLOCATABLE, DIMENSION(:) :: Infiltration
+TYPE (VentilationData),        ALLOCATABLE, DIMENSION(:) :: Ventilation
+TYPE (ZoneAirBalanceData),     ALLOCATABLE, DIMENSION(:) :: ZoneAirBalance
+TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: Mixing
+TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: CrossMixing
+TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: RefDoorMixing
+TYPE (WindowBlindProperties),  ALLOCATABLE, DIMENSION(:) :: Blind
+TYPE (SurfaceScreenProperties), ALLOCATABLE, DIMENSION(:) :: SurfaceScreens
+TYPE (ScreenTransData),        ALLOCATABLE, DIMENSION(:) :: ScreenTrans
+TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: MaterialSave
+TYPE (ConstructionData),       ALLOCATABLE, DIMENSION(:) :: ConstructSave
+TYPE (ZoneCatEUseData),        ALLOCATABLE, DIMENSION(:) :: ZoneIntEEuse
+TYPE (RefrigCaseCreditData),   ALLOCATABLE, DIMENSION(:) :: RefrigCaseCredit
+TYPE (HeatReclaimRefrigeratedRackData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimRefrigeratedRack
+TYPE (HeatReclaimRefrigCondenserData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimRefrigCondenser
+TYPE (HeatReclaimDXCoilData) , ALLOCATABLE, DIMENSION(:) :: HeatReclaimDXCoil
+TYPE (AirReportVars), ALLOCATABLE, DIMENSION(:) :: ZnAirRpt
+TYPE (TCGlazingsType), ALLOCATABLE, DIMENSION(:) :: TCGlazings
+TYPE (ZoneEquipData),          ALLOCATABLE, DIMENSION(:) :: ZoneCO2Gen
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: PeopleObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: LightsObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: ZoneElectricObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: ZoneGasObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: HotWaterEqObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: InfiltrationObjects
+TYPE (GlobalInternalGainMiscObject), ALLOCATABLE, DIMENSION(:) :: VentilationObjects
 TYPE (ZoneReportVars), ALLOCATABLE, PUBLIC, DIMENSION(:) :: ZnRpt
 
 
@@ -1494,7 +1641,7 @@ INTEGER :: MaxNumberOfWarmupDays=25               ! Maximum number of warmup day
 INTEGER :: MinNumberOfWarmupDays=6                ! Minimum number of warmup days allowed
 REAL(r64) :: CondFDRelaxFactor = 1.0d0  ! Relaxation factor, for looping across all the surfaces.
 REAL(r64) :: CondFDRelaxFactorInput = 1.0d0  ! Relaxation factor, for looping across all the surfaces, user input value
-LOGICAL ::  CondFDVariableProperties = .FALSE. ! if true, then variable conductivity or enthalpy in Cond FD.
+!LOGICAL ::  CondFDVariableProperties = .FALSE. ! if true, then variable conductivity or enthalpy in Cond FD.
 
 INTEGER :: ZoneAirSolutionAlgo = Use3rdOrder      ! ThirdOrderBackwardDifference, AnalyticalSolution, and EulerMethod
 REAL(r64) :: BuildingRotationAppendixG=0.0d0        ! Building Rotation for Appendix G
@@ -1503,26 +1650,13 @@ REAL(r64) :: BuildingRotationAppendixG=0.0d0        ! Building Rotation for Appe
 
 INTEGER :: NumOfZoneLists   =0 ! Total number of zone lists
 INTEGER :: NumOfZoneGroups  =0 ! Total number of zone groups
-INTEGER :: NumPeopleStatements = 0 ! Number of People objects in input
-INTEGER :: NumLightsStatements = 0 ! Number of Lights objects in input
-INTEGER :: NumZoneElectricStatements = 0 ! Number of ZoneElectric objects in input
-INTEGER :: NumZoneGasStatements = 0 ! Number of ZoneGas objects in input
-INTEGER :: NumInfiltrationStatements = 0 ! Number of Design Flow Infiltration objects in input
-INTEGER :: NumVentilationStatements = 0 ! Number of Design Flow Ventilation objects in input
-INTEGER :: NumHotWaterEqStatements = 0 ! number of Hot Water Equipment objects in input.
-INTEGER :: TotMaterials     =0 ! Total number of unique materials (layers) in this simulation
-INTEGER :: TotConstructs    =0 ! Total number of unique constructions in this simulation
-INTEGER :: TotSpectralData  =0 ! Total window glass spectral data sets
-INTEGER :: W5GlsMat         =0 ! Window5 Glass Materials, specified by transmittance and front and back reflectance
-INTEGER :: W5GlsMatAlt      =0 ! Window5 Glass Materials, specified by index of refraction and extinction coeff
-INTEGER :: W5GasMat         =0 ! Window5 Single-Gas Materials
-INTEGER :: W5GasMatMixture  =0 ! Window5 Gas Mixtures
-INTEGER :: TotBlinds        =0 ! Total number of blind materials
-INTEGER :: TotScreens       =0 ! Total number of exterior window screen materials
-INTEGER :: TotTCGlazings = 0     ! Number of TC glazing object - WindowMaterial:Glazing:Thermochromic found in the idf file
-INTEGER :: NumSurfaceScreens=0 ! Total number of screens on exterior windows
-INTEGER :: TotShades        =0 ! Total number of shade materials
-INTEGER :: TotSimpleWindow ! number of simple window systems.
+INTEGER :: NumPeopleStatements = 0 ! Number of People objects in input - possibly global assignments
+INTEGER :: NumLightsStatements = 0 ! Number of Lights objects in input - possibly global assignments
+INTEGER :: NumZoneElectricStatements = 0 ! Number of ZoneElectric objects in input - possibly global assignments
+INTEGER :: NumZoneGasStatements = 0 ! Number of ZoneGas objects in input - possibly global assignments
+INTEGER :: NumInfiltrationStatements = 0 ! Number of Design Flow Infiltration objects in input - possibly global assignments
+INTEGER :: NumVentilationStatements = 0 ! Number of Design Flow Ventilation objects in input - possibly global assignments
+INTEGER :: NumHotWaterEqStatements = 0 ! number of Hot Water Equipment objects in input. - possibly global assignments
 INTEGER :: TotPeople        =0 ! Total People Statements in input and extrapolated from global assignments
 INTEGER :: TotLights        =0 ! Total Lights Statements in input and extrapolated from global assignments
 INTEGER :: TotElecEquip     =0 ! Total Electric Equipment Statements in input and extrapolated from global assignments
@@ -1540,8 +1674,21 @@ INTEGER :: TotWindAndStackVentilation = 0 ! number of wind and stack open area Z
 INTEGER :: TotMixing        =0 ! Total Mixing Statements in input
 INTEGER :: TotCrossMixing   =0 ! Total Cross Mixing Statements in input
 INTEGER :: TotRefDoorMixing =0 ! Total RefrigerationDoor Mixing Statements in input
-INTEGER :: TotZoneAirBalance   =0 ! Total Zone Air Balance Statements in input
 INTEGER :: TotBBHeat        =0 ! Total BBHeat Statements in input
+INTEGER :: TotMaterials     =0 ! Total number of unique materials (layers) in this simulation
+INTEGER :: TotConstructs    =0 ! Total number of unique constructions in this simulation
+INTEGER :: TotSpectralData  =0 ! Total window glass spectral data sets
+INTEGER :: W5GlsMat         =0 ! Window5 Glass Materials, specified by transmittance and front and back reflectance
+INTEGER :: W5GlsMatAlt      =0 ! Window5 Glass Materials, specified by index of refraction and extinction coeff
+INTEGER :: W5GasMat         =0 ! Window5 Single-Gas Materials
+INTEGER :: W5GasMatMixture  =0 ! Window5 Gas Mixtures
+INTEGER :: TotBlinds        =0 ! Total number of blind materials
+INTEGER :: TotScreens       =0 ! Total number of exterior window screen materials
+INTEGER :: TotTCGlazings = 0     ! Number of TC glazing object - WindowMaterial:Glazing:Thermochromic found in the idf file
+INTEGER :: NumSurfaceScreens=0 ! Total number of screens on exterior windows
+INTEGER :: TotShades        =0 ! Total number of shade materials
+INTEGER :: TotSimpleWindow ! number of simple window systems.
+INTEGER :: TotZoneAirBalance   =0 ! Total Zone Air Balance Statements in input
 INTEGER :: TotFrameDivider  =0 ! Total number of window frame/divider objects
 INTEGER :: AirFlowFlag=0
 INTEGER :: TotCO2Gen        =0 ! Total CO2 source and sink statements in input
@@ -1590,9 +1737,12 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: InitialZoneDifSolReflW   ! Initial diffu
                                                             ! reflected from interior surfaces [W]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneDifSolFrExtWinsRep ! Diffuse solar into zone from exterior windows [W]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneDifSolFrIntWinsRep ! Diffuse solar into zone from interior windows [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCond ! Zone opaque surface conduction (W)
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCondGainRep ! = Zone opaque surface conduction when >= 0
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCondLossRep ! = -Zone opaque surface conduction when < 0
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCond ! Zone inside face opaque surface conduction (W)
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCondGainRep ! = Zone inside face opaque surface conduction when >= 0
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfInsFaceCondLossRep ! = -Zone inside face opaque surface conduction when < 0
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfExtFaceCond ! Zone outside face opaque surface conduction (W)
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfExtFaceCondGainRep ! = Zone outside face opaque surface conduction when >= 0
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneOpaqSurfExtFaceCondLossRep ! = -Zone outside face opaque surface conduction when < 0
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadThermInAbs      !Thermal radiation absorbed on inside surfaces
 REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: QRadSWwinAbs      !Short wave radiation absorbed in window glass layers
 REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: InitialDifSolwinAbs !Initial diffuse solar absorbed in window glass layers
@@ -1628,6 +1778,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneDifSolFrExtWinsRepEnergy ! Energy of
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneDifSolFrIntWinsRepEnergy ! Energy of ZoneDifSolFrIntWinsRep [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZnOpqSurfInsFaceCondGnRepEnrg ! Energy of ZoneOpaqSurfInsFaceCondGainRep [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZnOpqSurfInsFaceCondLsRepEnrg ! Energy of ZoneOpaqSurfInsFaceCondLossRep [J]
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZnOpqSurfExtFaceCondGnRepEnrg ! Energy of ZoneOpaqSurfInsFaceCondGainRep [J]
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZnOpqSurfExtFaceCondLsRepEnrg ! Energy of ZoneOpaqSurfInsFaceCondLossRep [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: BmIncInsSurfAmountRepEnergy !energy of BmIncInsSurfAmountRep [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: IntBmIncInsSurfAmountRepEnergy !energy of IntBmIncInsSurfAmountRep [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSWwinAbsTotEnergy     ! Energy of QRadSWwinAbsTot [J]
@@ -1639,8 +1791,10 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: InitialDifSolInTransReport  !Report - In
                                                                !transmitted out through inside of window surface (W)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWInAbsTotalReport  !Report - Total interior/exterior shortwave
                                                        !absorbed on inside of surface (W)
-
-
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsTotalReport  !Report - Total exterior shortwave/solar 
+                                                       !absorbed on outside of surface (W)
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsEnergyReport  !Report - Total exterior shortwave/solar 
+                                                       !absorbed on outside of surface (j)
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: NominalR ! Nominal R value of each material -- used in matching interzone surfaces
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: NominalRSave
@@ -1682,7 +1836,9 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: MultCircumSolar    ! Contribution to eff
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MultHorizonZenith  ! Contribution to eff sky view factor from horizon or zenith brightening
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QS                  ! Zone short-wave flux density; used to calculate short-wave
-                                                       ! radiation absorbed on inside surfaces of zone
+                                                            !     radiation absorbed on inside surfaces of zone
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QSLights            ! Like QS, but Lights short-wave only.
+
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QSDifSol            ! Like QS, but diffuse solar short-wave only.
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ITABSF              !FRACTION OF THERMAL FLUX ABSORBED (PER UNIT AREA)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: TMULT               !TMULT  - MULTIPLIER TO COMPUTE 'ITABSF'
@@ -1722,6 +1878,8 @@ REAL(r64)         :: GasWght(10)=         & ! Gas molecular weights for gases in
 !Variables Dimensioned to Number of Zones
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MVFC      ! Design Mixing Flow Rate [m3/s] (Cross Zone Mixing)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MTC       ! Control Temperature For Mixing [C] (Cross Zone Mixing)
+
+REAL(r64), TARGET :: ZeroPointerVal = 0.d0
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE DataHeatBalance:
 PUBLIC  CheckAndSetConstructionProperties
@@ -2805,7 +2963,7 @@ END FUNCTION DisplayMaterialRoughness
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -108,6 +108,14 @@ INTEGER, PARAMETER :: SizePerFloorArea       = 204
 INTEGER, PARAMETER :: SizePerUnit            = 205
 INTEGER, PARAMETER :: SizePerSolarColArea    = 206
 
+INTEGER, PARAMETER :: HPWHControlNotSet      = 500
+INTEGER, PARAMETER :: Heater1HPWHControl     = 501
+INTEGER, PARAMETER :: Heater2HPWHControl     = 502
+INTEGER, PARAMETER :: SourceInletHPWHControl = 503
+INTEGER, PARAMETER :: SourceOutletHPWHControl= 504
+INTEGER, PARAMETER :: UseInletHPWHControl    = 505
+INTEGER, PARAMETER :: UseOutletHPWHControl   = 506
+
           ! DERIVED TYPE DEFINITIONS:
 TYPE StratifiedNodeData
   REAL(r64) :: Mass = 0.0                        ! All nodes have the same mass (kg)
@@ -472,6 +480,7 @@ TYPE HeatPumpWaterHeaterData
   LOGICAL                      :: ShowSetpointWarning = .TRUE.  ! Warn when set point is greater than max tank temp limit
   REAL(r64)               :: HPWaterHeaterSensibleCapacity =0.0 ! sensible capacity delivered when HPWH is attached to a zone (W)
   REAL(r64)               :: HPWaterHeaterLatentCapacity   =0.0 ! latent capacity delivered when HPWH is attached to a zone (kg/s)
+  INTEGER                 :: ControlSensorLocation         = HPWHControlNotSet ! if using stratified tank, indicates control point
 END TYPE HeatPumpWaterHeaterData
 
 TYPE WaterHeaterDesuperheaterData
@@ -561,6 +570,7 @@ LOGICAL :: GetWaterThermalTankInputFlag = .TRUE.             ! Calls to Water He
 REAL(r64)    :: MixerInletAirSchedule         =0.0 ! output of inlet air mixer node schedule
 REAL(r64)    :: MdotAir                       =0.0 ! mass flow rate of evaporator air, kg/s
 INTEGER :: NumWaterHeaterSizing          =0 ! Number of sizing/design objects for water heaters.
+LOGICAL, DIMENSION(:), ALLOCATABLE :: AlreadyRated ! control so we don't repeat again
 
           ! SUBROUTINE SPECIFICATIONS:
 PUBLIC  SimWaterThermalTank
@@ -573,6 +583,8 @@ PRIVATE SetupStratifiedNodes
 PRIVATE CalcWaterThermalTankMixed
 PRIVATE CalcWaterThermalTankStratified
 PRIVATE CalcHeatPumpWaterHeater
+PRIVATE PLRResidualMixedTank
+PRIVATE PLRResidualStratifiedTank
 PRIVATE CalcDesuperheaterWaterHeater
 PRIVATE PartLoadFactor
 PRIVATE PlantMassFlowRatesFunc
@@ -585,6 +597,7 @@ PRIVATE UpdateWaterThermalTank
 PRIVATE ReportWaterThermalTank
 PRIVATE CalcStandardRatings
 PRIVATE ReportCWTankInits
+PRIVATE FindStratifiedTankSensedTemp
 
 CONTAINS
 
@@ -1067,18 +1080,20 @@ SUBROUTINE CalcWaterThermalTankZoneGains
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Peter Graham Ellis
           !       DATE WRITTEN   March 2005
-          !       MODIFIED
+          !       MODIFIED       B. Griffith November 2011, new internal gains structure
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Calculates the zone internal gains due to water heater skin losses.
+          ! Calculates the zone internal gains due to water heater skin losses during sizing.
+          ! initilizes gains to zone at begin environment.
 
           ! METHODOLOGY EMPLOYED:
           ! Sums the tank losses from all of the water heaters in the zone to add as a gain to the zone.
+          ! Now used to determine tank losses during sizing.  Internal gains are summed in a centralized way now
+          !
 
           ! USE STATEMENTS:
   USE DataGlobals, ONLY: BeginEnvrnFlag, DoingSizing
-  USE DataHeatBalance, ONLY: ZoneIntGain
   USE DataHeatBalFanSys, ONLY: MAT
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
 
@@ -1155,10 +1170,8 @@ SUBROUTINE CalcWaterThermalTankZoneGains
                           WaterThermalTank(WaterThermalTankNum)%SkinLossFracToZone * &
                          (TankTemp-MAT(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone) )
       END SELECT
-    ELSE
-      QLossToZone = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain
+      WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain = QLossToZone
     END IF
-    ZoneIntGain(ZoneNum)%WaterThermalTankGain = ZoneIntGain(ZoneNum)%WaterThermalTankGain + QLossToZone
   END DO
 
   RETURN
@@ -1199,7 +1212,8 @@ SUBROUTINE GetWaterThermalTankInput
                                 NodeConnectionType_OutsideAir, NodeConnectionType_OutsideAirReference, &
                                 ObjectIsParent, ObjectIsNotParent
   USE CurveManager,       ONLY: GetCurveIndex, GetCurveType, CurveValue
-  USE DataHeatBalance,    ONLY: Zone
+  USE DataHeatBalance,    ONLY: Zone, IntGainTypeOf_WaterHeaterMixed, IntGainTypeOf_WaterHeaterStratified, &
+                                IntGainTypeOf_ThermalStorageChilledWaterMixed, IntGainTypeOf_ThermalStorageChilledWaterStratified
   USE DXCoils,            ONLY: DXCoil, GetDXCoilIndex, NumDXCoils
   USE General,            ONLY: TrimSigDigits,  RoundSigDigits
   USE ReportSizingManager, ONLY: ReportSizingOutput
@@ -1308,9 +1322,10 @@ SUBROUTINE GetWaterThermalTankInput
 
     END IF
 
-720  FORMAT( '! <Water Heater Information>,Type,Name,Volume {m3},Maximum Capacity {W},Recovery Efficiency,Energy Factor')
-721  FORMAT( '! <Water Heater Information>,Type,Name,Volume {m3},Maximum Capacity {W},Recovery Efficiency,', &
-             'Energy Factor,"DX Coil Total Cooling Rate {W, HPWH Only}"')
+720  FORMAT( '! <Water Heater Information>,Type,Name,Volume {m3},Maximum Capacity {W},Standard Rated Recovery Efficiency, ' &
+              'Standard Rated Energy Factor')
+721  FORMAT( '! <Heat Pump Water Heater Information>,Type,Name,Volume {m3},Maximum Capacity {W},' &
+             'Standard Rated Recovery Efficiency,Standard Rated Energy Factor,"DX Coil Total Cooling Rate {W, HPWH Only}"')
 722  FORMAT( '! <Water Heater Stratified Node Information>,Node Number,Height {m},Volume {m3},Maximum Capacity {W},', &
              'Off-Cycle UA {W/K},On-Cycle UA {W/K},Number Of Inlets,Number Of Outlets')
 725  FORMAT('! <Chilled Water Tank Information>,Type,Name,Volume {m3},Use Side Design Flow Rate {m3/s}, ',  &
@@ -2312,6 +2327,28 @@ SUBROUTINE GetWaterThermalTankInput
                            HPWaterHeater(HPWaterHeaterNum)%FanName, &
                            FanInletNode,FanOutletNode)
 
+        IF (.not. lAlphaFieldBlanks(29)) THEN
+          SELECT CASE (cAlphaArgs(29))
+          CASE ('HEATER1')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = Heater1HPWHControl
+          CASE ('HEATER2')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = Heater2HPWHControl
+          CASE ('SOURCEINLET')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = SourceInletHPWHControl
+          CASE ('SOURCEOUTLET')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = SourceOutletHPWHControl
+          CASE ('USEINLET')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = UseInletHPWHControl
+          CASE ('USEOUTLET')
+            HPWaterHeater(HPWaterHeaterNum)%ControlSensorLocation = UseOutletHPWHControl
+          CASE DEFAULT
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(HPWaterHeater(HPWaterHeaterNum)%Name)//'", invalid ')
+            CALL ShowContinueError(trim(cAlphaFieldNames(29))//'="'//TRIM(cAlphaArgs(29))//'".')
+            ErrorsFound=.TRUE.
+          END SELECT
+        
+        ENDIF
+
       END DO ! DO HPWaterHeaterNum = 1, NumHeatPumpWaterHeater
 
       IF (ErrorsFound) THEN
@@ -2813,7 +2850,7 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule = GetScheduleIndex(cAlphaArgs(5))
         IF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule .EQ. 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Heater 1 Set Point Temperature Schedule not found = '//TRIM(cAlphaArgs(5)))
+            ': '//trim(cAlphaFieldNames(5))//' not found = '//TRIM(cAlphaArgs(5)))
           ErrorsFound = .TRUE.
         END IF
 
@@ -2840,7 +2877,7 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule2 = GetScheduleIndex(cAlphaArgs(6))
         IF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule2 .EQ. 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Heater 2 Set Point Temperature Schedule not found = '//TRIM(cAlphaArgs(6)))
+            ':  '//trim(cAlphaFieldNames(6))//' not found = '//TRIM(cAlphaArgs(6)))
           ErrorsFound = .TRUE.
         END IF
 
@@ -3863,7 +3900,7 @@ SUBROUTINE GetWaterThermalTankInput
 
           IF(WaterThermalTank(CheckWaterHeaterNum)%Type .EQ. 'WATER HEATER:SIMPLE')THEN  ! name change issue here.
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(HPWaterHeater(HPWaterHeaterNum)%Name)//':')
-            CALL ShowContinueError('WaterHeater:HeatPump can not be used with WATER HEATER:SIMPLE.')
+            CALL ShowContinueError('WaterHeater:HeatPump cannot be used with WATER HEATER:SIMPLE.')
             ErrorsFound = .TRUE.
           ELSEIF ((WaterThermalTank(CheckWaterHeaterNum)%Type .EQ. cMixedWHModuleObj)  &
             .OR. (WaterThermalTank(CheckWaterHeaterNum)%Type .EQ. cStratifiedWHModuleObj)) THEN
@@ -4602,6 +4639,38 @@ SUBROUTINE GetWaterThermalTankInput
           END IF
         ENDIF
 
+        ! set up internal gains if tank is in a thermal zone
+        IF (WaterThermalTank(WaterThermalTankNum)%AmbientTempZone > 0) THEN
+          SELECT CASE (WaterThermalTank(WaterThermalTankNum)%TypeNum)
+          
+          CASE (MixedWaterHeater)
+            CALL SetupZoneInternalGain(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone, &
+                                   'WaterHeater:Mixed', &
+                                   WaterThermalTank(WaterThermalTankNum)%Name, &
+                                   IntGainTypeOf_WaterHeaterMixed, &
+                                   ConvectionGainRate = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain )
+          CASE (StratifiedWaterHeater)
+            CALL SetupZoneInternalGain(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone, &
+                                   'WaterHeater:Stratified', &
+                                   WaterThermalTank(WaterThermalTankNum)%Name, &
+                                   IntGainTypeOf_WaterHeaterStratified, &
+                                   ConvectionGainRate = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain )
+          CASE (MixedChilledWaterStorage)
+            CALL SetupZoneInternalGain(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone, &
+                                   'ThermalStorage:ChilledWater:Mixed', &
+                                   WaterThermalTank(WaterThermalTankNum)%Name, &
+                                   IntGainTypeOf_ThermalStorageChilledWaterMixed, &
+                                   ConvectionGainRate = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain )
+          CASE (StratifiedChilledWaterStorage)
+            CALL SetupZoneInternalGain(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone, &
+                                   'ThermalStorage:ChilledWater:Stratified', &
+                                   WaterThermalTank(WaterThermalTankNum)%Name, &
+                                   IntGainTypeOf_ThermalStorageChilledWaterStratified, &
+                                   ConvectionGainRate = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain )
+          END SELECT
+       
+        ENDIF
+
       END DO ! WaterThermalTankNum
     END IF
 
@@ -5034,6 +5103,8 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
     ALLOCATE (MyWarmupFlag( NumWaterThermalTank  ))
     ALLOCATE (SetLoopIndexFlag( NumWaterThermalTank ))
     ALLOCATE (MySizingDoneFlag( NumWaterThermalTank ))
+    ALLOCATE(AlreadyRated(NumWaterThermalTank))
+    AlreadyRated = .FALSE.
     MyEnvrnFlag = .TRUE.
     MyWarmupFlag = .FALSE.
     InitWaterThermalTanksOnce = .FALSE.
@@ -5145,15 +5216,22 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
         CALL ShowFatalError('InitWaterThermalTank: Program terminated due to previous condition(s).')
       ENDIF
     ENDIF
-
+    IF ((SourceInletNode > 0) .AND. (WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum > 0) &
+         .OR. (WaterThermalTank(WaterThermalTankNum)%HeatPumpNum > 0)) THEN
+      SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
+    ENDIF
 
     IF (PlantSizesOkayToFinalize) SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
+    IF (WaterThermalTank(WaterThermalTankNum)%StandAlone) SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
 
   ELSEIF( SetLoopIndexFlag(WaterThermalTankNum) .AND. .NOT. AnyPlantInModel) THEN
     CALL CalcStandardRatings(WaterThermalTankNum)
     SetLoopIndexFlag(WaterThermalTankNum) = .FALSE.
   ENDIF
 
+  IF (WaterThermalTank(WaterThermalTankNum)%StandAlone   .AND. (.NOT. AlreadyRated(WaterThermalTankNum))) THEN
+    CALL CalcStandardRatings(WaterThermalTankNum)
+  ENDIF
 
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag(WaterThermalTankNum) .AND. .NOT. SetLoopIndexFlag(WaterThermalTankNum)) THEN
 
@@ -5220,7 +5298,20 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
           ENDIF
         ENDIF
       ENDIF
-      IF (.NOT. MySizingDoneFlag(WaterThermalTankNum)) RETURN
+      IF (.NOT. MySizingDoneFlag(WaterThermalTankNum)) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum > 0) &
+           .OR. (WaterThermalTank(WaterThermalTankNum)%HeatPumpNum > 0)) THEN
+          IF ( (WaterThermalTank(WaterThermalTankNum)%UseInletNode            == 0)        .AND. &
+               (WaterThermalTank(WaterThermalTankNum)%Volume                  /= AutoSize) .AND. &
+               (WaterThermalTank(WaterThermalTankNum)%MaxCapacity             /= Autosize) ) THEN
+              MySizingDoneFlag(WaterThermalTankNum) = .TRUE.
+          ELSE
+            RETURN
+          ENDIF
+        ELSE
+          RETURN
+        ENDIF
+      ENDIF
     ENDIF
 
 
@@ -7399,7 +7490,7 @@ SUBROUTINE CalcDesuperheaterWaterHeater(WaterThermalTankNum,FirstHVACIteration)
               Par(4) = 0.0
             END IF
             Par(5) = MdotWater
-            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, PartLoadRatio, PLRResidual, 0.0d0, &
+            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, PartLoadRatio, PLRResidualMixedTank, 0.0d0, &
                                   WaterHeaterDesuperheater(DesuperheaterNum)%DXSysPLR, Par)
             IF (SolFla == -1) THEN
               WRITE(IterNum,*) MaxIte
@@ -7495,7 +7586,7 @@ SUBROUTINE CalcDesuperheaterWaterHeater(WaterThermalTankNum,FirstHVACIteration)
                 Par(4) = 0.0
               END IF
               Par(5) = MdotWater
-              CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, PartLoadRatio, PLRResidual, 0.0d0, &
+              CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, PartLoadRatio, PLRResidualMixedTank, 0.0d0, &
                                     WaterHeaterDesuperheater(DesuperheaterNum)%DXSysPLR, Par)
               IF (SolFla == -1) THEN
                 WRITE(IterNum,*) MaxIte
@@ -7614,7 +7705,7 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   March 2005
-          !       MODIFIED       na
+          !       MODIFIED       B. Griffith, Jan 2012 for stratified tank
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -7738,8 +7829,15 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
     IF(OutletAirSplitterNode .GT. 0) THEN
       Node(HPAirOutletNode) = Node(OutletAirSplitterNode)
     END IF
+
 !   Simulate tank if HP compressor unavailable for water heating
-    CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
+    SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+
+    CASE(MixedWaterHeater)
+      CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
+    CASE((StratifiedWaterHeater))
+      CALL CalcWaterThermalTankStratified(WaterThermalTankNum)
+    END SELECT
 
 !   If HPWH compressor is available and unit is off for another reason, off-cycle parasitics are calculated
     IF(AvailSchedule .NE. 0)THEN
@@ -7769,233 +7867,271 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
     ENDIF
     RETURN
   END IF
-
-  TankTemp                      = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
+  SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+  CASE(MixedWaterHeater)
+    TankTemp                    = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
+  CASE(StratifiedWaterHeater)
+    TankTemp                    = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                                        HPWaterHeater(HPNum)%ControlSensorLocation)
+  END SELECT
   HPWaterHeater(HPNum)%Mode     = HPWaterHeater(HPNum)%SaveMode
 
 ! set the heat pump air- and water-side mass flow rate
   MdotWater         = HPWaterHeater(HPNum)%OperatingWaterFlowRate * RhoH2O(TankTemp)
 
-! select tank type
-  SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
-
-    CASE(MixedWaterHeater)
-
 !     select mode of operation (float mode or heat mode)
-      SELECT CASE(HPWaterHeater(HPNum)%Mode)
+  SELECT CASE(HPWaterHeater(HPNum)%Mode)
 !       HPWH was heating last iteration and will continue to heat until the set point is reached
-        CASE(HeatMode)
+    CASE(HeatMode)
 
-          HPPartLoadRatio                        = 1.0
+      HPPartLoadRatio                        = 1.0
 
 !         set up full air flow on DX coil inlet node
-          Node(DXCoilAirInletNode)%MassFlowRate = MdotAir
+      Node(DXCoilAirInletNode)%MassFlowRate = MdotAir
 
 !         set the condenser inlet node mass flow rate prior to calling the HPWH DX coil
-          Node(HPWaterInletNode)%MassFlowRate = MdotWater
-          WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater
+      Node(HPWaterInletNode)%MassFlowRate = MdotWater
+      WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater
 
-          HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
-          DO loopIter = 1, 4
-            CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
-            CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
+      HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
+      DO loopIter = 1, 4
+        CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
+        CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
 
 !           move the full load outlet temperature rate to the water heater structure variables
 !           (water heaters source inlet node temperature/mdot are set in Init, set it here after CalcHPWHDXCoil has been called)
-            WaterThermalTank(WaterThermalTankNum)%SourceInletTemp    = Node(HPWaterInletNode)%Temp + CondenserDeltaT
-            WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater
+        WaterThermalTank(WaterThermalTankNum)%SourceInletTemp    = Node(HPWaterInletNode)%Temp + CondenserDeltaT
+        WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater
 
 !           this CALL does not update node temps, must use WaterThermalTank variables
-            CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
-            NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
-            Node(HPWaterInletNode)%Temp = WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp
-            IF(ABS(Node(HPWaterInletNode)%Temp - HPWHCondInletNodeLast) < SmallTempDiff)EXIT
-            HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
-          END DO
+      ! select tank type
+        SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+        CASE(MixedWaterHeater)
+          CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
+          NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
+        CASE(StratifiedWaterHeater)
+          CALL CalcWaterThermalTankStratified(WaterThermalTankNum)
+          NewTankTemp = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                               HPWaterHeater(HPNum)%ControlSensorLocation)
+        END SELECT
+        Node(HPWaterInletNode)%Temp = WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp
+        IF(ABS(Node(HPWaterInletNode)%Temp - HPWHCondInletNodeLast) < SmallTempDiff)EXIT
+        HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
+      END DO
 
 !         if tank temperature is greater than set point, calculate a PLR needed to exactly reach the set point
-          IF(NewTankTemp .GT. SetPointTemp) THEN
-            HPWaterHeater(HPNum)%Mode = FloatMode
-            Par(1) = SetPointTemp
-            Par(2) = HPWaterHeater(HPNum)%SaveWHMode
-            Par(3) = WaterThermalTankNum
-            IF(FirstHVACIteration) THEN
-              Par(4) = 1.0
+      IF(NewTankTemp .GT. SetPointTemp) THEN
+        HPWaterHeater(HPNum)%Mode = FloatMode
+        Par(1) = SetPointTemp
+        Par(2) = HPWaterHeater(HPNum)%SaveWHMode
+        Par(3) = WaterThermalTankNum
+        IF(FirstHVACIteration) THEN
+          Par(4) = 1.0
+        ELSE
+          Par(4) = 0.0
+        END IF
+        Par(5) = MdotWater
+        SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+        CASE(MixedWaterHeater)
+          CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidualMixedTank, 0.0d0,    &
+                             1.0d0, Par)
+        CASE(StratifiedWaterHeater)
+          CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidualStratifiedTank, 0.0d0,    &
+                             1.0d0, Par)
+        END SELECT
+        IF (SolFla == -1) THEN
+          WRITE(IterNum,*) MaxIte
+          IterNum=ADJUSTL(IterNum)
+          IF(.NOT. WarmupFlag)THEN
+            HPWaterHeater(HPNum)%IterLimitExceededNum1 = HPWaterHeater(HPNum)%IterLimitExceededNum1 + 1
+            IF (HPWaterHeater(HPNum)%IterLimitExceededNum1 .EQ. 1) THEN
+              CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
+              CALL ShowContinueError('Iteration limit exceeded calculating heat pump water heater compressor'// &
+                                     ' part-load ratio, maximum iterations = '//TRIM(IterNum)// &
+                                     '. Part-load ratio returned = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
+              CALL ShowContinueErrorTimeStamp('This error occurred in heating mode.')
             ELSE
-              Par(4) = 0.0
+              CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
+                                                //TRIM(HPWaterHeater(HPNum)%Name)//&
+              '":  Iteration limit exceeded in heating mode warning continues. Part-load ratio statistics follow.' &
+              , HPWaterHeater(HPNum)%IterLimitErrIndex1, HPPartLoadRatio, HPPartLoadRatio)
             END IF
-            Par(5) = MdotWater
-            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidual, 0.0d0,    &
-                                 1.0d0, Par)
-            IF (SolFla == -1) THEN
-              WRITE(IterNum,*) MaxIte
-              IterNum=ADJUSTL(IterNum)
-              IF(.NOT. WarmupFlag)THEN
-                HPWaterHeater(HPNum)%IterLimitExceededNum1 = HPWaterHeater(HPNum)%IterLimitExceededNum1 + 1
-                IF (HPWaterHeater(HPNum)%IterLimitExceededNum1 .EQ. 1) THEN
-                  CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
-                  CALL ShowContinueError('Iteration limit exceeded calculating heat pump water heater compressor'// &
-                                         ' part-load ratio, maximum iterations = '//TRIM(IterNum)// &
-                                         '. Part-load ratio returned = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
-                  CALL ShowContinueErrorTimeStamp('This error occurred in heating mode.')
-                ELSE
-                  CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
-                                                    //TRIM(HPWaterHeater(HPNum)%Name)//&
-                  '":  Iteration limit exceeded in heating mode warning continues. Part-load ratio statistics follow.' &
-                  , HPWaterHeater(HPNum)%IterLimitErrIndex1, HPPartLoadRatio, HPPartLoadRatio)
-                END IF
-              END IF
-            ELSE IF (SolFla == -2) THEN
-              HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,(SetPointTemp - TankTemp)/(NewTankTemp - TankTemp)))
-              IF(.NOT. WarmupFlag)THEN
-                HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 = HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 + 1
-                IF (HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 .EQ. 1) THEN
-                  CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
-                  CALL ShowContinueError('Heat pump water heater compressor part-load ratio calculation failed: PLR limits ' &
-                                   //'of 0 to 1 exceeded. Part-load ratio used = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
-                  CALL ShowContinueError('Please send this information to the EnergyPlus support group.')
-                  CALL ShowContinueErrorTimeStamp('This error occured in heating mode.')
-                ELSE
-                  CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
-                                                    //TRIM(HPWaterHeater(HPNum)%Name)//&
-                  '":  Part-load ratio calculation failed in heating mode warning continues. Part-load ratio statistics follow.'&
-                  , HPWaterHeater(HPNum)%RegulaFalsiFailedIndex1, HPPartLoadRatio, HPPartLoadRatio)
-                END IF
-              END IF
-            END IF
-            NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
-          ELSE
-            HPPartLoadRatio = 1.0
           END IF
+        ELSE IF (SolFla == -2) THEN
+          HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,(SetPointTemp - TankTemp)/(NewTankTemp - TankTemp)))
+          IF(.NOT. WarmupFlag)THEN
+            HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 = HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 + 1
+            IF (HPWaterHeater(HPNum)%RegulaFalsiFailedNum1 .EQ. 1) THEN
+              CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
+              CALL ShowContinueError('Heat pump water heater compressor part-load ratio calculation failed: PLR limits ' &
+                               //'of 0 to 1 exceeded. Part-load ratio used = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
+              CALL ShowContinueError('Please send this information to the EnergyPlus support group.')
+              CALL ShowContinueErrorTimeStamp('This error occured in heating mode.')
+            ELSE
+              CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
+                                                //TRIM(HPWaterHeater(HPNum)%Name)//&
+              '":  Part-load ratio calculation failed in heating mode warning continues. Part-load ratio statistics follow.'&
+              , HPWaterHeater(HPNum)%RegulaFalsiFailedIndex1, HPPartLoadRatio, HPPartLoadRatio)
+            END IF
+          END IF
+        END IF
+        SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+        CASE(MixedWaterHeater)
+          NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
+        CASE(StratifiedWaterHeater)
+          NewTankTemp = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                                        HPWaterHeater(HPNum)%ControlSensorLocation)
+        END SELECT
+      ELSE
+        HPPartLoadRatio = 1.0
+      END IF
 
 !       HPWH was floating last iteration and will continue to float until the cut-in temperature is reached
-        CASE(FloatMode)
+    CASE(FloatMode)
 
 !         set the condenser inlet node temperature and full mass flow rate prior to calling the HPWH DX coil
-          Node(HPWaterInletNode)%Temp          = TankTemp
-          Node(HPWaterOutletNode)%Temp         = TankTemp
-          Node(HPWaterInletNode)%MassFlowRate  = 0.0
-          Node(HPWaterOutletNode)%MassFlowRate = 0.0
+      SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+      CASE(MixedWaterHeater)
+        Node(HPWaterInletNode)%Temp          = TankTemp
+        Node(HPWaterOutletNode)%Temp         = TankTemp
+      CASE(StratifiedWaterHeater)
+        Node(HPWaterInletNode)%Temp          = WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp
+        Node(HPWaterOutletNode)%Temp         = WaterThermalTank(WaterThermalTankNum)%SourceInletTemp
+      END SELECT
+      Node(HPWaterInletNode)%MassFlowRate  = 0.0
+      Node(HPWaterOutletNode)%MassFlowRate = 0.0
 
 !         check tank temperature by setting source inlet mass flow rate to zero
-          HPPartLoadRatio = 0.0
+      HPPartLoadRatio = 0.0
 
 !         set the full load outlet temperature on the water heater source inlet node (init has already been called)
-          WaterThermalTank(WaterThermalTankNum)%SourceInletTemp = Node(HPWaterOutletNode)%Temp
+      WaterThermalTank(WaterThermalTankNum)%SourceInletTemp = Node(HPWaterOutletNode)%Temp
 
 !         check tank temperature by setting source inlet mass flow rate to zero
-          WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = 0.0
+      WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = 0.0
 
 !         disable the tank's internal heating element to find PLR of the HPWH using floating temperatures
-          WaterThermalTank(WaterThermalTankNum)%MaxCapacity = 0.0
-          WaterThermalTank(WaterThermalTankNum)%MinCapacity = 0.0
+      WaterThermalTank(WaterThermalTankNum)%MaxCapacity = 0.0
+      WaterThermalTank(WaterThermalTankNum)%MinCapacity = 0.0
+      SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+      CASE(MixedWaterHeater)
+        CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
+        NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
+      CASE(StratifiedWaterHeater)
+        CALL CalcWaterThermalTankStratified(WaterThermalTankNum)
+        NewTankTemp = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                                        HPWaterHeater(HPNum)%ControlSensorLocation)
+      END SELECT
 
-          CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
-
-          NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
 
 !         reset the tank's internal heating element capacity
-          WaterThermalTank(WaterThermalTankNum)%MaxCapacity = HPWaterHeater(HPNum)%BackupElementCapacity
-          WaterThermalTank(WaterThermalTankNum)%MinCapacity = HPWaterHeater(HPNum)%BackupElementCapacity
+      WaterThermalTank(WaterThermalTankNum)%MaxCapacity = HPWaterHeater(HPNum)%BackupElementCapacity
+      WaterThermalTank(WaterThermalTankNum)%MinCapacity = HPWaterHeater(HPNum)%BackupElementCapacity
 
-          IF(NewTankTemp .LE. (SetPointTemp - DeadbandTempDiff)) THEN
+      IF(NewTankTemp .LE. (SetPointTemp - DeadbandTempDiff)) THEN
 
 !           HPWH is now in heating mode
-            HPWaterHeater(HPNum)%Mode = HeatMode
+        HPWaterHeater(HPNum)%Mode = HeatMode
 !           reset the water heater's mode (call above may have changed modes)
-            WaterThermalTank(WaterThermalTankNum)%Mode = HPWaterHeater(HPNum)%SaveWHMode
+        WaterThermalTank(WaterThermalTankNum)%Mode = HPWaterHeater(HPNum)%SaveWHMode
 
 !           estimate portion of time step that the HP operates based on a linear interpolation of the tank temperature decay
 !           this assumes that all heating sources are off
-            IF(Tanktemp .NE. NewTankTemp) THEN
-              HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,((SetPointTemp - DeadbandTempDiff) - NewTankTemp) / (Tanktemp - NewTankTemp)))
-            ELSE
-              HPPartLoadRatio = 1.0
-            END IF
+        IF(Tanktemp .NE. NewTankTemp) THEN
+          HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,((SetPointTemp - DeadbandTempDiff) - NewTankTemp) / (Tanktemp - NewTankTemp)))
+        ELSE
+          HPPartLoadRatio = 1.0
+        END IF
 
 !           set the condenser inlet node mass flow rate prior to calling the CalcHPWHDXCoil
-            Node(HPWaterInletNode)%MassFlowRate    = MdotWater * HPPartLoadRatio
-            WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater * HPPartLoadRatio
+        Node(HPWaterInletNode)%MassFlowRate    = MdotWater * HPPartLoadRatio
+        WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = MdotWater * HPPartLoadRatio
 
-            Node(DXCoilAirInletNode)%MassFlowRate = MdotAir * HPPartLoadRatio
+        Node(DXCoilAirInletNode)%MassFlowRate = MdotAir * HPPartLoadRatio
 
-            HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
-            DO loopIter = 1, 4
-              CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
-              CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
-              WaterThermalTank(WaterThermalTankNum)%SourceInletTemp    = Node(HPWaterInletNode)%Temp + CondenserDeltaT
+        HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
+        DO loopIter = 1, 4
+          CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
+          CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
+          WaterThermalTank(WaterThermalTankNum)%SourceInletTemp    = Node(HPWaterInletNode)%Temp + CondenserDeltaT
 
 !             this CALL does not update node temps, must use WaterThermalTank variables
-              CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
-              NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
-              Node(HPWaterInletNode)%Temp = WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp
-              IF(ABS(Node(HPWaterInletNode)%Temp - HPWHCondInletNodeLast) < SmallTempDiff)EXIT
-              HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
-            END DO
+        ! select tank type
+          SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+          CASE(MixedWaterHeater)
+            CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
+            NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
+          CASE(StratifiedWaterHeater)
+            CALL CalcWaterThermalTankStratified(WaterThermalTankNum)
+            NewTankTemp = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                                        HPWaterHeater(HPNum)%ControlSensorLocation)
+          END SELECT
+          Node(HPWaterInletNode)%Temp = WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp
+          IF(ABS(Node(HPWaterInletNode)%Temp - HPWHCondInletNodeLast) < SmallTempDiff)EXIT
+          HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
+        END DO
 
 !           if tank temperature is greater than set point, calculate a PLR needed to exactly reach the set point
-            IF(NewTankTemp .GT. SetPointTemp) THEN
-              HPWaterHeater(HPNum)%Mode = FloatMode
-              Par(1) = SetPointTemp
-              Par(2) = HPWaterHeater(HPNum)%SaveWHMode
-              Par(3) = WaterThermalTankNum
-              IF(FirstHVACIteration) THEN
-                Par(4) = 1.0
+        IF(NewTankTemp .GT. SetPointTemp) THEN
+          HPWaterHeater(HPNum)%Mode = FloatMode
+          Par(1) = SetPointTemp
+          Par(2) = HPWaterHeater(HPNum)%SaveWHMode
+          Par(3) = WaterThermalTankNum
+          IF(FirstHVACIteration) THEN
+            Par(4) = 1.0
+          ELSE
+            Par(4) = 0.0
+          END IF
+          Par(5) = MdotWater
+          SELECT CASE(HPWaterHeater(HPNum)%TankTypeNum)
+          CASE(MixedWaterHeater)
+            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidualMixedTank, 0.0d0,    &
+                               1.0d0, Par)
+          CASE(StratifiedWaterHeater)
+            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidualStratifiedTank, 0.0d0,    &
+                               1.0d0, Par)
+          END SELECT
+          IF (SolFla == -1) THEN
+            WRITE(IterNum,*) MaxIte
+            IterNum=ADJUSTL(IterNum)
+            IF(.NOT. WarmupFlag)THEN
+              HPWaterHeater(HPNum)%IterLimitExceededNum2 = HPWaterHeater(HPNum)%IterLimitExceededNum2 + 1
+              IF (HPWaterHeater(HPNum)%IterLimitExceededNum2 .EQ. 1) THEN
+                CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
+                CALL ShowContinueError('Iteration limit exceeded calculating heat pump water heater compressor'// &
+                                       ' part-load ratio, maximum iterations = '//TRIM(IterNum)// &
+                                       '. Part-load ratio returned = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
+                CALL ShowContinueErrorTimeStamp('This error occurred in float mode.')
               ELSE
-                Par(4) = 0.0
+                CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
+                                                  //TRIM(HPWaterHeater(HPNum)%Name)//&
+                '":  Iteration limit exceeded in float mode warning continues. Part-load ratio statistics follow.' &
+                , HPWaterHeater(HPNum)%IterLimitErrIndex2, HPPartLoadRatio, HPPartLoadRatio)
               END IF
-              Par(5) = MdotWater
-              CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, HPPartLoadRatio, PLRResidual, 0.0d0,  &
-                                      1.0d0, Par)
-              IF (SolFla == -1) THEN
-                WRITE(IterNum,*) MaxIte
-                IterNum=ADJUSTL(IterNum)
-                IF(.NOT. WarmupFlag)THEN
-                  HPWaterHeater(HPNum)%IterLimitExceededNum2 = HPWaterHeater(HPNum)%IterLimitExceededNum2 + 1
-                  IF (HPWaterHeater(HPNum)%IterLimitExceededNum2 .EQ. 1) THEN
-                    CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
-                    CALL ShowContinueError('Iteration limit exceeded calculating heat pump water heater compressor'// &
-                                           ' part-load ratio, maximum iterations = '//TRIM(IterNum)// &
-                                           '. Part-load ratio returned = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
-                    CALL ShowContinueErrorTimeStamp('This error occurred in float mode.')
-                  ELSE
-                    CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
-                                                      //TRIM(HPWaterHeater(HPNum)%Name)//&
-                    '":  Iteration limit exceeded in float mode warning continues. Part-load ratio statistics follow.' &
-                    , HPWaterHeater(HPNum)%IterLimitErrIndex2, HPPartLoadRatio, HPPartLoadRatio)
-                  END IF
-                END IF
-              ELSE IF (SolFla == -2) THEN
-                HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,(SetPointTemp - TankTemp)/(NewTankTemp - TankTemp)))
-                IF(.NOT. WarmupFlag)THEN
-                  HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 = HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 + 1
-                  IF (HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 .EQ. 1) THEN
-                    CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
-                    CALL ShowContinueError('Heat pump water heater compressor part-load ratio calculation failed: PLR limits ' &
-                                   //'of 0 to 1 exceeded. Part-load ratio used = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
-                    CALL ShowContinueError('Please send this information to the EnergyPlus support group.')
-                    CALL ShowContinueErrorTimeStamp('This error occured in float mode.')
-                  ELSE
-                    CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
-                                                      //TRIM(HPWaterHeater(HPNum)%Name)//&
-                    '": Part-load ratio calculation failed in float mode warning continues. Part-load ratio statistics follow.' &
-                    , HPWaterHeater(HPNum)%RegulaFalsiFailedIndex2, HPPartLoadRatio, HPPartLoadRatio)
-                  END IF
-                END IF
+            END IF
+          ELSE IF (SolFla == -2) THEN
+            HPPartLoadRatio = MAX(0.0d0,MIN(1.0d0,(SetPointTemp - TankTemp)/(NewTankTemp - TankTemp)))
+            IF(.NOT. WarmupFlag)THEN
+              HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 = HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 + 1
+              IF (HPWaterHeater(HPNum)%RegulaFalsiFailedNum2 .EQ. 1) THEN
+                CALL ShowWarningError(TRIM(HPWaterHeater(HPNum)%Type)//' "'//TRIM(HPWaterHeater(HPNum)%Name)//'"')
+                CALL ShowContinueError('Heat pump water heater compressor part-load ratio calculation failed: PLR limits ' &
+                               //'of 0 to 1 exceeded. Part-load ratio used = '//TRIM(RoundSigDigits(HPPartLoadRatio,3)))
+                CALL ShowContinueError('Please send this information to the EnergyPlus support group.')
+                CALL ShowContinueErrorTimeStamp('This error occured in float mode.')
+              ELSE
+                CALL ShowRecurringWarningErrorAtEnd(TRIM(HPWaterHeater(HPNum)%Type)//' "' &
+                                                  //TRIM(HPWaterHeater(HPNum)%Name)//&
+                '": Part-load ratio calculation failed in float mode warning continues. Part-load ratio statistics follow.' &
+                , HPWaterHeater(HPNum)%RegulaFalsiFailedIndex2, HPPartLoadRatio, HPPartLoadRatio)
               END IF
             END IF
           END IF
-
-        CASE DEFAULT
-!         Never gets here, only allowed modes for HPWH are float and heat
-      END SELECT
+        END IF
+      END IF
 
     CASE DEFAULT
-!     Never gets here, case is checked in GetWaterThermalTankInput
-      CALL ShowFatalError('WaterHeater:HeatPump = '//TRIM(HPWaterHeater(HPNum)%Name) &
-          //':  invalid water heater tank type and name entered = ' &
-          //TRIM(HPWaterHeater(HPNum)%TankType)//', '//TRIM(HPWaterHeater(HPNum)%TankName))
-
+!         Never gets here, only allowed modes for HPWH are float and heat
   END SELECT
 
 ! set air-side mass flow rate for final calculation
@@ -8091,7 +8227,7 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
 END SUBROUTINE CalcHeatPumpWaterHeater
 
 
-REAL(r64) FUNCTION PLRResidual(HPPartLoadRatio, Par)
+REAL(r64) FUNCTION PLRResidualMixedTank(HPPartLoadRatio, Par)
           ! FUNCTION INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   May 2005
@@ -8147,10 +8283,72 @@ REAL(r64) FUNCTION PLRResidual(HPPartLoadRatio, Par)
   END IF
   CALL CalcWaterThermalTankMixed(WaterThermalTankNum)
   NewTankTemp = WaterThermalTank(WaterThermalTankNum)%TankTemp
-  PLRResidual = Par(1) - NewTankTemp
+  PLRResidualMixedTank = Par(1) - NewTankTemp
   RETURN
 
-END FUNCTION PLRResidual
+END FUNCTION PLRResidualMixedTank
+
+REAL(r64) FUNCTION PLRResidualStratifiedTank(HPPartLoadRatio, Par)
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B.Griffith,  Richard Raustad
+          !       DATE WRITTEN   Jan 2012
+          !       MODIFIED
+          !       RE-ENGINEERED
+
+          ! PURPOSE OF THIS FUNCTION:
+          !  Calculates residual function (desired tank temp - actual tank temp)
+          !  HP water heater output depends on the part load ratio which is being varied to zero the residual.
+
+          ! METHODOLOGY EMPLOYED:
+          !  Calls CalcWaterThermalTankStratified to get tank temperature at the given part load ratio (source water mass flow rate)
+          !  and calculates the residual as defined above
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+          ! USE STATEMENTS:
+  USE DataHVACGlobals, ONLY: NumPlantLoops
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)     :: HPPartLoadRatio ! compressor cycling ratio (1.0 is continuous, 0.0 is off)
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1) = HP set point temperature [C]
+                                                  ! par(2) = tank mode
+                                                  ! par(3) = water heater num
+                                                  ! par(4) = FirstHVACIteration
+                                                  ! par(5) = MdotWater
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          !  na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          !  na
+
+          ! DERIVED TYPE DEFINITIONS
+          !  na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WaterThermalTankNum     ! index of water heater
+  REAL(r64)    :: NewTankTemp        ! resulting tank temperature [C]
+  LOGICAL :: FirstHVACIteration ! FirstHVACIteration flag
+
+  WaterThermalTankNum = INT(Par(3))
+  WaterThermalTank(WaterThermalTankNum)%Mode = INT(Par(2))
+  WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate = Par(5) * HPPartLoadRatio
+  ! FirstHVACIteration is a logical, Par is real, so make 1.0=TRUE and 0.0=FALSE
+  IF(Par(4) .EQ. 1.0)THEN
+    FirstHVACIteration = .TRUE.
+  ELSE
+    FirstHVACIteration = .FALSE.
+  END IF
+  CALL CalcWaterThermalTankStratified(WaterThermalTankNum)
+  NewTankTemp = FindStratifiedTankSensedTemp(WaterThermalTankNum, &
+                        HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%ControlSensorLocation)
+  PLRResidualStratifiedTank = Par(1) - NewTankTemp
+  RETURN
+
+END FUNCTION PLRResidualStratifiedTank
 
 REAL(r64) FUNCTION PlantMassFlowRatesFunc(WaterThermalTankNum, InNodeNum, FirstHVACIteration, &
                                 WaterThermalTankSide, &
@@ -8175,6 +8373,7 @@ REAL(r64) FUNCTION PlantMassFlowRatesFunc(WaterThermalTankNum, InNodeNum, FirstH
 
           ! USE STATEMENTS:
   USE DataLoopNode,      ONLY: Node
+  USE DataBranchAirLoopPlant
   USE ScheduleManager,   ONLY: GetCurrentScheduleValue
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -9735,14 +9934,6 @@ SUBROUTINE CalcStandardRatings(WaterThermalTankNum)
   LOGICAL :: FirstTimeFlag            ! used during HPWH rating procedure
   CHARACTER(len=MaxNameLength) :: equipName
   Logical, SAVE :: MyOneTimeSetupFlag = .true. ! one time setup flag
-  LOGICAL, SAVE, DIMENSION(:), ALLOCATABLE :: AlreadyRated ! control so we don't repeat again
-
-
-  If (MyOneTimeSetupFlag) then
-    Allocate(AlreadyRated(NumWaterThermalTank))
-    AlreadyRated = .FALSE.
-    MyOneTimeSetupFlag = .FALSE.
-  ENDIF
 
   If (AlreadyRated(WaterThermalTankNum)) Then ! bail we already did this one
     RETURN
@@ -9990,7 +10181,7 @@ SUBROUTINE CalcStandardRatings(WaterThermalTankNum)
   END IF
 
   720 FORMAT('Water Heater Information',6(',',A))
-  721 FORMAT('Water Heater Information',7(',',A))
+  721 FORMAT('Heat Pump Water Heater Information',7(',',A))
 
   AlreadyRated(WaterThermalTankNum) = .TRUE.
   RETURN
@@ -10061,9 +10252,70 @@ SUBROUTINE ReportCWTankInits(WaterThermalTankNum)
 END SUBROUTINE ReportCWTankInits
 
 
+FUNCTION FindStratifiedTankSensedTemp(WaterThermalTankNum,ControlLocationType)  RESULT (SensedTemp)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! find tank temperature depending on how sensed
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: WaterThermalTankNum
+  INTEGER, INTENT(IN)  :: ControlLocationType
+  REAL(r64)            :: SensedTemp
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER  :: StratNodeToUse = 0
+  
+  SELECT CASE (ControlLocationType)
+  
+  CASE (Heater1HPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%HeaterNode1
+  CASE (Heater2HPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%HeaterNode2
+  CASE (SourceInletHPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%SourceInletStratNode
+  CASE (SourceOutletHPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%SourceOutletStratNode
+  CASE (UseInletHPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%UseInletStratNode
+  CASE (UseOutletHPWHControl)
+     StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%UseOutletStratNode
+  END SELECT
+  
+  SensedTemp = WaterThermalTank(WaterThermalTankNum)%Node(StratNodeToUse)%Temp
+
+  RETURN
+
+END FUNCTION FindStratifiedTankSensedTemp
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

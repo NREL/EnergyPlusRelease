@@ -8,7 +8,7 @@ MODULE DaylightingManager
 
           ! PURPOSE OF THIS MODULE:
           ! Manages the daylighting calculations for each thermal zone that has an associated
-          ! DAYLIGHTING:DETAILED object.
+          ! Daylighting:Controls object.
 
           ! Includes calculation of interior daylight illuminance and glare
           ! from each of the windows in a zone, control of window shading devices
@@ -134,6 +134,9 @@ PRIVATE DayltgSkyLuminance
 PRIVATE DayltgCrossProduct
 PRIVATE DayltgSetupAdjZoneListsAndPointers
 PRIVATE CheckForGeometricTransform
+PRIVATE CalcDayltgCoeffsRefMapPoints
+PRIVATE CalcDayltgCoeffsRefPoints
+PRIVATE CalcDayltgCoeffsMapPoints
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE DaylightingModule
 CONTAINS
@@ -565,16 +568,6 @@ SUBROUTINE CalcDayltgCoefficients
     ! Skip zones with no exterior windows in the zone or in adjacent zone with which an interior window is shared
     IF(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins == 0) CYCLE
 
-    ZoneDaylight(ZoneNum)%DaylIllFacSky         = 0.0
-    ZoneDaylight(ZoneNum)%DaylSourceFacSky      = 0.0
-    ZoneDaylight(ZoneNum)%DaylBackFacSky        = 0.0
-    ZoneDaylight(ZoneNum)%DaylIllFacSun         = 0.0
-    ZoneDaylight(ZoneNum)%DaylIllFacSunDisk     = 0.0
-    ZoneDaylight(ZoneNum)%DaylSourceFacSun      = 0.0
-    ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk  = 0.0
-    ZoneDaylight(ZoneNum)%DaylBackFacSun        = 0.0
-    ZoneDaylight(ZoneNum)%DaylBackFacSunDisk    = 0.0
-
     CALL CalcDayltgCoeffsRefMapPoints(ZoneNum)
 
   END DO ! End of zone loop, ZoneNum
@@ -597,34 +590,33 @@ SUBROUTINE CalcDayltgCoefficients
             DaylFac1 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,1,1,1,12)
             DaylFac2 = 0.0
             IF(ZoneDaylight(ZoneNum)%TotalDaylRefPoints > 1) DaylFac2 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,2,1,1,12)
-            Write(OutputFileInits,701) ' Clear Sky Daylight Factors,',   &
-              trim(CurMnDy),TRIM(Zone(ZoneNum)%Name),TRIM(Surface(IWin)%Name),  &
-              trim(RoundSigDigits(DaylFac1,4)),trim(RoundSigDigits(DaylFac2,4))
+            Write(OutputFileInits,fmtA) ' Clear Sky Daylight Factors,'//   &
+              trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//','//  &
+              trim(RoundSigDigits(DaylFac1,4))//','//trim(RoundSigDigits(DaylFac2,4))
 
             ! clear Turbid sky
             DaylFac1 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,1,2,1,12)
             DaylFac2 = 0.0
             IF(ZoneDaylight(ZoneNum)%TotalDaylRefPoints > 1) DaylFac2 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,2,2,1,12)
-            Write(OutputFileInits,701) ' Clear Turbid Sky Daylight Factors,',   &
-              trim(CurMnDy),TRIM(Zone(ZoneNum)%Name),TRIM(Surface(IWin)%Name),  &
-              trim(RoundSigDigits(DaylFac1,4)),trim(RoundSigDigits(DaylFac2,4))
+            Write(OutputFileInits,fmtA) ' Clear Turbid Sky Daylight Factors,'//   &
+              trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//','//  &
+              trim(RoundSigDigits(DaylFac1,4))//','//trim(RoundSigDigits(DaylFac2,4))
 
             ! Intermediate sky
             DaylFac1 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,1,3,1,12)
             DaylFac2 = 0.0
             IF(ZoneDaylight(ZoneNum)%TotalDaylRefPoints > 1) DaylFac2 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,2,3,1,12)
-            Write(OutputFileInits,701) ' Intermediate Sky Daylight Factors,',   &
-              trim(CurMnDy),TRIM(Zone(ZoneNum)%Name),TRIM(Surface(IWin)%Name),  &
-              trim(RoundSigDigits(DaylFac1,4)),trim(RoundSigDigits(DaylFac2,4))
+            Write(OutputFileInits,fmtA) ' Intermediate Sky Daylight Factors,'//   &
+              trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//','//  &
+              trim(RoundSigDigits(DaylFac1,4))//','//trim(RoundSigDigits(DaylFac2,4))
 
             ! Overcast sky
             DaylFac1 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,1,4,1,12)
             DaylFac2 = 0.0
             IF(ZoneDaylight(ZoneNum)%TotalDaylRefPoints > 1) DaylFac2 = ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,2,4,1,12)
-            Write(OutputFileInits,701) ' Overcast Sky Daylight Factors,',   &
-              trim(CurMnDy),TRIM(Zone(ZoneNum)%Name),TRIM(Surface(IWin)%Name),  &
-              trim(RoundSigDigits(DaylFac1,4)),trim(RoundSigDigits(DaylFac2,4))
-            701 Format(A,A,',',A,',',A,',',A,',',A)
+            Write(OutputFileInits,fmtA) ' Overcast Sky Daylight Factors,'//   &
+              trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//','//  &
+              trim(RoundSigDigits(DaylFac1,4))//','//trim(RoundSigDigits(DaylFac2,4))
         END IF
       END DO
     END DO
@@ -699,17 +691,16 @@ SUBROUTINE CalcDayltgCoefficients
           DO ISlatAngle = 1, ISA
             IF (ISlatAngle == 1) THEN
               ! base window without shades, screens, or blinds
-              Write(OutputFileDFS,801) trim(CurMnDy), TRIM(Zone(ZoneNum)%Name), TRIM(Surface(IWin)%Name), 'Base Window'
+              Write(OutputFileDFS,fmtA) trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//',Base Window'
             ELSEIF (ISlatAngle == 2 .AND. ISA == 2) THEN
               ! window shade or blind with fixed slat angle
-              Write(OutputFileDFS,801) trim(CurMnDy), TRIM(Zone(ZoneNum)%Name), TRIM(Surface(IWin)%Name), ' '
+              Write(OutputFileDFS,fmtA) trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//', '
             ELSE
               ! blind with variable slat angle
               SlatAngle = 180.d0/real((MaxSlatAngs - 1),r64) * real((ISlatAngle - 2),r64)
-              Write(OutputFileDFS,801) trim(CurMnDy), TRIM(Zone(ZoneNum)%Name), TRIM(Surface(IWin)%Name),   &
+              Write(OutputFileDFS,fmtA) trim(CurMnDy)//','//TRIM(Zone(ZoneNum)%Name)//','//TRIM(Surface(IWin)%Name)//','//   &
                  trim(RoundSigDigits(SlatAngle,1))
             ENDIF
-            801 Format(A,',', A, ',', A, ',',A)
 
             DO IHR = 1, 24
               ! daylight reference point 1
@@ -732,12 +723,11 @@ SUBROUTINE CalcDayltgCoefficients
               ENDIF
 
               ! write daylight factors - 4 sky types for each daylight ref point
-              Write(OutputFileDFS,803) trim(RoundSigDigits(IHR)),  &
-                 trim(RoundSigDigits(DFClrSky1,5)),trim(RoundSigDigits(DFClrTbSky1,5)),  &
-                 trim(RoundSigDigits(DFIntSky1,5)),trim(RoundSigDigits(DFOcSky1,5)),  &
-                 trim(RoundSigDigits(DFClrSky2,5)),trim(RoundSigDigits(DFClrTbSky2,5)),  &
-                 trim(RoundSigDigits(DFIntSky2,5)),trim(RoundSigDigits(DFOcSky2,5))
-              803 Format(A,8(',',A))
+              Write(OutputFileDFS,fmtA) trim(RoundSigDigits(IHR))//','//  &
+                 trim(RoundSigDigits(DFClrSky1,5))//','//trim(RoundSigDigits(DFClrTbSky1,5))//','//  &
+                 trim(RoundSigDigits(DFIntSky1,5))//','//trim(RoundSigDigits(DFOcSky1,5))//','//  &
+                 trim(RoundSigDigits(DFClrSky2,5))//','//trim(RoundSigDigits(DFClrTbSky2,5))//','//  &
+                 trim(RoundSigDigits(DFIntSky2,5))//','//trim(RoundSigDigits(DFOcSky2,5))
             END DO
           END DO
         END IF
@@ -754,6 +744,7 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
           !       AUTHOR         Linda Lawrie
           !       DATE WRITTEN   October 2004
           !       MODIFIED       May 2006 (RR): added exterior window screens
+          !                      April 2012 (LKL); change to allow multiple maps per zone
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -779,13 +770,97 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
   INTEGER, INTENT(IN) :: ZoneNum
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: tmpDFCalc = 0.05d0             ! cut out illuminance (lux) for exterior horizontal in calculating
-                                            ! the daylighting and glare factors
+  REAL(r64), PARAMETER :: tmpDFCalc = 0.05d0 ! cut off illuminance (lux) for exterior horizontal in calculating
+                                             ! the daylighting and glare factors
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
           ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER   :: IWin         ! Window counter
+  INTEGER   :: PipeNum      ! TDD pipe object number
+  INTEGER   :: loopwin      ! loop index for exterior windows associated with a daylit zone
+  LOGICAL, SAVE     :: VeryFirstTime=.true.
+  INTEGER TZoneNum
+  LOGICAL ErrorsFound
+
+  IF (VeryFirstTime) THEN
+    ! make sure all necessary surfaces match to pipes
+    ErrorsFound=.false.
+    DO TZoneNum=1,NumOfZones
+      DO loopwin = 1,ZoneDaylight(TZoneNum)%NumOfDayltgExtWins
+        IWin = ZoneDaylight(TZoneNum)%DayltgExtWinSurfNums(loopwin)
+        IF (SurfaceWindow(IWin)%OriginalClass /= SurfaceClass_TDD_Diffuser) CYCLE
+        ! Look up the TDD:DOME object
+        PipeNum = FindTDDPipe(IWin)
+        IF (PipeNum == 0) THEN
+          CALL ShowSevereError('GetTDDInput: Surface='//TRIM(Surface(IWin)%Name)//  &
+             ', TDD:Dome object does not reference a valid Diffuser object.')
+          CALL ShowContinueError('...needs DaylightingDevice:Tubular of same name as Surface.')
+          ErrorsFound=.true.
+        ENDIF
+      ENDDO
+    ENDDO
+
+    IF (ErrorsFound) THEN
+      CALL ShowFatalError('Not all TubularDaylightDome objects have corresponding DaylightingDevice:Tubular objects.'//  &
+        ' Program terminates.')
+    ENDIF
+    VeryFirstTime=.false.
+  ENDIF
+
+  !Calc for daylighting reference points
+  CALL CalcDayltgCoeffsRefPoints(ZoneNum)
+  IF (.not. DoingSizing) THEN
+    !Calc for illuminance map
+    CALL CalcDayltgCoeffsMapPoints(ZoneNum)
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CalcDayltgCoeffsRefMapPoints
+
+SUBROUTINE CalcDayltgCoeffsRefPoints(ZoneNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Provides calculations for Daylighting Coefficients for daylighting reference points
+
+          ! METHODOLOGY EMPLOYED:
+          ! Was previously part of CalcDayltgCoeffsRefMapPoints -- broken out to all multiple
+          ! maps per zone
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: POLYF, InterpProfAng, BlindBeamBeamTrans, SafeDivide, RoundSigDigits
+  USE DaylightingDevices, ONLY: FindTDDPipe, TransTDD
+  USE SolarReflectionManager, ONLY: SolReflRecSurf
+  USE Vectors
+  USE DataSystemVariables, ONLY: DetailedSkyDiffuseAlgorithm
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  REAL(r64), PARAMETER :: tmpDFCalc = 0.05d0 ! cut off illuminance (lux) for exterior horizontal in calculating
+                                             ! the daylighting and glare factors
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
@@ -846,7 +921,6 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
   INTEGER   :: BlNum                        ! Window blind number
   INTEGER   :: ScNum                        ! Window screen number
   INTEGER   :: JB                           ! Slat angle counter
-!  CHARACTER(len=30) :: ShType                       ! Window shading type
   INTEGER   :: ShType                       ! Window shading type
   REAL(r64) :: TransBmBmMult(MaxSlatAngs)   ! Beam-beam transmittance of isolated blind
   REAL(r64) :: TransBmBmMultRefl(MaxSlatAngs) ! As above but for beam reflected from exterior obstruction
@@ -984,60 +1058,12 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
   REAL(r64) :: TVISIntWinDisk               ! Visible transmittance of int win at COSBIntWin for sun
   REAL(r64) :: TVisIntWinMult               ! Interior window vis trans multiplier for ext win in adjacent zone
   REAL(r64) :: TVisIntWinDiskMult           ! Interior window vis trans solar disk multiplier for ext win in adj zone
-  INTEGER   :: CalcLoop                     ! 1=Ref points, 2=Map points
-  LOGICAL   :: DoingRefs                    ! True when doing "refs".
-  INTEGER   :: EndLoop                      ! When doing sizing, only do first loop
+  LOGICAL, SAVE     :: refFirstTime=.true.
   INTEGER   :: BRef
   INTEGER   :: ILB
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapWindowSolidAngAtRefPt
-  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapWindowSolidAngAtRefPtWtd
-  LOGICAL, SAVE     :: mapFirstTime=.true.
-  LOGICAL, SAVE     :: refFirstTime=.true.
-  LOGICAL, SAVE     :: VeryFirstTime=.true.
-  INTEGER TZoneNum
-  LOGICAL ErrorsFound
-
-  IF (VeryFirstTime) THEN
-    ! make sure all necessary surfaces match to pipes
-    ErrorsFound=.false.
-    DO TZoneNum=1,NumOfZones
-      DO loopwin = 1,ZoneDaylight(TZoneNum)%NumOfDayltgExtWins
-        IWin = ZoneDaylight(TZoneNum)%DayltgExtWinSurfNums(loopwin)
-        IF (SurfaceWindow(IWin)%OriginalClass /= SurfaceClass_TDD_Diffuser) CYCLE
-        ! Look up the TDD:DOME object
-        PipeNum = FindTDDPipe(IWin)
-        IF (PipeNum == 0) THEN
-          CALL ShowSevereError('GetTDDInput: Surface='//TRIM(Surface(IWin)%Name)//  &
-             ', TDD:Dome object does not reference a valid Diffuser object.')
-          CALL ShowContinueError('...needs DaylightingDevice:Tubular of same name as Surface.')
-          ErrorsFound=.true.
-        ENDIF
-      ENDDO
-    ENDDO
-
-    IF (ErrorsFound) THEN
-      CALL ShowFatalError('Not all TubularDaylightDome objects have corresponding DaylightingDevice:Tubular objects.'//  &
-        ' Program terminates.')
-    ENDIF
-    VeryFirstTime=.false.
-  ENDIF
-
-  IF (mapFirstTime .and. ANY(ZoneDaylight%TotalMapRefPoints > 0) ) THEN
-    IL=-999
-    DO CalcLoop=1,NumOfZones
-      IL=MAX(IL,ZoneDaylight(CalcLoop)%TotalMapRefPoints)
-    ENDDO
-    ALLOCATE(MapErrIndex(TotSurfaces,IL))
-    MapErrIndex=0
-    mapFirstTime=.false.
-  ENDIF
 
   IF (refFirstTime .and. ANY(ZoneDaylight%TotalDaylRefPoints > 0) ) THEN
-    IL=-999
-    DO CalcLoop=1,NumOfZones
-      IL=MAX(IWin,ZoneDaylight(CalcLoop)%TotalDaylRefPoints)
-    ENDDO
-    ALLOCATE(RefErrIndex(TotSurfaces,IL))
+    ALLOCATE(RefErrIndex(TotSurfaces,MAXVAL(ZoneDaylight%TotalDaylRefPoints)))
     RefErrIndex=0
     refFirstTime=.false.
   ENDIF
@@ -1050,1197 +1076,542 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
   VIEWVC(2) = COS(AZVIEW)
   VIEWVC(3) = 0.
 
-  IF (.not. DoingSizing) THEN
-    !Calc for daylighting reference points and illuminance map
-    EndLoop=2
-  ELSE
-    !Calc for daylighting reference points only
-    EndLoop=1
-  ENDIF
+  ZoneDaylight(ZoneNum)%DaylIllumAtRefPt        =0.0 ! Daylight illuminance at reference points (lux)
+  ZoneDaylight(ZoneNum)%GlareIndexAtRefPt       =0.0 ! Glare index at reference points
+  ZoneDaylight(ZoneNum)%SolidAngAtRefPt         =0.0
+  ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd      =0.0
+  ZoneDaylight(ZoneNum)%IllumFromWinAtRefPt     =0.0
+  ZoneDaylight(ZoneNum)%BackLumFromWinAtRefPt   =0.0
+  ZoneDaylight(ZoneNum)%SourceLumFromWinAtRefPt =0.0
 
-  DO CalcLoop = 1, EndLoop
+  ZoneDaylight(ZoneNum)%DaylIllFacSky        =0.0
+  ZoneDaylight(ZoneNum)%DaylSourceFacSky     =0.0
+  ZoneDaylight(ZoneNum)%DaylBackFacSky       =0.0
+  ZoneDaylight(ZoneNum)%DaylIllFacSun        =0.0
+  ZoneDaylight(ZoneNum)%DaylIllFacSunDisk    =0.0
+  ZoneDaylight(ZoneNum)%DaylSourceFacSun     =0.0
+  ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk =0.0
+  ZoneDaylight(ZoneNum)%DaylBackFacSun       =0.0
+  ZoneDaylight(ZoneNum)%DaylBackFacSunDisk   =0.0
 
-    !           ---------------------
-    ! ---------- REFERENCE POINT LOOP ----------
-    !           ---------------------
+  NRF = ZoneDaylight(ZoneNum)%TotalDaylRefPoints
+  ZF=0.0
+  ZF(1:NRF) = ZoneDaylight(ZoneNum)%FracZoneDaylit(1:NRF)
+  BRef=0
 
-    DoingRefs=(CalcLoop == 1)
+  DO IL = 1,NRF
+    ! Reference point in absolute coordinate system
+    RREF(1:3) = ZoneDaylight(ZoneNum)%DaylRefPtAbsCoord(IL,1:3) ! (x, y, z)
 
-    IF (DoingRefs) THEN
-      NRF = ZoneDaylight(ZoneNum)%TotalDaylRefPoints
-      ZF=0.0
-      ZF(1:NRF) = ZoneDaylight(ZoneNum)%FracZoneDaylit(1:NRF)
-      BRef=0
-    ELSE
-      NRF = ZoneDaylight(ZoneNum)%TotalMapRefPoints
-      ZF=0.
-      BRef=2
-    ENDIF
+    !           -------------
+    ! ---------- WINDOW LOOP ----------
+    !           -------------
 
-    DO IL = 1,NRF
+    DO loopwin = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
+      IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loopwin)
 
-      IF (DoingRefs) THEN
-        ! Reference point in absolute coordinate system
-        RREF(1:3) = ZoneDaylight(ZoneNum)%DaylRefPtAbsCoord(IL,1:3) ! (x, y, z)
+      ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) = 0.0
+      ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) = 0.0
+
+      ZoneNumThisWin = Surface(Surface(IWin)%BaseSurf)%Zone
+      IF(ZoneNumThisWin == ZoneNum) THEN
+        ExtWinType = InZoneExtWin
       ELSE
-        RREF(1:3) = ZoneDaylight(ZoneNum)%MapRefPtAbsCoord(IL,1:3) ! (x, y, z)
+        ExtWinType = AdjZoneExtWin
+      END IF
+
+      IConst = Surface(IWin)%Construction
+      IF(SurfaceWindow(IWin)%StormWinFlag == 1) IConst = Surface(IWin)%StormWinConstruction
+
+      ! TH Added 6/29/2009.
+      ! For thermochromic windows, the daylight and glare factros are calculated for a base window construction
+      !  at base TC layer temperature. During each time step calculations at DayltgInteriorIllum,
+      !  DayltgInteriorMapIllum, and DayltgGlare, the daylight and glare factors are adjusted by the visible
+      !  transmittance ratio = VT of actual TC window based on last hour TC layer temperature / VT of the base TC window
+      IF (Construct(IConst)%TCFlag == 1) THEN
+        ! For thermochromic windows, use the base window construction at base temperature of the TC layer
+        IConst = Construct(IConst)%TCMasterConst
       ENDIF
 
-        !           -------------
-        ! ---------- WINDOW LOOP ----------
-        !           -------------
+      ICtrl = Surface(IWin)%WindowShadingControlPtr
+      ShType = WSC_ST_NoShade ! 'NOSHADE'
+      IF (ICtrl > 0) ShType = WindowShadingControl(ICtrl)%ShadingType
+      BlNum = SurfaceWindow(IWin)%BlindNumber
+      ScNum = SurfaceWindow(IWin)%ScreenNumber
 
-        IF (.not. DoingRefs) THEN
-          ALLOCATE(MapWindowSolidAngAtRefPt(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
-          MapWindowSolidAngAtRefPt=0.0
-          ALLOCATE(MapWindowSolidAngAtRefPtWtd(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
-          MapWindowSolidAngAtRefPtWtd=0.0
-        ENDIF
+      ShelfNum = Surface(IWin)%Shelf
+      IF (ShelfNum > 0) THEN
+        InShelfSurf = Shelf(Surface(IWin)%Shelf)%InSurf ! Inside daylighting shelf present if > 0
+      ELSE
+        InShelfSurf = 0
+      END IF
 
-        DO loopwin = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
-          IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loopwin)
+      Rectangle = .FALSE.
+      Triangle = .FALSE.
+      IF (Surface(IWin)%Sides == 3) Triangle = .TRUE.
+      IF (Surface(IWin)%Sides == 4) Rectangle = .TRUE.
 
-          IF (DoingRefs) THEN
-            ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) = 0.0
-            ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) = 0.0
-          ELSE
-            ZoneDaylight(ZoneNum)%SolidAngAtMapPt(IL,loopwin) = 0.0
-            ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd(IL,loopwin) = 0.0
-          ENDIF
+      IF (Rectangle) THEN
+        ! Vertices of window (numbered counter-clockwise starting at upper left as viewed
+        ! from inside of room). Assumes original vertices are numbered counter-clockwise from
+        ! upper left as viewed from outside.
+        W3 = Surface(IWin)%Vertex(2)
+        W2 = Surface(IWin)%Vertex(3)
+        W1 = Surface(IWin)%Vertex(4)
+      ELSE IF (Triangle) THEN
+        W3 = Surface(IWin)%Vertex(2)
+        W2 = Surface(IWin)%Vertex(3)
+        W1 = Surface(IWin)%Vertex(1)
+      END IF
 
-          ZoneNumThisWin = Surface(Surface(IWin)%BaseSurf)%Zone
-          IF(ZoneNumThisWin == ZoneNum) THEN
-            ExtWinType = InZoneExtWin
-          ELSE
-            ExtWinType = AdjZoneExtWin
-          END IF
+      ! Shade/blind calculation flag
+      LSHCAL = 0
 
-          IConst = Surface(IWin)%Construction
-          IF(SurfaceWindow(IWin)%StormWinFlag == 1) IConst = Surface(IWin)%StormWinConstruction
+      ! Visible transmittance at normal incidence
+      SurfaceWindow(IWin)%VisTransSelected = POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))* &
+                                             SurfaceWindow(IWin)%GlazedFrac
+      ! For windows with switchable glazing, ratio of visible transmittance at normal
+      ! incidence for fully switched (dark) state to that of unswitched state
+      SurfaceWindow(IWin)%VisTransRatio = 1.0
+      IF (ICtrl > 0) THEN
+        IF (ShType == WSC_ST_SwitchableGlazing) THEN
+          IConstShaded = Surface(IWin)%ShadedConstruction
+          SurfaceWindow(IWin)%VisTransRatio =   &
+            SafeDivide(POLYF(1.0d0,Construct(IConstShaded)%TransVisBeamCoef(1)),POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1)))
+        END IF
+      END IF
 
-          ! TH Added 6/29/2009.
-          ! For thermochromic windows, the daylight and glare factros are calculated for a base window cosntruction
-          !  at base TC layer temperature. During each time step calculations at DayltgInteriorIllum,
-          !  DayltgInteriorMapIllum, and DayltgGlare, the daylight and glare factors are adjusted by the visible
-          !  transmittance ratio = VT of actual TC window based on last hour TC layer temperature / VT of the base TC window
-          IF (Construct(IConst)%TCFlag == 1) THEN
-            ! For thermochromic windows, use the base window construction at base temperature of the TC layer
-            IConst = Construct(IConst)%TCMasterConst
-          ENDIF
+      ! Unit vectors from window vertex 2 to 1 and 2 to 3,
+      ! center point of window, and vector from ref pt to center of window
+      W21 = W1 - W2
+      W23 = W3 - W2
+      HW = SQRT(DOT_PRODUCT(W21,W21))
+      WW = SQRT(DOT_PRODUCT(W23,W23))
+      IF (Rectangle) THEN
+        WC  = W2 + (W23 + W21) / 2.d0
+      ELSE IF (Triangle) THEN
+        WC  = W2 + (W23 + W21) / 3.d0
+      END IF
+      SurfaceWindow(IWin)%WinCenter = WC
+      REFWC = WC - RREF
+      ! Unit vectors
+      W21 = W21/HW
+      W23 = W23/WW
 
-          ICtrl = Surface(IWin)%WindowShadingControlPtr
-          ShType = WSC_ST_NoShade ! 'NOSHADE'
-          IF (ICtrl > 0) ShType = WindowShadingControl(ICtrl)%ShadingType
-          BlNum = SurfaceWindow(IWin)%BlindNumber
-          ScNum = SurfaceWindow(IWin)%ScreenNumber
+      ! Unit vector normal to window (pointing away from room)
+      WNORM = Surface(IWin)%lcsz
 
-          ShelfNum = Surface(IWin)%Shelf
-          IF (ShelfNum > 0) THEN
-            InShelfSurf = Shelf(Surface(IWin)%Shelf)%InSurf ! Inside daylighting shelf present if > 0
-          ELSE
-            InShelfSurf = 0
-          END IF
+      ! Initialize number of window elements
+      NDIVX = 40
+      NDIVY = 40
 
-          Rectangle = .FALSE.
-          Triangle = .FALSE.
-          IF (Surface(IWin)%Sides == 3) Triangle = .TRUE.
-          IF (Surface(IWin)%Sides == 4) Rectangle = .TRUE.
+      ! Distance from ref point to window plane
+      ALF = ABS(DOT_PRODUCT(WNORM, REFWC))
 
-          IF (Rectangle) THEN
-            ! Vertices of window (numbered counter-clockwise starting at upper left as viewed
-            ! from inside of room). Assumes original vertices are numbered counter-clockwise from
-            ! upper left as viewed from outside.
-            W3 = Surface(IWin)%Vertex(2)
-            W2 = Surface(IWin)%Vertex(3)
-            W1 = Surface(IWin)%Vertex(4)
-          ELSE IF (Triangle) THEN
-            W3 = Surface(IWin)%Vertex(2)
-            W2 = Surface(IWin)%Vertex(3)
-            W1 = Surface(IWin)%Vertex(1)
-          END IF
+      ! Check if ref point to close to window due to input error (0.1524 m below is 0.5 ft)
+      IF (ALF < 0.1524d0 .AND. ExtWinType == InZoneExtWin) THEN
+        ! Ref pt is close to window plane. Get vector from window
+        ! origin to projection of ref pt on window plane.
+        W2REF = RREF + ALF * WNORM - W2
 
-          ! Shade/blind calculation flag
-          LSHCAL = 0
-
-          ! Visible transmittance at normal incidence
-          SurfaceWindow(IWin)%VisTransSelected = POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))* &
-                                                 SurfaceWindow(IWin)%GlazedFrac
-          ! For windows with switchable glazing, ratio of visible transmittance at normal
-          ! incidence for fully switched (dark) state to that of unswitched state
-          SurfaceWindow(IWin)%VisTransRatio = 1.0
-          IF (ICtrl > 0) THEN
-            IF (ShType == WSC_ST_SwitchableGlazing) THEN
-              IConstShaded = Surface(IWin)%ShadedConstruction
-              SurfaceWindow(IWin)%VisTransRatio = POLYF(1.0d0,Construct(IConstShaded)%TransVisBeamCoef(1)) / &
-              POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))
-            END IF
-          END IF
-
-          ! Unit vectors from window vertex 2 to 1 and 2 to 3,
-          ! center point of window, and vector from ref pt to center of window
-          W21 = W1 - W2
-          W23 = W3 - W2
-          HW = SQRT(DOT_PRODUCT(W21,W21))
-          WW = SQRT(DOT_PRODUCT(W23,W23))
-          IF (Rectangle) THEN
-            WC  = W2 + (W23 + W21) / 2.d0
-          ELSE IF (Triangle) THEN
-            WC  = W2 + (W23 + W21) / 3.d0
-          END IF
-          SurfaceWindow(IWin)%WinCenter = WC
-          REFWC = WC - RREF
-          ! Unit vectors
-          W21 = W21/HW
-          W23 = W23/WW
-
-          ! Unit vector normal to window (pointing away from room)
-          WNORM = Surface(IWin)%lcsz
-
-          ! Initialize number of window elements
-          NDIVX = 40
-          NDIVY = 40
-
-          ! Distance from ref point to window plane
-          ALF = ABS(DOT_PRODUCT(WNORM, REFWC))
-
-          ! Check if ref point to close to window due to input error (0.1524 m below is 0.5 ft)
-          IF (ALF < 0.1524d0 .AND. ExtWinType == InZoneExtWin) THEN
-            ! Ref pt is close to window plane. Get vector from window
-            ! origin to projection of ref pt on window plane.
-            W2REF = RREF + ALF * WNORM - W2
-
-            D1a = DOT_PRODUCT(W2REF, W23)
-!            IF (D1 < 0.0 .OR. D1 > WW) GO TO 4254
-            D1b = DOT_PRODUCT(W2REF, W21)
-!            IF (D1 < 0.0 .OR. D1 > HW) GO TO 4254
+        D1a = DOT_PRODUCT(W2REF, W23)
+        D1b = DOT_PRODUCT(W2REF, W21)
 
 !            ! Error message if ref pt is too close to window.
-            IF (D1a > 0.0 .and. D1b > 0.0 .and. D1b <= HW .and. D1a <= WW) THEN
-              IF (DoingRefs) THEN
-                CALL ShowSevereError('Daylighting calculation cannot be done for zone '//TRIM(Zone(ZoneNum)%Name)// &
-                ' because reference point #'//TRIM(RoundSigDigits(IL))//' is less than 0.15m (6") from window plane '//  &
-                 TRIM(Surface(IWin)%Name))
-                CALL ShowContinueError('Distance=['//TRIM(RoundSigDigits(ALF,5))//  &
-                          ']. This is too close; check position of reference point.')
-                CALL ShowFatalError('Program terminates due to preceding condition.')
+        IF (D1a > 0.0 .and. D1b > 0.0 .and. D1b <= HW .and. D1a <= WW) THEN
+          CALL ShowSevereError('CalcDaylightCoeffRefPoints: Daylighting calculation cannot be done for zone '//  &
+             TRIM(Zone(ZoneNum)%Name)//' because reference point #'//  &
+             TRIM(RoundSigDigits(IL))//' is less than 0.15m (6") from window plane '//TRIM(Surface(IWin)%Name))
+          CALL ShowContinueError('Distance=['//TRIM(RoundSigDigits(ALF,5))//  &
+                      ']. This is too close; check position of reference point.')
+          CALL ShowFatalError('Program terminates due to preceding condition.')
+        END IF
+      ELSE IF (ALF < 0.1524d0 .and. ExtWinType == AdjZoneExtWin) THEN
+        IF (RefErrIndex(IWin,IL) == 0) THEN ! only show error message once
+          CALL ShowWarningError('CalcDaylightCoeffRefPoints: For Zone="'//TRIM(Zone(ZoneNum)%Name)//        &
+              '" External Window="'//TRIM(Surface(IWin)%Name)//'"in Zone="'//TRIM(Zone(Surface(IWin)%Zone)%Name)//      &
+               '" reference point is less than 0.15m (6") from window plane ')
+          CALL ShowContinueError('Distance=['//trim(RoundSigDigits(ALF,1))//' m] to ref point=['//  &
+             TRIM(RoundSigDigits(RREF(1),1))//  &
+             ','//TRIM(RoundSigDigits(RREF(2),1))//  &
+             ','//TRIM(RoundSigDigits(RREF(3),1))//'], Inaccuracy in Daylighting Calcs may result.')
+          RefErrIndex(IWin,IL)=1
+        ENDIF
+      END IF
+
+      ! Number of window elements in X and Y for daylighting calculation
+      IF (ALF > 0.1524d0) THEN
+        NDIVX = 1 + INT(4.d0 * WW / ALF)
+        NDIVY = 1 + INT(4.d0 * HW / ALF)
+      ENDIF
+
+      IF(ExtWinType == AdjZoneExtWin) THEN
+        ! Adjust number of exterior window elements to give acceptable number of rays through
+        ! interior windows in the zone (for accuracy of interior window daylighting calculation)
+        SolidAngExtWin = SafeDivide( ((Surface(IWin)%Area + SurfaceWindow(IWin)%DividerArea) / Surface(IWin)%Multiplier ),  &
+                                                          ALF**2)
+        SolidAngMinIntWin = ZoneDaylight(ZoneNum)%MinIntWinSolidAng
+        SolidAngRatio = MAX(1.0d0,SolidAngExtWin/SolidAngMinIntWin)
+        NDIVX = SQRT(SolidAngRatio)*NDIVX
+        NDIVY = SQRT(SolidAngRatio)*NDIVY
+      END IF
+
+      NWX = MIN(40,NDIVX)
+      NWY = MIN(40,NDIVY)
+
+      ! Discretization of triangle is simpler if NWX = NWY
+      IF (Triangle) THEN
+        NWX = MAX(NWX,NWY)
+        NWY = NWX
+      END IF
+
+      ! Edge lengths of window elements
+      DWX = WW / NWX
+      DWY = HW / NWY
+
+      ! Azimuth and altitude of window normal
+      SurfaceWindow(IWin)%Phi = ASIN(WNORM(3))
+      IF (ABS(WNORM(1)) > 1.0d-5 .OR. ABS(WNORM(2)) > 1.0d-5) THEN
+        SurfaceWindow(IWin)%Theta = ATAN2(WNORM(2), WNORM(1))
+      ELSE
+        SurfaceWindow(IWin)%Theta = 0.
+      END IF
+
+      ! Recalculation of values for TDD:DOME
+      IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+
+        ! Look up the TDD:DOME object
+        PipeNum = FindTDDPipe(IWin)
+        IWin2 = TDDPipe(PipeNum)%Dome
+
+        ! Calculate reference point coords relative to the diffuser coordinate system
+        ! W21, W23, and WNORM are the unit vectors
+        REFD(1) = DOT_PRODUCT(REFWC,W21)
+        REFD(2) = DOT_PRODUCT(REFWC,W23)
+        REFD(3) = DOT_PRODUCT(REFWC,WNORM)
+
+        ! Calculate view vector coords relative to the diffuser coordinate system
+        VIEWVD(1) = DOT_PRODUCT(VIEWVC,W21)
+        VIEWVD(2) = DOT_PRODUCT(VIEWVC,W23)
+        VIEWVD(3) = DOT_PRODUCT(VIEWVC,WNORM)
+
+        U3 = Surface(IWin2)%Vertex(2)
+        U2 = Surface(IWin2)%Vertex(3)
+
+        IF(Surface(IWin2)%Sides == 4) THEN
+          ! Vertices of window (numbered counter-clockwise starting
+          ! at upper left as viewed from inside of room)
+          ! Assumes original vertices are numbered counter-clockwise from
+          ! upper left as viewed from outside.
+          U3 = Surface(IWin2)%Vertex(2)
+          U2 = Surface(IWin2)%Vertex(3)
+          U1 = Surface(IWin2)%Vertex(4)
+        ELSE IF(Surface(IWin2)%Sides == 3) THEN
+          U3 = Surface(IWin2)%Vertex(2)
+          U2 = Surface(IWin2)%Vertex(3)
+          U1 = Surface(IWin2)%Vertex(1)
+        END IF
+
+        ! Unit vectors from window vertex 2 to 1 and 2 to 3,
+        ! center point of window, and vector from ref pt to center of window
+        U21 = U1 - U2
+        U23 = U3 - U2
+        HW = SQRT(DOT_PRODUCT(U21,U21))
+        WW = SQRT(DOT_PRODUCT(U23,U23))
+        IF(Surface(IWin2)%Sides == 4) THEN
+          WC = U2 + (U23 + U21) / 2.d0
+        ELSE IF(Surface(IWin2)%Sides == 3) THEN
+          WC = U2 + (U23 + U21) / 3.0d0
+        END IF
+        SurfaceWindow(IWin2)%WinCenter = WC
+        ! Unit vectors
+        U21 = U21 / HW
+        U23 = U23 / WW
+
+        ! Unit vector normal to dome (pointing away from TDD)
+        ! These are specific to the exterior.
+        ! NOTE:  Preserve WNORM for later in the code.
+        CALL DayltgCrossProduct(U21, U23, WNORM2)
+        WNORM2 = WNORM2 / (SQRT(DOT_PRODUCT(WNORM2,WNORM2)))
+
+        ! Azimuth and altitude of dome normal
+        ! These are specific to the exterior.
+        SurfaceWindow(IWin2)%Phi = ASIN(WNORM2(3))
+        IF (ABS(WNORM2(1)) > 1.0d-5 .OR. ABS(WNORM2(2)) > 1.0d-5) THEN
+          SurfaceWindow(IWin2)%Theta = ATAN2(WNORM2(2), WNORM2(1))
+        ELSE
+          SurfaceWindow(IWin2)%Theta = 0.0
+        END IF
+
+        ! Calculate new virtual reference point coords relative to dome coord system
+        ! W21, W23, and WNORM2 are now the unit vectors for the dome coord system
+        REFWC = REFD(1) * U21 + REFD(2) * U23 + REFD(3) * WNORM2
+        RREF2 = WC - REFWC
+
+        ! Calculate new virtual view vector coords relative to dome coord system
+        VIEWVC2 = VIEWVD(1) * U21 + VIEWVD(2) * U23 + VIEWVD(3) * WNORM2
+
+        ! Copy several values from the diffuser so that DayltgInterReflectedIllum works correctly
+        ! These are specific to the interior.
+        SurfaceWindow(IWin2)%RhoCeilingWall = SurfaceWindow(IWin)%RhoCeilingWall
+        SurfaceWindow(IWin2)%RhoFloorWall = SurfaceWindow(IWin)%RhoFloorWall
+        SurfaceWindow(IWin2)%FractionUpgoing = SurfaceWindow(IWin)%FractionUpgoing
+        SurfaceWindow(IWin2)%GlazedFrac = SurfaceWindow(IWin)%GlazedFrac
+
+      ELSE
+        ! This is not a TDD:DIFFUSER.  Make sure nothing is messed up for a regular window.
+        IWin2 = IWin
+        WNORM2 = WNORM
+        RREF2 = RREF
+        VIEWVC2 = VIEWVC
+
+        U2 = W2
+        U21 = W21
+        U23 = W23
+      END IF
+
+      ! Initialize sky and sun components of direct illuminance (arrays EDIRSK, EDIRSU, EDIRSUdisk)
+      ! and average window luminance (arrays AVWLSK, AVWLSU, AVWLSUdisk), at ref pt.
+      EDIRSK = 0.
+      EDIRSU = 0.
+      EDIRSUdisk = 0.
+      AVWLSK = 0.
+      AVWLSU = 0.
+      AVWLSUdisk = 0.
+
+      ! Initialize solid angle subtended by window wrt ref pt
+      ! and solid angle weighted by glare position factor
+      SurfaceWindow(IWin)%SolidAngAtRefPt(IL) = 0.
+      SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) = 0.
+
+      ! Area of window element
+      IF (Rectangle) THEN
+        DAXY = DWX * DWY
+      ELSE IF (Triangle) THEN
+        SinCornerAng = SQRT(1.0d0 - DOT_PRODUCT(W21,W23)**2)
+        DAXY = DWX * DWY * SinCornerAng
+      END IF
+
+      !           ---------------------
+      ! ---------- WINDOW ELEMENT LOOP ----------
+      !           ---------------------
+
+      DO IX = 1,NWX
+        IF (Rectangle) THEN
+          NWYlim = NWY
+        ELSE IF (Triangle) THEN
+          NWYlim = NWY - IX + 1
+        END IF
+
+        DO IY = 1,NWYlim
+          LSHCAL = LSHCAL + 1
+          SkyObstructionMult = 1.0
+
+          ! Center of win element in absolute coord sys
+          RWIN = W2 + (REAL(IX,r64) - 0.5d0) * W23 * DWX + (REAL(IY,r64) - 0.5d0) * W21 * DWY
+
+          ! Center of win element on TDD:DOME in absolute coord sys
+          ! If no TDD, RWIN2 = RWIN
+          RWIN2 = U2 + (REAL(IX,r64) - 0.5d0) * U23 * DWX + (REAL(IY,r64) - 0.5d0) * U21 * DWY
+
+          ! Distance between ref pt and window element
+          DIS = SQRT(DOT_PRODUCT(RWIN - RREF, RWIN - RREF))
+
+          ! Unit vector along ray from ref pt to element
+          RAY = (RWIN - RREF) / DIS
+
+          ! Cosine of angle between ray and window outward normal
+          COSB = DOT_PRODUCT(WNORM2, RAY)
+
+          ! If COSB > 0, direct light from window can reach ref pt. Otherwise go to loop
+          ! over sun position and calculate inter-reflected component of illuminance
+          IF (COSB > 0.) THEN
+            ! Azimuth (-pi to pi) and altitude (-pi/2 to pi/2) of ray. Azimuth = 0 is along east.
+            PHRAY = ASIN(RAY(3))
+            IF (ABS(RAY(1)) > 1.0d-5 .OR. ABS(RAY(2)) > 1.0d-5) THEN
+              THRAY = ATAN2(RAY(2), RAY(1))
+            ELSE
+              THRAY = 0.
+            END IF
+
+            ! Solid angle subtended by element wrt ref pt.
+            DAXY1 = DAXY
+            ! For triangle, at end of Y column only one half of parallelopiped's area contributes
+            IF (Triangle .AND. IY == NWYlim) DAXY1 = 0.5d0 * DAXY
+            DOMEGA = DAXY1 * COSB / (DIS * DIS)
+
+            ! Calculate position factor (used in glare calculation) for this
+            ! win element / ref pt / view-vector combination
+            POSFAC = 0.
+
+            ! Distance from ref pt to intersection of view vector and plane
+            ! normal to view vector containing the window element
+
+            RR = DIS * DOT_PRODUCT(RAY, VIEWVC2)
+            IF (RR > 0.) THEN
+              ! Square of distance from above intersection point to win element
+              ASQ = DIS * DIS - RR * RR
+              ! Vertical displacement of win element wrt ref pt
+              YD = RWIN2(3) - RREF2(3)
+              ! Horizontal and vertical displacement ratio and position factor
+              XR = SQRT(ABS(ASQ - YD * YD)) / RR
+              YR = ABS(YD / RR)
+              POSFAC = DayltgGlarePositionFactor(XR, YR)
+            END IF
+
+            IHitIntObs = 0
+            IntWinHitNum = 0
+            IHitIntWin = 0
+            TVISIntWinDisk = 0.0 ! Init Value
+            TVISIntWin = 0.0
+
+            IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+              ! Unshaded visible transmittance of TDD for a single ray from sky/ground element
+              TVISB = TransTDD(PipeNum, COSB, VisibleBeam) * SurfaceWindow(IWin)%GlazedFrac
+
+            ELSE ! Regular window
+              ! Vis trans of glass for COSB incidence angle
+              TVISB = POLYF(COSB,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
+                         SurfaceWindow(IWin)%LightWellEff
+              IF(ExtWinType == AdjZoneExtWin) THEN
+                IHitIntWin = 0
+                ! Does ray pass through an interior window in zone (ZoneNum) containing the ref point?
+                DO IntWin = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+                  IF(Surface(IntWin)%Class == SurfaceClass_Window .AND. Surface(IntWin)%ExtBoundCond >= 1) THEN
+                    IF(Surface(Surface(IntWin)%ExtBoundCond)%Zone == Surface(IWin)%Zone) THEN
+                      CALL DayltgPierceSurface(IntWin,RREF,RAY,IHitIntWin,HitPtIntWin)
+                      IF(IHitIntWin > 0) THEN
+                        IntWinHitNum = IntWin
+                        COSBIntWin = DOT_PRODUCT(Surface(IntWin)%OutNormVec(1:3),RAY)
+                        IF(COSBIntWin <= 0.0) THEN
+                          IHitIntWin = 0
+                          IntWinHitNum = 0
+                          CYCLE
+                        END IF
+                        TVISIntWin = POLYF(COSBIntWin,Construct(Surface(IntWin)%Construction)%TransVisBeamCoef(1))
+                        TVISB = TVISB * TVISIntWin
+                        EXIT  ! Ray passes thru interior window; exit from DO loop
+                      END IF
+                    END IF
+                  END IF
+                END DO  ! End of loop over surfaces in zone ZoneNum
+
+                IF(IHitIntWin == 0) THEN
+                  ! Ray does not pass through an int win in ZoneNum. Therefore, it hits the opaque part
+                  ! of a surface between ref point in ZoneNum and ext win element in adjacent zone.
+                  IHitIntObs = 1
+                END IF
+              END IF  ! End of check if this is an ext win in an adjacent zone
+            END IF  ! End of check if TDD:Diffuser or regular exterior window
+
+            ! Check for interior obstructions
+            IF(ExtWinType == InZoneExtWin .AND. IHitIntObs == 0) THEN
+              ! Check for obstruction between reference point and window element
+              ! Returns IHitIntObs = 1 if obstruction is hit, IHitIntObs = 0 otherwise.
+              ! (Example of interior obstruction is a wall in an L-shaped room that lies
+              ! between reference point and window.)
+              CALL DayltgHitInteriorObstruction(IWin,RREF,RWIN,IHitIntObs)
+            END IF
+
+            IF(ExtWinType == AdjZoneExtWin .AND. IntWinHitNum > 0 .AND. IHitIntObs == 0) THEN
+              ! Check for obstruction between ref point and interior window through which ray passes
+              CALL DayltgHitInteriorObstruction(IntWinHitNum,RREF,HitPtIntWin,IHitIntObs)
+              IF(IHitIntObs == 0) THEN
+                ! Check for obstruction between intersection point on int window and ext win element
+                CALL DayltgHitBetWinObstruction(IntWinHitNum,IWin,HitPtIntwin,RWIN,IHitIntObs)
               END IF
             END IF
-          ELSE IF (ALF < 0.1524d0 .and. ExtWinType == AdjZoneExtWin) THEN
-            IF (DoingRefs) THEN
-              IF (RefErrIndex(IWin,IL) == 0) THEN ! only show error message once
-                CALL ShowWarningError('CalcDaylightCoeffRefPoints: For Zone="'//TRIM(Zone(ZoneNum)%Name)//        &
-                    '" External Window="'//TRIM(Surface(IWin)%Name)//'"in Zone="'//TRIM(Zone(Surface(IWin)%Zone)%Name)//      &
-                     '" reference point is less than 0.15m (6") from window plane ')
-                CALL ShowContinueError('Distance=['//trim(RoundSigDigits(ALF,1))//' m] to ref point=['//  &
-                   TRIM(RoundSigDigits(RREF(1),1))//  &
-                   ','//TRIM(RoundSigDigits(RREF(2),1))//  &
-                   ','//TRIM(RoundSigDigits(RREF(3),1))//'], Inaccuracy in Daylighting Calcs may result.')
-                RefErrIndex(IWin,IL)=1
-              ENDIF
-            ELSE
-              IF (MapErrIndex(IWin,IL) == 0) THEN ! only show error message once
-                CALL ShowWarningError('CalcDaylightCoeffMapPoints: For Zone="'//TRIM(Zone(ZoneNum)%Name)//        &
-                   '" External Window="'//TRIM(Surface(IWin)%Name)//'"in Zone="'//TRIM(Zone(Surface(IWin)%Zone)%Name)//      &
-                   '" map point is less than 0.15m (6") from window plane ')
-                CALL ShowContinueError('Distance=['//trim(RoundSigDigits(ALF,1))//' m] map point=['//  &
-                   TRIM(RoundSigDigits(RREF(1),1))//  &
-                   ','//TRIM(RoundSigDigits(RREF(2),1))//  &
-                   ','//TRIM(RoundSigDigits(RREF(3),1))//'], Inaccuracy in Map Calcs may result.')
-                MapErrIndex(IWin,IL)=1
-              ENDIF
-            END IF
-          END IF
 
-          ! Number of window elements in X and Y for daylighting calculation
-          IF (ALF > 0.1524d0) THEN
-            NDIVX = 1 + INT(4.d0 * WW / ALF)
-            NDIVY = 1 + INT(4.d0 * HW / ALF)
-          ENDIF
-
-!4254      CONTINUE
-
-          IF(ExtWinType == AdjZoneExtWin) THEN
-            ! Adjust number of exterior window elements to give acceptable number of rays through
-            ! interior windows in the zone (for accuracy of interior window daylighting calculation)
-            SolidAngExtWin = SafeDivide( ((Surface(IWin)%Area + SurfaceWindow(IWin)%DividerArea) / Surface(IWin)%Multiplier ),  &
-                                                              ALF**2)
-            SolidAngMinIntWin = ZoneDaylight(ZoneNum)%MinIntWinSolidAng
-            SolidAngRatio = MAX(1.0d0,SolidAngExtWin/SolidAngMinIntWin)
-            NDIVX = SQRT(SolidAngRatio)*NDIVX
-            NDIVY = SQRT(SolidAngRatio)*NDIVY
-          END IF
-
-          NWX = MIN(40,NDIVX)
-          NWY = MIN(40,NDIVY)
-
-          ! Discretization of triangle is simpler if NWX = NWY
-          IF (Triangle) THEN
-            NWX = MAX(NWX,NWY)
-            NWY = NWX
-          END IF
-
-          ! Edge lengths of window elements
-          DWX = WW / NWX
-          DWY = HW / NWY
-
-          ! Azimuth and altitude of window normal
-          SurfaceWindow(IWin)%Phi = ASIN(WNORM(3))
-          IF (ABS(WNORM(1)) > 1.0d-5 .OR. ABS(WNORM(2)) > 1.0d-5) THEN
-            SurfaceWindow(IWin)%Theta = ATAN2(WNORM(2), WNORM(1))
-          ELSE
-            SurfaceWindow(IWin)%Theta = 0.
-          END IF
-
-          ! Recalculation of values for TDD:DOME
-          IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
-
-            ! Look up the TDD:DOME object
-            PipeNum = FindTDDPipe(IWin)
-            IWin2 = TDDPipe(PipeNum)%Dome
-
-            ! Calculate reference point coords relative to the diffuser coordinate system
-            ! W21, W23, and WNORM are the unit vectors
-            REFD(1) = DOT_PRODUCT(REFWC,W21)
-            REFD(2) = DOT_PRODUCT(REFWC,W23)
-            REFD(3) = DOT_PRODUCT(REFWC,WNORM)
-
-            ! Calculate view vector coords relative to the diffuser coordinate system
-            VIEWVD(1) = DOT_PRODUCT(VIEWVC,W21)
-            VIEWVD(2) = DOT_PRODUCT(VIEWVC,W23)
-            VIEWVD(3) = DOT_PRODUCT(VIEWVC,WNORM)
-
-            U3 = Surface(IWin2)%Vertex(2)
-            U2 = Surface(IWin2)%Vertex(3)
-
-            IF(Surface(IWin2)%Sides == 4) THEN
-              ! Vertices of window (numbered counter-clockwise starting
-              ! at upper left as viewed from inside of room)
-              ! Assumes original vertices are numbered counter-clockwise from
-              ! upper left as viewed from outside.
-              U3 = Surface(IWin2)%Vertex(2)
-              U2 = Surface(IWin2)%Vertex(3)
-              U1 = Surface(IWin2)%Vertex(4)
-            ELSE IF(Surface(IWin2)%Sides == 3) THEN
-              U3 = Surface(IWin2)%Vertex(2)
-              U2 = Surface(IWin2)%Vertex(3)
-              U1 = Surface(IWin2)%Vertex(1)
+            IF(IHitIntObs == 0) THEN
+              IF(ExtWinType==InZoneExtWin .OR. (ExtWinType==AdjZoneExtWin .AND. IHitIntWin>0)) THEN
+                ! Increment solid angle subtended by portion of window above ref pt
+                SurfaceWindow(IWin)%SolidAngAtRefPt(IL) = SurfaceWindow(IWin)%SolidAngAtRefPt(IL) + DOMEGA
+                ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) =   &
+                              ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) + DOMEGA
+                ! Increment position-factor-modified solid angle
+                SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) =  &
+                      SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) + DOMEGA * POSFAC
+                ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) =  &
+                      ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) + DOMEGA * POSFAC
+              END IF
             END IF
 
-            ! Unit vectors from window vertex 2 to 1 and 2 to 3,
-            ! center point of window, and vector from ref pt to center of window
-            U21 = U1 - U2
-            U23 = U3 - U2
-            HW = SQRT(DOT_PRODUCT(U21,U21))
-            WW = SQRT(DOT_PRODUCT(U23,U23))
-            IF(Surface(IWin2)%Sides == 4) THEN
-              WC = U2 + (U23 + U21) / 2.d0
-            ELSE IF(Surface(IWin2)%Sides == 3) THEN
-              WC = U2 + (U23 + U21) / 3.0d0
-            END IF
-            SurfaceWindow(IWin2)%WinCenter = WC
-            ! Unit vectors
-            U21 = U21 / HW
-            U23 = U23 / WW
+            IF(IHitIntObs == 1) ObTrans = 0.0
 
-            ! Unit vector normal to dome (pointing away from TDD)
-            ! These are specific to the exterior.
-            ! NOTE:  Preserve WNORM for later in the code.
-            CALL DayltgCrossProduct(U21, U23, WNORM2)
-            WNORM2 = WNORM2 / (SQRT(DOT_PRODUCT(WNORM2,WNORM2)))
-
-            ! Azimuth and altitude of dome normal
-            ! These are specific to the exterior.
-            SurfaceWindow(IWin2)%Phi = ASIN(WNORM2(3))
-            IF (ABS(WNORM2(1)) > 1.0d-5 .OR. ABS(WNORM2(2)) > 1.0d-5) THEN
-              SurfaceWindow(IWin2)%Theta = ATAN2(WNORM2(2), WNORM2(1))
-            ELSE
-              SurfaceWindow(IWin2)%Theta = 0.0
+            IHitExtObs = 0
+            IF (IHitIntObs == 0) THEN
+              ! No interior obstruction was hit.
+              ! Check for exterior obstructions between window element and sky/ground.
+              ! Get product of transmittances of obstructions hit by ray.
+              ! ObTrans = 1.0 will be returned if no exterior obstructions are hit.
+              CALL DayltgHitObstruction(IHr,IWin2,RWIN2,RAY,ObTrans)
+              IF(ObTrans < 1.0) IHitExtObs = 1
             END IF
 
-            ! Calculate new virtual reference point coords relative to dome coord system
-            ! W21, W23, and WNORM2 are now the unit vectors for the dome coord system
-            REFWC = REFD(1) * U21 + REFD(2) * U23 + REFD(3) * WNORM2
-            RREF2 = WC - REFWC
-
-            ! Calculate new virtual view vector coords relative to dome coord system
-            VIEWVC2 = VIEWVD(1) * U21 + VIEWVD(2) * U23 + VIEWVD(3) * WNORM2
-
-            ! Copy several values from the diffuser so that DayltgInterReflectedIllum works correctly
-            ! These are specific to the interior.
-            SurfaceWindow(IWin2)%RhoCeilingWall = SurfaceWindow(IWin)%RhoCeilingWall
-            SurfaceWindow(IWin2)%RhoFloorWall = SurfaceWindow(IWin)%RhoFloorWall
-            SurfaceWindow(IWin2)%FractionUpgoing = SurfaceWindow(IWin)%FractionUpgoing
-            SurfaceWindow(IWin2)%GlazedFrac = SurfaceWindow(IWin)%GlazedFrac
-
-          ELSE
-            ! This is not a TDD:DIFFUSER.  Make sure nothing is messed up for a regular window.
-            IWin2 = IWin
-            WNORM2 = WNORM
-            RREF2 = RREF
-            VIEWVC2 = VIEWVC
-
-            U2 = W2
-            U21 = W21
-            U23 = W23
-          END IF
-
-          ! Initialize sky and sun components of direct illuminance (arrays EDIRSK, EDIRSU, EDIRSUdisk)
-          ! and average window luminance (arrays AVWLSK, AVWLSU, AVWLSUdisk), at ref pt.
-          EDIRSK = 0.
-          EDIRSU = 0.
-          EDIRSUdisk = 0.
-          AVWLSK = 0.
-          AVWLSU = 0.
-          AVWLSUdisk = 0.
-
-          ! Initialize solid angle subtended by window wrt ref pt
-          ! and solid angle weighted by glare position factor
-          IF (DoingRefs) THEN
-            SurfaceWindow(IWin)%SolidAngAtRefPt(IL) = 0.
-            SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) = 0.
-          ELSE
-            MapWindowSolidAngAtRefPt(loopwin,IL) = 0.
-            MapWindowSolidAngAtRefPtWtd(loopwin,IL) = 0.
-          ENDIF
-
-          ! Area of window element
-          IF (Rectangle) THEN
-            DAXY = DWX * DWY
-          ELSE IF (Triangle) THEN
-            SinCornerAng = SQRT(1.0d0 - DOT_PRODUCT(W21,W23)**2)
-            DAXY = DWX * DWY * SinCornerAng
-          END IF
-
-          !           ---------------------
-          ! ---------- WINDOW ELEMENT LOOP ----------
-          !           ---------------------
-
-          DO IX = 1,NWX
-            IF (Rectangle) THEN
-              NWYlim = NWY
-            ELSE IF (Triangle) THEN
-              NWYlim = NWY - IX + 1
-            END IF
-
-            DO IY = 1,NWYlim
-              LSHCAL = LSHCAL + 1
-              SkyObstructionMult = 1.0
-
-              ! Center of win element in absolute coord sys
-              RWIN = W2 + (REAL(IX,r64) - 0.5d0) * W23 * DWX + (REAL(IY,r64) - 0.5d0) * W21 * DWY
-
-              ! Center of win element on TDD:DOME in absolute coord sys
-              ! If no TDD, RWIN2 = RWIN
-              RWIN2 = U2 + (REAL(IX,r64) - 0.5d0) * U23 * DWX + (REAL(IY,r64) - 0.5d0) * U21 * DWY
-
-              ! Distance between ref pt and window element
-              DIS = SQRT(DOT_PRODUCT(RWIN - RREF, RWIN - RREF))
-
-              ! Unit vector along ray from ref pt to element
-              RAY = (RWIN - RREF) / DIS
-
-              ! Cosine of angle between ray and window outward normal
-              COSB = DOT_PRODUCT(WNORM2, RAY)
-
-              ! If COSB > 0, direct light from window can reach ref pt. Otherwise go to loop
-              ! over sun position and calculate inter-reflected component of illuminance
-              IF (COSB > 0.) THEN
-                ! Azimuth (-pi to pi) and altitude (-pi/2 to pi/2) of ray. Azimuth = 0 is along east.
-                PHRAY = ASIN(RAY(3))
-                IF (ABS(RAY(1)) > 1.0d-5 .OR. ABS(RAY(2)) > 1.0d-5) THEN
-                  THRAY = ATAN2(RAY(2), RAY(1))
-                ELSE
-                  THRAY = 0.
-                END IF
-
-                ! Solid angle subtended by element wrt ref pt.
-                DAXY1 = DAXY
-                ! For triangle, at end of Y column only one half of parallelopiped's area contributes
-                IF (Triangle .AND. IY == NWYlim) DAXY1 = 0.5d0 * DAXY
-                DOMEGA = DAXY1 * COSB / (DIS * DIS)
-
-                ! Calculate position factor (used in glare calculation) for this
-                ! win element / ref pt / view-vector combination
-                POSFAC = 0.
-
-                ! Distance from ref pt to intersection of view vector and plane
-                ! normal to view vector containing the window element
-
-                RR = DIS * DOT_PRODUCT(RAY, VIEWVC2)
-                IF (RR > 0.) THEN
-                  ! Square of distance from above intersection point to win element
-                  ASQ = DIS * DIS - RR * RR
-                  ! Vertical displacement of win element wrt ref pt
-                  YD = RWIN2(3) - RREF2(3)
-                  ! Horizontal and vertical displacement ratio and position factor
-                  XR = SQRT(ABS(ASQ - YD * YD)) / RR
-                  YR = ABS(YD / RR)
-                  POSFAC = DayltgGlarePositionFactor(XR, YR)
-                END IF
-
-                IHitIntObs = 0
-                IntWinHitNum = 0
-                IHitIntWin = 0
-                TVISIntWinDisk = 0.0 ! Init Value
-                TVISIntWin = 0.0
-
-                IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
-                  ! Unshaded visible transmittance of TDD for a single ray from sky/ground element
-                  TVISB = TransTDD(PipeNum, COSB, VisibleBeam) * SurfaceWindow(IWin)%GlazedFrac
-
-                ELSE ! Regular window
-                  ! Vis trans of glass for COSB incidence angle
-                  TVISB = POLYF(COSB,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
-                             SurfaceWindow(IWin)%LightWellEff
-                  IF(ExtWinType == AdjZoneExtWin) THEN
-                    IHitIntWin = 0
-                    ! Does ray pass through an interior window in zone (ZoneNum) containing the ref point?
-                    DO IntWin = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
-                      IF(Surface(IntWin)%Class == SurfaceClass_Window .AND. Surface(IntWin)%ExtBoundCond >= 1) THEN
-                        IF(Surface(Surface(IntWin)%ExtBoundCond)%Zone == Surface(IWin)%Zone) THEN
-                          CALL DayltgPierceSurface(IntWin,RREF,RAY,IHitIntWin,HitPtIntWin)
-                          IF(IHitIntWin > 0) THEN
-                            IntWinHitNum = IntWin
-                            COSBIntWin = DOT_PRODUCT(Surface(IntWin)%OutNormVec(1:3),RAY)
-                            IF(COSBIntWin <= 0.0) THEN
-                              IHitIntWin = 0
-                              IntWinHitNum = 0
-                              CYCLE
-                            END IF
-                            TVISIntWin = POLYF(COSBIntWin,Construct(Surface(IntWin)%Construction)%TransVisBeamCoef(1))
-                            TVISB = TVISB * TVISIntWin
-                            EXIT  ! Ray passes thru interior window; exit from DO loop
-                          END IF
-                        END IF
-                      END IF
-                    END DO  ! End of loop over surfaces in zone ZoneNum
-
-                    IF(IHitIntWin == 0) THEN
-                      ! Ray does not pass through an int win in ZoneNum. Therefore, it hits the opaque part
-                      ! of a surface between ref point in ZoneNum and ext win element in adjacent zone.
-                      IHitIntObs = 1
-                    END IF
-                  END IF  ! End of check if this is an ext win in an adjacent zone
-                END IF  ! End of check if TDD:Diffuser or regular exterior window
-
-                ! Check for interior obstructions
-                IF(ExtWinType == InZoneExtWin .AND. IHitIntObs == 0) THEN
-                  ! Check for obstruction between reference point and window element
-                  ! Returns IHitIntObs = 1 if obstruction is hit, IHitIntObs = 0 otherwise.
-                  ! (Example of interior obstruction is a wall in an L-shaped room that lies
-                  ! between reference point and window.)
-                  CALL DayltgHitInteriorObstruction(IWin,RREF,RWIN,IHitIntObs)
-                END IF
-
-                IF(ExtWinType == AdjZoneExtWin .AND. IntWinHitNum > 0 .AND. IHitIntObs == 0) THEN
-                  ! Check for obstruction between ref point and interior window through which ray passes
-                  CALL DayltgHitInteriorObstruction(IntWinHitNum,RREF,HitPtIntWin,IHitIntObs)
-                  IF(IHitIntObs == 0) THEN
-                    ! Check for obstruction between intersection point on int window and ext win element
-                    CALL DayltgHitBetWinObstruction(IntWinHitNum,IWin,HitPtIntwin,RWIN,IHitIntObs)
-                  END IF
-                END IF
-
-                IF(IHitIntObs == 0) THEN
-                  IF(ExtWinType==InZoneExtWin .OR. (ExtWinType==AdjZoneExtWin .AND. IHitIntWin>0)) THEN
-                    IF (DoingRefs) THEN
-                      ! Increment solid angle subtended by portion of window above ref pt
-                      SurfaceWindow(IWin)%SolidAngAtRefPt(IL) = SurfaceWindow(IWin)%SolidAngAtRefPt(IL) + DOMEGA
-                      ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) =   &
-                                    ZoneDaylight(ZoneNum)%SolidAngAtRefPt(IL,loopwin) + DOMEGA
-                      ! Increment position-factor-modified solid angle
-                      SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) =  &
-                            SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) + DOMEGA * POSFAC
-                      ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) =  &
-                            ZoneDaylight(ZoneNum)%SolidAngAtRefPtWtd(IL,loopwin) + DOMEGA * POSFAC
-                    ELSE
-                      MapWindowSolidAngAtRefPt(loopwin,IL) = MapWindowSolidAngAtRefPt(loopwin,IL) + DOMEGA
-                      ZoneDaylight(ZoneNum)%SolidAngAtMapPt(IL,loopwin) =   &
-                                    ZoneDaylight(ZoneNum)%SolidAngAtMapPt(IL,loopwin) + DOMEGA
-                      MapWindowSolidAngAtRefPtWtd(loopwin,IL) =   &
-                                    MapWindowSolidAngAtRefPtWtd(loopwin,IL)  + DOMEGA * POSFAC
-                      ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd(IL,loopwin) =  &
-                            ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd(IL,loopwin) + DOMEGA * POSFAC
-                    ENDIF
-                  END IF
-                END IF
-
-                IF(IHitIntObs == 1) ObTrans = 0.0
-
-                IHitExtObs = 0
-                IF (IHitIntObs == 0) THEN
-                  ! No interior obstruction was hit.
-                  ! Check for exterior obstructions between window element and sky/ground.
-                  ! Get product of transmittances of obstructions hit by ray.
-                  ! ObTrans = 1.0 will be returned if no exterior obstructions are hit.
-                  CALL DayltgHitObstruction(IHr,IWin2,RWIN2,RAY,ObTrans)
-                  IF(ObTrans < 1.0) IHitExtObs = 1
-                END IF
-
-                IF(CalcSolRefl .AND. PHRAY < 0.0 .AND. ObTrans > 1.d-6) THEN
-                  ! Calculate effect of obstructions on shading of sky diffuse reaching the ground point hit
-                  ! by the ray. This effect is given by the ratio SkyObstructionMult =
-                  ! (obstructed sky diffuse at ground point)/(unobstructed sky diffuse at ground point).
-                  ! This ratio is calculated for an isotropic sky.
-                  ! Ground point hit by the ray:
-                  Alfa = ACOS(-RAY(3))
-                  Beta = ATAN2(RAY(2),RAY(1))
-                  HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
-                  GroundHitPt(3) = GroundLevelZ
-                  GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
-                  GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
-                  ! Send rays upward from hit point and see which ones are unobstructed and so go to sky.
-                  ! Divide hemisphere centered at ground hit point into elements of altitude Phi and
-                  ! azimuth Theta and create upward-going ground ray unit vector at each Phi,Theta pair.
-                  ! Phi = 0 at the horizon; Phi = Pi/2 at the zenith.
-                  DPhi = PiOvr2 / (AltAngStepsForSolReflCalc/2.d0)
-                  DTheta = 2.d0*Pi / (2.d0*AzimAngStepsForSolReflCalc)
-                  SkyGndObs = 0.0
-                  SkyGndUnObs = 0.0
-                  ! Altitude loop
-                  DO IPhi = 1,(AltAngStepsForSolReflCalc/2)
-                    Phi = (IPhi - 0.5d0) * DPhi
-                    SPhi = SIN(Phi)
-                    CPhi = COS(Phi)
-                    ! Third component of ground ray unit vector in (Theta,Phi) direction
-                    URay(3) = SPhi
-                    dOmegaGnd = CPhi * DTheta * DPhi
-                    ! Cosine of angle of incidence of ground ray on ground plane
-                    CosIncAngURay = SPhi
-                    IncAngSolidAngFac = CosIncAngURay*dOmegaGnd/Pi
-                    ! Azimuth loop
-                    DO ITheta = 1,2*AzimAngStepsForSolReflCalc
-                      Theta = (ITheta - 0.5d0) * DTheta
-                      URay(1) = CPhi * COS(Theta)
-                      URay(2) = CPhi * SIN(Theta)
-                      SkyGndUnObs = SkyGndUnObs + IncAngSolidAngFac
-                      ! Does this ground ray hit an obstruction?
-                      IHitObs = 0
-                      DO ObsSurfNum = 1, TotSurfaces
-                        IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
-                        CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,URay,IHitObs,ObsHitPt)
-                        IF(IHitObs > 0) EXIT
-                      END DO
-                      IF(IHitObs > 0) CYCLE ! Obstruction hit
-                      ! Sky is hit
-                      SkyGndObs = SkyGndObs + IncAngSolidAngFac
-                    END DO ! End of azimuth loop
-                  END DO  ! End of altitude loop
-                  SkyObstructionMult = SkyGndObs / (SkyGndUnObs + 1.E-8)
-                END IF  ! End of check if solar reflection calculation is in effect
-
-              END IF  ! End of check if COSB > 0
-
-              !           -------------------
-              ! ---------- SUN POSITION LOOP ----------
-              !           -------------------
-
-              ! Sun position counter. Used to avoid calculating various quantities
-              ! that do not depend on sun position.
-              ISunPos = 0
-
-              DO IHR = 1,24
-                IF (SUNCOSHR(3,IHR) < SunIsUpValue) CYCLE
-                ISunPos = ISunPos + 1
-
-                ! Altitude of sun (degrees)
-                PHSUN = PHSUNHR(IHR)
-                SPHSUN = SPHSUNHR(IHR)
-                CPHSUN = CPHSUNHR(IHR)
-
-                ! Azimuth of sun in absolute coord sys
-                THSUN = THSUNHR(IHR)
-
-                ! First time through, call routine to calculate inter-reflected illuminance
-                ! at reference point and luminance of window with shade, screen or blind.
-
-                ! Rob/TH - Not sure whether this call is necessary for interior zones with interior windows only.
-!  new code would be -
-! IF (LSHCAL == 1 .AND. ExtWinType /= AdjZoneExtWin) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
-                IF (LSHCAL == 1) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
-
-                ! Daylighting shelf simplification:  The shelf completely blocks all view of the window,
-                ! only interrelflected illumination is allowed (see DayltgInterReflectedIllum above).
-                ! Everything else in this loop has to do with direct luminance from the window.
-                IF (InShelfSurf > 0) CYCLE
-
-                IF (COSB <= 0.0) CYCLE
-
-                XEDIRSK = 0.
-                XEDIRSU = 0.
-                XAVWLSK = 0.
-
-                ! Add contribution of this window element to glare and to
-                ! direct illuminance at reference point
-
-                ! The I,J,K indices for sky and sun components of direct illuminance
-                ! (EDIRSK, EDIRSU) and average window luminance (AVWLSK, AVWLSU) are:
-                ! I=1 for clear sky, =2 Clear turbid, =3 Intermediate, =4 Overcast;
-                ! J=1 for bare window, =2 for window with shade or fixed slat-angle blind;
-                !  = 2,3,...,MaxSlatAngs+1 for window with variable slat-angle blind;
-                ! K = sun position index.
-
-                ! ----- CASE I -- BARE WINDOW (no shading device)
-
-                ! Beam solar and sky solar reflected from nearest obstruction.
-                ! In the following IHitIntObs == 0  ==> no interior obstructions hit, and
-                !                  IHitExtObs == 1  ==> one or more exterior obstructions hit.
-                IF(CalcSolRefl .AND. IHitIntObs == 0 .AND. IHitExtObs == 1) THEN
-                  ! One or more exterior obstructions was hit; get contribution of reflection
-                  ! from nearest obstruction.
-                  ! Find obstruction whose hit point is closest to this ray's window element
-                  CALL DayltgClosestObstruction(RWIN2,Ray,NearestHitSurfNum,NearestHitPt)
-                  IF(NearestHitSurfNum > 0) THEN
-
-                    ! Beam solar reflected from nearest obstruction
-
-                    CALL DayltgSurfaceLumFromSun(IHr,Ray,NearestHitSurfNum,NearestHitPt,LumAtHitPtFrSun)
-                    AVWLSU(1,IHR) = AVWLSU(1,IHR) + LumAtHitPtFrSun * TVISB
-                    IF (PHRAY >= 0.) EDIRSU(1,IHR) = EDIRSU(1,IHR) + LumAtHitPtFrSun * DOMEGA * RAY(3) * TVISB
-
-                    ! Sky solar reflected from nearest obstruction
-
-                    ObsConstrNum = Surface(NearestHitSurfNum)%Construction
-                    IF(ObsConstrNum > 0) THEN
-                      ! Exterior building surface is nearest hit
-                      IF(.NOT.Construct(ObsConstrNum)%TypeIsWindow) THEN
-                        ! Obstruction is not a window, i.e., is an opaque surface
-                        ObsVisRefl = 1.0d0 - Material(Construct(ObsConstrNum)%LayerPoint(1))%AbsorpVisible
-                      ELSE
-                        ! Obstruction is a window; assume it is bare
-                        IF(SurfaceWindow(NearestHitSurfNum)%StormWinFlag==1)  &
-                          ObsConstrNum = Surface(NearestHitSurfNum)%StormWinConstruction
-                        ObsVisRefl = Construct(ObsConstrNum)%ReflectVisDiffFront
-                      END IF
-                    ELSE
-                      ! Shadowing surface is nearest hit
-                      IF(Surface(NearestHitSurfNum)%Shelf > 0) THEN
-                        ! This is a daylighting shelf, for which reflection is separately calculated
-                        ObsVisRefl = 0.
-                      ELSE
-                        ObsVisRefl = Surface(NearestHitSurfNum)%ShadowSurfDiffuseVisRefl
-                        IF(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct > 0) &
-                          ObsVisRefl = ObsVisRefl + Surface(NearestHitSurfNum)%ShadowSurfGlazingFrac *  &
-                          Construct(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct)%ReflectVisDiffFront
-                      END IF
-                    END IF
-                    NearestHitSurfNumX = NearestHitSurfNum
-                    ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
-                    ! The following gets the correct side of a shadowing surface for reflection.
-                    IF(Surface(NearestHitSurfNum)%ShadowingSurf) THEN
-                      IF(DOT_PRODUCT(RAY,Surface(NearestHitSurfNum)%OutNormVec) > 0.0)  NearestHitSurfNumX = &
-                           NearestHitSurfNum + 1
-                    END IF
-                    IF (.not. DetailedSkyDiffuseAlgorithm .or. .not.  ShadingTransmittanceVaries .or.  &
-                        SolarDistribution == MinimalShadowing) THEN
-                      SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
-                               DifShdgRatioIsoSky(NearestHitSurfNumX) / Pi
-                    ELSE
-                      SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
-                               DifShdgRatioIsoSkyHRTS(NearestHitSurfNumX,IHR,1) / Pi
-                    ENDIF
-                    DO ISky = 1,4
-                      XAVWLSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum
-                      AVWLSK(ISky,1,IHR) = AVWLSK(ISky,1,IHR) + XAVWLSK(ISky) * TVISB
-                      IF (PHRAY >= 0.) THEN
-                        XEDIRSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum * DOMEGA * RAY(3)
-                        EDIRSK(ISky,1,IHR) = EDIRSK(ISky,1,IHR) + XEDIRSK(ISky) * TVISB
-                      END IF
-                    END DO
-                  END IF
-                END IF  ! End of check if solar reflection calculation is in effect
-
-                IF(ObTrans > 1.d-6) THEN
-                  ! Ray did not hit an obstruction or the transmittance product of hit obstructions is non-zero.
-                  ! Contribution of sky or ground luminance in cd/m2
-                  IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
-                    ! Make all transmitted light diffuse for a TDD with a bare diffuser
-                    DO ISKY = 1,4
-                      AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR)
-                      IF(ISky == 1) THEN
-                        AVWLSU(1,IHR) = AVWLSU(1,IHR) + WLUMSU(1,IHR)
-                        AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + WLUMSUdisk(1,IHR)
-                      END IF
-                      IF(PHRAY > 0.) THEN
-                        EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR) * DOMEGA * RAY(3)
-                        IF(ISky == 1) EDIRSU(1,IHR) = EDIRSU(1,IHR) + WLUMSU(1,IHR) * DOMEGA * RAY(3)
-                      END IF
-                    END DO
-
-                  ELSE ! Bare window
-
-                    DO ISKY = 1,4
-                      IF (PHRAY > 0.) THEN
-                        ! Ray heads upward to sky
-                        ELUM = DayltgSkyLuminance(ISky,THRAY,PHRAY)
-                        XEDIRSK(ISKY) = ELUM * DOMEGA * RAY(3)
-                        DEDIR  = XEDIRSK(ISKY) * TVISB
-                        EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + DEDIR * ObTrans
-                        AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + ELUM * TVISB * ObTrans
-                        XAVWLSK(ISKY) = ELUM * ObTrans
-                      ELSE ! PHRAY <= 0.
-                        ! Ray heads downward to ground.
-                        ! Contribution from sky diffuse reflected from ground
-                        XAVWLSK(ISKY) = GILSK(ISKY,IHR) * (GndReflectanceForDayltg / PI) * ObTrans *  &
-                                                  SkyObstructionMult
-                        AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + TVISB * XAVWLSK(ISKY)
-                        ! Contribution from beam solar reflected from ground (beam reaching ground point
-                        ! can be obstructed [SunObstructionMult < 1.0] if CalcSolRefl = .TRUE.)
-                        IF(ISky == 1) THEN
-                          SunObstructionMult = 1.0
-                          IF(CalcSolRefl) THEN
-                            ! Coordinates of ground point hit by the ray
-                            Alfa = ACOS(-RAY(3))
-                            Beta = ATAN2(RAY(2),RAY(1))
-                            HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
-                            GroundHitPt(3) = GroundLevelZ
-                            GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
-                            GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
-                            ! Sun reaches ground point if vector from this point to the sun is unobstructed
-                            IHitObs = 0
-                            DO ObsSurfNum = 1,TotSurfaces
-                               IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
-                               CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,SunCosHr(1:3,IHr),IHitObs,ObsHitPt)
-                               IF(IHitObs > 0) EXIT
-                            END DO
-                            IF(IHitObs > 0) SunObstructionMult = 0.0
-                          END IF
-                          AVWLSU(1,IHR) = AVWLSU(1,IHR) +  &
-                               TVISB * GILSU(IHR) * (GndReflectanceForDayltg / PI) * ObTrans * SunObstructionMult
-                        END IF  ! End of check if ISky = 1
-                      END IF  ! End of check if ray is going up or down
-                    END DO  ! End of loop over sky types
-                  END IF ! End of check if bare window or TDD:DIFFUSER
-                END IF ! End of check if ObTrans > 1.E-6
-
-                !
-                ! Illuminance from beam solar (without interior reflection)
-                !
-                ! Just run this once on the last pass
-                IF (IX == NWX .AND. IY == NWY) THEN ! Last pass
-
-                  ! Beam solar reaching reference point directly without exterior reflection
-
-                  ! Unit vector from ref. pt. to sun
-                  RAYCOS(1) = CPHSUN * COS(THSUN)
-                  RAYCOS(2) = CPHSUN * SIN(THSUN)
-                  RAYCOS(3) = SPHSUN
-
-                  ! Is sun on front side of exterior window?
-                  COSI = DOT_PRODUCT(WNORM2,RAYCOS)
-                  IF (COSI > 0.) THEN
-
-                    ! Does RAYCOS pass thru exterior window? HP is point that RAYCOS intersects window plane.
-                    CALL DayltgPierceSurface(IWin2,RREF2,RAYCOS,IP,HP)
-                    IHitIntObsDisk = 0
-                    IF (IP > 0) THEN
-                      IF(ExtWinType == InZoneExtWin) THEN
-                        ! Check for interior obstructions between reference point and HP.
-                        CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHitIntObsDisk)
-                      END IF
-                      ObTransDisk = 0.0  ! Init value
-                      ! Init flag for vector from RP to sun passing through interior window
-                      IHitIntWinDisk = 0
-                      IF(ExtWinType == AdjZoneExtWin) THEN ! This block is for RPs in zones with interior windows
-                                                           ! adjacent to zones with exterior windows
-                        ! Does RAYCOS pass through interior window in zone containing RP?
-                        DO IntWinDisk = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
-                          IF(Surface(IntWinDisk)%Class==SurfaceClass_Window .AND. Surface(IntWinDisk)%ExtBoundCond >= 1) THEN
-                            IF(Surface(Surface(IntWinDisk)%ExtBoundCond)%Zone == Surface(IWin2)%Zone) THEN
-                              CALL DayltgPierceSurface(IntWinDisk,RREF,RAYCOS,IHitIntWinDisk,HitPtIntWinDisk)
-                              IF(IHitIntWinDisk > 0) THEN
-                                IntWinDiskHitNum = IntWinDisk
-                                COSBIntWin = DOT_PRODUCT(Surface(IntWinDisk)%OutNormVec(1:3),RAYCOS)
-                                IF(COSBIntWin <= 0.0) THEN
-                                  IHitIntWinDisk = 0
-                                  IntWinDiskHitNum = 0
-                                  CYCLE
-                                END IF
-                                TVISIntWinDisk = POLYF(COSBIntWin,Construct(Surface(IntWinDisk)%Construction)%TransVisBeamCoef(1))
-                                EXIT
-                              END IF
-                            END IF
-                          END IF
-                        END DO
-
-                        IF(IHitIntWinDisk == 0) THEN  ! Vector from RP to sun does not pass through interior window
-                          ObTransDisk = 0.0
-                          IHIT = 1             !!fcw Is this needed?
-                        END IF
-
-                        ! Check for interior obstructions between ref point and interior window
-                        IHitIntObsDisk = 0
-                        IF(IHitIntWinDisk > 0) THEN
-                          CALL DayltgHitInteriorObstruction(IntWinDiskHitNum,RREF,HitPtIntWinDisk,IHitIntObsDisk)
-                          ! If no obstruction between RP and hit int win, check for obstruction
-                          ! between int win and ext win
-                          IF(IHitIntObsDisk == 0) &
-                            CALL DayltgHitBetWinObstruction(IntWinDiskHitNum,IWin2,HitPtIntWinDisk,HP,IHitIntObsDisk)
-                        END IF
-                        IF(IHitIntObsDisk == 1) ObTransDisk = 0.0
-                      END IF  ! case where RP is in zone with interior window adjacent to zone with exterior window
-
-                      IHitExtObsDisk = 0
-                      ! RJH 08-25-07 IHitIntWinDisk should not be reset to 0 here, and should be tested below.
-                      ! This is to correct logic flaw causing direct solar to reach adjacent zone refpt
-                      ! when vector to sun does not pass through interior window
-                      ! IHitIntWinDisk = 0
-                      IF(IHitIntObsDisk == 0) THEN  ! No interior obstruction was hit
-                        ! Net transmittance of exterior obstructions encountered by RAYCOS
-                        ! ObTransDisk = 1.0 will be returned if no exterior obstructions are hit.
-                        CALL DayltgHitObstruction(IHr,IWin2,RREF2,RAYCOS,ObTransDisk)
-                        IF(ObTransDisk < 1.0) IHitExtObsDisk = 1
-                        ! RJH 08-26-07 However, if this is a case of interior window
-                        ! and vector to sun does not pass through interior window
-                        ! then reset ObTransDisk to 0.0 since it is the key test for adding
-                        ! contribution of sun to RP below.
-                        IF((ExtWinType == AdjZoneExtWin) .AND. (IHitIntWinDisk == 0)) THEN
-                          ObTransDisk = 0.0
-                        END IF
-                      END IF
-
-                      ! PETER: need side wall mounted TDD to test this
-                      ! PETER: probably need to replace RREF2 with RWIN2
-                      ! PETER: need to check for interior obstructions too.
-
-                      IF (ObTransDisk > 1.d-6) THEN
-
-                        ! Sun reaches reference point;  increment illuminance.
-                        ! Direct normal illuminance is normalized to 1.0
-
-                        IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
-                          ! No beam is transmitted.  Takes care of TDD with a bare diffuser and all types of blinds.
-                          TVISS = 0.0
-                        ELSE
-                          ! Beam transmittance for bare window and all types of blinds
-                          TVISS = POLYF(COSI,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
-                                     SurfaceWindow(IWin)%LightWellEff
-                          IF(ExtWinType==AdjZoneExtWin.AND.IHitIntWinDisk==1)  &
-                            TVISS = TVISS * TVISIntWinDisk
-                        END IF
-
-                        EDIRSUdisk(1,IHR) = RAYCOS(3) * TVISS * ObTransDisk  ! Bare window
-
-                        TransBmBmMult = 0.0
-                        IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.   &
-                            ShType == WSC_ST_BetweenGlassBlind) THEN
-                          CALL ProfileAngle(IWin,RAYCOS,Blind(BlNum)%SlatOrientation,ProfAng)
-                          ! Contribution of beam passing through slats and reaching reference point
-                          DO JB = 1,MaxSlatAngs
-                            !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                            IF (SurfaceWindow(IWin)%MovableSlats) THEN
-                              SlatAng = (JB - 1) * PI / (MaxSlatAngs - 1)
-                            ELSE
-                              SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
-                            END IF
-                            TransBmBmMult(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
-                                                 Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
-                            EDIRSUdisk(JB+1,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(JB) * ObTransDisk
-
-                            ! do this only once for fixed slat blinds
-                            IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
-                          END DO
-                        ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-!                          pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
-!                          SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
-!                          SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
-                          CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
-                                                           Theta=(THSUN - SurfaceWindow(IWin)%Theta))
-                          TransBmBmMult(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
-                          EDIRSUdisk(2,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(1) * ObTransDisk
-                        END IF
-
-                        ! Glare from solar disk
-
-                        ! Position factor for sun (note that AZVIEW is wrt y-axis and THSUN is wrt
-                        ! x-axis of absolute coordinate system.
-                        XR = TAN(ABS(PIOVR2 - AZVIEW - THSUN) + 0.001d0)
-                        YR = TAN(PHSUN + 0.001d0)
-                        POSFAC = DayltgGlarePositionFactor(XR,YR)
-
-                        IF (DoingRefs) THEN
-                          IF (POSFAC /= 0.0 .AND. SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) > 0.000001d0) THEN
-                            ! Increment window luminance.  Luminance of solar disk (cd/m2)
-                            ! is 1.47*10^4*(direct normal solar illuminance) for direct normal solar
-                            ! illuminance in lux (lumens/m2). For purposes of calculating daylight factors
-                            ! direct normal solar illuminance = 1.0.
-                            ! Solid angle subtended by sun is 0.000068 steradians
-
-                            XAVWL = 14700.d0 * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
-                                     SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL)**0.8d0
-                            AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
-
-                            IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
-                                ShType == WSC_ST_BetweenGlassBlind) THEN
-                              DO JB = 1,MaxSlatAngs
-                                !IF (.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                                AVWLSUdisk(JB+1,IHR) = XAVWL * TVISS * TransBmBmMult(JB) * ObTransDisk
-                                IF (.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
-                              END DO
-                            ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-                              AVWLSUdisk(2,IHR) = XAVWL * TVISS * TransBmBmMult(1) * ObTransDisk
-                            END IF
-                          END IF ! Position factor
-                        ELSE
-                          IF (POSFAC /= 0.0 .AND. MapWindowSolidAngAtRefPtWtd(loopwin,IL) > 0.000001d0) THEN
-                            ! Increment window luminance.  Luminance of solar disk (cd/m2)
-                            ! is 1.47*10^4*(direct normal solar illuminance) for direct normal solar
-                            ! illuminance in lux (lumens/m2). For purposes of calculating daylight factors
-                            ! direct normal solar illuminance = 1.0.
-                            ! Solid angle subtended by sun is 0.000068 steradians
-
-                            XAVWL = 14700.d0 * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
-                                     MapWindowSolidAngAtRefPtWtd(loopwin,IL)**0.8d0
-                            AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
-
-                            IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
-                                ShType == WSC_ST_BetweenGlassBlind) THEN
-                              DO JB = 1,MaxSlatAngs
-                                !IF (.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                                AVWLSUdisk(JB+1,IHR) = XAVWL * TVISS * TransBmBmMult(JB) * ObTransDisk
-                                IF (.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
-                              END DO
-                            ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-                              AVWLSUdisk(2,IHR) = XAVWL * TVISS * TransBmBmMult(1) * ObTransDisk
-                            END IF
-                          END IF ! Position factor
-                        ENDIF
-                      END IF ! Beam avoids all obstructions
-                    END IF ! Beam passes thru window
-                  END IF ! Sun on front side
-
-                  ! Beam solar reaching reference point after beam-beam (specular) reflection from
-                  ! an exterior surface
-
-                  IF(CalcSolRefl) THEN
-                    ! Receiving surface number corresponding this window
-                    RecSurfNum = Surface(IWin2)%ShadowSurfRecSurfNum
-                    IF (RecSurfNum > 0) THEN    ! interior windows do not apply
-                      IF(SolReflRecSurf(RecSurfNum)%NumPossibleObs > 0) THEN
-                        ! This window has associated obstructions that could reflect beam onto the window
-                        DO loop = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
-                          ReflSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop)
-                          ReflSurfNumX = ReflSurfNum
-                          ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
-                          ! The following gets the correct side of a shadowing surface for reflection.
-                          IF(Surface(ReflSurfNum)%ShadowingSurf) THEN
-                            IF(DOT_PRODUCT(RAYCOS,Surface(ReflSurfNum)%OutNormVec) < 0.0)  ReflSurfNumX = &
-                            ReflSurfNum + 1
-                          END IF
-                          ! Require that the surface can have specular reflection
-                          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .OR. &
-                             Surface(ReflSurfNum)%ShadowSurfGlazingFrac > 0.0) THEN
-                            ReflNorm = Surface(ReflSurfNumX)%OutNormVec
-                            ! Vector to sun that is mirrored in obstruction
-                            SunVecMir = RAYCOS - 2.0d0*DOT_PRODUCT(RAYCOS,ReflNorm)*ReflNorm
-                            ! Skip if reflecting surface is not sunlit
-                            IF(SunlitFrac(ReflSurfNumX,IHr,1) < 0.01d0) CYCLE
-                            ! Skip if altitude angle of mirrored sun is negative since reflected sun cannot
-                            ! reach reference point in this case
-                            IF(SunVecMir(3) <= 0.0) CYCLE
-                            ! Cosine of incidence angle of reflected beam on window
-                            CosIncAngRec = DOT_PRODUCT(Surface(IWin2)%OutNormVec,SunVecMir)
-                            IF(CosIncAngRec <= 0.0) CYCLE
-                            ! Does ray from ref. pt. along SunVecMir pass through window?
-                            CALL DayltgPierceSurface(IWin2,RREF2,SunVecMir,IP,HP)
-                            IF(IP == 0) CYCLE  ! Ray did not pass through window
-                            ! Check if this ray hits interior obstructions
-                            CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHit)
-                            IF(IHit > 0) CYCLE ! Interior obstruction was hit
-                            ! Does ray hit this reflecting surface?
-                            CALL DayltgPierceSurface(ReflSurfNum,RREF2,SunVecMir,IHitRefl,HitPtRefl)
-                            IF(IHitRefl == 0) CYCLE  ! Ray did not hit this reflecting surface
-                            ReflDistance = SQRT(DOT_PRODUCT(HitPtRefl-RREF2,HitPtRefl-RREF2))
-                            ! Is ray from ref. pt. to reflection point (HitPtRefl) obstructed?
-                            IHitObsRefl = 0
-                            DO loop2 = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
-                              ObsSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop2)
-                              IF(ObsSurfNum == ReflSurfNum .OR. ObsSurfNum == Surface(ReflSurfNum)%BaseSurf) CYCLE
-                              CALL DayltgPierceSurface(ObsSurfNum,RREF2,SunVecMir,IHitObs,HitPtObs)
-                              IF(IHitObs > 0) THEN
-                                ObsDistance = SQRT(DOT_PRODUCT(HitPtObs-RREF2,HitPtObs-RREF2))
-                                IF(ObsDistance < ReflDistance) THEN
-                                  IHitObsRefl = 1
-                                  EXIT
-                                END IF
-                              END IF
-                            END DO
-                            IF(IHitObsRefl > 0) CYCLE  ! Obstruct'n closer than reflect'n pt. was hit; go to next obstruction
-                            ! There is no obstruction for this ray between ref pt and hit pt on reflecting surface.
-                            ! See if ray from hit pt on reflecting surface to original (unmirrored) sun position is obstructed
-                            IHitObs = 0
-                            IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
-                              ! Reflecting surface is a window.
-                              ! Receiving surface number for this reflecting window.
-                              ReflSurfRecNum = Surface(ReflSurfNum)%ShadowSurfRecSurfNum
-                              IF(ReflSurfRecNum > 0) THEN
-                                ! Loop over possible obstructions for this reflecting window
-                                DO loop2 = 1,SolReflRecSurf(ReflSurfRecNum)%NumPossibleObs
-                                  ObsSurfNum = SolReflRecSurf(ReflSurfRecNum)%PossibleObsSurfNums(loop2)
-                                  CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
-                                  IF(IHitObs > 0) EXIT
-                                END DO
-                              END IF
-                            ELSE
-                              ! Reflecting surface is a building shade
-                              DO ObsSurfNum = 1, TotSurfaces
-                                IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
-                                IF(ObsSurfNum == ReflSurfNum) CYCLE
-                                CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
-                                IF(IHitObs > 0) EXIT
-                              END DO
-                            END IF  ! End of check if reflector is a window or shadowing surface
-
-                            IF(IHitObs > 0) CYCLE ! Obstruct'n hit between reflect'n hit point and sun; go to next obstruction
-
-                            ! No obstructions. Calculate reflected beam illuminance at ref. pt. from this reflecting surface.
-                            SpecReflectance = 0.0
-                            CosIncAngRefl = ABS(DOT_PRODUCT(RAYCOS,ReflNorm))
-                            IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
-                              ConstrNumRefl = Surface(ReflSurfNum)%Construction
-                              IF(SurfaceWindow(ReflSurfNum)%StormWinFlag==1) &
-                                ConstrNumRefl = Surface(ReflSurfNum)%StormWinConstruction
-                              SpecReflectance = POLYF(ABS(CosIncAngRefl),Construct(ConstrNumRefl)%ReflSolBeamFrontCoef(1:6))
-                            END IF
-                            IF(Surface(ReflSurfNum)%ShadowingSurf  &
-                               .AND.Surface(ReflSurfNum)%ShadowSurfGlazingConstruct > 0)  &
-                               SpecReflectance = Surface(ReflSurfNum)%ShadowSurfGlazingFrac * POLYF(ABS(CosIncAngRefl), &
-                                     Construct(Surface(ReflSurfNum)%ShadowSurfGlazingConstruct)%ReflSolBeamFrontCoef(1:6))
-                            TVisRefl = POLYF(CosIncAngRec,Construct(IConst)%TransVisBeamCoef(1)) *   &
-                                                SurfaceWindow(IWin)%GlazedFrac * SurfaceWindow(IWin)%LightWellEff
-                            EDIRSUdisk(1,IHR) = EDIRSUdisk(1,IHR) + SunVecMir(3) * SpecReflectance * TVisRefl  ! Bare window
-
-                            TransBmBmMultRefl = 0.0
-                            IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
-                                ShType == WSC_ST_BetweenGlassBlind) THEN
-                              CALL ProfileAngle(IWin,SunVecMir,Blind(BlNum)%SlatOrientation,ProfAng)
-                              ! Contribution of reflected beam passing through slats and reaching reference point
-                              DO JB = 1,MaxSlatAngs
-                                !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                                IF (SurfaceWindow(IWin)%MovableSlats) THEN
-                                  SlatAng = (JB - 1) * PI / (MaxSlatAngs - 1)
-                                ELSE
-                                  SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
-                                END IF
-                                TransBmBmMultRefl(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
-                                                   Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
-                                EDIRSUdisk(JB+1,IHR) = EDIRSUdisk(JB+1,IHR) +  &
-                                   SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(JB)
-
-                                IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
-                              END DO
-                            ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-!                             pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
-!                             SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
-!                             SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
-                              CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
-                                                               Theta=(THSUN - SurfaceWindow(IWin)%Theta))
-                              TransBmBmMultRefl(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
-                              EDIRSUdisk(2,IHR) = EDIRSUdisk(2,IHR) +  &
-                                   SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(1)
-                            END IF  ! End of check if window has a blind or screen
-
-                            ! Glare from reflected solar disk
-
-                            PHSUNrefl = SunVecMir(3)
-                            THSUNrefl = ATAN2(SunVecMir(2),SunVecMir(1))
-                            XR = TAN(ABS(PiOvr2 - AZVIEW - THSUNrefl) + 0.001d0)
-                            YR = TAN(PHSUNrefl + 0.001)
-                            POSFAC=DayltgGlarePositionFactor(XR,YR)
-                            IF (DoingRefs) THEN
-                              IF(POSFAC /= 0.0 .AND. SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) > 0.000001d0) THEN
-                                XAVWL = 14700. * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
-                                       SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL)**0.8d0
-                                AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + XAVWL * TVisRefl * SpecReflectance  ! Bare window
-                                IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
-                                    ShType == WSC_ST_BetweenGlassBlind) THEN
-                                  DO JB = 1,MaxSlatAngs
-                                    !IF(.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                                    AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) +  &
-                                          XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(JB)
-                                    IF(.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
-                                  END DO
-                                ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-                                    AVWLSUdisk(2,IHR) = AVWLSUdisk(2,IHR) +  &
-                                          XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(1)
-                                END IF
-                              END IF
-                            ELSE
-                              IF (POSFAC /= 0.0 .AND. MapWindowSolidAngAtRefPtWtd(loopwin,IL) > 0.000001d0) THEN
-                                XAVWL = 14700. * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
-                                       MapWindowSolidAngAtRefPtWtd(loopwin,IL)**0.8d0
-                              AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
-                                AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + XAVWL * TVisRefl * SpecReflectance  ! Bare window
-                                IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
-                                    ShType == WSC_ST_BetweenGlassBlind) THEN
-                                  DO JB = 1,MaxSlatAngs
-                                    !IF(.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                                    AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) +  &
-                                          XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(JB)
-                                    IF(.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
-                                  END DO
-                                ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
-                                    AVWLSUdisk(2,IHR) = AVWLSUdisk(2,IHR) +  &
-                                          XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(1)
-                                END IF
-                              END IF
-                            ENDIF
-
-                          END IF  ! End of check that obstruction can specularly reflect
-                        END DO  ! End of loop over obstructions associated with this window
-
-                      END IF  ! End of check if this window has associated obstructions
-                    END IF   ! End of check to see if this is exterior type window
-                  END IF  ! End of check if exterior reflection calculation is in effect
-
-                END IF ! Last pass
-
-                IF((ICtrl > 0 .AND.  &
-                   (ShType ==WSC_ST_InteriorShade.OR.ShType ==WSC_ST_ExteriorShade.OR.ShType ==WSC_ST_BetweenGlassShade.OR. &
-                    ShType ==WSC_ST_InteriorBlind.OR.ShType ==WSC_ST_ExteriorBlind.OR.ShType ==WSC_ST_BetweenGlassBlind .OR. &
-                    ShType ==WSC_ST_ExteriorScreen)).OR.SurfaceWindow(IWin)%SolarDiffusing) THEN
-
-                  ! ----- CASE II -- WINDOW WITH SCREEN, SHADE, BLIND, OR DIFFUSING WINDOW
-
-                  ! Interior window visible transmittance multiplier for exterior window in adjacent zone
-                  TVisIntWinMult = 1.0
-                  TVisIntWinDiskMult = 1.0
-                  IF(Surface(IWin)%Zone /= ZoneNum) THEN
-                    TVisIntWinMult = TVisIntWin
-                    TVisIntWinDiskMult = TVisIntWinDisk
-                  END IF
-
-                  DO ISKY = 1,4
-                    DO JB = 1,MaxSlatAngs
-                      !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
-                      AVWLSK(ISKY,JB+1,IHR) = AVWLSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*TVisIntWinMult
-                      IF (ISky == 1) THEN
-                        AVWLSU(JB+1,IHR) = AVWLSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*TVisIntWinMult
-                        AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) + WLUMSUdisk(JB+1,IHR)*TVisIntWinDiskMult
-                      END IF
-                      IF (PHRAY > 0.) THEN
-                        EDIRSK(ISKY,JB+1,IHR) = EDIRSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
-                        IF (ISky == 1) EDIRSU(JB+1,IHR) = EDIRSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
-                      END IF
-                      IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
-                    END DO
+            IF(CalcSolRefl .AND. PHRAY < 0.0 .AND. ObTrans > 1.d-6) THEN
+              ! Calculate effect of obstructions on shading of sky diffuse reaching the ground point hit
+              ! by the ray. This effect is given by the ratio SkyObstructionMult =
+              ! (obstructed sky diffuse at ground point)/(unobstructed sky diffuse at ground point).
+              ! This ratio is calculated for an isotropic sky.
+              ! Ground point hit by the ray:
+              Alfa = ACOS(-RAY(3))
+              Beta = ATAN2(RAY(2),RAY(1))
+              HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
+              GroundHitPt(3) = GroundLevelZ
+              GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
+              GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
+              ! Send rays upward from hit point and see which ones are unobstructed and so go to sky.
+              ! Divide hemisphere centered at ground hit point into elements of altitude Phi and
+              ! azimuth Theta and create upward-going ground ray unit vector at each Phi,Theta pair.
+              ! Phi = 0 at the horizon; Phi = Pi/2 at the zenith.
+              DPhi = PiOvr2 / (AltAngStepsForSolReflCalc/2.d0)
+              DTheta = 2.d0*Pi / (2.d0*AzimAngStepsForSolReflCalc)
+              SkyGndObs = 0.0
+              SkyGndUnObs = 0.0
+              ! Altitude loop
+              DO IPhi = 1,(AltAngStepsForSolReflCalc/2)
+                Phi = (IPhi - 0.5d0) * DPhi
+                SPhi = SIN(Phi)
+                CPhi = COS(Phi)
+                ! Third component of ground ray unit vector in (Theta,Phi) direction
+                URay(3) = SPhi
+                dOmegaGnd = CPhi * DTheta * DPhi
+                ! Cosine of angle of incidence of ground ray on ground plane
+                CosIncAngURay = SPhi
+                IncAngSolidAngFac = CosIncAngURay*dOmegaGnd/Pi
+                ! Azimuth loop
+                DO ITheta = 1,2*AzimAngStepsForSolReflCalc
+                  Theta = (ITheta - 0.5d0) * DTheta
+                  URay(1) = CPhi * COS(Theta)
+                  URay(2) = CPhi * SIN(Theta)
+                  SkyGndUnObs = SkyGndUnObs + IncAngSolidAngFac
+                  ! Does this ground ray hit an obstruction?
+                  IHitObs = 0
+                  DO ObsSurfNum = 1, TotSurfaces
+                    IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                    CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,URay,IHitObs,ObsHitPt)
+                    IF(IHitObs > 0) EXIT
                   END DO
-                END IF
+                  IF(IHitObs > 0) CYCLE ! Obstruction hit
+                  ! Sky is hit
+                  SkyGndObs = SkyGndObs + IncAngSolidAngFac
+                END DO ! End of azimuth loop
+              END DO  ! End of altitude loop
+              SkyObstructionMult = SkyGndObs / (SkyGndUnObs + 1.d-8)
+            END IF  ! End of check if solar reflection calculation is in effect
 
-              END DO ! End of hourly sun position loop, IHR
-            END DO ! End of window Y-element loop, IY
-          END DO ! End of window X-element loop, IX
+          END IF  ! End of check if COSB > 0
 
-          ! Loop again over hourly sun positions and calculate daylight factors by adding
-          ! direct and inter-reflected illum components, then dividing by exterior horiz illum.
-          ! Also calculate corresponding glare factors.
+          !           -------------------
+          ! ---------- SUN POSITION LOOP ----------
+          !           -------------------
+
+          ! Sun position counter. Used to avoid calculating various quantities
+          ! that do not depend on sun position.
           ISunPos = 0
-!          IDaylFacPtr = ZoneDaylight(ZoneNum)%DayltgFacPtrsForExtWins(loopwin)
-          ILB=BRef+IL
 
           DO IHR = 1,24
             IF (SUNCOSHR(3,IHR) < SunIsUpValue) CYCLE
-
             ISunPos = ISunPos + 1
 
             ! Altitude of sun (degrees)
@@ -2251,105 +1622,2101 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
             ! Azimuth of sun in absolute coord sys
             THSUN = THSUNHR(IHR)
 
-            DO ISKY = 1,4 ! Loop over sky types
+            ! First time through, call routine to calculate inter-reflected illuminance
+            ! at reference point and luminance of window with shade, screen or blind.
 
-              ! Loop over shading index (1=bare window; 2=diffusing glazing, shade, screen or fixed slat-angle blind;
-              ! 2 to MaxSlatAngs+1 for variable slat-angle blind)
+            ! Rob/TH - Not sure whether this call is necessary for interior zones with interior windows only.
+!  new code would be -
+! IF (LSHCAL == 1 .AND. ExtWinType /= AdjZoneExtWin) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
+            IF (LSHCAL == 1) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
 
-              ! TH. 9/22/2009. CR 7625 - daylight illuminance spikes during some sunset hours due to the calculated sky and sun
-              !  related daylight factors > 1, which theoretically can occur when sun is perpendicular to the window
-              !  and interior surfaces with high visible reflectance.
-              ! Added tmpDFCalc (default to 0.05 lux) as the cap for GILSK and GILSU in calculating the daylight factors
-              !  the assumption behind it is if exterior horizontal surface does not get daylight, spaces do not get daylight.
+            ! Daylighting shelf simplification:  The shelf completely blocks all view of the window,
+            ! only interrelflected illumination is allowed (see DayltgInterReflectedIllum above).
+            ! Everything else in this loop has to do with direct luminance from the window.
+            IF (InShelfSurf > 0) CYCLE
 
-              DO JSH = 1,MaxSlatAngs+1
-                IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JSH > 2) EXIT
+            IF (COSB <= 0.0) CYCLE
 
-                IF (GILSK(ISKY,IHR) > tmpDFCalc) THEN
-                  ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
-                                 (EDIRSK(ISKY,JSH,IHR) + EINTSK(ISKY,JSH,IHR)) / GILSK(ISKY,IHR)
-                  ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
-                                 AVWLSK(ISKY,JSH,IHR) / (NWX*NWY * GILSK(ISKY,IHR))
-                  ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
-                      EINTSK(ISKY,JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (PI*GILSK(ISKY,IHR))
-                ELSE
-                  ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
-                  ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
-                  ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
-                ENDIF
+            XEDIRSK = 0.
+            XEDIRSU = 0.
+            XAVWLSK = 0.
 
-                IF (ISky == 1) THEN
-                  IF (GILSU(IHR) > tmpDFCalc) THEN
-                    ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) =   &
-                                      (EDIRSU(JSH,IHR) + EINTSU(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
-                    ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) =   &
-                                  (EDIRSUdisk(JSH,IHR) + EINTSUdisk(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
+            ! Add contribution of this window element to glare and to
+            ! direct illuminance at reference point
 
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) =  &
-                                   AVWLSU(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) =   &
-                                   AVWLSUdisk(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
+            ! The I,J,K indices for sky and sun components of direct illuminance
+            ! (EDIRSK, EDIRSU) and average window luminance (AVWLSK, AVWLSU) are:
+            ! I=1 for clear sky, =2 Clear turbid, =3 Intermediate, =4 Overcast;
+            ! J=1 for bare window, =2 for window with shade or fixed slat-angle blind;
+            !  = 2,3,...,MaxSlatAngs+1 for window with variable slat-angle blind;
+            ! K = sun position index.
 
-                    ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) =   &
-                      EINTSU(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
-                    ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) =   &
-                      EINTSUdisk(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
+            ! ----- CASE I -- BARE WINDOW (no shading device)
+
+            ! Beam solar and sky solar reflected from nearest obstruction.
+            ! In the following IHitIntObs == 0  ==> no interior obstructions hit, and
+            !                  IHitExtObs == 1  ==> one or more exterior obstructions hit.
+            IF(CalcSolRefl .AND. IHitIntObs == 0 .AND. IHitExtObs == 1) THEN
+              ! One or more exterior obstructions was hit; get contribution of reflection
+              ! from nearest obstruction.
+              ! Find obstruction whose hit point is closest to this ray's window element
+              CALL DayltgClosestObstruction(RWIN2,Ray,NearestHitSurfNum,NearestHitPt)
+              IF(NearestHitSurfNum > 0) THEN
+
+                ! Beam solar reflected from nearest obstruction
+
+                CALL DayltgSurfaceLumFromSun(IHr,Ray,NearestHitSurfNum,NearestHitPt,LumAtHitPtFrSun)
+                AVWLSU(1,IHR) = AVWLSU(1,IHR) + LumAtHitPtFrSun * TVISB
+                IF (PHRAY >= 0.) EDIRSU(1,IHR) = EDIRSU(1,IHR) + LumAtHitPtFrSun * DOMEGA * RAY(3) * TVISB
+
+                ! Sky solar reflected from nearest obstruction
+
+                ObsConstrNum = Surface(NearestHitSurfNum)%Construction
+                IF(ObsConstrNum > 0) THEN
+                  ! Exterior building surface is nearest hit
+                  IF(.NOT.Construct(ObsConstrNum)%TypeIsWindow) THEN
+                    ! Obstruction is not a window, i.e., is an opaque surface
+                    ObsVisRefl = 1.0d0 - Material(Construct(ObsConstrNum)%LayerPoint(1))%AbsorpVisible
                   ELSE
-                    ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) = 0.0
-                    ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
-
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) = 0.0
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
-
-                    ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) = 0.0
-                    ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
-                  ENDIF
-                END IF
-              END DO ! End of shading index loop, JSH
-
-              ! For switchable glazing put daylighting factors for switched (dark) state in IS=2 location
-              IF (ICtrl > 0) THEN
-                IF(WindowShadingControl(ICtrl)%ShadingType == WSC_ST_SwitchableGlazing) THEN
-                  VTR = SurfaceWindow(IWin)%VisTransRatio
-                  ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,1,IHR)*VTR
-                  ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,1,IHR)*VTR
-                  ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,1,IHR)*VTR
-                  IF (ISky == 1) THEN
-                    ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,1,IHR)*VTR
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,1,IHR)*VTR
-                    ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,1,IHR)*VTR
-                    ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,1,IHR)*VTR
-                    ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,2,IHR) =   &
-                                    ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,1,IHR)*VTR
-                    ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,2,IHR) =     &
-                                    ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                    ! Obstruction is a window; assume it is bare
+                    IF(SurfaceWindow(NearestHitSurfNum)%StormWinFlag==1)  &
+                      ObsConstrNum = Surface(NearestHitSurfNum)%StormWinConstruction
+                    ObsVisRefl = Construct(ObsConstrNum)%ReflectVisDiffFront
+                  END IF
+                ELSE
+                  ! Shadowing surface is nearest hit
+                  IF(Surface(NearestHitSurfNum)%Shelf > 0) THEN
+                    ! This is a daylighting shelf, for which reflection is separately calculated
+                    ObsVisRefl = 0.
+                  ELSE
+                    ObsVisRefl = Surface(NearestHitSurfNum)%ShadowSurfDiffuseVisRefl
+                    IF(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct > 0) &
+                      ObsVisRefl = ObsVisRefl + Surface(NearestHitSurfNum)%ShadowSurfGlazingFrac *  &
+                      Construct(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct)%ReflectVisDiffFront
                   END IF
                 END IF
-              END IF ! ICtrl > 0
+                NearestHitSurfNumX = NearestHitSurfNum
+                ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
+                ! The following gets the correct side of a shadowing surface for reflection.
+                IF(Surface(NearestHitSurfNum)%ShadowingSurf) THEN
+                  IF(DOT_PRODUCT(RAY,Surface(NearestHitSurfNum)%OutNormVec) > 0.0)  NearestHitSurfNumX = &
+                       NearestHitSurfNum + 1
+                END IF
+                IF (.not. DetailedSkyDiffuseAlgorithm .or. .not.  ShadingTransmittanceVaries .or.  &
+                    SolarDistribution == MinimalShadowing) THEN
+                  SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
+                           DifShdgRatioIsoSky(NearestHitSurfNumX) / Pi
+                ELSE
+                  SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
+                           DifShdgRatioIsoSkyHRTS(NearestHitSurfNumX,IHR,1) / Pi
+                ENDIF
+                DO ISky = 1,4
+                  XAVWLSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum
+                  AVWLSK(ISky,1,IHR) = AVWLSK(ISky,1,IHR) + XAVWLSK(ISky) * TVISB
+                  IF (PHRAY >= 0.) THEN
+                    XEDIRSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum * DOMEGA * RAY(3)
+                    EDIRSK(ISky,1,IHR) = EDIRSK(ISky,1,IHR) + XEDIRSK(ISky) * TVISB
+                  END IF
+                END DO
+              END IF
+            END IF  ! End of check if solar reflection calculation is in effect
 
-            END DO ! End of sky type loop, ISky
-          END DO ! End of sun position loop, IHR
-        END DO ! End of window loop, loopwin - IWin
+            IF(ObTrans > 1.d-6) THEN
+              ! Ray did not hit an obstruction or the transmittance product of hit obstructions is non-zero.
+              ! Contribution of sky or ground luminance in cd/m2
+              IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+                ! Make all transmitted light diffuse for a TDD with a bare diffuser
+                DO ISKY = 1,4
+                  AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR)
+                  IF(ISky == 1) THEN
+                    AVWLSU(1,IHR) = AVWLSU(1,IHR) + WLUMSU(1,IHR)
+                    AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + WLUMSUdisk(1,IHR)
+                  END IF
+                  IF(PHRAY > 0.) THEN
+                    EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR) * DOMEGA * RAY(3)
+                    IF(ISky == 1) EDIRSU(1,IHR) = EDIRSU(1,IHR) + WLUMSU(1,IHR) * DOMEGA * RAY(3)
+                  END IF
+                END DO
 
-        IF (.not. DoingRefs) THEN
-          DEALLOCATE(MapWindowSolidAngAtRefPt)
-          DEALLOCATE(MapWindowSolidAngAtRefPtWtd)
-        ENDIF
+              ELSE ! Bare window
 
-    END DO ! End of reference point loop, IL
+                DO ISKY = 1,4
+                  IF (PHRAY > 0.) THEN
+                    ! Ray heads upward to sky
+                    ELUM = DayltgSkyLuminance(ISky,THRAY,PHRAY)
+                    XEDIRSK(ISKY) = ELUM * DOMEGA * RAY(3)
+                    DEDIR  = XEDIRSK(ISKY) * TVISB
+                    EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + DEDIR * ObTrans
+                    AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + ELUM * TVISB * ObTrans
+                    XAVWLSK(ISKY) = ELUM * ObTrans
+                  ELSE ! PHRAY <= 0.
+                    ! Ray heads downward to ground.
+                    ! Contribution from sky diffuse reflected from ground
+                    XAVWLSK(ISKY) = GILSK(ISKY,IHR) * (GndReflectanceForDayltg / PI) * ObTrans *  &
+                                              SkyObstructionMult
+                    AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + TVISB * XAVWLSK(ISKY)
+                    ! Contribution from beam solar reflected from ground (beam reaching ground point
+                    ! can be obstructed [SunObstructionMult < 1.0] if CalcSolRefl = .TRUE.)
+                    IF(ISky == 1) THEN
+                      SunObstructionMult = 1.0
+                      IF(CalcSolRefl) THEN
+                        ! Coordinates of ground point hit by the ray
+                        Alfa = ACOS(-RAY(3))
+                        Beta = ATAN2(RAY(2),RAY(1))
+                        HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
+                        GroundHitPt(3) = GroundLevelZ
+                        GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
+                        GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
+                        ! Sun reaches ground point if vector from this point to the sun is unobstructed
+                        IHitObs = 0
+                        DO ObsSurfNum = 1,TotSurfaces
+                           IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                           CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,SunCosHr(1:3,IHr),IHitObs,ObsHitPt)
+                           IF(IHitObs > 0) EXIT
+                        END DO
+                        IF(IHitObs > 0) SunObstructionMult = 0.0
+                      END IF
+                      AVWLSU(1,IHR) = AVWLSU(1,IHR) +  &
+                           TVISB * GILSU(IHR) * (GndReflectanceForDayltg / PI) * ObTrans * SunObstructionMult
+                    END IF  ! End of check if ISky = 1
+                  END IF  ! End of check if ray is going up or down
+                END DO  ! End of loop over sky types
+              END IF ! End of check if bare window or TDD:DIFFUSER
+            END IF ! End of check if ObTrans > 1.E-6
 
-  END DO ! End of CalcLoop
+            !
+            ! Illuminance from beam solar (without interior reflection)
+            !
+            ! Just run this once on the last pass
+            IF (IX == NWX .AND. IY == NWY) THEN ! Last pass
+
+              ! Beam solar reaching reference point directly without exterior reflection
+
+              ! Unit vector from ref. pt. to sun
+              RAYCOS(1) = CPHSUN * COS(THSUN)
+              RAYCOS(2) = CPHSUN * SIN(THSUN)
+              RAYCOS(3) = SPHSUN
+
+              ! Is sun on front side of exterior window?
+              COSI = DOT_PRODUCT(WNORM2,RAYCOS)
+              IF (COSI > 0.) THEN
+
+                ! Does RAYCOS pass thru exterior window? HP is point that RAYCOS intersects window plane.
+                CALL DayltgPierceSurface(IWin2,RREF2,RAYCOS,IP,HP)
+                IHitIntObsDisk = 0
+                IF (IP > 0) THEN
+                  IF(ExtWinType == InZoneExtWin) THEN
+                    ! Check for interior obstructions between reference point and HP.
+                    CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHitIntObsDisk)
+                  END IF
+                  ObTransDisk = 0.0  ! Init value
+                  ! Init flag for vector from RP to sun passing through interior window
+                  IHitIntWinDisk = 0
+                  IF(ExtWinType == AdjZoneExtWin) THEN ! This block is for RPs in zones with interior windows
+                                                       ! adjacent to zones with exterior windows
+                    ! Does RAYCOS pass through interior window in zone containing RP?
+                    DO IntWinDisk = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+                      IF(Surface(IntWinDisk)%Class==SurfaceClass_Window .AND. Surface(IntWinDisk)%ExtBoundCond >= 1) THEN
+                        IF(Surface(Surface(IntWinDisk)%ExtBoundCond)%Zone == Surface(IWin2)%Zone) THEN
+                          CALL DayltgPierceSurface(IntWinDisk,RREF,RAYCOS,IHitIntWinDisk,HitPtIntWinDisk)
+                          IF(IHitIntWinDisk > 0) THEN
+                            IntWinDiskHitNum = IntWinDisk
+                            COSBIntWin = DOT_PRODUCT(Surface(IntWinDisk)%OutNormVec(1:3),RAYCOS)
+                            IF(COSBIntWin <= 0.0) THEN
+                              IHitIntWinDisk = 0
+                              IntWinDiskHitNum = 0
+                              CYCLE
+                            END IF
+                            TVISIntWinDisk = POLYF(COSBIntWin,Construct(Surface(IntWinDisk)%Construction)%TransVisBeamCoef(1))
+                            EXIT
+                          END IF
+                        END IF
+                      END IF
+                    END DO
+
+                    IF(IHitIntWinDisk == 0) THEN  ! Vector from RP to sun does not pass through interior window
+                      ObTransDisk = 0.0
+                      IHIT = 1             !!fcw Is this needed?
+                    END IF
+
+                    ! Check for interior obstructions between ref point and interior window
+                    IHitIntObsDisk = 0
+                    IF(IHitIntWinDisk > 0) THEN
+                      CALL DayltgHitInteriorObstruction(IntWinDiskHitNum,RREF,HitPtIntWinDisk,IHitIntObsDisk)
+                      ! If no obstruction between RP and hit int win, check for obstruction
+                      ! between int win and ext win
+                      IF(IHitIntObsDisk == 0) &
+                        CALL DayltgHitBetWinObstruction(IntWinDiskHitNum,IWin2,HitPtIntWinDisk,HP,IHitIntObsDisk)
+                    END IF
+                    IF(IHitIntObsDisk == 1) ObTransDisk = 0.0
+                  END IF  ! case where RP is in zone with interior window adjacent to zone with exterior window
+
+                  IHitExtObsDisk = 0
+                  ! RJH 08-25-07 IHitIntWinDisk should not be reset to 0 here, and should be tested below.
+                  ! This is to correct logic flaw causing direct solar to reach adjacent zone refpt
+                  ! when vector to sun does not pass through interior window
+                  ! IHitIntWinDisk = 0
+                  IF(IHitIntObsDisk == 0) THEN  ! No interior obstruction was hit
+                    ! Net transmittance of exterior obstructions encountered by RAYCOS
+                    ! ObTransDisk = 1.0 will be returned if no exterior obstructions are hit.
+                    CALL DayltgHitObstruction(IHr,IWin2,RREF2,RAYCOS,ObTransDisk)
+                    IF(ObTransDisk < 1.0) IHitExtObsDisk = 1
+                    ! RJH 08-26-07 However, if this is a case of interior window
+                    ! and vector to sun does not pass through interior window
+                    ! then reset ObTransDisk to 0.0 since it is the key test for adding
+                    ! contribution of sun to RP below.
+                    IF((ExtWinType == AdjZoneExtWin) .AND. (IHitIntWinDisk == 0)) THEN
+                      ObTransDisk = 0.0
+                    END IF
+                  END IF
+
+                  ! PETER: need side wall mounted TDD to test this
+                  ! PETER: probably need to replace RREF2 with RWIN2
+                  ! PETER: need to check for interior obstructions too.
+
+                  IF (ObTransDisk > 1.d-6) THEN
+
+                    ! Sun reaches reference point;  increment illuminance.
+                    ! Direct normal illuminance is normalized to 1.0
+
+                    IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+                      ! No beam is transmitted.  Takes care of TDD with a bare diffuser and all types of blinds.
+                      TVISS = 0.0
+                    ELSE
+                      ! Beam transmittance for bare window and all types of blinds
+                      TVISS = POLYF(COSI,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
+                                 SurfaceWindow(IWin)%LightWellEff
+                      IF(ExtWinType==AdjZoneExtWin.AND.IHitIntWinDisk==1)  &
+                        TVISS = TVISS * TVISIntWinDisk
+                    END IF
+
+                    EDIRSUdisk(1,IHR) = RAYCOS(3) * TVISS * ObTransDisk  ! Bare window
+
+                    TransBmBmMult = 0.0
+                    IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.   &
+                        ShType == WSC_ST_BetweenGlassBlind) THEN
+                      CALL ProfileAngle(IWin,RAYCOS,Blind(BlNum)%SlatOrientation,ProfAng)
+                      ! Contribution of beam passing through slats and reaching reference point
+                      DO JB = 1,MaxSlatAngs
+                        !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                        IF (SurfaceWindow(IWin)%MovableSlats) THEN
+                          SlatAng = (JB - 1) * PI / (MaxSlatAngs - 1)
+                        ELSE
+                          SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
+                        END IF
+                        TransBmBmMult(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                             Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                        EDIRSUdisk(JB+1,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(JB) * ObTransDisk
+
+                        ! do this only once for fixed slat blinds
+                        IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                      END DO
+                    ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+!                          pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
+!                          SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
+!                          SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
+                      CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
+                                                       Theta=(THSUN - SurfaceWindow(IWin)%Theta))
+                      TransBmBmMult(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
+                      EDIRSUdisk(2,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(1) * ObTransDisk
+                    END IF
+
+                    ! Glare from solar disk
+
+                    ! Position factor for sun (note that AZVIEW is wrt y-axis and THSUN is wrt
+                    ! x-axis of absolute coordinate system.
+                    XR = TAN(ABS(PIOVR2 - AZVIEW - THSUN) + 0.001d0)
+                    YR = TAN(PHSUN + 0.001d0)
+                    POSFAC = DayltgGlarePositionFactor(XR,YR)
+
+                    IF (POSFAC /= 0.0 .AND. SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) > 0.000001d0) THEN
+                      ! Increment window luminance.  Luminance of solar disk (cd/m2)
+                      ! is 1.47*10^4*(direct normal solar illuminance) for direct normal solar
+                      ! illuminance in lux (lumens/m2). For purposes of calculating daylight factors
+                      ! direct normal solar illuminance = 1.0.
+                      ! Solid angle subtended by sun is 0.000068 steradians
+
+                      XAVWL = 14700.d0 * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
+                               SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL)**0.8d0
+                      AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
+
+                      IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                          ShType == WSC_ST_BetweenGlassBlind) THEN
+                        DO JB = 1,MaxSlatAngs
+                          !IF (.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                          AVWLSUdisk(JB+1,IHR) = XAVWL * TVISS * TransBmBmMult(JB) * ObTransDisk
+                          IF (.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
+                        END DO
+                      ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+                        AVWLSUdisk(2,IHR) = XAVWL * TVISS * TransBmBmMult(1) * ObTransDisk
+                      END IF
+                    ENDIF ! Position Factor
+                  END IF ! Beam avoids all obstructions
+                END IF ! Beam passes thru window
+              END IF ! Sun on front side
+
+              ! Beam solar reaching reference point after beam-beam (specular) reflection from
+              ! an exterior surface
+
+              IF(CalcSolRefl) THEN
+                ! Receiving surface number corresponding this window
+                RecSurfNum = Surface(IWin2)%ShadowSurfRecSurfNum
+                IF (RecSurfNum > 0) THEN    ! interior windows do not apply
+                  IF(SolReflRecSurf(RecSurfNum)%NumPossibleObs > 0) THEN
+                    ! This window has associated obstructions that could reflect beam onto the window
+                    DO loop = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
+                      ReflSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop)
+                      ReflSurfNumX = ReflSurfNum
+                      ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
+                      ! The following gets the correct side of a shadowing surface for reflection.
+                      IF(Surface(ReflSurfNum)%ShadowingSurf) THEN
+                        IF(DOT_PRODUCT(RAYCOS,Surface(ReflSurfNum)%OutNormVec) < 0.0)  ReflSurfNumX = &
+                        ReflSurfNum + 1
+                      END IF
+                      ! Require that the surface can have specular reflection
+                      IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .OR. &
+                         Surface(ReflSurfNum)%ShadowSurfGlazingFrac > 0.0) THEN
+                        ReflNorm = Surface(ReflSurfNumX)%OutNormVec
+                        ! Vector to sun that is mirrored in obstruction
+                        SunVecMir = RAYCOS - 2.0d0*DOT_PRODUCT(RAYCOS,ReflNorm)*ReflNorm
+                        ! Skip if reflecting surface is not sunlit
+                        IF(SunlitFrac(ReflSurfNumX,IHr,1) < 0.01d0) CYCLE
+                        ! Skip if altitude angle of mirrored sun is negative since reflected sun cannot
+                        ! reach reference point in this case
+                        IF(SunVecMir(3) <= 0.0) CYCLE
+                        ! Cosine of incidence angle of reflected beam on window
+                        CosIncAngRec = DOT_PRODUCT(Surface(IWin2)%OutNormVec,SunVecMir)
+                        IF(CosIncAngRec <= 0.0) CYCLE
+                        ! Does ray from ref. pt. along SunVecMir pass through window?
+                        CALL DayltgPierceSurface(IWin2,RREF2,SunVecMir,IP,HP)
+                        IF(IP == 0) CYCLE  ! Ray did not pass through window
+                        ! Check if this ray hits interior obstructions
+                        CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHit)
+                        IF(IHit > 0) CYCLE ! Interior obstruction was hit
+                        ! Does ray hit this reflecting surface?
+                        CALL DayltgPierceSurface(ReflSurfNum,RREF2,SunVecMir,IHitRefl,HitPtRefl)
+                        IF(IHitRefl == 0) CYCLE  ! Ray did not hit this reflecting surface
+                        ReflDistance = SQRT(DOT_PRODUCT(HitPtRefl-RREF2,HitPtRefl-RREF2))
+                        ! Is ray from ref. pt. to reflection point (HitPtRefl) obstructed?
+                        IHitObsRefl = 0
+                        DO loop2 = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
+                          ObsSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop2)
+                          IF(ObsSurfNum == ReflSurfNum .OR. ObsSurfNum == Surface(ReflSurfNum)%BaseSurf) CYCLE
+                          CALL DayltgPierceSurface(ObsSurfNum,RREF2,SunVecMir,IHitObs,HitPtObs)
+                          IF(IHitObs > 0) THEN
+                            ObsDistance = SQRT(DOT_PRODUCT(HitPtObs-RREF2,HitPtObs-RREF2))
+                            IF(ObsDistance < ReflDistance) THEN
+                              IHitObsRefl = 1
+                              EXIT
+                            END IF
+                          END IF
+                        END DO
+                        IF(IHitObsRefl > 0) CYCLE  ! Obstruct'n closer than reflect'n pt. was hit; go to next obstruction
+                        ! There is no obstruction for this ray between ref pt and hit pt on reflecting surface.
+                        ! See if ray from hit pt on reflecting surface to original (unmirrored) sun position is obstructed
+                        IHitObs = 0
+                        IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
+                          ! Reflecting surface is a window.
+                          ! Receiving surface number for this reflecting window.
+                          ReflSurfRecNum = Surface(ReflSurfNum)%ShadowSurfRecSurfNum
+                          IF(ReflSurfRecNum > 0) THEN
+                            ! Loop over possible obstructions for this reflecting window
+                            DO loop2 = 1,SolReflRecSurf(ReflSurfRecNum)%NumPossibleObs
+                              ObsSurfNum = SolReflRecSurf(ReflSurfRecNum)%PossibleObsSurfNums(loop2)
+                              CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
+                              IF(IHitObs > 0) EXIT
+                            END DO
+                          END IF
+                        ELSE
+                          ! Reflecting surface is a building shade
+                          DO ObsSurfNum = 1, TotSurfaces
+                            IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                            IF(ObsSurfNum == ReflSurfNum) CYCLE
+                            CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
+                            IF(IHitObs > 0) EXIT
+                          END DO
+                        END IF  ! End of check if reflector is a window or shadowing surface
+
+                        IF(IHitObs > 0) CYCLE ! Obstruct'n hit between reflect'n hit point and sun; go to next obstruction
+
+                        ! No obstructions. Calculate reflected beam illuminance at ref. pt. from this reflecting surface.
+                        SpecReflectance = 0.0
+                        CosIncAngRefl = ABS(DOT_PRODUCT(RAYCOS,ReflNorm))
+                        IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
+                          ConstrNumRefl = Surface(ReflSurfNum)%Construction
+                          IF(SurfaceWindow(ReflSurfNum)%StormWinFlag==1) &
+                            ConstrNumRefl = Surface(ReflSurfNum)%StormWinConstruction
+                          SpecReflectance = POLYF(ABS(CosIncAngRefl),Construct(ConstrNumRefl)%ReflSolBeamFrontCoef(1:6))
+                        END IF
+                        IF(Surface(ReflSurfNum)%ShadowingSurf  &
+                           .AND.Surface(ReflSurfNum)%ShadowSurfGlazingConstruct > 0)  &
+                           SpecReflectance = Surface(ReflSurfNum)%ShadowSurfGlazingFrac * POLYF(ABS(CosIncAngRefl), &
+                                 Construct(Surface(ReflSurfNum)%ShadowSurfGlazingConstruct)%ReflSolBeamFrontCoef(1:6))
+                        TVisRefl = POLYF(CosIncAngRec,Construct(IConst)%TransVisBeamCoef(1)) *   &
+                                            SurfaceWindow(IWin)%GlazedFrac * SurfaceWindow(IWin)%LightWellEff
+                        EDIRSUdisk(1,IHR) = EDIRSUdisk(1,IHR) + SunVecMir(3) * SpecReflectance * TVisRefl  ! Bare window
+
+                        TransBmBmMultRefl = 0.0
+                        IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                            ShType == WSC_ST_BetweenGlassBlind) THEN
+                          CALL ProfileAngle(IWin,SunVecMir,Blind(BlNum)%SlatOrientation,ProfAng)
+                          ! Contribution of reflected beam passing through slats and reaching reference point
+                          DO JB = 1,MaxSlatAngs
+                            !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                            IF (SurfaceWindow(IWin)%MovableSlats) THEN
+                              SlatAng = REAL((JB - 1),r64) * PI / REAL((MaxSlatAngs - 1),r64)
+                            ELSE
+                              SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
+                            END IF
+                            TransBmBmMultRefl(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                               Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                            EDIRSUdisk(JB+1,IHR) = EDIRSUdisk(JB+1,IHR) +  &
+                               SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(JB)
+
+                            IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                          END DO
+                        ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+!                             pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
+!                             SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
+!                             SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
+                          CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
+                                                           Theta=(THSUN - SurfaceWindow(IWin)%Theta))
+                          TransBmBmMultRefl(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
+                          EDIRSUdisk(2,IHR) = EDIRSUdisk(2,IHR) +  &
+                               SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(1)
+                        END IF  ! End of check if window has a blind or screen
+
+                        ! Glare from reflected solar disk
+
+                        PHSUNrefl = SunVecMir(3)
+                        THSUNrefl = ATAN2(SunVecMir(2),SunVecMir(1))
+                        XR = TAN(ABS(PiOvr2 - AZVIEW - THSUNrefl) + 0.001d0)
+                        YR = TAN(PHSUNrefl + 0.001)
+                        POSFAC=DayltgGlarePositionFactor(XR,YR)
+                        IF(POSFAC /= 0.0 .AND. SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL) > 0.000001d0) THEN
+                          XAVWL = 14700. * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
+                                 SurfaceWindow(IWin)%SolidAngAtRefPtWtd(IL)**0.8d0
+                          AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + XAVWL * TVisRefl * SpecReflectance  ! Bare window
+                          IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                              ShType == WSC_ST_BetweenGlassBlind) THEN
+                            DO JB = 1,MaxSlatAngs
+                              !IF(.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                              AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) +  &
+                                    XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(JB)
+                              IF(.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
+                            END DO
+                          ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+                              AVWLSUdisk(2,IHR) = AVWLSUdisk(2,IHR) +  &
+                                    XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(1)
+                          END IF
+                        END IF
+                      END IF  ! End of check that obstruction can specularly reflect
+                    END DO  ! End of loop over obstructions associated with this window
+
+                  END IF  ! End of check if this window has associated obstructions
+                END IF   ! End of check to see if this is exterior type window
+              END IF  ! End of check if exterior reflection calculation is in effect
+
+            END IF ! Last pass
+
+            IF((ICtrl > 0 .AND.  &
+               (ShType ==WSC_ST_InteriorShade.OR.ShType ==WSC_ST_ExteriorShade.OR.ShType ==WSC_ST_BetweenGlassShade.OR. &
+                ShType ==WSC_ST_InteriorBlind.OR.ShType ==WSC_ST_ExteriorBlind.OR.ShType ==WSC_ST_BetweenGlassBlind .OR. &
+                ShType ==WSC_ST_ExteriorScreen)).OR.SurfaceWindow(IWin)%SolarDiffusing) THEN
+
+              ! ----- CASE II -- WINDOW WITH SCREEN, SHADE, BLIND, OR DIFFUSING WINDOW
+
+              ! Interior window visible transmittance multiplier for exterior window in adjacent zone
+              TVisIntWinMult = 1.0
+              TVisIntWinDiskMult = 1.0
+              IF(Surface(IWin)%Zone /= ZoneNum) THEN
+                TVisIntWinMult = TVisIntWin
+                TVisIntWinDiskMult = TVisIntWinDisk
+              END IF
+
+              DO ISKY = 1,4
+                DO JB = 1,MaxSlatAngs
+                  !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                  AVWLSK(ISKY,JB+1,IHR) = AVWLSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*TVisIntWinMult
+                  IF (ISky == 1) THEN
+                    AVWLSU(JB+1,IHR) = AVWLSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*TVisIntWinMult
+                    AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) + WLUMSUdisk(JB+1,IHR)*TVisIntWinDiskMult
+                  END IF
+                  IF (PHRAY > 0.) THEN
+                    EDIRSK(ISKY,JB+1,IHR) = EDIRSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
+                    IF (ISky == 1) EDIRSU(JB+1,IHR) = EDIRSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
+                  END IF
+                  IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                END DO
+              END DO
+            END IF
+
+          END DO ! End of hourly sun position loop, IHR
+        END DO ! End of window Y-element loop, IY
+      END DO ! End of window X-element loop, IX
+
+      ! Loop again over hourly sun positions and calculate daylight factors by adding
+      ! direct and inter-reflected illum components, then dividing by exterior horiz illum.
+      ! Also calculate corresponding glare factors.
+      ISunPos = 0
+      ILB=BRef+IL
+
+      DO IHR = 1,24
+        IF (SUNCOSHR(3,IHR) < SunIsUpValue) CYCLE
+
+        ISunPos = ISunPos + 1
+
+        ! Altitude of sun (degrees)
+        PHSUN = PHSUNHR(IHR)
+        SPHSUN = SPHSUNHR(IHR)
+        CPHSUN = CPHSUNHR(IHR)
+
+        ! Azimuth of sun in absolute coord sys
+        THSUN = THSUNHR(IHR)
+
+        DO ISKY = 1,4 ! Loop over sky types
+
+          ! Loop over shading index (1=bare window; 2=diffusing glazing, shade, screen or fixed slat-angle blind;
+          ! 2 to MaxSlatAngs+1 for variable slat-angle blind)
+
+          ! TH. 9/22/2009. CR 7625 - daylight illuminance spikes during some sunset hours due to the calculated sky and sun
+          !  related daylight factors > 1, which theoretically can occur when sun is perpendicular to the window
+          !  and interior surfaces with high visible reflectance.
+          ! Added tmpDFCalc (default to 0.05 lux) as the cap for GILSK and GILSU in calculating the daylight factors
+          !  the assumption behind it is if exterior horizontal surface does not get daylight, spaces do not get daylight.
+
+          DO JSH = 1,MaxSlatAngs+1
+            IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JSH > 2) EXIT
+
+            IF (GILSK(ISKY,IHR) > tmpDFCalc) THEN
+              ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                             (EDIRSK(ISKY,JSH,IHR) + EINTSK(ISKY,JSH,IHR)) / GILSK(ISKY,IHR)
+              ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                             AVWLSK(ISKY,JSH,IHR) / (NWX*NWY * GILSK(ISKY,IHR))
+              ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                  EINTSK(ISKY,JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (PI*GILSK(ISKY,IHR))
+            ELSE
+              ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+              ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+              ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+            ENDIF
+
+            IF (ISky == 1) THEN
+              IF (GILSU(IHR) > tmpDFCalc) THEN
+                ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) =   &
+                                  (EDIRSU(JSH,IHR) + EINTSU(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
+                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                              (EDIRSUdisk(JSH,IHR) + EINTSUdisk(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
+
+                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) =  &
+                               AVWLSU(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
+                ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                               AVWLSUdisk(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
+
+                ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) =   &
+                  EINTSU(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
+                ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                  EINTSUdisk(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
+              ELSE
+                ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+
+                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+
+                ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+              ENDIF
+            END IF
+          END DO ! End of shading index loop, JSH
+
+          ! For switchable glazing put daylighting factors for switched (dark) state in IS=2 location
+          IF (ICtrl > 0) THEN
+            IF(WindowShadingControl(ICtrl)%ShadingType == WSC_ST_SwitchableGlazing) THEN
+              VTR = SurfaceWindow(IWin)%VisTransRatio
+              ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylIllFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+              ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylSourceFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+              ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylBackFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+              IF (ISky == 1) THEN
+                ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylIllFacSun(loopwin,ILB,1,IHR)*VTR
+                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loopwin,ILB,1,IHR)*VTR
+                ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylBackFacSun(loopwin,ILB,1,IHR)*VTR
+                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,2,IHR) =   &
+                                ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,2,IHR) =     &
+                                ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loopwin,ILB,1,IHR)*VTR
+              END IF
+            END IF
+          END IF ! ICtrl > 0
+
+        END DO ! End of sky type loop, ISky
+      END DO ! End of sun position loop, IHR
+    END DO ! End of window loop, loopwin - IWin
+
+  END DO ! End of reference point loop, IL
 
   RETURN
 
-END SUBROUTINE CalcDayltgCoeffsRefMapPoints
+END SUBROUTINE CalcDayltgCoeffsRefPoints
+
+SUBROUTINE CalcDayltgCoeffsMapPoints(ZoneNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Provides calculations for Daylighting Coefficients for map illuminance points
+
+          ! METHODOLOGY EMPLOYED:
+          ! Was previously part of CalcDayltgCoeffsRefMapPoints -- broken out to all multiple
+          ! maps per zone
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: POLYF, InterpProfAng, BlindBeamBeamTrans, SafeDivide, RoundSigDigits
+  USE DaylightingDevices, ONLY: FindTDDPipe, TransTDD
+  USE SolarReflectionManager, ONLY: SolReflRecSurf
+  USE Vectors
+  USE DataSystemVariables, ONLY: DetailedSkyDiffuseAlgorithm
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  REAL(r64), PARAMETER :: tmpDFCalc = 0.05d0 ! cut off illuminance (lux) for exterior horizontal in calculating
+                                             ! the daylighting and glare factors
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: W1(3)                        ! First vertex of window (where vertices are numbered
+                                            ! counter-clockwise starting at upper left as viewed
+                                            ! from inside of room
+  REAL(r64) :: W2(3)                        ! Second vertex of window
+  REAL(r64) :: W3(3)                        ! Third vertex of window
+  REAL(r64) :: U1(3)                        ! First vertex of window for TDD:DOME (if exists)
+  REAL(r64) :: U2(3)                        ! Second vertex of window for TDD:DOME (if exists)
+  REAL(r64) :: U3(3)                        ! Third vertex of window for TDD:DOME (if exists)
+  REAL(r64) :: WC(3)                        ! Center point of window
+  REAL(r64) :: RREF(3)                      ! Location of a reference point in absolute coordinate system
+  REAL(r64) :: RREF2(3)                     ! Location of virtual reference point in absolute coordinate system
+  REAL(r64) :: RWIN(3)                      ! Center of a window element in absolute coordinate system
+  REAL(r64) :: RWIN2(3)                     ! Center of a window element for TDD:DOME (if exists) in abs coord sys
+  REAL(r64) :: RAY(3)                       ! Unit vector along ray from reference point to window element
+  REAL(r64) :: W21(3)                       ! Vector from window vertex 2 to window vertex 1
+  REAL(r64) :: W23(3)                       ! Vector from window vertex 2 to window vertex 3
+  REAL(r64) :: U21(3)                       ! Vector from window vertex 2 to window vertex 1 for TDD:DOME (if exists)
+  REAL(r64) :: U23(3)                       ! Vector from window vertex 2 to window vertex 3 for TDD:DOME (if exists)
+  REAL(r64) :: REFWC(3)                     ! Vector from reference point to center of window
+  REAL(r64) :: REFD(3)                      ! Vector from ref pt to center of win in TDD:DIFFUSER coord sys (if exists)
+  REAL(r64) :: WNORM(3)                     ! Unit vector normal to window (pointing away from room)
+  REAL(r64) :: WNORM2(3)                    ! Unit vector normal to TDD:DOME (if exists)
+!  REAL(r64) :: W2REF(3)                     ! Vector from window origin to project of ref. pt. on window plane
+  REAL(r64) :: VIEWVC(3)                    ! View vector in absolute coordinate system
+  REAL(r64) :: VIEWVC2(3)                   ! Virtual view vector in absolute coordinate system
+  REAL(r64) :: VIEWVD(3)                    ! Virtual view vector in TDD:DIFFUSER coord sys (if exists)
+  REAL(r64) :: ZF(2)                        ! Fraction of zone controlled by each reference point
+                                            !  In the following four variables, I=1 for clear sky, 2 for overcast.
+  REAL(r64) :: XEDIRSK(4)                   ! Illuminance contribution from luminance element, sky-related
+  REAL(r64) :: XEDIRSU                      ! Illuminance contribution from luminance element, sun-related
+  REAL(r64) :: XAVWLSK(4)                   ! Luminance of window element, sky-related
+                                            !  In the following I,J,K or J,K arrays, I=1 for clear sky, 2 for clear turbid,
+                                            !  3 for intermediate, 4 for overcast;
+                                            !  J=1 for bare window, 2 for window shade or blind with fixed slat ang,
+                                            !  or 2 to MaxSlatAngs+1 for blind with movable slats; K = sun position index.
+  REAL(r64) :: EDIRSK(4,MaxSlatAngs+1,24)   ! Sky-related component of direct illuminance
+  REAL(r64) :: EDIRSU(MaxSlatAngs+1,24)     ! Sun-related component of direct illuminance (excluding beam solar at ref pt)
+  REAL(r64) :: EDIRSUdisk(MaxSlatAngs+1,24) ! Sun-related component of direct illuminance due to beam solar at ref pt
+  REAL(r64) :: AVWLSK(4,MaxSlatAngs+1,24)   ! Sky-related average window luminance
+  REAL(r64) :: AVWLSU(MaxSlatAngs+1,24)     ! Sun-related average window luminance, excluding view of solar disk
+  REAL(r64) :: AVWLSUdisk(MaxSlatAngs+1,24) ! Sun-related average window luminance due to view of solar disk
+  REAL(r64) :: RAYCOS(3)                    ! Unit vector from reference point to sun
+  INTEGER   :: IHR                          ! Hour of day counter
+  INTEGER   :: NRF                          ! Number of daylighting reference points in a zone
+  INTEGER   :: IL                           ! Reference point counter
+  REAL(r64) :: AZVIEW                       ! Azimuth of view vector in absolute coord system for
+                                            !  glare calculation (radians)
+  INTEGER   :: IConst                       ! Construction counter
+  INTEGER   :: ICtrl                        ! Window control counter
+  INTEGER   :: IWin                         ! Window counter
+  INTEGER   :: IWin2                        ! Secondary window counter (for TDD:DOME object, if exists)
+  INTEGER   :: PipeNum                      ! TDD pipe object number
+  INTEGER   :: ShelfNum                     ! Daylighting shelf object number
+  INTEGER   :: InShelfSurf                  ! Inside daylighting shelf surface number
+  INTEGER   :: BlNum                        ! Window blind number
+  INTEGER   :: ScNum                        ! Window screen number
+  INTEGER   :: JB                           ! Slat angle counter
+  INTEGER   :: ShType                       ! Window shading type
+  REAL(r64) :: TransBmBmMult(MaxSlatAngs)   ! Beam-beam transmittance of isolated blind
+  REAL(r64) :: TransBmBmMultRefl(MaxSlatAngs) ! As above but for beam reflected from exterior obstruction
+  REAL(r64) :: ProfAng                      ! Solar profile angle on a window (radians)
+  INTEGER   :: IConstShaded                 ! Shaded construction counter
+  REAL(r64) :: WW                           ! Window width (m)
+  REAL(r64) :: HW                           ! Window height (m)
+  INTEGER   :: LSHCAL                       ! Interior shade calculation flag: 0=not yet
+                                            !  calculated, 1=already calculated
+  INTEGER   :: NDIVX                        ! Number of window x divisions for daylighting calc
+  INTEGER   :: NDIVY                        ! Number of window y divisions for daylighting calc
+  REAL(r64) :: ALF                          ! Distance from reference point to window plane (m)
+!  REAL(r64) :: D1a                          ! Projection of vector from window origin to reference
+!                                            !  on window X  axis (m)
+!  REAL(r64) :: D1b                          ! Projection of vector from window origin to reference
+!                                            !  on window Y axis (m)
+  INTEGER   :: NWX                          ! Number of window elements in x direction for dayltg calc
+  INTEGER   :: NWY                          ! Number of window elements in y direction for dayltg calc
+  INTEGER   :: NWYlim                       ! For triangle, largest NWY for a given IX
+  REAL(r64) :: DWX                          ! Horizontal dimension of window element (m)
+  REAL(r64) :: DWY                          ! Vertical dimension of window element (m)
+  INTEGER   :: IX                           ! Counter for window elements in the x direction
+  INTEGER   :: IY                           ! Counter for window elements in the y direction
+  REAL(r64) :: DIS                          ! Distance between reference point and center of window element (m)
+  REAL(r64) :: COSB                         ! Cosine of angle between window outward normal and ray from
+                                            !  reference point to window element
+  REAL(r64) :: PHRAY                        ! Altitude of ray from reference point to window element (radians)
+  REAL(r64) :: THRAY                        ! Azimuth of ray from reference point to window element (radians)
+  REAL(r64) :: DOMEGA                       ! Solid angle subtended by window element wrt reference point (steradians)
+  REAL(r64) :: POSFAC                       ! Position factor for a window element / ref point / view vector combination
+  REAL(r64) :: RR                           ! Distance from ref point to intersection of view vector
+                                            !  and plane normal to view vector and window element (m)
+  REAL(r64) :: ASQ                          ! Square of distance from above intersection to window element (m2)
+  REAL(r64) :: YD                           ! Vertical displacement of window element wrt ref point
+  REAL(r64) :: XR                           ! Horizontal displacement ratio
+  REAL(r64) :: YR                           ! Vertical displacement ratio
+  REAL(r64) :: TVISB                        ! Visible transmittance of window for COSB angle of incidence (times light well
+                                            !   efficiency, if appropriate)
+  INTEGER   :: ISunPos                      ! Sun position counter; used to avoid calculating various
+                                            !  quantities that do not depend on sun position.
+  INTEGER   :: IHIT                         ! Hit flag; =1 if ray from ref point thru window element hits
+                                            !  an obstruction, =0 otherwise.
+  INTEGER   :: IHitIntObs                   ! = 1 if interior obstruction hit, = 0 otherwise
+  REAL(r64) :: ObTrans                      ! Product of solar transmittances of exterior obstructions hit by ray
+                                            ! from reference point through a window element
+  REAL(r64) :: ObTransDisk                  ! Product of solar transmittances of exterior obstructions hit by ray
+                                            ! from reference point to sun
+  REAL(r64) :: HP(3)                        ! Hit coordinates, if ray hits
+  REAL(r64) :: LumAtHitPtFrSun              ! Luminance at hit point of obstruction by reflection of direct light from
+                                            !  sun (cd/m2)
+  INTEGER   :: ISky                         ! Sky type index: 1=clear, 2=clear turbid, 3=intermediate, 4=overcast
+  INTEGER   :: JSH                          ! Shading index: J=1 is unshaded window, J=2 is shaded window
+  REAL(r64) :: ELUM                         ! Sky or ground luminance (cd/m2)
+  REAL(r64) :: DEDIR                        ! Illuminance contribution at reference point from window element (lux)
+  REAL(r64) :: COSI                         ! Cosine of angle between direct sun and window outward normal
+  INTEGER   :: IP                           ! IP=1 if ray passes thru window, =0 if not
+  REAL(r64) :: TVISS                        ! Direct solar visible transmittance of window at given angle of incidence
+                                            !  (times light well efficiency, if appropriate)
+  REAL(r64) :: XAVWL                        ! XAVWL*TVISS is contribution of window luminance from solar disk (cd/m2)
+  REAL(r64) :: VTR                          ! For switchable glazing, ratio of visible transmittance of
+                                            !  fully-switched state to that of the unswitched state
+  REAL(r64) :: SlatAng                      ! Blind slat angle (rad)
+  INTEGER   :: Loop,Loop2                   ! DO loop indices
+  INTEGER   :: loopwin                      ! loop index for exterior windows associated with a daylit zone
+  LOGICAL   :: Rectangle                    ! True if window is rectangular
+  LOGICAL   :: Triangle                     ! True if window is triangular
+  REAL(r64) :: DAXY                         ! Area of window element
+  REAL(r64) :: DAXY1                        ! For triangle, area of window element at end of column
+  REAL(r64) :: SinCornerAng                 ! For triangle, sine of corner angle of window element
+  INTEGER   :: NearestHitSurfNum            ! Surface number of nearest obstruction
+  INTEGER   :: NearestHitSurfNumX           ! Surface number to use when obstruction is a shadowing surface
+  REAL(r64) :: NearestHitPt(3)              ! Hit point of ray on nearest obstruction
+  REAL(r64) :: SunObstructionMult           ! = 1.0 if sun hits a ground point; otherwise = 0.0
+  REAL(r64) :: SkyObstructionMult           ! Ratio of obstructed to unobstructed sky diffuse at a ground point
+  REAL(r64) :: HorDis                       ! Distance between ground hit point and proj'n of center
+                                            !  of window element onto ground (m)
+  REAL(r64) :: Alfa,Beta                    ! Intermediate variables
+  REAL(r64) :: GroundHitPt(3)               ! Coordinates of point that ray hits ground (m)
+  INTEGER   :: IHitObs                      ! 1 if obstruction is hit; 0 otherwise
+  REAL(r64) :: ObsHitPt(3)                  ! Coordinates of hit point on an obstruction (m)
+  INTEGER   :: ObsSurfNum                   ! Surface number of obstruction
+  INTEGER   :: ObsConstrNum                 ! Construction number of obstruction
+  REAL(r64) :: ObsVisRefl                   ! Visible reflectance of obstruction
+  REAL(r64) :: SkyReflVisLum                ! Reflected sky luminance at hit point divided by
+  REAL(r64) :: SkyGndUnObs                  ! Unobstructed sky irradiance at a ground point
+  REAL(r64) :: SkyGndObs                    ! Obstructed sky irradiance at a ground point
+  REAL(r64) :: Phi,Theta                    ! Altitude and azimuth angle of ray from a ground point (radians)
+  INTEGER   :: IPhi,ITheta                  ! Phi and Theta indices
+  REAL(r64) :: DPhi,DTheta                  ! Phi and Theta increment (radians)
+  REAL(r64) :: SPhi,CPhi                    ! Sin and cos of Phi
+  REAL(r64) :: dOmegaGnd                    ! Solid angle element of ray from ground point (steradians)
+  REAL(r64) :: URay(3)                      ! Unit vector in (Phi,Theta) direction
+  REAL(r64) :: CosIncAngURay                ! Cosine of incidence angle of URay on ground plane
+  REAL(r64) :: IncAngSolidAngFac            ! CosIncAngURay*dOmegaGnd/Pi
+  INTEGER   :: RecSurfNum                   ! Receiving surface number
+  INTEGER   :: ReflSurfNum,ReflSurfNumX     ! Reflecting surface number
+  REAL(r64) :: ReflNorm(3)                  ! Normal vector to reflecting surface
+  REAL(r64) :: CosIncAngRefl                ! Cos of angle of incidence of beam on reflecting surface
+  REAL(r64) :: SunVecMir(3)                 ! Sun ray mirrored in reflecting surface
+  REAL(r64) :: CosIncAngRec                 ! Cos of angle of incidence of reflected beam on receiving window
+  INTEGER   :: IHitRefl                     ! 1 if ray hits reflecting surface; 0 otherwise
+  REAL(r64) :: HitPtRefl(3)                 ! Point that ray hits reflecting surface
+  REAL(r64) :: ReflDistance                 ! Distance between ref pt and hit point on reflecting surf (m)
+  INTEGER   :: IHitObsRefl                  ! > 0 if obstruction hit between ref pt and reflection point
+  REAL(r64) :: HitPtObs(3)                  ! Hit point on obstruction
+  REAL(r64) :: ObsDistance                  ! Distance from ref pt to reflection point
+  INTEGER   :: ReflSurfRecNum               ! Receiving surface number for a reflecting window
+  REAL(r64) :: SpecReflectance              ! Specular reflectance of a reflecting surface
+  REAL(r64) :: TVisRefl                     ! Bare window vis trans for reflected beam
+                                            !  (times light well efficiency, if appropriate)
+  INTEGER   :: ConstrNumRefl                ! Window construction number for a specularly reflecting shading surf
+  REAL(r64) :: PHSUNrefl                    ! Altitude angle of reflected sun (radians)
+  REAL(r64) :: THSUNrefl                    ! Azimuth anggle of reflected sun (radians)
+  INTEGER   :: ExtWinType                   ! Exterior window type (InZoneExtWin, AdjZoneExtWin, NotInOrAdjZoneExtWin)
+  REAL(r64) :: SolidAngExtWin               ! Approx. solid angle subtended by an ext. window wrt ref pt
+  REAL(r64) :: SolidAngMinIntWin            ! Approx. smallest solid angle subtended by an int. window wrt ref pt
+  REAL(r64) :: SolidAngRatio                ! Ratio of SolidAngExtWin and SolidAngMinIntWin
+  INTEGER   :: ZoneNumThisWin               ! A window's zone number
+  INTEGER   :: IntWin                       ! Interior window surface index
+  INTEGER   :: IntWinHitNum                 ! Surface number of interior window that is intersected
+  INTEGER   :: IHitIntWin                   ! Ray from ref pt passes through interior window
+  INTEGER   :: IHitExtObs                   ! 1 if ray from ref pt to ext win hits an exterior obstruction
+  REAL(r64) :: HitPtIntWin(3)               ! Intersection point on an interior window for ray from ref pt to ext win (m)
+  REAL(r64) :: TVISIntWin                   ! Visible transmittance of int win at COSBIntWin for light from ext win
+
+  INTEGER   :: IHitIntWinDisk               ! 1 if ray from ref pt to sun passes thru an int window; 0 otherwise
+  INTEGER   :: IHitIntObsDisk               ! 1 if ray from ref pt to sun hits an interior obstruction; 0 otherwise
+  INTEGER   :: IHitExtObsDisk               ! 1 if ray from ref pt to sun hits an exterior obstruction; 0 otherwise
+
+  INTEGER   :: IntWinDisk                   ! Surface loop index for finding int windows betw ref pt and sun
+  REAL(r64) :: HitPtIntWinDisk(3)           ! Intersection point on an interior window for ray from ref pt to sun (m)
+  INTEGER   :: IntWinDiskHitNum             ! Surface number of int window intersected by ray betw ref pt and sun
+  REAL(r64) :: COSBIntWin                   ! Cos of angle between int win outward normal and ray betw ref pt and
+                                            !  exterior window element or between ref pt and sun
+  REAL(r64) :: TVISIntWinDisk               ! Visible transmittance of int win at COSBIntWin for sun
+  REAL(r64) :: TVisIntWinMult               ! Interior window vis trans multiplier for ext win in adjacent zone
+  REAL(r64) :: TVisIntWinDiskMult           ! Interior window vis trans solar disk multiplier for ext win in adj zone
+!  INTEGER   :: CalcLoop                     ! 1=Ref points, 2=Map points
+!  LOGICAL   :: DoingRefs                    ! True when doing "refs".
+!  INTEGER   :: EndLoop                      ! When doing sizing, only do first loop
+!  INTEGER   :: BRef
+  INTEGER   :: ILB
+  INTEGER   :: MapNum                       ! Loop for map number
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapWindowSolidAngAtRefPt
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: MapWindowSolidAngAtRefPtWtd
+  LOGICAL, SAVE     :: mapFirstTime=.true.
+!  INTEGER TZoneNum
+!  LOGICAL ErrorsFound
+
+  IF (mapFirstTime .and. TotIllumMaps > 0) THEN
+    IL=-999
+    DO MapNum=1,TotIllumMaps
+      IL=MAX(IL,IllumMapCalc(MapNum)%TotalMapRefPoints)
+    ENDDO
+    ALLOCATE(MapErrIndex(TotSurfaces,IL))
+    MapErrIndex=0
+    mapFirstTime=.false.
+  ENDIF
+
+  ! Azimuth of view vector in absolute coord sys
+  AZVIEW = (ZoneDaylight(ZoneNum)%ViewAzimuthForGlare + Zone(ZoneNum)%RelNorth + BuildingAzimuth + BuildingRotationAppendixG)  &
+               * DegToRadians
+  ! View vector components in absolute coord sys
+  VIEWVC(1) = SIN(AZVIEW)
+  VIEWVC(2) = COS(AZVIEW)
+  VIEWVC(3) = 0.
+
+  DO MapNum=1,TotIllumMaps
+
+    IF (IllumMapCalc(MapNum)%Zone /= ZoneNum) CYCLE
+
+    IllumMapCalc(MapNum)%DaylIllumAtMapPt        =0.0 ! Daylight illuminance at reference points (lux)
+    IllumMapCalc(MapNum)%GlareIndexAtMapPt       =0.0 ! Glare index at reference points
+    IllumMapCalc(MapNum)%SolidAngAtMapPt         =0.0
+    IllumMapCalc(MapNum)%SolidAngAtMapPtWtd      =0.0
+    IllumMapCalc(MapNum)%IllumFromWinAtMapPt     =0.0
+    IllumMapCalc(MapNum)%BackLumFromWinAtMapPt   =0.0
+    IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt =0.0
+
+    IllumMapCalc(MapNum)%DaylIllFacSky           =0.0
+    IllumMapCalc(MapNum)%DaylSourceFacSky        =0.0
+    IllumMapCalc(MapNum)%DaylBackFacSky          =0.0
+    IllumMapCalc(MapNum)%DaylIllFacSun           =0.0
+    IllumMapCalc(MapNum)%DaylIllFacSunDisk       =0.0
+    IllumMapCalc(MapNum)%DaylSourceFacSun        =0.0
+    IllumMapCalc(MapNum)%DaylSourceFacSunDisk    =0.0
+    IllumMapCalc(MapNum)%DaylBackFacSun          =0.0
+    IllumMapCalc(MapNum)%DaylBackFacSunDisk      =0.0
+
+    NRF = IllumMapCalc(MapNum)%TotalMapRefPoints
+    ZF=0.
+!    BRef=2
+    DO IL = 1,NRF
+
+      RREF(1:3) = IllumMapCalc(MapNum)%MapRefPtAbsCoord(IL,1:3) ! (x, y, z)
+
+      !           -------------
+      ! ---------- WINDOW LOOP ----------
+      !           -------------
+
+      ALLOCATE(MapWindowSolidAngAtRefPt(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
+      MapWindowSolidAngAtRefPt=0.0
+      ALLOCATE(MapWindowSolidAngAtRefPtWtd(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
+      MapWindowSolidAngAtRefPtWtd=0.0
+
+      DO loopwin = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
+        IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loopwin)
+
+        IllumMapCalc(MapNum)%SolidAngAtMapPt(IL,loopwin) = 0.0
+        IllumMapCalc(MapNum)%SolidAngAtMapPtWtd(IL,loopwin) = 0.0
+
+        ZoneNumThisWin = Surface(Surface(IWin)%BaseSurf)%Zone
+        IF(ZoneNumThisWin == ZoneNum) THEN
+          ExtWinType = InZoneExtWin
+        ELSE
+          ExtWinType = AdjZoneExtWin
+        END IF
+
+        IConst = Surface(IWin)%Construction
+        IF(SurfaceWindow(IWin)%StormWinFlag == 1) IConst = Surface(IWin)%StormWinConstruction
+
+        ! TH Added 6/29/2009.
+        ! For thermochromic windows, the daylight and glare factros are calculated for a base window cosntruction
+        !  at base TC layer temperature. During each time step calculations at DayltgInteriorIllum,
+        !  DayltgInteriorMapIllum, and DayltgGlare, the daylight and glare factors are adjusted by the visible
+        !  transmittance ratio = VT of actual TC window based on last hour TC layer temperature / VT of the base TC window
+        IF (Construct(IConst)%TCFlag == 1) THEN
+          ! For thermochromic windows, use the base window construction at base temperature of the TC layer
+          IConst = Construct(IConst)%TCMasterConst
+        ENDIF
+
+        ICtrl = Surface(IWin)%WindowShadingControlPtr
+        ShType = WSC_ST_NoShade ! 'NOSHADE'
+        IF (ICtrl > 0) ShType = WindowShadingControl(ICtrl)%ShadingType
+        BlNum = SurfaceWindow(IWin)%BlindNumber
+        ScNum = SurfaceWindow(IWin)%ScreenNumber
+
+        ShelfNum = Surface(IWin)%Shelf
+        IF (ShelfNum > 0) THEN
+          InShelfSurf = Shelf(Surface(IWin)%Shelf)%InSurf ! Inside daylighting shelf present if > 0
+        ELSE
+          InShelfSurf = 0
+        END IF
+
+        Rectangle = .FALSE.
+        Triangle = .FALSE.
+        IF (Surface(IWin)%Sides == 3) Triangle = .TRUE.
+        IF (Surface(IWin)%Sides == 4) Rectangle = .TRUE.
+
+        IF (Rectangle) THEN
+          ! Vertices of window (numbered counter-clockwise starting at upper left as viewed
+          ! from inside of room). Assumes original vertices are numbered counter-clockwise from
+          ! upper left as viewed from outside.
+          W3 = Surface(IWin)%Vertex(2)
+          W2 = Surface(IWin)%Vertex(3)
+          W1 = Surface(IWin)%Vertex(4)
+        ELSE IF (Triangle) THEN
+          W3 = Surface(IWin)%Vertex(2)
+          W2 = Surface(IWin)%Vertex(3)
+          W1 = Surface(IWin)%Vertex(1)
+        END IF
+
+        ! Shade/blind calculation flag
+        LSHCAL = 0
+
+        ! Visible transmittance at normal incidence
+        SurfaceWindow(IWin)%VisTransSelected = POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))* &
+                                               SurfaceWindow(IWin)%GlazedFrac
+        ! For windows with switchable glazing, ratio of visible transmittance at normal
+        ! incidence for fully switched (dark) state to that of unswitched state
+        SurfaceWindow(IWin)%VisTransRatio = 1.0
+        IF (ICtrl > 0) THEN
+          IF (ShType == WSC_ST_SwitchableGlazing) THEN
+            IConstShaded = Surface(IWin)%ShadedConstruction
+            SurfaceWindow(IWin)%VisTransRatio = SafeDivide(POLYF(1.0d0,Construct(IConstShaded)%TransVisBeamCoef(1)) , &
+                                                  POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1)))
+          END IF
+        END IF
+
+        ! Unit vectors from window vertex 2 to 1 and 2 to 3,
+        ! center point of window, and vector from ref pt to center of window
+        W21 = W1 - W2
+        W23 = W3 - W2
+        HW = SQRT(DOT_PRODUCT(W21,W21))
+        WW = SQRT(DOT_PRODUCT(W23,W23))
+        IF (Rectangle) THEN
+          WC  = W2 + (W23 + W21) / 2.d0
+        ELSE IF (Triangle) THEN
+          WC  = W2 + (W23 + W21) / 3.d0
+        END IF
+        SurfaceWindow(IWin)%WinCenter = WC
+        REFWC = WC - RREF
+        ! Unit vectors
+        W21 = W21/HW
+        W23 = W23/WW
+
+        ! Unit vector normal to window (pointing away from room)
+        WNORM = Surface(IWin)%lcsz
+
+        ! Initialize number of window elements
+        NDIVX = 40
+        NDIVY = 40
+
+        ! Distance from ref point to window plane
+        ALF = ABS(DOT_PRODUCT(WNORM, REFWC))
+
+        IF (ALF < 0.1524d0 .and. ExtWinType == AdjZoneExtWin) THEN
+          IF (MapErrIndex(IWin,IL) == 0) THEN ! only show error message once
+            CALL ShowWarningError('CalcDaylightCoeffMapPoints: For Zone="'//TRIM(Zone(ZoneNum)%Name)//        &
+               '" External Window="'//TRIM(Surface(IWin)%Name)//'"in Zone="'//TRIM(Zone(Surface(IWin)%Zone)%Name)//      &
+               '" map point is less than 0.15m (6") from window plane ')
+            CALL ShowContinueError('Distance=['//trim(RoundSigDigits(ALF,1))//' m] map point=['//  &
+               TRIM(RoundSigDigits(RREF(1),1))//  &
+               ','//TRIM(RoundSigDigits(RREF(2),1))//  &
+               ','//TRIM(RoundSigDigits(RREF(3),1))//'], Inaccuracy in Map Calcs may result.')
+            MapErrIndex(IWin,IL)=1
+          ENDIF
+        END IF
+
+        ! Number of window elements in X and Y for daylighting calculation
+        IF (ALF > 0.1524d0) THEN
+          NDIVX = 1 + INT(4.d0 * WW / ALF)
+          NDIVY = 1 + INT(4.d0 * HW / ALF)
+        ENDIF
+
+        IF(ExtWinType == AdjZoneExtWin) THEN
+          ! Adjust number of exterior window elements to give acceptable number of rays through
+          ! interior windows in the zone (for accuracy of interior window daylighting calculation)
+          SolidAngExtWin = SafeDivide( ((Surface(IWin)%Area + SurfaceWindow(IWin)%DividerArea) / Surface(IWin)%Multiplier ),  &
+                                                            ALF**2)
+          SolidAngMinIntWin = ZoneDaylight(ZoneNum)%MinIntWinSolidAng
+          SolidAngRatio = MAX(1.0d0,SolidAngExtWin/SolidAngMinIntWin)
+          NDIVX = SQRT(SolidAngRatio)*NDIVX
+          NDIVY = SQRT(SolidAngRatio)*NDIVY
+        END IF
+
+        NWX = MIN(40,NDIVX)
+        NWY = MIN(40,NDIVY)
+
+        ! Discretization of triangle is simpler if NWX = NWY
+        IF (Triangle) THEN
+          NWX = MAX(NWX,NWY)
+          NWY = NWX
+        END IF
+
+        ! Edge lengths of window elements
+        DWX = WW / NWX
+        DWY = HW / NWY
+
+        ! Azimuth and altitude of window normal
+        SurfaceWindow(IWin)%Phi = ASIN(WNORM(3))
+        IF (ABS(WNORM(1)) > 1.0d-5 .OR. ABS(WNORM(2)) > 1.0d-5) THEN
+          SurfaceWindow(IWin)%Theta = ATAN2(WNORM(2), WNORM(1))
+        ELSE
+          SurfaceWindow(IWin)%Theta = 0.
+        END IF
+
+        ! Recalculation of values for TDD:DOME
+        IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+
+          ! Look up the TDD:DOME object
+          PipeNum = FindTDDPipe(IWin)
+          IWin2 = TDDPipe(PipeNum)%Dome
+
+          ! Calculate reference point coords relative to the diffuser coordinate system
+          ! W21, W23, and WNORM are the unit vectors
+          REFD(1) = DOT_PRODUCT(REFWC,W21)
+          REFD(2) = DOT_PRODUCT(REFWC,W23)
+          REFD(3) = DOT_PRODUCT(REFWC,WNORM)
+
+          ! Calculate view vector coords relative to the diffuser coordinate system
+          VIEWVD(1) = DOT_PRODUCT(VIEWVC,W21)
+          VIEWVD(2) = DOT_PRODUCT(VIEWVC,W23)
+          VIEWVD(3) = DOT_PRODUCT(VIEWVC,WNORM)
+
+          U3 = Surface(IWin2)%Vertex(2)
+          U2 = Surface(IWin2)%Vertex(3)
+
+          IF(Surface(IWin2)%Sides == 4) THEN
+            ! Vertices of window (numbered counter-clockwise starting
+            ! at upper left as viewed from inside of room)
+            ! Assumes original vertices are numbered counter-clockwise from
+            ! upper left as viewed from outside.
+            U3 = Surface(IWin2)%Vertex(2)
+            U2 = Surface(IWin2)%Vertex(3)
+            U1 = Surface(IWin2)%Vertex(4)
+          ELSE IF(Surface(IWin2)%Sides == 3) THEN
+            U3 = Surface(IWin2)%Vertex(2)
+            U2 = Surface(IWin2)%Vertex(3)
+            U1 = Surface(IWin2)%Vertex(1)
+          END IF
+
+          ! Unit vectors from window vertex 2 to 1 and 2 to 3,
+          ! center point of window, and vector from ref pt to center of window
+          U21 = U1 - U2
+          U23 = U3 - U2
+          HW = SQRT(DOT_PRODUCT(U21,U21))
+          WW = SQRT(DOT_PRODUCT(U23,U23))
+          IF(Surface(IWin2)%Sides == 4) THEN
+            WC = U2 + (U23 + U21) / 2.d0
+          ELSE IF(Surface(IWin2)%Sides == 3) THEN
+            WC = U2 + (U23 + U21) / 3.0d0
+          END IF
+          SurfaceWindow(IWin2)%WinCenter = WC
+          ! Unit vectors
+          U21 = U21 / HW
+          U23 = U23 / WW
+
+          ! Unit vector normal to dome (pointing away from TDD)
+          ! These are specific to the exterior.
+          ! NOTE:  Preserve WNORM for later in the code.
+          CALL DayltgCrossProduct(U21, U23, WNORM2)
+          WNORM2 = WNORM2 / (SQRT(DOT_PRODUCT(WNORM2,WNORM2)))
+
+          ! Azimuth and altitude of dome normal
+          ! These are specific to the exterior.
+          SurfaceWindow(IWin2)%Phi = ASIN(WNORM2(3))
+          IF (ABS(WNORM2(1)) > 1.0d-5 .OR. ABS(WNORM2(2)) > 1.0d-5) THEN
+            SurfaceWindow(IWin2)%Theta = ATAN2(WNORM2(2), WNORM2(1))
+          ELSE
+            SurfaceWindow(IWin2)%Theta = 0.0
+          END IF
+
+          ! Calculate new virtual reference point coords relative to dome coord system
+          ! W21, W23, and WNORM2 are now the unit vectors for the dome coord system
+          REFWC = REFD(1) * U21 + REFD(2) * U23 + REFD(3) * WNORM2
+          RREF2 = WC - REFWC
+
+          ! Calculate new virtual view vector coords relative to dome coord system
+          VIEWVC2 = VIEWVD(1) * U21 + VIEWVD(2) * U23 + VIEWVD(3) * WNORM2
+
+          ! Copy several values from the diffuser so that DayltgInterReflectedIllum works correctly
+          ! These are specific to the interior.
+          SurfaceWindow(IWin2)%RhoCeilingWall = SurfaceWindow(IWin)%RhoCeilingWall
+          SurfaceWindow(IWin2)%RhoFloorWall = SurfaceWindow(IWin)%RhoFloorWall
+          SurfaceWindow(IWin2)%FractionUpgoing = SurfaceWindow(IWin)%FractionUpgoing
+          SurfaceWindow(IWin2)%GlazedFrac = SurfaceWindow(IWin)%GlazedFrac
+
+        ELSE
+          ! This is not a TDD:DIFFUSER.  Make sure nothing is messed up for a regular window.
+          IWin2 = IWin
+          WNORM2 = WNORM
+          RREF2 = RREF
+          VIEWVC2 = VIEWVC
+
+          U2 = W2
+          U21 = W21
+          U23 = W23
+        END IF
+
+        ! Initialize sky and sun components of direct illuminance (arrays EDIRSK, EDIRSU, EDIRSUdisk)
+        ! and average window luminance (arrays AVWLSK, AVWLSU, AVWLSUdisk), at ref pt.
+        EDIRSK = 0.
+        EDIRSU = 0.
+        EDIRSUdisk = 0.
+        AVWLSK = 0.
+        AVWLSU = 0.
+        AVWLSUdisk = 0.
+
+        ! Initialize solid angle subtended by window wrt ref pt
+        ! and solid angle weighted by glare position factor
+        MapWindowSolidAngAtRefPt(loopwin,IL) = 0.
+        MapWindowSolidAngAtRefPtWtd(loopwin,IL) = 0.
+
+        ! Area of window element
+        IF (Rectangle) THEN
+          DAXY = DWX * DWY
+        ELSE IF (Triangle) THEN
+          SinCornerAng = SQRT(1.0d0 - DOT_PRODUCT(W21,W23)**2)
+          DAXY = DWX * DWY * SinCornerAng
+        END IF
+
+        !           ---------------------
+        ! ---------- WINDOW ELEMENT LOOP ----------
+        !           ---------------------
+
+        DO IX = 1,NWX
+          IF (Rectangle) THEN
+            NWYlim = NWY
+          ELSE IF (Triangle) THEN
+            NWYlim = NWY - IX + 1
+          END IF
+
+          DO IY = 1,NWYlim
+            LSHCAL = LSHCAL + 1
+            SkyObstructionMult = 1.0
+
+            ! Center of win element in absolute coord sys
+            RWIN = W2 + (REAL(IX,r64) - 0.5d0) * W23 * DWX + (REAL(IY,r64) - 0.5d0) * W21 * DWY
+
+            ! Center of win element on TDD:DOME in absolute coord sys
+            ! If no TDD, RWIN2 = RWIN
+            RWIN2 = U2 + (REAL(IX,r64) - 0.5d0) * U23 * DWX + (REAL(IY,r64) - 0.5d0) * U21 * DWY
+
+            ! Distance between ref pt and window element
+            DIS = SQRT(DOT_PRODUCT(RWIN - RREF, RWIN - RREF))
+
+            ! Unit vector along ray from ref pt to element
+            RAY = (RWIN - RREF) / DIS
+
+            ! Cosine of angle between ray and window outward normal
+            COSB = DOT_PRODUCT(WNORM2, RAY)
+
+            ! If COSB > 0, direct light from window can reach ref pt. Otherwise go to loop
+            ! over sun position and calculate inter-reflected component of illuminance
+            IF (COSB > 0.) THEN
+              ! Azimuth (-pi to pi) and altitude (-pi/2 to pi/2) of ray. Azimuth = 0 is along east.
+              PHRAY = ASIN(RAY(3))
+              IF (ABS(RAY(1)) > 1.0d-5 .OR. ABS(RAY(2)) > 1.0d-5) THEN
+                THRAY = ATAN2(RAY(2), RAY(1))
+              ELSE
+                THRAY = 0.
+              END IF
+
+              ! Solid angle subtended by element wrt ref pt.
+              DAXY1 = DAXY
+              ! For triangle, at end of Y column only one half of parallelopiped's area contributes
+              IF (Triangle .AND. IY == NWYlim) DAXY1 = 0.5d0 * DAXY
+              DOMEGA = DAXY1 * COSB / (DIS * DIS)
+
+              ! Calculate position factor (used in glare calculation) for this
+              ! win element / ref pt / view-vector combination
+              POSFAC = 0.
+
+              ! Distance from ref pt to intersection of view vector and plane
+              ! normal to view vector containing the window element
+
+              RR = DIS * DOT_PRODUCT(RAY, VIEWVC2)
+              IF (RR > 0.) THEN
+                ! Square of distance from above intersection point to win element
+                ASQ = DIS * DIS - RR * RR
+                ! Vertical displacement of win element wrt ref pt
+                YD = RWIN2(3) - RREF2(3)
+                ! Horizontal and vertical displacement ratio and position factor
+                XR = SQRT(ABS(ASQ - YD * YD)) / RR
+                YR = ABS(YD / RR)
+                POSFAC = DayltgGlarePositionFactor(XR, YR)
+              END IF
+
+              IHitIntObs = 0
+              IntWinHitNum = 0
+              IHitIntWin = 0
+              TVISIntWinDisk = 0.0 ! Init Value
+              TVISIntWin = 0.0
+
+              IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+                ! Unshaded visible transmittance of TDD for a single ray from sky/ground element
+                TVISB = TransTDD(PipeNum, COSB, VisibleBeam) * SurfaceWindow(IWin)%GlazedFrac
+
+              ELSE ! Regular window
+                ! Vis trans of glass for COSB incidence angle
+                TVISB = POLYF(COSB,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
+                           SurfaceWindow(IWin)%LightWellEff
+                IF(ExtWinType == AdjZoneExtWin) THEN
+                  IHitIntWin = 0
+                  ! Does ray pass through an interior window in zone (ZoneNum) containing the ref point?
+                  DO IntWin = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+                    IF(Surface(IntWin)%Class == SurfaceClass_Window .AND. Surface(IntWin)%ExtBoundCond >= 1) THEN
+                      IF(Surface(Surface(IntWin)%ExtBoundCond)%Zone == Surface(IWin)%Zone) THEN
+                        CALL DayltgPierceSurface(IntWin,RREF,RAY,IHitIntWin,HitPtIntWin)
+                        IF(IHitIntWin > 0) THEN
+                          IntWinHitNum = IntWin
+                          COSBIntWin = DOT_PRODUCT(Surface(IntWin)%OutNormVec(1:3),RAY)
+                          IF(COSBIntWin <= 0.0) THEN
+                            IHitIntWin = 0
+                            IntWinHitNum = 0
+                            CYCLE
+                          END IF
+                          TVISIntWin = POLYF(COSBIntWin,Construct(Surface(IntWin)%Construction)%TransVisBeamCoef(1))
+                          TVISB = TVISB * TVISIntWin
+                          EXIT  ! Ray passes thru interior window; exit from DO loop
+                        END IF
+                      END IF
+                    END IF
+                  END DO  ! End of loop over surfaces in zone ZoneNum
+
+                  IF(IHitIntWin == 0) THEN
+                    ! Ray does not pass through an int win in ZoneNum. Therefore, it hits the opaque part
+                    ! of a surface between ref point in ZoneNum and ext win element in adjacent zone.
+                    IHitIntObs = 1
+                  END IF
+                END IF  ! End of check if this is an ext win in an adjacent zone
+              END IF  ! End of check if TDD:Diffuser or regular exterior window
+
+              ! Check for interior obstructions
+              IF(ExtWinType == InZoneExtWin .AND. IHitIntObs == 0) THEN
+                ! Check for obstruction between reference point and window element
+                ! Returns IHitIntObs = 1 if obstruction is hit, IHitIntObs = 0 otherwise.
+                ! (Example of interior obstruction is a wall in an L-shaped room that lies
+                ! between reference point and window.)
+                CALL DayltgHitInteriorObstruction(IWin,RREF,RWIN,IHitIntObs)
+              END IF
+
+              IF(ExtWinType == AdjZoneExtWin .AND. IntWinHitNum > 0 .AND. IHitIntObs == 0) THEN
+                ! Check for obstruction between ref point and interior window through which ray passes
+                CALL DayltgHitInteriorObstruction(IntWinHitNum,RREF,HitPtIntWin,IHitIntObs)
+                IF(IHitIntObs == 0) THEN
+                  ! Check for obstruction between intersection point on int window and ext win element
+                  CALL DayltgHitBetWinObstruction(IntWinHitNum,IWin,HitPtIntwin,RWIN,IHitIntObs)
+                END IF
+              END IF
+
+              IF(IHitIntObs == 0) THEN
+                IF(ExtWinType==InZoneExtWin .OR. (ExtWinType==AdjZoneExtWin .AND. IHitIntWin>0)) THEN
+                  MapWindowSolidAngAtRefPt(loopwin,IL) = MapWindowSolidAngAtRefPt(loopwin,IL) + DOMEGA
+                  IllumMapCalc(MapNum)%SolidAngAtMapPt(IL,loopwin) =   &
+                                IllumMapCalc(MapNum)%SolidAngAtMapPt(IL,loopwin) + DOMEGA
+                  MapWindowSolidAngAtRefPtWtd(loopwin,IL) =   &
+                                MapWindowSolidAngAtRefPtWtd(loopwin,IL)  + DOMEGA * POSFAC
+                  IllumMapCalc(MapNum)%SolidAngAtMapPtWtd(IL,loopwin) =  &
+                        IllumMapCalc(MapNum)%SolidAngAtMapPtWtd(IL,loopwin) + DOMEGA * POSFAC
+                END IF
+              END IF
+
+              IF(IHitIntObs == 1) ObTrans = 0.0
+
+              IHitExtObs = 0
+              IF (IHitIntObs == 0) THEN
+                ! No interior obstruction was hit.
+                ! Check for exterior obstructions between window element and sky/ground.
+                ! Get product of transmittances of obstructions hit by ray.
+                ! ObTrans = 1.0 will be returned if no exterior obstructions are hit.
+                CALL DayltgHitObstruction(IHr,IWin2,RWIN2,RAY,ObTrans)
+                IF(ObTrans < 1.0) IHitExtObs = 1
+              END IF
+
+              IF(CalcSolRefl .AND. PHRAY < 0.0 .AND. ObTrans > 1.d-6) THEN
+                ! Calculate effect of obstructions on shading of sky diffuse reaching the ground point hit
+                ! by the ray. This effect is given by the ratio SkyObstructionMult =
+                ! (obstructed sky diffuse at ground point)/(unobstructed sky diffuse at ground point).
+                ! This ratio is calculated for an isotropic sky.
+                ! Ground point hit by the ray:
+                Alfa = ACOS(-RAY(3))
+                Beta = ATAN2(RAY(2),RAY(1))
+                HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
+                GroundHitPt(3) = GroundLevelZ
+                GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
+                GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
+                ! Send rays upward from hit point and see which ones are unobstructed and so go to sky.
+                ! Divide hemisphere centered at ground hit point into elements of altitude Phi and
+                ! azimuth Theta and create upward-going ground ray unit vector at each Phi,Theta pair.
+                ! Phi = 0 at the horizon; Phi = Pi/2 at the zenith.
+                DPhi = PiOvr2 / (AltAngStepsForSolReflCalc/2.d0)
+                DTheta = 2.d0*Pi / (2.d0*AzimAngStepsForSolReflCalc)
+                SkyGndObs = 0.0
+                SkyGndUnObs = 0.0
+                ! Altitude loop
+                DO IPhi = 1,(AltAngStepsForSolReflCalc/2)
+                  Phi = (IPhi - 0.5d0) * DPhi
+                  SPhi = SIN(Phi)
+                  CPhi = COS(Phi)
+                  ! Third component of ground ray unit vector in (Theta,Phi) direction
+                  URay(3) = SPhi
+                  dOmegaGnd = CPhi * DTheta * DPhi
+                  ! Cosine of angle of incidence of ground ray on ground plane
+                  CosIncAngURay = SPhi
+                  IncAngSolidAngFac = CosIncAngURay*dOmegaGnd/Pi
+                  ! Azimuth loop
+                  DO ITheta = 1,2*AzimAngStepsForSolReflCalc
+                    Theta = (ITheta - 0.5d0) * DTheta
+                    URay(1) = CPhi * COS(Theta)
+                    URay(2) = CPhi * SIN(Theta)
+                    SkyGndUnObs = SkyGndUnObs + IncAngSolidAngFac
+                    ! Does this ground ray hit an obstruction?
+                    IHitObs = 0
+                    DO ObsSurfNum = 1, TotSurfaces
+                      IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                      CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,URay,IHitObs,ObsHitPt)
+                      IF(IHitObs > 0) EXIT
+                    END DO
+                    IF(IHitObs > 0) CYCLE ! Obstruction hit
+                    ! Sky is hit
+                    SkyGndObs = SkyGndObs + IncAngSolidAngFac
+                  END DO ! End of azimuth loop
+                END DO  ! End of altitude loop
+                SkyObstructionMult = SkyGndObs / (SkyGndUnObs + 1.d-8)
+              END IF  ! End of check if solar reflection calculation is in effect
+
+            END IF  ! End of check if COSB > 0
+
+            !           -------------------
+            ! ---------- SUN POSITION LOOP ----------
+            !           -------------------
+
+            ! Sun position counter. Used to avoid calculating various quantities
+            ! that do not depend on sun position.
+            ISunPos = 0
+
+            DO IHR = 1,24
+              IF (SUNCOSHR(3,IHR) < SunIsUpValue) CYCLE
+              ISunPos = ISunPos + 1
+
+              ! Altitude of sun (degrees)
+              PHSUN = PHSUNHR(IHR)
+              SPHSUN = SPHSUNHR(IHR)
+              CPHSUN = CPHSUNHR(IHR)
+
+              ! Azimuth of sun in absolute coord sys
+              THSUN = THSUNHR(IHR)
+
+              ! First time through, call routine to calculate inter-reflected illuminance
+              ! at reference point and luminance of window with shade, screen or blind.
+
+              ! Rob/TH - Not sure whether this call is necessary for interior zones with interior windows only.
+!  new code would be -
+! IF (LSHCAL == 1 .AND. ExtWinType /= AdjZoneExtWin) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
+              IF (LSHCAL == 1) CALL DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin2)
+
+              ! Daylighting shelf simplification:  The shelf completely blocks all view of the window,
+              ! only interrelflected illumination is allowed (see DayltgInterReflectedIllum above).
+              ! Everything else in this loop has to do with direct luminance from the window.
+              IF (InShelfSurf > 0) CYCLE
+
+              IF (COSB <= 0.0) CYCLE
+
+              XEDIRSK = 0.
+              XEDIRSU = 0.
+              XAVWLSK = 0.
+
+              ! Add contribution of this window element to glare and to
+              ! direct illuminance at reference point
+
+              ! The I,J,K indices for sky and sun components of direct illuminance
+              ! (EDIRSK, EDIRSU) and average window luminance (AVWLSK, AVWLSU) are:
+              ! I=1 for clear sky, =2 Clear turbid, =3 Intermediate, =4 Overcast;
+              ! J=1 for bare window, =2 for window with shade or fixed slat-angle blind;
+              !  = 2,3,...,MaxSlatAngs+1 for window with variable slat-angle blind;
+              ! K = sun position index.
+
+              ! ----- CASE I -- BARE WINDOW (no shading device)
+
+              ! Beam solar and sky solar reflected from nearest obstruction.
+              ! In the following IHitIntObs == 0  ==> no interior obstructions hit, and
+              !                  IHitExtObs == 1  ==> one or more exterior obstructions hit.
+              IF(CalcSolRefl .AND. IHitIntObs == 0 .AND. IHitExtObs == 1) THEN
+                ! One or more exterior obstructions was hit; get contribution of reflection
+                ! from nearest obstruction.
+                ! Find obstruction whose hit point is closest to this ray's window element
+                CALL DayltgClosestObstruction(RWIN2,Ray,NearestHitSurfNum,NearestHitPt)
+                IF(NearestHitSurfNum > 0) THEN
+
+                  ! Beam solar reflected from nearest obstruction
+
+                  CALL DayltgSurfaceLumFromSun(IHr,Ray,NearestHitSurfNum,NearestHitPt,LumAtHitPtFrSun)
+                  AVWLSU(1,IHR) = AVWLSU(1,IHR) + LumAtHitPtFrSun * TVISB
+                  IF (PHRAY >= 0.) EDIRSU(1,IHR) = EDIRSU(1,IHR) + LumAtHitPtFrSun * DOMEGA * RAY(3) * TVISB
+
+                  ! Sky solar reflected from nearest obstruction
+
+                  ObsConstrNum = Surface(NearestHitSurfNum)%Construction
+                  IF(ObsConstrNum > 0) THEN
+                    ! Exterior building surface is nearest hit
+                    IF(.NOT.Construct(ObsConstrNum)%TypeIsWindow) THEN
+                      ! Obstruction is not a window, i.e., is an opaque surface
+                      ObsVisRefl = 1.0d0 - Material(Construct(ObsConstrNum)%LayerPoint(1))%AbsorpVisible
+                    ELSE
+                      ! Obstruction is a window; assume it is bare
+                      IF(SurfaceWindow(NearestHitSurfNum)%StormWinFlag==1)  &
+                        ObsConstrNum = Surface(NearestHitSurfNum)%StormWinConstruction
+                      ObsVisRefl = Construct(ObsConstrNum)%ReflectVisDiffFront
+                    END IF
+                  ELSE
+                    ! Shadowing surface is nearest hit
+                    IF(Surface(NearestHitSurfNum)%Shelf > 0) THEN
+                      ! This is a daylighting shelf, for which reflection is separately calculated
+                      ObsVisRefl = 0.
+                    ELSE
+                      ObsVisRefl = Surface(NearestHitSurfNum)%ShadowSurfDiffuseVisRefl
+                      IF(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct > 0) &
+                        ObsVisRefl = ObsVisRefl + Surface(NearestHitSurfNum)%ShadowSurfGlazingFrac *  &
+                        Construct(Surface(NearestHitSurfNum)%ShadowSurfGlazingConstruct)%ReflectVisDiffFront
+                    END IF
+                  END IF
+                  NearestHitSurfNumX = NearestHitSurfNum
+                  ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
+                  ! The following gets the correct side of a shadowing surface for reflection.
+                  IF(Surface(NearestHitSurfNum)%ShadowingSurf) THEN
+                    IF(DOT_PRODUCT(RAY,Surface(NearestHitSurfNum)%OutNormVec) > 0.0)  NearestHitSurfNumX = &
+                         NearestHitSurfNum + 1
+                  END IF
+                  IF (.not. DetailedSkyDiffuseAlgorithm .or. .not.  ShadingTransmittanceVaries .or.  &
+                      SolarDistribution == MinimalShadowing) THEN
+                    SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
+                             DifShdgRatioIsoSky(NearestHitSurfNumX) / Pi
+                  ELSE
+                    SkyReflVisLum = ObsVisRefl * Surface(NearestHitSurfNumX)%ViewFactorSky *  &
+                             DifShdgRatioIsoSkyHRTS(NearestHitSurfNumX,IHR,1) / Pi
+                  ENDIF
+                  DO ISky = 1,4
+                    XAVWLSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum
+                    AVWLSK(ISky,1,IHR) = AVWLSK(ISky,1,IHR) + XAVWLSK(ISky) * TVISB
+                    IF (PHRAY >= 0.) THEN
+                      XEDIRSK(ISky) = GILSK(ISky,IHR) * SkyReflVisLum * DOMEGA * RAY(3)
+                      EDIRSK(ISky,1,IHR) = EDIRSK(ISky,1,IHR) + XEDIRSK(ISky) * TVISB
+                    END IF
+                  END DO
+                END IF
+              END IF  ! End of check if solar reflection calculation is in effect
+
+              IF(ObTrans > 1.d-6) THEN
+                ! Ray did not hit an obstruction or the transmittance product of hit obstructions is non-zero.
+                ! Contribution of sky or ground luminance in cd/m2
+                IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+                  ! Make all transmitted light diffuse for a TDD with a bare diffuser
+                  DO ISKY = 1,4
+                    AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR)
+                    IF(ISky == 1) THEN
+                      AVWLSU(1,IHR) = AVWLSU(1,IHR) + WLUMSU(1,IHR)
+                      AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + WLUMSUdisk(1,IHR)
+                    END IF
+                    IF(PHRAY > 0.) THEN
+                      EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + WLUMSK(ISKY,1,IHR) * DOMEGA * RAY(3)
+                      IF(ISky == 1) EDIRSU(1,IHR) = EDIRSU(1,IHR) + WLUMSU(1,IHR) * DOMEGA * RAY(3)
+                    END IF
+                  END DO
+
+                ELSE ! Bare window
+
+                  DO ISKY = 1,4
+                    IF (PHRAY > 0.) THEN
+                      ! Ray heads upward to sky
+                      ELUM = DayltgSkyLuminance(ISky,THRAY,PHRAY)
+                      XEDIRSK(ISKY) = ELUM * DOMEGA * RAY(3)
+                      DEDIR  = XEDIRSK(ISKY) * TVISB
+                      EDIRSK(ISKY,1,IHR) = EDIRSK(ISKY,1,IHR) + DEDIR * ObTrans
+                      AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + ELUM * TVISB * ObTrans
+                      XAVWLSK(ISKY) = ELUM * ObTrans
+                    ELSE ! PHRAY <= 0.
+                      ! Ray heads downward to ground.
+                      ! Contribution from sky diffuse reflected from ground
+                      XAVWLSK(ISKY) = GILSK(ISKY,IHR) * (GndReflectanceForDayltg / PI) * ObTrans *  &
+                                                SkyObstructionMult
+                      AVWLSK(ISKY,1,IHR) = AVWLSK(ISKY,1,IHR) + TVISB * XAVWLSK(ISKY)
+                      ! Contribution from beam solar reflected from ground (beam reaching ground point
+                      ! can be obstructed [SunObstructionMult < 1.0] if CalcSolRefl = .TRUE.)
+                      IF(ISky == 1) THEN
+                        SunObstructionMult = 1.0
+                        IF(CalcSolRefl) THEN
+                          ! Coordinates of ground point hit by the ray
+                          Alfa = ACOS(-RAY(3))
+                          Beta = ATAN2(RAY(2),RAY(1))
+                          HorDis = (RWIN2(3)-GroundLevelZ)*TAN(Alfa)
+                          GroundHitPt(3) = GroundLevelZ
+                          GroundHitPt(1) = RWIN2(1) + HorDis*COS(Beta)
+                          GroundHitPt(2) = RWIN2(2) + HorDis*SIN(Beta)
+                          ! Sun reaches ground point if vector from this point to the sun is unobstructed
+                          IHitObs = 0
+                          DO ObsSurfNum = 1,TotSurfaces
+                             IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                             CALL DayltgPierceSurface(ObsSurfNum,GroundHitPt,SunCosHr(1:3,IHr),IHitObs,ObsHitPt)
+                             IF(IHitObs > 0) EXIT
+                          END DO
+                          IF(IHitObs > 0) SunObstructionMult = 0.0
+                        END IF
+                        AVWLSU(1,IHR) = AVWLSU(1,IHR) +  &
+                             TVISB * GILSU(IHR) * (GndReflectanceForDayltg / PI) * ObTrans * SunObstructionMult
+                      END IF  ! End of check if ISky = 1
+                    END IF  ! End of check if ray is going up or down
+                  END DO  ! End of loop over sky types
+                END IF ! End of check if bare window or TDD:DIFFUSER
+              END IF ! End of check if ObTrans > 1.E-6
+
+              !
+              ! Illuminance from beam solar (without interior reflection)
+              !
+              ! Just run this once on the last pass
+              IF (IX == NWX .AND. IY == NWY) THEN ! Last pass
+
+                ! Beam solar reaching reference point directly without exterior reflection
+
+                ! Unit vector from ref. pt. to sun
+                RAYCOS(1) = CPHSUN * COS(THSUN)
+                RAYCOS(2) = CPHSUN * SIN(THSUN)
+                RAYCOS(3) = SPHSUN
+
+                ! Is sun on front side of exterior window?
+                COSI = DOT_PRODUCT(WNORM2,RAYCOS)
+                IF (COSI > 0.) THEN
+
+                  ! Does RAYCOS pass thru exterior window? HP is point that RAYCOS intersects window plane.
+                  CALL DayltgPierceSurface(IWin2,RREF2,RAYCOS,IP,HP)
+                  IHitIntObsDisk = 0
+                  IF (IP > 0) THEN
+                    IF(ExtWinType == InZoneExtWin) THEN
+                      ! Check for interior obstructions between reference point and HP.
+                      CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHitIntObsDisk)
+                    END IF
+                    ObTransDisk = 0.0  ! Init value
+                    ! Init flag for vector from RP to sun passing through interior window
+                    IHitIntWinDisk = 0
+                    IF(ExtWinType == AdjZoneExtWin) THEN ! This block is for RPs in zones with interior windows
+                                                         ! adjacent to zones with exterior windows
+                      ! Does RAYCOS pass through interior window in zone containing RP?
+                      DO IntWinDisk = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+                        IF(Surface(IntWinDisk)%Class==SurfaceClass_Window .AND. Surface(IntWinDisk)%ExtBoundCond >= 1) THEN
+                          IF(Surface(Surface(IntWinDisk)%ExtBoundCond)%Zone == Surface(IWin2)%Zone) THEN
+                            CALL DayltgPierceSurface(IntWinDisk,RREF,RAYCOS,IHitIntWinDisk,HitPtIntWinDisk)
+                            IF(IHitIntWinDisk > 0) THEN
+                              IntWinDiskHitNum = IntWinDisk
+                              COSBIntWin = DOT_PRODUCT(Surface(IntWinDisk)%OutNormVec(1:3),RAYCOS)
+                              IF(COSBIntWin <= 0.0) THEN
+                                IHitIntWinDisk = 0
+                                IntWinDiskHitNum = 0
+                                CYCLE
+                              END IF
+                              TVISIntWinDisk = POLYF(COSBIntWin,Construct(Surface(IntWinDisk)%Construction)%TransVisBeamCoef(1))
+                              EXIT
+                            END IF
+                          END IF
+                        END IF
+                      END DO
+
+                      IF(IHitIntWinDisk == 0) THEN  ! Vector from RP to sun does not pass through interior window
+                        ObTransDisk = 0.0
+                        IHIT = 1             !!fcw Is this needed?
+                      END IF
+
+                      ! Check for interior obstructions between ref point and interior window
+                      IHitIntObsDisk = 0
+                      IF(IHitIntWinDisk > 0) THEN
+                        CALL DayltgHitInteriorObstruction(IntWinDiskHitNum,RREF,HitPtIntWinDisk,IHitIntObsDisk)
+                        ! If no obstruction between RP and hit int win, check for obstruction
+                        ! between int win and ext win
+                        IF(IHitIntObsDisk == 0) &
+                          CALL DayltgHitBetWinObstruction(IntWinDiskHitNum,IWin2,HitPtIntWinDisk,HP,IHitIntObsDisk)
+                      END IF
+                      IF(IHitIntObsDisk == 1) ObTransDisk = 0.0
+                    END IF  ! case where RP is in zone with interior window adjacent to zone with exterior window
+
+                    IHitExtObsDisk = 0
+                    ! RJH 08-25-07 IHitIntWinDisk should not be reset to 0 here, and should be tested below.
+                    ! This is to correct logic flaw causing direct solar to reach adjacent zone refpt
+                    ! when vector to sun does not pass through interior window
+                    ! IHitIntWinDisk = 0
+                    IF(IHitIntObsDisk == 0) THEN  ! No interior obstruction was hit
+                      ! Net transmittance of exterior obstructions encountered by RAYCOS
+                      ! ObTransDisk = 1.0 will be returned if no exterior obstructions are hit.
+                      CALL DayltgHitObstruction(IHr,IWin2,RREF2,RAYCOS,ObTransDisk)
+                      IF(ObTransDisk < 1.0) IHitExtObsDisk = 1
+                      ! RJH 08-26-07 However, if this is a case of interior window
+                      ! and vector to sun does not pass through interior window
+                      ! then reset ObTransDisk to 0.0 since it is the key test for adding
+                      ! contribution of sun to RP below.
+                      IF((ExtWinType == AdjZoneExtWin) .AND. (IHitIntWinDisk == 0)) THEN
+                        ObTransDisk = 0.0
+                      END IF
+                    END IF
+
+                    ! PETER: need side wall mounted TDD to test this
+                    ! PETER: probably need to replace RREF2 with RWIN2
+                    ! PETER: need to check for interior obstructions too.
+
+                    IF (ObTransDisk > 1.d-6) THEN
+
+                      ! Sun reaches reference point;  increment illuminance.
+                      ! Direct normal illuminance is normalized to 1.0
+
+                      IF (SurfaceWindow(IWin)%OriginalClass .EQ. SurfaceClass_TDD_Diffuser) THEN
+                        ! No beam is transmitted.  Takes care of TDD with a bare diffuser and all types of blinds.
+                        TVISS = 0.0
+                      ELSE
+                        ! Beam transmittance for bare window and all types of blinds
+                        TVISS = POLYF(COSI,Construct(IConst)%TransVisBeamCoef(1)) * SurfaceWindow(IWin)%GlazedFrac * &
+                                   SurfaceWindow(IWin)%LightWellEff
+                        IF(ExtWinType==AdjZoneExtWin.AND.IHitIntWinDisk==1)  &
+                          TVISS = TVISS * TVISIntWinDisk
+                      END IF
+
+                      EDIRSUdisk(1,IHR) = RAYCOS(3) * TVISS * ObTransDisk  ! Bare window
+
+                      TransBmBmMult = 0.0
+                      IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.   &
+                          ShType == WSC_ST_BetweenGlassBlind) THEN
+                        CALL ProfileAngle(IWin,RAYCOS,Blind(BlNum)%SlatOrientation,ProfAng)
+                        ! Contribution of beam passing through slats and reaching reference point
+                        DO JB = 1,MaxSlatAngs
+                          !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                          IF (SurfaceWindow(IWin)%MovableSlats) THEN
+                            SlatAng = (JB - 1) * PI / (MaxSlatAngs - 1)
+                          ELSE
+                            SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
+                          END IF
+                          TransBmBmMult(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                               Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                          EDIRSUdisk(JB+1,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(JB) * ObTransDisk
+
+                          ! do this only once for fixed slat blinds
+                          IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                        END DO
+                      ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+!                          pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
+!                          SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
+!                          SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
+                        CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
+                                                         Theta=(THSUN - SurfaceWindow(IWin)%Theta))
+                        TransBmBmMult(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
+                        EDIRSUdisk(2,IHR) = RAYCOS(3) * TVISS * TransBmBmMult(1) * ObTransDisk
+                      END IF
+
+                      ! Glare from solar disk
+
+                      ! Position factor for sun (note that AZVIEW is wrt y-axis and THSUN is wrt
+                      ! x-axis of absolute coordinate system.
+                      XR = TAN(ABS(PIOVR2 - AZVIEW - THSUN) + 0.001d0)
+                      YR = TAN(PHSUN + 0.001d0)
+                      POSFAC = DayltgGlarePositionFactor(XR,YR)
+
+                      IF (POSFAC /= 0.0 .AND. MapWindowSolidAngAtRefPtWtd(loopwin,IL) > 0.000001d0) THEN
+                        ! Increment window luminance.  Luminance of solar disk (cd/m2)
+                        ! is 1.47*10^4*(direct normal solar illuminance) for direct normal solar
+                        ! illuminance in lux (lumens/m2). For purposes of calculating daylight factors
+                        ! direct normal solar illuminance = 1.0.
+                        ! Solid angle subtended by sun is 0.000068 steradians
+
+                        XAVWL = 14700.d0 * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
+                                 MapWindowSolidAngAtRefPtWtd(loopwin,IL)**0.8d0
+                        AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
+
+                        IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                            ShType == WSC_ST_BetweenGlassBlind) THEN
+                          DO JB = 1,MaxSlatAngs
+                            !IF (.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                            AVWLSUdisk(JB+1,IHR) = XAVWL * TVISS * TransBmBmMult(JB) * ObTransDisk
+                            IF (.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
+                          END DO
+                        ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+                          AVWLSUdisk(2,IHR) = XAVWL * TVISS * TransBmBmMult(1) * ObTransDisk
+                        END IF
+                      END IF ! Position factor
+                    END IF ! Beam avoids all obstructions
+                  END IF ! Beam passes thru window
+                END IF ! Sun on front side
+
+                ! Beam solar reaching reference point after beam-beam (specular) reflection from
+                ! an exterior surface
+
+                IF(CalcSolRefl) THEN
+                  ! Receiving surface number corresponding this window
+                  RecSurfNum = Surface(IWin2)%ShadowSurfRecSurfNum
+                  IF (RecSurfNum > 0) THEN    ! interior windows do not apply
+                    IF(SolReflRecSurf(RecSurfNum)%NumPossibleObs > 0) THEN
+                      ! This window has associated obstructions that could reflect beam onto the window
+                      DO loop = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
+                        ReflSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop)
+                        ReflSurfNumX = ReflSurfNum
+                        ! Each shadowing surface has a "mirror" duplicate surface facing in the opposite direction.
+                        ! The following gets the correct side of a shadowing surface for reflection.
+                        IF(Surface(ReflSurfNum)%ShadowingSurf) THEN
+                          IF(DOT_PRODUCT(RAYCOS,Surface(ReflSurfNum)%OutNormVec) < 0.0)  ReflSurfNumX = &
+                          ReflSurfNum + 1
+                        END IF
+                        ! Require that the surface can have specular reflection
+                        IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .OR. &
+                           Surface(ReflSurfNum)%ShadowSurfGlazingFrac > 0.0) THEN
+                          ReflNorm = Surface(ReflSurfNumX)%OutNormVec
+                          ! Vector to sun that is mirrored in obstruction
+                          SunVecMir = RAYCOS - 2.0d0*DOT_PRODUCT(RAYCOS,ReflNorm)*ReflNorm
+                          ! Skip if reflecting surface is not sunlit
+                          IF(SunlitFrac(ReflSurfNumX,IHr,1) < 0.01d0) CYCLE
+                          ! Skip if altitude angle of mirrored sun is negative since reflected sun cannot
+                          ! reach reference point in this case
+                          IF(SunVecMir(3) <= 0.0) CYCLE
+                          ! Cosine of incidence angle of reflected beam on window
+                          CosIncAngRec = DOT_PRODUCT(Surface(IWin2)%OutNormVec,SunVecMir)
+                          IF(CosIncAngRec <= 0.0) CYCLE
+                          ! Does ray from ref. pt. along SunVecMir pass through window?
+                          CALL DayltgPierceSurface(IWin2,RREF2,SunVecMir,IP,HP)
+                          IF(IP == 0) CYCLE  ! Ray did not pass through window
+                          ! Check if this ray hits interior obstructions
+                          CALL DayltgHitInteriorObstruction(IWin2,RREF2,HP,IHit)
+                          IF(IHit > 0) CYCLE ! Interior obstruction was hit
+                          ! Does ray hit this reflecting surface?
+                          CALL DayltgPierceSurface(ReflSurfNum,RREF2,SunVecMir,IHitRefl,HitPtRefl)
+                          IF(IHitRefl == 0) CYCLE  ! Ray did not hit this reflecting surface
+                          ReflDistance = SQRT(DOT_PRODUCT(HitPtRefl-RREF2,HitPtRefl-RREF2))
+                          ! Is ray from ref. pt. to reflection point (HitPtRefl) obstructed?
+                          IHitObsRefl = 0
+                          DO loop2 = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
+                            ObsSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop2)
+                            IF(ObsSurfNum == ReflSurfNum .OR. ObsSurfNum == Surface(ReflSurfNum)%BaseSurf) CYCLE
+                            CALL DayltgPierceSurface(ObsSurfNum,RREF2,SunVecMir,IHitObs,HitPtObs)
+                            IF(IHitObs > 0) THEN
+                              ObsDistance = SQRT(DOT_PRODUCT(HitPtObs-RREF2,HitPtObs-RREF2))
+                              IF(ObsDistance < ReflDistance) THEN
+                                IHitObsRefl = 1
+                                EXIT
+                              END IF
+                            END IF
+                          END DO
+                          IF(IHitObsRefl > 0) CYCLE  ! Obstruct'n closer than reflect'n pt. was hit; go to next obstruction
+                          ! There is no obstruction for this ray between ref pt and hit pt on reflecting surface.
+                          ! See if ray from hit pt on reflecting surface to original (unmirrored) sun position is obstructed
+                          IHitObs = 0
+                          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
+                            ! Reflecting surface is a window.
+                            ! Receiving surface number for this reflecting window.
+                            ReflSurfRecNum = Surface(ReflSurfNum)%ShadowSurfRecSurfNum
+                            IF(ReflSurfRecNum > 0) THEN
+                              ! Loop over possible obstructions for this reflecting window
+                              DO loop2 = 1,SolReflRecSurf(ReflSurfRecNum)%NumPossibleObs
+                                ObsSurfNum = SolReflRecSurf(ReflSurfRecNum)%PossibleObsSurfNums(loop2)
+                                CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
+                                IF(IHitObs > 0) EXIT
+                              END DO
+                            END IF
+                          ELSE
+                            ! Reflecting surface is a building shade
+                            DO ObsSurfNum = 1, TotSurfaces
+                              IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
+                              IF(ObsSurfNum == ReflSurfNum) CYCLE
+                              CALL DayltgPierceSurface(ObsSurfNum,HitPtRefl,RAYCOS,IHitObs,HitPtObs)
+                              IF(IHitObs > 0) EXIT
+                            END DO
+                          END IF  ! End of check if reflector is a window or shadowing surface
+
+                          IF(IHitObs > 0) CYCLE ! Obstruct'n hit between reflect'n hit point and sun; go to next obstruction
+
+                          ! No obstructions. Calculate reflected beam illuminance at ref. pt. from this reflecting surface.
+                          SpecReflectance = 0.0
+                          CosIncAngRefl = ABS(DOT_PRODUCT(RAYCOS,ReflNorm))
+                          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window) THEN
+                            ConstrNumRefl = Surface(ReflSurfNum)%Construction
+                            IF(SurfaceWindow(ReflSurfNum)%StormWinFlag==1) &
+                              ConstrNumRefl = Surface(ReflSurfNum)%StormWinConstruction
+                            SpecReflectance = POLYF(ABS(CosIncAngRefl),Construct(ConstrNumRefl)%ReflSolBeamFrontCoef(1:6))
+                          END IF
+                          IF(Surface(ReflSurfNum)%ShadowingSurf  &
+                             .AND.Surface(ReflSurfNum)%ShadowSurfGlazingConstruct > 0)  &
+                             SpecReflectance = Surface(ReflSurfNum)%ShadowSurfGlazingFrac * POLYF(ABS(CosIncAngRefl), &
+                                   Construct(Surface(ReflSurfNum)%ShadowSurfGlazingConstruct)%ReflSolBeamFrontCoef(1:6))
+                          TVisRefl = POLYF(CosIncAngRec,Construct(IConst)%TransVisBeamCoef(1)) *   &
+                                              SurfaceWindow(IWin)%GlazedFrac * SurfaceWindow(IWin)%LightWellEff
+                          EDIRSUdisk(1,IHR) = EDIRSUdisk(1,IHR) + SunVecMir(3) * SpecReflectance * TVisRefl  ! Bare window
+
+                          TransBmBmMultRefl = 0.0
+                          IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                              ShType == WSC_ST_BetweenGlassBlind) THEN
+                            CALL ProfileAngle(IWin,SunVecMir,Blind(BlNum)%SlatOrientation,ProfAng)
+                            ! Contribution of reflected beam passing through slats and reaching reference point
+                            DO JB = 1,MaxSlatAngs
+                              !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                              IF (SurfaceWindow(IWin)%MovableSlats) THEN
+                                SlatAng = REAL((JB - 1),r64) * PI / REAL((MaxSlatAngs - 1),r64)
+                              ELSE
+                                SlatAng = Blind(BlNum)%SlatAngle * DegToRadians
+                              END IF
+                              TransBmBmMultRefl(JB) = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                                 Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                              EDIRSUdisk(JB+1,IHR) = EDIRSUdisk(JB+1,IHR) +  &
+                                 SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(JB)
+
+                              IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                            END DO
+                          ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+!                             pass angle from sun to window normal here using PHSUN and THSUN from above and surface angles
+!                             SunAltitudeToWindowNormalAngle = PHSUN - SurfaceWindow(IWin)%Phi
+!                             SunAzimuthToWindowNormalAngle = THSUN - SurfaceWindow(IWin)%Theta
+                            CALL CalcScreenTransmittance(IWin, Phi=(PHSUN - SurfaceWindow(IWin)%Phi), &
+                                                             Theta=(THSUN - SurfaceWindow(IWin)%Theta))
+                            TransBmBmMultRefl(1) = SurfaceScreens(SurfaceWindow(IWin)%ScreenNumber)%BmBmTrans
+                            EDIRSUdisk(2,IHR) = EDIRSUdisk(2,IHR) +  &
+                                 SunVecMir(3) * SpecReflectance * TVisRefl * TransBmBmMultRefl(1)
+                          END IF  ! End of check if window has a blind or screen
+
+                          ! Glare from reflected solar disk
+
+                          PHSUNrefl = SunVecMir(3)
+                          THSUNrefl = ATAN2(SunVecMir(2),SunVecMir(1))
+                          XR = TAN(ABS(PiOvr2 - AZVIEW - THSUNrefl) + 0.001d0)
+                          YR = TAN(PHSUNrefl + 0.001)
+                          POSFAC=DayltgGlarePositionFactor(XR,YR)
+                          IF (POSFAC /= 0.0 .AND. MapWindowSolidAngAtRefPtWtd(loopwin,IL) > 0.000001d0) THEN
+                            XAVWL = 14700. * SQRT(0.000068d0 * POSFAC) *  REAL(NWX * NWY,r64) /  &
+                                   MapWindowSolidAngAtRefPtWtd(loopwin,IL)**0.8d0
+
+                            AVWLSUdisk(1,IHR) = XAVWL * TVISS * ObTransDisk  ! Bare window
+                            AVWLSUdisk(1,IHR) = AVWLSUdisk(1,IHR) + XAVWL * TVisRefl * SpecReflectance  ! Bare window
+                            IF (ShType == WSC_ST_ExteriorBlind .OR. ShType == WSC_ST_InteriorBlind .OR.  &
+                                ShType == WSC_ST_BetweenGlassBlind) THEN
+                              DO JB = 1,MaxSlatAngs
+                                !IF(.NOT. SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                                AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) +  &
+                                      XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(JB)
+                                IF(.NOT. SurfaceWindow(IWin)%MovableSlats) EXIT
+                              END DO
+                            ELSE IF(ShType == WSC_ST_ExteriorScreen) THEN
+                                AVWLSUdisk(2,IHR) = AVWLSUdisk(2,IHR) +  &
+                                      XAVWL * TVisRefl * SpecReflectance * TransBmBmMultRefl(1)
+                            END IF
+                          END IF  ! Position Factor
+                        END IF  ! End of check that obstruction can specularly reflect
+                      END DO  ! End of loop over obstructions associated with this window
+
+                    END IF  ! End of check if this window has associated obstructions
+                  END IF   ! End of check to see if this is exterior type window
+                END IF  ! End of check if exterior reflection calculation is in effect
+
+              END IF ! Last pass
+
+              IF((ICtrl > 0 .AND.  &
+                 (ShType ==WSC_ST_InteriorShade.OR.ShType ==WSC_ST_ExteriorShade.OR.ShType ==WSC_ST_BetweenGlassShade.OR. &
+                  ShType ==WSC_ST_InteriorBlind.OR.ShType ==WSC_ST_ExteriorBlind.OR.ShType ==WSC_ST_BetweenGlassBlind .OR. &
+                  ShType ==WSC_ST_ExteriorScreen)).OR.SurfaceWindow(IWin)%SolarDiffusing) THEN
+
+                ! ----- CASE II -- WINDOW WITH SCREEN, SHADE, BLIND, OR DIFFUSING WINDOW
+
+                ! Interior window visible transmittance multiplier for exterior window in adjacent zone
+                TVisIntWinMult = 1.0
+                TVisIntWinDiskMult = 1.0
+                IF(Surface(IWin)%Zone /= ZoneNum) THEN
+                  TVisIntWinMult = TVisIntWin
+                  TVisIntWinDiskMult = TVisIntWinDisk
+                END IF
+
+                DO ISKY = 1,4
+                  DO JB = 1,MaxSlatAngs
+                    !IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JB > 1) EXIT
+                    AVWLSK(ISKY,JB+1,IHR) = AVWLSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*TVisIntWinMult
+                    IF (ISky == 1) THEN
+                      AVWLSU(JB+1,IHR) = AVWLSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*TVisIntWinMult
+                      AVWLSUdisk(JB+1,IHR) = AVWLSUdisk(JB+1,IHR) + WLUMSUdisk(JB+1,IHR)*TVisIntWinDiskMult
+                    END IF
+                    IF (PHRAY > 0.) THEN
+                      EDIRSK(ISKY,JB+1,IHR) = EDIRSK(ISKY,JB+1,IHR) + WLUMSK(ISKY,JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
+                      IF (ISky == 1) EDIRSU(JB+1,IHR) = EDIRSU(JB+1,IHR) + WLUMSU(JB+1,IHR)*DOMEGA*RAY(3)*TVisIntWinMult
+                    END IF
+                    IF (.NOT.SurfaceWindow(IWin)%MovableSlats) EXIT
+                  END DO
+                END DO
+              END IF
+
+            END DO ! End of hourly sun position loop, IHR
+          END DO ! End of window Y-element loop, IY
+        END DO ! End of window X-element loop, IX
+
+        ! Loop again over hourly sun positions and calculate daylight factors by adding
+        ! direct and inter-reflected illum components, then dividing by exterior horiz illum.
+        ! Also calculate corresponding glare factors.
+        ISunPos = 0
+        ILB=IL
+
+        DO IHR = 1,24
+          IF (SUNCOSHR(3,IHR) < SunIsUpValue) CYCLE
+
+          ISunPos = ISunPos + 1
+
+          ! Altitude of sun (degrees)
+          PHSUN = PHSUNHR(IHR)
+          SPHSUN = SPHSUNHR(IHR)
+          CPHSUN = CPHSUNHR(IHR)
+
+          ! Azimuth of sun in absolute coord sys
+          THSUN = THSUNHR(IHR)
+
+          DO ISKY = 1,4 ! Loop over sky types
+
+            ! Loop over shading index (1=bare window; 2=diffusing glazing, shade, screen or fixed slat-angle blind;
+            ! 2 to MaxSlatAngs+1 for variable slat-angle blind)
+
+            ! TH. 9/22/2009. CR 7625 - daylight illuminance spikes during some sunset hours due to the calculated sky and sun
+            !  related daylight factors > 1, which theoretically can occur when sun is perpendicular to the window
+            !  and interior surfaces with high visible reflectance.
+            ! Added tmpDFCalc (default to 0.05 lux) as the cap for GILSK and GILSU in calculating the daylight factors
+            !  the assumption behind it is if exterior horizontal surface does not get daylight, spaces do not get daylight.
+
+            DO JSH = 1,MaxSlatAngs+1
+              IF (.NOT.SurfaceWindow(IWin)%MovableSlats .AND. JSH > 2) EXIT
+
+              IF (GILSK(ISKY,IHR) > tmpDFCalc) THEN
+                IllumMapCalc(MapNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                               (EDIRSK(ISKY,JSH,IHR) + EINTSK(ISKY,JSH,IHR)) / GILSK(ISKY,IHR)
+                IllumMapCalc(MapNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                               AVWLSK(ISKY,JSH,IHR) / (NWX*NWY * GILSK(ISKY,IHR))
+                IllumMapCalc(MapNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) =   &
+                    EINTSK(ISKY,JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (PI*GILSK(ISKY,IHR))
+              ELSE
+                IllumMapCalc(MapNum)%DaylIllFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+                IllumMapCalc(MapNum)%DaylSourceFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+                IllumMapCalc(MapNum)%DaylBackFacSky(loopwin,ILB,ISky,JSH,IHR) = 0.0
+              ENDIF
+
+              IF (ISky == 1) THEN
+                IF (GILSU(IHR) > tmpDFCalc) THEN
+                  IllumMapCalc(MapNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) =   &
+                                    (EDIRSU(JSH,IHR) + EINTSU(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
+                  IllumMapCalc(MapNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                                (EDIRSUdisk(JSH,IHR) + EINTSUdisk(JSH,IHR)) / (GILSU(IHR) + 0.0001d0)
+
+                  IllumMapCalc(MapNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) =  &
+                                 AVWLSU(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
+                  IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                                 AVWLSUdisk(JSH,IHR) / (NWX*NWY * (GILSU(IHR) + 0.0001d0))
+
+                  IllumMapCalc(MapNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) =   &
+                    EINTSU(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
+                  IllumMapCalc(MapNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) =   &
+                    EINTSUdisk(JSH,IHR) * ZoneDaylight(ZoneNum)%AveVisDiffReflect / (Pi*(GILSU(IHR) + 0.0001d0))
+                ELSE
+                  IllumMapCalc(MapNum)%DaylIllFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                  IllumMapCalc(MapNum)%DaylIllFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+
+                  IllumMapCalc(MapNum)%DaylSourceFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                  IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+
+                  IllumMapCalc(MapNum)%DaylBackFacSun(loopwin,ILB,JSH,IHR) = 0.0
+                  IllumMapCalc(MapNum)%DaylBackFacSunDisk(loopwin,ILB,JSH,IHR) = 0.0
+                ENDIF
+              END IF
+            END DO ! End of shading index loop, JSH
+
+            ! For switchable glazing put daylighting factors for switched (dark) state in IS=2 location
+            IF (ICtrl > 0) THEN
+              IF(WindowShadingControl(ICtrl)%ShadingType == WSC_ST_SwitchableGlazing) THEN
+                VTR = SurfaceWindow(IWin)%VisTransRatio
+                IllumMapCalc(MapNum)%DaylIllFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylIllFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+                IllumMapCalc(MapNum)%DaylSourceFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylSourceFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+                IllumMapCalc(MapNum)%DaylBackFacSky(loopwin,ILB,ISky,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylBackFacSky(loopwin,ILB,ISky,1,IHR)*VTR
+                IF (ISky == 1) THEN
+                  IllumMapCalc(MapNum)%DaylIllFacSun(loopwin,ILB,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylIllFacSun(loopwin,ILB,1,IHR)*VTR
+                  IllumMapCalc(MapNum)%DaylSourceFacSun(loopwin,ILB,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylSourceFacSun(loopwin,ILB,1,IHR)*VTR
+                  IllumMapCalc(MapNum)%DaylBackFacSun(loopwin,ILB,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylBackFacSun(loopwin,ILB,1,IHR)*VTR
+                  IllumMapCalc(MapNum)%DaylIllFacSunDisk(loopwin,ILB,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylIllFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                  IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loopwin,ILB,2,IHR) =   &
+                                  IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                  IllumMapCalc(MapNum)%DaylBackFacSunDisk(loopwin,ILB,2,IHR) =     &
+                                  IllumMapCalc(MapNum)%DaylBackFacSunDisk(loopwin,ILB,1,IHR)*VTR
+                END IF
+              END IF
+            END IF ! ICtrl > 0
+
+          END DO ! End of sky type loop, ISky
+        END DO ! End of sun position loop, IHR
+
+      END DO ! End of window loop, loopwin - IWin
+
+      DEALLOCATE(MapWindowSolidAngAtRefPt)
+      DEALLOCATE(MapWindowSolidAngAtRefPtWtd)
+
+    END DO ! End of reference point loop, IL
+
+  END DO  ! MapNum
+
+  RETURN
+
+END SUBROUTINE CalcDayltgCoeffsMapPoints
 
 SUBROUTINE GetDaylightingParametersInput
 
@@ -2414,7 +3781,7 @@ SUBROUTINE GetDaylightingParametersInput
   LOGICAL   :: bRecordsOnErrFile      ! true if there are records on the error file
   ! RJH DElight Modification End - local variable declarations
 
-  INTEGER   :: NumReports, RepNum, NumNames, NumNumbers, IOStat
+  INTEGER   :: NumReports, NumNames, NumNumbers, IOStat
 
     ErrorsFound=.false.
     cCurrentModuleObject='Daylighting:Controls'
@@ -2639,7 +4006,7 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
   USE DataIPShortCuts
   USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindIteminList
   USE DataStringGlobals, ONLY: CharSpace, CharComma, CharTab
-  USE InternalHeatGains, ONLY: CheckLightsReplaceableMinMaxForZone
+  USE InternalHeatGains, ONLY: CheckLightsReplaceableMinMaxForZone, GetDesignLightingLevelForZone
   USE General, ONLY: TrimSigDigits, RoundSigDigits
   USE OutputReportPredefined
 
@@ -2667,7 +4034,6 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
   INTEGER                                    :: RefPt
   INTEGER                                    :: X, Y
   INTEGER                                    :: SurfLoop
-  INTEGER, EXTERNAL                          :: FindNumberInList
   INTEGER                                    :: AddMapPoints
   INTEGER                                    :: ZoneFound
   CHARACTER(len=MaxNameLength)               :: refName
@@ -2684,6 +4050,9 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
   Logical   :: doTransform
   REAL(r64) :: OldAspectRatio
   REAL(r64) :: NewAspectRatio
+  REAL(r64) :: rLightLevel
+  LOGICAL,ALLOCATABLE,DIMENSION(:) :: ZoneMsgDone
+  INTEGER,ALLOCATABLE,DIMENSION(:) :: ZoneMapCount
 
           ! FLOW:
 
@@ -2705,6 +4074,9 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
   TotIllumMaps = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   ALLOCATE(IllumMap(TotIllumMaps))
+  ALLOCATE(IllumMapCalc(TotIllumMaps))
+  ALLOCATE(ZoneMapCount(NumOfZones))
+  ZoneMapCount=0
 
   IF (TotIllumMaps > 0) THEN
     DO MapNum = 1, TotIllumMaps
@@ -2721,6 +4093,10 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
         ErrorsFound = .TRUE.
       ENDIF
 
+      IllumMapCalc(MapNum)%Zone=IllumMap(MapNum)%Zone
+      IF (IllumMap(MapNum)%Zone /= 0) THEN
+        ZoneMapCount(IllumMap(MapNum)%Zone)=ZoneMapCount(IllumMap(MapNum)%Zone)+1
+      ENDIF
       IllumMap(MapNum)%Z = rNumericArgs(1)
 
       IllumMap(MapNum)%Xmin = rNumericArgs(2)
@@ -2795,6 +4171,20 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
 
   END IF
 
+  DO Loop1=1,NumOfZones
+    ALLOCATE(ZoneDaylight(Loop1)%ZoneToMap(ZoneMapCount(Loop1)))
+    ZoneDayLight(Loop1)%ZoneToMap=0
+    ZoneDayLight(Loop1)%MapCount=0
+  ENDDO
+
+  DO MapNum=1,TotIllumMaps
+    IF (IllumMap(MapNum)%Zone == 0) CYCLE
+    ZoneDayLight(IllumMap(MapNum)%Zone)%MapCount=ZoneDayLight(IllumMap(MapNum)%Zone)%MapCount+1
+    ZoneDayLight(IllumMap(MapNum)%Zone)%ZoneToMap(ZoneDayLight(IllumMap(MapNum)%Zone)%MapCount)=MapNum
+  ENDDO
+
+  DEALLOCATE(ZoneMapCount)
+
   cCurrentModuleObject='Daylighting:Controls'
   DO Loop1 = 1, TotDaylightingDetailed
     cAlphaArgs='  '
@@ -2826,6 +4216,7 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
     ZoneDaylight(ZoneFound)%DaylightType=DetailedDaylighting
     ZoneDaylight(ZoneFound)%TotalDaylRefPoints=rNumericArgs(1)
 
+    rLightLevel=GetDesignLightingLevelForZone(ZoneFound)
     CALL CheckLightsReplaceableMinMaxForZone(ZoneFound)
 
     ALLOCATE(ZoneDaylight(ZoneFound)%DaylRefPtAbsCoord(MaxRefPoints,3))
@@ -3005,7 +4396,7 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
     ENDIF
     ZoneDaylight(ZoneFound)%LightControlProbability=rNumericArgs(18)
 
-    IF (ZoneDaylight(ZoneFound)%TotalDaylRefPoints .GE. 1) THEN
+    IF (ZoneDaylight(ZoneFound)%TotalDaylRefPoints >= 1) THEN
       refName = TRIM(cAlphaArgs(1)) // ' - REF 1'
       CALL PreDefTableEntry(pdchDyLtZone,refName,cAlphaArgs(1))
       CALL PreDefTableEntry(pdchDyLtKind,refName,'Detailed')
@@ -3019,8 +4410,10 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
           CALL PreDefTableEntry(pdchDyLtCtrl,refName,'Continuous/Off')
       END SELECT
       CALL PreDefTableEntry(pdchDyLtFrac,refName,ZoneDaylight(ZoneFound)%FracZoneDaylit(1))
+      CALL PreDefTableEntry(pdchDyLtWInst, refName, rLightLevel)
+      CALL PreDefTableEntry(pdchDyLtWCtrl, refName, rLightLevel * ZoneDaylight(ZoneFound)%FracZoneDaylit(1))
     END IF
-    IF (ZoneDaylight(ZoneFound)%TotalDaylRefPoints .GE. 2) THEN
+    IF (ZoneDaylight(ZoneFound)%TotalDaylRefPoints >= 2) THEN
       refName = TRIM(cAlphaArgs(1)) // ' - REF 2'
       CALL PreDefTableEntry(pdchDyLtZone,refName,cAlphaArgs(1))
       CALL PreDefTableEntry(pdchDyLtKind,refName,'Detailed')
@@ -3034,36 +4427,29 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
           CALL PreDefTableEntry(pdchDyLtCtrl,refName,'Continuous/Off')
       END SELECT
       CALL PreDefTableEntry(pdchDyLtFrac,refName,ZoneDaylight(ZoneFound)%FracZoneDaylit(2))
+      CALL PreDefTableEntry(pdchDyLtWInst, refName, rLightLevel)
+      CALL PreDefTableEntry(pdchDyLtWCtrl, refName, rLightLevel * ZoneDaylight(ZoneFound)%FracZoneDaylit(2))
     END IF
 
     ! Check for illuminance maps associated with this zone
     DO MapNum = 1, TotIllumMaps
-      ! For now this will only process the first map found for a zone
-      ! Later could do more than one map per zone
       IF (IllumMap(MapNum)%Zone == ZoneFound) THEN
-
-        IF (ALLOCATED(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord)) THEN ! protect hard crash if more than one map per zone
-          CALL ShowWarningError('GetDetailedDaylighting: found multiple illuminance maps in a single zone')
-          CALL ShowContinueError('Zone name ='//TRIM(Zone(ZoneFound)%Name))
-          Call ShowContinueError('Only the first illuminance map requested will be generated. The simulation continues.')
-          CYCLE
-        ENDIF
         IF (IllumMap(MapNum)%Xnum*IllumMap(MapNum)%Ynum > 0)  THEN
           ! Add additional daylighting reference points for map
           AddMapPoints = IllumMap(MapNum)%Xnum*IllumMap(MapNum)%Ynum
-          ZoneDaylight(ZoneFound)%TotalMapRefPoints=AddMapPoints
-          ALLOCATE(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(AddMapPoints,3))
-          ZoneDaylight(ZoneFound)%MapRefPtAbsCoord=0.0
-          ALLOCATE(ZoneDaylight(ZoneFound)%MapRefPtInBounds(AddMapPoints))
-          ZoneDaylight(ZoneFound)%MapRefPtInBounds   =.true.
-          ALLOCATE(ZoneDaylight(ZoneFound)%DaylIllumAtMapPt(AddMapPoints))
-          ZoneDaylight(ZoneFound)%DaylIllumAtMapPt=0.0
-          ALLOCATE(ZoneDaylight(ZoneFound)%GlareIndexAtMapPt(AddMapPoints))
-          ZoneDaylight(ZoneFound)%GlareIndexAtMapPt=0.0
-          ALLOCATE(ZoneDaylight(ZoneFound)%DaylIllumAtMapPtHr(AddMapPoints))
-          ZoneDaylight(ZoneFound)%DaylIllumAtMapPtHr=0.0
-          ALLOCATE(ZoneDaylight(ZoneFound)%GlareIndexAtMapPtHr(AddMapPoints))
-          ZoneDaylight(ZoneFound)%GlareIndexAtMapPtHr=0.0
+          IllumMapCalc(MapNum)%TotalMapRefPoints=AddMapPoints
+          ALLOCATE(IllumMapCalc(MapNum)%MapRefPtAbsCoord(AddMapPoints,3))
+          IllumMapCalc(MapNum)%MapRefPtAbsCoord=0.0
+          ALLOCATE(IllumMapCalc(MapNum)%MapRefPtInBounds(AddMapPoints))
+          IllumMapCalc(MapNum)%MapRefPtInBounds   =.true.
+          ALLOCATE(IllumMapCalc(MapNum)%DaylIllumAtMapPt(AddMapPoints))
+          IllumMapCalc(MapNum)%DaylIllumAtMapPt=0.0
+          ALLOCATE(IllumMapCalc(MapNum)%GlareIndexAtMapPt(AddMapPoints))
+          IllumMapCalc(MapNum)%GlareIndexAtMapPt=0.0
+          ALLOCATE(IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(AddMapPoints))
+          IllumMapCalc(MapNum)%DaylIllumAtMapPtHr=0.0
+          ALLOCATE(IllumMapCalc(MapNum)%GlareIndexAtMapPtHr(AddMapPoints))
+          IllumMapCalc(MapNum)%GlareIndexAtMapPtHr=0.0
 
           IF (AddMapPoints > MaxMapRefPoints) THEN
             CALL ShowSevereError('GetDaylighting Parameters: Total Map Reference points entered is greater than maximum allowed.')
@@ -3093,9 +4479,9 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
           ! Map points and increments are stored in AbsCoord and then that is operated on if relative coords entered.
           DO Y = 1, IllumMap(MapNum)%Ynum
             DO X = 1, IllumMap(MapNum)%Xnum
-              ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) = IllumMap(MapNum)%Xmin + (X - 1)*IllumMap(MapNum)%Xinc
-              ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) = IllumMap(MapNum)%Ymin + (Y - 1)*IllumMap(MapNum)%Yinc
-              ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) = IllumMap(MapNum)%Z
+              IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) = IllumMap(MapNum)%Xmin + (X - 1)*IllumMap(MapNum)%Xinc
+              IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) = IllumMap(MapNum)%Ymin + (Y - 1)*IllumMap(MapNum)%Yinc
+              IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) = IllumMap(MapNum)%Z
               RefPt = RefPt + 1
             ENDDO
           ENDDO
@@ -3103,19 +4489,19 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
           DO Y = 1, IllumMap(MapNum)%Ynum
             DO X = 1, IllumMap(MapNum)%Xnum
               IF (.not. DaylRefWorldCoordSystem) THEN
-                Xb = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) * CosZoneRelNorth &
-                     - ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) * SinZoneRelNorth &
+                Xb = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) * CosZoneRelNorth &
+                     - IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) * SinZoneRelNorth &
                      + Zone(ZoneFound)%OriginX
-                Yb = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) * SinZoneRelNorth &
-                     + ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) * CosZoneRelNorth &
+                Yb = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) * SinZoneRelNorth &
+                     + IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) * CosZoneRelNorth &
                      + Zone(ZoneFound)%OriginY
-                ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) = Xb * CosBldgRelNorth - Yb * SinBldgRelNorth
-                ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) = Xb * SinBldgRelNorth + Yb * CosBldgRelNorth
-                ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) +  &
+                IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) = Xb * CosBldgRelNorth - Yb * SinBldgRelNorth
+                IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) = Xb * SinBldgRelNorth + Yb * CosBldgRelNorth
+                IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) +  &
                              Zone(ZoneFound)%OriginZ
                 IF (doTransform) THEN
-                  Xo = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) ! world coordinates.... shifted by relative north angle...
-                  Yo = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)
+                  Xo = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) ! world coordinates.... shifted by relative north angle...
+                  Yo = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)
                   ! next derotate the building
                   XnoRot=Xo * CosBldgRelNorth + Yo * SinBldgRelNorth
                   YnoRot=Yo * CosBldgRelNorth - Xo * SinBldgRelNorth
@@ -3123,95 +4509,95 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
                   Xtrans = XnoRot * SQRT(NewAspectRatio/OldAspectRatio)
                   Ytrans = YnoRot * SQRT(OldAspectRatio/NewAspectRatio)
                   ! rerotate
-                  ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) = Xtrans * CosBldgRelNorth - Ytrans * SinBldgRelNorth
+                  IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) = Xtrans * CosBldgRelNorth - Ytrans * SinBldgRelNorth
 
-                  ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) = Xtrans * SinBldgRelNorth + Ytrans * CosBldgRelNorth
+                  IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) = Xtrans * SinBldgRelNorth + Ytrans * CosBldgRelNorth
                 ENDIF
               ELSE
-                Xb = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1)
-                Yb = ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)
-                ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) = Xb * CosBldgRotAppGonly - Yb * SinBldgRotAppGonly
-                ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) = Xb * SinBldgRotAppGonly + Yb * CosBldgRotAppGonly
+                Xb = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1)
+                Yb = IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)
+                IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) = Xb * CosBldgRotAppGonly - Yb * SinBldgRotAppGonly
+                IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) = Xb * SinBldgRotAppGonly + Yb * CosBldgRotAppGonly
               ENDIF
               IF (RefPt == 1) THEN
-                IllumMap(MapNum)%Xmin=ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1)
-                IllumMap(MapNum)%Ymin=ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)
-                IllumMap(MapNum)%Xmax=ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1)
-                IllumMap(MapNum)%Ymax=ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)
-                IllumMap(MapNum)%Z   =ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3)
+                IllumMap(MapNum)%Xmin=IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1)
+                IllumMap(MapNum)%Ymin=IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)
+                IllumMap(MapNum)%Xmax=IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1)
+                IllumMap(MapNum)%Ymax=IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)
+                IllumMap(MapNum)%Z   =IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3)
               ENDIF
-              IllumMap(MapNum)%Xmin=MIN(IllumMap(MapNum)%Xmin,ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1))
-              IllumMap(MapNum)%Ymin=MIN(IllumMap(MapNum)%Ymin,ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2))
-              IllumMap(MapNum)%Xmax=MAX(IllumMap(MapNum)%Xmax,ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1))
-              IllumMap(MapNum)%Ymax=MAX(IllumMap(MapNum)%Ymax,ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2))
-              IF ((ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX .and.          &
-                  (Zone(ZoneFound)%MinimumX - ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1)) > .001) .or.  &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) > Zone(ZoneFound)%MaximumX .and.          &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) - Zone(ZoneFound)%MaximumX) > .001) .or.  &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY .and.          &
-                  (Zone(ZoneFound)%MinimumY - ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)) > .001) .or.  &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) > Zone(ZoneFound)%MaximumY .and.          &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) - Zone(ZoneFound)%MaximumY) > .001) .or.  &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ .and.          &
-                  (Zone(ZoneFound)%MinimumZ - ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3)) > .001) .or.  &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) > Zone(ZoneFound)%MaximumZ .and.          &
-                  (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) - Zone(ZoneFound)%MaximumZ) > .001)) THEN
-                ZoneDaylight(ZoneFound)%MapRefPtInBounds(RefPt)=.false.
+              IllumMap(MapNum)%Xmin=MIN(IllumMap(MapNum)%Xmin,IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1))
+              IllumMap(MapNum)%Ymin=MIN(IllumMap(MapNum)%Ymin,IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2))
+              IllumMap(MapNum)%Xmax=MAX(IllumMap(MapNum)%Xmax,IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1))
+              IllumMap(MapNum)%Ymax=MAX(IllumMap(MapNum)%Ymax,IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2))
+              IF ((IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX .and.          &
+                  (Zone(ZoneFound)%MinimumX - IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1)) > .001d0) .or.  &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) > Zone(ZoneFound)%MaximumX .and.          &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) - Zone(ZoneFound)%MaximumX) > .001d0) .or.  &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY .and.          &
+                  (Zone(ZoneFound)%MinimumY - IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)) > .001d0) .or.  &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) > Zone(ZoneFound)%MaximumY .and.          &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) - Zone(ZoneFound)%MaximumY) > .001d0) .or.  &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ .and.          &
+                  (Zone(ZoneFound)%MinimumZ - IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3)) > .001d0) .or.  &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) > Zone(ZoneFound)%MaximumZ .and.          &
+                  (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) - Zone(ZoneFound)%MaximumZ) > .001d0)) THEN
+                IllumMapCalc(MapNum)%MapRefPtInBounds(RefPt)=.false.
               ENDIF
               ! Test extremes of Map Points against Zone Min/Max
-              IF (RefPt == 1 .or. RefPt == ZoneDaylight(ZoneFound)%TotalMapRefPoints) THEN
-                IF ((ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX  .or.  &
-                     ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) > Zone(ZoneFound)%MaximumX) .and. &
-                     .not. ZoneDaylight(ZoneFound)%MapRefPtInBounds(RefPt)) THEN
+              IF (RefPt == 1 .or. RefPt == IllumMapCalc(MapNum)%TotalMapRefPoints) THEN
+                IF ((IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX  .or.  &
+                     IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) > Zone(ZoneFound)%MaximumX) .and. &
+                     .not. IllumMapCalc(MapNum)%MapRefPtInBounds(RefPt)) THEN
                   CALL ShowWarningError('GetDetailedDaylighting: Reference Map point #['//  &
                      TRIM(RoundSigDigits(RefPt))//'], X Value outside Zone Min/Max X, Zone='//  &
                        TRIM(Zone(ZoneFound)%Name))
                   CALL ShowContinueError('...X Reference Point= '//                                                        &
-                         TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1),2))//', Zone Minimum X= '//  &
+                         TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1),2))//', Zone Minimum X= '//  &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumX,2))//', Zone Maximum X= '//                             &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MaximumX,2)))
-                  IF (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX) THEN
+                  IF (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1) < Zone(ZoneFound)%MinimumX) THEN
                     CALL ShowContinueError('...X Reference Distance Outside MinimumX= '//  &
-                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumX-ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1),4))//' m.')
+                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumX-IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1),4))//' m.')
                   ELSE
                     CALL ShowContinueError('...X Reference Distance Outside MaximumX= '//  &
-                       TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,1)-Zone(ZoneFound)%MaximumX,4))//' m.')
+                       TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1)-Zone(ZoneFound)%MaximumX,4))//' m.')
                   ENDIF
                 ENDIF
-                IF ((ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY  .or.  &
-                     ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) > Zone(ZoneFound)%MaximumY) .and. &
-                     .not. ZoneDaylight(ZoneFound)%MapRefPtInBounds(RefPt)) THEN
+                IF ((IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY  .or.  &
+                     IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) > Zone(ZoneFound)%MaximumY) .and. &
+                     .not. IllumMapCalc(MapNum)%MapRefPtInBounds(RefPt)) THEN
                   CALL ShowWarningError('GetDetailedDaylighting: Reference Map point #['//  &
                      TRIM(RoundSigDigits(RefPt))//'], Y Value outside Zone Min/Max Y, Zone='//  &
                        TRIM(Zone(ZoneFound)%Name))
                   CALL ShowContinueError('...Y Reference Point= '//                                                        &
-                         TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2),2))//', Zone Minimum Y= '//  &
+                         TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2),2))//', Zone Minimum Y= '//  &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumY,2))//', Zone Maximum Y= '//                             &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MaximumY,2)))
-                  IF (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY) THEN
+                  IF (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2) < Zone(ZoneFound)%MinimumY) THEN
                     CALL ShowContinueError('...Y Reference Distance Outside MinimumY= '//  &
-                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumY-ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2),4))//' m.')
+                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumY-IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2),4))//' m.')
                   ELSE
                     CALL ShowContinueError('...Y Reference Distance Outside MaximumY= '//  &
-                       TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,2)-Zone(ZoneFound)%MaximumY,4))//' m.')
+                       TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2)-Zone(ZoneFound)%MaximumY,4))//' m.')
                   ENDIF
                 ENDIF
-                IF ((ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ  .or.  &
-                     ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) > Zone(ZoneFound)%MaximumZ) .and. &
-                     .not. ZoneDaylight(ZoneFound)%MapRefPtInBounds(RefPt)) THEN
+                IF ((IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ  .or.  &
+                     IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) > Zone(ZoneFound)%MaximumZ) .and. &
+                     .not. IllumMapCalc(MapNum)%MapRefPtInBounds(RefPt)) THEN
                   CALL ShowWarningError('GetDetailedDaylighting: Reference Map point #['//  &
                      TRIM(RoundSigDigits(RefPt))//'], Z Value outside Zone Min/Max Z, Zone='//  &
                        TRIM(Zone(ZoneFound)%Name))
                   CALL ShowContinueError('...Z Reference Point= '//                                                        &
-                         TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3),2))//', Zone Minimum Z= '//  &
+                         TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3),2))//', Zone Minimum Z= '//  &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumZ,2))//', Zone Maximum Z= '//                             &
                          TRIM(RoundSigDigits(Zone(ZoneFound)%MaximumZ,2)))
-                  IF (ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ) THEN
+                  IF (IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3) < Zone(ZoneFound)%MinimumZ) THEN
                     CALL ShowContinueError('...Z Reference Distance Outside MinimumZ= '//  &
-                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumZ-ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3),4))//' m.')
+                       TRIM(RoundSigDigits(Zone(ZoneFound)%MinimumZ-IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3),4))//' m.')
                   ELSE
                     CALL ShowContinueError('...Z Reference Distance Outside MaximumZ= '//  &
-                       TRIM(RoundSigDigits(ZoneDaylight(ZoneFound)%MapRefPtAbsCoord(RefPt,3)-Zone(ZoneFound)%MaximumZ,4))//' m.')
+                       TRIM(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,3)-Zone(ZoneFound)%MaximumZ,4))//' m.')
                   ENDIF
                 ENDIF
               ENDIF
@@ -3225,15 +4611,18 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
 
   END DO
 
-
+  ALLOCATE(ZoneMsgDone(NumOfZones))
+  ZoneMsgDone=.false.
   DO MapNum = 1, TotIllumMaps
     IF (IllumMap(MapNum)%Zone == 0) CYCLE
-    IF (ZoneDaylight(IllumMap(MapNum)%Zone)%DaylightType /= DetailedDaylighting) THEN
+    IF (ZoneDaylight(IllumMap(MapNum)%Zone)%DaylightType /= DetailedDaylighting .and.   &
+        .not. ZoneMsgDone(IllumMap(MapNum)%Zone)) THEN
       CALL ShowSevereError('Zone Name in Output:IlluminanceMap is not used for Daylighting:Controls='//  &
                          TRIM(Zone(IllumMap(MapNum)%Zone)%Name))
       ErrorsFound = .TRUE.
     ENDIF
   ENDDO
+  DEALLOCATE(ZoneMsgDone)
 
   IF (TotIllumMaps > 0) THEN
     Write(OutputFileInits,'(A)')   &
@@ -4344,7 +5733,7 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   INTEGER           :: ZoneNum               ! Zone number
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  REAL(r64),PARAMETER :: tmpSWIterStep = 0.05d0 ! step of switching factor, assuming maximum of 20 switching states
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -4379,7 +5768,7 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   INTEGER   :: IS                    ! IS=1 for unshaded window, =2 for shaded window
   INTEGER   :: ISWFLG                ! Switchable glazing flag: =1 if one or more windows in a zone
                                      !  has switchable glazing that adjusts visible transmittance to just meet
-                                     !  daylighting set point; =0 otherwise.
+                                     !  daylighting setpoint; =0 otherwise.
   INTEGER   :: IConst                ! Window construction pointer
   INTEGER   :: IConstShaded          ! Pointer to shaded window construction
   INTEGER   :: ICtrl                 ! Window shading control pointer
@@ -4406,7 +5795,6 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   ! Added variables for glare iterations for switchable glazings
   REAL(r64) :: tmpSWSL1 = 0.0
   REAL(r64) :: tmpSWSL2 = 0.0
-  REAL(r64) :: tmpSWIterStep = 0.05d0 ! step of switching factor, assuming maximum of 20 switching states
   REAL(r64) :: tmpSWFactor = 0.0      ! new switching factor to meet glare criteria
   REAL(r64) :: tmpSWFactor0  = 0.0    ! original switching factor to meet daylight illuminance
   REAL(r64) :: tmpMult = 0.0
@@ -4414,15 +5802,17 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   REAL(r64), SAVE, ALLOCATABLE, DIMENSION(:,:,:) :: tmpIllumFromWinAtRefPt
   REAL(r64), SAVE, ALLOCATABLE, DIMENSION(:,:,:) :: tmpBackLumFromWinAtRefPt
   REAL(r64), SAVE, ALLOCATABLE, DIMENSION(:,:,:) :: tmpSourceLumFromWinAtRefPt
+  LOGICAL, SAVE :: firsttime=.true.  ! true first time routine is called
 
   LOGICAL   :: blnCycle = .False.
 
   ! Three arrays to save original clear and dark (fully switched) states'
   !  zone/window daylighting properties.
-  IF (.NOT.ALLOCATED(tmpIllumFromWinAtRefPt)) THEN
+  IF (firsttime) THEN
     ALLOCATE(tmpIllumFromWinAtRefPt(2,2,MAX(MAXVAL(Zone%NumSubSurfaces),MAXVAL(ZoneDaylight%NumOfDayltgExtWins))))
     ALLOCATE(tmpBackLumFromWinAtRefPt(2,2,MAX(MAXVAL(Zone%NumSubSurfaces),MAXVAL(ZoneDaylight%NumOfDayltgExtWins))))
     ALLOCATE(tmpSourceLumFromWinAtRefPt(2,2,MAX(MAXVAL(Zone%NumSubSurfaces),MAXVAL(ZoneDaylight%NumOfDayltgExtWins))))
+    firsttime=.false.
   ENDIF
   tmpIllumFromWinAtRefPt = 0.0d0
   tmpBackLumFromWinAtRefPt = 0.0d0
@@ -4672,7 +6062,7 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   END DO ! End of first loop over exterior windows associated with this zone
 
   ! Initialize flag that one or more windows has switchable glazing
-  ! control that adjusts visible transmittance to just meet dayltg set point
+  ! control that adjusts visible transmittance to just meet dayltg setpoint
   ! (and the window has not already been switched)
   ISWFLG = 0
 
@@ -4712,7 +6102,7 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   ! unswitched state. Assumes some windows in a space may have this control and
   ! others not.
 
-  ! If daylight illuminance is above set point, allow switching
+  ! If daylight illuminance is above setpoint, allow switching
   IF (ISWFLG /= 0 .AND. DaylIllum(1) > SETPNT(1)) THEN
 
     ! Third loop over windows.  Get illuminance at ref pt 1 from
@@ -4787,8 +6177,8 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
           ZoneDaylight(ZoneNum)%BacLum(IL) =  ZoneDaylight(ZoneNum)%BacLum(IL) +  &
                          (VTRAT - 1.0d0) * ZoneDaylight(ZoneNum)%BackLumFromWinAtRefPt(IL,IS,loop)
 
-          ! Adjust illum, background illum and source luminance for this window in intermdeiate switched state
-          !  for later used in the DayltgGlare calc because SurfaceWindow(IWin)%ShadingFlag = SwitchableGlazing = 2
+          ! Adjust illum, background illum and source luminance for this window in intermediate switched state
+          !  for later use in the DayltgGlare calc because SurfaceWindow(IWin)%ShadingFlag = SwitchableGlazing = 2
           IS = 2
           VTRAT = SurfaceWindow(IWin)%VisTransSelected/(TVIS2+0.000001d0)
           ZoneDaylight(ZoneNum)%IllumFromWinAtRefPt(IL,IS,loop)    = VTRAT * tmpIllumFromWinAtRefPt(IL,IS,loop)
@@ -5280,6 +6670,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
   REAL(r64) :: FP                           ! Fraction electric lighting power input required to meet setpoint
   REAL(r64) :: XRAN                         ! Random number between 0 and 1
   INTEGER   :: MapNum                       ! Illuminance map number
+  INTEGER   :: ILM
 
           ! FLOW:
 
@@ -5321,7 +6712,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
       ! Stepped system
       FP = 0.
       IF (DaylIllum(IL) > 0.0 .AND. DaylIllum(IL) < ZoneDaylight(ZoneNum)%IllumSetPoint(IL)) &
-        FP = REAL(INT(ZoneDaylight(ZoneNum)%LightControlSteps*FL) + 1,r64) / ZoneDaylight(ZoneNum)%LightControlSteps
+        FP = REAL(INT(ZoneDaylight(ZoneNum)%LightControlSteps*FL) + 1,r64) / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64)
 
       IF (DaylIllum(IL) == 0.) FP = 1.0
 
@@ -5332,7 +6723,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
         CALL RANDOM_NUMBER(XRAN)
         IF (XRAN >= ZoneDaylight(ZoneNum)%LightControlProbability) THEN
           ! Set level one higher
-          IF (FP < 1.0) FP = FP + 1.0 / ZoneDaylight(ZoneNum)%LightControlSteps
+          IF (FP < 1.0d0) FP = FP + (1.0d0 / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64))
         END IF ! XRAN
       END IF ! Light Control Probability < 1
     END IF ! Lighting System Type
@@ -5356,22 +6747,21 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
   IF(TotIllumMaps > 0 .and. .not. DoingSizing .and. .not. WarmupFlag) THEN
     ! If an illuminance map is associated with this zone, generate the map
     IF (TimeStep == 1) mapResultsToReport=.false.
-    DO MapNum = 1, TotIllumMaps
-      IF (IllumMap(MapNum)%Zone == ZoneNum) THEN
-        DO IL = 1,ZoneDaylight(ZoneNum)%TotalMapRefPoints
-          ZoneDaylight(ZoneNum)%DaylIllumAtMapPtHr(IL) = ZoneDaylight(ZoneNum)%DaylIllumAtMapPtHr(IL) + &
-              ZoneDaylight(ZoneNum)%DaylIllumAtMapPt(IL)/NumOfTimeStepInHour
-          IF (ZoneDaylight(ZoneNum)%DaylIllumAtMapPtHr(IL) > 0.0d0) THEN
-            mapResultsToReport=.true.
-            mapResultsReported=.true.
-          ENDIF
-        END DO
-        CALL ReportIllumMap(MapNum)
-        IF (TimeStep == NumOfTimeStepInHour) THEN
-          ZoneDayLight(ZoneNum)%DaylIllumAtMapPtHr=0.0
-          ZoneDaylight(ZoneNum)%DaylIllumAtMapPt=0.0
+    DO ILM=1,ZoneDaylight(ZoneNum)%MapCount
+      MapNum=ZoneDaylight(ZoneNum)%ZoneToMap(ILM)
+      DO IL = 1,IllumMapCalc(MapNum)%TotalMapRefPoints
+        IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(IL) = IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(IL) + &
+            IllumMapCalc(MapNum)%DaylIllumAtMapPt(IL)/REAL(NumOfTimeStepInHour,r64)
+        IF (IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(IL) > 0.0d0) THEN
+          mapResultsToReport=.true.
+          mapResultsReported=.true.
         ENDIF
-      END IF
+      END DO
+      CALL ReportIllumMap(MapNum)
+      IF (TimeStep == NumOfTimeStepInHour) THEN
+        IllumMapCalc(MapNum)%DaylIllumAtMapPtHr=0.0
+        IllumMapCalc(MapNum)%DaylIllumAtMapPt=0.0
+      ENDIF
     END DO
   END IF
 
@@ -5576,7 +6966,7 @@ SUBROUTINE DayltgInterReflectedIllum(ISunPos,IHR,ZoneNum,IWin)
   REAL(r64) :: TVISBSun                  ! Window's visible transmittance at COSBSun
                                          !  (times light well efficiency, if appropriate)
   REAL(r64) :: ZSU1                      ! Transmitted direct normal illuminance (lux)
-!  CHARACTER(len=30) :: ShType                    ! Window shading device type
+!  CHARACTER(len=32) :: ShType                    ! Window shading device type
   INTEGER   :: ShType                    ! Window shading device type
   LOGICAL   :: ShadeOn                   ! True if exterior or interior window shade present
   LOGICAL   :: BlindOn                   ! True if exterior or interior window blind present
@@ -6846,8 +8236,8 @@ INTEGER           :: ZoneNum               ! Zone number
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-INTEGER   :: NREFPT                ! Number of daylighting reference points
-INTEGER   :: REFPT1                ! 1st reference point
+INTEGER   :: NREFPT                ! Number of daylighting map reference points
+!INTEGER   :: REFPT1                ! 1st reference point
 INTEGER   :: ISky                  ! Sky type index
 INTEGER   :: ISky1, ISky2          ! Sky type index values for averaging two sky types
 REAL(r64) :: DFSKHR (4,2)          ! Sky daylight factor for sky type (first index),
@@ -6862,9 +8252,9 @@ REAL(r64) :: SFSUHR (2)            ! Sun source luminance factor for bare/shaded
 INTEGER   :: IL                    ! Reference point index
 INTEGER   :: IWin                  ! Window index
 INTEGER   :: IS                    ! IS=1 for unshaded window, =2 for shaded window
-INTEGER   :: ISWFLG                ! Switchable glazing flag: =1 if one or more windows in a zone
-                                   !  has switchable glazing that adjusts visible transmittance to just meet
-                                   !  daylighting set point; =0 otherwise.
+!INTEGER   :: ISWFLG                ! Switchable glazing flag: =1 if one or more windows in a zone
+!                                   !  has switchable glazing that adjusts visible transmittance to just meet
+!                                   !  daylighting setpoint; =0 otherwise.
 INTEGER   :: ICtrl                 ! Window shading control pointer
 REAL(r64) :: SkyWeight             ! Weighting factor used to average two different sky types
 REAL(r64) :: HorIllSky(4)          ! Horizontal illuminance for different sky types
@@ -6890,265 +8280,316 @@ REAL(r64) :: VTMaster
 REAL(r64) :: VTDark = 0.0d0         ! Visible transmittance (VT) of electrochromic (EC) windows in fully dark state
 REAL(r64) :: VTMULT = 1.0d0         ! VT multiplier for EC windows
 INTEGER   :: IConstShaded = 0       ! The shaded window construction for switchable windows
+INTEGER :: MapNum
+INTEGER :: ILM
 
 
-      IF (FirstTimeFlag) THEN
-        ALLOCATE(DaylIllum(MaxMapRefPoints))
-        ALLOCATE(BACLUM(MaxMapRefPoints))
-        ALLOCATE(GLRNDX(MaxMapRefPoints))
-        FirstTimeFlag=.false.
-      ENDIF
+  IF (FirstTimeFlag) THEN
+    ALLOCATE(DaylIllum(MaxMapRefPoints))
+    ALLOCATE(BACLUM(MaxMapRefPoints))
+    ALLOCATE(GLRNDX(MaxMapRefPoints))
+    FirstTimeFlag=.false.
+  ENDIF
 
-      IF (WarmUpFlag) RETURN
+  IF (WarmUpFlag) RETURN
 !              Initialize reference point illuminance and window background luminance
 
-      NREFPT = ZoneDaylight(ZoneNum)%TotalMapRefPoints
-      REFPT1 = 1
+  DO ILM=1,ZoneDaylight(ZoneNum)%MapCount
+    MapNum=ZoneDaylight(ZoneNum)%ZoneToMap(ILM)
+    NREFPT = IllumMapCalc(MapNum)%TotalMapRefPoints
 
-      DaylIllum = 0.
-      BACLUM = 0.
-      GLRNDX=0.
+    DaylIllum = 0.
+    BACLUM = 0.
+    GLRNDX=0.
 
-      IF(SkyClearness > 3.0d0) THEN       !Sky is average of clear and clear turbid
-        SkyWeight = MIN(1.0d0,(SkyClearness-3.d0)/3.d0)
-        ISky1 = 1
-        ISky2 = 2
-      ELSE IF(SkyClearness > 1.2d0) THEN  !Sky is average of clear turbid and intermediate
-        SkyWeight = (SkyClearness - 1.2d0)/1.8d0
-        ISky1 = 2
-        ISky2 = 3
-      ELSE                              !Sky is average of intermediate and overcast
-        SkyWeight = MIN(1.0d0, MAX(0.0d0, (SkyClearness-1.d0)/0.2d0, (SkyBrightness-0.05d0)/0.4d0))
-        ISky1 = 3
-        ISky2 = 4
-      END IF
+    IF(SkyClearness > 3.0d0) THEN       !Sky is average of clear and clear turbid
+      SkyWeight = MIN(1.0d0,(SkyClearness-3.d0)/3.d0)
+      ISky1 = 1
+      ISky2 = 2
+    ELSE IF(SkyClearness > 1.2d0) THEN  !Sky is average of clear turbid and intermediate
+      SkyWeight = (SkyClearness - 1.2d0)/1.8d0
+      ISky1 = 2
+      ISky2 = 3
+    ELSE                              !Sky is average of intermediate and overcast
+      SkyWeight = MIN(1.0d0, MAX(0.0d0, (SkyClearness-1.d0)/0.2d0, (SkyBrightness-0.05d0)/0.4d0))
+      ISky1 = 3
+      ISky2 = 4
+    END IF
 
 !              First loop over windows in this space.
 !              Find contribution of each window to the daylight illum
 !              and to the glare numerator at each reference point.
 !              Use shading flags set in WindowShadingManager.
 
-      DO 2000 loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
-        IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
+    DO loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
+      IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
 
-        ! Added TH 6/29/2009 for thermochromic windows
-        VTRatio = 1.0d0
-        IF (NREFPT > 0) THEN
-          IConst = Surface(IWin)%Construction
-          IF (Construct(IConst)%TCFlag == 1) THEN
-            ! For thermochromic windows, daylight and glare factors are always calculated
-            !  based on the master construction. They need to be adjusted by the VTRatio, including:
-            !  ZoneDaylight()%DaylIllFacSky, DaylIllFacSun, DaylIllFacSunDisk; DaylBackFacSky,
-            !  DaylBackFacSun, DaylBackFacSunDisk, DaylSourceFacSky, DaylSourceFacSun, DaylSourceFacSunDisk
-            VTNow = POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))
-            VTMaster = POLYF(1.0d0,Construct(Construct(IConst)%TCMasterConst)%TransVisBeamCoef(1))
-            VTRatio = VTNow / VTMaster
-          ENDIF
+      ! Added TH 6/29/2009 for thermochromic windows
+      VTRatio = 1.0d0
+      IF (NREFPT > 0) THEN
+        IConst = Surface(IWin)%Construction
+        IF (Construct(IConst)%TCFlag == 1) THEN
+          ! For thermochromic windows, daylight and glare factors are always calculated
+          !  based on the master construction. They need to be adjusted by the VTRatio, including:
+          !  ZoneDaylight()%DaylIllFacSky, DaylIllFacSun, DaylIllFacSunDisk; DaylBackFacSky,
+          !  DaylBackFacSun, DaylBackFacSunDisk, DaylSourceFacSky, DaylSourceFacSun, DaylSourceFacSunDisk
+          VTNow = POLYF(1.0d0,Construct(IConst)%TransVisBeamCoef(1))
+          VTMaster = POLYF(1.0d0,Construct(Construct(IConst)%TCMasterConst)%TransVisBeamCoef(1))
+          VTRatio = VTNow / VTMaster
         ENDIF
+      ENDIF
 
 !              Loop over reference points
-          DO 3000 IL = REFPT1,NREFPT
-            ! in this structure the Map points are all 3...
-            ILB=2+IL
+      DO ILB = 1,NREFPT
 
-!              Daylight factors for current sun position
-            DO ISky = 1,4
-
+!          Daylight factors for current sun position
+        DO ISky = 1,4
 !                                ===Bare window===
-              DFSKHR(ISky,1) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,1,HourOfDay) + &
-                               WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,1,PreviousHour))
+          DFSKHR(ISky,1) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,1,HourOfDay) + &
+                           WeightPreviousHour * IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,1,PreviousHour))
 
-              IF(ISky == 1) DFSUHR(1) = VTRatio * (WeightNow * &
-                   (ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,1,HourOfDay) +   &
-                     ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,1,HourOfDay)) + &
-                                        WeightPreviousHour * &
-                   (ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,1,PreviousHour) +   &
-                             ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,1,PreviousHour)))
+          IF (ISky == 1) THEN
+            DFSUHR(1) = VTRatio * ( WeightNow * ( IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,1,HourOfDay) +   &
+                                                  IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,1,HourOfDay) ) + &
+                                    WeightPreviousHour * ( IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,1,PreviousHour) +  &
+                                                           IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,1,PreviousHour) ) )
+          ENDIF
 
-              BFSKHR(ISky,1) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,1,HourOfDay) + &
-                               WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,1,PreviousHour))
+          BFSKHR(ISky,1) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,1,HourOfDay) + &
+                               WeightPreviousHour * IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,1,PreviousHour))
 
-              IF(ISky == 1) BFSUHR(1) = VTRatio * (WeightNow * &
-                   (ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,1,HourOfDay) +   &
-                                ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,1,HourOfDay)) +&
-                               WeightPreviousHour * &
-                   (ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,1,PreviousHour) +   &
-                        ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,1,PreviousHour)))
+          IF (ISky == 1) THEN
+            BFSUHR(1) = VTRatio * (WeightNow * ( IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,1,HourOfDay) +   &
+                                                 IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,1,HourOfDay) ) +&
+                                   WeightPreviousHour *  ( IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,1,PreviousHour) +  &
+                                                           IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,1,PreviousHour) ) )
+          ENDIF
 
-              SFSKHR(ISky,1) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,1,HourOfDay) + &
-                               WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,1,PreviousHour))
+          SFSKHR(ISky,1) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,1,HourOfDay) + &
+                             WeightPreviousHour * IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,1,PreviousHour))
 
-              IF(ISky == 1) SFSUHR(1) = VTRatio * (WeightNow * &
-                   (ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,1,HourOfDay) +   &
-                      ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,1,HourOfDay)) + &
-                            WeightPreviousHour * &
-                   (ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,1,PreviousHour) +   &
-                      ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,1,PreviousHour)))
+          IF (ISky == 1) THEN
+            SFSUHR(1) = VTRatio * (WeightNow * ( IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,1,HourOfDay) +   &
+                                                 IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,1,HourOfDay) ) + &
+                                   WeightPreviousHour * ( IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,1,PreviousHour) +   &
+                                                          IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,1,PreviousHour) ) )
+          ENDIF
 
-              IF (SurfaceWindow(IWin)%ShadingFlag >= 1 .OR. SurfaceWindow(IWin)%SolarDiffusing) THEN
+          IF (SurfaceWindow(IWin)%ShadingFlag >= 1 .OR. SurfaceWindow(IWin)%SolarDiffusing) THEN
 
 !                                 ===Shaded window===
-                IF(.NOT.SurfaceWindow(IWin)%MovableSlats) THEN
+            IF (.NOT.SurfaceWindow(IWin)%MovableSlats) THEN
+              ! Shade, screen, blind with fixed slats, or diffusing glass
+              DFSKHR(ISky,2) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,2,HourOfDay) + &
+                                          WeightPreviousHour * IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,2,PreviousHour) )
 
-                ! Shade, screen, blind with fixed slats, or diffusing glass
-                  DFSKHR(ISky,2) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,2,HourOfDay) + &
-                                   WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,2,PreviousHour))
+              IF (ISky == 1) THEN
+                DFSUHR(2) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,2,HourOfDay) +  &
+                              WeightPreviousHour * IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,2,PreviousHour))
 
-                  IF(ISky == 1) THEN
-                    DFSUHR(2) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,2,HourOfDay) +  &
-                                WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,2,PreviousHour))
+                IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                    DFSUHR(2) = DFSUHR(2) + VTRatio *   &
+                       (WeightNow * IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,2,HourOfDay) + &
+                        WeightPreviousHour * IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,2,PreviousHour))
+                ENDIF
+              END IF
 
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) &
-                      DFSUHR(2) = DFSUHR(2) + VTRatio * (WeightNow *   &
-                                     ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,HourOfDay) + &
-                                     WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,PreviousHour))
-                  END IF
+              BFSKHR(ISky,2) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,2,HourOfDay) + &
+                                 WeightPreviousHour * IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,2,PreviousHour))
 
-                  BFSKHR(ISky,2) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,2,HourOfDay) + &
-                                   WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,2,PreviousHour))
+              IF (ISky == 1) THEN
+                BFSUHR(2) = VTRatio * (WeightNow * IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,2,HourOfDay) +  &
+                              WeightPreviousHour * IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,2,PreviousHour))
+                IF (.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                  BFSUHR(2) = BFSUHR(2) + VTRatio *   &
+                     (WeightNow * IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,2,HourOfDay) + &
+                      WeightPreviousHour * IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,2,PreviousHour))
+                ENDIF
+              END IF
 
-                  IF(ISky == 1) THEN
-                    BFSUHR(2) = VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,2,HourOfDay) +  &
-                                WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,2,PreviousHour))
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) &
-                      BFSUHR(2) = BFSUHR(2) + VTRatio *   &
-                         (WeightNow * ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,2,HourOfDay) + &
-                          WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,2,PreviousHour))
-                  END IF
+              SFSKHR(ISky,2) = VTRatio *   &
+                   (WeightNow * IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,2,HourOfDay) + &
+                    WeightPreviousHour * IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,2,PreviousHour))
 
-                  SFSKHR(ISky,2) = VTRatio *   &
-                     (WeightNow * ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,2,HourOfDay) + &
-                      WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,2,PreviousHour))
+              IF (ISky == 1) THEN
+                SFSUHR(2) = VTRatio *   &
+                     (WeightNow * IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,2,HourOfDay) +  &
+                      WeightPreviousHour * IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,2,PreviousHour))
+                IF (.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                  SFSUHR(2) = SFSUHR(2) + VTRatio *   &
+                       (WeightNow * IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,2,HourOfDay) + &
+                        WeightPreviousHour * IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,2,PreviousHour))
+                ENDIF
+              END IF
 
-                  IF(ISky == 1) THEN
-                    SFSUHR(2) = VTRatio *   &
-                       (WeightNow * ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,2,HourOfDay) +  &
-                        WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,2,PreviousHour))
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) &
-                      SFSUHR(2) = SFSUHR(2) + VTRatio *   &
-                         (WeightNow * ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,2,HourOfDay) + &
-                          WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,2,PreviousHour))
-                  END IF
+            ELSE  ! Blind with movable slats
+              VarSlats = SurfaceWindow(IWin)%MovableSlats
+              SlatAng = SurfaceWindow(IWin)%SlatAngThisTs
 
-                ELSE  ! Blind with movable slats
-                  VarSlats = SurfaceWindow(IWin)%MovableSlats
-                  SlatAng = SurfaceWindow(IWin)%SlatAngThisTs
+              DFSKHR(ISky,2) = VTRatio *   &
+                 (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                               IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
+                  WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                                 IllumMapCalc(MapNum)%DaylIllFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
 
-                  DFSKHR(ISky,2) = VTRatio * (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                                   ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
-                                   WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                                   ZoneDaylight(ZoneNum)%DaylIllFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
+              IF (ISky == 1) THEN
+                DFSUHR(2) = VTRatio *   &
+                   (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                    WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylIllFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
 
-                  IF(ISky == 1) THEN
-                    DFSUHR(2) = VTRatio* (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                       WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylIllFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                  ! We add the contribution from the solar disk if slats do not block beam solar
+                  ! TH CR 8010, DaylIllFacSunDisk needs to be interpolated
+                  !IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) DFSUHR(2) = DFSUHR(2) + &
+                  !  VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,HourOfDay) + &
+                  !            WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,PreviousHour))
+                IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                  DFSUHR(2) = DFSUHR(2) + VTRatio * &
+                         (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                              IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                          WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                              IllumMapCalc(MapNum)%DaylIllFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                ENDIF
+              END IF
 
-                    ! We add the contribution from the solar disk if slats do not block beam solar
-                    ! TH CR 8010, DaylIllFacSunDisk needs to be interpolated
-                    !IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) DFSUHR(2) = DFSUHR(2) + &
-                    !  VTRatio * (WeightNow * ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,HourOfDay) + &
-                    !            WeightPreviousHour * ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2,PreviousHour))
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) DFSUHR(2) = DFSUHR(2) + &
-                                VTRatio * (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                                WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                                ZoneDaylight(ZoneNum)%DaylIllFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
-                  END IF
+              BFSKHR(ISky,2) = VTRatio *   &
+                 (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
+                  WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
 
-                  BFSKHR(ISky,2) = VTRatio*(WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                            ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
-                            WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                            ZoneDaylight(ZoneNum)%DaylBackFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
+              IF (ISky == 1) THEN
+                BFSUHR(2) = VTRatio *   &
+                   (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                    WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
 
-                  IF(ISky == 1) THEN
-                    BFSUHR(2) = VTRatio*(WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                       WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylBackFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                  ! TH CR 8010, DaylBackFacSunDisk needs to be interpolated
+                IF (.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                  BFSUHR(2) = BFSUHR(2) + VTRatio * &
+                     (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                      WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylBackFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                ENDIF
+              END IF
 
-                    ! TH CR 8010, DaylBackFacSunDisk needs to be interpolated
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) BFSUHR(2) = BFSUHR(2) + &
-                       VTRatio * (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                       WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylBackFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
-                  END IF
+              SFSKHR(ISky,2) = VTRatio *   &
+                 (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                           IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
+                  WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                           IllumMapCalc(MapNum)%DaylSourceFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
 
-                  SFSKHR(ISky,2) = VTRatio*(WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                                  ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,HourOfDay)) + &
-                                  WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                                  ZoneDaylight(ZoneNum)%DaylSourceFacSky(loop,ILB,ISky,2:MaxSlatAngs+1,PreviousHour)))
+              IF (ISky == 1) THEN
+                SFSUHR(2) = VTRatio *   &
+                   (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                         IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                    WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                         IllumMapCalc(MapNum)%DaylSourceFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
 
-                  IF(ISky == 1) THEN
-                    SFSUHR(2) = VTRatio*(WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                                WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                                ZoneDaylight(ZoneNum)%DaylSourceFacSun(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                  ! TH CR 8010, DaylSourceFacSunDisk needs to be interpolated
+                IF (.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) THEN
+                  SFSUHR(2) = SFSUHR(2) + VTRatio * &
+                     (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
+                      WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
+                          IllumMapCalc(MapNum)%DaylSourceFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
+                ENDIF
+              END IF
 
-                    ! TH CR 8010, DaylSourceFacSunDisk needs to be interpolated
-                    IF(.NOT.SurfaceWindow(IWin)%SlatsBlockBeam) SFSUHR(2) = SFSUHR(2) + &
-                       VTRatio * (WeightNow * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,2:MaxSlatAngs+1,HourOfDay)) + &
-                       WeightPreviousHour * InterpSlatAng(SlatAng,VarSlats,  &
-                       ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk(loop,ILB,2:MaxSlatAngs+1,PreviousHour)))
-                  END IF
+            END IF ! End of check if window has blind with movable slats
 
-                END IF ! End of check if window has blind with movable slats
+          ENDIF  ! End of check if window is shaded or has diffusing glass
 
-              ENDIF  ! End of check if window is shaded or has diffusing glass
-
-          END DO
+        END DO
 
 !              Get illuminance at ref point from bare and shaded window by
 !              multiplying daylight factors by exterior horizontal illuminance
 
 ! Adding 0.001 in the following prevents zero HorIllSky in early morning or late evening when sun
 ! is up in the present time step but GILSK(ISky,HourOfDay) and GILSK(ISky,NextHour) are both zero.
-      DO ISky = 1,4
-        HorIllSky(ISky) = WeightNow * GILSK(ISky,HourOfDay) + WeightPreviousHour * GILSK(ISky,PreviousHour) + 0.001d0
-      END DO
+        DO ISky = 1,4
+          HorIllSky(ISky) = WeightNow * GILSK(ISky,HourOfDay) + WeightPreviousHour * GILSK(ISky,PreviousHour) + 0.001d0
+        END DO
 
-      ! HISKF is current time step horizontal illuminance from sky, calculated in DayltgLuminousEfficacy,
-      ! which is called in WeatherManager. HISUNF is current time step horizontal illuminance from sun,
-      ! also calculated in DayltgLuminousEfficacy.
-      HorIllSkyFac = HISKF/((1.d0-SkyWeight)*HorIllSky(ISky2) + SkyWeight*HorIllSky(ISky1))
+    ! HISKF is current time step horizontal illuminance from sky, calculated in DayltgLuminousEfficacy,
+    ! which is called in WeatherManager. HISUNF is current time step horizontal illuminance from sun,
+    ! also calculated in DayltgLuminousEfficacy.
+        HorIllSkyFac = HISKF/((1.d0-SkyWeight)*HorIllSky(ISky2) + SkyWeight*HorIllSky(ISky1))
 
-      DO IS = 1,2
-        IF(IS == 2.AND.SurfaceWindow(IWin)%ShadingFlag<=0.AND..not.SurfaceWindow(IWin)%SolarDiffusing) EXIT
+        DO IS = 1,2
+          IF(IS == 2.AND.SurfaceWindow(IWin)%ShadingFlag<=0.AND..not.SurfaceWindow(IWin)%SolarDiffusing) EXIT
 
-        ZoneDaylight(ZoneNum)%IllumFromWinAtMapPt(IL,IS,loop) = &
-          DFSUHR(IS)*HISUNF + HorIllSkyFac * (DFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
-                              DFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
+          IllumMapCalc(MapNum)%IllumFromWinAtMapPt(ILB,IS,loop) = &
+            DFSUHR(IS)*HISUNF + HorIllSkyFac * (DFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
+                                DFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
 
-        ZoneDaylight(ZoneNum)%BackLumFromWinAtMapPt(IL,IS,loop) = &
-          BFSUHR(IS)*HISUNF + HorIllSkyFac * (BFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
-                              BFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
+          IllumMapCalc(MapNum)%BackLumFromWinAtMapPt(ILB,IS,loop) = &
+            BFSUHR(IS)*HISUNF + HorIllSkyFac * (BFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
+                                BFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
 
-        ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(IL,IS,loop) = &
-          SFSUHR(IS)*HISUNF + HorIllSkyFac * (SFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
-                              SFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
-        ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(IL,IS,loop) = &
-            MAX(ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(IL,IS,loop),0.0d0)
-      ENDDO
+          IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(ILB,IS,loop) = &
+            SFSUHR(IS)*HISUNF + HorIllSkyFac * (SFSKHR(ISky1,IS)*SkyWeight*HorIllSky(ISky1) + &
+                                SFSKHR(ISky2,IS)*(1.-SkyWeight)*HorIllSky(ISky2))
+          IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(ILB,IS,loop) = &
+              MAX(IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(ILB,IS,loop),0.0d0)
+        ENDDO
 
- 3000 CONTINUE  ! End of reference point loop
- 2000 CONTINUE  ! End of first loop over windows
+      ENDDO  ! End of reference point loop
+    ENDDO  ! End of first loop over windows
 
 !              Second loop over windows. Find total daylight illuminance
 !              and background luminance for each ref pt from all windows in
 !              the space.  Use shading flags.
 
+    DO loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
+      IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
+
+      IS = 1
+      IF ((SurfaceWindow(IWin)%ShadingFlag >= 1 .AND. SurfaceWindow(IWin)%ShadingFlag <= 9) .OR. &
+           SurfaceWindow(IWin)%SolarDiffusing) IS = 2
+
+      ! CR 8057. 3/17/2010.
+      ! Switchable windows may be in partially switched state rather than fully dark state
+      VTMULT = 1.0d0
+
+      ICtrl = Surface(IWin)%WindowShadingControlPtr
+      IF(ICtrl > 0) THEN
+        IF (WindowShadingControl(ICtrl)%ShadingControlType == WSCT_MeetDaylIlumSetp .AND. &
+            SurfaceWindow(IWin)%ShadingFlag == SwitchableGlazing) THEN
+          ! switchable windows in partial or fully switched state,
+          !  get its intermediate VT calculated in DayltgInteriorIllum
+          IConstShaded = Surface(IWin)%ShadedConstruction
+          IF (IConstShaded > 0) VTDark = POLYF(1.0d0,Construct(IConstShaded)%TransVisBeamCoef(1))* &
+                                         SurfaceWindow(IWin)%GlazedFrac
+          IF (VTDark > 0) VTMULT = SurfaceWindow(IWin)%VisTransSelected / VTDark
+        ENDIF
+      ENDIF
+
+      DO IL = 1,NREFPT
+!              Determine if illuminance contribution is from bare or shaded window
+        DaylIllum(IL) = DaylIllum(IL) + VTMULT * IllumMapCalc(MapNum)%IllumFromWinAtMapPt(IL,IS,loop)
+        BACLUM(IL) = BACLUM(IL) + VTMULT * IllumMapCalc(MapNum)%BackLumFromWinAtMapPt(IL,IS,loop)
+      END DO
+
+    END DO  ! End of second window loop
+
+!              Calculate glare index at each reference point
+    DO IL = 1,NREFPT
+!        Following code taken directly from DayltgGlare ... duplicate calculation
+       ! Initialize glare constant
+      GTOT = 0.0d0
+
+      ! Loop over exterior windows associated with zone
       DO loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
         IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
-
         IS = 1
-        IF ((SurfaceWindow(IWin)%ShadingFlag >= 1 .AND. SurfaceWindow(IWin)%ShadingFlag <= 9) .OR. &
-             SurfaceWindow(IWin)%SolarDiffusing) IS = 2
+        IF((SurfaceWindow(IWin)%ShadingFlag >= 1 .AND. SurfaceWindow(IWin)%ShadingFlag <= 9) .OR. &
+            SurfaceWindow(IWin)%SolarDiffusing) IS = 2
 
-        ! CR 8057. 3/17/2010.
-        ! Switchable windows may be in partially switched state rather than fully dark state
+        ! CR 8057. 3/17/2010
         VTMULT = 1.0d0
 
         ICtrl = Surface(IWin)%WindowShadingControlPtr
@@ -7164,66 +8605,30 @@ INTEGER   :: IConstShaded = 0       ! The shaded window construction for switcha
           ENDIF
         ENDIF
 
-        DO IL = REFPT1,NREFPT
-!              Determine if illuminance contribution is from bare or shaded window
-          DaylIllum(IL) = DaylIllum(IL) + VTMULT * ZoneDaylight(ZoneNum)%IllumFromWinAtMapPt(IL,IS,loop)
-          BACLUM(IL) = BACLUM(IL) + VTMULT * ZoneDaylight(ZoneNum)%BackLumFromWinAtMapPt(IL,IS,loop)
-        END DO
+        ! Conversion from ft-L to cd/m2, with cd/m2 = 0.2936 ft-L, gives the 0.4794 factor
+        ! below, which is (0.2936)**0.6
+        GTOT1  = 0.4794d0*((VTMULT * IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(IL,IS,loop))**1.6d0) *   &
+                        IllumMapCalc(MapNum)%SolidAngAtMapPtWtd(IL,loop)**0.8d0
+        GTOT2  = BACLUM(IL) + 0.07d0 * (IllumMapCalc(MapNum)%SolidAngAtMapPt(IL,loop)**0.5d0) *  &
+                        VTMULT * IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(IL,IS,loop)
+        GTOT = GTOT + GTOT1 / (GTOT2 + 0.000001d0)
+      END DO
 
-      END DO  ! End of second window loop
-
-!              Calculate glare index at each reference point
-      DO IL = REFPT1,NREFPT
-!        Following code taken directly from DayltgGlare ... duplicate calculation
-         ! Initialize glare constant
-        GTOT = 0.0d0
-
-        ! Loop over exterior windows associated with zone
-        DO loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
-          IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
-          IS = 1
-          IF((SurfaceWindow(IWin)%ShadingFlag >= 1 .AND. SurfaceWindow(IWin)%ShadingFlag <= 9) .OR. &
-              SurfaceWindow(IWin)%SolarDiffusing) IS = 2
-
-          ! CR 8057. 3/17/2010
-          VTMULT = 1.0d0
-
-          ICtrl = Surface(IWin)%WindowShadingControlPtr
-          IF(ICtrl > 0) THEN
-            IF (WindowShadingControl(ICtrl)%ShadingControlType == WSCT_MeetDaylIlumSetp .AND. &
-                SurfaceWindow(IWin)%ShadingFlag == SwitchableGlazing) THEN
-              ! switchable windows in partial or fully switched state,
-              !  get its intermediate VT calculated in DayltgInteriorIllum
-              IConstShaded = Surface(IWin)%ShadedConstruction
-              IF (IConstShaded > 0) VTDark = POLYF(1.0d0,Construct(IConstShaded)%TransVisBeamCoef(1))* &
-                                             SurfaceWindow(IWin)%GlazedFrac
-              IF (VTDark > 0) VTMULT = SurfaceWindow(IWin)%VisTransSelected / VTDark
-            ENDIF
-          ENDIF
-
-          ! Conversion from ft-L to cd/m2, with cd/m2 = 0.2936 ft-L, gives the 0.4794 factor
-          ! below, which is (0.2936)**0.6
-          GTOT1  = 0.4794d0*((VTMULT * ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(IL,IS,loop))**1.6d0) *   &
-                          ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd(IL,loop)**0.8d0
-          GTOT2  = BACLUM(IL) + 0.07d0 * (ZoneDaylight(ZoneNum)%SolidAngAtMapPt(IL,loop)**0.5d0) *  &
-                          VTMULT * ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(IL,IS,loop)
-          GTOT = GTOT + GTOT1 / (GTOT2 + 0.000001d0)
-        END DO
-
-        ! Glare index (adding 0.000001 prevents LOG10 (0))
-        GLRNDX(IL) = 10.0d0*LOG10(GTOT+0.000001d0)
-        ! Set glare index to zero for GTOT < 1
-        GLRNDX(IL) = MAX(0.0d0, GLRNDX(IL))
-      ENDDO
+      ! Glare index (adding 0.000001 prevents LOG10 (0))
+      GLRNDX(IL) = 10.0d0*LOG10(GTOT+0.000001d0)
+      ! Set glare index to zero for GTOT < 1
+      GLRNDX(IL) = MAX(0.0d0, GLRNDX(IL))
+    ENDDO
 
 !              Variables for reporting
-      DO IL = REFPT1,NREFPT
-        ZoneDaylight(ZoneNum)%DaylIllumAtMapPt(IL)  = DaylIllum(IL)
-        ZoneDaylight(ZoneNum)%GlareIndexAtMapPt(IL) = GLRNDX(IL)
-      ENDDO
+    DO IL = 1,NREFPT
+      IllumMapCalc(MapNum)%DaylIllumAtMapPt(IL)  = DaylIllum(IL)
+      IllumMapCalc(MapNum)%GlareIndexAtMapPt(IL) = GLRNDX(IL)
+    ENDDO
+  ENDDO
 
+  RETURN
 
-      RETURN
 END SUBROUTINE DayltgInteriorMapIllum
 
 
@@ -7274,18 +8679,18 @@ SUBROUTINE ReportIllumMap(MapNum)
   INTEGER             :: RefPt
   INTEGER             :: X, Y
   INTEGER             :: R
-  REAL(r64)           :: NumOut
+!  REAL(r64)           :: NumOut
   INTEGER             :: IllumOut
 
   LOGICAL, SAVE       :: FirstTime = .TRUE.
   LOGICAL, SAVE, ALLOCATABLE, DIMENSION(:) :: FirstTimeMaps
   LOGICAL, SAVE, ALLOCATABLE, DIMENSION(:) :: EnvrnPrint
-  CHARACTER(len=5), SAVE, ALLOCATABLE, DIMENSION(:) :: SavedMnDy
-  CHARACTER(len=50), ALLOCATABLE, DIMENSION(:,:), SAVE :: RefPts
+  CHARACTER(len=8), SAVE, ALLOCATABLE, DIMENSION(:) :: SavedMnDy
+  CHARACTER(len=52), ALLOCATABLE, DIMENSION(:,:), SAVE :: RefPts
   CHARACTER(len=15) MapNoString
-  CHARACTER(len=2) HrString
+  CHARACTER(len=4) HrString
   INTEGER linelen
-  CHARACTER(len=50) AddXorYString
+  CHARACTER(len=52) AddXorYString
 ! BSLLC Start
   REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: XValue
   REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: YValue
@@ -7314,8 +8719,7 @@ SUBROUTINE ReportIllumMap(MapNum)
 
     FirstTimeMaps(MapNum)=.false.
     IllumMap(MapNum)%UnitNo=GetNewUnitNumber()
-    WRITE(MapNoString,*) MapNum
-    MapNoString=ADJUSTL(MapNoString)
+    MapNoString=RoundSigDigits(MapNum)
     IF (MapColSep == CharTab) THEN
       OPEN(UNIT=IllumMap(MapNum)%UnitNo,FILE='eplusmap.tab'//TRIM(MapNoString),STATUS='UNKNOWN',ACTION='readwrite',ERR=901)
       CommaDelimited=.false.
@@ -7332,8 +8736,7 @@ SUBROUTINE ReportIllumMap(MapNum)
     IllumMap(MapNum)%Name=trim(IllumMap(MapNum)%Name)//' at '//trim(RoundSigDigits(IllumMap(MapNum)%Z,2))//'m'
 
     DO R=1,ZoneDaylight(IllumMap(MapNum)%Zone)%TotalDaylRefPoints
-      WRITE(String,*) R
-      String=ADJUSTL(String)
+      String=RoundSigDigits(R)
       RefPts(R,IllumMap(MapNum)%Zone)='RefPt'//TRIM(String)//'=('
       String=RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%DaylRefPtAbsCoord(R,1),2)
       RefPts(R,IllumMap(MapNum)%Zone)=TRIM(RefPts(R,IllumMap(MapNum)%Zone))//TRIM(String)//':'
@@ -7342,18 +8745,15 @@ SUBROUTINE ReportIllumMap(MapNum)
       String=RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%DaylRefPtAbsCoord(R,3),2)
       RefPts(R,IllumMap(MapNum)%Zone)=TRIM(RefPts(R,IllumMap(MapNum)%Zone))//TRIM(String)//')'
     ENDDO
-    ! could have multiple maps for the same zone!!!
   END IF
   IF (SavedMnDy(MapNum) /= CurMnDyHr(1:5)) THEN
     EnvrnPrint(MapNum)=.true.
     SavedMnDy(MapNum)=CurMnDyHr(1:5)
   ENDIF
   IF (EnvrnPrint(MapNum)) THEN
-! BSLLC Start
     CALL WriteDaylightMapTitle (MapNum, IllumMap(MapNum)%UnitNo, IllumMap(MapNum)%Name, &
         EnvironmentName, IllumMap(MapNum)%Zone, RefPts(1,IllumMap(MapNum)%Zone), &
         RefPts(2,IllumMap(MapNum)%Zone),IllumMap(MapNum)%Z)
-! BSLLC Finish
     EnvrnPrint(MapNum)=.false.
   ENDIF
 
@@ -7368,8 +8768,8 @@ SUBROUTINE ReportIllumMap(MapNum)
       RefPt=1
       DO X = 1, IllumMap(MapNum)%Xnum
          AddXorYString=MapColSep//'('//  &
-           trim(RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%MapRefPtAbsCoord(RefPt,1),2))//';'//  &
-           trim(RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%MapRefPtAbsCoord(RefPt,2),2))//')='
+           trim(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1),2))//';'//  &
+           trim(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2),2))//')='
          IF (IllumMap(MapNum)%HeaderXLineLengthNeeded) &
            linelen=linelen+len_trim(AddXorYString)
          mapLine = TRIM(mapLine)//AddXorYString
@@ -7393,17 +8793,17 @@ SUBROUTINE ReportIllumMap(MapNum)
       ! Write Y scale prefix and illuminance values
       RefPt = 1
       DO Y = 1, IllumMap(MapNum)%Ynum
-        mapLine='('//trim(RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%MapRefPtAbsCoord(RefPt,1),2))//';'//  &
-             trim(RoundSigDigits(ZoneDaylight(IllumMap(MapNum)%Zone)%MapRefPtAbsCoord(RefPt,2),2))//')='
+        mapLine='('//trim(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,1),2))//';'//  &
+             trim(RoundSigDigits(IllumMapCalc(MapNum)%MapRefPtAbsCoord(RefPt,2),2))//')='
         DO R=RefPt,RefPt+IllumMap(MapNum)%Xnum-1
-          IllumOut=NINT(ZoneDaylight(IllumMap(MapNum)%Zone)%DaylIllumAtMapPtHr(R))
-          IF (ZoneDayLight(IllumMap(MapNum)%Zone)%MapRefPtInBounds(R)) THEN
-            WRITE(String,*) IllumOut
+          IllumOut=NINT(IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(R))
+          IF (IllumMapCalc(MapNum)%MapRefPtInBounds(R)) THEN
+            String=RoundSigDigits(IllumOut)
           ELSE
-            WRITE(String,*) IllumOut
-            String='*'//ADJUSTL(String)
+            String=RoundSigDigits(IllumOut)
+            String='*'//String
           ENDIF
-          mapLine=TRIM(mapLine)//MapColSep//ADJUSTL(String)
+          mapLine=TRIM(mapLine)//MapColSep//String
         ENDDO
 
         WRITE(IllumMap(MapNum)%UnitNo,FmtA) TRIM(mapLine)
@@ -7427,8 +8827,8 @@ SUBROUTINE ReportIllumMap(MapNum)
             DO X = 1, IllumMap(MapNum)%Xnum
                 XValue(X) = IllumMap(MapNum)%Xmin + (X - 1)*IllumMap(MapNum)%Xinc
                 IllumIndex = X + (Y - 1)*IllumMap(MapNum)%Xnum
-                IllumValue(X,Y) = NINT(ZoneDaylight(IllumMap(MapNum)%Zone)%DaylIllumAtMapPtHr(IllumIndex))
-                IF (.NOT. ZoneDayLight(IllumMap(MapNum)%Zone)%MapRefPtInBounds(IllumIndex)) THEN
+                IllumValue(X,Y) = NINT(IllumMapCalc(MapNum)%DaylIllumAtMapPtHr(IllumIndex))
+                IF (.NOT. IllumMapCalc(MapNum)%MapRefPtInBounds(IllumIndex)) THEN
                     IllumValue(X,Y) = -IllumValue(X,Y)
                 ENDIF
             END DO ! X Loop
@@ -7658,6 +9058,7 @@ SUBROUTINE DayltgSetupAdjZoneListsAndPointers
   INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneExtWin
   INTEGER  :: Winsize
   INTEGER  :: Refsize
+  INTEGER  :: MapNum
 
           ! FLOW:
 ! Count number of exterior Windows (use to allocate arrays)
@@ -7855,19 +9256,23 @@ DO ZoneNum = 1,NumOfZones
     ALLOCATE(ZoneDaylight(ZoneNum)%SourceLumFromWinAtRefPt(ZoneDaylight(ZoneNum)%TotalDaylRefPoints,2,ZoneExtWin(ZoneNum)))
     ZoneDaylight(ZoneNum)%SourceLumFromWinAtRefPt=0.0
 
-    IF (ZoneDaylight(ZoneNum)%TotalMapRefPoints > 0) THEN
-      ! might be able to use TotalMapRefPoints for zone in below.
-      ALLOCATE(ZoneDaylight(ZoneNum)%SolidAngAtMapPt(ZoneDaylight(ZoneNum)%TotalMapRefPoints,ZoneExtWin(ZoneNum)))
-      ZoneDaylight(ZoneNum)%SolidAngAtMapPt=0.0
-      ALLOCATE(ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd(ZoneDaylight(ZoneNum)%TotalMapRefPoints,ZoneExtWin(ZoneNum)))
-      ZoneDaylight(ZoneNum)%SolidAngAtMapPtWtd=0.0
-      ALLOCATE(ZoneDaylight(ZoneNum)%IllumFromWinAtMapPt(ZoneDaylight(ZoneNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
-      ZoneDaylight(ZoneNum)%IllumFromWinAtMapPt=0.0
-      ALLOCATE(ZoneDaylight(ZoneNum)%BackLumFromWinAtMapPt(ZoneDaylight(ZoneNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
-      ZoneDaylight(ZoneNum)%BackLumFromWinAtMapPt=0.0
-      ALLOCATE(ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt(ZoneDaylight(ZoneNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
-      ZoneDaylight(ZoneNum)%SourceLumFromWinAtMapPt=0.0
-    ENDIF
+    DO Loop=1,ZoneDaylight(ZoneNum)%MapCount
+      MapNum=ZoneDaylight(ZoneNum)%ZoneToMap(Loop)
+
+      IF (IllumMapCalc(MapNum)%TotalMapRefPoints > 0) THEN
+        ! might be able to use TotalMapRefPoints for zone in below.
+        ALLOCATE(IllumMapCalc(MapNum)%SolidAngAtMapPt(IllumMapCalc(MapNum)%TotalMapRefPoints,ZoneExtWin(ZoneNum)))
+        IllumMapCalc(MapNum)%SolidAngAtMapPt=0.0
+        ALLOCATE(IllumMapCalc(MapNum)%SolidAngAtMapPtWtd(IllumMapCalc(MapNum)%TotalMapRefPoints,ZoneExtWin(ZoneNum)))
+        IllumMapCalc(MapNum)%SolidAngAtMapPtWtd=0.0
+        ALLOCATE(IllumMapCalc(MapNum)%IllumFromWinAtMapPt(IllumMapCalc(MapNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
+        IllumMapCalc(MapNum)%IllumFromWinAtMapPt=0.0
+        ALLOCATE(IllumMapCalc(MapNum)%BackLumFromWinAtMapPt(IllumMapCalc(MapNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
+        IllumMapCalc(MapNum)%BackLumFromWinAtMapPt=0.0
+        ALLOCATE(IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt(IllumMapCalc(MapNum)%TotalMapRefPoints,2,ZoneExtWin(ZoneNum)))
+        IllumMapCalc(MapNum)%SourceLumFromWinAtMapPt=0.0
+      ENDIF
+    ENDDO
 
     ZoneExtWinCtr = 0
 
@@ -7918,7 +9323,7 @@ DO ZoneNum = 1,NumOfZones
 
     ZoneDaylight(ZoneNum)%NumOfDayltgExtWins = ZoneExtWin(ZoneNum)
     WinSize=ZoneExtWin(ZoneNum)
-    RefSize=2+ZoneDaylight(ZoneNum)%TotalMapRefPoints
+    RefSize=2
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylIllFacSky         (WinSize,RefSize,4,MaxSlatAngs+1,24))
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylSourceFacSky      (WinSize,RefSize,4,MaxSlatAngs+1,24))
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylBackFacSky        (WinSize,RefSize,4,MaxSlatAngs+1,24))
@@ -7928,6 +9333,20 @@ DO ZoneNum = 1,NumOfZones
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylSourceFacSunDisk  (WinSize,RefSize,MaxSlatAngs+1,24))
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylBackFacSun        (WinSize,RefSize,MaxSlatAngs+1,24))
     ALLOCATE(ZoneDaylight(ZoneNum)%DaylBackFacSunDisk    (WinSize,RefSize,MaxSlatAngs+1,24))
+
+    DO Loop=1,ZoneDaylight(ZoneNum)%MapCount
+      MapNum=ZoneDaylight(ZoneNum)%ZoneToMap(Loop)
+      RefSize=IllumMapCalc(MapNum)%TotalMapRefPoints
+      ALLOCATE(IllumMapCalc(MapNum)%DaylIllFacSky         (WinSize,RefSize,4,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylSourceFacSky      (WinSize,RefSize,4,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylBackFacSky        (WinSize,RefSize,4,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylIllFacSun         (WinSize,RefSize,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylIllFacSunDisk     (WinSize,RefSize,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylSourceFacSun      (WinSize,RefSize,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylSourceFacSunDisk  (WinSize,RefSize,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylBackFacSun        (WinSize,RefSize,MaxSlatAngs+1,24))
+      ALLOCATE(IllumMapCalc(MapNum)%DaylBackFacSunDisk    (WinSize,RefSize,MaxSlatAngs+1,24))
+    ENDDO
 
   END IF  ! End of check if a Daylighting:Detailed zone
 END DO  ! End of primary zone loop
@@ -8240,8 +9659,7 @@ SUBROUTINE CheckForGeometricTransform(DoTransform,OldAspectRatio,NewAspectRatio)
 
 END SUBROUTINE CheckForGeometricTransform
 
-! BSLLC Start
-SUBROUTINE WriteDaylightMapTitle (mapNum, unitNo, mapName, environmentName, zone, refPt1, refPt2, zcoord)
+SUBROUTINE WriteDaylightMapTitle (mapNum, unitNo, mapName, environmentName, zonenum, refPt1, refPt2, zcoord)
     ! SUBROUTINE INFORMATION:
     !       AUTHOR         Greg Stark
     !       DATE WRITTEN   Sept 2008
@@ -8268,7 +9686,7 @@ SUBROUTINE WriteDaylightMapTitle (mapNum, unitNo, mapName, environmentName, zone
     INTEGER, INTENT(IN) :: unitNo
     CHARACTER(len=*), INTENT(IN) :: mapName
     CHARACTER(len=*), INTENT(IN) :: environmentName
-    INTEGER, INTENT(IN) :: zone
+    INTEGER, INTENT(IN) :: zonenum
     REAL(r64), INTENT(IN) :: zcoord
     CHARACTER(len=*), INTENT(IN) :: refPt1
     CHARACTER(len=*), INTENT(IN) :: refPt2
@@ -8283,25 +9701,25 @@ SUBROUTINE WriteDaylightMapTitle (mapNum, unitNo, mapName, environmentName, zone
     ! na
 
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-    ! na
+    CHARACTER(len=300) :: fullmapName  ! for output to map units as well as SQL
 
     ! must add correct number of commas at end
-    WRITE(unitNo, FmtA) 'Date/Time,'//TRIM(environmentName)//':'//TRIM(mapName)//   &
-        ':Illuminance [lux] (Hourly)'//MapColSep//TRIM(refPt1)//MapColSep// &
+    fullmapName=trim(Zone(zonenum)%Name)//':'//TRIM(environmentName)//':'//TRIM(mapName)//   &
+        ' Illuminance [lux] (Hourly)'
+    WRITE(unitNo, FmtA) 'Date/Time,'//trim(fullmapName)//MapColSep//TRIM(refPt1)//MapColSep// &
         TRIM(refPt2)//MapColSep//MapColSep
 
     IF (WriteOutputToSQLite) THEN
-        CALL CreateSQLiteDaylightMapTitle (mapNum, mapName, environmentName, zone, refPt1, refPt2, zcoord)
+        CALL CreateSQLiteDaylightMapTitle (mapNum, fullmapName, environmentName, zonenum, refPt1, refPt2, zcoord)
     END IF
 
 RETURN
 
 END SUBROUTINE WriteDaylightMapTitle
-! BSLLC Finish
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

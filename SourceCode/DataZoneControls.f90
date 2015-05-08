@@ -105,18 +105,18 @@ PUBLIC ! Everything private unless explicitly made public
     CHARACTER(len=MaxNameLength), DIMENSION(:), ALLOCATABLE :: ControlType     ! Type of control
     CHARACTER(len=MaxNameLength), DIMENSION(:), ALLOCATABLE :: ControlTypeName ! Name of control type
     INTEGER, DIMENSION(:), ALLOCATABLE :: ControlTypeSchIndx  ! Index to control type schedule
-    INTEGER :: SchIndx_SglHeatSetPointFanger             =0   ! Index to fanger single heating set point schedule
-    INTEGER :: SchIndx_SglCoolSetPointFanger             =0   ! Index to fanger single cooling set point schedule
-    INTEGER :: SchIndx_SglHCSetPointFanger               =0   ! Index to fanger single heating/cooling set point schedule
-    INTEGER :: SchIndx_DualSetPointFanger                =0   ! Index to fanger dual set point schedule
-    INTEGER :: SchIndx_SglHeatSetPointPierce             =0   ! Index to pierce single heating set point schedule
-    INTEGER :: SchIndx_SglCoolSetPointPierce             =0   ! Index to pierce single cooling set point schedule
-    INTEGER :: SchIndx_SglHCSetPointPierce               =0   ! Index to pierce single heating/cooling set point schedule
-    INTEGER :: SchIndx_DualSetPointPierce                =0   ! Index to pierce dual set point schedule
-    INTEGER :: SchIndx_SglHeatSetPointKSU                =0   ! Index to KSU single heating set point schedule
-    INTEGER :: SchIndx_SglCoolSetPointKSU                =0   ! Index to KSU single cooling set point schedule
-    INTEGER :: SchIndx_SglHCSetPointKSU                  =0   ! Index to KSU single heating/cooling set point schedule
-    INTEGER :: SchIndx_DualSetPointKSU                   =0   ! Index to KSU dual set point schedule
+    INTEGER :: SchIndx_SglHeatSetPointFanger             =0   ! Index to fanger single heating setpoint schedule
+    INTEGER :: SchIndx_SglCoolSetPointFanger             =0   ! Index to fanger single cooling setpoint schedule
+    INTEGER :: SchIndx_SglHCSetPointFanger               =0   ! Index to fanger single heating/cooling setpoint schedule
+    INTEGER :: SchIndx_DualSetPointFanger                =0   ! Index to fanger dual setpoint schedule
+    INTEGER :: SchIndx_SglHeatSetPointPierce             =0   ! Index to pierce single heating setpoint schedule
+    INTEGER :: SchIndx_SglCoolSetPointPierce             =0   ! Index to pierce single cooling setpoint schedule
+    INTEGER :: SchIndx_SglHCSetPointPierce               =0   ! Index to pierce single heating/cooling setpoint schedule
+    INTEGER :: SchIndx_DualSetPointPierce                =0   ! Index to pierce dual setpoint schedule
+    INTEGER :: SchIndx_SglHeatSetPointKSU                =0   ! Index to KSU single heating setpoint schedule
+    INTEGER :: SchIndx_SglCoolSetPointKSU                =0   ! Index to KSU single cooling setpoint schedule
+    INTEGER :: SchIndx_SglHCSetPointKSU                  =0   ! Index to KSU single heating/cooling setpoint schedule
+    INTEGER :: SchIndx_DualSetPointKSU                   =0   ! Index to KSU dual setpoint schedule
 
 
     LOGICAL :: ManageDemand                          =.FALSE. ! Flag to indicate whether to use demand limiting
@@ -169,7 +169,7 @@ PUBLIC ! Everything private unless explicitly made public
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

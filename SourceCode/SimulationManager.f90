@@ -1,3 +1,15 @@
+#include "Timer.h"
+
+! HBIRE_USE_OMP defined, then openMP instructions are used.  Compiler may have to have switch for openmp
+! HBIRE_NO_OMP defined, then old code is used without any openmp instructions
+! HBIRE - loop in HeatBalanceIntRadExchange.f90
+
+#ifdef HBIRE_USE_OMP
+#undef HBIRE_NO_OMP
+#else
+#define HBIRE_NO_OMP
+#endif
+
 MODULE SimulationManager        ! EnergyPlus Simulation Module
 
           ! MODULE INFORMATION:
@@ -112,6 +124,9 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   USE DemandManager,       ONLY: InitDemandManagers
   USE PlantManager,        ONLY: CheckIfAnyPlant
   USE CurveManager,        ONLY: InitCurveReporting
+  USE DataTimings
+  USE DataSystemVariables, ONLY: DeveloperFlag, TimingFlag
+  USE SetPointManager,     ONLY: CheckIFAnyIdealCondEntSetPoint
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -130,9 +145,14 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   LOGICAL, SAVE :: TerminalError = .FALSE.
   LOGICAL       :: SimsDone
   LOGICAL       :: ErrFound
+!  real(r64) :: t0,t1,st0,st1
+
+!  CHARACTER(len=70) :: tdstring
+!  CHARACTER(len=138) :: tdstringlong
+
+  INTEGER :: EnvCount
 
           ! FLOW:
-
   CALL PostIPProcessing
 
   BeginSimFlag = .TRUE.
@@ -140,25 +160,28 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   DoOutputReporting = .FALSE.
   DisplayPerfSimulationFlag=.false.
   DoWeatherInitReporting=.false.
-  RunPeriodsInInput=GetNumObjectsFound('RunPeriod')>0
+  RunPeriodsInInput=(GetNumObjectsFound('RunPeriod')>0 .or. GetNumObjectsFound('RunPeriod:CustomRange')>0)
   AskForConnectionsReport=.false.    ! set to false until sizing is finished
 
   CALL OpenOutputFiles
-!  CALL CreateSQLiteDatabase
+  CALL CheckThreading
   CALL GetProjectData
   CALL CheckForMisMatchedEnvironmentSpecifications
   CALL CheckForRequestedReporting
   CALL SetPredefinedTables
+
   CALL SetupTimePointers('Zone',TimeStepZone)  ! Set up Time pointer for HB/Zone Simulation
   Call SetupTimePointers('HVAC',TimeStepSys)
 
   CALL CheckIFAnyEMS
   CALL CheckIFAnyPlant
 
-  CALL ManageBranchInput  ! just gets input and returns.
+  CALL CheckIFAnyIdealCondEntSetPoint
 
+  CALL ManageBranchInput  ! just gets input and returns.
   DoingSizing = .TRUE.
   CALL ManageSizing
+
   BeginFullSimFlag = .TRUE.
   SimsDone=.false.
   IF (DoDesDaySim .OR. DoWeathSim) THEN
@@ -185,11 +208,13 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   WarmupFlag=.false.
   DoWeatherInitReporting=.true.
 
-!  Note:  All the inputs have been "gotten" by the time we get here.
+!  Note:  All the inputs have been 'gotten' by the time we get here.
   ErrFound=.false.
   IF (DoOutputReporting) THEN
     CALL DisplayString('Reporting Surfaces')
+
     CALL ReportSurfaces
+
     CALL SetupNodeVarsForReporting
     MetersHaveBeenInitialized=.true.
     CALL SetupPollutionMeterReporting
@@ -236,6 +261,10 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   CALL ShowMessage('Beginning Simulation')
   CALL ResetEnvironmentCounter
 
+
+  EnvCount=0
+  WarmupFlag=.true.
+
   DO WHILE (Available)
 
     CALL GetNextEnvironment(Available,ErrorsFound)
@@ -245,6 +274,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     IF ( (.NOT. DoDesDaySim) .AND. (KindOfSim /= ksRunPeriodWeather) ) CYCLE
     IF ( (.NOT. DoWeathSim) .AND. (KindOfSim == ksRunPeriodWeather)) CYCLE
 
+    EnvCount=EnvCount+1
     IF (WriteOutputToSQLite) CALL CreateSQLiteEnvironmentPeriodRecord()
 
     ExitDuringSimulations=.true.
@@ -321,7 +351,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
 
           CALL ManageHeatBalance
 
-          !  After the first iteration of HeatBalance, all the "input" has been gotten
+          !  After the first iteration of HeatBalance, all the 'input' has been gotten
           IF (BeginFullSimFlag) THEN
             IF (GetNumRangeCheckErrorsFound() > 0) THEN
               CALL ShowFatalError('Out of "range" values found in input')
@@ -345,6 +375,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
 
     ! Need one last call to send latest states to middleware
     CALL ExternalInterfaceExchangeVariables
+
   END DO                        ! ... End environment loop.
 
   WarmupFlag=.false.
@@ -362,20 +393,33 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     ENDIF
   ENDIF
 
+#ifdef EP_Detailed_Timings
+                             CALL epStartTime('Closeout Reporting=')
+#endif
   CALL SimCostEstimate
-  CALL ComputeTariff          !     Compute the utility bills
-  CALL GetInputForLifeCycleCost !must be prior to WriteTabularReports
-  CALL OpenOutputTabularFile
-  CALL WriteTabularReports    !     Create the tabular reports at completion of each
-  CALL WriteTabularTariffReports
-  CALL ComputeLifeCycleCostAndReport !must be after WriteTabularReports and WriteTabularTariffReports
-  CALL CloseOutputTabularFile
-  CALL CloseOutputFiles
-  CALL DumpAirLoopStatistics        ! Dump runtime statistics for air loop controller simulation to cvs file
 
-! BSLLC Start
+  CALL ComputeTariff          !     Compute the utility bills
+
+  CALL GetInputForLifeCycleCost !must be prior to WriteTabularReports
+
+  CALL OpenOutputTabularFile
+
+  CALL WriteTabularReports    !     Create the tabular reports at completion of each
+
+  CALL WriteTabularTariffReports
+
+  CALL ComputeLifeCycleCostAndReport !must be after WriteTabularReports and WriteTabularTariffReports
+
+  CALL CloseOutputTabularFile
+
+  CALL DumpAirLoopStatistics        ! Dump runtime statistics for air loop controller simulation to csv file
+
+#ifdef EP_Detailed_Timings
+                             CALL epStopTime('Closeout Reporting=')
+#endif
+  CALL CloseOutputFiles
+
   CALL CreateZoneExtendedOutput
-! BSLLC Finished
 
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Error condition occurred.  Previous Severe Errors cause termination.')
@@ -422,7 +466,7 @@ SUBROUTINE GetProjectData
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER, PARAMETER, DIMENSION(12) :: Div60=(/1,2,3,4,5,6,10,12,15,20,30,60/)
   CHARACTER(len=*), PARAMETER :: Blank=' '
-  CHARACTER(len=*), PARAMETER :: fmtA="(A)"
+  CHARACTER(len=*), PARAMETER :: fmtA='(A)'
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -443,16 +487,15 @@ SUBROUTINE GetProjectData
   INTEGER :: NumA
   INTEGER :: NumRunControl
   CHARACTER(len=20) :: VersionID=' '
-!  CHARACTER(len=3) :: NumOut1
-!  CHARACTER(len=3) :: NumOut2
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject
+  LOGICAL :: CondFDAlgo
 
   ErrorsFound=.false.
 
   CurrentModuleObject='Version'
   Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
   IF (Num == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     Num1=LEN_TRIM(MatchVersion)
@@ -473,6 +516,22 @@ SUBROUTINE GetProjectData
     CALL ShowSevereError('Too many '//TRIM(CurrentModuleObject)//' Objects found.')
     ErrorsFound=.true.
   ENDIF
+
+  ! Do Mini Get on HB Algorithm
+   CurrentModuleObject='HeatBalanceAlgorithm'
+   Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   CondFDAlgo=.false.
+   IF (Num > 0) THEN
+     CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+     SELECT CASE (Alphas(1))
+       CASE ('CONDUCTIONFINITEDIFFERENCE','CONDFD','CONDUCTIONFINITEDIFFERENCEDETAILED','CONDUCTIONFINITEDIFFERENCESIMPLIFIED')
+         CondFDAlgo=.true.
+
+       CASE DEFAULT
+     END SELECT
+   ENDIF
 
   CurrentModuleObject='Timestep'
   Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
@@ -496,17 +555,29 @@ SUBROUTINE GetProjectData
          ') not evenly divisible into 60, '//'defaulted to nearest ('//TRIM(RoundSigDigits(Div60(Which)))//').')
       NumOfTimeStepInHour=Div60(Which)
     ENDIF
+    IF (CondFDAlgo .and. NumOfTimeStepInHour < 20) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//': Requested number ('//TRIM(RoundSigDigits(NumOfTimeStepInHour))//  &
+         ') cannot be used when Conduction Finite Difference algorithm is selected.')
+      CALL ShowContinueError('...'//trim(CurrentModuleObject)//' is set to 20.')
+      NumOfTimeStepInHour=20
+    ENDIF
     IF (NumOfTimeStepInHour < 4 .and. GetNumObjectsFound('Zone') > 0) THEN
       CALL ShowWarningError(TRIM(CurrentModuleObject)//': Requested number ('//TRIM(RoundSigDigits(NumOfTimeStepInHour))//  &
          ') is less than the suggested minimum of 4.')
       CALL ShowContinueError('Please see entry for '//TRIM(CurrentModuleObject)//  &
          ' in Input/Output Reference for discussion of considerations.')
     ENDIF
-  ELSEIF (Num == 0 .and. GetNumObjectsFound('Zone') > 0) THEN
+  ELSEIF (Num == 0 .and. GetNumObjectsFound('Zone') > 0 .and. .not. CondFDAlgo) THEN
     CALL ShowWarningError('No '//TRIM(CurrentModuleObject)//' object found.  Number of TimeSteps in Hour defaulted to 4.')
     NumOfTimeStepInHour=4
-  ELSEIF (Num == 0) THEN
+  ELSEIF (Num == 0 .and. .not. CondFDAlgo) THEN
     NumOfTimeStepInHour=4
+  ELSEIF (Num == 0 .and. GetNumObjectsFound('Zone') > 0 .and. CondFDAlgo) THEN
+    CALL ShowWarningError('No '//TRIM(CurrentModuleObject)//' object found.  Number of TimeSteps in Hour defaulted to 20.')
+    CALL ShowContinueError('...Due to presence of Conduction Finite Difference Algorithm selection.')
+    NumOfTimeStepInHour=20
+  ELSEIF (Num == 0 .and. CondFDAlgo) THEN
+    NumOfTimeStepInHour=20
   ELSE
     CALL ShowSevereError('Too many '//TRIM(CurrentModuleObject)//' Objects found.')
     ErrorsFound=.true.
@@ -610,14 +681,18 @@ SUBROUTINE GetProjectData
         IgnoreDiffuseRadiation=.true.
       ELSEIF (SameString(Alphas(NumA),'DeveloperFlag')) THEN
         DeveloperFlag=.true.
+      ELSEIF (SameString(Alphas(NumA),'TimingFlag')) THEN
+        TimingFlag=.true.
+      ELSEIF (SameString(Alphas(NumA),'ReportDetailedWarmupConvergence')) THEN
+        ReportDetailedWarmupConvergence=.true.
       ELSEIF (SameString(Alphas(NumA),'CreateMinimalSurfaceVariables')) THEN
         CYCLE
 !        CreateMinimalSurfaceVariables=.true.
       ELSEIF (SameString(Alphas(NumA),'CreateNormalSurfaceVariables')) THEN
         CYCLE
 !        IF (CreateMinimalSurfaceVariables) THEN
-!          CALL ShowWarningError('GetProjectData: '//trim(CurrentModuleObject)//'="'//  &
-!             TRIM(Alphas(NumA))//'", prior set=true for this condition reverts to false.')
+!          CALL ShowWarningError('GetProjectData: '//trim(CurrentModuleObject)//'=''//  &
+!             TRIM(Alphas(NumA))//'', prior set=true for this condition reverts to false.')
 !        ENDIF
 !        CreateMinimalSurfaceVariables=.false.
       ELSEIF (Alphas(NumA) /= Blank) THEN
@@ -867,7 +942,7 @@ SUBROUTINE CheckForMisMatchedEnvironmentSpecifications
   ENDIF
   IF (.not. DoDesDaySim .and. .not. DoWeathSim) THEN
     CALL ShowWarningError('"Do the design day simulations" and "Do the weather file simulation"'// &
-           ' are both set to "No".  No simulations will be performed, and most input will not be read."')
+           ' are both set to "No".  No simulations will be performed, and most input will not be read.')
   ENDIF
   IF (.not. DoZoneSizing .and. .not. DoSystemSizing .and. .not. DoPlantSizing .and.  &
       .not. DoDesDaySim .and. .not. DoWeathSim) THEN
@@ -1060,6 +1135,7 @@ SUBROUTINE CloseOutputFiles
   USE DataBranchNodeConnections, ONLY: NumOfNodeConnections, MaxNumOfNodeConnections
   USE DataHeatBalance, ONLY: CondFDRelaxFactor, SolutionAlgo, UseCondFD, CondFDRelaxFactorInput
   USE General, ONLY: RoundSigDigits
+  USE DataSystemVariables !, ONLY: MaxNumberOfThreads,NumberIntRadThreads,iEnvSetThreads
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1067,7 +1143,12 @@ SUBROUTINE CloseOutputFiles
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  CHARACTER(len=*), PARAMETER :: EndOfDataFormat = "('End of Data')"  ! Signifies the end of the data block in the output file
+  CHARACTER(len=*), PARAMETER :: EndOfDataFormat = '("End of Data")'  ! Signifies the end of the data block in the output file
+  CHARACTER(len=*), PARAMETER :: ThreadingHeader = '! <Program Control Information:Threads/Parallel Sims>, '//  &
+          'Threading Supported,Maximum Number of Threads, Env Set Threads (OMP_NUM_THREADS), '//  &
+          'EP Env Set Threads (EP_OMP_NUM_THREADS). IDF Set Threads, Number of Threads Used (Interior Radiant Exchange), '//  &
+          'Number NominalSurface, Number Parallel Sims'
+  CHARACTER(len=*), PARAMETER :: fmtA='(A)'
 
 
           ! INTERFACE BLOCK SPECIFICATIONS:
@@ -1078,7 +1159,7 @@ SUBROUTINE CloseOutputFiles
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   CHARACTER(len=20) DebugPosition
-  INTEGER EchoInputFile  ! found unit number for "eplusout.audit"
+  INTEGER EchoInputFile  ! found unit number for 'eplusout.audit'
   INTEGER, EXTERNAL :: FindUnitNumber
 
   EchoInputFile=FindUnitNumber('eplusout.audit')
@@ -1127,6 +1208,44 @@ SUBROUTINE CloseOutputFiles
                                       TRIM(RoundSigDigits(CondFDRelaxFactorInput,3)) // ', '// &
                                       TRIM(RoundSigDigits(CondFDRelaxFactor,3))
   ENDIF
+  ! Report number of threads to eio file
+  IF (Threading) THEN
+    IF (lnumActiveSims) THEN
+      Write(OutputFileInits,fmtA) ThreadingHeader
+      Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, Yes,'// &
+                                        TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iEnvSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iepEnvSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iIDFSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(NumberIntRadThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iNominalTotSurfaces)) // ', '// &
+                                        TRIM(RoundSigDigits(inumActiveSims))
+    ELSE
+      Write(OutputFileInits,fmtA) ThreadingHeader
+      Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, Yes,'// &
+                                        TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iEnvSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iepEnvSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iIDFSetThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iNominalTotSurfaces)) // ', '// &
+                                        TRIM(RoundSigDigits(NumberIntRadThreads)) // ', '// &
+                                        'N/A'
+    ENDIF
+  ELSE ! no threading
+    IF (lnumActiveSims) THEN
+      Write(OutputFileInits,fmtA) ThreadingHeader
+      Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, No,'// &
+                                        TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
+                                        'N/A, N/A, N/A, N/A, N/A, '// &
+                                        TRIM(RoundSigDigits(inumActiveSims))
+    ELSE
+      Write(OutputFileInits,fmtA) ThreadingHeader
+      Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, No,'// &
+                                        TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
+                                        'N/A, N/A, N/A, N/A, N/A, N/A'
+    ENDIF
+  ENDIF
+
   ! Close the Initialization Output File
   WRITE (OutputFileInits,EndOfDataFormat)
   CLOSE (OutputFileInits)
@@ -1142,7 +1261,7 @@ SUBROUTINE CloseOutputFiles
   ENDIF
 
   !  In case some debug output was produced, it appears that the
-  !  position on the INQUIRE will not be "ASIS" (3 compilers tested)
+  !  position on the INQUIRE will not be 'ASIS' (3 compilers tested)
   !  So, will want to keep....
 
   INQUIRE(OutputFileDebug,POSITION=DebugPosition)
@@ -1184,7 +1303,8 @@ SUBROUTINE SetupSimulation(ErrorsFound)
   USE DataEnvironment ,    ONLY: EndMonthFlag
   USE InputProcessor,      ONLY: GetNumRangeCheckErrorsFound
   USE CostEstimateManager, ONLY: SimCostEstimate
-  USE DataSystemVariables, ONLY: DeveloperFlag
+  USE General, ONLY: TrimSigDigits
+  USE DataTimings
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1202,8 +1322,10 @@ SUBROUTINE SetupSimulation(ErrorsFound)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL :: Available=.false. ! an environment is available to process
+!  integer :: env_iteration=0
+!  CHARACTER(len=32) :: cEnvChar
 
-!  return  ! remove comment to do "old way"
+!  return  ! remove comment to do 'old way'
 
   Available = .true.
 
@@ -1242,7 +1364,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
 
           CALL ManageHeatBalance
 
-          !  After the first iteration of HeatBalance, all the "input" has been gotten
+          !  After the first iteration of HeatBalance, all the 'input' has been gotten
           IF (BeginFullSimFlag) THEN
             IF (GetNumRangeCheckErrorsFound() > 0) THEN
               CALL ShowFatalError('Out of "range" values found in input')
@@ -1270,8 +1392,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
           TimeStep=NumOfTimeStepInHour
           EndEnvrnFlag   = .True.
 
-          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - hour 24 timestep n')
-
+          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - hour 24 timestep 1')
           CALL ManageWeather
 
           CALL ManageExteriorEnergyUse
@@ -1296,7 +1417,7 @@ SUBROUTINE ReportNodeConnections
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine "reports" the NodeConnection data structure.  It groups the
+          ! This subroutine 'reports' the NodeConnection data structure.  It groups the
           ! report/dump by parent, non-parent objects.
 
           ! METHODOLOGY EMPLOYED:
@@ -2042,7 +2163,7 @@ SUBROUTINE ReportParentChildren
       CALL GetChildrenData(ParentNodeList(Loop)%CType,ParentNodeList(Loop)%CName,NumChildren,               &
         ChildCType,ChildCName,ChildInNodeName,ChildInNodeNum,ChildOutNodeName,ChildOutNodeNum,  &
         ErrorsFound)
-      if (Loop > 1) WRITE(outputfiledebug,"(1X,60('='))")
+      if (Loop > 1) WRITE(outputfiledebug,'(1X,60("="))')
       WRITE(outputfiledebug,'(A)') ' Parent Node,'//TRIM(ParentNodeList(Loop)%CType)//':'//  &
                               TRIM(ParentNodeList(Loop)%CName)//','//  &
                               TRIM(ParentNodeList(Loop)%InletNodeName)//','//TRIM(ParentNodeList(Loop)%OutletNodeName)
@@ -2057,7 +2178,7 @@ SUBROUTINE ReportParentChildren
       DEALLOCATE(ChildInNodeNum)
       DEALLOCATE(ChildOutNodeNum)
     ELSE
-      if (Loop > 1) WRITE(outputfiledebug,"(1X,60('='))")
+      if (Loop > 1) WRITE(outputfiledebug,'(1X,60("="))')
       WRITE(outputfiledebug,'(A)') ' Parent Node (no children),'//TRIM(ParentNodeList(Loop)%CType)//':'//  &
                               TRIM(ParentNodeList(Loop)%CName)//','//  &
                               TRIM(ParentNodeList(Loop)%InletNodeName)//','//TRIM(ParentNodeList(Loop)%OutletNodeName)
@@ -2367,6 +2488,180 @@ SUBROUTINE CheckCachedIPErrors
 
 END SUBROUTINE CheckCachedIPErrors
 
+SUBROUTINE CheckThreading
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Check number of threads available versus number of surfaces, etc.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Check Max Threads (OMP_NUM_THREADS) = MaxNumberOfThreads, iEnvSetThreads
+          ! Check EP Max Threads (EP_OMP_NUM_THREADS) = iepEnvSetThreads
+          ! Check if IDF input (ProgramControl) = iIDFSetThreads
+          ! Check # active sims (cntActv) = inumActiveSims [report only?]
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSystemVariables
+  USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem
+  USE DataIPShortCuts
+  USE General, ONLY: RoundSigDigits
+#if defined(_OPENMP) && defined(HBIRE_USE_OMP)
+use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
+#endif
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: Blank=' '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=10) :: cEnvValue
+  INTEGER :: ios
+#ifdef HBIRE_USE_OMP
+  INTEGER :: TotHTSurfs        ! Number of BuildingSurface:Detailed items to obtain
+  INTEGER :: TotDetailedWalls  ! Number of Wall:Detailed items to obtain
+  INTEGER :: TotDetailedRoofs  ! Number of RoofCeiling:Detailed items to obtain
+  INTEGER :: TotDetailedFloors ! Number of Floor:Detailed items to obtain
+  INTEGER :: TotHTSubs         ! Number of FenestrationSurface:Detailed items to obtain
+  INTEGER :: TotIntMass        ! Number of InternalMass items to obtain
+  ! Simple Surfaces (Rectangular)
+  INTEGER :: TotRectExtWalls   ! Number of Exterior Walls to obtain
+  INTEGER :: TotRectIntWalls   ! Number of Adiabatic Walls to obtain
+  INTEGER :: TotRectIZWalls    ! Number of Interzone Walls to obtain
+  INTEGER :: TotRectUGWalls    ! Number of Underground to obtain
+  INTEGER :: TotRectRoofs      ! Number of Roofs to obtain
+  INTEGER :: TotRectCeilings   ! Number of Adiabatic Ceilings to obtain
+  INTEGER :: TotRectIZCeilings ! Number of Interzone Ceilings to obtain
+  INTEGER :: TotRectGCFloors   ! Number of Floors with Ground Contact to obtain
+  INTEGER :: TotRectIntFloors  ! Number of Adiabatic Walls to obtain
+  INTEGER :: TotRectIZFloors   ! Number of Interzone Floors to obtain
+  INTEGER :: TotRectWindows
+  INTEGER :: TotRectDoors
+  INTEGER :: TotRectGlazedDoors
+  INTEGER :: TotRectIZWindows
+  INTEGER :: TotRectIZDoors
+  INTEGER :: TotRectIZGlazedDoors
+  INTEGER :: iIDFsetThreadsInput
+  INTEGER :: NumAlphas
+  INTEGER :: NumNumbers
+
+  MaxNumberOfThreads=MAXTHREADS()
+  Threading=.true.
+
+  cEnvValue=' '
+  CALL Get_Environment_Variable(cNumThreads,cEnvValue)
+  IF (cEnvValue /= Blank) THEN
+    lEnvSetThreadsInput=.true.
+    READ(cEnvValue,*,IOSTAT=ios) iEnvSetThreads
+    IF (ios /= 0) iEnvSetThreads=MaxNumberOfThreads
+    IF (iEnvSetThreads == 0) iEnvSetThreads=MaxNumberOfThreads
+  ENDIF
+
+  cEnvValue=' '
+  CALL Get_Environment_Variable(cepNumThreads,cEnvValue)
+  IF (cEnvValue /= Blank) THEN
+    lepSetThreadsInput=.true.
+    READ(cEnvValue,*,IOSTAT=ios) iepEnvSetThreads
+    IF (ios /= 0) iepEnvSetThreads=MaxNumberOfThreads
+    IF (iepEnvSetThreads == 0) iepEnvSetThreads=MaxNumberOfThreads
+  ENDIF
+
+  ! Figure out how many surfaces there are.
+  TotHTSurfs            =GetNumObjectsFound('BuildingSurface:Detailed')
+  TotDetailedWalls      =GetNumObjectsFound('Wall:Detailed')
+  TotDetailedRoofs      =GetNumObjectsFound('RoofCeiling:Detailed')
+  TotDetailedFloors     =GetNumObjectsFound('Floor:Detailed')
+  TotHTSubs             =GetNumObjectsFound('FenestrationSurface:Detailed')
+  TotIntMass            =GetNumObjectsFound('InternalMass')
+  TotRectWindows        =GetNumObjectsFound('Window')
+  TotRectDoors          =GetNumObjectsFound('Door')
+  TotRectGlazedDoors    =GetNumObjectsFound('GlazedDoor')
+  TotRectIZWindows      =GetNumObjectsFound('Window:Interzone')
+  TotRectIZDoors        =GetNumObjectsFound('Door:Interzone')
+  TotRectIZGlazedDoors  =GetNumObjectsFound('GlazedDoor:Interzone')
+  TotRectExtWalls       =GetNumObjectsFound('Wall:Exterior')
+  TotRectIntWalls       =GetNumObjectsFound('Wall:Adiabatic')
+  TotRectIZWalls        =GetNumObjectsFound('Wall:Interzone')
+  TotRectUGWalls        =GetNumObjectsFound('Wall:Underground')
+  TotRectRoofs          =GetNumObjectsFound('Roof')
+  TotRectCeilings       =GetNumObjectsFound('Ceiling:Adiabatic')
+  TotRectIZCeilings     =GetNumObjectsFound('Ceiling:Interzone')
+  TotRectGCFloors       =GetNumObjectsFound('Floor:GroundContact')
+  TotRectIntFloors      =GetNumObjectsFound('Floor:Adiabatic ')
+  TotRectIZFloors       =GetNumObjectsFound('Floor:Interzone')
+
+  iNominalTotSurfaces=TotHTSurfs + TotDetailedWalls + TotDetailedRoofs + TotDetailedFloors +              &
+        TotHTSubs + TotIntMass + TotRectWindows + TotRectDoors + TotRectGlazedDoors + TotRectIZWindows + &
+        TotRectIZDoors + TotRectIZGlazedDoors + TotRectExtWalls + TotRectIntWalls + TotRectIZWalls +     &
+        TotRectUGWalls + TotRectRoofs + TotRectCeilings + TotRectIZCeilings + TotRectGCFloors +          &
+        TotRectIntFloors + TotRectIZFloors
+
+  cCurrentModuleObject='ProgramControl'
+  IF (GetNumObjectsFound(cCurrentModuleObject) > 0) THEN
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,ios,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    iIDFsetThreadsInput=INT(rNumericArgs(1))
+    lIDFsetThreadsInput=.true.
+    IF (iIDFsetThreadsInput <= 0) THEN
+      iIDFsetThreadsInput=MaxNumberOfThreads
+      IF (lEnvSetThreadsInput) iIDFsetThreadsInput=iEnvSetThreads
+      IF (lepSetThreadsInput)  iIDFsetThreadsInput=iepEnvSetThreads
+    ENDIF
+    IF (iIDFSetThreadsInput > MaxNumberOfThreads) THEN
+      CALL ShowWarningError('CheckThreading: Your chosen number of threads=['//trim(RoundSigDigits(iIDFSetThreadsInput))//  &
+         '] is greater than the maximum number of threads=['//trim(RoundSigDigits(MaxNumberOfThreads))//'].')
+      CALL ShowContinueError('...execution time for this run may be degraded.')
+    ENDIF
+  ENDIF
+
+  IF (iNominalTotSurfaces <= 30) THEN
+    NumberIntRadThreads=1
+    IF (lEnvSetThreadsInput) NumberIntRadThreads=iEnvSetThreads
+    IF (lepSetThreadsInput)  NumberIntRadThreads=iepEnvSetThreads
+    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreadsInput
+  ELSE
+    NumberIntRadThreads=MaxNumberOfThreads
+    IF (lEnvSetThreadsInput) NumberIntRadThreads=iEnvSetThreads
+    IF (lepSetThreadsInput)  NumberIntRadThreads=iepEnvSetThreads
+    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreadsInput
+  ENDIF
+#else
+  Threading=.false.
+  cCurrentModuleObject='ProgramControl'
+  IF (GetNumObjectsFound(cCurrentModuleObject) > 0) THEN
+    CALL ShowWarningError('CheckThreading: '//trim(cCurrentModuleObject)//' is not available in this version.')
+  ENDIF
+  MaxNumberOfThreads=1
+#endif
+  ! just reporting
+  cEnvValue=' '
+  CALL Get_Environment_Variable(cNumActiveSims,cEnvValue)
+  IF (cEnvValue /= Blank) THEN
+    lnumActiveSims=.true.
+    READ(cEnvValue,*,IOSTAT=ios) inumActiveSims
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CheckThreading
 
 END MODULE SimulationManager
 
@@ -2499,7 +2794,7 @@ END SUBROUTINE Resimulate
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

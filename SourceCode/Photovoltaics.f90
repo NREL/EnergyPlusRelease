@@ -410,7 +410,7 @@ SUBROUTINE GetPVInput
       If (lAlphaFieldBlanks(3)) then
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-        CALL ShowContinueError('Field can not be blank')
+        CALL ShowContinueError('Field cannot be blank')
         ErrorsFound=.TRUE.
       ELSE
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
@@ -438,7 +438,7 @@ SUBROUTINE GetPVInput
       IF (lAlphaFieldBlanks(5)) then
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5)) )
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-        CALL ShowContinueError('Field can not be blank')
+        CALL ShowContinueError('Field cannot be blank')
         ErrorsFound=.TRUE.
       ELSE
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5)) )
@@ -479,7 +479,7 @@ SUBROUTINE GetPVInput
         IF (lAlphaFieldBlanks(2)) then
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-          CALL ShowContinueError('Field can not be blank')
+          CALL ShowContinueError('Field cannot be blank')
           ErrorsFound=.TRUE.
         ELSE
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
@@ -526,7 +526,7 @@ SUBROUTINE GetPVInput
         IF (lAlphaFieldBlanks(2)) then
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-          CALL ShowContinueError('Field can not be blank')
+          CALL ShowContinueError('Field cannot be blank')
           ErrorsFound=.TRUE.
         ELSE
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
@@ -2674,7 +2674,7 @@ SUBROUTINE GetExtVentedCavityTsColl(VentModNum, TsColl)
 !
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

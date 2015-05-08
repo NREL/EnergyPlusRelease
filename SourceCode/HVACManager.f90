@@ -27,7 +27,9 @@ USE DataGlobals, ONLY: TimeStepZone,WarmUpFlag,EndHourFlag,  &
                        emsCallFromEndSystemTimestepAfterHVACReporting, emsCallFromBeforeHVACManagers, &
                        emsCallFromAfterHVACManagers, emsCallFromHVACIterationLoop, &
                        AnyEnergyManagementSystemInModel, &
-                       emsCallFromEndSystemTimestepBeforeHVACReporting
+                       emsCallFromEndSystemTimestepBeforeHVACReporting, &
+                       AnyIdealCondEntSetPointInModel, &
+                       RunOptCondEntTemp
 USE DataInterfaces, ONLY: SetupOutputVariable,ShowFatalError,                 &
                        ShowWarningError,ShowContinueError,ShowMessage,     &
                        ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
@@ -122,12 +124,14 @@ SUBROUTINE ManageHVAC
   USE RefrigeratedCase,             ONLY : ManageRefrigeratedCaseRacks
   USE SystemAvailabilityManager,    ONLY : ManageHybridVentilation
   USE DataHeatBalFanSys, ONLY: SysDepZoneLoads, SysDepZoneLoadsLagged, ZTAVComf, ZoneAirHumRatAvgComf
-  USE DataSystemVariables,          ONLY : ReportDuringWarmup
+  USE DataSystemVariables,          ONLY : ReportDuringWarmup, UpdateDataDuringWarmupExternalInterface ! added for FMI
   USE PlantManager,                 ONLY : UpdateNodeThermalHistory
   USE ZoneContaminantPredictorCorrector, ONLY: ManageZoneContaminanUpdates
-  USE DataContaminantBalance,       ONLY: Contaminant, ZoneAirCO2, ZoneAirCO2Temp, ZoneAirCO2Avg, OutdoorCO2
+  USE DataContaminantBalance,       ONLY: Contaminant, ZoneAirCO2, ZoneAirCO2Temp, ZoneAirCO2Avg, OutdoorCO2, &
+                                          ZoneAirGC, ZoneAirGCTemp, ZoneAirGCAvg, OutdoorGC
   USE ScheduleManager,              ONLY: GetCurrentScheduleValue
   USE ManageElectricPower,          ONLY : ManageElectricLoadCenters
+  USE InternalHeatGains,            ONLY : UpdateInternalGainValues
 
   IMPLICIT NONE ! Enforce explicit typing of all variables
 
@@ -181,6 +185,10 @@ SUBROUTINE ManageHVAC
     OutdoorCO2 = GetCurrentScheduleValue(Contaminant%CO2OutdoorSchedPtr)
     ZoneAirCO2Avg = 0.0D0
   END IF
+  IF (Contaminant%GenericContamSimulation) Then
+    OutdoorGC = GetCurrentScheduleValue(Contaminant%GenericContamOutdoorSchedPtr)
+    IF (ALLOCATED(ZoneAirGCAvg)) ZoneAirGCAvg = 0.0D0
+  END IF
 
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
     CALL ResetNodeData
@@ -226,6 +234,8 @@ SUBROUTINE ManageHVAC
   SysDepZoneLoadsLagged = SysDepZoneLoads
   CALL ManageEMS(emsCallFromBeginTimestepBeforePredictor) !calling point
 
+  CALL UpdateInternalGainValues(SuppressRadiationUpdate = .TRUE., SumLatentGains = .TRUE.)
+
   CALL ManageZoneAirUpdates(iPredictStep,ZoneTempChange,ShortenTimeStepSys, &
                      UseZoneTimeStepHistory, &
                       PriorTimeStep )
@@ -234,13 +244,19 @@ SUBROUTINE ManageHVAC
     CALL ManageZoneContaminanUpdates(iPredictStep,ShortenTimeStepSys,UseZoneTimeStepHistory,PriorTimeStep)
 
   CALL SimHVAC
-
+  
+  IF (AnyIdealCondEntSetPointInModel .and. MetersHaveBeenInitialized .and. .NOT. WarmUpFlag) THEN
+    RunOptCondEntTemp = .TRUE.
+    DO WHILE (RunOptCondEntTemp)
+      CALL SimHVAC
+    END DO  
+  END IF
+  
   CALL ManageWater
 
   ! Only simulate once per zone timestep; must be after SimHVAC
   IF (FirstTimeStepSysFlag .and. MetersHaveBeenInitialized) THEN
     CALL ManageDemand
-
   END IF
 
   BeginTimeStepFlag = .FALSE.  ! At this point, we have been through the first pass through SimHVAC so this needs to be set
@@ -280,6 +296,8 @@ SUBROUTINE ManageHVAC
         CALL ManageAirflowNetworkBalance(.FALSE.)
       end if
 
+      CALL UpdateInternalGainValues(SuppressRadiationUpdate = .TRUE., SumLatentGains = .TRUE.)
+
       CALL ManageZoneAirUpdates(iPredictStep,ZoneTempChange,ShortenTimeStepSys, &
                       UseZoneTimeStepHistory, &
                      PriorTimeStep )
@@ -288,6 +306,13 @@ SUBROUTINE ManageHVAC
         CALL ManageZoneContaminanUpdates(iPredictStep,ShortenTimeStepSys,UseZoneTimeStepHistory,PriorTimeStep)
 
       CALL SimHVAC
+      
+      IF (AnyIdealCondEntSetPointInModel .and. MetersHaveBeenInitialized .and. .NOT. WarmUpFlag) THEN
+        RunOptCondEntTemp = .TRUE.
+        DO WHILE (RunOptCondEntTemp)
+          CALL SimHVAC
+        END DO  
+      END IF
 
       CALL ManageWater
 
@@ -313,13 +338,15 @@ SUBROUTINE ManageHVAC
       ZoneAirHumRatAvg(ZoneNum) = ZoneAirHumRatAvg(ZoneNum) + ZoneAirHumRat(ZoneNum)* FracTimeStepZone
       IF (Contaminant%CO2Simulation) &
         ZoneAirCO2Avg(ZoneNum) = ZoneAirCO2Avg(ZoneNum) + ZoneAirCO2(ZoneNum)* FracTimeStepZone
+      IF (Contaminant%GenericContamSimulation) &
+        ZoneAirGCAvg(ZoneNum) = ZoneAirGCAvg(ZoneNum) + ZoneAirGC(ZoneNum)* FracTimeStepZone
     END DO
 
     CALL DetectOscillatingZoneTemp
     CALL UpdateZoneListAndGroupLoads ! Must be called before UpdateDataandReport(HVACTSReporting)
     CALL UpdateIceFractions          ! Update fraction of ice stored in TES
 
-    ! update electricity data for net, purchased, sold etc. 
+    ! update electricity data for net, purchased, sold etc.
     DummyLogical = .FALSE.
     CALL ManageElectricLoadCenters(.FALSE.,DummyLogical, .TRUE. )
     ! Update the plant and condenser loop capacitance model temperature history.
@@ -365,6 +392,8 @@ SUBROUTINE ManageHVAC
         PrintedWarmup=.true.
       END IF
       CALL CalcMoreNodeInfo
+      CALL UpdateDataandReport(HVACTSReporting)
+    ELSEIF (UpdateDataDuringWarmupExternalInterface) THEN ! added for FMI
       CALL UpdateDataandReport(HVACTSReporting)
     END IF
     CALL ManageEMS(emsCallFromEndSystemTimestepAfterHVACReporting) ! EMS calling point
@@ -467,7 +496,8 @@ SUBROUTINE SimHVAC
                                               PlantManageSubIterations, PlantManageHalfLoopCalls, &
                                               DemandSide, SupplySide
   USE PlantUtilities,                  ONLY : CheckPlantMixerSplitterConsistency, &
-                                              CheckForRunawayPlantTemps
+                                              CheckForRunawayPlantTemps, AnyPlantSplitterMixerLacksContinuity
+  USE DataGlobals,                     ONLY : AnyPlantInModel
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -477,6 +507,8 @@ SUBROUTINE SimHVAC
           ! SUBROUTINE PARAMETER DEFINITIONS:
   LOGICAL, PARAMETER :: IsPlantLoop = .TRUE.
   LOGICAL, PARAMETER :: NotPlantLoop = .FALSE.
+  LOGICAL, PARAMETER :: SimWithPlantFlowUnlocked = .FALSE.
+  LOGICAL, PARAMETER :: SimWithPlantFlowLocked   = .TRUE.
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -591,7 +623,7 @@ SUBROUTINE SimHVAC
 
           ! Manages the various component simulations
   CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
-                              SimElecCircuitsFlag,     FirstHVACIteration)
+                              SimElecCircuitsFlag,     FirstHVACIteration, SimWithPlantFlowUnlocked)
 
           ! Eventually, when all of the flags are set to false, the
           ! simulation has converged for this system time step.
@@ -613,7 +645,7 @@ SUBROUTINE SimHVAC
 
           ! Manages the various component simulations
     CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
-                              SimElecCircuitsFlag, FirstHVACIteration)
+                              SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowUnlocked)
 
           ! Eventually, when all of the flags are set to false, the
           ! simulation has converged for this system time step.
@@ -621,7 +653,42 @@ SUBROUTINE SimHVAC
     HVACManageIteration = HVACManageIteration + 1   ! Increment the iteration counter
 
   END DO
-
+  IF (AnyPlantInModel) THEN
+    If (AnyPlantSplitterMixerLacksContinuity()) THEN
+      ! now call for one second to last plant simulation
+      SimAirLoopsFlag = .FALSE. 
+      SimZoneEquipmentFlag = .FALSE.
+      SimNonZoneEquipmentFlag = .FALSE.
+      SimPlantLoopsFlag = .TRUE.
+      SimElecCircuitsFlag = .FALSE.
+      CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
+                                  SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowUnlocked)
+      ! now call for all non-plant simulation, but with plant flow lock on
+      SimAirLoopsFlag = .TRUE.
+      SimZoneEquipmentFlag = .TRUE.
+      SimNonZoneEquipmentFlag = .TRUE.
+      SimPlantLoopsFlag = .FALSE.
+      SimElecCircuitsFlag = .TRUE.
+      CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
+                                  SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowLocked)
+      ! now call for a last plant simulation
+      SimAirLoopsFlag = .FALSE. 
+      SimZoneEquipmentFlag = .FALSE.
+      SimNonZoneEquipmentFlag = .FALSE.
+      SimPlantLoopsFlag = .TRUE.
+      SimElecCircuitsFlag = .FALSE.
+      CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
+                                  SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowUnlocked)
+      ! now call for a last all non-plant simulation, but with plant flow lock on
+      SimAirLoopsFlag = .TRUE.
+      SimZoneEquipmentFlag = .TRUE.
+      SimNonZoneEquipmentFlag = .TRUE.
+      SimPlantLoopsFlag = .FALSE.
+      SimElecCircuitsFlag = .TRUE.
+      CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
+                                  SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowLocked)
+    ENDIF
+  ENDIF
 
   !DSU  Test plant loop for errors
   DO LoopNum = 1, TotNumLoops
@@ -762,7 +829,7 @@ END SUBROUTINE SimHVAC
 
 
 SUBROUTINE SimSelectedEquipment(SimAirLoops, SimZoneEquipment, SimNonZoneEquipment, SimPlantLoops, &
-                                SimElecCircuits,  FirstHVACIteration)
+                                SimElecCircuits,  FirstHVACIteration, LockPlantFlows)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Russ Taylor, Rick Strand
@@ -801,6 +868,7 @@ SUBROUTINE SimSelectedEquipment(SimAirLoops, SimZoneEquipment, SimNonZoneEquipme
   LOGICAL :: SimElecCircuits        ! True when electic circuits need to be (re)simulated
   LOGICAL :: FirstHVACIteration     ! True when solution technique on first iteration
   LOGICAL :: ResimulateAirZone      ! True when solution technique on third iteration used in AirflowNetwork
+  LOGICAL, INTENT(IN) :: LockPlantFlows
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   Integer, PARAMETER :: MaxAir    = 5    ! Iteration Max for Air Simulation Iterations
@@ -826,7 +894,11 @@ SUBROUTINE SimSelectedEquipment(SimAirLoops, SimZoneEquipment, SimNonZoneEquipme
   ! Set all plant flow locks to UNLOCKED to allow air side components to operate properly
   ! This requires that the plant flow resolver carefully set the min/max avail limits on
   !  air side components to ensure they request within bounds.
-  CALL SetAllFlowLocks(FlowUnlocked)
+  IF (LockPlantFlows) THEN
+    CALL SetAllFlowLocks(FlowLocked)
+  ELSE
+    CALL SetAllFlowLocks(FlowUnlocked)
+  ENDIF
   CALL ResetAllPlantInterConnectFlags()
 
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
@@ -1406,7 +1478,7 @@ SUBROUTINE CalcAirFlowSimple
   USE ThermalChimney, ONLY : ManageThermalChimney
   USE DataZoneEquipment, ONLY: ZoneEquipAvail
   USE DataHVACGlobals, ONLY: CycleOn, CycleOnZoneFansOnly
-  USE DataContaminantBalance, ONLY: Contaminant, ZoneAirCO2, MixingMassFlowCO2
+  USE DataContaminantBalance, ONLY: Contaminant, ZoneAirCO2, MixingMassFlowCO2, ZoneAirGC, MixingMassFlowGC
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1509,6 +1581,7 @@ SUBROUTINE CalcAirFlowSimple
    CrossMixingReportFlag = .FALSE.
    MixingReportFlag = .FALSE.
    IF (Contaminant%CO2Simulation .AND. TotMixing+TotCrossMixing > 0) MixingMassFlowCO2 = 0.0
+   IF (Contaminant%GenericContamSimulation .AND. TotMixing+TotCrossMixing > 0) MixingMassFlowGC = 0.0
 
    IVF = 0.0
    MCPTI = 0.0
@@ -1876,6 +1949,9 @@ SUBROUTINE CalcAirFlowSimple
           IF (Contaminant%CO2Simulation) Then
             MixingMassFlowCO2(N) = MixingMassFlowCO2(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirCO2(M)
           END IF
+          IF (Contaminant%GenericContamSimulation) Then
+            MixingMassFlowGC(N) = MixingMassFlowGC(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirGC(M)
+          END IF
           MixingReportFlag(J) = .TRUE.
        END IF
      END IF
@@ -1894,6 +1970,9 @@ SUBROUTINE CalcAirFlowSimple
          IF (Contaminant%CO2Simulation) Then
            MixingMassFlowCO2(N) = MixingMassFlowCO2(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirCO2(M)
          END IF
+         IF (Contaminant%GenericContamSimulation) Then
+           MixingMassFlowGC(N) = MixingMassFlowGC(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirGC(M)
+         END IF
          MixingReportFlag(J) = .TRUE.
        END IF
      END IF
@@ -1910,6 +1989,9 @@ SUBROUTINE CalcAirFlowSimple
        MixingMassFlowXHumRat(N) = MixingMassFlowXHumRat(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZHumRat(M)
        IF (Contaminant%CO2Simulation) Then
          MixingMassFlowCO2(N) = MixingMassFlowCO2(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirCO2(M)
+       END IF
+       IF (Contaminant%GenericContamSimulation) Then
+         MixingMassFlowGC(N) = MixingMassFlowGC(N) + Mixing(J)%DesiredAirFlowRate * AirDensity * ZoneAirGC(M)
        END IF
        MixingReportFlag(J) = .TRUE.
     END IF
@@ -2040,7 +2122,11 @@ SUBROUTINE CalcAirFlowSimple
          MixingMassFlowXHumRat(N) = MixingMassFlowXHumRat(N) + MVFC(J)*AirDensity*ZHumRat(m)
          IF (Contaminant%CO2Simulation) Then
            MixingMassFlowCO2(M) = MixingMassFlowCO2(M) + MVFC(J) * AirDensity * ZoneAirCO2(n)
-           MixingMassFlowCO2(N) = MixingMassFlowCO2(N) + MVFC(J)*AirDensity*ZoneAirCO2(m)
+           MixingMassFlowCO2(N) = MixingMassFlowCO2(N) + MVFC(J) * AirDensity * ZoneAirCO2(m)
+         END IF
+         IF (Contaminant%GenericContamSimulation) Then
+           MixingMassFlowGC(M) = MixingMassFlowGC(M) + MVFC(J) * AirDensity * ZoneAirGC(n)
+           MixingMassFlowGC(N) = MixingMassFlowGC(N) + MVFC(J) * AirDensity * ZoneAirGC(m)
          END IF
        END IF
      END IF
@@ -2858,7 +2944,7 @@ SUBROUTINE GetStandAloneERVNodes(OutdoorNum)
 END SUBROUTINE GetStandAloneERVNodes
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

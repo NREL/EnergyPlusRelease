@@ -31,7 +31,7 @@ USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHou
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
                            SetupOutputVariable
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallTempDiff, SmallAirVolFlow, SingleCoolingSetPoint, &
-                           SingleHeatingSetPoint
+                           SingleHeatingSetPoint, PlenumInducedMassFlow
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
 
   ! Use statements for access to subroutines in other modules
@@ -107,6 +107,7 @@ TYPE PowIndUnitData
   INTEGER                      :: HWCompNum          =0   ! index for plant component for hot plant coil
 
   INTEGER                      :: ADUNum             =0     ! index of corresponding air distribution unit
+  LOGICAL                      :: InducesPlenumAir   =.FALSE.  ! True if secondary air comes from the plenum
   ! Report data
   REAL(r64)                    :: HeatingRate        =0.0   ! unit heat addition rate to zone [W]
   REAL(r64)                    :: HeatingEnergy      =0.0   ! unit heat addition to zone [J]
@@ -134,6 +135,7 @@ PRIVATE CalcParallelPIU
 ! PRIVATE UpdatePIU
 PRIVATE ReportPIU
 PUBLIC  PIUnitHasMixer
+PUBLIC  PIUInducesPlenumAir
 
 CONTAINS
 
@@ -273,6 +275,8 @@ SUBROUTINE GetPIUs
   USE DataDefineEquip,   ONLY: AirDistUnit, NumAirDistUnits
   USE DataIPShortCuts
   USE DataPlant,  ONLY: TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
+  USE WaterCoils, ONLY: GetCoilWaterInletNode
+  USE SteamCoils, ONLY: GetCoilSteamInletNode
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -539,22 +543,28 @@ DO PIUIndex = 1,NumParallelPIUs
                             NodeType_Air,NodeConnectionType_Internal,1,ObjectIsParent)
   ! The reheat coil control node is necessary for hot water reheat, but not necessary for
   ! electric or gas reheat.
-  IF (PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Gas .OR. PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Electric) THEN
-    IF(cAlphaArgs(11) /= '') THEN
-      CALL ShowWarningError('In '//TRIM(cCurrentModuleObject)//' = ' // TRIM(PIU(PIUNum)%Name) &
-                             // ' the '//TRIM(cAlphaFieldNames(11))//' is not needed and will be ignored.')
-      CALL ShowContinueError('  It is used for hot water reheat coils only.')
-    END IF
-  ELSE
-    IF(cAlphaArgs(11) == '') THEN
-      CALL ShowSevereError('In '//TRIM(cCurrentModuleObject)//' = ' // TRIM(PIU(PIUNum)%Name) &
-                           // ' the '//TRIM(cAlphaFieldNames(11))//' is undefined.')
-      ErrorsFound=.true.
-    END IF
-    PIU(PIUNum)%HotControlNode  = &
-      GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                        NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
-  END IF
+!  IF (PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Gas .OR. PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Electric) THEN
+!    IF(cAlphaArgs(11) /= '') THEN
+!      CALL ShowWarningError('In '//TRIM(cCurrentModuleObject)//' = ' // TRIM(PIU(PIUNum)%Name) &
+!                             // ' the '//TRIM(cAlphaFieldNames(11))//' is not needed and will be ignored.')
+!      CALL ShowContinueError('  It is used for hot water reheat coils only.')
+!    END IF
+!  ELSE
+!    IF(cAlphaArgs(11) == '') THEN
+!      CALL ShowSevereError('In '//TRIM(cCurrentModuleObject)//' = ' // TRIM(PIU(PIUNum)%Name) &
+!                           // ' the '//TRIM(cAlphaFieldNames(11))//' is undefined.')
+!      ErrorsFound=.true.
+!    END IF
+!    PIU(PIUNum)%HotControlNode  = &
+!      GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+!                        NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
+!  END IF
+  IF (PIU(PIUNum)%HCoilType_Num == HCoilType_SimpleHeating) THEN
+    PIU(PIUNum)%HotControlNode  = GetCoilWaterInletNode(cAlphaArgs(9),cAlphaArgs(10),ErrorsFound)
+  ENDIF
+  IF (PIU(PIUNum)%HCoilType_Num == HCoilType_SteamAirHeating) THEN
+    PIU(PIUNum)%HotControlNode  = GetCoilSteamInletNode(cAlphaArgs(9),cAlphaArgs(10),ErrorsFound)
+  ENDIF
   PIU(PIUNum)%MixerName = cAlphaArgs(7) ! name of zone mixer object
   PIU(PIUNum)%FanName = cAlphaArgs(8)   ! name of fan object
   PIU(PIUNum)%HCoil = cAlphaArgs(10)    ! name of heating coil object
@@ -890,8 +900,8 @@ SUBROUTINE SizePIU(PIUNum)
   USE InputProcessor
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,     ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
-  USE DataPlant,          ONLY: PlantLoop
+!  USE BranchInputManager, ONLY: MyPlantSizingIndex
+  USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
@@ -1352,8 +1362,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
                              CompErrIndex=PIU(PIUNum)%CompErrIndex, &
                              LoopNum     = PIU(PIUNum)%HWLoopNum,   &
                              LoopSide    = PIU(PIUNum)%HWLoopSide,  &
-                             BranchIndex = PIU(PIUNum)%HWBranchNum, &
-                             CompIndex   = PIU(PIUNum)%HWCompNum)
+                             BranchIndex = PIU(PIUNum)%HWBranchNum)
     END IF
   CASE(HCoilType_SteamAirHeating) ! COIL:STEAM:AIRHEATING
     IF ( .NOT. HCoilOn) THEN
@@ -1394,6 +1403,11 @@ PIU(PIUNum)%SensCoolRate = ABS(MIN(constant_zero,PowerMet))
 IF (Node(OutletNode)%MassFlowRate .EQ. 0.0) THEN
   Node(PriNode)%MassFlowRate = 0.0
   Node(SecNode)%MassFlowRate = 0.0
+END IF
+IF (PIU(PIUNum)%InducesPlenumAir) THEN
+  PlenumInducedMassFlow = Node(SecNode)%MassFlowRate
+ELSE
+  PlenumInducedMassFlow = 0.0
 END IF
 Node(OutletNode)%MassFlowRateMax = PIU(PIUNum)%MaxTotAirMassFlow
 
@@ -1611,8 +1625,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
                              CompErrIndex=PIU(PIUNum)%CompErrIndex,   &
                              LoopNum     = PIU(PIUNum)%HWLoopNum,   &
                              LoopSide    = PIU(PIUNum)%HWLoopSide,  &
-                             BranchIndex = PIU(PIUNum)%HWBranchNum, &
-                             CompIndex   = PIU(PIUNum)%HWCompNum)
+                             BranchIndex = PIU(PIUNum)%HWBranchNum)
     END IF
   CASE(HCoilType_SteamAirHeating)  ! COIL:STEAM:AIRHEATING
     IF ( .NOT. HCoilOn) THEN
@@ -1651,6 +1664,11 @@ PIU(PIUNum)%SensCoolRate = ABS(MIN(constant_zero,PowerMet))
 IF (Node(OutletNode)%MassFlowRate .EQ. 0.0) THEN
   Node(PriNode)%MassFlowRate = 0.0
   Node(SecNode)%MassFlowRate = 0.0
+END IF
+IF (PIU(PIUNum)%InducesPlenumAir) THEN
+  PlenumInducedMassFlow = Node(SecNode)%MassFlowRate
+ELSE
+  PlenumInducedMassFlow = 0.0
 END IF
 Node(OutletNode)%MassFlowRateMax = PIU(PIUNum)%MaxPriAirMassFlow
 
@@ -1758,10 +1776,64 @@ FUNCTION PIUnitHasMixer(CompName) RESULT(YesNo)
 
 END FUNCTION PIUnitHasMixer
 
+SUBROUTINE PIUInducesPlenumAir(NodeNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   January 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Marks a PIU air terminal unit as obtaining its induced air from
+          ! a plenum.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: NodeNum  ! induced air node number
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: PIUIndex
+
+  IF (GetPIUInputFlag) THEN
+    CALL GetPIUs
+    GetPIUInputFlag = .FALSE.
+  END IF
+
+  DO PIUIndex=1,NumPIUs
+    IF (NodeNum == PIU(PIUIndex)%SecAirInNode) THEN
+      PIU(PIUIndex)%InducesPlenumAir = .TRUE.
+      EXIT
+    END IF
+  END DO
+  
+  RETURN
+
+END SUBROUTINE PIUInducesPlenumAir
+
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

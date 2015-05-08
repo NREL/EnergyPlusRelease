@@ -613,9 +613,9 @@ DO iInObj = 1 , NumTariff
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-                ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !name of the tariff
@@ -908,9 +908,9 @@ DO iInObj = 1 , NumQualify
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
@@ -999,9 +999,9 @@ DO iInObj = 1 , numChargeSimple
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
@@ -1089,9 +1089,9 @@ DO iInObj = 1 , numChargeBlock
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-                ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
@@ -1202,9 +1202,9 @@ DO iInObj = 1 , numRatchet
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-               ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
@@ -1285,9 +1285,9 @@ DO iInObj = 1 , numEconVarObj
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'ECONOMICS:') .GT. 0) THEN
+    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-                 ' a field was found containing ECONOMICS: which may indicate a missing comma.')
+          ' a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   tariffPt = FindTariffIndex(AlphaArray(2),AlphaArray(1))
@@ -1469,7 +1469,7 @@ DO WHILE (endOfWord .GT. 0)
   END IF
   ! if a token is found then put it into step array
   IF (token .EQ. 0) THEN
-    CALL ShowWarningError('In ECONOMIC:COMPUTE line: ' // TRIM(lineOfCompute))
+    CALL ShowWarningError('In UtilityCost:Computation line: ' // TRIM(lineOfCompute))
     CALL ShowContinueError('  Do not recognize: ' // TRIM(word) // ' Will skip.')
   ELSE
     CALL incrementSteps
@@ -2064,7 +2064,7 @@ ELSE IF (SameString(nameOfSeason,'Fall')) THEN
 ELSE IF (SameString(nameOfSeason,'Annual')) THEN
   LookUpSeason = seasonAnnual
 ELSE
-  CALL ShowWarningError('ECONOMICS: Invalid season name ' // TRIM(nameOfSeason) // ' in: ' // TRIM(nameOfReferingObj))
+  CALL ShowWarningError('UtilityCost: Invalid season name ' // TRIM(nameOfSeason) // ' in: ' // TRIM(nameOfReferingObj))
   CALL ShowContinueError('  Defaulting to Annual')
   LookUpSeason = seasonAnnual
 END IF
@@ -2117,7 +2117,7 @@ END DO
 IF (found .GT. 0) THEN
   FindTariffIndex = found
 ELSE
-  CALL ShowWarningError('ECONOMICS:QUALIFY: The tariff name ' // TRIM(nameOfTariff))
+  CALL ShowWarningError('UtilityCost:Qualify: The tariff name ' // TRIM(nameOfTariff))
   CALL ShowContinueError ('  not found in: ' // TRIM(nameOfReferingObj))
   FindTariffIndex = 0
 END IF
@@ -2290,8 +2290,8 @@ IF (flagIfNotNumeric .AND. (LEN_TRIM(stringIn) .GE. 1)) THEN
     econVar(AssignVariablePt)%isAssigned = .TRUE.
   END IF
   econVar(AssignVariablePt)%tariffIndx = tariffPt
-  ! if the user defines the ECONOMIC:COMPUTATION then this is called when reading the
-  ! ECONOMIC:TARIFF with varNotYetDefined but they are already defined because
+  ! if the user defines the UtilityCost:Computation then this is called when reading the
+  ! UtilityCost:Tariff with varNotYetDefined but they are already defined because
   ! the subroutine CreateCategoryNativeVariables has already been called.
   IF (.NOT. ((varSpecific .EQ. varNotYetDefined) .AND. (econVar(AssignVariablePt)%specific .GE. catEnergyCharges))) THEN
     econVar(AssignVariablePt)%specific = varSpecific
@@ -2467,7 +2467,8 @@ DO iString = 1,LEN_TRIM(StringIn)
   END IF
 END DO
 IF (foundSpaces) THEN
-  CALL ShowWarningError('UtilityCost: Spaces were removed from the economics variable: ' // TRIM(stringOut))
+  CALL ShowWarningError('UtilityCost: Spaces were removed from the variable="' // TRIM(StringIn) // '".')
+  CALL ShowContinueError('...Resultant variable="'//trim(StringOut)//'".')
 END IF
 END FUNCTION RemoveSpaces
 
@@ -5875,7 +5876,7 @@ END SUBROUTINE GetMonthlyCostForResource
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

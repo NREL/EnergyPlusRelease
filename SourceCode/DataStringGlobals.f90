@@ -38,7 +38,15 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=*), PARAMETER :: AccentedLowerCase='àáâãäåæçèéêëìíîïğñòóôõöøùúûüı'
           CHARACTER(len=*), PARAMETER :: AllCase=&
        'àáâãäåæçèéêëìíîïğñòóôõöøùúûüıÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+#ifdef WINDOWS
           CHARACTER(len=1),  PARAMETER :: PathChar='\'
+#elif defined LINUX
+          CHARACTER(len=1),  PARAMETER :: PathChar='/'
+#elif defined MAC
+          CHARACTER(len=1),  PARAMETER :: PathChar='/'
+#else
+          CHARACTER(len=1),  PARAMETER :: PathChar='\'  ! default to Windows
+#endif
           INTEGER,           PARAMETER :: PathLimit=255
           CHARACTER(len=1),  PARAMETER :: CharComma=CHAR(44) !comma
           CHARACTER(len=1),  PARAMETER :: CharSemicolon=CHAR(59) !comma
@@ -56,14 +64,14 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=PathLimit)    :: CurrentWorkingFolder=' '  ! Current working directory for run
           CHARACTER(len=PathLimit+15) :: FullName=' '              ! Full name of file to open, including path
           CHARACTER(len=120) :: IDDVerString=' '                   ! Version information from the IDD (line 1)
-          CHARACTER(len=120) :: VerString='EnergyPlus, Version 7.0'      ! String that represents version information
-          CHARACTER(len=5)   :: MatchVersion='7.0.0' ! String to be matched by Version object
+          CHARACTER(len=120) :: VerString='EnergyPlus, Version 7.1'      ! String that represents version information
+          CHARACTER(len=5)   :: MatchVersion='7.1.0' ! String to be matched by Version object
           CHARACTER(len=40)  :: CurrentDateTime=' '       ! For printing current date and time at start of run
 
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

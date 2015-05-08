@@ -586,7 +586,8 @@ ELSE
         IsWidth(ZoneNum)=0
       END IF
     ELSE
-      Ain(ZoneNum)= MultizoneSurfaceCrackData(TypeNum)%FlowCoef / &
+      Ain(ZoneNum)= MultizoneCompDetOpeningData(TypeNum)%FlowCoef*2.0 &
+                    *(MultizoneSurfaceData(MaxSurf)%Width+MultizoneSurfaceData(MaxSurf)%Height) / &
                      (BaseDischargeCoef*SQRT(2./PsyRhoAirFnPbTdbW(OutBaroPress,MAT(ZoneNum),ZoneAirHumRat(ZoneNum))))
       Win=Ain(ZoneNum)/SurfParametersCVDV(MaxSurf)%Width
       IsWidth(ZoneNum)=1
@@ -894,6 +895,7 @@ SUBROUTINE CalcUCSDCV(ZoneNum)
   USE DataZoneEquipment,          ONLY: ZoneEquipConfig
   USE Psychrometrics,             ONLY: PsyRhoAirFnPbTdbW, PsyCpAirFnWTdb
   USE DataHVACGlobals,            ONLY: TimestepSys
+  USE InternalHeatGains,          ONLY: SumAllInternalConvectionGains, SumAllReturnAirConvectionGains
 
   IMPLICIT         NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -929,6 +931,7 @@ SUBROUTINE CalcUCSDCV(ZoneNum)
   REAL(r64)     :: MCpT_Total
   REAL(r64)     :: L
   REAL(r64)     :: ZoneMult   ! total zone multiplier
+  REAL(r64)     :: RetAirConvGain 
 
   GainsFrac=0.0
   ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
@@ -939,21 +942,17 @@ SUBROUTINE CalcUCSDCV(ZoneNum)
     ENDIF
   ENDDO
 
-  ConvGains = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-                      + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-                      + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-                      + ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%TDDPipeGain + SumConvHTRadSys(ZoneNum) &
-                      + ZoneIntGain(ZoneNum)%WaterThermalTankGain + ZoneIntGain(ZoneNum)%QFCConv &
-                      + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-                      + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv &
-                      + ZoneIntGain(ZoneNum)%PipeHTGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone &
+  CALL SumAllInternalConvectionGains(ZoneNum, ConvGains)
+
+  ConvGains =  ConvGains    &
+                      + SumConvHTRadSys(ZoneNum) &
                       + SysDepZoneLoadsLagged(ZoneNum) + NonAirSystemResponse(ZoneNum)/ZoneMult
 
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-    ConvGains = ConvGains + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC + ZoneIntGain(ZoneNum)%QLTCRA +   &
-       ZoneIntGain(ZoneNum)%T_QLTCRA
+    CALL SumAllReturnAirConvectionGains(ZoneNum, RetAirConvGain )
+    ConvGains = ConvGains + RetAirConvGain
   END IF
 
   ConvGainsJet = ConvGains*GainsFrac
@@ -1121,7 +1120,7 @@ END SUBROUTINE CalcUCSDCV
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

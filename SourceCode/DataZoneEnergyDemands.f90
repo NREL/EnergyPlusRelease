@@ -31,6 +31,8 @@ TYPE ZoneSystemDemandData ! Sensible cooling/heating loads to be met (watts)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequired
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequiredToHeatingSP !load required to meet heating setpoint by sequence
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequiredToCoolingSP !load required to meet cooling setpoint by sequence
+  REAL(r64) :: SupplyAirAdjustFactor              = 1.0D0 ! supply air adjustment factor due to the cap of
+                                                          ! zone maximum outdoor air fraction
 END TYPE ZoneSystemDemandData
 
 TYPE ZoneSystemMoistureDemand  ! Humidification/dehumidification loads to be met (kg water per second)
@@ -61,7 +63,7 @@ LOGICAL, ALLOCATABLE :: CurDeadbandOrSetback(:) ! same as above except updated a
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

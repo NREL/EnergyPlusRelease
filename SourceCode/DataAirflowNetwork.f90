@@ -77,7 +77,7 @@ TYPE AirflowNetworkSimuProp ! Basic parameters for AirflowNetwork simulation
                                          ! MULTIZONE WITHOUT DISTRIBUTION
                                          ! MULTIZONE WITH DISTRIBUTION ONLY DURING FAN OPERATION,
                                          ! and NO MULTIZONE OR DISTRIBUTION
- CHARACTER(len=30)  :: WPCCntr = 'Input'     ! Wind pressure coefficient input control: "SURFACE-AVERAGE CALCULATION", or "INPUT"
+ CHARACTER(len=32)  :: WPCCntr = 'Input'     ! Wind pressure coefficient input control: "SURFACE-AVERAGE CALCULATION", or "INPUT"
  INTEGER  :: iWPCCntr    ! Integer equivalent for WPCCntr field
  CHARACTER(len=MaxNameLength)  :: CpArrayName = ' '  ! CP Array name at WPCCntr = "INPUT"
  CHARACTER(len=10)  :: BldgType = ' '        ! Building type: "LOWRISE" or "HIGHRISE" at WPCCntr = "SURFACE-AVERAGE CALCULATIO"
@@ -96,7 +96,7 @@ TYPE AirflowNetworkSimuProp ! Basic parameters for AirflowNetwork simulation
  INTEGER  :: ExtLargeOpeningErrIndex =0 ! Exterior large opening error index during HVAC system operation
  INTEGER  :: OpenFactorErrCount =0   ! Large opening error count at Open factor > 1.0
  INTEGER  :: OpenFactorErrIndex =0   ! Large opening error error index at Open factor > 1.0
- CHARACTER(len=30)  :: InitType = 'ZeroNodePressures' ! Initialization flag type:
+ CHARACTER(len=32)  :: InitType = 'ZeroNodePressures' ! Initialization flag type:
                                                         ! "ZERO NODE PRESSURES", or "Linear Initialization Method"
 END TYPE AirflowNetworkSimuProp
 
@@ -169,7 +169,7 @@ TYPE MultizoneCompDetOpeningProp ! Large detailed opening component
  CHARACTER(len=MaxNameLength)  :: Name = ' ' ! Name of large detailed opening component
  REAL(r64)     :: FlowCoef    = 0.0d0             ! Air Mass Flow Coefficient When Window or Door Is Closed
  REAL(r64)     :: FlowExpo    = 0.0d0             ! Air Mass Flow exponent When Window or Door Is Closed
- CHARACTER(len=30) :: TypeName = 'NonPivoted' ! Name of Large vertical opening type
+ CHARACTER(len=32) :: TypeName = 'NonPivoted' ! Name of Large vertical opening type
  INTEGER  :: LVOType     = 0               ! Large vertical opening type number
  REAL(r64)     :: LVOValue    = 0.0d0             ! Extra crack length for LVO type 1 with multiple openable parts,
                                            ! or Height of pivoting axis for LVO type 2
@@ -445,6 +445,7 @@ TYPE AirflowNetworkNodeSimuData ! Node variable for simulation
  REAL(r64)     :: WZ =0.0d0         ! Humidity ratio [kg/kg]
  REAL(r64)     :: PZ =0.0d0         ! Pressure [Pa]
  REAL(r64)     :: CO2Z =0.0d0       ! CO2 [ppm]
+ REAL(r64)     :: GCZ =0.0d0        ! Generic contaminant [ppm]
 END TYPE AirflowNetworkNodeSimuData
 
 TYPE AirflowNetworkLinkSimuData
@@ -496,6 +497,9 @@ TYPE AirflowNetworkExchangeProp
  REAL(r64) :: SumMHrCO = 0.0d0
  REAL(r64) :: SumMMHrCO = 0.0d0
  REAL(r64) :: TotalCO2 = 0.0d0
+ REAL(r64) :: SumMHrGC = 0.0d0
+ REAL(r64) :: SumMMHrGC = 0.0d0
+ REAL(r64) :: TotalGC = 0.0d0
 END TYPE AirflowNetworkExchangeProp
 
           ! MODULE VARIABLE DECLARATIONS:
@@ -580,6 +584,7 @@ LOGICAL :: RollBackFlag = .FALSE.          ! Roll back flag when system time ste
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ANZT    ! Local zone air temperature for roll back use
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ANZW    ! Local zone air humidity ratio for roll back use
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ANCO    ! Local zone air CO2 for roll back use
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ANGC    ! Local zone air generic contaminant for roll back use
 INTEGER :: AirflowNetworkNumOfExhFan = 0   ! Number of zone exhaust fans
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: AirflowNetworkZoneExhaustFan ! Logical to use zone exhaust fans
 LOGICAL :: AirflowNetworkFanActivated = .FALSE. ! Supply fan activation flag
@@ -588,7 +593,7 @@ INTEGER :: MultiSpeedHPIndicator     = 0   ! Indicator for multispeed heat pump 
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

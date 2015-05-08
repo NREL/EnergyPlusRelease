@@ -42,7 +42,7 @@ PUBLIC   ! Data Only Module
   INTEGER, PARAMETER :: NumValidNodeFluidTypes=4
 
   ! Valid Connection Types for Nodes
-  CHARACTER(len=*), PARAMETER, DIMENSION(14) :: ValidConnectionTypes=  &
+  CHARACTER(len=*), PARAMETER, DIMENSION(15) :: ValidConnectionTypes=  &
                      (/'Inlet              ',  &
                        'Outlet             ',  &
                        'Internal           ',  &
@@ -56,9 +56,10 @@ PUBLIC   ! Data Only Module
                        'ZoneExhaust        ',  &
                        'Setpoint           ',  &
                        'Electric           ',  &
-                       'OutsideAirReference'/)
+                       'OutsideAirReference',  &
+                       'InducedAir         '/)
 
-  INTEGER, PARAMETER :: NumValidConnectionTypes=14
+  INTEGER, PARAMETER :: NumValidConnectionTypes=15
 
   INTEGER, PARAMETER :: NodeConnectionType_Inlet               = 1
   INTEGER, PARAMETER :: NodeConnectionType_Outlet              = 2
@@ -74,6 +75,7 @@ PUBLIC   ! Data Only Module
   INTEGER, PARAMETER :: NodeConnectionType_Setpoint            = 12
   INTEGER, PARAMETER :: NodeConnectionType_Electric            = 13
   INTEGER, PARAMETER :: NodeConnectionType_OutsideAirReference = 14
+  INTEGER, PARAMETER :: NodeConnectionType_InducedAir          = 15
 
   ! Valid IsParent Types for Node Connections
   LOGICAL, PARAMETER    :: ObjectIsParent          = .TRUE.
@@ -120,6 +122,8 @@ PUBLIC   ! Data Only Module
    ! Contaminant
    REAL(r64)     :: CO2                       = 0.d0 ! {ppm}
    REAL(r64)     :: CO2SetPoint               = 0.d0 ! {ppm}
+   REAL(r64)     :: GenContam                 = 0.d0 ! {ppm}
+   REAL(r64)     :: GenContamSetPoint         = 0.d0 ! {ppm}
  END TYPE NodeData
 
  TYPE MoreNodeData
@@ -129,6 +133,7 @@ PUBLIC   ! Data Only Module
    REAL(r64)     :: VolFlowRateCrntRho        = 0.d0 ! volume flow rate at current density, only used for air nodes [m3/s]
    REAL(r64)     :: WetbulbTemp               = 0.d0 ! wetbulb temperature [C]
    REAL(r64)     :: AirDensity                = 0.d0 ! reported air density at standard density [kg/m3]
+   REAL(r64)     :: AirDewpointTemp           = 0.d0 ! reported system node dewpoint temperature [C]
  END TYPE MoreNodeData
 
  TYPE MarkedNodeData
@@ -178,7 +183,9 @@ PUBLIC   ! Data Only Module
               .FALSE.,      & ! EMSOverrideOutAirWetBulb
               0.0D0,        & ! EMSValueForOutAirWetBulb {C}
               0.0D0,        & ! CO2 {ppm}
-              0.0D0)          ! CO2 setpoint {ppm}
+              0.0D0,        & ! CO2 setpoint {ppm}
+              0.0D0,        & ! Generic contaminant {ppm}
+              0.0D0)          ! Generic contaminant setpoint {ppm}
 
  TYPE (MoreNodeData), ALLOCATABLE, DIMENSION(:) :: MoreNodeInfo
  TYPE (MarkedNodeData), ALLOCATABLE, DIMENSION(:) :: MarkedNode
@@ -193,7 +200,7 @@ PUBLIC   ! Data Only Module
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

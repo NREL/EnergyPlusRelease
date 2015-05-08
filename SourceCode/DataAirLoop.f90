@@ -99,7 +99,8 @@ TYPE AirLoopControlData ! Derived type for air control information
   LOGICAL :: CoolingActiveFlag =.FALSE. ! true whenever the air loop cooling coil is operating
   LOGICAL :: HeatingActiveFlag =.FALSE. ! true whenever the air loop heating coil is operating
   LOGICAL :: OASysComponentsSimulated = .FALSE. !- true after OA components have been simulated
-  LOGICAL :: AirLoopDCVFlag =.true.    ! TRUE if the air loop has OA Controller specifying a Mechanical controller with DCV - internal flag only
+  LOGICAL :: AirLoopDCVFlag =.true.    ! TRUE if the air loop has OA Controller specifying a Mechanical controller with DCV
+                                       ! - internal flag only
 END TYPE AirLoopControlData
 
 TYPE AirLoopFlowData ! Derived type for air loop flow information
@@ -115,6 +116,7 @@ TYPE AirLoopFlowData ! Derived type for air loop flow information
   REAL(r64) :: SupFlow        =0.0 ! supply air flow rate [kg/s]
   REAL(r64) :: RetFlow        =0.0 ! return air flow rate [kg/s]
   REAL(r64) :: RetFlow0       =0.0 ! sum of zone return flows before adjusting for total loop exhaust
+  REAL(r64) :: RecircFlow     =0.0 ! sum of zone plenum recirculated flows
   REAL(r64) :: FanPLR         =0.0 ! Operating PLR of air loop fan
   REAL(r64) :: OAFrac         =0.0 ! fraction of outside air to mixed air mass flow rate
   LOGICAL :: FlowError   =.FALSE. ! error flag for flow error message
@@ -148,7 +150,7 @@ END TYPE OAControllerData
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

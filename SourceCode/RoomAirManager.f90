@@ -1989,7 +1989,7 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
         IF (ZoneEquipConfig(ZoneEquipConfigNum)%IsControlled) THEN
           IsZoneCV(Loop) = .FALSE.
           AirModel(Loop)%SimAirModel= .FALSE.
-          CALL ShowSevereError('Unmixed Flow: Cross Ventilation can not be applied for Zone='//TRIM(zone(loop)%Name))
+          CALL ShowSevereError('Unmixed Flow: Cross Ventilation cannot be applied for Zone='//TRIM(zone(loop)%Name))
           CALL ShowContinueError('An HVAC system is present in the zone. Fully mixed airflow model will be used for Zone='//  &
                                  TRIM(zone(loop)%Name))
           cycle
@@ -2154,7 +2154,7 @@ END SUBROUTINE SharedDVCVUFDataInit
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

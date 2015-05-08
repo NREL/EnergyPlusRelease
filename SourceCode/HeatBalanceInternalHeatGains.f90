@@ -34,17 +34,39 @@ IMPLICIT NONE         ! Enforce explicit typing of all variables
 PRIVATE ! Everything private unless explicitly made public
 
   ! MODULE PARAMETER DEFINITIONS:
-  ! na
+
 
 LOGICAL :: GetInternalHeatGainsInputFlag = .TRUE.   ! Controls the GET routine calling (limited to first time)
 
   ! SUBROUTINE SPECIFICATIONS FOR MODULE InternalHeatGains
 PUBLIC  ManageInternalHeatGains
+PUBLIC  UpdateInternalGainValues
 PRIVATE GetInternalHeatGainsInput
 PRIVATE InitInternalHeatGains
 PRIVATE ReportInternalHeatGains
 PUBLIC  GetDesignLightingLevelForZone
 PUBLIC  CheckLightsReplaceableMinMaxForZone
+PUBLIC  SumAllInternalConvectionGains
+PUBLIC  SumInternalConvectionGainsByTypes
+!PUBLIC  SumInternalConvectionGainsByIndices
+PUBLIC  SumAllReturnAirConvectionGains
+PUBLIC  SumReturnAirConvectionGainsByTypes
+!PUBLIC SumReturnAirConvectionGainsByIndices
+PUBLIC  SumAllInternalRadiationGains
+PUBLIC  SumInternalRadiationGainsByTypes
+!PUBLIC  SumInternalRadiationGainsByIndices
+PUBLIC  SumAllInternalLatentGains
+PUBLIC  SumInternalLatentGainsByTypes
+!PUBLIC  SumInternalLatentGainsByIndices
+PUBLIC  SumAllReturnAirLatentGains
+!PUBLIC
+PUBLIC  SumAllInternalCO2Gains
+PUBLIC  SumInternalCO2GainsByTypes
+PUBLIC  SumAllInternalGenericContamGains
+!PUBLIC  SumInternalCO2GainsByIndices
+!PUBLIC  GetInternalGainDeviceIndex
+
+
 
 CONTAINS
 
@@ -471,11 +493,11 @@ SUBROUTINE GetInternalHeatGainsInput
         ENDIF
 
         IF (NumNumber == 6 .and. .not. lNumericFieldBlanks(6)) THEN
-          People(Loop)%CO2Rate = IHGNumbers(6)
+          People(Loop)%CO2RateFactor = IHGNumbers(6)
         ELSE
-          People(Loop)%CO2Rate = 3.82d-8 ! m3/s-W
+          People(Loop)%CO2RateFactor = 3.82d-8 ! m3/s-W
         ENDIF
-        If (People(Loop)%CO2Rate .LT. 0.d0) Then
+        If (People(Loop)%CO2RateFactor .LT. 0.d0) Then
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cNumericFieldNames(6))//' < 0.0, value ='//  &
                              TRIM(RoundSigDigits(IHGNumbers(6),2)))
@@ -519,8 +541,8 @@ SUBROUTINE GetInternalHeatGainsInput
           ELSEIF (SchMin < 70.0d0 .or. SchMax > 1000.0d0) THEN
             IF (Item1 == 1) THEN
               CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'='//TRIM(AlphaName(1))//  &
-                                   '", '//TRIM(cAlphaFieldNames(5))//  &
-                                   ' falls outside typical range [70,1000] W/person for Thermal Comfort Reporting.')
+                                   '", '//TRIM(cAlphaFieldNames(5))//' values')
+              CALL ShowContinueError('fall outside typical range [70,1000] W/person for Thermal Comfort Reporting.')
               CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//'; Odd comfort values may result. '//  &
                                'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] W/person.')
@@ -838,6 +860,17 @@ SUBROUTINE GetInternalHeatGainsInput
           CALL SetupEMSInternalVariable( 'People Count Design Level'  , People(Loop)%Name,  '[each]', &
                                        People(Loop)%NumberOfPeople )
         ENDIF
+
+        !setup internal gains
+        CALL SetupZoneInternalGain(People(Loop)%ZonePtr, &
+                           'People', &
+                           People(Loop)%Name, &
+                           IntGainTypeOf_People, &
+                           ConvectionGainRate       = People(Loop)%ConGainRate,&
+                           ThermalRadiationGainRate = People(Loop)%RadGainRate, &
+                           LatentGainRate           = People(Loop)%LatGainRate, &
+                           CarbonDioxideGainRate    = People(Loop)%CO2GainRate)
+
       END DO ! Item1 - number of zones
     END DO ! Item - number of people statements
   ENDIF ! TotPeople > 0
@@ -1177,6 +1210,15 @@ SUBROUTINE GetInternalHeatGainsInput
           CALL SetupEMSInternalVariable( 'Lighting Power Design Level', Lights(Loop)%Name, '[W]' ,&
                                            Lights(Loop)%DesignLevel )
         ENDIF ! EMS
+                !setup internal gains
+        CALL SetupZoneInternalGain(Lights(Loop)%ZonePtr, &
+                           'Lights', &
+                           Lights(Loop)%Name, &
+                           IntGainTypeOf_Lights, &
+                           ConvectionGainRate          = Lights(Loop)%ConGainRate,&
+                           ThermalRadiationGainRate    = Lights(Loop)%RadGainRate, &
+                           ReturnAirConvectionGainRate = Lights(Loop)%RetAirGainRate)
+
 
         ! send values to predefined lighting summary report
         liteName = Lights(loop)%Name
@@ -1475,6 +1517,14 @@ SUBROUTINE GetInternalHeatGainsInput
                                            ZoneElectric(Loop)%DesignLevel )
         ENDIF ! EMS
 
+        CALL SetupZoneInternalGain(ZoneElectric(Loop)%ZonePtr, &
+                   'ElectricEquipment', &
+                   ZoneElectric(Loop)%Name, &
+                   IntGainTypeOf_ElectricEquipment, &
+                   ConvectionGainRate          = ZoneElectric(Loop)%ConGainRate,&
+                   ThermalRadiationGainRate    = ZoneElectric(Loop)%RadGainRate, &
+                   LatentGainRate              = ZoneElectric(Loop)%LatGainRate)
+
       END DO ! Item1
     END DO ! Item - Number of ZoneElectric objects
   END IF ! Check on number of ZoneElectric
@@ -1657,15 +1707,15 @@ SUBROUTINE GetInternalHeatGainsInput
         ZoneGas(Loop)%FractionLost=IHGNumbers(6)
 
         IF ((NumNumber .EQ. 7) .OR. (.not. lNumericFieldBlanks(7))) THEN
-          ZoneGas(Loop)%CO2Rate=IHGNumbers(7)
+          ZoneGas(Loop)%CO2RateFactor=IHGNumbers(7)
         END IF
-        If (ZoneGas(Loop)%CO2Rate .LT. 0.d0) Then
+        If (ZoneGas(Loop)%CO2RateFactor .LT. 0.d0) Then
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                            '", '//TRIM(cNumericFieldNames(7))//' < 0.0, value ='//  &
                            TRIM(RoundSigDigits(IHGNumbers(7),2)))
           ErrorsFound=.true.
         End If
-        If (ZoneGas(Loop)%CO2Rate .GT. 4.0d-7) Then
+        If (ZoneGas(Loop)%CO2RateFactor .GT. 4.0d-7) Then
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cNumericFieldNames(7))//' > 4.0E-7, value ='//  &
                              TRIM(RoundSigDigits(IHGNumbers(7),2)))
@@ -1760,6 +1810,15 @@ SUBROUTINE GetInternalHeatGainsInput
           CALL SetupEMSInternalVariable( 'Gas Process Power Design Level', ZoneGas(Loop)%Name, '[W]' ,&
                                            ZoneGas(Loop)%DesignLevel )
         ENDIF ! EMS
+
+        CALL SetupZoneInternalGain(ZoneGas(Loop)%ZonePtr, &
+                   'GasEquipment', &
+                   ZoneGas(Loop)%Name, &
+                   IntGainTypeOf_GasEquipment, &
+                   ConvectionGainRate          = ZoneGas(Loop)%ConGainRate, &
+                   ThermalRadiationGainRate    = ZoneGas(Loop)%RadGainRate, &
+                   CarbonDioxideGainRate       = ZoneGas(Loop)%CO2GainRate, &
+                   LatentGainRate              = ZoneGas(Loop)%LatGainRate)
 
       END DO ! Item1
     END DO ! Item - number of gas statements
@@ -2034,6 +2093,14 @@ SUBROUTINE GetInternalHeatGainsInput
                                            ZoneHWEq(Loop)%DesignLevel )
         ENDIF ! EMS
 
+        CALL SetupZoneInternalGain(ZoneHWEq(Loop)%ZonePtr, &
+                   'HotWaterEquipment', &
+                   ZoneHWEq(Loop)%Name, &
+                   IntGainTypeOf_HotWaterEquipment, &
+                   ConvectionGainRate          = ZoneHWEq(Loop)%ConGainRate,&
+                   ThermalRadiationGainRate    = ZoneHWEq(Loop)%RadGainRate, &
+                   LatentGainRate              = ZoneHWEq(Loop)%LatGainRate)
+
       END DO ! Item1
     END DO ! Item - number of hot water statements
   END IF
@@ -2257,6 +2324,14 @@ SUBROUTINE GetInternalHeatGainsInput
                                        ZoneSteamEq(Loop)%DesignLevel )
     ENDIF ! EMS
 
+    CALL SetupZoneInternalGain(ZoneSteamEq(Loop)%ZonePtr, &
+                   'SteamEquipment', &
+                   ZoneSteamEq(Loop)%Name, &
+                   IntGainTypeOf_SteamEquipment, &
+                   ConvectionGainRate          = ZoneSteamEq(Loop)%ConGainRate,&
+                   ThermalRadiationGainRate    = ZoneSteamEq(Loop)%RadGainRate, &
+                   LatentGainRate              = ZoneSteamEq(Loop)%LatGainRate)
+
   END DO
 
 
@@ -2422,6 +2497,14 @@ SUBROUTINE GetInternalHeatGainsInput
                                        ZoneOtherEq(Loop)%DesignLevel )
     ENDIF ! EMS
 
+    CALL SetupZoneInternalGain(ZoneOtherEq(Loop)%ZonePtr, &
+                   'OtherEquipment', &
+                   ZoneOtherEq(Loop)%Name, &
+                   IntGainTypeOf_OtherEquipment, &
+                   ConvectionGainRate          = ZoneOtherEq(Loop)%ConGainRate,&
+                   ThermalRadiationGainRate    = ZoneOtherEq(Loop)%RadGainRate, &
+                   LatentGainRate              = ZoneOtherEq(Loop)%LatGainRate)
+
   END DO
 
 
@@ -2565,6 +2648,13 @@ SUBROUTINE GetInternalHeatGainsInput
                                        ZoneBBHeat(Loop)%CapatHighTemperature )
     ENDIF ! EMS
 
+    CALL SetupZoneInternalGain(ZoneBBHeat(Loop)%ZonePtr, &
+                   'ZoneBaseboard:OutdoorTemperatureControlled', &
+                   ZoneBBHeat(Loop)%Name, &
+                   IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled, &
+                   ConvectionGainRate          = ZoneBBHeat(Loop)%ConGainRate,&
+                   ThermalRadiationGainRate    = ZoneBBHeat(Loop)%RadGainRate)
+
   END DO
 
   RepVarSet=.true.
@@ -2627,12 +2717,12 @@ SUBROUTINE GetInternalHeatGainsInput
       ENDIF
     ENDIF
 
-    ZoneCO2Gen(Loop)%CO2Rate=IHGNumbers(1)
+    ZoneCO2Gen(Loop)%CO2DesignRate=IHGNumbers(1)
 
     IF (ZoneCO2Gen(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('CO2 source and sink rate [m3/s]',ZoneCO2Gen(Loop)%Power, &
+    CALL SetupOutputVariable('CO2 source and sink rate [m3/s]',ZoneCO2Gen(Loop)%CO2GainRate, &
                              'Zone','Average',ZoneCO2Gen(Loop)%Name)
 
     ! Zone total report variables
@@ -2643,6 +2733,12 @@ SUBROUTINE GetInternalHeatGainsInput
                                'Zone','Average',Zone(ZoneCO2Gen(Loop)%ZonePtr)%Name)
 
     ENDIF
+
+    CALL SetupZoneInternalGain(ZoneCO2Gen(Loop)%ZonePtr, &
+               'ZoneContaminantSourceAndSink:CarbonDioxide', &
+               ZoneCO2Gen(Loop)%Name, &
+               IntGainTypeOf_ZoneContaminantSourceAndSinkCarbonDioxide, &
+               CarbonDioxideGainRate       = ZoneCO2Gen(Loop)%CO2GainRate)
 
   END DO
 
@@ -2784,7 +2880,7 @@ SUBROUTINE GetInternalHeatGainsInput
       StringOut='No'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    StringOut=RoundSigDigits(People(Loop)%CO2Rate,4)
+    StringOut=RoundSigDigits(People(Loop)%CO2RateFactor,4)
     IF (People(Loop)%Fanger .or. People(Loop)%Pierce .or. People(Loop)%KSU) THEN
       WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
       IF (People(Loop)%MRTCalcType == ZoneAveraged) THEN
@@ -3153,6 +3249,8 @@ SUBROUTINE InitInternalHeatGains
   USE MicroCHPElectricGenerator, ONLY: FigureMicroCHPZoneGains
   USE ManageElectricPower,       ONLY: FigureInverterZoneGains, FigureElectricalStorageZoneGains, &
                                        FigureTransformerZoneGains
+  USE DaylightingDevices,        ONLY: FigureTDDZoneGains
+  USE RefrigeratedCase,          ONLY: FigureRefrigerationZoneGains
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3173,7 +3271,8 @@ SUBROUTINE InitInternalHeatGains
   REAL(r64) :: ActivityLevel_WperPerson  ! Units on Activity Level (Schedule)
   REAL(r64) :: NumberOccupants       ! Number of occupants
   INTEGER :: SurfNum            ! DO loop counter for surfaces
-  INTEGER :: Loop,NZ
+  INTEGER :: Loop
+  INTEGER :: NZ
   REAL(r64) :: Q !, QR
   REAL(r64) :: TotalPeopleGain    ! Total heat gain from people (intermediate calculational variable)
   REAL(r64) :: SensiblePeopleGain ! Sensible heat gain from people (intermediate calculational variable)
@@ -3183,64 +3282,45 @@ SUBROUTINE InitInternalHeatGains
   INTEGER :: ReturnZonePlenumCondNum ! Number of ZoneRetPlenCond for a zone's return air plenum, if it exists
   REAL(r64) :: ReturnPlenumTemp   ! Air temperature of a zone's return air plenum (C)
 
-  REAL(r64), ALLOCATABLE, SAVE, DIMENSION(:) :: QSA
+!  REAL(r64), ALLOCATABLE, SAVE, DIMENSION(:) :: QSA
 
-  IF (.NOT. ALLOCATED(QSA)) ALLOCATE(QSA(NumOfZones))
+!  IF (.NOT. ALLOCATED(QSA)) ALLOCATE(QSA(NumOfZones))
 
                 !  Zero out time step variables
-  ZoneIntGain%NOFOCC = 0.0
-  ZoneIntGain%QOCTOT = 0.0
-  ZoneIntGain%QOCSEN = 0.0
-  ZoneIntGain%QOCLAT = 0.0
-  ZoneIntGain%QOCRAD = 0.0
-  ZoneIntGain%QOCCON = 0.0
-  ZoneIntGain%QLTSW  = 0.0
-  ZoneIntGain%QLTCRA = 0.0
-  ZoneIntGain%QLTRAD = 0.0
-  ZoneIntGain%QLTCON = 0.0
-  ZoneIntGain%QLTTOT = 0.0
-  ZoneIntGain%T_QLTSW  = 0.0
-  ZoneIntGain%T_QLTCRA = 0.0
-  ZoneIntGain%T_QLTRAD = 0.0
-  ZoneIntGain%T_QLTCON = 0.0
-  ZoneIntGain%T_QLTTOT = 0.0
-  ZoneIntGain%QEELAT = 0.0
-  ZoneIntGain%QEERAD = 0.0
-  ZoneIntGain%QEECON = 0.0
-  ZoneIntGain%QEELost = 0.0
-  ZoneIntGain%QGELAT = 0.0
-  ZoneIntGain%QGERAD = 0.0
-  ZoneIntGain%QGECON = 0.0
-  ZoneIntGain%QGELost= 0.0
-  ZoneIntGain%QBBRAD = 0.0
-  ZoneIntGain%QBBCON = 0.0
-  ZoneIntGain%QOELAT = 0.0
-  ZoneIntGain%QOERAD = 0.0
-  ZoneIntGain%QOECON = 0.0
-  ZoneIntGain%QOELost= 0.0
-  ZoneIntGain%QHWLAT = 0.0
-  ZoneIntGain%QHWRAD = 0.0
-  ZoneIntGain%QHWCON = 0.0
-  ZoneIntGain%QHWLost= 0.0
-  ZoneIntGain%QSELAT = 0.0
-  ZoneIntGain%QSERAD = 0.0
-  ZoneIntGain%QSECON = 0.0
-  ZoneIntGain%QSELost= 0.0
-  ZoneIntGain%FanPower = 0.0
-  ZoneIntGain%MinVentTemp = 0.0
-  ZoneIntGain%TDDPipeGain = 0.0
-  ZoneIntGain%WaterThermalTankGain = 0.0
-  ZoneIntGain%WaterUseSensibleGain = 0.0
-  ZoneIntGain%WaterUseLatentGain = 0.0
-  ZoneIntGain%QFCConv = 0.0
-  ZoneIntGain%QFCRad  = 0.0
-  ZoneIntGain%QGenConv = 0.0
-  ZoneIntGain%QGenRad  = 0.0
-  ZoneIntGain%QInvertConv = 0.0
-  ZoneIntGain%QInvertRad  = 0.0
-  ZoneIntGain%QElecStorConv = 0.0
-  ZoneIntGain%QElecStorRad  = 0.0
-  ZoneIntGain%PipeHTGain = 0.0
+  ZoneIntGain%NOFOCC = 0.d0
+  ZoneIntGain%QOCTOT = 0.d0
+  ZoneIntGain%QOCSEN = 0.d0
+  ZoneIntGain%QOCLAT = 0.d0
+  ZoneIntGain%QOCRAD = 0.d0
+  ZoneIntGain%QOCCON = 0.d0
+  ZoneIntGain%QLTSW  = 0.d0
+  ZoneIntGain%QLTCRA = 0.d0
+  ZoneIntGain%QLTRAD = 0.d0
+  ZoneIntGain%QLTCON = 0.d0
+  ZoneIntGain%QLTTOT = 0.d0
+
+  ZoneIntGain%QEELAT = 0.d0
+  ZoneIntGain%QEERAD = 0.d0
+  ZoneIntGain%QEECON = 0.d0
+  ZoneIntGain%QEELost = 0.d0
+  ZoneIntGain%QGELAT = 0.d0
+  ZoneIntGain%QGERAD = 0.d0
+  ZoneIntGain%QGECON = 0.d0
+  ZoneIntGain%QGELost= 0.d0
+  ZoneIntGain%QBBRAD = 0.d0
+  ZoneIntGain%QBBCON = 0.d0
+  ZoneIntGain%QOELAT = 0.d0
+  ZoneIntGain%QOERAD = 0.d0
+  ZoneIntGain%QOECON = 0.d0
+  ZoneIntGain%QOELost= 0.d0
+  ZoneIntGain%QHWLAT = 0.d0
+  ZoneIntGain%QHWRAD = 0.d0
+  ZoneIntGain%QHWCON = 0.d0
+  ZoneIntGain%QHWLost= 0.d0
+  ZoneIntGain%QSELAT = 0.d0
+  ZoneIntGain%QSERAD = 0.d0
+  ZoneIntGain%QSECON = 0.d0
+  ZoneIntGain%QSELost= 0.d0
 
   DO Loop = 0, 25
     ZoneIntEEuse%EEConvected(Loop) = 0.0
@@ -3256,7 +3336,7 @@ SUBROUTINE InitInternalHeatGains
   ZnRpt%SteamPower = 0.0
   ZnRpt%BaseHeatPower = 0.0
 
-  QSA = 0.0
+!  QSA = 0.0
 
           ! Process Internal Heat Gains, People done below
           ! Occupant Stuff
@@ -3303,6 +3383,8 @@ SUBROUTINE InitInternalHeatGains
       ZonePreDefRep(NZ)%isOccupied = .true. !set flag to occupied to be used in tabular reporting for ventilation
       ZonePreDefRep(NZ)%NumOccAccum = ZonePreDefRep(NZ)%NumOccAccum + NumberOccupants * TimeStepZone
       ZonePreDefRep(NZ)%NumOccAccumTime = ZonePreDefRep(NZ)%NumOccAccumTime + TimeStepZone
+    ELSE
+      ZonePreDefRep(NZ)%isOccupied = .false. !set flag to occupied to be used in tabular reporting for ventilation
     END IF
 
     People(Loop)%NumOcc = NumberOccupants
@@ -3311,6 +3393,7 @@ SUBROUTINE InitInternalHeatGains
     People(Loop)%SenGainRate = SensiblePeopleGain
     People(Loop)%LatGainRate = TotalPeopleGain - SensiblePeopleGain
     People(Loop)%TotGainRate = TotalPeopleGain
+    People(Loop)%CO2GainRate = TotalPeopleGain * People(Loop)%CO2RateFactor
 
     ZoneIntGain(NZ)%NOFOCC = ZoneIntGain(NZ)%NOFOCC + People(Loop)%NumOcc
     ZoneIntGain(NZ)%QOCRAD = ZoneIntGain(NZ)%QOCRAD + People(Loop)%RadGainRate
@@ -3412,8 +3495,9 @@ SUBROUTINE InitInternalHeatGains
     ZoneGas(Loop)%RadGainRate = Q * ZoneGas(Loop)%FractionRadiant
     ZoneGas(Loop)%ConGainRate = Q * ZoneGas(Loop)%FractionConvected
     ZoneGas(Loop)%LatGainRate = Q * ZoneGas(Loop)%FractionLatent
-    ZoneGas(Loop)%LostRate = Q * ZoneGas(Loop)%FractionLost
+    ZoneGas(Loop)%LostRate    = Q * ZoneGas(Loop)%FractionLost
     ZoneGas(Loop)%TotGainRate = Q - ZoneGas(Loop)%LostRate
+    ZoneGas(Loop)%CO2GainRate = Q * ZoneGas(Loop)%CO2RateFactor
 
     NZ = ZoneGas(Loop)%ZonePtr
     ZnRpt(NZ)%GasPower = ZnRpt(NZ)%GasPower + ZoneGas(Loop)%Power
@@ -3513,30 +3597,30 @@ SUBROUTINE InitInternalHeatGains
     ZoneIntGain(NZ)%QBBCON = ZoneIntGain(NZ)%QBBCON + ZoneBBHeat(Loop)%ConGainRate
   END DO
 
-!  IF (.NOT. BeginEnvrnFlag) THEN
-    CALL CalcWaterThermalTankZoneGains
-    CALL CalcZonePipesHeatGain
-    CALL CalcWaterUseZoneGains
-    CALL FigureFuelCellZoneGains
-    CALL FigureMicroCHPZoneGains
-    CALL FigureInverterZoneGains
-    CALL FigureElectricalStorageZoneGains
-    CALL FigureTransformerZoneGains
-!  END IF
+  DO Loop=1, TotCO2Gen
+    NZ = ZoneCO2Gen(Loop)%ZonePtr
+    ZoneCO2Gen(Loop)%CO2GainRate = ZoneCO2Gen(Loop)%CO2DesignRate * GetCurrentScheduleValue(ZoneCO2Gen(Loop)%SchedPtr)
+    ZnRpt(NZ)%CO2Rate = ZnRpt(NZ)%CO2Rate + ZoneCO2Gen(Loop)%CO2GainRate
+  ENDDO
 
-!                                      SUM RADIANT and Latent GAINS (Convective moved to ZoneTempPredictorCorrector)
+  CALL CalcWaterThermalTankZoneGains
+  CALL CalcZonePipesHeatGain
+  CALL CalcWaterUseZoneGains
+  CALL FigureFuelCellZoneGains
+  CALL FigureMicroCHPZoneGains
+  CALL FigureInverterZoneGains
+  CALL FigureElectricalStorageZoneGains
+  CALL FigureTransformerZoneGains
+  CALL FigureTDDZoneGains
+  CALL FigureRefrigerationZoneGains
+
+! store pointer values to hold generic internal gain values constant for entire timestep
+  CALL UpdateInternalGainValues
 
   DO NZ = 1, NumOfZones
+    CALL SumAllInternalRadiationGains(NZ, QL(NZ))
 
-    QL(NZ)= ZoneIntGain(NZ)%QOCRAD + ZoneIntGain(NZ)%QLTRAD + ZoneIntGain(NZ)%T_QLTRAD &
-      + ZoneIntGain(NZ)%QEERAD &
-      + ZoneIntGain(NZ)%QGERAD + ZoneIntGain(NZ)%QOERAD + ZoneIntGain(NZ)%QHWRAD &
-      + ZoneIntGain(NZ)%QSERAD + ZoneIntGain(NZ)%QBBRAD + ZoneIntGain(NZ)%QFCRad &
-      + ZoneIntGain(NZ)%QGenRad
-
-    ZoneLatentGain(NZ) = ZoneIntGain(NZ)%QOCLAT + ZoneIntGain(NZ)%QEELAT + ZoneIntGain(NZ)%QGELAT &
-                       + ZoneIntGain(NZ)%QOELAT + ZoneIntGain(NZ)%QHWLAT + ZoneIntGain(NZ)%QSELAT &
-                       + ZoneIntGain(NZ)%WaterUseLatentGain
+    CALL SumAllInternalLatentGains(NZ, ZoneLatentGain(NZ))
 
   END DO
 
@@ -3592,6 +3676,14 @@ SUBROUTINE ReportInternalHeatGains
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: Loop
   INTEGER :: ZoneLoop                ! Counter for the # of zones (nz)
+  INTEGER, DIMENSION(7) :: TradIntGainTypes = (/IntGainTypeOf_People , &
+                                                IntGainTypeOf_Lights ,&
+                                                IntGainTypeOf_ElectricEquipment  , &
+                                                IntGainTypeOf_GasEquipment  , &
+                                                IntGainTypeOf_HotWaterEquipment   , &
+                                                IntGainTypeOf_SteamEquipment   , &
+                                                IntGainTypeOf_OtherEquipment   /)
+
 
           ! FLOW:
   DO Loop = 1, TotPeople
@@ -3784,37 +3876,24 @@ SUBROUTINE ReportInternalHeatGains
 
     ! Overall Zone Variables
 
-    ! BG comment these overalls need to add component gains from water heater, water use, and generators
+    ! these overalls include component gains from devices like water heater, water use, and generators
     !   working vars QFCConv QGenConv QFCRad QGenRad  WaterUseLatentGain WaterThermalTankGain WaterUseSensibleGain
-    !    (sort of awkward to do here because the individual report vars are handled elsewhere. )
 
-    ZnRpt(ZoneLoop)%TotRadiantGain    = ZnRpt(ZoneLoop)%PeopleRadGain+ZnRpt(ZoneLoop)%LtsRadGain+ &
-                                       ZnRpt(ZoneLoop)%ElecRadGain+ZnRpt(ZoneLoop)%GasRadGain+    &
-                                       ZnRpt(ZoneLoop)%OtherRadGain+ZnRpt(ZoneLoop)%HWRadGain+ZnRpt(ZoneLoop)%SteamRadGain
-    ZnRpt(ZoneLoop)%TotVisHeatGain    = ZnRpt(ZoneLoop)%LtsVisGain
-    ZnRpt(ZoneLoop)%TotConvectiveGain    = ZnRpt(ZoneLoop)%PeopleConGain+ZnRpt(ZoneLoop)%LtsConGain+ &
-                                       ZnRpt(ZoneLoop)%ElecConGain+ZnRpt(ZoneLoop)%GasConGain+    &
-                                       ZnRpt(ZoneLoop)%OtherConGain+ZnRpt(ZoneLoop)%HWConGain+ZnRpt(ZoneLoop)%SteamConGain
-    ZnRpt(ZoneLoop)%TotLatentGain    = ZnRpt(ZoneLoop)%PeopleLatGain+                             &
-                                       ZnRpt(ZoneLoop)%ElecLatGain+ZnRpt(ZoneLoop)%GasLatGain+    &
-                                       ZnRpt(ZoneLoop)%OtherLatGain+ZnRpt(ZoneLoop)%HWLatGain+ZnRpt(ZoneLoop)%SteamLatGain
-    ZnRpt(ZoneLoop)%TotTotalHeatGain  = ZnRpt(ZoneLoop)%TotLatentGain + ZnRpt(ZoneLoop)%TotRadiantGain &
-                                        + ZnRpt(ZoneLoop)%TotConvectiveGain + ZnRpt(ZoneLoop)%TotVisHeatGain
-    ZnRpt(ZoneLoop)%TotRadiantGainRate= ZnRpt(ZoneLoop)%PeopleRadGainRate+ZnRpt(ZoneLoop)%LtsRadGainRate+ &
-                                       ZnRpt(ZoneLoop)%ElecRadGainRate+ZnRpt(ZoneLoop)%GasRadGainRate+    &
-                                       ZnRpt(ZoneLoop)%OtherRadGainRate+ZnRpt(ZoneLoop)%HWRadGainRate+  &
-                                       ZnRpt(ZoneLoop)%SteamRadGainRate
-    ZnRpt(ZoneLoop)%TotVisHeatGainRate    = ZnRpt(ZoneLoop)%LtsVisGainRate
-    ZnRpt(ZoneLoop)%TotConvectiveGainRate = ZnRpt(ZoneLoop)%PeopleConGainRate+ZnRpt(ZoneLoop)%LtsConGainRate+ &
-                                       ZnRpt(ZoneLoop)%ElecConGainRate+ZnRpt(ZoneLoop)%GasConGainRate+    &
-                                       ZnRpt(ZoneLoop)%OtherConGainRate+ZnRpt(ZoneLoop)%HWConGainRate+  &
-                                       ZnRpt(ZoneLoop)%SteamConGainRate
-    ZnRpt(ZoneLoop)%TotLatentGainRate    = ZnRpt(ZoneLoop)%PeopleLatGainRate+                             &
-                                       ZnRpt(ZoneLoop)%ElecLatGainRate+ZnRpt(ZoneLoop)%GasLatGainRate+    &
-                                       ZnRpt(ZoneLoop)%OtherLatGainRate+ZnRpt(ZoneLoop)%HWLatGainRate+    &
-                                       ZnRpt(ZoneLoop)%SteamLatGainRate
+    ZnRpt(ZoneLoop)%TotVisHeatGain      = ZnRpt(ZoneLoop)%LtsVisGain
+    ZnRpt(ZoneLoop)%TotVisHeatGainRate  = ZnRpt(ZoneLoop)%LtsVisGainRate
+
+    CALL SumInternalRadiationGainsByTypes(ZoneLoop, TradIntGainTypes, ZnRpt(ZoneLoop)%TotRadiantGainRate)
+    ZnRpt(ZoneLoop)%TotRadiantGain = ZnRpt(ZoneLoop)%TotRadiantGainRate*TimeStepZone*SecInHour
+
+    CALL SumInternalConvectionGainsByTypes(ZoneLoop, TradIntGainTypes, ZnRpt(ZoneLoop)%TotConvectiveGainRate)
+    ZnRpt(ZoneLoop)%TotConvectiveGain = ZnRpt(ZoneLoop)%TotConvectiveGainRate *TimeStepZone*SecInHour
+
+    CALL SumInternalLatentGainsByTypes( ZoneLoop, TradIntGainTypes, ZnRpt(ZoneLoop)%TotLatentGainRate)
+    ZnRpt(ZoneLoop)%TotLatentGain = ZnRpt(ZoneLoop)%TotLatentGainRate *TimeStepZone*SecInHour
+
     ZnRpt(ZoneLoop)%TotTotalHeatGainRate  = ZnRpt(ZoneLoop)%TotLatentGainRate + ZnRpt(ZoneLoop)%TotRadiantGainRate &
-                                        + ZnRpt(ZoneLoop)%TotConvectiveGainRate + ZnRpt(ZoneLoop)%TotVisHeatGainRate
+                                            + ZnRpt(ZoneLoop)%TotConvectiveGainRate + ZnRpt(ZoneLoop)%TotVisHeatGainRate
+    ZnRpt(ZoneLoop)%TotTotalHeatGain  = ZnRpt(ZoneLoop)%TotTotalHeatGainRate * TimeStepZone * SecInHour
   END DO
 
   RETURN
@@ -3841,7 +3920,6 @@ FUNCTION GetDesignLightingLevelForZone(WhichZone) RESULT(DesignLightingLevelSum)
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList
   USE DataHeatBalance
   USE DataGlobals
 
@@ -3980,9 +4058,809 @@ SUBROUTINE CheckLightsReplaceableMinMaxForZone(WhichZone)
 
 END SUBROUTINE CheckLightsReplaceableMinMaxForZone
 
+SUBROUTINE UpdateInternalGainValues(SuppressRadiationUpdate, SumLatentGains)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataHeatBalFanSys, ONLY: ZoneLatentGain
+  USE DataContaminantBalance, ONLY: Contaminant, ZoneGCGain
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  LOGICAL , OPTIONAL, INTENT(IN)  :: SuppressRadiationUpdate
+  LOGICAL , OPTIONAL, INTENT(IN)  :: SumLatentGains
+
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Loop
+  INTEGER :: NZ
+  LOGICAL :: DoRadiationUpdate
+  LOGICAL :: ReSumLatentGains
+
+  DoRadiationUpdate = .TRUE.
+  ReSumLatentGains  = .FALSE.
+
+  IF (PRESENT(SuppressRadiationUpdate)) THEN
+    IF (SuppressRadiationUpdate) DoRadiationUpdate = .FALSE.
+  ENDIF
+
+  IF (PRESENT(SumLatentGains)) THEN
+    IF (SumLatentGains) ReSumLatentGains = .TRUE.
+  ENDIF
+
+! store pointer values to hold generic internal gain values constant for entire timestep
+  DO NZ = 1, NumOfZones
+    DO Loop=1, ZoneIntGain(NZ)%NumberOfDevices
+      ZoneIntGain(NZ)%Device(Loop)%ConvectGainRate         = ZoneIntGain(NZ)%Device(Loop)%PtrConvectGainRate
+      ZoneIntGain(NZ)%Device(Loop)%ReturnAirConvGainRate   = ZoneIntGain(NZ)%Device(Loop)%PtrReturnAirConvGainRate
+      IF (DoRadiationUpdate) ZoneIntGain(NZ)%Device(Loop)%RadiantGainRate         = ZoneIntGain(NZ)%Device(Loop)%PtrRadiantGainRate
+      ZoneIntGain(NZ)%Device(Loop)%LatentGainRate          = ZoneIntGain(NZ)%Device(Loop)%PtrLatentGainRate
+      ZoneIntGain(NZ)%Device(Loop)%ReturnAirLatentGainRate = ZoneIntGain(NZ)%Device(Loop)%PtrReturnAirLatentGainRate
+      ZoneIntGain(NZ)%Device(Loop)%CarbonDioxideGainRate   = ZoneIntGain(NZ)%Device(Loop)%PtrCarbonDioxideGainRate
+      ZoneIntGain(NZ)%Device(Loop)%GenericContamGainRate   = ZoneIntGain(NZ)%Device(Loop)%PtrGenericContamGainRate
+    ENDDO
+    IF (ReSumLatentGains) THEN
+      CALL SumAllInternalLatentGains(NZ, ZoneLatentGain(NZ))
+    ENDIF
+  ENDDO
+
+  If (Contaminant%GenericContamSimulation .AND. ALLOCATED(ZoneGCGain)) Then 
+    DO NZ = 1, NumOfZones
+      CALL SumAllInternalGenericContamGains(NZ, ZoneGCGain(NZ) )
+      ZnRpt(NZ)%GCRate = ZoneGCGain(NZ)
+    ENDDO
+  END IF
+
+  RETURN
+
+END SUBROUTINE UpdateInternalGainValues
+
+SUBROUTINE SumAllInternalConvectionGains(ZoneNum, SumConvGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumConvGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumConvGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumConvGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumConvGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumConvGainRate = tmpSumConvGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%ConvectGainRate
+  ENDDO
+
+  SumConvGainRate = tmpSumConvGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllInternalConvectionGains
+
+SUBROUTINE SumInternalConvectionGainsByTypes(ZoneNum, GainTypeARR, SumConvGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing a subset of the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  INTEGER, DIMENSION(:), INTENT(IN) :: GainTypeARR ! variable length 1-d array of integer valued gain types
+  REAL(r64), INTENT(OUT)    :: SumConvGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumberOfTypes
+  REAL(r64) :: tmpSumConvGainRate
+  INTEGER  :: DeviceNum
+  INTEGER  :: TypeNum
+
+  NumberOfTypes = Size(GainTypeARR)
+  tmpSumConvGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumConvGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    DO TypeNum = 1, NumberOfTypes
+
+      IF (ZoneIntGain(ZoneNum)%Device(DeviceNum)%CompTypeOfNum == GainTypeARR(TypeNum)) THEN
+        tmpSumConvGainRate = tmpSumConvGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%ConvectGainRate
+      ENDIF
+
+    ENDDO
+  ENDDO
+
+  SumConvGainRate = tmpSumConvGainRate
+  RETURN
+
+END SUBROUTINE SumInternalConvectionGainsByTypes
+
+
+SUBROUTINE SumAllReturnAirConvectionGains(ZoneNum, SumReturnAirGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumReturnAirGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumRetAirGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumRetAirGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumReturnAirGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumRetAirGainRate = tmpSumRetAirGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%ReturnAirConvGainRate
+  ENDDO
+
+  SumReturnAirGainRate = tmpSumRetAirGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllReturnAirConvectionGains
+
+SUBROUTINE SumReturnAirConvectionGainsByTypes(ZoneNum, GainTypeARR, SumReturnAirGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing a subset of the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  INTEGER, DIMENSION(:), INTENT(IN) :: GainTypeARR ! variable length 1-d array of integer valued gain types
+  REAL(r64), INTENT(OUT)    :: SumReturnAirGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumberOfTypes
+  REAL(r64) :: tmpSumRetAirConvGainRate
+  INTEGER  :: DeviceNum
+  INTEGER  :: TypeNum
+
+  NumberOfTypes = Size(GainTypeARR)
+  tmpSumRetAirConvGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumReturnAirGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    DO TypeNum = 1, NumberOfTypes
+
+      IF (ZoneIntGain(ZoneNum)%Device(DeviceNum)%CompTypeOfNum == GainTypeARR(TypeNum)) THEN
+        tmpSumRetAirConvGainRate = tmpSumRetAirConvGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%ReturnAirConvGainRate
+      ENDIF
+
+    ENDDO
+  ENDDO
+
+  SumReturnAirGainRate = tmpSumRetAirConvGainRate
+  RETURN
+
+END SUBROUTINE SumReturnAirConvectionGainsByTypes
+
+
+SUBROUTINE SumAllInternalRadiationGains(ZoneNum, SumRadGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumRadGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumRadGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumRadGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumRadGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumRadGainRate = tmpSumRadGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%RadiantGainRate
+  ENDDO
+
+  SumRadGainRate = tmpSumRadGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllInternalRadiationGains
+
+SUBROUTINE SumInternalRadiationGainsByTypes(ZoneNum, GainTypeARR, SumRadiationGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing a subset of the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  INTEGER, DIMENSION(:), INTENT(IN) :: GainTypeARR ! variable length 1-d array of integer valued gain types
+  REAL(r64), INTENT(OUT)    :: SumRadiationGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumberOfTypes
+  REAL(r64) :: tmpSumRadiationGainRate
+  INTEGER  :: DeviceNum
+  INTEGER  :: TypeNum
+
+  NumberOfTypes = Size(GainTypeARR)
+  tmpSumRadiationGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumRadiationGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    DO TypeNum = 1, NumberOfTypes
+
+      IF (ZoneIntGain(ZoneNum)%Device(DeviceNum)%CompTypeOfNum == GainTypeARR(TypeNum)) THEN
+        tmpSumRadiationGainRate = tmpSumRadiationGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%RadiantGainRate
+      ENDIF
+
+    ENDDO
+  ENDDO
+
+  SumRadiationGainRate = tmpSumRadiationGainRate
+  RETURN
+
+END SUBROUTINE SumInternalRadiationGainsByTypes
+
+SUBROUTINE SumAllInternalLatentGains(ZoneNum, SumLatentGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumLatentGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumLatentGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumLatentGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumLatentGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumLatentGainRate = tmpSumLatentGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%LatentGainRate
+  ENDDO
+
+  SumLatentGainRate = tmpSumLatentGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllInternalLatentGains
+
+SUBROUTINE SumInternalLatentGainsByTypes(ZoneNum, GainTypeARR, SumLatentGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing a subset of the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  INTEGER, DIMENSION(:), INTENT(IN) :: GainTypeARR ! variable length 1-d array of integer valued gain types
+  REAL(r64), INTENT(OUT)    :: SumLatentGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumberOfTypes
+  REAL(r64) :: tmpSumLatentGainRate
+  INTEGER  :: DeviceNum
+  INTEGER  :: TypeNum
+
+  NumberOfTypes = Size(GainTypeARR)
+  tmpSumLatentGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumLatentGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    DO TypeNum = 1, NumberOfTypes
+
+      IF (ZoneIntGain(ZoneNum)%Device(DeviceNum)%CompTypeOfNum == GainTypeARR(TypeNum)) THEN
+        tmpSumLatentGainRate = tmpSumLatentGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%LatentGainRate
+      ENDIF
+
+    ENDDO
+  ENDDO
+
+  SumLatentGainRate = tmpSumLatentGainRate
+  RETURN
+
+END SUBROUTINE SumInternalLatentGainsByTypes
+
+SUBROUTINE SumAllReturnAirLatentGains(ZoneNum, SumRetAirLatentGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Nov. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumRetAirLatentGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumLatentGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumLatentGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumRetAirLatentGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumLatentGainRate = tmpSumLatentGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%ReturnAirLatentGainRate
+  ENDDO
+
+  SumRetAirLatentGainRate = tmpSumLatentGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllReturnAirLatentGains
+
+SUBROUTINE SumAllInternalCO2Gains(ZoneNum, SumCO2GainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumCO2GainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumCO2GainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumCO2GainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumCO2GainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumCO2GainRate = tmpSumCO2GainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%CarbonDioxideGainRate
+  ENDDO
+
+  SumCO2GainRate = tmpSumCO2GainRate
+
+  RETURN
+
+END SUBROUTINE SumAllInternalCO2Gains
+
+SUBROUTINE SumInternalCO2GainsByTypes(ZoneNum, GainTypeARR, SumCO2GainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec. 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing a subset of the internal gain types
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  INTEGER, DIMENSION(:), INTENT(IN) :: GainTypeARR ! variable length 1-d array of integer valued gain types
+  REAL(r64), INTENT(OUT)    :: SumCO2GainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumberOfTypes
+  REAL(r64) :: tmpSumCO2GainRate
+  INTEGER  :: DeviceNum
+  INTEGER  :: TypeNum
+
+  NumberOfTypes = Size(GainTypeARR)
+  tmpSumCO2GainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumCO2GainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    DO TypeNum = 1, NumberOfTypes
+
+      IF (ZoneIntGain(ZoneNum)%Device(DeviceNum)%CompTypeOfNum == GainTypeARR(TypeNum)) THEN
+        tmpSumCO2GainRate = tmpSumCO2GainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%CarbonDioxideGainRate
+      ENDIF
+
+    ENDDO
+  ENDDO
+
+  SumCO2GainRate = tmpSumCO2GainRate
+  RETURN
+
+END SUBROUTINE SumInternalCO2GainsByTypes
+
+SUBROUTINE SumAllInternalGenericContamGains(ZoneNum, SumGCGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         L. Gu
+          !       DATE WRITTEN   Feb. 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! worker routine for summing all the internal gain types based on the existing subrotine SumAllInternalCO2Gains
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: ZoneNum  ! zone index pointer for which zone to sum gains for
+  REAL(r64), INTENT(OUT)    :: SumGCGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: tmpSumGCGainRate
+  INTEGER  :: DeviceNum
+
+  tmpSumGCGainRate = 0.d0
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    SumGCGainRate = 0.d0
+    RETURN
+  ENDIF
+
+  DO DeviceNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    tmpSumGCGainRate = tmpSumGCGainRate + ZoneIntGain(ZoneNum)%Device(DeviceNum)%GenericContamGainRate
+  ENDDO
+
+  SumGCGainRate = tmpSumGCGainRate
+
+  RETURN
+
+END SUBROUTINE SumAllInternalGenericContamGains
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -4005,3 +4883,167 @@ END SUBROUTINE CheckLightsReplaceableMinMaxForZone
 !
 
 END MODULE InternalHeatGains
+
+! outside of Module
+
+SUBROUTINE SetupZoneInternalGain(ZoneNum, cComponentObject , cComponentName, IntGainComp_TypeOfNum, ConvectionGainRate , &
+                     ReturnAirConvectionGainRate, ThermalRadiationGainRate, LatentGainRate, ReturnAirLatentGainRate, &
+                     CarbonDioxideGainRate, GenericContamGainRate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   November 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! provide a general interface for setting up devices with internal gains
+
+          ! METHODOLOGY EMPLOYED:
+          ! use pointers to access gain rates in device models
+          ! devices are internal gains like people, lights, electric equipment
+          ! and HVAC components with skin loss models like thermal tanks, and power conditioning.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPrecisionGlobals
+  USE DataHeatBalance
+  USE InputProcessor, ONLY: MakeUpperCase, SameString
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,           INTENT(IN) :: ZoneNum
+  CHARACTER(len=*),  INTENT(IN) :: cComponentObject ! object class name for device contributing internal gain
+  CHARACTER(len=*),  INTENT(IN) :: cComponentName  ! user unique name for device
+  INTEGER         ,  INTENT(IN) :: IntGainComp_TypeOfNum
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ConvectionGainRate ! pointer target for remote convection gain value to be accessed
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ReturnAirConvectionGainRate
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ThermalRadiationGainRate  ! pointer target for remote IR radiation gain value to be accessed
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: LatentGainRate
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: ReturnAirLatentGainRate
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: CarbonDioxideGainRate
+  REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: GenericContamGainRate
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER :: DeviceAllocInc = 4
+
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: IntGainsNum
+  LOGICAL :: FoundIntGainsType
+  LOGICAL :: FoundDuplicate
+  CHARACTER(len=MaxNameLength) :: UpperCaseObjectType
+  CHARACTER(len=MaxNameLength) :: UpperCaseObjectName
+
+  TYPE(GenericComponentZoneIntGainStruct), DIMENSION(:), ALLOCATABLE :: TempGenDeviceIntGainsArr
+
+  FoundIntGainsType = .FALSE.
+  FoundDuplicate    = .FALSE.
+  UpperCaseObjectType = MakeUpperCase(cComponentObject)
+  UpperCaseObjectName = MakeUpperCase(cComponentName)
+
+  ! Check if IntGainComp_TypeOfNum and cComponentObject are consistent
+  If (.NOT. SameString(UpperCaseObjectType, ZoneIntGainDeviceTypes(IntGainComp_TypeOfNum)) ) THEN
+    CALL ShowSevereError('SetupZoneInternalGain: developer error, trapped inconsistent internal gains object types' &
+                         // ' sent to SetupZoneInternalGain')
+    CALL ShowContinueError('Object type character = '//Trim(cComponentObject) )
+    CALL ShowContinueError('Type of Num object name = '//TRIM(ZoneIntGainDeviceTypes(IntGainComp_TypeOfNum)) )
+    RETURN
+  ENDIF
+
+
+  DO IntGainsNum = 1, ZoneIntGain(ZoneNum)%NumberOfDevices
+    IF ((ZoneIntGain(ZoneNum)%Device(IntGainsNum)%CompObjectType == UpperCaseObjectType) &
+        .AND. (ZoneIntGain(ZoneNum)%Device(IntGainsNum)%CompTypeOfNum ==  IntGainComp_TypeOfNum)) THEN
+      FoundIntGainsType = .TRUE.
+      IF (ZoneIntGain(ZoneNum)%Device(IntGainsNum)%CompObjectName == UpperCaseObjectName) THEN
+        FoundDuplicate = .TRUE.
+        EXIT
+      ENDIF
+    ENDIF
+  ENDDO
+
+  IF (FoundDuplicate) THEN
+    CALL ShowSevereError('SetupZoneInternalGain: developer error, trapped duplicate internal gains sent to SetupZoneInternalGain')
+    RETURN
+  ENDIF
+
+  IF (ZoneIntGain(ZoneNum)%NumberOfDevices == 0) THEN
+    ALLOCATE( ZoneIntGain(ZoneNum)%Device(DeviceAllocInc) )
+    ZoneIntGain(ZoneNum)%NumberOfDevices   = 1
+    ZoneIntGain(ZoneNum)%MaxNumberOfDevices = DeviceAllocInc
+  ELSE
+    IF (ZoneIntGain(ZoneNum)%NumberOfDevices +1 > ZoneIntGain(ZoneNum)%MaxNumberOfDevices) THEN
+      ALLOCATE(TempGenDeviceIntGainsArr(ZoneIntGain(ZoneNum)%MaxNumberOfDevices + DeviceAllocInc) )
+      TempGenDeviceIntGainsArr(1:ZoneIntGain(ZoneNum)%NumberOfDevices)  &
+         = ZoneIntGain(ZoneNum)%Device(1:ZoneIntGain(ZoneNum)%NumberOfDevices)
+      DEALLOCATE(ZoneIntGain(ZoneNum)%Device)
+      ALLOCATE(ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%MaxNumberOfDevices + DeviceAllocInc) )
+      ZoneIntGain(ZoneNum)%MaxNumberOfDevices = ZoneIntGain(ZoneNum)%MaxNumberOfDevices + DeviceAllocInc
+      ZoneIntGain(ZoneNum)%Device(1:ZoneIntGain(ZoneNum)%NumberOfDevices) &
+         = TempGenDeviceIntGainsArr(1:ZoneIntGain(ZoneNum)%NumberOfDevices)
+      DEALLOCATE(TempGenDeviceIntGainsArr)
+    ENDIF
+    ZoneIntGain(ZoneNum)%NumberOfDevices = ZoneIntGain(ZoneNum)%NumberOfDevices + 1
+  ENDIF
+
+  ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%CompObjectType = UpperCaseObjectType
+  ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%CompObjectName = UpperCaseObjectName
+  ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%CompTypeOfNum  = IntGainComp_TypeOfNum
+
+  ! note pointer assignments in code below!
+  IF (PRESENT(ConvectionGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrConvectGainRate => ConvectionGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrConvectGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(ReturnAirConvectionGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrReturnAirConvGainRate => ReturnAirConvectionGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrReturnAirConvGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(ThermalRadiationGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrRadiantGainRate => ThermalRadiationGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrRadiantGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(LatentGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrLatentGainRate => LatentGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrLatentGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(ReturnAirLatentGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrReturnAirLatentGainRate => ReturnAirLatentGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrReturnAirLatentGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(CarbonDioxideGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrCarbonDioxideGainRate => CarbonDioxideGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrCarbonDioxideGainRate => ZeroPointerVal
+  ENDIF
+
+  IF (PRESENT(GenericContamGainRate)) THEN
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrGenericContamGainRate => GenericContamGainRate
+  ELSE
+    ZoneIntGain(ZoneNum)%Device(ZoneIntGain(ZoneNum)%NumberOfDevices)%PtrGenericContamGainRate => ZeroPointerVal
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SetupZoneInternalGain

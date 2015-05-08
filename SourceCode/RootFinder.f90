@@ -597,7 +597,7 @@ SUBROUTINE IterateRootFinder( RootFinderData, X, Y, IsDoneFlag )
         IsDoneFlag = .TRUE.
         RETURN
       END IF
-    END IF    
+    END IF
 
     ! Check singularity condition between min and max points
     IF ( .NOT.CheckNonSingularity(RootFinderData) ) THEN
@@ -988,7 +988,7 @@ LOGICAL FUNCTION CheckMinMaxRange( RootFinderData, X )
       RETURN
     END IF
   ENDIF
-  
+
   CheckMinMaxRange = .TRUE.
 
   RETURN
@@ -1442,7 +1442,7 @@ LOGICAL FUNCTION CheckIncrementRoundOff( RootFinderData, X )
 
           ! FUNCTION ARGUMENT DEFINITIONS:
   TYPE(RootFinderDataType), INTENT(IN)    :: RootFinderData ! Data used by root finding algorithm
-  REAL(r64), INTENT(IN)                        :: X              ! X value for current iterate
+  REAL(r64), INTENT(IN)                   :: X              ! X value for current iterate
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -1458,6 +1458,7 @@ LOGICAL FUNCTION CheckIncrementRoundOff( RootFinderData, X )
   REAL(r64)       :: TolX               ! Tolerance to satisfy for X increment
           ! FLOW:
 
+  CheckIncrementRoundOff = .FALSE.
   ! Check for round-off error in X increments since last iterate
   IF ( RootFinderData%CurrentPoint%DefinedFlag ) THEN
     ! TODO: Use typical value for X averaged over successive iterations
@@ -2987,7 +2988,7 @@ END SUBROUTINE WriteRootFinderStatus
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

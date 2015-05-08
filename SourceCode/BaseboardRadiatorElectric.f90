@@ -345,7 +345,8 @@ CONTAINS
 !           '] will be processed.')
 !        ElecBaseboard(BaseboardNum)%TotSurfToDistrib = MaxDistribSurfaces
 !      END IF
-      IF (ElecBaseboard(BaseboardNum)%TotSurfToDistrib < MinDistribSurfaces) THEN
+      IF ( (ElecBaseboard(BaseboardNum)%TotSurfToDistrib < MinDistribSurfaces) .AND. &
+           (ElecBaseboard(BaseboardNum)%FracRadiant > MinFraction) ) THEN
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))// &
           '", the number of surface/radiant fraction groups entered was less than the allowable minimum.')
         CALL ShowContinueError('...the minimum that must be entered=['//trim(RoundSigDigits(MinDistribSurfaces))//'].')
@@ -394,7 +395,8 @@ CONTAINS
           '", Summed radiant fractions for people + surface groups > 1.0')
         ErrorsFound = .TRUE.
       END IF
-      IF (AllFracsSummed < (MaxFraction - 0.01d0)) THEN  ! User didn't distribute all of the radiation warn that some will be lost
+      IF ( (AllFracsSummed < (MaxFraction - 0.01d0)) .AND. &              ! User didn't distribute all of the
+           (ElecBaseboard(BaseboardNum)%FracRadiant > MinFraction) ) THEN ! radiation warn that some will be lost
         CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))// &
           '", Summed radiant fractions for people + surface groups < 1.0')
         CALL ShowContinueError('The rest of the radiant energy delivered by the baseboard heater will be lost')
@@ -1112,7 +1114,7 @@ END FUNCTION SumHATsurf
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -1091,10 +1091,16 @@ SUBROUTINE GetPowerManagerInput
                              SameString, MakeUPPERCase, GetObjectDefMaxArgs
   USE DataIPShortCuts
   USE ScheduleManager, ONLY: GetScheduleIndex
-  USE CurveManager,    ONLY: GetCurveIndex
-  Use DataHeatBalance, ONLY: Zone
+  USE CurveManager,    ONLY: GetCurveIndex, GetCurveType
+  Use DataHeatBalance, ONLY: Zone, IntGainTypeOf_ElectricLoadCenterInverterSimple, &
+                             IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower, &
+                             IntGainTypeOf_ElectricLoadCenterInverterLookUpTable, &
+                             IntGainTypeOf_ElectricLoadCenterStorageSimple, &
+                             IntGainTypeOf_ElectricLoadCenterStorageBattery, &
+                             IntGainTypeOf_ElectricLoadCenterTransformer
   USE DataGlobals    , ONLY: NumOfZones, AnyEnergyManagementSystemInModel
-  USE DataInterfaces,  ONLY: SetupEMSActuator, SetupEMSInternalVariable, SetupOutputVariable
+  USE DataInterfaces 
+  USE General,         ONLY: RoundSigDigits
 
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1104,6 +1110,7 @@ SUBROUTINE GetPowerManagerInput
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: Blank=' '
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetPowerManagerInput: '
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
@@ -1176,7 +1183,7 @@ SUBROUTINE GetPowerManagerInput
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
         IsBlank=.false.
-        CALL VerifyName(cAlphaArgs(1),InverterNames,InvertNum-1,IsNotOK,IsBlank,'Inverter Names')
+        CALL VerifyName(cAlphaArgs(1),InverterNames,InvertNum-1,IsNotOK,IsBlank,trim(cCurrentModuleObject)//' Name')
         IF (IsNotOK) THEN
           ErrorsFound=.true.
           IF (IsBlank) cAlphaArgs(1)='xxxxx'
@@ -1187,8 +1194,8 @@ SUBROUTINE GetPowerManagerInput
 
         Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
         If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           ErrorsFound=.true.
         ENDIF
 
@@ -1199,8 +1206,8 @@ SUBROUTINE GetPowerManagerInput
             Inverter(InvertNum)%HeatLossesDestination = LostToOutside
           ELSE
             Inverter(InvertNum)%HeatLossesDestination = LostToOutside
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
             CAll ShowContinueError('Zone name not found. Inverter heat losses will not be added to a zone' )
             ! continue with simulation but inverter losses not sent to a zone.
           ENDIF
@@ -1229,7 +1236,7 @@ SUBROUTINE GetPowerManagerInput
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
         IsBlank=.false.
-        CALL VerifyName(cAlphaArgs(1),InverterNames,InvertNum-1,IsNotOK,IsBlank,'Inverter Names')
+        CALL VerifyName(cAlphaArgs(1),InverterNames,InvertNum-1,IsNotOK,IsBlank,trim(cCurrentModuleObject)//' Name')
         IF (IsNotOK) THEN
           ErrorsFound=.true.
           IF (IsBlank) cAlphaArgs(1)='xxxxx'
@@ -1240,8 +1247,8 @@ SUBROUTINE GetPowerManagerInput
 
         Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
         If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           ErrorsFound=.true.
         ENDIF
 
@@ -1252,16 +1259,16 @@ SUBROUTINE GetPowerManagerInput
             Inverter(InvertNum)%HeatLossesDestination = LostToOutside
           ELSE
             Inverter(InvertNum)%HeatLossesDestination = LostToOutside
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
                         ! continue with simulation but inverter losses not sent to a zone.
             CAll ShowContinueError('Zone name not found. Inverter heat losses will not be added to a zone' )
           ENDIF
         ENDIF
         Inverter(InvertNum)%CurveNum =  GetCurveIndex(cAlphaArgs(4))
         If (Inverter(InvertNum)%CurveNum == 0) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
           CAll ShowContinueError('Curve was not found')
           ErrorsFound=.true.
         ENDIF
@@ -1284,7 +1291,7 @@ SUBROUTINE GetPowerManagerInput
                        AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK = .false.
         IsBlank = .false.
-        Call VerifyName(cAlphaArgs(1), InverterNames, InvertNum-1, IsNotOK, IsBlank, 'Inverter Names')
+        CALL VerifyName(cAlphaArgs(1),InverterNames,InvertNum-1,IsNotOK,IsBlank,trim(cCurrentModuleObject)//' Name')
         IF (IsNotOK) Then
           errorsFound = .true.
           If (IsBlank) cAlphaArgs(1)='xxxx'
@@ -1295,8 +1302,8 @@ SUBROUTINE GetPowerManagerInput
 
         Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
         If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           ErrorsFound=.true.
         ENDIF
 
@@ -1306,8 +1313,8 @@ SUBROUTINE GetPowerManagerInput
           IF (lAlphaFieldBlanks(3)) THEN
             Inverter(InvertNum)%HeatLossesDestination = LostToOutside
           ELSE
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
             CAll ShowContinueError('Zone name not found. Inverter heat losses will not be added to a zone' )
             ! continue with simulation but inverter losses not sent to a zone.
           ENDIF
@@ -1338,8 +1345,32 @@ SUBROUTINE GetPowerManagerInput
            Inverter(InvertNum)%AncillACuseRate , 'System', 'Average', Inverter(InvertNum)%Name )
       Call SetupOutputVariable('Inverter Ancillary AC Consumed Energy [J]', &
            Inverter(InvertNum)%AncillACuseEnergy , 'System', 'Sum', Inverter(InvertNum)%Name , &
-           ResourceTypeKey='Electricity',EndUseKey='Cogeneration',GroupKey='Plant') ! right now PV is the only DC source
-
+           ResourceTypeKey='Electricity',EndUseKey='Cogeneration',GroupKey='Plant') ! called cogeneration for end use table
+      IF (Inverter(InvertNum)%ZoneNum > 0) THEN
+        SELECT CASE (Inverter(InvertNum)%ModelType)
+        CASE (SimpleConstantEff)
+          CALL SetupZoneInternalGain(Inverter(InvertNum)%ZoneNum, &
+                     'ElectricLoadCenter:Inverter:Simple',  &
+                     Inverter(InvertNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterInverterSimple,    &
+                     ConvectionGainRate    =    Inverter(InvertNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = Inverter(InvertNum)%QdotRadZone )
+        CASE (CurveFuncOfPower)
+          CALL SetupZoneInternalGain(Inverter(InvertNum)%ZoneNum, &
+                     'ElectricLoadCenter:Inverter:FunctionOfPower',  &
+                     Inverter(InvertNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower,    &
+                     ConvectionGainRate    =    Inverter(InvertNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = Inverter(InvertNum)%QdotRadZone )
+        CASE (CECLookUpTableModel)
+          CALL SetupZoneInternalGain(Inverter(InvertNum)%ZoneNum, &
+                     'ElectricLoadCenter:Inverter:LookUpTable',  &
+                     Inverter(InvertNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterInverterLookUpTable,         &
+                     ConvectionGainRate    =    Inverter(InvertNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = Inverter(InvertNum)%QdotRadZone)
+        END SELECT
+      ENDIF
 
     ENDDO
 
@@ -1361,7 +1392,7 @@ SUBROUTINE GetPowerManagerInput
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
         IsBlank=.false.
-        CALL VerifyName(cAlphaArgs(1), StorageNames, StorNum-1, IsNotOK,IsBlank,'Electrical Storage Names')
+        CALL VerifyName(cAlphaArgs(1), StorageNames, StorNum-1, IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
         If (IsNotOK) Then
           ErrorsFound = .true.
           If (IsBlank) cAlphaArgs(1) = 'xxxx'
@@ -1371,8 +1402,8 @@ SUBROUTINE GetPowerManagerInput
 
         ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
         If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           ErrorsFound=.true.
         ENDIF
 
@@ -1383,8 +1414,8 @@ SUBROUTINE GetPowerManagerInput
             ElecStorage(StorNum)%HeatLossesDestination = LostToOutside
           ELSE
             ElecStorage(StorNum)%HeatLossesDestination = LostToOutside
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
             CAll ShowContinueError('Zone name not found. Electrical storage heat losses will not be added to a zone' )
             !continue with simulation but storage losses not sent to a zone.
           ENDIF
@@ -1415,7 +1446,7 @@ SUBROUTINE GetPowerManagerInput
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
         IsBlank=.false.
-        CALL VerifyName(cAlphaArgs(1), StorageNames, StorNum-1, IsNotOK,IsBlank,'Electrical Storage Names')
+        CALL VerifyName(cAlphaArgs(1), StorageNames, StorNum-1, IsNotOK,IsBlank,trim(cCurrentModuleObject)//' Name')
         If (IsNotOK) Then
           ErrorsFound = .true.
           If (IsBlank) cAlphaArgs(1) = 'xxxx'
@@ -1425,8 +1456,8 @@ SUBROUTINE GetPowerManagerInput
 
         ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
         If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
           ErrorsFound=.true.
         ENDIF
 
@@ -1437,8 +1468,8 @@ SUBROUTINE GetPowerManagerInput
             ElecStorage(StorNum)%HeatLossesDestination = LostToOutside
           ELSE
             ElecStorage(StorNum)%HeatLossesDestination = LostToOutside
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
             CAll ShowContinueError('Zone name not found. Electrical storage heat losses will not be added to a zone')
             !continue with simulation but storage losses not sent to a zone.
           ENDIF
@@ -1446,14 +1477,33 @@ SUBROUTINE GetPowerManagerInput
 
 
         ElecStorage(StorNum)%ChargeCurveNum = GetCurveIndex(cAlphaArgs(4)) !voltage calculation for charging
-          IF(ElecStorage(StorNum)%ChargeCurveNum.EQ. 0)THEN
-              CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-              CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          IF(ElecStorage(StorNum)%ChargeCurveNum.EQ. 0 .and. .not. lAlphaFieldBlanks(4))THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+              ErrorsFound=.true.
+          ELSEIF (lAlphaFieldBlanks(4)) THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' cannot be blank. But no entry found.')
+          ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%ChargeCurveNum),'RectangularHyperbola2')) THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
+              CALL ShowContinueError('Curve Type must be RectangularHyperbola2 but was '//  &
+                 trim(GetCurveType(ElecStorage(StorNum)%ChargeCurveNum)))
+              ErrorsFound=.true.
           ENDIF
         ElecStorage(StorNum)%DischargeCurveNum = GetCurveIndex(cAlphaArgs(5)) ! voltage calculation for discharging
-          IF(ElecStorage(StorNum)%DischargeCurveNum.EQ. 0)THEN
-              CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
-              CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          IF(ElecStorage(StorNum)%DischargeCurveNum.EQ. 0 .and. .not. lAlphaFieldBlanks(5))THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
+          ELSEIF (lAlphaFieldBlanks(5)) THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//' cannot be blank. But no entry found.')
+          ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%DischargeCurveNum),'RectangularHyperbola2')) THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
+              CALL ShowContinueError('Curve Type must be RectangularHyperbola2 but was '//  &
+                 trim(GetCurveType(ElecStorage(StorNum)%DischargeCurveNum)))
+              ErrorsFound=.true.
           ENDIF
 
         IF (SameString(cAlphaArgs(6),'Yes')) THEN
@@ -1461,17 +1511,27 @@ SUBROUTINE GetPowerManagerInput
         ELSEIF(SameString(cAlphaArgs(6),'No')) THEN
             ElecStorage(StorNum)%LifeCalculation = 2
         ELSE
-            CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-            CAll ShowContinueError('Yes or No should be selected. Default value NO is used to continue simulation')
+            CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
+            CAll ShowContinueError('Yes or No should be selected. Default value No is used to continue simulation')
             ElecStorage(StorNum)%LifeCalculation = 2
         ENDIF
 
         IF(ElecStorage(StorNum)%LifeCalculation == 1) THEN
             ElecStorage(StorNum)%LifeCurveNum = GetCurveIndex(cAlphaArgs(7)) !Battery life calculation
-            IF(ElecStorage(StorNum)%LifeCurveNum.EQ. 0)THEN
-               CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
-               CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            IF(ElecStorage(StorNum)%LifeCurveNum.EQ. 0 .and. .not. lAlphaFieldBlanks(7))THEN
+               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+            ELSEIF (lAlphaFieldBlanks(7)) THEN
+               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' cannot be blank when '//  &
+                  trim(cAlphaArgs(6))//' = Yes. But no entry found.')
+            ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%LifeCurveNum),'DoubleExponentialDecay')) THEN
+              CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+              CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+              CALL ShowContinueError('Curve Type must be DoubleExponentialDecay but was '//  &
+                 trim(GetCurveType(ElecStorage(StorNum)%LifeCurveNum)))
+              ErrorsFound=.true.
             ENDIF
         ENDIF
 
@@ -1548,6 +1608,27 @@ SUBROUTINE GetPowerManagerInput
           CALL SetupEMSActuator('Electrical Storage', ElecStorage(StorNum)%Name, 'Power Charge Rate' , '[W]', &
                      ElecStorage(StorNum)%EMSOverridePelIntoStorage, ElecStorage(StorNum)%EMSValuePelIntoStorage )
         ENDIF
+        
+        IF (ElecStorage(StorNum)%ZoneNum > 0) THEN
+          SELECT CASE (ElecStorage(StorNum)%StorageModelMode)
+          
+          CASE (SimpleBucketStorage)
+            CALL SetupZoneInternalGain(ElecStorage(StorNum)%ZoneNum, &
+                     'ElectricLoadCenter:Storage:Simple',  &
+                     ElecStorage(StorNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterStorageSimple,         &
+                     ConvectionGainRate    =    ElecStorage(StorNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = ElecStorage(StorNum)%QdotRadZone)
+          CASE (KiBaMBattery)
+            CALL SetupZoneInternalGain(ElecStorage(StorNum)%ZoneNum, &
+                     'ElectricLoadCenter:Storage:Battery',  &
+                     ElecStorage(StorNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterStorageBattery,         &
+                     ConvectionGainRate    =    ElecStorage(StorNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = ElecStorage(StorNum)%QdotRadZone)
+          END SELECT
+        ENDIF
+        
      ENDDO
 
   ENDIF !any storage at all
@@ -1567,7 +1648,7 @@ SUBROUTINE GetPowerManagerInput
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
       IsBlank=.false.
-      CALL VerifyName(cAlphaArgs(1), TransformerNames, TransfNum-1, IsNotOK,IsBlank,'Electric Transformer Names')
+      CALL VerifyName(cAlphaArgs(1), TransformerNames, TransfNum-1, IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
       IF (IsNotOK) THEN
         ErrorsFound = .true.
         IF (IsBlank) cAlphaArgs(1) = 'xxxx'  !Actually, this line is not necessary because name is a required field
@@ -1577,8 +1658,8 @@ SUBROUTINE GetPowerManagerInput
 
       Transformer(TransfNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
       IF ( Transformer(TransfNum)%AvailSchedPtr == 0 ) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
         ErrorsFound=.true.
       ENDIF
 
@@ -1587,8 +1668,8 @@ SUBROUTINE GetPowerManagerInput
       ELSEIF (SameString(cAlphaArgs(3), 'PowerOutFromOnsiteGeneration' ) )   THEN
         Transformer(TransfNum)%UsageMode     = PowerOutFromBldg
       ELSE
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
         ErrorsFound=.true.
       ENDIF
 
@@ -1599,8 +1680,8 @@ SUBROUTINE GetPowerManagerInput
           Transformer(TransfNum)%HeatLossesDestination = LostToOutside
         ELSE
           Transformer(TransfNum)%HeatLossesDestination = LostToOutside
-          CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
           CAll ShowContinueError('Zone name not found. Transformer heat losses will not be added to a zone' )
           !continue with simulation but storage losses not sent to a zone.
         ENDIF
@@ -1615,8 +1696,8 @@ SUBROUTINE GetPowerManagerInput
       ELSEIF (SameString(cAlphaArgs(5), 'Aluminum' ) )   THEN
         Transformer(TransfNum)%FactorTempCoeff     = 225.0d0
       ELSE
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5)) )
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5)) )
         ErrorsFound=.true.
       ENDIF
 
@@ -1628,8 +1709,8 @@ SUBROUTINE GetPowerManagerInput
       ELSEIF (SameString(cAlphaArgs(6), 'NominalEfficiency' ) )   THEN
         Transformer(TransfNum)%PerformanceInputMode     = EfficiencyMethod
       ELSE
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
         ErrorsFound=.true.
       ENDIF
 
@@ -1646,9 +1727,9 @@ SUBROUTINE GetPowerManagerInput
         IF (lNumericFieldBlanks(11)) THEN
           Transformer(TransfNum)%MaxPUL = Transformer(TransfNum)%RatedPUL
         ELSEIF(Transformer(TransfNum)%MaxPUL <= 0 .OR. Transformer(TransfNum)%MaxPUL > 1) THEN
-          CALL ShowSevereError('Invalid data for '//TRIM(cNumericFieldNames(11))// &
-               ' Entered value must be > 0 and <= 1.')
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(11))//'=['//trim(RoundSigDigits(rNumericArgs(11),3))//'].')
+          CALL ShowContinueError('Entered value must be > 0 and <= 1.')
           ErrorsFound=.true.
         ENDIF
       ENDIF
@@ -1659,8 +1740,8 @@ SUBROUTINE GetPowerManagerInput
         Transformer(TransfNum)%ConsiderLosses     = .FALSE.
       ELSE
         IF(Transformer(TransfNum)%UsageMode == PowerInFromGrid) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
           ErrorsFound=.true.
         ENDIF
       ENDIF
@@ -1671,8 +1752,8 @@ SUBROUTINE GetPowerManagerInput
 
         !Provide warning if no meter is wired to a transformer used to get power from the grid
         IF(NumWiredMeters <= 0) THEN
-          CALL ShowSevereError('ISOLATED Transformer: No meter wired to a transformer used to input power from grid' )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowWarningError(RoutineName//'ElectricLoadCenter:Transformer="'//TRIM(Transformer(TransfNum)%Name)//'":')
+          CALL ShowContinueError('ISOLATED Transformer: No meter wired to a transformer used to input power from grid' )
         END IF
 
         ALLOCATE(Transformer(TransfNum)%WiredMeterNames(NumWiredMeters))
@@ -1722,6 +1803,17 @@ SUBROUTINE GetPowerManagerInput
       CALL SetupOutputVariable('Energy Produced for Cogeneration Transformer [J]', &
            Transformer(TransfNum)%ElecProducedCoGen, 'System', 'Sum', Transformer(TransfNum)%Name ,&
            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='System')
+           
+      IF (Transformer(TransfNum)%ZoneNum > 0) THEN
+        CALL SetupZoneInternalGain(Transformer(TransfNum)%ZoneNum, &
+                     'ElectricLoadCenter:Transformer',  &
+                     Transformer(TransfNum)%Name , &
+                     IntGainTypeOf_ElectricLoadCenterTransformer,         &
+                     ConvectionGainRate    =    Transformer(TransfNum)%QdotconvZone, &
+                     ThermalRadiationGainRate = Transformer(TransfNum)%QdotRadZone)
+      ENDIF
+           
+           
     ENDDO ! End loop for get transformer inputs
   ENDIF
 
@@ -1755,10 +1847,6 @@ SUBROUTINE GetPowerManagerInput
     CALL VerifyName(cAlphaArgs(1),ListName,Count-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
       ErrorsFound=.true.
-      IF (IsBlank) THEN
-        CALL ShowSevereError('Name cannot be blank for '//TRIM(cCurrentModuleObject))
-        ErrorsFound=.true.
-      ENDIF
     ENDIF
     ListName(Count) =TRIM(cAlphaArgs(1))
   END DO
@@ -1800,8 +1888,8 @@ SUBROUTINE GetPowerManagerInput
     ELSEIF (SameString(cAlphaArgs(3), 'FollowThermalLimitElectrical' ) ) THEN
       ElecLoadCenter(Count)%OperationScheme     = iOpSchemeThermalFollowLimitElectrical
     ELSE
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
       ErrorsFound=.true.
     ENDIF
 
@@ -1813,11 +1901,12 @@ SUBROUTINE GetPowerManagerInput
     IF ((ElecLoadCenter(Count)%TrackSchedPtr == 0 ) .and.  &
        (ElecLoadCenter(Count)%OperationScheme == iOpSchemeTrackSchedule) ) THEN ! throw error
        IF (.not. lAlphaFieldBlanks(4)) THEN
-         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
+         CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+         CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
        ELSE
-         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//' = blank field.')
+         CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+         CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' = blank field.')
        ENDIF
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
        CAll ShowContinueError('Schedule not found; Must be entered and valid when Operation Scheme=TrackSchedule')
        errorsFound = .TRUE.
     ENDIF
@@ -1850,8 +1939,8 @@ SUBROUTINE GetPowerManagerInput
        ElecLoadCenter(Count)%BussType = ACBuss
        cAlphaArgs(6)='AlternatingCurrent (field was blank)'
     ELSE
-       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+       CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+       CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
        errorsFound = .TRUE.
     ENDIF
 
@@ -1859,11 +1948,12 @@ SUBROUTINE GetPowerManagerInput
       ElecLoadCenter(Count)%InverterModelNum = FindItemInList(cAlphaArgs(7), InverterNames, NumInverters)
       If (ElecLoadCenter(Count)%InverterModelNum <= 0) Then
         IF (.not. lAlphaFieldBlanks(7)) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
         ELSE
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//' = blank field.')
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' = blank field.')
         ENDIF
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
         CAll ShowContinueError('Inverter object was not found; Must have and be valid when Buss Type="'//  &
            trim(cAlphaArgs(6))//'".')
         errorsFound = .TRUE.
@@ -1872,8 +1962,8 @@ SUBROUTINE GetPowerManagerInput
         IF (Count-1  > 0) THEN
           Found=FindItemInList(cAlphaArgs(7),ElecLoadCenter%InverterName,Count-1)
           IF (Found /= 0) THEN
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
             CALL ShowContinueError('Inverter object has already been used by another '//TRIM(cCurrentModuleObject))
             errorsFound = .TRUE.
           ENDIF
@@ -1886,11 +1976,12 @@ SUBROUTINE GetPowerManagerInput
       ElecLoadCenter(Count)%StorageModelNum = FindItemInList(cAlphaArgs(8), StorageNames, NumElecStorageDevices)
       IF (ElecLoadCenter(Count)%StorageModelNum <= 0) THEN
         IF (.not. lAlphaFieldBlanks(8)) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(cAlphaArgs(8)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(cAlphaArgs(8)) )
         ELSE
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(8))//' = blank field.')
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(8))//' = blank field.')
         ENDIF
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
         CALL ShowContinueError('Electrical storage object was not found; Must have and be valid when Buss Type="'//  &
            trim(cAlphaArgs(6))//'".')
         errorsFound = .TRUE.
@@ -1899,8 +1990,8 @@ SUBROUTINE GetPowerManagerInput
         IF (Count-1  > 0) THEN
           Found=FindItemInList(cAlphaArgs(8),ElecLoadCenter%StorageName,Count-1)
           IF (Found /= 0) THEN
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(cAlphaArgs(8)) )
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(cAlphaArgs(8)) )
             CALL ShowContinueError('Storage object has already been used by another '//TRIM(cCurrentModuleObject))
             errorsFound = .TRUE.
           ENDIF
@@ -1915,8 +2006,8 @@ SUBROUTINE GetPowerManagerInput
     IF(NumAlphas >= 9 .AND. (.not. lAlphaFieldBlanks(9)) ) THEN
       ElecLoadCenter(Count)%TransformerModelNum = FindItemInList(cAlphaArgs(9), TransformerNames, NumTransformers)
         IF (ElecLoadCenter(Count)%TransformerModelNum <= 0) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(cAlphaArgs(9)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(cAlphaArgs(9)) )
           ErrorsFound = .TRUE.
         ELSE
         ! It is allowed that a transformer can serve multiple load centers.
@@ -1987,8 +2078,8 @@ SUBROUTINE GetPowerManagerInput
         ELSEIF (SameString(cAlphaArgs(alphacount) , 'Generator:WindTurbine') ) THEN
           ElecLoadCenter(Count)%ElecGen(GenCount)%CompType_Num  = iGeneratorWindTurbine
         ELSE
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
           ErrorsFound=.true.
         ENDIF
         CALL ValidateComponent(ElecLoadCenter(Count)%ElecGen(GenCount)%TypeOf,ElecLoadCenter(Count)%ElecGen(GenCount)%Name,  &
@@ -2015,8 +2106,8 @@ SUBROUTINE GetPowerManagerInput
         ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSched      = cAlphaArgs(alphacount)
         ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr   = GetScheduleIndex(cAlphaArgs(alphacount))
         IF (ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr <= 0) THEN
-          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
           CAll ShowContinueError('Schedule was not found ')
           errorsFound = .true.
         ENDIF
@@ -2099,8 +2190,8 @@ SUBROUTINE GetPowerManagerInput
   !This has to be done after reading in all load centers
   DO TransfNum = 1, NumTransformers
     IF(Transformer(TransfNum)%UsageMode == PowerOutFromBldg .AND. Transformer(TransfNum)%LoadCenterNum == 0) THEN
-      CALL ShowSevereError('ISOLATED Transformer: No load center connects to a transformer used to output power' )
-      CALL ShowContinueError('Entered in ElectricLoadCenter:Transformer ='//TRIM(Transformer(TransfNum)%Name) )
+      CALL ShowSevereError(RoutineName//'ElectricLoadCenter:Transformer="'//TRIM(Transformer(TransfNum)%Name)//'", invalid entry.')
+      CALL ShowContinueError('ISOLATED Transformer: No load center connects to a transformer used to output power' )
     END IF
   END DO
 
@@ -2109,7 +2200,7 @@ SUBROUTINE GetPowerManagerInput
 
 
   IF (ErrorsFound) THEN
-    CALL ShowFatalError('Errors found processing input for electric load center.')
+    CALL ShowFatalError(RoutineName//'Preceding errors terminate program.')
   ENDIF
 
 RETURN
@@ -2826,14 +2917,9 @@ SUBROUTINE FigureInverterZoneGains
   ENDIF
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
-  DO InvertNum =1 , NumInverters
-    If (Inverter(InvertNum)%ZoneNum == 0) CYCLE
-    ZoneNum = Inverter(InvertNum)%ZoneNum
+!  IF(DoingSizing)THEN
 
-    ZoneIntGain(ZoneNum)%QInvertConv = Inverter(InvertNum)%QdotconvZone + ZoneIntGain(ZoneNum)%QInvertConv
-    ZoneIntGain(ZoneNum)%QInvertRad  = Inverter(InvertNum)%QdotRadZone  + ZoneIntGain(ZoneNum)%QInvertRad
-
-  ENDDO
+!  ENDIF
 
   RETURN
 
@@ -3463,7 +3549,6 @@ SUBROUTINE FigureElectricalStorageZoneGains
 
           ! USE STATEMENTS:
   USE DataGlobals, ONLY: BeginEnvrnFlag
-  USE DataHeatBalance, ONLY: ZoneIntGain
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -3493,14 +3578,9 @@ SUBROUTINE FigureElectricalStorageZoneGains
   ENDIF
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
-  DO StorNum =1 , NumElecStorageDevices
-    If (ElecStorage(StorNum)%ZoneNum == 0) CYCLE
-    ZoneNum = ElecStorage(StorNum)%ZoneNum
+!  IF(DoingSizing)THEN
 
-    ZoneIntGain(ZoneNum)%QElecStorConv = ElecStorage(StorNum)%QdotconvZone + ZoneIntGain(ZoneNum)%QElecStorConv
-    ZoneIntGain(ZoneNum)%QElecStorRad  = ElecStorage(StorNum)%QdotRadZone  + ZoneIntGain(ZoneNum)%QElecStorRad
-
-  ENDDO
+!  ENDIF
 
   RETURN
 
@@ -3804,16 +3884,9 @@ SUBROUTINE FigureTransformerZoneGains
 
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
-  DO TransfNum =1 , NumTransformers
-    If (Transformer(TransfNum)%ZoneNum == 0) CYCLE
-    ZoneNum = Transformer(TransfNum)%ZoneNum
+!  IF(DoingSizing)THEN
 
-    ZoneIntGain(ZoneNum)%QTransformerConv = Transformer(TransfNum)%QdotconvZone       &
-                                             + ZoneIntGain(ZoneNum)%QTransformerConv
-    ZoneIntGain(ZoneNum)%QTransformerRad  = Transformer(TransfNum)%QdotRadZone        &
-                                             + ZoneIntGain(ZoneNum)%QTransformerRad
-
-  ENDDO
+!  ENDIF
 
   RETURN
 
@@ -3932,7 +4005,7 @@ END SUBROUTINE
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

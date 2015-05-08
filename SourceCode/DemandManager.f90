@@ -156,6 +156,7 @@ SUBROUTINE ManageDemand
   LOGICAL, SAVE :: ResimHB                  ! Flag to resimulate the heat balance simulation (including HVAC)
   LOGICAL, SAVE :: ResimHVAC                ! Flag to resimulate the HVAC simulation
   LOGICAL, SAVE :: BeginDemandSim     ! TRUE in the first timestep after warmup of a new environment
+  LOGICAL, SAVE :: ClearHistory       ! TRUE in the first timestep during warmup of a new environment
 
           ! FLOW:
   IF (GetInput .AND. .NOT. DoingSizing) THEN
@@ -166,16 +167,19 @@ SUBROUTINE ManageDemand
 
   IF (NumDemandManagerList > 0) THEN
 
-    IF (WarmupFlag) BeginDemandSim = .TRUE.
-
-    IF (.NOT. WarmupFlag .AND. .NOT. DoingSizing) THEN
-
-      IF (BeginDemandSim) THEN
+    IF (WarmupFlag) THEN
+      BeginDemandSim = .TRUE.
+      IF (ClearHistory) THEN
         ! Clear historical variables
         DO ListNum = 1, NumDemandManagerList
           DemandManagerList(ListNum)%History = 0.0
+          DemandManagerList(ListNum)%MeterDemand = 0.0
           DemandManagerList(ListNum)%AverageDemand = 0.0
           DemandManagerList(ListNum)%PeakDemand = 0.0
+          DemandManagerList(ListNum)%ScheduledLimit = 0.0
+          DemandManagerList(ListNum)%DemandLimit = 0.0
+          DemandManagerList(ListNum)%AvoidedDemand = 0.0
+          DemandManagerList(ListNum)%OverLimit = 0.0
           DemandManagerList(ListNum)%OverLimitDuration = 0.0
         END DO  ! ListNum
 
@@ -184,8 +188,16 @@ SUBROUTINE ManageDemand
         DemandMgr%ElapsedTime = 0
         DemandMgr%ElapsedRotationTime = 0
         DemandMgr%RotatedLoadNum = 0
+      ENDIF
+      ClearHistory=.false.
+    ENDIF
 
+
+    IF (.NOT. WarmupFlag .AND. .NOT. DoingSizing) THEN
+
+      IF (BeginDemandSim) THEN
         BeginDemandSim = .FALSE.
+        ClearHistory=.true.
       END IF
 
       DemandManagerExtIterations = 0
@@ -1717,7 +1729,7 @@ END SUBROUTINE InitDemandManagers
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

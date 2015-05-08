@@ -29,7 +29,7 @@ USE DataLoopNode
 USE DataGlobals
 USE DataEnvironment
 USE DataInterfaces
-USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2
+USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2, OutdoorGC
 !USE DataHVACGlobals, ONLY: FirstTimeStepSysFlag
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
@@ -89,7 +89,7 @@ SUBROUTINE SetOutAirNodes
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
   IF (GetOutAirNodesInputFlag) THEN ! First time subroutine has been entered
-    CALL GetOutAirNodesInput  ! Get Set Point Manager data
+    CALL GetOutAirNodesInput  ! Get OutAir Nodes data
     GetOutAirNodesInputFlag = .FALSE.
   END IF
   CALL InitOutAirNodes
@@ -385,6 +385,7 @@ SUBROUTINE InitOutAirNodes
       Node(NodeNum)%Quality = 0.0
       ! Add contaminants
       IF (Contaminant%CO2Simulation) Node(NodeNum)%CO2 = OutdoorCo2
+      IF (Contaminant%GenericContamSimulation) Node(NodeNum)%GenContam = OutdoorGC
     END DO
 
   RETURN
@@ -430,7 +431,7 @@ FUNCTION CheckOutAirNodeNumber(NodeNumber) RESULT(Okay)
           ! na
 
   IF (GetOutAirNodesInputFlag) THEN ! First time subroutine has been entered
-    CALL GetOutAirNodesInput  ! Get Set Point Manager data
+    CALL GetOutAirNodesInput  ! Get Out Air Nodes data
     GetOutAirNodesInputFlag = .FALSE.
     CALL SetOutAirNodes
   END IF
@@ -489,7 +490,7 @@ SUBROUTINE CheckAndAddAirNodeNumber(NodeNumber,Okay)
   LOGICAL :: errflag=.false.
 
   IF (GetOutAirNodesInputFlag) THEN ! First time subroutine has been entered
-    CALL GetOutAirNodesInput  ! Get Set Point Manager data
+    CALL GetOutAirNodesInput  ! Get Out Air Nodes data
     GetOutAirNodesInputFlag = .FALSE.
     CALL SetOutAirNodes
   END IF
@@ -539,6 +540,7 @@ SUBROUTINE CheckAndAddAirNodeNumber(NodeNumber,Okay)
       Node(NodeNumber)%Quality = 0.0
       ! Add contaminants
       IF (Contaminant%CO2Simulation) Node(NodeNumber)%CO2 = OutdoorCo2
+      IF (Contaminant%GenericContamSimulation) Node(NodeNumber)%GenContam = OutdoorGC
     ENDIF
   ENDIF
 
@@ -548,7 +550,7 @@ END SUBROUTINE CheckAndAddAirNodeNumber
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

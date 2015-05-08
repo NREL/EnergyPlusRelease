@@ -15,8 +15,7 @@ MODULE WaterUse
           ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: WarmupFlag, MaxNameLength, BeginEnvrnFlag, InitConvTemp, NumOfZones
-USE DataInterfaces, ONLY: SetupOutputVariable, ShowWarningError, ShowFatalError, ShowSevereError, &
-                       ShowContinueError, ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
+USE DataInterfaces
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
 
@@ -63,9 +62,11 @@ TYPE WaterEquipmentType
   INTEGER                      :: SensibleFracSchedule = 0 ! Pointer to schedule object
   REAL(r64)                    :: SensibleRate = 0.0
   REAL(r64)                    :: SensibleEnergy = 0.0
+  REAL(r64)                    :: SensibleRateNoMultiplier = 0.d0
   INTEGER                      :: LatentFracSchedule = 0   ! Pointer to schedule object
   REAL(r64)                    :: LatentRate = 0.0
   REAL(r64)                    :: LatentEnergy = 0.0
+  REAL(r64)                    :: LatentRateNoMultiplier = 0.d0 
   REAL(r64)                    :: MoistureRate = 0.0
   REAL(r64)                    :: MoistureMass = 0.0
 
@@ -328,7 +329,7 @@ SUBROUTINE SimulateWaterUseConnection(EquipTypeNum, CompName, CompIndex, InitLoo
   LOGICAL, INTENT(IN)          :: FirstHVACIteration
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: WaterEquipNum
+!  INTEGER :: WaterEquipNum
   INTEGER :: WaterConnNum
   INTEGER :: NumIteration
   INTEGER, SAVE :: MaxIterationsErrorCount
@@ -828,6 +829,14 @@ SUBROUTINE GetWaterUseInput
         WaterEquipment(WaterEquipNum)%MoistureRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
       CALL SetupOutputVariable('Water Use Equipment Moisture Gain To Zone [kg]', &
         WaterEquipment(WaterEquipNum)%MoistureMass, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
+
+      CALL SetupZoneInternalGain(WaterEquipment(WaterEquipNum)%Zone, &
+                     'WaterUse:Equipment',  &
+                     WaterEquipment(WaterEquipNum)%Name, &
+                     IntGainTypeOf_WaterUseEquipment,    &
+                     ConvectionGainRate    = WaterEquipment(WaterEquipNum)%SensibleRateNoMultiplier, &
+                     LatentGainRate        = WaterEquipment(WaterEquipNum)%LatentRateNoMultiplier)
+
     END IF
 
   END DO ! WaterEquipNum
@@ -1771,8 +1780,10 @@ SUBROUTINE CalcWaterUseZoneGains
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
     WaterEquipment%SensibleRate = 0.0
     WaterEquipment%SensibleEnergy = 0.0
+    WaterEquipment%SensibleRateNoMultiplier = 0.d0 
     WaterEquipment%LatentRate = 0.0
     WaterEquipment%LatentEnergy = 0.0
+    WaterEquipment%LatentRateNoMultiplier = 0.d0
     WaterEquipment%MixedTemp = 0.0
     WaterEquipment%TotalMassFlowRate = 0.0
     WaterEquipment%DrainTemp = 0.0
@@ -1789,15 +1800,21 @@ SUBROUTINE CalcWaterUseZoneGains
   DO WaterEquipNum = 1, NumWaterEquipment
     IF (WaterEquipment(WaterEquipNum)%Zone == 0) CYCLE
     ZoneNum = WaterEquipment(WaterEquipNum)%Zone
-    ZoneIntGain(ZoneNum)%WaterUseSensibleGain = ZoneIntGain(ZoneNum)%WaterUseSensibleGain &
-          + WaterEquipment(WaterEquipNum)%SensibleRate                                        &
+    WaterEquipment(WaterEquipNum)%SensibleRateNoMultiplier =  WaterEquipment(WaterEquipNum)%SensibleRate  &
           / ( Zone(ZoneNum)%Multiplier                             & ! CR7401, back out multipliers
-        * Zone(ZoneNum)%ListMultiplier)
-    ZoneIntGain(ZoneNum)%WaterUseLatentGain = ZoneIntGain(ZoneNum)%WaterUseLatentGain &
-          + WaterEquipment(WaterEquipNum)%LatentRate                                       &
+              * Zone(ZoneNum)%ListMultiplier)
+    WaterEquipment(WaterEquipNum)%LatentRateNoMultiplier =  WaterEquipment(WaterEquipNum)%LatentRate  &
           / ( Zone(ZoneNum)%Multiplier                             & ! CR7401, back out multipliers
-             * Zone(ZoneNum)%ListMultiplier)
+              * Zone(ZoneNum)%ListMultiplier)
   END DO
+  
+!  ! this routine needs to model approx zone gains for use during sizing
+!  IF(DoingSizing)THEN
+!    DO WaterEquipNum = 1, NumWaterEquipment
+!      WaterEquipment(WaterEquipNum)%SensibleRateNoMultiplier = 
+!      WaterEquipment(WaterEquipNum)%LatentRateNoMultiplier   = 
+!    END DO
+!  ENDIF
 
   RETURN
 
@@ -1805,7 +1822,7 @@ END SUBROUTINE CalcWaterUseZoneGains
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

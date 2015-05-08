@@ -111,7 +111,7 @@ TYPE EvapConditions
   REAL(r64)    :: StageEff                        = 0.0D0 !Reporting for Indirect Total Stage Efficiency
   REAL(r64)    :: DPBoundFactor                   = 0.0D0 ! in RDDSpecial efficency w.r.t. dewpoint
   Integer      :: EvapControlNodeNum              = 0   ! need to control to avoid over cooling
-  REAL(r64)    :: DesiredOutletTemp               = 0.0D0 ! set point manager should set this
+  REAL(r64)    :: DesiredOutletTemp               = 0.0D0 ! setpoint manager should set this
   REAL(r64)    :: PartLoadFract                   = 0.0D0 ! reduces cooling performance and associated fan power
   Integer      :: DewPointBoundFlag               = 0   ! report when indirect research special cooler is bound by dewpoint
                                                         ! rather than wetbulb-depression approach
@@ -827,14 +827,14 @@ SUBROUTINE InitEvapCooler(EvapCoolNum)
           IF (.NOT. AnyEnergyManagementSystemInModel) THEN
             CALL ShowSevereError('Missing temperature setpoint for Evap Cooler unit ' // &
                                   TRIM(EvapCond(EvapCoolNum)%EvapCoolerName))
-            CALL ShowContinueError(' use a Set Point Manager to establish a setpoint at the unit control node.')
+            CALL ShowContinueError(' use a Setpoint Manager to establish a setpoint at the unit control node.')
           ELSE
             localSetpointCheck = .FALSE.
             CALL CheckIfNodeSetpointManagedByEMS(ControlNode, iTemperatureSetpoint, localSetpointCheck)
             IF (localSetpointCheck) THEN
               CALL ShowSevereError('Missing temperature setpoint for Evap Cooler unit ' // &
                                     TRIM(EvapCond(EvapCoolNum)%EvapCoolerName))
-              CALL ShowContinueError(' use a Set Point Manager to establish a setpoint at the unit control node.')
+              CALL ShowContinueError(' use a Setpoint Manager to establish a setpoint at the unit control node.')
               CALL ShowContinueError(' or use an EMS actuator to establish a setpoint at the unit control node.')
             ENDIF
           ENDIF
@@ -2093,6 +2093,10 @@ SUBROUTINE UpdateEvapCooler(EvapCoolNum)
     Node(OutletNode)%CO2 = Node(InletNode)%CO2
   End If
 
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(OutletNode)%GenContam = Node(InletNode)%GenContam
+  End If
+
   RETURN
 END Subroutine UpdateEvapCooler
 
@@ -2157,7 +2161,7 @@ END Subroutine ReportEvapCooler
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

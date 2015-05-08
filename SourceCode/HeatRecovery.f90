@@ -1685,7 +1685,7 @@ END IF
             IF (.NOT. AnyEnergyManagementSystemInModel) THEN
               CALL ShowSevereError('Missing temperature setpoint for ' // &
                               TRIM(cHXTypes(ExchCond(ExIndex)%ExchTypeNum)) //' "'//TRIM(ExchCond(ExIndex)%Name) // '" :')
-              CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the supply air outlet node ' // &
+              CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the supply air outlet node ' // &
                                'of the Heat Exchanger.')
               CALL ShowFatalError(' Previous condition causes program termination.')
             ELSE
@@ -1694,7 +1694,7 @@ END IF
               IF (FatalError) THEN
                 CALL ShowSevereError('Missing temperature setpoint for ' // &
                                 TRIM(cHXTypes(ExchCond(ExIndex)%ExchTypeNum)) //' "'//TRIM(ExchCond(ExIndex)%Name) // '" :')
-                CALL ShowContinueError('  use a Set Point Manager to establish a setpoint at the supply air outlet node ' // &
+                CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the supply air outlet node ' // &
                                  'of the Heat Exchanger.')
                 CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the supply air outlet node ' // &
                                  'of the Heat Exchanger.')
@@ -1774,8 +1774,8 @@ END IF
               CALL ShowWarningError('Missing optional HumRatMax setpoint for ' // &
                         TRIM(cHXTypes(ExchCond(ExchNum)%ExchTypeNum)) //' "'//TRIM(ExchCond(ExchNum)%Name) // '"')
               CALL ShowContinueError('...the simulation will continue without control of the desiccant heat exchanger to'// &
-                                 ' a maximum humidity ratio set point.')
-              CALL ShowContinueError('...use a Set Point Manager to establish a setpoint at the process air outlet node ' // &
+                                 ' a maximum humidity ratio setpoint.')
+              CALL ShowContinueError('...use a Setpoint Manager to establish a setpoint at the process air outlet node ' // &
                                'of the desiccant Heat Exchanger if control is desired.')
             ELSE
              ! need call to EMS to check node
@@ -1784,8 +1784,8 @@ END IF
                 CALL ShowWarningError('Missing optional HumRatMax setpoint for ' // &
                         TRIM(cHXTypes(ExchCond(ExchNum)%ExchTypeNum)) //' "'//TRIM(ExchCond(ExchNum)%Name) // '"')
                 CALL ShowContinueError('...the simulation will continue without control of the desiccant heat exchanger to'// &
-                                 ' a maximum humidity ratio set point.')
-                CALL ShowContinueError('...use a Set Point Manager to establish a setpoint at the process air outlet node ' // &
+                                 ' a maximum humidity ratio setpoint.')
+                CALL ShowContinueError('...use a Setpoint Manager to establish a setpoint at the process air outlet node ' // &
                                'of the desiccant Heat Exchanger if control is desired.')
                 CALL ShowContinueError('...or use an EMS Actuator to establish a maximum humidity ratio setpoint at the ' &
                                //'process air outlet node of the desiccant Heat Exchanger if control is desired.')
@@ -2234,7 +2234,7 @@ SUBROUTINE CalcAirToAirGenericHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Econ
   REAL(r64)    :: HXSupAirVolFlowRate ! air volume flow rate of the supply air stream through the heat exchanger [m3/sec]
   REAL(r64)    :: HXAvgAirVolFlowRate ! average air volume flow rate through the heat exchanger [m3/sec]
   REAL(r64)    :: HXAirVolFlowRatio   ! ratio of avg actual air volume flow through HX to nominal HX air volume flow [-]
-  REAL(r64)    :: HXTempSetPoint      ! set point temperature at supply outlet node of HX when ControlToTemperatureSetpoint = Yes
+  REAL(r64)    :: HXTempSetPoint      ! setpoint temperature at supply outlet node of HX when ControlToTemperatureSetpoint = Yes
   REAL(r64)    :: MassFlowSecIn       ! secondary air mass flow rate at HX inlet
 !  REAL(r64)    :: MassFlowSecOut      ! secondary air mass flow rate at HX outlet
   REAL(r64)    :: MassFlowSupIn       ! supply air mass flow rate at HX inlet
@@ -2408,7 +2408,7 @@ SUBROUTINE CalcAirToAirGenericHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Econ
     ExchCond(ExNum)%SecOutEnth = ExchCond(ExNum)%SecInEnth + QTotTrans/ExchCond(ExNum)%SecOutMassFlow
     ExchCond(ExNum)%SecOutHumRat = PsyWFnTdbH(ExchCond(ExNum)%SecOutTemp,ExchCond(ExNum)%SecOutEnth)
 !
-!   Control the supply air outlet temperature to a set point for Heating Mode only
+!   Control the supply air outlet temperature to a setpoint for Heating Mode only
 !   (ControlFraction = 0 HX fully bypassed, ControlFraction = 1 air passed entirely through HX)
 !   (supply air stream bypass mass flow rate proportional to ControlFraction except when frost control is active)
     IF(ExchCond(ExNum)%ControlToTemperatureSetPoint .AND. &
@@ -2692,7 +2692,7 @@ SUBROUTINE CalcDesiccantBalancedHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Fa
   REAL(r64) :: MinHumRatNeeded        ! minimum humidity ratio setpoint for balanced desiccant HX [kg/kg]
   REAL(r64) :: HXPartLoadRatio        ! local heat exchanger part-load ratio
   REAL(r64) :: TestSaturationEnthalpy ! enthalpy used to test for regeneration outlet condition over saturation curve (J/kg)
-  CHARACTER(len=30), SAVE :: ThisSub = 'CalcDesiccantBalancedHeatExch:'! Used to pass to Psyc routines
+  CHARACTER(len=32), SAVE :: ThisSub = 'CalcDesiccantBalancedHeatExch:'! Used to pass to Psyc routines
   REAL(r64) :: AverageMassFlowRate    ! average of supply (regen) and secondary (process) mass flow rates [kg/s]
   LOGICAL   :: EconomizerActiveFlag   ! local representing the economizer status when PRESENT
   LOGICAL   :: HighHumCtrlActiveFlag  ! local representing high humidity control when PRESENT
@@ -2863,7 +2863,7 @@ SUBROUTINE CalcDesiccantBalancedHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Fa
 
 !       check the model output, if the regen delta W is positive, the process air stream is dehumidified
         IF(FullLoadDeltaW .GT. 0)THEN
-!         check for a set point, if no set point then PLR remains at 1
+!         check for a setpoint, if no setpoint then PLR remains at 1
           IF(MaxHumRatNeeded .NE. SensedNodeFlagValue)THEN
             IF (ExchCond(ExNum)%SecInHumRat .GT. MaxHumRatNeeded .AND. MaxHumRatNeeded .GT. 0.0) THEN
               HXPartLoadRatio = (ExchCond(ExNum)%SecInHumRat - MaxHumRatNeeded) / FullLoadDeltaW
@@ -2873,7 +2873,7 @@ SUBROUTINE CalcDesiccantBalancedHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Fa
           END IF
 !       check the model output, if the regen delta W is negative, the process air stream is humidified
         ELSE IF(FullLoadDeltaW .LT. 0)THEN
-!         check for a set point, if no set point then PLR remains at 1
+!         check for a setpoint, if no setpoint then PLR remains at 1
           IF(MinHumRatNeeded .NE. SensedNodeFlagValue)THEN
             IF (ExchCond(ExNum)%SecInHumRat .LT. MinHumRatNeeded .AND. MinHumRatNeeded .GT. 0.0) THEN
               HXPartLoadRatio = (ExchCond(ExNum)%SecInHumRat - MinHumRatNeeded) / FullLoadDeltaW
@@ -3136,7 +3136,7 @@ SUBROUTINE FrostControl(ExNum)
           TempSupOut = TempSupIn + &
               ExchCond(ExNum)%SensEffectiveness * SafeDiv(CMin,CSup) * (TempSecIn - TempSupIn)
           QSensTrans = CSup * (TempSupIn - TempSupOut)
-!         Csec can not be 0 in this subroutine
+!         Csec cannot be 0 in this subroutine
           TempSecOut = TempSecIn + QSensTrans / CSec
           Error =  (TempSecOut - TempThreshold)
 !         recalculate DFFraction until convergence, gaurd against divide by 0 (unlikely).
@@ -3342,6 +3342,10 @@ SUBROUTINE UpdateHeatRecovery(ExNum)
   IF (Contaminant%CO2Simulation) Then
     Node(SupOutNode)%CO2 = Node(SupInNode)%CO2
     Node(SecOutNode)%CO2 = Node(SecInNode)%CO2
+  End If
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(SupOutNode)%GenContam = Node(SupInNode)%GenContam
+    Node(SecOutNode)%GenContam = Node(SecInNode)%GenContam
   End If
 
 RETURN
@@ -3812,10 +3816,10 @@ SUBROUTINE CheckModelBoundsTempEq(ExchNum, T_RegenInTemp, T_RegenInHumRat, T_Pro
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: CharValue          = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: CharValue          = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -4160,10 +4164,10 @@ SUBROUTINE CheckModelBoundsHumRatEq(ExchNum, H_RegenInTemp, H_RegenInHumRat, H_P
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: CharValue          = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: CharValue          = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -4503,10 +4507,10 @@ SUBROUTINE CheckModelBoundOutput_Temp(ExchNum, RegenInTemp, RegenOutTemp, FirstH
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: CharValue          = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: CharValue          = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -4675,10 +4679,10 @@ SUBROUTINE CheckModelBoundOutput_HumRat(ExchNum, RegenInHumRat, RegenOutHumRat, 
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: CharValue          = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: CharValue          = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -4851,9 +4855,9 @@ SUBROUTINE CheckModelBoundsRH_TempEq(ExchNum, T_RegenInTemp, T_RegenInHumRat, T_
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
  REAL(r64)                :: RegenInletRH       = 0.0     ! Regeneration inlet air relative humidity
  REAL(r64)                :: ProcInletRH        = 0.0     ! Process inlet air relative humidity
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -5045,9 +5049,9 @@ SUBROUTINE CheckModelBoundsRH_HumRatEq(ExchNum, H_RegenInTemp, H_RegenInHumRat, 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
  REAL(r64)                :: RegenInletRH       = 0.0     ! Regeneration inlet air relative humidity
  REAL(r64)                :: ProcInletRH        = 0.0     ! Process inlet air relative humidity
- CHARACTER(len=30)        :: OutputChar         = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharLo       = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharHi       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputChar         = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharLo       = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharHi       = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -5229,8 +5233,8 @@ SUBROUTINE CheckForBalancedFlow(ExchNum, ProcessInMassFlow, RegenInMassFlow, Fir
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- CHARACTER(len=30)        :: OutputCharProc     = ' '     ! character string for warning messages
- CHARACTER(len=30)        :: OutputCharRegen    = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharProc     = ' '     ! character string for warning messages
+ CHARACTER(len=32)        :: OutputCharRegen    = ' '     ! character string for warning messages
  REAL(r64),SAVE    :: TimeStepSysLast    = 0.0     ! last system time step (used to check for downshifting)
  REAL(r64)    :: CurrentEndTime     = 0.0     ! end time of time step for current simulation time step
  REAL(r64),SAVE    :: CurrentEndTimeLast = 0.0     ! end time of time step for last simulation time step
@@ -5726,7 +5730,7 @@ END SUBROUTINE SetHeatExchangerData
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

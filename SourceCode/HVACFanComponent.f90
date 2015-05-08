@@ -923,7 +923,7 @@ SUBROUTINE GetFanInput
       Do FanNum=1,NumFans
              ! Setup Report variables for the Fans  CurrentModuleObject='Fans'
        CALL SetupOutputVariable('Fan Electric Power[W]', Fan(FanNum)%FanPower, 'System','Average',Fan(FanNum)%FanName)
-       CALL SetupOutputVariable('Fan Delta Temp[C]', Fan(FanNum)%DeltaTemp, 'System','Average',Fan(FanNum)%FanName)
+       CALL SetupOutputVariable('Fan Delta Temp[deltaC]', Fan(FanNum)%DeltaTemp, 'System','Average',Fan(FanNum)%FanName)
        CALL SetupOutputVariable('Fan Electric Consumption[J]', Fan(FanNum)%FanEnergy, 'System','Sum',Fan(FanNum)%FanName, &
                                  ResourceTypeKey='Electric',GroupKey='System', &
                                  EndUseKey='Fans',EndUseSubKey=Fan(FanNum)%EndUseSubcategoryName)
@@ -1205,7 +1205,7 @@ SUBROUTINE SizeFan(FanNum)
 
   REAL(r64) RhoAir             ! Air density [kg/m3]
   REAL(r64) FanVolFlow         ! Fan volumetric airflow [m3/s]
-  REAL(r64) DuctStaticPress    ! Duct static pressure set point [Pa]
+  REAL(r64) DuctStaticPress    ! Duct static pressure setpoint [Pa]
   REAL(r64) DeltaPressTot      ! Total pressure rise across fan [N/m2 = Pa]
   REAL(r64) FanOutletVelPress  ! Fan outlet velocity pressure [Pa]
   REAL(r64) EulerNum           ! Fan Euler number [-]
@@ -1805,7 +1805,7 @@ SUBROUTINE SimVariableVolumeFan(FanNum)
     !  avoid the unrealistic high temperature rise across the fan.
     ! TH, 2/15/2011
     ! This change caused diffs for VAV systems when fan runs at less than 10% flow conditions.
-    !  A potential way to improve is to check the temperature rise across the fan first, 
+    !  A potential way to improve is to check the temperature rise across the fan first,
     !  if it is too high (say > 20C) then applies the code.
     DeltaTAcrossFan = Fan(FanNum)%OutletAirTemp - Fan(FanNum)%InletAirTemp
     IF (DeltaTAcrossFan > 20.0) THEN
@@ -2202,7 +2202,7 @@ SUBROUTINE SimComponentModelFan(FanNum)
   REAL(r64) RhoAir             ! Air density [kg/m3]
   REAL(r64) MassFlow           ! Fan mass airflow [kg/s]
   REAL(r64) FanVolFlow         ! Fan volumetric airflow [m3/s]
-  REAL(r64) DuctStaticPress    ! Duct static pressure set point [Pa]
+  REAL(r64) DuctStaticPress    ! Duct static pressure setpoint [Pa]
   REAL(r64) DeltaPressTot      ! Total pressure rise across fan [N/m2 = Pa]
   REAL(r64) FanOutletVelPress  ! Fan outlet velocity pressure [Pa]
   REAL(r64) EulerNum           ! Fan Euler number [-]
@@ -2488,6 +2488,10 @@ SUBROUTINE UpdateFan(FanNum)
 
   IF (Contaminant%CO2Simulation) Then
     Node(OutletNode)%CO2 = Node(InletNode)%CO2
+  End If
+
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(OutletNode)%GenContam = Node(InletNode)%GenContam
   End If
 
   RETURN
@@ -3132,7 +3136,7 @@ END SUBROUTINE SetFanData
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

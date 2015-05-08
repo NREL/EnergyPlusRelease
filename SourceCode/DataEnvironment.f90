@@ -157,6 +157,8 @@ LOGICAL :: PrintEnvrnStampWarmupPrinted=.false.
 
 LOGICAL :: RunPeriodEnvironment=.false.       ! True if Run Period, False if DesignDay
 CHARACTER(len=20) :: EnvironmentStartEnd=' '  ! Start/End dates for Environment
+LOGICAL :: CurrentYearIsLeapYear = .false.  ! true when current year is leap year (convoluted logic dealing with
+                                            ! whether weather file allows leap years, runperiod inputs.
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE DataEnvironment:
 PUBLIC OutDryBulbTempAt
@@ -447,7 +449,7 @@ END SUBROUTINE SetOutBulbTempAt
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

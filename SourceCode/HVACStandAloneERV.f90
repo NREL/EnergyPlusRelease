@@ -1407,6 +1407,19 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
 
     END IF
 
+  ELSE IF (StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate == AutoSize) THEN
+    CALL SetFanData(StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex, ErrorsFound, &
+                    StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
+                    StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow* &
+                    StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
+                    0.0d0)
+    StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow * &
+                                                             StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
+    CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num)), &
+                              StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
+                             'Maximum Supply Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow* &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
+
   END IF
 
   IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow == AutoSize) THEN
@@ -1480,6 +1493,20 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
 
 
     END IF
+
+  ELSE IF (StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate == AutoSize) THEN
+      CALL SetFanData(StandAloneERV(StandAloneERVNum)%ExhaustAirFanIndex, ErrorsFound, &
+                      StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
+                      StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
+                      StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
+                      0.0d0)
+      StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
+                                                               StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
+
+      CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num)), &
+                              StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
+                             'Maximum Exhaust Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
 
   END IF
 
@@ -2076,7 +2103,7 @@ END FUNCTION GetStandAloneERVReturnAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

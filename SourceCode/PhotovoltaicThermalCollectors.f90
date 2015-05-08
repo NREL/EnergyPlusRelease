@@ -650,7 +650,7 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
         IF (Node(PVT(PVTindex)%HVACOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) THEN
           IF (.NOT. AnyEnergyManagementSystemInModel) THEN
             CALL ShowSevereError( 'Missing temperature setpoint for PVT outlet node  ')
-            CALL ShowContinueError('Add a set point manager to outlet node of PVT named ' &
+            CALL ShowContinueError('Add a setpoint manager to outlet node of PVT named ' &
                                     //Trim(PVT(PVTindex)%Name) )
             SetPointErrorFlag = .TRUE.
           ELSE
@@ -658,7 +658,7 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
             CALL CheckIfNodeSetpointManagedByEMS(PVT(PVTindex)%HVACOutletNodeNum,iTemperatureSetpoint, SetPointErrorFlag)
             IF (SetPointErrorFlag) THEN
               CALL ShowSevereError( 'Missing temperature setpoint for PVT outlet node  ')
-              CALL ShowContinueError('Add a set point manager to outlet node of PVT named ' &
+              CALL ShowContinueError('Add a setpoint manager to outlet node of PVT named ' &
                                     //Trim(PVT(PVTindex)%Name) )
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node of PVT')
             ENDIF
@@ -1343,7 +1343,7 @@ END SUBROUTINE GetPVTThermalPowerProduction
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

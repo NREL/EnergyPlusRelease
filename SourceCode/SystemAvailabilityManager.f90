@@ -2976,7 +2976,7 @@ SUBROUTINE GetHybridVentilationInputs
       CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
       CALL ShowContinueError('The inputs for'//TRIM(cAlphaFieldNames(8))// &
                             ' and '//TRIM(cAlphaFieldNames(9))//' are valid.')
-      CALL ShowContinueError('But both objects can not work at the same time. The Simple Airflow Control is disabled')
+      CALL ShowContinueError('But both objects cannot work at the same time. The Simple Airflow Control is disabled')
       HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr = 0
     ELSE IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
       ! Check schedule values
@@ -3298,13 +3298,13 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
   REAL(r64)    :: ZoneAirRH       ! Zone air relative humidity
   REAL(r64)    :: TempExt         ! Outdoor dry bulb temperature at zone height
   REAL(r64)    :: WindExt         ! Outdoor wind spped at zone height
-!unused  REAL(r64)    :: RHSetPoint      ! RH set point from a given schedule
-  REAL(r64)    :: WSetPoint       ! Humidity ratio set point from a given RH setpoint schedule
-  REAL(r64)    :: OASetPoint      ! Outdoor air set point from a given OA setpoint schedule
+!unused  REAL(r64)    :: RHSetPoint      ! RH setpoint from a given schedule
+  REAL(r64)    :: WSetPoint       ! Humidity ratio setpoint from a given RH setpoint schedule
+  REAL(r64)    :: OASetPoint      ! Outdoor air setpoint from a given OA setpoint schedule
   REAL(r64)    :: ACH             ! Zone air change per hour
   LOGICAL      :: found           ! Used for humidistat object
-  REAL(r64)    :: ZoneRHHumidifyingSetPoint   ! Zone humidifying set point (%)
-  REAL(r64)    :: ZoneRHDehumidifyingSetPoint ! Zone dehumidifying set point (%)
+  REAL(r64)    :: ZoneRHHumidifyingSetPoint   ! Zone humidifying setpoint (%)
+  REAL(r64)    :: ZoneRHDehumidifyingSetPoint ! Zone dehumidifying setpoint (%)
   INTEGER      :: ControlledZoneNum           ! Index into the ZoneEquipConfig array
   INTEGER      :: SimpleControlType           ! Simple control type from a schedule: 0 individual, 1 global
   INTEGER      :: i                ! Array index
@@ -3617,7 +3617,7 @@ END FUNCTION GetHybridVentilationControlStatus
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

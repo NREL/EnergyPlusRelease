@@ -14,7 +14,7 @@ MODULE VentilatedSlab
   ! METHODOLOGY EMPLOYED:
   ! Systems are modeled as a collection of components: radiant panel, outside air mixer,
   ! fan, heating coil and/or cooling coil plus an integrated control
-  ! algorithm that adjusts the hot or cold water flow to meet the set point
+  ! algorithm that adjusts the hot or cold water flow to meet the setpoint
   ! condition.  Outside air mixing is handled locally as either fixed percent
   ! or as attempting to meet a prescribed mixed air temperature.
 
@@ -1464,6 +1464,7 @@ IF (MyPlantScanFlag(item) .AND. ALLOCATED(PlantLoop)) THEN
                                   VentSlab(Item)%HWCompNum,  &
                                   errFlag=errFlag)
     IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(VentSlab(Item)%Name)//'", type=ZoneHVAC:VentilatedSlab')
       CALL ShowFatalError('InitVentilatedSlab: Program terminated due to previous condition(s).')
     ENDIF
 
@@ -1481,7 +1482,11 @@ IF (MyPlantScanFlag(item) .AND. ALLOCATED(PlantLoop)) THEN
                                   VentSlab(Item)%CWLoopSide, &
                                   VentSlab(Item)%CWBranchNum, &
                                   VentSlab(Item)%CWCompNum)
-     VentSlab(Item)%ColdCoilOutNodeNum   =    &
+    IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(VentSlab(Item)%Name)//'", type=ZoneHVAC:VentilatedSlab')
+      CALL ShowFatalError('InitVentilatedSlab: Program terminated due to previous condition(s).')
+    ENDIF
+    VentSlab(Item)%ColdCoilOutNodeNum   =    &
             PlantLoop(VentSlab(Item)%CWLoopNum)%LoopSide(VentSlab(Item)%CWLoopSide) &
                          %Branch(VentSlab(Item)%CWBranchNum)%Comp(VentSlab(Item)%CWCompNum)%NodeNumOut
   ELSE
@@ -1718,9 +1723,9 @@ SUBROUTINE SizeVentilatedSlab(Item)
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,     ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXDXCoilName, GetHXCoilType
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
+!  USE BranchInputManager, ONLY: MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
-  USE DataPlant,       ONLY: PlantLoop
+  USE DataPlant,       ONLY: PlantLoop, MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -2524,8 +2529,7 @@ Else ! System On
                                  CompErrIndex=VentSlab(Item)%CompErrIndex,  &
                                  LoopNum     = VentSlab(Item)%HWLoopNum,    &
                                  LoopSide    = VentSlab(Item)%HWLoopSide,   &
-                                 BranchIndex = VentSlab(Item)%HWBranchNum,  &
-                                 CompIndex   = VentSlab(Item)%HWCompNum)
+                                 BranchIndex = VentSlab(Item)%HWBranchNum)
 
         CASE (Heating_GasCoilType,Heating_ElectricCoilType,Heating_SteamCoilType)
 
@@ -2768,8 +2772,7 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
                                  CompErrIndex=VentSlab(Item)%CompErrIndex,  &
                                  LoopNum     = VentSlab(Item)%CWLoopNum,    &
                                  LoopSide    = VentSlab(Item)%CWLoopSide,   &
-                                 BranchIndex = VentSlab(Item)%CWBranchNum,  &
-                                 CompIndex   = VentSlab(Item)%CWCompNum)
+                                 BranchIndex = VentSlab(Item)%CWBranchNum)
 
       END IF
 
@@ -4254,7 +4257,7 @@ END SUBROUTINE ReportVentilatedSlab
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

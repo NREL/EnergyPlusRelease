@@ -680,16 +680,16 @@ CONTAINS
 !  real(r64) rotang_2
 
    real(r64) az
-   real(r64) azm
+!   real(r64) azm
    real(r64) tlt
 !  real(r64) newtlt
 !  real(r64) roundval
-   real(r64) xcomp
-   real(r64) ycomp
-   real(r64) zcomp
-   real(r64) proj
-   integer :: scount
-   integer :: nvert1
+!   real(r64) xcomp
+!   real(r64) ycomp
+!   real(r64) zcomp
+!   real(r64) proj
+!   integer :: scount
+!   integer :: nvert1
 !  real(r64) :: tltcos
 
 !!!     x3=VecNormalize(Surf(2)-Surf(1))
@@ -764,10 +764,10 @@ CONTAINS
      az=az/degtoradians
      az=MOD(450.d0 - az, 360.d0)
      az=az+90.d0
+     if (az < 0.0) az=az+360.d0
      az=mod(az,360.d0)
 
      ! Normalize the azimuth angle so it is positive
-     if (az < 0.0) az=az+360.d0
      if (abs(az-360.d0) < 1.d-3) az=0.0d0
      Azimuth=az
      Tilt=tlt
@@ -974,8 +974,8 @@ CONTAINS
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-!    TYPE (Vector) :: V1
-!    TYPE (Vector) :: V2
+!     TYPE (Vector) :: U
+!     TYPE (Vector) :: V
      INTEGER Side
      INTEGER curVert
      INTEGER nextVert
@@ -988,14 +988,22 @@ CONTAINS
      yvalue=0.0d0
      zvalue=0.0d0
 
-     DO Side=1,NSides
-       curVert=Side
-       nextVert=Side+1
-       if (nextVert > NSides) nextVert=1
-       xvalue=xvalue+ (VList(curVert)%y-VList(nextVert)%y) * (VList(curVert)%z+VList(nextVert)%z)
-       yvalue=yvalue+ (VList(curVert)%z-VList(nextVert)%z) * (VList(curVert)%x+VList(nextVert)%x)
-       zvalue=zvalue+ (VList(curVert)%x-VList(nextVert)%x) * (VList(curVert)%y+VList(nextVert)%y)
-     ENDDO
+!     IF (NSides > 3) THEN
+       DO Side=1,NSides
+         curVert=Side
+         nextVert=Side+1
+         if (nextVert > NSides) nextVert=1
+         xvalue=xvalue+ (VList(curVert)%y-VList(nextVert)%y) * (VList(curVert)%z+VList(nextVert)%z)
+         yvalue=yvalue+ (VList(curVert)%z-VList(nextVert)%z) * (VList(curVert)%x+VList(nextVert)%x)
+         zvalue=zvalue+ (VList(curVert)%x-VList(nextVert)%x) * (VList(curVert)%y+VList(nextVert)%y)
+       ENDDO
+!     ELSE  ! Triangle
+!       U=VList(2)-VList(1)
+!       V=VList(3)-VList(1)
+!       xvalue=(U%y*V%z)-(U%z*V%y)
+!       yvalue=(U%z*V%x)-(U%x*V%z)
+!       zvalue=(U%x*V%y)-(U%y*V%x)
+!     ENDIF
 
      OutNewellSurfaceNormalVector%x=xvalue
      OutNewellSurfaceNormalVector%y=yvalue
@@ -1005,6 +1013,55 @@ CONTAINS
      RETURN
 
    END SUBROUTINE CreateNewellSurfaceNormalVector
+
+   SUBROUTINE CompareTwoVectors(vector1,vector2,areSame,tolerance)
+
+             ! SUBROUTINE INFORMATION:
+             !       AUTHOR         Linda Lawrie
+             !       DATE WRITTEN   February 2012
+             !       MODIFIED       na
+             !       RE-ENGINEERED  na
+
+             ! PURPOSE OF THIS SUBROUTINE:
+             ! This routine will provide the ability to compare two vectors (e.g. surface normals)
+             ! to be the same within a specified tolerance.
+
+             ! METHODOLOGY EMPLOYED:
+             ! compare each element (x,y,z)
+
+             ! REFERENCES:
+             ! na
+
+             ! USE STATEMENTS:
+             ! na
+
+     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+             ! SUBROUTINE ARGUMENT DEFINITIONS:
+     TYPE(vector), INTENT(IN) :: vector1   ! standard vector
+     TYPE(vector), INTENT(IN) :: vector2   ! standard vector
+     LOGICAL, INTENT(INOUT)   :: areSame   ! true if the two vectors are the same within specified tolerance
+     REAL(r64), INTENT(IN)    :: tolerance ! specified tolerance
+
+             ! SUBROUTINE PARAMETER DEFINITIONS:
+             ! na
+
+             ! INTERFACE BLOCK SPECIFICATIONS:
+             ! na
+
+             ! DERIVED TYPE DEFINITIONS:
+             ! na
+
+             ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+             ! na
+     areSame=.true.
+     IF (ABS(vector1%x-vector2%x) > tolerance) areSame=.false.
+     IF (ABS(vector1%y-vector2%y) > tolerance) areSame=.false.
+     IF (ABS(vector1%z-vector2%z) > tolerance) areSame=.false.
+
+     RETURN
+
+   END SUBROUTINE CompareTwoVectors
 
    SUBROUTINE CalcCoPlanarNess(Surf,NSides,IsCoPlanar,MaxDist,ErrorVertex)
 
@@ -1876,7 +1933,7 @@ End Module DXFEarClipping
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

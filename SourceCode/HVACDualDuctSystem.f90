@@ -1319,6 +1319,8 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
           !       AUTHOR         Richard J. Liesen
           !       DATE WRITTEN   Jan 2000
           !       MODIFIED       na
+          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor 
+          !                                 air fraction - a TRACE feature
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1397,6 +1399,11 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
        MassFlow = DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail
      End If
 
+     ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
+     ENDIF
+
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail)
 
@@ -1421,6 +1428,11 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
        MassFlow = DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail
      End If
 
+     ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
+     ENDIF
+     
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail)
 
@@ -1430,6 +1442,11 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      MassFlow = (DamperHotAirInlet(DamperNum)%AirMassFlowRateMax/2.0) * Damper(DamperNum)%ZoneMinAirFrac + &
                 DamperColdAirInlet(DamperNum)%AirMassFlowRateMax/2.0 * Damper(DamperNum)%ZoneMinAirFrac
 
+     ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
+     ENDIF
+     
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,&
          (DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail+DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail))
@@ -1577,7 +1594,7 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
   REAL(r64) :: QTotLoadRemain    ! [W]
   REAL(r64) :: QtoHeatSPRemain  ! [W]
   REAL(r64) :: QtoCoolSPRemain  ! [W]
-  REAL(r64) :: QTotRemainAdjust  ! [W]
+!  REAL(r64) :: QTotRemainAdjust  ! [W]
   REAL(r64) :: QtoHeatSPRemainAdjust  ! [W]
   REAL(r64) :: QtoCoolSPRemainAdjust  ! [W]
   REAL(r64) :: QOALoadToHeatSP  ! [W]
@@ -1976,7 +1993,7 @@ SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
   REAL(r64) :: OAVdot            ! temporary volume flow rate (m3/s)
   REAL(r64) :: PeopleCount       ! temporary accumulator for people
   INTEGER   :: Loop
-  INTEGER   :: AirLoopNum        ! Index to air loop
+!  INTEGER   :: AirLoopNum        ! Index to air loop
 
    ! initialize OA flow rate and OA report variable
 
@@ -2195,6 +2212,9 @@ SUBROUTINE UpdateDualDuct(DamperNum)
 
   IF (Contaminant%CO2Simulation) Then
     Node(OutletNode)%CO2 = MAX(Node(HotInletNode)%CO2,Node(ColdInletNode)%CO2)
+  End If
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(OutletNode)%GenContam = MAX(Node(HotInletNode)%GenContam,Node(ColdInletNode)%GenContam)
   End If
 
   RETURN
@@ -2429,7 +2449,7 @@ SUBROUTINE GetDualDuctOutdoorAirRecircUse(CompTypeName, CompName, RecircIsUsed )
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: DamperNum
+!  INTEGER :: DamperNum
   LOGICAL, SAVE :: FirstTimeOnly = .TRUE.
   LOGICAL, SAVE, ALLOCATABLE ,DIMENSION (:) :: RecircIsUsedARR
   CHARACTER(len=MaxNameLength),SAVE, ALLOCATABLE ,DIMENSION (:) :: DamperNamesARR
@@ -2492,7 +2512,7 @@ END SUBROUTINE GetDualDuctOutdoorAirRecircUse
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

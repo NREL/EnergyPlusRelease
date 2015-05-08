@@ -139,6 +139,7 @@ PRIVATE CalcTDDTransSolHorizon
 PRIVATE CalcTDDTransSolAniso
 PRIVATE InterpolatePipeTransBeam
 PRIVATE CalcViewFactorToShelf
+PUBLIC  FigureTDDZoneGains
 
 CONTAINS
 
@@ -162,6 +163,8 @@ SUBROUTINE InitDaylightingDevices
 
           ! USE STATEMENTS:
   USE General, ONLY: RoundSigDigits
+  USE DataHeatBalance, ONLY : IntGainTypeOf_DaylightingDeviceTubular
+  USE DataInterfaces
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -272,6 +275,13 @@ SUBROUTINE InitDaylightingDevices
       SumTZoneLengths=0.0
       DO TZoneNum = 1, TDDPipe(PipeNum)%NumOfTZones
         SumTZoneLengths = SumTZoneLengths + TDDPipe(PipeNum)%TZoneLength(TZoneNum)
+        
+        CALL SetupZoneInternalGain(TDDPipe(PipeNum)%TZone(TZoneNum), &
+                                   'DaylightingDevice:Tubular', &
+                                   TDDPipe(PipeNum)%Name, &
+                                   IntGainTypeOf_DaylightingDeviceTubular, &
+                                   ConvectionGainRate = TDDPipe(PipeNum)%TZoneHeatGain(TZoneNum) )
+        
       END DO ! TZoneNum
 
       TDDPipe(PipeNum)%ExtLength = TDDPipe(PipeNum)%TotLength - SumTZoneLengths
@@ -590,9 +600,11 @@ SUBROUTINE GetTDDInput
       ELSE
         ALLOCATE(TDDPipe(PipeNum)%TZone(TDDPipe(PipeNum)%NumOfTZones))
         ALLOCATE(TDDPipe(PipeNum)%TZoneLength(TDDPipe(PipeNum)%NumOfTZones))
+        ALLOCATE(TDDPipe(PipeNum)%TZoneHeatGain(TDDPipe(PipeNum)%NumOfTZones))
 
         TDDPipe(PipeNum)%TZone = 0
-        TDDPipe(PipeNum)%TZoneLength = 0.0
+        TDDPipe(PipeNum)%TZoneLength = 0.d0
+        TDDPipe(PipeNum)%TZoneHeatGain = 0.d0
 
         DO TZoneNum = 1, TDDPipe(PipeNum)%NumOfTZones
           TZoneName = cAlphaArgs(TZoneNum + 4)
@@ -1367,7 +1379,7 @@ SUBROUTINE DistributeTDDAbsorbedSolar
   INTEGER :: PipeNum        ! TDD pipe object number
   INTEGER :: DiffSurf       ! Surface number of TDD:DIFFUSER
   INTEGER :: TZoneNum       ! Transition zone index
-  INTEGER :: ActualZone     ! Actual transition zone number
+!  INTEGER :: ActualZone     ! Actual transition zone number
   REAL(r64)    :: transDiff      ! Diffuse transmittance of TDD:DIFFUSER
   REAL(r64)    :: QRefl          ! Diffuse radiation reflected back up the pipe
   REAL(r64)    :: TotTDDPipeGain ! Total absorbed solar gain in the tubular daylighting device pipe
@@ -1393,11 +1405,9 @@ SUBROUTINE DistributeTDDAbsorbedSolar
     TDDPipe(PipeNum)%PipeAbsorbedSolar = MAX(0.0d0, TotTDDPipeGain) ! Report variable [W]
 
     DO TZoneNum = 1, TDDPipe(PipeNum)%NumOfTZones
-      ActualZone = TDDPipe(PipeNum)%TZone(TZoneNum)
-
       ! Distribute absorbed solar gain in proportion to transition zone length
-      ZoneIntGain(ActualZone)%TDDPipeGain = ZoneIntGain(ActualZone)%TDDPipeGain &
-        + TotTDDPipeGain * (TDDPipe(PipeNum)%TZoneLength(TZoneNum) / TDDPipe(PipeNum)%TotLength)
+      TDDPipe(PipeNum)%TZoneHeatGain(TZoneNum) = &
+          TotTDDPipeGain * (TDDPipe(PipeNum)%TZoneLength(TZoneNum) / TDDPipe(PipeNum)%TotLength)
     END DO ! TZoneNum
   END DO
 
@@ -1488,9 +1498,61 @@ SUBROUTINE CalcViewFactorToShelf(ShelfNum)
 
 END SUBROUTINE CalcViewFactorToShelf
 
+SUBROUTINE FigureTDDZoneGains
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Dec 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! intialize zone gains at begin new environment
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals, ONLY: BeginEnvrnFlag
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL, SAVE :: MyEnvrnFlag = .TRUE.
+  INTEGER   :: Loop
+  
+  IF (NumOfTDDPipes == 0) RETURN
+  
+  IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
+    DO Loop = 1, NumOfTDDPipes
+      TDDPipe(Loop)%TZoneHeatGain = 0.d0
+    ENDDO
+    MyEnvrnFlag = .FALSE.
+  ENDIF
+  IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
+  
+  RETURN
+
+END SUBROUTINE FigureTDDZoneGains
+
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

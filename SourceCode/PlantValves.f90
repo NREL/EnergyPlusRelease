@@ -303,8 +303,9 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
   USE DataGlobals,       ONLY: BeginEnvrnFlag
   USE DataInterfaces,    ONLY: ShowSevereError, ShowWarningError, ShowContinueError, ShowContinueErrorTimeStamp
   USE DataLoopNode,      ONLY: Node
-  USE DataPlant,         ONLY: TypeOf_ValveTempering, PlantLoop, ScanPlantLoopsForObject, ControlType_Active, &
+  USE DataPlant,         ONLY: TypeOf_ValveTempering, PlantLoop, ScanPlantLoopsForObject, &
                                GenEquipTypes_Pump, TypeOf_ValveTempering
+  USE DataBranchAirLoopPlant, ONLY : ControlType_Active
   USE InputProcessor,    ONLY: SameString
   USE DataHVACGlobals,   ONLY: NumPlantLoops
   USE PlantUtilities,    ONLY: InitComponentNodes
@@ -520,7 +521,7 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
 
     IF ((InletNode > 0) .AND. (OutletNode > 0)) THEN
     !   Node(InletNode)%Temp = 0.0
-       Call InitComponentNodes(0.d0, Node(PumpOutNode)%MassFlowRateMax, &  
+       Call InitComponentNodes(0.d0, Node(PumpOutNode)%MassFlowRateMax, &
                                TemperValve(CompNum)%PltInletNodeNum, &
                                TemperValve(CompNum)%PltOutletNodeNum, &
                                TemperValve(CompNum)%LoopNum, &
@@ -693,13 +694,13 @@ SUBROUTINE UpdatePlantValves(CompTypeNum,CompNum)
   SELECT CASE (CompTypeNum)
 
   CASE (TypeOf_ValveTempering)
-   
+
     CALL SafeCopyPlantNode(TemperValve(CompNum)%PltInletNodeNum, TemperValve(CompNum)%PltOutletNodeNum)
 
     ! set mass flows in diverter path
     mdot =  TemperValve(CompNum)%MixedMassFlowRate   &
                                              * TemperValve(CompNum)%FlowDivFract
-                                             
+
     IF (TemperValve(CompNum)%LoopNum > 0) THEN
       CALL SetComponentFlowRate( mdot, &
                                  TemperValve(CompNum)%PltInletNodeNum,  &
@@ -708,7 +709,7 @@ SUBROUTINE UpdatePlantValves(CompTypeNum,CompNum)
                                  TemperValve(CompNum)%LoopSideNum,      &
                                  TemperValve(CompNum)%BranchNum,        &
                                  TemperValve(CompNum)%CompNum  )
-      
+
       TemperValve(CompNum)%DivertedFlowRate = mdot
     ELSE
       TemperValve(CompNum)%DivertedFlowRate = 0.d0
@@ -769,7 +770,7 @@ END SUBROUTINE ReportPlantValves
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

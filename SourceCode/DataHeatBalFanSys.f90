@@ -179,6 +179,9 @@ REAL(r64) :: ZoneVolCapMultpMoist  ! This is a multiplier used on the zone volum
                               ! for the calculation of the zone humidity ratio in the predictor and corrector step
 REAL(r64) :: ZoneVolCapMultpCO2  ! This is a multiplier used on the zone volume to make the capacitance more realistic
                               ! for the calculation of the zone CO2 concentration in the predictor and corrector step
+REAL(r64) :: ZoneVolCapMultpGenContam  ! This is a multiplier used on the zone volume to make the capacitance more realistic
+                              ! for the calculation of the zone generic contaminant concentration in the predictor
+                              ! and corrector step
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: TempControlType
 INTEGER, ALLOCATABLE, DIMENSION(:) :: ComfortControlType
@@ -187,7 +190,7 @@ TYPE (ZoneComfortControlsFangerData), ALLOCATABLE, DIMENSION(:) :: ZoneComfortCo
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

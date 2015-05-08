@@ -768,7 +768,7 @@ SUBROUTINE CalcHighTempRadiantSystem(RadSysNum)
   REAL(r64)    :: HeatFrac       ! fraction of maximum energy input to radiant system [dimensionless]
   REAL(r64)    :: OffTemp        ! Temperature above which the radiant system should be completely off [C]
   REAL(r64)    :: OpTemp         ! Operative temperature [C]
-  REAL(r64)    :: QZnReq         ! heating or cooling needed by zone [Watts]
+!  REAL(r64)    :: QZnReq         ! heating or cooling needed by zone [Watts]
   REAL(r64)    :: SetPtTemp      ! Setpoint temperature [C]
   INTEGER :: ZoneNum        ! number of zone being served
 
@@ -1406,7 +1406,7 @@ END FUNCTION SumHATsurf
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

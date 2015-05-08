@@ -73,10 +73,10 @@ REAL(r64), PRIVATE, ALLOCATABLE, DIMENSION(:,:)        :: Gamma1 ! Intermediate 
                                                                         ! in Seem's dissertation
 REAL(r64), PRIVATE, ALLOCATABLE, DIMENSION(:,:)        :: Gamma2 ! Intermediate calculation array corresponding to a term
                                                                         ! in Seem's dissertation
-INTEGER,          PRIVATE                                     :: NodeSource ! Node at which a source or sink is present
-INTEGER,          PRIVATE                                     :: NodeUserTemp ! Node where user wishes to calculate a temperature
+INTEGER,   PRIVATE                                     :: NodeSource ! Node at which a source or sink is present
+INTEGER,   PRIVATE                                     :: NodeUserTemp ! Node where user wishes to calculate a temperature
                                                                               ! (for constructions with sources/sinks only)
-INTEGER,          PRIVATE                                     :: rcmax  ! Total number of nodes in the construct (<= MaxTotNodes)
+INTEGER,   PRIVATE                                     :: rcmax  ! Total number of nodes in the construct (<= MaxTotNodes)
 REAL(r64), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:)      :: s      ! Coefficients for the surface temperature history terms
 REAL(r64), PRIVATE, DIMENSION(4,3)                     :: s0     ! Coefficients for the current surface temperature terms
 REAL(r64), PRIVATE                                     :: TinyLimit
@@ -229,7 +229,7 @@ SUBROUTINE InitConductionTransferFunctions
   INTEGER                           :: ipts1      ! Intermediate calculation for number of nodes per layer
   INTEGER                           :: ir         ! Loop control for constructing Identity Matrix
   INTEGER                           :: Layer      ! Loop counter
-  INTEGER                           :: Layer1     ! Loop counter  
+  INTEGER                           :: Layer1     ! Loop counter
   INTEGER                           :: LayersInConstruct ! Array containing the number of layers for each construct
                                                   ! Different from TotLayers because shades are not include in local var
   REAL(r64), &
@@ -295,7 +295,7 @@ SUBROUTINE InitConductionTransferFunctions
     ResLayer     = .FALSE.
 
     DO Layer = 1, Construct(ConstrNum)%TotLayers    ! Begin layer loop ...
-      
+
           ! Loop through all of the layers in the current construct. The purpose
           ! of this loop is to define the thermal properties necessary to
           ! calculate the CTFs.
@@ -371,7 +371,7 @@ SUBROUTINE InitConductionTransferFunctions
               rho(Layer) = 0.0d0
               rk(Layer)  = 1.0d0
               dl(Layer)  = lr(Layer)
-            END IF              
+            END IF
 
           END IF
         END IF      ! ... end of resistive layer determination IF-THEN block.
@@ -426,13 +426,18 @@ SUBROUTINE InitConductionTransferFunctions
           dl(LayersInConstruct)  = 0.0d0
             ! Now reduce the number of layers in construct since merger is complete
           LayersInConstruct = LayersInConstruct - 1
+            ! Also adjust layers with source/sinks if two layers are merged
+          IF (Construct(ConstrNum)%SourceSinkPresent) THEN
+            Construct(ConstrNum)%SourceAfterLayer = Construct(ConstrNum)%SourceAfterLayer - 1
+            Construct(ConstrNum)%TempAfterLayer   = Construct(ConstrNum)%TempAfterLayer - 1
+          END IF
         ELSE ! These are not adjacent layers and there is a logic flaw here (should not happen)
           CALL ShowFatalError('Combining resistance layers failed for '//TRIM(Construct(ConstrNum)%Name))
           CALL ShowContinueError('This should never happen.  Contact EnergyPlus Support for further assistance.')
         END IF
       END DO
     END IF
-  
+
           ! Convert SI units to English.  In theory, conversion to English
           ! units is not necessary; however, Russ Taylor noted that some
           ! numerical problems when SI units were used and decided to continue
@@ -572,7 +577,7 @@ SUBROUTINE InitConductionTransferFunctions
             END IF
 
             dx(Layer) = dl(Layer)/REAL(Nodes(Layer),r64) ! calc node spacing
-          
+
           END IF
 
         END DO      ! . .. end of layers in construction loop (calculating #nodes per layer)
@@ -2118,7 +2123,7 @@ SUBROUTINE ReportCTFs(DoReportBecauseError)
   IF (DoReport .or. DoReportBecauseError) THEN
 !
 !                                      Write Descriptions
-    Write(OutputFileInits,'(A)') '! <Construction>,Construction Name,#Layers,#CTFs,Time Step {hours},'// &
+    Write(OutputFileInits,'(A)') '! <Construction>,Construction Name,Index,#Layers,#CTFs,Time Step {hours},'// &
                              'ThermalConductance {w/m2-K},'// &
                              'OuterThermalAbsorptance,InnerThermalAbsorptance,OuterSolarAbsorptance,'// &
                              'InnerSolarAbsorptance,Roughness'
@@ -2132,14 +2137,15 @@ SUBROUTINE ReportCTFs(DoReportBecauseError)
 
       IF (Construct(ThisNum)%TypeIsWindow) CYCLE
 
-      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),Construct(ThisNum)%TotLayers,Construct(ThisNum)%NumCTFTerms, &
+      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),ThisNum, Construct(ThisNum)%TotLayers,  &
+                                 Construct(ThisNum)%NumCTFTerms, &
                                  Construct(ThisNum)%CTFTimeStep,                                                          &
                                  Construct(ThisNum)%UValue,Construct(ThisNum)%OutsideAbsorpThermal,                         &
                                  Construct(ThisNum)%InsideAbsorpThermal,Construct(ThisNum)%OutsideAbsorpSolar,              &
                                  Construct(ThisNum)%InsideAbsorpSolar,  &
                                  TRIM(DisplayMaterialRoughness(Construct(ThisNum)%OutsideRoughness))
 !
- 700  FORMAT(' Construction,',A,2(',',I4),',',F8.3,',',G15.4,4(',',F8.3),',',A)
+ 700  FORMAT(' Construction,',A,3(',',I4),',',F8.3,',',G15.4,4(',',F8.3),',',A)
  701  FORMAT(' Material,',A,',',F8.4,',',F14.3,',',F11.3,',',F13.3,',',G12.4)
  702  FORMAT(' Material:Air,',A,',',G12.4)
  703  FORMAT(' CTF,',I4,4(',',G20.8))
@@ -2200,7 +2206,7 @@ END SUBROUTINE ReportCTFs
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

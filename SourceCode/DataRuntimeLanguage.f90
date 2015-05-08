@@ -38,6 +38,8 @@ INTEGER, PARAMETER :: PntrReal        = 301 ! data type for overloaded pointer m
 INTEGER, PARAMETER :: PntrInteger     = 302 ! data type for overloaded pointer management, integer
 INTEGER, PARAMETER :: PntrLogical     = 303 ! data type for overloaded pointer management, logical
 
+INTEGER, PARAMETER :: MaxWhileLoopIterations = 1000000 ! protect from infinite loop in WHILE loops
+
 ! Parameters for identifying operator types in Erl
 ! The number of these parameters indicates the order of precedence
 INTEGER, PARAMETER :: OperatorLiteral        = 1  ! Just stores a literal value
@@ -120,7 +122,10 @@ INTEGER, PARAMETER :: FuncTrendMin           = 65 ! accessor for Erl Trend varia
 INTEGER, PARAMETER :: FuncTrendDirection     = 66 ! accessor for Erl Trend variables, slope value
 INTEGER, PARAMETER :: FuncTrendSum           = 67 ! accessor for Erl Trend variables, sum value
 
-INTEGER, PARAMETER :: NumPossibleOperators   = 67 ! total number of operators and built-in functions
+! Curve and Table access function
+INTEGER, PARAMETER :: FuncCurveValue         = 68
+
+INTEGER, PARAMETER :: NumPossibleOperators   = 68 ! total number of operators and built-in functions
 
           ! DERIVED TYPE DEFINITIONS:
 TYPE OutputVarSensorType
@@ -292,13 +297,19 @@ INTEGER :: NumErlVariables             = 0 ! count of Erl variables
 INTEGER :: NumErlStacks                = 0 ! count of Erl program stacks in model. sum of programs and subroutines
 INTEGER :: NumExpressions              = 0 ! count of Erl expressions
 INTEGER :: NumEMSOutputVariables       = 0 ! count of EMS output variables, custom output variables from Erl
+INTEGER :: NumEMSMeteredOutputVariables= 0 ! count of EMS metered output variables, custom meters from Erl
 INTEGER :: NumErlTrendVariables        = 0 ! count of EMS trend variables in model
+INTEGER :: NumEMSCurveIndices          = 0 ! count of EMS curve index variables in model
+INTEGER :: NumEMSConstructionIndices   = 0 ! count of EMS construction index variables in model
 
 !#####################################################################
 !code for ExternalInterface
 INTEGER :: NumExternalInterfaceGlobalVariables = 0 ! count of ExternalInterface runtime variable
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMU
                                                    ! will be updated with values from ExternalInterface
 INTEGER :: NumExternalInterfaceActuatorsUsed   = 0 ! count of ExternalInterface Actuators
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMU
+
 !#####################################################################
 
 INTEGER :: OutputEMSFileUnitNum        = 0 ! file lun handle for open EMS output file
@@ -310,10 +321,161 @@ LOGICAL :: OutputEMSActuatorAvailSmall = .FALSE. ! how much to write out to EDD 
 LOGICAL :: OutputEMSInternalVarsFull   = .FALSE. ! how much to write out to EDD file, if true dump full combinatorial internal list
 LOGICAL :: OutputEMSInternalVarsSmall  = .FALSE. ! how much to write out to EDD file, if true dump internal list without key names
 
+LOGICAL, DIMENSION(:,:), ALLOCATABLE  :: EMSConstructActuatorChecked
+LOGICAL, DIMENSION(:,:), ALLOCATABLE  :: EMSConstructActuatorIsOkay
+
+CONTAINS
+
+SUBROUTINE ValidateEMSVariableName(cModuleObject,cFieldValue,cFieldName,errFlag,ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   May 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Consolidate error checking on EMS variable names.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError,ShowContinueError
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: cModuleObject  ! the current object name
+  CHARACTER(len=*), INTENT(IN) :: cFieldValue    ! the field value
+  CHARACTER(len=*), INTENT(IN) :: cFieldName     ! the current field name
+  LOGICAL, INTENT(OUT)         :: errFlag        ! true if errors found in this routine.
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound    ! true if errors found in this routine.
+
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER  :: InvalidStartCharacters='0123456789'
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+ INTEGER :: pos
+
+  errFlag=.false.
+  IF (SCAN(TRIM(cFieldValue), ' ') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot contain spaces')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  IF (SCAN(TRIM(cFieldValue), '-') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot contain "-" characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  IF (SCAN(TRIM(cFieldValue), '+') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot contain "+" characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  pos=SCAN(cFieldValue(1:1),InvalidStartCharacters)
+  IF (pos > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot start with numeric characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE ValidateEMSVariableName
+
+SUBROUTINE ValidateEMSProgramName(cModuleObject,cFieldValue,cFieldName,cSubType,errFlag,ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   May 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Consolidate error checking on EMS variable names.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError,ShowContinueError
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: cModuleObject  ! the current object name
+  CHARACTER(len=*), INTENT(IN) :: cFieldValue    ! the field value
+  CHARACTER(len=*), INTENT(IN) :: cFieldName     ! the current field name
+  CHARACTER(len=*), INTENT(IN) :: cSubType       ! sub type = Program or Subroutine
+  LOGICAL, INTENT(OUT)         :: errFlag        ! true if errors found in this routine.
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound    ! true if errors found in this routine.
+
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER  :: InvalidStartCharacters='0123456789'
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+ INTEGER :: pos
+
+  errFlag=.false.
+  IF (SCAN(TRIM(cFieldValue), ' ') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used for EMS '//trim(cSubType)//' cannot contain spaces')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  IF (SCAN(TRIM(cFieldValue), '-') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used for EMS '//trim(cSubType)//' cannot contain "-" characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  IF (SCAN(TRIM(cFieldValue), '+') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used for EMS '//trim(cSubType)//' cannot contain "+" characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+!  pos=SCAN(cFieldValue(1:1),InvalidStartCharacters)
+!  IF (pos > 0) THEN
+!    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+!    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot start with numeric characters.')
+!    errFlag=.true.
+!    ErrorsFound = .TRUE.
+!  ENDIF
+
+  RETURN
+
+END SUBROUTINE ValidateEMSProgramName
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

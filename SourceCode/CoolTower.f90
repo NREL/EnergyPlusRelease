@@ -444,11 +444,11 @@ DO CoolTowerNum = 1, NumCoolTowers
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
     CALL SetupOutputVariable('Cooltower Inlet Temperature [C]',CoolTowerSys(CoolTowerNum)%InletDBTemp, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Inlet Humidity Ratio [kg/kg]',CoolTowerSys(CoolTowerNum)%InletHumRat, &
+    CALL SetupOutputVariable('Cooltower Inlet Humidity Ratio [kgWater/kgDryAir]',CoolTowerSys(CoolTowerNum)%InletHumRat, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
     CALL SetupOutputVariable('Cooltower Outlet Temperature [C]',CoolTowerSys(CoolTowerNum)%OutletTemp, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Outlet Humidity Ratio [kg/kg]',CoolTowerSys(CoolTowerNum)%OutletHumRat, &
+    CALL SetupOutputVariable('Cooltower Outlet Humidity Ratio [kgWater/kgDryAir]',CoolTowerSys(CoolTowerNum)%OutletHumRat, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
     CALL SetupOutputVariable('Cooltower Pump Electric Power [W]',CoolTowerSys(CoolTowerNum)%PumpElecPower, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
@@ -778,7 +778,7 @@ END SUBROUTINE ReportCoolTower
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

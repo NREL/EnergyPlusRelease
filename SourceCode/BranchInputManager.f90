@@ -24,12 +24,14 @@ MODULE BranchInputManager
   ! USE STATEMENTS:
 ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals, ONLY: MaxNameLength, OutputFileBNDetails
-USE DataInterfaces, ONLY: ShowFatalError, ShowWarningError, ShowSevereError, ShowMessage, ShowContinueError
+USE DataGlobals, ONLY: MaxNameLength, OutputFileBNDetails, DisplayExtraWarnings
+USE DataInterfaces, ONLY: ShowFatalError, ShowWarningError, ShowSevereError, ShowMessage, ShowContinueError, ShowSevereMessage
 USE DataLoopNode
+USE DataBranchAirLoopPlant
 
   ! Use statements for access to subroutines in other modules
-USE InputProcessor, ONLY: GetNumObjectsFound,GetObjectItem, FindItemInList, VerifyName, GetObjectDefMaxArgs, MakeUPPERCase
+USE InputProcessor, ONLY: GetNumObjectsFound,GetObjectItem, FindItemInList, VerifyName, GetObjectDefMaxArgs, MakeUPPERCase,   &
+                          SameString
 USE NodeInputManager
 USE BranchNodeConnections
 
@@ -42,13 +44,14 @@ PRIVATE ! Everything private unless explicitly made public
   CHARACTER(len=*), PARAMETER :: cSPLITTER='Connector:Splitter'
   CHARACTER(len=*), PARAMETER :: Blank=' '
 
+
   !DERIVED TYPE DEFINITIONS
 TYPE ConnectorData
   CHARACTER(len=MaxNameLength)       :: Name              = Blank ! Name for this Connector
   INTEGER                            :: NumOfConnectors   = 0     ! Number of Connectors in this group
   INTEGER                            :: NumOfSplitters    = 0     ! Number of Splitters in this connector group
   INTEGER                            :: NumOfMixers       = 0     ! Number of Mixers in this connector group
-  CHARACTER(len=30), DIMENSION(:), &
+  CHARACTER(len=32), DIMENSION(:), &
                      ALLOCATABLE     :: ConnectorType    ! Connector:Splitter or Connector:Mixer
   CHARACTER(len=MaxNameLength), &
      DIMENSION(:), ALLOCATABLE       :: ConnectorName    ! Name for that Connector:Splitter or Connector:Mixer
@@ -137,6 +140,7 @@ PUBLIC  NumCompsInBranch
 PUBLIC  GetLoopSplitter
 PUBLIC  GetLoopMixer
 PUBLIC  TestBranchIntegrity
+PUBLIC  AuditBranches
 !PUBLIC  TestAirPathIntegrity
 !PRIVATE TestSupplyAirPathIntegrity
 !PRIVATE TestReturnAirPathIntegrity
@@ -150,7 +154,7 @@ PRIVATE GetBranchListInput
 PUBLIC  GetNumSplitterMixerInConntrList
 PUBLIC  GetFirstBranchInletNodeName
 PUBLIC  GetLastBranchOutletNodeName
-PUBLIC  MyPlantSizingIndex
+!PUBLIC  MyPlantSizingIndex
 PRIVATE FindPlantLoopBranchConnection
 PRIVATE FindCondenserLoopBranchConnection
 PRIVATE FindAirLoopBranchConnection
@@ -198,6 +202,11 @@ SUBROUTINE ManageBranchInput
 
   IF (GetBranchInputFlag) THEN
     CALL GetBranchInput
+    IF (GetBranchListInputFlag) THEN
+      GetBranchListInputFlag=.false.
+      CALL GetBranchListInput
+    ENDIF
+    CALL AuditBranches(.false.)
     GetBranchInputFlag=.false.
   ENDIF
 
@@ -1252,9 +1261,8 @@ SUBROUTINE GetBranchInput
           ! na
 
           ! USE STATEMENTS:
-  USE DataPlant, ONLY: ControlType_Active,ControlType_Passive,ControlType_SeriesActive,ControlType_Bypass,PressureCurve_Error
   USE InputProcessor, ONLY: SameString
-  USE PlantPressureSystem, ONLY: GetPressureCurveTypeAndIndex
+  USE CurveManager, ONLY: GetPressureCurveTypeAndIndex
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2405,100 +2413,6 @@ SUBROUTINE GetMixerInput
 
 END SUBROUTINE GetMixerInput
 
-FUNCTION MyPlantSizingIndex(CompType,CompName,NodeNumIn,NodeNumOut,ErrorsFound,SupressErrors) RESULT(MyPltSizNum)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Fred Buhl
-          !       DATE WRITTEN   July 2008
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! Identify the correct Plant Sizing object for demand-side components such as heating and
-          ! cooling coils.
-
-
-          ! METHODOLOGY EMPLOYED:
-          ! This function searches all plant loops for a component whose input and
-          ! output nodes match the desired input & output nodes. This plant loop index is then used
-          ! to search the Plant Sizing array for the matching Plant Sizing object.
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE InputProcessor,  ONLY: FindItemInList
-  USE DataSizing, ONLY: NumPltSizInput, PlantSizData
-  USE DataPlant, ONLY: PlantLoop, ScanPlantLoopsForNodeNum
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! FUNCTION ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: CompType      ! component description
-  CHARACTER(len=*), INTENT(IN) :: CompName      ! user name of component
-  INTEGER, INTENT(IN) :: NodeNumIn      ! component water inlet node
-  INTEGER, INTENT(IN) :: NodeNumOut     ! component water outlet node
-  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if there's an error
-  LOGICAL, OPTIONAL, INTENT(IN):: SupressErrors ! used for WSHP's where condenser loop may not be on a plant loop
-  INTEGER                      :: MyPltSizNum  ! returned plant sizing index
-
-          ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-
-  INTEGER                      :: MyPltLoopNum
-  INTEGER                      :: PlantLoopNum
-  INTEGER                      :: DummyLoopSideNum
-  INTEGER                      :: DummyBranchNum
-  LOGICAL                      :: PrintErrorFlag
-
-  MyPltLoopNum = 0
-  MyPltSizNum = 0
-  ErrorsFound = .false.
-  IF(PRESENT(SupressErrors))THEN
-    PrintErrorFlag = SupressErrors
-  ELSE
-    PrintErrorFlag = .TRUE.
-  END IF
-
-  CALL ScanPlantLoopsForNodeNum('MyPlantSizingIndex', NodeNumIn, PlantLoopNum, DummyLoopSideNum, DummyBranchNum )
-
-  IF (PlantLoopNum > 0) THEN
-    MyPltLoopNum = PlantLoopNum
-  ELSE
-    MyPltLoopNum = 0
-  END IF
-
-  IF (MyPltLoopNum > 0) THEN
-    IF (NumPltSizInput > 0) THEN
-      MyPltSizNum = FindItemInList(PlantLoop(MyPltLoopNum)%Name,PlantSizData%PlantLoopName,NumPltSizInput)
-    ENDIF
-    IF (MyPltSizNum == 0) THEN
-      IF (PrintErrorFlag) THEN
-        Call ShowSevereError('MyPlantSizingIndex: Could not find ' //TRIM(PlantLoop(MyPltLoopNum)%Name) &
-                                 //' in Sizing:Plant objects.')
-        Call ShowContinueError('...reference Component Type="'//trim(CompType)//'", Name="'//trim(CompName)//'".')
-      ENDIF
-      ErrorsFound=.true.
-    ENDIF
-  ELSE
-    IF(PrintErrorFlag)THEN
-      Call ShowWarningError('Could not find ' //TRIM(CompType)//' with name '//TRIM(CompName)//' on any plant loop')
-    END IF
-    ErrorsFound=.true.
-  END IF
-
-  RETURN
-
-END FUNCTION MyPlantSizingIndex
-
 SUBROUTINE FindPlantLoopBranchConnection(BranchListName,FoundPlantLoopName,FoundPlantLoopNum,FoundSupplyDemand,  &
                                          FoundVolFlowRate,MatchedPlantLoop)
 
@@ -2834,6 +2748,100 @@ END SUBROUTINE FindAirPlantCondenserLoopFromBranchList
 !   Routines that test branch integrity
 !==================================================================================
 
+SUBROUTINE AuditBranches(mustprint,CompType,CompName)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   November 2011
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This routine will point out any "dangling branches" that are not included on a BranchList.
+          ! Warnings are produced as the user might clutter up the input file with unused branches.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: RoundSigDigits
+  USE DataErrorTracking, ONLY: TotalSevereErrors
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  LOGICAL, INTENT(IN) :: mustprint ! true if the warning should be printed.
+  CHARACTER(len=*), INTENT(IN), OPTIONAL :: CompType ! when mustprint (ScanPlantLoop)  use CompType in error message and scan
+  CHARACTER(len=*), INTENT(IN), OPTIONAL :: CompName ! when mustprint (ScanPlantLoop)  use CompName in error message and scan
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumDanglingCount  ! when mustprint not true, count and report
+  INTEGER :: BlNum   ! Branch List Counter
+  INTEGER :: BrN     ! Branch Counter
+  INTEGER :: CpN     ! Components on Branch
+  INTEGER :: Found   ! non-zero when found
+  CHARACTER(len=MaxNameLength) :: FoundBranchName  ! Branch matching compname/type
+  LOGICAL :: NeverFound
+
+  NumDanglingCount=0
+  NeverFound=.true.
+  DO BrN=1,NumOfBranches
+    Found=0
+    FoundBranchName=' '
+    IF (PRESENT(CompType) .and. PRESENT(CompName)) THEN
+      DO CpN=1,Branch(BrN)%NumOfComponents
+        IF (.not. SameString(CompType,Branch(BrN)%Component(CpN)%CType) .or.   &
+            .not. SameString(CompName,Branch(BrN)%Component(CpN)%Name) ) CYCLE
+        FoundBranchName=Branch(BrN)%Name
+        NeverFound=.false.
+      ENDDO
+    ENDIF
+    DO BlNum=1,NumOfBranchLists
+      Found=FindItemInList(Branch(BrN)%Name,BranchList(BlNum)%BranchNames,BranchList(BlNum)%NumOfBranchNames)
+      IF (Found /= 0) EXIT
+    ENDDO
+    IF (Found /= 0) CYCLE
+    NumDanglingCount=NumDanglingCount+1
+    IF (DisplayExtraWarnings .or. mustprint) THEN
+      IF (mustprint) THEN
+        CALL ShowContinueError('AuditBranches: Branch="'//trim(Branch(BrN)%Name)//'" not found on any BranchLists.')
+        IF (FoundBranchName /= ' ') THEN
+          CALL ShowContinueError('Branch contains component, type="'//trim(CompType)//'", name="'//  &
+             trim(CompName)//'"')
+        ENDIF
+      ELSE
+        CALL ShowSevereMessage('AuditBranches: Branch="'//trim(Branch(BrN)%Name)//'" not found on any BranchLists.')
+        TotalSevereErrors=TotalSevereErrors+1
+      ENDIF
+    ENDIF
+  ENDDO
+  IF (mustprint .and. NeverFound) THEN  ! this may be caught during branch input, not sure
+    CALL ShowContinueError('Component, type="'//trim(CompType)//'", name="'//trim(CompName)//'" was not found on any Branch.')
+    CALL ShowContinueError('Look for mistyped branch or component names/types.')
+  ENDIF
+  IF (.not. mustprint .and. NumDanglingCount > 0) THEN
+    CALL ShowSevereMessage('AuditBranches: There are '//trim(RoundSigDigits(NumDanglingCount))//  &
+       ' branch(es) that do not appear on any BranchList.')
+    TotalSevereErrors=TotalSevereErrors+NumDanglingCount
+    CALL ShowContinueError('Use Output:Diagnostics,DisplayExtraWarnings; for detail of each branch not on a branch list.')
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE AuditBranches
+
 SUBROUTINE TestBranchIntegrity(ErrFound)
 
           ! SUBROUTINE INFORMATION:
@@ -2898,7 +2906,17 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
   INTEGER Loop2
   LOGICAL :: IsAirBranch
   INTEGER :: BranchFluidType
-  LOGICAL :: MixedFluidTypesOnBranch
+  LOGICAL :: MixedFluidTypesOnBranchList
+  INTEGER :: InitialBranchFluidNode
+  INTEGER,ALLOCATABLE, DIMENSION(:) :: BranchFluidNodes
+  INTEGER,ALLOCATABLE, DIMENSION(:) :: FoundBranches
+  INTEGER,ALLOCATABLE, DIMENSION(:) :: BranchPtrs
+  INTEGER :: NumNodesOnBranchList
+  INTEGER :: NumFluidNodes
+  CHARACTER(len=MaxNameLength) :: OriginalBranchFluidType
+  CHARACTER(len=MaxNameLength) :: cBranchFluidType
+  INTEGER :: Ptr
+  INTEGER :: EndPtr
 
   ALLOCATE(BranchReported(NumOfBranches))
   BranchReported=.false.
@@ -2932,79 +2950,146 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
 
     IsAirBranch=.false.
     BranchFluidType=NodeType_Unknown
-    MixedFluidTypesOnBranch=.false.
+    MixedFluidTypesOnBranchList=.false.
+    NumNodesOnBranchList=0
+    ALLOCATE(FoundBranches(BranchList(BCount)%NumOfBranchNames))
+    FoundBranches=0
+    ALLOCATE(BranchPtrs(BranchList(BCount)%NumOfBranchNames+2))
+    BranchPtrs=0
     DO Count=1,BranchList(BCount)%NumOfBranchNames
-
       Found=FindItemInList(BranchList(BCount)%BranchNames(Count),Branch%Name,NumOfBranches)
-      IF (Found /= 0) THEN
-        BranchReported(Found)=.true.
-                 ! Check Branch for connections
-
-        WRITE(ChrOut,*) Count
-        ChrOut=ADJUSTL(ChrOut)
-        MatchNode=0
-        IF (Branch(Found)%NumOfComponents > 0) THEN
-          MatchNode=Branch(Found)%Component(1)%InletNode
-          MatchNodeName=Branch(Found)%Component(1)%InletNodeName
-          BranchInletNodeName=Branch(Found)%Component(1)%InletNodeName
-        ELSE
-          CALL ShowWarningError('Branch has no components='//TRIM(Branch(Found)%Name))
-        ENDIF
-        NumErr=0
-        DO Loop=1,Branch(Found)%NumOfComponents
-          IF (Node(Branch(Found)%Component(Loop)%InletNode)%FluidType == NodeType_Air) IsAirBranch=.true.
-          IF (BranchFluidType == NodeType_Unknown) THEN
-            BranchFluidType=Node(Branch(Found)%Component(Loop)%InletNode)%FluidType
-          ELSEIF (BranchFluidType /= Node(Branch(Found)%Component(Loop)%InletNode)%FluidType .and.  &
-                  Node(Branch(Found)%Component(Loop)%InletNode)%FluidType /= NodeType_Unknown ) THEN
-            MixedFluidTypesOnBranch=.true.
-          ENDIF
-          IF (Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType == NodeType_Air) IsAirBranch=.true.
-          IF (BranchFluidType == NodeType_Unknown) THEN
-            BranchFluidType=Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType
-          ELSEIF (BranchFluidType /= Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType .and.  &
-                  Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType /= NodeType_Unknown ) THEN
-            MixedFluidTypesOnBranch=.true.
-          ENDIF
-          IF (Branch(Found)%Component(Loop)%InletNode /= MatchNode) THEN
-            CALL ShowSevereError('Error Detected in BranchList='//TRIM(BranchList(BCount)%Name))
-            CALL ShowContinueError('Actual Error occurs in Branch='//TRIM(Branch(Found)%Name))
-            CALL ShowContinueError('Branch Outlet does not match Inlet, Outlet='//TRIM(MatchNodeName))
-            CALL ShowContinueError('Inlet Name='//TRIM(Branch(Found)%Component(Loop)%InletNodeName))
-            ErrFound=.true.
-            NumErr=NumErr+1
-          ELSE
-            MatchNode=Branch(Found)%Component(Loop)%OutletNode
-            MatchNodeName=Branch(Found)%Component(Loop)%OutletNodeName
-          ENDIF
-        ENDDO
-        Branch(Found)%FluidType=BranchFluidType
-        IF (IsAirBranch .and. Branch(Found)%MaxFlowRate == 0.0) THEN
-          CALL ShowSevereError('Branch='//TRIM(Branch(Found)%Name)//' is an air branch with zero max flow rate.')
-          ErrFound=.true.
-        ENDIF
-        IF (MixedFluidTypesOnBranch) THEN
-          CALL ShowWarningError('Branch='//TRIM(Branch(Found)%Name)//' has mixed fluid types in its nodes.')
-        ENDIF
-        BranchOutletNodeName=MatchNodeName
-        IF (Branch(Found)%AssignedLoopName == Blank) THEN
-          BranchLoopName = '**Unknown**'
-          BranchLoopType = '**Unknown**'
-        ELSEIF (TRIM(Branch(Found)%AssignedLoopName) ==  TRIM(BranchList(BCount)%LoopName)) THEN
-          BranchLoopName = TRIM(BranchList(BCount)%LoopName)
-          BranchLoopType = TRIM(BranchList(BCount)%LoopType)
-        ELSE
-          BranchLoopName = TRIM(Branch(Found)%AssignedLoopName)
-          BranchLoopType = '**Unknown**'
-        ENDIF
-        WRITE(OutputFileBNDetails,701) '   Branch,'//TRIM(ChrOut)//','//TRIM(Branch(Found)%Name)//','//  &
-          TRIM(BranchLoopName)//','//TRIM(BranchLoopType)//','//  &
-          TRIM(BranchInletNodeName)//','//TRIM(BranchOutletNodeName)
+      IF (Found > 0) THEN
+        NumNodesOnBranchList=NumNodesOnBranchList+Branch(Found)%NumOfComponents*2
+        FoundBranches(Count)=Found
+        BranchPtrs(Count)=NumNodesOnBranchList
       ELSE
         CALL ShowSevereError('Branch not found='//TRIM(BranchList(BCount)%BranchNames(Count)))
         ErrFound=.true.
       ENDIF
     ENDDO
+    BranchPtrs(BranchList(BCount)%NumOfBranchNames+1)=BranchPtrs(BranchList(BCount)%NumOfBranchNames)+1
+    ALLOCATE(BranchFluidNodes(NumNodesOnBranchList))
+    BranchFluidNodes=0
+    OriginalBranchFluidType=Blank
+    NumFluidNodes=0
+    DO Count=1,BranchList(BCount)%NumOfBranchNames
+
+      WRITE(ChrOut,*) Count
+      ChrOut=ADJUSTL(ChrOut)
+
+      Found=FoundBranches(Count)
+      IF (Found == 0) THEN
+        WRITE(OutputFileBNDetails,701) '   Branch,'//TRIM(ChrOut)//','//  &
+           TRIM(BranchList(BCount)%BranchNames(Count))//'(not found),'//  &
+           '**Unknown**,**Unknown**,**Unknown**,**Unknown**'
+        CYCLE
+      ENDIF
+      BranchReported(Found)=.true.
+               ! Check Branch for connections
+
+      MatchNode=0
+      InitialBranchFluidNode=0
+      IF (Branch(Found)%NumOfComponents > 0) THEN
+        MatchNode=Branch(Found)%Component(1)%InletNode
+        MatchNodeName=Branch(Found)%Component(1)%InletNodeName
+        BranchInletNodeName=Branch(Found)%Component(1)%InletNodeName
+      ELSE
+        CALL ShowWarningError('Branch has no components='//TRIM(Branch(Found)%Name))
+      ENDIF
+      NumErr=0
+      DO Loop=1,Branch(Found)%NumOfComponents
+        IF (Node(Branch(Found)%Component(Loop)%InletNode)%FluidType == NodeType_Air) IsAirBranch=.true.
+        IF (BranchFluidType == NodeType_Unknown) THEN
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%InletNode
+          BranchFluidType=Node(Branch(Found)%Component(Loop)%InletNode)%FluidType
+          InitialBranchFluidNode=Branch(Found)%Component(Loop)%InletNode
+          OriginalBranchFluidType=ValidNodeFluidTypes(BranchFluidType)
+        ELSEIF (BranchFluidType /= Node(Branch(Found)%Component(Loop)%InletNode)%FluidType .and.  &
+                Node(Branch(Found)%Component(Loop)%InletNode)%FluidType /= NodeType_Unknown ) THEN
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%InletNode
+          MixedFluidTypesOnBranchList=.true.
+        ELSE
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%InletNode
+        ENDIF
+        IF (Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType == NodeType_Air) IsAirBranch=.true.
+        IF (BranchFluidType == NodeType_Unknown) THEN
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%InletNode
+          BranchFluidType=Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType
+          InitialBranchFluidNode=Branch(Found)%Component(Loop)%OutletNode
+          OriginalBranchFluidType=ValidNodeFluidTypes(BranchFluidType)
+        ELSEIF (BranchFluidType /= Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType .and.  &
+                Node(Branch(Found)%Component(Loop)%OutletNode)%FluidType /= NodeType_Unknown ) THEN
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%OutletNode
+          MixedFluidTypesOnBranchList=.true.
+        ELSE
+          NumFluidNodes=NumFluidNodes+1
+          BranchFluidNodes(NumFluidNodes)=Branch(Found)%Component(Loop)%OutletNode
+        ENDIF
+        IF (Branch(Found)%Component(Loop)%InletNode /= MatchNode) THEN
+          CALL ShowSevereError('Error Detected in BranchList='//TRIM(BranchList(BCount)%Name))
+          CALL ShowContinueError('Actual Error occurs in Branch='//TRIM(Branch(Found)%Name))
+          CALL ShowContinueError('Branch Outlet does not match Inlet, Outlet='//TRIM(MatchNodeName))
+          CALL ShowContinueError('Inlet Name='//TRIM(Branch(Found)%Component(Loop)%InletNodeName))
+          ErrFound=.true.
+          NumErr=NumErr+1
+        ELSE
+          MatchNode=Branch(Found)%Component(Loop)%OutletNode
+          MatchNodeName=Branch(Found)%Component(Loop)%OutletNodeName
+        ENDIF
+      ENDDO
+      Branch(Found)%FluidType=BranchFluidType
+      IF (IsAirBranch .and. Branch(Found)%MaxFlowRate == 0.0) THEN
+        CALL ShowSevereError('Branch='//TRIM(Branch(Found)%Name)//' is an air branch with zero max flow rate.')
+        ErrFound=.true.
+      ENDIF
+      BranchOutletNodeName=MatchNodeName
+      IF (Branch(Found)%AssignedLoopName == Blank) THEN
+        BranchLoopName = '**Unknown**'
+        BranchLoopType = '**Unknown**'
+      ELSEIF (TRIM(Branch(Found)%AssignedLoopName) ==  TRIM(BranchList(BCount)%LoopName)) THEN
+        BranchLoopName = TRIM(BranchList(BCount)%LoopName)
+        BranchLoopType = TRIM(BranchList(BCount)%LoopType)
+      ELSE
+        BranchLoopName = TRIM(Branch(Found)%AssignedLoopName)
+        BranchLoopType = '**Unknown**'
+      ENDIF
+      WRITE(OutputFileBNDetails,701) '   Branch,'//TRIM(ChrOut)//','//TRIM(Branch(Found)%Name)//','//  &
+        TRIM(BranchLoopName)//','//TRIM(BranchLoopType)//','//  &
+        TRIM(BranchInletNodeName)//','//TRIM(BranchOutletNodeName)
+    ENDDO
+    IF (MixedFluidTypesOnBranchList) THEN
+      CALL ShowWarningError('BranchList='//TRIM(BranchList(BCount)%Name)//' has mixed fluid types in its nodes.')
+      IF (OriginalBranchFluidType == Blank) OriginalBranchFluidType='**Unknown**'
+      CALL ShowContinueError('Initial Node='//trim(NodeID(InitialBranchFluidNode))//  &
+           ', Fluid Type='//trim(OriginalBranchFluidType))
+      CALL ShowContinueError('BranchList Topology - Note nodes which do not match that fluid type:')
+      Ptr=1
+      EndPtr=BranchPtrs(1)
+      DO Loop=1,BranchList(BCount)%NumOfBranchNames
+        IF (FoundBranches(Loop) /= 0) THEN
+          CALL ShowContinueError('..Branch='//trim(Branch(FoundBranches(Loop))%Name))
+        ELSE
+          CALL ShowContinueError('..Illegal Branch='//trim(BranchList(BCount)%BranchNames(Loop)))
+          CYCLE
+        ENDIF
+        DO Loop2=Ptr,EndPtr
+          cBranchFluidType=ValidNodeFluidTypes(Node(BranchFluidNodes(Loop2))%FluidType)
+          IF (cBranchFluidType == Blank) cBranchFluidType='**Unknown**'
+          CALL ShowContinueError('....Node='//trim(NodeID(BranchFluidNodes(Loop2)))//', Fluid Type='//  &
+            trim(cBranchFluidType))
+        ENDDO
+        Ptr=EndPtr+1
+        EndPtr=BranchPtrs(Loop+1)
+      ENDDO
+    ENDIF
+    DEALLOCATE(BranchFluidNodes)
+    DEALLOCATE(BranchPtrs)
+    DEALLOCATE(FoundBranches)
   ENDDO
 
   ! Build node names in branches
@@ -3111,7 +3196,7 @@ END SUBROUTINE TestBranchIntegrity
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

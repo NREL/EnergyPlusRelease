@@ -235,8 +235,7 @@ CONTAINS
                                  CompErrIndex=SteamBaseboard(BaseboardNum)%CompErrIndex, &
                                  LoopNum = SteamBaseboard(BaseboardNum)%LoopNum, &
                                  LoopSide = SteamBaseboard(BaseboardNum)%LoopSideNum, &
-                                 BranchIndex = SteamBaseboard(BaseboardNum)%BranchNum, &
-                                 CompIndex   = SteamBaseboard(BaseboardNum)%CompNum )
+                                 BranchIndex = SteamBaseboard(BaseboardNum)%BranchNum)
         CASE DEFAULT
           CALL ShowSevereError('SimSteamBaseboard: Errors in Baseboard='//TRIM(SteamBaseboard(BaseboardNum)%EquipID))
           CALL ShowContinueError('Invalid or unimplemented equipment type='//  &
@@ -449,7 +448,8 @@ CONTAINS
 !           '] will be processed.')
 !        SteamBaseboard(BaseboardNum)%TotSurfToDistrib = MaxDistribSurfaces
 !      END IF
-      IF (SteamBaseboard(BaseboardNum)%TotSurfToDistrib < MinDistribSurfaces) THEN
+      IF ( (SteamBaseboard(BaseboardNum)%TotSurfToDistrib < MinDistribSurfaces) .AND. &
+           (SteamBaseboard(BaseboardNum)%FracRadiant > MinFraction) ) THEN
         CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
           '", the number of surface/radiant fraction groups entered was less than the allowable minimum.')
         CALL ShowContinueError('...the minimum that must be entered=['//trim(RoundSigDigits(MinDistribSurfaces))//'].')
@@ -498,12 +498,8 @@ CONTAINS
       CALL ShowContinueError('Occurs in Baseboard Heater='//TRIM(cAlphaArgs(1)))
            ErrorsFound = .TRUE.
     END IF
-    IF (AllFracsSummed < (MaxFraction - 0.01d0)) THEN  !User didn't distribute all of the radiation warn that some will be lost
-        CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
-          '", Summed radiant fractions for people + surface groups > 1.0')
-        ErrorsFound = .TRUE.
-      END IF
-      IF (AllFracsSummed < (MaxFraction - 0.01d0)) THEN  ! User didn't distribute all of the radiation warn that some will be lost
+      IF ( (AllFracsSummed < (MaxFraction - 0.01d0)) .AND. &               ! User didn't distribute all of the
+           (SteamBaseboard(BaseboardNum)%FracRadiant > MinFraction) ) THEN ! radiation warn that some will be lost
         CALL ShowWarningError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
           '", Summed radiant fractions for people + surface groups < 1.0')
         CALL ShowContinueError('The rest of the radiant energy delivered by the baseboard heater will be lost')
@@ -768,7 +764,7 @@ SUBROUTINE SizeSteamBaseboard(BaseboardNum)
   USE PlantUtilities,      ONLY: RegisterPlantCompDesignFlow
   USE DataEnvironment,     ONLY: StdBaroPress
   USE FluidProperties,     ONLY: GetSatEnthalpyRefrig,GetSatDensityRefrig, GetSatSpecificHeatRefrig
-  USE BranchInputManager,  ONLY: MyPlantSizingIndex
+!  USE BranchInputManager,  ONLY: MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1460,7 +1456,7 @@ END SUBROUTINE UpdateSteamBaseboardPlantConnection
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

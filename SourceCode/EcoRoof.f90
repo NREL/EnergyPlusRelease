@@ -45,9 +45,19 @@ PRIVATE
 
   ! MODULE VARIABLE DECLARATIONS:
 
-  REAL(r64)     :: Tfold     ! leaf temperature from the previous time step
-  REAL(r64)     :: Tgold     ! ground temperature from the previous time step
-  LOGICAL  :: EcoRoofbeginFlag = .TRUE.
+  REAL(r64) :: CumRunoff = 0.0  ! Cumulative runoff, updated each time step (m) mult by roof area to get volume
+  REAL(r64) :: CumET = 0.0      ! Cumulative evapotranspiration from soil and plants (m)
+  REAL(r64) :: CumPrecip = 0.0
+  REAL(r64) :: CumIrrigation = 0.0 ! Cumulative irrigation, updated each time step (m) mult by roof area to get volume
+  REAL(r64) :: CurrentRunoff
+  REAL(r64) :: CurrentET
+  REAL(r64) :: CurrentPrecipitation  ! units of (m) per timestep
+  REAL(r64) :: CurrentIrrigation     ! units of (m) per timestep
+
+  REAL(r64) :: Tfold     ! leaf temperature from the previous time step
+  REAL(r64) :: Tgold     ! ground temperature from the previous time step
+  LOGICAL   :: EcoRoofbeginFlag = .TRUE.
+
 
 
 PUBLIC CalcEcoRoof  !Algorithm for the module
@@ -185,7 +195,8 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
   REAL(r64) :: Zo       ! foliage roughness length (m)
   REAL(r64) :: Cfhn     ! transfer coefficient at near-neutral conditions
   REAL(r64) :: Cf       ! bulk Transfer coefficient, equation 10 page 6 (FASST).
-  REAL(r64) :: sheatf
+  REAL(r64), SAVE :: sheatf ! sensible heat flux coeff for foliage (W/m^2K)
+  REAL(r64), SAVE :: sensiblef !  sensible heat transfer TO foliage (W/m^2) DJS Jan 2011
   REAL(r64) :: ra       ! Aerodynamic Resistance
 
   REAL(r64)  :: f1inv  ! intermediate calculation variable
@@ -218,7 +229,8 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
   REAL(r64) :: Ce       ! bulk transfer coefficient (this is in fact Ceg in equation 28 main report)
   REAL(r64) :: Gammah   ! latent heat exchange stability correction factor
   REAL(r64) :: Chg      ! in fact it is the same as Ce (=Ceg) is transfer coefficient (but wot?)
-  REAL(r64) :: sheatg   ! intermediate calculation variable
+  REAL(r64), SAVE :: sheatg   ! intermediate calculation variable - sensible flux coef (W/m^2K for ground)
+  REAL(r64), SAVE :: sensibleg ! sensible heat flux TO ground (w/m^2) DJS Jan 2011
   REAL(r64) :: T3G      ! intermediate variable in the equation for Tg
   REAL(r64) :: T2G      ! intermediate variable in the equation for Tg
   REAL(r64) :: LeafTK ! the current leaf's temperature (Kelvin)
@@ -294,6 +306,30 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
 
     FirstEcoSurf =  Surfnum          ! this determines WHEN to updatesoilProps
 
+! DJS NOVEMBER 2010 - Make calls to SetupOutput Variable to allow for reporting of ecoroof variables
+
+    CALL SetupOutputVariable('Ecoroof Soil Temperature [C]',Tg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Vegetation Temperature [C]',Tf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Soil Root Moisture []',MeanRootMoisture, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Soil Near Surface Moisture []',Moisture, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Soil Sensible Flux [W/m2]',sensibleg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Vegetation Sensible Flux [W/m2]',sensiblef, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Vegetation Water Flux [m/s]',vfluxf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Soil Water Flux [m/s]',vfluxg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Vegetation Latent Flux [W/m2]',Lf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Ecoroof Soil Latent Flux [W/m2]',Lg, 'Zone','State','Environment')
+
+    CALL SetupOutputVariable('Ecoroof Cumulative Precipitation [m]',CumPrecip, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Cumulative Irrigation [m]',CumIrrigation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Cumulative Runoff [m]',CumRunoff, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Cumulative Evapotranspiration [m]',CumET, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Current Precipitation [m]',CurrentPrecipitation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Current Irrigation [m]',CurrentIrrigation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Current Runoff [m]',CurrentRunoff, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Ecoroof Current Evapotranspiration [m]',CurrentET, 'Zone','Sum','Environment')
+
+! DJS NOVEMBER 2010 - end of calls to setup output of ecoroof variables
+
   END IF ! Initialization statements for first entry into ecoroof routines
 
 
@@ -316,6 +352,14 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Tf=10.0d0
     VFluxf=0.0
     VFluxg=0.0
+    CumRunoff = 0.0
+    CumET = 0.0
+    CumPrecip = 0.0
+    CumIrrigation = 0.0
+    CurrentRunoff = 0.0
+    CurrentET = 0.0
+    CurrentPrecipitation = 0.0
+    CurrentIrrigation = 0.0
     MyEnvrnFlag=.false.
   ENDIF
 
@@ -383,7 +427,9 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Waf = 0.83d0*Cfhn**0.5d0*sigmaf*Ws + (1.d0- sigmaf)*Ws ! Wind Speed inside foliage. Equation #6, FASST model
     Cf = 0.01d0*(1.0d0+0.3d0/Waf) ! The bulk Transfer coefficient, equation 10 page 6.
     sheatf = e0+1.1d0*LAI*Rhoaf*Cpa*Cf*Waf ! Intermediate calculation for Sensible Heat Transfer
+    sensiblef = sheatf*(Taf - Tf) ! DJS Jan 2011 sensible flux TO foliage into air (Frankenstein 2004, eqn7)
     !sourced from Frankenstein et al (2004a). Added e0 windless correction factor.
+    !an early version had (1.0-0.7)*sigmaf in calc of sensiblef... how did that get there!?! Fixed.
 
     !These parameters were taken from "The Atm Boundary Layer", By J.R. Garratt
     !NOTE the Garratt eqn. (A21) gives esf in units of hPA so we have multiplied
@@ -483,6 +529,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Chng = (Kv/LOG(Za/Zog))**2 / rch  ! bulk transfer coefficient near ground
     Chg = Gammah* ( (1.d0-sigmaf)*Chng+sigmaf*Cfhn ) !
     sheatg= e0+Rhoag*Cpa*Chg*Waf  ! added the e0 windless correction
+    sensibleg = sheatg*(Taf - Tg)  ! sensible flux TO soil (W/m^2) DJS Jan 2011 (eqn. 32 in Frankenstein 2004)
 
     Chne = (Kv/LOG(Za/Zog))**2 / rche
     Ce = gammah * ((1.d0-sigmaf)*Chne+sigmaf*Cfhn)   ! this is in fact Ceg in eq (28)
@@ -565,11 +612,11 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Tfold = LeafTK - KelvinConv
     Tgold = SoilTK - KelvinConv
 
-Endif ! if firstecosurface (if not we do NOT need to recalculate ecoroof energybalance as all ecoroof surfaces MUST be the same
+  Endif ! if firstecosurface (if not we do NOT need to recalculate ecoroof energybalance as all ecoroof surfaces MUST be the same
       ! this endif was moved here from the if statement regarding whether we are looking at the first ecoroof surface or not.
 
-  TH(SurfNum,1,1) = TGold ! SoilTemperature
-  TempExt = TGold
+  TH(SurfNum,1,1) = Tgold ! SoilTemperature
+  TempExt = Tgold
 
 END SUBROUTINE CalcEcoRoof
 
@@ -619,8 +666,7 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   REAL(r64), INTENT(IN)    :: Qsoil !unused1208
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: RatioMax = 1.1d0
-  REAL(r64), PARAMETER :: RatioMin = 0.9d0
+          ! na
 
   !Soil Parameters from Reference listed in the code:
   REAL(r64), PARAMETER :: alpha=23d0   !These parameters are empirical constants
@@ -636,6 +682,8 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: RatioMax
+  REAL(r64) :: RatioMin
   REAL(r64) :: MoistureDiffusion ! moisture transport down from near-surface to root zone
   REAL(r64),SAVE :: TopDepth  ! Thickness of "near-surface" soil layer
   REAL(r64),SAVE :: RootDepth ! Thickness of "root zone" soil layer
@@ -646,6 +694,7 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   REAL(r64) :: SoilAbsorpSolar  ! Moisture dependent Solar absorptance (1-albedo)
   REAL(r64) :: SoilDensity      ! Moisture dependent density to be fed back into CTF Calculator
 
+  REAL(r64) :: SatRatio
   REAL(r64) :: TestRatio        ! Ratio to determine if timestep change in properties is too abrupt for CTF
 
   REAL(r64),SAVE :: DryCond         ! Dry soil value of conductivity
@@ -653,16 +702,6 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   REAL(r64),SAVE :: DryAbsorp       ! Dry soil value of solar absorptance (1-albedo)
   REAL(r64),SAVE :: DrySpecHeat     ! Dry soil value of specific heat
   REAL(r64) :: AvgMoisture     ! Average soil moisture over depth of ecoroof media
-
-  REAL(r64), SAVE :: CurrentRunoff
-  REAL(r64), SAVE :: CurrentET
-  REAL(r64), SAVE :: CurrentPrecipitation  ! units of (m) per timestep
-  REAL(r64), SAVE :: CurrentIrrigation     ! units of (m) per timestep
-
-  REAL(r64), SAVE :: CumRunoff = 0.0  ! Cumulative runoff, updated each time step (m) mult by roof area to get volume
-  REAL(r64), SAVE :: CumET = 0.0      ! Cumulative evapotranspiration from soil and plants (m)
-  REAL(r64), SAVE :: CumPrecip = 0.0
-  REAL(r64), SAVE :: CumIrrigation = 0.0 ! Cumulative irrigation, updated each time step (m) mult by roof area to get volume
 
   LOGICAL,SAVE  :: UpdatebeginFlag = .TRUE.  ! one time flag
 
@@ -686,6 +725,16 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
   ! Recall Moisture = near-surface moisture value (m^3/m^3)
   ! Recall MeanRootMoisture = root zone moisture value (m^3/m^3)
+
+    !DJS 2009 set the ratiomax and ratiomin values in the code now (rather than as parameters) so that
+  !DJS 2009 we can link them to timesteps and make these limits apply to actual RATES... 
+  !DJS 2009 reasonable rates are +/- 10% change in properties per 15 minute period... Otherwise we have
+  !DJS 2009 stability issues.
+  !DJS 2011 FEB - Since we no longer use CTF with soil-dependent properties (Do not RECALL INITCONDUCTION...
+  !DJS 2011 FEB - we may be able to get away with NO limits on rates of change when using CFD routine.
+  !DJS 2011 FEB - for now we stick with 20% per quarter hour.
+   RatioMax = 1.0 + 0.20*minutespertimestep/15.0 
+   RatioMin = 1.0 - 0.20*minutespertimestep/15.0 
 
   If (UpdatebeginFlag) then
 
@@ -731,14 +780,21 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
   ! NEXT Update evapotranspiration summary variable for print out
   CurrentET= (Vfluxg+ Vfluxf)*MinutesPerTimeStep*60.0d0  ! units are meters
-  CumET = CumET + CurrentET
+  IF (.not. WarmupFlag) THEN
+    CumET = CumET + CurrentET
+  ENDIF
 
   ! NEXT Add Precipitation to surface soil moisture variable (if a schedule exists)
+  IF (.not. WarmupFlag) THEN
+  CurrentPrecipitation = 0.0 ! first initialize to zero
+  ENDIF
   CurrentPrecipitation = 0.0 ! first initialize to zero
   If (Rainfall%ModeID ==RainSchedDesign) then
     CurrentPrecipitation = Rainfall%CurrentAmount !  units of m
     Moisture = Moisture + CurrentPrecipitation/TopDepth  ! x (m) evenly put into top layer
-    CumPrecip = CumPrecip + CurrentPrecipitation
+    IF (.not. WarmupFlag) THEN
+      CumPrecip = CumPrecip + CurrentPrecipitation
+    ENDIF
   Endif
 
   ! NEXT Add Irrigation to surface soil moisture variable (if a schedule exists)
@@ -747,14 +803,17 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
     If (Irrigation%ModeID == IrrSchedDesign) then
       CurrentIrrigation = irrigation%ScheduledAmount ! units of m
       irrigation%actualamount=CurrentIrrigation
-    elseif (Irrigation%ModeID ==IrrSmartSched .and. moisture .lt. 0.4d0*MoistureMax) then
+!    elseif (Irrigation%ModeID ==IrrSmartSched .and. moisture .lt. 0.4d0*MoistureMax) then
+    elseif (Irrigation%ModeID ==IrrSmartSched .and. moisture .lt. Irrigation%IrrigationThreshold*MoistureMax) then
       ! Smart schedule only irrigates when scheduled AND the soil is less than 40% saturated
       CurrentIrrigation = irrigation%ScheduledAmount ! units of m
       irrigation%actualamount=CurrentIrrigation
     endif
 
     Moisture = Moisture + CurrentIrrigation/TopDepth ! irrigation in (m)/timestep put into top layer
-    CumIrrigation = CumIrrigation + CurrentIrrigation
+    IF (.not. WarmupFlag) THEN
+      CumIrrigation = CumIrrigation + CurrentIrrigation
+    ENDIF
 
  ! Note: If soil top layer gets a massive influx of rain &/or irrigation some of
  ! the water will simply run right off the top and not penetrate at all!
@@ -782,7 +841,8 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
    endif
 
   IF (Material(Construct(ConstrNum)%LayerPoint(1))%EcoRoofCalculationMethod == 1) THEN
-  !THE SECTION BELOW WAS THE INITIAL MOISTURE DISTRIBUTION MODEL. REMOVED 7/21/2010 BY SF
+
+  !THE SECTION BELOW WAS THE INITIAL MOISTURE DISTRIBUTION MODEL.
   !Any line with "!-" was code.  A line with "!" was just a comment.  This is done in case this code needs to be resurected in the future.
   !See below this commented out code for the new moisture distribution model.
   !*********************************************************************************************************
@@ -888,13 +948,13 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
     !Limit the moisture from going over the saturation limit and create runoff:
     IF(MeanRootMoisture .GE. MoistureMax) THEN
-         MeanRootMoisture=0.9999*MoistureMax
-         CurrentRunOff=CurrentRunOff+(Moisture-MoistureMax*0.9999)*RootDepth
+         MeanRootMoisture=0.9999d0*MoistureMax
+         CurrentRunOff=CurrentRunOff+(Moisture-MoistureMax*0.9999d0)*RootDepth
     END IF
 
     !Limit the soil from going below the soil saturation limit:
-    IF(MeanRootMoisture .LE. (1.01*MoistureResidual)) THEN
-         MeanRootMoisture=1.01*MoistureResidual
+    IF(MeanRootMoisture .LE. (1.01d0*MoistureResidual)) THEN
+         MeanRootMoisture=1.01d0*MoistureResidual
     END IF
 
     !Next, track runoff from the bottom of the soil:
@@ -905,7 +965,9 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
   ! NEXT Limit moisture values to saturation (create RUNOFF that we can track)
   ! CurrentRunoff is sum of "overwatering" in a timestep and excess moisture content
-     CumRunoff = CumRunoff + CurrentRunoff
+     IF (.not. WarmupFlag) THEN
+       CumRunoff = CumRunoff + CurrentRunoff
+     ENDIF
 
   if (MeanRootMoisture .LE. MoistureResidual*1.00001d0) then
     Moisture = Moisture - (MoistureResidual*1.00001d0 - MeanRootMoisture)*RootDepth/TopDepth
@@ -924,7 +986,6 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
     ! changes by more than a certain percentage (typically 5-20%).
 
     ! Note wet soil absorptance is generally 25-50% higher than dry soil absorptance (assume linear)
-    !SoilAbsorpSolar = DryAbsorp* (1.0+ 0.15* (Moisture - MoistureResidual)/(MoistureMax - MoistureResidual))
   SoilAbsorpSolar = DryAbsorp+ (0.92d0-DryAbsorp)*(Moisture -MoistureResidual)/(MoistureMax - MoistureResidual)
   ! Limit solar absorptivity to 95% so soil abledo is always above 5%
   if (SoilAbsorpSolar .GT. 0.95d0 ) SoilAbsorpSolar = 0.95d0
@@ -943,12 +1004,22 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
     ! Note 990 kg/m^3 is water density and the moisture is depth-averaged
 
   ! Note wet soil has specific heat that is 40% higher than dry soil (assume linear)
-    SoilSpecHeat = DrySpecHeat*(1.0d0+ 0.4d0*(AvgMoisture-MoistureResidual)/(MoistureMax-MoistureResidual))
+! OLD ::  SoilSpecHeat = DrySpecHeat*(1.0d0+ 0.4d0*(AvgMoisture-MoistureResidual)/(MoistureMax-MoistureResidual))
+  ! This is now based on Melos Hagos's results for C (March 2009)
+  !    SoilSpecHeat = DrySpecHeat + 3.09*(AvgMoisture) CLEARLY in ERROR BY FACTOR of 1000
+  !    DJS - Melos report has Spec = Cdry + 1.9 theta (where C is in kJ/kg/K), so...
+    SoilSpecHeat = DrySpecHeat + 1900.0d0*AvgMoisture
 
   ! Note wet soil has thermal conductivity that is up to 3 times that of  dry soil ...
   ! For now simply let it DOUBLE over the range of moisture
 
-  SoilConductivity = DryCond* (1.0d0 + 1.0d0 * (AvgMoisture-MoistureResidual)/(MoistureMax-MoistureResidual))
+  ! Note wet soil has thermal conductivity that is up to 3 times that of  dry soil ...
+  ! OLD :: SoilConductivity = DryCond* (1.0d0 + 1.0d0 * (AvgMoisture-MoistureResidual)/(MoistureMax-MoistureResidual))
+  ! This is now based on Melos Hagos's results for k/kdry (March 2009)
+    SatRatio = (AvgMoisture - MoistureResidual)/(MoistureMax - MoistureResidual)
+    SoilConductivity = (DryCond/1.15d0) * (1.45d0 * exp(4.411d0 * SatRatio))/(1.0d0 + 0.45d0 * exp(4.411d0 * SatRatio))
+  ! DJS 2009 - note, this allows the actual conductivity to dip a little below the dry value... corresponding to
+  ! DJS 2009 - "bone dry" if you will, when moisture --> residual value.
 
   ! HERE WE RE-RUN THE CONDUCTION TRANSFER FUNCTION (CTF) CALCULATIONS
 
@@ -1002,7 +1073,7 @@ END SUBROUTINE UpdateSoilProps
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

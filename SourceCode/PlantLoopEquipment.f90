@@ -86,19 +86,16 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE ScheduleManager,               ONLY: GetCurrentScheduleValue
   USE Boilers,                       ONLY: SimBoiler
   USE WaterThermalTanks,             ONLY: SimWaterThermalTank
-  USE ChillerConstCOP  ,             ONLY: SimConstCOPChiller
   USE ChillerAbsorption,             ONLY: SimBLASTAbsorber
   USE ChillerIndirectAbsorption,     ONLY: SimIndirectAbsorber
   USE ChillerGasAbsorption,          ONLY: SimGasAbsorber
   USE ChillerExhaustAbsorption,      ONLY: SimExhaustAbsorber
-  USE ChillerEngineDriven,           ONLY: SimEngineDrivenChiller
-  USE ChillerElectric,               ONLY: SimElectricChiller
+  USE PlantChillers,                 ONLY: SimChiller
   USE ChillerElectricEIR,            ONLY: SimElectricEIRChiller
   USE ChillerReformulatedEIR,        ONLY: SimReformulatedEIRChiller
   USE HeatPumpWaterToWaterHEATING,   ONLY: SimHPWatertoWaterHEATING
   USE HeatPumpWaterToWaterCOOLING,   ONLY: SimHPWatertoWaterCOOLING
   USE HeatPumpWaterToWaterSimple,    ONLY: SimHPWatertoWaterSimple
-  USE ChillerGasTurbine,             ONLY: SimGTChiller
   USE OutsideEnergySources,          ONLY: SimOutsideEnergy
   USE Pipes,                         ONLY: SimPipes
   USE PipeHeatTransfer,              ONLY: SimPipesHeatTransfer
@@ -130,6 +127,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE RefrigeratedCase,              ONLY: SimRefrigCondenser
   USE PhotovoltaicThermalCollectors, ONLY: SimPVTcollectors, CalledFromPlantLoopEquipMgr
   USE PlantPipingSystemsManager,     ONLY: SimPipingSystemCircuit
+  USE UserDefinedComponents,         ONLY: SimUserDefinedPlantComponent
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -174,6 +172,8 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   INTEGER      :: GeneralEquipType !Basic Equipment type from EquipType Used to help organize this routine
   LOGICAL      :: PumpPowerToLoop = .False.
   LOGICAL,SAVE :: RunLoopPumps = .False.
+  REAL(r64)       :: TempCondInDesign        ! Design condenser inlet temp. C , or 25.d0
+  REAL(r64)       :: TempEvapOutDesign
 
   ! Based on the general equip type and the GetCompSizFac value, see if we can just leave early
   GeneralEquipType = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%GeneralEquipType
@@ -270,14 +270,16 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
     CASE (GenEquipTypes_Chiller)
       SELECT CASE (EquipTypeNum)
 
-        CASE (TypeOf_Chiller_EngineDriven)
-          CALL SimEngineDrivenChiller(LoopNum, LoopSideNum, EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration, &
-                                      InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+        CASE (TypeOf_Chiller_EngineDriven, TypeOf_Chiller_Electric, TypeOf_Chiller_ConstCOP, TypeOf_Chiller_CombTurbine)
+          CALL SimChiller(LoopNum, LoopSideNum, EquipTypeNum,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration, &
+                    InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac, TempCondInDesign, TempEvapOutDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesEvapOut =  TempEvapOutDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -285,12 +287,13 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_Chiller_Absorption)
           CALL SimBLASTAbsorber(EquipType,EquipName,EquipFlowCtrl,LoopNum,LoopSideNum,EquipNum,RunFlag,FirstHVACIteration, &
-                                InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+                                InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac,TempCondInDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -298,25 +301,13 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_Chiller_Indirect_Absorption)
           CALL SimIndirectAbsorber(EquipType,EquipName,EquipFlowCtrl,LoopNum,LoopSideNum,EquipNum,RunFlag,FirstHVACIteration, &
-                                InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+                                InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac,TempCondInDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
-            END IF
-            IF (GetCompSizFac) THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
-            END IF
-
-        CASE (TypeOf_Chiller_Electric)
-          CALL SimElectricChiller(LoopNum, LoopSideNum, EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration, &
-                                  InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
-            IF(InitLoopEquip)THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -324,12 +315,14 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_Chiller_ElectricEIR)
           CALL SimElectricEIRChiller(EquipType,EquipName,EquipFlowCtrl,EquipNum,LoopNum,RunFlag,FirstHVACIteration, &
-                                  InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+                    InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac,TempCondInDesign,TempEvapOutDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesEvapOut =  TempEvapOutDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -337,38 +330,14 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_Chiller_ElectricReformEIR)
           CALL SimReformulatedEIRChiller(EquipType,EquipName,EquipFlowCtrl,EquipNum,LoopNum,RunFlag,FirstHVACIteration, &
-                                  InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+                    InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac,TempCondInDesign,TempEvapOutDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
-            END IF
-            IF (GetCompSizFac) THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
-            END IF
-
-        CASE (TypeOf_Chiller_CombTurbine)
-          CALL SimGTChiller(LoopNum, LoopSideNum, EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration, &    !DSU
-                            InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
-            IF(InitLoopEquip)THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
-            END IF
-            IF (GetCompSizFac) THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
-            END IF
-
-        CASE (TypeOf_Chiller_ConstCOP)
-          CALL SimConstCOPChiller(LoopNum, EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration, &    !DSU
-                                  InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
-            IF(InitLoopEquip)THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesEvapOut =  TempEvapOutDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -380,12 +349,14 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
           CALL SimGasAbsorber(EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag,FirstHVACIteration,&
                               InitLoopEquip,CurLoad,                         &    !DSU
                               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%NodeNumIn, &
-                              Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+                              Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac,TempCondInDesign,TempEvapOutDesign)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesCondIn  =  TempCondInDesign
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%TempDesEvapOut =  TempEvapOutDesign
             END IF
             IF (GetCompSizFac) THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
@@ -1011,6 +982,11 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE ( TypeOf_CoilWAHPCoolingEquationFit )
 
+        CASE ( TypeOf_CoilVSWAHPHeatingEquationFit )
+
+        CASE ( TypeOf_CoilVSWAHPCoolingEquationFit )
+
+
         CASE ( TypeOf_CoilWAHPHeatingParamEst )
 
         CASE ( TypeOf_CoilWAHPCoolingParamEst )
@@ -1045,7 +1021,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
       SELECT CASE (EquipTypeNum)
 
-      CASE (TypeOf_SolarCollectorFlatPlate)
+      CASE (TypeOf_SolarCollectorFlatPlate, TypeOf_SolarCollectorICS)
 
         CALL SimSolarCollector(EquipTypeNum, EquipName, EquipNum, InitLoopEquip, FirstHVACIteration)
 
@@ -1123,6 +1099,25 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
         CALL ShowFatalError('Preceding condition causes termination.')
       END SELECT
 
+    CASE (GenEquipTypes_PlantComponent)
+
+      SELECT CASE (EquipTypeNum)
+
+      CASE (Typeof_PlantComponentUserDefined)
+
+        CALL SimUserDefinedPlantComponent(LoopNum, LoopSideNum, EquipType,EquipName, &
+                                         EquipNum, InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad)
+        IF(InitLoopEquip)THEN
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+        END IF
+
+      CASE DEFAULT
+
+      END SELECT
+
     CASE DEFAULT
       CALL ShowSevereError('SimPlantEquip: Invalid Equipment type='//TRIM(EquipType))
       CALL ShowContinueError('Occurs in Plant Loop='//TRIM(PlantLoop(LoopNum)%Name))
@@ -1135,7 +1130,7 @@ END SUBROUTINE SimPlantEquip
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -25,7 +25,7 @@ MODULE ThermalComfort
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataGlobals
-USE DataHeatBalance,   ONLY: MRT, People, Zone, ZoneAveraged, SurfaceWeighted, AngleFactor, NumPeopleStatements
+USE DataHeatBalance,   ONLY: MRT, People, Zone, ZoneAveraged, SurfaceWeighted, AngleFactor, TotPeople
 USE DataEnvironment,   ONLY: OutBaroPress
 USE DataHeatBalFanSys, ONLY: MAT, ZTAV, ZoneAirHumRat,ZoneComfortControlsFanger, ZoneAirHumRatAvg, &
                              ZTAVComf, ZoneAirHumRatAvgComf
@@ -153,7 +153,6 @@ REAL(r64) :: Hr                = 0.0d0 ! Radiant heat transfer coeffiency
 REAL(r64) :: IntHeatProd       = 0.0d0 ! Internal heat production
 INTEGER :: IterNum        = 0   ! Number of iteration
 REAL(r64) :: LatRespHeatLoss   = 0.0d0 ! Latent respiration heat loss
-!INTEGER, PUBLIC :: NumPeopleStatements   = 0   ! Number of people
 INTEGER :: MaxZoneNum     = 0   ! Number of zones
 INTEGER :: MRTCalcType    = 0   ! The type of MRT calculation (ZoneAveraged or SurfaceWeighted)
 REAL(r64) :: OpTemp            = 0.0d0 ! Operative temperature
@@ -273,7 +272,7 @@ SUBROUTINE ManageThermalComfort
   IF (FirstTimeFlag) THEN
     CALL InitThermalComfort ! Mainly sets up output stuff
     FirstTimeFlag = .FALSE.
-    IF (NumPeopleStatements > 0) THEN
+    IF (TotPeople > 0) THEN
       IF (ANY(People%AdaptiveASH55)) ASH55Flag  = .true.
       IF (ANY(People%AdaptiveCEN15251)) CEN15251Flag = .true.
     ENDIF
@@ -337,17 +336,14 @@ SUBROUTINE InitThermalComfort
   CHARACTER(len=MaxNameLength) :: CurrentGroupName
 
           ! FLOW:
-!  NumPeopleStatements = SIZE(People)
 
-  ALLOCATE (ThermalComfortData(NumPeopleStatements))
+  ALLOCATE (ThermalComfortData(TotPeople))
 
 
-  DO Loop = 1, NumPeopleStatements
-    IF (LEN_TRIM(People(Loop)%Name) .EQ. 0) THEN
-      CurrentGroupName = TRIM(Zone(People(Loop)%ZonePtr)%Name) // "-" // ACHAR(MOD(Loop,26) + 64)
-    ELSE
-      CurrentGroupName = People(Loop)%Name
-    END IF
+  DO Loop = 1, TotPeople
+
+    CurrentGroupName = People(Loop)%Name
+
     ! CurrentModuleObject='People'
     IF (People(Loop)%Fanger) THEN
       CALL SetupOutputVariable('FangerPMV []',ThermalComfortData(Loop)%FangerPMV, &
@@ -419,7 +415,7 @@ SUBROUTINE InitThermalComfort
   ALLOCATE (ThermalComfortInASH55(NumOfZones))
 
   ! ASHRAE 55 Warning. If any people statement for a zone is true, set that zone to true
-  DO Loop = 1, NumPeopleStatements
+  DO Loop = 1, TotPeople
     IF (People(Loop)%Show55Warning) THEN
       ThermalComfortInASH55(People(Loop)%ZonePtr)%Enable55Warning =  .TRUE.
     END IF
@@ -484,7 +480,7 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
           ! PURPOSE OF THIS SUBROUTINE:
           ! This subroutine calculates PMV(Predicted Mean Vote) using the Fanger thermal
           ! comfort model. This subroutine is also used for thermal comfort control by determining
-          ! the temperature at which the PMV is equal to a PMV set point specified by the user.
+          ! the temperature at which the PMV is equal to a PMV setpoint specified by the user.
 
           ! METHODOLOGY EMPLOYED:
           ! This subroutine is based heavily upon the work performed by Dan Maloney for
@@ -531,7 +527,7 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
     REAL(r64) :: PMV  ! temporary variable to store calculated Fanger PMV value
     REAL(r64) :: PPD  ! temporary variable to store calculated Fanger PPD value
 
-      DO PeopleNum = 1, NumPeopleStatements
+      DO PeopleNum = 1, TotPeople
 
           ! Optional argument is used to access people object when thermal comfort control is used
           If (PRESENT(PNum)) then
@@ -551,7 +547,7 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
               ELSEIF (ZoneUCSDCV(ZoneNum)%VforComfort== VComfort_Recirculation) THEN
                  AirTemp = ZTJET(ZoneNum)%Med
               ELSE
-                ! Thermal comfort control uses Tset to determine PMV set point value, otherwise use zone temp
+                ! Thermal comfort control uses Tset to determine PMV setpoint value, otherwise use zone temp
                 If (PRESENT(PNum)) then
                   AirTemp = Tset
                 Else
@@ -696,7 +692,7 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
 
           ThermalComfortData(PeopleNum)%FangerPMV = PMV
 
-          ! Pass resulting PMV based on temperature set point (Tset) when using thermal comfort control
+          ! Pass resulting PMV based on temperature setpoint (Tset) when using thermal comfort control
           If (PRESENT(PNum)) then
             PMVResult = PMV
           End If
@@ -769,7 +765,7 @@ SUBROUTINE CalcThermalComfortPierce
   REAL(r64) :: AvgBodyTemp          ! Average body temperature
   REAL(r64) :: AvgBodyTempHigh      ! Average body temperature when HSI(Belding's classic heat sterss index) is 100
   REAL(r64) :: AvgBodyTempLow       ! Average body temperature when DISC is 0
-  REAL(r64) :: AvgBodyTempSet       ! Set point for average body temperature
+  REAL(r64) :: AvgBodyTempSet       ! Setpoint for average body temperature
   REAL(r64) :: BodyThermSigCold     ! Temperature difference of Body when BodyTempSet is higher than BodyTemp
   REAL(r64) :: BodyTempChange       ! Temperature change of body in 1 minute
   REAL(r64) :: BodyThermSigWarm     ! Temperature difference of Body when BodyTemp is higher than BodyTempSet
@@ -778,7 +774,7 @@ SUBROUTINE CalcThermalComfortPierce
   REAL(r64) :: CloSurfTempOld       ! Old value of clothing surface temperature
   REAL(r64) :: CoreThermSigCold     ! Temperature difference of core when CoreTempSet is higher than CoreTemp
   REAL(r64) :: CoreHeatStorage      ! Heat storage in core compartment
-  REAL(r64) :: CoreTempSet          ! Set point for body core temperature
+  REAL(r64) :: CoreTempSet          ! Setpoint for body core temperature
   REAL(r64) :: CoreThermSigWarm     ! Temperature difference of core when CoreTemp is higher than CoreTempSet
   REAL(r64) :: DryHeatLossET        ! Heat loss from clothing surface due to both convection and radiation at ET
   REAL(r64) :: DryHeatLossSET       ! Heat loss from clothing surface due to both convection and radiation at SET
@@ -793,7 +789,7 @@ SUBROUTINE CalcThermalComfortPierce
   REAL(r64) :: HcStd                ! Standard convective heat transfer coefficient
   REAL(r64) :: HrStd                ! Standard radiant heat transfer coefficient
   REAL(r64) :: HStd                 ! Standard combined heat transfer coefficient
-  INTEGER :: IterMin              ! Time period for the ieterative calculation
+  INTEGER :: IterMin                ! Time period for the ieterative calculation
   REAL(r64) :: LewisRat             ! Lewis ratio
   REAL(r64) :: RegSweat             ! The rate of regulatory sweating
   REAL(r64) :: SET                  ! Standard effective temperature
@@ -802,9 +798,9 @@ SUBROUTINE CalcThermalComfortPierce
   REAL(r64) :: SkinHeatLoss         ! Heat loss from skin
   REAL(r64) :: SkinHeatStorage      ! Heat storage in skin compartment
   REAL(r64) :: SkinMassRat          ! Actual skin mass to total body mass ratio
-  REAL(r64) :: SkinMassRatSet       ! Set point for
+  REAL(r64) :: SkinMassRatSet       ! Setpoint for skin mass to total body mass ratio
   REAL(r64) :: SkinRelHum           ! Relative humidity at skin
-  REAL(r64) :: SkinTempSet          ! Set point for skin temperature
+  REAL(r64) :: SkinTempSet          ! Setpoint for skin temperature
   REAL(r64) :: SkinThermSigWarm     ! Temperature difference of skin when SkinTemp is higher than SkinTempSet
   REAL(r64) :: StdCloBodyRat        ! Standard ratio of clothed body
   REAL(r64) :: StdCloFac            ! Clothing factor determined experimentally at standard environment
@@ -819,7 +815,7 @@ SUBROUTINE CalcThermalComfortPierce
 
         ! FLOW:
 
-  DO PeopleNum = 1, NumPeopleStatements
+  DO PeopleNum = 1, TotPeople
 
     IF(.NOT. People(PeopleNum)%Pierce) CYCLE
 
@@ -861,7 +857,7 @@ SUBROUTINE CalcThermalComfortPierce
     ENDIF
 
     ! Definition of vascular control signals
-    ! CoreTempSet, SkinTempSet, and AvgBodyTempSet are the set points for core, skin and
+    ! CoreTempSet, SkinTempSet, and AvgBodyTempSet are the setpoints for core, skin and
     ! average body temperatures corresponding to physiol.  neutrality
     ! SkinMassRatSet is the ratio of skin mass to total body mass (skin+core)
     ! Typical values for CoreTempSet, SkinTempSet and SkinMassRatSet are 36.8, 33.7 and 0.10
@@ -1229,7 +1225,7 @@ SUBROUTINE CalcThermalComfortKSU
   TimeExpos = 1.
   TempDiffer = 0.5
 
-  DO PeopleNum = 1, NumPeopleStatements
+  DO PeopleNum = 1, TotPeople
 ! THE NEXT SIX VARIABLES WILL BE READ IN FROM INPUT DECK
     IF(.NOT. People(PeopleNum)%KSU) CYCLE
 
@@ -1760,7 +1756,7 @@ SUBROUTINE GetAngleFactorList
      CALL ShowFatalError('GetAngleFactorList: Program terminated due to preceding errors.')
   END IF
 
-  DO Item = 1, NumPeopleStatements
+  DO Item = 1, TotPeople
     IF(People(Item)%MRTCalcType /= AngleFactor) CYCLE
     People(Item)%AngleFactorListPtr = FindIteminList(People(Item)%AngleFactorListName,AngleFactorList%Name,NumOfAngleFactorLists)
     WhichAFList=People(Item)%AngleFactorListPtr
@@ -2027,7 +2023,7 @@ AnyZoneTimeNotSimpleASH55Either = 0
 !assume the zone is unoccupied
 ThermalComfortInASH55%ZoneIsOccupied = .FALSE.
 !loop through the people objects and determine if the zone is currently occupied
-DO iPeople = 1, NumPeopleStatements
+DO iPeople = 1, TotPeople
   ZoneNum = People(iPeople)%ZonePtr
   NumberOccupants = People(iPeople)%NumberOfPeople * GetCurrentScheduleValue(People(iPeople)%NumberOfPeoplePtr)
   IF (NumberOccupants .GT. 0) THEN
@@ -2392,7 +2388,7 @@ INTEGER, EXTERNAL :: GetNewUnitNumber
 CHARACTER(len=200) :: lineIn
 CHARACTER(len=200) :: lineAvg
 CHARACTER(len=200) :: epwLine
-CHARACTER(len=50) :: ioerrmsg
+CHARACTER(len=52) :: ioerrmsg
 REAL(r64), SAVE :: avgDryBulbASH=0.0d0
 REAL(r64) :: dryBulb
 REAL(r64), SAVE :: runningAverageASH=0.0d0
@@ -2555,7 +2551,7 @@ IF (BeginHourFlag) THEN
   avgDryBulbASH = avgDryBulbASH + (OutDryBulbTemp / 24.0d0)
 END IF
 
-DO PeopleNum = 1, NumPeopleStatements
+DO PeopleNum = 1, TotPeople
   IF(.NOT. People(PeopleNum)%AdaptiveASH55) CYCLE
   ZoneNum = People(PeopleNum)%ZonePtr
   IF (IsZoneDV(ZoneNum) .or. IsZoneUI(ZoneNum)) THEN
@@ -2750,7 +2746,7 @@ IF (initiate .and. weathersimulation) THEN
         runningAverageCEN = runningAverageCEN + alpha**(7-i)*avgDryBulbCEN
       END DO
     END IF
-    runningAverageCEN = (1-alpha) * runningAverageCEN
+    runningAverageCEN = (1.0d0-alpha) * runningAverageCEN
     avgDryBulbCEN = 0.0d0
     CLOSE(unit=epwFile)
     useEpwData = .true.
@@ -2764,19 +2760,19 @@ IF (initiate) RETURN
 
 IF (BeginDayFlag .and. .not. firstDaySet) THEN
   ! Update the running average, reset the daily avg
-  runningAverageCEN = 0.2 * runningAverageCEN + 0.8 * avgDryBulbCEN
+  runningAverageCEN = 0.2d0 * runningAverageCEN + 0.8d0 * avgDryBulbCEN
   avgDryBulbCEN = 0.0d0
 END IF
 
 firstDaySet=.false.
 
 ! Update the daily average
-IF (BeginHourFlag) THEN 
+IF (BeginHourFlag) THEN
   avgDryBulbCEN = avgDryBulbCEN + (OutDryBulbTemp / 24.0d0)
 ENDIF
 
 
-DO PeopleNum = 1, NumPeopleStatements
+DO PeopleNum = 1, TotPeople
   IF(.NOT. People(PeopleNum)%AdaptiveCEN15251) CYCLE
   ZoneNum = People(PeopleNum)%ZonePtr
   IF (IsZoneDV(ZoneNum) .or. IsZoneUI(ZoneNum)) THEN
@@ -2846,7 +2842,7 @@ END SUBROUTINE CalcThermalComfortAdaptiveCEN15251
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

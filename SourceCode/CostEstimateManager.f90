@@ -268,7 +268,7 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
   USE DataHeatBalance,   ONLY: Construct, TotConstructs, Lights, zone ,totLights
   USE InputProcessor,    ONLY: FindItem
   USE DXCoils       ,    ONLY: DXCoil, NumDXCoils
-  USE ChillerElectric ,  ONLY: ElectricChiller, numElectricChillers
+  USE PlantChillers ,  ONLY: ElectricChiller, numElectricChillers
   USE DataPhotovoltaics, ONLY: PVarray, NumPVs, NumSimplePVModuleTypes, iSimplePVModel
   USE DataDaylighting
   USE HeatingCoils,      ONLY: HeatingCoil, NumHeatingCoils
@@ -420,7 +420,7 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
         ErrorsFound = .TRUE.
       endif
 
-      thisChil = FindItem(CostLineItem(Item)%ParentObjName, ElectricChiller%Name, NumElectricChillers )
+      thisChil = FindItem(CostLineItem(Item)%ParentObjName, ElectricChiller%Base%Name, NumElectricChillers )
       IF (thisChil == 0) THEN
         CALL ShowWarningError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
            '", Chiller:Electric, invalid chiller specified.')
@@ -567,7 +567,7 @@ SUBROUTINE CalcCostEstimate
   USE DataHeatBalance,   ONLY: Construct, TotConstructs, Lights, zone ,totLights
   USE InputProcessor,    ONLY: FindItem
   USE DXCoils       ,    ONLY: DXCoil, NumDXCoils
-  USE ChillerElectric ,  ONLY: ElectricChiller, numElectricChillers
+  USE PlantChillers ,  ONLY: ElectricChiller, numElectricChillers
   USE DataPhotovoltaics, ONLY: PVarray, NumPVs, NumSimplePVModuleTypes, iSimplePVModel
   USE DataDaylighting
   USE HeatingCoils,      ONLY: HeatingCoil, NumHeatingCoils
@@ -750,15 +750,15 @@ SUBROUTINE CalcCostEstimate
 
     CASE ('CHILLER:ELECTRIC')
       !
-      thisChil = FindItem(CostLineItem(Item)%ParentObjName, ElectricChiller%Name, NumElectricChillers )
+      thisChil = FindItem(CostLineItem(Item)%ParentObjName, ElectricChiller%Base%Name, NumElectricChillers )
       If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKiloWattCap > 0.0)) then
-          CostLineItem(item)%Qty = ElectricChiller(thisChil)%NomCap/1000.0
+          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%NomCap/1000.0
           CostLineItem(item)%units = 'kW (tot cool cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
       ENDIF
       If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
-          CostLineItem(item)%Qty = ElectricChiller(thisChil)%COP * ElectricChiller(thisChil)%NomCap/1000.0
+          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%COP * ElectricChiller(thisChil)%Base%NomCap/1000.0
           CostLineItem(item)%units = 'kW*COP (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
@@ -869,7 +869,7 @@ END SUBROUTINE CalcCostEstimate
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -403,6 +403,7 @@ SUBROUTINE GetSurfHBDataForMundtModel(ZoneNum)
     USE DataHeatBalance,            ONLY : Zone, HConvIn, ZoneIntGain, RefrigCaseCredit
     USE DataZoneEquipment,          ONLY : ZoneEquipConfig
     USE Psychrometrics,             ONLY : PsyWFnTdpPb,PsyCpAirFnWTdb,PsyRhoAirFnPbTdbW
+    USE InternalHeatGains,          ONLY : SumAllInternalConvectionGains, SumAllReturnAirConvectionGains
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -430,6 +431,7 @@ SUBROUTINE GetSurfHBDataForMundtModel(ZoneNum)
     REAL(r64)                       :: ZoneMassFlowRate      ! zone mass flowrate
     INTEGER                         :: ZoneEquipConfigNum    ! index number for zone equipment configuration
     REAL(r64)                       :: ZoneMult              ! total zone multiplier
+    REAL(r64)                       :: RetAirConvGain
 
           ! FLOW:
 
@@ -477,21 +479,16 @@ SUBROUTINE GetSurfHBDataForMundtModel(ZoneNum)
         QsysCoolTot = -(SumSysMCpT - ZoneMassFlowRate * CpAir * MAT(ZoneNum))
     END IF
     ! determine heat gains
-    ConvIntGain = ZoneIntGain(ZoneNum)%QOCCON + ZoneIntGain(ZoneNum)%QLTCON + ZoneIntGain(ZoneNum)%T_QLTCON &
-                + ZoneIntGain(ZoneNum)%QEECON + ZoneIntGain(ZoneNum)%QGECON + ZoneIntGain(ZoneNum)%QOECON &
-                + ZoneIntGain(ZoneNum)%QHWCON + ZoneIntGain(ZoneNum)%QSECON + ZoneIntGain(ZoneNum)%QBBCON &
-                + ZoneIntGain(ZoneNum)%WaterThermalTankGain + ZoneIntGain(ZoneNum)%QFCConv &
-                + ZoneIntGain(ZoneNum)%WaterUseSensibleGain + ZoneIntGain(ZoneNum)%QGenConv &
-                + ZoneIntGain(ZoneNum)%QInvertConv + ZoneIntGain(ZoneNum)%QElecStorConv &
-                + ZoneIntGain(ZoneNum)%PipeHTGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone &
-                + ZoneIntGain(ZoneNum)%TDDPipeGain + SumConvHTRadSys(ZoneNum) &
+    CALL SumAllInternalConvectionGains(ZoneNum, ConvIntGain)
+    ConvIntGain = ConvIntGain  &
+                + SumConvHTRadSys(ZoneNum) &
                 + SysDepZoneLoadsLagged(ZoneNum) + NonAirSystemResponse(ZoneNum)/ZoneMult
 
     ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
     ! low or zero)
     IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
-      ConvIntGain = ConvIntGain + RefrigCaseCredit(ZoneNum)%SenCaseCreditToHVAC + ZoneIntGain(ZoneNum)%QLTCRA +   &
-         ZoneIntGain(ZoneNum)%T_QLTCRA
+      CALL SumAllReturnAirConvectionGains(ZoneNum, RetAirConvGain )
+      ConvIntGain = ConvIntGain + RetAirConvGain
     END IF
 
     QventCool = - MCPI(ZoneNum)*(Zone(ZoneNum)%OutDryBulbTemp-MAT(ZoneNum))
@@ -932,7 +929,7 @@ END SUBROUTINE SetSurfHBDataForMundtModel
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

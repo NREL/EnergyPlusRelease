@@ -687,11 +687,11 @@ SUBROUTINE GetWatertoAirHPInput
         WatertoAirHP(HPNum)%OutletAirMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
    CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
         WatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kg/kg]', &
+   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
         WatertoAirHP(HPNum)%InletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
    CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
         WatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kg/kg]', &
+   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
         WatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
 
    CALL SetupOutputVariable('WatertoAirHP Source Side Mass Flow Rate[kg/s]', &
@@ -2262,6 +2262,9 @@ SUBROUTINE UpdateWatertoAirHP(HPNum)
   IF (Contaminant%CO2Simulation) Then
      Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
   End If
+  IF (Contaminant%GenericContamSimulation) Then
+     Node(AirOutletNode)%GenContam = Node(AirInletNode)%GenContam
+  End If
 
   RETURN
 END SUBROUTINE UpdateWatertoAirHP
@@ -2783,6 +2786,7 @@ MODULE WatertoAirHeatPumpSimple
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals
+USE DataSizing
 USE DataEnvironment, ONLY: StdBaroPress, OutBaroPress
 USE DataHVACGlobals, ONLY: CycFanCycCoil, ContFanCycCoil
 USE DataInterfaces
@@ -3383,11 +3387,11 @@ SUBROUTINE GetSimpleWatertoAirHPInput
         SimpleWatertoAirHP(HPNum)%AirMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
    CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
         SimpleWatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kg/kg]', &
+   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
         SimpleWatertoAirHP(HPNum)%InletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
    CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
         SimpleWatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kg/kg]', &
+   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
         SimpleWatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
    CALL SetupOutputVariable('WatertoAirHP Water Mass Flow Rate [kg/s]', &
         SimpleWatertoAirHP(HPNum)%WaterMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
@@ -3680,15 +3684,14 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataSizing
   USE Psychrometrics
-  USE DataPlant,          ONLY: PlantLoop
+  USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE DataHVACGlobals,    ONLY: SmallAirVolFlow, SmallLoad
   USE General,            ONLY: TrimSigDigits
   USE PlantUtilities,     ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE DataAirSystems,     ONLY: PrimaryAirSystem
-  USE BranchInputManager, ONLY: MyPlantSizingIndex
+  USE OutputReportPredefined
   USE FluidProperties,    ONLY: GetDensityGlycol, GetSpecificHeatGlycol
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -3860,8 +3863,18 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
-        MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
-        MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+        IF(ZoneEqDXCoil)THEN
+          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0) THEN
+            MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+            MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+          ELSE
+            MixTemp = FinalZoneSizing(CurZoneEqNum)%ZoneRetTempAtCoolPeak
+            MixHumRat = FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
+          END IF
+        ELSE
+          MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+          MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+        END IF
         SupTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
         SupHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
         TimeStepNumAtMax = FinalZoneSizing(CurZoneEqNum)%TimeStepNumAtCoolMax
@@ -3912,6 +3925,18 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
                              SimpleWatertoAirHP(HPNum)%Name, &
                             'Rated Total Cooling Capacity [W]', &
                              SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+    CALL PreDefTableEntry(pdchCoolCoilTotCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+    CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
+                                 - SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
+                                   / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+      CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedPowerCool &
+                                   / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+    ELSE
+      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+      CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+    ENDIF
 
   END IF
 
@@ -3993,8 +4018,18 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
-        MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
-        MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+        IF(ZoneEqDXCoil)THEN
+          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0) THEN
+            MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+            MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+          ELSE
+            MixTemp = FinalZoneSizing(CurZoneEqNum)%ZoneRetTempAtCoolPeak
+            MixHumRat = FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
+          END IF
+        ELSE
+          MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+          MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+        END IF
         SupTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
         SupHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
         TimeStepNumAtMax = FinalZoneSizing(CurZoneEqNum)%TimeStepNumAtCoolMax
@@ -4048,6 +4083,15 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
                              SimpleWatertoAirHP(HPNum)%Name, &
                             'Rated Sensible Cooling Capacity [W]', &
                              SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+    CALL PreDefTableEntry(pdchCoolCoilSensCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+    CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
+                                 - SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
+                                 / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+    ELSE
+      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+    ENDIF
 
   END IF
 
@@ -4130,7 +4174,13 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
                              SimpleWatertoAirHP(HPNum)%Name, &
                             'Nominal Heating Capacity [W]', &
                              SimpleWatertoAirHP(HPNum)%RatedCapHeat)
-
+    CALL PreDefTableEntry(pdchHeatCoilNomCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapHeat)
+    IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedPowerHeat &
+                             / SimpleWatertoAirHP(HPNum)%RatedCapHeat)
+    ELSE
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+    ENDIF
   END IF
 
 
@@ -4491,7 +4541,7 @@ LOOP: DO
     QSensible = SensCapRated*(SensCapCoeff1 + (ratioTDB * SensCapCoeff2) + (ratioTWB * SensCapCoeff3) +   &
                                 (ratioTS * SensCapCoeff4) + (ratioVL * SensCapCoeff5) + (ratioVS * SensCapCoeff6))
     Winput = CoolPowerRated*(CoolPowerCoeff1 + (ratioTWB * CoolPowerCoeff2) + (ratioTS * CoolPowerCoeff3)+   &
-                                (ratioVL * CoolPowerCoeff4) + (ratioVS * TotalCapCoeff5))
+                                (ratioVL * CoolPowerCoeff4) + (ratioVS * CoolPowerCoeff5))
     Qsource =  QLoadTotal + Winput
 
   !Check if the Sensible Load is greater than the Total Cooling Load
@@ -4884,6 +4934,9 @@ SUBROUTINE UpdateSimpleWatertoAirHP(HPNum)
 
    IF (Contaminant%CO2Simulation) Then
      Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
+   End If
+   IF (Contaminant%GenericContamSimulation) Then
+     Node(AirOutletNode)%GenContam = Node(AirInletNode)%GenContam
    End If
 
   RETURN
@@ -5447,7 +5500,7 @@ END MODULE WatertoAirHeatPumpSimple
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

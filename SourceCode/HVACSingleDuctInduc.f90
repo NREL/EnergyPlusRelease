@@ -568,6 +568,9 @@ SUBROUTINE InitIndUnit(IUNum,FirstHVACIteration)
                                           IndUnit(IUNum)%HWCompNum,          &
                                           errFlag=errFlag)
     ENDIF
+    IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(IndUnit(IUNum)%Name)//'", type='//trim(IndUnit(IUNum)%UnitType))
+    ENDIF
     IF (IndUnit(IUNum)%CCoil_PlantTypeNum == TypeOf_CoilWaterCooling .OR. &
           IndUnit(IUNum)%CCoil_PlantTypeNum == TypeOf_CoilWaterDetailedFlatCooling ) THEN
       errFlag=.false.
@@ -580,6 +583,7 @@ SUBROUTINE InitIndUnit(IUNum,FirstHVACIteration)
                                           errFlag=errFlag)
     ENDIF
     IF (errFlag) THEN
+      CALL ShowContinueError('Reference Unit="'//trim(IndUnit(IUNum)%Name)//'", type='//trim(IndUnit(IUNum)%UnitType))
       CALL ShowFatalError('InitIndUnit: Program terminated for previous conditions.')
     ENDIF
     MyPlantScanFlag(IUNum) = .FALSE.
@@ -732,10 +736,10 @@ SUBROUTINE SizeIndUnit(IUNum)
   USE DataSizing
   USE InputProcessor
   USE WaterCoils,          ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
-  USE BranchInputManager,  ONLY: MyPlantSizingIndex
+!  USE BranchInputManager,  ONLY: MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
-  USE DataPlant,           ONLY: PlantLoop
+  USE DataPlant,           ONLY: PlantLoop, MyPlantSizingIndex
 
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -810,9 +814,10 @@ SUBROUTINE SizeIndUnit(IUNum)
             ! the design heating coil load is the zone load minus whatever the central system does. Note that
             ! DesHeatCoilInTempTU is really the primary air inlet temperature for the unit.
             IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak > 0.0) THEN
-              DesCoilLoad = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatLoad - CpAir*RhoAir*DesPriVolFlow* &
-                (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU -   &
-                     TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak)
+              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor - & 
+                              CpAir*RhoAir*DesPriVolFlow* &
+                             (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU -   &
+                              TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak)
             ELSE
               DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(ZoneSizThermSetPtLo(CurZoneEqNum) -   &
                                     TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU)
@@ -877,9 +882,10 @@ IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
             ! the design cooling coil load is the zone load minus whatever the central system does. Note that
             ! DesCoolCoilInTempTU is really the primary air inlet temperature for the unit.
             IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0) THEN
-              DesCoilLoad = TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolLoad - CpAir*RhoAir*DesPriVolFlow* &
-                (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak -   &
-                      TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU)
+              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesCoolLoad * CalcFinalZoneSizing(CurZoneEqNum)%CoolSizingFactor - &
+                            CpAir*RhoAir*DesPriVolFlow* &
+                            (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak -   &
+                             TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU)
             ELSE
               DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU   &
                                          - ZoneSizThermSetPtHi(CurZoneEqNum))
@@ -1456,7 +1462,7 @@ END FUNCTION FourPipeInductionUnitHasMixer
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

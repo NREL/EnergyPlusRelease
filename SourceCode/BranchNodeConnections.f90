@@ -421,8 +421,28 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
 !      ErrorsFound=.true.
     ENDIF
   ENDDO
-
-  ! Check 5 -- every inlet should have a matching outlet, zonereturn, zoneexhaust, reliefair or outsideair
+  
+  ! Check 5 -- return plenum induced air outlet nodes -- must be an inlet somewhere
+  DO Loop1=1,NumOfNodeConnections
+    IF (NodeConnections(Loop1)%ConnectionType /= ValidConnectionTypes(NodeConnectionType_InducedAir)) CYCLE
+    IsValid=.false.
+    DO Loop2=1, NumOfNodeConnections
+      IF (Loop1 == Loop2) CYCLE
+      IF (NodeConnections(Loop1)%NodeNumber /= NodeConnections(Loop2)%NodeNumber) CYCLE
+      IF (NodeConnections(Loop2)%ConnectionType /= ValidConnectionTypes(NodeConnectionType_Inlet)) CYCLE
+      IsValid=.true.
+    ENDDO
+    IF (.not. IsValid) THEN
+      CALL ShowSevereError('Node Connection Error, Node="'//TRIM(NodeConnections(Loop1)%NodeName)//  &
+            '", Return plenum induced air outlet node did not find a matching inlet node.')
+      CALL ShowContinueError('Reference Object='//TRIM(NodeConnections(Loop1)%ObjectType)//  &
+             ', Name='//TRIM(NodeConnections(Loop1)%ObjectName))
+      ErrorCounter=ErrorCounter+1
+      ErrorsFound=.true.
+    ENDIF
+  ENDDO
+  
+  ! Check 6 -- every inlet should have a matching outlet, zonereturn, zoneexhaust, induced air, reliefair or outsideair
           !    a)  If an InletNode's object is AirLoopHVAC, CondenserLoop, or PlantLoop, then skip the test.
           !    b)  If an InletNode's object is not one of the above types, it is valid if the
           !        same node name appears as an INLET to an AirLoopHVAC, CondenserLoop, or PlantLoop.
@@ -439,6 +459,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
       IF (NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_Outlet)      .or. &
           NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_ZoneReturn)  .or. &
           NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_ZoneExhaust) .or. &
+          NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_InducedAir) .or. &
           NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_ReliefAir)   .or. &
           NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_OutsideAir)) THEN
             MatchedAtLeastOne=.true.
@@ -465,7 +486,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
     ENDIF
   ENDDO
 
-  ! Check 6 -- non-parent inlet nodes -- must never be an inlet more than once
+  ! Check 7 -- non-parent inlet nodes -- must never be an inlet more than once
   DO Loop1=1,NumOfNodeConnections
     ! Only non-parent node connections
     IF (NodeConnections(Loop1)%ObjectIsParent) CYCLE
@@ -488,7 +509,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
     ENDDO
   ENDDO
 
-  ! Check 7 -- non-parent outlet nodes -- must never be an outlet more than once
+  ! Check 8 -- non-parent outlet nodes -- must never be an outlet more than once
   DO Loop1=1,NumOfNodeConnections
     ! Only non-parent node connections
     IF (NodeConnections(Loop1)%ObjectIsParent) CYCLE
@@ -517,7 +538,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
     ENDDO
   ENDDO
 
-  ! Check 8 -- nodes of type OutsideAirReference must be registered as NodeConnectionType_OutsideAir
+  ! Check 9 -- nodes of type OutsideAirReference must be registered as NodeConnectionType_OutsideAir
   DO Loop1=1,NumOfNodeConnections
     IF (NodeConnections(Loop1)%ConnectionType /= ValidConnectionTypes(NodeConnectionType_OutsideAirReference)) CYCLE
     IsValid=.false.
@@ -1838,7 +1859,6 @@ SUBROUTINE GetNodeConnectionType(NodeNumber, NodeConnectType, ErrFlag)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
   INTEGER           :: NodeConnectIndex, NumInList
-  INTEGER, EXTERNAL :: FindNumberInList
   INTEGER, ALLOCATABLE, DIMENSION(:) :: ListArray
 
   IF (ALLOCATED(NodeConnectType)) DEALLOCATE(NodeConnectType)
@@ -1940,7 +1960,7 @@ END SUBROUTINE FindAllNumbersinList
 
 !     NOTICE
 !
-!     Copyright © 1996-2010 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

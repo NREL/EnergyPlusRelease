@@ -1,5 +1,15 @@
-MODULE HeatBalanceIntRadExchange
+#include "Timer.h"
 
+! HBIRE_USE_OMP defined, then openMP instructions are used.  Compiler may have to have switch for openmp
+! HBIRE_NO_OMP defined, then old code is used without any openmp instructions
+
+#ifdef HBIRE_USE_OMP
+#undef HBIRE_NO_OMP
+#else
+#define HBIRE_NO_OMP
+#endif
+
+MODULE HeatBalanceIntRadExchange
           ! Module containing the routines dealing with the interior radiant exchange
           ! between surfaces.
 
@@ -47,8 +57,10 @@ character(len=*), PARAMETER :: fmtx='(A,I4,1x,A,1x,6f16.8)'
 character(len=*), PARAMETER :: fmty='(A,1x,6f16.8)'
 
           ! DERIVED TYPE DEFINITIONS
+          ! na
 
           ! MODULE VARIABLE DECLARATIONS:
+          ! na
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE HeatBalanceIntRadExchange
 PUBLIC  CalcInteriorRadExchange
@@ -60,6 +72,8 @@ PRIVATE CalcMatrixInverse
 
 CONTAINS
 
+#ifdef HBIRE_USE_OMP
+! noel's OMP version Feb 12th
 SUBROUTINE CalcInteriorRadExchange(SurfaceTemp,SurfIterations,NetLWRadToSurf,ZoneToResimulate)
 
           ! SUBROUTINE INFORMATION:
@@ -67,7 +81,6 @@ SUBROUTINE CalcInteriorRadExchange(SurfaceTemp,SurfIterations,NetLWRadToSurf,Zon
           !       DATE WRITTEN   September 2000
           !       MODIFIED       6/18/01, FCW: calculate IR on windows
           !                      Jan 2002, FCW: add blinds with movable slats
-          !                      Sep 2011 LKL/BG - resimulate only zones needing it for Radiant systems
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -82,8 +95,14 @@ SUBROUTINE CalcInteriorRadExchange(SurfaceTemp,SurfIterations,NetLWRadToSurf,Zon
           ! Hottel, H. C. and A. F. Sarofim, Radiative Transfer, Ch 3, McGraw Hill, 1967.
 
           ! USE STATEMENTS:
-
+USE DataTimings
+USE DataSystemVariables, ONLY: DeveloperFlag,MaxNumberOfThreads,NumberIntRadThreads
 USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
+
+! need to verify adding this module is not slowing things down.
+#if defined(_OPENMP) && defined(HBIRE_USE_OMP)
+use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
+#endif
           ! na
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -95,7 +114,6 @@ USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
   INTEGER, INTENT(IN), OPTIONAL          :: ZoneToResimulate  ! if passed in, then only calculate for this zone
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-!  REAL(r64), PARAMETER :: KelvinConv = KelvinConv                ! Conversion from Celsius to Kelvin
   REAL(r64), PARAMETER :: StefanBoltzmannConst = 5.6697d-8   ! Stefan-Boltzmann constant in W/(m2*K4)
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -125,16 +143,389 @@ USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
   INTEGER       :: ShadeFlag            ! Window shading status current time step
   INTEGER       :: ShadeFlagPrev        ! Window shading status previous time step
 
+  real(r64) :: t0,t1
+  REAL(r64) :: wtime
+  integer, save :: totalSurfaces, minNSurfaces, maxNSurfaces
+  CHARACTER(len=158) :: tdstring
+  integer :: i, NumSurfaces, previousRSN
+  logical :: threadloop=.True., problem_with_recsurfnum
+  integer, dimension(:,:), allocatable, save :: ZoneSurfaceKey
+  REAL(r64)     :: sumLW, sumIR
+
+  !variables added as part of strategy to reduce calculation time - Glazer 2011-04-22
+  REAL(r64)     :: SendSurfTempInKTo4th ! Sending surface temperature in K to 4th power
+  REAL(r64)     :: RecSurfTempInKTo4th  ! Receiving surface temperature in K to 4th power
+  REAL(r64),DIMENSION(:),ALLOCATABLE, SAVE :: SendSurfaceTempInKto4thPrecalc
+
+  ! FLOW:
+#ifdef EP_Detailed_Timings
+                             CALL epStartTime('CalcInteriorRadExchange=')
+#endif
+  IF (FirstTime) THEN
+
+#ifdef PRECALC_SS_TEMP4
+     ! This optimization conflicted with threading.  We can probably figure out
+     ! a way to get the best of both, but for now, as I'm trying to ensure OpenMP
+     ! is working, don't compile with this.  Note I still use SendSurfTempInKTo4th
+     ! to minimize code differences. (NDK)
+     ALLOCATE(SendSurfaceTempInKto4thPrecalc(SIZE(SurfaceTemp)))
+#endif
+
+     if (DeveloperFlag) Then
+       TSTART(t0)
+     Else
+       t0=0.0
+     EndIf
+     CALL InitInteriorRadExchange
+     if (DeveloperFlag) Then
+       TSTOP(t1)
+     Else
+       t1=0.0
+     EndIf
+     FirstTime = .FALSE.
+
+     if (DeveloperFlag) then
+       write(tdstring,*)' HBIRE_USE_OMP max number of OMP threads MAXTHREADS=', MAXTHREADS()
+       call DisplayString(trim(tdstring))
+       write(tdstring,*)' HBIRE_USE_OMP set number of OMP threads=', NumberIntRadThreads
+       call DisplayString(trim(tdstring))
+     endif
+
+     minNSurfaces=99999999
+     maxNSurfaces=0
+     totalSurfaces = 0
+     ! LKL - why not use SUM, MIN, MAX functions here?
+     DO ZoneNum = 1, NumOfZones
+        totalSurfaces = totalSurfaces + ZoneInfo(ZoneNum)%NumOfSurfaces
+        if (ZoneInfo(ZoneNum)%NumOfSurfaces > maxNSurfaces) maxNsurfaces = ZoneInfo(ZoneNum)%NumOfSurfaces
+        if (ZoneInfo(ZoneNum)%NumOfSurfaces < minNSurfaces) minNsurfaces = ZoneInfo(ZoneNum)%NumOfSurfaces
+     end DO
+
+     if (DeveloperFlag) THEN
+       WRITE(tdstring, '(a,4(a,i7),a, f8.3)') " CalcInteriorRadExchange", &
+          " Nzones=", NumOfZones, &
+          " NS=", totalSurfaces, &
+          " min/max=", minNSurfaces, " " , maxNSurfaces, &
+          " init wc=", t1-t0
+       CALL DisplayString(trim(tdstring))
+     endif
+
+     ! Crude attempt to ensure that no recv surface is owned by two zones
+     ! as this could be a threading problem with current implementation.
+     ! Need to do this better, or have someone say 'for sure' that it's safe. (NDK)
+     problem_with_recsurfnum=.false.
+     previousRSN=-1
+     DO ZoneNum = 1, NumOfZones
+        DO RecZoneSurfNum = 1, ZoneInfo(ZoneNum)%NumOfSurfaces
+           RecSurfNum = ZoneInfo(ZoneNum)%SurfacePtr(RecZoneSurfNum)
+           if (RecSurfNum .le. previousRSN) then
+              if (DeveloperFlag) then
+                write(tdstring,*) "zone=", zonenum, " recsurfnum=", recsurfnum
+                call DisplayString(trim(tdstring))
+              endif
+              problem_with_recsurfnum=.true.
+           endif
+           previousRSN=RecSurfNum
+        enddo
+     enddo
+     if (problem_with_recsurfnum .and. DeveloperFlag) then
+       call DisplayString(' PROBLEM WITH RecSurfNum that could affect threading!')
+     endif
+
+     ! The is that if we just thread over zones in the zone loop, there is
+     ! often not enough zones to get good load-balancing.  So let's consider each
+     ! Zone-RecvSurface pair.  It looks like each pair has independent work within the loop.
+     ! This is a naive implementation to achieve this, but I'm sure we can do better
+     ! so that we don't need a seperate ZoneSurfaceKey array.
+     !  This just helped me ensure I was doing it correctly. (NDK)
+#define JOINLOOPS
+#ifdef JOINLOOPS
+     if (DeveloperFlag) then
+       write(tdstring,*) " JOINLOOPS.  allocate ZoneSurfaceKey(totalSurfaces,2) NZ*NS=",  NumOfZones*totalSurfaces
+       call DisplayString(trim(tdstring))
+     endif
+     ! not de-allocated
+     allocate(ZoneSurfaceKey(totalSurfaces,2))
+     i=1
+     DO ZoneNum = 1, NumOfZones
+        DO RecZoneSurfNum = 1, ZoneInfo(ZoneNum)%NumOfSurfaces
+           ZoneSurfaceKey(i,1) = ZoneNum
+           ZoneSurfaceKey(i,2) = RecZoneSurfNum
+           i=i+1
+        end DO
+     end DO
+#endif
+  END IF ! firsttime
+
+
+  ConstrNumRec=0
+
+  IF (.NOT. PRESENT(ZoneToResimulate)) THEN
+    NetLWRadToSurf = 0.0
+    SurfaceWindow%IRfromParentZone = 0.0
+  ENDIF
+
+  ! Inside the main zone loop, this code is only executed if SurfIterations==0.
+  ! For threading, I pulled this section out of the loop and
+  ! execute a sep loop over zones only if SurfIteratios==0.
+  ! This was done to make the loop easier to thread.  It may be possible
+  ! to thread this loop and/or move it back to original position.
+  ! Need to examine CalcScriptF() and make sure it is thread-safe. (NDK)
+
+  ! When SurfIterations (passed in) is 0, do this calc for all zones (skipping if ZonesToResim)
+  IF(SurfIterations == 0) THEN
+
+     DO ZoneNum = 1, NumOfZones
+
+        IF (PRESENT(ZoneToResimulate)) THEN
+           IF (ZoneNum /= ZoneToResimulate ) THEN
+              CYCLE
+           ELSE
+              NetLWRadToSurf(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)                 = 0.d0
+              SurfaceWindow(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%IRfromParentZone = 0.d0
+           ENDIF
+        ENDIF
+
+        IntShadeOrBlindStatusChanged = .FALSE.
+
+        IF(.NOT.BeginEnvrnFlag) THEN  ! Check for change in shade/blind status
+           DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+              IF(IntShadeOrBlindStatusChanged) EXIT ! Need only check of one window's status has changed
+              ConstrNum = Surface(SurfNum)%Construction
+              IF(.NOT.Construct(ConstrNum)%TypeIsWindow) CYCLE
+              ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+              ShadeFlagPrev = SurfaceWindow(SurfNum)%ExtIntShadePrevTS
+              IF((ShadeFlagPrev /= IntShadeOn .AND. ShadeFlag == IntShadeOn).OR. &
+                   (ShadeFlagPrev /= IntBlindOn .AND. ShadeFlag == IntBlindOn).OR. &
+                   (ShadeFlagPrev == IntShadeOn .AND. ShadeFlag /= IntShadeOn).OR. &
+                   (ShadeFlagPrev == IntBlindOn .AND. ShadeFlag /= IntBlindOn))    &
+                   IntShadeOrBlindStatusChanged = .TRUE.
+           END DO
+        END IF
+
+        IF(IntShadeOrBlindStatusChanged.OR.BeginEnvrnFlag) THEN  ! Calc inside surface emissivities for this time step
+           DO ZoneSurfNum = 1,ZoneInfo(ZoneNum)%NumOfSurfaces
+              SurfNum = ZoneInfo(ZoneNum)%SurfacePtr(ZoneSurfNum)
+              ConstrNum = Surface(SurfNum)%Construction
+              ZoneInfo(ZoneNum)%Emissivity(ZoneSurfNum) = Construct(ConstrNum)%InsideAbsorpThermal
+              IF(Construct(ConstrNum)%TypeIsWindow.AND. &
+                   (SurfaceWindow(SurfNum)%ShadingFlag==IntShadeOn.OR.SurfaceWindow(SurfNum)%ShadingFlag==IntBlindOn)) THEN
+                 ZoneInfo(ZoneNum)%Emissivity(ZoneSurfNum) = &
+                      InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+                      SurfaceWindow(SurfNum)%EffShBlindEmiss) + &
+                      InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+                      SurfaceWindow(SurfNum)%EffGlassEmiss)
+              END IF
+           END DO
+
+           CALL CalcScriptF(ZoneInfo(ZoneNum)%NumOfSurfaces, &
+                            ZoneInfo(ZoneNum)%Area,          &
+                            ZoneInfo(ZoneNum)%F,             &
+                            ZoneInfo(ZoneNum)%Emissivity,    &
+                            ZoneInfo(ZoneNum)%ScriptF)
+        END IF
+
+     enddo
+  END IF  ! End of check if SurfIterations = 0
+
+
+!     NumberIntRadThreads=MAXTHREADS()
+!     MaxNumberOfThreads=MAX(MaxNumberOfThreads,NumberIntRadThreads)
+     CALL omp_set_num_threads(NumberIntRadThreads)
+! Allow these to be set at compile time, but give them defaults
+! These scheduling parameters are only for load-balancing and should not affect results
+! I've found that a good set of values over wide range of problems is to use dynamic scheduling
+! with chunk size of 16. (NDK)
+#ifndef SCHEDULE_IRE
+#define SCHEDULE_IRE dynamic
+#endif
+#ifndef SCHEDULE_IRE_N
+#define SCHEDULE_IRE_N 16
+#endif
+  !$omp parallel do schedule(SCHEDULE_IRE,SCHEDULE_IRE_N) default(none) &
+  !$omp& private(i, ZoneNum, RecZoneSurfNum, SendZoneSurfNum) &
+  !$omp& private(RecSurfNum, ConstrNumRec, RecSurfTemp, RecSurfEmiss) &
+  !$omp& private(SendSurfNum, ConstrNumSend, SendSurfTemp) &
+  !$omp& private(sumLW, sumIR) &
+  !$omp& private(RecSurfTempInKTo4th, SendSurfTempInKTo4th) &
+  !$omp& shared(totalSurfaces, SurfaceTemp, Construct, ZoneInfo, Surface, SurfaceWindow) &
+  !$omp& shared(NetLWRadToSurf, SurfIterations, NumOfZones, ZoneSurfaceKey, ZoneToResimulate)
+  DO i=1, totalSurfaces
+     ZoneNum =        ZoneSurfaceKey(i,1)
+     RecZoneSurfNum = ZoneSurfaceKey(i,2)
+
+     ! Should not have cycles in threaded code
+     IF (PRESENT(ZoneToResimulate) .and. ZoneNum /= ZoneToResimulate ) THEN
+        ! skip
+     else
+
+        RecSurfNum = ZoneInfo(ZoneNum)%SurfacePtr(RecZoneSurfNum)
+        ConstrNumRec = Surface(RecSurfNum)%Construction
+        RecSurfTemp  = SurfaceTemp(RecSurfNum)
+        RecSurfEmiss = Construct(ConstrNumRec)%InsideAbsorpThermal
+        IF(Construct(ConstrNumRec)%TypeIsWindow .AND.   &
+             SurfaceWindow(RecZoneSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser) THEN
+           IF(SurfIterations == 0 .AND. SurfaceWindow(RecSurfNum)%ShadingFlag <= 0) THEN
+              ! If the window is bare this TS and it is the first time through we use the previous TS glass
+              ! temperature whether or not the window was shaded in the previous TS. If the window was shaded
+              ! the previous time step this temperature is a better starting value than the shade temperature.
+              RecSurfTemp = SurfaceWindow(RecSurfNum)%ThetaFace(2*Construct(ConstrNumRec)%TotGlassLayers)-KelvinConv
+              ! For windows with an interior shade or blind an effective inside surface temp
+              ! and emiss is used here that is a weighted combination of shade/blind and glass temp and emiss.
+           ELSE IF(SurfaceWindow(RecSurfNum)%ShadingFlag==IntShadeOn.OR.SurfaceWindow(RecSurfNum)%ShadingFlag==IntBlindOn) THEN
+
+              RecSurfTemp = SurfaceWindow(RecSurfNum)%EffInsSurfTemp
+              RecSurfEmiss = &
+                   InterpSlatAng(SurfaceWindow(RecSurfNum)%SlatAngThisTS,SurfaceWindow(RecSurfNum)%MovableSlats, &
+                   SurfaceWindow(RecSurfNum)%EffShBlindEmiss) + &
+                   InterpSlatAng(SurfaceWindow(RecSurfNum)%SlatAngThisTS,SurfaceWindow(RecSurfNum)%MovableSlats, &
+                   SurfaceWindow(RecSurfNum)%EffGlassEmiss)
+           END IF
+        END IF
+
+        ! precalculate the fourth power of surface temperature as part of strategy to reduce calculation time - Glazer 2011-04-22
+        RecSurfTempInKTo4th = (RecSurfTemp+KelvinConv)**4
+
+        ! Calculate net long-wave radiation for opaque surfaces and incident
+        ! long-wave radiation for windows.
+        ! Sum these locally as private variables first, then store where they belong (NDK)
+        sumLW = 0.0d0
+        sumIR = 0.0d0
+        DO SendZoneSurfNum = 1, ZoneInfo(ZoneNum)%NumOfSurfaces
+           SendSurfNum = ZoneInfo(ZoneNum)%SurfacePtr(SendZoneSurfNum)
+           ConstrNumSend = Surface(SendSurfNum)%Construction
+           SendSurfTemp  = SurfaceTemp(SendSurfNum)
+
+           IF(Construct(ConstrNumSend)%TypeIsWindow .AND.   &
+                SurfaceWindow(SendSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser) THEN
+              IF(SurfIterations == 0 .AND. SurfaceWindow(SendSurfNum)%ShadingFlag <= 0) THEN
+                 SendSurfTemp = SurfaceWindow(SendSurfNum)%ThetaFace(2*Construct(ConstrNumSend)%TotGlassLayers)-KelvinConv
+              ELSE IF(SurfaceWindow(SendSurfNum)%ShadingFlag == IntShadeOn .OR.  &
+                   SurfaceWindow(SendSurfNum)%ShadingFlag == IntBlindOn) THEN
+                 SendSurfTemp = SurfaceWindow(SendSurfNum)%EffInsSurfTemp
+              END IF
+           END IF
+           SendSurfTempInKTo4th = (SendSurfTemp+KelvinConv)**4
+
+           IF (RecZoneSurfNum /= SendZoneSurfNum) &
+                sumLW = sumLW + (StefanBoltzmannConst &
+                *ZoneInfo(ZoneNum)%ScriptF(RecZoneSurfNum,SendZoneSurfNum) &
+                *(SendSurfTempInKTo4th - RecSurfTempInKTo4th))
+           IF(Construct(ConstrNumRec)%TypeIsWindow)  THEN    ! Window
+              ! Calculate interior LW incident on window rather than net LW for use in window layer
+              ! heat balance calculation.
+              sumIR = sumIR + (StefanBoltzmannConst &
+                   *ZoneInfo(ZoneNum)%ScriptF(RecZoneSurfNum,SendZoneSurfNum) &
+                   * SendSurfTempInKTo4th) / RecSurfEmiss
+              IF (SurfaceWindow(RecSurfNum)%IRfromParentZone < 0.0) THEN
+                 CALL ShowRecurringWarningErrorAtEnd('CalcInteriorRadExchange: Window_IRFromParentZone negative, Window="'// &
+                      TRIM(Surface(RecSurfNum)%Name)//'"',  &
+                      SurfaceWindow(RecSurfNum)%IRErrCount)
+                 CALL ShowRecurringContinueErrorAtEnd('..occurs in Zone="'//TRIM(ZoneInfo(Surface(RecSurfNum)%Zone)%Name)//  &
+                      '", reset to 0.0 for remaining calculations.',SurfaceWindow(RecSurfNum)%IRErrCountC)
+                 SurfaceWindow(RecSurfNum)%IRfromParentZone=0.0
+              ENDIF
+           ENDIF
+        END DO ! SendZoneSurfNum
+
+        NetLWRadToSurf(RecSurfNum) = sumLW
+        SurfaceWindow(RecSurfNum)%IRfromParentZone = sumIR
+
+     endif ! skipping if simulating one zone
+  END DO ! i=1... totalSurfaces
+  !$omp end parallel do
+
+#ifdef EP_Detailed_Timings
+                             CALL epStopTime('CalcInteriorRadExchange=')
+#endif
+  RETURN
+
+END SUBROUTINE CalcInteriorRadExchange
+#endif
+
+#ifdef HBIRE_NO_OMP
+SUBROUTINE CalcInteriorRadExchange(SurfaceTemp,SurfIterations,NetLWRadToSurf,ZoneToResimulate)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Rick Strand
+          !       DATE WRITTEN   September 2000
+          !       MODIFIED       6/18/01, FCW: calculate IR on windows
+          !                      Jan 2002, FCW: add blinds with movable slats
+          !                      Sep 2011 LKL/BG - resimulate only zones needing it for Radiant systems
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Determines the interior radiant exchange between surfaces using
+          ! Hottel's ScriptF method for the grey interchange between surfaces
+          ! in an enclosure.
+
+          ! METHODOLOGY EMPLOYED:
+          ! See reference
+
+          ! REFERENCES:
+          ! Hottel, H. C. and A. F. Sarofim, Radiative Transfer, Ch 3, McGraw Hill, 1967.
+
+          ! USE STATEMENTS:
+USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
+USE DataTimings
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENTS:
+  REAL(r64), DIMENSION(:), INTENT(IN)  :: SurfaceTemp    ! Current surface temperatures
+  INTEGER, INTENT(IN)               :: SurfIterations ! Number of iterations in calling subroutine
+  REAL(r64), DIMENSION(:), INTENT(INOUT) :: NetLWRadToSurf ! Net long wavelength radiant exchange from other surfaces
+  INTEGER, INTENT(IN), OPTIONAL          :: ZoneToResimulate  ! if passed in, then only calculate for this zone
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  REAL(r64), PARAMETER :: StefanBoltzmannConst = 5.6697d-8   ! Stefan-Boltzmann constant in W/(m2*K4)
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL, SAVE :: FirstTime = .TRUE.   ! Logical flag for one-time initializations
+  INTEGER       :: RecSurfNum           ! Counter within DO loop (refers to main surface derived type index) RECEIVING SURFACE
+  INTEGER       :: RecZoneSurfNum       ! DO loop counter for receiving surface within a zone (local derived type arrays)
+  INTEGER       :: SendSurfNum          ! Counter within DO loop (refers to main surface derived type index) SENDING SURFACE
+
+  INTEGER       :: SendZoneSurfNum      ! DO loop counter for sending surfaces within a zone (local derived type arrays)
+  INTEGER       :: ZoneNum              ! DO loop counter for zones
+  INTEGER       :: ConstrNumRec         ! Receiving surface construction number
+  INTEGER       :: ConstrNumSend        ! Sending surface construction number
+  REAL(r64)     :: RecSurfTemp          ! Receiving surface temperature (C)
+  REAL(r64)     :: SendSurfTemp         ! Sending surface temperature (C)
+  REAL(r64)     :: RecSurfEmiss         ! Inside surface emissivity
+  INTEGER       :: ZoneSurfNum          ! Runs from 1 to number of surfaces in zone
+  INTEGER       :: SurfNum              ! Surface number
+  INTEGER       :: ConstrNum            ! Construction number
+  LOGICAL       :: IntShadeOrBlindStatusChanged ! True if status of interior shade or blind on at least
+                                                ! one window in a zone has changed from previous time step
+  INTEGER       :: ShadeFlag            ! Window shading status current time step
+  INTEGER       :: ShadeFlagPrev        ! Window shading status previous time step
+  CHARACTER(len=158) :: tdstring
+
   !variables added as part of strategy to reduce calculation time - Glazer 2011-04-22
   REAL(r64)     :: SendSurfTempInKTo4th ! Sending surface temperature in K to 4th power
   REAL(r64)     :: RecSurfTempInKTo4th  ! Receiving surface temperature in K to 4th power
   REAL(r64),DIMENSION(:),ALLOCATABLE, SAVE :: SendSurfaceTempInKto4thPrecalc
 
           ! FLOW:
+
+#ifdef EP_Detailed_Timings
+                             CALL epStartTime('CalcInteriorRadExchange=')
+#endif
   IF (FirstTime) THEN
     ALLOCATE(SendSurfaceTempInKto4thPrecalc(SIZE(SurfaceTemp)))
     CALL InitInteriorRadExchange
     FirstTime = .FALSE.
+     if (DeveloperFlag) then
+       write(tdstring,*)' OMP turned off, HBIRE loop executed in serial'
+       call DisplayString(trim(tdstring))
+     endif
   END IF
 
   ConstrNumRec=0
@@ -291,9 +682,17 @@ USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
     END DO
   END DO
 
+#ifdef EP_Detailed_Timings
+                             CALL epStopTime('CalcInteriorRadExchange=')
+#endif
   RETURN
 
 END SUBROUTINE CalcInteriorRadExchange
+#endif
+
+
+
+
 
 
 SUBROUTINE InitInteriorRadExchange
@@ -341,7 +740,7 @@ SUBROUTINE InitInteriorRadExchange
   INTEGER :: ZoneSurfNum        ! DO loop counter for surfaces within a zone (refers to local derived type arrays)
   INTEGER :: Findex             !  index to print view factors
   INTEGER :: Vindex             !  index for vertices
-  INTEGER :: NumZonesWithUserFbyN  !  Zones with user input,  used for flag here
+!  INTEGER :: NumZonesWithUserFbyN  !  Zones with user input,  used for flag here
   INTEGER :: NumZonesWithUserFbyS  !  Zones with user input,  used for flag here
 !unused  INTEGER :: RepNum             !  Index for report objects
 !unused  INTEGER NumNames
@@ -374,8 +773,8 @@ SUBROUTINE InitInteriorRadExchange
      WRITE(OutputFileInits,'(A)')'! <View Factor>,Surface Name,Surface Class,Row Sum,View Factors for each Surface'
    END IF
 
-   cCurrentModuleObject='ZoneProperty:UserViewFactors'
-   NumZonesWithUserFbyN = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+!   cCurrentModuleObject='ZoneProperty:UserViewFactors'
+!   NumZonesWithUserFbyN = GetNumObjectsFound(TRIM(cCurrentModuleObject))
    cCurrentModuleObject='ZoneProperty:UserViewFactors:bySurfaceName'
    NumZonesWithUserFbyS = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
@@ -458,15 +857,15 @@ SUBROUTINE InitInteriorRadExchange
 
      NoUserInputF=.true.
 
-     IF (NumZonesWithUserFbyN > 0) THEN
+!     IF (NumZonesWithUserFbyN > 0) THEN
 
-       CALL GetInputViewFactors(ZoneInfo(ZoneNum)%Name,       &   ! Obtains user input view factors from input file
-                             ZoneInfo(ZoneNum)%NumOfSurfaces, &
-                             ZoneInfo(ZoneNum)%F,             &
-                             ZoneInfo(ZoneNum)%SurfacePtr,    &
-                             NoUserInputF,                    &
-                             ErrorsFound)
-     ENDIF
+!       CALL GetInputViewFactors(ZoneInfo(ZoneNum)%Name,       &   ! Obtains user input view factors from input file
+!                             ZoneInfo(ZoneNum)%NumOfSurfaces, &
+!                             ZoneInfo(ZoneNum)%F,             &
+!                             ZoneInfo(ZoneNum)%SurfacePtr,    &
+!                             NoUserInputF,                    &
+!                             ErrorsFound)
+!     ENDIF
 
      IF (NumZonesWithUserFbyS > 0) THEN
 
@@ -1534,7 +1933,7 @@ END SUBROUTINE CalcMatrixInverse
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

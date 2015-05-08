@@ -54,6 +54,7 @@ REAL(r64), PARAMETER :: HCMULT = 100000.d0   ! Multiplier used to change meters 
      ! Homogeneous Coordinates are represented in integers (64 bit). This changes the surface coordinates from meters
      ! to .01 millimeters -- making that the resolution for shadowing, polygon clipping, etc.
 REAL(r64), PARAMETER :: sqHCMULT = HCMULT*HCMULT   ! Square of HCMult used in Homogeneous coordinates
+REAL(r64), PARAMETER :: kHCMULT = 1.0d0/(HCMULT*HCMULT)   ! half of inverse square of HCMult used in Homogeneous coordinates
 
 !INTEGER,          PRIVATE, PARAMETER :: MAXCMB = 2000   ! Length of SHDCMB array
 !INTEGER,          PARAMETER :: MAXHCS = 15000 ! 200      ! Maximum number of HC surfaces (was 56)
@@ -148,6 +149,12 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: YTEMP  ! Temporary 'Y' values for HC ver
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: YVC    ! Y-vertices of the clipped figure
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: YVS    ! Y-vertices of the shadow
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZVC    ! Z-vertices of the clipped figure
+! Used in Sutherland Hodman poly clipping
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: ATEMP    ! Temporary 'A' values for HC vertices of the overlap
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: BTEMP    ! Temporary 'B' values for HC vertices of the overlap
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: CTEMP    ! Temporary 'C' values for HC vertices of the overlap
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: XTEMP1   ! Temporary 'X' values for HC vertices of the overlap
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: YTEMP1   ! Temporary 'Y' values for HC vertices of the overlap
 INTEGER,PUBLIC :: maxNumberOfFigures=0
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE SolarShading
@@ -162,6 +169,8 @@ PRIVATE ComputeIntSolarAbsorpFactors
 PRIVATE CLIP
 PRIVATE CTRANS
 PRIVATE HTRANS
+PRIVATE HTRANS0
+PRIVATE HTRANS1
 PRIVATE INCLOS
 PRIVATE INTCPT
 PRIVATE CLIPPOLY
@@ -250,8 +259,10 @@ SUBROUTINE InitSolarCalculations
     if (firsttime) CALL DisplayString('Allocate Solar Module Arrays')
     CALL AllocateModuleArrays
 
-    if (firsttime) CALL DisplayString('Computing Interior Solar Absorption Factors')
-    CALL ComputeIntSolarAbsorpFactors
+    IF (SolarDistribution /=  FullInteriorExterior) THEN
+      if (firsttime) CALL DisplayString('Computing Interior Solar Absorption Factors')
+      CALL ComputeIntSolarAbsorpFactors
+    ENDIF
 
     if (firsttime) CALL DisplayString('Determining Shadowing Combinations')
     CALL DetermineShadowingCombinations
@@ -518,7 +529,7 @@ SUBROUTINE GetShadowingInput
     DetailedSkyDiffuseAlgorithm=.true.
     cAlphaArgs(2)='DetailedSkyDiffuseModeling'
     IF (ShadowingCalcFrequency > 1) THEN
-      CALL ShowContinueError('Better accuracy may be gained by setting the '//trim(cAlphaFieldNames(1))//   &
+      CALL ShowContinueError('Better accuracy may be gained by setting the '//trim(cNumericFieldNames(1))//   &
          ' to 1 in the '//trim(cCurrentModuleObject)//' object.')
     ENDIF
   ELSEIF (DetailedSkyDiffuseAlgorithm) THEN
@@ -698,6 +709,13 @@ SUBROUTINE AllocateModuleArrays
   ZoneOpaqSurfInsFaceCondGainRep=0.0
   ALLOCATE (ZoneOpaqSurfInsFaceCondLossRep(NumOfZones))
   ZoneOpaqSurfInsFaceCondLossRep=0.0
+  ALLOCATE (ZoneOpaqSurfExtFaceCond(NumOfZones))
+  ZoneOpaqSurfExtFaceCond=0.0
+  ALLOCATE (ZoneOpaqSurfExtFaceCondGainRep(NumOfZones))
+  ZoneOpaqSurfExtFaceCondGainRep=0.0
+  ALLOCATE (ZoneOpaqSurfExtFaceCondLossRep(NumOfZones))
+  ZoneOpaqSurfExtFaceCondLossRep=0.0
+
   ALLOCATE (QRadSWOutIncident(TotSurfaces))
   QRadSWOutIncident=0.0
   ALLOCATE (QRadSWOutIncidentBeam(TotSurfaces))
@@ -747,6 +765,7 @@ SUBROUTINE AllocateModuleArrays
   ALLOCATE (WindowRevealStatus(TotSurfaces,24,NumOfTimeStepInHour))
   WindowRevealStatus=0
 
+  ! Weiler-Atherton
   ALLOCATE(XTEMP((MaxVerticesPerSurface+1)*2))
   XTEMP=0.0D0
   ALLOCATE(YTEMP((MaxVerticesPerSurface+1)*2))
@@ -761,6 +780,19 @@ SUBROUTINE AllocateModuleArrays
   YVS=0.0D0
   ALLOCATE(ZVC(MaxVerticesPerSurface+1))
   ZVC=0.0D0
+
+  !Sutherland-Hodgman
+  ALLOCATE(ATEMP(2*(MaxVerticesPerSurface + 1)))
+  ATEMP=0.0d0
+  ALLOCATE(BTEMP(2*(MaxVerticesPerSurface + 1)))
+  BTEMP=0.0d0
+  ALLOCATE(CTEMP(2*(MaxVerticesPerSurface + 1)))
+  CTEMP=0.0d0
+  ALLOCATE(XTEMP1(2*(MaxVerticesPerSurface + 1)))
+  XTEMP1=0.0d0
+  ALLOCATE(YTEMP1(2*(MaxVerticesPerSurface + 1)))
+  YTEMP1=0.0d0
+
   !energy
   ALLOCATE (WinTransSolarEnergy(TotSurfaces))
   WinTransSolarEnergy=0.0
@@ -800,6 +832,10 @@ SUBROUTINE AllocateModuleArrays
   ZnOpqSurfInsFaceCondGnRepEnrg=0.0
   ALLOCATE (ZnOpqSurfInsFaceCondLsRepEnrg(NumOfZones))
   ZnOpqSurfInsFaceCondLsRepEnrg=0.0
+  ALLOCATE (ZnOpqSurfExtFaceCondGnRepEnrg(NumOfZones))
+  ZnOpqSurfExtFaceCondGnRepEnrg=0.0
+  ALLOCATE (ZnOpqSurfExtFaceCondLsRepEnrg(NumOfZones))
+  ZnOpqSurfExtFaceCondLsRepEnrg=0.0
 !  ALLOCATE (DifIncInsSurfAmountRepEnergy(TotSurfaces))
 !  DifIncInsSurfAmountRepEnergy=0.0
   ALLOCATE (IntBmIncInsSurfAmountRepEnergy(TotSurfaces))
@@ -1510,6 +1546,7 @@ REAL(r64)   :: ViewFactorSkyGeom       ! Geometrical sky view factor
           MultHorizonZenith(SurfNum) * DifShdgRatioHorizHRTS(SurfNum,HourOfDay,TimeStep)
         curDifShdgRatioIsoSky(SurfNum) = DifShdgRatioIsoSkyHRTS(SurfNum,HourOfDay,TimeStep)
       ENDIF
+      AnisoSkyMult(SurfNum)=MAX(0.0d0,AnisoSkyMult(SurfNum))  ! make sure not negative.
     END DO
 
 END SUBROUTINE AnisoSkyViewFactors
@@ -1807,7 +1844,7 @@ SUBROUTINE CHKSBS(HTS,GRSNR,SBSNR)
     YVS(N) = YVT(NVT+1-N)
   END DO
 
-  CALL HTRANS(1,NS2,NVT)
+  CALL HTRANS1(NS2,NVT)
 
           ! Put coordinates of the subsurface into clockwise sequence.
 
@@ -1816,7 +1853,7 @@ SUBROUTINE CHKSBS(HTS,GRSNR,SBSNR)
     XVS(N) = ShadeV(SBSNR)%XV(NVS+1-N)
     YVS(N) = ShadeV(SBSNR)%YV(NVS+1-N)
   END DO
-  CALL HTRANS(1,NS1,NVS)
+  CALL HTRANS1(NS1,NVS)
 
           ! Determine the overlap condition.
 
@@ -2074,6 +2111,7 @@ SUBROUTINE ComputeIntSolarAbsorpFactors
           !       AUTHOR         Legacy Code
           !       DATE WRITTEN
           !       MODIFIED       B. Griffith, Oct 2010, deal with no floor case
+          !                      L. Lawrie, Mar 2012, relax >154 tilt even further (>120 considered non-wall by ASHRAE)
           !       RE-ENGINEERED  Lawrie, Oct 2000
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2092,7 +2130,7 @@ SUBROUTINE ComputeIntSolarAbsorpFactors
           ! BLAST/IBLAST code, original author George Walton
 
           ! USE STATEMENTS:
-          ! na
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2136,8 +2174,12 @@ SUBROUTINE ComputeIntSolarAbsorpFactors
     DO SurfNum = FirstZoneSurf, LastZoneSurf
 
       IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
-      !CR 8229, relaxed from -0.99 to -0.9  (Tilt > 154)
-      IF (Zone(ZoneNum)%OfType == StandardZone .and. Surface(SurfNum)%CosTilt < -0.90d0) &
+        !CR 8229, relaxed from -0.99 to -0.5  (Tilt > 154)
+        ! CR8769   !use ASHRAE std of >120, -0.9 to -0.5  (Tilt > 120)
+!      IF (Surface(SurfNum)%Class == SurfaceClass_Floor) THEN
+!        write(outputfiledebug,*) 'surf=',trim(surface(surfnum)%name),Surface(SurfNum)%CosTilt
+!      endif
+      IF (Zone(ZoneNum)%OfType == StandardZone .and. Surface(SurfNum)%CosTilt < -0.5d0) &
            AreaSum = AreaSum + Surface(SurfNum)%Area
       !  Next is not implemented but would be:
       ! IF ((Zone(ZoneNum)%OfType .eq. SolarWallZone .or Zone(ZoneNum)%OfType .eq. RoofPondZone) .and.     &
@@ -2150,6 +2192,10 @@ SUBROUTINE ComputeIntSolarAbsorpFactors
     IF ((.NOT. Zone(ZoneNum)%HasFloor) .AND. (HorizAreaSum > 0.d0)) THEN
       !fill floor area even though surfs not called "Floor", they are roughly horizontal and face upwards.
       Zone(ZoneNum)%FloorArea= HorizAreaSum
+      CALL ShowWarningError('ComputeIntSolarAbsorpFactors: Solar distribution model is set to place solar gains '//  &
+               'on the zone floor,')
+      CALL ShowContinueError('...Zone="'//trim(Zone(ZoneNum)%Name)//'" has no floor, but has approximate horizontal surfaces.')
+      CALL ShowContinueError('...these Tilt > 120°, (area=['//trim(RoundSigDigits(HorizAreaSum,2))//'] m2) will be used.')
     ENDIF
 
           ! Compute ISABSF
@@ -2158,8 +2204,9 @@ SUBROUTINE ComputeIntSolarAbsorpFactors
 
       IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
 
-        ! only horizontal surfaces. !      !CR 8229, relaxed from -0.99 to -0.9  (Tilt > 154)
-      IF ( (Zone(ZoneNum)%OfType /= StandardZone .or. Surface(SurfNum)%CosTilt < -0.90d0) .and. &
+        ! only horizontal surfaces. !      !CR 8229, relaxed from -0.99 to -0.5  (Tilt > 154)
+        ! only horizontal surfaces. !      !CR8769 use ASHRAE std of >120, -0.9 to -0.5  (Tilt > 120)
+      IF ( (Zone(ZoneNum)%OfType /= StandardZone .or. Surface(SurfNum)%CosTilt < -0.5d0) .and. &
            (Zone(ZoneNum)%OfType .eq. StandardZone .or. Surface(SurfNum)%ExtBoundCond > 0) ) THEN
 
         ConstrNum=Surface(SurfNum)%Construction
@@ -2490,8 +2537,6 @@ SUBROUTINE HTRANS(I,NS,NumVertices)
   INTEGER N              ! Loop Control (vertex number)
   REAL(r64) SUM   ! Sum variable
   INTEGER(i64) ::  ITEMP !
-  INTEGER,SAVE :: Count=0     ! debugging variable
-  real(r64),SAVE :: MaxNS=-999.d0
 
   IF (NS > MaxHCS*2) THEN
     CALL ShowFatalError('Solar Shading: HTrans: Too many Figures (>'//TRIM(TrimSigDigits(MaxHCS))//')')
@@ -2530,17 +2575,82 @@ SUBROUTINE HTRANS(I,NS,NumVertices)
 !  DO N = 1, NumVertices
 !    SUM = SUM + HCX(N,NS)*HCY(N+1,NS) - HCY(N,NS)*HCX(N+1,NS) ! Since HCX and HCY integerized, value of SUM should be ok
 !  END DO
-  HCAREA(NS)=0.5d0*SUM/(sqHCMULT)
-  Count=Count+1
-  if (ns > maxns) then
-!    write(outputfiledebug,*) ' ns, area=',NS,HCAREA(NS)
-    maxns=ns
-  endif
+  HCAREA(NS)=(0.5d0*SUM)/(sqHCMULT)
+!  HCAREA(NS)=0.5d0*SUM*(kHCMULT)
 
 
   RETURN
 
 END SUBROUTINE HTRANS
+
+SUBROUTINE HTRANS0(NS,NumVertices)
+  USE General, ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  INTEGER, INTENT(IN) :: NS  ! Figure Number
+  INTEGER, INTENT(IN) :: NumVertices ! Number of vertices
+  INTEGER N              ! Loop Control (vertex number)
+  REAL(r64) SUM   ! Sum variable
+
+  IF (NS > MaxHCS*2) THEN
+    CALL ShowFatalError('Solar Shading: HTrans0: Too many Figures (>'//TRIM(TrimSigDigits(MaxHCS))//')')
+  ENDIF
+
+  HCNV(NS)=NumVertices
+  HCX(NumVertices+1,NS)=HCX(1,NS)
+  HCY(NumVertices+1,NS)=HCY(1,NS)
+
+  SUM=0.0D0
+  DO N = 1, NumVertices
+    HCA(N,NS) = HCY(N,NS) - HCY(N+1,NS)
+    HCB(N,NS) = HCX(N+1,NS) - HCX(N,NS)
+    HCC(N,NS) = (HCY(N+1,NS)*HCX(N,NS)) - (HCX(N+1,NS)*HCY(N,NS))
+    SUM = SUM + HCC(N,NS)
+  END DO
+
+  HCAREA(NS)=(0.5d0*SUM)/(sqHCMULT)
+
+  RETURN
+END SUBROUTINE HTRANS0
+
+SUBROUTINE HTRANS1(NS,NumVertices)
+  USE General, ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  INTEGER, INTENT(IN) :: NS  ! Figure Number
+  INTEGER, INTENT(IN) :: NumVertices ! Number of vertices
+  INTEGER N              ! Loop Control (vertex number)
+  REAL(r64) SUM   ! Sum variable
+  INTEGER(i64) ::  ITEMP !
+
+  IF (NS > MaxHCS*2) THEN
+    CALL ShowFatalError('Solar Shading: HTrans1: Too many Figures (>'//TRIM(TrimSigDigits(MaxHCS))//')')
+  ENDIF
+
+  ! only in HTRANS1
+  DO N = 1, NumVertices
+     ITEMP     = NINT(XVS(N)*HCMULT,i64)
+     HCX(N,NS) = ITEMP
+     ITEMP     = NINT(YVS(N)*HCMULT,i64)
+     HCY(N,NS) = ITEMP
+  END DO
+
+  HCNV(NS)=NumVertices
+  HCX(NumVertices+1,NS)=HCX(1,NS)
+  HCY(NumVertices+1,NS)=HCY(1,NS)
+
+  SUM=0.0D0
+  DO N = 1, NumVertices
+    HCA(N,NS) = HCY(N,NS) - HCY(N+1,NS)
+    HCB(N,NS) = HCX(N+1,NS) - HCX(N,NS)
+    HCC(N,NS) = (HCY(N+1,NS)*HCX(N,NS)) - (HCX(N+1,NS)*HCY(N,NS))
+    SUM = SUM + HCC(N,NS)
+  END DO
+
+  HCAREA(NS)=(0.5d0*SUM)/(sqHCMULT)
+
+  RETURN
+END SUBROUTINE HTRANS1
 
 SUBROUTINE INCLOS(N1,N1NumVert,N2,N2NumVert,NumVerticesOverlap,NIN)
 
@@ -2711,6 +2821,7 @@ SUBROUTINE INTCPT(NV1,NV2,NV3,NS1,NS2)
       XUntrunc   = (HCC(M,NS2)*HCB(N,NS1)-HCB(M,NS2)*HCC(N,NS1))/W
       YUntrunc   = (HCA(M,NS2)*HCC(N,NS1)-HCC(M,NS2)*HCA(N,NS1))/W
       IF (NV3 > SIZE(XTEMP)) THEN
+!        write(outputfiledebug,*) 'nv3=',nv3,' size(xtemp)=',size(xtemp)
         ALLOCATE(XTEMP1(SIZE(XTEMP)+10))
         ALLOCATE(YTEMP1(SIZE(YTEMP)+10))
         XTEMP1=0.0d0
@@ -2733,8 +2844,8 @@ SUBROUTINE INTCPT(NV1,NV2,NV3,NS1,NS2)
 
       IF (KK /= 0) THEN
         DO K = 1, KK
-          IF (ABS(XTEMP(NV3)-XTEMP(K)) > 2) CYCLE
-          IF (ABS(YTEMP(NV3)-YTEMP(K)) > 2) CYCLE
+          IF (ABS(XTEMP(NV3)-XTEMP(K)) > 2.0d0) CYCLE
+          IF (ABS(YTEMP(NV3)-YTEMP(K)) > 2.0d0) CYCLE
           NV3 = KK
           EXIT ! K DO loop
         END DO
@@ -2803,11 +2914,11 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
 
   REAL(r64) W        ! Normalization factor
   REAL(r64) HFunct
-  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: ATEMP    ! Temporary 'A' values for HC vertices of the overlap
-  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: BTEMP    ! Temporary 'B' values for HC vertices of the overlap
-  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: CTEMP    ! Temporary 'C' values for HC vertices of the overlap
-  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: XTEMP1   ! Temporary 'X' values for HC vertices of the overlap
-  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: YTEMP1   ! Temporary 'Y' values for HC vertices of the overlap
+!  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: ATEMP    ! Temporary 'A' values for HC vertices of the overlap
+!  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: BTEMP    ! Temporary 'B' values for HC vertices of the overlap
+!  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: CTEMP    ! Temporary 'C' values for HC vertices of the overlap
+!  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: XTEMP1   ! Temporary 'X' values for HC vertices of the overlap
+!  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: YTEMP1   ! Temporary 'Y' values for HC vertices of the overlap
 
   ! Populate the arrays with the original polygon
   DO P=1, NV1
@@ -2846,8 +2957,8 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
           IF(E==NV2) THEN       ! Remove near-duplicates on last edge
             IF (KK /= 0) THEN
               DO K = 1, KK
-                IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2) CYCLE
-                IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2) CYCLE
+                IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2.0d0) CYCLE
+                IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2.0d0) CYCLE
                 NVTEMP = KK
                 EXIT ! K DO loop
               END DO
@@ -2864,8 +2975,8 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
         IF(E==NV2) THEN            ! Remove near-duplicates on last edge
           IF (KK /= 0) THEN
             DO K = 1, KK
-              IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2) CYCLE
-              IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2) CYCLE
+              IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2.0d0) CYCLE
+              IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2.0d0) CYCLE
               NVTEMP = KK
               EXIT ! K DO loop
             END DO
@@ -2886,8 +2997,8 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
             IF(E==NV2) THEN         ! Remove near-duplicates on last edge
               IF (KK /= 0) THEN
                 DO K = 1, KK
-                  IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2) CYCLE
-                  IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2) CYCLE
+                  IF (ABS(XTEMP(NVTEMP)-XTEMP(K)) > 2.0d0) CYCLE
+                  IF (ABS(YTEMP(NVTEMP)-YTEMP(K)) > 2.0d0) CYCLE
                   NVTEMP = KK
                   EXIT ! K DO loop
                 END DO
@@ -3284,7 +3395,7 @@ SUBROUTINE DeterminePolygonOverlap(NS1,NS2,NS3)
       END DO
     ENDIF
 
-    CALL HTRANS(0,NS3,NV3)  ! Determine h.c. values of sides.
+    CALL HTRANS0(NS3,NV3)  ! Determine h.c. values of sides.
         ! Skip overlaps of negligible area.
 
     IF (ABS(HCAREA(NS3))*HCMULT < ABS(HCAREA(NS1))) THEN
@@ -3412,11 +3523,11 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
                  ! For windows, includes divider area
   REAL(r64), SAVE :: TimeStepFraction=0.0
   INTEGER TS     ! TimeStep Loop Counter
-  REAL(r64)  :: Phi               ! Altitude angle
-  REAL(r64)  :: Theta             ! Azimuth angle
+  !REAL(r64)  :: Phi               ! Altitude angle
+  !REAL(r64)  :: Theta             ! Azimuth angle
   REAL(r64)  :: CosPhi            ! Cosine of Phi
   REAL(r64)  :: Fac1WoShdg        ! Intermediate calculation factor, without shading
-  REAL(r64)  :: FracIlluminated   ! Fraction of surface area illuminated by a sky patch
+  !REAL(r64)  :: FracIlluminated   ! Fraction of surface area illuminated by a sky patch
   REAL(r64)  :: Fac1WithShdg      ! Intermediate calculation factor, with shading
 
   ! Intialize some values for the period
@@ -3939,6 +4050,7 @@ SUBROUTINE DetermineShadowingCombinations
     CALL ShowWarningMessage('DetermineShadowingCombinations: There are '//trim(TrimSigDigits(TotalReceivingNonConvexSurfaces))//  &
        ' surfaces which are receiving surfaces and are non-convex.')
     CALL ShowContinueError('...Shadowing values may be inaccurate. Check .shd report file for more surface shading details')
+    CALL ShowContinueError('...Add Output:Diagnostics,DisplayExtraWarnings; to see individual warnings for each surface.')
     TotalWarningErrors=TotalWarningErrors+TotalReceivingNonConvexSurfaces
   ENDIF
 
@@ -3946,6 +4058,7 @@ SUBROUTINE DetermineShadowingCombinations
     CALL ShowSevereMessage('DetermineShadowingCombinations: There are '//trim(TrimSigDigits(TotalCastingNonConvexSurfaces))//  &
        ' surfaces which are casting surfaces and are non-convex.')
     CALL ShowContinueError('...Shadowing values may be inaccurate. Check .shd report file for more surface shading details')
+    CALL ShowContinueError('...Add Output:Diagnostics,DisplayExtraWarnings; to see individual severes for each surface.')
     TotalSevereErrors=TotalSevereErrors+TotalCastingNonConvexSurfaces
   ENDIF
 
@@ -4075,7 +4188,7 @@ SUBROUTINE SHADOW(IHOUR,TS)
         YVS(N) = YVT(NVT+1-N)
       END DO
 
-      CALL HTRANS(1,1,NVT)  ! Transform to homogeneous coordinates.
+      CALL HTRANS1(1,NVT)  ! Transform to homogeneous coordinates.
 
       HCAREA(1)=-HCAREA(1)  ! Compute (+) gross surface area.
       HCT(1)=1.0d0
@@ -4198,7 +4311,7 @@ SUBROUTINE SHDBKS(NGRS,CurSurf,NBKS,HTS)
 
     NS3      = LOCHCA+1
     HCT(NS3) = 0.0d0
-    CALL HTRANS(1,NS3,NVT)
+    CALL HTRANS1(NS3,NVT)
 
           ! Adjust near-duplicate points.
 
@@ -4212,7 +4325,7 @@ SUBROUTINE SHDBKS(NGRS,CurSurf,NBKS,HTS)
       END DO
     END DO
 
-    CALL HTRANS(0,NS3,NVT)
+    CALL HTRANS0(NS3,NVT)
 
           ! Determine area of overlap of projected back surface and receiving surface.
 
@@ -4335,31 +4448,24 @@ SUBROUTINE SHDGSS(NGRS,IHOUR,TS,CurSurf,NGSS,HTS)
 !---former stmt            GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR) == 0.0) CYCLE
 
      IF (.NOT.Surface(GSSNR)%HeatTransSurf) THEN
-       IF (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR) == 1.0) CYCLE
+       IF (Surface(GSSNR)%IsTransparent) CYCLE
+       IF (Surface(GSSNR)%SchedShadowSurfIndex > 0) THEN
+         IF (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR) == 1.0) CYCLE
+       ENDIF
      ENDIF
 
 !      No shadow if shading surface is transparent
-!      IF ((.NOT.Surface(GSSNR)%HeatTransSurf)) THEN
-!        if (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS) /=   &
-!            GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex)) THEN
-!          write(outputfiledebug,*) ' shading 1'
-!          IF (Surface(GSSNR)%SchedShadowSurfIndex /= 0) &
-!             write(outputfiledebug,*) 'schedule=',trim(getScheduleName(Surface(GSSNR)%SchedShadowSurfIndex))
-!          write(outputfiledebug,*) 'act time hour,ts=',hourofday,timestep
-!          write(outputfiledebug,*) 'routine time=hour,ts=',ihour,ts
-!          write(outputfiledebug,*) ' lookup=',LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS)
-!          write(outputfiledebug,*) ' get=',GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex)
-!        endif
-!      ENDIF
-
       IF (.not. CalcSkyDifShading) THEN
         IF (.not.Surface(GSSNR)%HeatTransSurf) THEN
-          IF (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS) == 1.0) CYCLE
+          IF (Surface(GSSNR)%IsTransparent) CYCLE
+          IF (Surface(GSSNR)%SchedShadowSurfIndex > 0) THEN
+            IF (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS) == 1.0) CYCLE
+          ENDIF
         ENDIF
       ELSE
         IF (.not.Surface(GSSNR)%HeatTransSurf) THEN
           IF (Surface(GSSNR)%SchedShadowSurfIndex > 0) THEN
-            IF (GetScheduleMinValue(Surface(GSSNR)%SchedShadowSurfIndex) == 1.0) CYCLE
+            IF (Surface(GSSNR)%IsTransparent) CYCLE
           ENDIF
         ENDIF
       ENDIF
@@ -4400,7 +4506,7 @@ SUBROUTINE SHDGSS(NGRS,IHOUR,TS,CurSurf,NGSS,HTS)
           ! Transform to the homogeneous coordinate system.
 
       NS3 = LOCHCA + 1
-      CALL HTRANS(1,NS3,NVS)
+      CALL HTRANS1(NS3,NVS)
 
           ! Adjust near-duplicate points.
 
@@ -4413,34 +4519,15 @@ SUBROUTINE SHDGSS(NGRS,IHOUR,TS,CurSurf,NGSS,HTS)
           HCY(N,NS3) = HCY(M,1)
         END DO
       END DO
-      CALL HTRANS(0,NS3,NumVertInShadowOrClippedSurface)
+      CALL HTRANS0(NS3,NumVertInShadowOrClippedSurface)
       IF (.not. CalcSkyDifShading) THEN
         IF (IHOUR /= 0) THEN
           SchValue=LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS)
         ELSE
-          IF (Surface(GSSNR)%SchedShadowSurfIndex == 0) THEN
-            SchValue=0.0
-          ELSE
-            SchValue=GetScheduleMinValue(Surface(GSSNR)%SchedShadowSurfIndex)
-          ENDIF
+          SchValue=Surface(GSSNR)%SchedMinValue
         ENDIF
-!      SchValue=GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex)
-!        if (LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS) /=   &
-!            GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex)) THEN
-!          write(outputfiledebug,*) ' shading 2'
-!          IF (Surface(GSSNR)%SchedShadowSurfIndex /= 0) &
-!             write(outputfiledebug,*) 'schedule=',trim(getScheduleName(Surface(GSSNR)%SchedShadowSurfIndex))
-!          write(outputfiledebug,*) 'act time hour,ts=',hourofday,timestep
-!          write(outputfiledebug,*) 'routine time=hour,ts=',ihour,ts
-!          write(outputfiledebug,*) ' lookup=',LookUpScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex,IHOUR,TS)
-!          write(outputfiledebug,*) ' get=',GetCurrentScheduleValue(Surface(GSSNR)%SchedShadowSurfIndex)
-!        endif
       ELSE
-        IF (Surface(GSSNR)%SchedShadowSurfIndex == 0) THEN
-          SchValue=0.0
-        ELSE
-          SchValue=GetScheduleMinValue(Surface(GSSNR)%SchedShadowSurfIndex)
-        ENDIF
+        SchValue=Surface(GSSNR)%SchedMinValue
       ENDIF
 
       HCT(NS3)=SchValue
@@ -5664,8 +5751,6 @@ DO ZoneNum = 1, NumOfZones
     IF(ShadeFlag < 1 .OR. ShadeFlag == SwitchableGlazing .OR. ShadeFlag >= 10) THEN ! Unshaded or switchable glazing
       WinTransBmSolar(SurfNum)  = (TBmBm + TBmDif) * SunLitFract * CosInc * Surface(SurfNum)%Area * InOutProjSLFracMult
 
-!    write(outputfiledebug,*) '5670=',WinTransBmSolar(SurfNum),(sunlitfract<.001d0),SunLitFract
-!    write(outputfiledebug,*)   CosInc,Surface(SurfNum)%Area,InOutProjSLFracMult
       !added TH 12/9/2009
       WinTransBmBmSolar  = TBmBm * SunLitFract * CosInc * Surface(SurfNum)%Area * InOutProjSLFracMult          ! m2
       WinTransBmDifSolar = TBmDif * SunLitFract * CosInc * Surface(SurfNum)%Area * InOutProjSLFracMult         ! m2
@@ -5682,8 +5767,6 @@ DO ZoneNum = 1, NumOfZones
 
     WinTransBmSolar(SurfNum) = WinTransBmSolar(SurfNum) + &
        SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
- !   write(outputfiledebug,*) '5686=',WinTransBmSolar(SurfNum),SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing
- !   write(outputfiledebug,*) DiffTrans,Surface(SurfNum)%Area
 
     !added TH 12/9/2009
     WinTransBmDifSolar = WinTransBmDifSolar + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
@@ -6159,8 +6242,8 @@ DO ZoneNum = 1, NumOfZones
 
         DO FloorNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
           ! In following, ISABSF is zero except for nominal floor surfaces
-          IF(ISABSF(FloorNum) <= 0.0 .OR. FloorNum == SurfNum) CYCLE  ! Keep only floor surfaces
           IF (.not. Surface(FloorNum)%HeatTransSurf) CYCLE
+          IF(ISABSF(FloorNum) <= 0.0 .OR. FloorNum == SurfNum) CYCLE  ! Keep only floor surfaces
           FlConstrNum = Surface(FloorNum)%Construction
 
           BTOTWinZone = TBm * SunLitFract * Surface(SurfNum)%Area * CosInc * InOutProjSLFracMult  ![m2]
@@ -6604,7 +6687,7 @@ SUBROUTINE SHDRVL(HTSS,SBSNR,Hour,TS)
 
               ! Transform to homogeneous coordinates
 
-          CALL HTRANS(1,FRVLHC,NVS)
+          CALL HTRANS1(FRVLHC,NVS)
           HCAREA(FRVLHC) = -HCAREA(FRVLHC)
           HCT(FRVLHC)    =  1.0d0
 
@@ -6636,7 +6719,7 @@ SUBROUTINE SHDRVL(HTSS,SBSNR,Hour,TS)
 
         NS1 = LOCHCA + 1
         LOCHCA = NS1
-        CALL HTRANS(1,NS1,NVS)
+        CALL HTRANS1(NS1,NVS)
 
              ! Put XV,YV in clockwise order
 
@@ -6649,7 +6732,7 @@ SUBROUTINE SHDRVL(HTSS,SBSNR,Hour,TS)
 
         NS2 = LOCHCA + 1
         LOCHCA = NS2
-        CALL HTRANS(1,NS2,NVS)
+        CALL HTRANS1(NS2,NVS)
         HCT(FRVLHC) = 1.0d0
 
              ! Find overlap
@@ -6793,7 +6876,7 @@ SUBROUTINE SHDSBS(IHOUR,CurSurf,NBKS,NSBS,HTS,TS)
           YVS(N) = ShadeV(SBSNR)%YV(NVS+1-N)
         END DO
         LOCHCA = FSBSHC
-        CALL HTRANS(1,LOCHCA,NVS)
+        CALL HTRANS1(LOCHCA,NVS)
         HCAREA(LOCHCA) = -HCAREA(LOCHCA)
         HCT(LOCHCA)    =  1.0
         NSBSHC = LOCHCA - FSBSHC + 1
@@ -7121,7 +7204,7 @@ SUBROUTINE WindowShadingManager
                                         ! 7 = exterior blind is on,
                                         ! 8 = between-glass shade is on,
                                         ! 9 = between-glass blind is on.
-!  CHARACTER(len=30)  :: ShadingType     ! Type of shading (interior shade, interior blind, etc.)
+!  CHARACTER(len=32)  :: ShadingType     ! Type of shading (interior shade, interior blind, etc.)
   INTEGER            :: ShadingType     ! Type of shading (interior shade, interior blind, etc.)
   LOGICAL            :: SchedAllowsControl ! True if control schedule is not specified or is
                                            !  specified and schedule value = 1
@@ -7684,7 +7767,7 @@ LOGICAL    :: ShadowingSurf     ! True if surface is a shadowing surface
 !                                                           ! sky on surface, with shading
 !REAL(r64), ALLOCATABLE, DIMENSION(:) :: WoShdgHoriz        ! Diffuse solar irradiance from horizon portion of
 !                                                           ! sky on surface, without shading
-INTEGER iHour,iTS
+!INTEGER iHour,iTS
 
           ! FLOW:
 
@@ -10051,7 +10134,7 @@ END SUBROUTINE CalcInteriorWinTransDifSolInitialDistribution
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

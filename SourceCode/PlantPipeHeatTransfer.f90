@@ -32,8 +32,7 @@ MODULE PipeHeatTransfer
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataGlobals,       ONLY : MaxNameLength
-USE DataInterfaces,    ONLY : ShowWarningError, ShowSevereError, ShowFatalError, &
-                              ShowContinueError, SetupOutputVariable
+USE DataInterfaces
 USE DataPlant,         ONLY : TypeOf_PipeExterior,TypeOf_PipeInterior, TypeOf_PipeUnderground
 
   ! Use statements for access to subroutines in other modules
@@ -144,7 +143,7 @@ TYPE PipeHTData
   LOGICAL                      :: BeginEnvrnupdateFlag  =.TRUE.
   LOGICAL                      :: SolarExposed          =.TRUE.  ! Flag to determine if solar is included at ground surface
   REAL(r64)                    :: SumTK                 =0.0     ! Sum of thickness/conductivity over all material layers
-  REAL(r64)                    :: ZoneHeatGainEnergy    =0.0     ! Lagged energy summation for zone heat gain {J}
+  REAL(r64)                    :: ZoneHeatGainRate      =0.0     ! Lagged energy summation for zone heat gain {W}
   INTEGER                      :: LoopNum               =0       ! PlantLoop index where this pipe lies
   INTEGER                      :: LoopSideNum           =0       ! PlantLoop%LoopSide index where this pipe lies
   INTEGER                      :: BranchNum             =0       ! ..LoopSide%Branch index where this pipe lies
@@ -351,7 +350,8 @@ SUBROUTINE GetPipesHeatTransfer
 
           ! USE STATEMENTS:
   USE DataGlobals,           ONLY : NumOfZones,SecInHour,PI
-  USE DataHeatBalance,       ONLY : Construct, TotConstructs, Zone, Material, TotMaterials
+  USE DataHeatBalance,       ONLY : Construct, TotConstructs, Zone, Material, TotMaterials, &
+                                    IntGainTypeOf_PipeIndoor
   USE InputProcessor,        ONLY : GetNumObjectsFound, GetObjectItem, FindItemInList, &
                                     SameString, VerifyName, MakeUPPERCase
   USE DataIPShortCuts  ! Data for field names, blank numerics
@@ -861,6 +861,13 @@ SUBROUTINE GetPipesHeatTransfer
                               PipeHT(Item)%Name)
       CALL SetupOutputVariable('Pipe Heat Transfer Environmental Heat Transfer Energy[J]', &
                               PipeHTReport(Item)%EnvHeatLossEnergy,'Plant','Sum',PipeHT(Item)%Name)
+                              
+      CALL SetupZoneInternalGain(PipeHT(Item)%EnvrZonePtr, &
+                     'Pipe:Indoor',  &
+                     PipeHT(Item)%Name, &
+                     IntGainTypeOf_PipeIndoor,    &
+                     ConvectionGainRate    = PipeHT(Item)%ZoneHeatGainRate)
+
     ENDIF
 
     CALL SetupOutputVariable('Pipe Heat Transfer Fluid Mass Flow rate[kg/s]',      &
@@ -1322,6 +1329,7 @@ SUBROUTINE InitPipesHeatTransfer(PipeType,PipeHTNum,FirstHVACIteration)
   PipeHTReport(PipeHTNum)%FluidHeatLossEnergy     = 0.0
   PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate = 0.0
   PipeHTReport(PipeHTNum)%EnvHeatLossEnergy       = 0.0
+  PipeHT(PipeHTNum)%ZoneHeatGainRate              = 0.d0
   FluidHeatLossRate                               = 0.0
   EnvHeatLossRate                                 = 0.0
   OutletTemp                                      = 0.0
@@ -1936,11 +1944,15 @@ SUBROUTINE ReportPipesHeatTransfer(PipeHTNum)
   PipeHTReport(PipeHTNum)%FluidHeatLossEnergy     = FluidHeatLossRate * DeltaTime      ! DeltaTime is in seconds
   PipeHTReport(PipeHTNum)%PipeInletTemp           = PipeHT(PipeHTNum)%PipeTemp(1)
   PipeHTReport(PipeHTNum)%PipeOutletTemp          = PipeHT(PipeHTNum)%PipeTemp(PipeHT(PipeHTNum)%NumSections)
-  PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate = EnvHeatLossRate
-  PipeHTReport(PipeHTNum)%EnvHeatLossEnergy       = EnvHeatLossRate * DeltaTime
+  
+  ! need to average the heat rate because it is now summing over multiple inner time steps
+  PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate = EnvHeatLossRate / NumInnerTimeSteps
+  PipeHTReport(PipeHTNum)%EnvHeatLossEnergy       = PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate * DeltaTime
 
-  ! for zone heat gains, we can now assign the current heat loss energy rate to the array used in the following subroutine
-  IF (PipeHT(PipeHTNum)%EnvironmentPtr .EQ. ZoneEnv) PipeHT(PipeHTNum)%ZoneHeatGainEnergy = EnvHeatLossRate
+  ! for zone heat gains, we assign the averaged heat rate over all inner time steps
+  IF (PipeHT(PipeHTNum)%EnvironmentPtr .EQ. ZoneEnv) THEN 
+      PipeHT(PipeHTNum)%ZoneHeatGainRate = PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate
+  END IF
 
   RETURN
 
@@ -1969,27 +1981,32 @@ SUBROUTINE CalcZonePipesHeatGain
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: PipeNum
-  INTEGER :: ZoneNum
+!  INTEGER :: PipeNum
+!  INTEGER :: ZoneNum
   LOGICAL, SAVE :: MyEnvrnFlag=.true.
-  REAL(r64) :: QLossToZone
+!  REAL(r64) :: QLossToZone
 
           ! FLOW:
   IF (NumOfPipeHT == 0) RETURN
 
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
-    PipeHT%ZoneHeatGainEnergy = 0.0
+    PipeHT%ZoneHeatGainRate = 0.0
     MyEnvrnFlag = .false.
   ENDIF
 
   IF (.not. BeginEnvrnFlag) MyEnvrnFlag=.true.
 
-  DO PipeNum = 1, NumOfPipeHT
-    IF (PipeHT(PipeNum)%EnvironmentPtr /= ZoneEnv) CYCLE
-    ZoneNum = PipeHT(PipeNum)%EnvrZonePtr
-    QLossToZone = PipeHT(PipeNum)%ZoneHeatGainEnergy
-    ZoneIntGain(ZoneNum)%PipeHTGain = ZoneIntGain(ZoneNum)%PipeHTGain + QLossToZone
-  END DO
+
+! this routine needs to model approx zone pipe gains for use during sizing
+!  IF(DoingSizing)THEN
+!    DO PipeNum = 1, NumOfPipeHT
+!    
+!      PipeHT(pipeNum)%ZoneHeatGainRate = 
+!    
+!    ENDDO
+!  
+!  ENDIF
+
 
   RETURN
 
@@ -2318,7 +2335,7 @@ End Function
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -190,9 +190,9 @@ PUBLIC          ! By definition, all variables which are placed in this data
     REAL(r64)     :: MaxValue = 0.0 ! Max of the values passed for this recurring error message
     REAL(r64)     :: MinValue = 0.0 ! Min of the values passed for this recurring error message
     REAL(r64)     :: SumValue = 0.0 ! Sum of the values passed for this recurring error message
-    CHARACTER(len=30) :: MaxUnits=' '  ! units for Max values
-    CHARACTER(len=30) :: MinUnits=' '  ! units for Min values
-    CHARACTER(len=30) :: SumUnits=' '  ! units for Sum values
+    CHARACTER(len=32) :: MaxUnits=' '  ! units for Max values
+    CHARACTER(len=32) :: MinUnits=' '  ! units for Min values
+    CHARACTER(len=32) :: SumUnits=' '  ! units for Sum values
     LOGICAL  :: ReportMax= .FALSE. ! Flag to report max value
     LOGICAL  :: ReportMin= .FALSE. ! Flag to report min value
     LOGICAL  :: ReportSum= .FALSE. ! Flag to report sum value
@@ -228,7 +228,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

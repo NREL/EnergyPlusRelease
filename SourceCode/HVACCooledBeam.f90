@@ -668,9 +668,9 @@ SUBROUTINE SizeCoolBeam(CBNum)
   USE DataGlobals,         ONLY: AutoCalculate
   USE PlantUtilities,      ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
-  USE BranchInputManager,  ONLY: MyPlantSizingIndex
+!  USE BranchInputManager,  ONLY: MyPlantSizingIndex
   USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
-  USE DataPlant,           ONLY: PlantLoop
+  USE DataPlant,           ONLY: PlantLoop, MyPlantSizingIndex
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1325,6 +1325,10 @@ SUBROUTINE UpdateCoolBeam(CBNum)
     Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
   End If
 
+  IF (Contaminant%GenericContamSimulation) Then
+    Node(AirOutletNode)%GenContam = Node(AirInletNode)%GenContam
+  End If
+
   RETURN
 
 END SUBROUTINE UpdateCoolBeam
@@ -1380,7 +1384,7 @@ END Subroutine ReportCoolBeam
 
 !     NOTICE
 !
-!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
