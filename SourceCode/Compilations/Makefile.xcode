@@ -1,0 +1,1035 @@
+PROG = $(BUILD_PRODUCT_LOC)/$(PRODUCT_NAME)
+
+SRCS =	AirflowNetworkBalanceManager.f90 AirflowNetworkSolver.f90 \
+	BaseboardRadiator.f90 BaseboardRadiatorWater.f90 \
+	BranchInputManager.f90 BranchNodeConnections.f90 \
+	ConductionTransferFunctionCalc.f90 CoolTower.f90 \
+	CostEstimateManager.f90 CurveManager.f90 DataAirflowNetwork.f90 \
+	DataAirLoop.f90 DataAirSystems.f90 DataBranchNodeConnections.f90 \
+	DataConvergParams.f90 DataConversions.f90 DataCostEstimate.f90 \
+	DataDaylighting.f90 DataDaylightingDevices.f90 Datadefineequip.f90 \
+	DataDElight.f90 DataEnvironment.f90 DataErrorTracking.f90 \
+	DataGenerators.f90 DataGlobalConstants.f90 DataGlobals.f90 \
+	DataHeatBalance.f90 DataHeatBalFanSys.f90 DataHeatBalSurface.f90 \
+	DataHVACControllers.f90 DataHVACGlobals.f90 DataIPShortCuts.f90 \
+	DataLoopNode.f90 DataMoistureBalance.f90 DataMoistureBalanceEMPD.f90 \
+	DataPhotovoltaics.f90 DataPlant.f90 DataPrecisionGlobals.f90 \
+	DataReportingFlags.f90 DataRoomAir.f90 DataRootFinder.f90 \
+	DataRuntimeLanguage.f90 DataShadowingCombinations.f90 DataSizing.f90 \
+	DataStringGlobals.f90 DataSurfaceColors.f90 DataSurfaceLists.f90 \
+	DataSurfaces.f90 DataSystemVariables.f90 DataUCSDSharedData.f90 \
+	DataVectorTypes.f90 DataViewFactorInformation.f90 DataWater.f90 \
+	DataZoneControls.f90 DataZoneEnergyDemands.f90 DataZoneEquipment.f90 \
+	DateTime.f90 DaylightingDevices.f90 DaylightingManager.f90 \
+	DElightManagerF_NO.f90 DemandManager.f90 DesiccantDehumidifiers.f90 \
+	DirectAir.f90 DisplayRoutines.f90 DXCoil.f90 EarthTube.f90 \
+	EconomicTariff.f90 EcoRoof.f90 ElectricPowerGenerators.f90 \
+	ElectricPowerManager.f90 EMSManager.f90 EnergyPlus.f90 \
+	ExteriorEnergyUseManager.f90 FanCoilUnits.f90 FluidProperties.f90 \
+	General.f90 GeneralRoutines.f90 GlobalNames.f90 \
+	HeatBalanceAirManager.f90 HeatBalanceConvectionCoeffs.f90 \
+	HeatBalanceHAMTManager.f90 HeatBalanceInternalHeatGains.f90 \
+	HeatBalanceIntRadExchange.f90 HeatBalanceManager.f90 \
+	HeatBalanceMovableInsulation.f90 HeatBalanceSurfaceManager.f90 \
+	HeatBalFiniteDifferenceManager.f90 HeatRecovery.f90 Humidifiers.f90 \
+	HVACControllers.f90 HVACCooledBeam.f90 HVACDualDuctSystem.f90 \
+	HVACDuct.f90 HVACDXSystem.f90 HVACEvapComponent.f90 \
+	HVACFanComponent.f90 HVACFurnace.f90 HVACHeatingCoils.f90 \
+	HVACHXAssistedCoolingCoil.f90 HVACInterfaceManager.f90 \
+	HVACManager.f90 HVACMixerComponent.f90 HVACMultiSpeedHeatPump.f90 \
+	HVACSingleDuctInduc.f90 HVACSingleDuctSystem.f90 \
+	HVACSplitterComponent.f90 HVACStandAloneERV.f90 \
+	HVACSteamCoilComponent.f90 HVACTranspiredCollector.f90 \
+	HVACUnitaryBypassVAV.f90 HVACWaterCoilComponent.f90 \
+	HVACWatertoAir.f90 InputProcessor.f90 MixedAir.f90 \
+	MoistureBalanceEMPDManager.f90 NodeInputManager.f90 \
+	NonZoneEquipmentManager.f90 OutAirNodeManager.f90 OutputProcessor.f90 \
+	OutputReportPredefined.f90 OutputReports.f90 OutputReportTabular.f90 \
+	PackagedTerminalHeatPump.f90 Photovoltaics.f90 \
+	PhotovoltaicThermalCollectors.f90 PlantAbsorptionChillers.f90 \
+	PlantBoilers.f90 PlantBoilersSteam.f90 PlantChillers.f90 \
+	PlantCondLoopDemandSideManager.f90 PlantCondLoopOperation.f90 \
+	PlantCondLoopSupplySideManager.f90 PlantCondLoopTowers.f90 \
+	PlantConnectionComp.f90 PlantDemandSideSolvers.f90 \
+	PlantEIRChillers.f90 PlantFlowResolver.f90 PlantFluidCoolers.f90 \
+	PlantFreeCoolingHeatExchanger.f90 PlantGasAbsorptionChiller.f90 \
+	PlantGroundHeatExchangers.f90 PlantHeatExchanger.f90 \
+	PlantIceThermalStorage.f90 PlantLoadProfile.f90 \
+	PlantLoopEquipments.f90 PlantManager.f90 \
+	PlantOutsideCoolingSources.f90 PlantOutsideHeatingSources.f90 \
+	PlantPipeHeatTransfer.f90 PlantPipes.f90 PlantPlateHeatExchanger.f90 \
+	PlantPondGroundHeatExchanger.f90 PlantPumps.f90 \
+	PlantSolarCollectors.f90 PlantSupplySideSolvers.f90 \
+	PlantSurfaceGroundHeatExchanger.f90 PlantUtilities.f90 \
+	PlantValves.f90 PlantWaterThermalTank.f90 PlantWatertoWaterGSHP.f90 \
+	PlantWaterUse.f90 PollutionAnalysisModule.f90 \
+	PoweredInductionUnits.f90 PsychRoutines.f90 Purchasedairmanager.f90 \
+	RadiantSystemHighTemp.f90 RadiantSystemLowTemp.f90 \
+	RefrigeratedCase.f90 ReturnAirPath.f90 RoomAirManager.f90 \
+	RoomAirModelCrossVent.f90 RoomAirModelDisplacementVent.f90 \
+	RoomAirModelMundt.f90 RoomAirModelUFAD.f90 \
+	RoomAirModelUserTempPattern.f90 RootFinder.f90 \
+	RuntimeLanguageProcessor.f90 ScheduleManager.f90 SetPointManager.f90 \
+	SimAirServingZones.f90 SimulationManager.f90 SizingManager.f90 \
+	SolarReflectionManager.f90 SolarShading.f90 \
+	SortAndStringUtilities.f90 SQLiteFortranRoutines.f90 \
+	SurfaceGeometry.f90 SystemAvailabilityManager.f90 SystemReports.f90 \
+	ThermalChimney.f90 ThermalComfort.f90 UnitHeater.f90 \
+	UnitVentilator.f90 UtilityRoutines.f90 VectorUtilities.f90 \
+	VentilatedSlab.f90 WaterManager.f90 WeatherManager.f90 WindowAC.f90 \
+	WindowManager.f90 Zoneairloopequipmentmanager.f90 \
+	Zoneequipmentmanager.f90 ZonePlenumComponent.f90 \
+	ZoneTempPredictorCorrector.f90 sqlite3.c SQLiteCRoutines.c
+
+OBJS =	AirflowNetworkBalanceManager.o AirflowNetworkSolver.o \
+	BaseboardRadiator.o BaseboardRadiatorWater.o BranchInputManager.o \
+	BranchNodeConnections.o ConductionTransferFunctionCalc.o CoolTower.o \
+	CostEstimateManager.o CurveManager.o DataAirflowNetwork.o \
+	DataAirLoop.o DataAirSystems.o DataBranchNodeConnections.o \
+	DataConvergParams.o DataConversions.o DataCostEstimate.o \
+	DataDaylighting.o DataDaylightingDevices.o Datadefineequip.o \
+	DataDElight.o DataEnvironment.o DataErrorTracking.o DataGenerators.o \
+	DataGlobalConstants.o DataGlobals.o DataHeatBalance.o \
+	DataHeatBalFanSys.o DataHeatBalSurface.o DataHVACControllers.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataMoistureBalance.o DataMoistureBalanceEMPD.o DataPhotovoltaics.o \
+	DataPlant.o DataPrecisionGlobals.o DataReportingFlags.o DataRoomAir.o \
+	DataRootFinder.o DataRuntimeLanguage.o DataShadowingCombinations.o \
+	DataSizing.o DataStringGlobals.o DataSurfaceColors.o \
+	DataSurfaceLists.o DataSurfaces.o DataSystemVariables.o \
+	DataUCSDSharedData.o DataVectorTypes.o DataViewFactorInformation.o \
+	DataWater.o DataZoneControls.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o DateTime.o DaylightingDevices.o \
+	DaylightingManager.o DElightManagerF_NO.o DemandManager.o \
+	DesiccantDehumidifiers.o DirectAir.o DisplayRoutines.o DXCoil.o \
+	EarthTube.o EconomicTariff.o EcoRoof.o ElectricPowerGenerators.o \
+	ElectricPowerManager.o EMSManager.o EnergyPlus.o \
+	ExteriorEnergyUseManager.o FanCoilUnits.o FluidProperties.o General.o \
+	GeneralRoutines.o GlobalNames.o HeatBalanceAirManager.o \
+	HeatBalanceConvectionCoeffs.o HeatBalanceHAMTManager.o \
+	HeatBalanceInternalHeatGains.o HeatBalanceIntRadExchange.o \
+	HeatBalanceManager.o HeatBalanceMovableInsulation.o \
+	HeatBalanceSurfaceManager.o HeatBalFiniteDifferenceManager.o \
+	HeatRecovery.o Humidifiers.o HVACControllers.o HVACCooledBeam.o \
+	HVACDualDuctSystem.o HVACDuct.o HVACDXSystem.o HVACEvapComponent.o \
+	HVACFanComponent.o HVACFurnace.o HVACHeatingCoils.o \
+	HVACHXAssistedCoolingCoil.o HVACInterfaceManager.o HVACManager.o \
+	HVACMixerComponent.o HVACMultiSpeedHeatPump.o HVACSingleDuctInduc.o \
+	HVACSingleDuctSystem.o HVACSplitterComponent.o HVACStandAloneERV.o \
+	HVACSteamCoilComponent.o HVACTranspiredCollector.o \
+	HVACUnitaryBypassVAV.o HVACWaterCoilComponent.o HVACWatertoAir.o \
+	InputProcessor.o MixedAir.o MoistureBalanceEMPDManager.o \
+	NodeInputManager.o NonZoneEquipmentManager.o OutAirNodeManager.o \
+	OutputProcessor.o OutputReportPredefined.o OutputReports.o \
+	OutputReportTabular.o PackagedTerminalHeatPump.o Photovoltaics.o \
+	PhotovoltaicThermalCollectors.o PlantAbsorptionChillers.o \
+	PlantBoilers.o PlantBoilersSteam.o PlantChillers.o \
+	PlantCondLoopDemandSideManager.o PlantCondLoopOperation.o \
+	PlantCondLoopSupplySideManager.o PlantCondLoopTowers.o \
+	PlantConnectionComp.o PlantDemandSideSolvers.o PlantEIRChillers.o \
+	PlantFlowResolver.o PlantFluidCoolers.o \
+	PlantFreeCoolingHeatExchanger.o PlantGasAbsorptionChiller.o \
+	PlantGroundHeatExchangers.o PlantHeatExchanger.o \
+	PlantIceThermalStorage.o PlantLoadProfile.o PlantLoopEquipments.o \
+	PlantManager.o PlantOutsideCoolingSources.o \
+	PlantOutsideHeatingSources.o PlantPipeHeatTransfer.o PlantPipes.o \
+	PlantPlateHeatExchanger.o PlantPondGroundHeatExchanger.o PlantPumps.o \
+	PlantSolarCollectors.o PlantSupplySideSolvers.o \
+	PlantSurfaceGroundHeatExchanger.o PlantUtilities.o PlantValves.o \
+	PlantWaterThermalTank.o PlantWatertoWaterGSHP.o PlantWaterUse.o \
+	PollutionAnalysisModule.o PoweredInductionUnits.o PsychRoutines.o \
+	Purchasedairmanager.o RadiantSystemHighTemp.o RadiantSystemLowTemp.o \
+	RefrigeratedCase.o ReturnAirPath.o RoomAirManager.o \
+	RoomAirModelCrossVent.o RoomAirModelDisplacementVent.o \
+	RoomAirModelMundt.o RoomAirModelUFAD.o RoomAirModelUserTempPattern.o \
+	RootFinder.o RuntimeLanguageProcessor.o ScheduleManager.o \
+	SetPointManager.o SimAirServingZones.o SimulationManager.o \
+	SizingManager.o SolarReflectionManager.o SolarShading.o \
+	SortAndStringUtilities.o SQLiteFortranRoutines.o SurfaceGeometry.o \
+	SystemAvailabilityManager.o SystemReports.o ThermalChimney.o \
+	ThermalComfort.o UnitHeater.o UnitVentilator.o UtilityRoutines.o \
+	VectorUtilities.o VentilatedSlab.o WaterManager.o WeatherManager.o \
+	WindowAC.o WindowManager.o Zoneairloopequipmentmanager.o \
+	Zoneequipmentmanager.o ZonePlenumComponent.o \
+	ZoneTempPredictorCorrector.o sqlite3.o SQLiteCRoutines.o
+
+CC = $(C_COMPILER)
+CFLAGS = $(C_FLAGS)
+
+F90 = $(FORTRAN_COMPILER)
+F90FLAGS = $(FORTRAN_FLAGS)
+
+LDFLAGS = $(LINKER_FLAGS)
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	if [ ! -e $(BUILD_PRODUCT_LOC) ]; then mkdir -p $(BUILD_PRODUCT_LOC); fi
+	$(F90) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+	if [ ! -e $(BUILD_PRODUCT_LOC)/include ]; then mkdir -p $(BUILD_PRODUCT_LOC)/include; fi
+	mv *.mod $(BUILD_PRODUCT_LOC)/include/
+	cp "$(BUILD_PRODUCT_LOC)/$(PRODUCT_NAME)" "$(PACKAGE_BIN_LOC)/$(PRODUCT_NAME)"
+	rm -f $(OBJS)
+
+clean:
+	rm -f $(PROG) $(OBJS) *.mod *.sql
+
+.SUFFIXES: $(SUFFIXES) .f90
+
+.f90.o:
+	$(F90) $(F90FLAGS) -c $<
+
+AirflowNetworkBalanceManager.o: AirflowNetworkSolver.o \
+	BranchNodeConnections.o DataAirLoop.o DataAirflowNetwork.o \
+	DataBranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSurfaces.o \
+	DataZoneEquipment.o General.o HVACFanComponent.o \
+	HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o HVACSingleDuctSystem.o \
+	InputProcessor.o MixedAir.o PsychRoutines.o ScheduleManager.o
+AirflowNetworkSolver.o: DataAirLoop.o DataAirflowNetwork.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o \
+	DataSurfaces.o General.o PsychRoutines.o
+BaseboardRadiator.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o General.o GlobalNames.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+BaseboardRadiatorWater.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataSurfaces.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o GlobalNames.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+BranchInputManager.o: BranchNodeConnections.o DataAirLoop.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEquipment.o General.o \
+	HVACMixerComponent.o HVACSplitterComponent.o InputProcessor.o \
+	NodeInputManager.o ZonePlenumComponent.o
+BranchNodeConnections.o: DataBranchNodeConnections.o DataGlobals.o \
+	DataLoopNode.o InputProcessor.o
+ConductionTransferFunctionCalc.o: DataConversions.o DataGlobals.o \
+	DataHeatBalance.o DataPrecisionGlobals.o General.o
+CoolTower.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalance.o DataPrecisionGlobals.o DataWater.o General.o \
+	InputProcessor.o PsychRoutines.o ScheduleManager.o WaterManager.o
+CostEstimateManager.o: DXCoil.o DataCostEstimate.o DataDaylighting.o \
+	DataGlobals.o DataHeatBalance.o DataIPShortCuts.o DataPhotovoltaics.o \
+	DataPrecisionGlobals.o DataSurfaces.o HVACHeatingCoils.o \
+	InputProcessor.o PlantChillers.o
+CurveManager.o: DataGlobals.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	General.o InputProcessor.o
+DataAirflowNetwork.o: DataGlobals.o DataPrecisionGlobals.o
+DataAirLoop.o: DataGlobals.o DataPrecisionGlobals.o
+DataAirSystems.o: DataGlobals.o DataPlant.o DataPrecisionGlobals.o
+DataBranchNodeConnections.o: DataGlobals.o
+DataConvergParams.o: DataPrecisionGlobals.o
+DataConversions.o: DataPrecisionGlobals.o
+DataCostEstimate.o: DataGlobals.o DataPrecisionGlobals.o
+DataDaylighting.o: DataGlobals.o DataPrecisionGlobals.o
+DataDaylightingDevices.o: DataGlobals.o DataPrecisionGlobals.o
+Datadefineequip.o: DataGlobals.o DataPrecisionGlobals.o
+DataDElight.o: DataPrecisionGlobals.o
+DataEnvironment.o: DataGlobals.o DataPrecisionGlobals.o
+DataErrorTracking.o: DataPrecisionGlobals.o
+DataGenerators.o: DataGlobals.o DataPrecisionGlobals.o
+DataGlobalConstants.o: DataGlobals.o InputProcessor.o
+DataGlobals.o: DataPrecisionGlobals.o
+DataHeatBalance.o: DataGlobals.o DataPrecisionGlobals.o DataSurfaces.o \
+	DataVectorTypes.o
+DataHeatBalFanSys.o: DataPrecisionGlobals.o
+DataHeatBalSurface.o: DataPrecisionGlobals.o
+DataHVACGlobals.o: DataGlobals.o DataPrecisionGlobals.o
+DataIPShortCuts.o: DataGlobals.o DataPrecisionGlobals.o
+DataLoopNode.o: DataGlobals.o DataPrecisionGlobals.o
+DataMoistureBalance.o: DataPrecisionGlobals.o
+DataMoistureBalanceEMPD.o: DataPrecisionGlobals.o
+DataPhotovoltaics.o: DataGlobals.o DataPrecisionGlobals.o
+DataPlant.o: DataGlobals.o DataLoopNode.o DataPrecisionGlobals.o
+DataRoomAir.o: DataGlobals.o DataPrecisionGlobals.o
+DataRootFinder.o: DataPrecisionGlobals.o
+DataRuntimeLanguage.o: DataGlobals.o DataPrecisionGlobals.o
+DataSizing.o: DataGlobals.o DataPrecisionGlobals.o
+DataSurfaceColors.o: DataGlobals.o DataPrecisionGlobals.o InputProcessor.o
+DataSurfaceLists.o: DataGlobals.o DataHeatBalance.o DataPrecisionGlobals.o \
+	DataSurfaces.o InputProcessor.o
+DataSurfaces.o: DataGlobals.o DataPrecisionGlobals.o DataVectorTypes.o
+DataSystemVariables.o: DataPrecisionGlobals.o
+DataUCSDSharedData.o: DataPrecisionGlobals.o
+DataVectorTypes.o: DataPrecisionGlobals.o
+DataViewFactorInformation.o: DataGlobals.o DataPrecisionGlobals.o
+DataWater.o: DataGlobals.o DataPrecisionGlobals.o
+DataZoneControls.o: DataGlobals.o DataPrecisionGlobals.o
+DataZoneEnergyDemands.o: DataPrecisionGlobals.o
+DataZoneEquipment.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataLoopNode.o DataPrecisionGlobals.o General.o \
+	InputProcessor.o NodeInputManager.o
+DateTime.o: DataPrecisionGlobals.o
+DaylightingDevices.o: DataDaylighting.o DataDaylightingDevices.o \
+	DataGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataSurfaces.o FluidProperties.o General.o \
+	InputProcessor.o VectorUtilities.o
+DaylightingManager.o: DElightManagerF_NO.o DataDaylighting.o \
+	DataDaylightingDevices.o DataEnvironment.o DataGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataStringGlobals.o DataSurfaces.o DaylightingDevices.o General.o \
+	HeatBalanceInternalHeatGains.o InputProcessor.o \
+	OutputReportPredefined.o SQLiteFortranRoutines.o ScheduleManager.o \
+	SolarReflectionManager.o VectorUtilities.o
+DElightManagerF_NO.o: DataDElight.o DataGlobals.o DataPrecisionGlobals.o
+DemandManager.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataZoneControls.o ExteriorEnergyUseManager.o \
+	General.o InputProcessor.o OutputProcessor.o ScheduleManager.o
+DesiccantDehumidifiers.o: BranchNodeConnections.o CurveManager.o DXCoil.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o General.o \
+	HVACFanComponent.o HVACHeatingCoils.o HeatRecovery.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o PsychRoutines.o \
+	ScheduleManager.o
+DirectAir.o: DataAirflowNetwork.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEquipment.o General.o \
+	HVACSplitterComponent.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+DXCoil.o: BranchNodeConnections.o CurveManager.o DataAirLoop.o \
+	DataAirSystems.o DataBranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataWater.o \
+	General.o InputProcessor.o NodeInputManager.o OutAirNodeManager.o \
+	OutputReportPredefined.o PsychRoutines.o ScheduleManager.o \
+	WaterManager.o
+EarthTube.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataSurfaces.o General.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o
+EconomicTariff.o: DataCostEstimate.o DataEnvironment.o DataGlobals.o \
+	DataPrecisionGlobals.o InputProcessor.o OutputProcessor.o \
+	OutputReportTabular.o ScheduleManager.o
+EcoRoof.o: ConductionTransferFunctionCalc.o DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalSurface.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSurfaces.o DataWater.o \
+	HeatBalanceConvectionCoeffs.o PsychRoutines.o
+ElectricPowerGenerators.o: BranchNodeConnections.o CurveManager.o \
+	DataEnvironment.o DataGenerators.o DataGlobalConstants.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	ElectricPowerGenerators.o General.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o PsychRoutines.o \
+	ScheduleManager.o
+ElectricPowerManager.o: CurveManager.o DataEnvironment.o \
+	DataGlobalConstants.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o ElectricPowerGenerators.o General.o \
+	InputProcessor.o Photovoltaics.o ScheduleManager.o
+EMSManager.o: DataGlobals.o DataPrecisionGlobals.o DataRuntimeLanguage.o \
+	InputProcessor.o OutputProcessor.o RuntimeLanguageProcessor.o
+EnergyPlus.o: DataGlobals.o DataPrecisionGlobals.o DataStringGlobals.o \
+	DataSystemVariables.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o SimulationManager.o
+ExteriorEnergyUseManager.o: DataEnvironment.o DataGlobals.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o General.o InputProcessor.o \
+	OutputReportPredefined.o ScheduleManager.o
+FanCoilUnits.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	HVACFanComponent.o HVACHXAssistedCoolingCoil.o \
+	HVACWaterCoilComponent.o InputProcessor.o MixedAir.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+FluidProperties.o: DataGlobals.o DataPrecisionGlobals.o General.o \
+	InputProcessor.o
+General.o: DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataSizing.o DataStringGlobals.o \
+	DataSurfaces.o InputProcessor.o
+GeneralRoutines.o: BaseboardRadiator.o BaseboardRadiatorWater.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataSizing.o DataSurfaces.o FanCoilUnits.o \
+	General.o HVACWaterCoilComponent.o HeatBalanceConvectionCoeffs.o \
+	InputProcessor.o PlantUtilities.o PsychRoutines.o UnitHeater.o \
+	UnitVentilator.o VentilatedSlab.o
+GlobalNames.o: DataGlobals.o DataPrecisionGlobals.o \
+	HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	HVACSteamCoilComponent.o HVACWaterCoilComponent.o InputProcessor.o
+HeatBalanceAirManager.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataRoomAir.o DataSurfaces.o DataZoneControls.o General.o \
+	HVACManager.o InputProcessor.o PsychRoutines.o ScheduleManager.o
+HeatBalanceConvectionCoeffs.o: DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	InputProcessor.o PsychRoutines.o ScheduleManager.o
+HeatBalanceHAMTManager.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataMoistureBalance.o \
+	DataSurfaces.o General.o InputProcessor.o PsychRoutines.o
+HeatBalanceInternalHeatGains.o: DataDaylighting.o DataEnvironment.o \
+	DataGlobals.o DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataZoneEquipment.o ElectricPowerGenerators.o ElectricPowerManager.o \
+	General.o InputProcessor.o OutputReportPredefined.o \
+	PlantPipeHeatTransfer.o PlantWaterThermalTank.o PlantWaterUse.o \
+	PsychRoutines.o ScheduleManager.o ZonePlenumComponent.o
+HeatBalanceIntRadExchange.o: DataEnvironment.o DataGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataSurfaces.o DataViewFactorInformation.o General.o InputProcessor.o
+HeatBalanceManager.o: ConductionTransferFunctionCalc.o DataDaylighting.o \
+	DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataReportingFlags.o DataRoomAir.o \
+	DataStringGlobals.o DataSurfaces.o DataSystemVariables.o \
+	DaylightingDevices.o EconomicTariff.o General.o \
+	HeatBalanceInternalHeatGains.o HeatBalanceSurfaceManager.o \
+	InputProcessor.o NodeInputManager.o OutputReportTabular.o \
+	ScheduleManager.o SolarShading.o SurfaceGeometry.o WindowManager.o
+HeatBalanceMovableInsulation.o: DataGlobals.o DataHeatBalance.o \
+	DataPrecisionGlobals.o DataSurfaces.o ScheduleManager.o
+HeatBalanceSurfaceManager.o: DElightManagerF_NO.o DataDaylighting.o \
+	DataDaylightingDevices.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalSurface.o \
+	DataHeatBalance.o DataLoopNode.o DataMoistureBalance.o \
+	DataMoistureBalanceEMPD.o DataPrecisionGlobals.o DataRoomAir.o \
+	DataSurfaces.o DataZoneEquipment.o DaylightingDevices.o \
+	DaylightingManager.o EcoRoof.o General.o \
+	HeatBalFiniteDifferenceManager.o HeatBalanceAirManager.o \
+	HeatBalanceConvectionCoeffs.o HeatBalanceHAMTManager.o \
+	HeatBalanceIntRadExchange.o HeatBalanceInternalHeatGains.o \
+	HeatBalanceMovableInsulation.o HeatBalanceSurfaceManager.o \
+	InputProcessor.o MoistureBalanceEMPDManager.o \
+	OutputReportPredefined.o PsychRoutines.o RadiantSystemHighTemp.o \
+	RadiantSystemLowTemp.o ScheduleManager.o SolarShading.o \
+	ThermalComfort.o WindowManager.o
+HeatBalFiniteDifferenceManager.o: DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalSurface.o DataHeatBalance.o \
+	DataIPShortCuts.o DataMoistureBalance.o DataPrecisionGlobals.o \
+	DataSurfaces.o General.o InputProcessor.o PsychRoutines.o
+HeatRecovery.o: BranchNodeConnections.o DXCoil.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+Humidifiers.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataWater.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o WaterManager.o
+HVACControllers.o: DataAirSystems.o DataConvergParams.o DataEnvironment.o \
+	DataGlobals.o DataHVACControllers.o DataHVACGlobals.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataRootFinder.o DataSizing.o \
+	DataSystemVariables.o General.o HVACWaterCoilComponent.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o RootFinder.o
+HVACCooledBeam.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o Datadefineequip.o General.o \
+	HVACWaterCoilComponent.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+HVACDualDuctSystem.o: BranchNodeConnections.o DataAirLoop.o \
+	DataConvergParams.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o Datadefineequip.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+HVACDuct.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o General.o \
+	InputProcessor.o NodeInputManager.o
+HVACDXSystem.o: BranchNodeConnections.o DXCoil.o DataAirLoop.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o General.o \
+	HVACHXAssistedCoolingCoil.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+HVACEvapComponent.o: BranchNodeConnections.o DataAirSystems.o \
+	DataEnvironment.o DataGlobalConstants.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataWater.o General.o \
+	InputProcessor.o NodeInputManager.o OutAirNodeManager.o \
+	PsychRoutines.o ScheduleManager.o WaterManager.o
+HVACFanComponent.o: BranchNodeConnections.o CurveManager.o DataAirLoop.o \
+	DataAirflowNetwork.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEquipment.o General.o InputProcessor.o NodeInputManager.o \
+	OutputReportPredefined.o PsychRoutines.o ScheduleManager.o
+HVACFurnace.o: BranchNodeConnections.o DXCoil.o DataAirLoop.o \
+	DataAirSystems.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataZoneControls.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	HVACFanComponent.o HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	HVACWatertoAir.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o PsychRoutines.o ScheduleManager.o
+HVACHeatingCoils.o: BranchNodeConnections.o CurveManager.o DXCoil.o \
+	DataAirLoop.o DataAirSystems.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o General.o InputProcessor.o \
+	NodeInputManager.o OutputReportPredefined.o PsychRoutines.o \
+	RefrigeratedCase.o ScheduleManager.o
+HVACHXAssistedCoolingCoil.o: BranchNodeConnections.o DXCoil.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o General.o \
+	HVACWaterCoilComponent.o HeatRecovery.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o
+HVACInterfaceManager.o: DataConvergParams.o DataGlobals.o DataHVACGlobals.o \
+	DataLoopNode.o DataPlant.o DataPrecisionGlobals.o
+HVACManager.o: AirflowNetworkBalanceManager.o BranchInputManager.o \
+	CoolTower.o DataAirLoop.o DataAirflowNetwork.o DataConvergParams.o \
+	DataEnvironment.o DataErrorTracking.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataReportingFlags.o DataRoomAir.o \
+	DataSurfaces.o DataSystemVariables.o DataZoneEquipment.o \
+	DemandManager.o EMSManager.o EarthTube.o ElectricPowerManager.o \
+	General.o NodeInputManager.o NonZoneEquipmentManager.o \
+	OutAirNodeManager.o OutputReportTabular.o \
+	PlantCondLoopDemandSideManager.o PlantCondLoopSupplySideManager.o \
+	PlantIceThermalStorage.o PlantManager.o PollutionAnalysisModule.o \
+	PsychRoutines.o RefrigeratedCase.o ScheduleManager.o \
+	SetPointManager.o SimAirServingZones.o SystemAvailabilityManager.o \
+	SystemReports.o ThermalChimney.o WaterManager.o \
+	ZoneTempPredictorCorrector.o Zoneequipmentmanager.o
+HVACMixerComponent.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataLoopNode.o DataPrecisionGlobals.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o
+HVACMultiSpeedHeatPump.o: BranchNodeConnections.o CurveManager.o DXCoil.o \
+	DataAirLoop.o DataAirSystems.o DataBranchNodeConnections.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataZoneControls.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o FluidProperties.o \
+	General.o GlobalNames.o HVACFanComponent.o HVACHeatingCoils.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+HVACSingleDuctInduc.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o Datadefineequip.o General.o HVACHeatingCoils.o \
+	HVACMixerComponent.o HVACWaterCoilComponent.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+HVACSingleDuctSystem.o: BranchNodeConnections.o DataAirflowNetwork.o \
+	DataConvergParams.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o Datadefineequip.o FluidProperties.o General.o \
+	HVACFanComponent.o HVACHeatingCoils.o HVACSteamCoilComponent.o \
+	HVACWaterCoilComponent.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+HVACSplitterComponent.o: DataEnvironment.o DataGlobals.o DataLoopNode.o \
+	DataPrecisionGlobals.o General.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+HVACStandAloneERV.o: BranchNodeConnections.o CurveManager.o DataAirLoop.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneControls.o DataZoneEquipment.o General.o HVACFanComponent.o \
+	HeatRecovery.o InputProcessor.o MixedAir.o NodeInputManager.o \
+	OutAirNodeManager.o PsychRoutines.o ScheduleManager.o
+HVACSteamCoilComponent.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o \
+	DataSizing.o FluidProperties.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+HVACTranspiredCollector.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalSurface.o \
+	DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSurfaces.o DataVectorTypes.o General.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+HVACUnitaryBypassVAV.o: BranchNodeConnections.o DXCoil.o DataAirLoop.o \
+	DataAirSystems.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataZoneControls.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	HVACFanComponent.o HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	InputProcessor.o MixedAir.o NodeInputManager.o PsychRoutines.o \
+	ScheduleManager.o
+HVACWaterCoilComponent.o: BranchInputManager.o BranchNodeConnections.o \
+	DataAirSystems.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataWater.o General.o InputProcessor.o NodeInputManager.o \
+	OutputReportPredefined.o PsychRoutines.o ScheduleManager.o \
+	WaterManager.o
+HVACWatertoAir.o: BranchNodeConnections.o CurveManager.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o \
+	FluidProperties.o General.o GlobalNames.o InputProcessor.o \
+	NodeInputManager.o OutputReportPredefined.o PsychRoutines.o
+InputProcessor.o: DataGlobals.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataSizing.o DataStringGlobals.o DataSystemVariables.o \
+	SortAndStringUtilities.o
+MixedAir.o: BranchNodeConnections.o CurveManager.o DataAirLoop.o \
+	DataAirSystems.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneControls.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o DesiccantDehumidifiers.o \
+	General.o HVACDXSystem.o HVACEvapComponent.o HVACFanComponent.o \
+	HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	HVACSteamCoilComponent.o HVACTranspiredCollector.o \
+	HVACWaterCoilComponent.o HeatRecovery.o InputProcessor.o \
+	NodeInputManager.o OutputReportPredefined.o \
+	PhotovoltaicThermalCollectors.o PsychRoutines.o ScheduleManager.o
+MoistureBalanceEMPDManager.o: DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataMoistureBalanceEMPD.o DataPrecisionGlobals.o DataSurfaces.o \
+	General.o InputProcessor.o PsychRoutines.o
+NodeInputManager.o: BranchNodeConnections.o DataEnvironment.o \
+	DataErrorTracking.o DataGlobals.o DataLoopNode.o \
+	DataPrecisionGlobals.o FluidProperties.o General.o InputProcessor.o \
+	OutputProcessor.o PsychRoutines.o ScheduleManager.o
+NonZoneEquipmentManager.o: DataGlobals.o DataHeatBalance.o InputProcessor.o \
+	PhotovoltaicThermalCollectors.o PlantChillers.o PlantEIRChillers.o \
+	PlantLoadProfile.o PlantSolarCollectors.o PlantWaterThermalTank.o \
+	PlantWaterUse.o RefrigeratedCase.o
+OutAirNodeManager.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataLoopNode.o DataPrecisionGlobals.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o
+OutputProcessor.o: DataEnvironment.o DataGlobalConstants.o DataGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataStringGlobals.o DataSystemVariables.o General.o InputProcessor.o \
+	OutputProcessor.o SQLiteFortranRoutines.o ScheduleManager.o \
+	SortAndStringUtilities.o
+OutputReportPredefined.o: DataGlobals.o DataPrecisionGlobals.o
+OutputReports.o: DataDaylighting.o DataErrorTracking.o DataGlobals.o \
+	DataHeatBalance.o DataPrecisionGlobals.o DataStringGlobals.o \
+	DataSurfaceColors.o DataSurfaces.o General.o VectorUtilities.o
+OutputReportTabular.o: DataCostEstimate.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataShadowingCombinations.o \
+	DataStringGlobals.o DataSurfaces.o DataWater.o ElectricPowerManager.o \
+	ExteriorEnergyUseManager.o General.o InputProcessor.o \
+	OutputProcessor.o OutputReportPredefined.o PollutionAnalysisModule.o \
+	ScheduleManager.o ZonePlenumComponent.o
+PackagedTerminalHeatPump.o: BranchNodeConnections.o DXCoil.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o FluidProperties.o \
+	General.o HVACFanComponent.o HVACHXAssistedCoolingCoil.o \
+	HVACHeatingCoils.o HVACSteamCoilComponent.o HVACWaterCoilComponent.o \
+	InputProcessor.o MixedAir.o NodeInputManager.o PsychRoutines.o \
+	ScheduleManager.o
+Photovoltaics.o: DataEnvironment.o DataGlobalConstants.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalSurface.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPhotovoltaics.o \
+	DataPrecisionGlobals.o DataSurfaces.o General.o \
+	HVACTranspiredCollector.o InputProcessor.o \
+	PhotovoltaicThermalCollectors.o ScheduleManager.o
+PhotovoltaicThermalCollectors.o: BranchInputManager.o BranchNodeConnections.o \
+	DataAirLoop.o DataAirSystems.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o \
+	DataPhotovoltaics.o DataPlant.o DataPrecisionGlobals.o DataSizing.o \
+	DataSurfaces.o General.o HeatBalanceConvectionCoeffs.o \
+	InputProcessor.o NodeInputManager.o OutputReportPredefined.o \
+	PsychRoutines.o ScheduleManager.o
+PlantAbsorptionChillers.o: BranchInputManager.o BranchNodeConnections.o \
+	CurveManager.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o FluidProperties.o General.o GlobalNames.o \
+	InputProcessor.o NodeInputManager.o OutputReportPredefined.o \
+	PsychRoutines.o
+PlantBoilers.o: BranchNodeConnections.o CurveManager.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataSizing.o General.o GlobalNames.o \
+	InputProcessor.o NodeInputManager.o OutputReportPredefined.o \
+	PsychRoutines.o
+PlantBoilersSteam.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o FluidProperties.o General.o GlobalNames.o \
+	InputProcessor.o NodeInputManager.o OutputReportPredefined.o \
+	PsychRoutines.o
+PlantChillers.o: BranchInputManager.o BranchNodeConnections.o CurveManager.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o \
+	DataLoopNode.o DataPlant.o DataPrecisionGlobals.o DataSizing.o \
+	General.o GlobalNames.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o OutputReportPredefined.o PsychRoutines.o
+PlantCondLoopDemandSideManager.o: BranchInputManager.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o General.o \
+	HVACInterfaceManager.o InputProcessor.o NodeInputManager.o \
+	PlantCondLoopSupplySideManager.o PlantPipeHeatTransfer.o PlantPipes.o \
+	PsychRoutines.o ScheduleManager.o
+PlantCondLoopOperation.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o EMSManager.o General.o InputProcessor.o \
+	NodeInputManager.o PlantUtilities.o PsychRoutines.o ScheduleManager.o
+PlantCondLoopSupplySideManager.o: BranchInputManager.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o General.o \
+	HVACInterfaceManager.o InputProcessor.o NodeInputManager.o \
+	PlantCondLoopOperation.o PlantCondLoopTowers.o PlantFluidCoolers.o \
+	PlantGroundHeatExchangers.o PlantPipeHeatTransfer.o PlantPipes.o \
+	PlantPlateHeatExchanger.o PlantPondGroundHeatExchanger.o PlantPumps.o \
+	PlantSurfaceGroundHeatExchanger.o PsychRoutines.o ScheduleManager.o
+PlantCondLoopTowers.o: BranchNodeConnections.o CurveManager.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o \
+	DataLoopNode.o DataPlant.o DataPrecisionGlobals.o DataSizing.o \
+	DataWater.o General.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o OutputReportPredefined.o PsychRoutines.o \
+	ScheduleManager.o WaterManager.o
+PlantConnectionComp.o: BranchNodeConnections.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o General.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+PlantDemandSideSolvers.o: DataGlobals.o DataHVACGlobals.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o General.o \
+	HVACInterfaceManager.o PlantFlowResolver.o PlantLoopEquipments.o \
+	PlantPipeHeatTransfer.o PlantPipes.o PlantPumps.o PlantUtilities.o \
+	PlantWaterThermalTank.o PlantWaterUse.o
+PlantEIRChillers.o: BranchInputManager.o BranchNodeConnections.o \
+	CurveManager.o DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o \
+	DataLoopNode.o DataPlant.o DataPrecisionGlobals.o DataSizing.o \
+	FluidProperties.o General.o GlobalNames.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o OutputReportPredefined.o \
+	PsychRoutines.o
+PlantFlowResolver.o: DataGlobals.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o General.o
+PlantFluidCoolers.o: BranchNodeConnections.o CurveManager.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o FluidProperties.o \
+	General.o InputProcessor.o NodeInputManager.o OutAirNodeManager.o \
+	OutputReportPredefined.o PsychRoutines.o ScheduleManager.o
+PlantFreeCoolingHeatExchanger.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o FluidProperties.o General.o InputProcessor.o \
+	NodeInputManager.o PlantCondLoopOperation.o PsychRoutines.o \
+	ScheduleManager.o
+PlantGasAbsorptionChiller.o: BranchInputManager.o BranchNodeConnections.o \
+	CurveManager.o DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o General.o GlobalNames.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o OutputReportPredefined.o \
+	PsychRoutines.o
+PlantGroundHeatExchangers.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o General.o InputProcessor.o NodeInputManager.o
+PlantHeatExchanger.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataSizing.o FluidProperties.o General.o \
+	InputProcessor.o NodeInputManager.o OutAirNodeManager.o \
+	OutputReportPredefined.o PsychRoutines.o ScheduleManager.o
+PlantIceThermalStorage.o: BranchNodeConnections.o CurveManager.o \
+	DataEnvironment.o DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+PlantLoadProfile.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o General.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+PlantLoopEquipments.o: DataGlobals.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o ElectricPowerGenerators.o \
+	PlantAbsorptionChillers.o PlantBoilers.o PlantBoilersSteam.o \
+	PlantChillers.o PlantCondLoopTowers.o PlantConnectionComp.o \
+	PlantEIRChillers.o PlantFluidCoolers.o \
+	PlantFreeCoolingHeatExchanger.o PlantGasAbsorptionChiller.o \
+	PlantGroundHeatExchangers.o PlantHeatExchanger.o \
+	PlantIceThermalStorage.o PlantOutsideCoolingSources.o \
+	PlantOutsideHeatingSources.o PlantPipeHeatTransfer.o PlantPipes.o \
+	PlantPondGroundHeatExchanger.o PlantPumps.o \
+	PlantSurfaceGroundHeatExchanger.o PlantValves.o \
+	PlantWaterThermalTank.o PlantWatertoWaterGSHP.o ScheduleManager.o
+PlantManager.o: BranchInputManager.o DataEnvironment.o DataErrorTracking.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o FluidProperties.o \
+	General.o InputProcessor.o NodeInputManager.o \
+	PlantCondLoopOperation.o PlantDemandSideSolvers.o PlantFlowResolver.o \
+	PlantPipeHeatTransfer.o PlantPipes.o PlantSupplySideSolvers.o \
+	PsychRoutines.o ScheduleManager.o SetPointManager.o \
+	SystemAvailabilityManager.o
+PlantOutsideCoolingSources.o: BranchNodeConnections.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+PlantOutsideHeatingSources.o: BranchNodeConnections.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+PlantPipeHeatTransfer.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	FluidProperties.o General.o HeatBalanceConvectionCoeffs.o \
+	InputProcessor.o NodeInputManager.o OutAirNodeManager.o \
+	ScheduleManager.o
+PlantPipes.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	General.o InputProcessor.o NodeInputManager.o
+PlantPlateHeatExchanger.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o FluidProperties.o General.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+PlantPondGroundHeatExchanger.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o FluidProperties.o General.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+PlantPumps.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o FluidProperties.o General.o InputProcessor.o \
+	NodeInputManager.o OutputReportPredefined.o PsychRoutines.o \
+	ScheduleManager.o
+PlantSolarCollectors.o: BranchNodeConnections.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSurfaces.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o
+PlantSupplySideSolvers.o: DataGlobals.o DataHVACGlobals.o DataLoopNode.o \
+	DataPlant.o DataPrecisionGlobals.o DataSizing.o FluidProperties.o \
+	General.o HVACInterfaceManager.o InputProcessor.o \
+	PlantCondLoopOperation.o PlantDemandSideSolvers.o PlantFlowResolver.o \
+	PlantLoopEquipments.o PlantPumps.o PlantUtilities.o PsychRoutines.o \
+	ScheduleManager.o
+PlantSurfaceGroundHeatExchanger.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o FluidProperties.o General.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o
+PlantUtilities.o: DataGlobals.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o General.o PlantHeatExchanger.o
+PlantValves.o: BranchNodeConnections.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	InputProcessor.o NodeInputManager.o
+PlantWaterThermalTank.o: BranchInputManager.o BranchNodeConnections.o \
+	CurveManager.o DXCoil.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataSizing.o DataSurfaces.o DataZoneEquipment.o General.o \
+	HVACFanComponent.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o OutputReportPredefined.o PlantSolarCollectors.o \
+	PsychRoutines.o ScheduleManager.o
+PlantWatertoWaterGSHP.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o FluidProperties.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o
+PlantWaterUse.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o DataWater.o \
+	General.o InputProcessor.o NodeInputManager.o PsychRoutines.o \
+	ScheduleManager.o WaterManager.o
+PollutionAnalysisModule.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataPrecisionGlobals.o InputProcessor.o \
+	ScheduleManager.o
+PoweredInductionUnits.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o Datadefineequip.o \
+	FluidProperties.o General.o HVACFanComponent.o HVACHeatingCoils.o \
+	HVACMixerComponent.o HVACSteamCoilComponent.o \
+	HVACWaterCoilComponent.o InputProcessor.o NodeInputManager.o \
+	PsychRoutines.o ScheduleManager.o
+PsychRoutines.o: DataEnvironment.o DataGlobals.o DataPrecisionGlobals.o \
+	General.o
+Purchasedairmanager.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+RadiantSystemHighTemp.o: DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataSizing.o DataSurfaces.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	InputProcessor.o ScheduleManager.o
+RadiantSystemLowTemp.o: BranchNodeConnections.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataSurfaceLists.o DataSurfaces.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o FluidProperties.o \
+	General.o InputProcessor.o NodeInputManager.o PsychRoutines.o \
+	ScheduleManager.o
+RefrigeratedCase.o: BranchNodeConnections.o CurveManager.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataWater.o DataZoneEquipment.o \
+	FluidProperties.o General.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o PsychRoutines.o ScheduleManager.o WaterManager.o
+ReturnAirPath.o: DataAirflowNetwork.o DataGlobals.o DataHVACGlobals.o \
+	DataIPShortCuts.o DataLoopNode.o DataPrecisionGlobals.o \
+	DataZoneEquipment.o HVACMixerComponent.o InputProcessor.o \
+	NodeInputManager.o ZonePlenumComponent.o
+RoomAirManager.o: DataAirflowNetwork.o DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataUCSDSharedData.o DataZoneEquipment.o General.o InputProcessor.o \
+	PsychRoutines.o RoomAirModelCrossVent.o \
+	RoomAirModelDisplacementVent.o RoomAirModelMundt.o RoomAirModelUFAD.o \
+	RoomAirModelUserTempPattern.o ScheduleManager.o
+RoomAirModelCrossVent.o: DataAirflowNetwork.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalSurface.o \
+	DataHeatBalance.o DataLoopNode.o DataPrecisionGlobals.o DataRoomAir.o \
+	DataSurfaces.o DataUCSDSharedData.o DataZoneEquipment.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o
+RoomAirModelDisplacementVent.o: DataAirflowNetwork.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataUCSDSharedData.o DataZoneEquipment.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o
+RoomAirModelMundt.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataZoneEquipment.o InputProcessor.o PsychRoutines.o
+RoomAirModelUFAD.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalSurface.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataRoomAir.o DataSizing.o \
+	DataSurfaces.o DataUCSDSharedData.o DataZoneEquipment.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o
+RoomAirModelUserTempPattern.o: DataEnvironment.o DataGlobals.o \
+	DataHeatBalFanSys.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataZoneEquipment.o FluidProperties.o General.o InputProcessor.o \
+	OutputReportTabular.o PsychRoutines.o ScheduleManager.o
+RootFinder.o: DataGlobals.o DataPrecisionGlobals.o DataRootFinder.o General.o
+RuntimeLanguageProcessor.o: DataEnvironment.o DataGlobals.o \
+	DataPrecisionGlobals.o DataRuntimeLanguage.o InputProcessor.o
+ScheduleManager.o: DataEnvironment.o DataGlobals.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o General.o InputProcessor.o
+SetPointManager.o: DataAirLoop.o DataAirSystems.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataZoneControls.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+SimAirServingZones.o: BranchInputManager.o DataAirLoop.o DataAirSystems.o \
+	DataConvergParams.o DataEnvironment.o DataGlobals.o \
+	DataHVACControllers.o DataHVACGlobals.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataSystemVariables.o \
+	DataZoneEquipment.o DesiccantDehumidifiers.o General.o \
+	HVACControllers.o HVACDXSystem.o HVACDuct.o HVACEvapComponent.o \
+	HVACFanComponent.o HVACFurnace.o HVACHXAssistedCoolingCoil.o \
+	HVACHeatingCoils.o HVACInterfaceManager.o HVACMultiSpeedHeatPump.o \
+	HVACSplitterComponent.o HVACSteamCoilComponent.o \
+	HVACUnitaryBypassVAV.o HVACWaterCoilComponent.o HeatRecovery.o \
+	Humidifiers.o InputProcessor.o MixedAir.o NodeInputManager.o \
+	PsychRoutines.o SystemAvailabilityManager.o ZonePlenumComponent.o
+SimulationManager.o: BranchInputManager.o BranchNodeConnections.o \
+	CostEstimateManager.o DataAirLoop.o DataBranchNodeConnections.o \
+	DataConvergParams.o DataEnvironment.o DataErrorTracking.o \
+	DataGlobalConstants.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o DataPlant.o \
+	DataPrecisionGlobals.o DataReportingFlags.o DataSizing.o \
+	DataStringGlobals.o DataSurfaces.o DataSystemVariables.o \
+	DataZoneEquipment.o DemandManager.o EconomicTariff.o \
+	ElectricPowerManager.o ExteriorEnergyUseManager.o General.o \
+	HVACControllers.o HVACDualDuctSystem.o HVACManager.o \
+	HeatBalanceAirManager.o HeatBalanceManager.o \
+	HeatBalanceSurfaceManager.o InputProcessor.o NodeInputManager.o \
+	OutAirNodeManager.o OutputProcessor.o OutputReportPredefined.o \
+	OutputReportTabular.o PollutionAnalysisModule.o RefrigeratedCase.o \
+	SQLiteFortranRoutines.o SizingManager.o SystemReports.o \
+	WeatherManager.o ZoneTempPredictorCorrector.o
+SizingManager.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataSizing.o DataStringGlobals.o DataZoneEquipment.o General.o \
+	HeatBalanceManager.o InputProcessor.o OutputReportPredefined.o \
+	SimAirServingZones.o WeatherManager.o Zoneequipmentmanager.o
+SolarReflectionManager.o: DataEnvironment.o DataGlobals.o DataHeatBalance.o \
+	DataPrecisionGlobals.o DataSurfaces.o DataVectorTypes.o General.o \
+	ScheduleManager.o VectorUtilities.o
+SolarShading.o: DataDaylighting.o DataDaylightingDevices.o DataEnvironment.o \
+	DataErrorTracking.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataReportingFlags.o \
+	DataShadowingCombinations.o DataSurfaces.o DataVectorTypes.o \
+	DataViewFactorInformation.o DaylightingDevices.o DaylightingManager.o \
+	General.o InputProcessor.o OutputReportPredefined.o ScheduleManager.o \
+	SolarReflectionManager.o VectorUtilities.o
+SortAndStringUtilities.o: DataGlobals.o
+SQLiteFortranRoutines.o: DataGlobals.o DataHeatBalance.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o General.o \
+	InputProcessor.o SQLiteFortranRoutines.o ScheduleManager.o
+SurfaceGeometry.o: DataEnvironment.o DataErrorTracking.o DataGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataReportingFlags.o DataSurfaces.o DataVectorTypes.o General.o \
+	InputProcessor.o OutputReportPredefined.o ScheduleManager.o \
+	VectorUtilities.o
+SystemAvailabilityManager.o: AirflowNetworkBalanceManager.o CurveManager.o \
+	DataAirLoop.o DataAirSystems.o DataAirflowNetwork.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataIPShortCuts.o DataLoopNode.o DataPlant.o DataPrecisionGlobals.o \
+	DataZoneControls.o DataZoneEquipment.o General.o InputProcessor.o \
+	NodeInputManager.o PsychRoutines.o ScheduleManager.o
+SystemReports.o: BranchNodeConnections.o DataAirLoop.o DataAirSystems.o \
+	DataConvergParams.o DataEnvironment.o DataGlobalConstants.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalance.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o FanCoilUnits.o GlobalNames.o \
+	HVACSplitterComponent.o HVACStandAloneERV.o InputProcessor.o \
+	PackagedTerminalHeatPump.o PsychRoutines.o Purchasedairmanager.o \
+	UnitVentilator.o WindowAC.o ZonePlenumComponent.o
+ThermalChimney.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataSurfaces.o General.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o
+ThermalComfort.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataZoneEnergyDemands.o General.o InputProcessor.o \
+	OutputReportPredefined.o OutputReportTabular.o PsychRoutines.o \
+	ScheduleManager.o
+UnitHeater.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o FluidProperties.o General.o HVACFanComponent.o \
+	HVACHeatingCoils.o HVACSteamCoilComponent.o HVACWaterCoilComponent.o \
+	InputProcessor.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+UnitVentilator.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataSizing.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o FluidProperties.o General.o HVACFanComponent.o \
+	HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	HVACSteamCoilComponent.o HVACWaterCoilComponent.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o PsychRoutines.o \
+	ScheduleManager.o
+UtilityRoutines.o: BranchInputManager.o BranchNodeConnections.o \
+	DataEnvironment.o DataErrorTracking.o DataGlobals.o \
+	DataPrecisionGlobals.o DataStringGlobals.o DataSystemVariables.o \
+	DaylightingManager.o General.o NodeInputManager.o \
+	OutputReportPredefined.o PlantManager.o SQLiteFortranRoutines.o \
+	SimulationManager.o SolarShading.o SystemReports.o
+VectorUtilities.o: DataGlobals.o DataPrecisionGlobals.o DataSurfaces.o \
+	DataVectorTypes.o
+VentilatedSlab.o: BranchNodeConnections.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalSurface.o \
+	DataHeatBalance.o DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataSurfaceLists.o DataSurfaces.o DataZoneEnergyDemands.o \
+	DataZoneEquipment.o FluidProperties.o General.o HVACFanComponent.o \
+	HVACHXAssistedCoolingCoil.o HVACHeatingCoils.o \
+	HVACSteamCoilComponent.o HVACWaterCoilComponent.o InputProcessor.o \
+	NodeInputManager.o OutAirNodeManager.o PsychRoutines.o \
+	ScheduleManager.o
+WaterManager.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataPrecisionGlobals.o \
+	DataSurfaces.o DataWater.o General.o InputProcessor.o \
+	ScheduleManager.o
+WeatherManager.o: DataEnvironment.o DataGlobals.o DataIPShortCuts.o \
+	DataPrecisionGlobals.o DataReportingFlags.o DataSystemVariables.o \
+	General.o InputProcessor.o OutputProcessor.o OutputReportPredefined.o \
+	PsychRoutines.o ScheduleManager.o
+WindowAC.o: BranchNodeConnections.o DXCoil.o DataEnvironment.o DataGlobals.o \
+	DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o DataSizing.o \
+	DataZoneEnergyDemands.o DataZoneEquipment.o General.o \
+	HVACFanComponent.o HVACHXAssistedCoolingCoil.o InputProcessor.o \
+	MixedAir.o NodeInputManager.o PsychRoutines.o ScheduleManager.o
+WindowManager.o: DataEnvironment.o DataGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalance.o DataLoopNode.o DataPrecisionGlobals.o \
+	DataSurfaces.o DataZoneEquipment.o General.o \
+	HeatBalanceConvectionCoeffs.o InputProcessor.o PsychRoutines.o \
+	ScheduleManager.o VectorUtilities.o
+Zoneairloopequipmentmanager.o: BranchNodeConnections.o DataAirLoop.o \
+	DataGlobals.o DataHVACGlobals.o DataLoopNode.o DataPrecisionGlobals.o \
+	DataZoneEquipment.o Datadefineequip.o General.o HVACCooledBeam.o \
+	HVACDualDuctSystem.o HVACSingleDuctInduc.o HVACSingleDuctSystem.o \
+	InputProcessor.o NodeInputManager.o PoweredInductionUnits.o \
+	PsychRoutines.o
+Zoneequipmentmanager.o: BaseboardRadiator.o BaseboardRadiatorWater.o \
+	DataAirLoop.o DataAirSystems.o DataAirflowNetwork.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o DataHeatBalance.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataRoomAir.o DataSizing.o \
+	DataSurfaces.o DataZoneEnergyDemands.o DataZoneEquipment.o \
+	DirectAir.o FanCoilUnits.o General.o HVACFanComponent.o \
+	HVACInterfaceManager.o HVACSplitterComponent.o HVACStandAloneERV.o \
+	HeatRecovery.o InputProcessor.o PackagedTerminalHeatPump.o \
+	PlantWaterThermalTank.o PsychRoutines.o Purchasedairmanager.o \
+	RadiantSystemHighTemp.o RadiantSystemLowTemp.o ReturnAirPath.o \
+	UnitHeater.o UnitVentilator.o VentilatedSlab.o WindowAC.o \
+	ZonePlenumComponent.o ZoneTempPredictorCorrector.o \
+	Zoneairloopequipmentmanager.o
+ZonePlenumComponent.o: DataEnvironment.o DataGlobals.o DataHVACGlobals.o \
+	DataHeatBalance.o DataIPShortCuts.o DataLoopNode.o \
+	DataPrecisionGlobals.o DataZoneEquipment.o Datadefineequip.o \
+	General.o InputProcessor.o NodeInputManager.o PsychRoutines.o
+ZoneTempPredictorCorrector.o: DataAirflowNetwork.o DataEnvironment.o \
+	DataGlobals.o DataHVACGlobals.o DataHeatBalFanSys.o \
+	DataHeatBalSurface.o DataHeatBalance.o DataIPShortCuts.o \
+	DataLoopNode.o DataPrecisionGlobals.o DataRoomAir.o DataSurfaces.o \
+	DataZoneControls.o DataZoneEnergyDemands.o DataZoneEquipment.o \
+	Datadefineequip.o General.o InputProcessor.o PsychRoutines.o \
+	RoomAirManager.o ScheduleManager.o ThermalComfort.o \
+	ZonePlenumComponent.o
+sqlite3.o: sqlite3.h
+SQLiteCRoutines.o: sqlite3.h SQLiteCRoutines.h

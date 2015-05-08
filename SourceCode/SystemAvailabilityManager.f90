@@ -1,0 +1,3642 @@
+MODULE SystemAvailabilityManager
+
+  ! Module containing the System Availability Manager routines
+
+  ! MODULE INFORMATION:
+  !       AUTHOR         Fred Buhl
+  !       DATE WRITTEN   August 2001
+  !       MODIFIED       February 2004, PGE: Added plant managers.
+  !       MODIFIED       March 2007, LG: Added hybrid ventilation control.
+  !                      August 2008, R. Raustad - FSEC: added 2 new scheduled sys avail managers
+  !                      March 2011, Chandan Sharma - FSEC: Added zone sys avail managers
+  !       RE-ENGINEERED  na
+
+  ! PURPOSE OF THIS MODULE
+  ! To encapsulate the data and algorithms required to
+  ! determine system (loop) availability and "cycle on" status.
+
+  ! METHODOLOGY EMPLOYED:
+  ! Previous time step node data and current zone thermostat setpoints are used
+  ! in a set of fixed, precoded algorithms to determine the current time step
+  ! on/off status of systems and loops.
+
+  ! USE STATEMENTS:
+  ! Use statements for data only modules
+  USE DataPrecisionGlobals
+  USE DataGlobals
+  USE DataHVACGlobals
+  USE DataInterfaces
+
+  ! Use statements for access to subroutines in other modules
+  USE ScheduleManager
+  USE DataAirSystems, ONLY : PrimaryAirSystem
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables
+
+  PRIVATE ! Everything private unless explicitly made public
+
+  ! MODULE PARAMETER DEFINITIONS
+  INTEGER, PARAMETER :: StayOff = 0
+  INTEGER, PARAMETER :: CycleOnAny = 1
+  INTEGER, PARAMETER :: CycleOnControlZone = 2
+  INTEGER, PARAMETER :: ZoneFansOnly = 3
+  ! Hybrid Ventilation parameters
+  INTEGER, PARAMETER :: HybridVentMode_No       = 0  ! No hybrid ventilation control
+  INTEGER, PARAMETER :: HybridVentMode_Temp     = 1  ! Temperature control
+  INTEGER, PARAMETER :: HybridVentMode_Enth     = 2  ! Enthalpy control
+  INTEGER, PARAMETER :: HybridVentMode_DewPoint = 3  ! Dew point control
+  INTEGER, PARAMETER :: HybridVentMode_OA       = 4  ! Outdoor air control
+
+  INTEGER, PARAMETER :: HybridVentCtrl_Noaction = 0  ! No hybrid ventilation control
+  INTEGER, PARAMETER :: HybridVentCtrl_Open     = 1  ! Open windows or doors
+  INTEGER, PARAMETER :: HybridVentCtrl_Close    = 2  ! Close windows or doors
+
+  INTEGER, PARAMETER :: NumValidSysAvailManagerTypes=11
+  CHARACTER(len=*), PARAMETER, DIMENSION(NumValidSysAvailManagerTypes) :: cValidSysAvailManagerTypes=    &
+                 (/'AvailabilityManager:Scheduled                ',  &
+                   'AvailabilityManager:ScheduledOn              ',  &
+                   'AvailabilityManager:ScheduledOff             ',  &
+                   'AvailabilityManager:NightCycle               ',  &
+                   'AvailabilityManager:DifferentialThermostat   ',  &
+                   'AvailabilityManager:HighTemperatureTurnOff   ',  &
+                   'AvailabilityManager:HighTemperatureTurnOn    ',  &
+                   'AvailabilityManager:LowTemperatureTurnOff    ',  &
+                   'AvailabilityManager:LowTemperatureTurnOn     ',  &
+                   'AvailabilityManager:NightVentilation         ',  &
+                   'AvailabilityManager:HybridVentilation        '/)
+
+  INTEGER, PARAMETER :: SysAvailMgr_Scheduled    = 1
+  INTEGER, PARAMETER :: SysAvailMgr_ScheduledOn  = 2
+  INTEGER, PARAMETER :: SysAvailMgr_ScheduledOff = 3
+  INTEGER, PARAMETER :: SysAvailMgr_NightCycle   = 4
+  INTEGER, PARAMETER :: SysAvailMgr_DiffThermo   = 5
+  INTEGER, PARAMETER :: SysAvailMgr_HiTempTOff   = 6
+  INTEGER, PARAMETER :: SysAvailMgr_HiTempTOn    = 7
+  INTEGER, PARAMETER :: SysAvailMgr_LoTempTOff   = 8
+  INTEGER, PARAMETER :: SysAvailMgr_LoTempTOn    = 9
+  INTEGER, PARAMETER :: SysAvailMgr_NightVent    = 10
+  INTEGER, PARAMETER :: SysAvailMgr_HybridVent   = 11
+
+  INTEGER, PARAMETER, DIMENSION(NumValidSysAvailManagerTypes) :: ValidSysAvailManagerTypes=  (/  &
+           SysAvailMgr_Scheduled,    &
+           SysAvailMgr_ScheduledOn,  &
+           SysAvailMgr_ScheduledOff, &
+           SysAvailMgr_NightCycle,   &
+           SysAvailMgr_DiffThermo,   &
+           SysAvailMgr_HiTempTOff,   &
+           SysAvailMgr_HiTempTOn,    &
+           SysAvailMgr_LoTempTOff,   &
+           SysAvailMgr_LoTempTOn,    &
+           SysAvailMgr_NightVent,    &
+           SysAvailMgr_HybridVent/)
+
+
+  ! DERIVED TYPE DEFINITIONS
+  TYPE DefineSchedSysAvailManager                  ! Derived type for Scheduled Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0   ! Schedule pointer
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineSchedSysAvailManager
+
+  TYPE DefineSchedOnSysAvailManager                ! Derived type for Scheduled On Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0   ! Schedule pointer
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineSchedOnSysAvailManager
+
+  TYPE DefineSchedOffSysAvailManager               ! Derived type for Scheduled Off Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0   ! Schedule pointer
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineSchedOffSysAvailManager
+
+  TYPE DefineNightCycSysAvailManager               ! Derived type for Night Cycle Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' '  ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0    ! Applicability schedule pointer
+    CHARACTER(len=MaxNameLength) :: FanSched          = ' '  ! Fan schedule name
+    INTEGER                      :: FanSchedPtr       = 0    ! Fan schedule pointer
+    INTEGER                      :: CtrlType          = 0    ! type of control: Stay Off, Cycle On Any,
+                                                            !   Cycle On Control Zone, or Cycle On Any - Zone Fans Only
+    REAL(r64)                    :: TempTolRange      = 1.0  ! range in degrees C of thermostat tolerance
+    INTEGER                      :: CyclingTimeSteps  = 1    ! period (in Loads time steps) system will cycle on.
+    CHARACTER(len=MaxNameLength) :: CtrlZoneName      = ' '  ! Name of the control zone
+    INTEGER                      :: ZoneNum           = 0    ! zome number of control zone
+    INTEGER                      :: ControlledZoneNum = 0    ! controlled zone number of control zone
+    INTEGER                      :: AvailStatus       = 0    ! reports status of availability manager
+  END TYPE DefineNightCycSysAvailManager
+
+  TYPE DefineDiffTSysAvailManager                  ! Derived type for Differential Thermostat Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: HotNode           = 0   ! "Hot" sensor node
+    INTEGER                      :: ColdNode          = 0   ! "Cold" sensor node
+    REAL(r64)                    :: TempDiffOn        = 0.0 ! Temperature difference for turn on (delta C)
+    REAL(r64)                    :: TempDiffOff       = 0.0 ! Temperature difference for turn off (delta C)
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineDiffTSysAvailManager
+
+  TYPE DefineHiLoSysAvailManager                   ! Derived type for High/Low Temperature On/Off Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: Node              = 0   ! Sensor node
+    REAL(r64)                    :: Temp              = 0.0 ! Temperature for on/off (C)
+    INTEGER                      :: SchedPtr          = 0   ! Applicability schedule pointer
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineHiLoSysAvailManager
+
+  TYPE DefineNightVentSysAvailManager
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
+    INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0   ! Applicability schedule pointer
+    CHARACTER(len=MaxNameLength) :: FanSched          = ' ' ! Fan schedule name
+    INTEGER                      :: FanSchedPtr       = 0   ! Fan schedule pointer
+    CHARACTER(len=MaxNameLength) :: VentTempSched     = ' ' ! Ventilation temperature schedule
+    INTEGER                      :: VentTempSchedPtr  = 0   ! Ventilation temperature schedule pointer
+    REAL(r64)                    :: VentDelT          = 0.0 ! Ventilation delta T [deltaC]
+    REAL(r64)                    :: VentTempLowLim    = 0.0 ! ventilation temperature low limit
+    CHARACTER(len=MaxNameLength) :: CtrlZoneName      = ' ' ! Name of the control zone
+    INTEGER                      :: ZoneNum           = 0   ! zome number of control zone
+    INTEGER                      :: ControlledZoneNum = 0   ! controlled zone number of control zone
+    REAL(r64)                    :: VentFlowFrac      = 0.0 ! the night venting flow fraction
+    INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
+  END TYPE DefineNightVentSysAvailManager
+
+  TYPE DefineHybridVentSysAvailManager
+    CHARACTER(len=MaxNameLength) :: Name                   = ' ' ! Name of the object
+    INTEGER                      :: MgrType                = 0   ! Integer equivalent of availability manager type
+    CHARACTER(len=MaxNameLength) :: AirLoopName            = ' ' ! Name of HVAC Air Loop
+    INTEGER                      :: AirLoopNum             = 0   ! HVAC Air Loop number
+    CHARACTER(len=MaxNameLength) :: ControlZoneName        = ' ' ! Controlled zone name
+    INTEGER                      :: NodeNumofControlledZone =0   ! Controlled zone node number
+    INTEGER                      :: ActualZoneNum          = 0   ! Actual zone number
+    INTEGER                      :: ControlledZoneNum      = 0   ! Controlled zone number
+    INTEGER                      :: ControlModeSchedPtr    = 0   ! Ventilation control mode schedule pointer
+    INTEGER                      :: ControlMode            = 0   ! hybrid ventilation control mode
+    INTEGER                      :: VentilationCtrl        = 0   ! Ventilation control type: Noaction, Close, Open
+    REAL(r64)                    :: MinOutdoorTemp    = -100.0   ! Minimum Outdoor Temperature [C]
+    REAL(r64)                    :: MaxOutdoorTemp     = 100.0   ! Maximum Outdoor Temperature [C]
+    REAL(r64)                    :: MinOutdoorEnth       = 0.1   ! Minimum Outdoor Enthalpy [J/kg]
+    REAL(r64)                    :: MaxOutdoorEnth  = 300000.0   ! Maximum Outdoor Enthalpy [J/kg]
+    REAL(r64)                    :: MinOutdoorDewPoint =-100.0   ! Minimum Outdoor Dew point temperature [C]
+    REAL(r64)                    :: MaxOutdoorDewPoint = 100.0   ! Maximum Outdoor Dew Point Temperature [C]
+    REAL(r64)                    :: MaxWindSpeed         = 0.0   ! Maximum Wind speed [m/s]
+    LOGICAL                      :: UseRainIndicator  = .TRUE.   ! Use WeatherFile Rain Indicators
+    CHARACTER(len=MaxNameLength) :: MinOASched             = ' ' ! Minimum Outdoor Ventilation Air Schedule Name
+    INTEGER                      :: MinOASchedPtr          = 0   ! Minimum Outdoor Ventilation Air Schedule pointer
+    INTEGER                      :: DewPointNoRHErrCount   = 0   ! Dewpoint control mode error count without a humidistat
+    INTEGER                      :: DewPointNoRHErrIndex   = 0   ! Dewpoint control mode error index without a humidistat
+    INTEGER                      :: DewPointErrCount       = 0   ! Dewpoint control mode error count without a valid humidistat
+    INTEGER                      :: DewPointErrIndex       = 0   ! Dewpoint control mode error index without a valid humidistat
+    INTEGER                      :: SingleHCErrCount       = 0   ! Temperature and enthalpy control mode error count
+                                                                 ! with a singleHeatingCooling setpoint
+    INTEGER                      :: SingleHCErrIndex       = 0   ! Temperature and enthalpy control mode error index
+                                                                 ! with a singleHeatingCooling setpoint
+    INTEGER                      :: OpeningFactorFWS       = 0   ! Opening factor modifier as a function of wind speed
+    INTEGER                      :: ANControlTypeSchedPtr  = 0   ! AirflowNetwork control type schedule pointer
+    INTEGER                      :: SimpleControlTypeSchedPtr = 0 ! Simple airflow object control type schedule pointer
+    INTEGER                      :: VentilationPtr         = 0   ! Ventilation object name pointer
+    INTEGER                      :: AvailStatus            = 0   ! reports status of availability manager
+    CHARACTER(len=MaxNameLength) :: VentilationName        = ' ' ! Ventilation object name
+  END TYPE DefineHybridVentSysAvailManager
+
+  TYPE SysAvailManagerList
+    CHARACTER(len=MaxNameLength) :: Name =' '            ! Availability Manager List Name
+    INTEGER                      :: NumItems=0
+    CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: AvailManagerName
+    CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAvailManagerType
+    INTEGER,                      ALLOCATABLE, DIMENSION(:) :: AvailManagerType
+  END TYPE
+
+  ! MODULE VARIABLE DECLARATIONS
+  TYPE (DefineSchedSysAvailManager),      ALLOCATABLE, DIMENSION(:) :: SchedSysAvailMgrData
+  TYPE (DefineSchedOnSysAvailManager),    ALLOCATABLE, DIMENSION(:) :: SchedOnSysAvailMgrData
+  TYPE (DefineSchedOffSysAvailManager),   ALLOCATABLE, DIMENSION(:) :: SchedOffSysAvailMgrData
+  TYPE (DefineNightCycSysAvailManager),   ALLOCATABLE, DIMENSION(:) :: NCycSysAvailMgrData
+  TYPE (DefineDiffTSysAvailManager),      ALLOCATABLE, DIMENSION(:) :: DiffTSysAvailMgrData
+  TYPE (DefineHiLoSysAvailManager),       ALLOCATABLE, DIMENSION(:) :: HiTurnOffSysAvailMgrData
+  TYPE (DefineHiLoSysAvailManager),       ALLOCATABLE, DIMENSION(:) :: HiTurnOnSysAvailMgrData
+  TYPE (DefineHiLoSysAvailManager),       ALLOCATABLE, DIMENSION(:) :: LoTurnOffSysAvailMgrData
+  TYPE (DefineHiLoSysAvailManager),       ALLOCATABLE, DIMENSION(:) :: LoTurnOnSysAvailMgrData
+  TYPE (DefineNightVentSysAvailManager),  ALLOCATABLE, DIMENSION(:) :: NVentSysAvailMgrData
+  TYPE (DefineHybridVentSysAvailManager), ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailMgrData
+  TYPE (SysAvailManagerList),             ALLOCATABLE, DIMENSION(:) :: SysAvailMgrListData
+
+  INTEGER :: NumSchedSysAvailMgrs     = 0
+  INTEGER :: NumSchedOnSysAvailMgrs   = 0
+  INTEGER :: NumSchedOffSysAvailMgrs  = 0
+  INTEGER :: NumNCycSysAvailMgrs      = 0
+  INTEGER :: NumDiffTSysAvailMgrs     = 0
+  INTEGER :: NumHiTurnOffSysAvailMgrs = 0
+  INTEGER :: NumHiTurnOnSysAvailMgrs  = 0
+  INTEGER :: NumLoTurnOffSysAvailMgrs = 0
+  INTEGER :: NumLoTurnOnSysAvailMgrs  = 0
+  INTEGER :: NumNVentSysAvailMgrs     = 0
+  INTEGER :: NumAvailManagerLists     = 0
+  LOGICAL :: GetAvailListsInput       = .TRUE.
+  LOGICAL :: GetAvailMgrInputFlag     = .TRUE.     ! First time, input is "gotten"
+  LOGICAL :: GetHybridInputFlag = .True.  ! Flag set to make sure you get input once
+
+  ! SUBROUTINE SPECIFICATIONS FOR MODULE
+
+  PUBLIC  ManageSystemAvailability
+  PRIVATE GetSysAvailManagerInputs
+  PRIVATE GetSysAvailManagerListInputs
+  PUBLIC  GetPlantAvailabilityManager
+  PUBLIC  GetAirLoopAvailabilityManager
+  PUBLIC  GetZoneEqAvailabilityManager
+  PRIVATE InitSysAvailManagers
+  PRIVATE SimSysAvailManager
+  PRIVATE CalcSchedSysAvailMgr
+  PRIVATE CalcSchedOnSysAvailMgr
+  PRIVATE CalcSchedOffSysAvailMgr
+  PRIVATE CalcNCycSysAvailMgr
+  PRIVATE CalcDiffTSysAvailMgr
+  PRIVATE CalcHiTurnOffSysAvailMgr
+  PRIVATE CalcHiTurnOnSysAvailMgr
+  PRIVATE CalcLoTurnOffSysAvailMgr
+  PRIVATE CalcLoTurnOnSysAvailMgr
+  PRIVATE CalcNVentSysAvailMgr
+  PUBLIC  ValidateAndSetSysAvailabilityManagerType
+  PUBLIC  ManageHybridVentilation
+  PRIVATE GetHybridVentilationInputs
+  PRIVATE CalcHybridVentSysAvailMgr
+  PRIVATE InitHybridVentSysAvailMgr
+  PUBLIC  GetHybridVentilationControlStatus
+
+  CONTAINS
+
+SUBROUTINE ManageSystemAvailability
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       L. Gu, April, 2007. Added hybrid ventilation control
+          !                      Chandan Sharma, March 2011 - FSEC: Added zone sys avail managers
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Manage the simulation of the System Availability Managers
+
+          ! METHODOLOGY EMPLOYED:
+          ! NA
+
+          ! REFERENCES:
+          ! NA
+
+          ! USE STATEMENTS:
+  USE DataZoneEquipment, ONLY: ZoneEquipAvail, TotalNumZoneEquipType
+  USE DataLoopNode
+  USE DataAirLoop
+  USE DataPlant
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! None
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER      :: PriAirSysNum              ! Primary Air System index
+  INTEGER      :: PriAirSysAvailMgrNum      ! Index of Sys Avail Manager in a Primary Air System
+  INTEGER      :: PlantNum                  ! Plant Loop index
+  INTEGER      :: PlantAvailMgrNum          ! Index of Plant Avail Manager in a Plant Loop
+  INTEGER      :: AvailStatus
+  INTEGER      :: PreviousStatus
+  INTEGER      :: ZoneInSysNum
+  INTEGER      :: CtrldZoneNum
+  INTEGER      :: HybridVentNum             ! Hybrid ventilation control number
+  INTEGER      :: ZoneEquipType             ! Type of ZoneHVAC:* component
+  INTEGER      :: CompNum                   ! Index of ZoneHVAC:* component
+  INTEGER      :: ZoneCompAvailMgrNum       ! Index of availability manager associated with the ZoneHVAC:* component
+  INTEGER      :: DummyArgument=1           ! This variable is used when SimSysAvailManager is called for a ZoneHVAC:* component
+
+  IF (GetAvailMgrInputFlag) THEN
+    CALL GetSysAvailManagerInputs
+    GetAvailMgrInputFlag=.FALSE.
+    RETURN
+  ENDIF
+
+  CALL InitSysAvailManagers
+
+  DO PriAirSysNum=1,NumPrimaryAirSys  ! loop over the primary air systems
+
+    PreviousStatus = PriAirSysAvailMgr(PriAirSysNum)%AvailStatus ! Save the previous status for differential thermostat
+    PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = NoAction ! initialize the availability to "take no action"
+
+    DO PriAirSysAvailMgrNum=1,PriAirSysAvailMgr(PriAirSysNum)%NumAvailManagers ! loop over the avail managers in system
+
+      CALL SimSysAvailManager(PriAirSysAvailMgr(PriAirSysNum)%AvailManagerType(PriAirSysAvailMgrNum), &
+                              PriAirSysAvailMgr(PriAirSysNum)%AvailManagerName(PriAirSysAvailMgrNum), &
+                              PriAirSysAvailMgr(PriAirSysNum)%AvailManagerNum(PriAirSysAvailMgrNum),  &
+                              PriAirSysNum, PreviousStatus, AvailStatus)
+
+      IF (AvailStatus .EQ. Forceoff) THEN
+        PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = ForceOff
+        EXIT  ! Fans forced off takes precedence
+      ELSE IF (AvailStatus .EQ. CycleOnZoneFansOnly) THEN
+        PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = CycleOnZoneFansOnly ! zone fans only takes next precedence
+      ELSE IF ( (AvailStatus .EQ. CycleOn) .AND. &
+                (PriAirSysAvailMgr(PriAirSysNum)%AvailStatus .EQ. NoAction) ) THEN
+        PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = CycleOn ! cycle on is lowest precedence
+      END IF
+
+    END DO ! end of availability manager loop
+
+    ! Add hybrid ventilation control
+    IF (NumHybridVentSysAvailMgrs > 0) THEN
+      DO HybridVentNum = 1, NumHybridVentSysAvailMgrs
+        IF (HybridVentSysAvailMgrData(HybridVentNum)%AirLoopNum == PriAirSysNum .AND. &
+            HybridVentSysAvailMgrData(HybridVentNum)%VentilationCtrl == HybridVentCtrl_Open) THEN
+          PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = ForceOff ! Force the system off
+        END IF
+      END DO
+    END IF
+
+    ! loop over the zones served by the system and set the zone equipment availability
+    DO ZoneInSysNum=1,AirToZoneNodeInfo(PriAirSysNum)%NumZonesCooled
+
+      CtrldZoneNum = AirToZoneNodeInfo(PriAirSysNum)%CoolCtrlZoneNums(ZoneInSysNum)
+      ZoneEquipAvail(CtrldZoneNum) = PriAirSysAvailMgr(PriAirSysNum)%AvailStatus
+
+    END DO
+
+  END DO ! end of primary air system loop
+
+
+  DO PlantNum=1,NumPlantLoops
+
+    PreviousStatus = PlantAvailMgr(PlantNum)%AvailStatus ! Save the previous status for differential thermostat
+    PlantAvailMgr(PlantNum)%AvailStatus = NoAction ! Initialize the availability to "take no action"
+
+    DO PlantAvailMgrNum=1,PlantAvailMgr(PlantNum)%NumAvailManagers ! loop over the avail managers in plant
+
+      CALL SimSysAvailManager(PlantAvailMgr(PlantNum)%AvailManagerType(PlantAvailMgrNum), &
+                              PlantAvailMgr(PlantNum)%AvailManagerName(PlantAvailMgrNum), &
+                              PlantAvailMgr(PlantNum)%AvailManagerNum(PlantAvailMgrNum),  &
+                              PlantNum, PreviousStatus, AvailStatus)
+
+      IF (AvailStatus /= NoAction) THEN
+        PlantAvailMgr(PlantNum)%AvailStatus = AvailStatus
+        EXIT ! First manager to do anything other than "NoAction" gets to set the availability
+      END IF
+
+    END DO ! end of availability manager loop
+
+  END DO ! end of plant loop
+
+  DO ZoneEquipType = 1,TotalNumZoneEquipType  ! loop over the zone equipment types
+    IF(ALLOCATED(ZoneComp))THEN
+     IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0)THEN
+      DO CompNum = 1, ZoneComp(ZoneEquipType)%TotalNumComp
+       IF(ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs)) THEN
+        IF(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers .GT. 0)THEN
+           ! Save the previous status for differential thermostat
+          PreviousStatus = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus
+           ! initialize the availability to "take no action"
+          ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
+          DO ZoneCompAvailMgrNum=1,ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+           ! loop over the avail managers in ZoneHVAC:* components
+            CALL SimSysAvailManager(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(ZoneCompAvailMgrNum), &
+                                    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(ZoneCompAvailMgrNum), &
+                                    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(ZoneCompAvailMgrNum),  &
+                                    DummyArgument, PreviousStatus, AvailStatus, ZoneEquipType, CompNum)
+            IF (AvailStatus .EQ. Forceoff) THEN
+              ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = ForceOff
+              EXIT  ! Fans forced off takes precedence
+            ELSE IF ( (AvailStatus .EQ. CycleOn) .AND. &
+                      (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus .EQ. NoAction) ) THEN
+              ! cycle on is next precedence
+              ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = CycleOn
+            END IF
+          END DO ! end of availability manager loop
+         ENDIF
+        ENDIF
+      END DO
+     ENDIF
+    ENDIF
+  END DO ! end of zone equip types
+
+  RETURN
+
+END SUBROUTINE ManageSystemAvailability
+
+SUBROUTINE GetSysAvailManagerInputs
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Obtains input data for System Availability Managers and stores it in
+          ! appropriate data structures.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses InputProcessor "Get" routines to obtain data.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindIteminList, SameString,   &
+        MakeUPPERCase, GetObjectDefMaxArgs
+  USE NodeInputManager, ONLY: GetOnlySingleNode, MarkNode
+  USE DataHeatBalance,  ONLY: Zone
+  USE DataLoopNode
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetSysAvailManagerInputs: ' ! include trailing blank
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cAlphaFieldNames
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cNumericFieldNames
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericFieldBlanks
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaFieldBlanks
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
+  REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
+  CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+  INTEGER       :: NumAlphas            ! Number of Alphas for each GetObjectItem call
+  INTEGER       :: NumNumbers           ! Number of Numbers for each GetObjectItem call
+  INTEGER       :: maxAlphas            ! maximum number of alphas for this set of objects
+  INTEGER       :: maxNumbers           ! maximum number of numbers for this set of objects
+  INTEGER       :: numArgs              ! maximum number of arguments for this set of objects
+  INTEGER       :: IOStatus             ! Used in GetObjectItem
+  LOGICAL       :: ErrorsFound=.FALSE.  ! Set to true if errors in input, fatal at end of routine
+  LOGICAL       :: IsNotOK              ! Flag to verify name
+  LOGICAL       :: IsBlank              ! Flag for blank name
+  INTEGER       :: SysAvailNum          ! DO loop index for all System Availability Managers
+  INTEGER       :: CyclingTimeSteps
+
+  ! Get the number of occurences of each type of manager and read in data
+  cCurrentModuleObject = 'AvailabilityManager:Scheduled'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=NumNumbers
+  maxAlphas=NumAlphas
+  cCurrentModuleObject = 'AvailabilityManager:ScheduledOn'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:ScheduledOff'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:NightCycle'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:DifferentialThermostat'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOff'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOn'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOff'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOn'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:NightVentilation'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+
+  ALLOCATE(cAlphaFieldNames(maxAlphas))
+  cAlphaFieldNames=' '
+  ALLOCATE(cAlphaArgs(maxAlphas))
+  cAlphaArgs=' '
+  ALLOCATE(lAlphaFieldBlanks(maxAlphas))
+  lAlphaFieldBlanks=.false.
+  ALLOCATE(cNumericFieldNames(maxNumbers))
+  cNumericFieldNames=' '
+  ALLOCATE(rNumericArgs(maxNumbers))
+  rNumericArgs=0.0d0
+  ALLOCATE(lNumericFieldBlanks(maxNumbers))
+  lNumericFieldBlanks=.false.
+
+  cCurrentModuleObject = 'AvailabilityManager:Scheduled'
+  NumSchedSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumSchedSysAvailMgrs > 0)THEN
+
+    ALLOCATE(SchedSysAvailMgrData(NumSchedSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumSchedSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),SchedSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      SchedSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      SchedSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_Scheduled
+
+      SchedSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (SchedSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager Scheduled Control Status', &
+                                SchedSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',SchedSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:ScheduledOn'
+  NumSchedOnSysAvailMgrs   = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumSchedOnSysAvailMgrs > 0)THEN
+
+    ALLOCATE(SchedOnSysAvailMgrData(NumSchedOnSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumSchedOnSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),SchedOnSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      SchedOnSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      SchedOnSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_ScheduledOn
+
+      SchedOnSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (SchedOnSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager ScheduledOn Control Status', &
+                                SchedOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',SchedOnSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:ScheduledOff'
+  NumSchedOffSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumSchedOffSysAvailMgrs > 0)THEN
+
+    ALLOCATE(SchedOffSysAvailMgrData(NumSchedOffSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumSchedOffSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),SchedOffSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      SchedOffSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      SchedOffSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_ScheduledOff
+
+      SchedOffSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (SchedOffSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager ScheduledOff Control Status', &
+                                SchedOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',SchedOffSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:NightCycle'
+  NumNCycSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  CyclingTimeSteps     = 0
+
+  IF(NumNCycSysAvailMgrs > 0)THEN
+
+    ALLOCATE(NCycSysAvailMgrData(NumNCycSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumNCycSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),NCycSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      NCycSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      NCycSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_NightCycle
+
+      NCycSysAvailMgrData(SysAvailNum)%TempTolRange = rNumericArgs(1)
+      CyclingTimeSteps = NINT( (rNumericArgs(2)/SecInHour)*REAL(NumOfTimeStepInHour,r64) )
+      CyclingTimeSteps = MAX(1, CyclingTimeSteps)
+      NCycSysAvailMgrData(SysAvailNum)%CyclingTimeSteps = CyclingTimeSteps
+      NCycSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (NCycSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+      NCycSysAvailMgrData(SysAvailNum)%FanSched = cAlphaArgs(3)
+      NCycSysAvailMgrData(SysAvailNum)%FanSchedPtr = GetScheduleIndex(cAlphaArgs(3))
+      IF (NCycSysAvailMgrData(SysAvailNum)%FanSchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+        CASE('STAYOFF')
+          NCycSysAvailMgrData(SysAvailNum)%CtrlType = StayOff
+        CASE('CYCLEONANY')
+          NCycSysAvailMgrData(SysAvailNum)%CtrlType = CycleOnAny
+        CASE('CYCLEONCONTROLZONE')
+          NCycSysAvailMgrData(SysAvailNum)%CtrlType = CycleOnControlZone
+        CASE('CYCLEONANYZONEFANSONLY')
+          NCycSysAvailMgrData(SysAvailNum)%CtrlType = ZoneFansOnly
+        CASE DEFAULT
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError(RoutineName//'incorrect value: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+          ErrorsFound=.TRUE.
+      END SELECT
+      IF (NCycSysAvailMgrData(SysAvailNum)%CtrlType .EQ. CycleOnControlZone) THEN
+        NCycSysAvailMgrData(SysAvailNum)%CtrlZoneName = cAlphaArgs(5)
+        NCycSysAvailMgrData(SysAvailNum)%ZoneNum = FindItemInList(cAlphaArgs(5),Zone%Name,NumOfZones)
+        IF (NCycSysAvailMgrData(SysAvailNum)%ZoneNum .EQ. 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError('not found: '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+          ErrorsFound = .TRUE.
+        END IF
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager Night Cycle Control Status', &
+                                NCycSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',NCycSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:DifferentialThermostat'
+  NumDiffTSysAvailMgrs     = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumDiffTSysAvailMgrs > 0)THEN
+
+    ALLOCATE(DiffTSysAvailMgrData(NumDiffTSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumDiffTSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),DiffTSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      DiffTSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      DiffTSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_DiffThermo
+
+      DiffTSysAvailMgrData(SysAvailNum)%HotNode = &
+        GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(DiffTSysAvailMgrData(SysAvailNum)%HotNode,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                          'Hot Node')
+      DiffTSysAvailMgrData(SysAvailNum)%ColdNode = &
+        GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(DiffTSysAvailMgrData(SysAvailNum)%ColdNode,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                          'Cold Node')
+
+      DiffTSysAvailMgrData(SysAvailNum)%TempDiffOn = rNumericArgs(1)
+
+      IF (NumNumbers > 1) THEN
+        DiffTSysAvailMgrData(SysAvailNum)%TempDiffOff = rNumericArgs(2)
+      ELSE
+        DiffTSysAvailMgrData(SysAvailNum)%TempDiffOff = DiffTSysAvailMgrData(SysAvailNum)%TempDiffOn
+      END IF
+
+      IF (DiffTSysAvailMgrData(SysAvailNum)%TempDiffOff > DiffTSysAvailMgrData(SysAvailNum)%TempDiffOn) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('The '//TRIM(cNumericFieldNames(2))//' is greater than the '//TRIM(cNumericFieldNames(1))//'.')
+        ErrorsFound = .TRUE.
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager Differential Thermostat Control Status', &
+                                DiffTSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',DiffTSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOff'
+  NumHiTurnOffSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumHiTurnOffSysAvailMgrs > 0)THEN
+    ALLOCATE(HiTurnOffSysAvailMgrData(NumHiTurnOffSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumHiTurnOffSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),HiTurnOffSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      HiTurnOffSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      HiTurnOffSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_HiTempTOff
+
+      HiTurnOffSysAvailMgrData(SysAvailNum)%Node = &
+        GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(HiTurnOffSysAvailMgrData(SysAvailNum)%Node,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                         'Sensor Node')
+
+      HiTurnOffSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
+
+      CALL SetupOutputVariable('Availability Manager High Temp Turn Off Control Status', &
+                                HiTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',HiTurnOffSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+
+  cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOn'
+  NumHiTurnOnSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumHiTurnOnSysAvailMgrs > 0)THEN
+
+    ALLOCATE(HiTurnOnSysAvailMgrData(NumHiTurnOnSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumHiTurnOnSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),HiTurnOnSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      HiTurnOnSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      HiTurnOnSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_HiTempTOn
+
+      HiTurnOnSysAvailMgrData(SysAvailNum)%Node = &
+        GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(HiTurnOnSysAvailMgrData(SysAvailNum)%Node,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                          'Sensor Node')
+
+      HiTurnOnSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
+
+      CALL SetupOutputVariable('Availability Manager High Temp Turn On Control Status', &
+                                HiTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',HiTurnOnSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOff'
+  NumLoTurnOffSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumLoTurnOffSysAvailMgrs > 0)THEN
+
+    ALLOCATE(LoTurnOffSysAvailMgrData(NumLoTurnOffSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumLoTurnOffSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),LoTurnOffSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      LoTurnOffSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      LoTurnOffSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_LoTempTOff
+
+      LoTurnOffSysAvailMgrData(SysAvailNum)%Node = &
+        GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(LoTurnOffSysAvailMgrData(SysAvailNum)%Node,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                               'Sensor Node')
+
+      LoTurnOffSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
+
+      IF (.NOT. lAlphaFieldBlanks(3)) THEN
+        LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(3))
+        IF (LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'" not found.')
+          CALL ShowContinueError('Occurs in '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'".')
+          ErrorsFound = .TRUE.
+        END IF
+      ELSE
+        LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr = 0
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager Low Temp Turn Off Control Status', &
+                                LoTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',LoTurnOffSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOn'
+  NumLoTurnOnSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumLoTurnOnSysAvailMgrs > 0)THEN
+
+    ALLOCATE(LoTurnOnSysAvailMgrData(NumLoTurnOnSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumLoTurnOnSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),LoTurnOnSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      LoTurnOnSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      LoTurnOnSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_LoTempTOn
+
+      LoTurnOnSysAvailMgrData(SysAvailNum)%Node = &
+        GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+        NodeType_Unknown,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+      CALL MarkNode(LoTurnOnSysAvailMgrData(SysAvailNum)%Node,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
+                                'Sensor Node')
+
+      LoTurnOnSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
+
+      CALL SetupOutputVariable('Availability Manager Low Temp Turn On Control Status', &
+                                LoTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',LoTurnOnSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:NightVentilation'
+  NumNVentSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF(NumNVentSysAvailMgrs > 0)THEN
+
+    ALLOCATE(NVentSysAvailMgrData(NumNVentSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumNVentSysAvailMgrs
+
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),NVentSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      NVentSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      NVentSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_NightVent
+
+      NVentSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (NVentSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+      NVentSysAvailMgrData(SysAvailNum)%FanSched = cAlphaArgs(3)
+      NVentSysAvailMgrData(SysAvailNum)%FanSchedPtr = GetScheduleIndex(cAlphaArgs(3))
+      IF (NVentSysAvailMgrData(SysAvailNum)%FanSchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+      NVentSysAvailMgrData(SysAvailNum)%VentTempSched = cAlphaArgs(4)
+      NVentSysAvailMgrData(SysAvailNum)%VentTempSchedPtr = GetScheduleIndex(cAlphaArgs(4))
+      IF (NVentSysAvailMgrData(SysAvailNum)%VentTempSchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+      NVentSysAvailMgrData(SysAvailNum)%VentDelT = rNumericArgs(1)
+      NVentSysAvailMgrData(SysAvailNum)%VentTempLowLim = rNumericArgs(2)
+      NVentSysAvailMgrData(SysAvailNum)%VentFlowFrac = rNumericArgs(3)
+      NVentSysAvailMgrData(SysAvailNum)%CtrlZoneName = cAlphaArgs(5)
+      NVentSysAvailMgrData(SysAvailNum)%ZoneNum = FindItemInList(cAlphaArgs(5),Zone%Name,NumOfZones)
+      IF (NVentSysAvailMgrData(SysAvailNum)%ZoneNum .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      CALL SetupOutputVariable('Availability Manager Night Ventilation Control Status', &
+                                NVentSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',NVentSysAvailMgrData(SysAvailNum)%Name)
+
+    END DO ! SysAvailNum
+
+  END IF
+
+  DEALLOCATE(cAlphaFieldNames)
+  DEALLOCATE(cAlphaArgs)
+  DEALLOCATE(lAlphaFieldBlanks)
+  DEALLOCATE(cNumericFieldNames)
+  DEALLOCATE(rNumericArgs)
+  DEALLOCATE(lNumericFieldBlanks)
+
+  IF (ErrorsFound) THEN
+      CALL ShowFatalError(RoutineName//'Errors found in input.  Preceding condition(s) cause termination.')
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetSysAvailManagerInputs
+
+SUBROUTINE GetSysAvailManagerListInputs
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   August 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This routine gets the System Availability Manager List object input and stores
+          ! it for later retrieval of items from the Plant and Air Loops.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cAlphaFieldNames
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cNumericFieldNames
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericFieldBlanks
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaFieldBlanks
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
+  REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
+  CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+  integer :: NumAlphas
+  integer :: NumNumbers
+  integer :: numArgs
+  integer :: Item
+  integer :: IOstatus
+  logical :: IsNotOK
+  logical :: IsBlank
+  logical :: ErrorsFound
+  integer :: list
+  integer :: itemnum
+
+  IF (GetAvailMgrInputFlag) THEN
+    CALL GetSysAvailManagerInputs
+    GetAvailMgrInputFlag=.FALSE.
+  ENDIF
+
+  ErrorsFound=.FALSE.
+
+  cCurrentModuleObject ='AvailabilityManagerAssignmentList'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  ALLOCATE(cAlphaFieldNames(NumAlphas))
+  cAlphaFieldNames=' '
+  ALLOCATE(cAlphaArgs(NumAlphas))
+  cAlphaArgs=' '
+  ALLOCATE(lAlphaFieldBlanks(NumAlphas))
+  lAlphaFieldBlanks=.false.
+  ALLOCATE(cNumericFieldNames(NumNumbers))
+  cNumericFieldNames=' '
+  ALLOCATE(rNumericArgs(NumNumbers))
+  rNumericArgs=0.0d0
+  ALLOCATE(lNumericFieldBlanks(NumNumbers))
+  lNumericFieldBlanks=.false.
+
+
+  cCurrentModuleObject ='AvailabilityManagerAssignmentList'
+  NumAvailManagerLists = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF (NumAvailManagerLists > 0) THEN
+
+    ALLOCATE(SysAvailMgrListData(NumAvailManagerLists))
+
+    DO Item=1,NumAvailManagerLists
+      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),SysAvailMgrListData%Name,Item-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      SysAvailMgrListData(Item)%Name=cAlphaArgs(1)
+
+      SysAvailMgrListData(Item)%NumItems = (NumAlphas-1)/2  ! Subtract off the list name first
+      ALLOCATE(SysAvailMgrListData(Item)%AvailManagerName(SysAvailMgrListData(Item)%NumItems))
+      SysAvailMgrListData(Item)%AvailManagerName=' '
+      ALLOCATE(SysAvailMgrListData(Item)%cAvailManagerType(SysAvailMgrListData(Item)%NumItems))
+      SysAvailMgrListData(Item)%cAvailManagerType=' '
+      ALLOCATE(SysAvailMgrListData(Item)%AvailManagerType(SysAvailMgrListData(Item)%NumItems))
+      SysAvailMgrListData(Item)%AvailManagerType=0
+
+      ! retrieve data
+
+      itemnum=1
+      DO list=1,SysAvailMgrListData(Item)%NumItems
+        itemnum=itemnum+1
+        SysAvailMgrListData(Item)%cAvailManagerType(list)= cAlphaArgs(itemnum)
+        SysAvailMgrListData(Item)%AvailManagerType(list) = ValidateAndSetSysAvailabilityManagerType(cAlphaArgs(itemnum))
+        ! these are validated individually in the GetPlant, GetSystem and GetZoneEq lists
+        itemnum=itemnum+1
+        SysAvailMgrListData(Item)%AvailManagerName(list) = cAlphaArgs(itemnum)
+      ENDDO  ! End of retrieving items
+    ENDDO
+
+  ENDIF
+
+  DEALLOCATE(cAlphaFieldNames)
+  DEALLOCATE(cAlphaArgs)
+  DEALLOCATE(lAlphaFieldBlanks)
+  DEALLOCATE(cNumericFieldNames)
+  DEALLOCATE(rNumericArgs)
+  DEALLOCATE(lNumericFieldBlanks)
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError('GetSysAvailManagerListInputs: Program terminates due to preceding conditions.')
+  ENDIF
+
+ RETURN
+
+END SUBROUTINE GetSysAvailManagerListInputs
+
+SUBROUTINE GetPlantAvailabilityManager(AvailabilityListName,Loop,NumPlantLoops,ErrorsFound)
+
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   August 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the plant availability manager data for the indicated
+          ! loop.  If the PlantAvailMgr structure has not been allocated, it will be allocated
+          ! to "number of plant loops".
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataPlant
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: AvailabilityListName  ! name that should be an Availability Manager List Name
+  INTEGER, INTENT(IN)          :: Loop                  ! which loop this is
+  INTEGER, INTENT(IN)          :: NumPlantLoops         ! Total number of plant loops
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound           ! true if certain errors are detected here
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER Found
+  INTEGER Num
+
+  IF (GetAvailListsInput) THEN
+    CALL GetSysAvailManagerListInputs
+    GetAvailListsInput=.FALSE.
+  ENDIF
+
+  IF (.not. ALLOCATED(PlantAvailMgr)) THEN
+    ALLOCATE(PlantAvailMgr(NumPlantLoops))
+  ENDIF
+
+  Found=0
+  IF (NumAvailManagerLists > 0) &
+    Found=FindItemInList(AvailabilityListName,SysAvailMgrListData%Name,NumAvailManagerLists)
+
+  IF (Found /= 0) THEN
+    PlantAvailMgr(Loop)%NumAvailManagers = SysAvailMgrListData(Found)%NumItems
+    PlantAvailMgr(Loop)%AvailStatus = NoAction
+    PlantAvailMgr(Loop)%StartTime = 0
+    PlantAvailMgr(Loop)%StopTime = 0
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerName(PlantAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerType(PlantAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerNum(PlantAvailMgr(Loop)%NumAvailManagers))
+    DO Num=1,PlantAvailMgr(Loop)%NumAvailManagers
+      PlantAvailMgr(Loop)%AvailManagerName(Num) = SysAvailMgrListData(Found)%AvailManagerName(Num)
+      PlantAvailMgr(Loop)%AvailManagerNum(Num)  = 0
+      PlantAvailMgr(Loop)%AvailManagerType(Num) = SysAvailMgrListData(Found)%AvailManagerType(Num)
+      IF (PlantAvailMgr(Loop)%AvailManagerType(Num) == 0) THEN
+        CALL ShowSevereError('GetPlantLoopData/GetPlantAvailabilityManager: '//  &
+           'Invalid System Availability Manager Type entered="'//  &
+           TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+           TRIM(AvailabilityListName)//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
+      IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_DiffThermo .and.  &
+          Num /= PlantAvailMgr(Loop)%NumAvailManagers) THEN
+        CALL ShowWarningError('GetPlantLoopData/GetPlantAvailabilityManager: '//  &
+           'AvailabilityManager:DifferentialThermostat="'//  &
+           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+        CALL ShowContinueError('...is not the last manager on the AvailabilityManagerAssignmentList.  '//  &
+                               'Any remaining managers will not be used.')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList ="'//  &
+           TRIM(AvailabilityListName)//'".')
+      ENDIF
+      IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_NightVent .OR. &
+          SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_NightCycle) THEN
+        CALL ShowSevereError('GetPlantLoopData/GetPlantAvailabilityManager: '//  &
+           'Invalid System Availability Manager Type entered="'//  &
+           TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
+        CALL ShowContinueError('...this manager is not used in a Plant Loop.')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+           TRIM(AvailabilityListName)//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
+    END DO  !End of Num Loop
+
+  ELSE
+    IF (AvailabilityListName /= ' ') THEN
+      CALL ShowWarningError('GetPlantLoopData/GetPlantAvailabilityManager: AvailabilityManagerAssignmentList='//  &
+         TRIM(AvailabilityListName)//' not found in lists.  No availability will be used.')
+    ENDIF
+    PlantAvailMgr(Loop)%NumAvailManagers = 0
+    PlantAvailMgr(Loop)%AvailStatus = NoAction
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerName(PlantAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerType(PlantAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PlantAvailMgr(Loop)%AvailManagerNum(PlantAvailMgr(Loop)%NumAvailManagers))
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetPlantAvailabilityManager
+
+SUBROUTINE GetAirLoopAvailabilityManager(AvailabilityListName,Loop,NumAirLoops,ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   August 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the availability manager data for the indicated air
+          ! loop or for the indicated type of zone equipment component.
+          ! If the PriAirSysAvailMgr structure has not been allocated, it will be allocated
+          ! to "number of air loops".
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataAirLoop
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: AvailabilityListName  ! name that should be an Availability Manager List Name
+  INTEGER, INTENT(IN)          :: Loop                  ! which loop this is
+  INTEGER, INTENT(IN)          :: NumAirLoops           ! Total number of air loops
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound           ! true if certain errors are detected here
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Found
+  INTEGER :: Num
+!  INTEGER :: CompNumAvailManagers ! Number of availability managers associated with a ZoneHVAC:* component
+
+  IF (GetAvailListsInput) THEN
+    CALL GetSysAvailManagerListInputs
+    GetAvailListsInput=.FALSE.
+  ENDIF
+
+  IF (.not. ALLOCATED(PriAirSysAvailMgr)) THEN
+    ALLOCATE(PriAirSysAvailMgr(NumAirLoops))
+  ENDIF
+
+  Found=0
+  IF (NumAvailManagerLists > 0) &
+    Found=FindItemInList(AvailabilityListName,SysAvailMgrListData%Name,NumAvailManagerLists)
+
+  IF (Found /= 0) THEN
+    PriAirSysAvailMgr(Loop)%NumAvailManagers = SysAvailMgrListData(Found)%NumItems
+    PriAirSysAvailMgr(Loop)%AvailStatus = NoAction
+    PriAirSysAvailMgr(Loop)%StartTime = 0
+    PriAirSysAvailMgr(Loop)%StopTime = 0
+    PriAirSysAvailMgr(Loop)%ReqSupplyFrac = 1.0
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerName(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerType(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerNum(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+    DO Num=1,PriAirSysAvailMgr(Loop)%NumAvailManagers
+      PriAirSysAvailMgr(Loop)%AvailManagerName(Num) = SysAvailMgrListData(Found)%AvailManagerName(Num)
+      PriAirSysAvailMgr(Loop)%AvailManagerNum(Num)  = 0
+      PriAirSysAvailMgr(Loop)%AvailManagerType(Num) = SysAvailMgrListData(Found)%AvailManagerType(Num)
+      IF (PriAirSysAvailMgr(Loop)%AvailManagerType(Num) == 0) THEN
+        CALL ShowSevereError('GetAirPathData/GetAirLoopAvailabilityManager: '//  &
+           'Invalid AvailabilityManagerAssignmentList Type entered="'//  &
+           TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+          TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+         ErrorsFound=.TRUE.
+      ENDIF
+      IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_DiffThermo .and.  &
+          Num /= PriAirSysAvailMgr(Loop)%NumAvailManagers) THEN
+        CALL ShowWarningError('GetAirPathData/GetAirLoopAvailabilityManager: '//  &
+           'AvailabilityManager:DifferentialThermostat="'//  &
+           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+        CALL ShowContinueError('...is not the last manager on the AvailabilityManagerAssignmentList.  '//  &
+                               'Any remaining managers will not be used.')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+      ENDIF
+    END DO  !End of Num Loop
+
+  ELSE
+    IF (AvailabilityListName /= ' ') THEN
+      CALL ShowWarningError('GetAirPathData/GetAirLoopAvailabilityManager: AvailabilityManagerAssignmentList='//  &
+         TRIM(AvailabilityListName)//' not found in lists.  No availability will be used.')
+    ENDIF
+    PriAirSysAvailMgr(Loop)%NumAvailManagers = 0
+    PriAirSysAvailMgr(Loop)%AvailStatus = NoAction
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerName(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerType(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+    ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerNum(PriAirSysAvailMgr(Loop)%NumAvailManagers))
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetAirLoopAvailabilityManager
+
+SUBROUTINE GetZoneEqAvailabilityManager(AvailabilityListName,ErrorsFound, &
+                                        ZoneEquipType, CompNum, TotalNumComp)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   April 2011
+          !       MODIFIED       Chandan Sharma, March 2011 - FSEC: Added zone sys avail managers
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the availability manager data for the indicated type of zone
+          ! equipment component.
+          ! If not allocated, ZoneComp structure will be allocated to "Total num of zone equip types" and
+          ! ZoneCompAvailMgrs structure will be allocated to "Total number of components of the indicated type".
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+  USE DataZoneEquipment, ONLY: TotalNumZoneEquipType
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: AvailabilityListName  ! name that should be an Availability Manager List Name
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound           ! true if certain errors are detected here
+  INTEGER, INTENT(IN)          :: ZoneEquipType     ! Type of ZoneHVAC:* component
+  INTEGER, INTENT(IN)          :: CompNum           ! Index of a particular ZoneHVAC:* component
+  INTEGER, INTENT(IN)          :: TotalNumComp      ! Total number of ZoneHVAC:* components of same type
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Found
+  INTEGER :: Num
+  INTEGER :: CompNumAvailManagers ! Number of availability managers associated with a ZoneHVAC:* component
+
+  IF (GetAvailListsInput) THEN
+    CALL GetSysAvailManagerListInputs
+    GetAvailListsInput=.FALSE.
+  ENDIF
+
+  IF (.not. ALLOCATED(ZoneComp)) THEN
+    ALLOCATE(ZoneComp(TotalNumZoneEquipType))
+  ENDIF
+  IF (.not. ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs)) THEN
+    ZoneComp(ZoneEquipType)%TotalNumComp = TotalNumComp
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(TotalNumComp))
+  ENDIF
+
+  Found=0
+  IF (NumAvailManagerLists > 0) &
+    Found=FindItemInList(AvailabilityListName,SysAvailMgrListData%Name,NumAvailManagerLists)
+
+  IF (Found /= 0) THEN
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers = SysAvailMgrListData(Found)%NumItems
+    CompNumAvailManagers = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime = 0
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime = 0
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%ReqSupplyFrac = 1.0
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(CompNumAvailManagers))
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(CompNumAvailManagers))
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(CompNumAvailManagers))
+    DO Num=1,ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(Num) = SysAvailMgrListData(Found)%AvailManagerName(Num)
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(Num)  = 0
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) = SysAvailMgrListData(Found)%AvailManagerType(Num)
+      IF (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) == 0) THEN
+        CALL ShowSevereError('GetZoneEqAvailabilityManager: '//  &
+           'Invalid AvailabilityManagerAssignmentList Type entered="'//  &
+           TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+          TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+         ErrorsFound=.TRUE.
+      ENDIF
+      IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_DiffThermo .and.  &
+          Num /= ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers) THEN
+        CALL ShowWarningError('GetZoneEqAvailabilityManager: '//  &
+           'AvailabilityManager:DifferentialThermostat="'//  &
+           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+        CALL ShowContinueError('...is not the last manager on the AvailabilityManagerAssignmentList.  '//  &
+                               'Any remaining managers will not be used.')
+        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+      ENDIF
+    END DO  !End of Num Loop
+
+  ELSE
+    IF (AvailabilityListName /= ' ') THEN
+      CALL ShowWarningError('GetZoneEqAvailabilityManager: AvailabilityManagerAssignmentList='//  &
+         TRIM(AvailabilityListName)//' not found in lists.  No availability will be used.')
+    ENDIF
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers = 0
+    CompNumAvailManagers = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(CompNumAvailManagers))
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(CompNumAvailManagers))
+    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(CompNumAvailManagers))
+  END IF
+  RETURN
+
+END SUBROUTINE GetZoneEqAvailabilityManager
+
+SUBROUTINE InitSysAvailManagers
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       Brent Griffith, CR8376 initialize to NoAction every timestep
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is for initializations of the System Availability Manager objects.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses the status flags to trigger initializations.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! NA
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL,SAVE  :: MyOneTimeFlag = .TRUE.    ! One time flag
+  INTEGER       :: SysAvailNum               ! DO loop indes for Sys Avail Manager objects
+  INTEGER       :: ControlledZoneNum         ! Index into the ZoneEquipConfig array
+
+  ! One time initializations
+  IF (MyOneTimeFlag) THEN
+
+    DO SysAvailNum = 1,NumNCycSysAvailMgrs
+      IF (NCycSysAvailMgrData(SysAvailNum)%CtrlType .EQ. CycleOnControlZone) THEN
+        ! set the controlled zone numbers
+        DO ControlledZoneNum = 1,NumOfZones
+          IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NCycSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
+            NCycSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+            EXIT
+          END IF
+        END DO
+      END IF
+    END DO
+
+    DO SysAvailNum = 1,NumNVentSysAvailMgrs
+      ! set the controlled zone numbers
+      DO ControlledZoneNum = 1,NumOfZones
+        IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NVentSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
+          NVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+          EXIT
+        END IF
+      END DO
+    END DO
+
+    MyOneTimeFlag = .FALSE.
+
+  END IF ! end 1 time initializations
+
+  ! initialize individual availability managers to no action (CR 8376 reporting issue)
+  IF (ALLOCATED(SchedSysAvailMgrData))     SchedSysAvailMgrData%AvailStatus     = NoAction
+  IF (ALLOCATED(SchedOnSysAvailMgrData))   SchedOnSysAvailMgrData%AvailStatus   = NoAction
+  IF (ALLOCATED(SchedOffSysAvailMgrData))  SchedOffSysAvailMgrData%AvailStatus  = NoAction
+  IF (ALLOCATED(NCycSysAvailMgrData))      NCycSysAvailMgrData%AvailStatus      = NoAction
+  IF (ALLOCATED(NVentSysAvailMgrData))     NVentSysAvailMgrData%AvailStatus     = NoAction
+  IF (ALLOCATED(DiffTSysAvailMgrData))     DiffTSysAvailMgrData%AvailStatus     = NoAction
+  IF (ALLOCATED(HiTurnOffSysAvailMgrData)) HiTurnOffSysAvailMgrData%AvailStatus = NoAction
+  IF (ALLOCATED(HiTurnOnSysAvailMgrData))  HiTurnOnSysAvailMgrData%AvailStatus  = NoAction
+  IF (ALLOCATED(LoTurnOffSysAvailMgrData)) LoTurnOffSysAvailMgrData%AvailStatus = NoAction
+  IF (ALLOCATED(LoTurnOnSysAvailMgrData))  LoTurnOnSysAvailMgrData%AvailStatus  = NoAction
+!  HybridVentSysAvailMgrData%AvailStatus= NoAction
+
+  RETURN
+
+END SUBROUTINE InitSysAvailManagers
+
+SUBROUTINE SimSysAvailManager(SysAvailType,SysAvailName,SysAvailNum,PriAirSysNum,PreviousStatus,AvailStatus,ZoneEquipType, CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Loop over all the System Availability Managers and invoke the correct
+          ! System Availability Manager algorithm.
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+  USE General,        ONLY: TrimSigDigits
+
+  IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT(IN) :: SysAvailType
+!  CHARACTER(len=*), INTENT(IN) :: SysAvailType
+  CHARACTER(len=*), INTENT(IN) :: SysAvailName
+  INTEGER,       INTENT(INOUT) :: SysAvailNum
+  INTEGER,          INTENT(IN) :: PriAirSysNum ! Primary Air System index. If being called for a ZoneHVAC:* component
+                                               ! then a dummyvariable is passed in to this subroutine.
+  INTEGER,          INTENT(IN) :: PreviousStatus
+  INTEGER,         INTENT(OUT) :: AvailStatus
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: ZoneEquipType   ! Type of ZoneHVAC:* equipment component
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: CompNum         ! Index of ZoneHVAC:* equipment component
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  SELECT CASE(SysAvailType)
+    CASE(SysAvailMgr_Scheduled) ! 'AvailabilityManager:Scheduled'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,SchedSysAvailMgrData%Name,NumSchedSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcSchedSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:Scheduled not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_ScheduledOn) ! 'AvailabilityManager:ScheduledOn'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,SchedOnSysAvailMgrData%Name,NumSchedOnSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcSchedOnSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:ScheduledOn not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_ScheduledOff) ! 'AvailabilityManager:ScheduledOff'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,SchedOffSysAvailMgrData%Name,NumSchedOffSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcSchedOffSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:ScheduledOff not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_NightCycle) ! 'AvailabilityManager:NightCycle'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,NCycSysAvailMgrData%Name,NumNCycSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus, ZoneEquipType, CompNum)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:NightCycle not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_NightVent) ! 'AvailabilityManager:NightVentilation'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,NVentSysAvailMgrData%Name,NumNVentSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcNVentSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipType)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:NightVentilation not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_DiffThermo) ! 'AvailabilityManager:DifferentialThermostat'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,DiffTSysAvailMgrData%Name,NumDiffTSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcDiffTSysAvailMgr(SysAvailNum,PreviousStatus,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:DifferentialThermostat not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_HiTempTOff)  ! 'AvailabilityManager:HighTemperatureTurnOff'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,HiTurnOffSysAvailMgrData%Name,NumHiTurnOffSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcHiTurnOffSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:HighTemperatureTurnOff not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_HiTempTOn)  ! 'AvailabilityManager:HighTemperatureTurnOn'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,HiTurnOnSysAvailMgrData%Name,NumHiTurnOnSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcHiTurnOnSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:HighTemperatureTurnOn not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_LoTempTOff)  ! 'AvailabilityManager:LowTemperatureTurnOff'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,LoTurnOffSysAvailMgrData%Name,NumLoTurnOffSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcLoTurnOffSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:LowTemperatureTurnOff not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_LoTempTOn)  ! 'AvailabilityManager:LowTemperatureTurnOn'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,LoTurnOnSysAvailMgrData%Name,NumLoTurnOnSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcLoTurnOnSysAvailMgr(SysAvailNum,AvailStatus)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:LowTemperatureTurnOn not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE DEFAULT
+      CALL ShowSevereError('AvailabilityManager Type not found: '//TRIM(TrimSigDigits(SysAvailType)))
+      CALL ShowContinueError('Occurs in Manager='//TRIM(SysAvailName))
+      CALL ShowFatalError('Preceding condition causes termination.')
+
+  END SELECT
+
+  RETURN
+
+END SUBROUTINE SimSysAvailManager
+
+SUBROUTINE CalcSchedSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop, plant loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Looks at the System Availability Manager schedule and sets the
+          ! AvailStatus indicator accordingly. Mostly a useless algorithm
+          ! since the fan schedules can do the same thing.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  IF (GetCurrentScheduleValue(SchedSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0) THEN
+    AvailStatus = CycleOn
+  ELSE
+    AvailStatus = ForceOff
+  END IF
+
+  SchedSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcSchedSysAvailMgr
+
+SUBROUTINE CalcSchedOnSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         R. Raustad - FSEC
+          !       DATE WRITTEN   August 2008
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop, plant loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Looks at the System Availability Manager schedule and sets the
+          ! AvailStatus indicator accordingly. If the schedule value is > 0
+          ! the availability status is CycleOn, ELSE the status is NoAction.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled on system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  IF (GetCurrentScheduleValue(SchedOnSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0) THEN
+    AvailStatus = CycleOn
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  SchedOnSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcSchedOnSysAvailMgr
+
+SUBROUTINE CalcSchedOffSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         R. Raustad - FSEC
+          !       DATE WRITTEN   August 2008
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop, plant loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Looks at the System Availability Manager schedule and sets the
+          ! AvailStatus indicator accordingly.  If the schedule value is = 0
+          ! the availability status is ForceOff, ELSE the status is NoAction.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled off system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  IF (GetCurrentScheduleValue(SchedOffSysAvailMgrData(SysAvailNum)%SchedPtr) .EQ. 0.0) THEN
+    AvailStatus = ForceOff
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  SchedOffSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcSchedOffSysAvailMgr
+
+SUBROUTINE CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipType, CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   August 2001
+          !       MODIFIED       March 2011, Chandan Sharma - FSEC: Allowed night cycle
+          !                             availability manager to work for ZoneHVAC component
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          ! For air loop, depending on the type of control, looks at 1 named zone or all the zones
+          ! attached to a primary air system, compares zone temperature to the setup
+          ! or setback thermostat setpoint, and sets the AvailStaus indicator according
+          ! to whether the system needs to be cycled on or not.
+          ! For ZoneHVAC component, uses the exact same method as above but only looks at the
+          ! zone where component is located.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataAirLoop
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataHeatBalFanSys, ONLY: TempZoneThermostatSetpoint, ZoneThermostatSetPointHi, &
+                               ZoneThermostatSetPointLo, TempControlType, TempTstatAir
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
+  INTEGER, INTENT (IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: ZoneEquipType  ! Type of ZoneHVAC equipment component
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: CompNum    ! Index of ZoneHVAC equipment component
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: StartTime
+  INTEGER :: StopTime
+  INTEGER :: ZoneInSysNum
+  INTEGER :: CtrldZoneNum
+  INTEGER :: ZoneNum
+  REAL(r64)    :: TempTol
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: ZoneCompNCControlType
+  LOGICAL, SAVE :: OneTimeFlag = .TRUE.
+
+  TempTol = 0.5*NCycSysAvailMgrData(SysAvailNum)%TempTolRange
+  IF (PRESENT(ZoneEquipType)) THEN
+    StartTime = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime
+    StopTime  = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime
+    IF (OneTimeFlag) THEN
+      ALLOCATE(ZoneCompNCControlType(NumNCycSysAvailMgrs))
+      ZoneCompNCControlType = .TRUE.
+      OneTimeFlag = .FALSE.
+    ENDIF
+  ELSE
+    StartTime = PriAirSysAvailMgr(PriAirSysNum)%StartTime
+    StopTime = PriAirSysAvailMgr(PriAirSysNum)%StopTime
+  ENDIF
+! CR 7913 changed to allow during warmup
+  IF ( (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) .OR. &
+       (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0) )  THEN
+    AvailStatus = NoAction
+    NCycSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus   ! CR 8358
+    RETURN
+  END IF
+
+  IF (PRESENT(ZoneEquipType)) THEN
+    IF ( SimTimeSteps >= StartTime .AND. SimTimeSteps < StopTime ) THEN ! if cycled on
+      AvailStatus = CycleOn
+    ELSE IF ( SimTimeSteps == StopTime ) THEN ! if end of cycle run time, shut down if fan off
+      AvailStatus = NoAction
+    ELSE
+
+      SELECT CASE(NCycSysAvailMgrData(SysAvailNum)%CtrlType) ! select type of night cycle control
+
+        CASE(StayOff)
+          AvailStatus = NoAction
+
+        CASE(CycleOnControlZone)
+
+          ZoneNum = NCycSysAvailMgrData(SysAvailNum)%ZoneNum
+
+          SELECT CASE(TempControlType(ZoneNum)) ! select on thermostat control
+
+            CASE(SingleHeatingSetPoint)
+              IF (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(SingleCoolingSetPoint)
+              IF (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(SingleHeatCoolSetPoint)
+              IF ( (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) .OR. &
+                   (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) ) THEN
+
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(DualSetPointWithDeadBand)
+              IF ( (TempTstatAir(ZoneNum) < ZoneThermostatSetPointLo(ZoneNum) - TempTol) .OR. &
+                   (TempTstatAir(ZoneNum) > ZoneThermostatSetPointHi(ZoneNum) + TempTol) ) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE DEFAULT
+              AvailStatus = NoAction
+
+          END SELECT ! end select on thermostat control
+
+        CASE(CycleOnAny, ZoneFansOnly)
+          IF (ZoneCompNCControlType(SysAvailNum)) THEN
+            CALL ShowWarningError('AvailabilityManager:NightCycle = '//TRIM(NCycSysAvailMgrData(SysAvailNum)%Name)// &
+                                 ', is specified for a ZoneHVAC component.')
+            CALL ShowContinueError('The only valid Control Types for ZoneHVAC components are CycleOnControlZone and StayOff.')
+            CALL ShowContinueError('Night Cycle operation will not be modeled for ZoneHVAC components that reference this '// &
+                                   'manager.')
+            ZoneCompNCControlType(SysAvailNum) = .FALSE.
+          ENDIF
+          AvailStatus = NoAction
+
+        CASE DEFAULT
+          AvailStatus = NoAction
+
+      END SELECT ! end select type of night cycle control
+
+      IF (AvailStatus == CycleOn) THEN ! reset the start and stop times
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime = SimTimeSteps
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime = SimTimeSteps + &
+                                          NCycSysAvailMgrData(SysAvailNum)%CyclingTimeSteps
+      END IF
+
+    END IF
+  ELSE
+    IF ( SimTimeSteps >= StartTime .AND. SimTimeSteps < StopTime ) THEN ! if cycled on
+      AvailStatus = CycleOn
+      IF (NCycSysAvailMgrData(SysAvailNum)%CtrlType == ZoneFansOnly) AvailStatus = CycleOnZoneFansOnly
+    ELSE IF ( SimTimeSteps == StopTime ) THEN ! if end of cycle run time, shut down if fan off
+      AvailStatus = NoAction
+    ELSE
+
+      SELECT CASE(NCycSysAvailMgrData(SysAvailNum)%CtrlType) ! select type of night cycle control
+
+        CASE(StayOff)
+          AvailStatus = NoAction
+
+        CASE(CycleOnAny, ZoneFansOnly)
+
+          ! If no zones cooled, Availstatus could be "unknown"
+          AvailStatus = NoAction
+
+          DO ZoneInSysNum=1,AirToZoneNodeInfo(PriAirSysNum)%NumZonesCooled ! loop over zones in system
+
+            CtrldZoneNum = AirToZoneNodeInfo(PriAirSysNum)%CoolCtrlZoneNums(ZoneInSysNum)
+            ZoneNum = ZoneEquipConfig(CtrldZoneNum)%ActualZoneNum
+
+            SELECT CASE(TempControlType(ZoneNum)) ! select on thermostat control
+
+              CASE(SingleHeatingSetPoint)
+                IF (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) THEN
+                  AvailStatus = CycleOn
+                  EXIT
+                ELSE
+                  AvailStatus = NoAction
+                END IF
+
+              CASE(SingleCoolingSetPoint)
+                IF (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) THEN
+                  AvailStatus = CycleOn
+                  EXIT
+                ELSE
+                  AvailStatus = NoAction
+                END IF
+
+              CASE(SingleHeatCoolSetPoint)
+                IF ( (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) .OR. &
+                     (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) ) THEN
+                  AvailStatus = CycleOn
+                  EXIT
+                ELSE
+                  AvailStatus = NoAction
+                END IF
+
+              CASE(DualSetPointWithDeadBand)
+                IF ( (TempTstatAir(ZoneNum) < ZoneThermostatSetPointLo(ZoneNum) - TempTol) .OR. &
+                     (TempTstatAir(ZoneNum) > ZoneThermostatSetPointHi(ZoneNum) + TempTol) ) THEN
+                  AvailStatus = CycleOn
+                  EXIT
+                ELSE
+                  AvailStatus = NoAction
+                END IF
+
+              CASE DEFAULT
+                AvailStatus = NoAction
+
+            END SELECT ! end select on thermostat control
+
+          END DO ! end loop over zones in system
+
+        CASE(CycleOnControlZone)
+
+          ZoneNum = NCycSysAvailMgrData(SysAvailNum)%ZoneNum
+
+          SELECT CASE(TempControlType(ZoneNum)) ! select on thermostat control
+
+            CASE(SingleHeatingSetPoint)
+              IF (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(SingleCoolingSetPoint)
+              IF (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(SingleHeatCoolSetPoint)
+              IF ( (TempTstatAir(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum) - TempTol) .OR. &
+                   (TempTstatAir(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum) + TempTol) ) THEN
+
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE(DualSetPointWithDeadBand)
+              IF ( (TempTstatAir(ZoneNum) < ZoneThermostatSetPointLo(ZoneNum) - TempTol) .OR. &
+                   (TempTstatAir(ZoneNum) > ZoneThermostatSetPointHi(ZoneNum) + TempTol) ) THEN
+                AvailStatus = CycleOn
+              ELSE
+                AvailStatus = NoAction
+              END IF
+
+            CASE DEFAULT
+              AvailStatus = NoAction
+
+          END SELECT ! end select on thermostat control
+
+        CASE DEFAULT
+          AvailStatus = NoAction
+
+      END SELECT ! end select type of night cycle control
+
+      IF (AvailStatus == CycleOn) THEN ! reset the start and stop times
+        PriAirSysAvailMgr(PriAirSysNum)%StartTime = SimTimeSteps
+        PriAirSysAvailMgr(PriAirSysNum)%StopTime = SimTimeSteps + NCycSysAvailMgrData(SysAvailNum)%CyclingTimeSteps
+        IF (NCycSysAvailMgrData(SysAvailNum)%CtrlType == ZoneFansOnly) AvailStatus = CycleOnZoneFansOnly
+      END IF
+
+    END IF
+  ENDIF
+  NCycSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcNCycSysAvailMgr
+
+SUBROUTINE CalcNVentSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipType)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   December 2004
+          !       MODIFIED       March 2011, Chandan Sharma - FSEC: Allowed night ventilation
+          !                             availability manager to work for zone component
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop and ZoneHVAC component and sets a specified flow
+          ! rate fraction for the air loop for use during night ventilation.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Looks at outside and indoor conditions to determine if night ventilation
+          ! is beneficial. If it is and it is scheduled on the AvailStatus is set to cycle
+          ! on and the loop flow rate fractionis set to the specified night ventilation
+          ! value.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataAirLoop
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataHeatBalFanSys, ONLY: TempZoneThermostatSetpoint, ZoneThermostatSetPointHi, &
+                               ZoneThermostatSetPointLo, TempControlType, TempTstatAir
+  USE DataEnvironment, ONLY:   OutDryBulbTemp
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
+  INTEGER, INTENT (IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: ZoneEquipType  ! Type of zone equipment component
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ZoneInSysNum
+  INTEGER :: CtrldZoneNum
+  INTEGER :: ZoneNum
+  LOGICAL :: TempCheck ! TRUE if one zone's temperature is above the value of the vent temp sched
+  LOGICAL :: DelTCheck ! TRUE if the control zone temperature - outside temperature > VentDelT
+  LOGICAL :: LowLimCheck ! TRUE if one zones's air temperature is below this value
+  REAL(r64) :: VentTemp       ! value of the ventilation temperature schedule
+  INTEGER :: ControlZoneNum ! actual zone number of the control zone
+
+  TempCheck = .FALSE.
+  DelTCheck = .FALSE.
+  LowLimCheck = .FALSE.
+! check if night venting allowed: not allowed if avail sched is off or fan sched is on
+! CR 7913 changed to allow during warmup
+  IF ( (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) .OR. &
+       (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0)  )  THEN
+    AvailStatus = NoAction
+  ELSE
+
+    VentTemp = GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%VentTempSchedPtr)
+    ControlZoneNum = NVentSysAvailMgrData(SysAvailNum)%ZoneNum
+
+    IF (PRESENT(ZoneEquipType)) THEN
+      ! if the room temperature is greater than the vent temp sched value, set the vent temp check to TRUE
+      IF (TempTstatAir(ControlZoneNum) > VentTemp) THEN
+        TempCheck = .TRUE.
+      END IF
+      ! if the room temperature is less than the low limit set the low limit check to TRUE
+      IF (TempTstatAir(ControlZoneNum) < NVentSysAvailMgrData(SysAvailNum)%VentTempLowLim) THEN
+        LowLimCheck = .TRUE.
+      END IF
+    ELSE
+      DO ZoneInSysNum=1,AirToZoneNodeInfo(PriAirSysNum)%NumZonesCooled ! loop over zones in system
+
+         CtrldZoneNum = AirToZoneNodeInfo(PriAirSysNum)%CoolCtrlZoneNums(ZoneInSysNum)
+         ZoneNum = ZoneEquipConfig(CtrldZoneNum)%ActualZoneNum
+         ! if the room temperature is greater than the vent temp sched value, set the vent temp check to TRUE
+         IF (TempTstatAir(ZoneNum) > VentTemp) THEN
+           TempCheck = .TRUE.
+         END IF
+         ! if the room temperature is less than the low limit set the low limit check to TRUE
+         IF (TempTstatAir(ZoneNum) < NVentSysAvailMgrData(SysAvailNum)%VentTempLowLim) THEN
+           LowLimCheck = .TRUE.
+         END IF
+
+      END DO
+    ENDIF
+    ! If the difference between the control zone temperature and the outside temperature is greater than
+    ! the specified night venting delta T then set the delta T check to TRUE
+    IF ( (TempTstatAir(ControlZoneNum) - OutDryBulbTemp)  > NVentSysAvailMgrData(SysAvailNum)%VentDelT ) THEN
+      DelTCheck = .TRUE.
+    END IF
+    ! If the limit requirements are met turn on night ventilation
+    IF (TempCheck .AND. DelTCheck .AND. .NOT. LowLimCheck) THEN
+      AvailStatus = CycleOn
+    ELSE
+      AvailStatus = NoAction
+    END IF
+
+  END IF
+
+  IF (.NOT. PRESENT(ZoneEquipType)) THEN
+    IF (AvailStatus == CycleOn) THEN
+      AirLoopControlInfo(PriAirSysNum)%LoopFlowRateSet = .TRUE.
+      AirLoopControlInfo(PriAirSysNum)%NightVent = .TRUE.
+      AirLoopFlow(PriAirSysNum)%ReqSupplyFrac = NVentSysAvailMgrData(SysAvailNum)%VentFlowFrac
+    END IF
+  ENDIF
+
+  NVentSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcNVentSysAvailMgr
+
+SUBROUTINE CalcDiffTSysAvailMgr(SysAvailNum,PreviousStatus,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Peter Graham Ellis
+          !       DATE WRITTEN   February 2004
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a plant loop, primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          !
+
+          ! USE STATEMENTS:
+  USE DataLoopNode, ONLY: Node
+  USE DataPlant, ONLY: PlantAvailMgr
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! Number of the current scheduled system availability manager
+  INTEGER, INTENT (IN)  :: PreviousStatus      ! System status for the previous timestep
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: DeltaTemp
+
+          ! FLOW:
+  DeltaTemp = Node(DiffTSysAvailMgrData(SysAvailNum)%HotNode)%Temp - Node(DiffTSysAvailMgrData(SysAvailNum)%ColdNode)%Temp
+
+  IF (DeltaTemp >= DiffTSysAvailMgrData(SysAvailNum)%TempDiffOn) THEN
+    AvailStatus = CycleOn
+  ELSE IF (DeltaTemp <= DiffTSysAvailMgrData(SysAvailNum)%TempDiffOff) THEN
+    AvailStatus = ForceOff
+  ELSE
+
+    IF (PreviousStatus == NoAction) THEN
+      AvailStatus = ForceOff
+    ELSE
+      AvailStatus = PreviousStatus ! No change, but not "NoAction"; it should always be on or off.
+    END IF
+
+  END IF
+
+  DiffTSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcDiffTSysAvailMgr
+
+
+SUBROUTINE CalcHiTurnOffSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Peter Graham Ellis
+          !       DATE WRITTEN   February 2004
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a plant loop, primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          !
+
+          ! USE STATEMENTS:
+  USE DataLoopNode, ONLY: Node
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! Number of the current scheduled system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! FLOW:
+  IF (Node(HiTurnOffSysAvailMgrData(SysAvailNum)%Node)%Temp >= HiTurnOffSysAvailMgrData(SysAvailNum)%Temp) THEN
+    AvailStatus = ForceOff
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  HiTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcHiTurnOffSysAvailMgr
+
+
+SUBROUTINE CalcHiTurnOnSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Peter Graham Ellis
+          !       DATE WRITTEN   February 2004
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a plant loop, primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          !
+
+          ! USE STATEMENTS:
+  USE DataLoopNode, ONLY: Node
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! Number of the current scheduled system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! FLOW:
+  IF (Node(HiTurnOnSysAvailMgrData(SysAvailNum)%Node)%Temp >= HiTurnOnSysAvailMgrData(SysAvailNum)%Temp) THEN
+    AvailStatus = CycleOn
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  HiTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcHiTurnOnSysAvailMgr
+
+
+SUBROUTINE CalcLoTurnOffSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Peter Graham Ellis
+          !       DATE WRITTEN   February 2004
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a plant loop, primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          !
+
+          ! USE STATEMENTS:
+  USE DataLoopNode, ONLY: Node
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! Number of the current scheduled system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! FLOW:
+
+          ! If applicability schedule is off, then availability manager is inactive, return no action
+  IF (LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr > 0) THEN
+    IF(GetCurrentScheduleValue(LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) THEN
+      AvailStatus = NoAction
+      LoTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+      RETURN
+    END IF
+  END IF
+
+          ! Availability manager is active, check temperature limit
+  IF (Node(LoTurnOffSysAvailMgrData(SysAvailNum)%Node)%Temp <= LoTurnOffSysAvailMgrData(SysAvailNum)%Temp) THEN
+    AvailStatus = ForceOff
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  LoTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcLoTurnOffSysAvailMgr
+
+
+SUBROUTINE CalcLoTurnOnSysAvailMgr(SysAvailNum,AvailStatus)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Peter Graham Ellis
+          !       DATE WRITTEN   February 2004
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a plant loop, primary air loop or ZoneHVAC component.
+
+          ! METHODOLOGY EMPLOYED:
+          !
+
+          ! USE STATEMENTS:
+  USE DataLoopNode, ONLY: Node
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! Number of the current scheduled system availability manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+
+          ! FLOW:
+  IF (Node(LoTurnOnSysAvailMgrData(SysAvailNum)%Node)%Temp <= LoTurnOnSysAvailMgrData(SysAvailNum)%Temp) THEN
+    AvailStatus = CycleOn
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+  LoTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+
+  RETURN
+
+END SUBROUTINE CalcLoTurnOnSysAvailMgr
+
+FUNCTION ValidateAndSetSysAvailabilityManagerType(AvailMgrName) RESULT(ValidType)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   April 2005
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns true for a valid System Availability Manager Type
+          ! and false if not.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItem
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: AvailMgrName  ! name to validate
+  INTEGER                      :: ValidType     ! result of validation
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: Found
+
+  Found=FindItem(AvailMgrName,cValidSysAvailManagerTypes,NumValidSysAvailManagerTypes)
+  IF (Found > 0 ) THEN
+!   Hybrid ventilation must not be specified in a list
+    IF(ValidSysAvailManagerTypes(Found) .NE. SysAvailMgr_HybridVent) THEN
+      ValidType=ValidSysAvailManagerTypes(Found)
+    ELSE
+      ValidType=0
+    END IF
+  ELSE
+    ValidType=0
+  ENDIF
+
+  RETURN
+
+END FUNCTION ValidateAndSetSysAvailabilityManagerType
+
+SUBROUTINE ManageHybridVentilation
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   March 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Manage the simulation of the Hybrid Ventilation Control System Availability Managers
+
+          ! METHODOLOGY EMPLOYED:
+          ! NA
+
+          ! REFERENCES:
+          ! NA
+
+          ! USE STATEMENTS:
+  USE DataZoneEquipment, ONLY: ZoneEquipAvail
+  USE DataLoopNode
+  USE DataAirLoop
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! None
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER      :: PriAirSysNum              ! Primary Air System index
+  INTEGER      :: SysAvailNum
+
+  IF (GetHybridInputFlag) THEN
+    CALL GetHybridVentilationInputs
+    GetHybridInputFlag=.FALSE.
+  ENDIF
+
+  IF (NumHybridVentSysAvailMgrs == 0) RETURN
+
+  CALL InitHybridVentSysAvailMgr
+
+  DO PriAirSysNum=1,NumPrimaryAirSys
+    DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .EQ. PriAirSysNum) &
+      CALL CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
+    END DO
+  END DO
+
+  RETURN
+
+END SUBROUTINE ManageHybridVentilation
+
+SUBROUTINE GetHybridVentilationInputs
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   March 2007
+          !       MODIFIED       L. GU, 6/23/08, Added more controls, including simple airflow objects
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Obtains input data for Hybrid Ventilation Control System Availability Managers and stores it in
+          ! appropriate data structures.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses InputProcessor "Get" routines to obtain data.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindIteminList, SameString, MakeUPPERCase
+  USE NodeInputManager, ONLY: GetOnlySingleNode, MarkNode
+  USE DataHeatBalance,  ONLY: Zone, TotVentilation, Ventilation
+  USE DataLoopNode
+  USE General, ONLY: TrimSigDigits
+  USE DataAirflowNetwork, ONLY: SimulateAirflowNetwork,AirflowNetworkControlSimple,AirflowNetworkControlSimpleADS
+  USE DataIPShortCuts
+  USE CurveManager,       ONLY: GetCurveIndex, GetCurveMinMaxValues, CurveValue, GetCurveType
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetHybridVentilationInputs: ' ! include trailing blank
+
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER                         :: NumAlphas  ! Number of Alphas for each GetObjectItem call
+  INTEGER                         :: NumNumbers ! Number of Numbers for each GetObjectItem call
+  INTEGER                         :: IOStatus   ! Used in GetObjectItem
+  LOGICAL                         :: ErrorsFound=.FALSE.  ! Set to true if errors in input, fatal at end of routine
+  LOGICAL       :: IsNotOK                      ! Flag to verify name
+  LOGICAL       :: IsBlank                      ! Flag for blank name
+  INTEGER       :: SysAvailNum                  ! DO loop index for all System Availability Managers
+  REAL(r64)     :: SchedMin                     ! Minimum value specified in a schedule
+  REAL(r64)     :: SchedMax                     ! Maximum value specified in a schedule
+  REAL(r64)     :: CurveMin                     ! Minimum value specified in a curve
+  REAL(r64)     :: CurveMax                     ! Maximum value specified in a curve
+  REAL(r64)     :: CurveVal                     ! Curve value
+
+
+  ! Get the number of occurences of each type of System Availability Manager
+  cCurrentModuleObject ='AvailabilityManager:HybridVentilation'
+  NumHybridVentSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  IF (NumHybridVentSysAvailMgrs == 0) RETURN
+
+  ! Allocate the data arrays
+  ALLOCATE(HybridVentSysAvailMgrData(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailAirLoopNum(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailVentCtrl(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailANCtrlStatus(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailMaster(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailWindModifier(NumHybridVentSysAvailMgrs))
+  HybridVentSysAvailANCtrlStatus = 0
+  HybridVentSysAvailMaster = 0
+
+  DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                 AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                 AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    IsNotOK=.FALSE.
+    IsBlank=.FALSE.
+    CALL VerifyName(cAlphaArgs(1),HyBridVentSysAvailMgrData%AirLoopName,SysAvailNum-1,IsNotOK,IsBlank,&
+                    TRIM(cCurrentModuleObject)//' Name')
+    IF (IsNotOK) THEN
+      ErrorsFound=.TRUE.
+      IF (IsBlank) cAlphaArgs(1)='xxxxx'
+    ENDIF
+    HybridVentSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+    HybridVentSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_HybridVent
+
+    HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName = cAlphaArgs(2)
+    HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName = cAlphaArgs(3)
+    ! Check zone number
+    HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum = FindItemInList(cAlphaArgs(3),Zone%Name,NumOfZones)
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum .EQ. 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" invalid')
+      CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+      ErrorsFound = .TRUE.
+    END IF
+
+    HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr = GetScheduleIndex(cAlphaArgs(4))
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr .EQ. 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" invalid')
+      CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+      ErrorsFound = .TRUE.
+    END IF
+
+    ! Check schedule values
+    SchedMin=GetScheduleMinValue(HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr)
+    SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr)
+    IF (SchedMin == 0 .and. SchedMax == 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))// &
+                         '" specifies control mode 0 for all entries.')
+      CALL ShowContinueError('All zones using this '//TRIM(cAlphaFieldNames(4))//' have no hybrid ventilation control.')
+    END IF
+    IF (SchedMax > 4.0d0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))// &
+                         '", the maximum schedule value should be 4. However, ')
+      CALL ShowContinueError('the maximum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMax,1)))
+      ErrorsFound = .TRUE.
+    END IF
+    IF (SchedMin < 0.0d0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))// &
+                              'the minimum schedule value should be 0. However, ')
+      CALL ShowContinueError('the minimum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMin,1)))
+      ErrorsFound = .TRUE.
+    END IF
+
+    ! Read use weather rain indicator
+    IF (SameString(cAlphaArgs(5), 'YES')) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%UseRainIndicator = .TRUE.
+    ELSEIF (SameString(cAlphaArgs(5), 'NO')) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%UseRainIndicator = .FALSE.
+    ELSE
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('..invalid value: '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+      CALL ShowContinueError('Valid choices are Yes or No.')
+      ErrorsFound = .TRUE.
+    END IF
+
+    ! Check max wind speed
+    IF (NumNumbers > 0) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MaxWindSpeed = rNumericArgs(1)
+      IF (rNumericArgs(1) > 40.0d0 .OR. rNumericArgs(1) < 0.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(1),0))// &
+                               '. The allowed value must be >= 0 and <= 40 m/s')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+
+    ! Read Max and Min outdoor temperature
+    IF (NumNumbers > 1) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorTemp = rNumericArgs(2)
+      IF (rNumericArgs(2) > 100.0d0 .OR. rNumericArgs(2) < -100.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(2),0))// &
+                               '. The allowed value must be between -100 C and +100 C')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    IF (NumNumbers > 2) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorTemp = rNumericArgs(3)
+      IF (rNumericArgs(3) > 100.0d0 .OR. rNumericArgs(3) < -100.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(3),0))// &
+                               '. The allowed value must be between -100 C and +100 C')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    ! Ensure MaxTemp >= MinTemp
+    IF (rNumericArgs(2) >= rNumericArgs(3)) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '" The '//TRIM(cNumericFieldNames(2))//' must be less than the '//  &
+         TRIM(cNumericFieldNames(3)))
+      CALL ShowContinueError('The '//TRIM(cNumericFieldNames(2))//' is '//TRIM(TrimSigDigits(rNumericArgs(2),0))// &
+                             '. The '//TRIM(cNumericFieldNames(3))//' is '//TRIM(TrimSigDigits(rNumericArgs(3),0))//'.')
+      ErrorsFound = .TRUE.
+    END IF
+
+    ! Read Max and Min outdoor enthalpy
+    IF (NumNumbers > 3) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorEnth = rNumericArgs(4)
+      IF (rNumericArgs(4) > 300000.0d0 .OR. rNumericArgs(4) < 0.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(4))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(4),0))// &
+                               '. The allowed value must be between 0 and 300000 J/kg')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    IF (NumNumbers > 4) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorEnth = rNumericArgs(5)
+      IF (rNumericArgs(5) > 300000.0d0 .OR. rNumericArgs(5) < 0.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(5),0))// &
+                               '. The allowed value must be between 0 and 300000 J/kg')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    ! Ensure MaxEnth >= MiniEnth
+    IF (rNumericArgs(4) >= rNumericArgs(5)) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '" The '//TRIM(cNumericFieldNames(4))//' must be less than the '//  &
+         TRIM(cNumericFieldNames(5)))
+      CALL ShowContinueError('The '//TRIM(cNumericFieldNames(4))//' is '//TRIM(TrimSigDigits(rNumericArgs(4),0))// &
+                             '. The '//TRIM(cNumericFieldNames(5))//' is '//TRIM(TrimSigDigits(rNumericArgs(5),0))//'.')
+      ErrorsFound = .TRUE.
+    END IF
+
+    ! Read Max and Min outdoor dew point
+    IF (NumNumbers > 5) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorDewPoint = rNumericArgs(6)
+      IF (rNumericArgs(6) > 100.0d0 .OR. rNumericArgs(6) < -100.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(6),0))// &
+                               '. The allowed value must be between -100 C and +100 C')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    IF (NumNumbers > 6) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorDewPoint = rNumericArgs(7)
+      IF (rNumericArgs(7) > 100.0 .OR. rNumericArgs(7) < -100.0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' is beyond the range.')
+        CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(7),0))// &
+                               '. The allowed value must be between -100 C and +100 C')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+    ! Ensure MaxTemp >= MinTemp
+    IF (rNumericArgs(6) >= rNumericArgs(7)) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '" The '//TRIM(cNumericFieldNames(6))//' must be less than the '//  &
+         TRIM(cNumericFieldNames(7)))
+      CALL ShowContinueError('The '//TRIM(cNumericFieldNames(6))//' is '//TRIM(TrimSigDigits(rNumericArgs(6),0))// &
+                             '. The '//TRIM(cNumericFieldNames(7))//' is '//TRIM(TrimSigDigits(rNumericArgs(7),0))//'.')
+      ErrorsFound = .TRUE.
+    END IF
+
+    HybridVentSysAvailMgrData(SysAvailNum)%MinOASched = cAlphaArgs(6)
+    HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr = GetScheduleIndex(cAlphaArgs(6))
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr .EQ. 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+      CALL ShowContinueError('..not found: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+      ErrorsFound = .TRUE.
+    END IF
+    SchedMin=GetScheduleMinValue(HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr)
+    IF (SchedMin < 0.0d0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="' //TRIM(cAlphaArgs(1))// &
+                           '", Schedule value must be >= 0 in '// &
+                            TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+      CALL ShowContinueError('The minimum schedule value is '//TRIM(TrimSigDigits(SchedMin,1)))
+      ErrorsFound = .TRUE.
+    END IF
+
+    IF (.NOT. lAlphaFieldBlanks(7)) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS = GetCurveIndex(cAlphaArgs(7))
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS .LE. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(' not found: '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+        ErrorsFound = .TRUE.
+      ELSE
+        CALL GetCurveMinMaxValues(HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS,CurveMin,CurveMax)
+        IF (CurveMin < 0.0d0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+          CALL ShowContinueError('The minimum wind speed used in '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))// &
+                           'should be greater than or equal to 0.0 (m/s)')
+          CALL ShowContinueError('Curve minimum value appears to be less than 0.')
+          ErrorsFound = .TRUE.
+        END IF
+        CurveVal = CurveValue(HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS,CurveMin)
+        IF(CurveVal .LT. 0.0d0)THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+          CALL ShowContinueError('The minimum value of '//TRIM(cAlphaFieldNames(7))//' must be greater ' &
+                                 //'than or equal to 0.0 at the minimum value of wind speed.')
+          CALL ShowContinueError(TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+          CALL ShowContinueError('Curve output at the minimum wind speed = '//TRIM(TrimSigDigits(CurveVal,3)))
+          ErrorsFound = .TRUE.
+        END IF
+        CurveVal = CurveValue(HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS,CurveMax)
+        IF(CurveVal .GT. 1.0d0)THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+          CALL ShowContinueError('The maximum value of '//TRIM(cAlphaFieldNames(7))//' must be less ' &
+                                 //'than or equal to 1.0 at the maximum value of wind speed.')
+          CALL ShowContinueError(TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+          CALL ShowContinueError('Curve output at the maximum wind speed = '//TRIM(TrimSigDigits(CurveVal,3)))
+          ErrorsFound = .TRUE.
+        END IF
+        ! Check curve type
+        SELECT CASE(GetCurveType(HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS))
+
+          CASE('QUADRATIC')
+          CASE('LINEAR')
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+            CALL ShowContinueError('Illegal curve type for '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+            ErrorsFound = .TRUE.
+        END SELECT
+     END IF
+    END IF
+
+    HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr = GetScheduleIndex(cAlphaArgs(8))
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0) THEN
+      HybridVentSysAvailMaster(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum
+      ! Check schedule values
+      SchedMin=GetScheduleMinValue(HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr)
+      SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr)
+      HybridVentSysAvailANCtrlStatus(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr
+      IF (SchedMax > 1.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(' For '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'",')
+        CALL ShowContinueError('the maximum schedule value should be 1. However, ')
+        CALL ShowContinueError('the maximum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMax,1)))
+        ErrorsFound = .TRUE.
+      END IF
+      IF (SchedMin < 0.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('For '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'",')
+        CALL ShowContinueError('the minimum schedule value should be 0. However, ')
+        CALL ShowContinueError('the minimum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMin,1)))
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+
+    HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr = GetScheduleIndex(cAlphaArgs(9))
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0 .AND. &
+        HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('The inputs for'//TRIM(cAlphaFieldNames(8))// &
+                            ' and '//TRIM(cAlphaFieldNames(9))//' are valid.')
+      CALL ShowContinueError('But both objects can not work at the same time. The Simple Airflow Control is disabled')
+      HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr = 0
+    ELSE IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
+      ! Check schedule values
+      SchedMin=GetScheduleMinValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+      SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+      IF (SchedMax > 1.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('For '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'",')
+        CALL ShowContinueError('the maximum schedule value should be 1. However, ')
+        CALL ShowContinueError('the maximum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMax,1)))
+        ErrorsFound = .TRUE.
+      END IF
+      IF (SchedMin < 0.0d0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('For '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'",')
+        CALL ShowContinueError('the minimum schedule value should be 0. However, ')
+        CALL ShowContinueError('the minimum entered value in the schedule is '//TRIM(TrimSigDigits(SchedMin,1)))
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
+      HybridVentSysAvailMgrData(SysAvailNum)%VentilationName = cAlphaArgs(10)
+      If (TotVentilation .GT. 0) Then
+        HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr = FindItemInList(cAlphaArgs(10),Ventilation%Name,TotVentilation)
+        HybridVentSysAvailMaster(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+        SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr .LE. 0 .AND. INT(SchedMax) == 1) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+          CALL ShowContinueError(TRIM(cAlphaFieldNames(10))//'="'//TRIM(cAlphaArgs(10))//'" is required and not found.')
+          ErrorsFound = .TRUE.
+        End If ! Otherwise check later
+      END IF
+    END IF
+
+    ! Check simple airflow object
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0 .AND. &
+        HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr > 0) THEN
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum .NE. &
+          Ventilation(HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr)%ZonePtr) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('The Zone name specified in the Ventilation ' &
+             //'object '//TRIM(Zone(Ventilation(HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr)%ZonePtr)%Name))
+        CALL ShowContinueError('is not equal to the '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+    END IF
+
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0 .AND. &
+        SimulateAirflowNetwork > AirflowNetworkControlSimple) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'"')
+      CALL ShowContinueError('The simple airflow objects are used for natural ventilation calculation.')
+      CALL ShowContinueError('The Airflow Network model is not allowed to perform. Please set the control type = ' &
+           //'NoMultizoneOrDistribution')
+      ErrorsFound = .TRUE.
+    END IF
+
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr == 0) THEN
+      IF (SimulateAirflowNetwork <= AirflowNetworkControlSimple) THEN
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'"')
+        CALL ShowContinueError ('The Airflow Network model is not available for Hybrid Ventilation Control.')
+      ELSE IF (SimulateAirflowNetwork == AirflowNetworkControlSimpleADS) THEN
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'"')
+        CALL ShowContinueError('Please check the AirflowNetwork Control field in the AirflowNetwork:SimulationControl object.')
+        CALL ShowContinueError('The suggested choices are MultizoneWithDistribution or MultizoneWithoutDistribution.')
+      END IF
+    END IF
+
+    ! Disallow combination of simple control and OA control mode
+    SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr)
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0 .AND. SchedMax .EQ. 4.0d0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('The outdoor ventilation air control type defined in '// TRIM(cAlphaArgs(4))//    &
+                        ' cannot work together with '//TRIM(cAlphaFieldNames(9)))
+      ErrorsFound = .TRUE.
+    END IF
+
+  END DO ! SysAvailNum
+
+  IF (NumHybridVentSysAvailMgrs > 1) THEN
+    DO SysAvailNum = 2,NumHybridVentSysAvailMgrs
+      IF (HybridVentSysAvailMgrData(SysAvailNum-1)%ANControlTypeSchedPtr > 0) THEN
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
+          CALL ShowSevereError('The AirflowNetwork model is used for natural ventilation calculation in ' &
+             //TRIM(cCurrentModuleObject)//'="' //TRIM(HybridVentSysAvailMgrData(SysAvailNum-1)%Name)//'"')
+          CALL ShowContinueError('The simple airflow objects are used for natural ventilation calculation in ' &
+             //TRIM(cCurrentModuleObject)//'="' //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'"')
+          CALL ShowContinueError('The hybrid ventilation control requires the same models to calculate natural ventilation')
+          ErrorsFound = .TRUE.
+        END IF
+     END IF
+      IF (HybridVentSysAvailMgrData(SysAvailNum-1)%SimpleControlTypeSchedPtr > 0) THEN
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0) THEN
+          CALL ShowSevereError('The Airflow Network model is used for natural ventilation calculation in ' &
+             //TRIM(cCurrentModuleObject)//'="' //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'"')
+          CALL ShowContinueError('The simple airflow objects are used for natural ventilation calculation in ' &
+             //TRIM(cCurrentModuleObject)//'="' //TRIM(HybridVentSysAvailMgrData(SysAvailNum-1)%Name)//'"')
+          CALL ShowContinueError('The hybrid ventilation control requires the same models to calculate natural ventilation')
+          ErrorsFound = .TRUE.
+        END IF
+     END IF
+    END DO ! SysAvailNum
+  END IF
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Errors found in input.  Preceding condition(s) cause termination.')
+  END IF
+
+  ! Set up output variables
+  DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+    CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
+                              'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
+    CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
+                              'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
+  END DO
+
+  RETURN
+
+END SUBROUTINE GetHybridVentilationInputs
+
+SUBROUTINE InitHybridVentSysAvailMgr
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   March 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is for initializations of the Hybrid Ventilation Control System Availability Manager
+
+          ! METHODOLOGY EMPLOYED:
+          ! Uses the status flags to trigger initializations.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE InputProcessor, ONLY : SameString
+  USE DataHeatBalance,  ONLY: TotVentilation, Ventilation
+  USE InputProcessor,   ONLY: FindIteminList
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! NA
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL,SAVE  :: MyOneTimeFlag = .TRUE.    ! One time flag
+  INTEGER       :: SysAvailNum               ! DO loop index for Sys Avail Manager objects
+  INTEGER       :: ControlledZoneNum         ! Index into the ZoneEquipConfig array
+  LOGICAL       :: ErrorsFound = .FALSE.     ! Set to true if errors in input, fatal at end of routine
+  INTEGER       :: AirLoopNum                ! Air loop number
+  INTEGER       :: ControlMode               ! Hybrid control mode
+  INTEGER       :: AirLoopCount              ! Air loop name count
+  REAL(r64)     :: SchedMax                  ! Maximum value specified in a schedule
+  INTEGER       :: SysAvailIndex             ! Hybrid Ventilation Sys Avail Manager index
+
+  ! One time initializations
+  IF (MyOneTimeFlag .AND. ALLOCATED(ZoneEquipConfig) .AND. ALLOCATED(PrimaryAirSystem)) THEN
+
+    ! Ensure the controlled zone is listed and defined in an HVAC Air Loop
+    DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0 .AND. TotVentilation > 0 .AND. &
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr .EQ. 0 ) THEN
+        HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr = &
+          FindItemInList(HybridVentSysAvailMgrData(SysAvailNum)%VentilationName,Ventilation%Name,TotVentilation)
+        HybridVentSysAvailMaster(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+        SchedMax=GetScheduleMaxValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr .LE. 0 .AND. INT(SchedMax) == 1) THEN
+          CALL ShowSevereError(TRIM('ZoneVentilation Object Name')//'="'// &
+             TRIM(HybridVentSysAvailMgrData(SysAvailNum)%VentilationName)//'" is required and not found.')
+          CALL ShowContinueError('Occurs in '//TRIM('AvailabilityManager:HybridVentilation')//'="' // &
+            TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)//'".')
+          ErrorsFound = .TRUE.
+        End If
+      End If
+      ! Check air loop number
+      DO AirLoopNum=1,NumPrimaryAirSys  ! loop over the primary air systems
+        IF (SameString(PrimaryAirSystem(AirLoopNum)%Name,HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum = AirLoopNum
+        END IF
+      END DO
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .eq. 0) THEN
+        CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+             ', AirLoopHVAC name not found=' &
+             //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+        ErrorsFound = .TRUE.
+      END IF
+      HybridVentSysAvailAirLoopNum(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum
+
+      ! set the controlled zone numbers
+      DO ControlledZoneNum = 1,NumOfZones
+        IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum ) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+          IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum > 0) THEN
+            IF (ZoneEquipConfig(ControlledZoneNum)%AirLoopNum /=HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum) THEN
+              CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+                  ', The controlled zone ='// TRIM(HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)// &
+                  ' is not served by this Air Loop='//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+              ErrorsFound = .TRUE.
+            END IF
+          END IF
+          EXIT
+        END IF
+      END DO
+
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum == 0) THEN
+        CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+                             ', The controlled zone is not defined' &
+                           //' correctly ='//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName))
+        ErrorsFound = .TRUE.
+      END IF
+    END DO
+
+    ! Ensure an airloop name is not used more than once in the hybrid ventilation control objects
+    DO AirLoopNum=1,NumPrimaryAirSys  ! loop over the primary air systems
+      AirLoopCount = 0
+      DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+        IF (SameString(PrimaryAirSystem(AirLoopNum)%Name,HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)) THEN
+          AirLoopCount = AirLoopCount+1
+          IF (AirLoopCount .GT. 1) SysAvailIndex = SysAvailNum
+        END IF
+      END DO
+      IF (AirLoopCount .GT. 1) THEN
+        CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailIndex)%MgrType))// &
+            ', The AirLoopHVAC name found more' &
+          //' than once=' //TRIM(PrimaryAirSystem(AirLoopNum)%Name))
+        CALL ShowContinueError('Each AirLoopHVAC allows one hybrid ventilation control object.')
+        ErrorsFound = .TRUE.
+      END IF
+    END DO
+
+    IF (ErrorsFound) THEN
+      CALL ShowFatalError('Errors found in getting AvailabilityManager:* inputs')
+    END IF
+
+    MyOneTimeFlag = .FALSE.
+
+  END IF ! end 1 time initializations
+
+  DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+    ControlMode = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%ControlModeSchedPtr)
+    HybridVentSysAvailMgrData(SysAvailNum)%ControlMode = ControlMode
+    ! -1 means that the value will be determined inside CalcHybridVentSysAvailMgr.
+    ! IF the value is still -1, the program will stop.
+    HybridVentSysAvailVentCtrl(SysAvailNum) = -1
+    HybridVentSysAvailWindModifier(SysAvailNum) = -1.0
+  END DO
+
+  RETURN
+
+END SUBROUTINE InitHybridVentSysAvailMgr
+
+SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   March 2007
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop and AirflowNetwork model to prevent
+          ! windows or doors open during HVAC system operation
+
+          ! METHODOLOGY EMPLOYED:
+          ! Looks at outside and indoor conditions to determine if hybrid ventilation
+          ! is beneficial. If it is and it is scheduled on the AvailStatus is set to cycle
+          ! on and open windows or doors.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataAirLoop
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataHeatBalFanSys, ONLY: TempZoneThermostatSetpoint, ZoneThermostatSetPointHi, &
+                               ZoneThermostatSetPointLo, TempControlType
+  USE DataEnvironment,   ONLY: OutEnthalpy, OutDewPointTemp, OutBaroPress, IsRain, OutHumRat
+  USE DataHeatBalFanSys, ONLY: ZoneAirHumRat, MAT
+  USE Psychrometrics,    ONLY: PsyHFnTdbW, PsyTdpFnWPb, PsyRhFnTdbWPb, PsyWFnTdbRhPb
+  USE DataHeatBalance,   ONLY: Zone, TotVentilation, Ventilation, TotMixing, Mixing, HybridControlTypeIndiv, &
+                               HybridControlTypeClose, HybridControlTypeGlobal
+  USE DataZoneControls,  ONLY: HumidityControlZone, NumHumidityControlZones
+  USE AirflowNetworkBalanceManager, ONLY: GetZoneInfilAirChangeRate, ManageAirflowNetworkBalance
+  USE CurveManager,       ONLY: CurveValue
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
+  INTEGER, INTENT (IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER      :: ZoneNum         ! actual zone number of the control zone
+  INTEGER      :: ControlMode     ! Hybrid control mode
+  INTEGER      :: HstatZoneNum    ! Humidity control zone number
+  REAL(r64)    :: ZoneAirEnthalpy ! Zone air enthalpy
+  REAL(r64)    :: ZoneAirDewpoint ! Zone air dew point temperature
+  REAL(r64)    :: ZoneAirRH       ! Zone air relative humidity
+  REAL(r64)    :: TempExt         ! Outdoor dry bulb temperature at zone height
+  REAL(r64)    :: WindExt         ! Outdoor wind spped at zone height
+!unused  REAL(r64)    :: RHSetPoint      ! RH set point from a given schedule
+  REAL(r64)    :: WSetPoint       ! Humidity ratio set point from a given RH setpoint schedule
+  REAL(r64)    :: OASetPoint      ! Outdoor air set point from a given OA setpoint schedule
+  REAL(r64)    :: ACH             ! Zone air change per hour
+  LOGICAL      :: found           ! Used for humidistat object
+  REAL(r64)    :: ZoneRHHumidifyingSetPoint   ! Zone humidifying set point (%)
+  REAL(r64)    :: ZoneRHDehumidifyingSetPoint ! Zone dehumidifying set point (%)
+  INTEGER      :: ControlledZoneNum           ! Index into the ZoneEquipConfig array
+  INTEGER      :: SimpleControlType           ! Simple control type from a schedule: 0 individual, 1 global
+  INTEGER      :: i                ! Array index
+
+  ControlMode = HybridVentSysAvailMgrData(SysAvailNum)%ControlMode
+
+  ZoneNum = HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum
+  HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_NoAction
+  TempExt = Zone(ZoneNum)%OutDryBulbTemp
+  WindExt = Zone(ZoneNum)%WindSpeed
+
+
+  SELECT CASE(ControlMode)
+
+      CASE(HybridVentMode_No)
+        HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_NoAction
+
+      ! Temperature control
+      CASE(HybridVentMode_Temp)
+        IF (TempExt >= HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorTemp .AND. &
+            TempExt <= HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorTemp) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Open
+        ELSE
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+        END IF
+
+      ! Enthalpy control
+      CASE(HybridVentMode_Enth)
+        ZoneAirEnthalpy = PsyHFnTdbW(MAT(ZoneNum),ZoneAirHumRat(ZoneNum))
+        IF (OutEnthalpy >= HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorEnth .AND. &
+            OutEnthalpy <= HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorEnth) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Open
+        ELSE
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+        END IF
+
+      ! Dew point control
+      CASE(HybridVentMode_DewPoint)
+        IF (OutDewPointTemp >= HybridVentSysAvailMgrData(SysAvailNum)%MinOutdoorDewPoint .AND. &
+            OutDewPointTemp <= HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorDewPoint) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Open
+        ELSE
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+        END IF
+
+      CASE(HybridVentMode_OA)
+        OASetPoint = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr)
+        ACH=0.0
+        If (HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0) Then
+          CALL ManageAirflowNetworkBalance(.TRUE.)
+          ACH = GetZoneInfilAirChangeRate(ZoneNum)
+        End If
+        IF (ACH > OASetpoint) THEN
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Open
+        ELSE
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+        END IF
+
+      CASE DEFAULT
+        CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+                 ': incorrect Control Type: '//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+        CALL ShowFatalError('Errors found in getting '// &
+                            TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+                            ' Control mode value')
+
+  END SELECT
+
+  IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Open) THEN
+
+    ! Temperature and enthalpy control
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlMode == HybridVentMode_Temp .OR. &
+        HybridVentSysAvailMgrData(SysAvailNum)%ControlMode == HybridVentMode_Enth) THEN
+
+      SELECT CASE(TempControlType(ZoneNum)) ! select on thermostat control
+
+        CASE(SingleHeatingSetPoint)
+          IF (MAT(ZoneNum) < TempZoneThermostatSetpoint(ZoneNum)) THEN
+            HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          END IF
+
+        CASE(SingleCoolingSetPoint)
+          IF (MAT(ZoneNum) > TempZoneThermostatSetpoint(ZoneNum)) THEN
+            HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          END IF
+
+        CASE(SingleHeatCoolSetPoint)
+          HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          HybridVentSysAvailMgrData(SysAvailNum)%SingleHCErrCount = &
+          HybridVentSysAvailMgrData(SysAvailNum)%SingleHCErrCount + 1
+          if (HybridVentSysAvailMgrData(SysAvailNum)%SingleHCErrCount < 2) THEN
+            CALL ShowWarningError('Hybrid ventilation control: ' //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)// &
+              ': The zone temperature control type is ThermostatSetpoint:SingleHeatingOrCooling.'//  &
+              ' Natural ventilation is not allowed.')
+            CALL ShowContinueErrorTimeStamp(' ')
+          else
+            CALL ShowRecurringWarningErrorAtEnd('Hybrid ventilation control: ' &
+             //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)//&
+             ': No natural ventilation continues with a ThermostatSetpoint:SingleHeatingOrCooling type...', &
+             HybridVentSysAvailMgrData(SysAvailNum)%SingleHCErrIndex, &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64),  &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64))
+          END IF
+
+        CASE(DualSetPointWithDeadBand)
+          IF ((MAT(ZoneNum) < ZoneThermostatSetPointLo(ZoneNum)) .OR. &
+              (MAT(ZoneNum) > ZoneThermostatSetPointHi(ZoneNum)) ) THEN
+            HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          END IF
+
+        CASE DEFAULT
+      END SELECT ! end select on thermostat control
+    END IF
+
+    ! Dew point control mode
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlMode == HybridVentMode_Dewpoint) THEN
+      ZoneAirRH = PsyRhFnTdbWPb(MAT(ZoneNum),ZoneAirHumRat(ZoneNum),OutBaroPress)*100
+      ZoneAirDewpoint = PsyTdpFnWPb(ZoneAirHumRat(ZoneNum),OutBaroPress)
+      IF (NumHumidityControlZones == 0) THEN
+        HybridVentSysAvailMgrData(SysAvailNum)%DewPointNoRHErrCount = &
+          HybridVentSysAvailMgrData(SysAvailNum)%DewPointNoRHErrCount + 1
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%DewPointNoRHErrCount < 2) THEN
+          CALL ShowWarningError('Hybrid ventilation control: Dew point control mode is selected, '&
+            //'but no ZoneControl:Humidistat object=' &
+                                //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+          CALL ShowContinueError('The hybrid ventilation control is triggered by outdoor min and max dewpoint only.')
+          CALL ShowContinueError('HVAC system may turn off when outdoor dewpoint is between min and max dewpoint.')
+          CALL ShowContinueErrorTimeStamp(' ')
+        else
+          CALL ShowRecurringWarningErrorAtEnd('Hybrid ventilation control: ' &
+             //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)//&
+             ': no ZoneControl:Humidistat object continues...', &
+             HybridVentSysAvailMgrData(SysAvailNum)%DewPointNoRHErrIndex, &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64),  &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64))
+        END IF
+      END IF
+      found = .FALSE.
+      DO HstatZoneNum = 1, NumHumidityControlZones
+        IF(HumidityControlZone(HstatZoneNum)%ActualZoneNum .EQ. ZoneNum) THEN
+          found = .TRUE.
+          ZoneRHHumidifyingSetPoint = GetCurrentScheduleValue(HumidityControlZone(HstatZoneNum)%HumidifyingSchedIndex)
+          ZoneRHDehumidifyingSetPoint = GetCurrentScheduleValue(HumidityControlZone(HstatZoneNum)%DehumidifyingSchedIndex)
+          IF (ZoneAirRH > ZoneRHDehumidifyingSetPoint) THEN ! Need dehumidification
+            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHDehumidifyingSetPoint / 100.0),OutBaroPress)
+            IF (WSetPoint < OutHumRat) &
+              HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          ELSE IF (ZoneAirRH < ZoneRHHumidifyingSetPoint) THEN ! Need humidification
+            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHHumidifyingSetPoint / 100.0),OutBaroPress)
+            IF (WSetPoint > OutHumRat) &
+              HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          ELSE
+            HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+          END IF
+        END IF
+      END DO
+      IF (.NOT. found .AND. NumHumidityControlZones > 0) THEN
+        HybridVentSysAvailMgrData(SysAvailNum)%DewPointErrCount = &
+          HybridVentSysAvailMgrData(SysAvailNum)%DewPointErrCount + 1
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%DewPointErrCount < 2) THEN
+          CALL ShowWarningError('Hybrid ventilation control: The zone for dew point control mode is different from ' &
+            //'the zone for ZoneControl:Humidistat=' &
+                                //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+          CALL ShowContinueError('The Zone name for hybrid control is '//Trim(Zone(ZoneNum)%Name)//'. Humidistat has no impact')
+          CALL ShowContinueError('HVAC system may turn off when outdoor dewpoint is between min and max dewpoint.')
+          CALL ShowContinueErrorTimeStamp(' ')
+        else
+          CALL ShowRecurringWarningErrorAtEnd('Hybrid ventilation control: ' &
+            //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)//&
+             ' No humidistat control impact continues...', &
+             HybridVentSysAvailMgrData(SysAvailNum)%DewPointErrIndex, &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64),   &
+             REAL(HybridVentSysAvailMgrData(SysAvailNum)%ControlMode,r64))
+        END IF
+      END IF
+    END IF
+
+    ! Outdoor ventilation air control mode
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlMode == HybridVentMode_OA) THEN
+
+    END IF
+  END IF
+
+  IF (WindExt > HybridVentSysAvailMgrData(SysAvailNum)%MaxWindSpeed) THEN
+    HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+  END IF
+
+  IF (IsRain .AND. HybridVentSysAvailMgrData(SysAvailNum)%UseRainIndicator) THEN
+    HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
+  END IF
+  ! Sent a signal to the AirflowNetwork to ensure large onpenings are close or open based on this logic
+  HybridVentSysAvailVentCtrl(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl
+  IF (HybridVentSysAvailVentCtrl(SysAvailNum) < 0) THEN
+  ! Fatal error
+    CALL ShowFatalError('Hybrid ventilation control: the ventilation control status is beyond the range. ' &
+      //'Please check input of control mode schedule')
+  END IF
+
+  IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+    PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = CycleOn
+  END IF
+
+  IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Open .AND. &
+      HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0 .AND. &
+      HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS .GT. 0) THEN
+    HybridVentSysAvailWindModifier(SysAvailNum) =  &
+      CurveValue(HybridVentSysAvailMgrData(SysAvailNum)%OpeningFactorFWS,WindExt)
+  END IF
+
+  ! Set up flags to control simple airflow objects
+  IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum > 0 .AND. &
+      HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
+    SimpleControlType = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+    DO ControlledZoneNum = 1,NumOfZones
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum == ZoneEquipConfig(ControlledZoneNum)%AirLoopNum) THEN
+        ! Setup flag for ventilation objects
+        DO i=1,TotVentilation
+          IF (Ventilation(i)%ZonePtr == ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum) THEN
+            Ventilation(i)%HybridControlType=HybridControlTypeIndiv
+            IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+              Ventilation(i)%HybridControlType = HybridControlTypeClose
+            ELSE
+              IF (SimpleControlType == 1) THEN
+                Ventilation(i)%HybridControlType=HybridControlTypeGlobal
+                Ventilation(i)%HybridControlMasterNum=HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+              END IF
+            END IF
+          END IF
+        END DO
+        ! Setup flag for Mixing objects
+        DO i=1,TotMixing
+          IF (Mixing(i)%ZonePtr == ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum) THEN
+            Mixing(i)%HybridControlType=HybridControlTypeIndiv
+            IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+              Mixing(i)%HybridControlType = HybridControlTypeClose
+            ELSE
+              IF (SimpleControlType == 1) THEN
+                Mixing(i)%HybridControlType=HybridControlTypeGlobal
+                Mixing(i)%HybridControlMasterNum=HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+              END IF
+            END IF
+          END IF
+        END DO
+      END IF
+    END DO
+  END IF
+
+  RETURN
+
+END SUBROUTINE CalcHybridVentSysAvailMgr
+
+FUNCTION GetHybridVentilationControlStatus(ZoneNum) Result(VentControl)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   July 2010
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This routine was designed to find whether this zone is controlled by hybrid ventilation
+          ! ventilation control option.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: TrimSigDigits
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)         :: ZoneNum              ! Index of zone
+  INTEGER :: SysAvailNum   ! index to system availability manager number
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL :: VentControl         ! Set to true if ventilation control in the same zone
+
+  ! Obtains inputs of hybrid ventilation objects
+  IF (GetHybridInputFlag) THEN  !First time subroutine has been entered
+    CALL GetHybridVentilationInputs
+    GetHybridInputFlag=.false.
+  End If
+
+  VentControl = .FALSE.
+
+  DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+    If (HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum == ZoneNum) Then
+      If (HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) Then
+        VentControl = .TRUE.
+      End If
+    End If
+  End Do
+
+  RETURN
+
+END FUNCTION GetHybridVentilationControlStatus
+
+!     NOTICE
+!
+!     Copyright © 1996-2011 The Board of Trustees of the University of Illinois
+!     and The Regents of the University of California through Ernest Orlando Lawrence
+!     Berkeley National Laboratory.  All rights reserved.
+!
+!     Portions of the EnergyPlus software package have been developed and copyrighted
+!     by other individuals, companies and institutions.  These portions have been
+!     incorporated into the EnergyPlus software package under license.   For a complete
+!     list of contributors, see "Notice" located in EnergyPlus.f90.
+!
+!     NOTICE: The U.S. Government is granted for itself and others acting on its
+!     behalf a paid-up, nonexclusive, irrevocable, worldwide license in this data to
+!     reproduce, prepare derivative works, and perform publicly and display publicly.
+!     Beginning five (5) years after permission to assert copyright is granted,
+!     subject to two possible five year renewals, the U.S. Government is granted for
+!     itself and others acting on its behalf a paid-up, non-exclusive, irrevocable
+!     worldwide license in this data to reproduce, prepare derivative works,
+!     distribute copies to the public, perform publicly and display publicly, and to
+!     permit others to do so.
+!
+!     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
+!
+
+END MODULE SystemAvailabilityManager
