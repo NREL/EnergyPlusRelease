@@ -296,7 +296,7 @@ DO Loop=1, TotEarthTube
     END SELECT
 
     EarthTubeSys(Loop)%FanPressure   = rNumericArgs(5)
-    IF (EarthTubeSys(Loop)%FanPressure < 0.0) THEN
+    IF (EarthTubeSys(Loop)%FanPressure < 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(5))//' must be positive, entered value='//  &
@@ -305,8 +305,8 @@ DO Loop=1, TotEarthTube
     END IF
 
     EarthTubeSys(Loop)%FanEfficiency = rNumericArgs(6)
-    IF ((EarthTubeSys(Loop)%FanEfficiency <= 0.0) .OR. &
-        (EarthTubeSys(Loop)%FanEfficiency >  1.0)) THEN
+    IF ((EarthTubeSys(Loop)%FanEfficiency <= 0.0d0) .OR. &
+        (EarthTubeSys(Loop)%FanEfficiency >  1.0d0)) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(6))//' must be greater than zero and less than or equal to one, entered value='//  &
@@ -316,7 +316,7 @@ DO Loop=1, TotEarthTube
 
 
     EarthTubeSys(Loop)%r1                 = rNumericArgs(7)
-    IF (EarthTubeSys(Loop)%r1 <= 0.0) THEN
+    IF (EarthTubeSys(Loop)%r1 <= 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(7))//' must be positive, entered value='//  &
@@ -325,7 +325,7 @@ DO Loop=1, TotEarthTube
     END IF
 
     EarthTubeSys(Loop)%r2                 = rNumericArgs(8)
-    IF (EarthTubeSys(Loop)%r2 <= 0.0) THEN
+    IF (EarthTubeSys(Loop)%r2 <= 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(8))//' must be positive, entered value='//  &
@@ -336,7 +336,7 @@ DO Loop=1, TotEarthTube
     EarthTubeSys(Loop)%r3                 = 2.d0*EarthTubeSys(Loop)%r1
 
     EarthTubeSys(Loop)%PipeLength         = rNumericArgs(9)
-    IF (EarthTubeSys(Loop)%PipeLength <= 0.0) THEN
+    IF (EarthTubeSys(Loop)%PipeLength <= 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(9))//' must be positive, entered value='//  &
@@ -345,7 +345,7 @@ DO Loop=1, TotEarthTube
     END IF
 
     EarthTubeSys(Loop)%PipeThermCond      = rNumericArgs(10)
-    IF (EarthTubeSys(Loop)%PipeThermCond <= 0.0) THEN
+    IF (EarthTubeSys(Loop)%PipeThermCond <= 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(10))//' must be positive, entered value='//  &
@@ -355,7 +355,7 @@ DO Loop=1, TotEarthTube
 
 
     EarthTubeSys(Loop)%z                  = rNumericArgs(11)
-    IF (EarthTubeSys(Loop)%z <= 0.0) THEN
+    IF (EarthTubeSys(Loop)%z <= 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(1))//  &
          '='//TRIM(cAlphaArgs(1)) // &
          ', '//TRIM(cNumericFieldNames(11))//' must be positive, entered value='//  &
@@ -398,8 +398,8 @@ DO Loop=1, TotEarthTube
 
           ! Override any user input for cases where natural ventilation is being used
     IF (EarthTubeSys(Loop)%FanType == NaturalEarthTube) THEN
-      EarthTubeSys(Loop)%FanPressure   = 0.0
-      EarthTubeSys(Loop)%FanEfficiency = 1.0
+      EarthTubeSys(Loop)%FanPressure   = 0.0d0
+      EarthTubeSys(Loop)%FanEfficiency = 1.0d0
     END IF
 
     EarthTubeSys(Loop)%ConstantTermCoef    = rNumericArgs(15)
@@ -538,16 +538,16 @@ REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: EVF  ! DESIGN EARTHTUBE FLOW RATE 
    ! Allocate the EVF array
    IF (.NOT. ALLOCATED(EVF)) ALLOCATE(EVF(NumOfZones))
 
-   EVF = 0.0
-   MCPTE = 0.0
-   MCPE = 0.0
-   EAMFL = 0.0
+   EVF = 0.0d0
+   MCPTE = 0.0d0
+   MCPE = 0.0d0
+   EAMFL = 0.0d0
 
 
 DO Loop=1, TotEarthTube
 
  NZ = EarthTubeSys(Loop)%ZonePtr
- EarthTubeSys(Loop)%FanPower = 0.0
+ EarthTubeSys(Loop)%FanPower = 0.0d0
          ! Skip this if the zone is below the minimum temperature limit
  IF (MAT(NZ) < EarthTubeSys(Loop)%MinTemperature) CYCLE
          ! Skip this if the zone is above the maximum temperature limit
@@ -563,7 +563,7 @@ DO Loop=1, TotEarthTube
            + WindSpeed*(EarthTubeSys(Loop)%VelocityTermCoef + WindSpeed*EarthTubeSys(Loop)%VelocitySQTermCoef) )
 
  EAMFL(NZ) = MCPE(NZ)/AirSpecHeat
- IF (EarthTubeSys(Loop)%FanEfficiency > 0.0) THEN
+ IF (EarthTubeSys(Loop)%FanEfficiency > 0.0d0) THEN
    EarthTubeSys(Loop)%FanPower = EAMFL(NZ)*EarthTubeSys(Loop)%FanPressure/(EarthTubeSys(Loop)%FanEfficiency*AirDensity)
  END IF
 
@@ -572,9 +572,9 @@ DO Loop=1, TotEarthTube
 
 ! Calculation of Average Ground Temperature between Depth z1 and z2 at time t
 GroundTempz1z2t=EarthTubeSys(Loop)%AverSoilSurTemp-EarthTubeSys(Loop)%ApmlSoilSurTemp*   &
-               exp(-EarthTubeSys(Loop)%z*SQRT(pi/365./EarthTubeSys(Loop)%SoilThermDiff))*   &
-               cos(2.*pi/365.*(DayOfYear-EarthTubeSys(Loop)%SoilSurPhaseConst-EarthTubeSys(Loop)%z/2.*   &
-               SQRT(365./pi/EarthTubeSys(Loop)%SoilThermDiff)))
+               exp(-EarthTubeSys(Loop)%z*SQRT(pi/365.0d0/EarthTubeSys(Loop)%SoilThermDiff))*   &
+               cos(2.0d0*pi/365.0d0*(DayOfYear-EarthTubeSys(Loop)%SoilSurPhaseConst-EarthTubeSys(Loop)%z/2.0d0*   &
+               SQRT(365.0d0/pi/EarthTubeSys(Loop)%SoilThermDiff)))
 EarthTubeSys(Loop)%GroundTempz1z2t = GroundTempz1z2t
 
 ! Calculation of Convective Heat Transfer Coefficient at Inner Pipe Surface
@@ -605,7 +605,7 @@ Rs=LOG((EarthTubeSys(Loop)%r1+EarthTubeSys(Loop)%r2+EarthTubeSys(Loop)%r3)/  &
 Rt=Rc+Rp+Rs
 OverallHeatTransCoef=1.d0/Rt
 
-IF (AirMassFlowRate*AirSpecHeat == 0.0) THEN
+IF (AirMassFlowRate*AirSpecHeat == 0.0d0) THEN
  EarthTubeSys(Loop)%InsideAirTemp=GroundTempz1z2t
 
 ELSE
@@ -631,7 +631,7 @@ IF (EarthTubeSys(Loop)%InsideAirTemp>=InsideDewPointTemp) THEN
  InsideEnthalpy  = PsyHFnTdbW(EarthTubeSys(Loop)%InsideAirTemp,OutHumRat)
       ! Intake fans will add some heat to the air, raising the temperature for an intake fan...
  IF (EarthTubeSys(Loop)%FanType == IntakeEarthTube) THEN
-   IF (EAMFL(NZ) == 0.0) Then
+   IF (EAMFL(NZ) == 0.0d0) Then
       OutletAirEnthalpy         = InsideEnthalpy
    ELSE
       OutletAirEnthalpy         = InsideEnthalpy + EarthTubeSys(Loop)%FanPower/EAMFL(NZ)
@@ -647,7 +647,7 @@ ELSE
  InsideEnthalpy  = PsyHFnTdbW(EarthTubeSys(Loop)%InsideAirTemp,InsideHumRat)
       ! Intake fans will add some heat to the air, raising the temperature for an intake fan...
  IF (EarthTubeSys(Loop)%FanType == IntakeEarthTube) THEN
-   IF (EAMFL(NZ) == 0.0) Then
+   IF (EAMFL(NZ) == 0.0d0) Then
       OutletAirEnthalpy         = InsideEnthalpy
    ELSE
       OutletAirEnthalpy         = InsideEnthalpy + EarthTubeSys(Loop)%FanPower/EAMFL(NZ)
@@ -720,8 +720,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
     ZnRptET(ZoneLoop)%EarthTubeVolFlowRate  = MCPE(ZoneLoop)/CpAir/AirDensity
     ZnRptET(ZoneLoop)%EarthTubeMassFlowRate = MCPE(ZoneLoop)/CpAir
 
-    ZnRptET(ZoneLoop)%EarthTubeFanElec = 0.0
-    ZnRptET(ZoneLoop)%EarthTubeAirTemp = 0.0
+    ZnRptET(ZoneLoop)%EarthTubeFanElec = 0.0d0
+    ZnRptET(ZoneLoop)%EarthTubeAirTemp = 0.0d0
     DO EarthTubeNum = 1, TotEarthTube
       IF (EarthTubeSys(EarthTubeNum)%ZonePtr == ZoneLoop) THEN
         ZnRptET(ZoneLoop)%EarthTubeFanElec       = EarthTubeSys(EarthTubeNum)%FanPower*ReportingConstant

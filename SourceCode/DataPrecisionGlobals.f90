@@ -40,9 +40,9 @@ PUBLIC ! This data only module is public.
     REAL(r64), PARAMETER :: constant_minusone=-1.0d0
     REAL(r64), PARAMETER :: constant_twenty=20.0d0
     REAL(r64), PARAMETER :: constant_pointfive=.5d0
-    REAL(r64), PARAMETER :: EXP_LowerLimit=-20.d0  ! In IVF=2.061153622438558E-009 - used 20
+    REAL(r64), PARAMETER :: EXP_LowerLimit=-20.d0  ! In IVF=2.061153622438558d-009 - used 20
                                                    ! because it's already used in other parts of the code
-    REAL(r64), PARAMETER :: EXP_UpperLimit= 40.d0  ! In IVF=2.353852668370200E+017
+    REAL(r64), PARAMETER :: EXP_UpperLimit= 40.d0  ! In IVF=2.353852668370200d+017
 
           ! DERIVED TYPE DEFINITIONS:
           ! na

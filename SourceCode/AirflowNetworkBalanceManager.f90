@@ -227,6 +227,8 @@ SUBROUTINE ManageAirflowNetworkBalance(FirstHVACIteration, Iter, ResimulateAirZo
          If (LoopSystemOnMassFlowrate > 0) AirflowNetworkFanActivated = .TRUE.
        Else If (SupplyFanType .EQ. FanType_SimpleVAV) Then
          If (PRESENT(Iter) .AND. Iter > 1) AirflowNetworkFanActivated = .TRUE.
+       Else If (AirflowNetworkUnitarySystem) Then
+         If (PRESENT(Iter) .AND. Iter > 1) AirflowNetworkFanActivated = .TRUE.
        Else
          AirflowNetworkFanActivated = .TRUE.
        End If
@@ -241,6 +243,9 @@ SUBROUTINE ManageAirflowNetworkBalance(FirstHVACIteration, Iter, ResimulateAirZo
        ResimulateAirZone = .TRUE.
      End If
      IF (SupplyFanType .EQ. FanType_SimpleVAV) Then
+       IF (.NOT. AirflowNetworkFanActivated .AND. Iter .LT. 3) ResimulateAirZone = .TRUE.
+     End If
+     If (AirflowNetworkUnitarySystem) Then
        IF (.NOT. AirflowNetworkFanActivated .AND. Iter .LT. 3) ResimulateAirZone = .TRUE.
      End If
    End If
@@ -503,7 +508,7 @@ SUBROUTINE GetAirflowNetworkInput
   WRITE(OutputFileInits,110)
   WRITE(OutputFileInits,120) Trim(SimAirNetworkKey)
 
-110 Format('! <AirflowNetwork Model:Control>, No Multizone or Distribution/Multizone with Distribution/' &
+110 Format('! <AirflowNetwork Model:Control>, No Multizone or Distribution/Multizone with Distribution/', &
            'Multizone without Distribution/Multizone with Distribution only during Fan Operation')
 120 Format('AirflowNetwork Model:Control,',A)
 
@@ -655,7 +660,7 @@ SUBROUTINE GetAirflowNetworkInput
   AirflowNetworkSimu%ConvLimit = Numbers(4)
   AirflowNetworkSimu%Azimuth = Numbers(5)
   AirflowNetworkSimu%AspectRatio = Numbers(6)
-  AirflowNetworkSimu%MaxPressure = 500 ! Maximum pressure difference by default
+  AirflowNetworkSimu%MaxPressure = 500.0d0 ! Maximum pressure difference by default
 
 
 ! *** Read AirflowNetwork simulation zone data
@@ -931,11 +936,13 @@ SUBROUTINE GetAirflowNetworkInput
         MultizoneSurfaceData(i)%Factor = 1.0d0
      end if
      ! Get input of ventilation control and associated data
-     If (NumAlphas > 4) then
-       MultizoneSurfaceData(i)%VentControl = Alphas(4)             ! Ventilation Control Mode: "TEMPERATURE", "ENTHALPY",
-                                                                   !   "CONSTANT", "ZONELEVEL", "NOVENT", "ADJACENTTEMPERATURE",
-                                                                   !   or "ADJACENTENTHALPY"
-       MultizoneSurfaceData(i)%VentSchName = Alphas(5)             ! Name of ventilation temperature control schedule
+     If (NumAlphas >= 4) then
+       ! Ventilation Control Mode: "TEMPERATURE", "ENTHALPY",
+       !   "CONSTANT", "ZONELEVEL", "NOVENT", "ADJACENTTEMPERATURE",
+       !   or "ADJACENTENTHALPY"
+       IF (.not. lAlphaBlanks(4)) MultizoneSurfaceData(i)%VentControl = Alphas(4)
+       ! Name of ventilation temperature control schedule
+       IF (.not. lAlphaBlanks(5)) MultizoneSurfaceData(i)%VentSchName = Alphas(5)
        SELECT CASE (MakeUPPERCase(MultizoneSurfaceData(i)%VentControl))
          CASE ('TEMPERATURE')
            MultizoneSurfaceData(i)%VentSurfCtrNum = VentCtrNum_Temp
@@ -1954,7 +1961,7 @@ SUBROUTINE GetAirflowNetworkInput
        CALL ShowWarningError(RoutineName//'SurfaceAverageCalculation is entered for field = Wind Pressure Coefficient Type.')
        CALL ShowContinueError('The AirflowNetwork model provides wind pressure coefficients for 4 vertical exterior ' &
                              //'orientations and 1 horizontal roof.')
-       CALL ShowContinueError(' There are only '//TRIM(RoundSigDigits(n,0))//' exterior surface orientations defined ' &
+       CALL ShowContinueError('There are only '//TRIM(RoundSigDigits(n,0))//' exterior surface orientations defined' &
                               //' in this input file using AirflowNetwork:MultiZone:Surface objects.')
        CALL ShowContinueError('Reconsider if this is your modeling intent. Simulation continues.')
      End If
@@ -3747,7 +3754,7 @@ if (OneTimeFlag) then
   ENDIF
 end if
 
-   DO 5 N=1,NetworkNumOfNodes
+   DO N=1,NetworkNumOfNodes
      if (AirflowNetworkNodeData(N)%NodeTypeNum.EQ.0) then
        AirflowNetworkNodeSimu(N)%PZ = 0.0d0
      else
@@ -3767,7 +3774,7 @@ end if
          ErrorsFound=.true.
        end if
      end if
-5  end do
+   END DO
 
   Do i=1,AirflowNetworkNumOfSurfaces
     MultizoneSurfaceData(i)%OpenFactor = 0.0d0
@@ -3945,8 +3952,10 @@ SUBROUTINE CalcWindPressureCoeffs
         SurfAng = Surface(SurfNum)%Azimuth
         FacadeNumThisSurf = 1
         AngDiffMin = ABS(SurfAng - FacadeAng(1))
+        If (AngDiffMin .GT. 359.d0) AngDiffMin = ABS(AngDiffMin - 360.d0)
         DO FacadeNum = 2,4
           AngDiff = ABS(SurfAng-FacadeAng(FacadeNum))
+          If (AngDiff .GT. 359.d0) AngDiff = ABS(AngDiff - 360.d0)
           IF(AngDiff < AngDiffMin) THEN
             AngDiffMin = AngDiff
             FacadeNumThisSurf = FacadeNum
@@ -4029,8 +4038,8 @@ SUBROUTINE CalcWindPressureCoeffs
           WtSR = (4.0d0 - SR)/3.0d0
         END IF
         MultizoneCpValueData(FacadeNum)%CpValue(WindDirNum) = &
-          WtSR     * (WtAng*CPHighRiseWall(IAng,ISR)   + (1.-WtAng)*CPHighRiseWall(IAng+1,ISR)) +  &
-          (1.-WtSR)* (WtAng*CPHighRiseWall(IAng,ISR+1) + (1.-WtAng)*CPHighRiseWall(IAng+1,ISR+1))
+          WtSR     * (WtAng*CPHighRiseWall(IAng,ISR)   + (1.0d0-WtAng)*CPHighRiseWall(IAng+1,ISR)) +  &
+          (1.0d0-WtSR)* (WtAng*CPHighRiseWall(IAng,ISR+1) + (1.0d0-WtAng)*CPHighRiseWall(IAng+1,ISR+1))
       END IF
 
       ! Wind-pressure coefficients for roof (assumed same for low-rise and high-rise buildings)
@@ -4046,8 +4055,8 @@ SUBROUTINE CalcWindPressureCoeffs
           WtSR = (1.0d0 - SR)/0.5d0
         END IF
         MultizoneCpValueData(FacadeNum)%CpValue(WindDirNum) = &
-          WtSR     * (WtAng*CPHighRiseRoof(IAng,ISR)   + (1.-WtAng)*CPHighRiseRoof(IAng+1,ISR)) +  &
-          (1.-WtSR)* (WtAng*CPHighRiseRoof(IAng,ISR+1) + (1.-WtAng)*CPHighRiseRoof(IAng+1,ISR+1))
+          WtSR     * (WtAng*CPHighRiseRoof(IAng,ISR)   + (1.0d0-WtAng)*CPHighRiseRoof(IAng+1,ISR)) +  &
+          (1.0d0-WtSR)* (WtAng*CPHighRiseRoof(IAng,ISR+1) + (1.0d0-WtAng)*CPHighRiseRoof(IAng+1,ISR+1))
       END IF
 
     END DO  ! End of wind direction loop
@@ -4296,7 +4305,7 @@ LOGICAL found,OANode
         end if
         if ((AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(2))%EPlusZoneNum > 0) .AND. &
             (AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(1))%EPlusZoneNum == 0) .AND. &
-            (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0)) then
+            (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0d0)) then
            LF = AirflowNetworkLinkageData(i)%NodeNums(2)
            LT = AirflowNetworkLinkageData(i)%NodeNums(1)
            MA((LT-1)*AirflowNetworkNumOfNodes+LT) = MA((LT-1)*AirflowNetworkNumOfNodes+LT)+  &
@@ -5250,7 +5259,7 @@ REAL(r64) R1, S
       IVEC(I+20) = I
     END DO
     DO I=1,NORDER
-       R1 = 0.0
+       R1 = 0.0d0
        M  = I
        DO J=I,NORDER
           IF (ABS(R1) .LT. ABS(MA((I-1)*NORDER+J))) THEN
@@ -5268,7 +5277,7 @@ REAL(r64) R1, S
              MA((J-1)*NORDER+M) = S
           END DO
        END IF
-       MA((I-1)*NORDER+I) = 1.0
+       MA((I-1)*NORDER+I) = 1.0d0
        DO J=1,NORDER
           MA((I-1)*NORDER+J) = MA((I-1)*NORDER+J)/R1
        END DO
@@ -5276,7 +5285,7 @@ REAL(r64) R1, S
           IF (I .EQ. J) CYCLE
           R1 = MA((J-1)*NORDER+I)
           IF (ABS(R1) .LE. 1.0D-20) CYCLE
-          MA((J-1)*NORDER+I) = 0.0
+          MA((J-1)*NORDER+I) = 0.0d0
           DO K=1,NORDER
              MA((J-1)*NORDER+K) = MA((J-1)*NORDER+K)-R1*MA((I-1)*NORDER+K)
           END DO
@@ -6071,20 +6080,20 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
             Node3 = Node2
           End If
           IF (AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_ZIN) Then
-            If (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%EPlusTypeNum == 0) Cycle 
+            If (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%EPlusTypeNum == 0) Cycle
           End If
           NodeMass = Node(AirflowNetworkNodeData(Node3)%EPlusNodeNum)%MassFlowRate
           AFNMass = AirflowNetworkLinkSimu(I)%FLOW
           If (NodeMass .GT. 0.0 .AND. AFNMass .GT. NodeMass + 0.01d0) Then
             CALL ShowWarningError('The mass flow rate difference is found between System Node = ' // &
-               Trim(NodeID(AirflowNetworkNodeData(Node3)%EPlusNodeNum)) & 
+               Trim(NodeID(AirflowNetworkNodeData(Node3)%EPlusNodeNum)) &
                //' and AFN Link = ' // Trim(AirflowNetworkLinkageData(I)%Name)//'.')
             CALL ShowContinueError('The system node max mass flow rate = '//TRIM(RoundSigDigits(NodeMass,3)) &
                //' kg/s. The AFN node mass flow rate = '//TRIM(RoundSigDigits(AFNMass,3)) // ' kg.s.')
                WriteFlag = .TRUE.
           End If
-        End If    
-      End Do  
+        End If
+      End Do
       MyOneTimeFlag1 = .FALSE.
       If (WriteFlag) Then
         CALL ShowWarningError('Please adjust the rate of Maximum Air Flow Rate field in the terminal objects or ' // &
@@ -6094,7 +6103,7 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
       MyOneTimeFlag1 = .FALSE.
     End If
   End If
-      
+
   ! Assign airflows to EPLus nodes
   DO I=1,AirflowNetworkNumOfLinks
      if (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%CompTypeNum .EQ. CompTypeNum_DWC .OR. &
@@ -6145,8 +6154,8 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
   DO I=1,AirflowNetworkNumOfLinks
     Node1 = AirflowNetworkLinkageData(i)%NodeNums(1)
     Node2 = AirflowNetworkLinkageData(i)%NodeNums(2)
-    CpAir = PsyCpAirFnWTdb((AirflowNetworkNodeSimu(Node1)%WZ+AirflowNetworkNodeSimu(Node2)%WZ)/2.0, &
-                           (AirflowNetworkNodeSimu(Node1)%TZ+AirflowNetworkNodeSimu(Node2)%TZ)/2.0)
+    CpAir = PsyCpAirFnWTdb((AirflowNetworkNodeSimu(Node1)%WZ+AirflowNetworkNodeSimu(Node2)%WZ)/2.0d0, &
+                           (AirflowNetworkNodeSimu(Node1)%TZ+AirflowNetworkNodeSimu(Node2)%TZ)/2.0d0)
     ! Calculate sensible loads from duct conduction losses
     if (AirflowNetworkLinkageData(i)%ZoneNum > 0 .AND. &
         AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%CompTypeNum == CompTypeNum_DWC) then
@@ -6160,14 +6169,14 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
       ! Calculate supply leak sensible losses
       if ((AirflowNetworkNodeData(Node2)%EPlusZoneNum > 0) .AND. &
          (AirflowNetworkNodeData(Node1)%EPlusNodeNum == 0) .AND. &
-         (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.0)) then
+         (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.0d0)) then
         ZN2=AirflowNetworkNodeData(Node2)%EPlusZoneNum
         Qsen = AirflowNetworkLinkSimu(I)%FLOW*CpAir*(AirflowNetworkNodeSimu(Node1)%TZ-AirflowNetworkNodeSimu(Node2)%TZ)
         AirflowNetworkExchangeData(ZN2)%LeakSen = AirflowNetworkExchangeData(ZN2)%LeakSen+Qsen
       end if
       if ((AirflowNetworkNodeData(Node1)%EPlusZoneNum > 0) .AND. &
           (AirflowNetworkNodeData(Node2)%EPlusNodeNum == 0) .AND. &
-          (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0)) then
+          (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0d0)) then
         ZN1=AirflowNetworkNodeData(Node1)%EPlusZoneNum
         Qsen = AirflowNetworkLinkSimu(I)%FLOW2*CpAir*(AirflowNetworkNodeSimu(Node2)%TZ-AirflowNetworkNodeSimu(Node1)%TZ)
         AirflowNetworkExchangeData(ZN1)%LeakSen = AirflowNetworkExchangeData(ZN1)%LeakSen+Qsen
@@ -6192,7 +6201,7 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
       ! Calculate supply leak latent losses
       if ((AirflowNetworkNodeData(Node2)%EPlusZoneNum > 0) .AND. &
           (AirflowNetworkNodeData(Node1)%EPlusNodeNum == 0) .AND. &
-          (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.0)) then
+          (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.0d0)) then
         ZN2=AirflowNetworkNodeData(Node2)%EPlusZoneNum
         Qlat = AirflowNetworkLinkSimu(I)%FLOW*(AirflowNetworkNodeSimu(Node1)%WZ-AirflowNetworkNodeSimu(Node2)%WZ)
         AirflowNetworkExchangeData(ZN2)%LeakLat = AirflowNetworkExchangeData(ZN2)%LeakLat+Qlat
@@ -6207,7 +6216,7 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
       end if
       if ((AirflowNetworkNodeData(Node1)%EPlusZoneNum > 0) .AND. &
           (AirflowNetworkNodeData(Node2)%EPlusNodeNum == 0) .AND. &
-          (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0)) then
+          (AirflowNetworkLinkSimu(I)%FLOW2 .GT. 0.0d0)) then
         ZN1=AirflowNetworkNodeData(Node1)%EPlusZoneNum
         Qlat = AirflowNetworkLinkSimu(I)%FLOW2*(AirflowNetworkNodeSimu(Node2)%WZ-AirflowNetworkNodeSimu(Node1)%WZ)
         AirflowNetworkExchangeData(ZN1)%LeakLat = AirflowNetworkExchangeData(ZN1)%LeakLat+Qlat
@@ -6232,7 +6241,7 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
   END DO
 
   ! Simple ONOFF fan
-  If (SupplyFanType .EQ. FanType_SimpleOnOff .AND. OnOffFanRunTimeFraction < 1.0) then
+  If (SupplyFanType .EQ. FanType_SimpleOnOff .AND. OnOffFanRunTimeFraction < 1.0d0) then
     DO I=1, NumOfZones
        AirflowNetworkExchangeData(i)%MultiZoneSen = AirflowNetworkExchangeData(i)%MultiZoneSen*OnOffFanRuntimeFraction
        AirflowNetworkExchangeData(i)%MultiZoneLat = AirflowNetworkExchangeData(i)%MultiZoneLat*OnOffFanRuntimeFraction
@@ -6399,7 +6408,7 @@ SUBROUTINE AirflowNetworkVentingControl (I,OpenFactor)
      VentCtrlNum = MultizoneSurfaceData(I)%VentSurfCtrNum
      If (MultizoneSurfaceData(I)%VentingSchNum > 0) then
        VentingSchVal = GetCurrentScheduleValue(MultizoneSurfaceData(I)%VentingSchNum)
-       If (VentingSchVal <= 0.) then
+       If (VentingSchVal <= 0.0d0) then
          VentingAllowed = .FALSE.
          SurfaceWindow(SurfNum)%VentingAvailabilityRep = 0.0d0
        End If
@@ -6410,7 +6419,7 @@ SUBROUTINE AirflowNetworkVentingControl (I,OpenFactor)
      VentCtrlNum = MultizoneZoneData(Iz)%VentCtrNum
      If (MultizoneZoneData(IZ)%VentingSchNum > 0) then
        VentingSchVal = GetCurrentScheduleValue(MultizoneZoneData(IZ)%VentingSchNum)
-       If (VentingSchVal <= 0.) then
+       If (VentingSchVal <= 0.0d0) then
          VentingAllowed = .FALSE.
          SurfaceWindow(SurfNum)%VentingAvailabilityRep = 0.0d0
        End If
@@ -6551,7 +6560,7 @@ SUBROUTINE AirflowNetworkVentingControl (I,OpenFactor)
      ! No venting, i.e, window/door always closed - added YJH 8 Aug 02
 
      if (VentCtrlNum == VentCtrNum_Novent ) then ! Novent
-       OpenFactor = 0.0
+       OpenFactor = 0.0d0
        SurfaceWindow(SurfNum)%VentingOpenFactorMultRep = -1.0d0
      endif
 
@@ -6769,7 +6778,7 @@ if (OneTimeFlag) then
         if (i .EQ. GetOAMixerReliefNodeNumber(1)) then
           NodeFound(i) = .TRUE.
         ElseIf (i .EQ. GetOAMixerInletNodeNumber(1)) Then
-          NodeFound(i) = .TRUE.           
+          NodeFound(i) = .TRUE.
         Else
           CALL ShowSevereError(RoutineName //Trim(NodeID(I)) //' is not defined as an ' &
                                //'AirflowNetwork:Distribution:Node object.')
@@ -7064,7 +7073,7 @@ if (OneTimeFlag) then
   End Do
 
   Do I=NumOfNodesMultiZone+1,AirflowNetworkNumOfNodes
-    If (AirflowNetworkNodeData(i)%EPlusTypeNum == EPlusTypeNum_SPL) then  
+    If (AirflowNetworkNodeData(i)%EPlusTypeNum == EPlusTypeNum_SPL) then
       LocalError=.false.
       j = GetSplitterOutletNumber('',1,LocalError)
       ALLOCATE(SplitterNodeNumbers(j+2))
@@ -7384,7 +7393,7 @@ SUBROUTINE HybridVentilationControl
       else
         CALL ShowRecurringWarningErrorAtEnd(RoutineName//'The hybrid ventilation control requires a global control.' &
                                             //' The individual control continues...', &
-                                            HybridGlobalErrIndex,  DBLE(controlType),  DBLE(ControlType))
+                                            HybridGlobalErrIndex,  REAL(controlType,r64),  REAL(ControlType,r64))
       end if
     End If
   End Do

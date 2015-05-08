@@ -26,6 +26,7 @@ USE DataEnvironment
 USE DataHeatBalance
 USE DataSurfaces
 USE DataInterfaces
+USE DataWindowEquivalentLayer, ONLY: CFSMAXNL
 
   ! Use statements for access to subroutines in other modules
   ! na
@@ -194,6 +195,7 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
   REAL(r64) :: NominalUwithConvCoeffs
   CHARACTER(len=32) :: cNominalU
   CHARACTER(len=32) :: cNominalUwithConvCoeffs
+  LOGICAL :: isWithConvCoefValid
 !  INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneSurfacesCount
 !  INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneSubSurfacesCount
 !  INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneShadingSurfacesCount
@@ -253,7 +255,7 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
   CALL AllocateModuleArrays ! This needs to be moved to the main manager routine of SSG at a later date
 
   ALLOCATE(AirSkyRadSplit(TotSurfaces))
-  AirSkyRadSplit=0.0
+  AirSkyRadSplit=0.0d0
 
   CalcWindowRevealReflection = .FALSE. ! Set to True in ProcessSurfaceVertices if beam solar reflection from window reveals
                                        ! is requested for one or more exterior windows.
@@ -276,12 +278,12 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
     IF (Surface(SurfNum)%Class /= SurfaceClass_IntMass) CALL ProcessSurfaceVertices(SurfNum,ErrorsFound)
   END DO
 
-  Zone%ExtWindowArea=0.0
+  Zone%ExtWindowArea=0.0d0
   Zone%HasInterZoneWindow=.false.
   Zone%HasWindow=.false.
-  Zone%ExtGrossWallArea=0.0
-  Zone%ExtNetWallArea=0.0
-  Zone%TotalSurfArea=0.0
+  Zone%ExtGrossWallArea=0.0d0
+  Zone%ExtNetWallArea=0.0d0
+  Zone%TotalSurfArea=0.0d0
 
   DetailedWWR=(GetNumSectionsFound('DETAILEDWWR_DEBUG') > 0)
   IF (DetailedWWR) THEN
@@ -370,14 +372,14 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
   ENDIF
 
   DO ZoneNum = 1, NumOfZones
-    CeilCount=0.0
-    FloorCount=0.0
+    CeilCount=0.0d0
+    FloorCount=0.0d0
     Count=0
-    AverageHeight=0.0
-    ZCeilAvg=0.0
-    ZFlrAvg=0.0
-    ZMax=-99999.0
-    ZMin=99999.0
+    AverageHeight=0.0d0
+    ZCeilAvg=0.0d0
+    ZFlrAvg=0.0d0
+    ZMax=-99999.0d0
+    ZMin=99999.0d0
     IF (DetailedWWR) THEN
       WRITE(OutputFileDebug,'(A)') trim(Zone(ZoneNum)%Name)//','//  &
                trim(RoundSigDigits(Zone(ZoneNum)%ExtGrossWallArea,2))//','//  &
@@ -411,20 +413,20 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
         ZMin=MIN(ZMin,MINVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%Z))
       ENDIF
     ENDDO
-    IF (CeilCount > 0.0 .and. FloorCount > 0.0) THEN
+    IF (CeilCount > 0.0d0 .and. FloorCount > 0.0d0) THEN
 !      ZCeilAvg=ZCeilAvg/CeilCount
 !      ZFlrAvg=ZFlrAvg/FloorCount
       AverageHeight=ZCeilAvg-ZFlrAvg
     ELSE
       AverageHeight=(ZMax-ZMin)
     ENDIF
-    IF (AverageHeight <= 0.0) THEN
+    IF (AverageHeight <= 0.0d0) THEN
       AverageHeight=(ZMax-ZMin)
     ENDIF
 
-    IF (Zone(ZoneNum)%CeilingHeight > 0.0) THEN
+    IF (Zone(ZoneNum)%CeilingHeight > 0.0d0) THEN
       ZoneCeilingHeightEntered(ZoneNum)=.true.
-      IF (AverageHeight > 0.0) THEN
+      IF (AverageHeight > 0.0d0) THEN
         IF (ABS(AverageHeight-Zone(ZoneNum)%CeilingHeight)/Zone(ZoneNum)%CeilingHeight  > .05d0) THEN
           IF (ErrCount == 1 .and. .not. DisplayExtraWarnings) THEN
             CALL ShowWarningError(RoutineName//'Entered Ceiling Height for some zone(s) significantly '//  &
@@ -446,7 +448,7 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
         ENDIF
       ENDIF
     ENDIF
-    IF ((Zone(ZoneNum)%CeilingHeight <= 0.0).AND.(AverageHeight > 0.0)) &
+    IF ((Zone(ZoneNum)%CeilingHeight <= 0.0d0).AND.(AverageHeight > 0.0d0)) &
          Zone(ZoneNum)%CeilingHeight = AverageHeight
 
   END DO
@@ -485,7 +487,7 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
       Zone(ZoneNum)%MinimumZ=MIN(Zone(ZoneNum)%MinimumZ,MINVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%z))
       Zone(ZoneNum)%MaximumZ=MAX(Zone(ZoneNum)%MaximumZ,MAXVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%z))
     END DO
-    IF (TotSurfArea > 0.0) THEN
+    IF (TotSurfArea > 0.0d0) THEN
       Zone(ZoneNum)%Centroid%x = Zone(ZoneNum)%Centroid%x / TotSurfArea
       Zone(ZoneNum)%Centroid%y = Zone(ZoneNum)%Centroid%y / TotSurfArea
       Zone(ZoneNum)%Centroid%z = Zone(ZoneNum)%Centroid%z / TotSurfArea
@@ -528,46 +530,13 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
   enddo ! zones
 
   do surfnum=1,totsurfaces
-    ! Calculate Nominal U-value with convection/film coefficients for reporting by adding on
-    ! prescribed R-values for interior and exterior convection coefficients as found in ASHRAE 90.1-2004, Appendix A
     if (Surface(surfnum)%Construction > 0 .and. Surface(surfnum)%Construction <= TotConstructs) THEN
-      cNominalUwithConvCoeffs=' '
-      SELECT CASE (Surface(surfnum)%class)
-        CASE (SurfaceClass_Wall)
-          ! Interior:  vertical, still air, Rcin = 0.68 ft2-F-hr/BTU
-          ! Exterior:  vertical, exterior wind exposure, Rcout = 0.17 ft2-F-hr/BTU
-          IF (NominalU(Surface(surfnum)%Construction) > 0.0) THEN
-            NominalUwithConvCoeffs = 1.0d0 / (0.1197548d0 + (1.0d0 / NominalU(Surface(surfnum)%Construction)) + 0.0299387d0)
-          ELSE
-            cNominalUwithConvCoeffs = '[invalid]'
-          ENDIF
-        CASE (SurfaceClass_Floor)
-          ! Interior:  horizontal, still air, heat flow downward, Rcin = 0.92 ft2-F-hr/BTU
-          ! Exterior:  horizontal, semi-exterior (crawlspace), Rcout = 0.46 ft2-F-hr/BTU
-          IF (NominalU(Surface(surfnum)%Construction) > 0.0) THEN
-            NominalUwithConvCoeffs = 1.0d0 / (0.1620212d0 + (1.0d0 / NominalU(Surface(surfnum)%Construction)) + 0.0810106d0)
-          ELSE
-            cNominalUwithConvCoeffs = '[invalid]'
-          ENDIF
-        CASE (SurfaceClass_Roof)
-          ! Interior:  horizontal, still air, heat flow upward, Rcin = 0.61 ft2-F-hr/BTU
-          ! Exterior:  horizontal, semi-exterior (attic), Rcout = 0.46 ft2-F-hr/BTU
-          IF (NominalU(Surface(surfnum)%Construction) > 0.0) THEN
-            NominalUwithConvCoeffs = 1.0d0 / (0.1074271d0 + (1.0d0 / NominalU(Surface(surfnum)%Construction)) + 0.0810106d0)
-          ELSE
-            cNominalUwithConvCoeffs = '[invalid]'
-          ENDIF
-        CASE DEFAULT
-          IF (NominalU(Surface(surfnum)%Construction) > 0.0) THEN
-            NominalUwithConvCoeffs = NominalU(Surface(surfnum)%Construction)
-          ELSE
-            cNominalUwithConvCoeffs = '[invalid]'
-          ENDIF
-      END SELECT
-      IF (cNominalUwithConvCoeffs == ' ') THEN
+      NominalUwithConvCoeffs = ComputeNominalUwithConvCoeffs(surfnum,isWithConvCoefValid)
+      IF (isWithConvCoefValid) THEN
         cNominalUwithConvCoeffs=RoundSigDigits(NominalUwithConvCoeffs,3)
-      ENDIF
-
+      ELSE
+        cNominalUwithConvCoeffs = '[invalid]'
+      END IF
       IF ((Surface(surfnum)%class == SurfaceClass_Window) .OR. (Surface(surfnum)%class == SurfaceClass_TDD_Dome)) THEN
         ! SurfaceClass_Window also covers glass doors and TDD:Diffusers
         cNominalU='N/A'
@@ -674,6 +643,10 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
 
   END DO ! ZoneNum
 
+! Do the Stratosphere check
+  CALL SetOutBulbTempAt(NumOfZones, Zone(1:NumOfZones)%Centroid%Z,           &
+       Zone(1:NumOfZones)%OutDryBulbTemp, Zone(1:NumOfZones)%OutWetBulbTemp, 'Zone')
+
 !  IF (ALLOCATED(ZoneSurfacesCount)) DEALLOCATE(ZoneSurfacesCount)
 !  IF (ALLOCATED(ZoneSubSurfacesCount)) DEALLOCATE(ZoneSubSurfacesCount)
 !  IF (ALLOCATED(ZoneShadingSurfacesCount)) DEALLOCATE(ZoneShadingSurfacesCount)
@@ -749,6 +722,8 @@ SUBROUTINE AllocateModuleArrays
   DGZone=0.0d0
   ALLOCATE (DBZone(NumOfZones))
   DBZone=0.0d0
+  ALLOCATE (DBZoneSSG(NumOfZones))
+  DBZoneSSG = 0.0d0
   ALLOCATE (QSDifSol(NumOfZones))
   QSDifSol=0.0d0
   ALLOCATE (AISurf(TotSurfaces))
@@ -761,7 +736,7 @@ SUBROUTINE AllocateModuleArrays
   BmToDiffReflFacObs=0.0d0
   ALLOCATE (BmToDiffReflFacGnd(TotSurfaces))
   BmToDiffReflFacGnd=0.0d0
-  ALLOCATE (AWinSurf(TotSurfaces,MaxSolidWinLayers))
+  ALLOCATE (AWinSurf(TotSurfaces,CFSMAXNL+1))
   AWinSurf=0.0d0
   ALLOCATE (AWinCFOverlap(TotSurfaces,MaxSolidWinLayers))
   AWinCFOverlap=0.0d0
@@ -1003,9 +978,9 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
   CALL GetGeometryParameters(ErrorsFound)
 
   IF (WorldCoordSystem) THEN
-    IF (BuildingAzimuth /= 0.0) RelWarning=.true.
+    IF (BuildingAzimuth /= 0.0d0) RelWarning=.true.
     DO ZoneNum=1,NumOfZones
-      IF (Zone(ZoneNum)%RelNorth /= 0.0) RelWarning=.true.
+      IF (Zone(ZoneNum)%RelNorth /= 0.0d0) RelWarning=.true.
     ENDDO
     IF (RelWarning .and. .not. WarningDisplayed) THEN
       CALL ShowWarningError(RoutineName//'World Coordinate System selected.  '// &
@@ -1016,9 +991,9 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
     ENDIF
     RelWarning=.false.
     DO ZoneNum=1,NumOfZones
-      IF (Zone(ZoneNum)%OriginX /= 0.0) RelWarning=.true.
-      IF (Zone(ZoneNum)%OriginY /= 0.0) RelWarning=.true.
-      IF (Zone(ZoneNum)%OriginZ /= 0.0) RelWarning=.true.
+      IF (Zone(ZoneNum)%OriginX /= 0.0d0) RelWarning=.true.
+      IF (Zone(ZoneNum)%OriginY /= 0.0d0) RelWarning=.true.
+      IF (Zone(ZoneNum)%OriginZ /= 0.0d0) RelWarning=.true.
     ENDDO
     IF (RelWarning .and. .not. WarningDisplayed) THEN
       CALL ShowWarningError(RoutineName//'World Coordinate System selected.  '// &
@@ -1167,9 +1142,9 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
       ! Outward normal unit vector (pointing away from room)
       SurfaceTmp(CurNewSurf)%OutNormVec = SurfaceTmp(CurNewSurf)%NewellSurfaceNormalVector
       DO N=1,3
-        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N)-1.0) < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) = +1.0
-        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N)+1.0) < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) = -1.0
-        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N))     < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) =  0.0
+        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) = +1.0d0
+        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) = -1.0d0
+        IF (ABS(SurfaceTmp(CurNewSurf)%OutNormVec(N))     < 1.d-06) SurfaceTmp(CurNewSurf)%OutNormVec(N) =  0.0d0
       ENDDO
 
       ! Can perform tests on this surface here
@@ -1685,7 +1660,7 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
             ! If significantly different areas -- this would not be good
             MultFound = Zone(Surface(Found)%Zone)%Multiplier * Zone(Surface(Found)%Zone)%ListMultiplier
             MultSurfNum = Zone(Surface(SurfNum)%Zone)%Multiplier * Zone(Surface(SurfNum)%Zone)%ListMultiplier
-            IF (Surface(Found)%Area > 0.0) THEN
+            IF (Surface(Found)%Area > 0.0d0) THEN
               IF (ABS((Surface(Found)%Area*MultFound - Surface(SurfNum)%Area*MultSurfNum)/  &
                        Surface(Found)%Area*MultFound) > .02d0) THEN  ! 2% difference in areas
                 ErrCount4=ErrCount4+1
@@ -1727,7 +1702,7 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
             ENDIF
             ! Check opposites Azimuth and Tilt
             ! Tilt
-            IF (ABS(ABS(Surface(Found)%Tilt+Surface(SurfNum)%Tilt)-180.d0) > 1.) THEN
+            IF (ABS(ABS(Surface(Found)%Tilt+Surface(SurfNum)%Tilt)-180.d0) > 1.0d0) THEN
               CALL ShowWarningError(RoutineName//'InterZone Surface Tilts do not match as expected.')
               CALL ShowContinueError('  Tilt='//TRIM(TrimSigDigits(Surface(SurfNum)%Tilt,1))//  &
                                      ' in Surface='//TRIM(Surface(SurfNum)%Name)//', Zone='//TRIM(Surface(SurfNum)%ZoneName))
@@ -1777,7 +1752,7 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
               ENDIF
             ELSE  ! Roofs, Floors
               ! should be looking at opposite tilts, not azimuth for roof/floor matches...
-!              IF (ABS(ABS(Surface(SurfNum)%Azimuth+Surface(Found)%Azimuth)-360.) > 1.) THEN
+!              IF (ABS(ABS(Surface(SurfNum)%Azimuth+Surface(Found)%Azimuth)-360.) > 1.0d0) THEN
 !                CALL ShowWarningError('InterZone Surface Azimuths do not match as expected.')
 !                CALL ShowContinueError('  Azimuth='//TRIM(TrimSigDigits(Surface(SurfNum)%Azimuth,1))//  &
 !                                       ' in Surface='//TRIM(Surface(SurfNum)%Name)//', Zone='//TRIM(Surface(SurfNum)%ZoneName))
@@ -1883,12 +1858,22 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
              trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
              '" with exterior condition ['//  &
              trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+          SurfError=.true.
         ELSEIF (Surface(SurfNum)%ExtBoundCond > 0) THEN
           CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
              '" exterior condition [interzone surface] in a base surface="'//  &
              trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
              '" with exterior condition ['//  &
              trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+          SurfError=.true.
+        ELSEIF (Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond == OtherSideCondModeledExt) THEN
+          CALL ShowWarningError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+           '" exterior condition ['//  &
+           trim(cExtBoundCondition(Surface(SurfNum)%ExtBoundCond))//  &
+           '] in a base surface="'//trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+           '" with exterior condition ['//  &
+           trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+          CALL ShowContinueError('...SubSurface will not use the exterior condition model of the base surface.')
         ELSE
           CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
            '" exterior condition ['//  &
@@ -1896,12 +1881,12 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
            '] in a base surface="'//trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
            '" with exterior condition ['//  &
            trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+          SurfError=.true.
         ENDIF
-        IF (.not. SubSurfaceSevereDisplayed) THEN
+        IF (.not. SubSurfaceSevereDisplayed .and. SurfError) THEN
           CALL ShowContinueError('...calculations for heat balance would be compromised.')
           SubSurfaceSevereDisplayed=.true.
         ENDIF
-        SurfError=.true.
       ENDIF
     ELSEIF (Surface(Surface(SurfNum)%BaseSurf)%BaseSurf == Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond) THEN
       ! adiabatic surface. make sure subsurfaces match
@@ -1982,9 +1967,9 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
       Zone(ZoneNum)%CalcFloorArea = Zone(ZoneNum)%FloorArea
       IF (Zone(ZoneNum)%UserEnteredFloorArea /= AutoCalculate) THEN
       ! Check entered vs calculated
-        IF (Zone(ZoneNum)%UserEnteredFloorArea > 0.0) THEN   ! User entered zone floor area,
+        IF (Zone(ZoneNum)%UserEnteredFloorArea > 0.0d0) THEN   ! User entered zone floor area,
                                                              ! produce message if not near calculated
-          IF (Zone(ZoneNum)%CalcFloorArea > 0.0) THEN
+          IF (Zone(ZoneNum)%CalcFloorArea > 0.0d0) THEN
             diffp=ABS(Zone(ZoneNum)%CalcFloorArea-Zone(ZoneNum)%UserEnteredFloorArea)/Zone(ZoneNum)%UserEnteredFloorArea
             IF (diffp  > .05d0) THEN
               ErrCount=ErrCount+1
@@ -2688,7 +2673,7 @@ SUBROUTINE GetDetShdSurfaceData(ErrorsFound,SurfNum,TotDetachedFixed,TotDetached
         SurfaceTmp(SurfNum)%SchedShadowSurfIndex=0
       ENDIF
       IF (SurfaceTmp(SurfNum)%SchedShadowSurfIndex /= 0) THEN
-        IF (.not. CheckScheduleValueMinMax(SurfaceTmp(SurfNum)%SchedShadowSurfIndex,'>=',0.0,'<=',1.0)) THEN
+        IF (.not. CheckScheduleValueMinMax(SurfaceTmp(SurfNum)%SchedShadowSurfIndex,'>=',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                                '", '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))// &
                                '", values not in range [0,1].')
@@ -2697,7 +2682,7 @@ SUBROUTINE GetDetShdSurfaceData(ErrorsFound,SurfNum,TotDetachedFixed,TotDetached
         SchedMinValue=GetScheduleMinValue(SurfaceTmp(SurfNum)%SchedShadowSurfIndex)
         SurfaceTmp(SurfNum)%SchedMinValue=SchedMinValue
         SchedMaxValue=GetScheduleMaxValue(SurfaceTmp(SurfNum)%SchedShadowSurfIndex)
-        IF (SchedMinValue == 1.0) THEN
+        IF (SchedMinValue == 1.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                                '", '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))// &
                                '", is always transparent.')
@@ -2872,7 +2857,7 @@ SUBROUTINE GetRectDetShdSurfaceData(ErrorsFound,SurfNum,TotRectDetachedFixed,Tot
       CALL MakeRectangularVertices(SurfNum,rNumericArgs(3),  &
                                    rNumericArgs(4),rNumericArgs(5),rNumericArgs(6),rNumericArgs(7),RectSurfRefWorldCoordSystem)
 
-      IF (SurfaceTmp(SurfNum)%Area <= 0.0) THEN
+      IF (SurfaceTmp(SurfNum)%Area <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
               '", Surface Area <= 0.0; Entered Area='//  &
               TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
@@ -3177,7 +3162,8 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
 
         IF (NoGroundTempObjWarning) THEN
           IF (.not. GroundTempObjInput) THEN
-            CALL ShowWarningError('GetSurfaces: Surfaces with interface to Ground found but no "Ground Temperatures" were input.')
+            CALL ShowWarningError('GetHTSurfaceData: Surfaces with interface to Ground '//  &
+               'found but no "Ground Temperatures" were input.')
             CALL ShowContinueError('Found first in surface='//TRIM(cAlphaArgs(1)))
             CALL ShowContinueError('Defaults, constant throughout the year of ('//TRIM(RoundSigDigits(GroundTemp,1))// &
                                ') will be used.')
@@ -3190,7 +3176,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
         SurfaceTmp(SurfNum)%ExtBoundCond = GroundFCfactorMethod
         IF (NoFCGroundTempObjWarning) THEN
           IF (.not. FCGroundTemps) THEN
-            CALL ShowSevereError('GetSurfaces: Surfaces with interface to GroundFCfactorMethod found '//  &
+            CALL ShowSevereError('GetHTSurfaceData: Surfaces with interface to GroundFCfactorMethod found '//  &
                 'but no "FC Ground Temperatures" were input.')
             CALL ShowContinueError('Found first in surface='//TRIM(cAlphaArgs(1)))
             CALL ShowContinueError('Either add a "Site:GroundTemperature:FCfactorMethod" object or '//  &
@@ -3227,7 +3213,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
           ErrorsFound=.true.
         ELSE
           SurfaceTmp(SurfNum)%OSCPtr=Found
-          IF (OSC(Found)%SurfFilmCoef > 0.0) THEN
+          IF (OSC(Found)%SurfFilmCoef > 0.0d0) THEN
             SurfaceTmp(SurfNum)%ExtBoundCond = OtherSideCoefCalcExt
           ELSE
             SurfaceTmp(SurfNum)%ExtBoundCond = OtherSideCoefNoCalcExt
@@ -3360,7 +3346,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
       ENDIF
       ALLOCATE(SurfaceTmp(SurfNum)%Vertex(SurfaceTmp(SurfNum)%Sides))
       CALL GetVertices(SurfNum,SurfaceTmp(SurfNum)%Sides,rNumericArgs(3:))
-      IF (SurfaceTmp(SurfNum)%Area <= 0.0) THEN
+      IF (SurfaceTmp(SurfNum)%Area <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
               '", Surface Area <= 0.0; Entered Area='//  &
               TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
@@ -3387,7 +3373,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
                        '", underground Floor Area = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
             CALL ShowContinueError('..which does not match its construction area.')
           ENDIF
-          IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1) THEN
+          IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1d0) THEN
             CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                        '", underground Floor Perimeter = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Perimeter,2)))
             CALL ShowContinueError('..which is less than its construction exposed perimeter.')
@@ -3693,7 +3679,7 @@ SUBROUTINE GetRectSurfaces(ErrorsFound,SurfNum,TotRectExtWalls,TotRectIntWalls,T
       CALL MakeRectangularVertices(SurfNum,rNumericArgs(3),  &
                                    rNumericArgs(4),rNumericArgs(5),rNumericArgs(6),rNumericArgs(7),RectSurfRefWorldCoordSystem)
 
-      IF (SurfaceTmp(SurfNum)%Area <= 0.0) THEN
+      IF (SurfaceTmp(SurfNum)%Area <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
               '", Surface Area <= 0.0; Entered Area='//  &
               TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
@@ -3702,7 +3688,7 @@ SUBROUTINE GetRectSurfaces(ErrorsFound,SurfNum,TotRectExtWalls,TotRectIntWalls,T
 
       !Check wall height for the CFactor walls
       IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Wall .and. SurfaceTmp(SurfNum)%ExtBoundCond == GroundFCfactorMethod) THEN
-        IF (ABS(SurfaceTmp(SurfNum)%Height - Construct(SurfaceTmp(SurfNum)%Construction)%Height)>0.05) THEN
+        IF (ABS(SurfaceTmp(SurfNum)%Height - Construct(SurfaceTmp(SurfNum)%Construction)%Height)>0.05d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                      '", underground Wall Height = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Height,2)))
           CALL ShowContinueError('..which deos not match its construction height.')
@@ -3711,12 +3697,12 @@ SUBROUTINE GetRectSurfaces(ErrorsFound,SurfNum,TotRectExtWalls,TotRectIntWalls,T
 
       !Check area and perimeter for the FFactor floors
       IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Floor .and. SurfaceTmp(SurfNum)%ExtBoundCond == GroundFCfactorMethod) THEN
-        IF (ABS(SurfaceTmp(SurfNum)%Area - Construct(SurfaceTmp(SurfNum)%Construction)%Area)>0.1) THEN
+        IF (ABS(SurfaceTmp(SurfNum)%Area - Construct(SurfaceTmp(SurfNum)%Construction)%Area)>0.1d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                      '", underground Floor Area = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
           CALL ShowContinueError('..which does not match its construction area.')
         ENDIF
-        IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1) THEN
+        IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                      '", underground Floor Perimeter = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Perimeter,2)))
           CALL ShowContinueError('..which is less than its construction exposed perimeter.')
@@ -3835,14 +3821,14 @@ SUBROUTINE MakeRectangularVertices(SurfNum,XCoord,YCoord,ZCoord,Length,Height,Su
     ENDIF
   ENDIF
 
-  XX(1)=0.0
-  XX(2)=0.0
+  XX(1)=0.0d0
+  XX(2)=0.0d0
   XX(3)=Length
   XX(4)=Length
   YY(1)=Height
   YY(4)=Height
-  YY(3)=0.0
-  YY(2)=0.0
+  YY(3)=0.0d0
+  YY(2)=0.0d0
 
   DO N = 1, SurfaceTmp(SurfNum)%Sides
     Vrt=N
@@ -3871,9 +3857,9 @@ SUBROUTINE MakeRectangularVertices(SurfNum,XCoord,YCoord,ZCoord,Length,Height,Su
   ! Outward normal unit vector (pointing away from room)
   SurfaceTmp(SurfNum)%OutNormVec = SurfaceTmp(SurfNum)%NewellSurfaceNormalVector
   DO N=1,3
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0d0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0d0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0d0
   ENDDO
 
 !  IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.) THEN
@@ -4197,7 +4183,7 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
             ! the base surface with OtherSide Coeff -- do we want that or is it an error?
             SurfaceTmp(SurfNum)%OSCPtr=Found
             SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)
-            IF (OSC(Found)%SurfFilmCoef > 0.0) THEN
+            IF (OSC(Found)%SurfFilmCoef > 0.0d0) THEN
               SurfaceTmp(SurfNum)%ExtBoundCond=OtherSideCoefCalcExt
             ELSE
               SurfaceTmp(SurfNum)%ExtBoundCond = OtherSideCoefNoCalcExt
@@ -4248,12 +4234,12 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
       SurfaceTmp(SurfNum)%Multiplier = INT(rNumericArgs(2))
     ! Only windows, glass doors and doors can have Multiplier > 1:
     IF ( (SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Window .and. SurfaceTmp(SurfNum)%Class .ne. SurfaceClass_GlassDoor .and.  &
-          SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Door) .AND. rNumericArgs(2) > 1.0) THEN
+          SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Door) .AND. rNumericArgs(2) > 1.0d0) THEN
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                           '", invalid '//TRIM(cNumericFieldNames(2))//'=['//TRIM(TrimSigDigits(rNumericArgs(2),1))//'].')
       CALL ShowContinueError('...because '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2))//   &
       ' multiplier will be set to 1.0.')
-      SurfaceTmp(SurfNum)%Multiplier = 1.0
+      SurfaceTmp(SurfNum)%Multiplier = 1.0d0
     END IF
 
     CALL GetVertices(SurfNum,SurfaceTmp(SurfNum)%Sides,rNumericArgs(4:))
@@ -4297,6 +4283,15 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                            '", invalid '//TRIM(cAlphaFieldNames(6))//' because it is not an exterior window.')
           ErrorsFound=.true.
+
+        ELSEIF (Construct(SurfaceTmp(SurfNum)%Construction)%WindowTypeEQL .AND. &
+                SurfaceTmp(SurfNum)%WindowShadingControlPtr > 0) THEN
+
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                           '", invalid '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+          CALL ShowContinueError('.. equivalent layer window model does not use shading control object.')
+          CALL ShowContinueError('.. Shading control is set to none or zero, and simulation continues.')
+          SurfaceTmp(SurfNum)%WindowShadingControlPtr = 0
         END IF
       END IF
 
@@ -4596,18 +4591,18 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
         SurfaceTmp(SurfNum)%Multiplier = INT(rNumericArgs(1))
       ! Only windows, glass doors and doors can have Multiplier > 1:
       IF ( (SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Window .and. SurfaceTmp(SurfNum)%Class .ne. SurfaceClass_GlassDoor .and.  &
-            SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Door) .AND. rNumericArgs(1) > 1.0) THEN
+            SurfaceTmp(SurfNum)%Class .NE. SurfaceClass_Door) .AND. rNumericArgs(1) > 1.0d0) THEN
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                             '", invalid '//TRIM(cNumericFieldNames(1))//'=['//TRIM(TrimSigDigits(rNumericArgs(1),1))//'].')
         CALL ShowContinueError('...because '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1))//   &
         ' multiplier will be set to 1.0.')
-        SurfaceTmp(SurfNum)%Multiplier = 1.0
+        SurfaceTmp(SurfNum)%Multiplier = 1.0d0
       END IF
 
       CALL MakeRelativeRectangularVertices(SurfaceTmp(SurfNum)%BaseSurf,SurfNum,  &
                          rNumericArgs(2),rNumericArgs(3),rNumericArgs(4),rNumericArgs(5))
 
-      IF (SurfaceTmp(SurfNum)%Area <= 0.0) THEN
+      IF (SurfaceTmp(SurfNum)%Area <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
               '", Surface Area <= 0.0; Entered Area='//  &
               TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
@@ -4812,11 +4807,11 @@ SUBROUTINE CheckWindowShadingControlFrameDivider(cRoutineName,ErrorsFound,SurfNu
        WindowShadingControl(WSCptr)%ShadingType==WSC_ST_BetweenGlassBlind) THEN
           ! Divider not allowed with between-glass shade or blind
       IF(SurfaceTmp(SurfNum)%FrameDivider > 0) THEN
-        IF(FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth > 0.0) THEN
+        IF(FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth > 0.0d0) THEN
           CALL ShowWarningError('A divider cannot be specified for window '//TRIM(SurfaceTmp(SurfNum)%Name))
           CALL ShowContinueError(', which has a between-glass shade or blind.')
           CALL ShowContinueError('Calculation will proceed without the divider for this window.')
-          FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth = 0.0
+          FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth = 0.0d0
         END IF
       END IF
           ! Check consistency of gap widths between unshaded and shaded constructions
@@ -4918,23 +4913,29 @@ SUBROUTINE CheckWindowShadingControlFrameDivider(cRoutineName,ErrorsFound,SurfNu
         SurfaceTmp(SurfNum)%FrameDivider = &
           FindIteminList(cAlphaArgs(FrameField),FrameDivider%Name,TotFrameDivider)
         IF(SurfaceTmp(SurfNum)%FrameDivider == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                       '", invalid '//TRIM(cAlphaFieldNames(FrameField))//'="'//TRIM(cAlphaArgs(FrameField))//'"')
-          ErrorsFound=.true.
+          IF (.NOT. Construct(SurfaceTmp(SurfNum)%Construction)%WindowTypeEQL) THEN
+               CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                    '", invalid '//TRIM(cAlphaFieldNames(FrameField))//'="'//TRIM(cAlphaArgs(FrameField))//'"')
+               ErrorsFound=.true.
+          ELSE
+               CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                   '", invalid '//TRIM(cAlphaFieldNames(FrameField))//'="'//TRIM(cAlphaArgs(FrameField))//'"')
+               CALL ShowContinueError('...Frame/Divider is not supported in Equivalent Layer Window model.')
+          ENDIF
         END IF
             ! Divider not allowed with between-glass shade or blind
         IF(.NOT.ErrorsFound .AND. WSCptr > 0 .AND. ConstrNumSh > 0) THEN
           IF(WindowShadingControl(WSCptr)%ShadingType==WSC_ST_BetweenGlassShade.OR. &
             WindowShadingControl(WSCptr)%ShadingType==WSC_ST_BetweenGlassBlind) THEN
             IF(SurfaceTmp(SurfNum)%FrameDivider > 0) THEN
-              IF(FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth > 0.0) THEN
+              IF(FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth > 0.0d0) THEN
                 CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                        '", invalid '//TRIM(cAlphaFieldNames(FrameField))//'="'//TRIM(cAlphaArgs(FrameField))//'"')
                 CALL ShowContinueError('Divider cannot be specified because the construction has a between-glass shade or blind.')
                 CALL ShowContinueError('Calculation will proceed without the divider for this window.')
                 CALL ShowContinueError('Divider width = ['//  &
                    trim(RoundSigDigits(FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth,2))//'].')
-                FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth = 0.0
+                FrameDivider(SurfaceTmp(SurfNum)%FrameDivider)%DividerWidth = 0.0d0
               END IF
             END IF ! End of check if window has divider
           END IF  ! End of check if window has a between-glass shade or blind
@@ -4942,6 +4943,16 @@ SUBROUTINE CheckWindowShadingControlFrameDivider(cRoutineName,ErrorsFound,SurfNu
       END IF  ! End of check if window has an associated FrameAndDivider
     END IF  ! End of check if window has a construction
   END IF
+
+  IF (Construct(SurfaceTmp(SurfNum)%Construction)%WindowTypeEQL) THEN
+     IF(SurfaceTmp(SurfNum)%FrameDivider > 0) THEN
+        ! Equivalent Layer window does not have frame/divider model
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+             '", invalid '//TRIM(cAlphaFieldNames(FrameField))//'="'//TRIM(cAlphaArgs(FrameField))//'"')
+        CALL ShowContinueError('Frame/Divider is not supported in Equivalent Layer Window model.')
+        SurfaceTmp(SurfNum)%FrameDivider = 0
+     ENDIF
+  ENDIF
 
   RETURN
 
@@ -4999,7 +5010,7 @@ SUBROUTINE CheckSubSurfaceMiscellaneous(cRoutineName,ErrorsFound,SurfNum,SubSurf
   ! Warning if window has multiplier > 1 and SolarDistribution = FullExterior or FullInteriorExterior
 
   IF((SurfaceTmp(SurfNum)%Class == SurfaceClass_Window .or. SurfaceTmp(SurfNum)%Class == SurfaceClass_GlassDoor)  &
-      .AND. SolarDistribution > MinimalShadowing .AND. SurfaceTmp(SurfNum)%Multiplier > 1.0) THEN
+      .AND. SolarDistribution > MinimalShadowing .AND. SurfaceTmp(SurfNum)%Multiplier > 1.0d0) THEN
     IF (DisplayExtraWarnings) THEN
       CALL ShowWarningError(trim(cRoutineName)//': A Multiplier > 1.0 for window/glass door '//TRIM(SurfaceTmp(SurfNum)%Name))
       CALL ShowContinueError('in conjunction with SolarDistribution = FullExterior or FullInteriorExterior')
@@ -5036,7 +5047,7 @@ SUBROUTINE CheckSubSurfaceMiscellaneous(cRoutineName,ErrorsFound,SurfNum,SubSurf
     IF (ConstrNum > 0) THEN
       DO Lay = 1,Construct(ConstrNum)%TotLayers
         LayerPtr = Construct(ConstrNum)%LayerPoint(Lay)
-        IF(Material(LayerPtr)%Group == WindowGlass .AND. Material(LayerPtr)%GlassTransDirtFactor < 1.0) THEN
+        IF(Material(LayerPtr)%Group == WindowGlass .AND. Material(LayerPtr)%GlassTransDirtFactor < 1.0d0) THEN
           CALL ShowSevereError(trim(cRoutineName)//': Interior Window or GlassDoor '//TRIM(SubSurfaceName)// &
             ' has a glass layer with')
           CALL ShowContinueError('Dirt Correction Factor for Solar and Visible Transmittance < 1.0')
@@ -5077,7 +5088,7 @@ SUBROUTINE CheckSubSurfaceMiscellaneous(cRoutineName,ErrorsFound,SurfNum,SubSurf
           IF (Found /= 0) SurfaceTmp(Found)%Area = SurfaceTmp(Found)%Area - SurfaceTmp(SurfNum)%Area
         END IF
 
-        IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0) THEN
+        IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0d0) THEN
           CALL ShowSevereError(trim(cRoutineName)//': Surface Openings have too much area for base surface='//  &
                                TRIM(SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Name))
           CALL ShowContinueError('Opening Surface creating error='//TRIM(SurfaceTmp(SurfNum)%Name))
@@ -5187,14 +5198,14 @@ SUBROUTINE MakeRelativeRectangularVertices(BaseSurfNum,SurfNum,XCoord,ZCoord,Len
   YLLC  = SurfaceTmp(BaseSurfNum)%Vertex(2)%Y+XCoord*BaseSinSurfAzimuth-ZCoord*BaseCosSurfTilt*BaseCosSurfAzimuth
   ZLLC  = SurfaceTmp(BaseSurfNum)%Vertex(2)%Z+ZCoord*BaseSinSurfTilt
 
-  XX(1)=0.0
-  XX(2)=0.0
+  XX(1)=0.0d0
+  XX(2)=0.0d0
   XX(3)=Length
   XX(4)=Length
   YY(1)=Height
   YY(4)=Height
-  YY(3)=0.0
-  YY(2)=0.0
+  YY(3)=0.0d0
+  YY(2)=0.0d0
 
   DO N = 1, SurfaceTmp(SurfNum)%Sides
     Vrt=N
@@ -5225,9 +5236,9 @@ SUBROUTINE MakeRelativeRectangularVertices(BaseSurfNum,SurfNum,XCoord,ZCoord,Len
   ! Outward normal unit vector (pointing away from room)
   SurfaceTmp(SurfNum)%OutNormVec = SurfaceTmp(SurfNum)%NewellSurfaceNormalVector
   DO N=1,3
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0
-    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0d0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0d0
+    IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0d0
   ENDDO
 
 !  IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.) THEN
@@ -5421,7 +5432,7 @@ SUBROUTINE GetAttShdSurfaceData(ErrorsFound,SurfNum,TotShdSubs)
       SurfaceTmp(SurfNum)%SchedShadowSurfIndex=0
     ENDIF
     IF (SurfaceTmp(SurfNum)%SchedShadowSurfIndex /= 0) THEN
-      IF (.not. CheckScheduleValueMinMax(SurfaceTmp(SurfNum)%SchedShadowSurfIndex,'>=',0.0,'<=',1.0)) THEN
+      IF (.not. CheckScheduleValueMinMax(SurfaceTmp(SurfNum)%SchedShadowSurfIndex,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                              '", '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))// &
                              '", values not in range [0,1].')
@@ -5999,12 +6010,12 @@ SUBROUTINE GetIntMassSurfaceData(ErrorsFound,SurfNum,TotIntMass)
     SurfaceTmp(SurfNum)%Tilt=90.d0
     SurfaceTmp(SurfNum)%CosTilt=COS(90.d0*DegToRadians)
     SurfaceTmp(SurfNum)%SinTilt=SIN(90.d0*DegToRadians)
-    SurfaceTmp(SurfNum)%Azimuth=0.
-    SurfaceTmp(SurfNum)%CosAzim=COS(0.0)
-    SurfaceTmp(SurfNum)%SinAzim=SIN(0.0)
+    SurfaceTmp(SurfNum)%Azimuth=0.0d0
+    SurfaceTmp(SurfNum)%CosAzim=COS(0.0d0)
+    SurfaceTmp(SurfNum)%SinAzim=SIN(0.0d0)
     ! Outward normal unit vector (pointing away from room)
     SurfaceTmp(SurfNum)%OutNormVec = SurfaceTmp(SurfNum)%lcsz
-    SurfaceTmp(SurfNum)%ViewFactorSky=.5
+    SurfaceTmp(SurfNum)%ViewFactorSky=.5d0
     SurfaceTmp(SurfNum)%ExtSolar=.false.
     SurfaceTmp(SurfNum)%ExtWind=.false.
     SurfaceTmp(SurfNum)%BaseSurf = SurfNum
@@ -6069,7 +6080,7 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) CYCLE
       SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = 0.2d0
       SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = 0.2d0
-      SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = 0.0
+      SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = 0.0d0
       SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = 0
   END DO
 
@@ -6113,7 +6124,7 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
     SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = rNumericArgs(3)
     SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(1)
     SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(2)
-    IF(rNumericArgs(3) > 0.0) THEN
+    IF(rNumericArgs(3) > 0.0d0) THEN
       GlConstrNum = FindItemInList(cAlphaArgs(2),Construct%Name,TotConstructs)
       IF(GlConstrNum == 0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
@@ -6129,7 +6140,7 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
     SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = rNumericArgs(3)
     SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(1)
     SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(2)
-    IF(rNumericArgs(3) > 0.0) THEN
+    IF(rNumericArgs(3) > 0.0d0) THEN
       GlConstrNum = FindItemInList(cAlphaArgs(2),Construct%Name,TotConstructs)
       IF(GlConstrNum /= 0) THEN
         Construct(GlConstrNum)%IsUsed=.true.
@@ -6391,7 +6402,7 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
     ExtVentedCavity(Item)%SolAbsorp     = rNumericArgs(3)
     ExtVentedCavity(Item)%HdeltaNPL     = rNumericArgs(4)
     ExtVentedCavity(Item)%PlenGapThick  = rNumericArgs(5)
-    IF (ExtVentedCavity(Item)%PlenGapThick <= 0.0) THEN
+    IF (ExtVentedCavity(Item)%PlenGapThick <= 0.0d0) THEN
          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(ExtVentedCavity(Item)%Name)//  &
                                 '", invalid .')
          ErrorsFound=.true.
@@ -6406,7 +6417,7 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
     ! Fill out data we now know
     ! sum areas of HT surface areas
     ExtVentedCavity(Item)%ProjArea      = SUM(Surface(ExtVentedCavity(Item)%SurfPtrs)%Area)
-    IF (ExtVentedCavity(Item)%ProjArea <= 0.0) THEN
+    IF (ExtVentedCavity(Item)%ProjArea <= 0.0d0) THEN
          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(ExtVentedCavity(Item)%Name)//  &
                                 '", invalid .')
          ErrorsFound=.true.
@@ -7216,7 +7227,7 @@ SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
            '", in Zone="'//TRIM(SurfaceTmp(SurfNum)%ZoneName)//'".')
         CALL ShowContinueError('Automatic fix is attempted.')
         CALL ReverseAndRecalculate(SurfNum,SurfaceTmp(SurfNum)%Sides,SurfWorldAz,SurfTilt)
-      ELSEIF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.) THEN
+      ELSEIF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.0d0) THEN
         TiltString=RoundSigDigits(SurfTilt,1)
         CALL ShowWarningError(RoutineName//'Roof/Ceiling is not oriented correctly! Tilt angle=['//TRIM(TiltString)//  &
            '], should be near 0,'//   &
@@ -7252,9 +7263,9 @@ SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
       ! Outward normal unit vector (pointing away from room)
       SurfaceTmp(SurfNum)%OutNormVec = SurfaceTmp(SurfNum)%NewellSurfaceNormalVector
       DO N=1,3
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0d0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0d0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))     < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0d0
       ENDDO
 
       IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Window .or. SurfaceTmp(SurfNum)%Class == SurfaceClass_GlassDoor .or.  &
@@ -7354,7 +7365,7 @@ SUBROUTINE ReverseAndRecalculate(SurfNum,NSides,SurfAzimuth,SurfTilt)
     CALL DetermineAzimuthAndTilt(SurfaceTmp(SurfNum)%Vertex,SurfaceTmp(SurfNum)%Sides,SurfAzimuth,SurfTilt,  &
                                  SurfaceTmp(SurfNum)%lcsx,SurfaceTmp(SurfNum)%lcsy,SurfaceTmp(SurfNum)%lcsz, &
                                  SurfaceTmp(SurfNum)%GrossArea,SurfaceTmp(SurfNum)%NewellSurfaceNormalVector)
-    IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.) THEN
+    IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Roof .and. SurfTilt > 80.0d0) THEN
       TiltString=RoundSigDigits(SurfTilt,1)
       CALL ShowWarningError(RoutineName//'Roof/Ceiling is still upside down! Tilt angle=['//TRIM(TiltString)//  &
            '], should be near 0, please fix manually.')
@@ -7489,9 +7500,9 @@ SUBROUTINE MakeMirrorSurface(SurfNum)
       ! Outward normal unit vector (pointing away from room)
       SurfaceTmp(SurfNum)%OutNormVec = SurfaceTmp(SurfNum)%NewellSurfaceNormalVector
       DO N=1,3
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0
-        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))       < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)-1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = +1.0d0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N)+1.0d0) < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) = -1.0d0
+        IF (ABS(SurfaceTmp(SurfNum)%OutNormVec(N))       < 1.d-06) SurfaceTmp(SurfNum)%OutNormVec(N) =  0.0d0
       ENDDO
 
     ! Can perform tests on this surface here
@@ -8207,8 +8218,8 @@ SUBROUTINE GetStormWindowData(ErrorsFound)
 
     ! Check for reversal of on and off times
     IF(SurfNum > 0) THEN
-      IF((Latitude > 0.0  .AND. (StormWindow(StormWinNum)%MonthOn < StormWindow(StormWinNum)%MonthOff)) .OR. &
-         (Latitude <= 0.0 .AND. (StormWindow(StormWinNum)%MonthOn > StormWindow(StormWinNum)%MonthOff))) THEN
+      IF((Latitude > 0.0d0  .AND. (StormWindow(StormWinNum)%MonthOn < StormWindow(StormWinNum)%MonthOff)) .OR. &
+         (Latitude <= 0.0d0 .AND. (StormWindow(StormWinNum)%MonthOn > StormWindow(StormWinNum)%MonthOff))) THEN
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" check times that storm window')
         CALL ShowContinueError('is put on (month='//TRIM(TrimSigDigits(StormWindow(StormWinNum)%MonthOn))//  &
            ', day='//TRIM(TrimSigDigits(StormWindow(StormWinNum)%DayOfMonthOn))//')'// &
@@ -8620,7 +8631,7 @@ SUBROUTINE GetOSCData(ErrorsFound)
       ENDIF
     ENDIF
 
-    IF (rNumericArgs(1) > 0.0 .and. .not. ANY(rNumericArgs(3:7) /= 0.0) &
+    IF (rNumericArgs(1) > 0.0d0 .and. .not. ANY(rNumericArgs(3:7) /= 0.0d0) &
          .AND. (.not. OSC(OSCNum)%SinusoidalConstTempCoef)) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
               '" has zeros for all coefficients.')
@@ -8628,7 +8639,7 @@ SUBROUTINE GetOSCData(ErrorsFound)
         'object will always be 0C.')
     ENDIF
 
-    IF (rNumericArgs(1) <= 0.0 .and. .not. ANY(rNumericArgs(3:7) /= 0.0) &
+    IF (rNumericArgs(1) <= 0.0d0 .and. .not. ANY(rNumericArgs(3:7) /= 0.0d0) &
          .AND. (.not. OSC(OSCNum)%SinusoidalConstTempCoef)) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
               '" has zeros for all coefficients.')
@@ -8659,7 +8670,7 @@ SUBROUTINE GetOSCData(ErrorsFound)
     IF (Loop == 1) THEN
       WRITE(OutputFileInits,OSCFormat1)
     ENDIF
-    IF (OSC(Loop)%SurfFilmCoef > 0.0) THEN
+    IF (OSC(Loop)%SurfFilmCoef > 0.0d0) THEN
       cAlphaArgs(1)=RoundSigDigits(OSC(Loop)%SurfFilmCoef,3)
       CALL SetupOutputVariable('Surface Other Side Coefficients Exterior Air Drybulb Temperature [C]',OSC(Loop)%OSCTempCalc, &
                                  'System','Average',OSC(Loop)%Name)
@@ -8928,7 +8939,7 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
             SurfaceTmp(SurfNum)%MaterialMovInsulExt=MaterNum
             SurfaceTmp(SurfNum)%SchedMovInsulExt=SchNum
             IF (Material(MaterNum)%Resistance <= 0.0d0) THEN
-              IF (Material(MaterNum)%Conductivity <= 0.0 .or. Material(MaterNum)%Thickness <= 0.0) THEN
+              IF (Material(MaterNum)%Conductivity <= 0.0d0 .or. Material(MaterNum)%Thickness <= 0.0d0) THEN
                 CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
                    '", invalid material.')
                 CALL ShowContinueError('"Outside", invalid material for movable insulation.')
@@ -8936,12 +8947,12 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
                    'Resistance=['//trim(RoundSigDigits(Material(MaterNum)%Resistance,3))//  &
                    '], must be > 0 for use in Movable Insulation.')
                 ErrorsFound=.true.
-              ELSEIF (Material(MaterNum)%Conductivity > 0.0) THEN
+              ELSEIF (Material(MaterNum)%Conductivity > 0.0d0) THEN
                 Material(MaterNum)%Resistance=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
               ENDIF
             ENDIF
             IF (Material(MaterNum)%Conductivity <= 0.0d0) THEN
-              IF (Material(MaterNum)%Resistance <= 0.0) THEN
+              IF (Material(MaterNum)%Resistance <= 0.0d0) THEN
                 CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
                    '", invalid material.')
                 CALL ShowContinueError('"Outside", invalid material for movable insulation.')
@@ -8963,7 +8974,7 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
             SurfaceTmp(SurfNum)%MaterialMovInsulInt=MaterNum
             SurfaceTmp(SurfNum)%SchedMovInsulInt=SchNum
             IF (Material(MaterNum)%Resistance <= 0.0d0) THEN
-              IF (Material(MaterNum)%Conductivity <= 0.0 .or. Material(MaterNum)%Thickness <= 0.0) THEN
+              IF (Material(MaterNum)%Conductivity <= 0.0d0 .or. Material(MaterNum)%Thickness <= 0.0d0) THEN
                 CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
                    '", invalid material.')
                 CALL ShowContinueError('"Inside", invalid material for movable insulation.')
@@ -8971,7 +8982,7 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
                    'Resistance=['//trim(RoundSigDigits(Material(MaterNum)%Resistance,3))//  &
                    '], must be > 0 for use in Movable Insulation.')
                 ErrorsFound=.true.
-              ELSEIF (Material(MaterNum)%Conductivity > 0.0) THEN
+              ELSEIF (Material(MaterNum)%Conductivity > 0.0d0) THEN
                 Material(MaterNum)%Resistance=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
               ENDIF
             ENDIF
@@ -9061,8 +9072,8 @@ SUBROUTINE CalculateZoneVolume(ErrorsFound,CeilingHeightEntered)
          '", zone floor area is zero. All values for this zone that are entered per floor area will be zero.')
     ENDIF
 
-    SumAreas=0.0
-    SurfCount=0
+    SumAreas=0.0d0
+    SurfCount=0.0d0
     NFaces=Zone(ZoneNum)%SurfaceLast-Zone(ZoneNum)%SurfaceFirst+1
     notused=0
     ZoneStruct%NumSurfaceFaces=NFaces
@@ -9092,29 +9103,29 @@ SUBROUTINE CalculateZoneVolume(ErrorsFound,CeilingHeightEntered)
       SumAreas=SumAreas+VecLength(ZoneStruct%SurfaceFace(NActFaces)%NewellAreaVector)
     ENDDO
     ZoneStruct%NumSurfaceFaces=NActFaces
-    SurfCount=NActFaces
+    SurfCount=REAL(NActFaces,r64)
     CALL CalcPolyhedronVolume(ZoneStruct,CalcVolume)
 
-    IF(Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF(Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       MinimumVolume=Zone(ZoneNum)%FloorArea * 2.5d0
-      IF (Zone(ZoneNum)%CeilingHeight > 0.0) THEN
+      IF (Zone(ZoneNum)%CeilingHeight > 0.0d0) THEN
         MinimumVolume=Zone(ZoneNum)%FloorArea*Zone(ZoneNum)%CeilingHeight
       ENDIF
     ELSE
       IF (SurfCount > 0) THEN
         MinimumVolume=SQRT(SumAreas/SurfCount)**3
       ELSE
-        MinimumVolume=0.0
+        MinimumVolume=0.0d0
       ENDIF
     ENDIF
-    IF (CalcVolume > 0.0) THEN
+    IF (CalcVolume > 0.0d0) THEN
       TempVolume=CalcVolume
     ELSE
       TempVolume=MinimumVolume
     ENDIF
 
-    IF (Zone(ZoneNum)%Volume > 0.0) THEN   ! User entered zone volume, produce message if not near calculated
-      IF (TempVolume > 0.0) THEN
+    IF (Zone(ZoneNum)%Volume > 0.0d0) THEN   ! User entered zone volume, produce message if not near calculated
+      IF (TempVolume > 0.0d0) THEN
         IF (ABS(TempVolume-Zone(ZoneNum)%Volume)/Zone(ZoneNum)%Volume  > .05d0) THEN
           ErrCount=ErrCount+1
           IF (ErrCount == 1 .and. .not. DisplayExtraWarnings) THEN
@@ -9140,7 +9151,7 @@ SUBROUTINE CalculateZoneVolume(ErrorsFound,CeilingHeightEntered)
         ENDIF
       ENDIF
     ELSEIF (CeilingHeightEntered(ZoneNum)) THEN   ! User did not enter zone volume, but entered ceiling height
-      IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+      IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
         Zone(ZoneNum)%Volume=Zone(ZoneNum)%FloorArea*Zone(ZoneNum)%CeilingHeight
       ELSE ! ceiling height entered but floor area zero
         Zone(ZoneNum)%Volume=TempVolume
@@ -9149,7 +9160,7 @@ SUBROUTINE CalculateZoneVolume(ErrorsFound,CeilingHeightEntered)
       Zone(ZoneNum)%Volume=TempVolume
     ENDIF
 
-    IF (Zone(ZoneNum)%Volume <= 0.0) THEN
+    IF (Zone(ZoneNum)%Volume <= 0.0d0) THEN
       CALL ShowSevereError('Indicated Zone Volume <= 0.0 for Zone='//TRIM(Zone(ZoneNum)%Name))
       CALL ShowContinueError('Zone Volume calculated was='//TRIM(RoundSigDigits(Zone(ZoneNum)%Volume,2)))
     ENDIF
@@ -9199,7 +9210,7 @@ SUBROUTINE CalculateZoneVolume(ErrorsFound,CeilingHeightEntered)
 
   ErrorFlag=.false.
   DO ZoneNum=1,NumOfZones
-    IF (Zone(ZoneNum)%Volume <= 0.0) ErrorFlag=.true.
+    IF (Zone(ZoneNum)%Volume <= 0.0d0) ErrorFlag=.true.
   END DO
   IF (ErrorFlag) THEN
     CALL ShowSevereError('All ZONE Volumes must be > 0.0')
@@ -9331,9 +9342,9 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
     ALLOCATE(X(MaxVerticesPerSurface))
     ALLOCATE(Y(MaxVerticesPerSurface))
     ALLOCATE(Z(MaxVerticesPerSurface))
-    X=0.0
-    Y=0.0
-    Z=0.0
+    X=0.0d0
+    Y=0.0d0
+    Z=0.0d0
     OneTimeFlag=.false.
   ENDIF
 
@@ -9432,7 +9443,7 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
 
        IF (ABS(Surface(Surface(ThisSurf)%Basesurf)%Tilt-ThisSurfTilt) <= .01d0) then
          ! left or right fin
-         IF (ThisSurfAz < 0.) ThisSurfAz=ThisSurfAz+360.d0
+         IF (ThisSurfAz < 0.0d0) ThisSurfAz=ThisSurfAz+360.d0
          IF (ThisSurfAz > Surface(Surface(ThisSurf)%BaseSurf)%Azimuth) then
            ThisShape=RectangularLeftFin
          ELSE
@@ -9455,7 +9466,7 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
          ErrorInSurface=.true.
        ENDIF
        ThisReveal=-Pt2Plane(Surface(ThisSurf)%Vertex(2),BasePlane)
-       IF (ABS(ThisReveal) < .0002d0) ThisReveal=0.0
+       IF (ABS(ThisReveal) < .0002d0) ThisReveal=0.0d0
        Surface(ThisSurf)%Reveal=ThisReveal
        Xp=Surface(ThisSurf)%Vertex(2)%x-BaseXLLC
        Yp=Surface(ThisSurf)%Vertex(2)%y-BaseYLLC
@@ -9498,20 +9509,20 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
           Surface(ThisSurf)%FrameDivider > 0) THEN
          FrDivNum = Surface(ThisSurf)%FrameDivider
          ! Set flag for calculating beam solar reflection from outside and/or inside window reveal
-         IF((Surface(ThisSurf)%Reveal > 0.0 .AND. FrameDivider(FrDivNum)%OutsideRevealSolAbs > 0.0) .OR. &
-            (FrameDivider(FrDivNum)%InsideSillDepth > 0.0 .AND. FrameDivider(FrDivNum)%InsideSillSolAbs > 0.0) .OR. &
-            (FrameDivider(FrDivNum)%InsideReveal > 0.0 .AND. FrameDivider(FrDivNum)%InsideRevealSolAbs > 0.0)) &
+         IF((Surface(ThisSurf)%Reveal > 0.0d0 .AND. FrameDivider(FrDivNum)%OutsideRevealSolAbs > 0.0d0) .OR. &
+            (FrameDivider(FrDivNum)%InsideSillDepth > 0.0d0 .AND. FrameDivider(FrDivNum)%InsideSillSolAbs > 0.0d0) .OR. &
+            (FrameDivider(FrDivNum)%InsideReveal > 0.0d0 .AND. FrameDivider(FrDivNum)%InsideRevealSolAbs > 0.0d0)) &
            CalcWindowRevealReflection = .TRUE.
 
          ! For exterior window with frame, subtract frame area from base surface
          ! (only rectangular windows are allowed to have a frame and/or divider;
          ! Surface(ThisSurf)%FrameDivider will be 0 for triangular windows)
          FrWidth = FrameDivider(FrDivNum)%FrameWidth
-         IF(FrWidth > 0.0) THEN
+         IF(FrWidth > 0.0d0) THEN
            FrArea = (Surface(ThisSurf)%Height + 2.0d0*FrWidth)*(Surface(ThisSurf)%Width + 2.0d0*FrWidth) &
                         - Surface(ThisSurf)%Area/Surface(ThisSurf)%Multiplier
            SurfaceWindow(ThisSurf)%FrameArea = FrArea * Surface(ThisSurf)%Multiplier
-           IF((Surface(Surface(ThisSurf)%BaseSurf)%Area - SurfaceWindow(ThisSurf)%FrameArea) <= 0.0) THEN
+           IF((Surface(Surface(ThisSurf)%BaseSurf)%Area - SurfaceWindow(ThisSurf)%FrameArea) <= 0.0d0) THEN
              CALL ShowSevereError(RoutineName//'Base Surface="'//TRIM(Surface(Surface(ThisSurf)%BaseSurf)%Name)//'", ')
              CALL ShowContinueError('Window Surface="'//trim(Surface(ThisSurf)%Name)//  &
                 '" area (with frame) is too large to fit on the surface.')
@@ -9525,13 +9536,13 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
          END IF
        ! If exterior window has divider, subtract divider area to get glazed area
          DivWidth = FrameDivider(Surface(ThisSurf)%FrameDivider)%DividerWidth
-         IF(DivWidth > 0.0 .and. .not. ErrorInSurface) THEN
+         IF(DivWidth > 0.0d0 .and. .not. ErrorInSurface) THEN
            DivArea = DivWidth * &
              (FrameDivider(FrDivNum)%HorDividers * Surface(ThisSurf)%Width + &
               FrameDivider(FrDivNum)%VertDividers * Surface(ThisSurf)%Height - &
               FrameDivider(FrDivNum)%HorDividers * FrameDivider(FrDivNum)%VertDividers * DivWidth)
            SurfaceWindow(ThisSurf)%DividerArea = DivArea * Surface(ThisSurf)%Multiplier
-           IF((Surface(ThisSurf)%Area - SurfaceWindow(ThisSurf)%DividerArea) <= 0.0) THEN
+           IF((Surface(ThisSurf)%Area - SurfaceWindow(ThisSurf)%DividerArea) <= 0.0d0) THEN
              CALL ShowSevereError(RoutineName//'Divider area exceeds glazed opening for window '&
                                  //TRIM(Surface(ThisSurf)%Name))
              CALL ShowContinueError('Window surface area=['//  &
@@ -9540,7 +9551,7 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
              ErrorInSurface=.true.
            ENDIF
            Surface(ThisSurf)%Area = Surface(ThisSurf)%Area - SurfaceWindow(ThisSurf)%DividerArea  ! Glazed area
-           IF (DivArea <= 0.0) THEN
+           IF (DivArea <= 0.0d0) THEN
              CALL ShowWarningError(RoutineName//'Calculated Divider Area <= 0.0 for Window='//  &
                 TRIM(Surface(ThisSurf)%Name))
              IF (FrameDivider(FrDivNum)%HorDividers == 0) THEN
@@ -9553,14 +9564,14 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
              SurfaceWindow(ThisSurf)%GlazedFrac = Surface(ThisSurf)%Area/(Surface(ThisSurf)%Area +  &
                                  SurfaceWindow(ThisSurf)%DividerArea)
              ! Correction factor for portion of divider subject to divider projection correction
-             DivFrac = (1.-FrameDivider(FrDivNum)%HorDividers * &
+             DivFrac = (1.0d0-FrameDivider(FrDivNum)%HorDividers * &
                FrameDivider(FrDivNum)%VertDividers * DivWidth**2 / DivArea)
              SurfaceWindow(ThisSurf)%ProjCorrDivOut = DivFrac * &
                FrameDivider(FrDivNum)%DividerProjectionOut/DivWidth
              SurfaceWindow(ThisSurf)%ProjCorrDivIn = DivFrac * &
                FrameDivider(FrDivNum)%DividerProjectionIn/DivWidth
              ! Correction factor for portion of frame subject to frame projection correction
-             IF(FrWidth > 0.0) THEN
+             IF(FrWidth > 0.0d0) THEN
                SurfaceWindow(ThisSurf)%ProjCorrFrOut = (FrameDivider(FrDivNum)%FrameProjectionOut/FrWidth)* &
                    (ThisHeight+ThisWidth-(FrameDivider(FrDivNum)%HorDividers + FrameDivider(FrDivNum)%VertDividers)* &
                   DivWidth)/(ThisHeight+ThisWidth+2*FrWidth)
@@ -9581,7 +9592,7 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
          ErrorInSurface=.true.
        ENDIF
        ThisReveal=-Pt2Plane(Surface(ThisSurf)%Vertex(2),BasePlane)
-       IF (ABS(ThisReveal) < .0002d0) ThisReveal=0.0
+       IF (ABS(ThisReveal) < .0002d0) ThisReveal=0.0d0
        Surface(ThisSurf)%Reveal=ThisReveal
        Xp=Surface(ThisSurf)%Vertex(2)%x-BaseXLLC
        Yp=Surface(ThisSurf)%Vertex(2)%y-BaseYLLC
@@ -9638,8 +9649,8 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
        Y(4) = YLLC
        Z(1) = Surface(ThisSurf)%Height
        Z(4) = Surface(ThisSurf)%Height
-       Z(2) = 0.0
-       Z(3) = 0.0
+       Z(2) = 0.0d0
+       Z(3) = 0.0d0
 
      CASE (RectangularLeftFin)
 
@@ -9665,8 +9676,8 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
        Y(4) = YLLC + Surface(ThisSurf)%Width
        Z(1) = Surface(ThisSurf)%Height
        Z(4) = Surface(ThisSurf)%Height
-       Z(2) = 0.0
-       Z(3) = 0.0
+       Z(2) = 0.0d0
+       Z(3) = 0.0d0
 
      CASE (RectangularRightFin)
 
@@ -9692,8 +9703,8 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
        Y(4) = YLLC
        Z(1) = Surface(ThisSurf)%Height
        Z(4) = Surface(ThisSurf)%Height
-       Z(2) = 0.0
-       Z(3) = 0.0
+       Z(2) = 0.0d0
+       Z(3) = 0.0d0
 
      CASE DEFAULT
        ! Error Condition
@@ -9706,11 +9717,11 @@ SUBROUTINE ProcessSurfaceVertices(ThisSurf,ErrorsFound)
      DO N = 1, Surface(ThisSurf)%Sides
       ! if less than 1/10 inch
        X(N)=ANINT(10000.d0*X(N),r64)/10000.d0
-       IF (ABS(X(N)) < .0025d0) X(N)=0.0
+       IF (ABS(X(N)) < .0025d0) X(N)=0.0d0
        Y(N)=ANINT(10000.d0*Y(N),r64)/10000.d0
-       IF (ABS(Y(N)) < .0025d0) Y(N)=0.0
+       IF (ABS(Y(N)) < .0025d0) Y(N)=0.0d0
        Z(N)=ANINT(10000.d0*Z(N),r64)/10000.d0
-       IF (ABS(Z(N)) < .0025d0) Z(N)=0.0
+       IF (ABS(Z(N)) < .0025d0) Z(N)=0.0d0
      ENDDO
 
      Surface(ThisSurf)%Shape=ThisShape
@@ -9915,18 +9926,25 @@ ELSE
   ConstrNewSh = TotConstructs + 1
   SurfaceTmp(SurfNum)%ShadedConstruction = ConstrNewSh
   ALLOCATE(ConstructSave(TotConstructs))
+  ALLOCATE(NominalRSave(TotConstructs))
   ALLOCATE(NominalUSave(TotConstructs))
   ConstructSave(1:TotConstructs) = Construct(1:TotConstructs)
+  NominalRSave(1:TotConstructs) = NominalRforNominalUCalculation(1:TotConstructs)
   NominalUSave(1:TotConstructs) = NominalU(1:TotConstructs)
   DEALLOCATE(Construct)
+  DEALLOCATE(NominalRforNominalUCalculation)
   DEALLOCATE(NominalU)
   TotConstructs = ConstrNewSh
   ALLOCATE(Construct(TotConstructs))
+  ALLOCATE(NominalRforNominalUCalculation(TotConstructs))
   ALLOCATE(NominalU(TotConstructs))
-  NominalU=0.0
+  NominalRforNominalUCalculation=0.0d0
+  NominalU=0.0d0
   Construct(1:TotConstructs-1) = ConstructSave(1:TotConstructs-1)
+  NominalRforNominalUCalculation(1:TotConstructs-1) = NominalRSave(1:TotConstructs-1)
   NominalU(1:TotConstructs-1) = NominalUSave(1:TotConstructs-1)
   DEALLOCATE(ConstructSave)
+  DEALLOCATE(NominalRSave)
   DEALLOCATE(NominalUSave)
 
   TotLayersOld = Construct(ConstrNum)%TotLayers
@@ -9972,30 +9990,30 @@ ELSE
   Construct(ConstrNewSh)%CTFTUserSource      = 0.0D0
   Construct(ConstrNewSh)%NumHistories        = 0
   Construct(ConstrNewSh)%NumCTFTerms         = 0
-  Construct(ConstrNewSh)%UValue              = 0.0
+  Construct(ConstrNewSh)%UValue              = 0.0d0
   Construct(ConstrNewSh)%SourceSinkPresent   = .FALSE.
   Construct(ConstrNewSh)%SolutionDimensions  = 0
   Construct(ConstrNewSh)%SourceAfterLayer    = 0
   Construct(ConstrNewSh)%TempAfterLayer      = 0
-  Construct(ConstrNewSh)%ThicknessPerpend    = 0.0
-  Construct(ConstrNewSh)%AbsDiff             = 0.0
-  Construct(ConstrNewSh)%AbsDiffBack         = 0.0
-  Construct(ConstrNewSh)%AbsDiffShade        = 0.0
-  Construct(ConstrNewSh)%AbsDiffBackShade    = 0.0
-  Construct(ConstrNewSh)%ShadeAbsorpThermal  = 0.0
-  Construct(ConstrNewSh)%AbsBeamCoef         = 0.0
-  Construct(ConstrNewSh)%AbsBeamBackCoef     = 0.0
-  Construct(ConstrNewSh)%AbsBeamShadeCoef    = 0.0
-  Construct(ConstrNewSh)%TransDiff           = 0.0
-  Construct(ConstrNewSh)%TransDiffVis        = 0.0
-  Construct(ConstrNewSh)%ReflectSolDiffBack  = 0.0
-  Construct(ConstrNewSh)%ReflectSolDiffFront = 0.0
-  Construct(ConstrNewSh)%ReflectVisDiffBack  = 0.0
-  Construct(ConstrNewSh)%ReflectVisDiffFront = 0.0
-  Construct(ConstrNewSh)%TransSolBeamCoef    = 0.0
-  Construct(ConstrNewSh)%TransVisBeamCoef    = 0.0
-  Construct(ConstrNewSh)%ReflSolBeamFrontCoef= 0.0
-  Construct(ConstrNewSh)%ReflSolBeamBackCoef = 0.0
+  Construct(ConstrNewSh)%ThicknessPerpend    = 0.0d0
+  Construct(ConstrNewSh)%AbsDiff             = 0.0d0
+  Construct(ConstrNewSh)%AbsDiffBack         = 0.0d0
+  Construct(ConstrNewSh)%AbsDiffShade        = 0.0d0
+  Construct(ConstrNewSh)%AbsDiffBackShade    = 0.0d0
+  Construct(ConstrNewSh)%ShadeAbsorpThermal  = 0.0d0
+  Construct(ConstrNewSh)%AbsBeamCoef         = 0.0d0
+  Construct(ConstrNewSh)%AbsBeamBackCoef     = 0.0d0
+  Construct(ConstrNewSh)%AbsBeamShadeCoef    = 0.0d0
+  Construct(ConstrNewSh)%TransDiff           = 0.0d0
+  Construct(ConstrNewSh)%TransDiffVis        = 0.0d0
+  Construct(ConstrNewSh)%ReflectSolDiffBack  = 0.0d0
+  Construct(ConstrNewSh)%ReflectSolDiffFront = 0.0d0
+  Construct(ConstrNewSh)%ReflectVisDiffBack  = 0.0d0
+  Construct(ConstrNewSh)%ReflectVisDiffFront = 0.0d0
+  Construct(ConstrNewSh)%TransSolBeamCoef    = 0.0d0
+  Construct(ConstrNewSh)%TransVisBeamCoef    = 0.0d0
+  Construct(ConstrNewSh)%ReflSolBeamFrontCoef= 0.0d0
+  Construct(ConstrNewSh)%ReflSolBeamBackCoef = 0.0d0
   Construct(ConstrNewSh)%W5FrameDivider      = 0
   Construct(ConstrNewSh)%FromWindow5DataFile = .false.
 
@@ -10150,69 +10168,69 @@ DO StormWinNum = 1,TotStormWin
         Material(TotMaterials)%Name = MatNameStAir
         Material(TotMaterials)%Group = WindowGas
         Material(TotMaterials)%Roughness = 3
-        Material(TotMaterials)%Conductivity = 0
-        Material(TotMaterials)%Density = 0.0
-        Material(TotMaterials)%IsoMoistCap = 0.0
-        Material(TotMaterials)%Porosity = 0.0
-        Material(TotMaterials)%Resistance = 0.0
-        Material(TotMaterials)%SpecHeat = 0.0
-        Material(TotMaterials)%ThermGradCoef = 0.0
+        Material(TotMaterials)%Conductivity = 0.0d0
+        Material(TotMaterials)%Density = 0.0d0
+        Material(TotMaterials)%IsoMoistCap = 0.0d0
+        Material(TotMaterials)%Porosity = 0.0d0
+        Material(TotMaterials)%Resistance = 0.0d0
+        Material(TotMaterials)%SpecHeat = 0.0d0
+        Material(TotMaterials)%ThermGradCoef = 0.0d0
         Material(TotMaterials)%Thickness = StormWindow(StormWinNum)%StormWinDistance
-        Material(TotMaterials)%VaporDiffus = 0.0
+        Material(TotMaterials)%VaporDiffus = 0.0d0
         Material(TotMaterials)%GasType = 0
-        Material(TotMaterials)%GasCon = 0.0
-        Material(TotMaterials)%GasVis = 0.0
-        Material(TotMaterials)%GasCp = 0.0
-        Material(TotMaterials)%GasWght = 0.0
-        Material(TotMaterials)%GasFract = 0.0
+        Material(TotMaterials)%GasCon = 0.0d0
+        Material(TotMaterials)%GasVis = 0.0d0
+        Material(TotMaterials)%GasCp = 0.0d0
+        Material(TotMaterials)%GasWght = 0.0d0
+        Material(TotMaterials)%GasFract = 0.0d0
         Material(TotMaterials)%GasType(1) = 1
         Material(TotMaterials)%GlassSpectralDataPtr = 0
         Material(TotMaterials)%NumberOfGasesInMixture = 1
-        Material(TotMaterials)%GasCon(1,1) = 2.873E-3
-        Material(TotMaterials)%GasCon(1,2) = 7.760E-5
-        Material(TotMaterials)%GasVis(1,1) = 3.723E-6
-        Material(TotMaterials)%GasVis(1,2) = 4.940E-8
-        Material(TotMaterials)%GasCp(1,1)  = 1002.737
-        Material(TotMaterials)%GasCp(1,2)  = 1.2324E-2
-        Material(TotMaterials)%GasWght(1) = 28.97
-        Material(TotMaterials)%GasFract(1) = 1.0
-        Material(TotMaterials)%AbsorpSolar = 0.0
-        Material(TotMaterials)%AbsorpThermal = 0.0
-        Material(TotMaterials)%AbsorpVisible = 0.0
-        Material(TotMaterials)%Trans = 0.0
-        Material(TotMaterials)%TransVis = 0.0
-        Material(TotMaterials)%GlassTransDirtFactor = 0.0
-        Material(TotMaterials)%ReflectShade = 0.0
-        Material(TotMaterials)%ReflectShadeVis = 0.0
-        Material(TotMaterials)%AbsorpThermalBack = 0.0
-        Material(TotMaterials)%AbsorpThermalFront = 0.0
-        Material(TotMaterials)%ReflectSolBeamBack = 0.0
-        Material(TotMaterials)%ReflectSolBeamFront = 0.0
-        Material(TotMaterials)%ReflectSolDiffBack = 0.0
-        Material(TotMaterials)%ReflectSolDiffFront = 0.0
-        Material(TotMaterials)%ReflectVisBeamBack = 0.0
-        Material(TotMaterials)%ReflectVisBeamFront = 0.0
-        Material(TotMaterials)%ReflectVisDiffBack = 0.0
-        Material(TotMaterials)%ReflectVisDiffFront = 0.0
-        Material(TotMaterials)%TransSolBeam = 0.0
-        Material(TotMaterials)%TransThermal = 0.0
-        Material(TotMaterials)%TransVisBeam = 0.0
-        Material(TotMaterials)%BlindDataPtr = 0.0
-        Material(TotMaterials)%WinShadeToGlassDist = 0.0
-        Material(TotMaterials)%WinShadeTopOpeningMult = 0.0
-        Material(TotMaterials)%WinShadeBottomOpeningMult = 0.0
-        Material(TotMaterials)%WinShadeLeftOpeningMult = 0.0
-        Material(TotMaterials)%WinShadeRightOpeningMult = 0.0
-        Material(TotMaterials)%WinShadeAirFlowPermeability = 0.0
-        Material(TotMaterials)%EMPDVALUE = 0.0
-        Material(TotMaterials)%MoistACoeff = 0.0
-        Material(TotMaterials)%MoistBCoeff = 0.0
-        Material(TotMaterials)%MoistCCoeff = 0.0
-        Material(TotMaterials)%MoistDCoeff = 0.0
-        Material(TotMaterials)%EMPDaCoeff = 0.0
-        Material(TotMaterials)%EMPDbCoeff = 0.0
-        Material(TotMaterials)%EMPDcCoeff = 0.0
-        Material(TotMaterials)%EMPDdCoeff = 0.0
+        Material(TotMaterials)%GasCon(1,1) = 2.873d-3
+        Material(TotMaterials)%GasCon(1,2) = 7.760d-5
+        Material(TotMaterials)%GasVis(1,1) = 3.723d-6
+        Material(TotMaterials)%GasVis(1,2) = 4.940d-8
+        Material(TotMaterials)%GasCp(1,1)  = 1002.737d0
+        Material(TotMaterials)%GasCp(1,2)  = 1.2324d-2
+        Material(TotMaterials)%GasWght(1) = 28.97d0
+        Material(TotMaterials)%GasFract(1) = 1.0d0
+        Material(TotMaterials)%AbsorpSolar = 0.0d0
+        Material(TotMaterials)%AbsorpThermal = 0.0d0
+        Material(TotMaterials)%AbsorpVisible = 0.0d0
+        Material(TotMaterials)%Trans = 0.0d0
+        Material(TotMaterials)%TransVis = 0.0d0
+        Material(TotMaterials)%GlassTransDirtFactor = 0.0d0
+        Material(TotMaterials)%ReflectShade = 0.0d0
+        Material(TotMaterials)%ReflectShadeVis = 0.0d0
+        Material(TotMaterials)%AbsorpThermalBack = 0.0d0
+        Material(TotMaterials)%AbsorpThermalFront = 0.0d0
+        Material(TotMaterials)%ReflectSolBeamBack = 0.0d0
+        Material(TotMaterials)%ReflectSolBeamFront = 0.0d0
+        Material(TotMaterials)%ReflectSolDiffBack = 0.0d0
+        Material(TotMaterials)%ReflectSolDiffFront = 0.0d0
+        Material(TotMaterials)%ReflectVisBeamBack = 0.0d0
+        Material(TotMaterials)%ReflectVisBeamFront = 0.0d0
+        Material(TotMaterials)%ReflectVisDiffBack = 0.0d0
+        Material(TotMaterials)%ReflectVisDiffFront = 0.0d0
+        Material(TotMaterials)%TransSolBeam = 0.0d0
+        Material(TotMaterials)%TransThermal = 0.0d0
+        Material(TotMaterials)%TransVisBeam = 0.0d0
+        Material(TotMaterials)%BlindDataPtr = 0
+        Material(TotMaterials)%WinShadeToGlassDist = 0.0d0
+        Material(TotMaterials)%WinShadeTopOpeningMult = 0.0d0
+        Material(TotMaterials)%WinShadeBottomOpeningMult = 0.0d0
+        Material(TotMaterials)%WinShadeLeftOpeningMult = 0.0d0
+        Material(TotMaterials)%WinShadeRightOpeningMult = 0.0d0
+        Material(TotMaterials)%WinShadeAirFlowPermeability = 0.0d0
+        Material(TotMaterials)%EMPDVALUE = 0.0d0
+        Material(TotMaterials)%MoistACoeff = 0.0d0
+        Material(TotMaterials)%MoistBCoeff = 0.0d0
+        Material(TotMaterials)%MoistCCoeff = 0.0d0
+        Material(TotMaterials)%MoistDCoeff = 0.0d0
+        Material(TotMaterials)%EMPDaCoeff = 0.0d0
+        Material(TotMaterials)%EMPDbCoeff = 0.0d0
+        Material(TotMaterials)%EMPDcCoeff = 0.0d0
+        Material(TotMaterials)%EMPDdCoeff = 0.0d0
       END IF  ! End of check if new air layer material has to be created
     END IF
 
@@ -10225,17 +10243,23 @@ DO StormWinNum = 1,TotStormWin
         Surface(SurfNum)%StormWinShadedConstruction = ConstrNew
       END IF
       ALLOCATE(ConstructSave(TotConstructs))
+      ALLOCATE(NominalRSave(TotConstructs))
       ALLOCATE(NominalUSave(TotConstructs))
       ConstructSave(1:TotConstructs) = Construct(1:TotConstructs)
+      NominalRSave(1:TotConstructs) = NominalRforNominalUCalculation(1:TotConstructs)
       NominalUSave(1:TotConstructs) = NominalU(1:TotConstructs)
       DEALLOCATE(Construct)
+      DEALLOCATE(NominalRforNominalUCalculation)
       DEALLOCATE(NominalU)
       TotConstructs = ConstrNew
       ALLOCATE(Construct(TotConstructs))
+      ALLOCATE(NominalRforNominalUCalculation(TotConstructs))
       ALLOCATE(NominalU(TotConstructs))
       Construct(1:TotConstructs-1) = ConstructSave(1:TotConstructs-1)
+      NominalRforNominalUCalculation(1:TotConstructs-1) = NominalRSave(1:TotConstructs-1)
       NominalU(1:TotConstructs-1) = NominalUSave(1:TotConstructs-1)
       DEALLOCATE(ConstructSave)
+      DEALLOCATE(NominalRSave)
       DEALLOCATE(NominalUSave)
 
       ConstrOld = ConstrNum
@@ -10251,10 +10275,10 @@ DO StormWinNum = 1,TotStormWin
       Construct(ConstrNew)%TotSolidLayers = Construct(ConstrOld)%TotSolidLayers + 1
       Construct(ConstrNew)%TotGlassLayers = Construct(ConstrOld)%TotGlassLayers + 1
       Construct(ConstrNew)%TypeIsWindow = .true.
-      Construct(ConstrNew)%InsideAbsorpVis      = 0.0
-      Construct(ConstrNew)%OutsideAbsorpVis     = 0.0
-      Construct(ConstrNew)%InsideAbsorpSolar    = 0.0
-      Construct(ConstrNew)%OutsideAbsorpSolar   = 0.0
+      Construct(ConstrNew)%InsideAbsorpVis      = 0.0d0
+      Construct(ConstrNew)%OutsideAbsorpVis     = 0.0d0
+      Construct(ConstrNew)%InsideAbsorpSolar    = 0.0d0
+      Construct(ConstrNew)%OutsideAbsorpSolar   = 0.0d0
       Construct(ConstrNew)%InsideAbsorpThermal  = Construct(ConstrOld)%InsideAbsorpThermal
       Construct(ConstrNew)%OutsideAbsorpThermal = Material(StormWinMatNum)%AbsorpThermalFront
       Construct(ConstrNew)%OutSideRoughness     = VerySmooth
@@ -10274,38 +10298,38 @@ DO StormWinNum = 1,TotStormWin
       Construct(ConstrNew)%CTFTUserSource      = 0.0D0
       Construct(ConstrNew)%NumHistories        = 0
       Construct(ConstrNew)%NumCTFTerms         = 0
-      Construct(ConstrNew)%UValue              = 0.0
+      Construct(ConstrNew)%UValue              = 0.0d0
       Construct(ConstrNew)%SourceSinkPresent   = .false.
       Construct(ConstrNew)%SolutionDimensions  = 0
       Construct(ConstrNew)%SourceAfterLayer    = 0
       Construct(ConstrNew)%TempAfterLayer      = 0
-      Construct(ConstrNew)%ThicknessPerpend    = 0.0
-      Construct(ConstrNew)%AbsDiffIn           = 0.0
-      Construct(ConstrNew)%AbsDiffOut          = 0.0
-      Construct(ConstrNew)%AbsDiff             = 0.0
-      Construct(ConstrNew)%AbsDiffBack         = 0.0
-      Construct(ConstrNew)%AbsDiffShade        = 0.0
-      Construct(ConstrNew)%AbsDiffBackShade    = 0.0
-      Construct(ConstrNew)%ShadeAbsorpThermal  = 0.0
-      Construct(ConstrNew)%AbsBeamCoef         = 0.0
-      Construct(ConstrNew)%AbsBeamBackCoef     = 0.0
-      Construct(ConstrNew)%AbsBeamShadeCoef    = 0.0
-      Construct(ConstrNew)%TransDiff           = 0.0
-      Construct(ConstrNew)%TransDiffVis        = 0.0
-      Construct(ConstrNew)%ReflectSolDiffBack  = 0.0
-      Construct(ConstrNew)%ReflectSolDiffFront = 0.0
-      Construct(ConstrNew)%ReflectVisDiffBack  = 0.0
-      Construct(ConstrNew)%ReflectVisDiffFront = 0.0
-      Construct(ConstrNew)%TransSolBeamCoef    = 0.0
-      Construct(ConstrNew)%TransVisBeamCoef    = 0.0
-      Construct(ConstrNew)%ReflSolBeamFrontCoef= 0.0
-      Construct(ConstrNew)%ReflSolBeamBackCoef = 0.0
+      Construct(ConstrNew)%ThicknessPerpend    = 0.0d0
+      Construct(ConstrNew)%AbsDiffIn           = 0.0d0
+      Construct(ConstrNew)%AbsDiffOut          = 0.0d0
+      Construct(ConstrNew)%AbsDiff             = 0.0d0
+      Construct(ConstrNew)%AbsDiffBack         = 0.0d0
+      Construct(ConstrNew)%AbsDiffShade        = 0.0d0
+      Construct(ConstrNew)%AbsDiffBackShade    = 0.0d0
+      Construct(ConstrNew)%ShadeAbsorpThermal  = 0.0d0
+      Construct(ConstrNew)%AbsBeamCoef         = 0.0d0
+      Construct(ConstrNew)%AbsBeamBackCoef     = 0.0d0
+      Construct(ConstrNew)%AbsBeamShadeCoef    = 0.0d0
+      Construct(ConstrNew)%TransDiff           = 0.0d0
+      Construct(ConstrNew)%TransDiffVis        = 0.0d0
+      Construct(ConstrNew)%ReflectSolDiffBack  = 0.0d0
+      Construct(ConstrNew)%ReflectSolDiffFront = 0.0d0
+      Construct(ConstrNew)%ReflectVisDiffBack  = 0.0d0
+      Construct(ConstrNew)%ReflectVisDiffFront = 0.0d0
+      Construct(ConstrNew)%TransSolBeamCoef    = 0.0d0
+      Construct(ConstrNew)%TransVisBeamCoef    = 0.0d0
+      Construct(ConstrNew)%ReflSolBeamFrontCoef= 0.0d0
+      Construct(ConstrNew)%ReflSolBeamBackCoef = 0.0d0
       Construct(ConstrNew)%W5FrameDivider      = 0
       Construct(ConstrNew)%FromWindow5DataFile = .false.
-      Construct(ConstrNew)%W5FileMullionWidth  = 0.0
+      Construct(ConstrNew)%W5FileMullionWidth  = 0.0d0
       Construct(ConstrNew)%W5FileMullionOrientation = 0
-      Construct(ConstrNew)%W5FileGlazingSysWidth = 0.0
-      Construct(ConstrNew)%W5FileGlazingSysHeight = 0.0
+      Construct(ConstrNew)%W5FileGlazingSysWidth = 0.0d0
+      Construct(ConstrNew)%W5FileGlazingSysHeight = 0.0d0
     END IF  ! End of check if new window constructions have to be created
   END DO  ! End of loop over unshaded and shaded window constructions
 END DO  ! End of loop over storm window objects
@@ -10424,7 +10448,7 @@ IF(IConst2 == 0) THEN  ! Only one glazing system on Window5 Data File for this w
      ! Calculate net area for base surface
   SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area =  &
          SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area - SurfaceTmp(SurfNum)%Area
-  IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0) THEN
+  IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0d0) THEN
     CALL ShowSevereError('Subsurfaces have too much area for base surface='//  &
                          TRIM(SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Name))
     CALL ShowContinueError('Subsurface creating error='//TRIM(SurfaceTmp(SurfNum)%Name))
@@ -10665,7 +10689,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
     SurfaceTmp(TotSurfaces)%Height = h2
     SurfaceTmp(TotSurfaces)%Width  = w2
 
-    IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0) THEN
+    IF (SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Area <= 0.0d0) THEN
       CALL ShowSevereError('SurfaceGeometry: ModifyWindow: Subsurfaces have too much area for base surface='//  &
                          TRIM(SurfaceTmp(SurfaceTmp(SurfNum)%BaseSurf)%Name))
       CALL ShowContinueError('Subsurface (window) creating error='//TRIM(SurfaceTmp(SurfNum)%Name))
@@ -10685,7 +10709,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       ! Left-hand glazing
 
       ! Vertex 1
-      dx = 0
+      dx = 0.0d0
       dy = H - h1
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10698,7 +10722,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       NewCoord%Vertex(1)%z = za + (dx/W)*(zb-za)
 
       ! Vertex 2
-      dx = 0
+      dx = 0.0d0
       dy = H
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10744,7 +10768,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
 
       ! Vertex 1
       dx = w1 + MulWidth
-      dy = H - (h1+h2)/2.
+      dy = H - (h1+h2)/2.0d0
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
       za = OriginalCoord%Vertex(1)%z + (dy/H)*(OriginalCoord%Vertex(2)%z-OriginalCoord%Vertex(1)%z)
@@ -10757,7 +10781,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
 
       ! Vertex 2
       dx = w1 + MulWidth
-      dy = H + (h2-h1)/2.
+      dy = H + (h2-h1)/2.0d0
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
       za = OriginalCoord%Vertex(1)%z + (dy/H)*(OriginalCoord%Vertex(2)%z-OriginalCoord%Vertex(1)%z)
@@ -10770,7 +10794,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
 
       ! Vertex 3
       dx = w1 + MulWidth + w2
-      dy = H + (h2-h1)/2.
+      dy = H + (h2-h1)/2.0d0
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
       za = OriginalCoord%Vertex(1)%z + (dy/H)*(OriginalCoord%Vertex(2)%z-OriginalCoord%Vertex(1)%z)
@@ -10783,7 +10807,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
 
       ! Vertex 4
       dx = w1 + MulWidth + w2
-      dy = H - (h1+h2)/2.
+      dy = H - (h1+h2)/2.0d0
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
       za = OriginalCoord%Vertex(1)%z + (dy/H)*(OriginalCoord%Vertex(2)%z-OriginalCoord%Vertex(1)%z)
@@ -10806,7 +10830,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       ! Bottom glazing
 
       ! Vertex 1
-      dx = 0
+      dx = 0.0d0
       dy = H - h1
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10819,7 +10843,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       NewCoord%Vertex(1)%z = za + (dx/W)*(zb-za)
 
       ! Vertex 2
-      dx = 0
+      dx = 0.0d0
       dy = H
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10864,7 +10888,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       ! Top glazing
 
       ! Vertex 1
-      dx = (w1 - w2)/2.
+      dx = (w1 - w2)/2.0d0
       dy = H - (h1+h2+MulWidth)
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10877,7 +10901,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       NewCoord%Vertex(1)%z = za + (dx/W)*(zb-za)
 
       ! Vertex 2
-      dx = (w1 - w2)/2.
+      dx = (w1 - w2)/2.0d0
       dy = H - (h1+MulWidth)
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10890,7 +10914,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       NewCoord%Vertex(2)%z = za + (dx/W)*(zb-za)
 
       ! Vertex 3
-      dx = (w1 + w2)/2.
+      dx = (w1 + w2)/2.0d0
       dy = H - (h1+MulWidth)
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -10903,7 +10927,7 @@ SUBROUTINE AddWindow(SurfNum,ErrorsFound,AddedSubSurfaces)
       NewCoord%Vertex(3)%z = za + (dx/W)*(zb-za)
 
       ! Vertex 4
-      dx = (w1 + w2)/2.
+      dx = (w1 + w2)/2.0d0
       dy = H - (h1+h2+MulWidth)
       xa = OriginalCoord%Vertex(1)%x + (dy/H)*(OriginalCoord%Vertex(2)%x-OriginalCoord%Vertex(1)%x)
       ya = OriginalCoord%Vertex(1)%y + (dy/H)*(OriginalCoord%Vertex(2)%y-OriginalCoord%Vertex(1)%y)
@@ -11118,40 +11142,40 @@ SUBROUTINE CalcSurfaceCentroid
       IF (Surface(thisSurf)%CLASS == SurfaceClass_IntMass) CYCLE
 
       !re-init
-      Xcm = 0.0
-      Ycm = 0.0
-      Zcm = 0.0
+      Xcm = 0.0d0
+      Ycm = 0.0d0
+      Zcm = 0.0d0
 
 
       SELECT CASE (surface(thissurf)%sides)  !is this a 3- or 4-sided surface
 
       CASE (3) !3-sided polygon
         ! centriod is simple average
-        Xcm = sum(surface(thisSurf)%vertex%x) / 3.
-        Ycm = sum(surface(thisSurf)%vertex%y) / 3.
-        Zcm = sum(surface(thisSurf)%vertex%z) / 3.
+        Xcm = sum(surface(thisSurf)%vertex%x) / 3.0d0
+        Ycm = sum(surface(thisSurf)%vertex%y) / 3.0d0
+        Zcm = sum(surface(thisSurf)%vertex%z) / 3.0d0
 
       CASE (4) !4-sided polygon
 
         ! re-init
-        Triangle1%X = 0.0
-        Triangle1%Y = 0.0
-        Triangle1%Z = 0.0
+        Triangle1%X = 0.0d0
+        Triangle1%Y = 0.0d0
+        Triangle1%Z = 0.0d0
 
-        Triangle2%X = 0.0
-        Triangle2%Y = 0.0
-        Triangle2%Z = 0.0
+        Triangle2%X = 0.0d0
+        Triangle2%Y = 0.0d0
+        Triangle2%Z = 0.0d0
 
-        XcmTri1     = 0.0
-        YcmTri1     = 0.0
-        ZcmTri1     = 0.0
+        XcmTri1     = 0.0d0
+        YcmTri1     = 0.0d0
+        ZcmTri1     = 0.0d0
 
-        XcmTri2     = 0.0
-        YcmTri2     = 0.0
-        ZcmTri2     = 0.0
+        XcmTri2     = 0.0d0
+        YcmTri2     = 0.0d0
+        ZcmTri2     = 0.0d0
 
-        Tri1Area    = 0.0
-        Tri2Area    = 0.0
+        Tri1Area    = 0.0d0
+        Tri2Area    = 0.0d0
 
         ! split into 2 3-sided polygons (Triangle 1 and Triangle 2)
         Triangle1%X = surface(thisSurf)%vertex( (/1,2,3/) )%X
@@ -11169,20 +11193,20 @@ SUBROUTINE CalcSurfaceCentroid
         ! get total Area of quad.
         TotalArea = surface(thisSurf)%grossarea
 
-        IF (TotalArea <= 0.0 ) then
+        IF (TotalArea <= 0.0d0 ) then
            !catch a problem....
             CALL ShowWarningError('CalcSurfaceCentroid: zero area surface, for surface='//TRIM(surface(thisSurf)%Name))
             cycle
         endif
         ! get centroid of Triangle 1
-        XcmTri1 = sum(Triangle1%x) / 3.
-        YcmTri1 = sum(Triangle1%y) / 3.
-        ZcmTri1 = sum(Triangle1%z) / 3.
+        XcmTri1 = sum(Triangle1%x) / 3.0d0
+        YcmTri1 = sum(Triangle1%y) / 3.0d0
+        ZcmTri1 = sum(Triangle1%z) / 3.0d0
 
         ! get centroid of Triangle 2
-        XcmTri2 = sum(Triangle2%x) / 3.
-        YcmTri2 = sum(Triangle2%y) / 3.
-        ZcmTri2 = sum(Triangle2%z) / 3.
+        XcmTri2 = sum(Triangle2%x) / 3.0d0
+        YcmTri2 = sum(Triangle2%y) / 3.0d0
+        ZcmTri2 = sum(Triangle2%z) / 3.0d0
 
         ! find area weighted combination of the two centroids.
 
@@ -11200,12 +11224,12 @@ SUBROUTINE CalcSurfaceCentroid
 !        Y2=MAXVAL(Surface(thisSurf)%Vertex(1:Surface(thisSurf)%Sides)%Y)
 !        Z1=MINVAL(Surface(thisSurf)%Vertex(1:Surface(thisSurf)%Sides)%Z)
 !        Z2=MAXVAL(Surface(thisSurf)%Vertex(1:Surface(thisSurf)%Sides)%Z)
-!        Xcm=(X1+X2)/2.
-!        Ycm=(Y1+Y2)/2.
-!        Zcm=(Z1+Z2)/2.
+!        Xcm=(X1+X2)/2.0d0
+!        Ycm=(Y1+Y2)/2.0d0
+!        Zcm=(Z1+Z2)/2.0d0
 
         ! Calc centroid as average of surfaces
-        VecAvg=vector(0.0,0.0,0.0)
+        VecAvg=vector(0.0d0,0.0d0,0.0d0)
 
         do vert=1,Surface(thisSurf)%Sides
           VecAvg=VecAvg + Surface(thisSurf)%Vertex(vert)
@@ -11237,7 +11261,7 @@ SUBROUTINE CalcSurfaceCentroid
       Surface(thissurf)%centroid%y = Ycm
       Surface(thissurf)%centroid%z = Zcm
 
-      if (Zcm < 0.0) then
+      if (Zcm < 0.0d0) then
         if (Surface(thisSurf)%ExtWind .or. Surface(thisSurf)%ExtBoundCond == ExternalEnvironment) negZcount=negZcount+1
       endif
 
@@ -11380,7 +11404,7 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
         ! Setup missing values to allow shading surfaces to model incident solar and wind
         Surface(SurfNum)%ExtSolar = .TRUE.
         Surface(SurfNum)%ExtWind = .TRUE.
-        Surface(SurfNum)%ViewFactorGround = 0.5 * (1.0 - Surface(SurfNum)%CosTilt)
+        Surface(SurfNum)%ViewFactorGround = 0.5d0 * (1.0d0 - Surface(SurfNum)%CosTilt)
 
       ENDIF
       ! check if this surface is used for ICS collector mounting and has OthersideCondictionsModel as its
@@ -11522,7 +11546,7 @@ SUBROUTINE CheckConvexity(SurfNum,NSides)
 
 
   ! Determine a suitable plane in which to do the tests
-  Det = 0
+  Det = 0.0d0
   DO N = 1, NSides
     Det = Det + X(N)*Y(N+1) - X(N+1)*Y(N)
   END DO
@@ -11530,7 +11554,7 @@ SUBROUTINE CheckConvexity(SurfNum,NSides)
     A = X
     B = Y
   ELSE
-    Det = 0
+    Det = 0.0d0
     DO N = 1, NSides
       Det = Det + X(N)*Z(N+1) - X(N+1)*Z(N)
     END DO
@@ -11538,7 +11562,7 @@ SUBROUTINE CheckConvexity(SurfNum,NSides)
       A = X
       B = Z
     ELSE
-      Det = 0
+      Det = 0.0d0
       DO N = 1, NSides
         Det = Det + Y(N)*Z(N+1) - Y(N+1)*Z(N)
       END DO

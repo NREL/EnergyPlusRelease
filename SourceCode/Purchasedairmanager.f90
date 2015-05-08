@@ -142,6 +142,8 @@ PRIVATE ! Everything private unless explicitly made public
       REAL(r64) :: MinOAMassFlowRate       = 0.0d0      ! The minimum required outdoor air mass flow rate [kg/s]
       REAL(r64) :: OutdoorAirMassFlowRate  = 0.0d0      ! The outdoor air mass flow rate [kg/s]
       ! Intermediate results
+      REAL(r64) :: FinalMixedAirTemp        = 0.0d0      ! Dry-bulb temperature of the mixed air, saved for system ventilation load reporting [C]
+      REAL(r64) :: FinalMixedAirHumRat      = 0.0d0      ! Humidity ratio of the mixed air, saved for system ventilation load reporting [kg-H2O/kg-dryair]
       REAL(r64) :: HtRecSenOutput           = 0.0d0      ! Sensible heating/cooling rate from heat recovery (<0 means cooling) [W]
       REAL(r64) :: HtRecLatOutput           = 0.0d0      ! Latent heating/cooling rate from heat recovery (<0 means cooling or dehumidfying) [W]
       REAL(r64) :: OASenOutput              = 0.0d0      ! Outdoor air sensible output relative to zone conditions [W], <0 means OA is cooler than zone air
@@ -229,6 +231,10 @@ PRIVATE CalcPurchAirLoads
 PRIVATE UpdatePurchasedAir
 PRIVATE ReportPurchasedAir
 PUBLIC  GetPurchasedAirOutAirMassFlow
+PUBLIC  GetPurchasedAirZoneInletAirNode
+PUBLIC  GetPurchasedAirMixedAirTemp
+PUBLIC  GetPurchasedAirMixedAirHumRat
+PUBLIC  GetPurchasedAirReturnAirNode
 PRIVATE CalcPurchAirMinOAMassFlow
 PRIVATE CalcPurchAirMixedAir
 
@@ -348,7 +354,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
           ! USE STATEMENTS:
   USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString, FindIteminList
-  USE NodeInputManager, ONLY: GetOnlySingleNode
+  USE NodeInputManager, ONLY: GetOnlySingleNode,InitUniqueNodeCheck,CheckUniqueNodes,EndUniqueNodeCheck
   USE OutAirNodeManager, ONLY: CheckAndAddAirNodeNumber
   USE DataLoopNode
   USE DataIPShortCuts
@@ -379,6 +385,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       LOGICAL :: IsNotOK                 ! Flag to verify name
       LOGICAL :: IsBlank                 ! Flag for blank name
       LOGICAL :: IsOANodeListed          ! Flag for OA node name listed in OutdoorAir:Node or Nodelist
+      LOGICAL :: UniqueNodeError         ! Flag for non-unique node error(s)
 
       cCurrentModuleObject='ZoneHVAC:IdealLoadsAirSystem'
 
@@ -389,6 +396,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       CheckEquipName=.true.
 
       IF (NumPurchAir .GT. 0)THEN
+        CALL InitUniqueNodeCheck(cCurrentModuleObject)
         DO PurchAirNum = 1,  NumPurchAir
           PurchAir(PurchAirNum)%cObjectName = cCurrentModuleObject
 
@@ -420,11 +428,17 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum  = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+          UniqueNodeError=.false.
+          CALL CheckUniqueNodes(cAlphaFieldNames(3),'NodeName',UniqueNodeError,CheckName=cAlphaArgs(3),ObjectName=cAlphaArgs(1))
+          IF (UniqueNodeError) ErrorsFound=.true.
                   ! If new (optional) exhaust air node name is present, then register it as inlet
           IF (.NOT.lAlphaFieldBlanks(4)) THEN
             PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum  = &
                  GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                  NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+            UniqueNodeError=.false.
+            CALL CheckUniqueNodes(cAlphaFieldNames(4),'NodeName',UniqueNodeError,CheckName=cAlphaArgs(4),ObjectName=cAlphaArgs(1))
+            IF (UniqueNodeError) ErrorsFound=.true.
           ENDIF
           PurchAir(PurchAirNum)%MaxHeatSuppAirTemp    = rNumericArgs(1)
           PurchAir(PurchAirNum)%MinCoolSuppAirTemp    = rNumericArgs(2)
@@ -594,6 +608,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                       ' does not appear in an OutdoorAir:NodeList or as an OutdoorAir:Node.')
                 CALL ShowContinueError('Adding OutdoorAir:Node='//TRIM(cAlphaArgs(12)))
             ENDIF
+            UniqueNodeError=.false.
+            CALL CheckUniqueNodes(cAlphaFieldNames(12),'NodeName',UniqueNodeError,CheckName=cAlphaArgs(12),ObjectName=cAlphaArgs(1))
+            IF (UniqueNodeError) ErrorsFound=.true.
 
             ! get Demand controlled ventilation type
             IF (SameString(cAlphaArgs(13),'None')) THEN
@@ -711,6 +728,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           PurchAir(PurchAirNum)%HtRecTotCoolRate     = 0.0d0
 
         END DO
+        CALL EndUniqueNodeCheck(cCurrentModuleObject)
       END IF
 
       DO PurchAirNum = 1,NumPurchAir
@@ -956,7 +974,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             CALL ShowSevereError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
                   TRIM(PurchAir(PurchAirNum)%Name))
             CALL ShowContinueError('Zone Supply Air Node Name='//TRIM(NodeID(SupplyNodeNum))//' is not a zone inlet node.')
-            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// & 
+            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// &
                                    TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
             CALL ShowFatalError('Preceding condition causes termination.')
           END IF
@@ -974,7 +992,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             CALL ShowSevereError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
                   TRIM(PurchAir(PurchAirNum)%Name))
             CALL ShowContinueError('Zone Exhaust Air Node Name='//TRIM(NodeID(ExhaustNodeNum))//' is not a zone exhaust node.')
-            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// & 
+            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// &
                                    TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
             CALL ShowContinueError('Zone return air node will be used for ideal loads recirculation air.')
             UseReturnNode = .true.
@@ -993,6 +1011,17 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             CALL ShowContinueError(' Invalid recirculation node. No exhaust or return node has been'// &
                   ' specified for this zone in ZoneHVAC:EquipmentConnections.')
             CALL ShowFatalError('Preceding condition causes termination.')
+          END IF
+        END IF
+        ! If there is OA and economizer is active, then there must be a limit on cooling flow rate
+        IF (PurchAir(PurchAirNum)%OutdoorAir .AND. (PurchAir(PurchAirNum)%EconomizerType /= NoEconomizer)) THEN
+          IF ((PurchAir(PurchAirNum)%CoolingLimit == NoLimit) .OR. (PurchAir(PurchAirNum)%CoolingLimit == LimitCapacity)) THEN
+            CALL ShowSevereError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                  TRIM(PurchAir(PurchAirNum)%Name))
+            CALL ShowContinueError('There is outdoor air with economizer active but there is no limit on cooling air flow rate.')
+            CALL ShowContinueError('Cooling Limit must be set to LimitFlowRate or LimitFlowRateAndCapacity, and '// &
+                                   'Maximum Cooling Air Flow Rate must be set to a value or autosize.')
+            CALL ShowContinueError('Simulation will proceed with no limit on outdoor air flow rate.')
           END IF
         END IF
       END IF
@@ -1120,6 +1149,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   April 2003
           !       MODIFIED       M. Witte, June 2011, add sizing for new capacity fields
+          !                      August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1137,6 +1167,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       USE InputProcessor
       USE ReportSizingManager, ONLY: ReportSizingOutput
       USE Psychrometrics, ONLY: PsyCpAirFnWTdb, RhoH2O, CpHw, CpCw, PsyHFnTdbW
+      USE General,             ONLY: RoundSigDigits 
 
       IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1158,72 +1189,196 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       REAL(r64)           :: MixedAirHumRat
       REAL(r64)           :: OutletHumRat
       REAL(r64)           :: DesignLoad
-
+      LOGICAL             :: IsAutosize              ! Indicator to autosize
+      REAL(r64)           :: MaxHeatVolFlowRateDes   ! Autosized maximum heating air flow for reporting 
+      REAL(r64)           :: MaxHeatVolFlowRateUser  ! Hardsized maximum heating air flow for reporting 
+      REAL(r64)           :: MaxCoolVolFlowRateDes   ! Autosized maximum cooling air flow for reporting 
+      REAL(r64)           :: MaxCoolVolFlowRateUser  ! Hardsized maximum cooling air flow for reporting 
+      REAL(r64)           :: MaxHeatSensCapDes       ! Autosized maximum sensible heating capacity for reporting 
+      REAL(r64)           :: MaxHeatSensCapUser      ! Hardsized maximum sensible heating capacity for reporting
+      REAL(r64)           :: MaxCoolTotCapDes        ! Autosized maximum sensible cooling capacity for reporting
+      REAL(r64)           :: MaxCoolTotCapUser       ! Hardsized maximum sensible cooling capacity for reporting
+      
+      IsAutosize = .FALSE.
+      MaxHeatVolFlowRateDes = 0.0d0
+      MaxHeatVolFlowRateUser = 0.0d0
+      MaxCoolVolFlowRateDes = 0.0d0
+      MaxCoolVolFlowRateUser = 0.0d0
+      MaxHeatSensCapDes = 0.0d0
+      MaxHeatSensCapUser = 0.0d0
+      MaxCoolTotCapDes = 0.0d0
+      MaxCoolTotCapUser = 0.0d0
 
       IF ((PurchAir(PurchAirNum)%MaxHeatVolFlowRate == AutoSize) .AND. &
           ((PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRate) .OR. &
            (PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRateAndCapacity))) THEN
+        IsAutosize = .TRUE.
+      END IF  
 
-        IF (CurZoneEqNum > 0) THEN
-
-          CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
-          PurchAir(PurchAirNum)%MaxHeatVolFlowRate = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
-          IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate < SmallAirVolFlow) THEN
-            PurchAir(PurchAirNum)%MaxHeatVolFlowRate = 0.0d0
+      IF (CurZoneEqNum > 0) THEN
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
+          IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0) THEN  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                        'User-Specified Maximum Heating Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxHeatVolFlowRate)
           END IF
-          CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
-                              'Maximum Heating Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxHeatVolFlowRate )
+        ELSE 
+          CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
+          MaxHeatVolFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+          IF (MaxHeatVolFlowRateDes < SmallAirVolFlow) THEN
+            MaxHeatVolFlowRateDes = 0.0d0
+          END IF
+          IF (IsAutosize) THEN
+            PurchAir(PurchAirNum)%MaxHeatVolFlowRate = MaxHeatVolFlowRateDes  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatVolFlowRateDes)
+          ELSE
+            IF (PurchAir(PurchAirNum)%MaxHeatVolFlowRate > 0.0d0 .AND. MaxHeatVolFlowRateDes > 0.0d0) THEN  
+              MaxHeatVolFlowRateUser = PurchAir(PurchAirNum)%MaxHeatVolFlowRate
+              CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatVolFlowRateDes, &
+                              'User-Specified Maximum Heating Air Flow Rate [m3/s]', MaxHeatVolFlowRateUser)
+              IF (DisplayExtraWarnings) THEN
+                IF ((ABS(MaxHeatVolFlowRateDes - MaxHeatVolFlowRateUser)/ MaxHeatVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+                  CALL ShowMessage('SizePurchasedAir: Potential issue with equipment sizing for ' &
+                                      //TRIM(PurchAir(PurchAirNum)%cObjectName)//' '// &
+                                      TRIM(PurchAir(PurchAirNum)%Name))
+                  CALL ShowContinueError('User-Specified Maximum Heating Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxHeatVolFlowRateUser,5))// ' [m3/s]')
+                  CALL ShowContinueError('differs from Design Size Maximum Heating Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxHeatVolFlowRateDes,5))// ' [m3/s]')
+                  CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                  CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+                END IF
+              ENDIF
+            END IF 
+          END IF
         END IF
-
       END IF
 
+      IsAutosize = .FALSE.
       IF ((PurchAir(PurchAirNum)%MaxCoolVolFlowRate == AutoSize) .AND. &
           ((PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRate) .OR. &
            (PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRateAndCapacity) .OR. &
            (PurchAir(PurchAirNum)%OutdoorAir .AND. PurchAir(PurchAirNum)%EconomizerType .NE. NoEconomizer))) THEN
+        IsAutosize = .TRUE.
+      END IF  
 
-        IF (CurZoneEqNum > 0) THEN
-
-          CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
-          PurchAir(PurchAirNum)%MaxCoolVolFlowRate = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
-          IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate < SmallAirVolFlow) THEN
-            PurchAir(PurchAirNum)%MaxCoolVolFlowRate = 0.0d0
+      IF (CurZoneEqNum > 0) THEN
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
+          IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0) THEN  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                        'User-Specified Maximum Cooling Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxCoolVolFlowRate)
           END IF
-          CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
-                              'Maximum Cooling Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxCoolVolFlowRate )
+        ELSE 
+          CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
+          MaxCoolVolFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
+          IF (MaxCoolVolFlowRateDes < SmallAirVolFlow) THEN
+            MaxCoolVolFlowRateDes = 0.0d0
+          END IF
+          IF (IsAutosize) THEN
+            PurchAir(PurchAirNum)%MaxCoolVolFlowRate = MaxCoolVolFlowRateDes
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Cooling Air Flow Rate [m3/s]', MaxCoolVolFlowRateDes)
+          ELSE
+            IF (PurchAir(PurchAirNum)%MaxCoolVolFlowRate > 0.0d0 .AND. MaxCoolVolFlowRateDes > 0.0d0) THEN  
+              MaxCoolVolFlowRateUser = PurchAir(PurchAirNum)%MaxCoolVolFlowRate
+              CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Cooling Air Flow Rate [m3/s]', MaxCoolVolFlowRateDes, &
+                              'User-Specified Maximum Cooling Air Flow Rate [m3/s]', MaxCoolVolFlowRateUser)
+              IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxCoolVolFlowRateDes - MaxCoolVolFlowRateUser)/MaxCoolVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizePurchasedAir: Potential issue with equipment sizing for ' &
+                                    //TRIM(PurchAir(PurchAirNum)%cObjectName)//' '// &
+                                    TRIM(PurchAir(PurchAirNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Cooling Air Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxCoolVolFlowRateUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Cooling Air Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxCoolVolFlowRateDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+              ENDIF
+            END IF 
+          END IF
         END IF
-
       END IF
 
+      IsAutosize = .FALSE.
       IF ((PurchAir(PurchAirNum)%MaxHeatSensCap == AutoSize) .AND. &
           ((PurchAir(PurchAirNum)%HeatingLimit == LimitCapacity) .OR. &
            (PurchAir(PurchAirNum)%HeatingLimit == LimitFlowRateAndCapacity))) THEN
+        IsAutosize = .TRUE.
+      END IF  
 
-        IF (CurZoneEqNum > 0) THEN
-
+      IF (CurZoneEqNum > 0) THEN
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
+          IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0) THEN  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                        'User-Specified Maximum Sensible Heating Capacity [W]', PurchAir(PurchAirNum)%MaxHeatSensCap)
+          END IF
+        ELSE 
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MixedAirTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
           OutletTemp   = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
           OutletHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-          DesignLoad   = PsyCpAirFnWTdb(OutletHumRat, 0.5*(MixedAirTemp+OutletTemp), 'SizePurchasedAir') &
+          DesignLoad   = PsyCpAirFnWTdb(OutletHumRat, 0.5d0*(MixedAirTemp+OutletTemp), 'SizePurchasedAir') &
                           * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                           * (OutletTemp-MixedAirTemp)
-          PurchAir(PurchAirNum)%MaxHeatSensCap = DesignLoad
-          IF (PurchAir(PurchAirNum)%MaxHeatSensCap < SmallLoad) THEN
-            PurchAir(PurchAirNum)%MaxHeatSensCap = 0.0d0
+          MaxHeatSensCapDes = DesignLoad
+          IF (MaxHeatSensCapDes < SmallLoad) THEN
+            MaxHeatSensCapDes = 0.0d0
           END IF
-          CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
-                              'Maximum Sensible Heating Capacity [W]', PurchAir(PurchAirNum)%MaxHeatSensCap )
+          IF (IsAutosize) THEN
+            PurchAir(PurchAirNum)%MaxHeatSensCap = MaxHeatSensCapDes  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Sensible Heating Capacity [W]', MaxHeatSensCapDes)
+            ! If there is OA, check if sizing calcs have OA>0, throw warning if not
+            IF ((PurchAir(PurchAirNum)%OutdoorAir) .AND. (FinalZoneSizing(CurZoneEqNum)%MinOA == 0.0)) THEN
+              CALL ShowWarningError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                    TRIM(PurchAir(PurchAirNum)%Name))
+              CALL ShowContinueError('There is outdoor air specified in this object, but the design outdoor air flow rate for this ')
+              CALL ShowContinueError('zone is zero. The Maximum Sensible Heating Capacity will be autosized for zero outdoor air flow. ')
+              CALL ShowContinueError('Check the outdoor air specifications in the Sizing:Zone object for zone '// &
+                                     TRIM(FinalZoneSizing(CurZoneEqNum)%ZoneName)//'.')
+            END IF
+          ELSE
+            IF (PurchAir(PurchAirNum)%MaxHeatSensCap > 0.0d0 .AND. MaxHeatSensCapDes > 0.0d0) THEN  
+              MaxHeatSensCapUser = PurchAir(PurchAirNum)%MaxHeatSensCap
+              CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Sensible Heating Capacity [W]', MaxHeatSensCapDes, &
+                              'User-Specified Maximum Sensible Heating Capacity [W]', MaxHeatSensCapUser)
+              IF (DisplayExtraWarnings) THEN
+                IF ((ABS(MaxHeatSensCapDes - MaxHeatSensCapUser)/MaxHeatSensCapUser) > AutoVsHardSizingThreshold) THEN
+                  CALL ShowMessage('SizePurchasedAir: Potential issue with equipment sizing for ' &
+                                      //TRIM(PurchAir(PurchAirNum)%cObjectName)//' '// &
+                                      TRIM(PurchAir(PurchAirNum)%Name))
+                  CALL ShowContinueError('...User-Specified Maximum Sensible Heating Capacity of '// &
+                                      TRIM(RoundSigDigits(MaxHeatSensCapUser,2))// ' [W]')
+                  CALL ShowContinueError('...differs from Design Size Maximum Sensible Heating Capacity of ' // &
+                                      TRIM(RoundSigDigits(MaxHeatSensCapDes,2))// ' [W]')
+                  CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                  CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+                END IF
+              ENDIF
+            END IF 
+          END IF
         END IF
-
       END IF
 
+      IsAutosize = .FALSE.
       IF ((PurchAir(PurchAirNum)%MaxCoolTotCap == AutoSize) .AND. &
           ((PurchAir(PurchAirNum)%CoolingLimit == LimitCapacity) .OR. &
            (PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRateAndCapacity))) THEN
+        IsAutosize = .TRUE.
+      END IF  
 
-        IF (CurZoneEqNum > 0) THEN
-
+      IF (CurZoneEqNum > 0) THEN
+        IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue  
+          IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0) THEN  
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                        'User-Specified Maximum Heating Air Flow Rate [m3/s]', PurchAir(PurchAirNum)%MaxCoolTotCap)
+          END IF
+        ELSE 
           CALL CheckZoneSizing(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name)
           MixedAirTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
           OutletTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
@@ -1232,14 +1387,45 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           DesignLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
                       * (PsyHFnTdbW(MixedAirTemp, MixedAirHumRat, 'SizePurchasedAir') &
                       -PsyHFnTdbW(OutletTemp, OutletHumRat, 'SizePurchasedAir'))
-          PurchAir(PurchAirNum)%MaxCoolTotCap = DesignLoad
-          IF (PurchAir(PurchAirNum)%MaxCoolTotCap < SmallLoad) THEN
-            PurchAir(PurchAirNum)%MaxCoolTotCap = 0.0d0
+          MaxCoolTotCapDes = DesignLoad
+          IF (MaxCoolTotCapDes < SmallLoad) THEN
+            MaxCoolTotCapDes = 0.0d0
           END IF
-          CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
-                              'Maximum Total Cooling Capacity [W]', PurchAir(PurchAirNum)%MaxCoolTotCap )
+          IF (IsAutosize) THEN
+            PurchAir(PurchAirNum)%MaxCoolTotCap = MaxCoolTotCapDes 
+            CALL ReportSizingOutput(PurchAir(PurchAirNum)%cObjectName, PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Total Cooling Capacity [W]', MaxCoolTotCapDes)
+            ! If there is OA, check if sizing calcs have OA>0, throw warning if not
+            IF ((PurchAir(PurchAirNum)%OutdoorAir) .AND. (FinalZoneSizing(CurZoneEqNum)%MinOA == 0.0)) THEN
+              CALL ShowWarningError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                    TRIM(PurchAir(PurchAirNum)%Name))
+              CALL ShowContinueError('There is outdoor air specified in this object, but the design outdoor air flow rate for this ')
+              CALL ShowContinueError('zone is zero. The Maximum Total Cooling Capacity will be autosized for zero outdoor air flow. ')
+              CALL ShowContinueError('Check the outdoor air specifications in the Sizing:Zone object for zone '// &
+                                     TRIM(FinalZoneSizing(CurZoneEqNum)%ZoneName)//'.')
+            END IF
+          ELSE
+            IF (PurchAir(PurchAirNum)%MaxCoolTotCap > 0.0d0 .AND. MaxCoolTotCapDes > 0.0d0) THEN  
+              MaxCoolTotCapUser = PurchAir(PurchAirNum)%MaxCoolTotCap
+              CALL ReportSizingOutput(TRIM(PurchAir(PurchAirNum)%cObjectName), PurchAir(PurchAirNum)%Name, &
+                              'Design Size Maximum Total Cooling Capacity [W]', MaxCoolTotCapDes, &
+                              'User-Specified Maximum Total Cooling Capacity [W]', MaxCoolTotCapUser)
+              IF (DisplayExtraWarnings) THEN
+                IF ((ABS(MaxCoolTotCapDes - MaxCoolTotCapUser)/MaxCoolTotCapUser) > AutoVsHardSizingThreshold) THEN
+                  CALL ShowMessage('SizePurchasedAir: Potential issue with equipment sizing for ' &
+                                      //TRIM(PurchAir(PurchAirNum)%cObjectName)//' '// &
+                                      TRIM(PurchAir(PurchAirNum)%Name))
+                  CALL ShowContinueError('User-Specified Maximum Total Cooling Capacity of '// &
+                                      TRIM(RoundSigDigits(MaxCoolTotCapUser,2))// ' [W]')
+                  CALL ShowContinueError('differs from Design Size Maximum Total Cooling Capacity of ' // &
+                                      TRIM(RoundSigDigits(MaxCoolTotCapDes,2))// ' [W]')
+                  CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                  CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+                END IF
+              ENDIF
+            END IF 
+          END IF
         END IF
-
       END IF
 
 !      IF (PurchAir(PurchAirNum)%OutdoorAir .AND. PurchAir(PurchAirNum)%OutsideAirVolFlowRate == AutoSize) THEN
@@ -1931,6 +2117,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            ENDIF
 
            IF (SupplyMassFlowRate > 0.0d0) THEN
+             PurchAir(PurchAirNum)%FinalMixedAirTemp = MixedAirtemp
+             PurchAir(PurchAirNum)%FinalMixedAirHumRat = MixedAirHumRat
              ! compute coil loads
              IF ((SupplyHumRat == MixedAirHumRat) .AND. (SupplyTemp == MixedAirTemp)) THEN
                ! If no change in humrat or temp, then set loads to zero
@@ -2031,7 +2219,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
              PurchAir(PurchAirNum)%LatCoilLoad = 0.0d0
              PurchAir(PurchAirNum)%OASenOutput = 0.0d0
              PurchAir(PurchAirNum)%OALatOutput = 0.0d0
-
+             PurchAir(PurchAirNum)%FinalMixedAirTemp = Node(RecircNodeNum)%Temp
+             PurchAir(PurchAirNum)%FinalMixedAirHumRat = Node(RecircNodeNum)%HumRat
              IF (Contaminant%CO2Simulation) THEN
                Node(InNodeNum)%CO2        = Node(ZoneNodeNum)%CO2
              END IF
@@ -2074,6 +2263,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            PurchAir(PurchAirNum)%LatCoilLoad = 0.0d0
            PurchAir(PurchAirNum)%OASenOutput = 0.0d0
            PurchAir(PurchAirNum)%OALatOutput = 0.0d0
+           PurchAir(PurchAirNum)%FinalMixedAirTemp = Node(RecircNodeNum)%Temp
+           PurchAir(PurchAirNum)%FinalMixedAirHumRat = Node(RecircNodeNum)%HumRat
 
          END IF
 
@@ -2505,6 +2696,208 @@ FUNCTION GetPurchasedAirOutAirMassFlow(PurchAirNum) RESULT(OutAirMassFlow)
   RETURN
 
 END FUNCTION GetPurchasedAirOutAirMassFlow
+
+INTEGER FUNCTION GetPurchasedAirZoneInletAirNode(PurchAirNum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B Griffith
+          !       DATE WRITTEN   Dec  2006
+          !       MODIFIED       Adapted for purchased air by M.J. Witte, Oct 2013
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! lookup function for zone inlet node for ventilation rate reporting
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: PurchAirNum          !
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  IF (GetPurchAirInputFlag ) THEN
+    CALL GetPurchasedAir
+    GetPurchAirInputFlag = .FALSE.
+  END IF
+
+  GetPurchasedAirZoneInletAirNode = 0
+  IF (PurchAirNum > 0 .and. PurchAirNum <= NumPurchAir) THEN
+    GetPurchasedAirZoneInletAirNode =  PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetPurchasedAirZoneInletAirNode
+
+
+INTEGER FUNCTION GetPurchasedAirReturnAirNode(PurchAirNum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B Griffith
+          !       DATE WRITTEN   Dec  2006
+          !       MODIFIED       Adapted for purchased air by M.J. Witte, Oct 2013
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! lookup function for recirculation air node for ventilation rate reporting
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: PurchAirNum          !
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  IF (GetPurchAirInputFlag ) THEN
+    CALL GetPurchasedAir
+    GetPurchAirInputFlag = .FALSE.
+  END IF
+
+  GetPurchasedAirReturnAirNode = 0
+  IF (PurchAirNum > 0 .and. PurchAirNum <= NumPurchAir) THEN
+    GetPurchasedAirReturnAirNode =  PurchAir(PurchAirNum)%ZoneRecircAirNodeNum
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetPurchasedAirReturnAirNode
+
+FUNCTION GetPurchasedAirMixedAirTemp(PurchAirNum) RESULT(MixedAirTemp)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B Griffith
+          !       DATE WRITTEN   Dec  2006
+          !       MODIFIED       Adapted for purchased air by M.J. Witte, Oct 2013
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! lookup function for mixed air Temp for ventilation rate reporting
+
+          ! METHODOLOGY EMPLOYED:
+          ! most analagous functions look up an outside air node but this function
+          ! gets the actual mass flow of outdoor air, following the features of the model
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: PurchAirNum          !
+  REAL(r64)             :: MixedAirTemp
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+  IF (GetPurchAirInputFlag ) THEN
+    CALL GetPurchasedAir
+    GetPurchAirInputFlag = .FALSE.
+  END IF
+
+  MixedAirTemp = PurchAir(PurchAirNum)%FinalMixedAirTemp
+
+  RETURN
+
+END FUNCTION GetPurchasedAirMixedAirTemp
+
+FUNCTION GetPurchasedAirMixedAirHumRat(PurchAirNum) RESULT(MixedAirHumRat)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B Griffith
+          !       DATE WRITTEN   Dec  2006
+          !       MODIFIED       Adapted for purchased air by M.J. Witte, Oct 2013
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! lookup function for mixed air HumRat for ventilation rate reporting
+
+          ! METHODOLOGY EMPLOYED:
+          ! most analagous functions look up an outside air node but this function
+          ! gets the actual mass flow of outdoor air, following the features of the model
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: PurchAirNum          !
+  REAL(r64)             :: MixedAirHumRat
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+  IF (GetPurchAirInputFlag ) THEN
+    CALL GetPurchasedAir
+    GetPurchAirInputFlag = .FALSE.
+  END IF
+
+  MixedAirHumRat = PurchAir(PurchAirNum)%FinalMixedAirHumRat
+
+  RETURN
+
+END FUNCTION GetPurchasedAirMixedAirHumRat
+
 !     NOTICE
 !
 !     Copyright © 1996-2013 The Board of Trustees of the University of Illinois

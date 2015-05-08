@@ -1,4 +1,4 @@
-MODULE WeatherManager          ! EnergyPus Simulation Module
+MODULE WeatherManager          ! EnergyPlus Simulation Module
 
           ! MODULE INFORMATION:
           !       AUTHOR         Rick Strand
@@ -70,6 +70,7 @@ INTEGER, PARAMETER :: DDHumIndType_Count = 8    ! # of DDHumIndTypes
 INTEGER, PARAMETER :: DDDBRangeType_Default    = 0 ! Design Day DryBulb Range Type = Default Multipliers
 INTEGER, PARAMETER :: DDDBRangeType_Multiplier = 1 ! Design Day DryBulb Range Type = Multiplier Schedule
 INTEGER, PARAMETER :: DDDBRangeType_Difference = 2 ! Design Day DryBulb Range Type = Difference Schedule
+INTEGER, PARAMETER :: DDDBRangeType_Profile    = 3 ! Design Day DryBulb Range Type = Temperature Profile
 
 INTEGER, PARAMETER :: WP_ScheduleValue         = 1 ! User entered Schedule value for Weather Property
 INTEGER, PARAMETER :: WP_DryBulbDelta          = 2 ! User entered DryBulb difference Schedule value for Weather Property
@@ -127,14 +128,14 @@ END TYPE EnvironmentData
 
 TYPE DesignDayData
   CHARACTER(len=MaxNameLength) :: Title = Blank     ! Environment name
-  REAL(r64) :: MaxDryBulb               = 0.0     ! Maximum Dry-Bulb Temperature (C)
-  REAL(r64) :: DailyDBRange             = 0.0     ! Daily Temperature Range (deltaC)
-  REAL(r64) :: HumIndValue              = 0.0     ! Humidity Indicating Value at Max Dry-bulb Temperature
+  REAL(r64) :: MaxDryBulb               = 0.0d0     ! Maximum Dry-Bulb Temperature (C)
+  REAL(r64) :: DailyDBRange             = 0.0d0     ! Daily Temperature Range (deltaC)
+  REAL(r64) :: HumIndValue              = 0.0d0     ! Humidity Indicating Value at Max Dry-bulb Temperature
   INTEGER   :: HumIndType               = 0       ! Humidity Indicating type  (see Parameters)
-  REAL(r64) :: PressBarom               = 0.0     ! Atmospheric/Barometric Pressure (Pascals)
-  REAL(r64) :: WindSpeed                = 0.0     ! Wind Speed (m/s)
-  REAL(r64) :: WindDir                  = 0.0     ! Wind Direction (degrees clockwise from North, N=0, E=90, S=180, W=270)
-  REAL(r64) :: SkyClear                 = 0.0     ! Sky Clearness (0 to 1)
+  REAL(r64) :: PressBarom               = 0.0d0     ! Atmospheric/Barometric Pressure (Pascals)
+  REAL(r64) :: WindSpeed                = 0.0d0     ! Wind Speed (m/s)
+  REAL(r64) :: WindDir                  = 0.0d0     ! Wind Direction (degrees clockwise from North, N=0, E=90, S=180, W=270)
+  REAL(r64) :: SkyClear                 = 0.0d0     ! Sky Clearness (0 to 1)
   INTEGER :: RainInd                    = 0       ! Rain Indicator (1 = raining and surfaces are wet, else 0)
   INTEGER :: SnowInd                    = 0       ! Snow Indicator (1 = snow on ground, else  0)
   INTEGER :: DayOfMonth                 = 0       ! Day of Month ( 1 - 31 )
@@ -148,9 +149,11 @@ TYPE DesignDayData
                                                   !    relative humidity (%) or wet-bulb range multipliers per HumIndType
   INTEGER :: BeamSolarSchPtr            = 0       ! Schedule pointer to a day schedule for beam solar
   INTEGER :: DiffuseSolarSchPtr         = 0       ! Schedule pointer to a day schedule for diffuse solar
-  REAL(r64) :: TauB                     = 0.0     ! beam pseudo optical depth for ASHRAE tau model
-  REAL(r64) :: TauD                     = 0.0     ! diffuse pseudo optical depth for ASHRAE tau model
-  REAL(r64) :: DailyWBRange             = 0.0     ! daily range of wetbulb (deltaC)
+  REAL(r64) :: TauB                     = 0.0d0     ! beam pseudo optical depth for ASHRAE tau model
+  REAL(r64) :: TauD                     = 0.0d0     ! diffuse pseudo optical depth for ASHRAE tau model
+  REAL(r64) :: DailyWBRange             = 0.0d0     ! daily range of wetbulb (deltaC)
+  LOGICAL   :: PressureEntered          =.false.  ! true if a pressure was entered in design day data
+  LOGICAL   :: DewPointNeedsSet         =.false.  ! true if the Dewpoint humidicating value needs to be set (after location determined)
 END TYPE DesignDayData
 
 TYPE RunPeriodData
@@ -188,9 +191,9 @@ TYPE DayWeatherVariables                ! Derived Type for Storing Weather "Head
   INTEGER :: DayOfWeek                  = 0       ! Day of week for weather data
   INTEGER :: DaylightSavingIndex        = 0       ! Daylight Saving Time Period indicator (0=no,1=yes)
   INTEGER :: HolidayIndex               = 0       ! Holiday indicator (0=no holiday, non-zero=holiday type)
-  REAL(r64)    :: SinSolarDeclinAngle        = 0.0     ! Sine of the solar declination angle
-  REAL(r64)    :: CosSolarDeclinAngle        = 0.0     ! Cosine of the solar declination angle
-  REAL(r64)    :: EquationOfTime             = 0.0     ! Value of the equation of time formula
+  REAL(r64)    :: SinSolarDeclinAngle        = 0.0d0     ! Sine of the solar declination angle
+  REAL(r64)    :: CosSolarDeclinAngle        = 0.0d0     ! Cosine of the solar declination angle
+  REAL(r64)    :: EquationOfTime             = 0.0d0     ! Value of the equation of time formula
 END TYPE DayWeatherVariables
 
 TYPE SpecialDayData
@@ -223,6 +226,7 @@ TYPE DataPeriodData
   INTEGER, DIMENSION(12) :: MonWeekDay  = 0
   INTEGER :: DataStJDay                 = 0
   INTEGER :: DataEnJDay                 = 0
+  LOGICAL :: HasYearData                = .false.
 END TYPE
 
 TYPE DaylightSavingPeriodData
@@ -239,22 +243,22 @@ END TYPE
 TYPE MissingData          ! This Derived type carries the default missing data
                           ! for those data elements that would be best replaced
                           ! with the previous hour's data for missing data.
-  REAL(r64) :: DryBulb      =0.0 ! Dry Bulb Temperature (C)
-  REAL(r64) :: DewPoint     =0.0 ! Dew Point Temperature (C)
+  REAL(r64) :: DryBulb      =0.0d0 ! Dry Bulb Temperature (C)
+  REAL(r64) :: DewPoint     =0.0d0 ! Dew Point Temperature (C)
   INTEGER   :: RelHumid     =0   ! Relative Humidity (%)
-  REAL(r64) :: StnPres      =0.0 ! Atmospheric Pressure (Pa)
+  REAL(r64) :: StnPres      =0.0d0 ! Atmospheric Pressure (Pa)
   INTEGER   :: WindDir      =0   ! Wind Direction (deg)
-  REAL(r64) :: WindSpd      =0.0 ! Wind Speed/Velocity (m/s)
+  REAL(r64) :: WindSpd      =0.0d0 ! Wind Speed/Velocity (m/s)
   INTEGER   :: TotSkyCvr    =0   ! Total Sky Cover (tenths)
   INTEGER   :: OpaqSkyCvr   =0   ! Opaque Sky Cover (tenths)
-  REAL(r64) :: Visibility   =0.0 ! Visibility (km)
+  REAL(r64) :: Visibility   =0.0d0 ! Visibility (km)
   INTEGER   :: Ceiling      =0   ! Ceiling Height (m)
   INTEGER   :: PrecipWater  =0   ! Precipitable Water (mm)
-  REAL(r64) :: AerOptDepth  =0.0 ! Aerosol Optical Depth
+  REAL(r64) :: AerOptDepth  =0.0d0 ! Aerosol Optical Depth
   INTEGER   :: SnowDepth    =0   ! Snow Depth (cm)
   INTEGER   :: DaysLastSnow =0   ! Number of Days since last snow
-  REAL(r64) :: Albedo       =0.0 ! Albedo
-  REAL(r64) :: LiquidPrecip =0.0 ! Rain/Liquid Precipitation (mm)
+  REAL(r64) :: Albedo       =0.0d0 ! Albedo
+  REAL(r64) :: LiquidPrecip =0.0d0 ! Rain/Liquid Precipitation (mm)
 END TYPE
 
 TYPE MissingDataCounts    ! This Derived type carries the counts of missing data
@@ -340,27 +344,28 @@ Character(len=100) :: LocationTitle=Blank   ! Location Title from input File
 LOGICAL :: LocationGathered=.false.        ! flag to show if Location exists on Input File (we assume one is there and
                                            ! correct on weather file)
 
-REAL(r64)  :: WeatherFileLatitude  = 0.0
-REAL(r64)  :: WeatherFileLongitude = 0.0
-REAL(r64)  :: WeatherFileTimeZone  = 0.0
-REAL(r64)  :: WeatherFileElevation = 0.0
+REAL(r64)  :: WeatherFileLatitude  = 0.0d0
+REAL(r64)  :: WeatherFileLongitude = 0.0d0
+REAL(r64)  :: WeatherFileTimeZone  = 0.0d0
+REAL(r64)  :: WeatherFileElevation = 0.0d0
 INTEGER :: WeatherFileUnitNumber           ! File unit number for the weather file
-REAL(r64), DIMENSION(12) :: GroundTemps=(/18.,18.,18.,18.,18.,18.,18.,18.,18.,18.,18.,18./)         ! Ground Temperatures
-REAL(r64), DIMENSION(12) :: GroundTempsFC = 0.                                     ! Ground Temperatures for F or C factor method
-REAL(r64), DIMENSION(12) :: SurfaceGroundTemps=(/13.,13.,13.,13.,13.,13.,13.,13.,13.,13.,13.,13./)  ! Surface Ground Temperatures
-REAL(r64), DIMENSION(12) :: DeepGroundTemps=(/16.,16.,16.,16.,16.,16.,16.,16.,16.,16.,16.,16./)     ! Deep Ground Temperatures
-REAL(r64), DIMENSION(12) :: GroundReflectances=(/.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2/)   !User Specified Ground Reflectances
-REAL(r64) :: SnowGndRefModifier=1.0           ! Modifier to ground reflectance during snow
-REAL(r64) :: SnowGndRefModifierForDayltg=1.0  ! Modifier to ground reflectance during snow for daylighting
+REAL(r64), DIMENSION(12) :: GroundTemps=(/18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0,18.d0/) ! Bldg Surface
+REAL(r64), DIMENSION(12) :: GroundTempsFC=(/0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0/) ! F or C factor method
+REAL(r64), DIMENSION(12) :: SurfaceGroundTemps=(/13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0,13.d0/) ! Surface
+REAL(r64), DIMENSION(12) :: DeepGroundTemps=(/16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0,16.d0/)   ! Deep
+REAL(r64), DIMENSION(12) :: GroundReflectances=(/.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0,.2d0/)   !User Specified Ground Reflectances
+!EPTeam above line replaces (big diffs) REAL(r64), DIMENSION(12) :: GroundReflectances=(/.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2/)   !User Specified Ground Reflectances
+REAL(r64) :: SnowGndRefModifier=1.0d0           ! Modifier to ground reflectance during snow
+REAL(r64) :: SnowGndRefModifierForDayltg=1.0d0  ! Modifier to ground reflectance during snow for daylighting
 INTEGER :: WaterMainsTempsMethod = 0          ! Water mains temperature calculation method
 INTEGER :: WaterMainsTempsSchedule = 0        ! Water mains temperature schedule
-REAL(r64) :: WaterMainsTempsAnnualAvgAirTemp = 0.0 ! Annual average outdoor air temperature (C)
-REAL(r64) :: WaterMainsTempsMaxDiffAirTemp = 0.0   ! Maximum difference in monthly average outdoor air temperatures (deltaC)
+REAL(r64) :: WaterMainsTempsAnnualAvgAirTemp = 0.0d0 ! Annual average outdoor air temperature (C)
+REAL(r64) :: WaterMainsTempsMaxDiffAirTemp = 0.0d0   ! Maximum difference in monthly average outdoor air temperatures (deltaC)
 LOGICAL :: wthFCGroundTemps=.false.
 REAL(r64) :: RainAmount=0.0d0
 REAL(r64) :: SnowAmount=0.0d0
 
-TYPE (DayWeatherVariables) :: TodayVariables=       &  ! Today's daily weather variables
+TYPE (DayWeatherVariables),SAVE :: TodayVariables=       &  ! Today's daily weather variables
     DayWeatherVariables(               & ! Derived Type for Storing Weather "Header" Data
      0, &     ! Day of year for weather data
      0, &     ! Year of weather data
@@ -369,10 +374,10 @@ TYPE (DayWeatherVariables) :: TodayVariables=       &  ! Today's daily weather v
      0, &     ! Day of week for weather data
      0, &     ! Daylight Saving Time Period indicator (0=no,1=yes)
      0, &     ! Holiday indicator (0=no holiday, non-zero=holiday type)
-   0.0, &     ! Sine of the solar declination angle
-   0.0, &     ! Cosine of the solar declination angle
-   0.0)       ! Value of the equation of time formula
-TYPE (DayWeatherVariables) ::  TomorrowVariables= &     ! Tomorrow's daily weather variables
+   0.0d0, &     ! Sine of the solar declination angle
+   0.0d0, &     ! Cosine of the solar declination angle
+   0.0d0)       ! Value of the equation of time formula
+TYPE (DayWeatherVariables),SAVE ::  TomorrowVariables= &     ! Tomorrow's daily weather variables
     DayWeatherVariables(               & ! Derived Type for Storing Weather "Header" Data
      0, &     ! Day of year for weather data
      0, &     ! Year of weather data
@@ -381,22 +386,39 @@ TYPE (DayWeatherVariables) ::  TomorrowVariables= &     ! Tomorrow's daily weath
      0, &     ! Day of week for weather data
      0, &     ! Daylight Saving Time Period indicator (0=no,1=yes)
      0, &     ! Holiday indicator (0=no holiday, non-zero=holiday type)
-   0.0, &     ! Sine of the solar declination angle
-   0.0, &     ! Cosine of the solar declination angle
-   0.0)       ! Value of the equation of time formula
+   0.0d0, &     ! Sine of the solar declination angle
+   0.0d0, &     ! Cosine of the solar declination angle
+   0.0d0)       ! Value of the equation of time formula
 TYPE (DayWeatherVariables), ALLOCATABLE, DIMENSION(:) :: DesignDay  ! Design day environments
-TYPE (MissingData) :: Missing  = MissingData(0.,0.,0,0.,0,0.,0,0,0.,0,0,0.,0,0,0.0,0.0)
-TYPE (MissingDataCounts) :: Missed = MissingDataCounts(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-TYPE (RangeDataCounts) :: OutOfRange = RangeDataCounts(0,0,0,0,0,0,0,0)
+TYPE (MissingData),SAVE :: Missing  = MissingData  &
+      (0.0d0,  & ! Dry Bulb Temperature (C)
+       0.0d0,  & ! Dew Point Temperature (C)
+       0,      & ! Relative Humidity (%)
+       0.0d0,  & ! Atmospheric Pressure (Pa)
+       0,      & ! Wind Direction (deg)
+       0.0d0,  & ! Wind Speed/Velocity (m/s)
+       0,      & ! Total Sky Cover (tenths)
+       0,      & ! Opaque Sky Cover (tenths)
+       0.0d0,  & ! Visibility (km)
+       0,      & ! Ceiling Height (m)
+       0,      & ! Precipitable Water (mm)
+       0.0d0,  & ! Aerosol Optical Depth
+       0,      & ! Snow Depth (cm)
+       0,      & ! Number of Days since last snow
+       0.0d0,  & ! Albedo
+       0.0d0)    ! Rain/Liquid Precipitation (mm)
+
+TYPE (MissingDataCounts),SAVE :: Missed = MissingDataCounts(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+TYPE (RangeDataCounts),SAVE :: OutOfRange = RangeDataCounts(0,0,0,0,0,0,0,0)
 
 TYPE (DesignDayData), ALLOCATABLE, DIMENSION(:) :: DesDayInput ! Design day Input Data
 TYPE (EnvironmentData), ALLOCATABLE, DIMENSION(:) :: Environment ! Environment data
 TYPE (RunPeriodData), ALLOCATABLE, DIMENSION(:) :: RunPeriodInput
 TYPE (RunPeriodData), ALLOCATABLE, DIMENSION(:) :: RunPeriodDesignInput
 TYPE (TypicalExtremeData), ALLOCATABLE, DIMENSION(:) :: TypicalExtremePeriods
-TYPE (DaylightSavingPeriodData) :: EPWDST = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data from EPW file
-TYPE (DaylightSavingPeriodData) :: IDFDST = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data from IDF file
-TYPE (DaylightSavingPeriodData) :: DST    = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data, if active
+TYPE (DaylightSavingPeriodData),SAVE :: EPWDST = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data from EPW file
+TYPE (DaylightSavingPeriodData),SAVE :: IDFDST = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data from IDF file
+TYPE (DaylightSavingPeriodData),SAVE :: DST    = DaylightSavingPeriodData(0,0,0,0,0,0,0,0) ! Daylight Saving Period Data, if active
 TYPE (WeatherProperties), ALLOCATABLE, DIMENSION(:) :: WPSkyTemperature
 Integer :: TotRunPers  =0  ! Total number of Run Periods (Weather data) to Setup
 Integer :: TotRunDesPers  =0   ! Total number of Run Design Periods (Weather data) to Setup
@@ -469,16 +491,26 @@ REAL(r64), ALLOCATABLE, DIMENSION (:,:,:) :: DDHumIndModifier       ! Design Day
 REAL(r64), ALLOCATABLE, DIMENSION (:,:,:) :: DDBeamSolarValues       ! Design Day Beam Solar Values
 REAL(r64), ALLOCATABLE, DIMENSION (:,:,:) :: DDDiffuseSolarValues    ! Design Day Relative Humidity Values
 
+REAL(r64), ALLOCATABLE, DIMENSION (:,:,:) :: DDSkyTempScheduleValues ! Sky temperature - DesignDay input
+
 INTEGER :: RptIsRain=0            ! Rain Report Value
 INTEGER :: RptIsSnow=0            ! Snow Report Value
 INTEGER :: RptDayType=0           ! DayType Report Value
 
 
-REAL(r64) :: HrAngle      =0.0 ! Current Hour Angle
-REAL(r64) :: SolarAltitudeAngle =0.0     ! Angle of Solar Altitude (degrees)
-REAL(r64) :: SolarAzimuthAngle  =0.0     ! Angle of Solar Azimuth (degrees)
-REAL(r64) :: HorizIRSky         =0.0     ! Horizontal Infrared Radiation Intensity (W/m2)
-REAL(r64) :: TimeStepFraction =0.0D0 ! Fraction of hour each time step represents
+REAL(r64) :: HrAngle      =0.0d0 ! Current Hour Angle
+REAL(r64) :: SolarAltitudeAngle =0.0d0     ! Angle of Solar Altitude (degrees)
+REAL(r64) :: SolarAzimuthAngle  =0.0d0     ! Angle of Solar Azimuth (degrees)
+REAL(r64) :: HorizIRSky         =0.0d0     ! Horizontal Infrared Radiation Intensity (W/m2)
+REAL(r64) :: TimeStepFraction =0.0d0 ! Fraction of hour each time step represents
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: SPSiteDryBulbRangeModScheduleValue    ! reporting Drybulb Temperature Range Modifier Schedule Value
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: SPSiteHumidityConditionScheduleValue  ! reporting Humidity Condition Schedule Value
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: SPSiteBeamSolarScheduleValue          ! reporting Beam Solar Schedule Value
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: SPSiteDiffuseSolarScheduleValue       ! reporting Diffuse Solar Schedule Value
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: SPSiteSkyTemperatureScheduleValue     ! reporting SkyTemperature Modifier Schedule Value
+INTEGER,ALLOCATABLE,DIMENSION(:)   :: SPSiteScheduleNamePtr ! SP Site Schedule Name Ptrs
+CHARACTER(len=16),ALLOCATABLE,DIMENSION(:) :: SPSiteScheduleUnits ! SP Site Schedule Units
+INTEGER :: NumSPSiteScheduleNamePtrs=0 ! Number of SP Site Schedules (DesignDay only)
 INTEGER :: NumMissing=0  ! Number of hours of missing data
 LOGICAL :: StripCR=.false.  ! If true, strip last character (<cr> off each EPW line)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: Interpolation       ! Interpolation values based on Number of Time Steps in Hour
@@ -676,6 +708,7 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
   CHARACTER(len=*), PARAMETER :: EnvDSTYFormat="('Environment:Daylight Saving,Yes',3(',',A))"
   CHARACTER(len=*), PARAMETER :: EnvSpDyFormat="('Environment:Special Days',4(',',A),',',I3)"
   CHARACTER(len=*), PARAMETER :: DateFormat="(I2.2,'/',I2.2)"
+  CHARACTER(len=*), PARAMETER :: DateFormatwithYear="(I2.2,'/',I2.2,'/',I4.4)"
   CHARACTER(len=*), PARAMETER, DIMENSION(5) :: SpecialDayNames=(/"Holiday        ","SummerDesignDay",  &
                                                                  "WinterDesignDay","CustomDay1     ","CustomDay2     "/)
   CHARACTER(len=*), PARAMETER, DIMENSION(12) :: ValidDayNames=(/"Sunday         ","Monday         ","Tuesday        ", &
@@ -695,8 +728,8 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
   LOGICAL, SAVE   :: PrntEnvHeaders=.true.
   INTEGER :: Loop
   INTEGER :: Loop1
-  CHARACTER(len=10) :: StDate
-  CHARACTER(len=10) :: EnDate
+  CHARACTER(len=20) :: StDate
+  CHARACTER(len=20) :: EnDate
   CHARACTER(len=10) :: string
   CHARACTER(len=10) :: cTotalEnvDays
   INTEGER :: NumDays
@@ -724,59 +757,6 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
   CHARACTER(len=3) :: AlpUseSnow
   CHARACTER(len=100) :: kindOfRunPeriod
   REAL(r64) :: GrossApproxAvgDryBulb
-
-  IF (GetInputFlag) THEN
-
-    CALL SetUpInterpolationValues
-    TimeStepFraction=1.d0/REAL(NumOfTimeStepInHour,r64)
-
-    CALL OpenWeatherFile(ErrorsFound)   ! moved here because of possibility of special days on EPW file
-    CALL CloseWeatherFile
-    CALL ReadUserWeatherInput
-    CALL AllocateWeatherData
-    IF (NumIntervalsPerHour /= 1) THEN
-      IF (NumIntervalsPerHour /= NumOfTimeStepInHour) THEN
-        CALL ShowSevereError(RoutineName//  &
-           'Number of intervals per hour on Weather file does not match specified number of Time Steps Per Hour')
-        ErrorsFound=.true.
-      ENDIF
-    ENDIF
-    GetInputFlag=.false.
-    Envrn=0
-    IF (NumOfEnvrn > 0) THEN
-      CALL ResolveLocationInformation(ErrorsFound) ! Obtain weather related info from input file
-      CALL CheckLocationValidity
-      IF (Environment(NumOfEnvrn)%KindOfEnvrn /= ksDesignDay) THEN
-        CALL CheckWeatherFileValidity
-      ENDIF
-      IF (ErrorsFound) THEN
-        CALL ShowSevereError(RoutineName//'No location specified, program will terminate.')
-      ENDIF
-    ELSE
-      ErrorsFound=.true.
-      CALL ShowSevereError(RoutineName//'No Design Days or Run Period(s) specified, program will terminate.')
-    ENDIF
-    IF (DDOnly .and. TotDesDays == 0) THEN
-      ErrorsFound=.true.
-      CALL ShowSevereError(RoutineName//  &
-         'Requested Design Days only (DDOnly) but no Design Days specified, program will terminate.')
-    ENDIF
-    IF (ReverseDD .and. TotDesDays == 1) THEN
-      ErrorsFound=.true.
-      CALL ShowSevereError(RoutineName//  &
-         'Requested Reverse Design Days (ReverseDD) but only 1 Design Day specified, program will terminate.')
-    ENDIF
-    CurrentOverallSimDay=0
-    TotalOverallSimDays=0
-    MaxNumberSimYears=1
-    DO Loop=1,NumOfEnvrn
-      TotalOverallSimDays=TotalOverallSimDays+Environment(Loop)%TotalDays
-      IF (Environment(Loop)%KindOfEnvrn == ksRunPeriodWeather) THEN
-        MaxNumberSimYears=MAX(MaxNumberSimYears,Environment(Loop)%NumSimYears)
-      ENDIF
-    ENDDO
-    CALL DisplaySimDaysProgress(CurrentOverallSimDay,TotalOverallSimDays)
-  ENDIF
 
   IF (BeginSimFlag .and. FirstCall) THEN
 
@@ -843,6 +823,59 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
     FirstCall=.false.
 
   END IF    ! ... end of BeginSimFlag IF-THEN block.
+
+  IF (GetInputFlag) THEN
+
+    CALL SetUpInterpolationValues
+    TimeStepFraction=1.d0/REAL(NumOfTimeStepInHour,r64)
+
+    CALL OpenWeatherFile(ErrorsFound)   ! moved here because of possibility of special days on EPW file
+    CALL CloseWeatherFile
+    CALL ReadUserWeatherInput
+    CALL AllocateWeatherData
+    IF (NumIntervalsPerHour /= 1) THEN
+      IF (NumIntervalsPerHour /= NumOfTimeStepInHour) THEN
+        CALL ShowSevereError(RoutineName//  &
+           'Number of intervals per hour on Weather file does not match specified number of Time Steps Per Hour')
+        ErrorsFound=.true.
+      ENDIF
+    ENDIF
+    GetInputFlag=.false.
+    Envrn=0
+    IF (NumOfEnvrn > 0) THEN
+      CALL ResolveLocationInformation(ErrorsFound) ! Obtain weather related info from input file
+      CALL CheckLocationValidity
+      IF (Environment(NumOfEnvrn)%KindOfEnvrn /= ksDesignDay) THEN
+        CALL CheckWeatherFileValidity
+      ENDIF
+      IF (ErrorsFound) THEN
+        CALL ShowSevereError(RoutineName//'No location specified, program will terminate.')
+      ENDIF
+    ELSE
+      ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//'No Design Days or Run Period(s) specified, program will terminate.')
+    ENDIF
+    IF (DDOnly .and. TotDesDays == 0) THEN
+      ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//  &
+         'Requested Design Days only (DDOnly) but no Design Days specified, program will terminate.')
+    ENDIF
+    IF (ReverseDD .and. TotDesDays == 1) THEN
+      ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//  &
+         'Requested Reverse Design Days (ReverseDD) but only 1 Design Day specified, program will terminate.')
+    ENDIF
+    CurrentOverallSimDay=0
+    TotalOverallSimDays=0
+    MaxNumberSimYears=1
+    DO Loop=1,NumOfEnvrn
+      TotalOverallSimDays=TotalOverallSimDays+Environment(Loop)%TotalDays
+      IF (Environment(Loop)%KindOfEnvrn == ksRunPeriodWeather) THEN
+        MaxNumberSimYears=MAX(MaxNumberSimYears,Environment(Loop)%NumSimYears)
+      ENDIF
+    ENDDO
+    CALL DisplaySimDaysProgress(CurrentOverallSimDay,TotalOverallSimDays)
+  ENDIF
 
   CALL CloseWeatherFile  ! will only close if opened.
   Envrn=Envrn+1
@@ -947,6 +980,11 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
             ELSE  ! Actual Weather
               RunStJDay=DataPeriods(Loop)%DataStJDay
               RunEnJDay=DataPeriods(Loop)%DataEnJDay
+              IF (.not. DataPeriods(Loop)%HasYearData) THEN
+                CALL ShowSevereError('GetNextEnvironment: Runperiod:CustomRange has been entered but weatherfile '//  &
+                   ' DATA PERIOD does not have year included in start/end date.')
+                CALL ShowContinueError('...to match the RunPeriod, the DATA PERIOD should be mm/dd/yyyy for both.')
+              ENDIF
               IF (.not. BetweenDates(Environment(Envrn)%StartDate,RunStJDay,RunEnJDay)) CYCLE
               IF (.not. BetweenDates(Environment(Envrn)%EndDate,RunStJDay,RunEnJDay)) CYCLE
               OkRun=.true.
@@ -961,17 +999,32 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
           ENDDO
 
           IF (.not. OkRun) THEN
+            IF (.not. Environment(Envrn)%ActualWeather) THEN
+              WRITE(StDate,DateFormat) Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay
+              WRITE(EnDate,DateFormat) Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay
+              CALL ShowSevereError(RoutineName//'Runperiod [mm/dd] (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//  &
+                                      ') requested not within Data Period(s) from Weather File')
+            ELSE
+              WRITE(StDate,DateFormatwithYear) Environment(Envrn)%StartMonth,Environment(Envrn)%StartDay,  &
+                 Environment(Envrn)%StartYear
+              WRITE(EnDate,DateFormatwithYear) Environment(Envrn)%EndMonth,Environment(Envrn)%EndDay,  &
+                 Environment(Envrn)%EndYear
+              CALL ShowSevereError(RoutineName//'Runperiod [mm/dd/yyyy] (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//  &
+                                      ') requested not within Data Period(s) from Weather File')
+            ENDIF
             WRITE(StDate,DateFormat) DataPeriods(1)%StMon,DataPeriods(1)%StDay
             WRITE(EnDate,DateFormat) DataPeriods(1)%EnMon,DataPeriods(1)%EnDay
-            CALL ShowSevereError(RoutineName//'Runperiod (Start='//TRIM(StDate)//',End='//TRIM(EnDate)//  &
-                                    ') requested not within DataPeriod(s) from Weather File')
             IF (DataPeriods(1)%StYear > 0) THEN
               string=RoundSigDigits(DataPeriods(1)%StYear)
               StDate=trim(StDate)//'/'//string
+            ELSE
+              StDate=trim(StDate)//'/<noyear>'
             ENDIF
             IF (DataPeriods(1)%EnYear > 0) THEN
               string=RoundSigDigits(DataPeriods(1)%EnYear)
               EnDate=trim(EnDate)//'/'//string
+            ELSE
+              EnDate=trim(EnDate)//'/<noyear>'
             ENDIF
             IF (NumDataPeriods == 1) THEN
               CALL ShowContinueError('Weather Data Period (Start='//TRIM(StDate)//',End='//TRIM(EnDate))
@@ -1342,7 +1395,7 @@ SUBROUTINE ResetWeekDaysByMonth(WeekDays,LeapYearAdd,StartMonth,StartMonthDay,En
           ! and previous weekdays per month.
 
           ! METHODOLOGY EMPLOYED:
-          ! <description>
+          ! NA
 
           ! REFERENCES:
           ! na
@@ -1888,7 +1941,7 @@ SUBROUTINE InitializeWeather(PrintEnvrnStamp)
     Missing%StnPres      = StdBaroPress  ! Initial "missing" value
     Missing%DryBulb      = 6.d0       ! Initial "missing" value
     Missing%DewPoint     = 3.d0       ! Initial "missing" value
-    Missing%RelHumid     = 50d0       ! Initial "missing" value
+    Missing%RelHumid     = 50.0d0       ! Initial "missing" value
     Missing%WindSpd      = 2.5d0      ! Initial "missing" value
     Missing%WindDir      = 180        ! Initial "missing" value
     Missing%TotSkyCvr    = 5          ! Initial "missing" value
@@ -1896,11 +1949,11 @@ SUBROUTINE InitializeWeather(PrintEnvrnStamp)
     Missing%Visibility   = 777.7d0    ! Initial "missing" value
     Missing%Ceiling      = 77777      ! Initial "missing" value
     Missing%PrecipWater  = 0          ! Initial "missing" value
-    Missing%AerOptDepth  = 0          ! Initial "missing" value
+    Missing%AerOptDepth  = 0.0d0      ! Initial "missing" value
     Missing%SnowDepth    = 0          ! Initial "missing" value
     Missing%DaysLastSnow = 88         ! Initial "missing" value
-    Missing%Albedo       = 0.0        ! Initial "missing" value
-    Missing%LiquidPrecip = 0.0        ! Initial "missing" value
+    Missing%Albedo       = 0.0d0      ! Initial "missing" value
+    Missing%LiquidPrecip = 0.0d0      ! Initial "missing" value
                                     ! Counts set to 0 for each environment
     Missed%StnPres      = 0
     Missed%DryBulb      = 0
@@ -2238,6 +2291,7 @@ SUBROUTINE SetCurrentWeather
           ! USE STATEMENTS:
   USE General, ONLY: JulianDay
   USE ScheduleManager, ONLY: UpdateScheduleValues
+  use inputprocessor, only:samestring
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2295,7 +2349,7 @@ SUBROUTINE SetCurrentWeather
 
   ! Determine if Sun is up or down, set Solar Cosine values for time step.
   CALL DetermineSunUpDown(SOLCOS)
-  IF (SunIsUp .and. SolarAltitudeAngle < 0.0) THEN
+  IF (SunIsUp .and. SolarAltitudeAngle < 0.0d0) THEN
     CALL ShowFatalError('SetCurrentWeather: At '//TRIM(CurMnDyHr)//' Sun is Up but Solar Altitude Angle is < 0.0')
   ENDIF
 
@@ -2323,6 +2377,38 @@ SUBROUTINE SetCurrentWeather
 
   IF (OutDewPointTemp > OutWetBulbTemp) THEN
     OutDewPointTemp=OutWetBulbTemp
+  ENDIF
+
+  IF (KindOfSim == ksDesignDay) THEN
+    SPSiteDryBulbRangeModScheduleValue = -999.0d0    ! N/A Drybulb Temperature Range Modifier Schedule Value
+    SPSiteHumidityConditionScheduleValue = -999.0d0  ! N/A Humidity Condition Schedule Value
+    SPSiteBeamSolarScheduleValue = -999.0d0          ! N/A Beam Solar Schedule Value
+    SPSiteDiffuseSolarScheduleValue = -999.0d0       ! N/A Diffuse Solar Schedule Value
+    SPSiteSkyTemperatureScheduleValue = -999.0d0     ! N/A SkyTemperature Modifier Schedule Value
+
+    IF (DesDayInput(Envrn)%DBTempRangeType /= DDDBRangeType_Default) THEN
+      SPSiteDryBulbRangeModScheduleValue(Envrn) = DDDBRngModifier(Envrn,HourOfDay,TimeStep)
+    ENDIF
+    IF (DesDayInput(Envrn)%HumIndType == DDHumIndType_WBProfDef         &
+        .or. DesDayInput(Envrn)%HumIndType == DDHumIndType_WBProfDif       &
+        .or. DesDayInput(Envrn)%HumIndType == DDHumIndType_WBProfMul) THEN
+      SPSiteHumidityConditionScheduleValue(Envrn) = DDHumIndModifier(Envrn,HourOfDay,TimeStep)
+    ELSEIF (DesDayInput(Envrn)%HumIndType ==  DDHumIndType_RelHumSch) THEN
+      SPSiteHumidityConditionScheduleValue(Envrn) = DDHumIndModifier(Envrn,HourOfDay,TimeStep)
+    ENDIF
+    IF (DesDayInput(Envrn)%SolarModel == SolarModel_Schedule) THEN
+      SPSiteBeamSolarScheduleValue(Envrn) = DDBeamSolarValues(Envrn,HourOfDay,TimeStep)
+      SPSiteDiffuseSolarScheduleValue(Envrn) = DDDiffuseSolarValues(Envrn,HourOfDay,TimeStep)
+    ENDIF
+    IF (Environment(Envrn)%WP_Type1 /= 0) THEN
+      SPSiteSkyTemperatureScheduleValue(Envrn) = DDSkyTempScheduleValues(Envrn,HourOfDay,TimeStep)
+    ENDIF
+  ELSEIF (TotDesDays > 0) THEN
+    SPSiteDryBulbRangeModScheduleValue = -999.0d0    ! N/A Drybulb Temperature Range Modifier Schedule Value
+    SPSiteHumidityConditionScheduleValue = -999.0d0  ! N/A Humidity Condition Schedule Value
+    SPSiteBeamSolarScheduleValue = -999.0d0          ! N/A Beam Solar Schedule Value
+    SPSiteDiffuseSolarScheduleValue = -999.0d0       ! N/A Diffuse Solar Schedule Value
+    SPSiteSkyTemperatureScheduleValue = -999.0d0     ! N/A SkyTemperature Modifier Schedule Value
   ENDIF
 
   WindSpeed      = TodayWindSpeed(HourOfDay,TimeStep)
@@ -2357,9 +2443,9 @@ SUBROUTINE SetCurrentWeather
   GndSolarRad=MAX((BeamSolarRad*SOLCOS(3) + DifSolarRad)*GndReflectance,0.0D0)
 
   IF (.not. SunIsUp) THEN
-    DifSolarRad    = 0.0
-    BeamSolarRad   = 0.0
-    GndSolarRad    = 0.0
+    DifSolarRad    = 0.0d0
+    BeamSolarRad   = 0.0d0
+    GndSolarRad    = 0.0d0
   ENDIF
 
   ! Calc some values
@@ -2481,18 +2567,18 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
   TYPE HourlyWeatherData
     LOGICAL, DIMENSION(24) :: IsRain      = .false. ! Rain indicator, true=rain
     LOGICAL, DIMENSION(24) :: IsSnow      = .false. ! Snow indicator, true=snow
-    REAL(r64), DIMENSION(24) :: OutDryBulbTemp = 0.0     ! Hourly dry bulb temperature of outside air
-    REAL(r64), DIMENSION(24) :: OutDewPointTemp= 0.0     ! Hourly Dew Point Temperature of outside air
-    REAL(r64), DIMENSION(24) :: OutBaroPress   = 0.0     ! Hourly barometric pressure of outside air
-    REAL(r64), DIMENSION(24) :: OutRelHum      = 0.0     ! Hourly relative humidity
-    REAL(r64), DIMENSION(24) :: WindSpeed      = 0.0     ! Hourly wind speed of outside air
-    REAL(r64), DIMENSION(24) :: WindDir        = 0.0     ! Hourly wind direction of outside air
-    REAL(r64), DIMENSION(24) :: SkyTemp        = 0.0     ! Hourly sky temperature
-    REAL(r64), DIMENSION(24) :: HorizIRSky     = 0.0     ! Hourly Horizontal Infrared Radiation Intensity
-    REAL(r64), DIMENSION(24) :: BeamSolarRad   = 0.0     ! Hourly direct normal solar irradiance
-    REAL(r64), DIMENSION(24) :: DifSolarRad    = 0.0     ! Hourly sky diffuse horizontal solar irradiance
-    REAL(r64), DIMENSION(24) :: Albedo         = 0.0     ! Albedo
-    REAL(r64), DIMENSION(24) :: LiquidPrecip   = 0.0     ! Liquid Precipitation
+    REAL(r64), DIMENSION(24) :: OutDryBulbTemp = 0.0d0     ! Hourly dry bulb temperature of outside air
+    REAL(r64), DIMENSION(24) :: OutDewPointTemp= 0.0d0     ! Hourly Dew Point Temperature of outside air
+    REAL(r64), DIMENSION(24) :: OutBaroPress   = 0.0d0     ! Hourly barometric pressure of outside air
+    REAL(r64), DIMENSION(24) :: OutRelHum      = 0.0d0     ! Hourly relative humidity
+    REAL(r64), DIMENSION(24) :: WindSpeed      = 0.0d0     ! Hourly wind speed of outside air
+    REAL(r64), DIMENSION(24) :: WindDir        = 0.0d0     ! Hourly wind direction of outside air
+    REAL(r64), DIMENSION(24) :: SkyTemp        = 0.0d0     ! Hourly sky temperature
+    REAL(r64), DIMENSION(24) :: HorizIRSky     = 0.0d0     ! Hourly Horizontal Infrared Radiation Intensity
+    REAL(r64), DIMENSION(24) :: BeamSolarRad   = 0.0d0     ! Hourly direct normal solar irradiance
+    REAL(r64), DIMENSION(24) :: DifSolarRad    = 0.0d0     ! Hourly sky diffuse horizontal solar irradiance
+    REAL(r64), DIMENSION(24) :: Albedo         = 0.0d0     ! Albedo
+    REAL(r64), DIMENSION(24) :: LiquidPrecip   = 0.0d0     ! Liquid Precipitation
   END TYPE
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER Hour
@@ -2625,29 +2711,29 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         ! Do the range checks on the first set of fields -- no others.
         ErrorsFound=.false.
         IF (DryBulb >= 99.9d0) &
-          CALL RangeCheck(ErrorsFound,'DryBulb Temperature','WeatherFile','Severe','>= -70',(Drybulb>=-70.), &
-                        '<= 70',(DryBulb <=70.),RoundSigDigits(DryBulb,2),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'DryBulb Temperature','WeatherFile','Severe','>= -90',(Drybulb>=-90.0d0), &
+                        '<= 70',(DryBulb <=70.0d0),RoundSigDigits(DryBulb,2),WhatObjectName=WeatherFileLocationTitle)
         IF (Dewpoint < 99.9d0) &
-          CALL RangeCheck(ErrorsFound,'DewPoint Temperature','WeatherFile','Severe','>= -70',(Dewpoint>=-70.), &
-                        '<= 70',(Dewpoint <=70.),RoundSigDigits(Dewpoint,2),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'DewPoint Temperature','WeatherFile','Severe','>= -90',(Dewpoint>=-90.0d0), &
+                        '<= 70',(Dewpoint <=70.0d0),RoundSigDigits(Dewpoint,2),WhatObjectName=WeatherFileLocationTitle)
         IF (RelHum < 999.d0) &
-          CALL RangeCheck(ErrorsFound,'Relative Humidity','WeatherFile','Severe','> 0',(RelHum>=0.), &
-                        '<= 110',(RelHum<=110.),RoundSigDigits(RelHum,0),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'Relative Humidity','WeatherFile','Severe','> 0',(RelHum>=0.0d0), &
+                        '<= 110',(RelHum<=110.0d0),RoundSigDigits(RelHum,0),WhatObjectName=WeatherFileLocationTitle)
         IF (AtmPress < 999999.d0) &
-          CALL RangeCheck(ErrorsFound,'Atmospheric Pressure','WeatherFile','Severe','> 31000',(AtmPress>31000.), &
-                          '<=120000',(AtmPress<=120000.),RoundSigDigits(AtmPress,0),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'Atmospheric Pressure','WeatherFile','Severe','> 31000',(AtmPress>31000.0d0), &
+                          '<=120000',(AtmPress<=120000.0d0),RoundSigDigits(AtmPress,0),WhatObjectName=WeatherFileLocationTitle)
         IF (DirectRad < 9999.d0) &
-          CALL RangeCheck(ErrorsFound,'Direct Radiation','WeatherFile','Severe','>= 0',(DirectRad>=0.),  &
+          CALL RangeCheck(ErrorsFound,'Direct Radiation','WeatherFile','Severe','>= 0',(DirectRad>=0.0d0),  &
              WhatObjectName=WeatherFileLocationTitle)
         IF (DiffuseRad < 9999.d0) &
-          CALL RangeCheck(ErrorsFound,'Diffuse Radiation','WeatherFile','Severe','>= 0',(DiffuseRad>=0.),  &
+          CALL RangeCheck(ErrorsFound,'Diffuse Radiation','WeatherFile','Severe','>= 0',(DiffuseRad>=0.0d0),  &
              WhatObjectName=WeatherFileLocationTitle)
         IF (WindDir < 999.d0) &
-          CALL RangeCheck(ErrorsFound,'Wind Direction','WeatherFile','Severe','>=0',(WindDir>=0.), &
-                        '<=360',(WindDir<=360.),RoundSigDigits(WindDir,0),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'Wind Direction','WeatherFile','Severe','>=0',(WindDir>=0.0d0), &
+                        '<=360',(WindDir<=360.0d0),RoundSigDigits(WindDir,0),WhatObjectName=WeatherFileLocationTitle)
         IF (WindSpeed < 999.d0) &
-          CALL RangeCheck(ErrorsFound,'Wind Speed','WeatherFile','Severe','>=0',(WindSpeed>=0.), &
-                        '<=40',(WindSpeed<=40.),RoundSigDigits(WindSpeed,2),WhatObjectName=WeatherFileLocationTitle)
+          CALL RangeCheck(ErrorsFound,'Wind Speed','WeatherFile','Severe','>=0',(WindSpeed>=0.0d0), &
+                        '<=40',(WindSpeed<=40.0d0),RoundSigDigits(WindSpeed,2),WhatObjectName=WeatherFileLocationTitle)
         IF (ErrorsFound) THEN
           CALL ShowSevereError('Out of Range errors found with initial day of WeatherFile')
         ENDIF
@@ -2707,18 +2793,18 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
 
     TryAgain=.false.
 
-    TomorrowOutDryBulbTemp=0.0
-    TomorrowOutDewPointTemp=0.0
-    TomorrowOutBaroPress=0.0
-    TomorrowOutRelHum=0.0
-    TomorrowWindSpeed=0.0
-    TomorrowWindDir=0.0
-    TomorrowSkyTemp=0.0
-    TomorrowHorizIRSky=0.0
-    TomorrowBeamSolarRad=0.0
-    TomorrowDifSolarRad=0.0
-    TomorrowAlbedo=0.0
-    TomorrowLiquidPrecip=0.0
+    TomorrowOutDryBulbTemp=0.0d0
+    TomorrowOutDewPointTemp=0.0d0
+    TomorrowOutBaroPress=0.0d0
+    TomorrowOutRelHum=0.0d0
+    TomorrowWindSpeed=0.0d0
+    TomorrowWindDir=0.0d0
+    TomorrowSkyTemp=0.0d0
+    TomorrowHorizIRSky=0.0d0
+    TomorrowBeamSolarRad=0.0d0
+    TomorrowDifSolarRad=0.0d0
+    TomorrowAlbedo=0.0d0
+    TomorrowLiquidPrecip=0.0d0
     TomorrowIsRain=.false.
     TomorrowIsSnow=.false.
 
@@ -2776,10 +2862,10 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         ENDIF
 
 !         Set possible missing values
-        IF (ETHoriz < 0.0) ETHoriz=9999.d0
-        IF (ETDirect < 0.0) ETDirect=9999.d0
-        IF (IRHoriz <= 0.0) IRHoriz=9999.d0
-        IF (GLBHoriz < 0.0) GLBHoriz=9999.d0
+        IF (ETHoriz < 0.0d0) ETHoriz=9999.d0
+        IF (ETDirect < 0.0d0) ETDirect=9999.d0
+        IF (IRHoriz <= 0.0d0) IRHoriz=9999.d0
+        IF (GLBHoriz < 0.0d0) GLBHoriz=9999.d0
         IF (DisplayWeatherMissingDataWarnings) THEN
           IF (DirectRad >= 9999.d0) THEN
             Missed%DirectRad=Missed%DirectRad+1
@@ -2808,7 +2894,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         IF (OpaqueSkyCover < 0.0d0) OpaqueSkyCover=99.d0
         IF (Visibility < 0.0d0) Visibility=9999.d0
         IF (CeilHeight < 0.0d0) CeilHeight=9999.d0
-        IF (PresWeathObs < 0) PresWeathObs=9.
+        IF (PresWeathObs < 0) PresWeathObs=9.0d0
         IF (PrecipWater < 0.0d0) PrecipWater=999.d0
         IF (AerosolOptDepth < 0.0d0) AerosolOptDepth=999.d0
         IF (SnowDepth < 0.0d0) SnowDepth=999.d0
@@ -2821,6 +2907,11 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
             EndDayOfMonth(2)=28
             SkipThisDay=.true.
             TryAgain=.true.
+            CALL ShowWarningError('ReadEPlusWeatherForDay: Feb29 data encountered but will not be processed.')
+            IF (.not. WFAllowsLeapYears) THEN
+              CALL ShowContinueError('...WeatherFile does not allow Leap Years. '//  &
+                 'HOLIDAYS/DAYLIGHT SAVINGS header must indicate "Yes".')
+            ENDIF
             CYCLE
           ELSEIF (WMonth == 2 .and. WDay == 29 .and. CurrentYearIsLeapYear .and. WFAllowsLeapYears) THEN
             TryAgain=.false.
@@ -2852,7 +2943,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
           DryBulb=Missing%DryBulb
           Missed%DryBulb=Missed%DryBulb+1
         ENDIF
-        IF (DryBulb <= -70.d0 .or. DryBulb >= 70.d0) THEN
+        IF (DryBulb < -90.d0 .or. DryBulb > 70.d0) THEN
           OutOfRange%DryBulb=OutOfRange%DryBulb+1
         ENDIF
 
@@ -2860,7 +2951,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
           DewPoint=Missing%DewPoint
           Missed%DewPoint=Missed%DewPoint+1
         ENDIF
-        IF (DewPoint <= -70.d0 .or. DewPoint >= 70.d0) THEN
+        IF (DewPoint < -90.d0 .or. DewPoint > 70.d0) THEN
           OutOfRange%DewPoint=OutOfRange%DewPoint+1
         ENDIF
 
@@ -2973,7 +3064,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
             SkyTemp=(IRHoriz/Sigma)**.25d0 -TKelvin
           ENDIF
         ELSE
-          SkyTemp=0.0  ! dealt with later
+          SkyTemp=0.0d0  ! dealt with later
         ENDIF
 
         TomorrowSkyTemp(Hour,CurTimeStep)=SkyTemp
@@ -3015,8 +3106,8 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
 
          ! default if rain but none on weather file
         IF (TomorrowIsRain(Hour,CurTimeStep) .and.   &
-            TomorrowLiquidPrecip(Hour,CurTimeStep) == 0.0)   &
-            TomorrowLiquidPrecip(Hour,CurTimeStep)=2.0d0     ! 2mm in an hour ~ .08 inch
+            TomorrowLiquidPrecip(Hour,CurTimeStep) == 0.0d0)   &
+            TomorrowLiquidPrecip(Hour,CurTimeStep)=2.0d0/REAL(NumOfTimeStepInHour,r64) ! 2mm in an hour ~ .08 inch
 
         Missing%DryBulb=DryBulb
         Missing%DewPoint=DewPoint
@@ -3145,7 +3236,7 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
 
         TomorrowLiquidPrecip(Hour,TS)   = LastHrLiquidPrecip*WtPrevHour        &
                                           + Wthr%LiquidPrecip(Hour)*WtNow
-        TomorrowIsRain(Hour,TS)         = (TomorrowLiquidPrecip(Hour,TS) >= .8d0)  !Wthr%IsRain(Hour)
+        TomorrowIsRain(Hour,TS)         = (TomorrowLiquidPrecip(Hour,TS) >= .8d0/REAL(NumOfTimeStepInHour,r64))  !Wthr%IsRain(Hour)
         TomorrowIsSnow(Hour,TS)         = Wthr%IsSnow(Hour)
       ENDDO  ! End of TS Loop
 
@@ -3562,7 +3653,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
           !       DATE WRITTEN   February 1977
-          !       MODIFIED       June 1997 (RKS)
+          !       MODIFIED       June 1997 (RKS); May 2013 (LKL) add temperature profile for drybulb.
           !       RE-ENGINEERED  August 2003;LKL -- to generate timestep weather for design days.
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3617,8 +3708,8 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
 
           ! DERIVED TYPE DEFINITIONS:
   TYPE HourlyWeatherData
-    REAL(r64), DIMENSION(24) :: BeamSolarRad   = 0.0     ! Hourly direct normal solar irradiance
-    REAL(r64), DIMENSION(24) :: DifSolarRad    = 0.0     ! Hourly sky diffuse horizontal solar irradiance
+    REAL(r64), DIMENSION(24) :: BeamSolarRad   = 0.0d0     ! Hourly direct normal solar irradiance
+    REAL(r64), DIMENSION(24) :: DifSolarRad    = 0.0d0     ! Hourly sky diffuse horizontal solar irradiance
   END TYPE
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
@@ -3669,6 +3760,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
   REAL(r64) :: TotSkyCover
   INTEGER :: Hour1Ago,Hour3Ago
   REAL(r64) :: BeamRad, DiffRad     ! working calculated beam and diffuse rad, W/m2
+  REAL(r64) :: testval
 !     For reporting purposes, set year to current system year
    SaveWarmupFlag=WarmupFlag
    WarmupFlag=.true.
@@ -3691,16 +3783,26 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    EnvironmentStartEnd=TRIM(CurMnDy)//' - '//TRIM(CurMnDy)
 
    ! Check that barometric pressure is within range
-   IF (ABS((DesDayInput(EnvrnNum)%PressBarom-StdBaroPress)/StdBaroPress) > .1d0) THEN  ! 10% off
-     CALL ShowWarningError('SetUpDesignDay: Entered DesignDay Barometric Pressure='//  &
-                           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%PressBarom,0))//   &
-                           ' differs by more than 10% from Standard Barometric Pressure='//  &
-                           TRIM(RoundSigDigits(StdBaroPress,0))//'.')
-     CALL ShowContinueError('...occurs in DesignDay='//TRIM(EnvironmentName)//  &
-                            ', Standard Pressure (based on elevation) will be used.')
+   IF (DesDayInput(EnvrnNum)%PressureEntered) THEN
+     IF (ABS((DesDayInput(EnvrnNum)%PressBarom-StdBaroPress)/StdBaroPress) > .1d0) THEN  ! 10% off
+       CALL ShowWarningError('SetUpDesignDay: Entered DesignDay Barometric Pressure='//  &
+                             TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%PressBarom,0))//   &
+                             ' differs by more than 10% from Standard Barometric Pressure='//  &
+                             TRIM(RoundSigDigits(StdBaroPress,0))//'.')
+       CALL ShowContinueError('...occurs in DesignDay='//TRIM(EnvironmentName)//  &
+                              ', Standard Pressure (based on elevation) will be used.')
+       DesDayInput(EnvrnNum)%PressBarom=StdBaroPress
+     ENDIF
+   ELSE
      DesDayInput(EnvrnNum)%PressBarom=StdBaroPress
    ENDIF
 
+   ! verify that design WB or DP <= design DB
+   IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_Dewpoint .and. DesDayInput(EnvrnNum)%DewpointNeedsSet) THEN
+     ! dew-point
+     testval=PsyWFnTdbRhPb(DesDayInput(EnvrnNum)%MaxDryBulb,1.0d0,DesDayInput(EnvrnNum)%PressBarom)
+     DesDayInput(EnvrnNum)%HumIndValue=PsyTdpFnWPb(testval,DesDayInput(EnvrnNum)%PressBarom)
+   ENDIF
 
    ! Day of week defaults to Monday, if day type specified, then that is used.
    DesignDay(EnvrnNum)%DayOfWeek = 2
@@ -3737,11 +3839,14 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
      StringOut=RoundSigDigits(DesDayInput(Envrn)%DailyDBRange,2)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+     StringOut=','
      IF (DesDayInput(Envrn)%DBTempRangeType == DDDBRangeType_Default) THEN
        StringOut='DefaultMultipliers,'
      ELSEIF (DesDayInput(Envrn)%DBTempRangeType == DDDBRangeType_Multiplier) THEN
        StringOut='MultiplierSchedule,'
-     ELSE !  DesDayInput(Envrn)%DBTempRangeType == DDDBRangeType_Difference
+     ELSEIF (DesDayInput(Envrn)%DBTempRangeType == DDDBRangeType_Profile) THEN
+       StringOut='TemperatureProfile,'
+     ELSEIF (DesDayInput(Envrn)%DBTempRangeType == DDDBRangeType_Difference) THEN
        StringOut='DifferenceSchedule,'
      ENDIF
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)
@@ -3781,7 +3886,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
      StringOut=RoundSigDigits(AVSC,1)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-     StringOut=RoundSigDigits(DesignDay(EnvrnNum)%EquationOfTime*60.,2)
+     StringOut=RoundSigDigits(DesignDay(EnvrnNum)%EquationOfTime*60.0d0,2)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
      StringOut=RoundSigDigits(ASIN(DesignDay(EnvrnNum)%SinSolarDeclinAngle)/DegToRadians,1)
      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
@@ -3825,7 +3930,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
      ConstantHumidityRatio=.true.
 
    CASE (DDHumIndType_Enthalpy)
-     HumidityRatio=PsyWFnTdbH(DesDayInput(EnvrnNum)%MaxDryBulb,DesDayInput(EnvrnNum)%HumIndValue*1000.,  &
+     HumidityRatio=PsyWFnTdbH(DesDayInput(EnvrnNum)%MaxDryBulb,DesDayInput(EnvrnNum)%HumIndValue*1000.0d0,  &
         'SetUpDesignDay:PsyWFnTdbH')
      ConstantHumidityRatio=.true.
 
@@ -3846,11 +3951,11 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    IF (DesDayInput(EnvrnNum)%RainInd /= 0) THEN
      TomorrowIsRain(:,:)=.true.
      OSky=10
-     TomorrowLiquidPrecip=3
+     TomorrowLiquidPrecip=3.0d0
    ELSE
      TomorrowIsRain(:,:)=.false.
      OSky=0
-     TomorrowLiquidPrecip=0.0
+     TomorrowLiquidPrecip=0.0d0
    ENDIF
 
    IF (DesDayInput(EnvrnNum)%SnowInd == 0) THEN
@@ -3866,16 +3971,18 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    TomorrowOutBaroPress(:,:) = DesDayInput(EnvrnNum)%PressBarom
    TomorrowWindSpeed(:,:)    = DesDayInput(EnvrnNum)%WindSpeed
    TomorrowWindDir(:,:)      = DesDayInput(EnvrnNum)%WindDir
-   TomorrowAlbedo=0.0
+   TomorrowAlbedo=0.0d0
 
    ! resolve daily ranges
    IF (DesDayInput(EnvrnNum)%DBTempRangeType == DDDBRangeType_Difference) THEN
-      DBRange = 1.      ! use unscaled multiplier values if difference
+      DBRange = 1.d0      ! use unscaled multiplier values if difference
+   ELSEIF (DesDayInput(EnvrnNum)%DBTempRangeType == DDDBRangeType_Profile) THEN
+      DBRange = 0.0d0
    ELSE
       DBRange = DesDayInput(EnvrnNum)%DailyDBRange
    ENDIF
    IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
-      WBRange = 1.      ! use unscaled multiplier values if difference
+      WBRange = 1.d0      ! use unscaled multiplier values if difference
    ELSE
       WBRange = DesDayInput(EnvrnNum)%DailyWBRange
    ENDIF
@@ -3883,8 +3990,13 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    DO Hour = 1,24
      DO TS=1,NumOfTimeStepInHour
 
-       ! dry-bulb profile
-       TomorrowOutDryBulbTemp(Hour,TS)=DesDayInput(EnvrnNum)%MaxDryBulb - DDDBRngModifier(EnvrnNum,Hour,TS)*DBRange
+       IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Profile) THEN
+         ! dry-bulb profile
+         TomorrowOutDryBulbTemp(Hour,TS)=DesDayInput(EnvrnNum)%MaxDryBulb - DDDBRngModifier(EnvrnNum,Hour,TS)*DBRange
+       ELSE ! DesDayInput(EnvrnNum)%DBTempRangeType == DDDBRangeType_Profile
+         TomorrowOutDryBulbTemp(Hour,TS)=DDDBRngModifier(EnvrnNum,Hour,TS)
+       ENDIF
+
 
        ! wet-bulb - generate from profile, humidity ratio, or dew point
        IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDef         &
@@ -3896,7 +4008,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
                               WetBulb, DesDayInput(EnvrnNum)%PressBarom)
          TomorrowOutDewPointTemp(Hour,TS)=PsyTdpFnWPb(OutHumRat,DesDayInput(EnvrnNum)%PressBarom)
          TomorrowOutRelHum(Hour,TS)=PsyRhFnTdbWPb(TomorrowOutDryBulbTemp(Hour,TS),OutHumRat, &
-                                               DesDayInput(EnvrnNum)%PressBarom,'WeatherManager')*100.
+                                               DesDayInput(EnvrnNum)%PressBarom,'WeatherManager')*100.0d0
        ELSE IF (ConstantHumidityRatio) THEN
        !  Need Dew Point Temperature.  Use Relative Humidity to get Humidity Ratio, unless Humidity Ratio is constant
         !BG 9-26-07  moved following inside this IF statment; when HumIndType is 'Schedule' HumidityRatio wasn't being initialized
@@ -3912,9 +4024,9 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
          ENDIF
          TomorrowOutDewPointTemp(Hour,TS)=PsyTdpFnWPb(OutHumRat,DesDayInput(EnvrnNum)%PressBarom)
          TomorrowOutRelHum(Hour,TS)=PsyRhFnTdbWPb(TomorrowOutDryBulbTemp(Hour,TS),OutHumRat, &
-                                               DesDayInput(EnvrnNum)%PressBarom,'WeatherManager')*100.
+                                               DesDayInput(EnvrnNum)%PressBarom,'WeatherManager')*100.0d0
        ELSE
-         HumidityRatio=PsyWFnTdbRhPb(TomorrowOutDryBulbTemp(Hour,TS),DDHumIndModifier(EnvrnNum,Hour,TS)/100.,  &
+         HumidityRatio=PsyWFnTdbRhPb(TomorrowOutDryBulbTemp(Hour,TS),DDHumIndModifier(EnvrnNum,Hour,TS)/100.0d0,  &
                                                DesDayInput(EnvrnNum)%PressBarom)
          ! TomorrowOutRelHum values set earlier
          TomorrowOutDewPointTemp(Hour,TS)=PsyTdpFnWPb(HumidityRatio,DesDayInput(EnvrnNum)%PressBarom)
@@ -4056,8 +4168,8 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    ! insurance: hourly values not known to be needed
    DO Hour = 1,24
      Hour1Ago = MOD( Hour+22, 24)+1
-     BeamRad = (TomorrowBeamSolarRad( Hour1Ago, NumOfTimeStepInHour) + TomorrowBeamSolarRad( Hour, NumOfTimeStepInHour)) / 2.
-     DiffRad = (TomorrowDifSolarRad(  Hour1Ago, NumOfTimeStepInHour) + TomorrowDifSolarRad(  Hour, NumOfTimeStepInHour)) / 2.
+     BeamRad = (TomorrowBeamSolarRad( Hour1Ago, NumOfTimeStepInHour) + TomorrowBeamSolarRad( Hour, NumOfTimeStepInHour)) / 2.0d0
+     DiffRad = (TomorrowDifSolarRad(  Hour1Ago, NumOfTimeStepInHour) + TomorrowDifSolarRad(  Hour, NumOfTimeStepInHour)) / 2.0d0
      IF (NumOfTimeStepInHour > 1) THEN
         BeamRad = BeamRad + SUM( TomorrowBeamSolarRad( Hour, 1:NumOfTimeStepInHour-1))
         DiffRad = DiffRad + SUM( TomorrowDifSolarRad(  Hour, 1:NumOfTimeStepInHour-1))
@@ -4067,14 +4179,17 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
    END DO
 
    IF (Environment(EnvrnNum)%WP_Type1 /= 0) THEN
-     SELECT CASE(Environment(EnvrnNum)%WP_Type1)
+
+     SELECT CASE(WPSkyTemperature(Environment(EnvrnNum)%WP_Type1)%CalculationType)
 
        CASE (WP_ScheduleValue)
          CALL GetSingleDayScheduleValues(WPSkyTemperature(Environment(EnvrnNum)%WP_Type1)%SchedulePtr,  &
                              TomorrowSkyTemp)
+         DDSkyTempScheduleValues(EnvrnNum,:,:)=TomorrowSkyTemp
        CASE (WP_DryBulbDelta)
          CALL GetSingleDayScheduleValues(WPSkyTemperature(Environment(EnvrnNum)%WP_Type1)%SchedulePtr,  &
                              TomorrowSkyTemp)
+         DDSkyTempScheduleValues(EnvrnNum,:,:)=TomorrowSkyTemp
          DO Hour=1,24
            DO TS=1,NumOfTimeStepInHour
              TomorrowSkyTemp(Hour,TS)=TomorrowOutDryBulbTemp(Hour,TS)-TomorrowSkyTemp(Hour,TS)
@@ -4084,6 +4199,7 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
        CASE (WP_DewPointDelta)
          CALL GetSingleDayScheduleValues(WPSkyTemperature(Environment(EnvrnNum)%WP_Type1)%SchedulePtr,  &
                              TomorrowSkyTemp)
+         DDSkyTempScheduleValues(EnvrnNum,:,:)=TomorrowSkyTemp
          DO Hour=1,24
            DO TS=1,NumOfTimeStepInHour
              TomorrowSkyTemp(Hour,TS)=TomorrowOutDewPointTemp(Hour,TS)-TomorrowSkyTemp(Hour,TS)
@@ -4202,10 +4318,10 @@ SUBROUTINE ASHRAETauModel( ETR, CosZen, TauB, TauD, IDirN, IDifH, IGlbH)
     REAL(r64) AB, AD    ! air mass exponents
     REAL(r64) M         ! air mass
 
-    IF (CosZen < SunIsUpValue .OR. TauB <= 0. .OR. TauD <= 0.) THEN
-        IDirN = 0.
-        IDifH = 0.
-        IGlbH = 0.
+    IF (CosZen < SunIsUpValue .OR. TauB <= 0.0d0 .OR. TauD <= 0.0d0) THEN
+        IDirN = 0.0d0
+        IDifH = 0.0d0
+        IGlbH = 0.0d0
     ELSE
         AB = 1.219d0 - 0.043d0*TauB - 0.151d0*TauD - 0.204d0*TauB*TauD
         AD = 0.202d0 + 0.852d0*TauB - 0.007d0*Taud - 0.357d0*TauB*TauD
@@ -4407,39 +4523,39 @@ SUBROUTINE CalculateDailySolarCoeffs(DayOfYear,A,B,C,AnnVarSolConstant,EquationO
   SineSolarDeclination = SineSolDeclCoef(1) + &
                            SineSolDeclCoef(2)*SinX +  &
                            SineSolDeclCoef(3)*CosX + &
-                           SineSolDeclCoef(4)*(SinX*CosX*2.) + &
+                           SineSolDeclCoef(4)*(SinX*CosX*2.0d0) + &
                            SineSolDeclCoef(5)*(CosX**2 - SinX**2) + &
-                           SineSolDeclCoef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.)) + &
-                           SineSolDeclCoef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.)) + &
-                           SineSolDeclCoef(8)*(2.*(SinX*CosX*2.)*(CosX**2 - SinX**2)) + &
-                           SineSolDeclCoef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.)**2)
+                           SineSolDeclCoef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.0d0)) + &
+                           SineSolDeclCoef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.0d0)) + &
+                           SineSolDeclCoef(8)*(2.0d0*(SinX*CosX*2.0d0)*(CosX**2 - SinX**2)) + &
+                           SineSolDeclCoef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.0d0)**2)
   CosineSolarDeclination=SQRT(1.0-SineSolarDeclination**2)
 
   EquationOfTime = EqOfTimeCoef(1) + &
                    EqOfTimeCoef(2)*SinX +  &
                    EqOfTimeCoef(3)*CosX + &
-                   EqOfTimeCoef(4)*(SinX*CosX*2.) + &
+                   EqOfTimeCoef(4)*(SinX*CosX*2.0d0) + &
                    EqOfTimeCoef(5)*(CosX**2 - SinX**2) + &
-                   EqOfTimeCoef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.)) + &
-                   EqOfTimeCoef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.)) + &
-                   EqOfTimeCoef(8)*(2.*(SinX*CosX*2.)*(CosX**2 - SinX**2)) + &
-                   EqOfTimeCoef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.)**2)
+                   EqOfTimeCoef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.0d0)) + &
+                   EqOfTimeCoef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.0d0)) + &
+                   EqOfTimeCoef(8)*(2.0d0*(SinX*CosX*2.0d0)*(CosX**2 - SinX**2)) + &
+                   EqOfTimeCoef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.0d0)**2)
 
   AnnVarSolConstant=1.000047d0 + .000352615d0*SinX + .0334454d0*CosX
 
   A = ASHRAE_A_Coef(1) + &
                    ASHRAE_A_Coef(2)*SinX +  &
                    ASHRAE_A_Coef(3)*CosX + &
-                   ASHRAE_A_Coef(4)*(SinX*CosX*2.) + &
+                   ASHRAE_A_Coef(4)*(SinX*CosX*2.0d0) + &
                    ASHRAE_A_Coef(5)*(CosX**2 - SinX**2) + &
-                   ASHRAE_A_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.)) + &
-                   ASHRAE_A_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.)) + &
-                   ASHRAE_A_Coef(8)*(2.*(SinX*CosX*2.)*(CosX**2 - SinX**2)) + &
-                   ASHRAE_A_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.)**2)
+                   ASHRAE_A_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_A_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_A_Coef(8)*(2.0d0*(SinX*CosX*2.0d0)*(CosX**2 - SinX**2)) + &
+                   ASHRAE_A_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.0d0)**2)
 
 !                        Compute B and C coefficients
 
-  IF (Latitude < 0.0) THEN
+  IF (Latitude < 0.0d0) THEN
 !                            If in southern hemisphere, compute B and C with a six month time shift.
     X = X - PI
     SinX = SIN(X)
@@ -4449,22 +4565,22 @@ SUBROUTINE CalculateDailySolarCoeffs(DayOfYear,A,B,C,AnnVarSolConstant,EquationO
   B = ASHRAE_B_Coef(1) + &
                    ASHRAE_B_Coef(2)*SinX +  &
                    ASHRAE_B_Coef(3)*CosX + &
-                   ASHRAE_B_Coef(4)*(SinX*CosX*2.) + &
+                   ASHRAE_B_Coef(4)*(SinX*CosX*2.0d0) + &
                    ASHRAE_B_Coef(5)*(CosX**2 - SinX**2) + &
-                   ASHRAE_B_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.)) + &
-                   ASHRAE_B_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.)) + &
-                   ASHRAE_B_Coef(8)*(2.*(SinX*CosX*2.)*(CosX**2 - SinX**2)) + &
-                   ASHRAE_B_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.)**2)
+                   ASHRAE_B_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_B_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_B_Coef(8)*(2.0d0*(SinX*CosX*2.0d0)*(CosX**2 - SinX**2)) + &
+                   ASHRAE_B_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.0d0)**2)
 
   C = ASHRAE_C_Coef(1) + &
                    ASHRAE_C_Coef(2)*SinX +  &
                    ASHRAE_C_Coef(3)*CosX + &
-                   ASHRAE_C_Coef(4)*(SinX*CosX*2.) + &
+                   ASHRAE_C_Coef(4)*(SinX*CosX*2.0d0) + &
                    ASHRAE_C_Coef(5)*(CosX**2 - SinX**2) + &
-                   ASHRAE_C_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.)) + &
-                   ASHRAE_C_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.)) + &
-                   ASHRAE_C_Coef(8)*(2.*(SinX*CosX*2.)*(CosX**2 - SinX**2)) + &
-                   ASHRAE_C_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.)**2)
+                   ASHRAE_C_Coef(6)*(SinX*(CosX**2 - SinX**2) + CosX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_C_Coef(7)*(CosX*(CosX**2 - SinX**2) - SinX*(SinX*CosX*2.0d0)) + &
+                   ASHRAE_C_Coef(8)*(2.0d0*(SinX*CosX*2.0d0)*(CosX**2 - SinX**2)) + &
+                   ASHRAE_C_Coef(9)*((CosX**2 - SinX**2)**2 - (SinX*CosX*2.0d0)**2)
 
       RETURN
 
@@ -5339,6 +5455,12 @@ SUBROUTINE ReadUserWeatherInput
         WeathSimReq=.false.
       ENDIF
 
+      ALLOCATE(SPSiteScheduleNamePtr(TotDesDays*5))
+      ALLOCATE(SPSiteScheduleUnits(TotDesDays*5))
+
+      SPSiteScheduleNamePtr=0
+      SPSiteScheduleUnits=Blank
+
       !Allocate the Design Day and Environment array to the # of DD's or/and
       ! Annual runs on input file
       ALLOCATE (DesignDay(TotDesDays))
@@ -5398,6 +5520,10 @@ SUBROUTINE ReadUserWeatherInput
       CALL SetupEnvironmentTypes
 
       CALL GetWeatherProperties(ErrorsFound)
+
+      ! Deallocate ones used for schedule pointers
+      DEALLOCATE(SPSiteScheduleNamePtr)
+      DEALLOCATE(SPSiteScheduleUnits)
 
      IF (ErrorsFound) THEN
        CALL ShowFatalError('GetWeatherInput: Above errors cause termination')
@@ -6512,12 +6638,38 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           !
 
           ! REFERENCES:
-          ! na
+          ! SizingPeriod:DesignDay,
+          !   A1, \field Name
+          !   N1,  \field Month
+          !   N2,  \field Day of Month
+          !   A2,  \field Day Type
+          !   N3,  \field Maximum Dry-Bulb Temperature
+          !   N4,  \field Daily Dry-Bulb Temperature Range
+          !   A3,  \field Dry-Bulb Temperature Range Modifier Type
+          !   A4,  \field Dry-Bulb Temperature Range Modifier Day Schedule Name
+          !   A5,  \field Humidity Condition Type
+          !   N5,  \field Wetbulb or DewPoint at Maximum Dry-Bulb
+          !   A6,  \field Humidity Condition Day Schedule Name
+          !   N6,  \field Humidity Ratio at Maximum Dry-Bulb
+          !   N7,  \field Enthalpy at Maximum Dry-Bulb  !will require units transition.
+          !   N8,  \field Daily Wet-Bulb Temperature Range
+          !   N9,  \field Barometric Pressure
+          !   N10, \field Wind Speed
+          !   N11, \field Wind Direction
+          !   A7,  \field Rain Indicator
+          !   A8,  \field Snow Indicator
+          !   A9,  \field Daylight Saving Time Indicator
+          !   A10, \field Solar Model Indicator
+          !   A11, \field Beam Solar Day Schedule Name
+          !   A12, \field Diffuse Solar Day Schedule Name
+          !   N12, \field ASHRAE Clear Sky Optical Depth for Beam Irradiance (taub)
+          !   N13, \field ASHRAE Clear Sky Optical Depth for Diffuse Irradiance (taud)
+          !   N14; \field Sky Clearness
 
           ! USE STATEMENTS:
   USE DataIPShortCuts
   USE InputProcessor, ONLY: FindItemInList, GetObjectItem, VerifyName, RangeCheck, SameString
-  USE General, ONLY: RoundSigDigits
+  USE General, ONLY: RoundSigDigits, FindNumberInList
   USE ScheduleManager, ONLY: GetDayScheduleIndex, GetSingleDayScheduleValues, CheckDayScheduleValueMinMax
   USE DataSystemVariables
   USE OutputReportPredefined
@@ -6572,6 +6724,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
   LOGICAL errflag
   INTEGER DDLoop
   CHARACTER(len=MaxNameLength) :: envTitle
+  CHARACTER(len=15) :: units
+  INTEGER :: schPtr
+  LOGICAL :: MaxDryBulbEntered
+  LOGICAL :: PressureEntered
 
          ! FLOW:
 
@@ -6584,6 +6740,19 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
    DDBeamSolarValues=0.0d0
    ALLOCATE (DDDiffuseSolarValues(TotDesDays,24,NumOfTimeStepInHour))
    DDDiffuseSolarValues=0.0d0
+   ALLOCATE (DDSkyTempScheduleValues(TotDesDays,24,NumOfTimeStepInHour))
+   DDSkyTempScheduleValues=0.0d0
+
+   ALLOCATE(SPSiteDryBulbRangeModScheduleValue(TotDesDays))
+   SPSiteDryBulbRangeModScheduleValue = 0.0d0
+   ALLOCATE(SPSiteHumidityConditionScheduleValue(TotDesDays))
+   SPSiteHumidityConditionScheduleValue = 0.0d0
+   ALLOCATE(SPSiteBeamSolarScheduleValue(TotDesDays))
+   SPSiteBeamSolarScheduleValue = 0.0d0
+   ALLOCATE(SPSiteDiffuseSolarScheduleValue(TotDesDays))
+   SPSiteDiffuseSolarScheduleValue = 0.0d0
+   ALLOCATE(SPSiteSkyTemperatureScheduleValue(TotDesDays))
+   SPSiteSkyTemperatureScheduleValue = 0.0d0
 
    IF (ReverseDD .and. TotDesDays <=1) THEN
      CALL ShowSevereError('GetDesignDayData: Reverse Design Day requested but # Design Days <=1')
@@ -6606,10 +6775,13 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
 
 
   !Call Input Get routine to retrieve design day data
+    MaxDryBulbEntered=.false.
+    PressureEntered=.false.
     CALL GetObjectItem(cCurrentModuleObject,DDLoop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumerics,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
+          !   A1, \field Name
     IsNotOK=.false.
     IsBlank=.false.
     CALL VerifyName(cAlphaArgs(1),DesDayInput%Title,EnvrnNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
@@ -6620,20 +6792,35 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     DesDayInput(EnvrnNum)%Title = cAlphaArgs(1)            ! Environment name
     Environment(EnvrnNum)%Title = DesDayInput(EnvrnNum)%Title
 
+          !   N3,  \field Maximum Dry-Bulb Temperature
+          !   N4,  \field Daily Dry-Bulb Temperature Range
+          !   N9,  \field Barometric Pressure
+          !   N10, \field Wind Speed
+          !   N11, \field Wind Direction
     DesDayInput(EnvrnNum)%MaxDryBulb = rNumericArgs(3)       ! Maximum Dry-Bulb Temperature (C)
+    IF (.not. lNumericFieldBlanks(3)) MaxDryBulbEntered=.true.
     DesDayInput(EnvrnNum)%DailyDBRange = rNumericArgs(4)     ! Daily dry-bulb temperature range (deltaC)
     DesDayInput(EnvrnNum)%PressBarom = rNumericArgs(9)       ! Atmospheric/Barometric Pressure (Pascals)
+    IF (.not. lNumericFieldBlanks(9)) PressureEntered=.true.
+    DesDayInput(EnvrnNum)%PressureEntered=PressureEntered
     DesDayInput(EnvrnNum)%WindSpeed = rNumericArgs(10)        ! Wind Speed (m/s)
     DesDayInput(EnvrnNum)%WindDir = MOD(rNumericArgs(11),360.d0)! Wind Direction
                                                                ! (degrees clockwise from North, N=0, E=90, S=180, W=270)
+          !   N1,  \field Month
+          !   N2,  \field Day of Month
+          !   N12, \field ASHRAE Clear Sky Optical Depth for Beam Irradiance (taub)
+          !   N13, \field ASHRAE Clear Sky Optical Depth for Diffuse Irradiance (taud)
+          !   N8,  \field Daily Wet-Bulb Temperature Range
     DesDayInput(EnvrnNum)%Month=Int(rNumericArgs(1))        ! Month of Year ( 1 - 12 )
     DesDayInput(EnvrnNum)%DayOfMonth=Int(rNumericArgs(2))   ! Day of Month ( 1 - 31 )
     DesDayInput(EnvrnNum)%TauB=rNumericArgs(12)              ! beam tau >= 0
     DesDayInput(EnvrnNum)%TauD=rNumericArgs(13)              ! diffuse tau >= 0
     DesDayInput(EnvrnNum)%DailyWBRange=rNumericArgs(8)      ! Daily wet-bulb temperature range (deltaC)
 
+          !   N14; \field Sky Clearness
     DesDayInput(EnvrnNum)%SkyClear = rNumericArgs(14)         ! Sky Clearness (0 to 1)
 
+          !   A7,  \field Rain Indicator
     IF (SameString(cAlphaArgs(7),'Yes') .or. SameString(cAlphaArgs(7),'1') ) THEN
       DesDayInput(EnvrnNum)%RainInd=1
     ELSEIF (SameString(cAlphaArgs(7),'No') .or. SameString(cAlphaArgs(7),'0') .or. lAlphaFieldBlanks(7)) THEN
@@ -6645,6 +6832,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%RainInd=0
     ENDIF
 
+          !   A8,  \field Snow Indicator
     IF (SameString(cAlphaArgs(8),'Yes') .or. SameString(cAlphaArgs(8),'1') ) THEN
       DesDayInput(EnvrnNum)%SnowInd=1
     ELSEIF (SameString(cAlphaArgs(8),'No') .or. SameString(cAlphaArgs(8),'0') .or. lAlphaFieldBlanks(8)) THEN
@@ -6656,8 +6844,139 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%SnowInd=0
     ENDIF
 
+          !   A3,  \field Dry-Bulb Temperature Range Modifier Type
+    ! check DB profile input
+    IF (lAlphaFieldBlanks(3)) THEN
+      cAlphaArgs(3)='DefaultMultipliers'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
+    ELSEIF (SameString(cAlphaArgs(3),'Multiplier') .or. SameString(cAlphaArgs(3),'MultiplierSchedule')) THEN
+      cAlphaArgs(3)='MultiplierSchedule'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Multiplier
+      units='[]'
+    ELSEIF (SameString(cAlphaArgs(3),'Difference') .or. SameString(cAlphaArgs(3),'Delta') .or.   &
+            SameString(cAlphaArgs(3),'DifferenceSchedule') .or. SameString(cAlphaArgs(3),'DeltaSchedule')) THEN
+      cAlphaArgs(3)='DifferenceSchedule'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Difference
+      units='[deltaC]'
+    ELSEIF (SameString(cAlphaArgs(3),'DefaultMultipliers')) THEN
+      cAlphaArgs(3)='DefaultMultipliers'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
+      ! Validate Temperature - Daily range
+    ELSEIF (SameString(cAlphaArgs(3),'TemperatureProfileSchedule')) THEN
+      cAlphaArgs(3)='TemperatureProfileSchedule'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Profile
+      units='[C]'
+    ELSE
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+      ErrorsFound=.true.
+      cAlphaArgs(3)='invalid field'
+      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
+    ENDIF
+
+    IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Profile .and. .not. MaxDryBulbEntered .and.   &
+        cAlphaArgs(3) /= 'invalid field') THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid blank field: '//TRIM(cNumericFieldNames(3)))
+      CALL ShowContinueError('..this field is required when '//trim(cAlphaFieldNames(3))//'="'//  &
+         trim(cAlphaArgs(3))//'".')
+      ErrorsFound=.true.
+    ENDIF
+
+    ! Assume either "multiplier" option will make full use of range...
+    IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Difference .and.   &
+        DesDayInput(EnvrnNum)%DBTempRangeTYpe /= DDDBRangeType_Profile) THEN
+      testval=DesDayInput(EnvrnNum)%MaxDryBulb-DesDayInput(EnvrnNum)%DailyDBRange
+      errflag=.false.
+      CALL RangeCheck(errflag,cAlphaFieldNames(3),cCurrentModuleObject,'Severe','>= -90',(testval>=-90.d0), &
+                        '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
+      IF (errflag) THEN
+        ErrorsFound=.true.
+      ENDIF
+    ENDIF
+
+          !   A4,  \field Dry-Bulb Temperature Range Modifier Day Schedule Name
+    IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Default) THEN
+      IF (.not. lAlphaFieldBlanks(4)) THEN
+        DesDayInput(EnvrnNum)%TempRangeSchPtr=GetDayScheduleIndex(cAlphaArgs(4))
+        IF (DesDayInput(EnvrnNum)%TempRangeSchPtr == 0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+          ErrorsFound=.true.
+        ELSE
+          CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%TempRangeSchPtr,DDDBRngModifier(EnvrnNum,:,:))
+          schPtr=FindNumberInList(DesDayInput(EnvrnNum)%TempRangeSchPtr,SPSiteScheduleNamePtr,NumSPSiteScheduleNamePtrs)
+          IF (schPtr == 0) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%TempRangeSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Drybulb Temperature Range Modifier Schedule Value '//units,  &
+               SPSiteDryBulbRangeModScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(4))
+          ELSEIF (SPSiteScheduleUnits(schPtr)/= units) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%TempRangeSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Drybulb Temperature Range Modifier Schedule Value '//units,  &
+               SPSiteDryBulbRangeModScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(4))
+          ENDIF
+          IF (cAlphaArgs(3) == 'MultiplierSchedule') THEN
+            IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+              CALL ShowContinueError('..Specified [Schedule] Dry-bulb Range Multiplier Values are not within [0.0, 1.0]')
+              ErrorsFound=.true.
+            ENDIF
+          ELSEIF (cAlphaArgs(3) == 'DifferenceSchedule') THEN  ! delta, must be > 0.0
+            IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=')) THEN
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+              CALL ShowSevereError('Some [Schedule] Dry-bulb Range Difference Values are < 0.0 [would make max larger].')
+              ErrorsFound=.true.
+            ENDIF
+          ENDIF
+          IF (cAlphaArgs(3) == 'TemperatureProfileSchedule') THEN
+            testval=MAXVAL(DDDBRngModifier(EnvrnNum,:,:))
+            IF (MaxDryBulbEntered) THEN
+              CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", data override.')
+              CALL ShowContinueError('..'//trim(cNumericFieldNames(3))//'=['//  &
+                 trim(RoundSigDigits(DesDayInput(EnvrnNum)%MaxDryBulb,2))//'] will be overwritten.')
+              CALL ShowContinueError('..'//trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'".')
+              CALL ShowContinueError('..with max value=['//trim(RoundSigDigits(testval,2))//'].')
+            ENDIF
+            DesDayInput(EnvrnNum)%MaxDryBulb=testval
+          ENDIF
+          testval=MAXVAL(DDDBRngModifier(EnvrnNum,:,:))
+          testval=DesDayInput(EnvrnNum)%MaxDryBulb-testval
+          errflag=.false.
+          CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(4)),TRIM(cCurrentModuleObject),'Severe','>= -90',(testval>=-90.d0), &
+                           '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
+          IF (errflag) THEN
+            ErrorsFound=.true.
+          ENDIF
+        ENDIF
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//' is blank.')
+        CALL ShowContinueError('..required when '//TRIM(cAlphaFieldNames(3))//' indicates "SCHEDULE".')
+        ErrorsFound=.true.
+      ENDIF
+    ELSE
+      ! Default dry-bulb temperature Range
+      LastHrValue=DefaultTempRangeMult(24)
+      DO HrLoop=1,24
+        DO TSLoop=1,NumOfTimeStepInHour
+          WNow=Interpolation(TSLoop)
+          WPrev=1.0-WNow
+          DDDBRngModifier(EnvrnNum,HrLoop,TSLoop)=LastHrValue*WPrev+DefaultTempRangeMult(HrLoop)*WNow
+        ENDDO
+        LastHrValue=DefaultTempRangeMult(HrLoop)
+      ENDDO
+    ENDIF
+
+          !   A5,  \field Humidity Condition Type
     IF (SameString(cAlphaArgs(5),'WetBulb')) THEN
       cAlphaArgs(5)='WetBulb'
+          !   N5,  \field Wetbulb or DewPoint at Maximum Dry-Bulb
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
@@ -6668,8 +6987,8 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Wetbulb
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Wet-Bulb',cCurrentModuleObject,'Severe','>= -70',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Wet-Bulb',cCurrentModuleObject,'Severe','>= -90',  &
+                     (DesDayInput(EnvrnNum)%HumIndValue>=-90.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
                      WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
 !        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
@@ -6687,15 +7006,15 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Dewpoint
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Dew-Point',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Dew-Point',TRIM(cCurrentModuleObject),'Severe','>= -90',  &
+                     (DesDayInput(EnvrnNum)%HumIndValue>=-90.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
                       WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'HumidityRatio')) THEN
       cAlphaArgs(5)='HumidityRatio'
+          !   N6,  \field Humidity Ratio at Maximum Dry-Bulb
       IF (.not. lNumericFieldBlanks(6)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(6)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
@@ -6710,11 +7029,11 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
                      (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= .03',(DesDayInput(EnvrnNum)%HumIndValue <=.03d0),  &
                      WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'Enthalpy')) THEN
       cAlphaArgs(5)='Enthalpy'
+          !   N7,  \field Enthalpy at Maximum Dry-Bulb  !will require units transition.
       IF (.not. lNumericFieldBlanks(7)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(7)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
@@ -6729,15 +7048,16 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
                      (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= 130000',(DesDayInput(EnvrnNum)%HumIndValue <=130000.d0),  &
                       WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'RelativeHumiditySchedule')) THEN
       cAlphaArgs(5)='RelativeHumiditySchedule'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_RelHumSch
+      units='[%]'
     ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileMultiplierSchedule')) THEN
       cAlphaArgs(5)='WetBulbProfileMultiplierSchedule'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_WBProfMul
+      units='[]'
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
@@ -6749,6 +7069,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileDifferenceSchedule')) THEN
       cAlphaArgs(5)='WetBulbProfileDifferenceSchedule'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_WBProfDif
+      units='[]'
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
@@ -6778,6 +7099,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ENDIF
 
     ! resolve humidity schedule if needed
+          !   A6,  \field Humidity Condition Day Schedule Name
     IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_RelHumSch .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfMul .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
@@ -6787,7 +7109,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         CALL ShowContinueError('..field is required when '//TRIM(cAlphaFieldNames(3))//'="'// TRIM(cAlphaArgs(3)) // '".')
         ErrorsFound=.true.
       ELSE
-        DesDayInput(EnvrnNum)%HumIndSchPtr=GetDayScheduleIndex( cAlphaArgs(6))
+        DesDayInput(EnvrnNum)%HumIndSchPtr=GetDayScheduleIndex(cAlphaArgs(6))
         IF (DesDayInput(EnvrnNum)%HumIndSchPtr == 0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
           CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
@@ -6796,6 +7118,22 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         ELSE
 
           CALL GetSingleDayScheduleValues( DesDayInput(EnvrnNum)%HumIndSchPtr, DDHumIndModifier(EnvrnNum,:,:))
+
+          schPtr=FindNumberInList(DesDayInput(EnvrnNum)%HumIndSchPtr,SPSiteScheduleNamePtr,NumSPSiteScheduleNamePtrs)
+          IF (schPtr == 0) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%HumIndSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Humidity Condition Schedule Value '//units,  &
+               SPSiteHumidityConditionScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(6))
+          ELSEIF (SPSiteScheduleUnits(schPtr)/= units) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%HumIndSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Humidity Condition Schedule Value '//units,  &
+               SPSiteHumidityConditionScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(6))
+          ENDIF
+
 
           SELECT CASE (DesDayInput(EnvrnNum)%HumIndType)
 
@@ -6856,9 +7194,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         CALL ShowContinueError('..'//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
         CALL ShowContinueError('..Conditions for day will be set to Relative Humidity = 100%')
         IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_Dewpoint) THEN
-          ! dew-point
-          testval=PsyWFnTdbRhPb(DesDayInput(EnvrnNum)%MaxDryBulb,1.0d0,DesDayInput(EnvrnNum)%PressBarom)
-          DesDayInput(EnvrnNum)%HumIndValue=PsyTdpFnWPb(testval,DesDayInput(EnvrnNum)%PressBarom)
+          DesDayInput(EnvrnNum)%DewpointNeedsSet = .true.
         ELSE
           ! wet-bulb
           DesDayInput(EnvrnNum)%HumIndValue = DesDayInput(EnvrnNum)%MaxDryBulb
@@ -6866,94 +7202,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ENDIF
     ENDIF
 
-    ! check DB profile input
-    IF (lAlphaFieldBlanks(3)) THEN
-      cAlphaArgs(3)='DefaultMultipliers'
-      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
-    ELSEIF (SameString(cAlphaArgs(3),'Multiplier') .or. SameString(cAlphaArgs(3),'MultiplierSchedule')) THEN
-      cAlphaArgs(3)='MultiplierSchedule'
-      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Multiplier
-    ELSEIF (SameString(cAlphaArgs(3),'Difference') .or. SameString(cAlphaArgs(3),'Delta') .or.   &
-            SameString(cAlphaArgs(3),'DifferenceSchedule') .or. SameString(cAlphaArgs(3),'DeltaSchedule')) THEN
-      cAlphaArgs(3)='DifferenceSchedule'
-      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Difference
-    ELSEIF (SameString(cAlphaArgs(3),'DefaultMultipliers')) THEN
-      cAlphaArgs(3)='DefaultMultipliers'
-      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
-      ! Validate Temperature - Daily range
-    ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
-      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
-      CALL ShowContinueError('..Default Dry-bulb Range modifiers will be used.')
-      cAlphaArgs(3)='DefaultMultipliers'
-      DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
-    ENDIF
-
-    ! Assume either "multiplier" option will make full use of range...
-    IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Difference) THEN
-      testval=DesDayInput(EnvrnNum)%MaxDryBulb-DesDayInput(EnvrnNum)%DailyDBRange
-      errflag=.false.
-      CALL RangeCheck(errflag,cAlphaFieldNames(3),cCurrentModuleObject,'Severe','>= -70',(testval>=-70.d0), &
-                        '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
-      IF (errflag) THEN
-!        CALL ShowContinueError('Occured in '//TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'".')
-        ErrorsFound=.true.
-      ENDIF
-    ENDIF
-
-    IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Default) THEN
-      IF (.not. lAlphaFieldBlanks(4)) THEN
-        DesDayInput(EnvrnNum)%TempRangeSchPtr=GetDayScheduleIndex(cAlphaArgs(4))
-        IF (DesDayInput(EnvrnNum)%TempRangeSchPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
-          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
-          ErrorsFound=.true.
-        ELSE
-          CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%TempRangeSchPtr,DDDBRngModifier(EnvrnNum,:,:))
-          IF (cAlphaArgs(3) == 'MultiplierSchedule') THEN
-            IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
-              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
-              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
-              CALL ShowContinueError('..Specified [Schedule] Dry-bulb Range Multiplier Values are not within [0.0, 1.0]')
-              ErrorsFound=.true.
-            ENDIF
-          ELSE  ! delta, must be > 0.0
-            IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=')) THEN
-              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
-              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
-              CALL ShowSevereError('Some [Schedule] Dry-bulb Range Difference Values are < 0.0 [would make max larger].')
-              ErrorsFound=.true.
-            ENDIF
-          ENDIF
-          testval=MAXVAL(DDDBRngModifier(EnvrnNum,:,:))
-          testval=DesDayInput(EnvrnNum)%MaxDryBulb-testval
-          errflag=.false.
-          CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(4)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
-                           '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
-          IF (errflag) THEN
-!            CALL ShowContinueError('Occured in '//TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'".')
-            ErrorsFound=.true.
-          ENDIF
-        ENDIF
-      ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
-        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//' is blank.')
-        CALL ShowContinueError('..required when '//TRIM(cAlphaFieldNames(3))//' indicates "SCHEDULE".')
-        ErrorsFound=.true.
-      ENDIF
-    ELSE
-      ! Default dry-bulb temperature Range
-      LastHrValue=DefaultTempRangeMult(24)
-      DO HrLoop=1,24
-        DO TSLoop=1,NumOfTimeStepInHour
-          WNow=Interpolation(TSLoop)
-          WPrev=1.0-WNow
-          DDDBRngModifier(EnvrnNum,HrLoop,TSLoop)=LastHrValue*WPrev+DefaultTempRangeMult(HrLoop)*WNow
-        ENDDO
-        LastHrValue=DefaultTempRangeMult(HrLoop)
-      ENDDO
-    ENDIF
-
+          !   A10, \field Solar Model Indicator
     IF (lAlphaFieldBlanks(10)) THEN
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_ClearSky
     ELSEIF (SameString(cAlphaArgs(10),'ASHRAEClearSky') .or. SameString(cAlphaArgs(10),'CLEARSKY')) THEN
@@ -6972,6 +7221,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ENDIF
 
     IF (DesDayInput(EnvrnNum)%SolarModel == SolarModel_Schedule) THEN
+          !   A11, \field Beam Solar Day Schedule Name
       IF (.not. lAlphaFieldBlanks(11)) THEN
         DesDayInput(EnvrnNum)%BeamSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(11))
         IF (DesDayInput(EnvrnNum)%BeamSolarSchPtr == 0) THEN
@@ -6981,6 +7231,21 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%BeamSolarSchPtr,DDBeamSolarValues(EnvrnNum,:,:))
+          schPtr=FindNumberInList(DesDayInput(EnvrnNum)%BeamSolarSchPtr,SPSiteScheduleNamePtr,NumSPSiteScheduleNamePtrs)
+          units='[W/m2]'
+          IF (schPtr == 0) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%BeamSolarSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Beam Solar Schedule Value '//units,  &
+               SPSiteBeamSolarScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(11))
+          ELSEIF (SPSiteScheduleUnits(schPtr)/= units) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%BeamSolarSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Beam Solar Schedule Value '//units,  &
+               SPSiteBeamSolarScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(11))
+          ENDIF
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%BeamSolarSchPtr,0.0,'>=')) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
             CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(11))//'="'//TRIM(cAlphaArgs(11))//'".')
@@ -6989,10 +7254,11 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           ENDIF
         ENDIF
       ELSE  ! should have entered beam schedule
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
         CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(11))//' is blank.')
-        CALL ShowContinueError('..All zeroes will be used. (no solar)')
+        ErrorsFound=.true.
       ENDIF
+          !   A12, \field Diffuse Solar Day Schedule Name
       IF (.not. lAlphaFieldBlanks(12)) THEN
         DesDayInput(EnvrnNum)%DiffuseSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(12))
         IF (DesDayInput(EnvrnNum)%DiffuseSolarSchPtr == 0) THEN
@@ -7002,6 +7268,21 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,DDDiffuseSolarValues(EnvrnNum,:,:))
+          schPtr=FindNumberInList(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,SPSiteScheduleNamePtr,NumSPSiteScheduleNamePtrs)
+          units='[W/m2]'
+          IF (schPtr == 0) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%DiffuseSolarSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Diffuse Solar Schedule Value '//units,  &
+               SPSiteDiffuseSolarScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(12))
+          ELSEIF (SPSiteScheduleUnits(schPtr)/= units) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=DesDayInput(EnvrnNum)%DiffuseSolarSchPtr
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Diffuse Solar Schedule Value '//units,  &
+               SPSiteDiffuseSolarScheduleValue(EnvrnNum),'Zone','Average',cAlphaArgs(12))
+          ENDIF
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,0.0,'>=')) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
             CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(12))//'="'//TRIM(cAlphaArgs(12))//'".')
@@ -7010,9 +7291,9 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           ENDIF
         ENDIF
       ELSE  ! should have entered diffuse schedule
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
         CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(12))//' is blank.')
-        CALL ShowContinueError('..All zeroes will be used. (no solar)')
+        ErrorsFound=.true.
       ENDIF
     ENDIF
 
@@ -7059,6 +7340,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       ErrorsFound=.true.
     END SELECT
 
+          !   A9,  \field Daylight Saving Time Indicator
     IF (SameString(cAlphaArgs(9),'Yes') .or. SameString(cAlphaArgs(9),'1') ) THEN
       DesDayInput(EnvrnNum)%DSTIndicator=1
     ELSEIF (SameString(cAlphaArgs(9),'No') .or. SameString(cAlphaArgs(9),'0') .or. lAlphaFieldBlanks(9)) THEN
@@ -7069,6 +7351,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%DSTIndicator=0
     ENDIF
 
+          !   A2,  \field Day Type
     DesDayInput(EnvrnNum)%DayType=FindItemInList(cAlphaArgs(2),ValidNames,12)
     IF (DesDayInput(EnvrnNum)%DayType == 0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
@@ -7218,6 +7501,7 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, SameString, FindItemInList, VerifyName
   USE ScheduleManager, ONLY: GetScheduleIndex,GetDayScheduleIndex
   USE DataIPShortCuts
+  USE General, ONLY: FindNumberInList
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -7241,8 +7525,11 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
   LOGICAL :: IsNotOk
   LOGICAL :: IsBlank
   INTEGER :: Found
+  INTEGER :: envFound
   INTEGER :: Count
+  INTEGER :: schPtr
   LOGICAL :: MultipleEnvironments
+  CHARACTER(len=15) :: units
 
   cCurrentModuleObject='WeatherProperty:SkyTemperature'
   NumWPSkyTemperatures=GetNumObjectsFound(cCurrentModuleObject)
@@ -7285,10 +7572,13 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
         ENDIF
       CASE DEFAULT ! really a name
         Found=FindItemInList(cAlphaArgs(1),Environment%Title,NumOfEnvrn)
+        envFound=Found
         IF (Found == 0) THEN
           CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//  &
              '", invalid Environment Name referenced.')
+          CALL ShowContinueError('...remainder of object not processed.')
           ErrorsFound=.true.
+          CYCLE
         ELSE
           IF (Environment(Found)%WP_Type1 /= 0) THEN
             CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//  &
@@ -7319,12 +7609,15 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
     IF (SameString(cAlphaArgs(2),'ScheduleValue')) THEN
       WPSkyTemperature(Item)%CalculationType=WP_ScheduleValue
       WPSkyTemperature(Item)%IsSchedule=.true.
+      units='[C]'
     ELSEIF (SameString(cAlphaArgs(2),'DifferenceScheduleDryBulbValue')) THEN
       WPSkyTemperature(Item)%CalculationType=WP_DryBulbDelta
       WPSkyTemperature(Item)%IsSchedule=.true.
+      units='[deltaC]'
     ELSEIF (SameString(cAlphaArgs(2),'DifferenceScheduleDewPointValue')) THEN
       WPSkyTemperature(Item)%CalculationType=WP_DewPointDelta
       WPSkyTemperature(Item)%IsSchedule=.true.
+      units='[deltaC]'
     ELSE
       CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//  &
         '", invalid '//trim(cAlphaFieldNames(2))//'.')
@@ -7360,8 +7653,24 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
            ' "Schedule:Day:Interval", or "Schedule:Day:List" objects.')
         ErrorsFound=.true.
       ELSE
-        WPSkyTemperature(Item)%IsSchedule=.true.
-        WPSkyTemperature(Item)%SchedulePtr=Found
+        IF (envFound /= 0) THEN
+          schPtr=FindNumberInList(Found,SPSiteScheduleNamePtr,NumSPSiteScheduleNamePtrs)
+          IF (schPtr == 0) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=Found
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Sky Temperature Schedule Value '//units,  &
+                 SPSiteSkyTemperatureScheduleValue(envFound),'Zone','Average',cAlphaArgs(3))
+          ELSEIF (SPSiteScheduleUnits(schPtr)/= units) THEN
+            NumSPSiteScheduleNamePtrs=NumSPSiteScheduleNamePtrs+1
+            SPSiteScheduleNamePtr(NumSPSiteScheduleNamePtrs)=Found
+            SPSiteScheduleUnits(NumSPSiteScheduleNamePtrs)=units
+            CALL SetupOutputVariable('Sizing Period Site Sky Temperature Schedule Value '//units,  &
+                 SPSiteSkyTemperatureScheduleValue(envFound),'Zone','Average',cAlphaArgs(3))
+          ENDIF
+          WPSkyTemperature(Item)%IsSchedule=.true.
+          WPSkyTemperature(Item)%SchedulePtr=Found
+        ENDIF
       ENDIF
     ENDIF
   ENDDO
@@ -7540,7 +7849,7 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Too many objects entered. Only one allowed.')
     ErrorsFound=.true.
   ELSE
-    DeepGroundTemps=16.
+    DeepGroundTemps=16.d0
   ENDIF
 
   ! Write Final Ground Temp Information to the initialization output file
@@ -8116,7 +8425,7 @@ REAL(r64)   :: AtmosMoisture           ! Atmospheric moisture (cm of precipitabl
 !              BeamSolarRad is the direct normal irradiance.
 !
       Zeta = 1.041d0*SunZenith**3
-      SkyClearness = ( (DifSolarRad + BeamSolarRad)/(DifSolarRad + 0.0001d0) + Zeta )/(1.+Zeta)
+      SkyClearness = ( (DifSolarRad + BeamSolarRad)/(DifSolarRad + 0.0001d0) + Zeta )/(1.0d0+Zeta)
       AirMass = (1.d0-0.1d0*Elevation/1000.d0) / (SinSunAltitude + 0.15d0/(SunAltitude/DegToRadians + 3.885d0)**1.253d0)
 !
 !              In the following, 93.73 is the extraterrestrial luminous efficacy
@@ -8145,7 +8454,7 @@ REAL(r64)   :: AtmosMoisture           ! Atmospheric moisture (cm of precipitabl
 !
 !              Sky diffuse luminous efficacy
 !
-      IF(SkyBrightness.LE.0.) THEN
+      IF(SkyBrightness.LE.0.0d0) THEN
          DiffLumEff = 0.d0
       ELSE
          DiffLumEff = ADiffLumEff(ISkyClearness) + BDiffLumEff(ISkyClearness)*AtmosMoisture + &
@@ -8208,6 +8517,8 @@ REAL(r64) Function GetSTM(Longitude)
       INTEGER i  ! Loop variable
       REAL(r64) temp  ! temporary value used to determine time zone
       REAL(r64) tz    ! resultant tz meridian
+
+      GetSTM=0.0d0
 !
       longl(0)=-7.5d0
       longh(0)=7.5d0
@@ -8307,8 +8618,6 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
   SELECT CASE(MakeUPPERCase(HeaderString))
 
     CASE ('LOCATION')
-
-  !
   ! LOCATION, A1 [City], A2 [State/Province/Region], A3 [Country],
   ! A4 [Source], N1 [WMO], N2 [Latitude],
   ! N3 [Longitude], N4 [Time Zone], N5 [Elevation {m}]
@@ -8903,6 +9212,7 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
                   DataPeriods(CurCount)%StMon=PMonth
                   DataPeriods(CurCount)%StDay=PDay
                   DataPeriods(CurCount)%StYear=PYear
+                  IF (PYear /= 0) DataPeriods(CurCount)%HasYearData=.true.
                 ELSE
                   CALL ShowSevereError('Data Periods must be of the form <DayOfYear> or <Month Day> (WeatherFile), found='  &
                                        //TRIM(Line(1:Pos-1)))
@@ -8917,6 +9227,11 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
                   DataPeriods(CurCount)%EnMon=PMonth
                   DataPeriods(CurCount)%EnDay=PDay
                   DataPeriods(CurCount)%EnYear=PYear
+                  IF (PYear == 0 .and. DataPeriods(CurCount)%HasYearData) THEN
+                    CALL ShowWarningError('Data Period (WeatherFile) - Start Date contains year. End Date does not.')
+                    CALL ShowContinueError('...Assuming same year as Start Date for this data.')
+                    DataPeriods(CurCount)%EnYear=DataPeriods(CurCount)%StYear
+                  ENDIF
                 ELSE
                   CALL ShowSevereError('Data Periods must be of the form <DayOfYear> or <Month Day>, (WeatherFile) found='  &
                                        //TRIM(Line(1:Pos-1)))
@@ -9300,7 +9615,7 @@ SUBROUTINE ReportMissing_RangeData
       CALL ShowWarningError(RangeString)
       OutOfRangeHeader=.true.
     ENDIF
-    WRITE(ErrString,rgFmt) 'Dry Bulb Temperatures','>=-70','<=70',OutOfRange%DryBulb
+    WRITE(ErrString,rgFmt) 'Dry Bulb Temperatures','>=-90','<=70',OutOfRange%DryBulb
     CALL ShowMessage(ErrString)
   ENDIF
   IF (OutOfRange%StnPres>0) THEN
@@ -9325,7 +9640,7 @@ SUBROUTINE ReportMissing_RangeData
       CALL ShowWarningError(RangeString)
       OutOfRangeHeader=.true.
     ENDIF
-    WRITE(ErrString,rgFmt) 'Dew Point Temperatures','>=-70','<=70',OutOfRange%DewPoint
+    WRITE(ErrString,rgFmt) 'Dew Point Temperatures','>=-90','<=70',OutOfRange%DewPoint
     CALL ShowMessage(ErrString)
   ENDIF
   IF (OutOfRange%WindSpd>0) THEN
@@ -9828,11 +10143,13 @@ FUNCTION CalculateDayOfWeek(JulianDate) RESULT (dayOfWeek)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: JulDate ! Julian date copy
   INTEGER :: Gyyyy  ! Gregorian yyyy
   INTEGER :: Gmm    ! Gregorian mm
   INTEGER :: Gdd    ! Gregorian dd
 
-  CALL JGDate(JulianToGregorian,JulianDate,Gyyyy,Gmm,Gdd)
+  JulDate = JulianDate
+  CALL JGDate(JulianToGregorian,JulDate,Gyyyy,Gmm,Gdd)
 
   ! Jan, Feb are 13, 14 months of previous year
   IF (Gmm < 3) THEN

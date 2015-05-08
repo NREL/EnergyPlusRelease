@@ -213,8 +213,8 @@ IF (MyOneTimeFlag) then
       ErrorsFound = .TRUE.
     ENDIF
 
-    FuelSupply(FuelSupNum)%LHVliquid = NumArray(2)*1000.0 !generic liquid LHV  (kJ/kG input converted to J/kG )
-    FuelSupply(FuelSupNum)%HHV = NumArray(3)*1000.0 !generic liquid HHV (kJ/kG input converted to J/kG )
+    FuelSupply(FuelSupNum)%LHVliquid = NumArray(2)*1000.0d0 !generic liquid LHV  (kJ/kG input converted to J/kG )
+    FuelSupply(FuelSupNum)%HHV = NumArray(3)*1000.0d0 !generic liquid HHV (kJ/kG input converted to J/kG )
     FuelSupply(FuelSupNum)%MW  = NumArray(4) !
     FuelSupply(FuelSupNum)%eCO2 = NumArray(5) !
 
@@ -238,7 +238,7 @@ IF (MyOneTimeFlag) then
       ENDDO
 
       ! check for molar fractions summing to 1.0.
-      IF (ABS(SUM(FuelSupply(FuelSupNum)%ConstitMolalFract)-1.0) > .0001d0) THEN
+      IF (ABS(SUM(FuelSupply(FuelSupNum)%ConstitMolalFract)-1.0d0) > .0001d0) THEN
         CALL showSevereError(TRIM(cCurrentModuleObject)//' molar fractions do not sum to 1.0')
         CALL ShowContinueError('Sum was='//TRIM(RoundSigDigits(SUM(FuelSupply(FuelSupNum)%ConstitMolalFract),5)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(AlphArray(1)))
@@ -638,9 +638,9 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
     ! now calculate LHV of fuel for entire simulation
 
     ! sum over each constituent
-    O2Stoic = 0.0
-    CO2ProdStoic = 0.0
-    H20ProdStoic = 0.0
+    O2Stoic = 0.0d0
+    CO2ProdStoic = 0.0d0
+    H20ProdStoic = 0.0d0
     CO2dataID   = 1  !hard-coded above
     WaterDataID = 4  !hard-coded above
     ! Loop over fuel constituents and do one-time setup
@@ -659,15 +659,15 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
       !for this fuel mixture, figure stoichiometric oxygen requirement
       O2Stoic = O2Stoic + FuelSupply(FuelSupplyNum)%ConstitMolalFract(i) *                  &
               (  GasPhaseThermoChemistryData(thisGasID)%NumCarbons                         &
-               + GasPhaseThermoChemistryData(thisGasID)%NumHydrogens / 4.0                 &
-               - GasPhaseThermoChemistryData(thisGasID)%NumOxygens / 2.0 )
+               + GasPhaseThermoChemistryData(thisGasID)%NumHydrogens / 4.0d0                 &
+               - GasPhaseThermoChemistryData(thisGasID)%NumOxygens / 2.0d0 )
      ! for this fuel mixture, figure stoichiometric Carbon Dioxide in Product Gases
 
      CO2ProdStoic = CO2ProdStoic + FuelSupply(FuelSupplyNum)%ConstitMolalFract(i) *                  &
                            GasPhaseThermoChemistryData(thisGasID)%NumCarbons
 
      H20ProdStoic = H20ProdStoic + FuelSupply(FuelSupplyNum)%ConstitMolalFract(i) *                  &
-                           GasPhaseThermoChemistryData(thisGasID)%NumHydrogens / 2.0
+                           GasPhaseThermoChemistryData(thisGasID)%NumHydrogens / 2.0d0
     ENDDO
 
     FuelSupply(FuelSupplyNum)%StoicOxygenRate = O2Stoic
@@ -675,16 +675,16 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
     FuelSupply(FuelSupplyNum)%H20ProductGasCoef = H20ProdStoic
 
     !Calculate LHV for an NdotFuel of 1.0
-    LHVfuel = 0.0
+    LHVfuel = 0.0d0
     DO i=1, FuelSupply(FuelSupplyNum)%NumConstituents
       thisGasID  = FuelSupply(FuelSupplyNum)%GasLibID(i)
-      IF (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens == 0.0) THEN
-        LHVi = 0.0
+      IF (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens == 0.0d0) THEN
+        LHVi = 0.0d0
       ELSE
         LHVi = GasPhaseThermoChemistryData(thisGasID)%StdRefMolarEnthOfForm            &
               - GasPhaseThermoChemistryData(thisGasID)%NumCarbons                    &
                   * GasPhaseThermoChemistryData(CO2dataID)%StdRefMolarEnthOfForm       &
-              - (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0)                    &
+              - (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0d0)                    &
                   * GasPhaseThermoChemistryData(WaterDataID)%StdRefMolarEnthOfForm
       ENDIF
       LHVfuel = LHVfuel + LHVi * FuelSupply(FuelSupplyNum)%ConstitMolalFract(i)
@@ -692,25 +692,25 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
     FuelSupply(FuelSupplyNum)%LHV = LHVfuel
 
   !Calculate HHV for an NdotFuel of 1.0
-    HHVfuel = 0.0
+    HHVfuel = 0.0d0
     DO i=1, FuelSupply(FuelSupplyNum)%NumConstituents
       thisGasID  = FuelSupply(FuelSupplyNum)%GasLibID(i)
-      IF (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens == 0.0) THEN
-        HHVi = 0.0
+      IF (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens == 0.0d0) THEN
+        HHVi = 0.0d0
       ELSE
         HHVi = GasPhaseThermoChemistryData(thisGasID)%StdRefMolarEnthOfForm            &
               - GasPhaseThermoChemistryData(thisGasID)%NumCarbons                      &
                   * GasPhaseThermoChemistryData(CO2dataID)%StdRefMolarEnthOfForm       &
-              - (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0)              &
+              - (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0d0)              &
                   * GasPhaseThermoChemistryData(WaterDataID)%StdRefMolarEnthOfForm     &
-              + (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0)              &
-                * (GasPhaseThermoChemistryData(WaterDataID)%StdRefMolarEnthOfForm + 285.8304)
+              + (GasPhaseThermoChemistryData(thisGasID)%NumHydrogens/2.0d0)              &
+                * (GasPhaseThermoChemistryData(WaterDataID)%StdRefMolarEnthOfForm + 285.8304d0)
       ENDIF
       HHVfuel = HHVfuel + HHVi * FuelSupply(FuelSupplyNum)%ConstitMolalFract(i)
     ENDDO
 
     !Calculate Molecular Weight for this fuel
-    MWfuel = 0.0
+    MWfuel = 0.0d0
     DO I=1, FuelSupply(FuelsupplyNum)%NumConstituents
       thisGasID = FuelSupply(FuelSupplyNum)%GasLibID(i)
       MWfuel = MWfuel + &
@@ -718,12 +718,12 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
     ENDDO
     FuelSupply(FuelSupplyNum)%MW = MWfuel
     FuelSupply(FuelSupplyNum)%KmolPerSecToKgPerSec =  MWfuel !TODO check this, guessing on conversion...
-    FuelSupply(FuelSupplyNum)%HHV = 1000000.0 * HHVfuel  / MWfuel ! (1000/k) (1000/k) (kJ/mol)/(g/mol) = J/kg
-    FuelSupply(FuelSupplyNum)%LHVJperkg = FuelSupply(FuelSupplyNum)%LHV * 1000000.0 / FuelSupply(FuelSupplyNum)%MW
+    FuelSupply(FuelSupplyNum)%HHV = 1000000.0d0 * HHVfuel  / MWfuel ! (1000/k) (1000/k) (kJ/mol)/(g/mol) = J/kg
+    FuelSupply(FuelSupplyNum)%LHVJperkg = FuelSupply(FuelSupplyNum)%LHV * 1000000.0d0 / FuelSupply(FuelSupplyNum)%MW
 
   ELSEIF(FuelSupply(FuelSupplyNum)%FuelTypeMode == fuelModeGenericLiquid) THEN
     FuelSupply(FuelSupplyNum)%LHV = FuelSupply(FuelSupplyNum)%LHVliquid  &
-                                    * FuelSupply(FuelSupplyNum)%MW /1000000.0 ! J/kg * g/mol (k/1000) (k/10000)
+                                    * FuelSupply(FuelSupplyNum)%MW /1000000.0d0 ! J/kg * g/mol (k/1000) (k/10000)
 
   ELSE
 
@@ -732,8 +732,8 @@ SUBROUTINE SetupFuelConstituentData(FuelSupplyNum, ErrorsFound)
  ! report Heating Values in EIO.
   WRITE(OutputFileInits, '(A)') '! <Fuel Supply>, Fuel Supply Name, Lower Heating Value [J/kmol], Lower Heating Value [kJ/kg], '  &
                                 // 'Higher Heating Value [KJ/kg],  Molecular Weight [g/mol] '
-  WRITE(OutputFileInits, 501) TRIM(FuelSupply(FuelSupplyNum)%Name) , FuelSupply(FuelSupplyNum)%LHV*1000000.0,  &
-                               FuelSupply(FuelSupplyNum)%LHVJperkg/ 1000.0 , FuelSupply(FuelSupplyNum)%HHV / 1000.0 ,  &
+  WRITE(OutputFileInits, 501) TRIM(FuelSupply(FuelSupplyNum)%Name) , FuelSupply(FuelSupplyNum)%LHV*1000000.0d0,  &
+                               FuelSupply(FuelSupplyNum)%LHVJperkg/ 1000.0d0 , FuelSupply(FuelSupplyNum)%HHV / 1000.0d0 ,  &
                                FuelSupply(FuelSupplyNum)%MW
 
   501 FORMAT(' Fuel Supply, ', A, ',', G13.6E2, ',' , G13.6E2, ',' , G13.6E2, ',', G13.6E2)
@@ -1011,8 +1011,8 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   REAL(r64) :: LimitMinMdotcw    = 0.0D0 ! lower limit for cooling water flow for generatior operation (kg/s)
 
   ! inits
-  PLRforSubtimestepStartUp  = 1.0
-  PLRforSubtimestepShutDown = 0.0
+  PLRforSubtimestepStartUp  = 1.0d0
+  PLRforSubtimestepShutDown = 0.0d0
   ConstrainedMaxP           = .false.
   ConstrainedMinP           = .false.
   ConstrainedIncreasingPdot = .false.
@@ -1039,8 +1039,8 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   END SELECT
 
   PelInput = ElecLoadRequest
-  ElectLoadForThermalRequest = 0.0
-  IF ((ThermalLoadRequest > 0.0) .AND. RunFlagPlant) THEN  ! deal with possible thermal load following
+  ElectLoadForThermalRequest = 0.0d0
+  IF ((ThermalLoadRequest > 0.0d0) .AND. RunFlagPlant) THEN  ! deal with possible thermal load following
   !Modify electric load request based on thermal load following signal using nominal efficiencies
     ElectLoadForThermalRequest = GeneratorDynamics(DynaCntrlNum)%ThermEffNom &
                                * ThermalLoadRequest / GeneratorDynamics(DynaCntrlNum)%ElectEffNom
@@ -1071,16 +1071,16 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
 
   CASE(OpModeOFF, OpModeStandby)
     ! possible future states {Off, Standby, WarmUp,Normal }
-     IF (schedval == 0.0) THEN
+     IF (schedval == 0.0d0) THEN
        newOpMode = OpModeOFF
 
-     ELSEIF (((schedval /= 0.0)  .AND. ( .NOT. RunFlag)) .OR. (TrialMdotcw < LimitMinMdotcw)) THEN
+     ELSEIF (((schedval /= 0.0d0)  .AND. ( .NOT. RunFlag)) .OR. (TrialMdotcw < LimitMinMdotcw)) THEN
        newOpMode = OpModeStandby
-     ELSEIF ((schedval /= 0.0)  .AND. (Runflag) ) THEN
+     ELSEIF ((schedval /= 0.0d0)  .AND. (Runflag) ) THEN
 
        IF (GeneratorDynamics(DynaCntrlNum)%WarmUpByTimeDelay) THEN
 
-         If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0) Then
+         If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0d0) Then
            newOpMode = OpModeNormal
 
          ! is startUp time delay longer than timestep?
@@ -1101,12 +1101,12 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            newOpMode = OpModeNormal
            ! assume linear interpolation for PLR
            PLRStartUp = .true.
-           IF  ( (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast) > 0.0 ) THEN
+           IF  ( (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast) > 0.0d0 ) THEN
                ! protect divide by zero or neg
              PLRforSubtimestepStartUp = (MicroCHP(GeneratorNum)%A42Model%Teng - GeneratorDynamics(DynaCntrlNum)%TnomEngOp ) &
                                        /  (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast)
            ELSE
-             PLRforSubtimestepStartUp = 1.0
+             PLRforSubtimestepStartUp = 1.0d0
            ENDIF
          ELSE
            newOpMode = OpModeWarmUp
@@ -1118,9 +1118,9 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   CASE(OpModeWarmUp)
     ! possible Future states {OFF, WarmUp, Normal, CoolDown }
         ! check availability manager
-     IF (schedval == 0.0) THEN
+     IF (schedval == 0.0d0) THEN
        ! to off unless cool down time period is needed
-       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0) THEN
+       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0d0) THEN
          newOpMode = OpModeOFF
        ELSE
          IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > TimeStepSys) THEN
@@ -1132,9 +1132,9 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            newOpMode = OpModeOFF
          ENDIF
        ENDIF
-     ELSEIF (((schedval /= 0.0)  .AND. ( .NOT. RunFlag)) .OR. (TrialMdotcw < LimitMinMdotcw)) THEN
+     ELSEIF (((schedval /= 0.0d0)  .AND. ( .NOT. RunFlag)) .OR. (TrialMdotcw < LimitMinMdotcw)) THEN
        ! to standby unless cool down time period is needed
-       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0) THEN
+       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0d0) THEN
          newOpMode = OpModeStandby
        ELSE
          IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > TimeStepSys) THEN
@@ -1148,7 +1148,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
            ! assuming no PLR situation unless engine made to normal operation.
          ENDIF
        ENDIF
-     ELSEIF ((schedval /= 0.0)  .AND. (RunFlag)) THEN
+     ELSEIF ((schedval /= 0.0d0)  .AND. (RunFlag)) THEN
        ! either warm up or normal
        ! check if warm up completed, depends on type of warm up control time delay or reach nominal temperature
        IF (GeneratorDynamics(DynaCntrlNum)%WarmUpByTimeDelay) THEN
@@ -1176,12 +1176,12 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
              newOpMode = OpModeNormal
              ! assume linear interpolation for PLR
              PLRStartUp = .true.
-             IF  ( (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast) > 0.0 ) THEN
+             IF  ( (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast) > 0.0d0 ) THEN
                  ! protect divide by zero or neg
                PLRforSubtimestepStartUp = (MicroCHP(GeneratorNum)%A42Model%Teng - GeneratorDynamics(DynaCntrlNum)%TnomEngOp ) &
                                        /  (MicroCHP(GeneratorNum)%A42Model%Teng - MicroCHP(GeneratorNum)%A42Model%TengLast)
              ELSE
-               PLRforSubtimestepStartUp = 1.0
+               PLRforSubtimestepStartUp = 1.0d0
              ENDIF
            ELSE
              newOpMode = OpModeWarmUp
@@ -1196,10 +1196,10 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
 
   CASE(OpModeNormal)
    !possible Future states {CoolDown, standby, off}
-     IF (((schedval == 0.0) .OR. ( .NOT. RunFlag)).OR. (TrialMdotcw < LimitMinMdotcw)) THEN
+     IF (((schedval == 0.0d0) .OR. ( .NOT. RunFlag)).OR. (TrialMdotcw < LimitMinMdotcw)) THEN
         ! is cool down time delay longer than timestep?
-       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0) THEN
-         If (schedval /= 0.0) then
+       IF (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay == 0.0d0) THEN
+         If (schedval /= 0.0d0) then
            newOpMode = OpModeStandBy
          else
            newOpMode = OpModeOff
@@ -1210,7 +1210,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
          GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
                                   + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        ELSE  ! cool down period is less than a single system time step
-         If (schedval /= 0.0) then
+         If (schedval /= 0.0d0) then
            newOpMode = OpModeStandBy
          else
            newOpMode = OpModeOff
@@ -1222,7 +1222,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
          GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = REAL(DayOfSim,r64)  &
                                   + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        ENDIF
-     ELSEIF ((schedval /= 0.0)  .AND. ( RunFlag)) THEN
+     ELSEIF ((schedval /= 0.0d0)  .AND. ( RunFlag)) THEN
 
 
        newOpMode = OpModeNormal
@@ -1231,9 +1231,9 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   CASE(opModeCoolDown)
    !possible Future States {Standby, OFF, WarmUp, Normal}
 
-     IF (schedval == 0.0)  THEN ! no longer available.
+     IF (schedval == 0.0d0)  THEN ! no longer available.
        ! probably goes to off but could be stuck in cool down for awhile
-       If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
+       If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0d0) Then
          ! calculate time for end of cool down period
          CurrentFractionalDay = REAL(DayOfSim,r64)  &
                             + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
@@ -1252,9 +1252,9 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
        ELSE !
          newOpMode = opModeOFF
        ENDIF
-     ELSEIF (((schedval /= 0.0)  .AND. ( .NOT. RunFlag) ) .OR. (TrialMdotcw < LimitMinMdotcw))Then
+     ELSEIF (((schedval /= 0.0d0)  .AND. ( .NOT. RunFlag) ) .OR. (TrialMdotcw < LimitMinMdotcw))Then
        ! probably goes to standby but could be stuck in cool down for awhile
-       If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
+       If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0d0) Then
          ! calculate time for end of cool down period
          CurrentFractionalDay = REAL(DayOfSim,r64)  &
                             + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
@@ -1273,12 +1273,12 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
        ELSE !
          newOpMode = OpModeStandby
        ENDIF
-     ELSEIF ((schedval /= 0.0)  .AND. ( RunFlag) ) THEN
+     ELSEIF ((schedval /= 0.0d0)  .AND. ( RunFlag) ) THEN
        ! was in cool down mode but is now being asked to restart
        ! probably goes to warm up but could be stuck in cool down or jump to normal
        IF (GeneratorDynamics(DynaCntrlNum)%MandatoryFullCoolDown) then
          ! is cool down done or not?
-         If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0) Then
+         If (GeneratorDynamics(DynaCntrlNum)%CoolDownDelay > 0.0d0) Then
            ! calculate time for end of cool down period
            CurrentFractionalDay = REAL(DayOfSim,r64)  &
                             + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
@@ -1294,14 +1294,14 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
              LastSystemTimeStepFractionalDay = CurrentFractionalDay - ( TimeStepSys/HoursInDay )
              PLRforSubtimestepShutDown  = (EndingFractionalDay - LastSystemTimeStepFractionalDay)*HoursInDay  &
                                         / TimeStepSys
-             If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0) then
+             If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0d0) then
                newOpMode = opModeNormal
                ! possible PLR on start up.
                PLRStartUp = .true.
                PLRforSubtimestepStartUp = ( (CurrentFractionalDay - EndingFractionalDay ) &
                                       / (CurrentFractionalDay - LastSystemTimeStepFractionalDay) )
 
-             ELSEIF (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay > 0.0) then
+             ELSEIF (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay > 0.0d0) then
                ! is remaining time enough?
                IF (( CurrentFractionalDay - EndingFractionalDay) > GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay ) THEN
                  newOpMode = opModeNormal
@@ -1325,10 +1325,10 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
        ELSE !not mandetory cool donw
          ! likely to go into warm up but if no warm up then back to normal
          IF (GeneratorDynamics(DynaCntrlNum)%WarmUpByTimeDelay) THEN
-           If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0) then
+           If (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay == 0.0d0) then
              newOpMode = opModeNormal
 
-           ELSEIF (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay > 0.0) then
+           ELSEIF (GeneratorDynamics(DynaCntrlNum)%StartUpTimeDelay > 0.0d0) then
              CurrentFractionalDay = REAL(DayOfSim,r64)  &
                             + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
              EndingFractionalDay = GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown  &
@@ -1357,11 +1357,11 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
      ENDIF
   END SELECT !previous case
 
-  If (PLRforSubtimestepStartUp < 0.0) PLRforSubtimestepStartUp = 0.0
-  If (PLRforSubtimestepStartUp > 1.0) PLRforSubtimestepStartUp = 1.0
+  If (PLRforSubtimestepStartUp < 0.0d0) PLRforSubtimestepStartUp = 0.0d0
+  If (PLRforSubtimestepStartUp > 1.0d0) PLRforSubtimestepStartUp = 1.0d0
 
-  If (PLRforSubtimestepShutDown < 0.0) PLRforSubtimestepShutDown = 0.0
-  If (PLRforSubtimestepShutDown > 1.0) PLRforSubtimestepShutDown = 1.0
+  If (PLRforSubtimestepShutDown < 0.0d0) PLRforSubtimestepShutDown = 0.0d0
+  If (PLRforSubtimestepShutDown > 1.0d0) PLRforSubtimestepShutDown = 1.0d0
 
   IF (newOpmode == OpModeWarmUp) THEN
     SELECT CASE (GeneratorType)
@@ -1401,15 +1401,15 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   ENDIF !
 
   IF (newOpmode == opModeCoolDown) THEN
-    Pel = 0.0 ! assumes no power generated during shut down
+    Pel = 0.0d0 ! assumes no power generated during shut down
   ENDIF
 
   IF (newOpmode == OpModeOFF) THEN
-    Pel = 0.0 ! assumes no power generated during OFF mode
+    Pel = 0.0d0 ! assumes no power generated during OFF mode
   ENDIF
 
   IF (newOpmode == OpModeStandby) THEN
-    Pel = 0.0 ! assumes no power generated during standby mode
+    Pel = 0.0d0 ! assumes no power generated during standby mode
   ENDIF
 
   ! Control step 3: adjust for max and min limits on Pel
@@ -1426,55 +1426,55 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   SELECT CASE (GeneratorType)
   CASE (iGeneratorMicroCHP)
     ! first clear out values
-    MicroCHP(GeneratorNum)%A42model%OffModeTime       = 0.0
-    MicroCHP(GeneratorNum)%A42model%StandyByModeTime  = 0.0
-    MicroCHP(GeneratorNum)%A42model%WarmUpModeTime    = 0.0
-    MicroCHP(GeneratorNum)%A42model%NormalModeTime    = 0.0
-    MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = 0.0
+    MicroCHP(GeneratorNum)%A42model%OffModeTime       = 0.0d0
+    MicroCHP(GeneratorNum)%A42model%StandyByModeTime  = 0.0d0
+    MicroCHP(GeneratorNum)%A42model%WarmUpModeTime    = 0.0d0
+    MicroCHP(GeneratorNum)%A42model%NormalModeTime    = 0.0d0
+    MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = 0.0d0
     SELECT CASE (newOpMode)
 
     CASE (OpModeOFF)
-      IF (PLRforSubtimestepShutDown == 0.0) THEN
+      IF (PLRforSubtimestepShutDown == 0.0d0) THEN
         MicroCHP(GeneratorNum)%A42model%OffModeTime  = TimeStepSys *  SecInHour
-      ELSEIF ( (PLRforSubtimestepShutDown > 0.0) .AND. (PLRforSubtimestepShutDown < 1.0)) THEN
+      ELSEIF ( (PLRforSubtimestepShutDown > 0.0d0) .AND. (PLRforSubtimestepShutDown < 1.0d0)) THEN
         MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = TimeStepSys *  SecInHour * (PLRforSubtimestepShutDown )
-        MicroCHP(GeneratorNum)%A42model%OffModeTime  = TimeStepSys *  SecInHour * (1.0 - PLRforSubtimestepShutDown )
+        MicroCHP(GeneratorNum)%A42model%OffModeTime  = TimeStepSys *  SecInHour * (1.0d0 - PLRforSubtimestepShutDown )
       ELSE
         MicroCHP(GeneratorNum)%A42model%OffModeTime = TimeStepSys *  SecInHour
       ENDIF
     CASE (OpModeStandby)
-      IF (PLRforSubtimestepShutDown == 0.0) THEN
+      IF (PLRforSubtimestepShutDown == 0.0d0) THEN
         MicroCHP(GeneratorNum)%A42model%StandyByModeTime  = TimeStepSys *  SecInHour
-      ELSEIF ( (PLRforSubtimestepShutDown > 0.0) .AND. (PLRforSubtimestepShutDown < 1.0)) THEN
+      ELSEIF ( (PLRforSubtimestepShutDown > 0.0d0) .AND. (PLRforSubtimestepShutDown < 1.0d0)) THEN
         MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = TimeStepSys *  SecInHour * (PLRforSubtimestepShutDown )
-        MicroCHP(GeneratorNum)%A42model%StandyByModeTime  = TimeStepSys *  SecInHour * (1.0 - PLRforSubtimestepShutDown )
+        MicroCHP(GeneratorNum)%A42model%StandyByModeTime  = TimeStepSys *  SecInHour * (1.0d0 - PLRforSubtimestepShutDown )
       ELSE
         MicroCHP(GeneratorNum)%A42model%StandyByModeTime = TimeStepSys *  SecInHour
       ENDIF
     CASE (OpModeWarmUp)
-      IF (PLRforSubtimestepShutDown == 0.0) THEN
+      IF (PLRforSubtimestepShutDown == 0.0d0) THEN
         MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour
-      ELSEIF ( (PLRforSubtimestepShutDown > 0.0) .AND. (PLRforSubtimestepShutDown < 1.0)) THEN
+      ELSEIF ( (PLRforSubtimestepShutDown > 0.0d0) .AND. (PLRforSubtimestepShutDown < 1.0d0)) THEN
         MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = TimeStepSys *  SecInHour * (PLRforSubtimestepShutDown )
-        MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour * (1.0 - PLRforSubtimestepShutDown )
+        MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour * (1.0d0 - PLRforSubtimestepShutDown )
       ELSE
         MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour
       ENDIF
 
     CASE (OpModeNormal)
-      IF (PLRforSubtimestepStartUp == 0.0) THEN
+      IF (PLRforSubtimestepStartUp == 0.0d0) THEN
         MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour
 
-      ELSEIF ( (PLRforSubtimestepStartUp > 0.0) .AND. (PLRforSubtimestepStartUp < 1.0)) THEN
-        MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour * ( 1.0 -PLRforSubtimestepStartUp )
+      ELSEIF ( (PLRforSubtimestepStartUp > 0.0d0) .AND. (PLRforSubtimestepStartUp < 1.0d0)) THEN
+        MicroCHP(GeneratorNum)%A42model%WarmUpModeTime  = TimeStepSys *  SecInHour * ( 1.0d0 -PLRforSubtimestepStartUp )
         MicroCHP(GeneratorNum)%A42model%NormalModeTime  = TimeStepSys *  SecInHour * ( PLRforSubtimestepStartUp )
 
       ELSE
-        IF (PLRforSubtimestepShutDown == 0.0) THEN
+        IF (PLRforSubtimestepShutDown == 0.0d0) THEN
           MicroCHP(GeneratorNum)%A42model%NormalModeTime  = TimeStepSys *  SecInHour
-        ELSEIF ( (PLRforSubtimestepShutDown > 0.0) .AND. (PLRforSubtimestepShutDown < 1.0)) THEN
+        ELSEIF ( (PLRforSubtimestepShutDown > 0.0d0) .AND. (PLRforSubtimestepShutDown < 1.0d0)) THEN
           MicroCHP(GeneratorNum)%A42model%CoolDownModeTime  = TimeStepSys *  SecInHour * (PLRforSubtimestepShutDown )
-          MicroCHP(GeneratorNum)%A42model%NormalModeTime  = TimeStepSys *  SecInHour * (1.0 - PLRforSubtimestepShutDown )
+          MicroCHP(GeneratorNum)%A42model%NormalModeTime  = TimeStepSys *  SecInHour * (1.0d0 - PLRforSubtimestepShutDown )
         ELSE
           MicroCHP(GeneratorNum)%A42model%NormalModeTime  = TimeStepSys *  SecInHour
         ENDIF
@@ -1848,7 +1848,7 @@ SUBROUTINE GetMicroCHPGeneratorInput
   USE DataIPShortCuts  ! Data for field names, blank numerics
   USE CurveManager,   ONLY : GetCurveCheck, CurveValue
   USE NodeInputManager, ONLY: GetOnlySingleNode
-  USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
+  USE BranchNodeConnections, ONLY: TestCompSet
   USE DataHeatBalance,  ONLY: Zone, IntGainTypeOf_GeneratorMicroCHP
   USE ScheduleManager, ONLY: GetScheduleIndex
   USE General, ONLY: RoundSigDigits
@@ -2051,12 +2051,12 @@ If (myonetimeflag) then
          ! check the node connections
     MicroCHP(GeneratorNum)%AirInletNodeId = &
                GetOnlySingleNode(AlphArray(6),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+               NodeType_Air,NodeConnectionType_Inlet,2,ObjectIsNotParent)
 
     MicroCHP(GeneratorNum)%AirOutletNodeName   = AlphArray(7) !  A7 Air Outlet Node Name
     MicroCHP(GeneratorNum)%AirOutletNodeId = &
                GetOnlySingleNode(AlphArray(7),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+               NodeType_Air,NodeConnectionType_Outlet,2,ObjectIsNotParent)
 
     MicroCHP(GeneratorNum)%FuelSupplyID  = FindItemInList(AlphArray(8), FuelSupply%name,NumGeneratorFuelSups) ! Fuel Supply ID
     IF (MicroCHP(GeneratorNum)%FuelSupplyID == 0) THEN
@@ -2283,7 +2283,7 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
                            PlantLoop(MicroCHP(GeneratorNum)%CWLoopNum)%FluidIndex, &
                           'InitMicroCHPNoNormalizeGenerators')
     IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN ! got a curve
-      MicroCHP(GeneratorNum)%PlantMassFlowRateMax = 2.0 * CurveValue(MicroCHP(GeneratorNum)%A42Model%WaterFlowCurveID, &
+      MicroCHP(GeneratorNum)%PlantMassFlowRateMax = 2.0d0 * CurveValue(MicroCHP(GeneratorNum)%A42Model%WaterFlowCurveID, &
                                                                MicroCHP(GeneratorNum)%A42Model%MaxElecPower ,    &
                                                                Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp )
     ELSEIF (MicroCHP(GeneratorNum)%CWLoopSideNum == SupplySide) THEN
@@ -2456,36 +2456,36 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)    :: AllowedLoad               = 0.0
+  REAL(r64)    :: AllowedLoad               = 0.0d0
   INTEGER :: CurrentOpMode             = 0
-  REAL(r64)    :: PLRforSubtimestepStartUp  = 1.0
-  REAL(r64)    :: PLRforSubtimestepShutDown = 0.0
+  REAL(r64)    :: PLRforSubtimestepStartUp  = 1.0d0
+  REAL(r64)    :: PLRforSubtimestepShutDown = 0.0d0
   LOGICAL :: RunFlag                   = .false.
   INTEGER :: DynaCntrlNum              = 0
-  REAL(r64)    :: Pnetss = 0.0
-  REAL(r64)    :: Pstandby = 0.0 ! power draw during standby, positive here means negative production
-  REAL(r64)    :: Pcooler  = 0.0 ! power draw during cool down, positive here means negative production
-!  REAL(r64)    :: Pnet   = 0.0
-  REAL(r64)    :: NdotFuel = 0.0
+  REAL(r64)    :: Pnetss = 0.0d0
+  REAL(r64)    :: Pstandby = 0.0d0 ! power draw during standby, positive here means negative production
+  REAL(r64)    :: Pcooler  = 0.0d0 ! power draw during cool down, positive here means negative production
+!  REAL(r64)    :: Pnet   = 0.0d0
+  REAL(r64)    :: NdotFuel = 0.0d0
 
   LOGICAL :: ConstrainedIncreasingNdot = .false.
   LOGICAL :: ConstrainedDecreasingNdot = .false.
   INTEGER :: I       = 0
-  REAL(r64)    :: dt      = 0.0
-  REAL(r64)    :: ElecEff = 0.0
-  REAL(r64)    :: MdotAir = 0.0
-  REAL(r64)    :: Qgenss  = 0.0
-  REAL(r64)    :: Mdotcw  = 0.0
-  REAL(r64)    :: TcwIn   = 0.0
-  REAL(r64)    ::  Tcwout = 0.0
-  REAL(r64)    :: MdotFuel = 0.0
-  REAL(r64)    :: MdotFuelAllowed = 0.0
-  REAL(r64)    :: MdotFuelMax = 0.0
-  REAL(r64)    :: MdotFuelWarmup = 0.0
-  REAL(r64)    :: Pmax    = 0.0
-  REAL(r64)    :: Qgross  = 0.0
-  REAL(r64)    :: Teng    = 0.0
-  REAL(r64)    :: ThermEff = 0.0
+  REAL(r64)    :: dt      = 0.0d0
+  REAL(r64)    :: ElecEff = 0.0d0
+  REAL(r64)    :: MdotAir = 0.0d0
+  REAL(r64)    :: Qgenss  = 0.0d0
+  REAL(r64)    :: Mdotcw  = 0.0d0
+  REAL(r64)    :: TcwIn   = 0.0d0
+  REAL(r64)    ::  Tcwout = 0.0d0
+  REAL(r64)    :: MdotFuel = 0.0d0
+  REAL(r64)    :: MdotFuelAllowed = 0.0d0
+  REAL(r64)    :: MdotFuelMax = 0.0d0
+  REAL(r64)    :: MdotFuelWarmup = 0.0d0
+  REAL(r64)    :: Pmax    = 0.0d0
+  REAL(r64)    :: Qgross  = 0.0d0
+  REAL(r64)    :: Teng    = 0.0d0
+  REAL(r64)    :: ThermEff = 0.0d0
   REAL(r64)    :: Cp = 0.d0 ! local fluid specific heat
 
   LOGICAL :: EnergyBalOK ! check for balance to exit loop
@@ -2508,18 +2508,18 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
 
   CASE (OpModeOFF)  ! same as standby in model spec but no Pnet standby electicity losses.
 
-    Qgenss   = 0.0
+    Qgenss   = 0.0d0
     Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
     TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
-    Pnetss   = 0.0
-    Pstandby = 0.0
+    Pnetss   = 0.0d0
+    Pstandby = 0.0d0
     Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * PLRforSubtimestepShutDown
-    ElecEff  = 0.0
-    ThermEff = 0.0
-    Qgross   = 0.0
-    NdotFuel = 0.0
-    MdotFuel = 0.0
-    MdotAir  = 0.0
+    ElecEff  = 0.0d0
+    ThermEff = 0.0d0
+    Qgross   = 0.0d0
+    NdotFuel = 0.0d0
+    MdotFuel = 0.0d0
+    MdotAir  = 0.0d0
 
     Mdotcw = 0.d0
     CALL SetComponentFlowRate(Mdotcw, &
@@ -2533,18 +2533,18 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
 
 
   CASE (OpModeStandby)
-    Qgenss = 0.0
+    Qgenss = 0.0d0
     Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
     TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
-    Pnetss   = 0.0
+    Pnetss   = 0.0d0
     Pstandby = MicroCHP(GeneratorNum)%A42Model%Pstandby * (1.0 - PLRforSubtimestepShutDown)
     Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * PLRforSubtimestepShutDown
-    ElecEff  = 0.0
-    ThermEff = 0.0
-    Qgross   = 0.0
-    NdotFuel = 0.0
-    MdotFuel = 0.0
-    MdotAir  = 0.0
+    ElecEff  = 0.0d0
+    ThermEff = 0.0d0
+    Qgross   = 0.0d0
+    NdotFuel = 0.0d0
+    MdotFuel = 0.0d0
+    MdotAir  = 0.0d0
 
     Mdotcw = 0.d0
     CALL SetComponentFlowRate(Mdotcw, &
@@ -2562,7 +2562,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
    IF ( MicroCHP(GeneratorNum)%A42Model%WarmUpByTimeDelay ) Then
      ! Internal combustion engine.  This is just like normal  operation but no net power yet.
       Pnetss   =  MyElectricLoad ! W
-      Pstandby = 0.0
+      Pstandby = 0.0d0
       Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * PLRforSubtimestepShutDown
       TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
@@ -2572,17 +2572,17 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss, Mdotcw , TcwIn )
       ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
 
-      IF ( ElecEff > 0.0) THEN ! trap divide by bad thing
+      IF ( ElecEff > 0.0d0) THEN ! trap divide by bad thing
         Qgross   = Pnetss/ElecEff     !W
       ELSE
-        Qgross = 0.0
+        Qgross = 0.0d0
       ENDIF
       ThermEff = CurveValue(MicroCHP(GeneratorNum)%A42Model%ThermalEffCurveID, Pnetss, Mdotcw , TcwIN )
       ThermEff  = MAX(0.0D0, ThermEff) !protect against bad curve result
 
       Qgenss   = ThermEff * Qgross !W
 
-      MdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0)&
+      MdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0)&
        *  FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
 
@@ -2592,7 +2592,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       IF (ConstrainedIncreasingNdot .OR. ConstrainedDecreasingNdot) THEN ! recalculate Pnetss with new NdotFuel with iteration
         MdotFuel = MdotFuelAllowed
         NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
-        Qgross = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  *1000.0* 1000.0)
+        Qgross = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  *1000.0d0* 1000.0d0)
 
         DO I=1, 20 ! iterating here  could add use of seach method .
           Pnetss = Qgross * ElecEff
@@ -2608,7 +2608,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
         Qgenss   = ThermEff * Qgross !W
 
       ENDIf
-      Pnetss   = 0.0 ! no actually power produced here.
+      Pnetss   = 0.0d0 ! no actually power produced here.
       NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
       MdotAir = CurveValue(MicroCHP(GeneratorNum)%A42Model%AirFlowCurveID, MdotFuel)
       MdotAir  = MAX(0.0D0, MdotAir) !protect against bad curve result
@@ -2617,19 +2617,19 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     ! Stirling engine mode warm up
     !   find MdotFuelMax
       Pmax = MicroCHP(GeneratorNum)%A42Model%MaxElecPower
-      Pnetss = 0.0
-      Pstandby = 0.0
+      Pnetss = 0.0d0
+      Pstandby = 0.0d0
       Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * PLRforSubtimestepShutDown ! could be here with part load in cool down
       TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
       ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pmax, Mdotcw, TcwIN)
       ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
-      IF ( ElecEff > 0.0) THEN ! trap divide by bad thing
+      IF ( ElecEff > 0.0d0) THEN ! trap divide by bad thing
          Qgross   = Pmax/ElecEff     !W
       ELSE
-         Qgross   = 0.0
+         Qgross   = 0.0d0
       ENDIF
-      NdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0)
+      NdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0)
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
       MdotFuelMax = NdotFuel * FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
 
@@ -2666,7 +2666,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
       MdotAir = CurveValue(MicroCHP(GeneratorNum)%A42Model%AirFlowCurveID, MdotFuelWarmup)
       MdotAir  = MAX(0.0D0, MdotAir) !protect against bad curve result
-      Qgross   = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0)
+      Qgross   = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0)
       ThermEff = CurveValue(MicroCHP(GeneratorNum)%A42Model%ThermalEffCurveID, Pmax, Mdotcw, TcwIN)
       Qgenss   = ThermEff * Qgross !W
 
@@ -2674,14 +2674,14 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
    NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
 
   CASE (OpModeNormal)
-    If (PLRforSubtimestepStartUp < 1.0) then
+    If (PLRforSubtimestepStartUp < 1.0d0) then
       If (RunFlagElectCenter)  Pnetss   = MyElectricLoad  ! W
       If (RunFlagPlant) Pnetss   = AllowedLoad
     else
       Pnetss   = AllowedLoad
     endif
-    Pstandby = 0.0
-    Pcooler  = 0.0
+    Pstandby = 0.0d0
+    Pcooler  = 0.0d0
     TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
     Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
     IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
@@ -2691,16 +2691,16 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss, Mdotcw, TcwIN )
     ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
 
-    IF ( ElecEff > 0.0) THEN ! trap divide by bad thing
+    IF ( ElecEff > 0.0d0) THEN ! trap divide by bad thing
       Qgross   = Pnetss/ElecEff     !W
     ELSE
-      Qgross = 0.0
+      Qgross = 0.0d0
     ENDIF
 
     ThermEff = CurveValue(MicroCHP(GeneratorNum)%A42Model%ThermalEffCurveID, Pnetss, Mdotcw, TcwIN)
     ThermEff  = MAX(0.0D0, ThermEff) !protect against bad curve result
     Qgenss   = ThermEff * Qgross !W
-    MdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0) &
+    MdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0) &
        *  FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
     CALL ManageGeneratorFuelFlow(iGeneratorMicroCHP, MicroCHP(GeneratorNum)%Name, GeneratorNum,RunFlag,MdotFuel, &
@@ -2709,7 +2709,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     IF (ConstrainedIncreasingNdot .OR. ConstrainedDecreasingNdot) THEN ! recalculate Pnetss with new NdotFuel with iteration
       MdotFuel = MdotFuelAllowed
       NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
-      Qgross = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 * 1000.0)
+      Qgross = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 * 1000.0d0)
 
       DO I=1, 20 ! iterating here,  could add use of seach method error signal
         Pnetss = Qgross * ElecEff
@@ -2729,27 +2729,27 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
     MdotAir = CurveValue(MicroCHP(GeneratorNum)%A42Model%AirFlowCurveID, MdotFuel)
     MdotAir  = MAX(0.0D0, MdotAir) !protect against bad curve result
-    IF (PLRforSubtimestepStartUp < 1.0) THEN
+    IF (PLRforSubtimestepStartUp < 1.0d0) THEN
       Pnetss = AllowedLoad
     ENDIF
 
   CASE (opModeCoolDown)
 
-      Pnetss   = 0.0
-      Pstandby = 0.0
+      Pnetss   = 0.0d0
+      Pstandby = 0.0d0
       Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown
       TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
       IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
         Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn )
       ENDIF
-      NdotFuel = 0.0
-      MdotFuel = 0.0
-      MdotAir  = 0.0
-      ElecEff  = 0.0
-      ThermEff = 0.0
-      Qgross   = 0.0
-      Qgenss   = 0.0
+      NdotFuel = 0.0d0
+      MdotFuel = 0.0d0
+      MdotAir  = 0.0d0
+      ElecEff  = 0.0d0
+      ThermEff = 0.0d0
+      Qgross   = 0.0d0
+      Qgenss   = 0.0d0
   END SELECT
 
   EnergyBalOK = .false.
@@ -2763,12 +2763,12 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
       ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pmax, Mdotcw, TcwIN)
       ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
-      IF ( ElecEff > 0.0) THEN ! trap divide by bad thing
+      IF ( ElecEff > 0.0d0) THEN ! trap divide by bad thing
          Qgross   = Pmax/ElecEff     !W
       ELSE
-         Qgross   = 0.0
+         Qgross   = 0.0d0
       ENDIF
-      NdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0)
+      NdotFuel = Qgross / (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0)
        !  kMol/s = (J/s) /(KJ/mol * 1000 J/KJ * 1000 mol/kmol)
       MdotFuelMax = NdotFuel * FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
 
@@ -2800,7 +2800,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       NdotFuel = MdotFuel / FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%KmolPerSecToKgPerSec
       MdotAir = CurveValue(MicroCHP(GeneratorNum)%A42Model%AirFlowCurveID, MdotFuelWarmup)
       MdotAir  = MAX(0.0D0, MdotAir) !protect against bad curve result
-      Qgross   = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0 *1000.0)
+      Qgross   = NdotFuel * (FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%LHV  * 1000.0d0 *1000.0d0)
       ThermEff = CurveValue(MicroCHP(GeneratorNum)%A42Model%ThermalEffCurveID, Pmax, Mdotcw, TcwIN)
       ThermEff  = MAX(0.0D0, ThermEff) !protect against bad curve result
       Qgenss   = ThermEff * Qgross !W
@@ -2897,7 +2897,7 @@ REAL(r64) FUNCTION FuncDetermineEngineTemp(Tcwout, MCeng, UAHX, UAskin, Troom, Q
   REAL(r64) :: b
 
   a = (  ( UAHX * Tcwout / MCeng) + ( UAskin * Troom /  MCeng )  + (  Qgenss / MCeng ) )
-  b = ( ( -1.0 * UAHX / MCeng )  + ( -1.0 * UAskin / MCeng ) )
+  b = ( ( -1.0d0 * UAHX / MCeng )  + ( -1.0d0 * UAskin / MCeng ) )
 
   FuncDetermineEngineTemp = (TengLast + a/b )* exp(b*time) - a / b
 
@@ -2953,7 +2953,7 @@ REAL(r64) FUNCTION FuncDetermineCoolantWaterExitTemp(Tcwin, MCcw, UAHX, MdotCpcw
   REAL(r64) :: b
 
   a =  ( MdotCpcw * Tcwin / MCcw) + ( UAHX * Teng /  MCcw )
-  b = ( ( -1.0 * MdotCpcw / MCcw )  + ( -1.0 * UAHX / MCcw ) )
+  b = ( ( -1.0d0 * MdotCpcw / MCcw )  + ( -1.0d0 * UAHX / MCcw ) )
 
   IF (b*time < (-1.d0 * MaxEXPArg)) THEN
 
@@ -3023,18 +3023,18 @@ Logical FUNCTION CheckMicroCHPThermalBalance(NomHeatGen, Tcwin, Tcwout, Teng, Tr
   !first compute derivatives using a + bT
 
   a = (  ( UAHX * Tcwout / MCeng) + ( UAskin * Troom /  MCeng )  + (  Qgenss / MCeng ) )
-  b = ( ( -1.0 * UAHX / MCeng )  + ( -1.0 * UAskin / MCeng )  )
+  b = ( ( -1.0d0 * UAHX / MCeng )  + ( -1.0d0 * UAskin / MCeng )  )
   DTengDtime = a + b*Teng
 
   a =  ( MdotCpcw * Tcwin / MCcw) + ( UAHX * Teng /  MCcw )
-  b = ( ( -1.0 * MdotCpcw / MCcw )  + ( -1.0 * UAHX / MCcw ) )
+  b = ( ( -1.0d0 * MdotCpcw / MCcw )  + ( -1.0d0 * UAHX / MCcw ) )
   DCoolOutTDtime = a + b*Tcwout
 
   magImbalEng     = UAHX * (Tcwout - Teng) + UAskin*(Troom - Teng) + Qgenss - MCeng * DTengDtime
 
   magImbalCooling = MdotCpcw * (Tcwin - Tcwout) +  UAHX * (Teng - Tcwout)- MCcw * DCoolOutTDtime
 
-  threshold = NomHeatGen / 10000000.0
+  threshold = NomHeatGen / 10000000.0d0
 
   CheckMicroCHPThermalBalance = .false.
 
@@ -3366,10 +3366,10 @@ SUBROUTINE UpdateMicroCHPGeneratorRecords(Num)
                                           * FuelSupply(MicroCHP(Num)%FuelSupplyID)%KmolPerSecToKgPerSec
               ! reporting: Fuel Energy used (J)
   MicroCHP(Num)%Report%FuelEnergyLHV        = MicroCHP(Num)%A42Model%NdotFuel * FuelSupply(MicroCHP(Num)%FuelSupplyID)%LHV &
-                                          * 1000000.0 *TimeStepSys*SecInHour
+                                          * 1000000.0d0 *TimeStepSys*SecInHour
               ! reporting: Fuel Energy used (W)
   MicroCHP(Num)%Report%FuelEnergyUseRateLHV = MicroCHP(Num)%A42Model%NdotFuel * FuelSupply(MicroCHP(Num)%FuelSupplyID)%LHV &
-                                          * 1000000.0
+                                          * 1000000.0d0
 
   MicroCHP(Num)%Report%SkinLossPower   = MicroCHP(Num)%A42Model%QdotconvZone + MicroCHP(Num)%A42Model%QdotRadZone
   MicroCHP(Num)%Report%SkinLossEnergy  = (MicroCHP(Num)%A42Model%QdotConvZone +   &
@@ -3643,7 +3643,7 @@ SUBROUTINE GetFuelCellGeneratorInput
   USE DataIPShortCuts  ! Data for field names, blank numerics
   USE CurveManager,   ONLY : GetCurveIndex
   USE NodeInputManager, ONLY: GetOnlySingleNode
-  USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
+  USE BranchNodeConnections, ONLY: TestCompSet
   USE DataHeatBalance,  ONLY: Zone, IntGainTypeOf_GeneratorFuelCell
   USE ScheduleManager, ONLY: GetScheduleIndex
   USE General, ONLY: RoundSigDigits
@@ -3761,98 +3761,102 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameFCPM,NumFuelCellGenerators)
+    IF (thisFuelCell > 0) THEN !cr9323
 
+      FuelCell(thisFuelCell)%FCPM%Name = AlphArray(1)
+      IF (SameString(AlphArray(2), 'ANNEX42')) FuelCell(thisFuelCell)%FCPM%EffMode = DirectCurveMode
+      IF (SameSTring(AlphArray(2), 'NORMALIZED')) FuelCell(thisFuelCell)%FCPM%EffMode = NormalizedCurveMode
+      IF (FuelCell(thisFuelCell)%FCPM%EffMode == 0) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        ErrorsFound = .true.
+      ENDIF
+      FuelCell(thisFuelCell)%FCPM%EffCurveID = GetCurveIndex(AlphArray(3))
+      IF (FuelCell(thisFuelCell)%FCPM%EffCurveID == 0) THEN
+         CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
+         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+         ErrorsFound = .true.
+      ENDIF
 
-    FuelCell(thisFuelCell)%FCPM%Name = AlphArray(1)
-    IF (SameString(AlphArray(2), 'ANNEX42')) FuelCell(thisFuelCell)%FCPM%EffMode = DirectCurveMode
-    IF (SameSTring(AlphArray(2), 'NORMALIZED')) FuelCell(thisFuelCell)%FCPM%EffMode = NormalizedCurveMode
-    IF (FuelCell(thisFuelCell)%FCPM%EffMode == 0) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+      FuelCell(thisFuelCell)%FCPM%NomEff           = NumArray(1)
+      FuelCell(thisFuelCell)%FCPM%NomPel           = NumArray(2)
+      FuelCell(thisFuelCell)%FCPM%NumCycles        = NumArray(3)
+      FuelCell(thisFuelCell)%FCPM%CyclingDegradRat = NumArray(4)
+      FuelCell(thisFuelCell)%FCPM%NumRunHours      = NumArray(5)
+      FuelCell(thisFuelCell)%FCPM%OperateDegradRat = NumArray(6)
+      FuelCell(thisFuelCell)%FCPM%ThreshRunHours   = NumArray(7)
+      FuelCell(thisFuelCell)%FCPM%UpTranLimit      = NumArray(8)
+      FuelCell(thisFuelCell)%FCPM%DownTranLimit    = NumArray(9)
+      FuelCell(thisFuelCell)%FCPM%StartUpTime      = NumArray(10)/SecInHour !convert to hours from seconds
+      FuelCell(thisFuelCell)%FCPM%StartUpFuel      = NumArray(11)
+      FuelCell(thisFuelCell)%FCPM%StartUpElectConsum = NumArray(12)
+      FuelCell(thisFuelCell)%FCPM%StartUpElectProd = NumArray(13)
+      FuelCell(thisFuelCell)%FCPM%ShutDownTime    = NumArray(14)/SecInHour !convert to hours from seconds
+      FuelCell(thisFuelCell)%FCPM%ShutDownFuel    = NumArray(15)
+      FuelCell(thisFuelCell)%FCPM%ShutDownElectConsum = NumArray(16)
+      FuelCell(thisFuelCell)%FCPM%ANC0           = NumArray(17)
+      FuelCell(thisFuelCell)%FCPM%ANC1           = NumArray(18)
+      IF (SameString(AlphArray(4),'ConstantRate')) &
+                   FuelCell(thisFuelCell)%FCPM%SkinLossMode = ConstantRateSkinLoss
+      IF (SameString(AlphArray(4),'UAForProcessGasTemperature')) &
+                   FuelCell(thisFuelCell)%FCPM%SkinLossMode = UADTSkinLoss
+      IF (SameString(AlphArray(4),'QUADRATIC FUNCTION OF FUEL RATE')) &
+                   FuelCell(thisFuelCell)%FCPM%SkinLossMode = QuadraticFuelNdotSkin
+      IF (FuelCell(thisFuelCell)%FCPM%SkinLossMode == 0) THEN
+         !throw error
+         CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
+         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+         ErrorsFound = .true.
+
+      ENDIF
+      FuelCell(thisFuelCell)%FCPM%ZoneName = AlphArray(5)
+      FuelCell(thisFuelCell)%FCPM%ZoneID   = FindItemInList(FuelCell(thisFuelCell)%FCPM%ZoneName, Zone%Name, NumOfZones)
+      IF (FuelCell(thisFuelCell)%FCPM%ZoneID == 0 ) THEN
+         CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
+         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+         Call ShowContinueError('Zone Name was not found ')
+         ErrorsFound = .true.
+      ENDIF
+
+      FuelCell(thisFuelCell)%FCPM%RadiativeFract = NumArray(19)
+      FuelCell(thisFuelCell)%FCPM%QdotSkin       = NumArray(20)
+      FuelCell(thisFuelCell)%FCPM%UAskin         = NumArray(21)
+
+      FuelCell(thisFuelCell)%FCPM%SkinLossCurveID = GetCurveIndex(AlphArray(6))
+      IF (FuelCell(thisFuelCell)%FCPM%SkinLossCurveID == 0) THEN
+         If (FuelCell(thisFuelCell)%FCPM%SkinLossMode == QuadraticFuelNdotSkin) THEN
+           CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
+           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+           ErrorsFound = .true.
+         ENDIF
+      ENDIF
+
+      FuelCell(thisFuelCell)%FCPM%NdotDilutionAir = NumArray(22)
+      FuelCell(thisFuelCell)%FCPM%StackHeatLossToDilution = NumArray(23)
+      FuelCell(thisFuelCell)%FCPM%DilutionInletNodeName = AlphArray(7)
+      FuelCell(thisFuelCell)%FCPM%DilutionInletNode =     &
+                 GetOnlySingleNode(AlphArray(7),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+      FuelCell(thisFuelCell)%FCPM%DilutionExhaustNodeName = AlphArray(8)
+      FuelCell(thisFuelCell)%FCPM%DilutionExhaustNode =     &
+                 GetOnlySingleNode(AlphArray(8),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+
+      FuelCell(thisFuelCell)%FCPM%PelMin = NumArray(24)
+      FuelCell(thisFuelCell)%FCPM%PelMax = NumArray(25)
+
+      !check for other FuelCell using the same power module and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%FCPM%Name, FuelCell(thisFuelCell)%FCPM%Name)) THEN
+           FuelCell(otherFuelCell)%FCPM = FuelCell(thisFuelCell)%FCPM
+        ENDIF
+
+      ENDDO
+    ELSE ! throw warning, did not find power module input
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
       ErrorsFound = .true.
     ENDIF
-    FuelCell(thisFuelCell)%FCPM%EffCurveID = GetCurveIndex(AlphArray(3))
-    IF (FuelCell(thisFuelCell)%FCPM%EffCurveID == 0) THEN
-       CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-       ErrorsFound = .true.
-    ENDIF
-
-    FuelCell(thisFuelCell)%FCPM%NomEff           = NumArray(1)
-    FuelCell(thisFuelCell)%FCPM%NomPel           = NumArray(2)
-    FuelCell(thisFuelCell)%FCPM%NumCycles        = NumArray(3)
-    FuelCell(thisFuelCell)%FCPM%CyclingDegradRat = NumArray(4)
-    FuelCell(thisFuelCell)%FCPM%NumRunHours      = NumArray(5)
-    FuelCell(thisFuelCell)%FCPM%OperateDegradRat = NumArray(6)
-    FuelCell(thisFuelCell)%FCPM%ThreshRunHours   = NumArray(7)
-    FuelCell(thisFuelCell)%FCPM%UpTranLimit      = NumArray(8)
-    FuelCell(thisFuelCell)%FCPM%DownTranLimit    = NumArray(9)
-    FuelCell(thisFuelCell)%FCPM%StartUpTime      = NumArray(10)/SecInHour !convert to hours from seconds
-    FuelCell(thisFuelCell)%FCPM%StartUpFuel      = NumArray(11)
-    FuelCell(thisFuelCell)%FCPM%StartUpElectConsum = NumArray(12)
-    FuelCell(thisFuelCell)%FCPM%StartUpElectProd = NumArray(13)
-    FuelCell(thisFuelCell)%FCPM%ShutDownTime    = NumArray(14)/SecInHour !convert to hours from seconds
-    FuelCell(thisFuelCell)%FCPM%ShutDownFuel    = NumArray(15)
-    FuelCell(thisFuelCell)%FCPM%ShutDownElectConsum = NumArray(16)
-    FuelCell(thisFuelCell)%FCPM%ANC0           = NumArray(17)
-    FuelCell(thisFuelCell)%FCPM%ANC1           = NumArray(18)
-    IF (SameString(AlphArray(4),'ConstantRate')) &
-                 FuelCell(thisFuelCell)%FCPM%SkinLossMode = ConstantRateSkinLoss
-    IF (SameString(AlphArray(4),'UAForProcessGasTemperature')) &
-                 FuelCell(thisFuelCell)%FCPM%SkinLossMode = UADTSkinLoss
-    IF (SameString(AlphArray(4),'QUADRATIC FUNCTION OF FUEL RATE')) &
-                 FuelCell(thisFuelCell)%FCPM%SkinLossMode = QuadraticFuelNdotSkin
-    IF (FuelCell(thisFuelCell)%FCPM%SkinLossMode == 0) THEN
-       !throw error
-       CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-       ErrorsFound = .true.
-
-    ENDIF
-    FuelCell(thisFuelCell)%FCPM%ZoneName = AlphArray(5)
-    FuelCell(thisFuelCell)%FCPM%ZoneID   = FindItemInList(FuelCell(thisFuelCell)%FCPM%ZoneName, Zone%Name, NumOfZones)
-    IF (FuelCell(thisFuelCell)%FCPM%ZoneID == 0 ) THEN
-       CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-       Call ShowContinueError('Zone Name was not found ')
-       ErrorsFound = .true.
-    ENDIF
-
-    FuelCell(thisFuelCell)%FCPM%RadiativeFract = NumArray(19)
-    FuelCell(thisFuelCell)%FCPM%QdotSkin       = NumArray(20)
-    FuelCell(thisFuelCell)%FCPM%UAskin         = NumArray(21)
-
-    FuelCell(thisFuelCell)%FCPM%SkinLossCurveID = GetCurveIndex(AlphArray(6))
-    IF (FuelCell(thisFuelCell)%FCPM%SkinLossCurveID == 0) THEN
-       If (FuelCell(thisFuelCell)%FCPM%SkinLossMode == QuadraticFuelNdotSkin) THEN
-         CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
-         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-         ErrorsFound = .true.
-       ENDIF
-    ENDIF
-
-    FuelCell(thisFuelCell)%FCPM%NdotDilutionAir = NumArray(22)
-    FuelCell(thisFuelCell)%FCPM%StackHeatLossToDilution = NumArray(23)
-    FuelCell(thisFuelCell)%FCPM%DilutionInletNodeName = AlphArray(7)
-    FuelCell(thisFuelCell)%FCPM%DilutionInletNode =     &
-               GetOnlySingleNode(AlphArray(7),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
-    FuelCell(thisFuelCell)%FCPM%DilutionExhaustNodeName = AlphArray(8)
-    FuelCell(thisFuelCell)%FCPM%DilutionExhaustNode =     &
-               GetOnlySingleNode(AlphArray(8),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
-
-    FuelCell(thisFuelCell)%FCPM%PelMin = NumArray(24)
-    FuelCell(thisFuelCell)%FCPM%PelMax = NumArray(25)
-
-    !check for other FuelCell using the same power module and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%FCPM%Name, FuelCell(thisFuelCell)%FCPM%Name)) THEN
-         FuelCell(otherFuelCell)%FCPM = FuelCell(thisFuelCell)%FCPM
-      ENDIF
-
-    ENDDO
-
   ENDDO ! loop over NumFuelCellPMs
 
   Call GetGeneratorFuelSupplyInput
@@ -3862,13 +3866,15 @@ If (myonetimeflag) then
   ENDDO
 
  !set fuel supply ID in Fuel cell structure
-  FuelCell(thisFuelCell)%FuelSupNum  =   &
-     FindItemInList( FuelCell(thisFuelCell)%NameFCFuelSup , FuelSupply%name,NumGeneratorFuelSups) ! Fuel Supply ID
-  IF (FuelCell(thisFuelCell)%FuelSupNum == 0) THEN
-    CALL ShowSevereError(TRIM(cAlphaFieldNames(4))//' Name: '// TRIM(FuelCell(thisFuelCell)%NameFCFuelSup)//' not found in ' //   &
-          FuelCell(GeneratorNum)%Name )
-    ErrorsFound = .true.
-  ENDIF
+  DO GeneratorNum = 1, NumFuelCellGenerators
+    FuelCell(GeneratorNum)%FuelSupNum  =   &
+       FindItemInList( FuelCell(GeneratorNum)%NameFCFuelSup , FuelSupply%name,NumGeneratorFuelSups) ! Fuel Supply ID
+    IF (FuelCell(GeneratorNum)%FuelSupNum == 0) THEN
+      CALL ShowSevereError('Fuel Supply Name: '// TRIM(FuelCell(GeneratorNum)%NameFCFuelSup) &
+            //' not found in ' //   FuelCell(GeneratorNum)%Name )
+      ErrorsFound = .true.
+    ENDIF
+  ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:AirSupply'
   NumFuelCellAirSups = GetNumObjectsFound(cCurrentModuleObject)
@@ -3893,169 +3899,177 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameFCAirSup,NumFuelCellGenerators)
-   !  this is only the first instance of a FuelCell generator using this type of power module
-    FuelCell(thisFuelCell)%AirSup%Name     = AlphArray(1)
-    FuelCell(thisFuelCell)%AirSup%NodeName = AlphArray(2)
+    IF (thisFuelCell > 0 ) THEN
 
-     ! check the node connections
-    FuelCell(thisFuelCell)%AirSup%SupNodeNum = &
-               GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+      FuelCell(thisFuelCell)%AirSup%Name     = AlphArray(1)
+      FuelCell(thisFuelCell)%AirSup%NodeName = AlphArray(2)
 
-    FuelCell(thisFuelCell)%AirSup%BlowerPowerCurveID = GetCurveIndex(AlphArray(3))
-    If (FuelCell(thisFuelCell)%AirSup%BlowerPowerCurveID == 0) Then
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowContinueError('Curve name was not found ')
-      errorsFound = .true.
-    ENDIF
-    FuelCell(thisFuelCell)%AirSup%BlowerHeatLossFactor = NumArray(1)
+       ! check the node connections
+      FuelCell(thisFuelCell)%AirSup%SupNodeNum = &
+                 GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
 
-    IF      (SameString(AlphArray(4), 'AirRatiobyStoics')) THEN
-      FuelCell(thisFuelCell)%AirSup%AirSupRateMode = ConstantStoicsAirRat
-    ELSEIF (SameString(AlphArray(4), 'QuadraticFunctionofElectricPower')) THEN
-      FuelCell(thisFuelCell)%AirSup%AirSupRateMode = QuadraticFuncofPel
-    ELSEIF (SameString(AlphArray(4), 'QUADRATIC FUNCTION OF FUEL RATE'))   THEN
-      FuelCell(thisFuelCell)%AirSup%AirSupRateMode = QuadraticFuncofNdot
-    ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
-    ENDIF
-
-    FuelCell(thisFuelCell)%AirSup%Stoics = NumArray(2) + 1.0  !
-
-    FuelCell(thisFuelCell)%AirSup%AirFuncPelCurveID = GetCurveIndex(AlphArray(5))
-    If ((FuelCell(thisFuelCell)%AirSup%AirFuncPelCurveID == 0) .AND. &
-        (FuelCell(thisFuelCell)%AirSup%AirSupRateMode == QuadraticFuncofPel)) then
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowSevereError('Curve name was not found')
-      errorsFound = .true.
-    ENDIF
-
-    FuelCell(thisFuelCell)%AirSup%AirTempCoeff = NumArray(3)
-
-    FuelCell(thisFuelCell)%AirSup%AirFuncNdotCurveID = GetCurveIndex(AlphArray(6))
-    If ((FuelCell(thisFuelCell)%AirSup%AirFuncNdotCurveID ==0) .AND. &
-        (FuelCell(thisFuelCell)%AirSup%AirSupRateMode == QuadraticFuncofNdot)) then
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowSevereError('Curve name was not found')
-      errorsFound = .true.
-    ENDIF
-
-    If(SameString('RecoverBurnerInverterStorage',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverBurnInvertBatt
-    ELSEIF (SameString('RecoverAuxiliaryBurner',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverAuxiliaryBurner
-    ELSEIF (SameString('RecoverInverterandStorage',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverInverterBatt
-    ELSEIF (SameString('RecoverInverter',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverInverter
-    ELSEIF (SameString('RecoverElectricalStorage',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverBattery
-    ELSEIF (SameString('NoRecovery',AlphArray(7))) THEN
-      FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = NoRecoveryOnAirIntake
-    ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(AlphArray(7)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
-    ENDIF
-
-
-    If(SameString('AmbientAir',AlphArray(8))) THEN
-      FuelCell(thisFuelCell)%AirSup%ConstituentMode = RegularAir
-    ELSEIF (SameString('UserDefinedConstituents',AlphArray(8))) THEN
-      FuelCell(thisFuelCell)%AirSup%ConstituentMode = UserDefinedConstituents
-    ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(AlphArray(8)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
-    ENDIF
-
-    If (FuelCell(thisFuelCell)%AirSup%ConstituentMode == UserDefinedConstituents) THEN
-      NumAirConstit  = NumArray(4)
-      FuelCell(thisFuelCell)%AirSup%NumConstituents =NumAirConstit
-
-      IF (NumAirConstit > 5) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(4))//'='//TRIM(RoundSigDigits(NumArray(4),2)))
+      FuelCell(thisFuelCell)%AirSup%BlowerPowerCurveID = GetCurveIndex(AlphArray(3))
+      If (FuelCell(thisFuelCell)%AirSup%BlowerPowerCurveID == 0) Then
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-        CALL ShowContinueError('Fuel Cell model not set up for more than 5 air constituents')
-        ErrorsFound = .true.
+        CALL ShowContinueError('Curve name was not found ')
+        errorsFound = .true.
+      ENDIF
+      FuelCell(thisFuelCell)%AirSup%BlowerHeatLossFactor = NumArray(1)
+
+      IF      (SameString(AlphArray(4), 'AirRatiobyStoics')) THEN
+        FuelCell(thisFuelCell)%AirSup%AirSupRateMode = ConstantStoicsAirRat
+      ELSEIF (SameString(AlphArray(4), 'QuadraticFunctionofElectricPower')) THEN
+        FuelCell(thisFuelCell)%AirSup%AirSupRateMode = QuadraticFuncofPel
+      ELSEIF (SameString(AlphArray(4), 'QUADRATIC FUNCTION OF FUEL RATE'))   THEN
+        FuelCell(thisFuelCell)%AirSup%AirSupRateMode = QuadraticFuncofNdot
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
       ENDIF
 
-      DO ConstitNum=1, NumAirConstit
-        FuelCell(thisFuelCell)%AirSup%ConstitName(ConstitNum)       = AlphArray(ConstitNum + 8)
-        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(ConstitNum) = NumArray(ConstitNum + 4)
+      FuelCell(thisFuelCell)%AirSup%Stoics = NumArray(2) + 1.0d0  !
 
+      FuelCell(thisFuelCell)%AirSup%AirFuncPelCurveID = GetCurveIndex(AlphArray(5))
+      If ((FuelCell(thisFuelCell)%AirSup%AirFuncPelCurveID == 0) .AND. &
+          (FuelCell(thisFuelCell)%AirSup%AirSupRateMode == QuadraticFuncofPel)) then
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowSevereError('Curve name was not found')
+        errorsFound = .true.
+      ENDIF
+
+      FuelCell(thisFuelCell)%AirSup%AirTempCoeff = NumArray(3)
+
+      FuelCell(thisFuelCell)%AirSup%AirFuncNdotCurveID = GetCurveIndex(AlphArray(6))
+      If ((FuelCell(thisFuelCell)%AirSup%AirFuncNdotCurveID ==0) .AND. &
+          (FuelCell(thisFuelCell)%AirSup%AirSupRateMode == QuadraticFuncofNdot)) then
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowSevereError('Curve name was not found')
+        errorsFound = .true.
+      ENDIF
+
+      If(SameString('RecoverBurnerInverterStorage',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverBurnInvertBatt
+      ELSEIF (SameString('RecoverAuxiliaryBurner',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverAuxiliaryBurner
+      ELSEIF (SameString('RecoverInverterandStorage',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverInverterBatt
+      ELSEIF (SameString('RecoverInverter',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverInverter
+      ELSEIF (SameString('RecoverElectricalStorage',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = RecoverBattery
+      ELSEIF (SameString('NoRecovery',AlphArray(7))) THEN
+        FuelCell(thisFuelCell)%AirSup%IntakeRecoveryMode = NoRecoveryOnAirIntake
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(AlphArray(7)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
+      ENDIF
+
+
+      If(SameString('AmbientAir',AlphArray(8))) THEN
+        FuelCell(thisFuelCell)%AirSup%ConstituentMode = RegularAir
+      ELSEIF (SameString('UserDefinedConstituents',AlphArray(8))) THEN
+        FuelCell(thisFuelCell)%AirSup%ConstituentMode = UserDefinedConstituents
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(AlphArray(8)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
+      ENDIF
+
+      If (FuelCell(thisFuelCell)%AirSup%ConstituentMode == UserDefinedConstituents) THEN
+        NumAirConstit  = NumArray(4)
+        FuelCell(thisFuelCell)%AirSup%NumConstituents =NumAirConstit
+
+        IF (NumAirConstit > 5) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(4))//'='//TRIM(RoundSigDigits(NumArray(4),2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+          CALL ShowContinueError('Fuel Cell model not set up for more than 5 air constituents')
+          ErrorsFound = .true.
+        ENDIF
+
+        DO ConstitNum=1, NumAirConstit
+          FuelCell(thisFuelCell)%AirSup%ConstitName(ConstitNum)       = AlphArray(ConstitNum + 8)
+          FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(ConstitNum) = NumArray(ConstitNum + 4)
+
+        ENDDO
+
+      ELSE  !regular air
+        NumAirConstit  = 5
+
+        FuelCell(thisFuelCell)%AirSup%NumConstituents = NumAirConstit
+
+        FuelCell(thisFuelCell)%AirSup%ConstitName(1)       = 'Nitrogen'
+        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(1) = 0.7728d0
+
+        FuelCell(thisFuelCell)%AirSup%ConstitName(2)       = 'Oxygen'
+        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(2) = 0.2073d0
+
+        FuelCell(thisFuelCell)%AirSup%ConstitName(3)       = 'Water'
+        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(3) = 0.0104d0
+
+        FuelCell(thisFuelCell)%AirSup%ConstitName(4)       = 'Argon'
+        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(4) = 0.0092d0
+
+        FuelCell(thisFuelCell)%AirSup%ConstitName(5)       = 'CarbonDioxide'
+        FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(5) = 0.0003d0
+
+      ENDIF
+
+      ! check for molar fractions summing to 1.0.
+      IF (ABS(SUM(FuelCell(thisFuelCell)%AirSup%ConstitMolalFract)-1.0d0) > .0001d0) THEN
+
+        CALL showSevereError(TRIM(cCurrentModuleObject)//' molar fractions do not sum to 1.0' )
+        CALL ShowContinueError('..Sum was='//TRIM(RoundSigDigits(SUM(FuelCell(thisFuelCell)%AirSup%ConstitMolalFract),1)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(AlphArray(1)))
+        errorsfound = .true.
+      ENDIF
+
+      !check for other FuelCell using the same Air Supply module and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%AirSup%Name, FuelCell(thisFuelCell)%AirSup%Name)) THEN
+           FuelCell(otherFuelCell)%AirSup = FuelCell(thisFuelCell)%AirSup
+        ENDIF
       ENDDO
-
-    ELSE  !regular air
-      NumAirConstit  = 5
-
-      FuelCell(thisFuelCell)%AirSup%NumConstituents = NumAirConstit
-
-      FuelCell(thisFuelCell)%AirSup%ConstitName(1)       = 'Nitrogen'
-      FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(1) = 0.7728d0
-
-      FuelCell(thisFuelCell)%AirSup%ConstitName(2)       = 'Oxygen'
-      FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(2) = 0.2073d0
-
-      FuelCell(thisFuelCell)%AirSup%ConstitName(3)       = 'Water'
-      FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(3) = 0.0104d0
-
-      FuelCell(thisFuelCell)%AirSup%ConstitName(4)       = 'Argon'
-      FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(4) = 0.0092d0
-
-      FuelCell(thisFuelCell)%AirSup%ConstitName(5)       = 'CarbonDioxide'
-      FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(5) = 0.0003d0
-
+    ELSE
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
+      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+      ErrorsFound = .true.
     ENDIF
 
-    ! check for molar fractions summing to 1.0.
-    IF (ABS(SUM(FuelCell(thisFuelCell)%AirSup%ConstitMolalFract)-1.0) > .0001d0) THEN
+  ENDDO
 
-      CALL showSevereError(TRIM(cCurrentModuleObject)//' molar fractions do not sum to 1.0' )
-      CALL ShowContinueError('..Sum was='//TRIM(RoundSigDigits(SUM(FuelCell(thisFuelCell)%AirSup%ConstitMolalFract),1)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(AlphArray(1)))
-      errorsfound = .true.
-    ENDIF
+  DO GeneratorNum = 1, NumFuelCellGenerators
+    ! find molal fraction of oxygen in air supply
+    thisConstituent = FindItem('Oxygen', FuelCell(GeneratorNum)%AirSup%ConstitName, &
+                                               FuelCell(GeneratorNum)%AirSup%NumConstituents)
+    IF (thisConstituent > 0) FuelCell(GeneratorNum)%AirSup%O2fraction =   &
+       FuelCell(GeneratorNum)%AirSup%ConstitMolalFract(thisConstituent)
 
-    !check for other FuelCell using the same Air Supply module and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%AirSup%Name, FuelCell(thisFuelCell)%AirSup%Name)) THEN
-         FuelCell(otherFuelCell)%AirSup = FuelCell(thisFuelCell)%AirSup
-      ENDIF
+    NumHardCodedConstituents = 14
+
+    ! Loop over air constituents and do one-time setup
+    DO i=1, FuelCell(GeneratorNum)%AirSup%NumConstituents
+
+      thisName = FuelCell(GeneratorNum)%AirSup%ConstitName(i)
+
+      thisGasID = FindItem(thisName, GasPhaseThermoChemistryData%ConstituentName, NumHardCodedConstituents)
+
+      FuelCell(GeneratorNum)%AirSup%GasLibID(i) = thisGasID
+
     ENDDO
 
+    !set up gas constiuents for product gases
+    FuelCell(GeneratorNum)%FCPM%GasLibID(1) = 1 !Carbon Dioxide
+    FuelCell(GeneratorNum)%FCPM%GasLibID(2) = 2 !Nitrogen
+    FuelCell(GeneratorNum)%FCPM%GasLibID(3) = 3 !Oxygen
+    FuelCell(GeneratorNum)%FCPM%GasLibID(4) = 4 !Water
+    FuelCell(GeneratorNum)%FCPM%GasLibID(5) = 5 !Argon
   ENDDO
-
-  ! find molal fraction of oxygen in air supply
-  thisConstituent = FindItem('Oxygen', FuelCell(thisFuelCell)%AirSup%ConstitName, &
-                                             FuelCell(thisFuelCell)%AirSup%NumConstituents)
-  IF (thisConstituent > 0) FuelCell(thisFuelCell)%AirSup%O2fraction =   &
-     FuelCell(thisFuelCell)%AirSup%ConstitMolalFract(thisConstituent)
-
-  NumHardCodedConstituents = 14
-
-  ! Loop over air constituents and do one-time setup
-  DO i=1, FuelCell(thisFuelCell)%AirSup%NumConstituents
-
-    thisName = FuelCell(thisFuelCell)%AirSup%ConstitName(i)
-
-    thisGasID = FindItem(thisName, GasPhaseThermoChemistryData%ConstituentName, NumHardCodedConstituents)
-
-    FuelCell(thisFuelCell)%AirSup%GasLibID(i) = thisGasID
-
-  ENDDO
-
-  !set up gas constiuents for product gases
-  FuelCell(thisFuelCell)%FCPM%GasLibID(1) = 1 !Carbon Dioxide
-  FuelCell(thisFuelCell)%FCPM%GasLibID(2) = 2 !Nitrogen
-  FuelCell(thisFuelCell)%FCPM%GasLibID(3) = 3 !Oxygen
-  FuelCell(thisFuelCell)%FCPM%GasLibID(4) = 4 !Water
-  FuelCell(thisFuelCell)%FCPM%GasLibID(5) = 5 !Argon
 
   cCurrentModuleObject = 'Generator:FuelCell:WaterSupply'
   NumFCWaterSups = GetNumObjectsFound(cCurrentModuleObject)
@@ -4079,68 +4093,75 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameFCWaterSup,NumFuelCellGenerators)
-   !  this is only the first instance of a FuelCell generator using this type of Water supply module
-    FuelCell(thisFuelCell)%WaterSup%Name = AlphArray(1)
-    FuelCell(thisFuelCell)%WaterSup%WaterSupRateCurveID =  GetCurveIndex(AlphArray(2))
-    IF (FuelCell(thisFuelCell)%WaterSup%WaterSupRateCurveID == 0) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowContinueError('Curve name was not found ')
-      errorsFound = .true.
-    ENDIF
-    FuelCell(thisFuelCell)%WaterSup%PmpPowerCurveID = GetCurveIndex(AlphArray(3))
-    IF (FuelCell(thisFuelCell)%WaterSup%PmpPowerCurveID == 0 ) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowContinueError('Curve name was not found ')
-      errorsFound = .true.
-    ENDIF
-    FuelCell(thisFuelCell)%WaterSup%PmpPowerLossFactor = NumArray(1)
-
-    IF(SameString('TemperatureFromAirNode',AlphArray(4))) THEN
-      FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformAirNode
-
-      FuelCell(thisFuelCell)%WaterSup%NodeName = AlphArray(5)
-      FuelCell(thisFuelCell)%WaterSup%NodeNum  = &
-             GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-             NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
-
-    ELSEIF(SameString('TemperatureFromWaterNode',AlphArray(4))) THEN
-      FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformWaterNode
-
-      FuelCell(thisFuelCell)%WaterSup%NodeName = AlphArray(5)
-      FuelCell(thisFuelCell)%WaterSup%NodeNum  = &
-             GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-             NodeType_Water,NodeConnectionType_Sensor,1,ObjectIsNotParent)
-
-    ELSEIF(SameString('MainsWaterTemperature' , AlphArray(4))) Then
-      FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformMains
-
-    ELSEIF (SameString('TemperatureFromSchedule', AlphArray(4))) THEN
-      FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformSchedule
-    ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
-    ENDIF
-
-
-    FuelCell(thisFuelCell)%WaterSup%SchedNum = GetScheduleIndex(AlphArray(6))
-    IF ((FuelCell(thisFuelCell)%WaterSup%SchedNum == 0) .AND. &
-       (FuelCell(thisFuelCell)%WaterSup%WaterTempMode == WaterInReformSchedule)) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CAll ShowContinueError('Schedule was not found')
-      errorsFound = .true.
-    ENDIF
-
-
-    !check for other FuelCell using the same Water Supply module and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%WaterSup%Name, FuelCell(thisFuelCell)%WaterSup%Name)) THEN
-         FuelCell(otherFuelCell)%WaterSup = FuelCell(thisFuelCell)%WaterSup
+    IF (thisFuelCell > 0) THEN
+     !  this is only the first instance of a FuelCell generator using this type of Water supply module
+      FuelCell(thisFuelCell)%WaterSup%Name = AlphArray(1)
+      FuelCell(thisFuelCell)%WaterSup%WaterSupRateCurveID =  GetCurveIndex(AlphArray(2))
+      IF (FuelCell(thisFuelCell)%WaterSup%WaterSupRateCurveID == 0) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowContinueError('Curve name was not found ')
+        errorsFound = .true.
       ENDIF
-    ENDDO
+      FuelCell(thisFuelCell)%WaterSup%PmpPowerCurveID = GetCurveIndex(AlphArray(3))
+      IF (FuelCell(thisFuelCell)%WaterSup%PmpPowerCurveID == 0 ) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowContinueError('Curve name was not found ')
+        errorsFound = .true.
+      ENDIF
+      FuelCell(thisFuelCell)%WaterSup%PmpPowerLossFactor = NumArray(1)
+
+  !!CR9240?
+      IF(SameString('TemperatureFromAirNode',AlphArray(4))) THEN
+        FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformAirNode
+
+        FuelCell(thisFuelCell)%WaterSup%NodeName = AlphArray(5)
+        FuelCell(thisFuelCell)%WaterSup%NodeNum  = &
+               GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+               NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+
+      ELSEIF(SameString('TemperatureFromWaterNode',AlphArray(4))) THEN
+        FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformWaterNode
+
+        FuelCell(thisFuelCell)%WaterSup%NodeName = AlphArray(5)
+        FuelCell(thisFuelCell)%WaterSup%NodeNum  = &
+               GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+               NodeType_Water,NodeConnectionType_Sensor,1,ObjectIsNotParent)
+
+      ELSEIF(SameString('MainsWaterTemperature' , AlphArray(4))) Then
+        FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformMains
+
+      ELSEIF (SameString('TemperatureFromSchedule', AlphArray(4))) THEN
+        FuelCell(thisFuelCell)%WaterSup%WaterTempMode = WaterInReformSchedule
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(AlphArray(4)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
+      ENDIF
+
+
+      FuelCell(thisFuelCell)%WaterSup%SchedNum = GetScheduleIndex(AlphArray(6))
+      IF ((FuelCell(thisFuelCell)%WaterSup%SchedNum == 0) .AND. &
+         (FuelCell(thisFuelCell)%WaterSup%WaterTempMode == WaterInReformSchedule)) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(AlphArray(6)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CAll ShowContinueError('Schedule was not found')
+        errorsFound = .true.
+      ENDIF
+
+
+      !check for other FuelCell using the same Water Supply module and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%WaterSup%Name, FuelCell(thisFuelCell)%WaterSup%Name)) THEN
+           FuelCell(otherFuelCell)%WaterSup = FuelCell(thisFuelCell)%WaterSup
+        ENDIF
+      ENDDO
+    ELSE
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
+      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+      ErrorsFound = .true.
+    ENDIF
 
   ENDDO
 
@@ -4166,45 +4187,51 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameFCAuxilHeat,NumFuelCellGenerators)
-    FuelCell(thisFuelCell)%AuxilHeat%Name = AlphArray(1)
+    IF (thisFuelCell > 0) THEN
+      FuelCell(thisFuelCell)%AuxilHeat%Name = AlphArray(1)
 
-    FuelCell(thisFuelCell)%AuxilHeat%ExcessAirRAT = NumArray(1)
-    FuelCell(thisFuelCell)%AuxilHeat%ANC0         = NumArray(2)
-    FuelCell(thisFuelCell)%AuxilHeat%ANC1         = NumArray(3)
-    FuelCell(thisFuelCell)%AuxilHeat%UASkin       = NumArray(4)
+      FuelCell(thisFuelCell)%AuxilHeat%ExcessAirRAT = NumArray(1)
+      FuelCell(thisFuelCell)%AuxilHeat%ANC0         = NumArray(2)
+      FuelCell(thisFuelCell)%AuxilHeat%ANC1         = NumArray(3)
+      FuelCell(thisFuelCell)%AuxilHeat%UASkin       = NumArray(4)
 
-    If (SameString('SurroundingZone', AlphArray(2))) Then
-      FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination  = SurroundingZone
-    ELSEIF (SameString('AirInletForFuelCell', AlphArray(2))) Then
-      FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination  =  AirInletForFC
+      If (SameString('SurroundingZone', AlphArray(2))) Then
+        FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination  = SurroundingZone
+      ELSEIF (SameString('AirInletForFuelCell', AlphArray(2))) Then
+        FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination  =  AirInletForFC
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        ErrorsFound = .true.
+      ENDIF
+
+      FuelCell(thisFuelCell)%AuxilHeat%ZoneName = AlphArray(3)
+      FuelCell(thisFuelCell)%AuxilHeat%ZoneID = FindItemInList(AlphArray(3),Zone%Name,size(Zone) )
+      IF ((FuelCell(thisFuelCell)%AuxilHeat%ZoneID == 0 )    &
+         .AND. (FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination == SurroundingZone)) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowContinueError('Zone name was not found ')
+        errorsfound = .true.
+      ENDIF
+      FuelCell(thisFuelCell)%AuxilHeat%MaxPowerW   = NumArray(5)
+      FuelCell(thisFuelCell)%AuxilHeat%MinPowerW   = NumArray(6)
+      FuelCell(thisFuelCell)%AuxilHeat%MaxPowerkmolperSec   = NumArray(7)
+      FuelCell(thisFuelCell)%AuxilHeat%MinPowerkmolperSec   = NumArray(8)
+
+      ! TODO finish Auxiliary heater
+
+      !check for other FuelCell using the same Auxiliary Heating module and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%AuxilHeat%Name, FuelCell(thisFuelCell)%AuxilHeat%Name)) THEN
+           FuelCell(otherFuelCell)%AuxilHeat = FuelCell(thisFuelCell)%AuxilHeat
+        ENDIF
+      ENDDO
     ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
       ErrorsFound = .true.
     ENDIF
-
-    FuelCell(thisFuelCell)%AuxilHeat%ZoneName = AlphArray(3)
-    FuelCell(thisFuelCell)%AuxilHeat%ZoneID = FindItemInList(AlphArray(3),Zone%Name,size(Zone) )
-    IF ((FuelCell(thisFuelCell)%AuxilHeat%ZoneID == 0 )    &
-       .AND. (FuelCell(thisFuelCell)%AuxilHeat%SkinLossDestination == SurroundingZone)) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowContinueError('Zone name was not found ')
-      errorsfound = .true.
-    ENDIF
-    FuelCell(thisFuelCell)%AuxilHeat%MaxPowerW   = NumArray(5)
-    FuelCell(thisFuelCell)%AuxilHeat%MinPowerW   = NumArray(6)
-    FuelCell(thisFuelCell)%AuxilHeat%MaxPowerkmolperSec   = NumArray(7)
-    FuelCell(thisFuelCell)%AuxilHeat%MinPowerkmolperSec   = NumArray(8)
-
-    ! TODO finish Auxiliary heater
-
-    !check for other FuelCell using the same Auxiliary Heating module and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%AuxilHeat%Name, FuelCell(thisFuelCell)%AuxilHeat%Name)) THEN
-         FuelCell(otherFuelCell)%AuxilHeat = FuelCell(thisFuelCell)%AuxilHeat
-      ENDIF
-    ENDDO
 
   ENDDO
 
@@ -4232,62 +4259,68 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameExhaustHX,NumFuelCellGenerators)
-    FuelCell(thisFuelCell)%ExhaustHX%Name            = AlphArray(1)
-    FuelCell(thisFuelCell)%ExhaustHX%WaterInNodeName = AlphArray(2)
-    FuelCell(thisFuelCell)%ExhaustHX%WaterOutNodeName= AlphArray(3)
-    !find node ids for water path
-    FuelCell(thisFuelCell)%ExhaustHX%WaterInNode =  &
-               GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Water,NodeConnectionType_Inlet,1,ObjectIsNotParent )
-    FuelCell(thisFuelCell)%ExhaustHX%WaterOutNode =  &
-               GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Water,NodeConnectionType_Outlet,1,ObjectIsNotParent )
-    CALL TestCompSet(TRIM(cCurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),  &
-                            'Heat Recovery Nodes')
+    IF (thisFuelCell > 0) THEN
+      FuelCell(thisFuelCell)%ExhaustHX%Name            = AlphArray(1)
+      FuelCell(thisFuelCell)%ExhaustHX%WaterInNodeName = AlphArray(2)
+      FuelCell(thisFuelCell)%ExhaustHX%WaterOutNodeName= AlphArray(3)
+      !find node ids for water path
+      FuelCell(thisFuelCell)%ExhaustHX%WaterInNode =  &
+                 GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Water,NodeConnectionType_Inlet,1,ObjectIsNotParent )
+      FuelCell(thisFuelCell)%ExhaustHX%WaterOutNode =  &
+                 GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Water,NodeConnectionType_Outlet,1,ObjectIsNotParent )
+      CALL TestCompSet(TRIM(cCurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),  &
+                              'Heat Recovery Nodes')
 
-    FuelCell(thisFuelCell)%ExhaustHX%ExhaustOutNodeName =  AlphArray(4)
-    FuelCell(thisFuelCell)%ExhaustHX%ExhaustOutNode     = &
-               GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent )
+  !CR9240
+      FuelCell(thisFuelCell)%ExhaustHX%ExhaustOutNodeName =  AlphArray(4)
+      FuelCell(thisFuelCell)%ExhaustHX%ExhaustOutNode     = &
+                 GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
+                 NodeType_Air,NodeConnectionType_Outlet,2,ObjectIsNotParent )
 
-    IF     (SameString('FixedEffectiveness', AlphArray(5))) THEN
-      FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = FixedEffectiveness
-    ELSEIF (SameString('EmpiricalUAeff', AlphArray(5))) THEN
-      FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = LMTDempiricalUAeff
-    ELSEIF (SameString('FundementalUAeff', AlphArray(5))) THEN
-      FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = LMTDfundementalUAeff
-    ELSEIF (SameString('CONDENSING', AlphArray(5))) THEN
-      FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = Condensing
+      IF     (SameString('FixedEffectiveness', AlphArray(5))) THEN
+        FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = FixedEffectiveness
+      ELSEIF (SameString('EmpiricalUAeff', AlphArray(5))) THEN
+        FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = LMTDempiricalUAeff
+      ELSEIF (SameString('FundementalUAeff', AlphArray(5))) THEN
+        FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = LMTDfundementalUAeff
+      ELSEIF (SameString('CONDENSING', AlphArray(5))) THEN
+        FuelCell(thisFuelCell)%ExhaustHX%HXmodelMode = Condensing
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
+
+      ENDIF
+      FuelCell(thisFuelCell)%ExhaustHX%WaterVolumeFlowMax= NumArray(1)
+      FuelCell(thisFuelCell)%ExhaustHX%HXEffect          = NumArray(2)
+      FuelCell(thisFuelCell)%ExhaustHX%hxs0              = NumArray(3)
+      FuelCell(thisFuelCell)%ExhaustHX%hxs1              = NumArray(4)
+      FuelCell(thisFuelCell)%ExhaustHX%hxs2              = NumArray(5)
+      FuelCell(thisFuelCell)%ExhaustHX%hxs3              = NumArray(6)
+      FuelCell(thisFuelCell)%ExhaustHX%hxs4              = NumArray(7)
+      FuelCell(thisFuelCell)%ExhaustHX%h0gas             = NumArray(8)
+      FuelCell(thisFuelCell)%ExhaustHX%NdotGasRef        = NumArray(9)
+      FuelCell(thisFuelCell)%ExhaustHX%nCoeff            = NumArray(10)
+      FuelCell(thisFuelCell)%ExhaustHX%AreaGas           = NumArray(11)
+      FuelCell(thisFuelCell)%ExhaustHX%h0Water           = NumArray(12)
+      FuelCell(thisFuelCell)%ExhaustHX%NdotWaterRef      = NumArray(13)
+      FuelCell(thisFuelCell)%ExhaustHX%mCoeff            = NumArray(14)
+      FuelCell(thisFuelCell)%ExhaustHX%AreaWater         = NumArray(15)
+      FuelCell(thisFuelCell)%ExhaustHX%Fadjust           = NumArray(16)
+      FuelCell(thisFuelCell)%ExhaustHX%l1Coeff           = NumArray(17)
+      FuelCell(thisFuelCell)%ExhaustHX%l2Coeff           = NumArray(18)
+      FuelCell(thisFuelCell)%ExhaustHX%CondensationThresholdTemp =  NumArray(19)
+
+      ! store cooling water volume flow rate for autosizing system
+      CALL RegisterPlantCompDesignFlow(FuelCell(thisFuelCell)%ExhaustHX%WaterInNode, &
+                                 FuelCell(thisFuelCell)%ExhaustHX%WaterVolumeFlowMax )
     ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(AlphArray(5)))
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
-
+      ErrorsFound = .true.
     ENDIF
-    FuelCell(thisFuelCell)%ExhaustHX%WaterVolumeFlowMax= NumArray(1)
-    FuelCell(thisFuelCell)%ExhaustHX%HXEffect          = NumArray(2)
-    FuelCell(thisFuelCell)%ExhaustHX%hxs0              = NumArray(3)
-    FuelCell(thisFuelCell)%ExhaustHX%hxs1              = NumArray(4)
-    FuelCell(thisFuelCell)%ExhaustHX%hxs2              = NumArray(5)
-    FuelCell(thisFuelCell)%ExhaustHX%hxs3              = NumArray(6)
-    FuelCell(thisFuelCell)%ExhaustHX%hxs4              = NumArray(7)
-    FuelCell(thisFuelCell)%ExhaustHX%h0gas             = NumArray(8)
-    FuelCell(thisFuelCell)%ExhaustHX%NdotGasRef        = NumArray(9)
-    FuelCell(thisFuelCell)%ExhaustHX%nCoeff            = NumArray(10)
-    FuelCell(thisFuelCell)%ExhaustHX%AreaGas           = NumArray(11)
-    FuelCell(thisFuelCell)%ExhaustHX%h0Water           = NumArray(12)
-    FuelCell(thisFuelCell)%ExhaustHX%NdotWaterRef      = NumArray(13)
-    FuelCell(thisFuelCell)%ExhaustHX%mCoeff            = NumArray(14)
-    FuelCell(thisFuelCell)%ExhaustHX%AreaWater         = NumArray(15)
-    FuelCell(thisFuelCell)%ExhaustHX%Fadjust           = NumArray(16)
-    FuelCell(thisFuelCell)%ExhaustHX%l1Coeff           = NumArray(17)
-    FuelCell(thisFuelCell)%ExhaustHX%l2Coeff           = NumArray(18)
-    FuelCell(thisFuelCell)%ExhaustHX%CondensationThresholdTemp =  NumArray(19)
-
-    ! store cooling water volume flow rate for autosizing system
-    CALL RegisterPlantCompDesignFlow(FuelCell(thisFuelCell)%ExhaustHX%WaterInNode, &
-                               FuelCell(thisFuelCell)%ExhaustHX%WaterVolumeFlowMax )
-
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:ElectricalStorage'
@@ -4314,30 +4347,35 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameElecStorage,NumFuelCellGenerators)
-    FuelCell(thisFuelCell)%ElecStorage%Name = AlphArray(1)
+    IF (thisFuelCell > 0) THEN
+      FuelCell(thisFuelCell)%ElecStorage%Name = AlphArray(1)
 
-    IF (SameString(AlphArray(2), 'SimpleEfficiencyWithConstraints')) THEN
-       FuelCell(thisFuelCell)%ElecStorage%StorageModelMode  = SimpleEffConstraints
-    ELSE
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      errorsFound = .true.
+      IF (SameString(AlphArray(2), 'SimpleEfficiencyWithConstraints')) THEN
+         FuelCell(thisFuelCell)%ElecStorage%StorageModelMode  = SimpleEffConstraints
+      ELSE
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        errorsFound = .true.
 
-    ENDIF
-    FuelCell(thisFuelCell)%ElecStorage%EnergeticEfficCharge    = NumArray(1)
-    FuelCell(thisFuelCell)%ElecStorage%EnergeticEfficDischarge = NumArray(2)
-    FuelCell(thisFuelCell)%ElecStorage%NominalEnergyCapacity   = NumArray(3)
-    FuelCell(thisFuelCell)%ElecStorage%MaxPowerDraw            = NumArray(4)
-    FuelCell(thisFuelCell)%ElecStorage%MaxPowerStore           = NumArray(5)
-    FuelCell(thisFuelCell)%ElecStorage%StartingEnergyStored    = NumArray(6)
-
-        !check for other FuelCell using the same Electrical Storage and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%ElecStorage%Name, FuelCell(thisFuelCell)%ElecStorage%Name)) THEN
-         FuelCell(otherFuelCell)%ElecStorage = FuelCell(thisFuelCell)%ElecStorage
       ENDIF
-    ENDDO
+      FuelCell(thisFuelCell)%ElecStorage%EnergeticEfficCharge    = NumArray(1)
+      FuelCell(thisFuelCell)%ElecStorage%EnergeticEfficDischarge = NumArray(2)
+      FuelCell(thisFuelCell)%ElecStorage%NominalEnergyCapacity   = NumArray(3)
+      FuelCell(thisFuelCell)%ElecStorage%MaxPowerDraw            = NumArray(4)
+      FuelCell(thisFuelCell)%ElecStorage%MaxPowerStore           = NumArray(5)
+      FuelCell(thisFuelCell)%ElecStorage%StartingEnergyStored    = NumArray(6)
 
+          !check for other FuelCell using the same Electrical Storage and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%ElecStorage%Name, FuelCell(thisFuelCell)%ElecStorage%Name)) THEN
+           FuelCell(otherFuelCell)%ElecStorage = FuelCell(thisFuelCell)%ElecStorage
+        ENDIF
+      ENDDO
+    ELSE
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
+      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+      ErrorsFound = .true.
+    ENDIF
 
   ENDDO
 
@@ -4366,33 +4404,39 @@ If (myonetimeflag) then
     ENDIF
 
     thisFuelCell = FindItemInList(AlphArray(1),FuelCell%NameInverter,NumFuelCellGenerators)
-    FuelCell(thisFuelCell)%Inverter%Name = AlphArray(1)
+    IF (thisFuelCell > 0) THEN
+      FuelCell(thisFuelCell)%Inverter%Name = AlphArray(1)
 
-    IF (SameString(AlphArray(2), 'QUADRATIC')) FuelCell(thisFuelCell)%Inverter%EffMode = InverterEffQuadratic
-    IF (SameSTring(AlphArray(2), 'Constant'))  FuelCell(thisFuelCell)%Inverter%EffMode = InverterEffConstant
-    IF (FuelCell(thisFuelCell)%Inverter%EffMode == 0) THEN
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      ErrorsFound = .true.
-    ENDIF
-
-    FuelCell(thisFuelCell)%Inverter%ConstEff = NumArray(1)
-
-    FuelCell(thisFuelCell)%Inverter%EffQuadraticCurveID  = GetCurveIndex(AlphArray(3))
-    If ((FuelCell(thisFuelCell)%Inverter%EffQuadraticCurveID == 0)  &
-         .AND. (FuelCell(thisFuelCell)%Inverter%EffMode == InverterEffQuadratic))  Then
-      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-      CALL ShowContinueError('Curve was not found ')
-      ErrorsFound = .true.
-    ENDIF
-
-        !check for other FuelCell using the same Inverter and fill
-    DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
-      IF (SameString(FuelCell(otherFuelCell)%Inverter%Name, FuelCell(thisFuelCell)%Inverter%Name)) THEN
-         FuelCell(otherFuelCell)%Inverter = FuelCell(thisFuelCell)%Inverter
+      IF (SameString(AlphArray(2), 'QUADRATIC')) FuelCell(thisFuelCell)%Inverter%EffMode = InverterEffQuadratic
+      IF (SameSTring(AlphArray(2), 'Constant'))  FuelCell(thisFuelCell)%Inverter%EffMode = InverterEffConstant
+      IF (FuelCell(thisFuelCell)%Inverter%EffMode == 0) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(AlphArray(2)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        ErrorsFound = .true.
       ENDIF
-    ENDDO
+
+      FuelCell(thisFuelCell)%Inverter%ConstEff = NumArray(1)
+
+      FuelCell(thisFuelCell)%Inverter%EffQuadraticCurveID  = GetCurveIndex(AlphArray(3))
+      If ((FuelCell(thisFuelCell)%Inverter%EffQuadraticCurveID == 0)  &
+           .AND. (FuelCell(thisFuelCell)%Inverter%EffMode == InverterEffQuadratic))  Then
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(AlphArray(3)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        CALL ShowContinueError('Curve was not found ')
+        ErrorsFound = .true.
+      ENDIF
+
+          !check for other FuelCell using the same Inverter and fill
+      DO otherFuelCell = thisFuelCell+1, NumFuelCellGenerators
+        IF (SameString(FuelCell(otherFuelCell)%Inverter%Name, FuelCell(thisFuelCell)%Inverter%Name)) THEN
+           FuelCell(otherFuelCell)%Inverter = FuelCell(thisFuelCell)%Inverter
+        ENDIF
+      ENDDO
+    ELSE
+      CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
+      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+      ErrorsFound = .true.
+    ENDIF
 
   ENDDO
 
@@ -4451,7 +4495,8 @@ If (myonetimeflag) then
         FuelCell(thisFuelCell)%StackCooler%StackCoolerPresent = .true.
 
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'not found'//TRIM(AlphArray(1)))
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(AlphArray(1)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
         errorsfound=.true.
       ENDIF
     ENDDO
@@ -4713,7 +4758,7 @@ SUBROUTINE CalcFuelCellGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
                                   + (INT(CurrentTime)+(SysTimeElapsed+(CurrentTime - INT(CurrentTime))))/HoursInDay
        FuelCell(GeneratorNum)%FCPM%HasBeenOn = .false.
 
-       If (FuelCell(GeneratorNum)%FCPM%ShutDownTime > 0.0) FuelCell(GeneratorNum)%FCPM%DuringShutDown = .true.
+       If (FuelCell(GeneratorNum)%FCPM%ShutDownTime > 0.0d0) FuelCell(GeneratorNum)%FCPM%DuringShutDown = .true.
 
     endif
 
@@ -4737,7 +4782,7 @@ SUBROUTINE CalcFuelCellGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
        FuelCell(GeneratorNum)%FCPM%HasBeenOn = .true.
        FuelCell(GeneratorNum)%FCPM%NumCycles = FuelCell(GeneratorNum)%FCPM%NumCycles + 1 ! increment cycling counter
 
-       If (FuelCell(GeneratorNum)%FCPM%StartUpTime > 0.0) FuelCell(GeneratorNum)%FCPM%DuringStartUp = .true.
+       If (FuelCell(GeneratorNum)%FCPM%StartUpTime > 0.0d0) FuelCell(GeneratorNum)%FCPM%DuringStartUp = .true.
 
   ENDIF
 
@@ -4748,11 +4793,11 @@ SUBROUTINE CalcFuelCellGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
 
   ! Note: Myload (input) is Pdemand (electical Power requested)
   Pdemand = myLoad
-  PacAncillariesTotal = 0.0
-  PpcuLosses          = 0.0
-  Pstorage            = 0.0
-  PgridExtra          = 0.0
-  PoutofInverter      = 0.0
+  PacAncillariesTotal = 0.0d0
+  PpcuLosses          = 0.0d0
+  Pstorage            = 0.0d0
+  PgridExtra          = 0.0d0
+  PoutofInverter      = 0.0d0
   ConstrainedFCPM     = .false.
 
  !!BEGIN SEQUENTIAL SUBSTITUTION to handle a lot of inter-related calcs
@@ -4806,28 +4851,28 @@ DO iter=1, 20
 
     Eel = CurveValue(FuelCell(GeneratorNum)%FCPM%EffCurveID, Pel/FuelCell(GeneratorNum)%FCPM%NomPel)  &
                *FuelCell(GeneratorNum)%FCPM%NomEff &
-         * (1 - FuelCell(GeneratorNum)%FCPM%NumCycles * FuelCell(GeneratorNum)%FCPM%CyclingDegradRat) &
-         * (1 - MAX((FuelCell(GeneratorNum)%FCPM%NumRunHours-FuelCell(GeneratorNum)%FCPM%ThreshRunHours), 0.0d0) &
+         * (1.0d0 - FuelCell(GeneratorNum)%FCPM%NumCycles * FuelCell(GeneratorNum)%FCPM%CyclingDegradRat) &
+         * (1.0d0 - MAX((FuelCell(GeneratorNum)%FCPM%NumRunHours-FuelCell(GeneratorNum)%FCPM%ThreshRunHours), 0.0d0) &
                    *FuelCell(GeneratorNum)%FCPM%OperateDegradRat)
 
   ELSEIF  (FuelCell(GeneratorNum)%FCPM%EffMode == DirectCurveMode ) THEN
    !Equation (8) in FuelCell Spec
     Eel = CurveValue(FuelCell(GeneratorNum)%FCPM%EffCurveID, Pel) &
-         * (1 - FuelCell(GeneratorNum)%FCPM%NumCycles * FuelCell(GeneratorNum)%FCPM%CyclingDegradRat) &
-         * (1 - MAX((FuelCell(GeneratorNum)%FCPM%NumRunHours-FuelCell(GeneratorNum)%FCPM%ThreshRunHours), 0.0d0) &
+         * (1.0d0 - FuelCell(GeneratorNum)%FCPM%NumCycles * FuelCell(GeneratorNum)%FCPM%CyclingDegradRat) &
+         * (1.0d0 - MAX((FuelCell(GeneratorNum)%FCPM%NumRunHours-FuelCell(GeneratorNum)%FCPM%ThreshRunHours), 0.0d0) &
                    *FuelCell(GeneratorNum)%FCPM%OperateDegradRat )
   ENDIF
 
   FuelCell(GeneratorNum)%FCPM%Eel = Eel
   ! Calculation Step 2. Determine fuel rate
 
-  NdotFuel = Pel / (Eel * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%LHV * 1000000.0) !Eq. 10 solved for Ndot
+  NdotFuel = Pel / (Eel * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%LHV * 1000000.0d0) !Eq. 10 solved for Ndot
 
   FuelCell(GeneratorNum)%FCPM%NdotFuel = NdotFuel
-  If (Pel <= 0.0) Then
+  If (Pel <= 0.0d0) Then
     !TODO zero stuff before leaving
-    Pel = 0.0
-    FuelCell(GeneratorNum)%FCPM%Pel = 0.0
+    Pel = 0.0d0
+    FuelCell(GeneratorNum)%FCPM%Pel = 0.0d0
     RETURN
   Else
 
@@ -4884,29 +4929,29 @@ DO iter=1, 20
 
        !  evaluate  heat capacity at average temperature usign shomate
   Tavg  = (FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoCompress   &
-     + FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoFCPM)/ 2.0
+     + FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoFCPM)/ 2.0d0
   Call FigureFuelHeatCap(GeneratorNum, Tavg, Cp)  ! Cp in (J/mol K)
 
     ! calculate a Temp of fuel out of compressor and into power module
 
-  IF (FuelCell(GeneratorNum)%FCPM%NdotFuel <= 0.0) THEN  !just pass through, domain probably collapased in modeling
+  IF (FuelCell(GeneratorNum)%FCPM%NdotFuel <= 0.0d0) THEN  !just pass through, domain probably collapased in modeling
      FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoFCPM =  FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoCompress
   ELSE
      FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoFCPM = (  &
-                                             (1. - FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%CompPowerLossFactor)  &
+                                             (1.0d0 - FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%CompPowerLossFactor)  &
                                                  *FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%PfuelCompEl              &
-                                           / (FuelCell(GeneratorNum)%FCPM%NdotFuel * Cp * 1000.00)) & !1000 Cp units mol-> kmol
+                                           / (FuelCell(GeneratorNum)%FCPM%NdotFuel * Cp * 1000.0d0)) & !1000 Cp units mol-> kmol
                                                 + FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%TfuelIntoCompress
   ENDIF
     ! calc skin losses from fuel compressor
   FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss     = FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%CompPowerLossFactor &
                                                *FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%PfuelCompEl
 
-  If (FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss < 0.0) then
+  If (FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss < 0.0d0) then
 !   write(*,*) 'problem in FuelSupply%QskinLoss ', FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss
    CALL ShowWarningError('problem in FuelSupply%QskinLoss '//  &
                    TRIM(RoundSigDigits(FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss,3)))
-   FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss = 0.0
+   FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%QskinLoss = 0.0d0
   endif
 
     ! calculate tatal fuel enthalpy coming into power module
@@ -4916,7 +4961,7 @@ DO iter=1, 20
 
   ! units, NdotFuel in kmol/sec. Hmolfule in KJ/mol ,
   !        factor of 1000's to get to J/s or watts
-  FuelCell(GeneratorNum)%FCPM%TotFuelInEnthalphy  = Hmolfuel * 1000.0 * FuelCell(GeneratorNum)%FCPM%NdotFuel * 1000.0
+  FuelCell(GeneratorNum)%FCPM%TotFuelInEnthalphy  = Hmolfuel * 1000.0d0 * FuelCell(GeneratorNum)%FCPM%NdotFuel * 1000.0d0
 
   !Calculation Step 6, water compressor calculations
 
@@ -4950,29 +4995,29 @@ DO iter=1, 20
      ! 75.325  J/mol K Water at 0.1 MPa and 298 K, reference NIST WEBBOOK
   call FigureLiquidWaterHeatCap(FuelCell(GeneratorNum)%WaterSup%TwaterIntoCompress, CpWater)
 
-  WaterEnthOfForm =   -241.8264 !KJ/mol
+  WaterEnthOfForm =   -241.8264d0 !KJ/mol
 
-  IF (FuelCell(GeneratorNum)%FCPM%NdotLiqwater <= 0.0) THEN  !just pass through, domain probably collapased in modeling
+  IF (FuelCell(GeneratorNum)%FCPM%NdotLiqwater <= 0.0d0) THEN  !just pass through, domain probably collapased in modeling
    FuelCell(GeneratorNum)%WaterSup%TwaterIntoFCPM = FuelCell(GeneratorNum)%WaterSup%TwaterIntoCompress !
   ELSE
 
     FuelCell(GeneratorNum)%WaterSup%TwaterIntoFCPM = ((1 - FuelCell(GeneratorNum)%WaterSup%PmpPowerLossFactor)  &
                                                *FuelCell(GeneratorNum)%WaterSup%PwaterCompEl              &
-                                               / (FuelCell(GeneratorNum)%FCPM%NdotLiqwater * CpWater * 1000.00)) &
+                                               / (FuelCell(GeneratorNum)%FCPM%NdotLiqwater * CpWater * 1000.0d0)) &
                                                + FuelCell(GeneratorNum)%WaterSup%TwaterIntoCompress
   ENDIF
 
   FuelCell(GeneratorNum)%WaterSup%QskinLoss = FuelCell(GeneratorNum)%WaterSup%PmpPowerLossFactor   &
                                           * FuelCell(GeneratorNum)%WaterSup%PwaterCompEl
 
-  If (FuelCell(GeneratorNum)%WaterSup%QskinLoss < 0.0) then
+  If (FuelCell(GeneratorNum)%WaterSup%QskinLoss < 0.0d0) then
   ! write(*,*) 'problem in WaterSup%QskinLoss ',FuelCell(GeneratorNum)%WaterSup%QskinLoss
-   FuelCell(GeneratorNum)%WaterSup%QskinLoss = 0.0
+   FuelCell(GeneratorNum)%WaterSup%QskinLoss = 0.0d0
   endif
 
   Call FigureLiquidWaterEnthalpy(FuelCell(GeneratorNum)%WaterSup%TwaterIntoFCPM, HLiqWater)   ! HLiqWater in KJ/mol
 
-  FuelCell(GeneratorNum)%FCPM%WaterInEnthalpy = FuelCell(GeneratorNum)%FCPM%NdotLiqwater*HLiqWater*1000.0*1000.0
+  FuelCell(GeneratorNum)%FCPM%WaterInEnthalpy = FuelCell(GeneratorNum)%FCPM%NdotLiqwater*HLiqWater*1000.0d0*1000.0d0
 
   !Calculation Step 7, Air compressor
 
@@ -4981,7 +5026,7 @@ DO iter=1, 20
   FuelCell(GeneratorNum)%AirSup%PairCompEl  = CurveValue(FuelCell(GeneratorNum)%AirSup%BlowerPowerCurveID, &
                                                        FuelCell(GeneratorNum)%FCPM%NdotAir)
 
-  Tavg = ( FuelCell(GeneratorNum)%AirSup%TairIntoBlower + FuelCell(GeneratorNum)%AirSup%TairIntoFCPM ) / 2.0
+  Tavg = ( FuelCell(GeneratorNum)%AirSup%TairIntoBlower + FuelCell(GeneratorNum)%AirSup%TairIntoFCPM ) / 2.0d0
 
   CALL FigureAirHeatCap(GeneratorNum, Tavg, Cp)  ! Cp in (J/mol K)
 
@@ -5018,35 +5063,35 @@ DO iter=1, 20
   CASE(RecoverBattery)
     FuelCell(GeneratorNum)%AirSup%QintakeRecovery = FuelCell(GeneratorNum)%ElecStorage%QairIntake
   CASE(NoRecoveryOnAirIntake)
-    FuelCell(GeneratorNum)%AirSup%QintakeRecovery =  0.0
+    FuelCell(GeneratorNum)%AirSup%QintakeRecovery =  0.0d0
 
   END SELECT
 
-  IF ( FuelCell(GeneratorNum)%FCPM%NdotAir <= 0.0 ) THEN !just pass through, domain probably collapased in modeling
+  IF ( FuelCell(GeneratorNum)%FCPM%NdotAir <= 0.0d0 ) THEN !just pass through, domain probably collapased in modeling
      FuelCell(GeneratorNum)%AirSup%TairIntoFCPM  = FuelCell(GeneratorNum)%AirSup%TairIntoBlower
 
   ELSE
      FuelCell(GeneratorNum)%AirSup%TairIntoFCPM = (((1 - FuelCell(GeneratorNum)%AirSup%BlowerHeatLossFactor) &
                                                * FuelCell(GeneratorNum)%AirSup%PairCompEl                &
                                                + FuelCell(GeneratorNum)%AirSup%QintakeRecovery)          &
-                                               / (FuelCell(GeneratorNum)%FCPM%NdotAir * Cp * 1000.00))   & !1000 Cp units mol-> kmol
+                                             / (FuelCell(GeneratorNum)%FCPM%NdotAir * Cp * 1000.0d0))   & !1000 Cp units mol-> kmol
                                                + FuelCell(GeneratorNum)%AirSup%TairIntoBlower
   ENDIF
 
   FuelCell(GeneratorNum)%AirSup%QskinLoss = FuelCell(GeneratorNum)%AirSup%BlowerHeatLossFactor &
                                          * FuelCell(GeneratorNum)%AirSup%PairCompEl
 
-  If (FuelCell(GeneratorNum)%AirSup%QskinLoss < 0.0) then
+  If (FuelCell(GeneratorNum)%AirSup%QskinLoss < 0.0d0) then
 !   write(*,*) 'problem in AirSup%QskinLoss ', FuelCell(GeneratorNum)%AirSup%QskinLoss
    CALL ShowWarningError('problem in AirSup%QskinLoss '//TRIM(RoundSigDigits(FuelCell(GeneratorNum)%AirSup%QskinLoss,3)))
-   FuelCell(GeneratorNum)%AirSup%QskinLoss = 0.0
+   FuelCell(GeneratorNum)%AirSup%QskinLoss = 0.0d0
   endif
 
   CAll FigureAirEnthalpy(GeneratorNum, FuelCell(GeneratorNum)%AirSup%TairIntoFCPM, Hmolair) ! (Hmolair in KJ/mol)
 
   ! units, NdotAir in kmol/sec.; Hmolfuel in KJ/mol ,
   !        factor of 1000's to get to J/s or watts
-  FuelCell(GeneratorNum)%FCPM%TotAirInEnthalphy  = Hmolair * 1000.0 * FuelCell(GeneratorNum)%FCPM%NdotAir * 1000.0
+  FuelCell(GeneratorNum)%FCPM%TotAirInEnthalphy  = Hmolair * 1000.0d0 * FuelCell(GeneratorNum)%FCPM%NdotAir * 1000.0d0
 
   ! calculation Step 8, Figure Product Gases
 
@@ -5074,11 +5119,11 @@ DO iter=1, 20
   NdotH20ProdGas = FuelCell(GeneratorNum)%FCPM%NdotFuel * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%H20ProductGasCoef
 
      !  set product gas constituent fractions  (assume five usual components)
-  NdotCO2 = 0.0
-  NdotN2  = 0.0
-  Ndot02  = 0.0
-  NdotH20 = 0.0
-  NdotAr  = 0.0
+  NdotCO2 = 0.0d0
+  NdotN2  = 0.0d0
+  Ndot02  = 0.0d0
+  NdotH20 = 0.0d0
+  NdotAr  = 0.0d0
 
 ! Product gas constiuents are fixed (not a user defined thing)
 !
@@ -5138,7 +5183,7 @@ DO iter=1, 20
 
   ! units, NdotProdGas in kmol/sec.; HmolProdGases in KJ/mol ,
   !        factor of 1000's to get to J/s or watts
-  FuelCell(GeneratorNum)%FCPM%TotProdGasEnthalphy  = HmolProdGases * 1000.0 * FuelCell(GeneratorNum)%FCPM%NdotProdGas * 1000.0
+  FuelCell(GeneratorNum)%FCPM%TotProdGasEnthalphy  = HmolProdGases * 1000.0d0 * FuelCell(GeneratorNum)%FCPM%NdotProdGas * 1000.0d0
 
 
   ! calculation Step 9, Figure Skin lossess
@@ -5170,14 +5215,14 @@ DO iter=1, 20
 
   ! units, NdotDilutionAir in kmol/sec.; Hmolair in KJ/mol ,
   !        factor of 1000's to get to J/s or watts
-  FuelCell(GeneratorNum)%FCPM%DilutionAirInEnthalpy  = Hmolair * 1000.0 * FuelCell(GeneratorNum)%FCPM%NdotDilutionAir * 1000.0
+  FuelCell(GeneratorNum)%FCPM%DilutionAirInEnthalpy  = Hmolair * 1000.0d0 * FuelCell(GeneratorNum)%FCPM%NdotDilutionAir * 1000.0d0
   FuelCell(GeneratorNum)%FCPM%DilutionAirOutEnthalpy = FuelCell(GeneratorNum)%FCPM%DilutionAirInEnthalpy   &
                                                    + FuelCell(GeneratorNum)%FCPM%StackHeatLossToDilution
 
   ! calculation Step 12, Calculate Reforming water out enthalpy
   Call FigureGaseousWaterEnthalpy(FuelCell(GeneratorNum)%FCPM%TprodGasLeavingFCPM, HGasWater)
 
-  FuelCell(GeneratorNum)%FCPM%WaterOutEnthalpy = HGasWater * 1000.0 * FuelCell(GeneratorNum)%FCPM%NdotLiqwater * 1000.0
+  FuelCell(GeneratorNum)%FCPM%WaterOutEnthalpy = HGasWater * 1000.0d0 * FuelCell(GeneratorNum)%FCPM%NdotLiqwater * 1000.0d0
 
   ! calculation Step 13, Calculate Heat balance
   !    move all terms in Equation 7 to RHS and calculate imbalance
@@ -5186,7 +5231,7 @@ DO iter=1, 20
                     - FuelCell(GeneratorNum)%FCPM%TotAirInEnthalphy   &
                     - FuelCell(GeneratorNum)%FCPM%WaterInEnthalpy     &
                     - FuelCell(GeneratorNum)%FCPM%DilutionAirInEnthalpy &
-                    - FuelCell(GeneratorNum)%FCPM%NdotFuel * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%LHV * 1000000.0 &
+                    - FuelCell(GeneratorNum)%FCPM%NdotFuel * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%LHV * 1000000.0d0 &
                     - FuelCell(GeneratorNum)%FCPM%PelancillariesAC    &
                     + FuelCell(GeneratorNum)%FCPM%Pel                 &
                     + FuelCell(GeneratorNum)%FCPM%TotProdGasEnthalphy &
@@ -5203,7 +5248,7 @@ DO iter=1, 20
 
   ! solve for a new TprodGasLeavingFCPM using regula falsi method
 
-  Acc = 0.01  ! guessing need to refine
+  Acc = 0.01d0  ! guessing need to refine
   MaxIter = 150 ! guessing need to refine
   SolverFlag = 0 !init
   Par(1) = real(GeneratorNum,r64)
@@ -5241,13 +5286,13 @@ DO iter=1, 20
 
    IF (FuelCell(GeneratorNum)%Inverter%EffMode ==  InverterEffConstant) THEN
 
-     PpcuLosses = (1 - FuelCell(GeneratorNum)%Inverter%ConstEff )* PintoInverter
+     PpcuLosses = (1.0d0 - FuelCell(GeneratorNum)%Inverter%ConstEff )* PintoInverter
 
    ENDIF
 
    IF (FuelCell(GeneratorNum)%Inverter%EffMode ==  InverterEffQuadratic) THEN
 
-     PpcuLosses = (1 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, PintoInverter))* PintoInverter
+     PpcuLosses = (1.0d0 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, PintoInverter))* PintoInverter
 
    ENDIF
 
@@ -5328,13 +5373,13 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
 
 
    !initialize locals
-  tmpPdraw   = 0.0
-  tmpPcharge = 0.0
+  tmpPdraw   = 0.0d0
+  tmpPcharge = 0.0d0
   drawing  = .false.
   charging = .false.
   Constrained = .false.
-  Pstorage = 0.0
-  PgridOverage = 0.0
+  Pstorage = 0.0d0
+  PgridOverage = 0.0d0
 
   ! step 1 figure out what is desired of electrical storage system
 
@@ -5360,7 +5405,7 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
       IF (FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge >= FuelCell(Num)%ElecStorage%NominalEnergyCapacity) THEN
           ! storage full!  no more allowed!
           PgridOverage = tmpPcharge
-          tmpPcharge = 0.0
+          tmpPcharge = 0.0d0
           Constrained = .true.
       ENDIF
       IF (tmpPcharge > FuelCell(Num)%ElecStorage%MaxPowerStore) THEN
@@ -5408,9 +5453,9 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
   IF (drawing) THEN
     IF (FuelCell(Num)%ElecStorage%StorageModelMode == SimpleEffConstraints) THEN
 
-      IF (FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge <= 0.0) THEN
+      IF (FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge <= 0.0d0) THEN
           ! storage empty  no more allowed!
-          tmpPdraw = 0.0
+          tmpPdraw = 0.0d0
           Constrained = .true.
           drawing = .false.
       ENDIF
@@ -5421,7 +5466,7 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
 
             !now take energy from storage by drawing  (amplified by energetic effic)
       IF ((FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge  &
-          - tmpPdraw *TimeStepSys*SecInHour/FuelCell(Num)%ElecStorage%EnergeticEfficDischarge) > 0.0 ) Then
+          - tmpPdraw *TimeStepSys*SecInHour/FuelCell(Num)%ElecStorage%EnergeticEfficDischarge) > 0.0d0 ) Then
 
         FuelCell(Num)%ElecStorage%ThisTimeStepStateOfCharge =  FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge &
                                 - tmpPdraw *TimeStepSys*SecInHour/FuelCell(Num)%ElecStorage%EnergeticEfficDischarge
@@ -5453,19 +5498,19 @@ SUBROUTINE ManageElectStorInteractions(Num,Pdemand, PpcuLosses, &
   IF ((.not. charging) .and. ( .not. drawing)) THEN
 
      FuelCell(Num)%ElecStorage%ThisTimeStepStateOfCharge = FuelCell(Num)%ElecStorage%LastTimeStepStateOfCharge
-     FuelCell(Num)%ElecStorage%PelNeedFromStorage = 0.0
-     FuelCell(Num)%ElecStorage%PelFromStorage = 0.0
-     FuelCell(Num)%ElecStorage%QairIntake  = 0.0
+     FuelCell(Num)%ElecStorage%PelNeedFromStorage = 0.0d0
+     FuelCell(Num)%ElecStorage%PelFromStorage = 0.0d0
+     FuelCell(Num)%ElecStorage%QairIntake  = 0.0d0
   ENDIF
 
-  IF (Pstorage >= 0.0) THEN
+  IF (Pstorage >= 0.0d0) THEN
 
     FuelCell(Num)%ElecStorage%PelIntoStorage = Pstorage
-    FuelCell(Num)%ElecStorage%PelFromStorage = 0.0
+    FuelCell(Num)%ElecStorage%PelFromStorage = 0.0d0
   ENDIF
-  IF (Pstorage < 0.0) THEN
+  IF (Pstorage < 0.0d0) THEN
 
-    FuelCell(Num)%ElecStorage%PelIntoStorage = 0.0
+    FuelCell(Num)%ElecStorage%PelIntoStorage = 0.0d0
     FuelCell(Num)%ElecStorage%PelFromStorage = - Pstorage
 
   ENDIF
@@ -5528,7 +5573,7 @@ FUNCTION FuelCellProductGasEnthResidual(TprodGas, Par) RESULT (Residuum)
 
   Call FigureProductGasesEnthalpy(GeneratorNum, TprodGas, thisHmolalProdGases)
 
-  Residuum = (thisHmolalProdGases * NdotProdGases * 1000000.0) - desiredHprodGases
+  Residuum = (thisHmolalProdGases * NdotProdGases * 1000000.0d0) - desiredHprodGases
 
   RETURN
 
@@ -5593,9 +5638,9 @@ SUBROUTINE FigureAirHeatCap(GeneratorNum, FluidTemp, Cp)
 
   ! two different themodynamic curve fits might be used
 
-  tempCp = 0.0
+  tempCp = 0.0d0
   Tkel = (FluidTemp +KelvinConv)
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
 
   DO thisConstit=1, FuelCell(GeneratorNum)%AirSup%NumConstituents
     gasID = FuelCell(GeneratorNum)%AirSup%GasLibID(thisConstit)
@@ -5691,11 +5736,11 @@ SUBROUTINE FigureAirEnthalpy(GeneratorNum, FluidTemp, Hair)
   REAL(r64) :: A5 ! NASA poly coeff
   REAL(r64) :: A6 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempHair = 0.0
+  tempHair = 0.0d0
 
   DO thisConstit=1, FuelCell(GeneratorNum)%AirSup%NumConstituents
     gasID = FuelCell(GeneratorNum)%AirSup%GasLibID(thisConstit)
@@ -5710,7 +5755,7 @@ SUBROUTINE FigureAirEnthalpy(GeneratorNum, FluidTemp, Hair)
        F = GasPhaseThermoChemistryData(gasID)%ShomateF
        H = GasPhaseThermoChemistryData(gasID)%ShomateH
 
-       HairI =  (A*Tsho + B*(Tsho**2)/2.0 + C*(Tsho**3)/3.0 + D*(Tsho**4)/4.0 - E/Tsho + F - H )
+       HairI =  (A*Tsho + B*(Tsho**2)/2.0d0 + C*(Tsho**3)/3.0d0 + D*(Tsho**4)/4.0d0 - E/Tsho + F - H )
 
        tempHair = tempHair + HairI * FuelCell(GeneratorNum)%AirSup%ConstitMolalFract(thisConstit)
 
@@ -5723,7 +5768,7 @@ SUBROUTINE FigureAirEnthalpy(GeneratorNum, FluidTemp, Hair)
        A5 = GasPhaseThermoChemistryData(gasID)%NASA_A5
        A6 = GasPhaseThermoChemistryData(gasID)%NASA_A6
 
-       tempHair = tempHair + ( ( (A1 + A2*Tkel/2.0 + A3*Tkel**2/3.0 + A4*Tkel**3/4.0 + A5*Tkel**4/5.0 + A6/Tkel)  &
+       tempHair = tempHair + ( ( (A1 + A2*Tkel/2.0d0 + A3*Tkel**2/3.0d0 + A4*Tkel**3/4.0d0 + A5*Tkel**4/5.0d0 + A6/Tkel)  &
                                * RinKJperMolpK * Tkel) - GasPhaseThermoChemistryData(gasID)%StdRefMolarEnthOfForm) &
                                * FuelCell(GeneratorNum)%AirSup%ConstitMolalFract(thisConstit)
      ENDIF
@@ -5790,11 +5835,11 @@ SUBROUTINE FigureFuelHeatCap(GeneratorNum, FluidTemp, Cp)
   REAL(r64) :: A4 ! NASA poly coeff
   REAL(r64) :: A5 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempCp = 0.0
+  tempCp = 0.0d0
 
   DO thisConstit=1, FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%NumConstituents
     gasID = FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%GasLibID(thisConstit)
@@ -5889,11 +5934,11 @@ SUBROUTINE FigureFuelEnthalpy(GeneratorNum, FluidTemp, Hfuel)
   REAL(r64) :: A5 ! NASA poly coeff
   REAL(r64) :: A6 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempHfuel = 0.0
+  tempHfuel = 0.0d0
 
   DO thisConstit=1, FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%NumConstituents
     gasID = FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%GasLibID(thisConstit)
@@ -5907,7 +5952,7 @@ SUBROUTINE FigureFuelEnthalpy(GeneratorNum, FluidTemp, Hfuel)
        F = GasPhaseThermoChemistryData(gasID)%ShomateF
        H = GasPhaseThermoChemistryData(gasID)%ShomateH
 
-       HfuelI  = (A*Tsho + B*(Tsho**2)/2.0 + C*(Tsho**3)/3.0 + D*(Tsho**4)/4.0 - E/Tsho + F - H )
+       HfuelI  = (A*Tsho + B*(Tsho**2)/2.0d0 + C*(Tsho**3)/3.0d0 + D*(Tsho**4)/4.0d0 - E/Tsho + F - H )
 
        tempHfuel = tempHfuel + HfuelI* FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%ConstitMolalFract(thisConstit)
 
@@ -5921,7 +5966,7 @@ SUBROUTINE FigureFuelEnthalpy(GeneratorNum, FluidTemp, Hfuel)
        A5 = GasPhaseThermoChemistryData(gasID)%NASA_A5
        A6 = GasPhaseThermoChemistryData(gasID)%NASA_A6
 
-       tempHfuel = tempHfuel + (((A1 + A2*Tkel/2.0 + A3*Tkel**2/3.0 + A4*Tkel**3/4. + A5*Tkel**4/5.0 + A6/Tkel)      &
+       tempHfuel = tempHfuel + (((A1 + A2*Tkel/2.0d0 + A3*Tkel**2/3.0d0 + A4*Tkel**3/4.0d0 + A5*Tkel**4/5.0d0 + A6/Tkel)      &
                                * RinKJperMolpK * Tkel) - GasPhaseThermoChemistryData(gasID)%StdRefMolarEnthOfForm) &
                                * FuelSupply(FuelCell(GeneratorNum)%FuelSupNum)%ConstitMolalFract(thisConstit)
      ENDIF
@@ -5991,11 +6036,11 @@ SUBROUTINE FigureProductGasesEnthalpy(GeneratorNum, FluidTemp, HProdGases)
   REAL(r64) :: A5 ! NASA poly coeff
   REAL(r64) :: A6 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempHprodGases = 0.0
+  tempHprodGases = 0.0d0
 
   DO thisConstit=1, 5
     gasID = FuelCell(GeneratorNum)%FCPM%GasLibID(thisConstit)
@@ -6009,7 +6054,7 @@ SUBROUTINE FigureProductGasesEnthalpy(GeneratorNum, FluidTemp, HProdGases)
        F = GasPhaseThermoChemistryData(gasID)%ShomateF
        H = GasPhaseThermoChemistryData(gasID)%ShomateH
 
-       tempHprodGases = tempHprodGases + ( (A*Tsho + B*(Tsho**2)/2.0 + C*(Tsho**3)/3.0 + D*(Tsho**4)/4.0 - E/Tsho + F - H ) &
+       tempHprodGases = tempHprodGases + ( (A*Tsho + B*(Tsho**2)/2.0d0 + C*(Tsho**3)/3.0d0 + D*(Tsho**4)/4.0d0 - E/Tsho + F - H ) &
                                * FuelCell(GeneratorNum)%FCPM%ConstitMolalFract(thisConstit) )
      ENDIF
      IF (GasPhaseThermoChemistryData(gasID)%ThermoMode == NASAPolynomial) THEN
@@ -6020,9 +6065,10 @@ SUBROUTINE FigureProductGasesEnthalpy(GeneratorNum, FluidTemp, HProdGases)
        A5 = GasPhaseThermoChemistryData(gasID)%NASA_A5
        A6 = GasPhaseThermoChemistryData(gasID)%NASA_A6
 
-       tempHprodGases = tempHprodGases + (((A1 + A2*Tkel/2.0 + A3*Tkel**2/3.0 + A4*Tkel**3/4.0 + A5*Tkel**4/5.0 + A6/Tkel)     &
-                               * RinKJperMolpK * Tkel) - GasPhaseThermoChemistryData(gasID)%StdRefMolarEnthOfForm) &
-                               * FuelCell(GeneratorNum)%FCPM%ConstitMolalFract(thisConstit)
+       tempHprodGases = tempHprodGases +   &
+                 (((A1 + A2*Tkel/2.0d0 + A3*Tkel**2/3.0d0 + A4*Tkel**3/4.0d0 + A5*Tkel**4/5.0d0 + A6/Tkel)     &
+                   * RinKJperMolpK * Tkel) - GasPhaseThermoChemistryData(gasID)%StdRefMolarEnthOfForm) &
+                   * FuelCell(GeneratorNum)%FCPM%ConstitMolalFract(thisConstit)
      ENDIF
     ENDIF ! gasid > 0
   ENDDO
@@ -6101,11 +6147,11 @@ SUBROUTINE FigureProductGasHeatCap(GeneratorNum, FluidTemp, Cp)
   REAL(r64) :: A4 ! NASA poly coeff
   REAL(r64) :: A5 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempCp = 0.0
+  tempCp = 0.0d0
 
   DO thisConstit=1, Size(FuelCell(GeneratorNum)%FCPM%GasLibID)
     gasID = FuelCell(GeneratorNum)%FCPM%GasLibID(thisConstit)
@@ -6210,11 +6256,11 @@ SUBROUTINE FigureAuxilHeatGasHeatCap(GeneratorNum, FluidTemp, Cp)
   REAL(r64) :: A4 ! NASA poly coeff
   REAL(r64) :: A5 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempCp = 0.0
+  tempCp = 0.0d0
 
   DO thisConstit=1, Size(FuelCell(GeneratorNum)%AuxilHeat%GasLibID)
     gasID = FuelCell(GeneratorNum)%AuxilHeat%GasLibID(thisConstit)
@@ -6319,11 +6365,11 @@ SUBROUTINE FigureHXleavingGasHeatCap(GeneratorNum, FluidTemp, Cp)
   REAL(r64) :: A4 ! NASA poly coeff
   REAL(r64) :: A5 ! NASA poly coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
   Tkel = (FluidTemp +KelvinConv)
   ! loop through fuel constituents and sum up Cp
 
-  tempCp = 0.0
+  tempCp = 0.0d0
 
   DO thisConstit=1, Size(FuelCell(GeneratorNum)%ExhaustHX%GasLibID)
     gasID = FuelCell(GeneratorNum)%ExhaustHX%GasLibID(thisConstit)
@@ -6409,17 +6455,17 @@ SUBROUTINE FigureGaseousWaterEnthalpy(FluidTemp, HGasWater)
 !  REAL(r64) :: H ! shomate coeff
 
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
 
-  A = 29.0373
-  B = 10.2573
-  C = 2.81048
-  D = -0.95914
-  E = 0.11725
-  F = -250.569
+  A = 29.0373d0
+  B = 10.2573d0
+  C = 2.81048d0
+  D = -0.95914d0
+  E = 0.11725d0
+  F = -250.569d0
 
 
-  HGasWater = A*Tsho + B*(Tsho**2)/2.0 + C*(Tsho**3)/3.0 + D*(Tsho**4)/4.0 - E/Tsho + F !- H
+  HGasWater = A*Tsho + B*(Tsho**2)/2.0d0 + C*(Tsho**3)/3.0d0 + D*(Tsho**4)/4.0d0 - E/Tsho + F !- H
 
   RETURN
 END SUBROUTINE FigureGaseousWaterEnthalpy
@@ -6470,17 +6516,17 @@ SUBROUTINE FigureLiquidWaterEnthalpy(FluidTemp, HLiqWater)
   REAL(r64) :: H ! shomate coeff
 
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
 
-  A = -203.606
-  B = 1523.29
-  C = -3196.413
-  D = 2474.455
-  E = 3.85533
-  F = -256.5478
-  H = -285.8304
+  A = -203.606d0
+  B = 1523.29d0
+  C = -3196.413d0
+  D = 2474.455d0
+  E = 3.85533d0
+  F = -256.5478d0
+  H = -285.8304d0
 
-  HLiqWater = A*Tsho + B*(Tsho**2)/2.0 + C*(Tsho**3)/3.0 + D*(Tsho**4)/4.0 - E/Tsho + F !- H
+  HLiqWater = A*Tsho + B*(Tsho**2)/2.0d0 + C*(Tsho**3)/3.0d0 + D*(Tsho**4)/4.0d0 - E/Tsho + F !- H
 
   RETURN
 END SUBROUTINE FigureLiquidWaterEnthalpy
@@ -6541,13 +6587,13 @@ SUBROUTINE FigureLiquidWaterHeatCap(FluidTemp, Cp)
   REAL(r64) :: D ! shomate coeff
   REAL(r64) :: E ! shomate coeff
 
-  Tsho = (FluidTemp +KelvinConv) / 1000.0
+  Tsho = (FluidTemp +KelvinConv) / 1000.0d0
 
-  A = -203.606
-  B = 1523.29
-  C = -3196.413
-  D = 2474.455
-  E = 3.85533
+  A = -203.606d0
+  B = 1523.29d0
+  C = -3196.413d0
+  D = 2474.455d0
+  E = 3.85533d0
 
   Cp = A + B*Tsho + C*Tsho**2 + D*Tsho**3 + E/(Tsho**2)
 
@@ -6604,7 +6650,7 @@ SUBROUTINE FigureLHVofFuel(Num,NdotFuel, NdotCO2,  NdotH20, LHV)
 
   CO2dataID   = 1  !hard-coded in SetupFuelAndAirConstituentData
   WaterDataID = 4  !hard-coded in SetupFuelAndAirConstituentData
-  DelfHfuel = 0.0
+  DelfHfuel = 0.0d0
 
   DO I = 1, FuelSupply(FuelCell(Num)%FuelSupNum)%NumConstituents
      thisGasID = FuelSupply(FuelCell(Num)%FuelSupNum)%GasLibID(i)
@@ -6667,7 +6713,7 @@ SUBROUTINE FigureACAncillaries(GeneratorNum, PacAncill)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
  !  Using lagged values inside a sequential substitution loop
-  PacAncill = 0.0
+  PacAncill = 0.0d0
   ! sect. 5.9
   FuelCell(GeneratorNum)%FCPM%PelancillariesAC = FuelCell(GeneratorNum)%FCPM%ANC0   &
                                              + FuelCell(GeneratorNum)%FCPM%ANC1 * FuelCell(GeneratorNum)%FCPM%NdotFuel
@@ -6746,14 +6792,14 @@ SUBROUTINE FigurePowerConditioningLosses(GeneratorNum, Pdemand, PpcuLosses)
   IF (FuelCell(GeneratorNum)%Inverter%EffMode ==  InverterEffQuadratic) THEN
 
     ! first use Pdemand instead of Pel to get initial estimate
-    lastPpcuLosses = Pdemand * ( 1 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, Pdemand) )  &
+    lastPpcuLosses = Pdemand * ( 1.0d0 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, Pdemand) )  &
                      /CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, Pdemand)
 
     Do iter=1, 20  ! seems like need to iterate (??) Need to investigate number and convergence success here
 
       Pel = Pdemand + lastPpcuLosses
 
-      lastPpcuLosses  = (1 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, Pel) ) * Pel
+      lastPpcuLosses  = (1.0d0 - CurveValue(FuelCell(GeneratorNum)%Inverter%EffQuadraticCurveID, Pel) ) * Pel
 
     ENDDO
 
@@ -6878,11 +6924,11 @@ SUBROUTINE FigureTransientConstraints(GeneratorNum, Pel, Constrained, PelDiff)
 
   IF (FuelCell(GeneratorNum)%FCPM%DuringShutDown) THEN
 
-    Pel = 0.0 ! assumes no power generated during shut down
+    Pel = 0.0d0 ! assumes no power generated during shut down
     Constrained = .true.
   ENDIF
 
-  PelDiff = 0.0
+  PelDiff = 0.0d0
   IF (constrained) then
    PelDiff = PelInput - Pel
   endif
@@ -6993,12 +7039,12 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
   REAL(r64)  :: TwaterOut
   REAL(r64)  :: hgas
   REAL(r64)  :: hwater
-  REAL(r64)  :: waterFract=0.0
+  REAL(r64)  :: waterFract=0.0d0
   REAL(r64)  :: NdotWaterVapor
   REAL(r64)  :: TcondThresh
   REAL(r64)  :: hxl1
   REAL(r64)  :: hxl2
-  REAL(r64)  :: NdotWaterCond=0.0
+  REAL(r64)  :: NdotWaterCond=0.0d0
   REAL(r64)  :: hfpwater
   INTEGER    :: I
 
@@ -7026,18 +7072,18 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
     TprodGasIn =  FuelCell(Num)%AuxilHeat%TauxMix
     CALL FigureAuxilHeatGasHeatCap(Num, TprodGasIn , CpProdGasMol) ! Cp in (J/mol*K)
     !factor of 1000.0 for kmol -> mol
-    NdotCp = MIN(NdotGas*CpProdGasMol*1000.0, NdotWater*CpWaterMol*1000.0)
+    NdotCp = MIN(NdotGas*CpProdGasMol*1000.0d0, NdotWater*CpWaterMol*1000.0d0)
 
     qHX   = eHX * NdotCp*(TprodGasIn - TwaterIn)
 
-    THXexh = TprodGasIn - qHX / (NdotGas*CpProdGasMol*1000.0)
+    THXexh = TprodGasIn - qHX / (NdotGas*CpProdGasMol*1000.0d0)
 
     Cp = GetSpecificHeatGlycol(PlantLoop(FuelCell(Num)%CWLoopNum)%FluidName, &
                                TwaterIn, &
                                PlantLoop(FuelCell(Num)%CWLoopNum)%FluidIndex, &
                                'CalcFuelCellGenHeatRecovery')
 
-    IF (MdotWater * Cp  <= 0.0) THEN
+    IF (MdotWater * Cp  <= 0.0d0) THEN
       TwaterOut =  TwaterIn
     ELSE
       TwaterOut  =  TwaterIn + qHX / (MdotWater * Cp)
@@ -7058,9 +7104,9 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
     TwaterIn  = FuelCell(Num)%ExhaustHX%WaterInletTemp
     CALL FigureLiquidWaterHeatCap(TwaterIn, CpWaterMol)
         !factor of 1000.0 for kmol -> mol
-    NdotCpWater = NdotWater*CpWaterMol*1000.0
+    NdotCpWater = NdotWater*CpWaterMol*1000.0d0
     CALL FigureAuxilHeatGasHeatCap(Num, TauxMix , CpProdGasMol) ! Cp in (J/mol*K)
-    NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0
+    NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0d0
 
     ! commented out protection for taking exponent of too large a number
     !   because it hasn't been a problem in testing
@@ -7072,11 +7118,12 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
     !   write(*,*) 'Houston, we have a problem, EXP [] func will fail for UAeff*(1/NdotCpWater:', UAeff*(1/NdotCpWater)
   !  ELSE
 
-    If ((NdotCpWater /= 0.0) .AND. (NdotCpAuxMix /= 0.0)) then ! trap divide by zero
+    If ((NdotCpWater /= 0.0d0) .AND. (NdotCpAuxMix /= 0.0d0)) then ! trap divide by zero
       ! now evaluate Eq. 44
-      THXexh = ((1-NdotCpAuxMix/NdotCpWater)/(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
-            +(    (EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) -1)               &
-                 /(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
+      THXexh = ((1.0d0-NdotCpAuxMix/NdotCpWater)/ &
+                  (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
+            +(    (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) -1.0d0)               &
+                 /(EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
 
       TwaterOut = TwaterIn + (NdotCpAuxMix/NdotCpWater) * (TauxMix - THXexh)  ! Eq. 42
 
@@ -7086,10 +7133,10 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
     ENDIF
    ! ENDIF
 
-    IF ((THXexh - TwaterIn) /= 0.0) THEN ! trap divide by zero
+    IF ((THXexh - TwaterIn) /= 0.0d0) THEN ! trap divide by zero
       qHX = UAeff * ( (TauxMix - TwaterOut) - (THXexh - TwaterIn) )/LOG( (TauxMix - TwaterOut) / (THXexh - TwaterIn) )
     ELSE
-      qHX = 0.0
+      qHX = 0.0d0
     ENDIF
 
   CASE(LMTDfundementalUAeff) !method 3
@@ -7105,21 +7152,22 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
        * (NdotWater/FuelCell(Num)%ExhaustHX%NdotWaterRef)**FuelCell(Num)%ExhaustHX%mCoeff !Eq. 48
 
     ! now equation 47
-    UAeff = 1./(1./(hgas*FuelCell(Num)%ExhaustHX%AreaGas) + 1./(hwater*FuelCell(Num)%ExhaustHX%AreaWater)   &
+    UAeff = 1.0d0/(1.0d0/(hgas*FuelCell(Num)%ExhaustHX%AreaGas) + 1.0d0/(hwater*FuelCell(Num)%ExhaustHX%AreaWater)   &
        +  FuelCell(Num)%ExhaustHX%Fadjust)
 
     TauxMix = FuelCell(Num)%AuxilHeat%TauxMix
     TwaterIn  = FuelCell(Num)%ExhaustHX%WaterInletTemp
     CALL FigureLiquidWaterHeatCap(TwaterIn, CpWaterMol)
-    NdotCpWater = NdotWater*CpWaterMol*1000.0
+    NdotCpWater = NdotWater*CpWaterMol*1000.0d0
     CALL FigureAuxilHeatGasHeatCap(Num, TauxMix , CpProdGasMol) ! Cp in (J/mol*K)
-    NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0
+    NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0d0
 
-    If ((NdotCpWater /= 0.0) .AND. (NdotCpAuxMix /= 0.0)) then ! trap divide by zero
+    If ((NdotCpWater /= 0.0d0) .AND. (NdotCpAuxMix /= 0.0d0)) then ! trap divide by zero
     ! now evaluate Eq. 44
-      THXexh = ((1-NdotCpAuxMix/NdotCpWater)/(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
-            +(    (EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) -1)               &
-                 /(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
+      THXexh = ((1.0d0-NdotCpAuxMix/NdotCpWater)/ &
+                  (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
+            +(    (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) -1.0d0)               &
+                 /(EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
 
       TwaterOut = TwaterIn + (NdotCpAuxMix/NdotCpWater) * (TauxMix - THXexh)  ! Eq. 42
 
@@ -7128,10 +7176,10 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
       TwaterOut = TwaterIn
     ENDIF
 
-    IF ((THXexh - TwaterIn) /= 0.0) THEN ! trap divide by zero
+    IF ((THXexh - TwaterIn) /= 0.0d0) THEN ! trap divide by zero
       qHX = UAeff * ( (TauxMix - TwaterOut) - (THXexh - TwaterIn) )/LOG( (TauxMix - TwaterOut) / (THXexh - TwaterIn) )
     ELSE
-      qHX = 0.0
+      qHX = 0.0d0
     ENDIF
 
   CASE(Condensing) !method 4
@@ -7151,9 +7199,9 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
       TauxMix = FuelCell(Num)%AuxilHeat%TauxMix
       TwaterIn  = FuelCell(Num)%ExhaustHX%WaterInletTemp
       CALL FigureLiquidWaterHeatCap(TwaterIn, CpWaterMol)
-      NdotCpWater = NdotWater*CpWaterMol*1000.0
+      NdotCpWater = NdotWater*CpWaterMol*1000.0d0
       CALL FigureAuxilHeatGasHeatCap(Num, TauxMix , CpProdGasMol) ! Cp in (J/mol*K)
-      NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0
+      NdotCpAuxMix = NdotGas*CpProdGasMol*1000.0d0
 
      !find water fraction in incoming gas stream
       DO I = 1, Size(FuelCell(Num)%AuxilHeat%GasLibID)
@@ -7167,17 +7215,17 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
 
       NdotWaterCond = (TcondThresh - TwaterIn) * ( hxl1 * (NdotWaterVapor/NdotGas) + hxl2*(NdotWaterVapor/NdotGas)**2)
 
-      If (NdotWaterCond < 0.0) NdotWaterCond = 0.0
+      If (NdotWaterCond < 0.0d0) NdotWaterCond = 0.0d0
 
       hfpwater =  4.4004d+07  ! molal heat of vaporization of water J/kmol)
 
-      If ((NdotCpWater /= 0.0) .AND. (NdotCpAuxMix /= 0.0)) then ! trap divide by zero
+      If ((NdotCpWater /= 0.0d0) .AND. (NdotCpAuxMix /= 0.0d0)) then ! trap divide by zero
 
       ! now evaluate Eq. 44
-        THXexh = ((1-NdotCpAuxMix/NdotCpWater)/    &
-                   (EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
-              +(    (EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) -1)               &
-                   /(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
+        THXexh = ((1.0d0-NdotCpAuxMix/NdotCpWater)/    &
+                    (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TauxMix  &
+              +(    (EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) -1.0d0)               &
+                   /(EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater)) - NdotCpAuxMix/NdotCpWater) )* TwaterIn
 
         TwaterOut = TwaterIn + (NdotCpAuxMix/NdotCpWater) * (TauxMix - THXexh) + (NdotWaterCond * hfpwater)/NdotCpWater
 
@@ -7185,22 +7233,22 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
 
                do loop = 1, 5 ! iterative soluion because in condensing case THXexh is function of qSens and qLatent
 
-                  IF ((THXexh - TwaterIn) /= 0.0) THEN ! trap divide by zero
+                  IF ((THXexh - TwaterIn) /= 0.0d0) THEN ! trap divide by zero
                     qSens = UAeff * ( (TauxMix - TwaterOut) - (THXexh - TwaterIn) )/  &
                                            LOG( (TauxMix - TwaterOut) / (THXexh - TwaterIn) )
                   else
-                    qSens = 0.0
+                    qSens = 0.0d0
                   endif
                   qLatent=  NdotWaterCond * hfpwater
                   If (qSens > 0) then
-                    THXexh = TauxMix *( (1-NdotCpAuxMix/NdotCpWater)                                                         &
-                                        /(  ( EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater) )                                   &
+                    THXexh = TauxMix *( (1.0d0-NdotCpAuxMix/NdotCpWater)                                                     &
+                                        /(  ( EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater) )                           &
                                            /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) ) ) - NdotCpAuxMix/NdotCpWater) ) &
-                           + TwaterIn *( ( EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater))                                   &
-                                          /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) )      -1)                        &
-                                          /(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater))                                     &
-                                           /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) ) - NdotCpAuxMix/NdotCpWater) )  &
-                           -( (qLatent/NdotCpWater) /(EXP(UAeff*(1/NdotCpAuxMix - 1/NdotCpWater))                           &
+                           + TwaterIn *( ( EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater))                               &
+                                          /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) )      -1.0d0)                     &
+                                          /(EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater))                              &
+                                           /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) ) - NdotCpAuxMix/NdotCpWater) )   &
+                           -( (qLatent/NdotCpWater) /(EXP(UAeff*(1.0d0/NdotCpAuxMix - 1.0d0/NdotCpWater))                    &
                                            /( EXP((UAeff * qLatent)/(NdotCpWater * qSens)) ) - NdotCpAuxMix/NdotCpWater) )
                   else
                     THXexh = TauxMix
@@ -7220,12 +7268,12 @@ SUBROUTINE CalcFuelCellGenHeatRecovery(Num)
       ENDIF
 
 
-      IF ((THXexh - TwaterIn) /= 0.0) THEN ! trap divide by zero
+      IF ((THXexh - TwaterIn) /= 0.0d0) THEN ! trap divide by zero
 
         qHX = UAeff * ( (TauxMix - TwaterOut) - (THXexh - TwaterIn) )/LOG( (TauxMix - TwaterOut) / (THXexh - TwaterIn) ) &
                + NdotWaterCond * hfpwater
       ELSE
-        qHX = 0.0
+        qHX = 0.0d0
       ENDIF
     ELSE !no cooling water flow, model will blow up.
       qHX       = 0.0D0
@@ -7369,9 +7417,9 @@ SUBROUTINE SimFuelCellPlantHeatRecovery(CompType,CompName,CompTypeNum,CompNum,Ru
     IF (CompNum == 0) THEN
       CALL ShowFatalError('SimFuelCellPlantHeatRecovery: Fuel Cell Generator Unit not found='//TRIM(CompName))
     ENDIF
-    MinCap  = 0.0
-    MaxCap  = 0.0
-    OptCap  = 0.0
+    MinCap  = 0.0d0
+    MaxCap  = 0.0d0
+    OptCap  = 0.0d0
     RETURN
   END IF  ! End Of InitLoopEquip
 
@@ -7518,7 +7566,7 @@ IF (BeginEnvrnFlag .and. MyEnvrnFlag(FCnum) .AND. .NOT. MyPlantScanFlag(FCnum)) 
   FuelCell(FCnum)%FCPM%NdotLiqwater  = 0.d0
   FuelCell(FCnum)%FCPM%TwaterInlet   = 0.d0
   FuelCell(FCnum)%FCPM%WaterInEnthalpy   = 0.d0
-  FuelCell(FCnum)%FCPM%TprodGasLeavingFCPM = 200.0
+  FuelCell(FCnum)%FCPM%TprodGasLeavingFCPM = 200.0d0
   FuelCell(FCnum)%FCPM%FractionalDayofLastStartUp = 0.d0
   FuelCell(FCnum)%FCPM%FractionalDayofLastShutDown = 0.d0
   FuelCell(FCnum)%FCPM%HasBeenOn = .true.
@@ -7896,18 +7944,18 @@ SUBROUTINE UpdateFuelCellGeneratorRecords(RunFlag, Num)
 
   FuelCell(Num)%Report%ACPowerGen          = FuelCell(Num)%ACPowerGen !electrical power produced [W]
   FuelCell(Num)%Report%ACEnergyGen         = FuelCell(Num)%ACPowerGen*TimeStepSys*SecInHour ! energy produced (J)
-  FuelCell(Num)%Report%QdotExhaust                = 0.0 ! reporting: exhaust gas heat recovered (W)
-  FuelCell(Num)%Report%TotalHeatEnergyRec         = 0.0 ! reporting: total heat recovered (J)
-  FuelCell(Num)%Report%ExhaustEnergyRec           = 0.0 ! reporting: exhaust gas heat recovered (J)
+  FuelCell(Num)%Report%QdotExhaust                = 0.0d0 ! reporting: exhaust gas heat recovered (W)
+  FuelCell(Num)%Report%TotalHeatEnergyRec         = 0.0d0 ! reporting: total heat recovered (J)
+  FuelCell(Num)%Report%ExhaustEnergyRec           = 0.0d0 ! reporting: exhaust gas heat recovered (J)
 
-  FuelCell(Num)%Report%HeatRecInletTemp           = 0.0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
-  FuelCell(Num)%Report%HeatRecOutletTemp          = 0.0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
-  FuelCell(Num)%Report%HeatRecMdot                = 0.0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
+  FuelCell(Num)%Report%HeatRecInletTemp           = 0.0d0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
+  FuelCell(Num)%Report%HeatRecOutletTemp          = 0.0d0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
+  FuelCell(Num)%Report%HeatRecMdot                = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
 
-  FuelCell(Num)%Report%ElectEfficiency   = 0.0
-  FuelCell(Num)%Report%ThermalEfficiency = 0.0
-  FuelCell(Num)%Report%OverallEfficiency = 0.0
-  FuelCell(Num)%Report%ExergyEfficiency  = 0.0
+  FuelCell(Num)%Report%ElectEfficiency   = 0.0d0
+  FuelCell(Num)%Report%ThermalEfficiency = 0.0d0
+  FuelCell(Num)%Report%OverallEfficiency = 0.0d0
+  FuelCell(Num)%Report%ExergyEfficiency  = 0.0d0
 
   FuelCell(Num)%Report%TairInlet         = FuelCell(Num)%AirSup%TairIntoBlower ! State point 1
   FuelCell(Num)%Report%TairIntoFCPM      = FuelCell(Num)%AirSup%TairIntoFCPM   ! State point 4
@@ -7927,16 +7975,16 @@ SUBROUTINE UpdateFuelCellGeneratorRecords(RunFlag, Num)
   FuelCell(Num)%Report%FuelCompressSkinLoss = FuelSupply(FuelCell(Num)%FuelSupNum)%QskinLoss
                                                               !heat rate of losses.by fuel supply compressor [W]
   FuelCell(Num)%Report%FuelEnergyLHV        = FuelCell(Num)%FCPM%NdotFuel * FuelSupply(FuelCell(Num)%FuelSupNum)%LHV &
-                                          * 1000000.0 *TimeStepSys*SecInHour ! reporting: Fuel Energy used (J)
+                                          * 1000000.0d0 *TimeStepSys*SecInHour ! reporting: Fuel Energy used (J)
   FuelCell(Num)%Report%FuelEnergyUseRateLHV = FuelCell(Num)%FCPM%NdotFuel * FuelSupply(FuelCell(Num)%FuelSupNum)%LHV &
-                                          * 1000000.0 ! reporting: Fuel Energy used (W)
+                                          * 1000000.0d0 ! reporting: Fuel Energy used (W)
   FuelCell(Num)%Report%FuelEnergyHHV        = FuelCell(Num)%FCPM%NdotFuel * FuelSupply(FuelCell(Num)%FuelSupNum)%HHV &
                                           * FuelSupply(FuelCell(Num)%FuelSupNum)%KmolPerSecToKgPerSec*TimeStepSys*SecInHour
 
   FuelCell(Num)%Report%FuelEnergyUseRateHHV = FuelCell(Num)%FCPM%NdotFuel * FuelSupply(FuelCell(Num)%FuelSupNum)%HHV &
                                           * FuelSupply(FuelCell(Num)%FuelSupNum)%KmolPerSecToKgPerSec
 
-  FuelCell(Num)%Report%FuelRateMdot         = 0.0 ! (Kg/s)
+  FuelCell(Num)%Report%FuelRateMdot         = 0.0d0 ! (Kg/s)
 
   FuelCell(Num)%Report%TwaterInlet    = FuelCell(Num)%WaterSup%TwaterIntoCompress
   FuelCell(Num)%Report%TwaterIntoFCPM = FuelCell(Num)%WaterSup%TwaterIntoFCPM
@@ -8089,54 +8137,54 @@ TYPE ICEngineGeneratorSpecs
        CHARACTER(len=MaxNameLength) :: TypeOf         = 'Generator:InternalCombustionEngine' ! Type of Generator
        INTEGER                      :: CompType_Num   = iGeneratorICEngine
        CHARACTER(len=MaxNameLength) :: FuelType       = ' ' ! Type of Fuel - DIESEL, GASOLINE, GAS
-       REAL(r64)         :: RatedPowerOutput          = 0.0 ! W - design nominal capacity of Generator
+       REAL(r64)         :: RatedPowerOutput          = 0.0d0 ! W - design nominal capacity of Generator
        INTEGER           :: ElectricCircuitNode       = 0   ! Electric Circuit Node
-       REAL(r64)         :: MinPartLoadRat            = 0.0 ! (IC ENGINE MIN) min allowed operating frac full load
-       REAL(r64)         :: MaxPartLoadRat            = 0.0 ! (IC ENGINE MAX) max allowed operating frac full load
-       REAL(r64)         :: OptPartLoadRat            = 0.0 ! (IC ENGINE BEST) optimal operating frac full load
-       REAL(r64)         :: ElecOutputFuelRat         = 0.0 !(RELDC) Ratio of Generator output to Fuel Energy Input
+       REAL(r64)         :: MinPartLoadRat            = 0.0d0 ! (IC ENGINE MIN) min allowed operating frac full load
+       REAL(r64)         :: MaxPartLoadRat            = 0.0d0 ! (IC ENGINE MAX) max allowed operating frac full load
+       REAL(r64)         :: OptPartLoadRat            = 0.0d0 ! (IC ENGINE BEST) optimal operating frac full load
+       REAL(r64)         :: ElecOutputFuelRat         = 0.0d0 !(RELDC) Ratio of Generator output to Fuel Energy Input
        INTEGER           :: ElecOutputFuelCurve       = 0   !Curve Index for generator output to Fuel Energy Input Coeff Poly Fit
-       REAL(r64)         :: RecJacHeattoFuelRat       = 0.0 !(RJACDC) Ratio of Recoverable Jacket Heat to Fuel Energy Input
+       REAL(r64)         :: RecJacHeattoFuelRat       = 0.0d0 !(RJACDC) Ratio of Recoverable Jacket Heat to Fuel Energy Input
        INTEGER           :: RecJacHeattoFuelCurve     = 0   !Curve Index for Ratio of Recoverable Jacket Heat to
                                                             ! Fuel Energy Input Coeff Poly Fit
-       REAL(r64)         :: RecLubeHeattoFuelRat      = 0.0 !(RLUBDC) Ratio of Recoverable Lube Oil Heat to Fuel Energy Input
+       REAL(r64)         :: RecLubeHeattoFuelRat      = 0.0d0 !(RLUBDC) Ratio of Recoverable Lube Oil Heat to Fuel Energy Input
        INTEGER           :: RecLubeHeattoFuelCurve    = 0   !Curve Index for Ratio of Recoverable Lube Oil Heat to
                                                             ! Fuel Energy Input Coef Poly Fit
-       REAL(r64)         :: TotExhausttoFuelRat       = 0.0 !(REXDC) Total Exhaust heat Input to Fuel Energy Input
+       REAL(r64)         :: TotExhausttoFuelRat       = 0.0d0 !(REXDC) Total Exhaust heat Input to Fuel Energy Input
        INTEGER           :: TotExhausttoFuelCurve     = 0   !Curve Index for Total Exhaust heat Input to Fuel Energy Input
                                                             ! Coeffs Poly Fit
-       REAL(r64)         :: ExhaustTemp               = 0.0 !(TEXDC) Exhaust Gas Temp to Fuel Energy Input
+       REAL(r64)         :: ExhaustTemp               = 0.0d0 !(TEXDC) Exhaust Gas Temp to Fuel Energy Input
        INTEGER           :: ExhaustTempCurve          = 0   !Curve Index for Exhaust Gas Temp to Fuel Energy Input Coeffs Poly Fit
        INTEGER           :: ErrExhaustTempIndex       = 0   ! error index for temp curve
-       REAL(r64)         :: UA                        = 0.0 !(UACDC) exhaust gas Heat Exchanger UA to Capacity
-       REAL(r64),DIMENSION(2) :: UACoef                    = 0.0 !Heat Exchanger UA Coeffs Poly Fit
-       REAL(r64)         :: MaxExhaustperPowerOutput  = 0.0 !MAX EXHAUST FLOW PER W DSL POWER OUTPUT COEFF
-       REAL(r64)         :: DesignMinExitGasTemp      = 0.0 !Steam Saturation Temperature
-       REAL(r64)         :: FuelHeatingValue          = 0.0 ! Heating Value of Fuel in kJ/kg
-       REAL(r64)         :: DesignHeatRecVolFlowRate  = 0.0 ! m3/s, Design Water mass flow rate through heat recovery loop
-       REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0 ! kg/s, Design Water mass flow rate through heat recovery loop
+       REAL(r64)         :: UA                        = 0.0d0 !(UACDC) exhaust gas Heat Exchanger UA to Capacity
+       REAL(r64),DIMENSION(2) :: UACoef                    = 0.0d0 !Heat Exchanger UA Coeffs Poly Fit
+       REAL(r64)         :: MaxExhaustperPowerOutput  = 0.0d0 !MAX EXHAUST FLOW PER W DSL POWER OUTPUT COEFF
+       REAL(r64)         :: DesignMinExitGasTemp      = 0.0d0 !Steam Saturation Temperature
+       REAL(r64)         :: FuelHeatingValue          = 0.0d0 ! Heating Value of Fuel in kJ/kg
+       REAL(r64)         :: DesignHeatRecVolFlowRate  = 0.0d0 ! m3/s, Design Water mass flow rate through heat recovery loop
+       REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0d0 ! kg/s, Design Water mass flow rate through heat recovery loop
        LOGICAL           :: HeatRecActive             = .false. ! True if Heat Rec Design Vol Flow Rate > 0
        INTEGER           :: HeatRecInletNodeNum       = 0   ! Node number on the heat recovery inlet side of the condenser
        INTEGER           :: HeatRecOutletNodeNum      = 0   ! Node number on the heat recovery outlet side of the condenser
-       REAL(r64)         :: HeatRecInletTemp          = 0.0 ! Inlet Temperature of the heat recovery fluid
-       REAL(r64)         :: HeatRecOutletTemp         = 0.0 ! Outlet Temperature of the heat recovery fluid
-       REAL(r64)         :: HeatRecMdotDesign         = 0.0 ! reporting: Heat Recovery Loop Mass flow rate
-       REAL(r64)         :: HeatRecMdotActual         = 0.0 !
-       REAL(r64)         :: QTotalHeatRecovered       = 0.0 ! total heat recovered (W)
-       REAL(r64)         :: QJacketRecovered          = 0.0 ! heat recovered from jacket (W)
-       REAL(r64)         :: QLubeOilRecovered         = 0.0 ! heat recovered from lube (W)
-       REAL(r64)         :: QExhaustRecovered         = 0.0 ! exhaust gas heat recovered (W)
-       REAL(r64)         :: FuelEnergyUseRate         = 0.0 ! Fuel Energy used (W)
-       REAL(r64)         :: TotalHeatEnergyRec        = 0.0 ! total heat recovered (J)
-       REAL(r64)         :: JacketEnergyRec           = 0.0 ! heat recovered from jacket (J)
-       REAL(r64)         :: LubeOilEnergyRec          = 0.0 ! heat recovered from lube (J)
-       REAL(r64)         :: ExhaustEnergyRec          = 0.0 ! exhaust gas heat recovered (J)
-       REAL(r64)         :: FuelEnergy                = 0.0 ! Fuel Energy used (J)
-       REAL(r64)         :: FuelMdot                  = 0.0 ! Fuel Amount used (Kg/s)
-       REAL(r64)         :: ExhaustStackTemp          = 0.0 ! Exhaust Stack Temperature (C)
-       REAL(r64)         :: ElecPowerGenerated        = 0.0 ! Electric Power Generated (W)
-       REAL(r64)         :: ElecEnergyGenerated       = 0.0 ! Amount of Electric Energy Generated (J)
-       REAL(r64)         :: HeatRecMaxTemp            = 0.0 !Max Temp that can be produced in heat recovery
+       REAL(r64)         :: HeatRecInletTemp          = 0.0d0 ! Inlet Temperature of the heat recovery fluid
+       REAL(r64)         :: HeatRecOutletTemp         = 0.0d0 ! Outlet Temperature of the heat recovery fluid
+       REAL(r64)         :: HeatRecMdotDesign         = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate
+       REAL(r64)         :: HeatRecMdotActual         = 0.0d0 !
+       REAL(r64)         :: QTotalHeatRecovered       = 0.0d0 ! total heat recovered (W)
+       REAL(r64)         :: QJacketRecovered          = 0.0d0 ! heat recovered from jacket (W)
+       REAL(r64)         :: QLubeOilRecovered         = 0.0d0 ! heat recovered from lube (W)
+       REAL(r64)         :: QExhaustRecovered         = 0.0d0 ! exhaust gas heat recovered (W)
+       REAL(r64)         :: FuelEnergyUseRate         = 0.0d0 ! Fuel Energy used (W)
+       REAL(r64)         :: TotalHeatEnergyRec        = 0.0d0 ! total heat recovered (J)
+       REAL(r64)         :: JacketEnergyRec           = 0.0d0 ! heat recovered from jacket (J)
+       REAL(r64)         :: LubeOilEnergyRec          = 0.0d0 ! heat recovered from lube (J)
+       REAL(r64)         :: ExhaustEnergyRec          = 0.0d0 ! exhaust gas heat recovered (J)
+       REAL(r64)         :: FuelEnergy                = 0.0d0 ! Fuel Energy used (J)
+       REAL(r64)         :: FuelMdot                  = 0.0d0 ! Fuel Amount used (Kg/s)
+       REAL(r64)         :: ExhaustStackTemp          = 0.0d0 ! Exhaust Stack Temperature (C)
+       REAL(r64)         :: ElecPowerGenerated        = 0.0d0 ! Electric Power Generated (W)
+       REAL(r64)         :: ElecEnergyGenerated       = 0.0d0 ! Amount of Electric Energy Generated (J)
+       REAL(r64)         :: HeatRecMaxTemp            = 0.0d0 !Max Temp that can be produced in heat recovery
        INTEGER           :: HRLoopNum                 = 0   ! cooling water plant loop index number, for heat recovery
        INTEGER           :: HRLoopSideNum             = 0   ! cooling water plant loop side index, for heat recovery
        INTEGER           :: HRBranchNum               = 0   ! cooling water plant loop branch index, for heat recovery
@@ -8145,23 +8193,23 @@ TYPE ICEngineGeneratorSpecs
 END TYPE ICEngineGeneratorSpecs
 
 TYPE ReportVars
-  REAL(r64)    :: PowerGen                   = 0.0 ! reporting: power (W)
-  REAL(r64)    :: EnergyGen                  = 0.0 ! reporting: energy (J)
-  REAL(r64)    :: QJacketRecovered           = 0.0 ! reporting: Heat Recovered from Jacket (W)
-  REAL(r64)    :: QLubeOilRecovered          = 0.0 ! reporting: Heat Recovered from Lubricant (W)
-  REAL(r64)    :: QExhaustRecovered          = 0.0 ! reporting: exhaust gas heat recovered (W)
-  REAL(r64)    :: QTotalHeatRecovered        = 0.0 ! reporting: Total Heat Recovered (W)
-  REAL(r64)    :: TotalHeatEnergyRec         = 0.0 ! reporting: total heat recovered (J)
-  REAL(r64)    :: JacketEnergyRec            = 0.0 ! reporting: heat recovered from jacket (J)
-  REAL(r64)    :: LubeOilEnergyRec           = 0.0 ! reporting: heat recovered from lube (J)
-  REAL(r64)    :: ExhaustEnergyRec           = 0.0 ! reporting: exhaust gas heat recovered (J)
-  REAL(r64)    :: FuelEnergy                 = 0.0 ! reporting: Fuel Energy used (J)
-  REAL(r64)    :: FuelEnergyUseRate          = 0.0 ! reporting: Fuel Energy used (W)
-  REAL(r64)    :: FuelMdot                   = 0.0 ! reporting: Fuel used (Kg/s)
-  REAL(r64)    :: ExhaustStackTemp           = 0.0 ! reporting: Exhaust Stack Temperature (C)
-  REAL(r64)    :: HeatRecInletTemp           = 0.0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
-  REAL(r64)    :: HeatRecOutletTemp          = 0.0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
-  REAL(r64)    :: HeatRecMdot                = 0.0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
+  REAL(r64)    :: PowerGen                   = 0.0d0 ! reporting: power (W)
+  REAL(r64)    :: EnergyGen                  = 0.0d0 ! reporting: energy (J)
+  REAL(r64)    :: QJacketRecovered           = 0.0d0 ! reporting: Heat Recovered from Jacket (W)
+  REAL(r64)    :: QLubeOilRecovered          = 0.0d0 ! reporting: Heat Recovered from Lubricant (W)
+  REAL(r64)    :: QExhaustRecovered          = 0.0d0 ! reporting: exhaust gas heat recovered (W)
+  REAL(r64)    :: QTotalHeatRecovered        = 0.0d0 ! reporting: Total Heat Recovered (W)
+  REAL(r64)    :: TotalHeatEnergyRec         = 0.0d0 ! reporting: total heat recovered (J)
+  REAL(r64)    :: JacketEnergyRec            = 0.0d0 ! reporting: heat recovered from jacket (J)
+  REAL(r64)    :: LubeOilEnergyRec           = 0.0d0 ! reporting: heat recovered from lube (J)
+  REAL(r64)    :: ExhaustEnergyRec           = 0.0d0 ! reporting: exhaust gas heat recovered (J)
+  REAL(r64)    :: FuelEnergy                 = 0.0d0 ! reporting: Fuel Energy used (J)
+  REAL(r64)    :: FuelEnergyUseRate          = 0.0d0 ! reporting: Fuel Energy used (W)
+  REAL(r64)    :: FuelMdot                   = 0.0d0 ! reporting: Fuel used (Kg/s)
+  REAL(r64)    :: ExhaustStackTemp           = 0.0d0 ! reporting: Exhaust Stack Temperature (C)
+  REAL(r64)    :: HeatRecInletTemp           = 0.0d0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
+  REAL(r64)    :: HeatRecOutletTemp          = 0.0d0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
+  REAL(r64)    :: HeatRecMdot                = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
 END TYPE ReportVars
 
           ! MODULE VARIABLE DECLARATIONS:
@@ -8377,9 +8425,9 @@ SUBROUTINE SimICEPlantHeatRecovery(CompType,CompName,CompTypeNum,CompNum,RunFlag
       CALL ShowFatalError('SimICEPlantHeatRecovery: ICE Generator Unit not found='//TRIM(CompName))
       RETURN
     ENDIF
-      MinCap  = 0.0
-      MaxCap  = 0.0
-      OptCap  = 0.0
+      MinCap  = 0.0d0
+      MaxCap  = 0.0d0
+      OptCap  = 0.0d0
       RETURN
   ENDIF ! End Of InitLoopEquip
 
@@ -8480,7 +8528,7 @@ SUBROUTINE GetICEngineGeneratorInput
     ICEngineGenerator(GeneratorNum)%Name                = AlphArray(1)
 
     ICEngineGenerator(GeneratorNum)%RatedPowerOutput    = NumArray(1)
-    IF (NumArray(1) == 0.0) THEN
+    IF (NumArray(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(NumArray(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
       ErrorsFound=.true.
@@ -8547,7 +8595,7 @@ SUBROUTINE GetICEngineGeneratorInput
     ICEngineGenerator(GeneratorNum)%DesignMinExitGasTemp = NumArray(8)
     ICEngineGenerator(GeneratorNum)%FuelHeatingValue = NumArray(9)
     ICEngineGenerator(GeneratorNum)%DesignHeatRecVolFlowRate = NumArray(10)
-    IF (ICEngineGenerator(GeneratorNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF (ICEngineGenerator(GeneratorNum)%DesignHeatRecVolFlowRate > 0.0d0) THEN
       ICEngineGenerator(GeneratorNum)%HeatRecActive=.true.
       ICEngineGenerator(GeneratorNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(AlphArray(8),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
@@ -8788,29 +8836,29 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
     HeatRecMdot = Node(HeatRecInNode)%MassFlowRate
 
   ELSE
-    HeatRecInTemp = 0.0
-    HeatRecMdot   = 0.0
+    HeatRecInTemp = 0.0d0
+    HeatRecMdot   = 0.0d0
   ENDIF
 
         !If no loop demand or Generator OFF, return
   IF (.NOT. Runflag) THEN
-    ICEngineGenerator(GeneratorNum)%ElecPowerGenerated   = 0.0
-    ICEngineGenerator(GeneratorNum)%ElecEnergyGenerated  = 0.0
+    ICEngineGenerator(GeneratorNum)%ElecPowerGenerated   = 0.0d0
+    ICEngineGenerator(GeneratorNum)%ElecEnergyGenerated  = 0.0d0
     ICEngineGenerator(GeneratorNum)%HeatRecInletTemp     = HeatRecInTemp
     ICEngineGenerator(GeneratorNum)%HeatRecOutletTemp    = HeatRecInTemp
-    ICEngineGenerator(GeneratorNum)%HeatRecMdotActual    = 0.0
-    ICEngineGenerator(GeneratorNum)%QJacketRecovered     = 0.0
-    ICEngineGenerator(GeneratorNum)%QExhaustRecovered    = 0.0
-    ICEngineGenerator(GeneratorNum)%QLubeOilRecovered    = 0.0
-    ICEngineGenerator(GeneratorNum)%QTotalHeatRecovered  = 0.0
-    ICEngineGenerator(GeneratorNum)%JacketEnergyRec      = 0.0
-    ICEngineGenerator(GeneratorNum)%ExhaustEnergyRec     = 0.0
-    ICEngineGenerator(GeneratorNum)%LubeOilEnergyRec     = 0.0
-    ICEngineGenerator(GeneratorNum)%TotalHeatEnergyRec   = 0.0
-    ICEngineGenerator(GeneratorNum)%FuelEnergyUseRate    = 0.0
-    ICEngineGenerator(GeneratorNum)%FuelEnergy           = 0.0
-    ICEngineGenerator(GeneratorNum)%FuelMdot             = 0.0
-    ICEngineGenerator(GeneratorNum)%ExhaustStackTemp     = 0.0
+    ICEngineGenerator(GeneratorNum)%HeatRecMdotActual    = 0.0d0
+    ICEngineGenerator(GeneratorNum)%QJacketRecovered     = 0.0d0
+    ICEngineGenerator(GeneratorNum)%QExhaustRecovered    = 0.0d0
+    ICEngineGenerator(GeneratorNum)%QLubeOilRecovered    = 0.0d0
+    ICEngineGenerator(GeneratorNum)%QTotalHeatRecovered  = 0.0d0
+    ICEngineGenerator(GeneratorNum)%JacketEnergyRec      = 0.0d0
+    ICEngineGenerator(GeneratorNum)%ExhaustEnergyRec     = 0.0d0
+    ICEngineGenerator(GeneratorNum)%LubeOilEnergyRec     = 0.0d0
+    ICEngineGenerator(GeneratorNum)%TotalHeatEnergyRec   = 0.0d0
+    ICEngineGenerator(GeneratorNum)%FuelEnergyUseRate    = 0.0d0
+    ICEngineGenerator(GeneratorNum)%FuelEnergy           = 0.0d0
+    ICEngineGenerator(GeneratorNum)%FuelMdot             = 0.0d0
+    ICEngineGenerator(GeneratorNum)%ExhaustStackTemp     = 0.0d0
 
     RETURN
   END IF
@@ -8827,11 +8875,11 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
 
 !Use Curve fit to determine Fuel Energy Input.  For electric power generated in Watts, the fuel
 !energy input is calculated in J/s.  The PLBasedFuelInputCurve selects ratio of fuel flow (J/s)/power generated (J/s).
-    IF (PLR > 0.0)THEN
+    IF (PLR > 0.0d0)THEN
       ElecOutputFuelRat = CurveValue(ICEngineGenerator(GeneratorNum)%ElecOutputFuelCurve, PLR)
       FuelEnergyUseRate = ElecPowerGenerated / ElecOutputFuelRat
     ELSE
-      FuelEnergyUseRate = 0.0
+      FuelEnergyUseRate = 0.0d0
     END IF
 
 !Use Curve fit to determine heat recovered in the water jacket.  This curve calculates the water jacket heat recovered (J/s) by
@@ -8856,7 +8904,7 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
 
 !Use Curve fit to determine Exhaust Temperature in C.  The temperature is simply a curve fit
 !of the exhaust temperature in C to the part load ratio.
-    IF (PLR > 0.0)THEN
+    IF (PLR > 0.0d0)THEN
       ExhaustTemp = CurveValue(ICEngineGenerator(GeneratorNum)%ExhaustTempCurve, PLR)
 
       IF (ExhaustTemp > ReferenceTemp) THEN
@@ -8885,11 +8933,11 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
           '="'//trim(ICEngineGenerator(GeneratorNum)%Name)//'" low Exhaust Temperature continues...',   &
           ICEngineGenerator(GeneratorNum)%ErrExhaustTempIndex,ReportMinOf=ExhaustTemp,ReportMaxOf=ExhaustTemp,   &
           ReportMaxUnits='[C]',ReportMinUnits='[C]')
-        QExhaustRec =0.0
+        QExhaustRec =0.0d0
         ExhaustStackTemp = ICEngineGenerator(GeneratorNum)%DesignMinExitGasTemp
       ENDIF
     ELSE
-      QExhaustRec =0.0
+      QExhaustRec =0.0d0
     END IF
 
 
@@ -8988,7 +9036,7 @@ IMPLICIT NONE
 
 
   !Need to set the HeatRecRatio to 1.0 if it is not modified
-  HRecRatio= 1.0
+  HRecRatio= 1.0d0
 
 
   HeatRecInTemp = Node(HeatRecInNode)%Temp
@@ -9012,18 +9060,18 @@ IMPLICIT NONE
   IF(HeatRecOutTemp > ICEngineGenerator(Num)%HeatRecMaxTemp) THEN
     IF(ICEngineGenerator(Num)%HeatRecMaxTemp /= HeatRecInTemp)THEN
       MinHeatRecMdot = (EnergyRecovered)/(HeatRecCp * (ICEngineGenerator(Num)%HeatRecMaxTemp - HeatRecInTemp))
-      If(MinHeatRecMdot < 0.0) MinHeatRecMdot = 0.0
+      If(MinHeatRecMdot < 0.0d0) MinHeatRecMdot = 0.0d0
     ELSE
-      MinHeatRecMdot = 0.0
+      MinHeatRecMdot = 0.0d0
     END IF
 
     !Recalculate Outlet Temperature, with adjusted flowrate
-    IF ((MinHeatRecMdot .GT. 0) .AND. (HeatRecCp .GT. 0)) THEN
+    IF ((MinHeatRecMdot .GT. 0.0d0) .AND. (HeatRecCp .GT. 0.0d0)) THEN
       HeatRecOutTemp = (EnergyRecovered)/(MinHeatRecMdot * HeatRecCp) + HeatRecInTemp
       HRecRatio = HeatRecMdot/MinHeatRecMdot
     ELSE
       HeatRecOutTemp = HeatRecInTemp
-      HRecRatio = 0.0
+      HRecRatio = 0.0d0
     END IF
 
   END IF
@@ -9327,74 +9375,74 @@ TYPE CTGeneratorSpecs
        CHARACTER(len=MaxNameLength) :: TypeOf         = 'Generator:CombustionTurbine' ! Type of Generator
        INTEGER           :: CompType_Num              = iGeneratorCombTurbine
        CHARACTER(len=MaxNameLength) :: FuelType             ! Type of Fuel - DIESEL, GASOLINE, GAS
-       REAL(r64)         :: RatedPowerOutput          = 0.0 ! W - design nominal capacity of Generator
+       REAL(r64)         :: RatedPowerOutput          = 0.0d0 ! W - design nominal capacity of Generator
        INTEGER           :: ElectricCircuitNode       = 0   ! Electric Circuit Node
-       REAL(r64)         :: MinPartLoadRat            = 0.0 ! (CT MIN) min allowed operating frac full load
-       REAL(r64)         :: MaxPartLoadRat            = 0.0 ! (CT MAX) max allowed operating frac full load
-       REAL(r64)         :: OptPartLoadRat            = 0.0 ! (CT BEST) optimal operating frac full load
-       REAL(r64)         :: FuelEnergyUseRate         = 0.0 !(EFUEL) rate of Fuel Energy Required to run COMBUSTION turbine (W)
-       REAL(r64)         :: FuelEnergy                = 0.0 !Amount of Fuel Energy Required to run COMBUSTION turbine (J)
+       REAL(r64)         :: MinPartLoadRat            = 0.0d0 ! (CT MIN) min allowed operating frac full load
+       REAL(r64)         :: MaxPartLoadRat            = 0.0d0 ! (CT MAX) max allowed operating frac full load
+       REAL(r64)         :: OptPartLoadRat            = 0.0d0 ! (CT BEST) optimal operating frac full load
+       REAL(r64)         :: FuelEnergyUseRate         = 0.0d0 !(EFUEL) rate of Fuel Energy Required to run COMBUSTION turbine (W)
+       REAL(r64)         :: FuelEnergy                = 0.0d0 !Amount of Fuel Energy Required to run COMBUSTION turbine (J)
        INTEGER           :: PLBasedFuelInputCurve     = 0   !(FUL1GC) Curve Index for Part Load Ratio Based Fuel Input
                                                             ! Coefficients Poly Fit
        INTEGER           :: TempBasedFuelInputCurve   = 0   !(FUL2GC) Curve Index for Ambient Temperature Based Fuel Input
                                                             ! Coeff Poly Fit
-       REAL(r64)         :: ExhaustFlow               = 0.0 !(FEX) Exhaust Gas Flow Rate cubic meters per second???
+       REAL(r64)         :: ExhaustFlow               = 0.0d0 !(FEX) Exhaust Gas Flow Rate cubic meters per second???
        INTEGER           :: ExhaustFlowCurve          = 0   !(FEXGC) Curve Index for Exhaust Gas Flow Rate Input Coef Poly Fit
-       REAL(r64)         :: ExhaustTemp               = 0.0 !(TEX) Exhaust Gas Temperature in C
+       REAL(r64)         :: ExhaustTemp               = 0.0d0 !(TEX) Exhaust Gas Temperature in C
        INTEGER           :: PLBasedExhaustTempCurve   = 0   !(TEX1GC) Curve Index for Part Load Ratio Based Exhaust Temp Input
                                                             ! Coeffs Poly Fit
        INTEGER           :: TempBasedExhaustTempCurve = 0   !(TEX2GC) Curve Index for Ambient Temperature Based Exhaust Gas Temp to
                                                             ! Fuel Energy Input Coeffs Poly Fit
-       REAL(r64)         :: QLubeOilRecovered         = 0.0 !(ELUBE) Recovered Lube Oil Energy (W)
-       REAL(r64)         :: QExhaustRecovered         = 0.0 !(EEX) Recovered Exhaust heat  (W)
-       REAL(r64)         :: QTotalHeatRecovered       = 0.0 !total heat recovered (W)
-       REAL(r64)         :: LubeOilEnergyRec          = 0.0 ! Recovered Lube Oil Energy (J)
-       REAL(r64)         :: ExhaustEnergyRec          = 0.0 ! Recovered Exhaust heat  (J)
-       REAL(r64)         :: TotalHeatEnergyRec        = 0.0 !total heat recovered (J)
+       REAL(r64)         :: QLubeOilRecovered         = 0.0d0 !(ELUBE) Recovered Lube Oil Energy (W)
+       REAL(r64)         :: QExhaustRecovered         = 0.0d0 !(EEX) Recovered Exhaust heat  (W)
+       REAL(r64)         :: QTotalHeatRecovered       = 0.0d0 !total heat recovered (W)
+       REAL(r64)         :: LubeOilEnergyRec          = 0.0d0 ! Recovered Lube Oil Energy (J)
+       REAL(r64)         :: ExhaustEnergyRec          = 0.0d0 ! Recovered Exhaust heat  (J)
+       REAL(r64)         :: TotalHeatEnergyRec        = 0.0d0 !total heat recovered (J)
        INTEGER           :: QLubeOilRecoveredCurve    = 0   !(ELUBEGC) Curve Index for Recoverable Lube Oil heat Input Coef Poly Fit
-       REAL(r64)         :: UA                        = 0.0 !(UACGC) exhaust gas Heat Exchanger UA
-       REAL(r64),DIMENSION(2) :: UACoef                    = 0.0 !Heat Exchanger UA  Coeffs Poly Fit
-       REAL(r64)         :: MaxExhaustperCTPower      = 0.0 !MAX EXHAUST FLOW PER W POWER OUTPUT COEFF
-       REAL(r64)         :: DesignHeatRecVolFlowRate  = 0.0 ! m3/s, Design Water mass flow rate through heat recovery loop
-       REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0 ! kg/s, Design Water mass flow rate through heat recovery loop
-       REAL(r64)         :: DesignMinExitGasTemp      = 0.0 !Steam Saturation Temperature (C)
-       REAL(r64)         :: DesignAirInletTemp        = 0.0 !Design Turbine Air Inlet Temperature (C)
-       REAL(r64)         :: ExhaustStackTemp          = 0.0 !turbine exhaust gas temp (C)
+       REAL(r64)         :: UA                        = 0.0d0 !(UACGC) exhaust gas Heat Exchanger UA
+       REAL(r64),DIMENSION(2) :: UACoef                    = 0.0d0 !Heat Exchanger UA  Coeffs Poly Fit
+       REAL(r64)         :: MaxExhaustperCTPower      = 0.0d0 !MAX EXHAUST FLOW PER W POWER OUTPUT COEFF
+       REAL(r64)         :: DesignHeatRecVolFlowRate  = 0.0d0 ! m3/s, Design Water mass flow rate through heat recovery loop
+       REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0d0 ! kg/s, Design Water mass flow rate through heat recovery loop
+       REAL(r64)         :: DesignMinExitGasTemp      = 0.0d0 !Steam Saturation Temperature (C)
+       REAL(r64)         :: DesignAirInletTemp        = 0.0d0 !Design Turbine Air Inlet Temperature (C)
+       REAL(r64)         :: ExhaustStackTemp          = 0.0d0 !turbine exhaust gas temp (C)
        LOGICAL           :: HeatRecActive             = .false. ! true when design max flow rate > 0
        INTEGER           :: HeatRecInletNodeNum       = 0   ! Node number on the heat recovery inlet side of the condenser
        INTEGER           :: HeatRecOutletNodeNum      = 0   ! Node number on the heat recovery outlet side of the condenser
-       REAL(r64)         :: HeatRecInletTemp          = 0.0 !Inlet Temperature of the heat recovery fluid
-       REAL(r64)         :: HeatRecOutletTemp         = 0.0 !Outlet Temperature of the heat recovery fluid
-       REAL(r64)         :: HeatRecMdot               = 0.0 ! reporting: Heat Recovery Loop Mass flow rate
+       REAL(r64)         :: HeatRecInletTemp          = 0.0d0 !Inlet Temperature of the heat recovery fluid
+       REAL(r64)         :: HeatRecOutletTemp         = 0.0d0 !Outlet Temperature of the heat recovery fluid
+       REAL(r64)         :: HeatRecMdot               = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate
        INTEGER           :: HRLoopNum                 = 0   ! cooling water plant loop index number, for heat recovery
        INTEGER           :: HRLoopSideNum             = 0   ! cooling water plant loop side index, for heat recovery
        INTEGER           :: HRBranchNum               = 0   ! cooling water plant loop branch index, for heat recovery
        INTEGER           :: HRCompNum                 = 0   ! cooling water plant loop component index, for heat recovery
 
-       REAL(r64)         :: FuelMdot                  = 0.0 ! reporting: Fuel Amount used (kg/s)
-       REAL(r64)         :: FuelHeatingValue          = 0.0 !Heating Value for Fuel in (kJ/kg)
-       REAL(r64)         :: ElecPowerGenerated        = 0.0 ! reporting: power generated (W)
-       REAL(r64)         :: ElecEnergyGenerated       = 0.0 ! reporting: power generated (W)
-       REAL(r64)         :: HeatRecMaxTemp            = 0.0 !Max Temp that can be produced in heat recovery
+       REAL(r64)         :: FuelMdot                  = 0.0d0 ! reporting: Fuel Amount used (kg/s)
+       REAL(r64)         :: FuelHeatingValue          = 0.0d0 !Heating Value for Fuel in (kJ/kg)
+       REAL(r64)         :: ElecPowerGenerated        = 0.0d0 ! reporting: power generated (W)
+       REAL(r64)         :: ElecEnergyGenerated       = 0.0d0 ! reporting: power generated (W)
+       REAL(r64)         :: HeatRecMaxTemp            = 0.0d0 !Max Temp that can be produced in heat recovery
        INTEGER           :: OAInletNode               = 0   ! optional inlet node index pointer for outdoor air for compustion
 END TYPE CTGeneratorSpecs
 
 TYPE ReportVars
-  REAL(r64)    :: PowerGen                = 0.0 ! reporting: power (W)
-  REAL(r64)    :: EnergyGen               = 0.0 ! reporting: power (W)
-  REAL(r64)    :: QTotalHeatRecovered     = 0.0 ! reporting: total Heat Recovered (W)
-  REAL(r64)    :: QLubeOilRecovered       = 0.0 ! reporting: Heat Recovered from Lubricant (W)
-  REAL(r64)    :: QExhaustRecovered       = 0.0 ! reporting: Heat Recovered from exhaust (W)
-  REAL(r64)    :: TotalHeatEnergyRec      = 0.0 ! reporting: total Heat Recovered (W)
-  REAL(r64)    :: LubeOilEnergyRec        = 0.0 ! reporting: Heat Recovered from Lubricant (W)
-  REAL(r64)    :: ExhaustEnergyRec        = 0.0 ! reporting: Heat Recovered from exhaust (W)
-  REAL(r64)    :: FuelEnergyUseRate       = 0.0 ! reporting: Fuel Energy use rate (W)
-  REAL(r64)    :: FuelEnergy              = 0.0 ! reporting: Fuel Energy used (J)
-  REAL(r64)    :: FuelMdot                = 0.0 ! reporting: Fuel Amount used (kg/s)
-  REAL(r64)    :: ExhaustStackTemp        = 0.0 ! reporting: Exhaust Stack Temperature (C)
-  REAL(r64)    :: HeatRecInletTemp        = 0.0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
-  REAL(r64)    :: HeatRecOutletTemp       = 0.0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
-  REAL(r64)    :: HeatRecMdot             = 0.0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
+  REAL(r64)    :: PowerGen                = 0.0d0 ! reporting: power (W)
+  REAL(r64)    :: EnergyGen               = 0.0d0 ! reporting: power (W)
+  REAL(r64)    :: QTotalHeatRecovered     = 0.0d0 ! reporting: total Heat Recovered (W)
+  REAL(r64)    :: QLubeOilRecovered       = 0.0d0 ! reporting: Heat Recovered from Lubricant (W)
+  REAL(r64)    :: QExhaustRecovered       = 0.0d0 ! reporting: Heat Recovered from exhaust (W)
+  REAL(r64)    :: TotalHeatEnergyRec      = 0.0d0 ! reporting: total Heat Recovered (W)
+  REAL(r64)    :: LubeOilEnergyRec        = 0.0d0 ! reporting: Heat Recovered from Lubricant (W)
+  REAL(r64)    :: ExhaustEnergyRec        = 0.0d0 ! reporting: Heat Recovered from exhaust (W)
+  REAL(r64)    :: FuelEnergyUseRate       = 0.0d0 ! reporting: Fuel Energy use rate (W)
+  REAL(r64)    :: FuelEnergy              = 0.0d0 ! reporting: Fuel Energy used (J)
+  REAL(r64)    :: FuelMdot                = 0.0d0 ! reporting: Fuel Amount used (kg/s)
+  REAL(r64)    :: ExhaustStackTemp        = 0.0d0 ! reporting: Exhaust Stack Temperature (C)
+  REAL(r64)    :: HeatRecInletTemp        = 0.0d0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
+  REAL(r64)    :: HeatRecOutletTemp       = 0.0d0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
+  REAL(r64)    :: HeatRecMdot             = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
 END TYPE ReportVars
 
 
@@ -9554,9 +9602,9 @@ SUBROUTINE SimCTPlantHeatRecovery(CompType,CompName,CompTypeNum,CompNum,RunFlag,
       CALL ShowFatalError('SimCTPlantHeatRecovery: CT Generator Unit not found='//TRIM(CompName))
       RETURN
     ENDIF
-      MinCap  = 0.0
-      MaxCap  = 0.0
-      OptCap  = 0.0
+      MinCap  = 0.0d0
+      MaxCap  = 0.0d0
+      OptCap  = 0.0d0
       RETURN
   ENDIF ! End Of InitLoopEquip
 
@@ -9646,7 +9694,7 @@ SUBROUTINE GetCTGeneratorInput
     CTGenerator(GeneratorNum)%Name                = AlphArray(1)
 
     CTGenerator(GeneratorNum)%RatedPowerOutput              = NumArray(1)
-    IF (NumArray(1) == 0.0) THEN
+    IF (NumArray(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(NumArray(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
       ErrorsFound=.true.
@@ -9715,7 +9763,7 @@ SUBROUTINE GetCTGeneratorInput
     CTGenerator(GeneratorNum)%FuelHeatingValue = NumArray(10)
     CTGenerator(GeneratorNum)%DesignHeatRecVolFlowRate = NumArray(11)
 
-    IF (CTGenerator(GeneratorNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF (CTGenerator(GeneratorNum)%DesignHeatRecVolFlowRate > 0.0d0) THEN
       CTGenerator(GeneratorNum)%HeatRecActive=.true.
       CTGenerator(GeneratorNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(AlphArray(9),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
@@ -9981,28 +10029,28 @@ SUBROUTINE CalcCTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
        HeatRecMdot = Node(HeatRecInNode)%MassFlowRate
     End If
   ELSE
-    HeatRecInTemp=0.0
-    HeatRecCp=0.0
-    HeatRecMdot=0.0
+    HeatRecInTemp=0.0d0
+    HeatRecCp=0.0d0
+    HeatRecMdot=0.0d0
   ENDIF
 
         !If no loop demand or Generator OFF, return
   IF (.NOT. Runflag) THEN
-    CTGenerator(GeneratorNum)%ElecPowerGenerated  = 0.0
-    CTGenerator(GeneratorNum)%ElecEnergyGenerated  = 0.0
+    CTGenerator(GeneratorNum)%ElecPowerGenerated  = 0.0d0
+    CTGenerator(GeneratorNum)%ElecEnergyGenerated  = 0.0d0
     CTGenerator(GeneratorNum)%HeatRecInletTemp    = HeatRecInTemp
     CTGenerator(GeneratorNum)%HeatRecOutletTemp   = HeatRecInTemp
-    CTGenerator(GeneratorNum)%HeatRecMdot         = 0.0
-    CTGenerator(GeneratorNum)%QLubeOilRecovered   = 0.0
-    CTGenerator(GeneratorNum)%QExhaustRecovered   = 0.0
-    CTGenerator(GeneratorNum)%QTotalHeatRecovered   = 0.0
-    CTGenerator(GeneratorNum)%LubeOilEnergyRec   = 0.0
-    CTGenerator(GeneratorNum)%ExhaustEnergyRec  = 0.0
-    CTGenerator(GeneratorNum)%TotalHeatEnergyRec  = 0.0
-    CTGenerator(GeneratorNum)%FuelEnergyUseRate      = 0.0
-    CTGenerator(GeneratorNum)%FuelEnergy     = 0.0
-    CTGenerator(GeneratorNum)%FuelMdot      = 0.0
-    CTGenerator(GeneratorNum)%ExhaustStackTemp    = 0.0
+    CTGenerator(GeneratorNum)%HeatRecMdot         = 0.0d0
+    CTGenerator(GeneratorNum)%QLubeOilRecovered   = 0.0d0
+    CTGenerator(GeneratorNum)%QExhaustRecovered   = 0.0d0
+    CTGenerator(GeneratorNum)%QTotalHeatRecovered   = 0.0d0
+    CTGenerator(GeneratorNum)%LubeOilEnergyRec   = 0.0d0
+    CTGenerator(GeneratorNum)%ExhaustEnergyRec  = 0.0d0
+    CTGenerator(GeneratorNum)%TotalHeatEnergyRec  = 0.0d0
+    CTGenerator(GeneratorNum)%FuelEnergyUseRate      = 0.0d0
+    CTGenerator(GeneratorNum)%FuelEnergy     = 0.0d0
+    CTGenerator(GeneratorNum)%FuelMdot      = 0.0d0
+    CTGenerator(GeneratorNum)%ExhaustStackTemp    = 0.0d0
     RETURN
   END IF
 
@@ -10041,7 +10089,7 @@ SUBROUTINE CalcCTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 !Use Curve fit to determine Exhaust Temperature.  This curve calculates the exhaust temperature (C) by
 !multiplying the exhaust temperature (C) for a particular part load as given by PLBasedExhaustTempCurve
 !a correction factor based on the deviation from design temperature, TempBasedExhaustTempCurve
-  IF ((PLR > 0.0) .AND. ( (ExhaustFlow > 0.0D0) .or. (MaxExhaustperCTPower > 0.0D0))) THEN
+  IF ((PLR > 0.0d0) .AND. ( (ExhaustFlow > 0.0D0) .or. (MaxExhaustperCTPower > 0.0D0))) THEN
 
     ExhaustTemp = CurveValue(CTGenerator(GeneratorNum)%PLBasedExhaustTempCurve, PLR)  * &
                   CurveValue(CTGenerator(GeneratorNum)%TempBasedExhaustTempCurve, AmbientDeltaT)
@@ -10056,7 +10104,7 @@ SUBROUTINE CalcCTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
     QExhaustRec = MAX(ExhaustFlow*ExhaustCP*(ExhaustTemp-ExhaustStackTemp),0.0d0)
   ELSE
     ExhaustStackTemp = CTGenerator(GeneratorNum)%DesignMinExitGasTemp
-    QExhaustRec = 0.0
+    QExhaustRec = 0.0d0
   END IF
 
 !Use Curve fit to determine Heat Recovered Lubricant heat.  This curve calculates the lube heat recovered (J/s) by
@@ -10066,33 +10114,33 @@ SUBROUTINE CalcCTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
 
 !Check for divide by zero
-  IF ((HeatRecMdot .GT. 0.0) .AND. (HeatRecCp .GT. 0.0)) THEN
+  IF ((HeatRecMdot .GT. 0.0d0) .AND. (HeatRecCp .GT. 0.0d0)) THEN
     HeatRecOutTemp = (QExhaustRec + QLubeOilRec)/(HeatRecMdot * HeatRecCp) + HeatRecInTemp
   ELSE
-    HeatRecMdot = 0.0
+    HeatRecMdot = 0.0d0
     HeatRecOutTemp = HeatRecInTemp
-    QExhaustRec =0.0
-    QLubeOilRec =0.0
+    QExhaustRec =0.0d0
+    QLubeOilRec =0.0d0
   END IF
 
 
 
   !Now verify the maximum temperature was not exceeded
-  HRecRatio = 1.0
-  MinHeatRecMdot=0.0
+  HRecRatio = 1.0d0
+  MinHeatRecMdot=0.0d0
   IF(HeatRecOutTemp > CTGenerator(GeneratorNum)%HeatRecMaxTemp) THEN
    IF(CTGenerator(GeneratorNum)%HeatRecMaxTemp /= HeatRecInTemp)THEN
       MinHeatRecMdot = (QExhaustRec + QLubeOilRec)/(HeatRecCp * (CTGenerator(GeneratorNum)%HeatRecMaxTemp - HeatRecInTemp))
-      If(MinHeatRecMdot < 0.0) MinHeatRecMdot = 0.0
+      If(MinHeatRecMdot < 0.0d0) MinHeatRecMdot = 0.0d0
    END IF
 
     !Recalculate Outlet Temperature, with adjusted flowrate
-    IF ((MinHeatRecMdot .GT. 0.0) .AND. (HeatRecCp .GT. 0.0)) THEN
+    IF ((MinHeatRecMdot .GT. 0.0d0) .AND. (HeatRecCp .GT. 0.0d0)) THEN
       HeatRecOutTemp = (QExhaustRec + QLubeOilRec)/(MinHeatRecMdot * HeatRecCp) + HeatRecInTemp
       HRecRatio = HeatRecMdot/MinHeatRecMdot
     ELSE
       HeatRecOutTemp = HeatRecInTemp
-      HRecRatio = 0.0
+      HRecRatio = 0.0d0
     END IF
     QLubeOilRec = QLubeOilRec*HRecRatio
     QExhaustRec = QExhaustRec*HRecRatio
@@ -10507,15 +10555,15 @@ TYPE MTGeneratorSpecs
        INTEGER    :: CombustionAirInletNodeNum    = 0     ! Combustion Air Inlet Node number
        INTEGER    :: CombustionAirOutletNodeNum   = 0     ! Combustion Air Outlet (Exhaust) Node number
        LOGICAL    :: ExhAirCalcsActive            = .FALSE. ! Flag to enable exhaust air calculations
-       REAL(r64)  :: RefExhaustAirMassFlowRate    = 0.0   ! Reference Exhaust Air Mass Flow Rate (kg/s)
-       REAL(r64)  :: ExhaustAirMassFlowRate       = 0.0   ! Actual Exhaust Air Mass Flow Rate (kg/s)
+       REAL(r64)  :: RefExhaustAirMassFlowRate    = 0.0d0   ! Reference Exhaust Air Mass Flow Rate (kg/s)
+       REAL(r64)  :: ExhaustAirMassFlowRate       = 0.0d0   ! Actual Exhaust Air Mass Flow Rate (kg/s)
        INTEGER    :: ExhFlowFTempCurveNum         = 0     ! Curve index for Exhaust Air Flow Rate function of inlet air temp
        INTEGER    :: ExhFlowFPLRCurveNum          = 0     ! Curve index for Exhaust Air Flow Rate function of part-load ratio
-       REAL(r64)  :: NomExhAirOutletTemp          = 0.0   ! Nominal Exhaust Air Outlet Temperature (C)
+       REAL(r64)  :: NomExhAirOutletTemp          = 0.0d0   ! Nominal Exhaust Air Outlet Temperature (C)
        INTEGER    :: ExhAirTempFTempCurveNum      = 0     ! Curve index for Exhaust Air Temperature function of inlet air temp
        INTEGER    :: ExhAirTempFPLRCurveNum       = 0     ! Curve index for Exhaust Air Temperature function of part-load ratio
        REAL(r64)  :: ExhaustAirTemperature        = 0.0d0   ! Combustion exhaust air temperature (C)
-       REAL(r64)  :: ExhaustAirHumRat             = 0.0   ! Combustion exhaust air humidity ratio (kg/kg)
+       REAL(r64)  :: ExhaustAirHumRat             = 0.0d0   ! Combustion exhaust air humidity ratio (kg/kg)
 
 !      Other required variables/calculated values
        INTEGER    :: CompType_Num                 = iGeneratorMicroturbine
@@ -10599,8 +10647,8 @@ TYPE ReportVars
   REAL(r64) :: AncillaryEnergy         = 0.0d0 ! Reporting: Ancillary energy use (J)
   REAL(r64) :: StandbyPowerRate        = 0.0d0 ! Reporting: Standby power use rate (W)
   REAL(r64) :: StandbyEnergy           = 0.0d0 ! Reporting: Standby energy use (J)
-  REAL(r64)  :: ExhAirMassFlowRate       = 0.0   ! Actual Exhaust Air Mass Flow Rate (kg/s)
-  REAL(r64)  :: ExhAirTemperature        = 0.0   ! Combustion exhaust air temperature (C)
+  REAL(r64)  :: ExhAirMassFlowRate       = 0.0d0   ! Actual Exhaust Air Mass Flow Rate (kg/s)
+  REAL(r64)  :: ExhAirTemperature        = 0.0d0   ! Combustion exhaust air temperature (C)
 END TYPE ReportVars
 
 
@@ -11462,7 +11510,7 @@ SUBROUTINE GetMTGeneratorInput
     IF (.NOT. lAlphaFieldBlanks(15) ) THEN
       MTGenerator(GeneratorNum)%CombustionAirInletNodeNum   = &
                   GetOnlySingleNode(AlphArray(15),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-                  NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                  NodeType_Air,NodeConnectionType_Inlet,2,ObjectIsNotParent)
     END IF
 
 !    Combustion air inlet node must be an outside air node
@@ -11476,7 +11524,7 @@ SUBROUTINE GetMTGeneratorInput
     IF (.NOT. lAlphaFieldBlanks(16)) THEN
       MTGenerator(GeneratorNum)%CombustionAirOutletNodeNum = &
                   GetOnlySingleNode(AlphArray(16),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
-                  NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                  NodeType_Air,NodeConnectionType_Outlet,2,ObjectIsNotParent)
     END IF
 
     IF (MTGenerator(GeneratorNum)%CombustionAirOutletNodeNum .GT. 0 .AND. &

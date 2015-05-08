@@ -639,12 +639,12 @@ SUBROUTINE UpdatePlantMixer(LoopNum,LoopSideNum,MixNum)
     SplitterNum = MixNum
     SplitterInNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitterNum)%NodeNumIn
           !Initialize Mixer outlet temp and mass flow rate
-    MixerOutletTemp             = 0.0
-    MixerOutletMassFlow         = 0.0
-    MixerOutletMassFlowMaxAvail = 0.0
-    MixerOutletMassFlowMinAvail = 0.0
-    MixerOutletPress            = 0.0
-    MixerOutletQuality          = 0.0
+    MixerOutletTemp             = 0.0d0
+    MixerOutletMassFlow         = 0.0d0
+    MixerOutletMassFlowMaxAvail = 0.0d0
+    MixerOutletMassFlowMinAvail = 0.0d0
+    MixerOutletPress            = 0.0d0
+    MixerOutletQuality          = 0.0d0
 
           !Calculate Mixer outlet mass flow rate
     DO InletNodeNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%TotalInletNodes
@@ -655,7 +655,7 @@ SUBROUTINE UpdatePlantMixer(LoopNum,LoopSideNum,MixNum)
           !Calculate Mixer outlet temperature
     DO InletNodeNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%TotalInletNodes
       MixerInletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Mixer(MixNum)%NodeNumIn(InletNodeNum)
-      IF(MixerOutletMassFlow > 0.0) THEN
+      IF(MixerOutletMassFlow > 0.0d0) THEN
         MixerInletMassFlow = Node(MixerInletNode)%MassFlowRate
         MassFrac  = MixerInletMassFlow / MixerOutletMassFlow
           !mass flow weighted temp and enthalpy for each mixer inlet

@@ -100,27 +100,27 @@ INTEGER, PARAMETER :: DESCENDING = 2
 INTEGER, PARAMETER :: NumAllCurveTypes          = 21
 
 ! curve object/table types (used for warning messages)
-INTEGER, PARAMETER :: CurveType_Linear          = 1
-INTEGER, PARAMETER :: CurveType_Quadratic       = 2
-INTEGER, PARAMETER :: CurveType_Cubic           = 3
-INTEGER, PARAMETER :: CurveType_Quartic         = 4
-INTEGER, PARAMETER :: CurveType_Exponent        = 5
-INTEGER, PARAMETER :: CurveType_BiCubic         = 6
-INTEGER, PARAMETER :: CurveType_BiQuadratic     = 7
-INTEGER, PARAMETER :: CurveType_QuadraticLinear = 8
-INTEGER, PARAMETER :: CurveType_TriQuadratic    = 9
-INTEGER, PARAMETER :: CurveType_FuncPressDrop   = 10
-INTEGER, PARAMETER :: CurveType_TableOneIV      = 11
-INTEGER, PARAMETER :: CurveType_TableTwoIV      = 12
-INTEGER, PARAMETER :: CurveType_TableMultiIV    = 13
-INTEGER, PARAMETER :: CurveType_FanPressureRise        = 14
-INTEGER, PARAMETER :: CurveType_ExponentialSkewNormal  = 15
-INTEGER, PARAMETER :: CurveType_Sigmoid                = 16
-INTEGER, PARAMETER :: CurveType_RectangularHyperbola1  = 17
-INTEGER, PARAMETER :: CurveType_RectangularHyperbola2  = 18
-INTEGER, PARAMETER :: CurveType_ExponentialDecay       = 19
-INTEGER, PARAMETER :: CurveType_DoubleExponentialDecay = 20
-INTEGER, PARAMETER :: CurveType_QuadLinear             = 21
+INTEGER, PUBLIC, PARAMETER :: CurveType_Linear          = 1
+INTEGER, PUBLIC, PARAMETER :: CurveType_Quadratic       = 2
+INTEGER, PUBLIC, PARAMETER :: CurveType_Cubic           = 3
+INTEGER, PUBLIC, PARAMETER :: CurveType_Quartic         = 4
+INTEGER, PUBLIC, PARAMETER :: CurveType_Exponent        = 5
+INTEGER, PUBLIC, PARAMETER :: CurveType_BiCubic         = 6
+INTEGER, PUBLIC, PARAMETER :: CurveType_BiQuadratic     = 7
+INTEGER, PUBLIC, PARAMETER :: CurveType_QuadraticLinear = 8
+INTEGER, PUBLIC, PARAMETER :: CurveType_TriQuadratic    = 9
+INTEGER, PUBLIC, PARAMETER :: CurveType_FuncPressDrop   = 10
+INTEGER, PUBLIC, PARAMETER :: CurveType_TableOneIV      = 11
+INTEGER, PUBLIC, PARAMETER :: CurveType_TableTwoIV      = 12
+INTEGER, PUBLIC, PARAMETER :: CurveType_TableMultiIV    = 13
+INTEGER, PUBLIC, PARAMETER :: CurveType_FanPressureRise        = 14
+INTEGER, PUBLIC, PARAMETER :: CurveType_ExponentialSkewNormal  = 15
+INTEGER, PUBLIC, PARAMETER :: CurveType_Sigmoid                = 16
+INTEGER, PUBLIC, PARAMETER :: CurveType_RectangularHyperbola1  = 17
+INTEGER, PUBLIC, PARAMETER :: CurveType_RectangularHyperbola2  = 18
+INTEGER, PUBLIC, PARAMETER :: CurveType_ExponentialDecay       = 19
+INTEGER, PUBLIC, PARAMETER :: CurveType_DoubleExponentialDecay = 20
+INTEGER, PUBLIC, PARAMETER :: CurveType_QuadLinear             = 21
 
 CHARACTER(len=*), PARAMETER, PUBLIC, DIMENSION(NumAllCurveTypes) :: cCurveTypes=  &
        (/'Curve:Linear                  ',  &
@@ -284,6 +284,7 @@ PUBLIC GetCurveName
 PUBLIC InitCurveReporting
 PUBLIC GetPressureCurveTypeAndIndex
 PUBLIC PressureCurveValue
+PUBLIC GetCurveObjectTypeNum
 
 CONTAINS
 
@@ -2109,7 +2110,7 @@ DO CurveIndex=1,NumTwoVarTab
    ALLOCATE(X2var(MaxTableNums))
    NumXVar = 1
    NextXVar = 1
-   XVar(1) = 1
+   XVar(1) = 1.0D0
    TempTableData = TableData
    Temp2TableData = TableData
    DO WHILE (NumXVar .LE. MaxTableNums)
@@ -2760,6 +2761,7 @@ LOGICAL            :: FileExists
 140   FORMAT('! Reading external file tabular data for ',A,' "',A,'"')
 150   FORMAT('! Reading tabular data for ',A,' "',A,'"')
 
+  TotalDataSets = 0 !Objexx:Uninit GO TO 1000 will cause TotalDataSets to be used before it is initialized: Line added
   IF(ReadFromFile)THEN
     FileExists=.false.
     CALL CheckForActualFileName(FileName,FileExists,TempFullFileName)
@@ -3768,19 +3770,19 @@ V1 = MAX(MIN(Var1,PerfCurve(CurveIndex)%Var1Max),PerfCurve(CurveIndex)%Var1Min)
 IF (PRESENT(Var2)) THEN
   V2 = MAX(MIN(Var2,PerfCurve(CurveIndex)%Var2Max),PerfCurve(CurveIndex)%Var2Min)
 ELSE
-  V2 = 0.0
+  V2 = 0.0d0
 END IF
 
 IF (PRESENT(Var3)) THEN
   V3 = MAX(MIN(Var3,PerfCurve(CurveIndex)%Var3Max),PerfCurve(CurveIndex)%Var3Min)
 ELSE
-  V3 = 0.0
+  V3 = 0.0d0
 END IF
 
 IF (PRESENT(Var4)) THEN
   V4 = MAX(MIN(Var4,PerfCurve(CurveIndex)%Var4Max),PerfCurve(CurveIndex)%Var4Min)
 ELSE
-  V4 = 0.0
+  V4 = 0.0d0
 END IF
 SELECT CASE (PerfCurve(CurveIndex)%CurveType)
 
@@ -3998,13 +4000,13 @@ V1 = MAX(MIN(Var1,PerfCurve(CurveIndex)%Var1Max),PerfCurve(CurveIndex)%Var1Min)
 IF (PRESENT(Var2)) THEN
   V2 = MAX(MIN(Var2,PerfCurve(CurveIndex)%Var2Max),PerfCurve(CurveIndex)%Var2Min)
 ELSE
-  V2 = 0.0
+  V2 = 0.0d0
 END IF
 
 IF (PRESENT(Var3)) THEN
   V3 = MAX(MIN(Var3,PerfCurve(CurveIndex)%Var3Max),PerfCurve(CurveIndex)%Var3Min)
 ELSE
-  V3 = 0.0
+  V3 = 0.0d0
 END IF
 
 SELECT CASE(TableLookup(TableIndex)%NumIndependentVars)
@@ -4217,7 +4219,7 @@ ELSE
           ' Insufficient number of independent variables warning continues...' &
           , PerfCurve(CurveIndex)%NumIVLowErrorIndex, 1.0D0, 1.0D0)
   END IF
-  V2 = 0.0
+  V2 = 0.0d0
 END IF
 
 IF (PRESENT(Var3)) THEN
@@ -4247,7 +4249,7 @@ ELSE
           ' Insufficient number of independent variables warning continues...' &
           , PerfCurve(CurveIndex)%NumIVLowErrorIndex, 2.0D0, 2.0D0)
   END IF
-  V3 = 0.0
+  V3 = 0.0d0
 END IF
 
 IF (PRESENT(Var4)) THEN
@@ -4277,7 +4279,7 @@ ELSE
           ' Insufficient number of independent variables warning continues...' &
           , PerfCurve(CurveIndex)%NumIVLowErrorIndex, 3.0D0, 3.0D0)
   END IF
-  V4 = 0.0
+  V4 = 0.0d0
 END IF
 
 IF (PRESENT(Var5)) THEN
@@ -4307,7 +4309,7 @@ ELSE
           ' Insufficient number of independent variables warning continues...' &
           , PerfCurve(CurveIndex)%NumIVLowErrorIndex, 4.0D0, 4.0D0)
   END IF
-  V5 = 0.0
+  V5 = 0.0d0
 END IF
 
       SELECT CASE(TableLookup(TableIndex)%NumIndependentVars)
@@ -5066,7 +5068,7 @@ INTEGER   :: J, K        ! loop coungters
 
    ALAG = 0.0D0
    DO J=ISPT,IEPT
-     Lagrange=1.0
+     Lagrange=1.0d0
      DO K=ISPT,IEPT
        IF (K .NE. J) THEN
          Lagrange = Lagrange*((DataPoint-Ordinate(K))/(Ordinate(J)-Ordinate(K)))
@@ -5916,6 +5918,54 @@ REAL(r64) FUNCTION CalculateMoodyFrictionFactor(ReynoldsNumber, RoughnessRatio)
   RETURN
 
 END FUNCTION CalculateMoodyFrictionFactor
+
+FUNCTION GetCurveObjectTypeNum( CurveIndex ) RESULT (CurveOrTableObjectTypeNum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   April 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! get the object type integer identifier for curves and tables
+
+          ! METHODOLOGY EMPLOYED:
+          ! retrieve from data structure.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)           :: CurveIndex  ! index of curve in curve array
+  INTEGER                        :: CurveOrTableObjectTypeNum
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+  IF (CurveIndex > 0) THEN
+    CurveOrTableObjectTypeNum = PerfCurve(CurveIndex)%ObjectType
+  ELSE
+    CurveOrTableObjectTypeNum = 0
+
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetCurveObjectTypeNum
 
 !=================================================================================================!
 

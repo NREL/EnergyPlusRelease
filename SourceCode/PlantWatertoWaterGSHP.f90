@@ -56,37 +56,34 @@ TYPE GshpSpecs
   INTEGER            :: WWHPPlantTypeOfNum      = 0       ! equipment type num
   LOGICAL            :: Available               = .false. ! need an array of logicals--load identifiers of available equipment
   LOGICAL            :: ON                      = .false. ! simulate the machine at it's operating part load ratio
-  REAL(r64)          :: COP                     = 0.0 ! Coefficient of Performance of the machine
-  REAL(r64)          :: NomCap                  = 0.0 ! Nominal Capcity of the HeatPump
-  REAL(r64)          :: MinPartLoadRat          = 0.0 ! Minimum operating Part Load Ratio
-  REAL(r64)          :: MaxPartLoadRat          = 0.0 ! Maximum operating Part Load Ratio
-  REAL(r64)          :: OptPartLoadRat          = 0.0 ! Optimal operating Part Load Ratio
-  REAL(r64)          :: LoadSideVolFlowRate     = 0.0 ! Design Flow Rate on the Load side m3/sec
+  REAL(r64)          :: COP                     = 0.0d0 ! Coefficient of Performance of the machine
+  REAL(r64)          :: NomCap                  = 0.0d0 ! Nominal Capcity of the HeatPump
+  REAL(r64)          :: MinPartLoadRat          = 0.0d0 ! Minimum operating Part Load Ratio
+  REAL(r64)          :: MaxPartLoadRat          = 0.0d0 ! Maximum operating Part Load Ratio
+  REAL(r64)          :: OptPartLoadRat          = 0.0d0 ! Optimal operating Part Load Ratio
+  REAL(r64)          :: LoadSideVolFlowRate     = 0.0d0 ! Design Flow Rate on the Load side m3/sec
   REAL(r64)          :: LoadSideDesignMassFlow  = 0.d0 ! Design flow rate (kg/s)
-  REAL(r64)          :: SourceSideVolFlowRate   = 0.0 ! Design Flow Rate on th Source Side m3/sec
+  REAL(r64)          :: SourceSideVolFlowRate   = 0.0d0 ! Design Flow Rate on th Source Side m3/sec
   REAL(r64)          :: SourceSideDesignMassFlow = 0.d0 ! Design flow rate (kg/s)
   INTEGER            :: SourceSideInletNodeNum  = 0   ! Node number on the inlet side of the plant
   INTEGER            :: SourceSideOutletNodeNum = 0   ! Node number on the outlet side of the plant
   INTEGER            :: LoadSideInletNodeNum    = 0   ! Node number on the inlet side of the Load Side
   INTEGER            :: LoadSideOutletNodeNum   = 0   ! Node number on the outlet side of the Load Side
-  REAL(r64)          :: SourceSideUACoeff       = 0.0 ! Source Side heat transfer coeff W/K
-  REAL(r64)          :: LoadSideUACoeff         = 0.0 ! Load Side heat transfer coeff  W/K
-  REAL(r64)          :: CompPistonDisp          = 0.0 ! compressor piston displacement m3
-  REAL(r64)          :: CompClearanceFactor     = 0.0 ! compressor clearance factor
-  REAL(r64)          :: CompSucPressDrop        = 0.0 ! deltap ,  compressor suction and discharge pressure drop Pascals
-  REAL(r64)          :: SuperheatTemp           = 0.0 ! deltatsh , super heating  °C
-  REAL(r64)          :: PowerLosses             = 0.0 ! constant part of electro mechanical power losses  watts Joules/sec
-  REAL(r64)          :: LossFactor              = 0.0 ! loss factor used ot define the electro mechanical
+  REAL(r64)          :: SourceSideUACoeff       = 0.0d0 ! Source Side heat transfer coeff W/K
+  REAL(r64)          :: LoadSideUACoeff         = 0.0d0 ! Load Side heat transfer coeff  W/K
+  REAL(r64)          :: CompPistonDisp          = 0.0d0 ! compressor piston displacement m3
+  REAL(r64)          :: CompClearanceFactor     = 0.0d0 ! compressor clearance factor
+  REAL(r64)          :: CompSucPressDrop        = 0.0d0 ! deltap ,  compressor suction and discharge pressure drop Pascals
+  REAL(r64)          :: SuperheatTemp           = 0.0d0 ! deltatsh , super heating  °C
+  REAL(r64)          :: PowerLosses             = 0.0d0 ! constant part of electro mechanical power losses  watts Joules/sec
+  REAL(r64)          :: LossFactor              = 0.0d0 ! loss factor used ot define the electro mechanical
                                                       ! loss that is supposed to be proportional to the theoretical power
-  REAL(r64)          :: HighPressCutOff         = 0.0 ! Maximum Design Pressure on the Load Side Pascals
-  REAL(r64)          :: LowPressCutOff          = 0.0 ! Minimum Design Pressure on the Source Side Pascals
+  REAL(r64)          :: HighPressCutOff         = 0.0d0 ! Maximum Design Pressure on the Load Side Pascals
+  REAL(r64)          :: LowPressCutOff          = 0.0d0 ! Minimum Design Pressure on the Source Side Pascals
 
   ! Added by Arun 6-27-02
-  ! to implement cycletime
-  LOGICAL            :: WasOn                   = .false.
+  ! to implement cycletime - removed 9/10/2013 LKL
   LOGICAL            :: IsOn                    = .false.
-  REAL(r64)   :: LastEventTime           = 0.0
-  REAL(r64)   :: CycleTime               = 0.0
   LOGICAL            :: MustRun                 = .false.
   !loop topology variables
   INTEGER            :: SourceLoopNum           = 0 ! source side plant loop index number
@@ -102,19 +99,19 @@ END TYPE GshpSpecs
 
     ! Output Variables Type definition
 TYPE ReportVars
-  REAL(r64)    :: Power                              = 0.0 ! Power Consumption Watts
-  REAL(r64)    :: Energy                             = 0.0 ! Energy Consumption Joules
-  REAL(r64)    :: QLoad                              = 0.0 ! Load Side heat transfer rate Watts
-  REAL(r64)    :: QLoadEnergy                        = 0.0 ! Load Side heat transfer Joules
-  REAL(r64)    :: QSource                            = 0.0 ! Source Side heat transfer rate Watts
-  REAL(r64)    :: QSourceEnergy                      = 0.0 ! Source Side heat transfer Joules
-  REAL(r64)    :: LoadSideWaterInletTemp             = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: SourceSideWaterInletTemp           = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)    :: LoadSideWaterOutletTemp            = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: SourceSideWaterOutletTemp          = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)    :: LoadSidemdot                       = 0.0 ! Mass flow rate of the cooling water in Load Side Kg/s
-  REAL(r64)    :: SourceSidemdot                     = 0.0 ! Mass flow rate of chilled water in Eavporator Kg/s
-  INTEGER :: WasOn                              = 0   ! On reporting Flag
+  REAL(r64)    :: Power                              = 0.0d0 ! Power Consumption Watts
+  REAL(r64)    :: Energy                             = 0.0d0 ! Energy Consumption Joules
+  REAL(r64)    :: QLoad                              = 0.0d0 ! Load Side heat transfer rate Watts
+  REAL(r64)    :: QLoadEnergy                        = 0.0d0 ! Load Side heat transfer Joules
+  REAL(r64)    :: QSource                            = 0.0d0 ! Source Side heat transfer rate Watts
+  REAL(r64)    :: QSourceEnergy                      = 0.0d0 ! Source Side heat transfer Joules
+  REAL(r64)    :: LoadSideWaterInletTemp             = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: SourceSideWaterInletTemp           = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)    :: LoadSideWaterOutletTemp            = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: SourceSideWaterOutletTemp          = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)    :: LoadSidemdot                       = 0.0d0 ! Mass flow rate of the cooling water in Load Side Kg/s
+  REAL(r64)    :: SourceSidemdot                     = 0.0d0 ! Mass flow rate of chilled water in Eavporator Kg/s
+  INTEGER   :: Running                             = 0   ! On reporting Flag
 END TYPE ReportVars
 
 
@@ -127,15 +124,15 @@ END TYPE ReportVars
   INTEGER            :: GSHPRefrigIndex=0
 
   INTEGER         :: NumGSHPs                      = 0   ! number of Gshps specified in input
-  REAL(r64)       :: LoadSideWaterMassFlowRate     = 0.0 ! Load Side mass flow rate, water side Kg/s
-  REAL(r64)       :: SourceSideWaterMassFlowRate   = 0.0 ! Source Side mass flow rate, water side Kg/s
-  REAL(r64)       :: Power                         = 0.0 ! power consumption Watts Joules/sec
-  REAL(r64)       :: QLoad                         = 0.0 ! heat rejection from Load Side coil Joules
-  REAL(r64)       :: QSource                       = 0.0 ! cooling capacity Joules
-  REAL(r64)       :: SourceSideWaterOutletTemp     = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)       :: SourceSideWaterInletTemp      = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)       :: LoadSideWaterOutletTemp       = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)       :: LoadSideWaterInletTemp        = 0.0 ! Source Side outlet temperature °C
+  REAL(r64)       :: LoadSideWaterMassFlowRate     = 0.0d0 ! Load Side mass flow rate, water side Kg/s
+  REAL(r64)       :: SourceSideWaterMassFlowRate   = 0.0d0 ! Source Side mass flow rate, water side Kg/s
+  REAL(r64)       :: Power                         = 0.0d0 ! power consumption Watts Joules/sec
+  REAL(r64)       :: QLoad                         = 0.0d0 ! heat rejection from Load Side coil Joules
+  REAL(r64)       :: QSource                       = 0.0d0 ! cooling capacity Joules
+  REAL(r64)       :: SourceSideWaterOutletTemp     = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)       :: SourceSideWaterInletTemp      = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)       :: LoadSideWaterOutletTemp       = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)       :: LoadSideWaterInletTemp        = 0.0d0 ! Source Side outlet temperature °C
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
 
 
@@ -147,7 +144,7 @@ PRIVATE    CalcGshpModel
 PRIVATE    GetGshpInput
 PRIVATE    InitGshp
 PRIVATE    UpdateGSHPRecords
-PRIVATE    ForceEquipment
+
 
 
 CONTAINS
@@ -351,7 +348,7 @@ SUBROUTINE GetGshpInput
     GSHP(GSHPNum)%WWHPPlantTypeOfNum    = TypeOf_HPWaterPEHeating
 
     GSHP(GSHPNum)%COP                 = NumArray(1)
-    IF(NumArray(1) == 0.0) THEN
+    IF(NumArray(1) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':COP = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
@@ -366,82 +363,75 @@ SUBROUTINE GetGshpInput
     GSHP(GSHPNum)%OptPartLoadRat    = NumArray(5)
 
     GSHP(GSHPNum)%LoadSideVolFlowRate    = NumArray(6)
-    IF(NumArray(6) == 0.0) THEN
+    IF(NumArray(6) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Load Side Flow Rate = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SourceSideVolFlowRate    = NumArray(7)
-    IF(NumArray(7) == 0.0) THEN
+    IF(NumArray(7) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side Flow Rate = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%LoadSideUACoeff          = NumArray(8)
-    IF(NumArray(8) == 0.0) THEN
+    IF(NumArray(8) == 0.0d0) THEN
       CALL ShowSevereError(ModuleCompName//':Load Side Heat Transfer Coeffcient = 0.0, Heatpump='//TRIM(AlphArray(1)))
       ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SourceSideUACoeff          = NumArray(9)
-    IF(NumArray(9) == 0.0) THEN
+    IF(NumArray(9) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side Heat Transfer Coeffcient = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompPistonDisp       = NumArray(10)
-    IF(NumArray(10) == 0.0) THEN
+    IF(NumArray(10) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Piston displacement/Storke = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompClearanceFactor  = NumArray(11)
-    IF(NumArray(11) == 0.0) THEN
+    IF(NumArray(11) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Clearance Factor = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompSucPressDrop     = NumArray(12)
-    IF(NumArray(12)==0.0) THEN
+    IF(NumArray(12)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//': Pressure Drop = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SuperheatTemp        = NumArray(13)
-    IF(NumArray(13) == 0.0) THEN
+    IF(NumArray(13) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side SuperHeat = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%PowerLosses          = NumArray(14)
-    IF(NumArray(14) == 0.0) THEN
+    IF(NumArray(14) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Power Loss = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
     GSHP(GSHPNum)%LossFactor           = NumArray(15)
-    IF(NumArray(15) == 0.0) THEN
+    IF(NumArray(15) == 0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Efficiency = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%HighPressCutOff        = NumArray(16)
-    IF(NumArray(16) == 0.0) THEN
-       GSHP(GSHPNum)%HighPressCutOff        = 500000000.
+    IF(NumArray(16) == 0.0d0) THEN
+       GSHP(GSHPNum)%HighPressCutOff        = 500000000.0d0
        !CALL ShowWarningError(ModuleCompName//': High Pressure Cut Off= 0.0 Heat Pump'//TRIM(AlphArray(1)))
     END IF
 
     GSHP(GSHPNum)%LowPressCutOff        = NumArray(17)
-    IF(NumArray(17) == 0.0) THEN
-       GSHP(GSHPNum)%LowPressCutOff        = 0.0
+    IF(NumArray(17) == 0.0d0) THEN
+       GSHP(GSHPNum)%LowPressCutOff        = 0.0d0
        !CALL ShowWarningError(ModuleCompName//': Low Pressure Cut Off= 0.0 Heat Pump'//TRIM(AlphArray(1)))
     END IF
-
-    GSHP(GSHPNum)%CycleTime           = NumArray(18)
-    IF(NumArray(18) == 0.0) THEN
-       GSHP(GSHPNum)%CycleTime        = 0.10
-       CALL ShowWarningError(ModuleCompName//': Unit Cycle Time= 0.0 Heat Pump'//TRIM(AlphArray(1)))
-    END IF
-
 
     GSHP(GSHPNum)%SourceSideInletNodeNum   =   &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,ModuleCompName,AlphArray(1), &
@@ -465,7 +455,7 @@ SUBROUTINE GetGshpInput
     CALL TestCompSet(ModuleCompNameUC,AlphArray(1),AlphArray(4),AlphArray(5),'Hot Water Nodes')
 
     ! save the design source side flow rate for use by plant loop sizing algorithms
-    CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%SourceSideVolFlowRate)
+    CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5d0*GSHP(GSHPNum)%SourceSideVolFlowRate)
 
   END DO
 
@@ -585,22 +575,20 @@ SUBROUTINE InitGshp(GSHPNum)
 
   !For each new environment
   IF(BeginEnvrnFlag .AND. MyEnvrnFlag(GSHPNum))Then
-    GshpReport(GSHPNum)%QLoad = 0.0
-    GshpReport(GSHPNum)%QSource = 0.0
-    GshpReport(GSHPNum)%Power = 0.0
-    GshpReport(GSHPNum)%QLoadEnergy = 0.0
-    GshpReport(GSHPNum)%QSourceEnergy = 0.0
-    GshpReport(GSHPNum)%Energy = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSidemdot=0.0
-    GshpReport(GSHPNum)%LoadSidemdot=0.0
-    GSHP(GSHPNum)%WasOn = .FALSE.
+    GshpReport(GSHPNum)%QLoad = 0.0d0
+    GshpReport(GSHPNum)%QSource = 0.0d0
+    GshpReport(GSHPNum)%Power = 0.0d0
+    GshpReport(GSHPNum)%QLoadEnergy = 0.0d0
+    GshpReport(GSHPNum)%QSourceEnergy = 0.0d0
+    GshpReport(GSHPNum)%Energy = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSidemdot=0.0d0
+    GshpReport(GSHPNum)%LoadSidemdot=0.0d0
     GSHP(GSHPNum)%isOn = .FALSE.
     GSHP(GSHPNum)%MustRun = .TRUE.
-    GSHP(GSHPNum)%LastEventTime = 0.0
 
     MyEnvrnFlag(GSHPNum) = .FALSE.
 
@@ -633,7 +621,7 @@ SUBROUTINE InitGshp(GSHPNum)
                                  GSHP(GSHPNum)%SourceCompNum)
 
     IF (Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) &
-                       Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint=0.0
+                       Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint=0.0d0
     Node(GSHP(GSHPNum)%SourceSideInletNodeNum)%Temp = Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint+30
 
   END IF
@@ -641,15 +629,15 @@ SUBROUTINE InitGshp(GSHPNum)
   IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(GSHPNum)= .TRUE.
 
   !On every call
-  GSHPReport(GSHPNum)%WasOn = 0
+  GSHPReport(GSHPNum)%Running = 0
 
   GSHP(GSHPNum)%MustRun = .TRUE.        ! Reset MustRun Flag to TRUE
 
-  LoadSideWaterMassFlowRate   = 0.0     ! Load Side mass flow rate, water side
-  SourceSideWaterMassFlowRate = 0.0     ! Source Side mass flow rate, water side
-  Power   = 0.0                         ! power consumption
-  QLoad   = 0.0                         ! heat rejection from Load Side coil
-  QSource = 0.0
+  LoadSideWaterMassFlowRate   = 0.0d0     ! Load Side mass flow rate, water side
+  SourceSideWaterMassFlowRate = 0.0d0     ! Source Side mass flow rate, water side
+  Power   = 0.0d0                         ! power consumption
+  QLoad   = 0.0d0                         ! heat rejection from Load Side coil
+  QSource = 0.0d0
 
 RETURN
 END SUBROUTINE InitGshp
@@ -737,8 +725,8 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
   REAL(r64)              :: DutyFactor
   INTEGER                :: IterationCount
 
-  REAL(r64), SAVE :: CurrentSimTime = 0.0
-  REAL(r64), SAVE :: PrevSimTime = 0.0
+  REAL(r64), SAVE :: CurrentSimTime = 0.0d0
+  REAL(r64), SAVE :: PrevSimTime = 0.0d0
   LOGICAL, SAVE          :: OneTimeFlag = .TRUE.
   ! Nodes
   INTEGER                :: SourceSideInletNode      ! Source Side inlet node number, water side
@@ -762,15 +750,15 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
   HighPressCutOff   = GSHP(GSHPNum)%HighPressCutOff
   LowPressCutOff    = GSHP(GSHPNum)%LowPressCutOff
   ! REPORT VAR
-  GSHPReport(GSHPNum)%WasOn = 0
+  GSHPReport(GSHPNum)%Running = 0
 
   ! Init Module level Variables
   GSHP(GSHPNum)%MustRun = .TRUE.      ! Reset MustRun Flag to TRUE
-  LoadSideWaterMassFlowRate  = 0.0    ! Load Side mass flow rate, water side
-  SourceSideWaterMassFlowRate = 0.0   ! Source Side mass flow rate, water side
-  Power = 0.0                         ! power consumption
-  QLoad = 0.0                         ! heat rejection from Load Side coil
-  QSource = 0.0
+  LoadSideWaterMassFlowRate  = 0.0d0    ! Load Side mass flow rate, water side
+  SourceSideWaterMassFlowRate = 0.0d0   ! Source Side mass flow rate, water side
+  Power = 0.0d0                         ! power consumption
+  QLoad = 0.0d0                         ! heat rejection from Load Side coil
+  QSource = 0.0d0
 
   LoadSideInletNode    = GSHP(GSHPNum)%LoadSideInletNodeNum
   LoadSideOutletNode   = GSHP(GSHPNum)%LoadSideOutletNodeNum
@@ -787,67 +775,18 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
   CurrentSimTime = (dayofSim-1)*24 + hourofday-1 + (timestep-1)*timestepZone + SysTimeElapsed
 
   ! initialize event time array when the environment simulation begins
-  IF(CurrentSimTime == 0.0 .AND. OneTimeFlag)THEN
-    GSHP%LastEventTime = 0.0
+  IF(CurrentSimTime == 0.0d0 .AND. OneTimeFlag)THEN
     OneTimeFlag = .FALSE.
   END IF
 
-  IF(CurrentSimTime > 0.0 )OneTimeFlag = .TRUE.
+  IF(CurrentSimTime > 0.0d0 )OneTimeFlag = .TRUE.
 
-  IF( GSHP(GSHPNum)%CycleTime > TimeStepSys)THEN
-
-    IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
-
-        ! Normal pump operation
-      IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
-        IF(MyLoad > 0.0 ) THEN
-          GSHP(GSHPNum)%isOn = .TRUE.
-          GSHP(GSHPNum)%MustRun = .TRUE.
-        ELSE
-          GSHP(GSHPNum)%isOn = .FALSE.
-          GSHP(GSHPNum)%MustRun = .FALSE.
-        END IF
-        IF((GSHP(GSHPNum)%WasOn .and. .not. GSHP(GSHPNum)%isOn) .or. (.not.GSHP(GSHPNum)%WasOn .and. GSHP(GSHPNum)%isOn)) THEN
-          GSHP(GSHPNum)%WasOn = GSHP(GSHPNum)%isOn
-          GSHP(GSHPNum)%LastEventTime = CurrentSimTime
-        END IF
-
-      ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN
-        ! Even if there is NO zone demand we run the heat pump for the cycle time
-        IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock== 0 )THEN
-          GSHP(GSHPNum)%MustRun = .TRUE.
-          CALL ForceEquipment( GshpType, GshpName, .TRUE. )
-        END IF
-      ! Keep the pump turned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN
-        ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
-        IF( MyLoad > 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
-          GSHP(GSHPNum)%MustRun = .FALSE.
-          CALL ForceEquipment( GshpType, GshpName, .FALSE. )
-        END IF
-      END IF
-
-    ELSE ! FIRSTHVAC .OR. WARMUP FLAG
-
-      IF(MyLoad > 0.0)THEN
-        GSHP(GSHPNum)%MustRun = .TRUE.
-      ELSE
-        GSHP(GSHPNum)%MustRun = .FALSE.
-      END IF
-
-    ENDIF
-
-  ELSE  ! CYCLE TIME < HVACTIMESTEP
-
-    IF(MyLoad > 0.0)THEN
-      GSHP(GSHPNum)%MustRun = .TRUE.
-      GSHP(GSHPNum)%IsOn = .TRUE.
-    ELSE
-      GSHP(GSHPNum)%MustRun = .FALSE.
-      GSHP(GSHPNum)%IsOn = .FALSE.
-    END IF
-
+  IF(MyLoad > 0.0d0)THEN
+    GSHP(GSHPNum)%MustRun = .TRUE.
+    GSHP(GSHPNum)%IsOn = .TRUE.
+  ELSE
+    GSHP(GSHPNum)%MustRun = .FALSE.
+    GSHP(GSHPNum)%IsOn = .FALSE.
   END IF
 
 
@@ -865,9 +804,9 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
           GSHP(GSHPNum)%SourceLoopNum, GSHP(GSHPNum)%SourceLoopSideNum, &
           GSHP(GSHPNum)%SourceBranchNum, GSHP(GSHPNum)%SourceCompNum)
         !now initialize simulation variables for "heat pump off"
-    QLoad   = 0.0
-    QSource = 0.0
-    Power   = 0.0
+    QLoad   = 0.0d0
+    QSource = 0.0d0
+    Power   = 0.0d0
     LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
     LoadSideWaterOutletTemp     = LoadSideWaterInletTemp
     SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
@@ -904,23 +843,21 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
               SourceSideInletNode, SourceSideOutletNode, &
               GSHP(GSHPNum)%SourceLoopNum, GSHP(GSHPNum)%SourceLoopSideNum, &
               GSHP(GSHPNum)%SourceBranchNum, GSHP(GSHPNum)%SourceCompNum)
-        QLoad = 0.0
-        QSource = 0.0
-        Power = 0.0
+        QLoad = 0.0d0
+        QSource = 0.0d0
+        Power = 0.0d0
         LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
         LoadSideWaterOutletTemp     = LoadSideWaterInletTemp
         SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
         SourceSideWaterOutletTemp   = SourceSideWaterInletTemp
-!        GSHP(GSHPNum)%WasOn = .FALSE.
-!        GSHP(GSHPNum)%LastEventTime = CurrentSimTime
       RETURN
     END IF
   END IF
 
 !***********BEGIN CALCULATION****************
 ! initialize the source and load side heat transfer rates for the simulation
-  initialQSource = 0.0
-  initialQLoad   = 0.0
+  initialQSource = 0.0d0
+  initialQLoad   = 0.0d0
   IterationCount = 0
 
   CpSourceSide = GetSpecificHeatGlycol(PlantLoop(GSHP(GSHPNum)%SourceLoopNum)%FluidName, &
@@ -934,10 +871,10 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
                                        'CalcGshpModel')
 
   ! Determine effectiveness of Source Side (the Evaporator in heating mode)
-  SourceSideEffect = 1- EXP( -SourceSideUA / &
+  SourceSideEffect = 1.0d0- EXP( -SourceSideUA / &
                             (CpSourceSide * SourceSideWaterMassFlowRate))
   !Determine effectiveness of Load Side the condenser in heating mode
-  LoadSideEffect = 1- EXP ( -LoadSideUA / &
+  LoadSideEffect = 1.0d0- EXP ( -LoadSideUA / &
                            (CpLoadSide * LoadSideWaterMassFlowRate))
 
   LOOPLoadEnth: DO  ! main loop to solve model equations
@@ -987,12 +924,12 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
     END IF
 
     ! Determine the Source Side Outlet Enthalpy
-    qual=1.0
+    qual=1.0d0
     SourceSideOutletEnth = GetSatEnthalpyRefrig(GSHPRefrigerant, SourceSideTemp, qual,   &
        GSHPRefrigIndex,'CalcGSHPModel:SourceSideTemp')
 
     ! Determine Load Side Outlet Enthalpy
-    qual= 0.0
+    qual= 0.0d0
     LoadSideOutletEnth = GetSatEnthalpyRefrig(GSHPRefrigerant,LoadSideTemp,qual,  &
        GSHPRefrigIndex,'CalcGSHPModel:LoadSideTemp')
 
@@ -1015,7 +952,7 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
 
     ! Iterate to find the Suction State - given suction pressure and superheat enthalpy
     LOOP: DO
-      CompSuctionTemp = 0.5 * ( T110 + T111 )
+      CompSuctionTemp = 0.5d0 * ( T110 + T111 )
 
       CompSuctionEnth = GetSupHeatEnthalpyRefrig(GSHPRefrigerant,CompSuctionTemp,SuctionPr,  &
          GSHPRefrigIndex,'CalcGSHPModel:CompSuctionTemp')
@@ -1052,7 +989,7 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
         CALL ShowWarningError(ModuleCompName//' did not converge')
         CALL ShowContinueErrorTimeStamp('  ')
         CALL ShowContinueError('Heatpump Name = '//TRIM(GSHP(GSHPNum)%Name))
-        WRITE(ErrString,*) ABS(100.0*(QLoad - initialQLoad)/(initialQLoad+SmallNum))
+        WRITE(ErrString,*) ABS(100.0d0*(QLoad - initialQLoad)/(initialQLoad+SmallNum))
         CALL ShowContinueError('Heat Inbalance (%)             = '//TRIM(ADJUSTL(ErrString)))
         WRITE(ErrString,*) QLoad
         CALL ShowContinueError('Load-side heat transfer rate   = '//TRIM(ADJUSTL(ErrString)))
@@ -1077,94 +1014,31 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
   END DO LOOPLoadEnth
 
   !Control Strategy
-!  IF( GSHP(GSHPNum)%CycleTime  < TimeStepSys )THEN
-    IF(ABS(MyLoad) < QLoad) THEN
-      DutyFactor = ABS(MyLoad)/QLoad
-      QLoad = ABS(MyLoad)
-      Power = DutyFactor * Power
-      QSource = QSource * DutyFactor
+  IF(ABS(MyLoad) < QLoad) THEN
+    DutyFactor = ABS(MyLoad)/QLoad
+    QLoad = ABS(MyLoad)
+    Power = DutyFactor * Power
+    QSource = QSource * DutyFactor
 
-      ! Determine the Exterior fluid temperature at the Load Side oulet and eveporator outlet...
-      ! Refrigerant = "Steam"
-      LoadSideWaterOutletTemp   = LoadSideWaterInletTemp + QLoad/(LoadSideWaterMassFlowRate * &
-                                  CpLoadSide)
-      SourceSideWaterOutletTemp = SourceSideWaterInletTemp - QSource/(SourceSideWaterMassFlowRate * &
-                                  CpSourceSide)
-      RETURN
-    END IF
-!  END IF
+    ! Determine the Exterior fluid temperature at the Load Side oulet and eveporator outlet...
+    ! Refrigerant = "Steam"
+    LoadSideWaterOutletTemp   = LoadSideWaterInletTemp + QLoad/(LoadSideWaterMassFlowRate * &
+                                CpLoadSide)
+    SourceSideWaterOutletTemp = SourceSideWaterInletTemp - QSource/(SourceSideWaterMassFlowRate * &
+                                CpSourceSide)
+    RETURN
+  END IF
 
   LoadSideWaterOutletTemp   = LoadSideWaterInletTemp + QLoad/(LoadSideWaterMassFlowRate * &
                               CpLoadSide)
   SourceSideWaterOutletTemp = SourceSideWaterInletTemp - QSource/(SourceSideWaterMassFlowRate * &
                               CpSourceSide )
   ! REPORT VAR
-  GSHPReport(GSHPNum)%WasOn = 1
+  GSHPReport(GSHPNum)%Running = 1
 
   RETURN
 
 END SUBROUTINE CalcGshpModel
-
-SUBROUTINE ForceEquipment( EquipType, EquipName, SwitchOn )
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         <author>
-          !       DATE WRITTEN   <date_written>
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant
-
-  IMPLICIT NONE
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: EquipType  !
-  CHARACTER(len=*), INTENT(IN) :: EquipName  !
-  LOGICAL, INTENT(IN)          :: SwitchOn
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: LoopNum
-  INTEGER :: BranchNum
-  INTEGER :: CompNum
-  INTEGER :: NumPlantLoops
-
-  NumPlantLoops=SIZE(PlantLoop)
-
-  DO LoopNum = 1,NumPlantLoops
-    DO BranchNum = 1 , PlantLoop(LoopNum)%LoopSide(SupplySide)%TotalBranches
-      DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%TotalComponents
-       IF(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name == EquipName .AND. &
-         PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf == EquipType)THEN
-         IF(SwitchOn)THEN
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .TRUE.
-         ELSE
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
-         END IF
-       END IF
-      END DO ! COMP LOOP
-    END DO ! BRANCH LOOP
-  END DO ! PLANT LOOP
-
-
-END SUBROUTINE ForceEquipment
 
 SUBROUTINE UpdateGSHPRecords(GSHPNum)
             ! SUBROUTINE INFORMATION:
@@ -1211,12 +1085,12 @@ SUBROUTINE UpdateGSHPRecords(GSHPNum)
     Node(SourceSideOutletNode)%Temp     = Node(SourceSideInletNode)%Temp
     Node(LoadSideOutletNode)%Temp       = Node(LoadSideInletNode)%Temp
 
-    GSHPReport(GSHPNum)%Power                = 0.0
-    GSHPReport(GSHPNum)%Energy               = 0.0
-    GSHPReport(GSHPNum)%QSource              = 0.0
-    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0
-    GSHPReport(GSHPNum)%QLoad                = 0.0
-    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0
+    GSHPReport(GSHPNum)%Power                = 0.0d0
+    GSHPReport(GSHPNum)%Energy               = 0.0d0
+    GSHPReport(GSHPNum)%QSource              = 0.0d0
+    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0d0
+    GSHPReport(GSHPNum)%QLoad                = 0.0d0
+    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0d0
     GSHPReport(GSHPNum)%SourceSideWaterInletTemp  = Node(SourceSideInletNode)%Temp
     GSHPReport(GSHPNum)%SourceSideWaterOutletTemp = Node(SourceSideOutletNode)%Temp
     GSHPReport(GSHPNum)%LoadSideWaterInletTemp   = Node(LoadSideInletNode)%Temp
@@ -1302,37 +1176,34 @@ TYPE GshpSpecs   ! Needs Some Modifications talk with Dr.Fisher and decide....
   INTEGER            :: WWHPPlantTypeOfNum
   LOGICAL            :: Available           = .false. ! need an array of logicals--load identifiers of available equipment
   LOGICAL            :: ON                  = .false. ! simulate the machine at it's operating part load ratio
-  REAL(r64)          :: COP                     = 0.0 ! Coefficeint of Performance of the machine
-  REAL(r64)          :: NomCap                  = 0.0 ! Nomial Capcity of the HeatPump
-  REAL(r64)          :: MinPartLoadRat          = 0.0 ! Minimum operating Part Load Ratio
-  REAL(r64)          :: MaxPartLoadRat          = 0.0 ! Maximum operating Part Load Ratio
-  REAL(r64)          :: OptPartLoadRat          = 0.0 ! Optimal operating Part Load Ratio
-  REAL(r64)          :: LoadSideVolFlowRate     = 0.0 ! Design Flow Rate on the Load side
+  REAL(r64)          :: COP                     = 0.0d0 ! Coefficeint of Performance of the machine
+  REAL(r64)          :: NomCap                  = 0.0d0 ! Nomial Capcity of the HeatPump
+  REAL(r64)          :: MinPartLoadRat          = 0.0d0 ! Minimum operating Part Load Ratio
+  REAL(r64)          :: MaxPartLoadRat          = 0.0d0 ! Maximum operating Part Load Ratio
+  REAL(r64)          :: OptPartLoadRat          = 0.0d0 ! Optimal operating Part Load Ratio
+  REAL(r64)          :: LoadSideVolFlowRate     = 0.0d0 ! Design Flow Rate on the Load side
   REAL(r64)          :: LoadSideDesignMassFlow  = 0.d0 ! Design flow rate (kg/s)
-  REAL(r64)          :: SourceSideVolFlowRate   = 0.0 ! Design Flow Rate on th Source Side
+  REAL(r64)          :: SourceSideVolFlowRate   = 0.0d0 ! Design Flow Rate on th Source Side
   REAL(r64)          :: SourceSideDesignMassFlow = 0.d0 ! Design flow rate (kg/s)
   INTEGER            :: SourceSideInletNodeNum  = 0   ! Node number on the inlet side of the plant
   INTEGER            :: SourceSideOutletNodeNum = 0   ! Node number on the outlet side of the plant
   INTEGER            :: LoadSideInletNodeNum    = 0   ! Node number on the inlet side of the Load Side
   INTEGER            :: LoadSideOutletNodeNum   = 0   ! Node number on the outlet side of the Load Side
-  REAL(r64)          :: SourceSideUACoeff       = 0.0 ! Source Side heat transfer coeff
-  REAL(r64)          :: LoadSideUACoeff         = 0.0 ! Load Side heat transfer coeff
-  REAL(r64)          :: CompPistonDisp          = 0.0 ! compressor piston displacement
-  REAL(r64)          :: CompClearanceFactor     = 0.0 ! compressor clearance factor
-  REAL(r64)          :: CompSucPressDrop        = 0.0 ! deltap ,  compressor suction and discharge pressure drop
-  REAL(r64)          :: SuperheatTemp           = 0.0 ! deltatsh , super heating
-  REAL(r64)          :: PowerLosses             = 0.0 ! constant part of electro mechanical power losses
-  REAL(r64)          :: LossFactor              = 0.0 ! loss factor used ot define the electro mechanical loss
+  REAL(r64)          :: SourceSideUACoeff       = 0.0d0 ! Source Side heat transfer coeff
+  REAL(r64)          :: LoadSideUACoeff         = 0.0d0 ! Load Side heat transfer coeff
+  REAL(r64)          :: CompPistonDisp          = 0.0d0 ! compressor piston displacement
+  REAL(r64)          :: CompClearanceFactor     = 0.0d0 ! compressor clearance factor
+  REAL(r64)          :: CompSucPressDrop        = 0.0d0 ! deltap ,  compressor suction and discharge pressure drop
+  REAL(r64)          :: SuperheatTemp           = 0.0d0 ! deltatsh , super heating
+  REAL(r64)          :: PowerLosses             = 0.0d0 ! constant part of electro mechanical power losses
+  REAL(r64)          :: LossFactor              = 0.0d0 ! loss factor used ot define the electro mechanical loss
                                                       !  that is supposed to be proportional to the theoretical power
-  REAL(r64)          :: HighPressCutOff         = 0.0 ! Maximum Design Pressure on the Load Side
-  REAL(r64)          :: LowPressCutOff          = 0.0 ! Minimum Design Pressure on the Source Side
+  REAL(r64)          :: HighPressCutOff         = 0.0d0 ! Maximum Design Pressure on the Load Side
+  REAL(r64)          :: LowPressCutOff          = 0.0d0 ! Minimum Design Pressure on the Source Side
 
       ! Added by Arun 6-27-02
-  ! to implement cycletime
-  LOGICAL            :: WasOn                     = .false.
+  ! to implement cycletime - removed 9/10/2013 LKL
   LOGICAL            :: IsOn                      = .false.
-  REAL(r64)   :: LastEventTime             = 0.0
-  REAL(r64)   :: CycleTime                 = 0.0
   LOGICAL      :: MustRun                         = .false.
   !loop topology variables
   INTEGER            :: SourceLoopNum           = 0 ! source side plant loop index number
@@ -1348,19 +1219,19 @@ END TYPE GshpSpecs
 
     ! Output Variables Type definition
 TYPE ReportVars
-  REAL(r64)    :: Power                       = 0.0 ! Power Consumption Watts
-  REAL(r64)    :: Energy                      = 0.0 ! Energy Consumption Joules
-  REAL(r64)    :: QLoad                       = 0.0 ! Load Side heat transfer rate Watts
-  REAL(r64)    :: QLoadEnergy                 = 0.0 ! Load Side heat transfer Joules
-  REAL(r64)    :: QSource                     = 0.0 ! Source Side heat transfer rate Watts
-  REAL(r64)    :: QSourceEnergy               = 0.0 ! Source Side heat transfer Joules
-  REAL(r64)    :: LoadSideWaterInletTemp      = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: SourceSideWaterInletTemp    = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)    :: LoadSideWaterOutletTemp     = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: SourceSideWaterOutletTemp   = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)    :: LoadSidemdot                = 0.0 ! Mass flow rate of the cooling water in Load Side kg/s
-  REAL(r64)    :: SourceSidemdot              = 0.0 ! Mass flow rate of chilled water in Eavporator kg/s
-  INTEGER :: WasOn                       = 0   ! On reporting Flag
+  REAL(r64)    :: Power                       = 0.0d0 ! Power Consumption Watts
+  REAL(r64)    :: Energy                      = 0.0d0 ! Energy Consumption Joules
+  REAL(r64)    :: QLoad                       = 0.0d0 ! Load Side heat transfer rate Watts
+  REAL(r64)    :: QLoadEnergy                 = 0.0d0 ! Load Side heat transfer Joules
+  REAL(r64)    :: QSource                     = 0.0d0 ! Source Side heat transfer rate Watts
+  REAL(r64)    :: QSourceEnergy               = 0.0d0 ! Source Side heat transfer Joules
+  REAL(r64)    :: LoadSideWaterInletTemp      = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: SourceSideWaterInletTemp    = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)    :: LoadSideWaterOutletTemp     = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: SourceSideWaterOutletTemp   = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)    :: LoadSidemdot                = 0.0d0 ! Mass flow rate of the cooling water in Load Side kg/s
+  REAL(r64)    :: SourceSidemdot              = 0.0d0 ! Mass flow rate of chilled water in Eavporator kg/s
+  INTEGER :: Running                       = 0   ! On reporting Flag
 END TYPE ReportVars
 
 
@@ -1373,15 +1244,15 @@ LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
     INTEGER            :: GSHPRefrigIndex=0
 
     INTEGER     :: NumGSHPs                  = 0   ! number of Gshps specified in input
-    REAL(r64)   :: LoadSideWaterMassFlowRate     = 0.0 ! Load Side mass flow rate, water side kg/s
-    REAL(r64)   :: SourceSideWaterMassFlowRate   = 0.0 ! Source Side mass flow rate, water side kg/s
-    REAL(r64)   :: Power                         = 0.0 ! power consumption Watts
-    REAL(r64)   :: QLoad                         = 0.0 ! heat rejection from Load Side coil Watts
-    REAL(r64)   :: QSource                       = 0.0 ! cooling capacity Watts
-    REAL(r64)   :: SourceSideWaterOutletTemp     = 0.0 ! Source Side outlet temperature °C
-    REAL(r64)   :: SourceSideWaterInletTemp      = 0.0 ! Source Side outlet temperature °C
-    REAL(r64)   :: LoadSideWaterOutletTemp       = 0.0 ! Source Side outlet temperature °C
-    REAL(r64)   :: LoadSidewaterInletTemp        = 0.0 ! Source Side outlet temperature °C
+    REAL(r64)   :: LoadSideWaterMassFlowRate     = 0.0d0 ! Load Side mass flow rate, water side kg/s
+    REAL(r64)   :: SourceSideWaterMassFlowRate   = 0.0d0 ! Source Side mass flow rate, water side kg/s
+    REAL(r64)   :: Power                         = 0.0d0 ! power consumption Watts
+    REAL(r64)   :: QLoad                         = 0.0d0 ! heat rejection from Load Side coil Watts
+    REAL(r64)   :: QSource                       = 0.0d0 ! cooling capacity Watts
+    REAL(r64)   :: SourceSideWaterOutletTemp     = 0.0d0 ! Source Side outlet temperature °C
+    REAL(r64)   :: SourceSideWaterInletTemp      = 0.0d0 ! Source Side outlet temperature °C
+    REAL(r64)   :: LoadSideWaterOutletTemp       = 0.0d0 ! Source Side outlet temperature °C
+    REAL(r64)   :: LoadSidewaterInletTemp        = 0.0d0 ! Source Side outlet temperature °C
 
 
 
@@ -1393,7 +1264,6 @@ PRIVATE    CalcGshpModel
 PRIVATE    GetGshpInput
 PRIVATE    InitGshp
 PRIVATE    UpdateGSHPRecords
-PRIVATE    ForceEquipment
 
 CONTAINS
          ! MODULE SUBROUTINES:
@@ -1571,7 +1441,7 @@ SUBROUTINE GetGshpInput
   IF(NumGshps <= 0) THEN
     CALL ShowSevereError('No Equipment found in SimGshp')
     ErrorsFound=.true.
- END IF
+  END IF
 
    ! Allocate Arrays
   ALLOCATE (GSHP(NumGshps))
@@ -1596,7 +1466,7 @@ SUBROUTINE GetGshpInput
     GSHP(GSHPNum)%WWHPPlantTypeOfNum    = TypeOf_HPWaterPECooling
 
     GSHP(GSHPNum)%COP                 = NumArray(1)
-    IF(NumArray(1)==0.0) THEN
+    IF(NumArray(1)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':COP = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
@@ -1612,82 +1482,76 @@ SUBROUTINE GetGshpInput
     GSHP(GSHPNum)%OptPartLoadRat    = NumArray(5)
 
     GSHP(GSHPNum)%LoadSideVolFlowRate    = NumArray(6)
-    IF(NumArray(6)==0.0) THEN
+    IF(NumArray(6)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Load Side Vol Flow Rate = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SourceSideVolFlowRate    = NumArray(7)
-    IF(NumArray(7)==0.0) THEN
+    IF(NumArray(7)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side Vol Flow Rate = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%LoadSideUACoeff          = NumArray(8)
-    IF(NumArray(9)==0.0) THEN
+    IF(NumArray(9)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Load Side Heat Transfer Coeffcient = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SourceSideUACoeff          = NumArray(9)
-    IF(NumArray(8)==0.0) THEN
+    IF(NumArray(8)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side Heat Transfer Coeffcient = 0.0, Heatpump=' &
                              //TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompPistonDisp       = NumArray(10)
-    IF(NumArray(10)==0.0) THEN
+    IF(NumArray(10)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Piston displacement/Storke = 0.0, Heatpump=' &
                              //TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompClearanceFactor  = NumArray(11)
-    IF(NumArray(11)==0.0) THEN
+    IF(NumArray(11)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Clearance Factor = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%CompSucPressDrop     = NumArray(12)
-    IF(NumArray(12)==0.0) THEN
+    IF(NumArray(12)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//': Pressure Drop = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%SuperheatTemp        = NumArray(13)
-    IF(NumArray(13)==0.0) THEN
+    IF(NumArray(13)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Source Side SuperHeat = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%PowerLosses          = NumArray(14)
-    IF(NumArray(14)==0.0) THEN
+    IF(NumArray(14)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Compressor Power Loss = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
     GSHP(GSHPNum)%LossFactor           = NumArray(15)
-    IF(NumArray(15)==0.0) THEN
+    IF(NumArray(15)==0.0d0) THEN
        CALL ShowSevereError(ModuleCompName//':Efficiency = 0.0, Heatpump='//TRIM(AlphArray(1)))
        ErrorsFound = .true.
     END IF
 
     GSHP(GSHPNum)%HighPressCutOff        = NumArray(16)
-    IF(NumArray(16)==0.0) THEN
-       GSHP(GSHPNum)%HighPressCutOff        = 500000000.
+    IF(NumArray(16)==0.0d0) THEN
+       GSHP(GSHPNum)%HighPressCutOff        = 500000000.0d0
        !CALL ShowWarningError(ModuleCompName//': High Pressure Cut Off= 0.0 Heat Pump'//TRIM(AlphArray(1)))
     END IF
 
     GSHP(GSHPNum)%LowPressCutOff        = NumArray(17)
-    IF(NumArray(17)==0.0) THEN
-       GSHP(GSHPNum)%LowPressCutOff        = 0.0
+    IF(NumArray(17)==0.0d0) THEN
+       GSHP(GSHPNum)%LowPressCutOff        = 0.0d0
        !CALL ShowWarningError(ModuleCompName//': Low Pressure Cut Off= 0.0 Heat Pump'//TRIM(AlphArray(1)))
-    END IF
-
-    GSHP(GSHPNum)%CycleTime           = NumArray(18)
-    IF(NumArray(18) == 0.0) THEN
-       GSHP(GSHPNum)%CycleTime        = 0.10
-       CALL ShowWarningError(ModuleCompName//': Unit Cycle Time= 0.0 Heat Pump'//TRIM(AlphArray(1)))
     END IF
 
     GSHP(GSHPNum)%SourceSideInletNodeNum   =   &
@@ -1711,21 +1575,19 @@ SUBROUTINE GetGshpInput
     CALL TestCompSet(ModuleCompNameUC,AlphArray(1),AlphArray(4),AlphArray(5),'Chilled Water Nodes')
 
     ! save the design source side flow rate for use by plant loop sizing algorithms
-    CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%SourceSideVolFlowRate)
+    CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5d0*GSHP(GSHPNum)%SourceSideVolFlowRate)
 
-    GshpReport(GSHPNum)%QLoad = 0.0
-    GshpReport(GSHPNum)%QSource = 0.0
-    GshpReport(GSHPNum)%Power = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSidemdot=0.0
-    GshpReport(GSHPNum)%LoadSidemdot=0.0
-    GSHP(GSHPNum)%WasOn = .FALSE.
+    GshpReport(GSHPNum)%QLoad = 0.0d0
+    GshpReport(GSHPNum)%QSource = 0.0d0
+    GshpReport(GSHPNum)%Power = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSidemdot=0.0d0
+    GshpReport(GSHPNum)%LoadSidemdot=0.0d0
     GSHP(GSHPNum)%isOn = .FALSE.
     GSHP(GSHPNum)%MustRun = .TRUE.
-    GSHP(GSHPNum)%LastEventTime = 0.0
 
   END DO
 
@@ -1869,22 +1731,20 @@ SUBROUTINE InitGshp(GSHPNum)
 
   !For each new environment
   IF(BeginEnvrnFlag .AND. MyEnvrnFlag(GSHPNum))Then
-    GshpReport(GSHPNum)%QLoad = 0.0
-    GshpReport(GSHPNum)%QSource = 0.0
-    GshpReport(GSHPNum)%Power = 0.0
-    GshpReport(GSHPNum)%QLoadEnergy = 0.0
-    GshpReport(GSHPNum)%QSourceEnergy = 0.0
-    GshpReport(GSHPNum)%Energy = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0
-    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0
-    GshpReport(GSHPNum)%SourceSidemdot=0.0
-    GshpReport(GSHPNum)%LoadSidemdot=0.0
-    GSHP(GSHPNum)%WasOn = .FALSE.
+    GshpReport(GSHPNum)%QLoad = 0.0d0
+    GshpReport(GSHPNum)%QSource = 0.0d0
+    GshpReport(GSHPNum)%Power = 0.0d0
+    GshpReport(GSHPNum)%QLoadEnergy = 0.0d0
+    GshpReport(GSHPNum)%QSourceEnergy = 0.0d0
+    GshpReport(GSHPNum)%Energy = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterInletTemp = 0.0d0
+    GshpReport(GSHPNum)%LoadSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSideWaterOutletTemp = 0.0d0
+    GshpReport(GSHPNum)%SourceSidemdot=0.0d0
+    GshpReport(GSHPNum)%LoadSidemdot=0.0d0
     GSHP(GSHPNum)%isOn = .FALSE.
     GSHP(GSHPNum)%MustRun = .TRUE.
-    GSHP(GSHPNum)%LastEventTime = 0.0
 
     MyEnvrnFlag(GSHPNum) = .FALSE.
     rho = GetDensityGlycol(PlantLoop(GSHP(GSHPNum)%LoadLoopNum)%FluidName, &
@@ -1916,7 +1776,7 @@ SUBROUTINE InitGshp(GSHPNum)
                                  GSHP(GSHPNum)%SourceCompNum)
 
 
-     Node(GSHP(GSHPNum)%SourceSideInletNodeNum)%Temp =  35.0
+     Node(GSHP(GSHPNum)%SourceSideInletNodeNum)%Temp =  35.0d0
   END IF
 
   IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(GSHPNum) = .TRUE.
@@ -1925,15 +1785,15 @@ SUBROUTINE InitGshp(GSHPNum)
 ! Init more variables
 
   !On every call
-  GSHPReport(GSHPNum)%WasOn = 0
+  GSHPReport(GSHPNum)%Running = 0
 
   GSHP(GSHPNum)%MustRun = .TRUE.        ! Reset MustRun Flag to TRUE
 
-  LoadSideWaterMassFlowRate   = 0.0     ! Load Side mass flow rate, water side
-  SourceSideWaterMassFlowRate = 0.0     ! Source Side mass flow rate, water side
-  Power   = 0.0                         ! power consumption
-  QLoad   = 0.0                         ! heat rejection from Load Side coil
-  QSource = 0.0
+  LoadSideWaterMassFlowRate   = 0.0d0     ! Load Side mass flow rate, water side
+  SourceSideWaterMassFlowRate = 0.0d0     ! Source Side mass flow rate, water side
+  Power   = 0.0d0                         ! power consumption
+  QLoad   = 0.0d0                         ! heat rejection from Load Side coil
+  QSource = 0.0d0
 
 RETURN
 END SUBROUTINE InitGshp
@@ -2020,8 +1880,8 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
    REAL(r64)              :: DutyFactor
    INTEGER                :: IterationCount
 
-  REAL(r64), SAVE :: CurrentSimTime = 0.0
-  REAL(r64), SAVE :: PrevSimTime = 0.0
+  REAL(r64), SAVE :: CurrentSimTime = 0.0d0
+  REAL(r64), SAVE :: PrevSimTime = 0.0d0
   LOGICAL, SAVE          :: OneTimeFlag = .TRUE.
   ! Nodes
   INTEGER                :: SourceSideInletNode      ! Source Side inlet node number, water side
@@ -2060,70 +1920,19 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
   CurrentSimTime = (dayofSim-1)*24 + hourofday-1 + (timestep-1)*timestepZone + SysTimeElapsed
 
   ! initialize event time array when the environment simulation begins
-  IF(CurrentSimTime == 0.0 .AND. OneTimeFlag)THEN
-    GSHP%LastEventTime = 0.0
+  IF(CurrentSimTime == 0.0d0 .AND. OneTimeFlag)THEN
     OneTimeFlag = .FALSE.
   END IF
 
-  IF(CurrentSimTime > 0.0 ) OneTimeFlag = .TRUE.
+  IF(CurrentSimTime > 0.0d0 ) OneTimeFlag = .TRUE.
 
-  IF( GSHP(GSHPNum)%CycleTime > TimeStepSys)THEN
-
-    IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
-
-      ! Normal pump operation
-      IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
-        IF(ABS(MyLoad) > 0.0 ) THEN !.AND. LoadSideWaterMassFlowRate > MassFlowTolerance )THEN
-          GSHP(GSHPNum)%isOn = .TRUE.
-          GSHP(GSHPNum)%MustRun = .TRUE.
-        ELSE
-          GSHP(GSHPNum)%isOn = .FALSE.
-          GSHP(GSHPNum)%MustRun = .FALSE.
-        END IF
-
-        IF((GSHP(GSHPNum)%WasOn .and. .not. GSHP(GSHPNum)%isOn) .or. (.not.GSHP(GSHPNum)%WasOn .and. GSHP(GSHPNum)%isOn)) THEN
-          GSHP(GSHPNum)%WasOn = GSHP(GSHPNum)%isOn
-          GSHP(GSHPNum)%LastEventTime = CurrentSimTime
-        END IF
-
-      ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN
-
-        ! Even if there is NO zone demand we run the heat pump for the cycle time
-        IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
-          GSHP(GSHPNum)%MustRun = .TRUE.
-          CALL ForceEquipment( GshpType, GshpName, .TRUE. )  !DSU?  still need? looks like a band aid?
-        END IF
-
-      ! Keep the pump truned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN
-        ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
-        IF( ABS(MyLoad) > 0.d0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
-          GSHP(GSHPNum)%MustRun = .FALSE.
-          CALL ForceEquipment( GshpType, GshpName, .FALSE. ) !DSU?  still need? looks like a band aid?
-        END IF
-      END IF
-    ELSE ! FIRSTHVAC .OR. WARMUP FLAG
-
-      IF(MyLoad < 0.d0)THEN
-        GSHP(GSHPNum)%MustRun = .TRUE.
-      ELSE
-        GSHP(GSHPNum)%MustRun = .FALSE.
-      END IF
-
-    END IF ! WARMUP/FIRSTHVAC CHECK
-
-  ELSE !CYCLE TIME < SYS TIME STEP
-
-    IF(MyLoad < 0.d0)THEN
-      GSHP(GSHPNum)%MustRun = .TRUE.
-      GSHP(GSHPNum)%IsOn = .TRUE.
-    ELSE
-      GSHP(GSHPNum)%MustRun = .FALSE.
-      GSHP(GSHPNum)%IsOn = .FALSE.
-    END IF
-
-  END IF  !CYCLE TIME < SYS TIME STEP
+  IF(MyLoad < 0.d0)THEN
+    GSHP(GSHPNum)%MustRun = .TRUE.
+    GSHP(GSHPNum)%IsOn = .TRUE.
+  ELSE
+    GSHP(GSHPNum)%MustRun = .FALSE.
+    GSHP(GSHPNum)%IsOn = .FALSE.
+  END IF
 
 !*******Set flow based on "flowlock" and "run" flags**********
 ! Set flows if the heat pump is not running
@@ -2139,9 +1948,9 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
           GSHP(GSHPNum)%SourceLoopNum, GSHP(GSHPNum)%SourceLoopSideNum, &
           GSHP(GSHPNum)%SourceBranchNum, GSHP(GSHPNum)%SourceCompNum)
         !now initialize simulation variables for "heat pump off"
-    QLoad   = 0.0
-    QSource = 0.0
-    Power   = 0.0
+    QLoad   = 0.0d0
+    QSource = 0.0d0
+    Power   = 0.0d0
     LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
     LoadSideWaterOutletTemp     = LoadSideWaterInletTemp
     SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
@@ -2177,15 +1986,13 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
               SourceSideInletNode, SourceSideOutletNode, &
               GSHP(GSHPNum)%SourceLoopNum, GSHP(GSHPNum)%SourceLoopSideNum, &
               GSHP(GSHPNum)%SourceBranchNum, GSHP(GSHPNum)%SourceCompNum)
-        QLoad = 0.0
-        QSource = 0.0
-        Power = 0.0
+        QLoad = 0.0d0
+        QSource = 0.0d0
+        Power = 0.0d0
         LoadSideWaterInletTemp      = Node(LoadSideInletNode)%Temp
         LoadSideWaterOutletTemp     = LoadSideWaterInletTemp
         SourceSideWaterInletTemp    = Node(SourceSideInletNode)%Temp
         SourceSideWaterOutletTemp   = SourceSideWaterInletTemp
-!        GSHP(GSHPNum)%WasOn = .FALSE.
-!        GSHP(GSHPNum)%LastEventTime = CurrentSimTime
       RETURN
     END IF
   END IF
@@ -2194,8 +2001,8 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
 !**********BEGIN THE CALCULATION**************
 
 ! initialize the source and load side heat transfer rates for the simulation
-  initialQSource = 0.0
-  initialQLoad   = 0.0
+  initialQSource = 0.0d0
+  initialQLoad   = 0.0d0
   IterationCount = 0
 
   CpSourceSide = GetSpecificHeatGlycol(PlantLoop(GSHP(GSHPNum)%SourceLoopNum)%FluidName, &
@@ -2268,11 +2075,11 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
 
     ! Determine the Source Side Outlet Enthalpy
 
-    qual= 1.0
+    qual= 1.0d0
     LoadSideOutletEnth = GetSatEnthalpyRefrig(GSHPRefrigerant,LoadSideRefridgTemp,qual,  &
        GSHPRefrigIndex,'CalcGSHPModel:LoadSideRefridgTemp')
 
-    qual=0.0
+    qual=0.0d0
     SourceSideOutletEnth = GetSatEnthalpyRefrig(GSHPRefrigerant, SourceSideRefridgTemp, qual,   &
        GSHPRefrigIndex,'CalcGSHPModel:SourceSideRefridgTemp')
 
@@ -2334,7 +2141,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
         CALL ShowWarningError('HeatPump:WaterToWater:ParameterEstimation, Cooling did not converge')
         CALL ShowContinueErrorTimeStamp('  ')
         CALL ShowContinueError('Heatpump Name = '//TRIM(GSHP(GSHPNum)%Name))
-        WRITE(ErrString,*) ABS(100.0*(QSource - initialQSource)/(initialQSource+SmallNum))
+        WRITE(ErrString,*) ABS(100.0d0*(QSource - initialQSource)/(initialQSource+SmallNum))
         CALL ShowContinueError('Heat Inbalance (%)             = '//TRIM(ADJUSTL(ErrString)))
         WRITE(ErrString,*) QLoad
         CALL ShowContinueError('Load-side heat transfer rate   = '//TRIM(ADJUSTL(ErrString)))
@@ -2361,91 +2168,28 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
   END DO LOOPSourceEnth
 
   !Control Strategy
-!  IF( GSHP(GSHPNum)%CycleTime  < TimeStepSys )THEN
-    IF(ABS(MyLoad) < QLoad) THEN
-      DutyFactor = ABS(MyLoad)/QLoad
-      QLoad      = ABS(MyLoad)
-      Power      = DutyFactor * Power
-      QSource    = QSource * DutyFactor
-      ! Determine the Exterior fluid temperature at the Load Side oulet and eveporator outlet...
-      LoadSideWaterOutletTemp   = LoadSideWaterInletTemp - QLoad/& ! Chilled water
-                                  (LoadSideWaterMassFlowRate * CpLoadSide)
-      SourceSideWaterOutletTemp = SourceSideWaterInletTemp + QSource/ & ! cooling water
-                                  (SourceSideWaterMassFlowRate  * CpSourceSide)
-      RETURN
-    END IF
-!  END IF
+  IF(ABS(MyLoad) < QLoad) THEN
+    DutyFactor = ABS(MyLoad)/QLoad
+    QLoad      = ABS(MyLoad)
+    Power      = DutyFactor * Power
+    QSource    = QSource * DutyFactor
+    ! Determine the Exterior fluid temperature at the Load Side oulet and eveporator outlet...
+    LoadSideWaterOutletTemp   = LoadSideWaterInletTemp - QLoad/& ! Chilled water
+                                (LoadSideWaterMassFlowRate * CpLoadSide)
+    SourceSideWaterOutletTemp = SourceSideWaterInletTemp + QSource/ & ! cooling water
+                                (SourceSideWaterMassFlowRate  * CpSourceSide)
+    RETURN
+  END IF
+
   LoadSideWaterOutletTemp   = LoadSideWaterInletTemp - QLoad/& ! Chilled water
                               (LoadSideWaterMassFlowRate * CpLoadSide)
   SourceSideWaterOutletTemp = SourceSideWaterInletTemp + QSource/&
                               (SourceSideWaterMassFlowRate  * CpSourceSide)
-  GSHPReport(GSHPNum)%WasOn = 1
+  GSHPReport(GSHPNum)%Running = 1
 
  RETURN
 
 END SUBROUTINE CalcGshpModel
-
-SUBROUTINE ForceEquipment( EquipType, EquipName, SwitchOn )
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         <author>
-          !       DATE WRITTEN   <date_written>
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine
-
-          ! METHODOLOGY EMPLOYED:
-          ! na.
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant
-
-  IMPLICIT NONE
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: EquipType  !
-  CHARACTER(len=*), INTENT(IN) :: EquipName  !
-  LOGICAL, INTENT(IN)          :: SwitchOn
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: LoopNum
-  INTEGER :: BranchNum
-  INTEGER :: CompNum
-  INTEGER :: NumPlantLoops
-
-  NumPlantLoops=SIZE(PlantLoop)
-
-  DO LoopNum = 1,NumPlantLoops
-    DO BranchNum = 1 , PlantLoop(LoopNum)%LoopSide(SupplySide)%TotalBranches
-      DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%TotalComponents
-       IF(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name == EquipName .AND. &
-         PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf == EquipType)THEN
-         IF(SwitchOn)THEN
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .TRUE.
-         ELSE
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
-         END IF
-       END IF
-      END DO ! COMP LOOP
-    END DO ! BRANCH LOOP
-  END DO ! PLANT LOOP
-
-
-END SUBROUTINE ForceEquipment
 
 SUBROUTINE UpdateGSHPRecords(GSHPNum)
             ! SUBROUTINE INFORMATION:
@@ -2491,12 +2235,12 @@ IMPLICIT NONE
           !set node temperatures
     Node(SourceSideOutletNode)%Temp     = Node(SourceSideInletNode)%Temp
     Node(LoadSideOutletNode)%Temp       = Node(LoadSideInletNode)%Temp
-    GSHPReport(GSHPNum)%Power                = 0.0
-    GSHPReport(GSHPNum)%Energy               = 0.0
-    GSHPReport(GSHPNum)%QSource              = 0.0
-    GSHPReport(GSHPNum)%QLoad                = 0.0
-    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0
-    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0
+    GSHPReport(GSHPNum)%Power                = 0.0d0
+    GSHPReport(GSHPNum)%Energy               = 0.0d0
+    GSHPReport(GSHPNum)%QSource              = 0.0d0
+    GSHPReport(GSHPNum)%QLoad                = 0.0d0
+    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0d0
+    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0d0
     GSHPReport(GSHPNum)%SourceSidemdot       = SourceSideWaterMassFlowRate
     GSHPReport(GSHPNum)%LoadSidemdot         = LoadSideWaterMassFlowRate
     GSHPReport(GSHPNum)%SourceSideWaterInletTemp  = Node(SourceSideInletNode)%Temp
@@ -2605,47 +2349,43 @@ TYPE GshpSpecs
   INTEGER      :: WWHPPlantTypeOfNum  = 0       ! equipment type num
   LOGICAL      :: Available           = .false. ! need an array of logicals--load identifiers of available equipment
   LOGICAL      :: ON                  = .false. ! simulate the machine at it's operating part load ratio
-  LOGICAL      :: WasOn               = .false. ! flag that the heat pump is ON during previous time step
   LOGICAL      :: IsOn                = .false. ! flag that the heat pump is ON during current time step
   LOGICAL      :: MustRun             = .false. ! flag that the heat pump is MUST RUN during current time step
-  REAL(r64)    :: LastEventTime       = 0.0     ! time of last event
-  REAL(r64)    :: CoolCycleTime       = 0.0     ! cycle time for the cooling coil
-  REAL(r64)    :: HeatCycleTime       = 0.0     ! cycle time for the heating coil
   REAL(r64)    :: SourceSideDesignMassFlow = 0.d0 ! Design flow rate (kg/s)
   REAL(r64)    :: LoadSideDesignMassFlow  = 0.d0 ! Design flow rate (kg/s)
-  REAL(r64)    :: RatedLoadVolFlowCool    = 0.0 ! Rated Cooling Load Side Volumetric Flow Rate [m3/s]
-  REAL(r64)    :: RatedSourceVolFlowCool  = 0.0 ! Rated Cooling Source Side Volumetric Flow Rate [m3/s]
-  REAL(r64)    :: RatedCapCool            = 0.0 ! Rated Cooling Capacity [W]
-  REAL(r64)    :: RatedPowerCool          = 0.0 ! Rated Cooling Power Consumption[W]
-  REAL(r64)    :: CoolCap1                = 0.0 ! 1st coefficient of the Cooling capacity performance curve
-  REAL(r64)    :: CoolCap2                = 0.0 ! 2nd coefficient of the Cooling capacity performance curve
-  REAL(r64)    :: CoolCap3                = 0.0 ! 3rd coefficient of the Cooling capacity performance curve
-  REAL(r64)    :: CoolCap4                = 0.0 ! 4th coefficient of the Cooling capacity performance curve
-  REAL(r64)    :: CoolCap5                = 0.0 ! 5th coefficient of the Cooling capacity performance curve
-  REAL(r64)    :: CoolPower1              = 0.0 ! 1st coefficient of the Cooling power consumption curve
-  REAL(r64)    :: CoolPower2              = 0.0 ! 2nd coefficient of the Cooling power consumption curve
-  REAL(r64)    :: CoolPower3              = 0.0 ! 3rd coefficient of the Cooling power consumption curve
-  REAL(r64)    :: CoolPower4              = 0.0 ! 4th coefficient of the Cooling power consumption curve
-  REAL(r64)    :: CoolPower5              = 0.0 ! 5th coefficient of the Cooling power consumption curve
+  REAL(r64)    :: RatedLoadVolFlowCool    = 0.0d0 ! Rated Cooling Load Side Volumetric Flow Rate [m3/s]
+  REAL(r64)    :: RatedSourceVolFlowCool  = 0.0d0 ! Rated Cooling Source Side Volumetric Flow Rate [m3/s]
+  REAL(r64)    :: RatedCapCool            = 0.0d0 ! Rated Cooling Capacity [W]
+  REAL(r64)    :: RatedPowerCool          = 0.0d0 ! Rated Cooling Power Consumption[W]
+  REAL(r64)    :: CoolCap1                = 0.0d0 ! 1st coefficient of the Cooling capacity performance curve
+  REAL(r64)    :: CoolCap2                = 0.0d0 ! 2nd coefficient of the Cooling capacity performance curve
+  REAL(r64)    :: CoolCap3                = 0.0d0 ! 3rd coefficient of the Cooling capacity performance curve
+  REAL(r64)    :: CoolCap4                = 0.0d0 ! 4th coefficient of the Cooling capacity performance curve
+  REAL(r64)    :: CoolCap5                = 0.0d0 ! 5th coefficient of the Cooling capacity performance curve
+  REAL(r64)    :: CoolPower1              = 0.0d0 ! 1st coefficient of the Cooling power consumption curve
+  REAL(r64)    :: CoolPower2              = 0.0d0 ! 2nd coefficient of the Cooling power consumption curve
+  REAL(r64)    :: CoolPower3              = 0.0d0 ! 3rd coefficient of the Cooling power consumption curve
+  REAL(r64)    :: CoolPower4              = 0.0d0 ! 4th coefficient of the Cooling power consumption curve
+  REAL(r64)    :: CoolPower5              = 0.0d0 ! 5th coefficient of the Cooling power consumption curve
   INTEGER      :: CoolCapNegativeCounter  = 0   ! Counter for number of times cooling capacity curve is <= 0.0
   INTEGER      :: CoolCapNegativeIndex    = 0   ! Index for recurring warning message regarding cooling capacity curve is <= 0.0
   INTEGER      :: CoolPowerNegativeCounter  = 0 ! Counter for number of times cooling power curve is <= 0.0
   INTEGER      :: CoolPowerNegativeIndex  = 0   ! Index for recurring warning message regarding cooling power curve is <= 0.0
 
-  REAL(r64)    :: RatedLoadVolFlowHeat    = 0.0 ! Rated Heating Load Side Volumetric Flow Rate [m3/s]
-  REAL(r64)    :: RatedSourceVolFlowHeat  = 0.0 ! Rated Heating Source Side Volumetric Flow Rate [m3/s]
-  REAL(r64)    :: RatedCapHeat            = 0.0 ! Rated Heating Capacity [W]
-  REAL(r64)    :: RatedPowerHeat          = 0.0 ! Rated Heating Compressor Power[W]
-  REAL(r64)    :: HeatCap1                = 0.0 ! 1st coefficient of the Heating capacity performance curve
-  REAL(r64)    :: HeatCap2                = 0.0 ! 2nd coefficient of the Heating capacity performance curve
-  REAL(r64)    :: HeatCap3                = 0.0 ! 3rd coefficient of the Heating capacity performance curve
-  REAL(r64)    :: HeatCap4                = 0.0 ! 4th coefficient of the Heating capacity performance curve
-  REAL(r64)    :: HeatCap5                = 0.0 ! 5th coefficient of the Heating capacity performance curve
-  REAL(r64)    :: HeatPower1              = 0.0 ! 1st coefficient of the Heating power consumption curve
-  REAL(r64)    :: HeatPower2              = 0.0 ! 2nd coefficient of the Heating power consumption curve
-  REAL(r64)    :: HeatPower3              = 0.0 ! 3rd coefficient of the Heating power consumption curve
-  REAL(r64)    :: HeatPower4              = 0.0 ! 4th coefficient of the Heating power consumption curve
-  REAL(r64)    :: HeatPower5              = 0.0 ! 5th coefficient of the Heating power consumption curve
+  REAL(r64)    :: RatedLoadVolFlowHeat    = 0.0d0 ! Rated Heating Load Side Volumetric Flow Rate [m3/s]
+  REAL(r64)    :: RatedSourceVolFlowHeat  = 0.0d0 ! Rated Heating Source Side Volumetric Flow Rate [m3/s]
+  REAL(r64)    :: RatedCapHeat            = 0.0d0 ! Rated Heating Capacity [W]
+  REAL(r64)    :: RatedPowerHeat          = 0.0d0 ! Rated Heating Compressor Power[W]
+  REAL(r64)    :: HeatCap1                = 0.0d0 ! 1st coefficient of the Heating capacity performance curve
+  REAL(r64)    :: HeatCap2                = 0.0d0 ! 2nd coefficient of the Heating capacity performance curve
+  REAL(r64)    :: HeatCap3                = 0.0d0 ! 3rd coefficient of the Heating capacity performance curve
+  REAL(r64)    :: HeatCap4                = 0.0d0 ! 4th coefficient of the Heating capacity performance curve
+  REAL(r64)    :: HeatCap5                = 0.0d0 ! 5th coefficient of the Heating capacity performance curve
+  REAL(r64)    :: HeatPower1              = 0.0d0 ! 1st coefficient of the Heating power consumption curve
+  REAL(r64)    :: HeatPower2              = 0.0d0 ! 2nd coefficient of the Heating power consumption curve
+  REAL(r64)    :: HeatPower3              = 0.0d0 ! 3rd coefficient of the Heating power consumption curve
+  REAL(r64)    :: HeatPower4              = 0.0d0 ! 4th coefficient of the Heating power consumption curve
+  REAL(r64)    :: HeatPower5              = 0.0d0 ! 5th coefficient of the Heating power consumption curve
   INTEGER      :: LoadSideInletNodeNum    = 0   ! Load Side Inlet Node
   INTEGER      :: LoadSideOutletNodeNum   = 0   ! Load Side Outlet Node
   INTEGER      :: SourceSideInletNodeNum  = 0   ! Source Side Inlet Node
@@ -2667,18 +2407,18 @@ END TYPE GshpSpecs
 
     ! Output Variables Type definition
 TYPE ReportVars
-  REAL(r64)    :: Power                   = 0.0 ! Power Consumption [W]
-  REAL(r64)    :: Energy                  = 0.0 ! Energy Consumption [J]
-  REAL(r64)    :: QLoad                   = 0.0 ! Load Side Heat Transfer Rate [W]
-  REAL(r64)    :: QLoadEnergy             = 0.0 ! Load Side Heat Transfer [J]
-  REAL(r64)    :: QSource                 = 0.0 ! Source Side Heat Transfer Rate [W]
-  REAL(r64)    :: QSourceEnergy           = 0.0 ! Source Side Heat Transfer [J]
-  REAL(r64)    :: LoadSideMassFlowRate    = 0.0 ! Load side volumetric flow rate m3/s
-  REAL(r64)    :: LoadSideInletTemp       = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: LoadSideOutletTemp      = 0.0 ! Load Side outlet temperature °C
-  REAL(r64)    :: SourceSideMassFlowRate  = 0.0 ! Source side volumetric flow rate m3/s
-  REAL(r64)    :: SourceSideInletTemp     = 0.0 ! Source Side outlet temperature °C
-  REAL(r64)    :: SourceSideOutletTemp    = 0.0 ! Source Side outlet temperature °C
+  REAL(r64)    :: Power                   = 0.0d0 ! Power Consumption [W]
+  REAL(r64)    :: Energy                  = 0.0d0 ! Energy Consumption [J]
+  REAL(r64)    :: QLoad                   = 0.0d0 ! Load Side Heat Transfer Rate [W]
+  REAL(r64)    :: QLoadEnergy             = 0.0d0 ! Load Side Heat Transfer [J]
+  REAL(r64)    :: QSource                 = 0.0d0 ! Source Side Heat Transfer Rate [W]
+  REAL(r64)    :: QSourceEnergy           = 0.0d0 ! Source Side Heat Transfer [J]
+  REAL(r64)    :: LoadSideMassFlowRate    = 0.0d0 ! Load side volumetric flow rate m3/s
+  REAL(r64)    :: LoadSideInletTemp       = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: LoadSideOutletTemp      = 0.0d0 ! Load Side outlet temperature °C
+  REAL(r64)    :: SourceSideMassFlowRate  = 0.0d0 ! Source side volumetric flow rate m3/s
+  REAL(r64)    :: SourceSideInletTemp     = 0.0d0 ! Source Side outlet temperature °C
+  REAL(r64)    :: SourceSideOutletTemp    = 0.0d0 ! Source Side outlet temperature °C
 END TYPE ReportVars
 
 TYPE (GSHPSpecs), ALLOCATABLE, DIMENSION(:)  ::GSHP
@@ -2706,8 +2446,6 @@ PRIVATE CalcWatertoWaterHPHeating
 PRIVATE UpdateGSHPRecords
 
           ! Other routines
-PRIVATE ForceEquipment
-
 
 CONTAINS
 
@@ -2774,11 +2512,11 @@ SUBROUTINE SimHPWatertoWaterSimple(GSHPType, GSHPTypeNum, GSHPName, GSHPNum, Fir
      IF (GSHPNum /= 0) THEN  ! if 0, fall through to next
        SELECT CASE (GSHPTypeNum)
        CASE (TypeOf_HPWaterEFCooling)
-            MinCap = 0.0
+            MinCap = 0.0d0
             MaxCap = GSHP(GSHPNum)%RatedCapCool
             OptCap = GSHP(GSHPNum)%RatedCapCool
        CASE (TypeOf_HPWaterEFHeating)
-            MinCap = 0.0
+            MinCap = 0.0d0
             MaxCap = GSHP(GSHPNum)%RatedCapHeat
             OptCap = GSHP(GSHPNum)%RatedCapHeat
        CASE DEFAULT
@@ -2913,62 +2651,9 @@ SUBROUTINE GetWatertoWaterHPInput
   END IF
 
   IF(NumGSHPs > 0) THEN
-  ALLOCATE (GSHP(NumGSHPs))
-  ALLOCATE (GSHPReport(NumGSHPs))
-  ! initialize the data structures
-    GSHP%CoolCycleTime = 0.0
-    GSHP%HeatCycleTime = 0.0
-    GSHP%LastEventTime = 0.0
-    GSHP%RatedLoadVolFlowCool = 0.0
-    GSHP%RatedSourceVolFlowCool = 0.0
-    GSHP%RatedCapCool = 0.0
-    GSHP%RatedPowerCool = 0.0
-    GSHP%CoolCap1 = 0.0
-    GSHP%CoolCap2 = 0.0
-    GSHP%CoolCap3 = 0.0
-    GSHP%CoolCap4 = 0.0
-    GSHP%CoolCap5 = 0.0
-    GSHP%CoolPower1 = 0.0
-    GSHP%CoolPower2 = 0.0
-    GSHP%CoolPower3 = 0.0
-    GSHP%CoolPower4 = 0.0
-    GSHP%CoolPower5 = 0.0
-    GSHP%CoolCapNegativeCounter  = 0
-    GSHP%CoolCapNegativeIndex  = 0
-    GSHP%CoolPowerNegativeCounter  = 0
-    GSHP%CoolPowerNegativeIndex  = 0
-    GSHP%RatedLoadVolFlowHeat = 0.0
-    GSHP%RatedSourceVolFlowHeat = 0.0
-    GSHP%RatedCapHeat = 0.0
-    GSHP%RatedPowerHeat = 0.0
-    GSHP%HeatCap1 = 0.0
-    GSHP%HeatCap2 = 0.0
-    GSHP%HeatCap3 = 0.0
-    GSHP%HeatCap4 = 0.0
-    GSHP%HeatCap5 = 0.0
-    GSHP%HeatPower1 = 0.0
-    GSHP%HeatPower2 = 0.0
-    GSHP%HeatPower3 = 0.0
-    GSHP%HeatPower4 = 0.0
-    GSHP%HeatPower5 = 0.0
-    GSHP%HeatCapNegativeCounter  = 0
-    GSHP%HeatCapNegativeIndex  = 0
-    GSHP%HeatPowerNegativeCounter  = 0
-    GSHP%HeatPowerNegativeIndex  = 0
-
-
-    GSHPReport%Power = 0.0
-    GSHPReport%Energy = 0.0
-    GSHPReport%QLoad = 0.0
-    GSHPReport%QLoadEnergy = 0.0
-    GSHPReport%QSource = 0.0
-    GSHPReport%QSourceEnergy = 0.0
-    GSHPReport%LoadSideMassFlowRate = 0.0
-    GSHPReport%LoadSideInletTemp = 0.0
-    GSHPReport%LoadSideOutletTemp = 0.0
-    GSHPReport%SourceSideMassFlowRate = 0.0
-    GSHPReport%SourceSideInletTemp = 0.0
-    GSHPReport%SourceSideOutletTemp = 0.0
+    ALLOCATE (GSHP(NumGSHPs))
+    ALLOCATE (GSHPReport(NumGSHPs))
+    ! initialize the data structures
   END IF
 
   !Load data structure for cooling coil
@@ -3002,7 +2687,6 @@ SUBROUTINE GetWatertoWaterHPInput
         GSHP(GSHPNum)%CoolPower3            = NumArray(12)
         GSHP(GSHPNum)%CoolPower4            = NumArray(13)
         GSHP(GSHPNum)%CoolPower5            = NumArray(14)
-        GSHP(GSHPNum)%CoolCycleTime         = NumArray(15)
 
         GSHP(GSHPNum)%SourceSideInletNodeNum   =   &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,HPEqFitCoolingUC,AlphArray(1), &
@@ -3025,7 +2709,7 @@ SUBROUTINE GetWatertoWaterHPInput
         CALL TestCompSet(HPEqFitCoolingUC,AlphArray(1),AlphArray(4),AlphArray(5),'Hot Water Nodes')
 
         ! save the design source side flow rate for use by plant loop sizing algorithms
-        CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%RatedSourceVolFlowCool)
+        CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5d0*GSHP(GSHPNum)%RatedSourceVolFlowCool)
 
         ! CurrentModuleObject='HeatPump:WatertoWater:EquationFit:Cooling'
         CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
@@ -3068,7 +2752,6 @@ SUBROUTINE GetWatertoWaterHPInput
         GSHP(GSHPNum)%HeatPower3            = NumArray(12)
         GSHP(GSHPNum)%HeatPower4            = NumArray(13)
         GSHP(GSHPNum)%HeatPower5            = NumArray(14)
-        GSHP(GSHPNum)%HeatCycleTime         = NumArray(15)
 
         GSHP(GSHPNum)%SourceSideInletNodeNum   =   &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,HPEqFitHeatingUC,AlphArray(1), &
@@ -3091,7 +2774,7 @@ SUBROUTINE GetWatertoWaterHPInput
         CALL TestCompSet(HPEqFitHeatingUC,AlphArray(1),AlphArray(4),AlphArray(5),'Hot Water Nodes')
 
         ! save the design source side flow rate for use by plant loop sizing algorithms
-        CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%RatedSourceVolFlowHeat)
+        CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5d0*GSHP(GSHPNum)%RatedSourceVolFlowHeat)
 
         ! CurrentModuleObject='HeatPump:WatertoWater:EquationFit:Heating'
         CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
@@ -3207,11 +2890,10 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
   INTEGER                :: LoadSideOutletNode      ! Load Side Outlet Node
   INTEGER                :: SourceSideInletNode     ! Source Side Inlet Node
   INTEGER                :: SourceSideOutletNode    ! Source Side Outlet Node
-  REAL(r64)  :: CycleTime               ! Cycle Time of the Coil (for cooling or heating)
   LOGICAL,  ALLOCATABLE, SAVE, DIMENSION(:)     :: MyEnvrnFlag   ! Flag required to keep track of initialization
   LOGICAL, SAVE          :: OneTimeFlag = .TRUE.    ! One Time Flag
-  REAL(r64), SAVE :: CurrentSimTime = 0.0    ! Current Simulation Time
-  REAL(r64), SAVE :: PrevSimTime = 0.0       ! Previous Simulation Time
+  REAL(r64), SAVE :: CurrentSimTime = 0.0d0    ! Current Simulation Time
+  REAL(r64), SAVE :: PrevSimTime = 0.0d0       ! Previous Simulation Time
   LOGICAL,  ALLOCATABLE, SAVE, DIMENSION(:)  :: MyPlanScanFlag
   LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE.
   INTEGER :: LoopNum
@@ -3236,32 +2918,23 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
   SourceSideOutletNode = GSHP(GSHPNum)%SourceSideOutletNodeNum
 
 
-  SELECT CASE (GSHPTypeNum)
-    CASE (TypeOf_HPWaterEFCooling)
-       CycleTime = GSHP(GSHPNum)%CoolCycleTime
-    CASE (TypeOf_HPWaterEFHeating)
-       CycleTime = GSHP(GSHPNum)%HeatCycleTime
-  END SELECT
-
   IF(MyEnvrnFlag(GSHPNum) .AND. BeginEnvrnFlag)THEN
     !Initialize all report variables to a known state at beginning of simulation
 
-    GSHPReport(GSHPNum)%Power=0.0
-    GSHPReport(GSHPNum)%Energy = 0.0
-    GSHPReport(GSHPNum)%QLoad = 0.0
-    GSHPReport(GSHPNum)%QLoadEnergy = 0.0
-    GSHPReport(GSHPNum)%QSource = 0.0
-    GSHPReport(GSHPNum)%QSourceEnergy = 0.0
-    GSHPReport(GSHPNum)%LoadSideMassFlowRate = 0.0
-    GSHPReport(GSHPNum)%LoadSideInletTemp = 0.0
-    GSHPReport(GSHPNum)%LoadSideOutletTemp = 0.0
-    GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0
-    GSHPReport(GSHPNum)%SourceSideInletTemp = 0.0
-    GSHPReport(GSHPNum)%SourceSideOutletTemp = 0.0
-    GSHP(GSHPNum)%WasOn = .FALSE.
+    GSHPReport(GSHPNum)%Power=0.0d0
+    GSHPReport(GSHPNum)%Energy = 0.0d0
+    GSHPReport(GSHPNum)%QLoad = 0.0d0
+    GSHPReport(GSHPNum)%QLoadEnergy = 0.0d0
+    GSHPReport(GSHPNum)%QSource = 0.0d0
+    GSHPReport(GSHPNum)%QSourceEnergy = 0.0d0
+    GSHPReport(GSHPNum)%LoadSideMassFlowRate = 0.0d0
+    GSHPReport(GSHPNum)%LoadSideInletTemp = 0.0d0
+    GSHPReport(GSHPNum)%LoadSideOutletTemp = 0.0d0
+    GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0d0
+    GSHPReport(GSHPNum)%SourceSideInletTemp = 0.0d0
+    GSHPReport(GSHPNum)%SourceSideOutletTemp = 0.0d0
     GSHP(GSHPNum)%IsOn = .FALSE.
     GSHP(GSHPNum)%MustRun = .TRUE.
-    GSHP(GSHPNum)%LastEventTime = 0.0
 
 
     IF (GSHP(GSHPNum)%WWHPPlantTypeOfNum  == TypeOf_HPWaterEFHeating) THEN
@@ -3305,7 +2978,7 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
                                  GSHP(GSHPNum)%SourceCompNum)
 
      IF (Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) &
-                            Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint=0.0
+                            Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint=0.0d0
      Node(GSHP(GSHPNum)%SourceSideInletNodeNum)%Temp  &
                 = Node(GSHP(GSHPNum)%SourceSideOutletNodeNum)%TempSetPoint+30
 
@@ -3322,87 +2995,31 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
   CurrentSimTime = (DayOfSim-1)*24 + (HourOfDay-1) + (TimeStep-1)*TimeStepZone + SysTimeElapsed
 
   ! Initialize event time array when the environment simulation begins
-  IF(CurrentSimTime == 0.0 .AND. OneTimeFlag)THEN
-    GSHP%LastEventTime = 0.0
+  IF(CurrentSimTime == 0.0d0 .AND. OneTimeFlag)THEN
     OneTimeFlag = .FALSE.
   END IF
 
   LoopNum              = GSHP(GSHPNum)%LoadLoopNum
   LoopSideNum          = GSHP(GSHPNum)%LoadLoopSideNum
 
-  IF(CurrentSimTime > 0.0 )OneTimeFlag = .TRUE.
+  IF(CurrentSimTime > 0.0d0 )OneTimeFlag = .TRUE.
 
-  IF(CycleTime > TimeStepSys)THEN
-
-    IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
-      ! Normal pump operation
-      IF ( (GSHP(GSHPNum)%LastEventTime + CycleTime) < CurrentSimTime ) THEN
-
-        IF(MyLoad > 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFHeating ) THEN
-          GSHP(GSHPNum)%IsOn    = .TRUE.
-          GSHP(GSHPNum)%MustRun = .TRUE.
-        ELSEIF (MyLoad < 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFCooling) THEN
-          GSHP(GSHPNum)%IsOn    = .TRUE.
-          GSHP(GSHPNum)%MustRun = .TRUE.
-        ELSE
-          GSHP(GSHPNum)%IsOn    = .FALSE.
-          GSHP(GSHPNum)%MustRun = .FALSE.
-        END IF
-
-        IF((GSHP(GSHPNum)%WasOn .and. .not. GSHP(GSHPNum)%IsOn) .or. (.not.GSHP(GSHPNum)%WasOn .and. GSHP(GSHPNum)%IsOn)) THEN
-          GSHP(GSHPNum)%WasOn = GSHP(GSHPNum)%IsOn
-          GSHP(GSHPNum)%LastEventTime = CurrentSimTime
-        END IF
-
-      ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime) > CurrentSimTime) ) THEN
-        ! Even if there is NO zone demand we run the heat pump for the cycle time
-        IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
-          GSHP(GSHPNum)%MustRun = .TRUE.
-          CALL ForceEquipment( GSHPTypeNum, GSHPName, .TRUE. )  !DSU?  still need? looks like a band aid?
-        END IF
-
-      ! Keep the pump turned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime)>CurrentSimTime)) THEN
-        ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
-        IF( ABS(MyLoad) > 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
-          GSHP(GSHPNum)%MustRun = .FALSE.
-          CALL ForceEquipment( GSHPTypeNum, GSHPName, .FALSE. ) !DSU?  still need? looks like a band aid?
-        END IF
-      END IF
-
-    ELSE ! FIRSTHVAC .OR. WARMUP FLAG
-
-      IF (MyLoad > 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFHeating ) THEN
-        GSHP(GSHPNum)%MustRun = .TRUE.
-      ELSEIF (MyLoad < 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFCooling) THEN
-        GSHP(GSHPNum)%MustRun = .TRUE.
-      ELSE
-        GSHP(GSHPNum)%MustRun = .FALSE.
-      END IF
-
-    END IF ! FIRSTHVAC/WARMUP CHECK
-
-  ELSE !CYCLETIME<SYS TIME STEP
-
-    IF(MyLoad > 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFHeating )THEN
-      GSHP(GSHPNum)%MustRun = .TRUE.
-      GSHP(GSHPNum)%IsOn    = .TRUE.
-    ELSEIF (MyLoad < 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFCooling) THEN
-      GSHP(GSHPNum)%MustRun = .TRUE.
-      GSHP(GSHPNum)%IsOn    = .TRUE.
-    ELSE
-      GSHP(GSHPNum)%MustRun = .FALSE.
-      GSHP(GSHPNum)%IsOn    = .FALSE.
-    END IF
-
+  IF(MyLoad > 0.0d0 .AND. GSHPTypeNum == TypeOf_HPWaterEFHeating )THEN
+    GSHP(GSHPNum)%MustRun = .TRUE.
+    GSHP(GSHPNum)%IsOn    = .TRUE.
+  ELSEIF (MyLoad < 0.0d0 .AND. GSHPTypeNum == TypeOf_HPWaterEFCooling) THEN
+    GSHP(GSHPNum)%MustRun = .TRUE.
+    GSHP(GSHPNum)%IsOn    = .TRUE.
+  ELSE
+    GSHP(GSHPNum)%MustRun = .FALSE.
+    GSHP(GSHPNum)%IsOn    = .FALSE.
   END IF
 
 !*******Set flow based on "flowlock" and "run" flags**********
 ! Set flows if the heat pump is not running
  IF( .NOT. GSHP(GSHPNum)%MustRun )THEN
-    GSHPReport(GSHPNum)%LoadSideMassFlowRate  = 0.0
-    GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0
+    GSHPReport(GSHPNum)%LoadSideMassFlowRate  = 0.0d0
+    GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0d0
 
     CALL SetComponentFlowRate(GSHPReport(GSHPNum)%LoadSideMassFlowRate, &
                                     GSHP(GSHPNum)%LoadSideInletNodeNum, &
@@ -3440,14 +3057,12 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
                                     GSHP(GSHPNum)%SourceBranchNum, &
                                     GSHP(GSHPNum)%SourceCompNum)
      !if there's no flowin one, turn the entire "heat pump off"
-    IF(GSHPReport(GSHPNum)%LoadSideMassFlowRate  <= 0.0 .OR. &
-        GSHPReport(GSHPNum)%SourceSideMassFlowRate  <= 0.0)THEN
-        GSHPReport(GSHPNum)%LoadSideMassFlowRate = 0.0
-        GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0
-        GSHP(GSHPNum)%MustRun = .FALSE.
+    IF(GSHPReport(GSHPNum)%LoadSideMassFlowRate  <= 0.0d0 .OR. &
+       GSHPReport(GSHPNum)%SourceSideMassFlowRate  <= 0.0d0)THEN
 
-!        GSHP(GSHPNum)%WasOn = .FALSE.
-!        GSHP(GSHPNum)%LastEventTime = CurrentSimTime
+      GSHPReport(GSHPNum)%LoadSideMassFlowRate = 0.0d0
+      GSHPReport(GSHPNum)%SourceSideMassFlowRate = 0.0d0
+      GSHP(GSHPNum)%MustRun = .FALSE.
 
       CALL SetComponentFlowRate(GSHPReport(GSHPNum)%LoadSideMassFlowRate, &
                                       GSHP(GSHPNum)%LoadSideInletNodeNum, &
@@ -3474,14 +3089,14 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
   GSHPReport(GSHPNum)%SourceSideInletTemp = Node(SourceSideInletNode)%Temp
 
   ! Outlet variables
-  GSHPReport(GSHPNum)%Power=0.0
-  GSHPReport(GSHPNum)%Energy = 0.0
-  GSHPReport(GSHPNum)%QLoad = 0.0
-  GSHPReport(GSHPNum)%QLoadEnergy = 0.0
-  GSHPReport(GSHPNum)%QSource = 0.0
-  GSHPReport(GSHPNum)%QSourceEnergy = 0.0
-  GSHPReport(GSHPNum)%LoadSideOutletTemp = 0.0
-  GSHPReport(GSHPNum)%SourceSideOutletTemp = 0.0
+  GSHPReport(GSHPNum)%Power=0.0d0
+  GSHPReport(GSHPNum)%Energy = 0.0d0
+  GSHPReport(GSHPNum)%QLoad = 0.0d0
+  GSHPReport(GSHPNum)%QLoadEnergy = 0.0d0
+  GSHPReport(GSHPNum)%QSource = 0.0d0
+  GSHPReport(GSHPNum)%QSourceEnergy = 0.0d0
+  GSHPReport(GSHPNum)%LoadSideOutletTemp = 0.0d0
+  GSHPReport(GSHPNum)%SourceSideOutletTemp = 0.0d0
 
 RETURN
 END SUBROUTINE InitWatertoWaterHP
@@ -3660,13 +3275,11 @@ SUBROUTINE CalcWatertoWaterHPCooling(GSHPNum, MyLoad)
   QSource = QLoad+Power   !assume no losses
 
   !Control Strategy
-  IF( GSHP(GSHPNum)%CoolCycleTime  < TimeStepSys )THEN
-    IF(ABS(MyLoad) < QLoad .AND. Qload .NE. 0.0d0) THEN
-      PartLoadRatio        = ABS(MyLoad)/QLoad
-      QLoad                = ABS(MyLoad)
-      Power                = Power * PartLoadRatio
-      QSource              = QSource * PartLoadRatio
-     END IF
+  IF(ABS(MyLoad) < QLoad .AND. Qload .NE. 0.0d0) THEN
+    PartLoadRatio        = ABS(MyLoad)/QLoad
+    QLoad                = ABS(MyLoad)
+    Power                = Power * PartLoadRatio
+    QSource              = QSource * PartLoadRatio
   END IF
 
   CpLoadSide   = GetSpecificHeatGlycol(PlantLoop(GSHP(GSHPNum)%LoadLoopNum)%FluidName, &
@@ -3728,7 +3341,7 @@ SUBROUTINE CalcWatertoWaterHPHeating(GSHPNum, MyLoad)
           ! SUBROUTINE PARAMETER DEFINITIONS:
 
   REAL(r64), PARAMETER   :: CelsiustoKelvin  = KelvinConv  ! Conversion from Celsius to Kelvin
-  REAL(r64), PARAMETER   :: Tref             = 283.15  ! Reference Temperature for performance curves,10C [K]
+  REAL(r64), PARAMETER   :: Tref             = 283.15d0  ! Reference Temperature for performance curves,10C [K]
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -3869,14 +3482,12 @@ SUBROUTINE CalcWatertoWaterHPHeating(GSHPNum, MyLoad)
   QSource = QLoad-Power   !assume no losses
 
   !Control Strategy
-!  IF( GSHP(GSHPNum)%HeatCycleTime  < TimeStepSys )THEN
   IF(ABS(MyLoad) < QLoad .AND. Qload .NE. 0.0d0) THEN
     PartLoadRatio        = ABS(MyLoad)/QLoad
     QLoad                = ABS(MyLoad)
     Power                = Power * PartLoadRatio
     QSource              = QSource * PartLoadRatio
   END IF
-!  END IF
 
   CpLoadSide   = GetSpecificHeatGlycol(PlantLoop(GSHP(GSHPNum)%LoadLoopNum)%FluidName, &
                            LoadSideInletTemp, &
@@ -3944,12 +3555,12 @@ SUBROUTINE UpdateGSHPRecords(GSHPNum)
 
   IF (.NOT. GSHP(GSHPNum)%MustRun )THEN
   ! Heatpump is off; just pass through conditions
-    GSHPReport(GSHPNum)%Power                = 0.0
-    GSHPReport(GSHPNum)%Energy               = 0.0
-    GSHPReport(GSHPNum)%QSource              = 0.0
-    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0
-    GSHPReport(GSHPNum)%QLoad                = 0.0
-    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0
+    GSHPReport(GSHPNum)%Power                = 0.0d0
+    GSHPReport(GSHPNum)%Energy               = 0.0d0
+    GSHPReport(GSHPNum)%QSource              = 0.0d0
+    GSHPReport(GSHPNum)%QSourceEnergy        = 0.0d0
+    GSHPReport(GSHPNum)%QLoad                = 0.0d0
+    GSHPReport(GSHPNum)%QLoadEnergy          = 0.0d0
     GSHPReport(GSHPNum)%LoadSideOutletTemp   = GSHPReport(GSHPNum)%LoadSideInletTemp
     GSHPReport(GSHPNum)%SourceSideOutletTemp = GSHPReport(GSHPNum)%SourceSideInletTemp
   END IF
@@ -3958,68 +3569,6 @@ SUBROUTINE UpdateGSHPRecords(GSHPNum)
   Node(LoadSideOutletNode)%Temp            = GSHPReport(GSHPNum)%LoadSideOutletTemp
 RETURN
 END SUBROUTINE UpdateGSHPRecords
-
-
-SUBROUTINE ForceEquipment( EquipTypeNum, EquipName, SwitchOn )
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         <author>
-          !       DATE WRITTEN   <date_written>
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant
-
-  IMPLICIT NONE
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: EquipTypeNum  !
-  CHARACTER(len=*), INTENT(IN) :: EquipName  !
-  LOGICAL, INTENT(IN)          :: SwitchOn
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER :: LoopNum
-  INTEGER :: BranchNum
-  INTEGER :: CompNum
-  INTEGER :: NumPlantLoops
-
-  NumPlantLoops=SIZE(PlantLoop)
-
-  DO LoopNum = 1,NumPlantLoops
-    DO BranchNum = 1 , PlantLoop(LoopNum)%LoopSide(SupplySide)%TotalBranches
-      DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%TotalComponents
-       IF(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name == EquipName .AND. &
-         PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == EquipTypeNum)THEN
-         IF(SwitchOn)THEN
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .TRUE.
-         ELSE
-          PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
-         END IF
-       END IF
-      END DO ! COMP LOOP
-    END DO ! BRANCH LOOP
-  END DO ! PLANT LOOP
-
-
-END SUBROUTINE ForceEquipment
 
 END MODULE HeatPumpWaterToWaterSimple
 

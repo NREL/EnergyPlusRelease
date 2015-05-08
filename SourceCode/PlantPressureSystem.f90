@@ -142,7 +142,7 @@ SUBROUTINE SimPressureDropSystem(LoopNum, FirstHVACIteration, CallType, LoopSide
     CASE (PressureCall_Init)
       CALL InitPressureDrop(LoopNum, FirstHVACIteration)
     CASE (PressureCall_Calc)
-      CALL BranchPressureDrop(LoopNum,LoopSideNum,BranchNum)
+      CALL BranchPressureDrop(LoopNum,LoopSideNum,BranchNum) !Objexx:OPTIONAL LoopSideNum, BranchNum used without PRESENT check
     CASE (PressureCall_Update)
       CALL UpdatePressureDrop(LoopNum)
     CASE DEFAULT
@@ -1403,12 +1403,12 @@ REAL(r64) FUNCTION ResolveLoopFlowVsPressure(LoopNum, SystemMassFlow, PumpCurveN
         !DampingFactor = MIN(DampingFactor * 1.1, 0.9d0)
       ELSE
         !we are stuck or diverging
-        DampingFactor = DampingFactor * 0.9
+        DampingFactor = DampingFactor * 0.9d0
       END IF
     END IF
 
     !Update pressure value with damping factor
-    SystemPressureDrop = DampingFactor * PumpPressureRise + (1 - DampingFactor) * SystemPressureDrop
+    SystemPressureDrop = DampingFactor * PumpPressureRise + (1.0d0 - DampingFactor) * SystemPressureDrop
 
   END DO
 

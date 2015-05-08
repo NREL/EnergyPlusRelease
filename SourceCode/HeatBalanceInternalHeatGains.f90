@@ -212,8 +212,8 @@ SUBROUTINE GetInternalHeatGainsInput
   CHARACTER(len=MaxNameLength) :: liteName
   INTEGER :: zonePt
   REAL(r64) :: mult
-  REAL(r64) :: sumArea = 0
-  REAL(r64) :: sumPower = 0
+  REAL(r64) :: sumArea = 0.0d0
+  REAL(r64) :: sumPower = 0.0d0
   INTEGER   :: ZoneNum
   REAL(r64) :: maxOccupLoad
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject
@@ -274,7 +274,7 @@ SUBROUTINE GetInternalHeatGainsInput
 
   ALLOCATE(IHGNumbers(MaxNumber))
   ALLOCATE(AlphaName(MaxAlpha))
-  IHGNumbers=0.0
+  IHGNumbers=0.0d0
   AlphaName=' '
 
   !CurrentModuleObject='Zone'
@@ -361,7 +361,7 @@ SUBROUTINE GetInternalHeatGainsInput
     Loop=0
     DO Item = 1, NumPeopleStatements
       AlphaName  = Blank
-      IHGNumbers = 0.0
+      IHGNumbers = 0.0d0
 
       CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -402,9 +402,9 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE  ! check min/max on schedule
           SchMin=GetScheduleMinValue(People(Loop)%NumberOfPeoplePtr)
           SchMax=GetScheduleMaxValue(People(Loop)%NumberOfPeoplePtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
             IF (Item1 == 1) THEN
-              IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -413,7 +413,7 @@ SUBROUTINE GetInternalHeatGainsInput
               ENDIF
             ENDIF
             IF (Item1 == 1) THEN
-              IF (SchMax < 0.0) THEN
+              IF (SchMax < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -435,9 +435,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('PEOPLE/AREA')
             IF (People(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(2) >= 0.0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
                 People(Loop)%NumberOfPeople = IHGNumbers(2)*Zone(People(Loop)%ZonePtr)%FloorArea
-                IF (Zone(People(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(People(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(People(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 People will result.')
                 ENDIF
@@ -455,9 +455,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('AREA/PERSON')
             IF (People(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(3) > 0.0) THEN
+              IF (IHGNumbers(3) > 0.0d0) THEN
                 People(Loop)%NumberOfPeople = Zone(People(Loop)%ZonePtr)%FloorArea/IHGNumbers(3)
-                IF (Zone(People(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(People(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(People(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 People will result.')
                 ENDIF
@@ -494,7 +494,7 @@ SUBROUTINE GetInternalHeatGainsInput
         People(Loop)%FractionRadiant   = IHGNumbers(4)
         People(Loop)%FractionConvected = 1.0d0-People(Loop)%FractionRadiant
         IF (Item1 == 1) THEN
-          IF (People(Loop)%FractionConvected < 0.0) THEN
+          IF (People(Loop)%FractionConvected < 0.0d0) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cNumericFieldNames(4))//' < 0.0, value ='//  &
                                    TRIM(RoundSigDigits(IHGNumbers(4),2)))
@@ -535,9 +535,9 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE   ! Check values in Schedule
           SchMin=GetScheduleMinValue(People(Loop)%ActivityLevelPtr)
           SchMax=GetScheduleMaxValue(People(Loop)%ActivityLevelPtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
             IF (Item1 == 1) THEN
-              IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(5))//' minimum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//  &
@@ -546,7 +546,7 @@ SUBROUTINE GetInternalHeatGainsInput
               ENDIF
             ENDIF
             IF (Item1 == 1) THEN
-              IF (SchMax < 0.0) THEN
+              IF (SchMax < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(5))//' maximum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//  &
@@ -559,8 +559,8 @@ SUBROUTINE GetInternalHeatGainsInput
               CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(5))//' values')
               CALL ShowContinueError('fall outside typical range [70,1000] W/person for Thermal Comfort Reporting.')
-              CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//'"; Odd comfort values may result. '//  &
-                               'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
+              CALL ShowContinueError('Odd comfort values may result; Schedule="'//TRIM(AlphaName(5))//'".')
+              CALL ShowContinueError('Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] W/person.')
             ENDIF
           ENDIF
@@ -585,7 +585,7 @@ SUBROUTINE GetInternalHeatGainsInput
           UsingThermalComfort=.false.
           lastOption = NumAlpha
 
-          DO OptionNum = 12,lastOption
+          DO OptionNum = 14,lastOption
 
             SELECT CASE (AlphaName(OptionNum))
 
@@ -684,8 +684,8 @@ SUBROUTINE GetInternalHeatGainsInput
             ELSE  ! check min/max on schedule
               SchMin=GetScheduleMinValue(People(Loop)%WorkEffPtr)
               SchMax=GetScheduleMaxValue(People(Loop)%WorkEffPtr)
-              IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-                IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                IF (SchMin < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                        '", '//TRIM(cAlphaFieldNames(9))//', minimum is < 0.0')
@@ -694,7 +694,7 @@ SUBROUTINE GetInternalHeatGainsInput
                     ErrorsFound=.true.
                   ENDIF
                 ENDIF
-                IF (SchMax < 0.0) THEN
+                IF (SchMax < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                        '", '//TRIM(cAlphaFieldNames(9))//', maximum is < 0.0')
@@ -722,32 +722,35 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
           ENDIF
 
-          IF (.not. lAlphaFieldBlanks(10)) THEN
-            People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(10))
+      IF (.not. lAlphaFieldBlanks(10) .or. AlphaName(10) /= ' ') THEN
+        SELECT CASE (AlphaName(10))
+          CASE('CLOTHINGINSULATIONSCHEDULE')
+            People(Loop)%ClothingType = 1
+            People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
             IF (People(Loop)%ClothingPtr == 0) THEN
               IF (Item1 == 1) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", invalid '//TRIM(cAlphaFieldNames(10))//' entered='//TRIM(AlphaName(10)))
+                                     '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
                 ErrorsFound=.true.
               ENDIF
             ELSE  ! check min/max on schedule
               SchMin=GetScheduleMinValue(People(Loop)%ClothingPtr)
               SchMax=GetScheduleMaxValue(People(Loop)%ClothingPtr)
-              IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-                IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                IF (SchMin < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(10))//', minimum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(10))//  &
+                                       '", '//TRIM(cAlphaFieldNames(12))//', minimum is < 0.0')
+                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
                                        '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
                     ErrorsFound=.true.
                   ENDIF
                 ENDIF
-                IF (SchMax < 0.0) THEN
+                IF (SchMax < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(10))//', maximum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(10))//  &
+                                       '", '//TRIM(cAlphaFieldNames(12))//', maximum is < 0.0')
+                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//  &
                                        '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
                     ErrorsFound=.true.
                   ENDIF
@@ -756,47 +759,75 @@ SUBROUTINE GetInternalHeatGainsInput
               IF (SchMax > 2.0d0) THEN
                 IF (Item1 == 1) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                     '", '//TRIM(cAlphaFieldNames(10))//', maximum is > 2.0')
-                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(10))//'"; '//  &
+                                     '", '//TRIM(cAlphaFieldNames(12))//', maximum is > 2.0')
+                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(12))//'"; '//  &
                                   'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] Clothing.')
                 ENDIF
               ENDIF
             ENDIF
-          ELSEIF (MustInpSch) THEN
-            IF (Item1 == 1) THEN
-              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                   '", blank '//TRIM(cAlphaFieldNames(10))//' is required for this item.')
-              ErrorsFound=.true.
-            ENDIF
-          ENDIF
 
-          IF (.not. lAlphaFieldBlanks(11)) THEN
-            People(Loop)%AirVelocityPtr  = GetScheduleIndex(AlphaName(11))
-            IF (People(Loop)%AirVelocityPtr == 0) THEN
+          CASE('DYNAMICCLOTHINGMODELASHRAE55')
+            People(Loop)%ClothingType = 2
+
+          CASE('CALCULATIONMETHODSCHEDULE')
+            People(Loop)%ClothingType = 3
+            People(Loop)%ClothingMethodPtr  = GetScheduleIndex(AlphaName(11))
+            IF (People(Loop)%ClothingMethodPtr == 0) THEN
               IF (Item1 == 1) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                      '", invalid '//TRIM(cAlphaFieldNames(11))//' entered='//TRIM(AlphaName(11)))
                 ErrorsFound=.true.
               ENDIF
+            ENDIF
+            IF (CheckScheduleValue(People(Loop)%ClothingMethodPtr,1)) THEN
+              People(Loop)%ClothingPtr  = GetScheduleIndex(AlphaName(12))
+              IF (People(Loop)%ClothingPtr == 0) THEN
+                IF (Item1 == 1) THEN
+                  CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                     '", invalid '//TRIM(cAlphaFieldNames(12))//' entered='//TRIM(AlphaName(12)))
+                  ErrorsFound=.true.
+                ENDIF
+              ENDIF
+            ENDIF
+
+          CASE DEFAULT
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(People(Loop)%Name)//  &
+                                 '", invalid '//TRIM(cAlphaFieldNames(10))//', value  ='//  &
+                                 TRIM(AlphaName(10)))
+              CALL ShowContinueError('...Valid values are "ClothingInsulationSchedule",'//   &
+                                     '"DynamicClothingModelASHRAE55a", "CalculationMethodSchedule".')
+              ErrorsFound=.true.
+        END SELECT
+      ENDIF
+
+
+          IF (.not. lAlphaFieldBlanks(13)) THEN
+            People(Loop)%AirVelocityPtr  = GetScheduleIndex(AlphaName(13))
+            IF (People(Loop)%AirVelocityPtr == 0) THEN
+              IF (Item1 == 1) THEN
+                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                     '", invalid '//TRIM(cAlphaFieldNames(13))//' entered='//TRIM(AlphaName(13)))
+                ErrorsFound=.true.
+              ENDIF
             ELSE  ! check min/max on schedule
               SchMin=GetScheduleMinValue(People(Loop)%AirVelocityPtr)
               SchMax=GetScheduleMaxValue(People(Loop)%AirVelocityPtr)
-              IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-                IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+                IF (SchMin < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(11))//', minimum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(11))//  &
+                                       '", '//TRIM(cAlphaFieldNames(13))//', minimum is < 0.0')
+                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
                                        '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
                     ErrorsFound=.true.
                   ENDIF
                 ENDIF
-                IF (SchMax < 0.0) THEN
+                IF (SchMax < 0.0d0) THEN
                   IF (Item1 == 1) THEN
                     CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                       '", '//TRIM(cAlphaFieldNames(11))//', maximum is < 0.0')
-                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(11))//  &
+                                       '", '//TRIM(cAlphaFieldNames(13))//', maximum is < 0.0')
+                    CALL ShowContinueError('Schedule="'//TRIM(AlphaName(13))//  &
                                        '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
                     ErrorsFound=.true.
                   ENDIF
@@ -806,7 +837,7 @@ SUBROUTINE GetInternalHeatGainsInput
           ELSEIF (MustInpSch) THEN
             IF (Item1 == 1) THEN
               CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                                   '", blank '//TRIM(cAlphaFieldNames(11))//' is required for this item.')
+                                   '", blank '//TRIM(cAlphaFieldNames(13))//' is required for this item.')
               ErrorsFound=.true.
             ENDIF
           ENDIF
@@ -894,17 +925,17 @@ SUBROUTINE GetInternalHeatGainsInput
 
   !transfer the nominal number of people in a zone to the tabular reporting
   DO Loop = 1,NumOfZones
-    IF (Zone(Loop)%TotOccupants > 0.0) THEN
-      IF (Zone(Loop)%FloorArea > 0.0 .and. Zone(Loop)%FloorArea/Zone(Loop)%TotOccupants < .1d0) THEN
+    IF (Zone(Loop)%TotOccupants > 0.0d0) THEN
+      IF (Zone(Loop)%FloorArea > 0.0d0 .and. Zone(Loop)%FloorArea/Zone(Loop)%TotOccupants < .1d0) THEN
         CALL ShowWarningError(RoutineName//'Zone="'//trim(Zone(Loop)%Name)//'" occupant density is extremely high.')
-        IF (Zone(Loop)%FloorArea > 0.0) THEN
+        IF (Zone(Loop)%FloorArea > 0.0d0) THEN
           CALL ShowContinueError('Occupant Density=['//trim(RoundSigDigits(Zone(Loop)%TotOccupants/Zone(Loop)%FloorArea,0))//  &
               '] person/m2.')
         ENDIF
         CALL ShowContinueError('Occupant Density=['//trim(RoundSigDigits(Zone(Loop)%FloorArea/Zone(Loop)%TotOccupants,3))//  &
            '] m2/person. Problems in Temperature Out of Bounds may result.')
       ENDIF
-      maxOccupLoad=0.0
+      maxOccupLoad=0.0d0
       DO Loop1=1,TotPeople
         IF (People(Loop1)%ZonePtr /= Loop) CYCLE
         IF (maxOccupLoad < GetScheduleMaxValue(People(Loop1)%NumberOfPeoplePtr)*People(Loop1)%NumberOfPeople) THEN
@@ -914,10 +945,10 @@ SUBROUTINE GetInternalHeatGainsInput
         ENDIF
       ENDDO
       IF (maxOccupLoad > Zone(Loop)%TotOccupants) THEN
-        IF (Zone(Loop)%FloorArea > 0.0 .and. Zone(Loop)%FloorArea/maxOccupLoad < .1d0) THEN
+        IF (Zone(Loop)%FloorArea > 0.0d0 .and. Zone(Loop)%FloorArea/maxOccupLoad < .1d0) THEN
           CALL ShowWarningError(RoutineName//'Zone="'//trim(Zone(Loop)%Name)//  &
                '" occupant density at a maximum schedule value is extremely high.')
-          IF (Zone(Loop)%FloorArea > 0.0) THEN
+          IF (Zone(Loop)%FloorArea > 0.0d0) THEN
             CALL ShowContinueError('Occupant Density=['//  &
                trim(RoundSigDigits(maxOccupLoad/Zone(Loop)%FloorArea,0))//  &
                 '] person/m2.')
@@ -931,7 +962,7 @@ SUBROUTINE GetInternalHeatGainsInput
     ENDIF
 
     IF (Zone(Loop)%IsNominalControlled) THEN !conditioned zones only
-      IF (Zone(Loop)%TotOccupants .GT. 0.0) THEN
+      IF (Zone(Loop)%TotOccupants .GT. 0.0d0) THEN
         Zone(Loop)%isNominalOccupied = .true.
         CALL PreDefTableEntry(pdchOaoNomNumOcc1,Zone(Loop)%name,Zone(Loop)%TotOccupants)
         CALL PreDefTableEntry(pdchOaoNomNumOcc2,Zone(Loop)%name,Zone(Loop)%TotOccupants)
@@ -997,7 +1028,7 @@ SUBROUTINE GetInternalHeatGainsInput
     Loop=0
     DO Item = 1, NumLightsStatements
       AlphaName  = Blank
-      IHGNumbers = 0.0
+      IHGNumbers = 0.0d0
 
       CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -1038,9 +1069,9 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE  ! check min/max on schedule
           SchMin=GetScheduleMinValue(Lights(Loop)%SchedPtr)
           SchMax=GetScheduleMaxValue(Lights(Loop)%SchedPtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
             IF (Item1 == 1) THEN
-              IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1049,7 +1080,7 @@ SUBROUTINE GetInternalHeatGainsInput
               ENDIF
             ENDIF
             IF (Item1 == 1) THEN
-              IF (SchMax < 0.0) THEN
+              IF (SchMax < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1071,9 +1102,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/AREA')
             IF (Lights(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(2) >= 0.0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
                 Lights(Loop)%DesignLevel=IHGNumbers(2)*Zone(Lights(Loop)%ZonePtr)%FloorArea
-                IF (Zone(Lights(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(Lights(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Lights(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Lights will result.')
                 ENDIF
@@ -1091,9 +1122,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/PERSON')
             IF (Lights(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(3) >= 0.0) THEN
+              IF (IHGNumbers(3) >= 0.0d0) THEN
                 Lights(Loop)%DesignLevel=IHGNumbers(3)*Zone(Lights(Loop)%ZonePtr)%TotOccupants
-                IF (Zone(Lights(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+                IF (Zone(Lights(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Lights(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Lights will result.')
                 ENDIF
@@ -1133,8 +1164,8 @@ SUBROUTINE GetInternalHeatGainsInput
         Lights(Loop)%FractionConvected=1.0d0 - (Lights(Loop)%FractionReturnAir +   &
                                               Lights(Loop)%FractionRadiant   +   &
                                               Lights(Loop)%FractionShortWave)
-        IF (ABS(Lights(Loop)%FractionConvected) <= .001d0) Lights(Loop)%FractionConvected=0.0
-        IF (Lights(Loop)%FractionConvected < 0.0) THEN
+        IF (ABS(Lights(Loop)%FractionConvected) <= .001d0) Lights(Loop)%FractionConvected=0.0d0
+        IF (Lights(Loop)%FractionConvected < 0.0d0) THEN
           IF (Item1 == 1) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", Sum of Fractions > 1.0')
@@ -1258,7 +1289,7 @@ SUBROUTINE GetInternalHeatGainsInput
         sumArea = sumArea + Zone(zonePt)%FloorArea * mult
         sumPower = sumPower + Lights(loop)%DesignLevel * mult
         CALL PreDefTableEntry(pdchInLtZone,liteName,Zone(zonePt)%Name)
-        IF(Zone(zonePt)%FloorArea .GT. 0.0)THEN
+        IF(Zone(zonePt)%FloorArea .GT. 0.0d0)THEN
           CALL PreDefTableEntry(pdchInLtDens,liteName,Lights(loop)%DesignLevel / Zone(zonePt)%FloorArea, 4)
         ELSE
           CALL PreDefTableEntry(pdchInLtDens,liteName,constant_zero, 4)
@@ -1272,7 +1303,7 @@ SUBROUTINE GetInternalHeatGainsInput
     END DO ! Item = Number of Lights Objects
   END IF  ! TotLights > 0 check
   ! add total line to lighting summary table
-  IF(sumArea .GT. 0.0)THEN
+  IF(sumArea .GT. 0.0d0)THEN
     CALL PreDefTableEntry(pdchInLtDens,'Interior Lighting Total',sumPower/sumArea, 4)  !** line 792
   ELSE
     CALL PreDefTableEntry(pdchInLtDens,'Interior Lighting Total',constant_zero, 4)
@@ -1338,7 +1369,7 @@ SUBROUTINE GetInternalHeatGainsInput
     Loop=0
     DO Item = 1, NumZoneElectricStatements
       AlphaName  = Blank
-      IHGNumbers = 0.0
+      IHGNumbers = 0.0d0
 
       CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -1377,15 +1408,15 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE  ! check min/max on schedule
           SchMin=GetScheduleMinValue(ZoneElectric(Loop)%SchedPtr)
           SchMax=GetScheduleMaxValue(ZoneElectric(Loop)%SchedPtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-            IF (SchMin < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+            IF (SchMin < 0.0d0) THEN
               CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
               CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                                  '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
               ErrorsFound=.true.
             ENDIF
-            IF (SchMax < 0.0) THEN
+            IF (SchMax < 0.0d0) THEN
               CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
               CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1406,9 +1437,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/AREA')
             IF (ZoneElectric(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(2) >= 0.0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
                 ZoneElectric(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneElectric(Loop)%ZonePtr)%FloorArea
-                IF (Zone(ZoneElectric(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(ZoneElectric(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Electric Equipment will result.')
                 ENDIF
@@ -1426,9 +1457,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/PERSON')
             IF (ZoneElectric(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(3) >= 0.0) THEN
+              IF (IHGNumbers(3) >= 0.0d0) THEN
                 ZoneElectric(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneElectric(Loop)%ZonePtr)%TotOccupants
-                IF (Zone(ZoneElectric(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+                IF (Zone(ZoneElectric(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Electric Equipment will result.')
                 ENDIF
@@ -1465,8 +1496,8 @@ SUBROUTINE GetInternalHeatGainsInput
         ZoneElectric(Loop)%FractionConvected=1.0d0 - (ZoneElectric(Loop)%FractionLatent +   &
                                                     ZoneElectric(Loop)%FractionRadiant +   &
                                                     ZoneElectric(Loop)%FractionLost)
-        IF (ABS(ZoneElectric(Loop)%FractionConvected) <= .001d0) ZoneElectric(Loop)%FractionConvected=0.0
-        IF (ZoneElectric(Loop)%FractionConvected < 0.0) THEN
+        IF (ABS(ZoneElectric(Loop)%FractionConvected) <= .001d0) ZoneElectric(Loop)%FractionConvected=0.0d0
+        IF (ZoneElectric(Loop)%FractionConvected < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", Sum of Fractions > 1.0')
           ErrorsFound=.true.
@@ -1632,7 +1663,7 @@ SUBROUTINE GetInternalHeatGainsInput
     Loop=0
     DO Item = 1, NumZoneGasStatements
       AlphaName  = Blank
-      IHGNumbers = 0.0
+      IHGNumbers = 0.0d0
 
       CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -1673,9 +1704,9 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE  ! check min/max on schedule
           SchMin=GetScheduleMinValue(ZoneGas(Loop)%SchedPtr)
           SchMax=GetScheduleMaxValue(ZoneGas(Loop)%SchedPtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
             IF (Item1 == 1) THEN
-              IF (SchMin < 0.0) THEN
+              IF (SchMin < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1684,7 +1715,7 @@ SUBROUTINE GetInternalHeatGainsInput
               ENDIF
             ENDIF
             IF (Item1 == 1) THEN
-              IF (SchMax < 0.0) THEN
+              IF (SchMax < 0.0d0) THEN
                 CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
                 CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1706,9 +1737,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/AREA','POWER/AREA')
             IF (ZoneGas(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(2) >= 0.0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
                 ZoneGas(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneGas(Loop)%ZonePtr)%FloorArea
-                IF (Zone(ZoneGas(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(ZoneGas(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(ZoneGas(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Gas Equipment will result.')
                 ENDIF
@@ -1726,9 +1757,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/PERSON','POWER/PERSON')
             IF (ZoneGas(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(3) >= 0.0) THEN
+              IF (IHGNumbers(3) >= 0.0d0) THEN
                 ZoneGas(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneGas(Loop)%ZonePtr)%TotOccupants
-                IF (Zone(ZoneGas(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+                IF (Zone(ZoneGas(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(ZoneGas(Loop)%Name)//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Gas Equipment will result.')
                 ENDIF
@@ -1781,8 +1812,8 @@ SUBROUTINE GetInternalHeatGainsInput
         ZoneGas(Loop)%FractionConvected=1.0d0 - (ZoneGas(Loop)%FractionLatent  +  &
                                                ZoneGas(Loop)%FractionRadiant  +  &
                                                ZoneGas(Loop)%FractionLost)
-        IF (ABS(ZoneGas(Loop)%FractionConvected) <= .001d0) ZoneGas(Loop)%FractionConvected=0.0
-        IF (ZoneGas(Loop)%FractionConvected < 0.0) THEN
+        IF (ABS(ZoneGas(Loop)%FractionConvected) <= .001d0) ZoneGas(Loop)%FractionConvected=0.0d0
+        IF (ZoneGas(Loop)%FractionConvected < 0.0d0) THEN
           IF (Item1 == 1) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", Sum of Fractions > 1.0')
@@ -1940,7 +1971,7 @@ SUBROUTINE GetInternalHeatGainsInput
     Loop=0
     DO Item = 1, NumHotWaterEqStatements
       AlphaName  = Blank
-      IHGNumbers = 0.0
+      IHGNumbers = 0.0d0
 
       CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -1979,15 +2010,15 @@ SUBROUTINE GetInternalHeatGainsInput
         ELSE  ! check min/max on schedule
           SchMin=GetScheduleMinValue(ZoneHWEq(Loop)%SchedPtr)
           SchMax=GetScheduleMaxValue(ZoneHWEq(Loop)%SchedPtr)
-          IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-            IF (SchMin < 0.0) THEN
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+            IF (SchMin < 0.0d0) THEN
               CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
               CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                                  '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
               ErrorsFound=.true.
             ENDIF
-            IF (SchMax < 0.0) THEN
+            IF (SchMax < 0.0d0) THEN
               CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
               CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -2008,9 +2039,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/AREA','POWER/AREA')
             IF (ZoneHWEq(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(2) >= 0.0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
                 ZoneHWEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneHWEq(Loop)%ZonePtr)%FloorArea
-                IF (Zone(ZoneHWEq(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(ZoneHWEq(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Hot Water Equipment will result.')
                 ENDIF
@@ -2028,9 +2059,9 @@ SUBROUTINE GetInternalHeatGainsInput
 
           CASE('WATTS/PERSON','POWER/PERSON')
             IF (ZoneHWEq(Loop)%ZonePtr /= 0) THEN
-              IF (IHGNumbers(3) >= 0.0) THEN
+              IF (IHGNumbers(3) >= 0.0d0) THEN
                 ZoneHWEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneHWEq(Loop)%ZonePtr)%TotOccupants
-                IF (Zone(ZoneHWEq(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+                IF (Zone(ZoneHWEq(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                     '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Hot Water Equipment will result.')
                 ENDIF
@@ -2067,8 +2098,8 @@ SUBROUTINE GetInternalHeatGainsInput
         ZoneHWEq(Loop)%FractionConvected=1.0d0 - (ZoneHWEq(Loop)%FractionLatent +   &
                                                     ZoneHWEq(Loop)%FractionRadiant +   &
                                                     ZoneHWEq(Loop)%FractionLost)
-        IF (ABS(ZoneHWEq(Loop)%FractionConvected) <= .001d0) ZoneHWEq(Loop)%FractionConvected=0.0
-        IF (ZoneHWEq(Loop)%FractionConvected < 0.0) THEN
+        IF (ABS(ZoneHWEq(Loop)%FractionConvected) <= .001d0) ZoneHWEq(Loop)%FractionConvected=0.0d0
+        IF (ZoneHWEq(Loop)%FractionConvected < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                  '", Sum of Fractions > 1.0')
           ErrorsFound=.true.
@@ -2177,422 +2208,542 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='SteamEquipment'
-  TotStmEquip=GetNumObjectsFound(CurrentModuleObject)
-  ALLOCATE(ZoneSteamEq(TotStmEquip))
+  NumSteamEqStatements=GetNumObjectsFound(CurrentModuleObject)
+  ALLOCATE(SteamEqObjects(NumSteamEqStatements))
 
-  DO Loop=1,TotStmEquip
-    AlphaName='  '
-    IHGNumbers=0.0
-    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+  TotStmEquip=0
+  ErrFlag=.false.
+  DO Item=1,NumSteamEqStatements
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-
     IsNotOK = .FALSE.
     IsBlank = .FALSE.
-    CALL VerifyName(AlphaName(1),ZoneSteamEq%Name,Loop-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    CALL VerifyName(AlphaName(1),SteamEqObjects%Name,Item-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
       ErrorsFound = .TRUE.
+      ErrFlag=.true.
       IF (IsBlank) AlphaName(1) = 'xxxxx'
     END IF
-    ZoneSteamEq(Loop)%Name = AlphaName(1)
+    SteamEqObjects(Item)%Name = AlphaName(1)
 
-    ZoneSteamEq(Loop)%ZonePtr=FindIteminList(AlphaName(2),Zone%Name,NumOfZones)
-    IF (ZoneSteamEq(Loop)%ZonePtr == 0) THEN
-      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                           '", invalid '//TRIM(cAlphaFieldNames(2))//  &
-                           ' entered='//TRIM(AlphaName(2)))
-      ErrorsFound=.true.
-    ENDIF
-
-    ZoneSteamEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
-    SchMin=0.0d0
-    SchMax=0.0d0
-    IF (ZoneSteamEq(Loop)%SchedPtr == 0) THEN
-      IF (lAlphaFieldBlanks(3)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", '//TRIM(cAlphaFieldNames(3))//' is required.')
-      ELSE
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(AlphaName(3)))
-      ENDIF
-      ErrorsFound=.true.
-    ELSE  ! check min/max on schedule
-      SchMin=GetScheduleMinValue(ZoneSteamEq(Loop)%SchedPtr)
-      SchMax=GetScheduleMaxValue(ZoneSteamEq(Loop)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
-          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
-          CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
-                             '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
-          ErrorsFound=.true.
-        ENDIF
-        IF (SchMax < 0.0) THEN
-          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
-          CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
-                             '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
-          ErrorsFound=.true.
-        ENDIF
-      ENDIF
-    ENDIF
-
-    ! Steam equipment design level calculation method.
-    SELECT CASE (AlphaName(4))
-      CASE('EQUIPMENTLEVEL')
-        ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(1)
-        IF (lNumericFieldBlanks(1)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Steam Equipment will result.')
-        ENDIF
-
-      CASE('WATTS/AREA','POWER/AREA')
-        IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
-          IF (IHGNumbers(2) >= 0.0) THEN
-            ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneSteamEq(Loop)%ZonePtr)%FloorArea
-            IF (Zone(ZoneSteamEq(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
-              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Steam Equipment will result.')
-            ENDIF
-          ELSE
-            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cNumericFieldNames(2))//', value  [<0.0]='//  &
-                             TRIM(RoundSigDigits(IHGNumbers(2),3)))
-            ErrorsFound=.true.
-          ENDIF
-        ENDIF
-        IF (lNumericFieldBlanks(2)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Steam Equipment will result.')
-        ENDIF
-
-      CASE('WATTS/PERSON','POWER/PERSON')
-        IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
-          IF (IHGNumbers(3) >= 0.0) THEN
-            ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneSteamEq(Loop)%ZonePtr)%TotOccupants
-            IF (Zone(ZoneSteamEq(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
-              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Steam Equipment will result.')
-            ENDIF
-          ELSE
-            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cNumericFieldNames(3))//', value  [<0.0]='//  &
-                             TRIM(RoundSigDigits(IHGNumbers(3),3)))
-            ErrorsFound=.true.
-          ENDIF
-        ENDIF
-        IF (lNumericFieldBlanks(3)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(3))//', but that field is blank.  0 Steam Equipment will result.')
-        ENDIF
-
-      CASE DEFAULT
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cAlphaFieldNames(4))//', value  ='//  &
-                             TRIM(AlphaName(4)))
-        CALL ShowContinueError('...Valid values are "EquipmentLevel", "Watts/Area", "Watts/Person".')
-        ErrorsFound=.true.
-    END SELECT
-
-    ! Calculate nominal min/max equipment level
-    ZoneSteamEq(Loop)%NomMinDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMin
-    ZoneSteamEq(Loop)%NomMaxDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMax
-
-    ZoneSteamEq(Loop)%FractionLatent=IHGNumbers(4)
-    ZoneSteamEq(Loop)%FractionRadiant=IHGNumbers(5)
-    ZoneSteamEq(Loop)%FractionLost=IHGNumbers(6)
-                ! FractionConvected is a calculated field
-    ZoneSteamEq(Loop)%FractionConvected=1.0d0 -  (ZoneSteamEq(Loop)%FractionLatent +   &
-                                                ZoneSteamEq(Loop)%FractionRadiant +   &
-                                                ZoneSteamEq(Loop)%FractionLost)
-    IF (ABS(ZoneSteamEq(Loop)%FractionConvected) <= .001d0) ZoneSteamEq(Loop)%FractionConvected=0.0
-    IF (ZoneSteamEq(Loop)%FractionConvected < 0.0) THEN
-      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", Sum of Fractions > 1.0')
-      ErrorsFound=.true.
-    ENDIF
-
-    IF (NumAlpha > 4) THEN
-      ZoneSteamEq(Loop)%EndUseSubcategory = AlphaName(5)
+    Item1=FindItemInList(AlphaName(2),Zone%Name,NumOfZones)
+    ZLItem=0
+    IF (Item1 == 0 .and. NumOfZoneLists > 0) &
+        ZLItem=FindItemInList(AlphaName(2),ZoneList%Name,NumOfZoneLists)
+    IF (Item1 > 0) THEN
+      SteamEqObjects(Item)%StartPtr=TotStmEquip+1
+      TotStmEquip=TotStmEquip+1
+      SteamEqObjects(Item)%NumOfZones=1
+      SteamEqObjects(Item)%ZoneListActive=.false.
+      SteamEqObjects(Item)%ZoneOrZoneListPtr=Item1
+    ELSEIF (ZLItem > 0) THEN
+      SteamEqObjects(Item)%StartPtr=TotStmEquip+1
+      TotStmEquip=TotStmEquip+ZoneList(ZLItem)%NumOfZones
+      SteamEqObjects(Item)%NumOfZones=ZoneList(ZLItem)%NumOfZones
+      SteamEqObjects(Item)%ZoneListActive=.true.
+      SteamEqObjects(Item)%ZoneOrZoneListPtr=ZLItem
     ELSE
-      ZoneSteamEq(Loop)%EndUseSubcategory = 'General'
-    END IF
-
-    IF (ZoneSteamEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
-
-    ! Object report variables
-    CALL SetupOutputVariable('Steam Equipment District Heating Rate [W]', ZoneSteamEq(Loop)%Power, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment District Heating Energy [J]', ZoneSteamEq(Loop)%Consumption, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name,ResourceTypeKey='DistrictHeating', &
-                             GroupKey='Building',ZoneKey=Zone(ZoneSteamEq(Loop)%ZonePtr)%Name, &
-                             EndUseKey='InteriorEquipment',EndUseSubKey=ZoneSteamEq(Loop)%EndUseSubcategory, &
-                             ZoneMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%Multiplier, &
-                             ZoneListMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%ListMultiplier)
-
-    CALL SetupOutputVariable('Steam Equipment Radiant Heating Energy [J]',ZoneSteamEq(Loop)%RadGainEnergy, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Radiant Heating Rate [W]',ZoneSteamEq(Loop)%RadGainRate, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Convective Heating Energy [J]',ZoneSteamEq(Loop)%ConGainEnergy, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Convective Heating Rate [W]',ZoneSteamEq(Loop)%ConGainRate, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Latent Gain Energy [J]',ZoneSteamEq(Loop)%LatGainEnergy, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Latent Gain Rate [W]',ZoneSteamEq(Loop)%LatGainRate, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Lost Heat Energy [J]',ZoneSteamEq(Loop)%LostEnergy, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Lost Heat Rate [W]',ZoneSteamEq(Loop)%LostRate, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Total Heating Energy [J]',ZoneSteamEq(Loop)%TotGainEnergy, &
-                             'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Total Heating Rate [W]',ZoneSteamEq(Loop)%TotGainRate, &
-                             'Zone','Average',ZoneSteamEq(Loop)%Name)
-
-    ! Zone total report variables
-    IF (RepVarSet(ZoneSteamEq(Loop)%ZonePtr)) THEN
-      RepVarSet(ZoneSteamEq(Loop)%ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Steam Equipment District Heating Rate [W]', &
-                               ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamPower, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment District Heating Energy [J]', &
-                               ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConsump, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-
-      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Energy [J]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGain, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Rate [W]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGainRate, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Energy [J]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGain, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Rate [W]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGainRate, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Energy [J]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGain, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Rate [W]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGainRate, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Energy [J]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLost, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Rate [W]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLostRate, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Total Heating Energy [J]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGain, &
-                               'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Total Heating Rate [W]',  &
-         ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGainRate, &
-                               'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+      CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(AlphaName(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(2))//'="'//trim(AlphaName(2))//'" not found.')
+      ErrorsFound=.true.
+      ErrFlag=.true.
     ENDIF
+  ENDDO
 
-    IF (AnyEnergyManagementSystemInModel) Then
-      CALL SetupEMSActuator('SteamEquipment', ZoneSteamEq(Loop)%Name, 'District Heating Power Level', '[W]', &
-                ZoneSteamEq(Loop)%EMSZoneEquipOverrideOn  , ZoneSteamEq(Loop)%EMSEquipPower )
-      CALL SetupEMSInternalVariable( 'Process Steam District Heat Design Level', ZoneSteamEq(Loop)%Name, '[W]' ,&
-                                       ZoneSteamEq(Loop)%DesignLevel )
-    ENDIF ! EMS
+  IF (ErrFlag) THEN
+    CALL ShowSevereError(RoutineName//'Errors with invalid names in '//trim(CurrentModuleObject)//  &
+       ' objects.')
+    CALL ShowContinueError('...These will not be read in.  Other errors may occur.')
+    TotStmEquip=0
+  ENDIF
 
-    IF (.not. ErrorsFound)   &
-      CALL SetupZoneInternalGain(ZoneSteamEq(Loop)%ZonePtr, &
-                   'SteamEquipment', &
-                   ZoneSteamEq(Loop)%Name, &
-                   IntGainTypeOf_SteamEquipment, &
-                   ConvectionGainRate          = ZoneSteamEq(Loop)%ConGainRate,&
-                   ThermalRadiationGainRate    = ZoneSteamEq(Loop)%RadGainRate, &
-                   LatentGainRate              = ZoneSteamEq(Loop)%LatGainRate)
+  ALLOCATE(ZoneSteamEq(TotStmEquip))
 
-  END DO
+  IF (TotStmEquip > 0) THEN
+    Loop=0
+    DO Item = 1, NumSteamEqStatements
+      AlphaName  = Blank
+      IHGNumbers = 0.0d0
 
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      DO Item1=1,SteamEqObjects(Item)%NumOfZones
+        Loop=Loop+1
+        IF (.not. SteamEqObjects(Item)%ZoneListActive) THEN
+          ZoneSteamEq(Loop)%Name = AlphaName(1)
+          ZoneSteamEq(Loop)%ZonePtr = SteamEqObjects(Item)%ZoneOrZoneListPtr
+        ELSE
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(SteamEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(SteamEqObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        SteamEqObjects(Item)%Name,     &
+                                        ZoneSteamEq%Name,           &
+                                        Loop-1,                       &
+                                        ZoneSteamEq(Loop)%Name,            &
+                                        ErrFlag)
+          ZoneSteamEq(Loop)%ZonePtr = ZoneList(SteamEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
+        ENDIF
+
+        ZoneSteamEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
+        IF (ZoneSteamEq(Loop)%SchedPtr == 0) THEN
+          IF (lAlphaFieldBlanks(3)) THEN
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", '//TRIM(cAlphaFieldNames(3))//' is required.')
+          ELSE
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(AlphaName(3)))
+          ENDIF
+          ErrorsFound=.true.
+        ELSE  ! check min/max on schedule
+          SchMin=GetScheduleMinValue(ZoneSteamEq(Loop)%SchedPtr)
+          SchMax=GetScheduleMaxValue(ZoneSteamEq(Loop)%SchedPtr)
+          IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+            IF (SchMin < 0.0d0) THEN
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
+              CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
+                                 '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
+              ErrorsFound=.true.
+            ENDIF
+            IF (SchMax < 0.0d0) THEN
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
+              CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
+                                 '". Maximum is ['//TRIM(RoundSigDigits(SchMax,1))//']. Values must be >= 0.0.')
+              ErrorsFound=.true.
+            ENDIF
+          ENDIF
+        ENDIF
+
+        ! Hot Water equipment design level calculation method.
+        SELECT CASE (AlphaName(4))
+          CASE('EQUIPMENTLEVEL')
+            ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(1)
+            IF (lNumericFieldBlanks(1)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
+
+          CASE('WATTS/AREA','POWER/AREA')
+            IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
+              IF (IHGNumbers(2) >= 0.0d0) THEN
+                ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneSteamEq(Loop)%ZonePtr)%FloorArea
+                IF (Zone(ZoneSteamEq(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
+                  CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                    '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Hot Water Equipment will result.')
+                ENDIF
+              ELSE
+                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cNumericFieldNames(2))//', value  [<0.0]='//  &
+                                 TRIM(RoundSigDigits(IHGNumbers(2),3)))
+                ErrorsFound=.true.
+              ENDIF
+            ENDIF
+            IF (lNumericFieldBlanks(2)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
+
+          CASE('WATTS/PERSON','POWER/PERSON')
+            IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
+              IF (IHGNumbers(3) >= 0.0d0) THEN
+                ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneSteamEq(Loop)%ZonePtr)%TotOccupants
+                IF (Zone(ZoneSteamEq(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
+                  CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                    '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Hot Water Equipment will result.')
+                ENDIF
+              ELSE
+                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cNumericFieldNames(3))//', value  [<0.0]='//  &
+                                 TRIM(RoundSigDigits(IHGNumbers(3),3)))
+                ErrorsFound=.true.
+              ENDIF
+            ENDIF
+            IF (lNumericFieldBlanks(3)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(3))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
+
+          CASE DEFAULT
+            IF (Item1 == 1) THEN
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cAlphaFieldNames(4))//', value  ='//  &
+                                 TRIM(AlphaName(4)))
+              CALL ShowContinueError('...Valid values are "EquipmentLevel", "Watts/Area", "Watts/Person".')
+              ErrorsFound=.true.
+            ENDIF
+        END SELECT
+
+        ! Calculate nominal min/max equipment level
+        ZoneSteamEq(Loop)%NomMinDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMin
+        ZoneSteamEq(Loop)%NomMaxDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMax
+
+        ZoneSteamEq(Loop)%FractionLatent=IHGNumbers(4)
+        ZoneSteamEq(Loop)%FractionRadiant=IHGNumbers(5)
+        ZoneSteamEq(Loop)%FractionLost=IHGNumbers(6)
+                    ! FractionConvected is a calculated field
+        ZoneSteamEq(Loop)%FractionConvected=1.0d0 - (ZoneSteamEq(Loop)%FractionLatent +   &
+                                                    ZoneSteamEq(Loop)%FractionRadiant +   &
+                                                    ZoneSteamEq(Loop)%FractionLost)
+        IF (ABS(ZoneSteamEq(Loop)%FractionConvected) <= .001d0) ZoneSteamEq(Loop)%FractionConvected=0.0d0
+        IF (ZoneSteamEq(Loop)%FractionConvected < 0.0d0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", Sum of Fractions > 1.0')
+          ErrorsFound=.true.
+        ENDIF
+
+        IF (NumAlpha > 4) THEN
+          ZoneSteamEq(Loop)%EndUseSubcategory = AlphaName(5)
+        ELSE
+          ZoneSteamEq(Loop)%EndUseSubcategory = 'General'
+        END IF
+
+        IF (ZoneSteamEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
+
+        ! Object report variables
+        CALL SetupOutputVariable('Steam Equipment District Heating Rate [W]', ZoneSteamEq(Loop)%Power, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment District Heating Energy [J]', ZoneSteamEq(Loop)%Consumption, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name,ResourceTypeKey='DistrictHeating', &
+                                 GroupKey='Building',ZoneKey=Zone(ZoneSteamEq(Loop)%ZonePtr)%Name, &
+                                 EndUseKey='InteriorEquipment',EndUseSubKey=ZoneSteamEq(Loop)%EndUseSubcategory, &
+                                 ZoneMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%Multiplier, &
+                                 ZoneListMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%ListMultiplier)
+
+        CALL SetupOutputVariable('Steam Equipment Radiant Heating Energy [J]',ZoneSteamEq(Loop)%RadGainEnergy, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Radiant Heating Rate [W]',ZoneSteamEq(Loop)%RadGainRate, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Convective Heating Energy [J]',ZoneSteamEq(Loop)%ConGainEnergy, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Convective Heating Rate [W]',ZoneSteamEq(Loop)%ConGainRate, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Latent Gain Energy [J]',ZoneSteamEq(Loop)%LatGainEnergy, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Latent Gain Rate [W]',ZoneSteamEq(Loop)%LatGainRate, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Lost Heat Energy [J]',ZoneSteamEq(Loop)%LostEnergy, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Lost Heat Rate [W]',ZoneSteamEq(Loop)%LostRate, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Total Heating Energy [J]',ZoneSteamEq(Loop)%TotGainEnergy, &
+                                 'Zone','Sum',ZoneSteamEq(Loop)%Name)
+        CALL SetupOutputVariable('Steam Equipment Total Heating Rate [W]',ZoneSteamEq(Loop)%TotGainRate, &
+                                 'Zone','Average',ZoneSteamEq(Loop)%Name)
+
+        ! Zone total report variables
+        IF (RepVarSet(ZoneSteamEq(Loop)%ZonePtr)) THEN
+          RepVarSet(ZoneSteamEq(Loop)%ZonePtr)=.false.
+          CALL SetupOutputVariable('Zone Steam Equipment District Heating Rate [W]', &
+                                   ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamPower, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment District Heating Energy [J]', &
+                                   ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConsump, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+
+          CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Energy [J]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGain, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Rate [W]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGainRate, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Energy [J]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGain, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Rate [W]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGainRate, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Energy [J]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGain, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Rate [W]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGainRate, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Energy [J]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLost, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Rate [W]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLostRate, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Total Heating Energy [J]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGain, &
+                                   'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Steam Equipment Total Heating Rate [W]',  &
+             ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGainRate, &
+                                   'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
+        ENDIF
+
+        IF (AnyEnergyManagementSystemInModel) Then
+          CALL SetupEMSActuator('SteamEquipment', ZoneSteamEq(Loop)%Name, 'District Heating Power Level', '[W]', &
+                    ZoneSteamEq(Loop)%EMSZoneEquipOverrideOn  , ZoneSteamEq(Loop)%EMSEquipPower )
+          CALL SetupEMSInternalVariable( 'Process Steam District Heat Design Level', ZoneSteamEq(Loop)%Name, '[W]' ,&
+                                           ZoneSteamEq(Loop)%DesignLevel )
+        ENDIF ! EMS
+
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(ZoneSteamEq(Loop)%ZonePtr, &
+                       'SteamEquipment', &
+                       ZoneSteamEq(Loop)%Name, &
+                       IntGainTypeOf_SteamEquipment, &
+                       ConvectionGainRate          = ZoneSteamEq(Loop)%ConGainRate,&
+                       ThermalRadiationGainRate    = ZoneSteamEq(Loop)%RadGainRate, &
+                       LatentGainRate              = ZoneSteamEq(Loop)%LatGainRate)
+
+      END DO ! Item1
+    END DO ! Item - number of hot water statements
+  END IF
 
   RepVarSet=.true.
   CurrentModuleObject='OtherEquipment'
-  TotOthEquip=GetNumObjectsFound(CurrentModuleObject)
-  ALLOCATE(ZoneOtherEq(TotOthEquip))
+  NumOtherEqStatements=GetNumObjectsFound(CurrentModuleObject)
+  ALLOCATE(OtherEqObjects(NumOtherEqStatements))
 
-  DO Loop=1,TotOthEquip
-    AlphaName='  '
-    IHGNumbers=0.0
-    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+  TotOthEquip=0
+  ErrFlag=.false.
+  DO Item=1,NumOtherEqStatements
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-
     IsNotOK = .FALSE.
     IsBlank = .FALSE.
-    CALL VerifyName(AlphaName(1),ZoneOtherEq%Name,Loop-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    CALL VerifyName(AlphaName(1),OtherEqObjects%Name,Item-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
       ErrorsFound = .TRUE.
+      ErrFlag=.true.
       IF (IsBlank) AlphaName(1) = 'xxxxx'
     END IF
-    ZoneOtherEq(Loop)%Name = AlphaName(1)
+    OtherEqObjects(Item)%Name = AlphaName(1)
 
-    ZoneOtherEq(Loop)%ZonePtr=FindIteminList(AlphaName(2),Zone%Name,NumOfZones)
-    IF (ZoneOtherEq(Loop)%ZonePtr == 0) THEN
-      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                           '", invalid '//TRIM(cAlphaFieldNames(2))//  &
-                           ' entered='//TRIM(AlphaName(2)))
-      ErrorsFound=.true.
-    ENDIF
-
-    ZoneOtherEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
-    SchMin=0.0d0
-    SchMax=0.0d0
-    IF (ZoneOtherEq(Loop)%SchedPtr == 0) THEN
-      IF (lAlphaFieldBlanks(3)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", '//TRIM(cAlphaFieldNames(3))//' is required.')
-      ELSE
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(AlphaName(3)))
-      ENDIF
-      ErrorsFound=.true.
+    Item1=FindItemInList(AlphaName(2),Zone%Name,NumOfZones)
+    ZLItem=0
+    IF (Item1 == 0 .and. NumOfZoneLists > 0) &
+        ZLItem=FindItemInList(AlphaName(2),ZoneList%Name,NumOfZoneLists)
+    IF (Item1 > 0) THEN
+      OtherEqObjects(Item)%StartPtr=TotOthEquip+1
+      TotOthEquip=TotOthEquip+1
+      OtherEqObjects(Item)%NumOfZones=1
+      OtherEqObjects(Item)%ZoneListActive=.false.
+      OtherEqObjects(Item)%ZoneOrZoneListPtr=Item1
+    ELSEIF (ZLItem > 0) THEN
+      OtherEqObjects(Item)%StartPtr=TotOthEquip+1
+      TotOthEquip=TotOthEquip+ZoneList(ZLItem)%NumOfZones
+      OtherEqObjects(Item)%NumOfZones=ZoneList(ZLItem)%NumOfZones
+      OtherEqObjects(Item)%ZoneListActive=.true.
+      OtherEqObjects(Item)%ZoneOrZoneListPtr=ZLItem
     ELSE
-      SchMin=GetScheduleMinValue(ZoneOtherEq(Loop)%SchedPtr)
-      SchMax=GetScheduleMaxValue(ZoneOtherEq(Loop)%SchedPtr)
+      CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(AlphaName(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(2))//'="'//trim(AlphaName(2))//'" not found.')
+      ErrorsFound=.true.
+      ErrFlag=.true.
     ENDIF
+  ENDDO
 
-    ! Other equipment design level calculation method.
-    SELECT CASE (AlphaName(4))
-      CASE('EQUIPMENTLEVEL')
-        ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(1)
-        IF (lNumericFieldBlanks(1)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Other Equipment will result.')
+  IF (ErrFlag) THEN
+    CALL ShowSevereError(RoutineName//'Errors with invalid names in '//trim(CurrentModuleObject)//  &
+       ' objects.')
+    CALL ShowContinueError('...These will not be read in.  Other errors may occur.')
+    TotOthEquip=0
+  ENDIF
+
+  ALLOCATE(ZoneOtherEq(TotOthEquip))
+
+  IF (TotOthEquip > 0) THEN
+    Loop=0
+    DO Item = 1, NumOtherEqStatements
+      AlphaName  = Blank
+      IHGNumbers = 0.0d0
+
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      DO Item1=1,OtherEqObjects(Item)%NumOfZones
+        Loop=Loop+1
+        IF (.not. OtherEqObjects(Item)%ZoneListActive) THEN
+          ZoneOtherEq(Loop)%Name = AlphaName(1)
+          ZoneOtherEq(Loop)%ZonePtr = OtherEqObjects(Item)%ZoneOrZoneListPtr
+        ELSE
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(OtherEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(OtherEqObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        OtherEqObjects(Item)%Name,     &
+                                        ZoneOtherEq%Name,           &
+                                        Loop-1,                       &
+                                        ZoneOtherEq(Loop)%Name,            &
+                                        ErrFlag)
+          ZoneOtherEq(Loop)%ZonePtr = ZoneList(OtherEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
-      CASE('WATTS/AREA','POWER/AREA')
-        IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
-          ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea
-          IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
-            CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-              '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Other Equipment will result.')
+        ZoneOtherEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
+        IF (ZoneOtherEq(Loop)%SchedPtr == 0) THEN
+          IF (lAlphaFieldBlanks(3)) THEN
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", '//TRIM(cAlphaFieldNames(3))//' is required.')
+          ELSE
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(AlphaName(3)))
           ENDIF
-        ENDIF
-        IF (lNumericFieldBlanks(2)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Other Equipment will result.')
-        ENDIF
-
-      CASE('WATTS/PERSON','POWER/PERSON')
-        IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
-          ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants
-          IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
-            CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-              '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Other Equipment will result.')
-          ENDIF
-        ENDIF
-        IF (lNumericFieldBlanks(3)) THEN
-          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-            '", specifies '//TRIM(cNumericFieldNames(3))//', but that field is blank.  0 Other Equipment will result.')
+          ErrorsFound=.true.
+        ELSE  ! check min/max on schedule
+          SchMin=GetScheduleMinValue(ZoneOtherEq(Loop)%SchedPtr)
+          SchMax=GetScheduleMaxValue(ZoneOtherEq(Loop)%SchedPtr)
         ENDIF
 
-      CASE DEFAULT
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", invalid '//TRIM(cAlphaFieldNames(4))//', value  ='//  &
-                             TRIM(AlphaName(4)))
-        CALL ShowContinueError('...Valid values are "EquipmentLevel", "Watts/Area", "Watts/Person".')
-        ErrorsFound=.true.
-    END SELECT
+        ! Hot Water equipment design level calculation method.
+        SELECT CASE (AlphaName(4))
+          CASE('EQUIPMENTLEVEL')
+            ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(1)
+            IF (lNumericFieldBlanks(1)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
 
-    ! Calculate nominal min/max equipment level
-    ZoneOtherEq(Loop)%NomMinDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMin
-    ZoneOtherEq(Loop)%NomMaxDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMax
+          CASE('WATTS/AREA','POWER/AREA')
+            IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
+              ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea
+              IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
+                CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                  '", specifies '//TRIM(cNumericFieldNames(2))//', but Zone Floor Area = 0.  0 Hot Water Equipment will result.')
+              ENDIF
+            ENDIF
+            IF (lNumericFieldBlanks(2)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
 
-    ZoneOtherEq(Loop)%FractionLatent=IHGNumbers(4)
-    ZoneOtherEq(Loop)%FractionRadiant=IHGNumbers(5)
-    ZoneOtherEq(Loop)%FractionLost=IHGNumbers(6)
-                ! FractionConvected is a calculated field
-    ZoneOtherEq(Loop)%FractionConvected=1.0d0 - (ZoneOtherEq(Loop)%FractionLatent +   &
-                                                ZoneOtherEq(Loop)%FractionRadiant +   &
-                                                ZoneOtherEq(Loop)%FractionLost)
-    IF (ABS(ZoneOtherEq(Loop)%FractionConvected) <= .001d0) ZoneOtherEq(Loop)%FractionConvected=0.0
-    IF (ZoneOtherEq(Loop)%FractionConvected < 0.0) THEN
-      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
-                             '", Sum of Fractions > 1.0')
-    ENDIF
+          CASE('WATTS/PERSON','POWER/PERSON')
+            IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
+              ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants
+              IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
+                CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                  '", specifies '//TRIM(cNumericFieldNames(2))//', but Total Occupants = 0.  0 Hot Water Equipment will result.')
+              ENDIF
+            ENDIF
+            IF (lNumericFieldBlanks(3)) THEN
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                '", specifies '//TRIM(cNumericFieldNames(3))//', but that field is blank.  0 Hot Water Equipment will result.')
+            ENDIF
 
-    IF (ZoneOtherEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
+          CASE DEFAULT
+            IF (Item1 == 1) THEN
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", invalid '//TRIM(cAlphaFieldNames(4))//', value  ='//  &
+                                 TRIM(AlphaName(4)))
+              CALL ShowContinueError('...Valid values are "EquipmentLevel", "Watts/Area", "Watts/Person".')
+              ErrorsFound=.true.
+            ENDIF
+        END SELECT
 
-    ! Object report variables
-    CALL SetupOutputVariable('Other Equipment Radiant Heating Energy [J]',ZoneOtherEq(Loop)%RadGainEnergy, &
-                             'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Radiant Heating Rate [W]',ZoneOtherEq(Loop)%RadGainRate, &
-                             'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Convective Heating Energy [J]',ZoneOtherEq(Loop)%ConGainEnergy, &
-                             'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Convective Heating Rate [W]',ZoneOtherEq(Loop)%ConGainRate, &
-                             'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Latent Gain Energy [J]',ZoneOtherEq(Loop)%LatGainEnergy, &
-                             'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Latent Gain Rate [W]',ZoneOtherEq(Loop)%LatGainRate, &
-                             'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Lost Heat Energy [J]',ZoneOtherEq(Loop)%LostEnergy, &
-                             'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Lost Heat Rate [W]',ZoneOtherEq(Loop)%LostRate, &
-                             'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Total Heating Energy [J]',ZoneOtherEq(Loop)%TotGainEnergy, &
-                             'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Total Heating Rate [W]',ZoneOtherEq(Loop)%TotGainRate, &
-                             'Zone','Average',ZoneOtherEq(Loop)%Name)
+        ! Calculate nominal min/max equipment level
+        ZoneOtherEq(Loop)%NomMinDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMin
+        ZoneOtherEq(Loop)%NomMaxDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMax
 
-    ! Zone total report variables
-    IF (RepVarSet(ZoneOtherEq(Loop)%ZonePtr)) THEN
-      RepVarSet(ZoneOtherEq(Loop)%ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Energy [J]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGain, &
-                               'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Rate [W]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGainRate, &
-                               'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Convective Heating Energy [J]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGain, &
-                               'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Convective Heating Rate [W]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGainRate, &
-                               'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Latent Gain Energy [J]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGain, &
-                               'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Latent Gain Rate [W]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGainRate, &
-                               'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Energy [J]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLost, &
-                               'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Rate [W]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLostRate, &
-                               'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Total Heating Energy [J]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGain, &
-                               'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Total Heating Rate [W]',  &
-                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGainRate, &
-                               'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-    ENDIF
-    IF (AnyEnergyManagementSystemInModel) Then
-      CALL SetupEMSActuator('OtherEquipment', ZoneOtherEq(Loop)%Name, 'Power Level', '[W]', &
-                ZoneOtherEq(Loop)%EMSZoneEquipOverrideOn  , ZoneOtherEq(Loop)%EMSEquipPower )
-      CALL SetupEMSInternalVariable( 'Other Equipment Design Level', ZoneOtherEq(Loop)%Name, '[W]' ,&
-                                       ZoneOtherEq(Loop)%DesignLevel )
-    ENDIF ! EMS
+        ZoneOtherEq(Loop)%FractionLatent=IHGNumbers(4)
+        ZoneOtherEq(Loop)%FractionRadiant=IHGNumbers(5)
+        ZoneOtherEq(Loop)%FractionLost=IHGNumbers(6)
+                    ! FractionConvected is a calculated field
+        ZoneOtherEq(Loop)%FractionConvected=1.0d0 - (ZoneOtherEq(Loop)%FractionLatent +   &
+                                                    ZoneOtherEq(Loop)%FractionRadiant +   &
+                                                    ZoneOtherEq(Loop)%FractionLost)
+        IF (ABS(ZoneOtherEq(Loop)%FractionConvected) <= .001d0) ZoneOtherEq(Loop)%FractionConvected=0.0d0
+        IF (ZoneOtherEq(Loop)%FractionConvected < 0.0d0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
+                                 '", Sum of Fractions > 1.0')
+          ErrorsFound=.true.
+        ENDIF
 
-    IF (.not. ErrorsFound)   &
-      CALL SetupZoneInternalGain(ZoneOtherEq(Loop)%ZonePtr, &
-                   'OtherEquipment', &
-                   ZoneOtherEq(Loop)%Name, &
-                   IntGainTypeOf_OtherEquipment, &
-                   ConvectionGainRate          = ZoneOtherEq(Loop)%ConGainRate,&
-                   ThermalRadiationGainRate    = ZoneOtherEq(Loop)%RadGainRate, &
-                   LatentGainRate              = ZoneOtherEq(Loop)%LatGainRate)
+        IF (NumAlpha > 4) THEN
+          ZoneOtherEq(Loop)%EndUseSubcategory = AlphaName(5)
+        ELSE
+          ZoneOtherEq(Loop)%EndUseSubcategory = 'General'
+        END IF
 
-  END DO
+        IF (ZoneOtherEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
+
+        ! Object report variables
+        CALL SetupOutputVariable('Other Equipment Radiant Heating Energy [J]',ZoneOtherEq(Loop)%RadGainEnergy, &
+                                 'Zone','Sum',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Radiant Heating Rate [W]',ZoneOtherEq(Loop)%RadGainRate, &
+                                 'Zone','Average',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Convective Heating Energy [J]',ZoneOtherEq(Loop)%ConGainEnergy, &
+                                 'Zone','Sum',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Convective Heating Rate [W]',ZoneOtherEq(Loop)%ConGainRate, &
+                                 'Zone','Average',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Latent Gain Energy [J]',ZoneOtherEq(Loop)%LatGainEnergy, &
+                                 'Zone','Sum',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Latent Gain Rate [W]',ZoneOtherEq(Loop)%LatGainRate, &
+                                 'Zone','Average',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Lost Heat Energy [J]',ZoneOtherEq(Loop)%LostEnergy, &
+                                 'Zone','Sum',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Lost Heat Rate [W]',ZoneOtherEq(Loop)%LostRate, &
+                                 'Zone','Average',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Total Heating Energy [J]',ZoneOtherEq(Loop)%TotGainEnergy, &
+                                 'Zone','Sum',ZoneOtherEq(Loop)%Name)
+        CALL SetupOutputVariable('Other Equipment Total Heating Rate [W]',ZoneOtherEq(Loop)%TotGainRate, &
+                                 'Zone','Average',ZoneOtherEq(Loop)%Name)
+
+        ! Zone total report variables
+        IF (RepVarSet(ZoneOtherEq(Loop)%ZonePtr)) THEN
+          RepVarSet(ZoneOtherEq(Loop)%ZonePtr)=.false.
+          CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Energy [J]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGain, &
+                                   'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Rate [W]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGainRate, &
+                                   'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Convective Heating Energy [J]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGain, &
+                                   'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Convective Heating Rate [W]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGainRate, &
+                                   'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Latent Gain Energy [J]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGain, &
+                                   'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Latent Gain Rate [W]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGainRate, &
+                                   'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Lost Heat Energy [J]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLost, &
+                                   'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Lost Heat Rate [W]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLostRate, &
+                                   'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Total Heating Energy [J]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGain, &
+                                   'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+          CALL SetupOutputVariable('Zone Other Equipment Total Heating Rate [W]',  &
+                                    ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGainRate, &
+                                   'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
+        ENDIF
+        IF (AnyEnergyManagementSystemInModel) Then
+          CALL SetupEMSActuator('OtherEquipment', ZoneOtherEq(Loop)%Name, 'Power Level', '[W]', &
+                    ZoneOtherEq(Loop)%EMSZoneEquipOverrideOn  , ZoneOtherEq(Loop)%EMSEquipPower )
+          CALL SetupEMSInternalVariable( 'Other Equipment Design Level', ZoneOtherEq(Loop)%Name, '[W]' ,&
+                                           ZoneOtherEq(Loop)%DesignLevel )
+        ENDIF ! EMS
+
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(ZoneOtherEq(Loop)%ZonePtr, &
+                       'OtherEquipment', &
+                       ZoneOtherEq(Loop)%Name, &
+                       IntGainTypeOf_OtherEquipment, &
+                       ConvectionGainRate          = ZoneOtherEq(Loop)%ConGainRate,&
+                       ThermalRadiationGainRate    = ZoneOtherEq(Loop)%RadGainRate, &
+                       LatentGainRate              = ZoneOtherEq(Loop)%LatGainRate)
+
+      END DO ! Item1
+    END DO ! Item - number of hot water statements
+  END IF
 
 
   RepVarSet=.true.
@@ -2602,7 +2753,7 @@ SUBROUTINE GetInternalHeatGainsInput
 
   DO Loop=1,TotBBHeat
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2637,15 +2788,15 @@ SUBROUTINE GetInternalHeatGainsInput
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneBBHeat(Loop)%SchedPtr)
       SchMax=GetScheduleMaxValue(ZoneBBHeat(Loop)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -2666,8 +2817,8 @@ SUBROUTINE GetInternalHeatGainsInput
     ZoneBBHeat(Loop)%CapatHighTemperature=IHGNumbers(3)
     ZoneBBHeat(Loop)%HighTemperature=IHGNumbers(4)
     ZoneBBHeat(Loop)%FractionRadiant=IHGNumbers(5)
-    ZoneBBHeat(Loop)%FractionConvected=1.0-ZoneBBHeat(Loop)%FractionRadiant
-    IF (ZoneBBHeat(Loop)%FractionConvected < 0.0) THEN
+    ZoneBBHeat(Loop)%FractionConvected=1.0d0-ZoneBBHeat(Loop)%FractionRadiant
+    IF (ZoneBBHeat(Loop)%FractionConvected < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", Sum of Fractions > 1.0')
       ErrorsFound=.true.
@@ -2751,7 +2902,7 @@ SUBROUTINE GetInternalHeatGainsInput
 
   DO Loop=1,TotCO2Gen
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2786,15 +2937,15 @@ SUBROUTINE GetInternalHeatGainsInput
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneCO2Gen(Loop)%SchedPtr)
       SchMax=GetScheduleMaxValue(ZoneCO2Gen(Loop)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -2841,12 +2992,12 @@ SUBROUTINE GetInternalHeatGainsInput
 
   WRITE(OutputFileInits,721)
   DO Loop=1,NumOfZones
-    LightTot=0.0
-    ElecTot=0.0
-    GasTot=0.0
-    OthTot=0.0
-    HWETot=0.0
-    STMTot=0.0
+    LightTot=0.0d0
+    ElecTot=0.0d0
+    GasTot=0.0d0
+    OthTot=0.0d0
+    HWETot=0.0d0
+    STMTot=0.0d0
     BBHeatInd='No'
     DO Loop1=1,TotLights
       IF (Lights(Loop1)%ZonePtr /= Loop) CYCLE
@@ -2877,10 +3028,10 @@ SUBROUTINE GetInternalHeatGainsInput
       BBHeatInd='Yes'
     ENDDO
     Zone(Loop)%InternalHeatGains=LightTot+ElecTot+GasTot+OthTot+HWETot+StmTot
-    IF (Zone(Loop)%FloorArea > 0.0) THEN
+    IF (Zone(Loop)%FloorArea > 0.0d0) THEN
       WRITE(OutputFileInits,720,advance='No') TRIM(Zone(Loop)%Name),TRIM(RoundSigDigits(Zone(Loop)%FloorArea,2)),  &
                 TRIM(RoundSigDigits(Zone(Loop)%TotOccupants,1))
-      IF (Zone(Loop)%TotOccupants > 0.0) THEN
+      IF (Zone(Loop)%TotOccupants > 0.0d0) THEN
         StringOut=RoundSigDigits(Zone(Loop)%FloorArea/Zone(Loop)%TotOccupants,3)
       ELSE
         StringOut='N/A'
@@ -2915,8 +3066,9 @@ SUBROUTINE GetInternalHeatGainsInput
        'ASHRAE 55 Warnings,Carbon Dioxide Generation Rate,Nominal Minimum Number of People,Nominal Maximum Number of People'
     IF (Loop == 1) THEN
       IF (People(Loop)%Fanger .or. People(Loop)%Pierce .or. People(Loop)%KSU) THEN
-        WRITE(OutputFileInits,fmta) ',MRT Calculation Type,Work Efficiency,Clothing,Air Velocity,Fanger Calculation,'//  &
-           'Pierce Calculation,KSU Calculation'
+        WRITE(OutputFileInits,fmta) ',MRT Calculation Type,Work Efficiency, Clothing Insulation Calculation Method,' // &
+          'Clothing Insulation Calculation Method Schedule,Clothing,Air Velocity,Fanger Calculation,Pierce Calculation,' // &
+          'KSU Calculation'
       ELSE
         WRITE(OutputFileInits,fmta) ' '
       ENDIF
@@ -2934,14 +3086,14 @@ SUBROUTINE GetInternalHeatGainsInput
        TRIM(Zone(ZoneNum)%Name),TRIM(RoundSigDigits(Zone(ZoneNum)%FloorArea,2)),   &
        TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(People(Loop)%NumberOfPeople,1))//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(People(Loop)%NumberOfPeople/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (People(Loop)%NumberOfPeople > 0.0) THEN
-      IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (People(Loop)%NumberOfPeople > 0.0d0) THEN
+      IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
         StringOut=RoundSigDigits(Zone(ZoneNum)%FloorArea/People(Loop)%NumberOfPeople,3)
       ELSE
         StringOut='N/A'
@@ -2986,6 +3138,25 @@ SUBROUTINE GetInternalHeatGainsInput
       ENDIF
       WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
       WRITE(OutputFileInits,fmta,advance='No') TRIM(GetScheduleName(People(Loop)%WorkEffPtr))//','
+
+      IF (People(Loop)%ClothingType == 1) THEN
+        StringOut='Clothing Insulation Schedule'
+      ELSEIF (People(Loop)%ClothingType == 2) THEN
+        StringOut='Dynamic Clothing Model ASHRAE55'
+      ELSEIF (People(Loop)%ClothingType == 3) THEN
+          StringOut='Calculation Method Schedule'
+      ELSE
+        StringOut='N/A'
+      ENDIF
+      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+
+      IF (People(Loop)%ClothingType == 3) THEN
+        StringOut = GetScheduleName(People(Loop)%ClothingMethodPtr)
+      ELSE
+        StringOut='N/A'
+      ENDIF
+      WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+
       WRITE(OutputFileInits,fmta,advance='No') TRIM(GetScheduleName(People(Loop)%ClothingPtr))//','
       WRITE(OutputFileInits,fmta,advance='No') TRIM(GetScheduleName(People(Loop)%AirVelocityPtr))//','
       IF (People(Loop)%Fanger) THEN
@@ -3029,13 +3200,13 @@ SUBROUTINE GetInternalHeatGainsInput
        TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(Lights(Loop)%DesignLevel,3))//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(Lights(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(Lights(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3076,13 +3247,13 @@ SUBROUTINE GetInternalHeatGainsInput
        TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(ZoneElectric(Loop)%DesignLevel,3))//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneElectric(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneElectric(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3122,13 +3293,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(ZoneGas(Loop)%DesignLevel,3))//','
 
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneGas(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneGas(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3169,13 +3340,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(ZoneHWEq(Loop)%DesignLevel,3))//','
 
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneHWEq(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneHWEq(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3216,13 +3387,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(ZoneSteamEq(Loop)%DesignLevel,3))//','
 
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneSteamEq(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneSteamEq(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3262,13 +3433,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
     WRITE(OutputFileInits,fmta,advance='No') TRIM(RoundSigDigits(ZoneOtherEq(Loop)%DesignLevel,3))//','
 
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneOtherEq(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(ZoneOtherEq(Loop)%DesignLevel/Zone(ZoneNum)%TotOccupants,3)
     ELSE
       StringOut='N/A'
@@ -3408,8 +3579,8 @@ SUBROUTINE InitInternalHeatGains
   INTEGER :: ReturnZonePlenumCondNum ! Number of ZoneRetPlenCond for a zone's return air plenum, if it exists
   REAL(r64) :: ReturnPlenumTemp   ! Air temperature of a zone's return air plenum (C)
   REAL(r64) :: pulseMultipler     ! use to create a pulse for the load component report computations
-  REAL(r64) :: curQL = 0.0        ! radiant value prior to adjustment for pulse for load component report
-  REAL(r64) :: adjQL = 0.0        ! radiant value including adjustment for pulse for load component report
+  REAL(r64) :: curQL = 0.0d0        ! radiant value prior to adjustment for pulse for load component report
+  REAL(r64) :: adjQL = 0.0d0        ! radiant value including adjustment for pulse for load component report
 
 !  REAL(r64), ALLOCATABLE, SAVE, DIMENSION(:) :: QSA
 
@@ -3452,18 +3623,18 @@ SUBROUTINE InitInternalHeatGains
   ZoneIntGain%QSELost= 0.d0
 
   DO Loop = 0, 25
-    ZoneIntEEuse%EEConvected(Loop) = 0.0
-    ZoneIntEEuse%EERadiated(Loop) = 0.0
-    ZoneIntEEuse%EELost(Loop) = 0.0
-    ZoneIntEEuse%EELatent(Loop) = 0.0
+    ZoneIntEEuse%EEConvected(Loop) = 0.0d0
+    ZoneIntEEuse%EERadiated(Loop) = 0.0d0
+    ZoneIntEEuse%EELost(Loop) = 0.0d0
+    ZoneIntEEuse%EELatent(Loop) = 0.0d0
   ENDDO
 
-  ZnRpt%LtsPower = 0.0
-  ZnRpt%ElecPower = 0.0
-  ZnRpt%GasPower = 0.0
-  ZnRpt%HWPower = 0.0
-  ZnRpt%SteamPower = 0.0
-  ZnRpt%BaseHeatPower = 0.0
+  ZnRpt%LtsPower = 0.0d0
+  ZnRpt%ElecPower = 0.0d0
+  ZnRpt%GasPower = 0.0d0
+  ZnRpt%HWPower = 0.0d0
+  ZnRpt%SteamPower = 0.0d0
+  ZnRpt%BaseHeatPower = 0.0d0
 
 !  QSA = 0.0
 
@@ -3484,10 +3655,10 @@ SUBROUTINE InitInternalHeatGains
     NumberOccupants = People(Loop)%NumberOfPeople * GetCurrentScheduleValue(People(Loop)%NumberOfPeoplePtr)
     If (People(Loop)%EMSPeopleOn) NumberOccupants = People(Loop)%EMSNumberOfPeople
 
-    TotalPeopleGain =  0.0
-    SensiblePeopleGain = 0.0
+    TotalPeopleGain =  0.0d0
+    SensiblePeopleGain = 0.0d0
 
-    IF (NumberOccupants > 0.0) THEN
+    IF (NumberOccupants > 0.0d0) THEN
       ActivityLevel_WperPerson = GetCurrentScheduleValue(People(Loop)%ActivityLevelPtr)
       TotalPeopleGain = NumberOccupants*ActivityLevel_WperPerson
       ! if the user did not specify a sensible fraction, calculate the sensible heat gain
@@ -3506,7 +3677,7 @@ SUBROUTINE InitInternalHeatGains
       END IF
 
       IF (SensiblePeopleGain > TotalPeopleGain) SensiblePeopleGain = TotalPeopleGain
-      IF (SensiblePeopleGain < 0.0) SensiblePeopleGain = 0.0
+      IF (SensiblePeopleGain < 0.0d0) SensiblePeopleGain = 0.0d0
 
       !For predefined tabular reports related to outside air ventilation
       ZonePreDefRep(NZ)%isOccupied = .true. !set flag to occupied to be used in tabular reporting for ventilation
@@ -3539,7 +3710,7 @@ SUBROUTINE InitInternalHeatGains
     IF (ZoneDaylight(NZ)%DaylightType == DetailedDaylighting &
       .OR. ZoneDaylight(NZ)%DaylightType == DElightDaylighting) THEN
 
-      IF (Lights(Loop)%FractionReplaceable > 0.0) THEN  ! FractionReplaceable can only be 0 or 1 for these models
+      IF (Lights(Loop)%FractionReplaceable > 0.0d0) THEN  ! FractionReplaceable can only be 0 or 1 for these models
         Q = Q * ZoneDaylight(NZ)%ZonePowerReductionFactor
       END IF
     END IF
@@ -3562,14 +3733,14 @@ SUBROUTINE InitInternalHeatGains
           FractionReturnAir = Lights(Loop)%FractionReturnAirPlenTempCoeff1 - &
                               Lights(Loop)%FractionReturnAirPlenTempCoeff2 * ReturnPlenumTemp
           FractionReturnAir = MAX(0.0d0,MIN(1.0d0,FractionReturnAir))
-          IF(FractionReturnAir >= (1.0 - Lights(Loop)%FractionShortWave)) THEN
-            FractionReturnAir = 1.0 - Lights(Loop)%FractionShortWave
-            FractionRadiant   = 0.0
-            FractionConvected = 0.0
+          IF(FractionReturnAir >= (1.0d0 - Lights(Loop)%FractionShortWave)) THEN
+            FractionReturnAir = 1.0d0 - Lights(Loop)%FractionShortWave
+            FractionRadiant   = 0.0d0
+            FractionConvected = 0.0d0
           ELSE
-            FractionRadiant   = ((1.0 - FractionReturnAir - Lights(Loop)%FractionShortWave)/ &
+            FractionRadiant   = ((1.0d0 - FractionReturnAir - Lights(Loop)%FractionShortWave)/ &
               (Lights(Loop)%FractionRadiant + Lights(Loop)%FractionConvected))* Lights(Loop)%FractionRadiant
-            FractionConvected = 1.0 - (FractionReturnAir + FractionRadiant + Lights(Loop)%FractionShortWave)
+            FractionConvected = 1.0d0 - (FractionReturnAir + FractionRadiant + Lights(Loop)%FractionShortWave)
           END IF
         END IF
       END IF
@@ -3701,7 +3872,7 @@ SUBROUTINE InitInternalHeatGains
   DO Loop = 1, TotBBHeat
     NZ = ZoneBBHeat(Loop)%ZonePtr
     IF (Zone(NZ)%OutDryBulbTemp >= ZoneBBHeat(Loop)%HighTemperature) THEN
-      Q = 0.0
+      Q = 0.0d0
     ELSE IF (Zone(NZ)%OutDryBulbTemp > ZoneBBHeat(Loop)%LowTemperature) THEN
       Q = (Zone(NZ)%OutDryBulbTemp - ZoneBBHeat(Loop)%LowTemperature) &
         * (ZoneBBHeat(Loop)%CapatHighTemperature - ZoneBBHeat(Loop)%CapatLowTemperature) &
@@ -3753,7 +3924,7 @@ SUBROUTINE InitInternalHeatGains
 
   END DO
 
-  SumConvHTRadSys = 0.0
+  SumConvHTRadSys = 0.0d0
 
   pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
   IF (CompLoadReportIsReq) THEN
@@ -4092,7 +4263,7 @@ FUNCTION GetDesignLightingLevelForZone(WhichZone) RESULT(DesignLightingLevelSum)
     CALL ShowFatalError('GetDesignLightingLevelForZone: Function called prior to Getting Lights Input.')
   ENDIF
 
-  DesignLightingLevelSum=0.0
+  DesignLightingLevelSum=0.0d0
 
   DO Loop=1,TotLights
     IF (Lights(Loop)%ZonePtr == WhichZone) THEN
@@ -4163,18 +4334,18 @@ SUBROUTINE CheckLightsReplaceableMinMaxForZone(WhichZone)
     NumLights=NumLights+1
     IF ((ZoneDaylight(Lights(Loop)%ZonePtr)%DaylightType == DetailedDaylighting &
       .OR. ZoneDaylight(Lights(Loop)%ZonePtr)%DaylightType == DElightDaylighting) &
-      .AND. (Lights(Loop)%FractionReplaceable > 0.0 .AND. Lights(Loop)%FractionReplaceable < 1.0)) THEN
+      .AND. (Lights(Loop)%FractionReplaceable > 0.0d0 .AND. Lights(Loop)%FractionReplaceable < 1.0d0)) THEN
       CALL ShowWarningError('CheckLightsReplaceableMinMaxForZone: '//  &
          'Fraction Replaceable must be 0.0 or 1.0 if used with daylighting.')
       CALL ShowContinueError('..Lights="'//TRIM(Lights(Loop)%Name)//  &
           '", Fraction Replaceable will be reset to 1.0 to allow dimming controls')
       CALL ShowContinueError('..in Zone='//TRIM(Zone(WhichZone)%Name))
-      Lights(Loop)%FractionReplaceable = 1.0
+      Lights(Loop)%FractionReplaceable = 1.0d0
     END IF
   ENDDO
 
   IF (ZoneDaylight(WhichZone)%DaylightType == DetailedDaylighting) THEN
-    IF (LightsRepMax == 0.0) THEN
+    IF (LightsRepMax == 0.0d0) THEN
       CALL ShowWarningError('CheckLightsReplaceable: Zone "'//TRIM(Zone(WhichZone)%Name)//  &
                      '" has Daylighting:Controls.')
       CALL ShowContinueError('but all of the LIGHTS object in that zone have zero Fraction Replaceable.')
@@ -4187,7 +4358,7 @@ SUBROUTINE CheckLightsReplaceableMinMaxForZone(WhichZone)
       CALL ShowContinueError('The daylighting controls will have no effect.')
     ENDIF
   ELSEIF (ZoneDaylight(WhichZone)%DaylightType == DElightDaylighting) THEN
-    IF (LightsRepMax == 0.0) THEN
+    IF (LightsRepMax == 0.0d0) THEN
       CALL ShowWarningError('CheckLightsReplaceable: Zone "'//TRIM(Zone(WhichZone)%Name)//  &
                      '" has Daylighting:Controls.')
       CALL ShowContinueError('but all of the LIGHTS object in that zone have zero Fraction Replaceable.')

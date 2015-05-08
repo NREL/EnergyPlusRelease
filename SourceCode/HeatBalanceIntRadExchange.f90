@@ -89,6 +89,7 @@ SUBROUTINE CalcInteriorRadExchange(SurfaceTemp,SurfIterations,NetLWRadToSurf,Zon
           ! USE STATEMENTS:
 USE General, ONLY: InterpSlatAng        ! Function for slat angle interpolation
 USE DataTimings
+USE WindowEquivalentLayer,  ONLY: EQLWindowInsideEffectiveEmiss
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -173,8 +174,8 @@ endif
 
   ConstrNumRec=0
   IF (.NOT. PRESENT(ZoneToResimulate)) THEN
-    NetLWRadToSurf = 0.0
-    SurfaceWindow%IRfromParentZone = 0.0
+    NetLWRadToSurf = 0.0d0
+    SurfaceWindow%IRfromParentZone = 0.0d0
   ENDIF
 
   DO ZoneNum = 1, NumOfZones
@@ -254,13 +255,16 @@ endif
       ConstrNumSend = Surface(SendSurfNum)%Construction
       SendSurfTemp  = SurfaceTemp(SendSurfNum)
       IF(Construct(ConstrNumSend)%TypeIsWindow .AND.   &
-         SurfaceWindow(SendSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser) THEN
+         SurfaceWindow(SendSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser .AND. &
+         .NOT. Construct(ConstrNumSend)%WindowTypeEQL) THEN
         IF(SurfIterations == 0 .AND. SurfaceWindow(SendSurfNum)%ShadingFlag <= 0) THEN
           SendSurfTemp = SurfaceWindow(SendSurfNum)%ThetaFace(2*Construct(ConstrNumSend)%TotGlassLayers)-KelvinConv
         ELSE IF(SurfaceWindow(SendSurfNum)%ShadingFlag == IntShadeOn .OR.  &
           SurfaceWindow(SendSurfNum)%ShadingFlag == IntBlindOn) THEN
           SendSurfTemp = SurfaceWindow(SendSurfNum)%EffInsSurfTemp
-        END IF
+       END IF
+      ELSEIF (Construct(ConstrNumSend)%WindowTypeEQL) THEN
+          SendSurfTemp = SurfaceWindow(SendSurfNum)%EffInsSurfTemp
       END IF
 #ifdef EP_HBIRE_SEQ
       SendSurfaceTempInKto4thPrecalc(SendZoneSurfNum) = (SendSurfTemp+KelvinConv)**4
@@ -276,7 +280,8 @@ endif
       RecSurfTemp  = SurfaceTemp(RecSurfNum)
       RecSurfEmiss = Construct(ConstrNumRec)%InsideAbsorpThermal
       IF (Construct(ConstrNumRec)%TypeIsWindow .AND.   &
-          SurfaceWindow(RecSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser) THEN
+          SurfaceWindow(RecSurfNum)%OriginalClass .NE. SurfaceClass_TDD_Diffuser .AND. &
+          .NOT. Construct(ConstrNumRec)%WindowTypeEQL ) THEN
         IF(SurfIterations == 0 .AND. SurfaceWindow(RecSurfNum)%ShadingFlag <= 0) THEN
             ! If the window is bare this TS and it is the first time through we use the previous TS glass
             ! temperature whether or not the window was shaded in the previous TS. If the window was shaded
@@ -293,6 +298,9 @@ endif
               InterpSlatAng(SurfaceWindow(RecSurfNum)%SlatAngThisTS,SurfaceWindow(RecSurfNum)%MovableSlats, &
                  SurfaceWindow(RecSurfNum)%EffGlassEmiss)
         END IF
+      ELSEIF( Construct(ConstrNumRec)%WindowTypeEQL) THEN
+        RecSurfEmiss = EQLWindowInsideEffectiveEmiss(ConstrNumRec)
+        RecSurfTemp = SurfaceWindow(RecSurfNum)%EffInsSurfTemp
       END IF
       ! precalculate the fourth power of surface temperature as part of strategy to reduce calculation time - Glazer 2011-04-22
       RecSurfTempInKTo4th = (RecSurfTemp+KelvinConv)**4
@@ -452,17 +460,17 @@ SUBROUTINE InitInteriorRadExchange
 
           ! Allocate the parts of the derived type
      ALLOCATE(ZoneInfo(ZoneNum)%F(ZoneInfo(ZoneNum)%NumOfSurfaces,ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%F=0.0
+     ZoneInfo(ZoneNum)%F=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%ScriptF(ZoneInfo(ZoneNum)%NumOfSurfaces,ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%ScriptF=0.0
+     ZoneInfo(ZoneNum)%ScriptF=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%Area(ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%Area=0.0
+     ZoneInfo(ZoneNum)%Area=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%Emissivity(ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%Emissivity=0.0
+     ZoneInfo(ZoneNum)%Emissivity=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%Azimuth(ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%Azimuth=0.0
+     ZoneInfo(ZoneNum)%Azimuth=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%Tilt(ZoneInfo(ZoneNum)%NumOfSurfaces))
-     ZoneInfo(ZoneNum)%Tilt=0.0
+     ZoneInfo(ZoneNum)%Tilt=0.0d0
      ALLOCATE(ZoneInfo(ZoneNum)%SurfacePtr(ZoneInfo(ZoneNum)%NumOfSurfaces))
      ZoneInfo(ZoneNum)%SurfacePtr=0
 
@@ -493,8 +501,8 @@ SUBROUTINE InitInteriorRadExchange
 
      IF (ZoneInfo(ZoneNum)%NumOfSurfaces == 1) THEN
           ! If there is only one surface in a zone, then there is no radiant exchange
-       ZoneInfo(ZoneNum)%F       = 0.0
-       ZoneInfo(ZoneNum)%ScriptF = 0.0
+       ZoneInfo(ZoneNum)%F       = 0.0d0
+       ZoneInfo(ZoneNum)%ScriptF = 0.0d0
        IF (DisplayAdvancedReportVariables)   &
           WRITE(OutputFileInits,'(A)')'Surface View Factor Check Values,'//trim(Zone(ZoneNum)%Name)//  &
              ',0,0,0,-1,0,0'
@@ -655,7 +663,7 @@ SUBROUTINE InitInteriorRadExchange
        DEALLOCATE(SaveApproximateViewFactors)
      ENDIF
 
-     RowSum=0.0
+     RowSum=0.0d0
      DO Findex = 1 , ZoneInfo(ZoneNum)%NumOfSurfaces
        RowSum=RowSum+SUM(ZoneInfo(ZoneNum)%F(Findex,:))
      END DO
@@ -748,7 +756,7 @@ USE General, ONLY: TrimSigDigits
       ErrorsFound=.true.
       NumNums=0
     ENDIF
-    F = 0.0
+    F = 0.0d0
     DO index = 1, NumNums,3
       inx1=rNumericArgs(index)
       inx2=rNumericArgs(index+1)
@@ -834,7 +842,7 @@ USE General, ONLY: TrimSigDigits
       ErrorsFound=.true.
       NumNums=0   ! cancel getting any coordinates
     ENDIF
-    F = 0.0
+    F = 0.0d0
     numinx1=0
 
     DO index = 2, NumAlphas,2
@@ -917,7 +925,7 @@ SUBROUTINE CalcApproximateViewFactors(N,A,Azimuth,Tilt,F,SPtr)
           ! FLOW:
           ! Calculate the sum of the areas seen by all zone surfaces
   ALLOCATE(ZoneArea(N))
-  ZoneArea = 0.0
+  ZoneArea = 0.0d0
   DO I = 1, N
     DO J = 1, N
           ! Assumption is that a surface cannot see itself or any other surface
@@ -941,7 +949,7 @@ SUBROUTINE CalcApproximateViewFactors(N,A,Azimuth,Tilt,F,SPtr)
 
       END IF
     END DO
-    IF (ZoneArea(I) <= 0.0) THEN
+    IF (ZoneArea(I) <= 0.0d0) THEN
       CALL ShowWarningError('CalcApproximateViewFactors: Zero area for all other zone surfaces.')
       CALL ShowContinueError('Happens for Surface="'//TRIM(Surface(SPtr(I))%Name)//'" in Zone='//  &
                              TRIM(Zone(Surface(SPtr(I))%Zone)%Name))
@@ -963,7 +971,7 @@ SUBROUTINE CalcApproximateViewFactors(N,A,Azimuth,Tilt,F,SPtr)
           !
           ! The second IF statement is intended to avoid a divide by zero if
           ! there are no other surfaces in the zone that can be seen.
-  F = 0.0
+  F = 0.0d0
   DO I = 1, N
     DO J = 1, N
 
@@ -978,7 +986,7 @@ SUBROUTINE CalcApproximateViewFactors(N,A,Azimuth,Tilt,F,SPtr)
             (Surface(SPtr(J))%Class == SurfaceClass_Roof)  .OR.        &
             ((ABS(Azimuth(I)-Azimuth(J)) > SameAngleLimit).OR. &
             (ABS(Tilt(I)-Tilt(J)) > SameAngleLimit)          ) ) THEN
-         IF (ZoneArea(I) > 0.0) F(I,J) = A(J)/(ZoneArea(I))
+         IF (ZoneArea(I) > 0.0d0) F(I,J) = A(J)/(ZoneArea(I))
        END IF
 
 
@@ -1078,11 +1086,11 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
   ALLOCATE(FixedAF(N,N))
   ALLOCATE(FixedAFTranspose(N,N))
 
-  AF          = 0.0
-  AFTranspose = 0.0
-  FixedAF     = 0.0
-  Accelerator = 1.0
-  ConvrgOld = 10.
+  AF          = 0.0d0
+  AFTranspose = 0.0d0
+  FixedAF     = 0.0d0
+  Accelerator = 1.0d0
+  ConvrgOld = 10.0d0
   LargestArea=MAXVAL(A)
 
   FixedAF=F   ! store for largest area check
@@ -1116,11 +1124,11 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
 
   ALLOCATE(FixedF(N,N))
   ALLOCATE(RowCoefficient(N))
-  FixedF      = 0.0
-  RowCoefficient = 1.0
+  FixedF      = 0.0d0
+  RowCoefficient = 1.0d0
 
   NumIterations =0
-  RowSum=0.0
+  RowSum=0.0d0
     !  Check for physically unreasonable enclosures.
 
   If (N<=3 ) Then
@@ -1136,7 +1144,7 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
      F=FixedF
      FixedCheckValue=ABS(SUM(FixedF)-N)
      FinalCheckValue=FixedCheckValue
-     RowSum=0.0
+     RowSum=0.0d0
      DO I = 1 , N
        RowSum=RowSum+SUM(FixedF(I,:))
      ENDDO
@@ -1158,7 +1166,7 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
         IF (ABS(SUM(FixedAF(i,1:N))) > 1.0d-10) THEN
           RowCoefficient(i)=A(i)/SUM(FixedAF(i,1:N))
         ELSE
-          RowCoefficient(i)=1.0
+          RowCoefficient(i)=1.0d0
         ENDIF
         FixedAF(i,1:N)=FixedAF(i,1:N)*RowCoefficient(i)
     END DO
@@ -1172,8 +1180,8 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
       DO J=1,N
         FixedF(i,j)=FixedAF(i,j)/A(i)
         IF (ABS(FixedF(i,j)) < 1.d-10) Then
-          FixedF(i,j)=0.0
-          FixedAF(i,j) = 0.0
+          FixedF(i,j)=0.0d0
+          FixedAF(i,j) = 0.0d0
         END IF
       END DO
     END DO
@@ -1210,7 +1218,7 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
         F=FixedF
         FinalCheckValue=FixedCheckValue
       ENDIF
-      RowSum=0.0
+      RowSum=0.0d0
       DO I = 1,N
         RowSum=RowSum+SUM(FixedF(I,:))
       ENDDO
@@ -1227,7 +1235,7 @@ SUBROUTINE FixViewFactors(N,A,F,ZoneNum,OriginalCheckValue,FixedCheckValue,Final
     FinalCheckValue=FixedCheckValue
   ELSE
     FinalCheckValue=OriginalCheckValue
-    RowSum=0.0
+    RowSum=0.0d0
     DO I = 1,N
       RowSum=RowSum+SUM(FixedF(I,:))
     ENDDO
@@ -1311,11 +1319,11 @@ SUBROUTINE CalcScriptF(N,A,F,EMISS,ScriptF)
   ALLOCATE(Cmatrix(N,N))
   ALLOCATE(ExciteMatrix(N,N))
 
-  AF           = 0.0
-  Cmatrix      = 0.0
-  Cinverse     = 0.0
-  ExciteMatrix = 0.0
-  ScriptF      = 0.0
+  AF           = 0.0d0
+  Cmatrix      = 0.0d0
+  Cinverse     = 0.0d0
+  ExciteMatrix = 0.0d0
+  ScriptF      = 0.0d0
 
           ! Set up AF matrix.
   DO I=1,N
@@ -1361,10 +1369,10 @@ SUBROUTINE CalcScriptF(N,A,F,EMISS,ScriptF)
   DO I=1,N
     DO J=1,N
       IF (I == J) THEN
-!        ScriptF(I,J) = EMISS(I)/(1.-EMISS(I))*(Jmatrix(I,J)-Delta*EMISS(I)), where Delta=1
+!        ScriptF(I,J) = EMISS(I)/(1.0d0-EMISS(I))*(Jmatrix(I,J)-Delta*EMISS(I)), where Delta=1
         ScriptF(I,J) = EMISS(I)/(1.d0-EMISS(I))*(Jmatrix(I,J)-EMISS(I))
       ELSE
-!        ScriptF(I,J) = EMISS(I)/(1.-EMISS(I))*(Jmatrix(I,J)-Delta*EMISS(I)), where Delta=0
+!        ScriptF(I,J) = EMISS(I)/(1.0d0-EMISS(I))*(Jmatrix(I,J)-Delta*EMISS(I)), where Delta=0
         ScriptF(I,J) = EMISS(I)/(1.d0-EMISS(I))*(Jmatrix(I,J))
       END IF
     END DO
@@ -1432,8 +1440,8 @@ SUBROUTINE CalcMatrixInverse(Matrix,InvMatrix)
   ALLOCATE(Identity(DimOfMatrix,DimOfMatrix))
   ALLOCATE(p(DimOfMatrix))
 
-  Identity  = 0
-  InvMatrix = 0
+  Identity  = 0.0d0
+  InvMatrix = 0.0d0
 
   DO i = 1, DimOfMatrix
     Identity(i,i) = 1.0d0
@@ -1456,7 +1464,7 @@ SUBROUTINE CalcMatrixInverse(Matrix,InvMatrix)
     p(piv) = temp
     DO i = j+1, DimOfMatrix
       mm               = Matrix(p(i),j)/Matrix(p(j),j)
-      Matrix(p(i),j)   = 0
+      Matrix(p(i),j)   = 0.0d0
       Identity(p(i),:) = Identity(p(i),:) - mm*Identity(p(j),:)
       DO k = j+1, DimOfMatrix
         Matrix(p(i),k) = Matrix(p(i),k) - mm*Matrix(p(j),k)

@@ -52,11 +52,13 @@ PRIVATE    FindDeltaTempRangeInput
 PRIVATE    FindRangeVariable
 PRIVATE    LoadEquipList
 PRIVATE    FindCompSPInput
+PRIVATE    GetUserDefinedOpSchemeInput
      !Initialization Routines
 PUBLIC     InitLoadDistribution
      !Load Distribution/Calculation Routines
 PRIVATE    DistributePlantLoad
 PRIVATE    FindCompSPLoad
+PRIVATE    DistributeUserDefinedPlantLoad
 
      !ON/OFF Utility Routines
 PRIVATE    TurnOnPlantLoopPipes
@@ -183,6 +185,9 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
   SELECT CASE(CurSchemeType)
     CASE(UncontrolledOpSchemeType, CompSetPtBasedSchemeType)
       CONTINUE !No RangeVariable specified for these types
+    CASE (EMSOpSchemeType)
+      CALL InitLoadDistribution(FirstHVACIteration)
+      CONTINUE !No RangeVariable specified for these types
     CASE(HeatingRBOpSchemeType)
       ! For zero demand, we need to clean things out before we leave
       IF (LoopDemand < SmallLoad) THEN
@@ -228,6 +233,10 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
         !check for EMS Control
     CALL TurnOnPlantLoopPipes(LoopNum,LoopSideNum)
     CALL FindCompSPLoad(LoopNum,LoopSideNum,BranchNum,CompNum,CurCompLevelOpNum)
+  ELSEIF(CurSchemeType==EMSOpSchemeType) THEN
+    CALL TurnOnPlantLoopPipes(LoopNum,LoopSideNum)
+    CALL DistributeUserDefinedPlantLoad(LoopNum, LoopSideNum,BranchNum,CompNum,CurCompLevelOpNum,CurSchemePtr,  &
+       LoopDemand,RemLoopDemand )
   ELSE !it's a range based control type with multiple equipment lists
     CurListNum = 0
     DO ListNum = 1,NumEquipLists
@@ -424,6 +433,9 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
             PlantLoop(LoopNum)%OpScheme(Num)%OpSchemeType=HeatingRBOpSchemeType
           CASE ('PLANTEQUIPMENTOPERATION:COMPONENTSETPOINT') !* Temp Based Control
             PlantLoop(LoopNum)%OpScheme(Num)%OpSchemeType=CompSetPtBasedSchemeType
+          CASE ('PLANTEQUIPMENTOPERATION:USERDEFINED')
+            PlantLoop(LoopNum)%OpScheme(Num)%OpSchemeType=EMSOpSchemeType
+            AnyEMSPlantOpSchemesInModel = .TRUE.
           CASE ('PLANTEQUIPMENTOPERATION:OUTDOORDRYBULB')
             PlantLoop(LoopNum)%OpScheme(Num)%OpSchemeType=DrybulbRBOpSchemeType
           CASE ('PLANTEQUIPMENTOPERATION:OUTDOORWETBULB')
@@ -537,6 +549,7 @@ SUBROUTINE GetOperationSchemeInput
   INTEGER  :: DPTDBO ! Number ofDewPoint Temperature Range Based Operation Inputs
   INTEGER  :: NumSchemes ! Number of Condenser equipment lists
   INTEGER  :: NumUncontrolledSchemes ! Number of Condenser equipment lists
+  INTEGER  :: NumUserDefOpSchemes ! number of user defined EMS op schemes
   INTEGER  :: CELists ! Number of Condenser equipment lists
   INTEGER  :: PELists ! Number of Plant equipment lists
   INTEGER  :: Count ! Loop counter
@@ -556,10 +569,11 @@ SUBROUTINE GetOperationSchemeInput
     DPRBO = GetNumObjectsFound('PlantEquipmentOperation:OutdoorDewpoint')
     RHRBO = GetNumObjectsFound('PlantEquipmentOperation:OutdoorRelativeHumidity')
     CSPBO = GetNumObjectsFound('PlantEquipmentOperation:ComponentSetpoint')   !* Temp Based Control
+    NumUserDefOpSchemes = GetNumObjectsFound('PlantEquipmentOperation:UserDefined' )
     DBTDBO = GetNumObjectsFound('PlantEquipmentOperation:OutdoorDryBulbDifference')
     WBTDBO = GetNumObjectsFound('PlantEquipmentOperation:OutdoorWetBulbDifference')
     DPTDBO = GetNumObjectsFound('PlantEquipmentOperation:OutdoorDewpointDifference')
-    NumSchemes = CLRBO+HLRBO+DBRBO+WBRBO+DPRBO+RHRBO+CSPBO+DBTDBO+WBTDBO+DPTDBO
+    NumSchemes = CLRBO+HLRBO+DBRBO+WBRBO+DPRBO+RHRBO+CSPBO+DBTDBO+WBTDBO+DPTDBO+NumUserDefOpSchemes
     NumUncontrolledSchemes = GetNumObjectsFound('PlantEquipmentOperation:Uncontrolled')
     IF ( (NumSchemes + NumUncontrolledSchemes) .le. 0 ) THEN
       CALL ShowFatalError('No PlantEquipmentOperation:* objects specified. Stop simulation.')
@@ -606,6 +620,10 @@ SUBROUTINE GetOperationSchemeInput
           Num <=(CLRBO+HLRBO+DBRBO+WBRBO+DPRBO+RHRBO+CSPBO+DBTDBO+WBTDBO+DPTDBO + NumUncontrolledSchemes))THEN
      CurrentModuleObject ='PlantEquipmentOperation:Uncontrolled'
      Count = Num-CLRBO-HLRBO-DBRBO-WBRBO-DPRBO-RHRBO-CSPBO-DBTDBO-WBTDBO-DPTDBO
+   ELSEIF(NumUserDefOpSchemes > 0 .AND. &
+          Num <=(CLRBO+HLRBO+DBRBO+WBRBO+DPRBO+RHRBO+CSPBO+DBTDBO+WBTDBO+DPTDBO + NumUncontrolledSchemes + NumUserDefOpSchemes))THEN
+     CurrentModuleObject ='PlantEquipmentOperation:UserDefined'
+     Count = Num-CLRBO-HLRBO-DBRBO-WBRBO-DPRBO-RHRBO-CSPBO-DBTDBO-WBTDBO-DPTDBO-NumUncontrolledSchemes
    ELSE
      CALL ShowFatalError('Error in control scheme identification')
    ENDIF
@@ -655,7 +673,7 @@ SUBROUTINE GetOperationSchemeInput
     !**********GET INPUT AND LOAD PLANT DATA STRUCTURE*********
 
     !extend number of equipment lists to include one for each CSPBO
-  NumSchemeLists =NumSchemeLists+CSPBO
+  NumSchemeLists =NumSchemeLists+CSPBO+NumUserDefOpSchemes
   DO LoopNum = 1, TotNumLoops
     DO SchemeNum = 1, PlantLoop(LoopNum)%NumOpSchemes
 
@@ -672,6 +690,10 @@ SUBROUTINE GetOperationSchemeInput
       CASE ('PLANTEQUIPMENTOPERATION:COMPONENTSETPOINT') !* Temp Based Control
         CurrentModuleObject = 'PlantEquipmentOperation:ComponentSetPoint'
         CALL FindCompSPInput(CurrentModuleObject,CSPBO,LoopNum,SchemeNum,ErrorsFound)
+
+      CASE ('PLANTEQUIPMENTOPERATION:USERDEFINED')
+        CurrentModuleObject = 'PlantEquipmentOperation:UserDefined'
+        CALL GetUserDefinedOpSchemeInput(CurrentModuleObject,NumUserDefOpSchemes,LoopNum,SchemeNum,ErrorsFound)
 
       CASE ('PLANTEQUIPMENTOPERATION:OUTDOORDRYBULB')
         CurrentModuleObject = 'PlantEquipmentOperation:OutdoorDryBulb'
@@ -1311,7 +1333,7 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
       ENDIF
     ENDDO
     IF (SchemeNameFound) THEN
-     ! why only one equip list assumed here?
+     ! why only one equip list assumed here? because component setpoint managers have their own lists contained.
       PlantLoop(LoopNum)%OpScheme(SchemeNum)%NumEquipLists = 1
       ALLOCATE (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1))
       PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%NumComps   = (NumAlphas - 1)/5
@@ -1533,6 +1555,143 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
   RETURN
 END SUBROUTINE FindCompSPInput
 
+SUBROUTINE GetUserDefinedOpSchemeInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataIPShortCuts
+  USE DataPlant
+  USE InputProcessor, ONLY: GetObjectItem, SameString, FindItemInList
+
+  USE DataRuntimeLanguage, ONLY: EMSProgramCallManager, NumProgramCallManagers
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming
+  INTEGER, INTENT(IN)       :: NumSchemes    ! May be set here and passed on
+  INTEGER, INTENT(IN)       :: LoopNum       ! May be set here and passed on
+  INTEGER, INTENT(IN)       :: SchemeNum     ! May be set here and passed on
+  LOGICAL, INTENT(INOUT)    :: ErrorsFound   ! May be set here and passed on
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER   :: Plant     = 1     ! Used to identify whether the current loop is Plant
+  INTEGER, PARAMETER   :: Condenser = 2     ! Used to identify whether the current loop is Condenser
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: NumAlphas
+  INTEGER :: NumNums
+  INTEGER :: Num
+  INTEGER :: Compnum
+  INTEGER :: IOSTAT
+  LOGICAL :: SchemeNameFound ! Set to FALSE if a match of OpScheme object and OpScheme name is not found
+  CHARACTER(len=MaxNameLength) :: LoopOpSchemeObj    ! Used to identify the object name for loop equipment operation scheme
+  INTEGER :: StackMngrNum ! local temporary for Erl program calling manager index
+  LOGICAL  :: lDummy
+
+  SchemeNameFound = .TRUE.
+
+  IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+    LoopOpSchemeObj = 'PlantEquipmentOperationSchemes'
+  ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN
+    LoopOpSchemeObj = 'CondenserEquipmentOperationSchemes'
+  ENDIF
+
+  IF (NumSchemes .GT. 0) THEN
+
+    DO Num = 1, NumSchemes
+      CALL GetObjectItem(CurrentModuleObject,Num, &
+                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
+                        NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      IF(SameString(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name,cAlphaArgs(1))) EXIT !found the correct one
+      IF (Num == NumSchemes) THEN ! did not find it
+        CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
+                             '", could not find '// &
+                             TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+        ErrorsFound = .true.
+        SchemeNameFound = .FALSE.
+      ENDIF
+    ENDDO
+    IF (SchemeNameFound) THEN
+      PlantLoop(LoopNum)%OpScheme(SchemeNum)%NumEquipLists = 1
+      ALLOCATE (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1))
+
+      PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%NumComps   = (NumAlphas - 3)/2
+      IF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%NumComps .GT. 0) THEN
+        ALLOCATE (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp &
+                  (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%NumComps))
+        DO Compnum = 1, PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%NumComps
+          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%Typeof   = cAlphaArgs(Compnum*2+2)
+          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%Name     = cAlphaArgs(Compnum*2+3)
+
+          !Setup EMS actuators for machines' MyLoad.
+          CALL SetupEMSActuator('Plant Equipment Operation', &
+                                          TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//':'// &
+                                          TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%Name), &
+                                'Distributed Load Rate', '[W]', lDummy, &
+                                PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%EMSActuatorDispatchedLoadValue)
+          CALL SetupEMSInternalVariable('Component Remaining Current Demand Rate', &
+                                          TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//':'// &
+                                          TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%Name), '[W]', &
+                                  PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%EMSIntVarRemainingLoadValue)
+        ENDDO
+      ENDIF
+      StackMngrNum = FindItemInList(cAlphaArgs(2), EMSProgramCallManager%Name, NumProgramCallManagers)
+      IF (StackMngrNum > 0) THEN ! found it
+        PlantLoop(LoopNum)%OpScheme(SchemeNum)%ErlSimProgramMngr = StackMngrNum
+      ELSE
+        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+        CALL ShowContinueError('Entered in '//TRIM(CurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowContinueError('EMS Program Manager Name not found.')
+        ErrorsFound = .TRUE.
+      ENDIF
+      IF (.NOT. lAlphaFieldBlanks(3)) THEN
+        StackMngrNum = FindItemInList(cAlphaArgs(3), EMSProgramCallManager%Name, NumProgramCallManagers)
+        IF (StackMngrNum > 0) THEN ! found it
+          PlantLoop(LoopNum)%OpScheme(SchemeNum)%ErlInitProgramMngr = StackMngrNum
+        ELSE
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
+          CALL ShowContinueError('Entered in '//TRIM(CurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          CALL ShowContinueError('EMS Program Manager Name not found.')
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
+
+      ! setup internal variable for Supply Side Current Demand Rate [W]
+      CALL SetupEMSInternalVariable('Supply Side Current Demand Rate',PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name, '[W]', &
+                                        PlantLoop(LoopNum)%OpScheme(SchemeNum)%EMSIntVarLoopDemandRate )
+    ENDIF
+
+  ELSE
+    CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
+                         '", could not find '// &
+                         TRIM(CurrentModuleObject)//' = "'//TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name)//'".')
+    ErrorsFound=.true.
+  ENDIF
+  RETURN
+
+END SUBROUTINE GetUserDefinedOpSchemeInput
+
 ! End of GetInput subroutines for the Module
 !******************************************************************************
 
@@ -1560,7 +1719,8 @@ SUBROUTINE InitLoadDistribution(FirstHVACIteration)
           ! USE STATEMENTS:
   USE ScheduleManager, ONLY: GetScheduleIndex, GetCurrentScheduleValue
   USE InputProcessor, ONLY: SameString, FindItem
-  USE DataGlobals,    ONLY: BeginEnvrnFlag
+  USE DataGlobals,    ONLY: BeginEnvrnFlag, emsCallFromUserDefinedComponentModel
+  USE EMSManager,            ONLY: ManageEMS
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1609,6 +1769,7 @@ TYPE (OpSchemePtrData),          ALLOCATABLE, DIMENSION(:) :: TempCompOpscheme
   LOGICAL                           :: errFlag1
   LOGICAL                           :: errFlag2
   REAL(r64)                         :: HighestRange
+
   errFlag2 = .FALSE.
         !Get Input
   IF (GetPlantOpInput)THEN
@@ -1844,13 +2005,31 @@ IF (MyOneTimeFlag) THEN
         ENDIF
       ENDDO
     ENDDO  !operation scheme
-
   ENDDO  !loop
+
 
 
    MyOneTimeFlag = .FALSE.
 ENDIF
 
+
+If (AnyEMSPlantOpSchemesInModel) THEN
+  ! Execute any Initialization EMS program calling managers for User-Defined operation.
+  DO LoopNum = 1, TotNumLoops
+    DO OpNum =1, PlantLoop(LoopNum)%NumOpschemes
+      IF (PlantLoop(LoopNum)%Opscheme(OpNum)%OpSchemeType == EMSOpSchemeType) THEN
+        IF (BeginEnvrnFlag .and. PlantLoop(LoopNum)%Opscheme(OpNum)%MyEnvrnFlag) THEN
+          IF (PlantLoop(LoopNum)%OpScheme(OpNum)%ErlInitProgramMngr > 0) THEN
+            CALL ManageEMS(emsCallFromUserDefinedComponentModel, &
+                         ProgramManagerToRun = PlantLoop(LoopNum)%OpScheme(OpNum)%ErlInitProgramMngr)
+          ENDIF
+          PlantLoop(LoopNum)%Opscheme(OpNum)%MyEnvrnFlag = .FALSE.
+        ENDIF
+        IF (.NOT. BeginEnvrnFlag) PlantLoop(LoopNum)%Opscheme(OpNum)%MyEnvrnFlag = .TRUE.
+      ENDIF
+    ENDDO  !operation scheme
+  ENDDO  !loop
+ENDIF
 
     !FIRST HVAC INITS
 IF (FirstHVACIteration )THEN
@@ -2534,6 +2713,83 @@ INTEGER, INTENT(IN)         :: OpNum  !index for Plant()%loopside()%branch()%com
 END SUBROUTINE FindCompSPLoad
 
 
+SUBROUTINE DistributeUserDefinedPlantLoad(LoopNum, LoopSideNum,BranchNum,CompNum,CurCompLevelOpNum,CurSchemePtr,  &
+   LoopDemand,RemLoopDemand )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   August 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,  ONLY: emsCallFromUserDefinedComponentModel
+  USE EMSManager,   ONLY: ManageEMS
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)         :: LoopNum
+  INTEGER, INTENT(IN)         :: LoopSideNum
+  INTEGER, INTENT(IN)         :: BranchNum
+  INTEGER, INTENT(IN)         :: CompNum
+  INTEGER, INTENT(IN)         :: CurCompLevelOpNum  !index for Plant()%loopside()%branch()%comp()%opscheme()
+  INTEGER, INTENT(IN)         :: CurSchemePtr
+  REAL(r64), INTENT(IN)       :: LoopDemand
+  REAL(r64), INTENT(INOUT)    :: RemLoopDemand
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER                  :: CompPtr
+  INTEGER                  :: ListPtr
+
+ ! ListPtr = PlantLoop(LoopNum)%loopside(LoopSideNum)%branch(BranchNum)%comp(CompNum)%opscheme(CurCompLevelOpNum)%EquipList(1)%ListPtr
+  CompPtr = PlantLoop(LoopNum)%loopside(LoopSideNum)%branch(BranchNum)%comp(CompNum)  &
+     %opscheme(CurCompLevelOpNum)%EquipList(1)%CompPtr
+
+  ! fill internal variable
+  PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(1)%Comp(CompPtr)%EMSIntVarRemainingLoadValue = LoopDemand
+
+  ! Call EMS program(s)
+  IF ( PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%ErlSimProgramMngr > 0) THEN
+    CALL ManageEMS(emsCallFromUserDefinedComponentModel, &
+                       ProgramManagerToRun = PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%ErlSimProgramMngr)
+  ENDIF
+
+  ! move actuated value to MyLoad
+
+  PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad = &
+                               PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(1)%Comp(CompPtr)%EMSActuatorDispatchedLoadValue
+  PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EquipDemand = &
+                               PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(1)%Comp(CompPtr)%EMSActuatorDispatchedLoadValue
+  IF (ABS(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad) > LoopDemandTol) THEN
+    PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .TRUE.
+
+  ELSE
+    PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE DistributeUserDefinedPlantLoad
+
 ! End Load Calculation/Distribution Section of the Plant Loop Module
 !******************************************************************************
 
@@ -2585,6 +2841,7 @@ REAL(r64) FUNCTION FindRangeVariable (LoopNum, CurSchemePtr, CurSchemeType)
         NodeTemperature = Node(ReferenceNodeNum)%Temp
         FindRangeVariable = NodeTemperature - OutDewPointTemp
     END SELECT OperationScheme
+    !Objexx:Return Check/enforce that one of these CASEs holds or add a default case to assure return value is set
 
     RETURN
 
@@ -2679,7 +2936,7 @@ SUBROUTINE TurnOffLoopEquipment(LoopNum)
         !Sankar Non Integrated Economizer
         IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump) THEN
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%ON = .FALSE.
-          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0d0
         ENDIF
        END DO
       END DO
@@ -2724,7 +2981,7 @@ SUBROUTINE TurnOffLoopSideEquipment(LoopNum,LoopSideNum)
         !Sankar Non Integrated Economizer
         IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump ) THEN
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%ON = .FALSE.
-          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0d0
         ENDIF
        END DO
       END DO
@@ -2880,7 +3137,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
 
         !Loop Control
      IF(PlantLoop(LoopNum)%EMSCtrl)THEN
-       IF(PlantLoop(LoopNum)%EMSValue <= 0.0)THEN
+       IF(PlantLoop(LoopNum)%EMSValue <= 0.0d0)THEN
          LoopShutdownFlag = .TRUE.
          CALL TurnOffLoopEquipment(LoopNum)
          RETURN
@@ -2893,7 +3150,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
 
         !Half-loop control
      IF( PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSCtrl)THEN
-       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSValue <= 0.0)THEN
+       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%EMSValue <= 0.0d0)THEN
          CALL TurnOffLoopSideEquipment(LoopNum,LoopSideNum)
          RETURN
        ELSE
@@ -2903,10 +3160,10 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
 
      IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideOn)THEN
            !EMSValue <= 0 turn component OFF
-       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue <= 0.0)THEN
+       IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%EMSLoadOverrideValue <= 0.0d0)THEN
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%ON = .FALSE.
          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available = .FALSE.
-         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad =0.0
+         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad =0.0d0
          RETURN
        ELSE
            !EMSValue > 0 Set Component Load and Turn component ON
@@ -2930,7 +3187,7 @@ SUBROUTINE ActivateEMSControls(LoopNum,LoopSideNum, BranchNum, CompNum, LoopShut
              QTemporary      = CurMassFlowRate*CurSpecHeat*(Tinlet-ToutLowLimit)
 
              !- Don't correct if Q is zero, as this could indicate a component which this hasn't been implemented
-             IF(QTemporary.GT.0.0)THEN
+             IF(QTemporary.GT.0.0d0)THEN
 
 !unused               ChangeInLoad = MIN(ChangeInLoad,QTemporary)
                ! DSU?  weird ems thing here?

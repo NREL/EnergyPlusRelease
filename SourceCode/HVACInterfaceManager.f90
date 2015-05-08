@@ -650,7 +650,7 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
   IF (ThisTankMass <= 0.d0) THEN ! no mass, no plant loop volume
     IF (MassFlowRate > 0.d0) THEN
       TankFinalTemp = TankInletTemp + PumpHeat/(MassFlowRate * Cp)
-      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0
+      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0d0
     ELSE
       TankFinalTemp = LastTankOutletTemp
       TankAverageTemp = LastTankOutletTemp
@@ -663,12 +663,12 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
                        (MassFlowRate * Cp * TankInletTemp + PumpHeat)/ (MassFlowRate * Cp)
       TankAverageTemp = ((ThisTankMass*Cp)/(MassFlowRate * Cp)*(LastTankOutletTemp - &
                         (MassFlowRate * Cp * TankInletTemp + PumpHeat)/(MassFlowRate * Cp)) * &
-                        (1.0-exp(-(MassFlowRate * Cp) / (ThisTankMass*Cp)*TimeStepSeconds))/TimeStepSeconds + &
+                        (1.0d0-exp(-(MassFlowRate * Cp) / (ThisTankMass*Cp)*TimeStepSeconds))/TimeStepSeconds + &
                         (MassFlowRate * Cp * TankInletTemp + PumpHeat)/(MassFlowRate * Cp))
     ELSE
 
       TankFinalTemp = PumpHeat/(ThisTankMass*Cp)*TimeStepSeconds + LastTankOutletTemp
-      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0
+      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0d0
 
     END IF
   ENDIF
@@ -769,9 +769,9 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType, MixedOutle
 
   IF (TankInletLoopSide == DemandSide) THEN
     ! for common pipe loops, assume 75% of plant loop volume is on the demand side
-    FracTotLoopMass = 0.25
+    FracTotLoopMass = 0.25d0
   ELSE
-    FracTotLoopMass = 0.75
+    FracTotLoopMass = 0.75d0
   ENDIF
 
 ! This needs to be based on time to deal with system downstepping and repeated timesteps
@@ -809,7 +809,7 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType, MixedOutle
   IF (ThisTankMass <= 0.d0) THEN ! no mass, no plant loop volume
     IF (MassFlowRate > 0.d0) THEN
       TankFinalTemp = TankInletTemp + PumpHeat/(MassFlowRate * Cp)
-      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0
+      TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0d0
     ELSE
       TankFinalTemp = LastTankOutletTemp
       TankAverageTemp = LastTankOutletTemp
@@ -822,12 +822,12 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType, MixedOutle
                     (MassFlowRate * Cp * TankInletTemp + PumpHeat)/ (MassFlowRate * Cp)
       TankAverageTemp = ((ThisTankMass*Cp)/(MassFlowRate * Cp)*(LastTankOutletTemp - &
                         (MassFlowRate * Cp * TankInletTemp + PumpHeat)/(MassFlowRate * Cp)) * &
-                        (1.0-exp(-(MassFlowRate * Cp) / (ThisTankMass*Cp)*TimeStepSeconds))/TimeStepSeconds + &
+                        (1.0d0-exp(-(MassFlowRate * Cp) / (ThisTankMass*Cp)*TimeStepSeconds))/TimeStepSeconds + &
                         (MassFlowRate * Cp * TankInletTemp + PumpHeat)/(MassFlowRate * Cp))
     ELSE
 
         TankFinalTemp = PumpHeat/(ThisTankMass*Cp)*TimeStepSeconds + LastTankOutletTemp
-        TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0
+        TankAverageTemp = (TankFinalTemp + LastTankOutletTemp)/2.0d0
 
     END IF
   ENDIF

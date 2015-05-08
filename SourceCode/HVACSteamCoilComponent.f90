@@ -56,39 +56,39 @@ MODULE SteamCoils
      INTEGER      :: SteamCoilType_Num              = 0   !
      CHARACTER(len=MaxNameLength) :: Schedule       = ' ' ! SteamCoil Operation Schedule
      INTEGER      :: SchedPtr                       = 0   ! Pointer to the correct schedule
-     REAL(r64)    :: InletAirMassFlowRate           = 0.0 ! MassFlow through the SteamCoil being Simulated [kg/s]
-     REAL(r64)    :: OutletAirMassFlowRate          = 0.0 ! MassFlow throught the SteamCoil being Simulated[kg/s]
-     REAL(r64)    :: InletAirTemp                   = 0.0 ! Inlet Air Temperature Operating Condition [C]
-     REAL(r64)    :: OutletAirTemp                  = 0.0 ! Outlet Air Temperature Operating Condition [C]
-     REAL(r64)    :: InletAirHumRat                 = 0.0 ! Inlet Air Humidity Ratio Operating Condition
-     REAL(r64)    :: OutletAirHumRat                = 0.0 ! Outlet Air Humidity Ratio Calculated Condition
-     REAL(r64)    :: InletAirEnthalpy               = 0.0 ! Inlet Air enthalpy [J/kg]
-     REAL(r64)    :: OutletAirEnthalpy              = 0.0 ! Outlet Air enthalpy [J/kg]
-     REAL(r64)    :: TotSteamCoilLoad               = 0.0 ! Total Load on the Coil [W]
-     REAL(r64)    :: SenSteamCoilLoad               = 0.0 ! Sensible Load on the Coil [W]
-     REAL(r64)    :: TotSteamHeatingCoilEnergy      = 0.0 ! Total Heating Coil energy of the Coil [J]
-     REAL(r64)    :: TotSteamCoolingCoilEnergy      = 0.0 ! Total Cooling Coil energy of the Coil [J]
-     REAL(r64)    :: SenSteamCoolingCoilEnergy      = 0.0 ! Sensible Cooling Coil energy of the Coil [J]
-     REAL(r64)    :: TotSteamHeatingCoilRate        = 0.0 ! Total Heating Coil Rate on the Coil [W]
-     REAL(r64)    :: LoopLoss                       = 0.0 ! Loss in loop due to cond return to atm pressure
-     REAL(r64)    :: TotSteamCoolingCoilRate        = 0.0 ! Total Cooling Coil Rate on the Coil [W]
-     REAL(r64)    :: SenSteamCoolingCoilRate        = 0.0 ! Sensible Cooling Coil Rate on the Coil [W]
-     REAL(r64)    :: LeavingRelHum                  = 0.0 ! Simple Coil Latent Model requires User input for leaving RH
-     REAL(r64)    :: DesiredOutletTemp              = 0.0 ! Temp desired at the outlet (C)
-     REAL(r64)    :: DesiredOutletHumRat            = 0.0 ! Humudity Ratio desired at outlet (C)
-     REAL(r64)    :: InletSteamTemp                 = 0.0 ! Inlet Steam Temperature [C]
-     REAL(r64)    :: OutletSteamTemp                = 0.0 ! Outlet Steam Temperature [C]
-     REAL(r64)    :: InletSteamMassFlowRate         = 0.0 ! Inlet Steam Mass Flow Rate [Kg/s]
-     REAL(r64)    :: OutletSteamMassFlowRate        = 0.0 ! Outlet Steam Mass Flow Rate [Kg/s]
-     REAL(r64)    :: MaxSteamVolFlowRate            = 0.0 ! Maximum water Volume flow rate [m3/s]
-     REAL(r64)    :: MaxSteamMassFlowRate           = 0.0 ! Maximum water mass flow rate [Kg/s]
-     REAL(r64)    :: InletSteamEnthalpy             = 0.0 ! Inlet Water Enthalpy (J/Kg)
-     REAL(r64)    :: OutletWaterEnthalpy            = 0.0 ! Outlet Water Enthalpy (J/kg)
-     REAL(r64)    :: InletSteamPress                = 0.0 ! Pressure at steam inlet (Pa)
-     REAL(r64)    :: InletSteamQuality              = 0.0 ! Quality of steam at inlet
-     REAL(r64)    :: OutletSteamQuality             = 0.0 ! Quality of steam at outlet
-     REAL(r64)    :: DegOfSubCooling                = 0.0
-     REAL(r64)    :: LoopSubCoolReturn              = 0.0
+     REAL(r64)    :: InletAirMassFlowRate           = 0.0d0 ! MassFlow through the SteamCoil being Simulated [kg/s]
+     REAL(r64)    :: OutletAirMassFlowRate          = 0.0d0 ! MassFlow throught the SteamCoil being Simulated[kg/s]
+     REAL(r64)    :: InletAirTemp                   = 0.0d0 ! Inlet Air Temperature Operating Condition [C]
+     REAL(r64)    :: OutletAirTemp                  = 0.0d0 ! Outlet Air Temperature Operating Condition [C]
+     REAL(r64)    :: InletAirHumRat                 = 0.0d0 ! Inlet Air Humidity Ratio Operating Condition
+     REAL(r64)    :: OutletAirHumRat                = 0.0d0 ! Outlet Air Humidity Ratio Calculated Condition
+     REAL(r64)    :: InletAirEnthalpy               = 0.0d0 ! Inlet Air enthalpy [J/kg]
+     REAL(r64)    :: OutletAirEnthalpy              = 0.0d0 ! Outlet Air enthalpy [J/kg]
+     REAL(r64)    :: TotSteamCoilLoad               = 0.0d0 ! Total Load on the Coil [W]
+     REAL(r64)    :: SenSteamCoilLoad               = 0.0d0 ! Sensible Load on the Coil [W]
+     REAL(r64)    :: TotSteamHeatingCoilEnergy      = 0.0d0 ! Total Heating Coil energy of the Coil [J]
+     REAL(r64)    :: TotSteamCoolingCoilEnergy      = 0.0d0 ! Total Cooling Coil energy of the Coil [J]
+     REAL(r64)    :: SenSteamCoolingCoilEnergy      = 0.0d0 ! Sensible Cooling Coil energy of the Coil [J]
+     REAL(r64)    :: TotSteamHeatingCoilRate        = 0.0d0 ! Total Heating Coil Rate on the Coil [W]
+     REAL(r64)    :: LoopLoss                       = 0.0d0 ! Loss in loop due to cond return to atm pressure
+     REAL(r64)    :: TotSteamCoolingCoilRate        = 0.0d0 ! Total Cooling Coil Rate on the Coil [W]
+     REAL(r64)    :: SenSteamCoolingCoilRate        = 0.0d0 ! Sensible Cooling Coil Rate on the Coil [W]
+     REAL(r64)    :: LeavingRelHum                  = 0.0d0 ! Simple Coil Latent Model requires User input for leaving RH
+     REAL(r64)    :: DesiredOutletTemp              = 0.0d0 ! Temp desired at the outlet (C)
+     REAL(r64)    :: DesiredOutletHumRat            = 0.0d0 ! Humudity Ratio desired at outlet (C)
+     REAL(r64)    :: InletSteamTemp                 = 0.0d0 ! Inlet Steam Temperature [C]
+     REAL(r64)    :: OutletSteamTemp                = 0.0d0 ! Outlet Steam Temperature [C]
+     REAL(r64)    :: InletSteamMassFlowRate         = 0.0d0 ! Inlet Steam Mass Flow Rate [Kg/s]
+     REAL(r64)    :: OutletSteamMassFlowRate        = 0.0d0 ! Outlet Steam Mass Flow Rate [Kg/s]
+     REAL(r64)    :: MaxSteamVolFlowRate            = 0.0d0 ! Maximum water Volume flow rate [m3/s]
+     REAL(r64)    :: MaxSteamMassFlowRate           = 0.0d0 ! Maximum water mass flow rate [Kg/s]
+     REAL(r64)    :: InletSteamEnthalpy             = 0.0d0 ! Inlet Water Enthalpy (J/Kg)
+     REAL(r64)    :: OutletWaterEnthalpy            = 0.0d0 ! Outlet Water Enthalpy (J/kg)
+     REAL(r64)    :: InletSteamPress                = 0.0d0 ! Pressure at steam inlet (Pa)
+     REAL(r64)    :: InletSteamQuality              = 0.0d0 ! Quality of steam at inlet
+     REAL(r64)    :: OutletSteamQuality             = 0.0d0 ! Quality of steam at outlet
+     REAL(r64)    :: DegOfSubCooling                = 0.0d0
+     REAL(r64)    :: LoopSubCoolReturn              = 0.0d0
      INTEGER      :: AirInletNodeNum                = 0   ! Inlet node number at air side
      INTEGER      :: AirOutletNodeNum               = 0   ! Outlet node number at air side
      INTEGER      :: SteamInletNodeNum              = 0   ! SteamInletNodeNum
@@ -101,7 +101,7 @@ MODULE SteamCoils
      INTEGER      :: BranchNum                      = 0   ! index for plant branch for steam coil
      INTEGER      :: CompNum                        = 0   ! index for plant component for steam coil
      INTEGER      :: Coil_PlantTypeNum              = 0   ! plant level index for coil type
-     REAL(r64)    :: OperatingCapacity              = 0.0 ! capacity of steam coil at operating conditions (W)
+     REAL(r64)    :: OperatingCapacity              = 0.0d0 ! capacity of steam coil at operating conditions (W)
  END TYPE SteamCoilEquipConditions
 
   ! INTERFACE DEFINITIONS
@@ -154,7 +154,8 @@ END INTERFACE GetCoilAirOutletNode
  PUBLIC  GetCoilCapacity
  PUBLIC  GetTypeOfCoil
  PUBLIC  GetSteamCoilIndex
- Public  GetSteamCoilControlNodeNum
+ PUBLIC  GetSteamCoilControlNodeNum
+ PUBLIC  GetSteamCoilAvailScheduleIndex
 
 CONTAINS
 
@@ -247,11 +248,11 @@ CONTAINS
    IF(PRESENT(PartLoadRatio))THEN
      PartLoadFrac = PartLoadRatio
    ELSE
-     PartLoadFrac = 1.0
+     PartLoadFrac = 1.0d0
    END IF
 
    IF(SteamCoil(CoilNum)%SteamCoilType_Num == SteamCoil_AirHeating) THEN
-     CALL CalcSteamAirCoil(CoilNum,QCoilReq,QCoilActualTemp,OpMode,PartLoadFrac)
+     CALL CalcSteamAirCoil(CoilNum,QCoilReq,QCoilActualTemp,OpMode,PartLoadFrac) !Objexx:OPTIONAL QCoilReq used without PRESENT check
      IF(PRESENT(QCoilActual))QCoilActual=QcoilActualTemp
    END IF
 
@@ -343,7 +344,7 @@ CONTAINS
    ALLOCATE(cNumericFields(NumNums))
    cNumericFields=' '
    ALLOCATE(NumArray(NumNums))
-   NumArray=0.0
+   NumArray=0.0d0
    ALLOCATE(lAlphaBlanks(NumAlphas))
    lAlphaBlanks=.true.
    ALLOCATE(lNumericBlanks(NumNums))
@@ -569,36 +570,36 @@ CONTAINS
    ! Do the Begin Environment initializations
    IF (BeginEnvrnFlag .and. MyEnvrnFlag(CoilNum)) THEN
      !Initialize all report variables to a known state at beginning of simulation
-     SteamCoil(CoilNum)%TotSteamHeatingCoilEnergy = 0.0
-     SteamCoil(CoilNum)%TotSteamCoolingCoilEnergy = 0.0
-     SteamCoil(CoilNum)%SenSteamCoolingCoilEnergy = 0.0
-     SteamCoil(CoilNum)%TotSteamHeatingCoilRate   = 0.0
-     SteamCoil(CoilNum)%TotSteamCoolingCoilRate   = 0.0
-     SteamCoil(CoilNum)%SenSteamCoolingCoilRate   = 0.0
+     SteamCoil(CoilNum)%TotSteamHeatingCoilEnergy = 0.0d0
+     SteamCoil(CoilNum)%TotSteamCoolingCoilEnergy = 0.0d0
+     SteamCoil(CoilNum)%SenSteamCoolingCoilEnergy = 0.0d0
+     SteamCoil(CoilNum)%TotSteamHeatingCoilRate   = 0.0d0
+     SteamCoil(CoilNum)%TotSteamCoolingCoilRate   = 0.0d0
+     SteamCoil(CoilNum)%SenSteamCoolingCoilRate   = 0.0d0
      ! Initialize other module level variables
-     SteamCoil(CoilNum)%InletAirMassFlowRate = 0.0
-     SteamCoil(CoilNum)%OutletAirMassFlowRate = 0.0
-     SteamCoil(CoilNum)%InletAirTemp = 0.0
-     SteamCoil(CoilNum)%OutletAirTemp = 0.0
-     SteamCoil(CoilNum)%InletAirHumRat = 0.0
-     SteamCoil(CoilNum)%OutletAirHumRat = 0.0
-     SteamCoil(CoilNum)%InletAirEnthalpy = 0.0
-     SteamCoil(CoilNum)%OutletAirEnthalpy = 0.0
-     SteamCoil(CoilNum)%TotSteamCoilLoad = 0.0
-     SteamCoil(CoilNum)%SenSteamCoilLoad = 0.0
-     SteamCoil(CoilNum)%LoopLoss = 0.0
-     SteamCoil(CoilNum)%LeavingRelHum = 0.0
-     SteamCoil(CoilNum)%DesiredOutletTemp = 0.0
-     SteamCoil(CoilNum)%DesiredOutletHumRat = 0.0
-     SteamCoil(CoilNum)%InletSteamTemp = 0.0
-     SteamCoil(CoilNum)%OutletSteamTemp = 0.0
-     SteamCoil(CoilNum)%InletSteamMassFlowRate = 0.0
-     SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0
-     SteamCoil(CoilNum)%InletSteamEnthalpy = 0.0
-     SteamCoil(CoilNum)%OutletWaterEnthalpy = 0.0
-     SteamCoil(CoilNum)%InletSteamPress = 0.0
-     SteamCoil(CoilNum)%InletSteamQuality = 0.0
-     SteamCoil(CoilNum)%OutletSteamQuality = 0.0
+     SteamCoil(CoilNum)%InletAirMassFlowRate = 0.0d0
+     SteamCoil(CoilNum)%OutletAirMassFlowRate = 0.0d0
+     SteamCoil(CoilNum)%InletAirTemp = 0.0d0
+     SteamCoil(CoilNum)%OutletAirTemp = 0.0d0
+     SteamCoil(CoilNum)%InletAirHumRat = 0.0d0
+     SteamCoil(CoilNum)%OutletAirHumRat = 0.0d0
+     SteamCoil(CoilNum)%InletAirEnthalpy = 0.0d0
+     SteamCoil(CoilNum)%OutletAirEnthalpy = 0.0d0
+     SteamCoil(CoilNum)%TotSteamCoilLoad = 0.0d0
+     SteamCoil(CoilNum)%SenSteamCoilLoad = 0.0d0
+     SteamCoil(CoilNum)%LoopLoss = 0.0d0
+     SteamCoil(CoilNum)%LeavingRelHum = 0.0d0
+     SteamCoil(CoilNum)%DesiredOutletTemp = 0.0d0
+     SteamCoil(CoilNum)%DesiredOutletHumRat = 0.0d0
+     SteamCoil(CoilNum)%InletSteamTemp = 0.0d0
+     SteamCoil(CoilNum)%OutletSteamTemp = 0.0d0
+     SteamCoil(CoilNum)%InletSteamMassFlowRate = 0.0d0
+     SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0d0
+     SteamCoil(CoilNum)%InletSteamEnthalpy = 0.0d0
+     SteamCoil(CoilNum)%OutletWaterEnthalpy = 0.0d0
+     SteamCoil(CoilNum)%InletSteamPress = 0.0d0
+     SteamCoil(CoilNum)%InletSteamQuality = 0.0d0
+     SteamCoil(CoilNum)%OutletSteamQuality = 0.0d0
 
      ! More Environment initializations
      AirInletNode                              = SteamCoil(CoilNum)%AirInletNodeNum
@@ -611,8 +612,8 @@ CONTAINS
      SteamDensity   =GetSatDensityRefrig ('STEAM',Node(SteamInletNode)%Temp,1.0d0,Node(SteamInletNode)%FluidIndex,'InitSteamCoil')
      StartEnthSteam =GetSatEnthalpyRefrig('STEAM',Node(SteamInletNode)%Temp,1.0d0,Node(SteamInletNode)%FluidIndex,'InitSteamCoil')
      Node(SteamInletNode)%Enthalpy             = StartEnthSteam
-     Node(SteamInletNode)%Quality              = 1.0
-     Node(SteamInletNode)%HumRat               = 0.0
+     Node(SteamInletNode)%Quality              = 1.0d0
+     Node(SteamInletNode)%HumRat               = 0.0d0
      SteamCoil(CoilNum)%MaxSteamMassFlowRate   = SteamDensity*SteamCoil(CoilNum)%MaxSteamVolFlowRate
 !     Node(SteamInletNode)%MassFlowRate         = SteamCoil(CoilNum)%MaxSteamMassFlowRate
 !     Node(SteamInletNode)%MassFlowRateMinAvail = 0.0
@@ -649,7 +650,7 @@ CONTAINS
 
    ! If a temperature setpoint controlled coil must set the desired outlet temp everytime
    IF (ControlNode.EQ.0) THEN
-       SteamCoil(CoilNum)%DesiredOutletTemp = 0.0
+       SteamCoil(CoilNum)%DesiredOutletTemp = 0.0d0
    ELSE IF (ControlNode.EQ.AirOutletNode) THEN
        SteamCoil(CoilNum)%DesiredOutletTemp = Node(ControlNode)%TempSetPoint
    ELSE
@@ -670,9 +671,9 @@ CONTAINS
    SteamCoil(CoilNum)%InletSteamEnthalpy      = Node(SteamInletNode)%Enthalpy
    SteamCoil(CoilNum)%InletSteamPress         = Node(SteamInletNode)%Press
    SteamCoil(CoilNum)%InletSteamQuality       = Node(SteamInletNode)%Quality
-   SteamCoil(CoilNum)%TotSteamHeatingCoilRate = 0.0
-   SteamCoil(CoilNum)%TotSteamCoolingCoilRate = 0.0
-   SteamCoil(CoilNum)%SenSteamCoolingCoilRate = 0.0
+   SteamCoil(CoilNum)%TotSteamHeatingCoilRate = 0.0d0
+   SteamCoil(CoilNum)%TotSteamCoolingCoilRate = 0.0d0
+   SteamCoil(CoilNum)%SenSteamCoolingCoilRate = 0.0d0
 !   Node(SteamInletNode)%MassFlowRateMaxAvail = MIN(Node(SteamInletNode)%MassFlowRateMaxAvail,&
 !                                                   SteamCoil(CoilNum)%MaxSteamMassFlowRate)
 
@@ -743,13 +744,13 @@ CONTAINS
    ErrorsFound   = .FALSE.
    PltSizSteamNum = 0
    PltSizNum     = 0
-   CoilInTemp    = 0.0
-   CoilInHumRat  = 0.0
-   CoilOutTemp   = 0.0
-   DesCoilLoad   = 0.0
-   MinFlowFrac   = 0.0
-   DesMassFlow   = 0.0
-   CpWater       = 0.0
+   CoilInTemp    = 0.0d0
+   CoilInHumRat  = 0.0d0
+   CoilOutTemp   = 0.0d0
+   DesCoilLoad   = 0.0d0
+   MinFlowFrac   = 0.0d0
+   DesMassFlow   = 0.0d0
+   CpWater       = 0.0d0
    RhoAirStd     = PsyRhoAirFnPbTdbW(StdBaroPress,20.0d0,0.0d0)
    CpAirStd      = PsyCpAirFnWTdb(0.0d0,20.0d0)
 
@@ -782,14 +783,14 @@ CONTAINS
          DesMassFlow = RhoAirStd*DesVolFlow
          ! get the outside air fraction
          IF (FinalSysSizing(CurSysNum)%HeatOAOption == MinOA) THEN
-           IF (DesVolFlow > 0.0) THEN
+           IF (DesVolFlow > 0.0d0) THEN
              OutAirFrac = FinalSysSizing(CurSysNum)%DesOutAirVolFlow / DesVolFlow
            ELSE
-             OutAirFrac = 1.0
+             OutAirFrac = 1.0d0
            END IF
            OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
          ELSE
-           OutAirFrac = 1.0
+           OutAirFrac = 1.0d0
          END IF
          ! mixed air temp
          CoilInTemp = OutAirFrac*FinalSysSizing(CurSysNum)%HeatOutTemp + &
@@ -817,7 +818,7 @@ CONTAINS
                                                        SteamCoil(CoilNum)%DegOfSubCooling*CpWater))
 !             PlantSizData(PltSizSteamNum)%DeltaT*CPHW(PlantSizData(PltSizSteamNum)%ExitTemp)))
          ELSE
-           SteamCoil(CoilNum)%MaxSteamVolFlowRate = 0.0
+           SteamCoil(CoilNum)%MaxSteamVolFlowRate = 0.0d0
            CALL ShowWarningError('The design coil load is zero for COIL:Heating:Steam ' &
                                  //TRIM(SteamCoil(CoilNum)%Name))
            !CALL ShowContinueError('The autosize value for max Steam flow rate is zero')
@@ -861,11 +862,11 @@ CONTAINS
                                                        SteamCoil(CoilNum)%DegOfSubCooling*CpWater))
 !             PlantSizData(PltSizSteamNum)%DeltaT*CPHW(PlantSizData(PltSizSteamNum)%ExitTemp)))
            ELSE
-           SteamCoil(CoilNum)%MaxSteamVolFlowRate = 0.0
+           SteamCoil(CoilNum)%MaxSteamVolFlowRate = 0.0d0
            END IF
          END IF
          ! issue warning if hw coil has zero flow
-         IF (SteamCoil(CoilNum)%MaxSteamVolFlowRate == 0.0) THEN
+         IF (SteamCoil(CoilNum)%MaxSteamVolFlowRate == 0.0d0) THEN
            CALL ShowWarningError('The design coil load is zero for COIL:Heating:Steam ' &
                                  //TRIM(SteamCoil(CoilNum)%Name))
            CALL ShowContinueError('The autosize value for max Steam flow rate is zero')
@@ -880,7 +881,7 @@ CONTAINS
    ELSE
      ! if there is no heating Plant Sizing object and autosizng was requested, issue an error message
      IF (SteamCoil(CoilNum)%MaxSteamVolFlowRate == AutoSize) THEN
-       CALL ShowContinueError('Autosizing of Steam coil requires a heating loop Sizing:Plant object')
+       CALL ShowSevereError('Autosizing of Steam coil requires a heating loop Sizing:Plant object')
        CALL ShowContinueError('Occurs in Steam coil object= '//TRIM(SteamCoil(CoilNum)%Name))
        ErrorsFound = .TRUE.
      END IF
@@ -942,31 +943,31 @@ CONTAINS
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-   REAL(r64) :: SteamMassFlowRate =0.0
-   REAL(r64) :: AirMassFlow       =0.0! [kg/sec]
-   REAL(r64) :: TempAirIn         =0.0! [C]
-   REAL(r64) :: TempAirOut        =0.0! [C]
-   REAL(r64) :: Win               =0.0
-   REAL(r64) :: TempSteamIn       =0.0
-   REAL(r64) :: TempWaterOut      =0.0
-   REAL(r64) :: CapacitanceAir    =0.0
-   REAL(r64) :: HeatingCoilLoad   =0.0
-   REAL(r64) :: CoilPress         =0.0
-   REAL(r64) :: EnthSteamInDry    =0.0
-   REAL(r64) :: EnthSteamOutWet   =0.0
-   REAL(r64) :: LatentHeatSteam   =0.0
-   REAL(r64) :: SubCoolDeltaTemp  =0.0
-   REAL(r64) :: TempSetPoint      =0.0
-   REAL(r64) :: QCoilReq          =0.0
-   REAL(r64) :: QCoilCap          =0.0
-   REAL(r64) :: QSteamCoilMaxHT   =0.0
-   REAL(r64) :: TempWaterAtmPress =0.0
-   REAL(r64) :: TempLoopOutToPump =0.0
-   REAL(r64) :: EnergyLossToEnvironment=0.0
-   REAL(r64) :: EnthCoilOutlet    =0.0
-   REAL(r64) :: EnthPumpInlet     =0.0
-   REAL(r64) :: EnthAtAtmPress    =0.0
-   REAL(r64) :: CpWater           =0.0
+   REAL(r64) :: SteamMassFlowRate =0.0d0
+   REAL(r64) :: AirMassFlow       =0.0d0! [kg/sec]
+   REAL(r64) :: TempAirIn         =0.0d0! [C]
+   REAL(r64) :: TempAirOut        =0.0d0! [C]
+   REAL(r64) :: Win               =0.0d0
+   REAL(r64) :: TempSteamIn       =0.0d0
+   REAL(r64) :: TempWaterOut      =0.0d0
+   REAL(r64) :: CapacitanceAir    =0.0d0
+   REAL(r64) :: HeatingCoilLoad   =0.0d0
+   REAL(r64) :: CoilPress         =0.0d0
+   REAL(r64) :: EnthSteamInDry    =0.0d0
+   REAL(r64) :: EnthSteamOutWet   =0.0d0
+   REAL(r64) :: LatentHeatSteam   =0.0d0
+   REAL(r64) :: SubCoolDeltaTemp  =0.0d0
+   REAL(r64) :: TempSetPoint      =0.0d0
+   REAL(r64) :: QCoilReq          =0.0d0
+   REAL(r64) :: QCoilCap          =0.0d0
+   REAL(r64) :: QSteamCoilMaxHT   =0.0d0
+   REAL(r64) :: TempWaterAtmPress =0.0d0
+   REAL(r64) :: TempLoopOutToPump =0.0d0
+   REAL(r64) :: EnergyLossToEnvironment=0.0d0
+   REAL(r64) :: EnthCoilOutlet    =0.0d0
+   REAL(r64) :: EnthPumpInlet     =0.0d0
+   REAL(r64) :: EnthAtAtmPress    =0.0d0
+   REAL(r64) :: CpWater           =0.0d0
 
    QCoilReq          = QCoilRequested
    TempAirIn         = SteamCoil(CoilNum)%InletAirTemp
@@ -978,24 +979,24 @@ CONTAINS
 
 !  adjust mass flow rates for cycling fan cycling coil operation
    IF(FanOpMode .EQ. CycFanCycCoil)THEN
-     IF(PartLoadRatio .GT. 0.0)THEN
+     IF(PartLoadRatio .GT. 0.0d0)THEN
        AirMassFlow       = SteamCoil(CoilNum)%InletAirMassFlowRate / PartLoadRatio
        SteamMassFlowRate = MIN(SteamCoil(CoilNum)%InletSteamMassFlowRate / PartLoadRatio, &
                                SteamCoil(CoilNum)%MaxSteamMassFlowRate)
        QCoilReq          = QCoilReq / PartLoadRatio
      ELSE
-       AirMassFlow = 0.0
-       SteamMassFlowRate = 0.0
+       AirMassFlow = 0.0d0
+       SteamMassFlowRate = 0.0d0
      END IF
    ELSE
      AirMassFlow         = SteamCoil(CoilNum)%InletAirMassFlowRate
      SteamMassFlowRate   = SteamCoil(CoilNum)%InletSteamMassFlowRate
    END IF
 
-   IF (AirMassFlow .GT. 0.0) THEN     ! If the coil is operating
+   IF (AirMassFlow .GT. 0.0d0) THEN     ! If the coil is operating
      CapacitanceAir=PsyCpAirFnWTdb(Win,TempAirIn)*AirMassFlow
    Else
-     CapacitanceAir=0.0
+     CapacitanceAir=0.0d0
    End If
 
      ! If the coil is operating there should be some heating capacitance
@@ -1005,9 +1006,9 @@ CONTAINS
    Select Case(SteamCoil(CoilNum)%TypeofCoil )
 
      Case(ZoneloadControl)
-       IF((CapacitanceAir .GT. 0.0) .AND.((SteamCoil(CoilNum)%InletSteamMassFlowRate).GT.0.0).AND.  &
-           (GetCurrentScheduleValue(SteamCoil(CoilNum)%SchedPtr).GT. 0.0 .OR. MySizeFlag(CoilNum)).and. &
-           (QCoilReq .gt. 0.0)) THEN
+       IF((CapacitanceAir .GT. 0.0d0) .AND.((SteamCoil(CoilNum)%InletSteamMassFlowRate).GT.0.0d0).AND.  &
+           (GetCurrentScheduleValue(SteamCoil(CoilNum)%SchedPtr).GT. 0.0d0 .OR. MySizeFlag(CoilNum)).and. &
+           (QCoilReq .gt. 0.0d0)) THEN
 
           ! Steam heat exchangers would not have effectivness, since all of the steam is
           ! converted to water and only then the steam trap allows it to leave the heat
@@ -1104,19 +1105,19 @@ CONTAINS
 
           TempAirOut                                 = TempAirIn
           TempWaterOut                               = TempSteamIn
-          HeatingCoilLoad                            = 0.0
+          HeatingCoilLoad                            = 0.0d0
           SteamCoil(CoilNum)%OutletWaterEnthalpy     = SteamCoil(CoilNum)%InletSteamEnthalpy
-          SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0
-          SteamCoil(CoilNum)%OutletSteamQuality      = 0.0
-          SteamCoil(CoilNum)%LoopLoss                = 0.0
+          SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0d0
+          SteamCoil(CoilNum)%OutletSteamQuality      = 0.0d0
+          SteamCoil(CoilNum)%LoopLoss                = 0.0d0
           TempLoopOutToPump                          = TempWaterOut
        END IF
 
 
      Case(TemperatureSetPointControl)
        ! Control coil output to meet a Setpoint Temperature.
-       IF((CapacitanceAir .GT. 0.0) .AND.((SteamCoil(CoilNum)%InletSteamMassFlowRate).GT.0.0).AND.   &
-           (GetCurrentScheduleValue(SteamCoil(CoilNum)%SchedPtr).GT. 0.0 .OR. MySizeFlag(CoilNum)).and. &
+       IF((CapacitanceAir .GT. 0.0d0) .AND.((SteamCoil(CoilNum)%InletSteamMassFlowRate).GT.0.0d0).AND.   &
+           (GetCurrentScheduleValue(SteamCoil(CoilNum)%SchedPtr).GT. 0.0d0 .OR. MySizeFlag(CoilNum)).and. &
            (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
           ! Steam heat exchangers would not have effectivness, since all of the steam is
@@ -1140,8 +1141,8 @@ CONTAINS
 
           ! Check to see if setpoint above enetering temperature. If not, set
           ! output to zero.
-          IF(QCoilCap .LE. 0.0) THEN
-              QCoilCap = 0.0
+          IF(QCoilCap .LE. 0.0d0) THEN
+              QCoilCap = 0.0d0
               TempAirOut = TempAirIn
 
               ! Steam Mass Flow Rate Required
@@ -1287,11 +1288,11 @@ CONTAINS
                                    SteamCoil(CoilNum)%CompNum )
           TempAirOut                                 = TempAirIn
           TempWaterOut                               = TempSteamIn
-          HeatingCoilLoad                            = 0.0
+          HeatingCoilLoad                            = 0.0d0
           SteamCoil(CoilNum)%OutletWaterEnthalpy     = SteamCoil(CoilNum)%InletSteamEnthalpy
-          SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0
-          SteamCoil(CoilNum)%OutletSteamQuality      = 0.0
-          SteamCoil(CoilNum)%LoopLoss                = 0.0
+          SteamCoil(CoilNum)%OutletSteamMassFlowRate = 0.0d0
+          SteamCoil(CoilNum)%OutletSteamQuality      = 0.0d0
+          SteamCoil(CoilNum)%LoopLoss                = 0.0d0
           TempLoopOutToPump                          = TempWaterOut
        ENDIF
 
@@ -1305,7 +1306,7 @@ CONTAINS
    SteamCoil(CoilNum)%TotSteamHeatingCoilRate = HeatingCoilLoad
    SteamCoil(CoilNum)%OutletAirTemp           = TempAirOut
    SteamCoil(CoilNum)%OutletSteamTemp         = TempLoopOutToPump
-   SteamCoil(CoilNum)%OutletSteamQuality      = 0.0
+   SteamCoil(CoilNum)%OutletSteamQuality      = 0.0d0
    QCoilActual = HeatingCoilLoad
 
    ! This SteamCoil does not change the moisture or Mass Flow across the component
@@ -1650,7 +1651,7 @@ FUNCTION GetCoilMaxWaterFlowRate(CoilType,CoilName,ErrorsFound) RESULT(MaxWaterF
     WhichCoil=FindItem(CoilName,SteamCoil%Name,NumSteamCoils)
     IF (WhichCoil /= 0) THEN
       ! coil does not specify MaxWaterFlowRate
-      MaxWaterFlowRate=0.0
+      MaxWaterFlowRate=0.0d0
       CALL ShowRecurringWarningErrorAtEnd('Requested Max Water Flow Rate from COIL:Heating:Steam N/A',ErrCount)
     ENDIF
   ELSE
@@ -1661,7 +1662,7 @@ FUNCTION GetCoilMaxWaterFlowRate(CoilType,CoilName,ErrorsFound) RESULT(MaxWaterF
     CALL ShowSevereError('GetCoilMaxWaterFlowRate: Could not find CoilType="'//TRIM(CoilType)//  &
                          '" with Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    MaxWaterFlowRate=-1000.
+    MaxWaterFlowRate=-1000.d0
   ENDIF
 
   RETURN
@@ -1717,7 +1718,7 @@ FUNCTION GetCoilMaxSteamFlowRate(CoilIndex,ErrorsFound) RESULT(MaxSteamFlowRate)
   IF (CoilIndex == 0) THEN
     CALL ShowSevereError('GetCoilMaxSteamFlowRate: Could not find CoilType = "Coil:Heating:Steam"')
     ErrorsFound=.true.
-    MaxSteamFlowRate=0.
+    MaxSteamFlowRate=0.0d0
   ELSE
     MaxSteamFlowRate=SteamCoil(CoilIndex)%MaxSteamVolFlowRate
   ENDIF
@@ -2230,7 +2231,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(Capacity)
     CALL ShowSevereError('GetCoilSteamInletNode: Could not find CoilType="'//TRIM(CoilType)//  &
                          '" with Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    Capacity=0.0
+    Capacity=0.0d0
   ENDIF
 
   RETURN
@@ -2368,6 +2369,77 @@ FUNCTION GetSteamCoilControlNodeNum(CoilType,CoilName,ErrorFlag) RESULT(NodeNumb
   RETURN
 
 END FUNCTION GetSteamCoilControlNodeNum
+
+FUNCTION GetSteamCoilAvailScheduleIndex(CoilType,CoilName,ErrorsFound) RESULT(AvailSchIndex)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Chandan Sharma, FSEC
+          !       DATE WRITTEN   February 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given coil and returns the availability schedule index.  If
+          ! incorrect coil type or name is given, errorsfound is returned as true and index is returned
+          ! as zero.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItem, SameString
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  INTEGER                      :: AvailSchIndex   ! returned availability schedule of matched coil
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  ! Obtains and Allocates HeatingCoil related parameters from input file
+  IF (GetSteamCoilsInputFlag) THEN  !First time subroutine has been entered
+      CALL GetSteamCoilInput
+      GetSteamCoilsInputFlag=.false.
+  End If
+
+  WhichCoil=0
+  AvailSchIndex=0
+
+  IF (SameString(CoilType,'Coil:Heating:Steam')) THEN
+    WhichCoil=FindItem(CoilName,SteamCoil%Name,NumSteamCoils)
+    IF (WhichCoil /= 0) THEN
+      AvailSchIndex=SteamCoil(WhichCoil)%SchedPtr
+    ENDIF
+  ELSE
+    WhichCoil=0
+  ENDIF
+
+  IF (WhichCoil == 0) THEN
+    CALL ShowSevereError('GetCoilAvailScheduleIndex: Could not find Coil, Type="'// &
+                          TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    AvailSchIndex=0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetSteamCoilAvailScheduleIndex
 
         ! End of Utility subroutines for the SteamCoil Module
 

@@ -51,7 +51,7 @@ PRIVATE ! Everything private unless explicitly made public
   REAL(r64)  :: HA_FLOOR   ! HA_FLOOR Convection Coefficient times Area for the floor(?) subzone
   REAL(r64)  :: HeightFloorSubzoneTop = 0.2d0   ! Assumed thickness of floor subzone
   REAL(r64)  :: ThickOccupiedSubzoneMin = 0.2d0 ! Minimum thickness of occupied subzone
-  REAL(r64)  :: HeightIntMass=0.0 ! Height of internal mass surfaces, assumed vertical, cannot exceed ceiling height
+  REAL(r64)  :: HeightIntMass=0.0d0 ! Height of internal mass surfaces, assumed vertical, cannot exceed ceiling height
   REAL(r64)  :: HeightIntMassDefault = 2.0d0 ! Default height of internal mass surfaces
 
   ! SUBROUTINE SPECIFICATIONS:
@@ -172,12 +172,12 @@ SUBROUTINE InitUCSDDV(ZoneNum)
 
   ! Do the begin environment initializations
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(ZoneNum)) THEN
-    HAT_MX    = 0.0
-    HAT_OC    = 0.0
-    HA_MX     = 0.0
-    HA_OC     = 0.0
-    HAT_FLOOR = 0.0
-    HA_FLOOR  = 0.0
+    HAT_MX    = 0.0d0
+    HAT_OC    = 0.0d0
+    HA_MX     = 0.0d0
+    HA_OC     = 0.0d0
+    HAT_FLOOR = 0.0d0
+    HA_FLOOR  = 0.0d0
     MyEnvrnFlag(ZoneNum) = .FALSE.
   END IF
 
@@ -256,12 +256,12 @@ SUBROUTINE HcUCSDDV(ZoneNum,FractionHeight)
   REAL(r64)                               :: LayFrac             ! Fraction height of the Occupied/Mixed subzone interface
   INTEGER                                 :: SurfNum             ! Surface number
 
-  HAT_MX    = 0.0
-  HAT_OC    = 0.0
-  HA_MX     = 0.0
-  HA_OC     = 0.0
-  HAT_FLOOR = 0.0
-  HA_FLOOR  = 0.0
+  HAT_MX    = 0.0d0
+  HAT_OC    = 0.0d0
+  HA_MX     = 0.0d0
+  HA_OC     = 0.0d0
+  HAT_FLOOR = 0.0d0
+  HA_FLOOR  = 0.0d0
   ! Is the air flow model for this zone set to UCSDDV Displacement Ventilation?
   IF(IsZoneDV(ZoneNum)) THEN
     LayFrac = FractionHeight
@@ -440,7 +440,7 @@ SUBROUTINE HcUCSDDV(ZoneNum,FractionHeight)
       Surface(SurfNum)%TAirRef = AdjacentAirTemp
       IF (SurfNum == 0) CYCLE
       ZSupSurf = HeightIntMass
-      ZInfSurf = 0.0
+      ZInfSurf = 0.0d0
 
       IF(ZSupSurf < LayH)THEN
         TempEffBulkAir(SurfNum) = ZTOC(ZoneNum)
@@ -601,8 +601,8 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
   REAL(r64)     :: ZoneMult                ! total zone multiplier
   INTEGER       :: Loop
   INTEGER       :: FlagApertures
-  REAL(r64)     :: TempDepCoef=0.0           ! Formerly CoefSumha, coef in zone temp equation with dimensions of h*A
-  REAL(r64)     :: TempIndCoef=0.0           ! Formerly CoefSumhat, coef in zone temp equation with dimensions of h*A(T1
+  REAL(r64)     :: TempDepCoef=0.0d0           ! Formerly CoefSumha, coef in zone temp equation with dimensions of h*A
+  REAL(r64)     :: TempIndCoef=0.0d0           ! Formerly CoefSumhat, coef in zone temp equation with dimensions of h*A(T1
   INTEGER, DIMENSION(28) :: IntGainTypesOccupied = (/IntGainTypeOf_People, &
                                                     IntGainTypeOf_WaterHeaterMixed, &
                                                     IntGainTypeOf_WaterHeaterStratified, &
@@ -674,7 +674,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
   CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesOccupied, ConvGainsOccupiedSubzone)
 
   ConvGainsOccupiedSubzone = ConvGainsOccupiedSubzone &
-                      + 0.5*SysDepZoneLoadsLagged(ZoneNum)
+                      + 0.5d0*SysDepZoneLoadsLagged(ZoneNum)
 
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
@@ -686,7 +686,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
 
   CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesMixedSubzone, ConvGainsMixedSubzone)
   ConvGainsMixedSubzone = ConvGainsMixedSubzone  + SumConvHTRadSys(ZoneNum) &
-                           + 0.5*SysDepZoneLoadsLagged(ZoneNum)
+                           + 0.5d0*SysDepZoneLoadsLagged(ZoneNum)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
     CALL SumReturnAirConvectionGainsByTypes(ZoneNum, IntGainTypesMixedSubzone, RetAirGain)
     ConvGainsMixedSubzone = ConvGainsMixedSubzone + RetAirGain
@@ -695,8 +695,8 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
   ConvGains = ConvGainsOccupiedSubzone + ConvGainsMixedSubzone
 
   !=================== Entering air system temperature and flow====================
-  SumSysMCp = 0.0
-  SumSysMCpT = 0.0
+  SumSysMCp = 0.0d0
+  SumSysMCpT = 0.0d0
   ! Check to make sure if this is a controlled zone and determine ZoneEquipConfigNum
   ZoneEquipConfigNum = ZoneNum
   IF (ZoneEquipConfig(ZoneEquipConfigNum)%IsControlled) THEN
@@ -722,20 +722,20 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
 
   IF (TotPeople > 0) THEN
     NumberOfOccupants = 0
-    NumberOfPlumes = 0.0
+    NumberOfPlumes = 0.0d0
     DO Ctd = 1,TotPeople
       IF(People(Ctd)%ZonePtr == ZoneNum) THEN
         NumberOfOccupants = NumberOfOccupants + People(Ctd)%NumberOfPeople ! *GetCurrentScheduleValue(People(Ctd)%NumberOfPeoplePtr)
         NumberOfPlumes = NumberOfOccupants*NumPLPP
       ENDIF
     ENDDO
-    IF (NumberOfPlumes == 0.0) THEN
-      NumberOfPlumes = 1.0
+    IF (NumberOfPlumes == 0.0d0) THEN
+      NumberOfPlumes = 1.0d0
     ENDIF
     PowerInPlumes = (1.0d0-GainsFrac)*ConvGainsOccupiedSubzone
     PowerPerPlume = PowerInPlumes/NumberOfPlumes
   ELSE
-    NumberOfPlumes = 1.0
+    NumberOfPlumes = 1.0d0
     PowerInPlumes = (1.0d0-GainsFrac)*ConvGainsOccupiedSubzone
     PowerPerPlume = PowerInPlumes/NumberOfPlumes
   ENDIF
@@ -803,14 +803,15 @@ IF (NumOfLinksMultizone >0) THEN
   END DO
 ENDIF
 
-  IF ((PowerInPlumes .EQ. 0.0) .OR. (MCPT_Total .EQ. 0.0) .OR. FlagApertures==0) THEN
+  IF ((PowerInPlumes .EQ. 0.0d0) .OR. (MCPT_Total .EQ. 0.0d0) .OR. FlagApertures==0) THEN
     ! The system will mix
-    HeightFrac = 0.0
+    HeightFrac = 0.0d0
   ELSE
     HeightFrac = Min(24.55d0*(MCP_Total*0.000833d0/(NumberOfPlumes*PowerPerPlume**(1.d0/3.d0)))**0.6d0 / CeilingHeight , 1.0d0)
     DO Ctd = 1,4
       CALL HcUCSDDV(ZoneNum,HeightFrac)
-      HeightFrac = Min(24.55d0*(MCP_Total*0.000833d0/(NumberOfPlumes*PowerPerPlume**(1.d0/3.d0)))**0.6 / CeilingHeight , 1.0d0)
+      HeightFrac = Min(24.55d0*(MCP_Total*0.000833d0/(NumberOfPlumes*PowerPerPlume**(1.d0/3.d0)))**0.6d0 / CeilingHeight , 1.0d0)
+!EPTeam-replaces above (cause diffs)      HeightFrac = Min(24.55d0*(MCP_Total*0.000833d0/(NumberOfPlumes*PowerPerPlume**(1.d0/3.d0)))**0.6 / CeilingHeight , 1.0d0)
       HeightTransition(ZoneNum) = HeightFrac * CeilingHeight
       AIRRATFloor(ZoneNum) = Zone(ZoneNum)%Volume*MIN(HeightTransition(ZoneNum),HeightFloorSubzoneTop) &
                            /CeilingHeight*ZoneVolCapMultpSens &
@@ -864,7 +865,7 @@ ENDIF
           ZTFLOOR(ZoneNum) = (TempHistTerm + HAT_FLOOR + MCPT_Total + NonAirSystemResponse(ZoneNum)/ZoneMult) &
                          / ((11.0d0/6.0d0)*AirCap + HA_FLOOR + MCP_Total)
         CASE (UseAnalyticalSolution)
-          If (TempDepCoef .eq. 0.0) Then ! B=0
+          If (TempDepCoef .eq. 0.0d0) Then ! B=0
             ZTFLOOR(ZoneNum) = Zone1Floor(ZoneNum) + TempIndCoef/AirCap
           Else
             ZTFLOOR(ZoneNum) = (Zone1Floor(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
@@ -882,10 +883,10 @@ ENDIF
           ZTOC(ZoneNum) = (TempHistTerm + ConvGainsOccupiedSubzone*GainsFrac + HAT_OC + ZTFLOOR(ZoneNum)*MCP_Total) &
                    / ((11.0d0/6.0d0)*AirCap + HA_OC + MCP_Total)
         CASE (UseAnalyticalSolution)
-          If (TempDepCoef .eq. 0.0) Then ! B=0
+          If (TempDepCoef .eq. 0.0d0) Then ! B=0
             ZTOC(ZoneNum) = Zone1OC(ZoneNum) + TempIndCoef/AirCap
           Else
-            If (AirCap .eq. 0.0) Then
+            If (AirCap .eq. 0.0d0) Then
               ZTOC(ZoneNum) = TempIndCoef/TempDepCoef
             Else
               ZTOC(ZoneNum) = (Zone1OC(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
@@ -896,19 +897,19 @@ ENDIF
           ZTOC(ZoneNum) = (AirCap*Zone1OC(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
       END SELECT
       AirCap = AIRRATMX(ZoneNum)
-      TempHistTerm = AirCap*(3.0*ZTM1MX(ZoneNum)-(3.0d0/2.0d0)*ZTM2MX(ZoneNum)+(1.0d0/3.0d0)*ZTM3MX(ZoneNum))
+      TempHistTerm = AirCap*(3.0d0*ZTM1MX(ZoneNum)-(3.0d0/2.0d0)*ZTM2MX(ZoneNum)+(1.0d0/3.0d0)*ZTM3MX(ZoneNum))
       TempDepCoef = HA_MX + MCP_Total
-      TempIndCoef = ConvGainsOccupiedSubzone*(1.0-GainsFrac) + ConvGainsMixedSubzone+ HAT_MX + ZTOC(ZoneNum)*MCP_Total
+      TempIndCoef = ConvGainsOccupiedSubzone*(1.0d0-GainsFrac) + ConvGainsMixedSubzone+ HAT_MX + ZTOC(ZoneNum)*MCP_Total
       SELECT CASE (ZoneAirSolutionAlgo)
         CASE (Use3rdOrder)
-          ZTMX(ZoneNum) = (TempHistTerm + ConvGainsOccupiedSubzone*(1.0-GainsFrac) + ConvGainsMixedSubzone &
+          ZTMX(ZoneNum) = (TempHistTerm + ConvGainsOccupiedSubzone*(1.0d0-GainsFrac) + ConvGainsMixedSubzone &
                     + HAT_MX + ZTOC(ZoneNum)*MCP_Total) &
                    / ((11.0d0/6.0d0)*AirCap + HA_MX + MCP_Total)
         CASE (UseAnalyticalSolution)
-          If (TempDepCoef .eq. 0.0) Then ! B=0
+          If (TempDepCoef .eq. 0.0d0) Then ! B=0
             ZTMX(ZoneNum) = Zone1MX(ZoneNum) + TempIndCoef/AirCap
           Else
-            If (AirCap .eq. 0.0) Then
+            If (AirCap .eq. 0.0d0) Then
               ZTMX(ZoneNum) = TempIndCoef/TempDepCoef
             Else
               ZTMX(ZoneNum) = (Zone1MX(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
@@ -921,8 +922,9 @@ ENDIF
     END DO
 
     ! MinFlow for interface layer at z = 1.0
-    MinFlow = (1.d0/24.55d0*1.0d0)**(1.0d0/0.6d0)*NumberOfPlumes*PowerPerPlume**(1./3.)
-    IF (MinFlow /= 0.0) THEN
+    MinFlow = (1.d0/24.55d0*1.0d0)**(1.0d0/0.6d0)*NumberOfPlumes*PowerPerPlume**(1.0d0/3.0d0)
+!EPTeam above replaces (cause diffs?)   MinFlow = (1.d0/24.55d0*1.0d0)**(1.0d0/0.6d0)*NumberOfPlumes*PowerPerPlume**(1./3.)
+    IF (MinFlow /= 0.0d0) THEN
         FracMinFlow(ZoneNum) = MCP_Total*0.000833d0 / MinFlow
     ELSE
         FracMinFlow(ZoneNum) = 9.999d0
@@ -931,12 +933,12 @@ ENDIF
   END IF
 
   !=============================== M I X E D  Calculation ==============================================
-  IF(ZTMX(ZoneNum) < ZTOC(ZoneNum) .or. MCP_Total <= 0.0 .or. &
+  IF(ZTMX(ZoneNum) < ZTOC(ZoneNum) .or. MCP_Total <= 0.0d0 .or. &
       HeightFrac*CeilingHeight < (HeightFloorSubzoneTop + ThickOccupiedSubzoneMin)) THEN
       MIXFLAG = .TRUE.
-      HeightFrac = 0.0
-      AvgTempGrad(ZoneNum) = 0.0
-      MaxTempGrad(ZoneNum) = 0.0
+      HeightFrac = 0.0d0
+      AvgTempGrad(ZoneNum) = 0.0d0
+      MaxTempGrad(ZoneNum) = 0.0d0
       AirModel(ZoneNum)%SimAirModel = .FALSE.
       AirCap = AIRRAT(ZoneNum)
       TempHistTerm = AirCap*(3.0d0*ZTM1(ZoneNum)-(3.0d0/2.0d0)*ZTM2(ZoneNum)+(1.0d0/3.0d0)*ZTM3(ZoneNum))
@@ -949,7 +951,7 @@ ENDIF
             ZTAveraged = (TempHistTerm + ConvGains + HAT_MX + HAT_OC + HAT_FLOOR + MCpT_Total)/ &
                     ((11.0d0/6.0d0)*AirCap + HA_MX + HA_OC + HA_FLOOR + MCP_Total)
           CASE (UseAnalyticalSolution)
-            If (TempDepCoef .eq. 0.0) Then ! B=0
+            If (TempDepCoef .eq. 0.0d0) Then ! B=0
               ZTAveraged = ZoneT1(ZoneNum) + TempIndCoef/AirCap
             Else
               ZTAveraged = (ZoneT1(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
@@ -969,7 +971,7 @@ ENDIF
             ZTAveraged = (TempHistTerm + ConvGains + HAT_MX + HAT_OC + HAT_FLOOR + MCpT_Total)/ &
                     ((11.0d0/6.0d0)*AirCap + HA_MX + HA_OC + HA_FLOOR + MCP_Total)
           CASE (UseAnalyticalSolution)
-            If (TempDepCoef .eq. 0.0) Then ! B=0
+            If (TempDepCoef .eq. 0.0d0) Then ! B=0
               ZTAveraged = ZoneT1(ZoneNum) + TempIndCoef/AirCap
             Else
               ZTAveraged = (ZoneT1(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
@@ -998,7 +1000,7 @@ ENDIF
   IF (MIXFLAG) THEN
     TCMF(ZoneNum) = ZTAveraged
   ELSE
-    IF (HeightComfort >= 0.0 .AND. HeightComfort < HeightFloorSubzoneAve) THEN
+    IF (HeightComfort >= 0.0d0 .AND. HeightComfort < HeightFloorSubzoneAve) THEN
       CALL ShowWarningError ('Displacement ventilation comfort height is in floor subzone in Zone: '//TRIM(Zone(ZoneNum)%Name))
       TCMF(ZoneNum) = ZTFloor(ZoneNum)
     ELSEIF (HeightComfort >= HeightFloorSubzoneAve .AND. HeightComfort < HeightOccupiedSubzoneAve) THEN
@@ -1025,7 +1027,7 @@ ENDIF
   IF (MIXFLAG) THEN
     TempTstatAir(ZoneNum) = ZTAveraged
   ELSE
-    IF (HeightThermostat >= 0.0 .AND. HeightThermostat < HeightFloorSubzoneAve) THEN
+    IF (HeightThermostat >= 0.0d0 .AND. HeightThermostat < HeightFloorSubzoneAve) THEN
       CALL ShowWarningError ('Displacement thermostat is in floor subzone in Zone: '//TRIM(Zone(ZoneNum)%Name))
       TempTstatAir(ZoneNum) = ZTFloor(ZoneNum)
     ELSEIF (HeightThermostat >= HeightFloorSubzoneAve .AND. HeightThermostat < HeightOccupiedSubzoneAve) THEN
@@ -1084,13 +1086,13 @@ ENDIF
 
 ! Mixed for reporting purposes
   IF ((MIXFLAG) .OR. ((ZTMX(ZoneNum)-ZTOC(ZoneNum)).LT.TempDiffCritRep)) THEN
-    ZoneDVMixedFlagRep(ZoneNum) = 1.
-    FracMinFlow(ZoneNum) = -1.0
+    ZoneDVMixedFlagRep(ZoneNum) = 1.d0
+    FracMinFlow(ZoneNum) = -1.0d0
     HeightTransition(ZoneNum) = -9.999d0
     AvgTempGrad(ZoneNum) = -9.999d0
     MaxTempGrad(ZoneNum) = -9.999d0
   ELSE
-    ZoneDVMixedFlagRep(ZoneNum) = 0.
+    ZoneDVMixedFlagRep(ZoneNum) = 0.0d0
   ENDIF
 
 

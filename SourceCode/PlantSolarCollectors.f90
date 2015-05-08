@@ -45,9 +45,9 @@ INTEGER, PARAMETER :: ICSRectangularTank = 1
           ! DERIVED TYPE DEFINITIONS:
 TYPE ParametersData
   CHARACTER(len=MaxNameLength) :: Name = ''              ! Name of solar collector parameters
-  REAL(r64)                    :: Area = 0.0             ! Gross area of collector (m2)
+  REAL(r64)                    :: Area = 0.0d0             ! Gross area of collector (m2)
   INTEGER                      :: TestFluid = WATER      ! Test fluid (only WATER for now)
-  REAL(r64)                    :: TestMassFlowRate = 0.0 ! Test volumetric flow rate (m3/s)
+  REAL(r64)                    :: TestMassFlowRate = 0.0d0 ! Test volumetric flow rate (m3/s)
   INTEGER                      :: TestType = INLET       ! Test correlation type (INLET | AVERAGE | OUTLET)
   REAL(r64)                    :: eff0                   ! Coefficient 1 of efficiency equation (Y-intercept)
   REAL(r64)                    :: eff1                   ! Coefficient 2 of efficiency equation (1st order)
@@ -56,20 +56,20 @@ TYPE ParametersData
   REAL(r64)                    :: iam2                   ! Coefficient 3 of incident angle modifier (2nd order)
 
   INTEGER                      :: ICSType_Num             = 0   ! ICS collector type
-  REAL(r64)                    :: Volume                  = 0.0 ! collector water net volume (m3)
-  REAL(r64)                    :: SideHeight              = 0.0 ! collector side height (m)
-  REAL(r64)                    :: ThermalMass             = 0.0 ! thermal mass of the absorber plate (J/m2C)
-  REAL(r64)                    :: ULossSide               = 0.0 ! heat loss conductance for collector side (W/m2C)
-  REAL(r64)                    :: ULossBottom             = 0.0 ! heat loss conductance for collector bottom (W/m2C)
+  REAL(r64)                    :: Volume                  = 0.0d0 ! collector water net volume (m3)
+  REAL(r64)                    :: SideHeight              = 0.0d0 ! collector side height (m)
+  REAL(r64)                    :: ThermalMass             = 0.0d0 ! thermal mass of the absorber plate (J/m2C)
+  REAL(r64)                    :: ULossSide               = 0.0d0 ! heat loss conductance for collector side (W/m2C)
+  REAL(r64)                    :: ULossBottom             = 0.0d0 ! heat loss conductance for collector bottom (W/m2C)
 
-  REAL(r64)                    :: AspectRatio             = 0.0 ! collector aspect ratio (dimensionless)
+  REAL(r64)                    :: AspectRatio             = 0.0d0 ! collector aspect ratio (dimensionless)
   INTEGER                      :: NumOfCovers             = 0   ! number of transparent collector covers
-  REAL(r64)                    :: CoverSpacing            = 0.0 ! collector cover spacings (m)
-  REAL(r64)                    :: RefractiveIndex(2)      = 0.0 ! refractive idex of inner and outer covers (dimensionless)
-  REAL(r64)                    :: ExtCoefTimesThickness(2)= 0.0 ! extinction coefficient times thickness of covers (dimensionless)
-  REAL(r64)                    :: EmissOfCover(2)         = 0.0 ! emissivity of inner and outer covers (dimensionless)
-  REAL(r64)                    :: EmissOfAbsPlate         = 0.0 ! emissivity Of absorber plate (dimensionless)
-  REAL(r64)                    :: AbsorOfAbsPlate         = 0.0 ! absorptance of the absorber plate (dimensionless)
+  REAL(r64)                    :: CoverSpacing            = 0.0d0 ! collector cover spacings (m)
+  REAL(r64)                    :: RefractiveIndex(2)      = 0.0d0 ! refractive idex of inner and outer covers (dimensionless)
+  REAL(r64)                    :: ExtCoefTimesThickness(2)= 0.0d0 ! extinction coefficient times thickness of covers (dimensionless)
+  REAL(r64)                    :: EmissOfCover(2)         = 0.0d0 ! emissivity of inner and outer covers (dimensionless)
+  REAL(r64)                    :: EmissOfAbsPlate         = 0.0d0 ! emissivity Of absorber plate (dimensionless)
+  REAL(r64)                    :: AbsorOfAbsPlate         = 0.0d0 ! absorptance of the absorber plate (dimensionless)
 
 END TYPE ParametersData
 
@@ -90,71 +90,71 @@ TYPE , PUBLIC :: CollectorData
   INTEGER                      :: Parameters = 0              ! Parameters object number
   INTEGER                      :: Surface = 0                 ! Surface object number
   INTEGER                      :: InletNode = 0               ! Inlet node
-  REAL(r64)                    :: InletTemp = 0.0             ! Inlet temperature from plant (C)
+  REAL(r64)                    :: InletTemp = 0.0d0             ! Inlet temperature from plant (C)
   INTEGER                      :: OutletNode = 0              ! Outlet node
-  REAL(r64)                    :: OutletTemp = 0.0            ! Outlet temperature or stagnation temperature in the collector (C)
-  REAL(r64)                    :: MassFlowRate          = 0.0 ! Mass flow rate through the collector (kg/s)
-  REAL(r64)                    :: MassFlowRateMax       = 0.0 ! Maximum mass flow rate through the collector (kg/s)
-  REAL(r64)                    :: VolFlowRateMax        = 0.0 ! Maximum volumetric flow rate through the collector (m3/s)
+  REAL(r64)                    :: OutletTemp = 0.0d0            ! Outlet temperature or stagnation temperature in the collector (C)
+  REAL(r64)                    :: MassFlowRate          = 0.0d0 ! Mass flow rate through the collector (kg/s)
+  REAL(r64)                    :: MassFlowRateMax       = 0.0d0 ! Maximum mass flow rate through the collector (kg/s)
+  REAL(r64)                    :: VolFlowRateMax        = 0.0d0 ! Maximum volumetric flow rate through the collector (m3/s)
   INTEGER                      :: ErrIndex              = 0   ! Error index for recurring error
   INTEGER                      :: IterErrIndex          = 0   ! Error index for recurring error (iteration - did not converge)
 
   ! Report variables
-  REAL(r64)                    :: IncidentAngleModifier = 0.0 ! Net incident angle modifier
-  REAL(r64)                    :: Efficiency            = 0.0 ! Thermal efficiency of solar energy conversion
-  REAL(r64)                    :: Power                 = 0.0 ! Heat gain or loss to collector fluid (W)
-  REAL(r64)                    :: HeatGain              = 0.0 ! Heat gain to collector fluid (W)
-  REAL(r64)                    :: HeatLoss              = 0.0 ! Heat loss from collector fluid (W)
-  REAL(r64)                    :: Energy                = 0.0 ! Energy gained (or lost) to collector fluid (J)
+  REAL(r64)                    :: IncidentAngleModifier = 0.0d0 ! Net incident angle modifier
+  REAL(r64)                    :: Efficiency            = 0.0d0 ! Thermal efficiency of solar energy conversion
+  REAL(r64)                    :: Power                 = 0.0d0 ! Heat gain or loss to collector fluid (W)
+  REAL(r64)                    :: HeatGain              = 0.0d0 ! Heat gain to collector fluid (W)
+  REAL(r64)                    :: HeatLoss              = 0.0d0 ! Heat loss from collector fluid (W)
+  REAL(r64)                    :: Energy                = 0.0d0 ! Energy gained (or lost) to collector fluid (J)
 
   ! Report variables
-  REAL(r64)                    :: HeatRate              = 0.0   ! Collector useful Heat gain rate [W]
-  REAL(r64)                    :: HeatEnergy            = 0.0   ! Collector useful Heat gain energy [J]
-  REAL(r64)                    :: StoredHeatRate        = 0.0   ! net heat gain or loss rate of the collector fluid [W]
-  REAL(r64)                    :: StoredHeatEnergy      = 0.0   ! net heat gain or loss energy of the collector fluid [J]
-  REAL(r64)                    :: HeatGainRate          = 0.0   ! Collector useful Heat gain rate [W]
-  REAL(r64)                    :: HeatGainEnergy        = 0.0   ! Collector useful Heat gain energy (J)
-  REAL(r64)                    :: HeatLossRate          = 0.0   ! collector useful heat loss rate [W]
-  REAL(r64)                    :: HeatLossEnergy        = 0.0   ! Collector useful Heat loss energy [J]
-  REAL(r64)                    :: SkinHeatLossRate      = 0.0   ! collector skin heat loss rate [W]
-  REAL(r64)                    :: CollHeatLossEnergy    = 0.0   ! collector skin heat loss energy[J]
-  REAL(r64)                    :: TauAlpha              = 0.0   ! Transmittance-absorptance product total radiation
-  REAL(r64)                    :: UTopLoss              = 0.0   ! Over all top loss coefficient [W/m2.C]
-  REAL(r64)                    :: TempOfWater           = 0.0   ! average temperature of the collector water [C]
-  REAL(r64)                    :: TempOfAbsPlate        = 0.0   ! average temperature of the abs plate [C]
-  REAL(r64)                    :: TempOfInnerCover      = 0.0   ! temperature of the collector inner cover [C]
-  REAL(r64)                    :: TempOfOuterCover      = 0.0   ! temperature of the collector inner cover [C]
+  REAL(r64)                    :: HeatRate              = 0.0d0   ! Collector useful Heat gain rate [W]
+  REAL(r64)                    :: HeatEnergy            = 0.0d0   ! Collector useful Heat gain energy [J]
+  REAL(r64)                    :: StoredHeatRate        = 0.0d0   ! net heat gain or loss rate of the collector fluid [W]
+  REAL(r64)                    :: StoredHeatEnergy      = 0.0d0   ! net heat gain or loss energy of the collector fluid [J]
+  REAL(r64)                    :: HeatGainRate          = 0.0d0   ! Collector useful Heat gain rate [W]
+  REAL(r64)                    :: HeatGainEnergy        = 0.0d0   ! Collector useful Heat gain energy (J)
+  REAL(r64)                    :: HeatLossRate          = 0.0d0   ! collector useful heat loss rate [W]
+  REAL(r64)                    :: HeatLossEnergy        = 0.0d0   ! Collector useful Heat loss energy [J]
+  REAL(r64)                    :: SkinHeatLossRate      = 0.0d0   ! collector skin heat loss rate [W]
+  REAL(r64)                    :: CollHeatLossEnergy    = 0.0d0   ! collector skin heat loss energy[J]
+  REAL(r64)                    :: TauAlpha              = 0.0d0   ! Transmittance-absorptance product total radiation
+  REAL(r64)                    :: UTopLoss              = 0.0d0   ! Over all top loss coefficient [W/m2.C]
+  REAL(r64)                    :: TempOfWater           = 0.0d0   ! average temperature of the collector water [C]
+  REAL(r64)                    :: TempOfAbsPlate        = 0.0d0   ! average temperature of the abs plate [C]
+  REAL(r64)                    :: TempOfInnerCover      = 0.0d0   ! temperature of the collector inner cover [C]
+  REAL(r64)                    :: TempOfOuterCover      = 0.0d0   ! temperature of the collector inner cover [C]
 
   ! Data from elsewhere and calculated
-  REAL(r64)                    :: TauAlphaNormal        = 0.0   ! Transmittance-absorptance product normal radiation
-  REAL(r64)                    :: TauAlphaSkyDiffuse    = 0.0   ! Transmittance-absorptance product sky diffuse radiation
-  REAL(r64)                    :: TauAlphaGndDiffuse    = 0.0   ! Transmittance-absorptance product grn diffuse radiation
-  REAL(r64)                    :: TauAlphaBeam          = 0.0   ! Transmittance-absorptance product beam radiation
-  REAL(r64)                    :: CoversAbsSkyDiffuse(2)= 0.0   ! sky diffuse solar absorptance of cover
-  REAL(r64)                    :: CoversAbsGndDiffuse(2)= 0.0   ! ground diffuse solar absorptance of cover
-  REAL(r64)                    :: CoverAbs(2)           = 0.0   ! solar rad weighted covers absorptance
-  REAL(r64)                    :: TimeElapsed           = 0.0   ! Fraction of the current hour that has elapsed (h)
+  REAL(r64)                    :: TauAlphaNormal        = 0.0d0   ! Transmittance-absorptance product normal radiation
+  REAL(r64)                    :: TauAlphaSkyDiffuse    = 0.0d0   ! Transmittance-absorptance product sky diffuse radiation
+  REAL(r64)                    :: TauAlphaGndDiffuse    = 0.0d0   ! Transmittance-absorptance product grn diffuse radiation
+  REAL(r64)                    :: TauAlphaBeam          = 0.0d0   ! Transmittance-absorptance product beam radiation
+  REAL(r64)                    :: CoversAbsSkyDiffuse(2)= 0.0d0   ! sky diffuse solar absorptance of cover
+  REAL(r64)                    :: CoversAbsGndDiffuse(2)= 0.0d0   ! ground diffuse solar absorptance of cover
+  REAL(r64)                    :: CoverAbs(2)           = 0.0d0   ! solar rad weighted covers absorptance
+  REAL(r64)                    :: TimeElapsed           = 0.0d0   ! Fraction of the current hour that has elapsed (h)
                                                                 ! Saved in order to identify the beginning of a new system time
-  REAL(r64)                    :: UbLoss                = 0.0   ! Over all bottom loss coefficient [W/m2C]
-  REAL(r64)                    :: UsLoss                = 0.0   ! Over all side loss coefficient [W/m2C]
-  REAL(r64)                    :: AreaRatio             = 0.0   ! Side area to collector area ratio [-]
-  REAL(r64)                    :: RefSkyDiffInnerCover  = 0.0   ! Sky diffuse refl of inner cover (cover 1)
-  REAL(r64)                    :: RefGrnDiffInnerCover  = 0.0   ! ground diffuse refl of inner cover (cover 1)
-  REAL(r64)                    :: RefDiffInnerCover     = 0.0   ! diffuse reflectance of the inner cover (cover 1) from bottom
-  REAL(r64)                    :: SavedTempOfWater      = 0.0   ! water temp carried from time step to time step [C]
-  REAL(r64)                    :: SavedTempOfAbsPlate   = 0.0   ! abs plate temp carried from time step to time step [C]
+  REAL(r64)                    :: UbLoss                = 0.0d0   ! Over all bottom loss coefficient [W/m2C]
+  REAL(r64)                    :: UsLoss                = 0.0d0   ! Over all side loss coefficient [W/m2C]
+  REAL(r64)                    :: AreaRatio             = 0.0d0   ! Side area to collector area ratio [-]
+  REAL(r64)                    :: RefSkyDiffInnerCover  = 0.0d0   ! Sky diffuse refl of inner cover (cover 1)
+  REAL(r64)                    :: RefGrnDiffInnerCover  = 0.0d0   ! ground diffuse refl of inner cover (cover 1)
+  REAL(r64)                    :: RefDiffInnerCover     = 0.0d0   ! diffuse reflectance of the inner cover (cover 1) from bottom
+  REAL(r64)                    :: SavedTempOfWater      = 0.0d0   ! water temp carried from time step to time step [C]
+  REAL(r64)                    :: SavedTempOfAbsPlate   = 0.0d0   ! abs plate temp carried from time step to time step [C]
 
-  REAL(r64)                    :: SavedTempOfInnerCover = 0.0   ! inner cover temp carried from time step to time step [C]
-  REAL(r64)                    :: SavedTempOfOuterCover = 0.0   ! outer cover temp carried from time step to time step [C]
-  REAL(r64)                    :: SavedTempCollectorOSCM= 0.0   ! Temperature of collector back from OSCM at previous time step [C]
-  REAL(r64)                    :: Length                = 1.0   ! characteristic length of the abs plate
-  REAL(r64)                    :: TiltR2V               = 0.0   ! collector tilt angle from the vertical [degree]
-  REAL(r64)                    :: Tilt                  = 0.0   ! collector tilt angle from the horizontal [degree]
-  REAL(r64)                    :: CosTilt               = 0.0   ! cosine of colector tilt angle [-]
-  REAL(r64)                    :: SinTilt               = 0.0   ! sine of 1.8 times colector tilt angle [-]
-  REAL(r64)                    :: SideArea              = 0.0   ! weighted collector side area (m2)
-  REAL(r64)                    :: Area                  = 0.0   ! collector area (m2)
-  REAL(r64)                    :: Volume                = 0.0   ! collector net volume (m3)
+  REAL(r64)                    :: SavedTempOfInnerCover = 0.0d0   ! inner cover temp carried from time step to time step [C]
+  REAL(r64)                    :: SavedTempOfOuterCover = 0.0d0   ! outer cover temp carried from time step to time step [C]
+  REAL(r64)                    :: SavedTempCollectorOSCM= 0.0d0   ! Temperature of collector back from OSCM at previous time step [C]
+  REAL(r64)                    :: Length                = 1.0d0   ! characteristic length of the abs plate
+  REAL(r64)                    :: TiltR2V               = 0.0d0   ! collector tilt angle from the vertical [degree]
+  REAL(r64)                    :: Tilt                  = 0.0d0   ! collector tilt angle from the horizontal [degree]
+  REAL(r64)                    :: CosTilt               = 0.0d0   ! cosine of colector tilt angle [-]
+  REAL(r64)                    :: SinTilt               = 0.0d0   ! sine of 1.8 times colector tilt angle [-]
+  REAL(r64)                    :: SideArea              = 0.0d0   ! weighted collector side area (m2)
+  REAL(r64)                    :: Area                  = 0.0d0   ! collector area (m2)
+  REAL(r64)                    :: Volume                = 0.0d0   ! collector net volume (m3)
   LOGICAL                      :: OSCM_ON               = .FALSE. ! Boundary condition is OSCM
   LOGICAL                      :: InitICS               = .FALSE. ! used to initialize ICS variables only
 
@@ -387,7 +387,7 @@ SUBROUTINE GetSolarCollectorInput
   ALLOCATE(Alphas(MaxAlphas))
   Alphas=' '
   ALLOCATE(Numbers(MaxNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(MaxAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(MaxNumbers))
@@ -436,7 +436,7 @@ SUBROUTINE GetSolarCollectorInput
           ErrorsFound = .TRUE.
       END SELECT
 
-      IF (rNumericArgs(2) > 0.0) THEN
+      IF (rNumericArgs(2) > 0.0d0) THEN
         Parameters(ParametersNum)%TestMassFlowRate = rNumericArgs(2) * RhoH2O(InitConvTemp)
       ELSE
         CALL ShowSevereError(TRIM(CurrentModuleParamObject)//' = '//TRIM(cAlphaArgs(1))// &
@@ -464,20 +464,20 @@ SUBROUTINE GetSolarCollectorInput
       IF (NumNumbers > 4) THEN
         Parameters(ParametersNum)%eff2 = rNumericArgs(5)
       ELSE
-        Parameters(ParametersNum)%eff2 = 0.0
+        Parameters(ParametersNum)%eff2 = 0.0d0
       END IF
 
       ! Incident angle modifier coefficients
       IF (NumNumbers > 5) THEN
         Parameters(ParametersNum)%iam1 = rNumericArgs(6)
       ELSE
-        Parameters(ParametersNum)%iam1 = 0.0
+        Parameters(ParametersNum)%iam1 = 0.0d0
       END IF
 
       IF (NumNumbers > 6) THEN
         Parameters(FlatPlateParamNum)%iam2 = rNumericArgs(7)
       ELSE
-        Parameters(ParametersNum)%iam2 = 0.0
+        Parameters(ParametersNum)%iam2 = 0.0d0
       END IF
     END DO ! ParametersNum
 
@@ -556,7 +556,7 @@ SUBROUTINE GetSolarCollectorInput
       END IF
 
       ! Give warning if surface area and gross area do not match within tolerance
-      IF (SurfNum > 0 .AND. ParametersNum > 0 .AND. Parameters(ParametersNum)%Area > 0.0 &
+      IF (SurfNum > 0 .AND. ParametersNum > 0 .AND. Parameters(ParametersNum)%Area > 0.0d0 &
         .AND. ABS(Parameters(ParametersNum)%Area - Surface(SurfNum)%Area)/Surface(SurfNum)%Area > 0.01d0) THEN
 
         CALL ShowWarningError(TRIM(CurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
@@ -572,7 +572,7 @@ SUBROUTINE GetSolarCollectorInput
       IF (NumNumbers > 0) THEN
         Collector(CollectorNum)%VolFlowRateMax = rNumericArgs(1)  ! Max volumetric flow rate used for plant sizing calculation
       ELSE
-        Collector(CollectorNum)%VolFlowRateMax = 0.0  ! Max vol flow rate is not specified; no flow for plant sizing calculation
+        Collector(CollectorNum)%VolFlowRateMax = 0.0d0  ! Max vol flow rate is not specified; no flow for plant sizing calculation
         Collector(CollectorNum)%MassFlowRateMax = 999999.9d0  ! But...set a very high value so that it demands as much as possible
       END IF
 
@@ -782,7 +782,7 @@ SUBROUTINE GetSolarCollectorInput
       END IF
 
       ! Give warning if surface area and gross area do not match within tolerance
-      IF (SurfNum > 0 .AND. ParametersNum > 0 .AND. Parameters(ParametersNum)%Area > 0.0 &
+      IF (SurfNum > 0 .AND. ParametersNum > 0 .AND. Parameters(ParametersNum)%Area > 0.0d0 &
         .AND. ABS(Parameters(ParametersNum)%Area - Surface(SurfNum)%Area)/Surface(SurfNum)%Area > 0.01d0) THEN
 
         CALL ShowWarningError(TRIM(CurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))//': ')
@@ -826,8 +826,8 @@ SUBROUTINE GetSolarCollectorInput
       IF (NumNumbers > 0) THEN
         Collector(CollectorNum)%VolFlowRateMax = rNumericArgs(1)  ! Max volumetric flow rate used for plant sizing calculation
       ELSE
-        Collector(CollectorNum)%VolFlowRateMax = 0.0  ! Max vol flow rate is not specified; no flow for plant sizing calculation
-        Collector(CollectorNum)%MassFlowRateMax = 999999.9  ! But...set a very high value so that it demands as much as possible
+        Collector(CollectorNum)%VolFlowRateMax = 0.0d0  ! Max vol flow rate is not specified; no flow for plant sizing calculation
+        Collector(CollectorNum)%MassFlowRateMax = 999999.9d0  ! But...set a very high value so that it demands as much as possible
       END IF
 
       ! Setup report variables
@@ -918,7 +918,7 @@ SUBROUTINE InitSolarCollector(CollectorNum)
   INTEGER :: InletNode
   INTEGER :: OutletNode
 
-  REAL(r64),PARAMETER   ::   BigNumber=9999.9     !Component desired mass flow rate
+  REAL(r64),PARAMETER   ::   BigNumber=9999.9d0     !Component desired mass flow rate
 
   LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE. ! one time flag
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: SetLoopIndexFlag       ! get loop number flag
@@ -1042,7 +1042,7 @@ SUBROUTINE InitSolarCollector(CollectorNum)
 
       ! transmittance-absorptance product for sky diffuse radiation.  Uses equivalent incident angle
       ! of sky radiation (radians), and is calculated according to Brandemuehl and Beckman (1980):
-      Theta = (59.68d0 - 0.1388d0 * Tilt + 0.001497d0 * Tilt**2.0) * DegToRadians
+      Theta = (59.68d0 - 0.1388d0 * Tilt + 0.001497d0 * Tilt**2) * DegToRadians
       Call CalcTransRefAbsOfCover(CollectorNum,Theta,TransSys,RefSys,AbsCover1,AbsCover2)
       Collector(CollectorNum)%TauAlphaSkyDiffuse = TransSys * Parameters(ParamNum)%AbsorOfAbsPlate   &
                                                  / (1.d0-(1.d0-Parameters(ParamNum)%AbsorOfAbsPlate) &
@@ -1052,7 +1052,7 @@ SUBROUTINE InitSolarCollector(CollectorNum)
 
       ! transmittance-absorptance product for ground diffuse radiation.  Uses equivalent incident angle
       ! of ground radiation (radians), and is calculated according to Brandemuehl and Beckman (1980):
-      Theta = (90.0d0 - 0.5788d0 * Tilt + 0.002693d0 * Tilt**2.d0) * DegToRadians
+      Theta = (90.0d0 - 0.5788d0 * Tilt + 0.002693d0 * Tilt**2) * DegToRadians
       Call CalcTransRefAbsOfCover(CollectorNum,Theta,TransSys,RefSys,AbsCover1,AbsCover2)
       Collector(CollectorNum)%TauAlphaGndDiffuse = TransSys * Parameters(ParamNum)%AbsorOfAbsPlate     &
                                                  / (1.d0- (1.d0- Parameters(ParamNum)%AbsorOfAbsPlate) &
@@ -1181,7 +1181,7 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
   ParamNum = Collector(CollectorNum)%Parameters
 
   ! Calculate incident angle modifier
-  IF (QRadSWOutIncident(SurfNum) > 0.0) THEN
+  IF (QRadSWOutIncident(SurfNum) > 0.0d0) THEN
     ThetaBeam = ACOS(CosIncidenceAngle(SurfNum))
 
     ! Calculate equivalent incident angles for sky and ground radiation according to Brandemuehl and Beckman (1980)
@@ -1194,7 +1194,7 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
       + QRadSWOutIncidentGndDiffuse(SurfNum) * IAM(ParamNum, ThetaGnd)) &
       / QRadSWOutIncident(SurfNum)
   ELSE
-    IncidentAngleModifier = 0.0
+    IncidentAngleModifier = 0.0d0
   END IF
 
   InletTemp = Collector(CollectorNum)%InletTemp
@@ -1214,9 +1214,9 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
   mCpATest = Parameters(ParamNum)%TestMassFlowRate * Cp / Parameters(Collector(CollectorNum)%Parameters)%Area
 
   Iteration = 1
-  OutletTemp = 0.0
-  OutletTempPrev = 999.9 ! Set to a ridiculous number so that DO loop runs at least once
-  Q = 0.0
+  OutletTemp = 0.0d0
+  OutletTempPrev = 999.9d0 ! Set to a ridiculous number so that DO loop runs at least once
+  Q = 0.0d0
 
   DO WHILE (ABS(OutletTemp - OutletTempPrev) > TempConvergTol) ! Check for temperature convergence
 
@@ -1226,7 +1226,7 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
     SELECT CASE (Parameters(ParamNum)%TestType)
       CASE (INLET)
         FRULpTest = Parameters(ParamNum)%eff1 + Parameters(ParamNum)%eff2 * (InletTemp - Surface(SurfNum)%OutDryBulbTemp)
-        TestTypeMod = 1.0
+        TestTypeMod = 1.0d0
 
       CASE (AVERAGE)
         FRULpTest = Parameters(ParamNum)%eff1 + Parameters(ParamNum)%eff2 *   &
@@ -1244,9 +1244,9 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
     FRULT = Parameters(ParamNum)%eff2 * TestTypeMod
     FRULpTest = FRULpTest * TestTypeMod
 
-    IF (MassFlowRate > 0.0) THEN ! Calculate efficiency and heat transfer with flow
+    IF (MassFlowRate > 0.0d0) THEN ! Calculate efficiency and heat transfer with flow
 
-      IF ((1.0d0 + FRULpTest / mCpATest) > 0.0) THEN
+      IF ((1.0d0 + FRULpTest / mCpATest) > 0.0d0) THEN
         FpULTest = -mCpATest * LOG(1.0d0 + FRULpTest / mCpATest)
       ELSE
         FpULTest = FRULpTest ! Avoid LOG( <0 )
@@ -1273,24 +1273,24 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
 
       ! CR 7877 bound unreasonable result
       IF (OutletTemp < -100) THEN
-         OutletTemp = -100.0
+         OutletTemp = -100.0d0
          Q = MassFlowRate * Cp * (OutletTemp - InletTemp)
       ENDIF
       IF (OutletTemp > 200) THEN
-         OutletTemp = 200.0
+         OutletTemp = 200.0d0
          Q = MassFlowRate * Cp * (OutletTemp - InletTemp)
       ENDIF
 
-      IF (QRadSWOutIncident(SurfNum) > 0.0) THEN ! Calculate thermal efficiency
+      IF (QRadSWOutIncident(SurfNum) > 0.0d0) THEN ! Calculate thermal efficiency
         ! NOTE: Efficiency can be > 1 if Q > QRadSWOutIncident because of favorable delta T, i.e. warm outdoor temperature
         Efficiency = Q / (QRadSWOutIncident(SurfNum) * Area) ! Q has units of W; QRadSWOutIncident has units of W/m2
       ELSE
-        Efficiency = 0.0
+        Efficiency = 0.0d0
       END IF
 
     ELSE ! Calculate stagnation temperature of fluid in collector (no flow)
-      Q = 0.0
-      Efficiency = 0.0
+      Q = 0.0d0
+      Efficiency = 0.0d0
 
       ! Calculate temperature of stagnant fluid in collector
       A = -FRULT
@@ -1311,7 +1311,7 @@ SUBROUTINE CalcSolarCollector(CollectorNum)
                 '", coefficient error continues.',    &
           Collector(CollectorNum)%ErrIndex,ReportMinOf=qEquation,ReportMaxOf=qEquation)
       ENDIF
-      IF (FRULT == 0.0 .or. qEquation < 0.0d0) THEN ! Linear, 1st order solution
+      IF (FRULT == 0.0d0 .or. qEquation < 0.0d0) THEN ! Linear, 1st order solution
         OutletTemp = Surface(SurfNum)%OutDryBulbTemp - FRTAN * IncidentAngleModifier * QRadSWOutIncident(SurfNum) / FRUL
       ELSE ! Quadratic, 2nd order solution
         OutletTemp = (-B + qEquation**0.5d0) / (2.0d0 * A)
@@ -1395,7 +1395,7 @@ REAL(r64) FUNCTION IAM(ParamNum, IncidentAngle)
     IAM = 1.0d0 + Parameters(ParamNum)%iam1 * s + Parameters(ParamNum)%iam2 * (s**2)
     IAM = MAX(IAM, 0.0d0) ! Never allow to be less than zero, but greater than one is a possibility
 
-    IF (IAM > 10.0) THEN  ! Greater than 10 is probably not a possibility
+    IF (IAM > 10.0d0) THEN  ! Greater than 10 is probably not a possibility
       CALL ShowSevereError('IAM Function: SolarCollectorPerformance:FlatPlate = '//TRIM(Parameters(ParamNum)%Name)// &
         ':  Incident Angle Modifier is out of bounds due to bad coefficients.')
       WRITE(String, *) Parameters(ParamNum)%iam1
@@ -1962,7 +1962,7 @@ SUBROUTINE CalcHeatTransCoeffAndCoverTemp(ColleNum)
 
           ! FUNCTION PARAMETER DEFINITIONS:
    REAL(r64), PARAMETER  :: gravity        = 9.806d0     ! gravitational constant [m/s^2]
-   REAL(r64), PARAMETER  :: SmallNumber    = 1.00E-20    ! small number to avoid div by zero
+   REAL(r64), PARAMETER  :: SmallNumber    = 1.00d-20    ! small number to avoid div by zero
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 !  CHARACTER(len=MaxNameLength):: String        ! Dummy string for converting numbers to strings
@@ -2241,7 +2241,7 @@ FUNCTION CalcConvCoeffBetweenPlates(TempSurf1,TempSurf2,AirGap,CosTilt,SinTilt) 
       NuL = 0.0d0
     ELSE
       IF (RaNumCosTilt > 1708.d0) THEN
-        NuL = 1.44d0 * (1. - 1708.d0*(SinTilt**1.6d0)/(RaNum*CosTilt)) * (1.d0 - 1708.0/RaNumCosTilt)
+        NuL = 1.44d0 * (1.0d0 - 1708.d0*(SinTilt**1.6d0)/(RaNum*CosTilt)) * (1.d0 - 1708.0d0/RaNumCosTilt)
       ELSE
         NuL = 0.0d0
       ENDIF
@@ -2339,14 +2339,14 @@ FUNCTION CalcConvCoeffAbsPlateAndWater(TAbsorber,TWater,Lc,TiltR2V) RESULT (hCon
      IF ( abs(TiltR2V - 90.0d0) < 1.0d0) THEN
        ! It is a horizontal surface
        RaNum = GrNum * PrOfWater
-       IF (RaNum .LE. 1708.0) THEN
+       IF (RaNum .LE. 1708.0d0) THEN
          NuL = 1.0d0
        ELSE
          NuL = 0.58d0 * (RaNum)**0.20d0
        ENDIF
      ELSE
        RaNum = GrNum * PrOfWater * CosTilt
-       IF (RaNum .LE. 1708.0) THEN
+       IF (RaNum .LE. 1708.0d0) THEN
          NuL = 1.0d0
        ELSE
          NuL = 0.56d0 * (RaNum)**0.25d0
@@ -2355,7 +2355,7 @@ FUNCTION CalcConvCoeffAbsPlateAndWater(TAbsorber,TWater,Lc,TiltR2V) RESULT (hCon
   ELSE
      ! cold plate facing down or hot plate facing up
      RaNum = GrNum * PrOfWater
-     IF (RaNum .GT. 5.0E8) THEN
+     IF (RaNum .GT. 5.0d8) THEN
        NuL = 0.13d0 * (RaNum)**(1.d0/3.d0)
      ELSE
        NuL = 0.16d0 * (RaNum)**(1.d0/3.d0)

@@ -56,41 +56,41 @@ TYPE CoolBeamData
   INTEGER                      :: CBType_Num           =0   ! index to type of cooled beam: passive=1; active=2
   CHARACTER(len=MaxNameLength) :: Sched                =' ' ! availability schedule
   INTEGER                      :: SchedPtr             =0   ! index to schedule
-  REAL(r64)                    :: MaxAirVolFlow        =0.0 ! m3/s (autosizable)
-  REAL(r64)                    :: MaxAirMassFlow       =0.0 ! kg/s
-  REAL(r64)                    :: MaxCoolWaterVolFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxCoolWaterMassFlow =0.0 !kg/s
+  REAL(r64)                    :: MaxAirVolFlow        =0.0d0 ! m3/s (autosizable)
+  REAL(r64)                    :: MaxAirMassFlow       =0.0d0 ! kg/s
+  REAL(r64)                    :: MaxCoolWaterVolFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxCoolWaterMassFlow =0.0d0 !kg/s
   INTEGER                      :: AirInNode            =0   ! unit air inlet node number
   INTEGER                      :: AirOutNode           =0   ! unit air outlet node number
   INTEGER                      :: CWInNode             =0   ! chilled water inlet node
   INTEGER                      :: CWOutNode            =0   ! chilled water outlet node
   INTEGER                      :: ADUNum               =0   ! index of corresponding air distribution unit
-  REAL(r64)                    :: NumBeams             =0.0 ! number of beams in the zone
-  REAL(r64)                    :: BeamLength           =0.0 ! length of individual beam [m]
-  REAL(r64)                    :: DesInletWaterTemp    =0.0 ! design inlet water temperature [C]
-  REAL(r64)                    :: DesOutletWaterTemp   =0.0 ! design outlet water Temperature [c]
-  REAL(r64)                    :: CoilArea             =0.0 ! coil surface area per coil length [m2/m]
-  REAL(r64)                    :: a                    =0.0 ! model parameter a
-  REAL(r64)                    :: n1                   =0.0 ! model parameter n0
-  REAL(r64)                    :: n2                   =0.0 ! model parameter n1
-  REAL(r64)                    :: n3                   =0.0 ! model parameter n2
-  REAL(r64)                    :: a0                   =0.0 ! model parameter a0
-  REAL(r64)                    :: K1                   =0.0 ! model parameter K1
-  REAL(r64)                    :: n                    =0.0 ! model parameter n
-  REAL(r64)                    :: Kin                  =0.0 ! Coefficient of Induction Kin
-  REAL(r64)                    :: InDiam               =0.0 ! Leaving Pipe Inside Diameter
+  REAL(r64)                    :: NumBeams             =0.0d0 ! number of beams in the zone
+  REAL(r64)                    :: BeamLength           =0.0d0 ! length of individual beam [m]
+  REAL(r64)                    :: DesInletWaterTemp    =0.0d0 ! design inlet water temperature [C]
+  REAL(r64)                    :: DesOutletWaterTemp   =0.0d0 ! design outlet water Temperature [c]
+  REAL(r64)                    :: CoilArea             =0.0d0 ! coil surface area per coil length [m2/m]
+  REAL(r64)                    :: a                    =0.0d0 ! model parameter a
+  REAL(r64)                    :: n1                   =0.0d0 ! model parameter n0
+  REAL(r64)                    :: n2                   =0.0d0 ! model parameter n1
+  REAL(r64)                    :: n3                   =0.0d0 ! model parameter n2
+  REAL(r64)                    :: a0                   =0.0d0 ! model parameter a0
+  REAL(r64)                    :: K1                   =0.0d0 ! model parameter K1
+  REAL(r64)                    :: n                    =0.0d0 ! model parameter n
+  REAL(r64)                    :: Kin                  =0.0d0 ! Coefficient of Induction Kin
+  REAL(r64)                    :: InDiam               =0.0d0 ! Leaving Pipe Inside Diameter
   ! time step variables
-  REAL(r64)                    :: TWIn                 =0.0 ! current inlet water temperature [C]
-  REAL(r64)                    :: TWOut                =0.0 ! current outlet water temperature [C]
-  REAL(r64)                    :: EnthWaterOut         =0.0 ! current outlet water enthalpy [J/kg]
-  REAL(r64)                    :: BeamFlow             =0.0 ! supply air flow per beam [m3/s]
-  REAL(r64)                    :: CoolWaterMassFlow    =0.0 ! chilled water mass flow rate [kg/s]
-  REAL(r64)                    :: BeamCoolingEnergy    =0.0 ! Cooled beam cooling energy of all beams in the zone [J]
-  REAL(r64)                    :: BeamCoolingRate      =0.0 ! Cooled beam cooling rate of all beams in the zone [W]
-  REAL(r64)                    :: SupAirCoolingEnergy  =0.0 ! Total cooling energy from supply air [J]
-  REAL(r64)                    :: SupAirCoolingRate    =0.0 ! Total cooling rate from supply air [W]
-  REAL(r64)                    :: SupAirHeatingEnergy  =0.0 ! Total cooling energy from supply air [J]
-  REAL(r64)                    :: SupAirHeatingRate    =0.0 ! Total cooling rate from supply air [W]
+  REAL(r64)                    :: TWIn                 =0.0d0 ! current inlet water temperature [C]
+  REAL(r64)                    :: TWOut                =0.0d0 ! current outlet water temperature [C]
+  REAL(r64)                    :: EnthWaterOut         =0.0d0 ! current outlet water enthalpy [J/kg]
+  REAL(r64)                    :: BeamFlow             =0.0d0 ! supply air flow per beam [m3/s]
+  REAL(r64)                    :: CoolWaterMassFlow    =0.0d0 ! chilled water mass flow rate [kg/s]
+  REAL(r64)                    :: BeamCoolingEnergy    =0.0d0 ! Cooled beam cooling energy of all beams in the zone [J]
+  REAL(r64)                    :: BeamCoolingRate      =0.0d0 ! Cooled beam cooling rate of all beams in the zone [W]
+  REAL(r64)                    :: SupAirCoolingEnergy  =0.0d0 ! Total cooling energy from supply air [J]
+  REAL(r64)                    :: SupAirCoolingRate    =0.0d0 ! Total cooling rate from supply air [W]
+  REAL(r64)                    :: SupAirHeatingEnergy  =0.0d0 ! Total cooling energy from supply air [J]
+  REAL(r64)                    :: SupAirHeatingRate    =0.0d0 ! Total cooling rate from supply air [W]
 
   INTEGER                      :: CWLoopNum     = 0  ! cooling water plant loop index number
   INTEGER                      :: CWLoopSideNum = 0  ! cooling water plant loop side index
@@ -304,7 +304,7 @@ SUBROUTINE GetCoolBeams
   ALLOCATE(cNumericFields(NumNumbers))
   cNumericFields=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(lAlphaBlanks(NumAlphas))
   lAlphaBlanks=.true.
   ALLOCATE(lNumericBlanks(NumNumbers))
@@ -585,8 +585,8 @@ SUBROUTINE InitCoolBeam(CBNum,FirstHVACIteration)
     CoolBeam(CBNum)%MaxAirMassFlow = RhoAir * CoolBeam(CBNum)%MaxAirVolFlow
     Node(InAirNode)%MassFlowRateMax = CoolBeam(CBNum)%MaxAirMassFlow
     Node(OutAirNode)%MassFlowRateMax = CoolBeam(CBNum)%MaxAirMassFlow
-    Node(InAirNode)%MassFlowRateMin = 0.0
-    Node(OutAirNode)%MassFlowRateMin = 0.0
+    Node(InAirNode)%MassFlowRateMin = 0.0d0
+    Node(OutAirNode)%MassFlowRateMin = 0.0d0
 
     InWaterNode = CoolBeam(CBNum)%CWInNode
     OutWaterNode = CoolBeam(CBNum)%CWOutNode
@@ -612,18 +612,18 @@ SUBROUTINE InitCoolBeam(CBNum,FirstHVACIteration)
   ! Do the start of HVAC time step initializations
   IF (FirstHVACIteration) THEN
     ! check for upstream zero flow. If nonzero and schedule ON, set primary flow to max
-    IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .GT. 0.0 .AND. Node(InAirNode)%MassFlowRate .GT. 0.0) THEN
+    IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .GT. 0.0d0 .AND. Node(InAirNode)%MassFlowRate .GT. 0.0d0) THEN
       Node(InAirNode)%MassFlowRate = CoolBeam(CBNum)%MaxAirMassFlow
     ELSE
-      Node(InAirNode)%MassFlowRate = 0.0
+      Node(InAirNode)%MassFlowRate = 0.0d0
     END IF
     ! reset the max and min avail flows
-    IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .GT. 0.0 .AND. Node(InAirNode)%MassFlowRateMaxAvail .GT. 0.0) THEN
+    IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .GT. 0.0d0 .AND. Node(InAirNode)%MassFlowRateMaxAvail .GT. 0.0d0) THEN
         Node(InAirNode)%MassFlowRateMaxAvail = CoolBeam(CBNum)%MaxAirMassFlow
         Node(InAirNode)%MassFlowRateMinAvail = CoolBeam(CBNum)%MaxAirMassFlow
     ELSE
-      Node(InAirNode)%MassFlowRateMaxAvail = 0.0
-      Node(InAirNode)%MassFlowRateMinAvail = 0.0
+      Node(InAirNode)%MassFlowRateMaxAvail = 0.0d0
+      Node(InAirNode)%MassFlowRateMinAvail = 0.0d0
     END IF
 !Plant should do this    InWaterNode = CoolBeam(CBNum)%CWInNode
 !    Node(InWaterNode)%MassFlowRateMaxAvail = CoolBeam(CBNum)%MaxCoolWaterMassFlow
@@ -633,8 +633,8 @@ SUBROUTINE InitCoolBeam(CBNum,FirstHVACIteration)
   ! do these initializations every time step
   InWaterNode = CoolBeam(CBNum)%CWInNode
   CoolBeam(CBNum)%TWin = Node(InWaterNode)%Temp
-  CoolBeam(CBNum)%SupAirCoolingRate = 0.0
-  CoolBeam(CBNum)%SupAirHeatingRate = 0.0
+  CoolBeam(CBNum)%SupAirCoolingRate = 0.0d0
+  CoolBeam(CBNum)%SupAirHeatingRate = 0.0d0
 
   ! CoolBeam(CBNum)%BeamFlow = Node(InAirNode)%MassFlowRate / (StdRhoAir*CoolBeam(CBNum)%NumBeams)
 
@@ -689,27 +689,27 @@ SUBROUTINE SizeCoolBeam(CBNum)
   INTEGER   :: PltSizCoolNum = 0    ! index of plant sizing object for the cooling loop
   INTEGER   :: NumBeams = 0         ! number of beams in the zone
   INTEGER   :: Iter=0               ! beam length iteration index
-  REAL(r64) :: DesCoilLoad = 0.0    ! total cooling capacity of the beams in the zone [W]
-  REAL(r64) :: DesLoadPerBeam = 0.0 ! cooling capacity per individual beam [W]
-  REAL(r64) :: DesAirVolFlow = 0.0  ! design total supply air flow rate [m3/s]
-  REAL(r64) :: DesAirFlowPerBeam = 0.0   ! design supply air volumetric flow per beam [m3/s]
-  REAL(r64) :: RhoAir = 0.0
-  REAL(r64) :: CpAir = 0.0
-  REAL(r64) :: WaterVel = 0.0            ! design water velocity in beam
-  REAL(r64) :: IndAirFlowPerBeamL = 0.0  ! induced volumetric air flow rate per beam length [m3/s-m]
-  REAL(r64) :: DT = 0.0                  ! air - water delta T [C]
-  REAL(r64) :: LengthX = 0.0             ! test value for beam length [m]
-  REAL(r64) :: Length = 0.0              ! beam length [m]
-  REAL(r64) :: ConvFlow = 0.0            ! convective and induced air mass flow rate across beam per beam plan area [kg/s-m2]
-  REAL(r64) :: K = 0.0                   ! coil (beam) heat transfer coefficient [W/m2-K]
-  REAL(r64) :: WaterVolFlowPerBeam = 0.0 ! Cooling water volumetric flow per beam [m3]
+  REAL(r64) :: DesCoilLoad = 0.0d0    ! total cooling capacity of the beams in the zone [W]
+  REAL(r64) :: DesLoadPerBeam = 0.0d0 ! cooling capacity per individual beam [W]
+  REAL(r64) :: DesAirVolFlow = 0.0d0  ! design total supply air flow rate [m3/s]
+  REAL(r64) :: DesAirFlowPerBeam = 0.0d0   ! design supply air volumetric flow per beam [m3/s]
+  REAL(r64) :: RhoAir = 0.0d0
+  REAL(r64) :: CpAir = 0.0d0
+  REAL(r64) :: WaterVel = 0.0d0            ! design water velocity in beam
+  REAL(r64) :: IndAirFlowPerBeamL = 0.0d0  ! induced volumetric air flow rate per beam length [m3/s-m]
+  REAL(r64) :: DT = 0.0d0                  ! air - water delta T [C]
+  REAL(r64) :: LengthX = 0.0d0             ! test value for beam length [m]
+  REAL(r64) :: Length = 0.0d0              ! beam length [m]
+  REAL(r64) :: ConvFlow = 0.0d0            ! convective and induced air mass flow rate across beam per beam plan area [kg/s-m2]
+  REAL(r64) :: K = 0.0d0                   ! coil (beam) heat transfer coefficient [W/m2-K]
+  REAL(r64) :: WaterVolFlowPerBeam = 0.0d0 ! Cooling water volumetric flow per beam [m3]
   LOGICAL   :: ErrorsFound
   REAL(r64) :: rho ! local fluid density
   REAL(r64) :: Cp  ! local fluid specific heat
 
   PltSizCoolNum = 0
-  DesAirVolFlow = 0.0
-  CpAir = 0.0
+  DesAirVolFlow = 0.0d0
+  CpAir = 0.0d0
   RhoAir = StdRhoAir
   ErrorsFound = .FALSE.
   ! find the appropriate Plant Sizing object
@@ -720,7 +720,7 @@ SUBROUTINE SizeCoolBeam(CBNum)
 
   IF (CoolBeam(CBNum)%Kin == AutoCalculate) THEN
     IF (CoolBeam(CBNum)%CBType_Num == Passive_Cooled_Beam) THEN
-      CoolBeam(CBNum)%Kin = 0.0
+      CoolBeam(CBNum)%Kin = 0.0d0
     ELSE
       CoolBeam(CBNum)%Kin = 2.0d0
     END IF
@@ -737,7 +737,7 @@ SUBROUTINE SizeCoolBeam(CBNum)
       CoolBeam(CBNum)%MaxAirVolFlow = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                            TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
       IF (CoolBeam(CBNum)%MaxAirVolFlow < SmallAirVolFlow) THEN
-        CoolBeam(CBNum)%MaxAirVolFlow = 0.0
+        CoolBeam(CBNum)%MaxAirVolFlow = 0.0d0
       END IF
       CALL ReportSizingOutput(CoolBeam(CBNum)%UnitType, CoolBeam(CBNum)%Name, &
                               'Supply Air Flow Rate [m3/s]', CoolBeam(CBNum)%MaxAirVolFlow)
@@ -758,7 +758,7 @@ SUBROUTINE SizeCoolBeam(CBNum)
           CpAir = PsyCpAirFnWTdb(FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat,FinalZoneSizing(CurZoneEqNum)%CoolDesTemp)
           ! the design cooling coil load is the zone load minus whatever the central system does. Note that
           ! DesCoolCoilInTempTU is really the primary air inlet temperature for the unit.
-          IF (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0) THEN
+          IF (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0d0) THEN
             DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolLoad - CpAir*RhoAir*DesAirVolFlow* &
               (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak - FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU)
           ELSE
@@ -781,16 +781,16 @@ SUBROUTINE SizeCoolBeam(CBNum)
                                                  Cp * rho )
           CoolBeam(CBNum)%MaxCoolWaterVolFlow = MAX(CoolBeam(CBNum)%MaxCoolWaterVolFlow,0.0d0)
           IF (CoolBeam(CBNum)%MaxCoolWaterVolFlow < SmallWaterVolFlow) THEN
-            CoolBeam(CBNum)%MaxCoolWaterVolFlow = 0.0
+            CoolBeam(CBNum)%MaxCoolWaterVolFlow = 0.0d0
           END IF
         ELSE
-          CoolBeam(CBNum)%MaxCoolWaterVolFlow = 0.0
+          CoolBeam(CBNum)%MaxCoolWaterVolFlow = 0.0d0
         END IF
 
         CALL ReportSizingOutput(CoolBeam(CBNum)%UnitType, CoolBeam(CBNum)%Name, &
                                 'Maximum Total Chilled Water Flow Rate [m3/s]', CoolBeam(CBNum)%MaxCoolWaterVolFlow)
       ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
+        CALL ShowSevereError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
         CALL ShowContinueError('Occurs in' //  TRIM(CoolBeam(CBNum)%UnitType) // ' Object='//TRIM(CoolBeam(CBNum)%Name))
         ErrorsFound = .TRUE.
       END IF
@@ -830,15 +830,15 @@ SUBROUTINE SizeCoolBeam(CBNum)
         DesCoilLoad = CoolBeam(CBNum)%MaxCoolWaterVolFlow *   &
            (CoolBeam(CBNum)%DesOutletWaterTemp - CoolBeam(CBNum)%DesInletWaterTemp) &
             * Cp  * rho
-        IF (DesCoilLoad > 0.0) THEN
+        IF (DesCoilLoad > 0.0d0) THEN
           DesLoadPerBeam = DesCoilLoad / NumBeams
           DesAirFlowPerBeam = CoolBeam(CBNum)%MaxAirVolFlow / NumBeams
           WaterVolFlowPerBeam = CoolBeam(CBNum)%MaxCoolWaterVolFlow / NumBeams
           WaterVel = WaterVolFlowPerBeam / (Pi * (CoolBeam(CBNum)%InDiam)**2 / 4.0d0)
-          IF (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0) THEN
+          IF (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0d0) THEN
             DT = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak - 0.5d0*  &
                (CoolBeam(CBNum)%DesInletWaterTemp + CoolBeam(CBNum)%DesOutletWaterTemp)
-            IF (DT <= 0.0) THEN
+            IF (DT <= 0.0d0) THEN
               DT = 7.8d0
             END IF
           ELSE
@@ -855,7 +855,7 @@ SUBROUTINE SizeCoolBeam(CBNum)
                   * (WaterVel/MinWaterVel)
             END IF
             Length = DesLoadPerBeam / (K * CoolBeam(CBNum)%CoilArea * DT)
-            IF (CoolBeam(CBNum)%Kin <= 0.0) EXIT
+            IF (CoolBeam(CBNum)%Kin <= 0.0d0) EXIT
             ! Check for convergence
             IF (ABS(Length - LengthX) > 0.01d0) THEN
               ! New guess for length
@@ -865,14 +865,14 @@ SUBROUTINE SizeCoolBeam(CBNum)
             END IF
           END DO
         ELSE
-          Length = 0.0
+          Length = 0.0d0
         END IF
         CoolBeam(CBNum)%BeamLength = Length
         CoolBeam(CBNum)%BeamLength = MAX(CoolBeam(CBNum)%BeamLength,1.0d0)
         CALL ReportSizingOutput(CoolBeam(CBNum)%UnitType, CoolBeam(CBNum)%Name, &
                                 'Beam Length [m]', CoolBeam(CBNum)%BeamLength)
       ELSE
-        CALL ShowContinueError('Autosizing of cooled beam length requires a cooling loop Sizing:Plant object')
+        CALL ShowSevereError('Autosizing of cooled beam length requires a cooling loop Sizing:Plant object')
         CALL ShowContinueError('Occurs in' //  TRIM(CoolBeam(CBNum)%UnitType) // ' Object='//TRIM(CoolBeam(CBNum)%Name))
         ErrorsFound = .TRUE.
       END IF
@@ -882,7 +882,7 @@ SUBROUTINE SizeCoolBeam(CBNum)
   END IF
 
     ! save the design water volumetric flow rate for use by the water loop sizing algorithms
-  IF (CoolBeam(CBNum)%MaxCoolWaterVolFlow > 0.0) THEN
+  IF (CoolBeam(CBNum)%MaxCoolWaterVolFlow > 0.0d0) THEN
     CALL RegisterPlantCompDesignFlow(CoolBeam(CBNum)%CWInNode,CoolBeam(CBNum)%MaxCoolWaterVolFlow)
   END IF
 
@@ -938,18 +938,18 @@ SUBROUTINE ControlCoolBeam(CBNum,ZoneNum,ZoneNodeNum,FirstHVACIteration,NonAirSy
   REAL(r64)    :: QZnReq            ! heating or cooling needed by zone [Watts]
   REAL(r64)    :: QToHeatSetPt      ! [W]  remaining load to heating setpoint
   REAL(r64)    :: QToCoolSetPt      ! [W]  remaining load to cooling setpoint
-  REAL(r64)    :: QMin=0.0          ! cooled beam output at minimum water flow [W]
-  REAL(r64)    :: QMax=0.0          ! cooled beam output at maximum water flow [W]
-  REAL(r64)    :: QSup=0.0          ! heating or cooling by supply air [W]
-  REAL(r64)    :: PowerMet=0.0      ! power supplied
-  REAL(r64)    :: CWFlow=0.0        ! cold water flow [kg/s]
-  REAL(r64)    :: AirMassFlow=0.0   ! air mass flow rate for the cooled beam system [kg/s]
-  REAL(r64)    :: MaxColdWaterFlow=0.0   ! max water mass flow rate for the cooled beam system [kg/s]
-  REAL(r64)    :: MinColdWaterFlow=0.0   ! min water mass flow rate for the cooled beam system [kg/s]
-  REAL(r64)    :: CpAirZn=0.0       ! specific heat of air at zone conditions [J/kg-C]
-  REAL(r64)    :: CpAirSys=0.0      ! specific heat of air at supply air conditions [J/kg-C]
-  REAL(r64)    :: TWOut=0.0         ! outlet water tamperature [C]
-  REAL(r64)    :: NumBeams=0.0      ! number of beams
+  REAL(r64)    :: QMin=0.0d0          ! cooled beam output at minimum water flow [W]
+  REAL(r64)    :: QMax=0.0d0          ! cooled beam output at maximum water flow [W]
+  REAL(r64)    :: QSup=0.0d0          ! heating or cooling by supply air [W]
+  REAL(r64)    :: PowerMet=0.0d0      ! power supplied
+  REAL(r64)    :: CWFlow=0.0d0        ! cold water flow [kg/s]
+  REAL(r64)    :: AirMassFlow=0.0d0   ! air mass flow rate for the cooled beam system [kg/s]
+  REAL(r64)    :: MaxColdWaterFlow=0.0d0   ! max water mass flow rate for the cooled beam system [kg/s]
+  REAL(r64)    :: MinColdWaterFlow=0.0d0   ! min water mass flow rate for the cooled beam system [kg/s]
+  REAL(r64)    :: CpAirZn=0.0d0       ! specific heat of air at zone conditions [J/kg-C]
+  REAL(r64)    :: CpAirSys=0.0d0      ! specific heat of air at supply air conditions [J/kg-C]
+  REAL(r64)    :: TWOut=0.0d0         ! outlet water tamperature [C]
+  REAL(r64)    :: NumBeams=0.0d0      ! number of beams
   INTEGER      :: ControlNode       ! the water inlet node
   INTEGER      :: InAirNode         ! the air inlet node
   LOGICAL      :: UnitOn            ! TRUE if unit is on
@@ -958,7 +958,7 @@ SUBROUTINE ControlCoolBeam(CBNum,ZoneNum,ZoneNodeNum,FirstHVACIteration,NonAirSy
   REAL(r64) :: ErrTolerance
 
   UnitOn = .TRUE.
-  PowerMet = 0.0
+  PowerMet = 0.0d0
   InAirNode = CoolBeam(CBNum)%AirInNode
   ControlNode = CoolBeam(CBNum)%CWInNode
   AirMassFlow = Node(InAirNode)%MassFlowRateMaxAvail
@@ -984,7 +984,7 @@ SUBROUTINE ControlCoolBeam(CBNum,ZoneNum,ZoneNodeNum,FirstHVACIteration,NonAirSy
                                  CoolBeam(CBNum)%CWBranchNum,     &
                                  CoolBeam(CBNum)%CWCompNum)
 
-  IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .LE. 0.0) UnitOn = .FALSE.
+  IF (GetCurrentScheduleValue(CoolBeam(CBNum)%SchedPtr) .LE. 0.0d0) UnitOn = .FALSE.
   IF (MaxColdWaterFlow <= SmallMassFlow) UnitOn = .FALSE.
 
  ! Set the unit's air inlet nodes mass flow rates
@@ -1009,7 +1009,7 @@ SUBROUTINE ControlCoolBeam(CBNum,ZoneNum,ZoneNodeNum,FirstHVACIteration,NonAirSy
         Par(3) = QToCoolSetPt-QSup ! load to be met by the beams
         Par(4) = QMin
         Par(5) = QMax
-        ErrTolerance = 0.01
+        ErrTolerance = 0.01d0
         CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, CWFlow, CoolBeamResidual, &
                               MinColdWaterFlow, MaxColdWaterFlow, Par)
         IF (SolFlag == -1) THEN
@@ -1034,7 +1034,7 @@ SUBROUTINE ControlCoolBeam(CBNum,ZoneNum,ZoneNodeNum,FirstHVACIteration,NonAirSy
   ! Get the cooling output at the chosen water flow rate
   CALL CalcCoolBeam(CBNum,ZoneNodeNum,CWFlow,PowerMet,TWOut)
   CoolBeam(CBNum)%BeamCoolingRate = -PowerMet
-  IF (QSup < 0.0) THEN
+  IF (QSup < 0.0d0) THEN
     CoolBeam(CBNum)%SupAirCoolingRate = ABS(QSup)
   ELSE
     CoolBeam(CBNum)%SupAirHeatingRate = QSup
@@ -1092,19 +1092,19 @@ SUBROUTINE CalcCoolBeam(CBNum,ZoneNode,CWFlow,LoadMet,TWOut)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER   :: Iter=0               ! TWOut iteration index
-  REAL(r64) :: TWIn=0.0             ! Inlet water temperature [C]
-  REAL(r64) :: ZTemp=0.0            ! zone air temperature [C]
-  REAL(r64) :: WaterCoolPower=0.0   ! cooling power from water side [W]
-  REAL(r64) :: DT=0.0               ! approximate air - water delta T [C]
-  REAL(r64) :: IndFlow=0.0          ! induced air flow rate per beam length [m3/s-m]
-  REAL(r64) :: CoilFlow=0.0         ! mass air flow rate of air passing through "coil" [kg/m2-s]
-  REAL(r64) :: WaterVel=0.0         ! water velocity [m/s]
-  REAL(r64) :: K=0.0                ! coil heat transfer coefficient [W/m2-K]
-  REAL(r64) :: AirCoolPower=0.0     ! cooling power from the air side [W]
+  REAL(r64) :: TWIn=0.0d0             ! Inlet water temperature [C]
+  REAL(r64) :: ZTemp=0.0d0            ! zone air temperature [C]
+  REAL(r64) :: WaterCoolPower=0.0d0   ! cooling power from water side [W]
+  REAL(r64) :: DT=0.0d0               ! approximate air - water delta T [C]
+  REAL(r64) :: IndFlow=0.0d0          ! induced air flow rate per beam length [m3/s-m]
+  REAL(r64) :: CoilFlow=0.0d0         ! mass air flow rate of air passing through "coil" [kg/m2-s]
+  REAL(r64) :: WaterVel=0.0d0         ! water velocity [m/s]
+  REAL(r64) :: K=0.0d0                ! coil heat transfer coefficient [W/m2-K]
+  REAL(r64) :: AirCoolPower=0.0d0     ! cooling power from the air side [W]
   REAL(r64) :: Diff                 ! difference between water side cooling power and air side cooling power [W]
-  REAL(r64) :: CWFlowPerBeam=0.0    ! water mass flow rate per beam
-  REAL(r64) :: Coeff = 0.0          ! iteration parameter
-  REAL(r64) :: Delta = 0.0
+  REAL(r64) :: CWFlowPerBeam=0.0d0    ! water mass flow rate per beam
+  REAL(r64) :: Coeff = 0.0d0          ! iteration parameter
+  REAL(r64) :: Delta = 0.0d0
   REAL(r64) :: mdot = 0.d0
   REAL(r64) :: Cp !local fluid specific heat
   REAL(r64) :: rho ! local fluid density
@@ -1135,10 +1135,10 @@ SUBROUTINE CalcCoolBeam(CBNum,ZoneNode,CWFlow,LoadMet,TWOut)
                              PlantLoop(CoolBeam(CBNum)%CWLoopNum)%FluidIndex, &
                              'CalcCoolBeam')
 
-  TWOut = TWIn + 2.0
+  TWOut = TWIn + 2.0d0
   ZTemp = Node(ZoneNode)%Temp
-  IF (mdot <= 0.0 .OR. TWIn <= 0.0) THEN
-    LoadMet = 0.0
+  IF (mdot <= 0.0d0 .OR. TWIn <= 0.0d0) THEN
+    LoadMet = 0.0d0
     TWOut = TWIn
     RETURN
   END IF
@@ -1167,10 +1167,10 @@ SUBROUTINE CalcCoolBeam(CBNum,ZoneNode,CWFlow,LoadMet,TWOut)
     Diff = WaterCoolPower - AirCoolPower
     Delta = TWout*(ABS(Diff)/Coeff)
     IF (ABS(Diff) > 0.1d0) THEN
-      IF (Diff < 0.0) THEN
+      IF (Diff < 0.0d0) THEN
         TWout = TWout + Delta ! increase TWout
         IF (TWout > ZTemp) THEN ! check that water outlet temperature is less than zone temperature
-          WaterCoolPower = 0.0
+          WaterCoolPower = 0.0d0
           TWout = ZTemp
           EXIT
         END IF
@@ -1230,8 +1230,8 @@ FUNCTION CoolBeamResidual(CWFlow, Par) RESULT (Residuum)
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
   INTEGER :: CBIndex
   INTEGER :: ZoneNodeIndex
-  REAL(r64)    :: UnitOutput=0.0
-  REAL(r64)    :: TWOut=0.0
+  REAL(r64)    :: UnitOutput=0.0d0
+  REAL(r64)    :: TWOut=0.0d0
 
   CBIndex = INT(Par(1))
   ZoneNodeIndex = INT(Par(2))

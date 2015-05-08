@@ -31,13 +31,12 @@ USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataSizing
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, &
-                           InitConvTemp, SysSizingCalc
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, &
-                           SetupOutputVariable, ShowContinueError, ShowWarningMessage,  &
-                           ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
+                           InitConvTemp, SysSizingCalc, DisplayExtraWarnings
+USE DataInterfaces
 Use DataEnvironment, ONLY: OutBaroPress, OutDryBulbTemp, OutRelHum, StdBaroPress, StdRhoAir
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallAirVolFlow, SingleCoolingSetPoint, &
-                           SingleHeatingSetPoint,cFanTypes, ContFanCycCoil
+                           SingleHeatingSetPoint,cFanTypes, ContFanCycCoil, ATMixer_InletSide, &
+                           ATMixer_SupplySide, cATMixerTypes, ATMixerExists
 
   ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -86,17 +85,17 @@ TYPE FanCoilData
                                                      ! 'VariableFanVariableFlow'
   INTEGER                      :: SpeedFanSel = 0    ! Speed fan selected
   INTEGER                      :: CapCtrlMeth_Num = 0
-  REAL (r64)                   :: PLR = 0            ! Part Load Ratio, fraction of time step fancoil is on
+  REAL (r64)                   :: PLR = 0.0d0            ! Part Load Ratio, fraction of time step fancoil is on
   INTEGER                      :: MaxIterIndexH = 0  ! Maximum iterations exceeded for heating
   INTEGER                      :: MaxIterIndexC = 0  ! Maximum iterations exceeded for cooling
-  REAL(r64)                    :: FanAirVolFlow=0.0  ! m3/s
-  REAL(r64)                    :: MaxAirVolFlow=0.0  ! m3/s
-  REAL(r64)                    :: MaxAirMassFlow=0.0 ! kg/s
-  REAL(r64)                    :: LowSpeedRatio=0.0  ! Low speed fan supply air flow ratio
-  REAL(r64)                    :: MedSpeedRatio=0.0  ! Medium speed fan supply air flow ratio
-  REAL (r64)                   :: SpeedFanRatSel=0.0 ! Speed fan ratio determined by fan speed selection at each timestep
-  REAL(r64)                    :: OutAirVolFlow =0.0 ! m3/s
-  REAL(r64)                    :: OutAirMassFlow=0.0 ! kg/s
+  REAL(r64)                    :: FanAirVolFlow=0.0d0  ! m3/s
+  REAL(r64)                    :: MaxAirVolFlow=0.0d0  ! m3/s
+  REAL(r64)                    :: MaxAirMassFlow=0.0d0 ! kg/s
+  REAL(r64)                    :: LowSpeedRatio=0.0d0  ! Low speed fan supply air flow ratio
+  REAL(r64)                    :: MedSpeedRatio=0.0d0  ! Medium speed fan supply air flow ratio
+  REAL (r64)                   :: SpeedFanRatSel=0.0d0 ! Speed fan ratio determined by fan speed selection at each timestep
+  REAL(r64)                    :: OutAirVolFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: OutAirMassFlow=0.0d0 ! kg/s
   INTEGER                      :: AirInNode     =0   ! inlet air node number
   INTEGER                      :: AirOutNode    =0   ! outlet air node number
   INTEGER                      :: OutsideAirNode=0   ! outside air node number
@@ -128,11 +127,11 @@ TYPE FanCoilData
   INTEGER                      :: CWCompNum           =0   ! index for plant component for chilled water coil
   INTEGER                      :: ControlCompTypeNum  = 0
   INTEGER                      :: CompErrIndex        = 0
-  REAL(r64)                    :: MaxColdWaterVolFlow =0.0 ! m3/s
-  REAL(r64)                    :: MaxColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MinColdWaterVolFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: ColdControlOffset   =0.0 ! control tolerance
+  REAL(r64)                    :: MaxColdWaterVolFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MinColdWaterVolFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: ColdControlOffset   =0.0d0 ! control tolerance
   CHARACTER(len=MaxNameLength) :: HCoilName           =' ' ! name of heating coil
   INTEGER                      :: HCoilName_Index = 0
   CHARACTER(len=MaxNameLength) :: HCoilType    =' '  ! type of heating coil:
@@ -143,24 +142,32 @@ TYPE FanCoilData
   INTEGER                      :: HWLoopSide          =0   ! index for plant loop side for hot water coil
   INTEGER                      :: HWBranchNum         =0   ! index for plant branch for hot water coil
   INTEGER                      :: HWCompNum           =0   ! index for plant component for hot water coil
-  REAL(r64)                    :: MaxHotWaterVolFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: MinHotWaterVolFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: HotControlOffset    =0.0 ! control tolerance
+  REAL(r64)                    :: MaxHotWaterVolFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: MinHotWaterVolFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: HotControlOffset    =0.0d0 ! control tolerance
   INTEGER                      :: AvailStatus         =0
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
+  ! addition for OA to Zone Units
+  LOGICAL                      :: ATMixerExists       = .FALSE. ! True if there is an ATMixer
+  CHARACTER(len=MaxNameLength) :: ATMixerName         =' ' ! name of air terminal mixer
+  INTEGER                      :: ATMixerIndex        =0   ! index to the air terminal mixer
+  INTEGER                      :: ATMixerType         =0   ! 1 = inlet side mixer, 2 = supply side mixer
+  INTEGER                      :: ATMixerPriNode      =0   ! primary inlet air node number for the air terminal mixer
+  INTEGER                      :: ATMixerSecNode      =0   ! secondary air inlet node number for the air terminal mixer
+  INTEGER                      :: ATMixerOutNode      =0   ! outlet air node number for the air terminal mixer
   ! Report data
-  REAL(r64)                    :: HeatPower           =0.0 ! unit heating output in watts
-  REAL(r64)                    :: HeatEnergy          =0.0 ! unit heating output in J
-  REAL(r64)                    :: TotCoolPower        =0.0 ! unit total cooling power output in watts
-  REAL(r64)                    :: TotCoolEnergy       =0.0 ! unit total cooling energy output in joules
-  REAL(r64)                    :: SensCoolPower       =0.0 ! unit sensible cooling power output in watts
-  REAL(r64)                    :: SensCoolEnergy      =0.0 ! unit sensible cooling energy output in joules
-  REAL(r64)                    :: ElecPower           =0.0 ! unit electric power consumption in watts
-  REAL(r64)                    :: ElecEnergy          =0.0 ! unit electiric energy consumption in joules
-  REAL(r64)                    :: DesCoolingLoad      =0.0 ! used for reporting in watts
-  REAL(r64)                    :: DesHeatingLoad      =0.0 ! used for reporting in watts
+  REAL(r64)                    :: HeatPower           =0.0d0 ! unit heating output in watts
+  REAL(r64)                    :: HeatEnergy          =0.0d0 ! unit heating output in J
+  REAL(r64)                    :: TotCoolPower        =0.0d0 ! unit total cooling power output in watts
+  REAL(r64)                    :: TotCoolEnergy       =0.0d0 ! unit total cooling energy output in joules
+  REAL(r64)                    :: SensCoolPower       =0.0d0 ! unit sensible cooling power output in watts
+  REAL(r64)                    :: SensCoolEnergy      =0.0d0 ! unit sensible cooling energy output in joules
+  REAL(r64)                    :: ElecPower           =0.0d0 ! unit electric power consumption in watts
+  REAL(r64)                    :: ElecEnergy          =0.0d0 ! unit electiric energy consumption in joules
+  REAL(r64)                    :: DesCoolingLoad      =0.0d0 ! used for reporting in watts
+  REAL(r64)                    :: DesHeatingLoad      =0.0d0 ! used for reporting in watts
 END TYPE FanCoilData
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -186,10 +193,12 @@ PUBLIC  GetFanCoilOutAirNode
 PUBLIC  GetFanCoilReturnAirNode
 PUBLIC  GetFanCoilMixedAirNode
 PUBLIC  GetFanCoilZoneInletAirNode
+PUBLIC  GetFanCoilInletAirNode
+PUBLIC  GetFanCoilIndex
 
 CONTAINS
 
-SUBROUTINE SimFanCoilUnit(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided,CompIndex)
+SUBROUTINE SimFanCoilUnit(CompName,ZoneNum,ControlledZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided,CompIndex)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -215,6 +224,7 @@ SUBROUTINE SimFanCoilUnit(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   CHARACTER(len=*), INTENT (IN)  :: CompName            ! name of the fan coil unit
   INTEGER,          INTENT (IN)  :: ZoneNum             ! number of zone being served
+  INTEGER,          INTENT (IN)  :: ControlledZoneNum   ! index into ZoneEquipConfig array; may not be equal to ZoneNum
   LOGICAL,          INTENT (IN)  :: FirstHVACIteration  ! TRUE if 1st HVAC simulation of system timestep
   REAL(r64),        INTENT (OUT) :: PowerMet            ! Sensible power supplied (W)
   REAL(r64),        INTENT (OUT) :: LatOutputProvided   ! Latent add/removal supplied by window AC (kg/s), dehumid = negative
@@ -276,7 +286,7 @@ SELECT CASE(FanCoil(FanCoilNum)%UnitType_Num)
 
   CASE (FanCoilUnit_4Pipe)
 
-    CALL Sim4PipeFanCoil(FanCoilNum,ZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
+    CALL Sim4PipeFanCoil(FanCoilNum,ZoneNum,ControlledZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
 
 END SELECT
 
@@ -309,7 +319,7 @@ SUBROUTINE GetFanCoilUnits
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString, GetObjectDefMaxArgs
+  USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString, GetObjectDefMaxArgs, FindItemInList
   USE NodeInputManager,      ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
   USE Fans,                  ONLY: GetFanDesignVolumeFlowRate, GetFanType
@@ -323,6 +333,7 @@ SUBROUTINE GetFanCoilUnits
   USE MixedAir,              ONLY: GetOAMixerIndex, GetOAMixerNodeNumbers
   USE DataZoneEquipment,     ONLY: ZoneEquipConfig, FanCoil4Pipe_Num
   USE DataGlobals,           ONLY: NumOfZones, ScheduleAlwaysOn
+  USE SingleDuct,            ONLY: GetATMixer
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -359,7 +370,14 @@ SUBROUTINE GetFanCoilUnits
   INTEGER                              :: TotalArgs=0     ! Total number of alpha and numeric arguments (max) for a
   INTEGER                              :: CtrlZone    ! index to loop counter
   INTEGER                              :: NodeNum     ! index to loop counter
-  LOGICAL                              :: ZoneNodeNotFound ! used in error checking
+  LOGICAL                              :: ZoneExNodeNotFound = .FALSE. ! used in error checking
+  LOGICAL                              :: ZoneInNodeNotFound = .FALSE. ! used in error checking
+  INTEGER                              :: ATMixerNum=0         ! index of air terminal mixer in the air terminal mixer data array
+  INTEGER                              :: ATMixerType=0        ! type of air terminal mixer (1=inlet side; 2=supply side)
+  INTEGER                              :: ATMixerPriNode=0     ! node number of the air terminal mixer primary air inlet
+  INTEGER                              :: ATMixerSecNode=0     ! node number of the air terminal mixer secondary air inlet
+  INTEGER                              :: ATMixerOutNode=0     ! node number of the air terminal mixer secondary air inlet
+  CHARACTER(len=MaxNameLength)         :: ATMixerName
 
 
           ! FLOW
@@ -382,7 +400,7 @@ cAlphaFields=' '
 ALLOCATE(cNumericFields(NumNumbers))
 cNumericFields=' '
 ALLOCATE(Numbers(NumNumbers))
-Numbers=0.0
+Numbers=0.0d0
 ALLOCATE(lAlphaBlanks(NumAlphas))
 lAlphaBlanks=.TRUE.
 ALLOCATE(lNumericBlanks(NumNumbers))
@@ -475,23 +493,25 @@ DO FanCoilIndex = 1,Num4PipeFanCoils
 
   FanCoil(FanCoilNum)%OAMixType = Alphas(7)
   FanCoil(FanCoilNum)%OAMixName = Alphas(8)
-
-  ErrFlag = .false.
-  CALL ValidateComponent(FanCoil(FanCoilNum)%OAMixType,FanCoil(FanCoilNum)%OAMixName,ErrFlag,TRIM(CurrentModuleObject))
-  IF (ErrFlag) THEN
-     CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".')
-     ErrorsFound = .TRUE.
-  ELSE
-    ! Get outdoor air mixer node numbers
-    OANodeNums = GetOAMixerNodeNumbers(FanCoil(FanCoilNum)%OAMixName, ErrFlag)
+  ! check to see if local OA mixer specified
+  IF (.NOT. lAlphaBlanks(8)) THEN
+    ErrFlag = .false.
+    CALL ValidateComponent(FanCoil(FanCoilNum)%OAMixType,FanCoil(FanCoilNum)%OAMixName,ErrFlag,TRIM(CurrentModuleObject))
     IF (ErrFlag) THEN
-       CALL ShowContinueError('that was specified in '//TRIM(CurrentModuleObject)//' = '//TRIM(FanCoil(FanCoilNum)%Name))
-       CALL ShowContinueError('..OutdoorAir:Mixer is required. Enter an OutdoorAir:Mixer object with this name.')
-       ErrorsFound=.true.
+       CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".')
+       ErrorsFound = .TRUE.
     ELSE
-       FanCoil(FanCoilNum)%OutsideAirNode = OANodeNums(1)
-       FanCoil(FanCoilNum)%AirReliefNode = OANodeNums(2)
-       FanCoil(FanCoilNum)%MixedAirNode = OANodeNums(4)
+      ! Get outdoor air mixer node numbers
+      OANodeNums = GetOAMixerNodeNumbers(FanCoil(FanCoilNum)%OAMixName, ErrFlag)
+      IF (ErrFlag) THEN
+         CALL ShowContinueError('that was specified in '//TRIM(CurrentModuleObject)//' = '//TRIM(FanCoil(FanCoilNum)%Name))
+         CALL ShowContinueError('..OutdoorAir:Mixer is required. Enter an OutdoorAir:Mixer object with this name.')
+         ErrorsFound=.true.
+      ELSE
+         FanCoil(FanCoilNum)%OutsideAirNode = OANodeNums(1)
+         FanCoil(FanCoilNum)%AirReliefNode = OANodeNums(2)
+         FanCoil(FanCoilNum)%MixedAirNode = OANodeNums(4)
+      ENDIF
     ENDIF
   ENDIF
 
@@ -654,49 +674,103 @@ DO FanCoilIndex = 1,Num4PipeFanCoils
     FanCoil(FanCoilNum)%HotControlOffset = 0.001d0
   END IF
 
-  ! Fan Coil unit air inlet node must be the same as a zone exhaust node and the OA Mixer return node
-  ! check that fan coil unit air inlet node is the same as a zone exhaust node
-  ZoneNodeNotFound = .TRUE.
-  DO CtrlZone = 1,NumOfZones
-    IF (.not. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
-    DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumExhaustNodes
-      IF (FanCoil(FanCoilNum)%AirInNode .EQ. ZoneEquipConfig(CtrlZone)%ExhaustNode(NodeNum)) THEN
-       ZoneNodeNotFound = .FALSE.
-       EXIT
-      END IF
+  !check for inlet side air mixer
+  CALL GetATMixer(FanCoil(FanCoilNum)%Name,ATMixerName,ATMixerNum,ATMixerType,ATMixerPriNode,AtmixerSecNode,ATMixerOutNode)
+  IF (ATMixerType == ATMixer_InletSide) THEN
+    ! save the air terminal mixer data in the fan coil data array
+    FanCoil(FanCoilNum)%ATMixerExists = .TRUE.
+    FanCoil(FanCoilNum)%ATMixerIndex = ATMixerNum
+    FanCoil(FanCoilNum)%ATMixerName = ATMixerName
+    FanCoil(FanCoilNum)%ATMixerType = ATMixer_InletSide
+    FanCoil(FanCoilNum)%ATMixerPriNode = ATMixerPriNode
+    FanCoil(FanCoilNum)%ATMixerSecNode = ATMixerSecNode
+    FanCoil(FanCoilNum)%ATMixerOutNode = ATMixerOutNode
+    ! check that fan coil doesn' have local outside air
+    IF (.NOT. lAlphaBlanks(8)) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+                           ' Fan coil unit has local as well as central outdoor air specified')
+    END IF
+    ! check that the air teminal mixer out node is the fan coil inlet node
+    IF (FanCoil(FanCoilNum)%AirInNode .NE. ATMixerOutNode) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+                    ' Fan coil unit air inlet node name must be the same as an air terminal mixer outlet node name.')
+      CALL ShowContinueError('..Air terminal mixer outlet node name is specified in AirTerminal:SingleDuct:InletSideMixer object.')
+      CALL ShowContinueError('..Fan coil unit air inlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirInNode)))
+      ErrorsFound=.TRUE.
+    END IF
+  ! check for supply side air terminal mixer
+  ELSE IF (ATMixerType == ATMixer_SupplySide) THEN
+    ! save the air terminal mixer data in the fan coil data array
+    FanCoil(FanCoilNum)%ATMixerExists = .TRUE.
+    FanCoil(FanCoilNum)%ATMixerIndex = ATMixerNum
+    FanCoil(FanCoilNum)%ATMixerName = ATMixerName
+    FanCoil(FanCoilNum)%ATMixerType = ATMixer_SupplySide
+    FanCoil(FanCoilNum)%ATMixerPriNode = ATMixerPriNode
+    FanCoil(FanCoilNum)%ATMixerSecNode = ATMixerSecNode
+    FanCoil(FanCoilNum)%ATMixerOutNode = ATMixerOutNode
+    ! check that fan coil doesn' have local outside air
+    IF (.NOT. lAlphaBlanks(8)) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+                           ' Fan coil unit has local as well as central outdoor air specified')
+    END IF
+    ! check that the air teminal mixer secondary air inlet node is the fan coil outlet node
+    IF (FanCoil(FanCoilNum)%AirOutNode .NE. ATMixerSecNode) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+                   ' Fan coil unit air outlet node name must be the same as the air terminal mixer secondary air inlet node name.')
+      CALL ShowContinueError('..Air terminal mixer secondary inlet node name is specified in '// &
+        'AirTerminal:SingleDuct:SupplySideMixer object.')
+      CALL ShowContinueError('..Fan coil unit air outlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirOutNode)))
+      ErrorsFound = .TRUE.
+    END IF
+  ! no air terminal mixer; do the normal connectivity checks
+  ELSE
+    ! check that the fan coil inlet node is the same as one of the zone exhaust nodes
+    ZoneExNodeNotFound = .TRUE.
+    DO CtrlZone = 1,NumOfZones
+      IF (.not. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
+      DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumExhaustNodes
+        IF (FanCoil(FanCoilNum)%AirInNode .EQ. ZoneEquipConfig(CtrlZone)%ExhaustNode(NodeNum)) THEN
+          ZoneExNodeNotFound = .FALSE.
+        END IF
+      END DO
     END DO
-  END DO
-  IF(ZoneNodeNotFound)THEN
-    CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+    IF (ZoneExNodeNotFound) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
                          ' Fan coil unit air inlet node name must be the same as a zone exhaust node name.')
-    CALL ShowContinueError('..Zone exhaust node name is specified in ZoneHVAC:EquipmentConnections object.')
-    CALL ShowContinueError('..Fan coil unit air inlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirInNode)))
-    ErrorsFound=.TRUE.
-  END IF
-  ! check that fan coil unit air outlet node is the same as a zone inlet node
-  ZoneNodeNotFound = .TRUE.
-  DO CtrlZone = 1,NumOfZones
-    IF (.not. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
-    DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumInletNodes
-      IF (FanCoil(FanCoilNum)%AirOutNode .EQ. ZoneEquipConfig(CtrlZone)%InletNode(NodeNum)) THEN
-        ZoneNodeNotFound = .FALSE.
-        EXIT
-      END IF
+      CALL ShowContinueError('..Zone exhaust node name is specified in ZoneHVAC:EquipmentConnections object.')
+      CALL ShowContinueError('..Fan coil unit air inlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirInNode)))
+      ErrorsFound=.TRUE.
+    END IF
+    ! check that the fan coil outlet node is the same as one of the zone inlet nodes
+    ZoneInNodeNotFound = .TRUE.
+    DO CtrlZone = 1,NumOfZones
+      IF (.not. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
+      DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumInletNodes
+        IF (FanCoil(FanCoilNum)%AirOutNode .EQ. ZoneEquipConfig(CtrlZone)%InletNode(NodeNum)) THEN
+          ZoneInNodeNotFound = .FALSE.
+        END IF
+      END DO
     END DO
-  END DO
-  IF(ZoneNodeNotFound)THEN
-    CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
-                         ' Fan coil unit air outlet node name must be the same as a zone inlet node name.')
-    CALL ShowContinueError('..Zone inlet node name is specified in ZoneHVAC:EquipmentConnections object.')
-    CALL ShowContinueError('..Fan coil unit air outlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirOutNode)))
-    ErrorsFound=.TRUE.
+    IF (ZoneInNodeNotFound) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(FanCoil(FanCoilNum)%Name)//'".'// &
+                           ' Fan coil unit air outlet node name must be the same as a zone inlet node name.')
+      CALL ShowContinueError('..Zone inlet node name is specified in ZoneHVAC:EquipmentConnections object.')
+      CALL ShowContinueError('..Fan coil unit air outlet node name = '//TRIM(NodeID(FanCoil(FanCoilNum)%AirOutNode)))
+
+      ErrorsFound=.TRUE.
+    END IF
   END IF
 
   ! Set up component set for supply fan
-  CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+  IF (FanCoil(FanCoilNum)%OutsideAirNode > 0) THEN
+    CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                       FanCoil(FanCoilNum)%FanType,FanCoil(FanCoilNum)%FanName, &
+                       NodeID(FanCoil(FanCoilNum)%MixedAirNode),'UNDEFINED')
+  ELSE
+    CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
                      FanCoil(FanCoilNum)%FanType,FanCoil(FanCoilNum)%FanName, &
-                     NodeID(FanCoil(FanCoilNum)%MixedAirNode),'UNDEFINED')
-
+                     NodeID(FanCoil(FanCoilNum)%AirInNode),'UNDEFINED')
+  END IF
    ! Set up component set for cooling coil
   CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
                      FanCoil(FanCoilNum)%CCoilType,FanCoil(FanCoilNum)%CCoilName,'UNDEFINED','UNDEFINED')
@@ -707,9 +781,11 @@ DO FanCoilIndex = 1,Num4PipeFanCoils
                      'UNDEFINED',NodeID(FanCoil(FanCoilNum)%AirOutNode))
 
    ! Set up component set for OA mixer - use OA node and Mixed air node
-  CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
-                     FanCoil(FanCoilNum)%OAMixType, FanCoil(FanCoilNum)%OAMixName, &
-                     NodeID(FanCoil(FanCoilNum)%OutsideAirNode),NodeID(FanCoil(FanCoilNum)%MixedAirNode))
+  IF (FanCoil(FanCoilNum)%OutsideAirNode > 0) THEN
+    CALL SetUpCompSets(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                       FanCoil(FanCoilNum)%OAMixType, FanCoil(FanCoilNum)%OAMixName, &
+                       NodeID(FanCoil(FanCoilNum)%OutsideAirNode),NodeID(FanCoil(FanCoilNum)%MixedAirNode))
+  END IF
 END DO
 
 DEALLOCATE(Alphas)
@@ -947,12 +1023,14 @@ IF (BeginEnvrnFlag .AND. MyEnvrnFlag(FanCoilNum) .AND. .NOT. MyPlantScanFlag(Fan
 !  Node(ColdConNode)%MassFlowRateMax = FanCoil(FanCoilNum)%MaxColdWaterFlow
 !  Node(ColdConNode)%MassFlowRateMin = FanCoil(FanCoilNum)%MinColdWaterFlow
 
-  Node(OutsideAirNode)%MassFlowRateMax = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(OutsideAirNode)%MassFlowRateMin = 0.0
+  IF (FanCoil(FanCoilNum)%OutsideAirNode > 0) THEN
+    Node(OutsideAirNode)%MassFlowRateMax = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(OutsideAirNode)%MassFlowRateMin = 0.0d0
+  END IF
   Node(OutNode)%MassFlowRateMax = FanCoil(FanCoilNum)%MaxAirMassFlow
-  Node(OutNode)%MassFlowRateMin = 0.0
+  Node(OutNode)%MassFlowRateMin = 0.0d0
   Node(InNode)%MassFlowRateMax = FanCoil(FanCoilNum)%MaxAirMassFlow
-  Node(InNode)%MassFlowRateMin = 0.0
+  Node(InNode)%MassFlowRateMin = 0.0d0
   MyEnvrnFlag(FanCoilNum) = .FALSE.
 END IF ! end one time inits
 
@@ -965,28 +1043,32 @@ InletNode = FanCoil(FanCoilNum)%AirInNode
 OutsideAirNode = FanCoil(FanCoilNum)%OutsideAirNode
 AirRelNode = FanCoil(FanCoilNum)%AirReliefNode
 ! Set the inlet node mass flow rate
-IF (GetCurrentScheduleValue(FanCoil(FanCoilNum)%SchedPtr) .gt. 0.0) THEN
+IF (GetCurrentScheduleValue(FanCoil(FanCoilNum)%SchedPtr) .gt. 0.0d0) THEN
   Node(InletNode)%MassFlowRate = FanCoil(FanCoilNum)%MaxAirMassFlow
   Node(InletNode)%MassFlowRateMaxAvail = Node(InletNode)%MassFlowRate
   Node(InletNode)%MassFlowRateMinAvail = Node(InletNode)%MassFlowRate
 
-  Node(OutsideAirNode)%MassFlowRate = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(OutsideAirNode)%MassFlowRateMaxAvail = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(OutsideAirNode)%MassFlowRateMinAvail = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(AirRelNode)%MassFlowRate = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(AirRelNode)%MassFlowRateMaxAvail = FanCoil(FanCoilNum)%OutAirMassFlow
-  Node(AirRelNode)%MassFlowRateMinAvail = FanCoil(FanCoilNum)%OutAirMassFlow
+  IF (OutsideAirNode > 0) THEN
+    Node(OutsideAirNode)%MassFlowRate = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(OutsideAirNode)%MassFlowRateMaxAvail = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(OutsideAirNode)%MassFlowRateMinAvail = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(AirRelNode)%MassFlowRate = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(AirRelNode)%MassFlowRateMaxAvail = FanCoil(FanCoilNum)%OutAirMassFlow
+    Node(AirRelNode)%MassFlowRateMinAvail = FanCoil(FanCoilNum)%OutAirMassFlow
+  ENDIF
 
 ELSE
-  Node(InletNode)%MassFlowRate = 0.0
-  Node(InletNode)%MassFlowRateMaxAvail = 0.0
-  Node(InletNode)%MassFlowRateMinAvail = 0.0
-  Node(OutsideAirNode)%MassFlowRate = 0.0
-  Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0
-  Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
-  Node(AirRelNode)%MassFlowRate = 0.0
-  Node(AirRelNode)%MassFlowRateMaxAvail = 0.0
-  Node(AirRelNode)%MassFlowRateMinAvail = 0.0
+  Node(InletNode)%MassFlowRate = 0.0d0
+  Node(InletNode)%MassFlowRateMaxAvail = 0.0d0
+  Node(InletNode)%MassFlowRateMinAvail = 0.0d0
+  IF (OutsideAirNode > 0) THEN
+    Node(OutsideAirNode)%MassFlowRate = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
+    Node(AirRelNode)%MassFlowRate = 0.0d0
+    Node(AirRelNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(AirRelNode)%MassFlowRateMinAvail = 0.0d0
+  END IF
 END IF
 
 RETURN
@@ -997,7 +1079,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   January 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1020,6 +1102,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
   USE DataPlant,      ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1051,22 +1134,45 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
   CHARACTER(len=MaxNameLength) :: CoolingCoilType
   REAL(r64)   :: rho
   REAL(r64)   :: Cp
-
-
+  LOGICAL             :: IsAutoSize               ! Indicator to autosize for reporting
+  REAL(r64)           :: MaxAirVolFlowDes         ! Autosized max air flow for reporting
+  REAL(r64)           :: MaxAirVolFlowUser        ! Hardsized max air flow for reporting
+  REAL(r64)           :: OutAirVolFlowDes         ! Autosized outdoor air flow for reporting
+  REAL(r64)           :: OutAirVolFlowUser        ! Hardsized outdoor air flow for reporting
+  REAL(r64)           :: MaxHotWaterVolFlowDes    ! Autosized hot water flow for reporting
+  REAL(r64)           :: MaxHotWaterVolFlowUser   ! Hardsized hot water flow for reporting
+  REAL(r64)           :: MaxColdWaterVolFlowDes   ! Autosized cold water flow for reporting
+  REAL(r64)           :: MaxColdWaterVolFlowUser  ! Hardsized cold water flow for reporting
 
   PltSizCoolNum = 0
   PltSizHeatNum = 0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxAirVolFlowDes = 0.0d0
+  MaxAirVolFlowUser = 0.0d0
+  OutAirVolFlowDes = 0.0d0
+  OutAirVolFlowUser = 0.0d0
+  MaxHotWaterVolFlowDes = 0.0d0
+  MaxHotWaterVolFlowUser = 0.0d0
+  MaxColdWaterVolFlowDes = 0.0d0
+  MaxColdWaterVolFlowUser = 0.0d0
 
   IF (FanCoil(FanCoilNum)%MaxAirVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
-
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (FanCoil(FanCoilNum)%MaxAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                          'User-Specified Supply Air Maximum Flow Rate [m3/s]', FanCoil(FanCoilNum)%MaxAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-      FanCoil(FanCoilNum)%MaxAirVolFlow = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+      MaxAirVolFlowDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                               FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (FanCoil(FanCoilNum)%MaxAirVolFlow < SmallAirVolFlow) THEN
-        FanCoil(FanCoilNum)%MaxAirVolFlow = 0.0
+      IF (MaxAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxAirVolFlowDes = 0.0d0
       END IF
 
 !     If fan is autosized, get fan volumetric flow rate
@@ -1076,19 +1182,40 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
                                                                        TRIM(FanCoil(FanCoilNum)%FanName),ErrorsFound)
       END IF
 !     Check that the fan volumetric flow rate is greater than or equal to the FCU voluetric flow rate
-      IF(FanCoil(FanCoilNum)%MaxAirVolFlow .GT. FanCoil(FanCoilNum)%FanAirVolFlow )THEN
+      IF(MaxAirVolFlowDes .GT. FanCoil(FanCoilNum)%FanAirVolFlow )THEN
         CALL ShowWarningError(RoutineName//TRIM(FanCoil(FanCoilNum)%UnitType)//': '//TRIM(FanCoil(FanCoilNum)%Name))
         CALL ShowContinueError('... Maximum supply air flow rate is greater than the maximum fan flow rate.')
-        CALL ShowContinueError('... Fan Coil Unit flow = '//TRIM(TrimSigDigits(FanCoil(FanCoilNum)%MaxAirVolFlow,5))//' m3/s.')
+        CALL ShowContinueError('... Fan Coil Unit flow = '//TRIM(TrimSigDigits(MaxAirVolFlowDes,5))//' [m3/s].')
         CALL ShowContinueError('... Fan = '//TRIM(cFanTypes(FanCoil(FanCoilNum)%FanType_Num))//': '//  &
            TRIM(FanCoil(FanCoilNum)%FanName))
-        CALL ShowContinueError('... Fan flow = '//TRIM(TrimSigDigits(FanCoil(FanCoilNum)%FanAirVolFlow,5))//' m3/s.')
+        CALL ShowContinueError('... Fan flow = '//TRIM(TrimSigDigits(FanCoil(FanCoilNum)%FanAirVolFlow,5))//' [m3/s].')
         CALL ShowContinueError('... Fan Coil Unit flow rate reduced to match the fan flow rate and the simulation continues.')
-        FanCoil(FanCoilNum)%MaxAirVolFlow = FanCoil(FanCoilNum)%FanAirVolFlow
+        MaxAirVolFlowDes = FanCoil(FanCoilNum)%FanAirVolFlow
       END IF
-
-      CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
-                              'Supply Air Maximum Flow Rate [m3/s]', FanCoil(FanCoilNum)%MaxAirVolFlow)
+      IF (IsAutosize) THEN
+        FanCoil(FanCoilNum)%MaxAirVolFlow = MaxAirVolFlowDes
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                              'Design Size Supply Air Maximum Flow Rate [m3/s]', MaxAirVolFlowDes)
+      ELSE ! Hard size with sizing data
+        IF (FanCoil(FanCoilNum)%MaxAirVolFlow > 0.0d0 .AND. MaxAirVolFlowDes > 0.0d0) THEN
+          MaxAirVolFlowUser = FanCoil(FanCoilNum)%MaxAirVolFlow
+          CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                              'Design Size Supply Air Maximum Flow Rate [m3/s]', MaxAirVolFlowDes, &
+                              'User-Specified Supply Air Maximum Flow Rate [m3/s]', MaxAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowDes - MaxAirVolFlowUser)/MaxAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeFanCoilUnit: Potential issue with equipment sizing for ' &
+                                     //TRIM(FanCoil(FanCoilNum)%UnitType)//' '//TRIM(FanCoil(FanCoilNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Maximum Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Maximum Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
 
   ELSE IF(FanCoil(FanCoilNum)%FanAirVolFlow .EQ. AutoSize)THEN
@@ -1108,82 +1235,147 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
     END IF
   END IF
 
+  IsAutosize = .FALSE.
   IF (FanCoil(FanCoilNum)%OutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-      FanCoil(FanCoilNum)%OutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,FanCoil(FanCoilNum)%MaxAirVolFlow)
-      IF (FanCoil(FanCoilNum)%OutAirVolFlow < SmallAirVolFlow) THEN
-        FanCoil(FanCoilNum)%OutAirVolFlow = 0.0
-      END IF
-      CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
-                              'Maximum Outdoor Air Flow Rate [m3/s]',FanCoil(FanCoilNum)%OutAirVolFlow)
-
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
 
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (FanCoil(FanCoilNum)%OutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                              'User-Specified Maximum Outdoor Air Flow Rate [m3/s]',FanCoil(FanCoilNum)%OutAirVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
+      OutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,FanCoil(FanCoilNum)%MaxAirVolFlow)
+      IF (OutAirVolFlowDes < SmallAirVolFlow) THEN
+        OutAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        FanCoil(FanCoilNum)%OutAirVolFlow = OutAirVolFlowDes
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                              'Design Size Maximum Outdoor Air Flow Rate [m3/s]',OutAirVolFlowDes)
+      ELSE
+        IF (FanCoil(FanCoilNum)%OutAirVolFlow > 0.0d0 .AND. OutAirVolFlowDes > 0.0d0) THEN
+          OutAirVolFlowUser = FanCoil(FanCoilNum)%OutAirVolFlow
+          CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                              'Design Size Maximum Outdoor Air Flow Rate [m3/s]',OutAirVolFlowDes, &
+                              'User-Specified Maximum Outdoor Air Flow Rate [m3/s]',OutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(OutAirVolFlowDes - OutAirVolFlowUser)/OutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeFanCoilUnit: Potential issue with equipment sizing for ' &
+                                     //TRIM(FanCoil(FanCoilNum)%UnitType)//' '//TRIM(FanCoil(FanCoilNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Outdoor Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(OutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Outdoor Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(OutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
+  END IF
+
+  IsAutosize = .FALSE.
   IF (FanCoil(FanCoilNum)%MaxHotWaterVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
-
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (FanCoil(FanCoilNum)%MaxHotWaterVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                                'User-Specified Maximum Hot Water Flow [m3/s]', FanCoil(FanCoilNum)%MaxHotWaterVolFlow)
+      END IF
+    ELSE
       CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',FanCoil(FanCoilNum)%HCoilName,ErrorsFound)
       CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',FanCoil(FanCoilNum)%HCoilName,ErrorsFound)
-      PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', FanCoil(FanCoilNum)%HCoilName, CoilWaterInletNode, &
+      IF (IsAutosize) THEN
+        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', FanCoil(FanCoilNum)%HCoilName, CoilWaterInletNode, &
                                          CoilWaterOutletNode, ErrorsFound)
-
-      IF (PltSizHeatNum > 0) THEN
-        CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-        IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow > 0.0) THEN
-          FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow, 1.0d0)
-        ELSE
-          FCOAFrac = 0.0
-        END IF
-        CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtHeatPeak + &
+        IF (PltSizHeatNum > 0) THEN
+          CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
+          IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow > 0.0d0) THEN
+            FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow, 1.0d0)
+          ELSE
+            FCOAFrac = 0.0d0
+          END IF
+          CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtHeatPeak + &
                      (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
-        CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-        CoilOutHumRat =FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-        DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+          CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+          CoilOutHumRat =FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+          DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                           * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                           * (CoilOutTemp-CoilInTemp)
-        FanCoil(FanCoilNum)%DesHeatingLoad = DesCoilLoad
-        IF (DesCoilLoad >= SmallLoad) THEN
-          rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
+          FanCoil(FanCoilNum)%DesHeatingLoad = DesCoilLoad
+          IF (DesCoilLoad >= SmallLoad) THEN
+            rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
                          60.d0, &
                          PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidIndex, &
                          'SizeFanCoilUnit')
 
 
-          Cp  = GetSpecificHeatGlycol(PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
+            Cp  = GetSpecificHeatGlycol(PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
                          60.d0, &
                          PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidIndex, &
                          'SizeFanCoilUnit')
 
 
-          FanCoil(FanCoilNum)%MaxHotWaterVolFlow = DesCoilLoad / &
-                                                     ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                     Cp * rho )
+            MaxHotWaterVolFlowDes = DesCoilLoad / &
+                                  ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                  Cp * rho )
+          ELSE
+            MaxHotWaterVolFlowDes = 0.0d0
+          END IF
         ELSE
-          FanCoil(FanCoilNum)%MaxHotWaterVolFlow = 0.0
-        END IF
-        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
-                                'Maximum Hot Water Flow [m3/s]', FanCoil(FanCoilNum)%MaxHotWaterVolFlow)
-      ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-        CALL ShowContinueError('Occurs in ' // TRIM(FanCoil(FanCoilNum)%UnitType) // ' Object=' &
+          CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+          CALL ShowContinueError('Occurs in ' // TRIM(FanCoil(FanCoilNum)%UnitType) // ' Object=' &
                                //TRIM(FanCoil(FanCoilNum)%Name))
-        ErrorsFound = .TRUE.
+          ErrorsFound = .TRUE.
+        END IF
       END IF
-
+      IF (IsAutosize) THEN
+        FanCoil(FanCoilNum)%MaxHotWaterVolFlow = MaxHotWaterVolFlowDes
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                                'Design Size Maximum Hot Water Flow [m3/s]', MaxHotWaterVolFlowDes)
+      ELSE ! Hard size with sizing data
+        IF (FanCoil(FanCoilNum)%MaxHotWaterVolFlow > 0.0d0 .AND. MaxHotWaterVolFlowDes > 0.0d0) THEN
+          MaxHotWaterVolFlowDes = FanCoil(FanCoilNum)%MaxHotWaterVolFlow
+          CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                                'Design Size Maximum Hot Water Flow [m3/s]', MaxHotWaterVolFlowDes, &
+                                'User-Specified Maximum Hot Water Flow [m3/s]', MaxHotWaterVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxHotWaterVolFlowDes - MaxHotWaterVolFlowUser)/ MaxHotWaterVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeFanCoilUnit: Potential issue with equipment sizing for ' &
+                                    //TRIM(FanCoil(FanCoilNum)%UnitType)//' '//TRIM(FanCoil(FanCoilNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Hot Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxHotWaterVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Hot Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxHotWaterVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIf
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (FanCoil(FanCoilNum)%MaxColdWaterVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
-
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (FanCoil(FanCoilNum)%MaxColdWaterVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                     'User-Specified Maximum Cold Water Flow [m3/s]', FanCoil(FanCoilNum)%MaxColdWaterVolFlow)
+      END IF
+    ELSE
       IF (SameString(FanCoil(FanCoilNum)%CCoilType,'CoilSystem:Cooling:Water:HeatExchangerAssisted')) THEN
         CoolingCoilName = GetHXDXCoilName(FanCoil(FanCoilNum)%CCoilType,FanCoil(FanCoilNum)%CCoilName,ErrorsFound)
         CoolingCoilType = GetHXCoilType(FanCoil(FanCoilNum)%CCoilType,FanCoil(FanCoilNum)%CCoilName,ErrorsFound)
@@ -1193,61 +1385,82 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
       END IF
       CoilWaterInletNode = GetCoilWaterInletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
       CoilWaterOutletNode = GetCoilWaterOutletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
-      PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType, CoolingCoilName, CoilWaterInletNode, &
+      IF (IsAutosize) THEN
+        PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType, CoolingCoilName, CoilWaterInletNode, &
                                          CoilWaterOutletNode, ErrorsFound)
-
-      IF (PltSizCoolNum > 0) THEN
-        CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
-        IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow > 0.0) THEN
-          FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
-        ELSE
-          FCOAFrac = 0.0
-        END IF
-        CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtCoolPeak + &
-                       (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak
-        CoilInHumRat = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutHumRatAtCoolPeak + &
-                        (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
-        CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
-        CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
-        IF (CoilOutHumRat > CoilInHumRat) THEN
-          IF (CoilInHumRat > 0.016d0) THEN
-            CoilOutHumRat = 0.5*CoilInHumRat
+        IF (PltSizCoolNum > 0) THEN
+          CALL CheckZoneSizing(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name)
+          IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow > 0.0d0) THEN
+            FCOAFrac = MIN(FanCoil(FanCoilNum)%OutAirVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
           ELSE
-            CoilOutHumRat = CoilInHumRat
+            FCOAFrac = 0.0d0
           END IF
-        END IF
-        DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
+          CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtCoolPeak + &
+                       (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak
+          CoilInHumRat = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutHumRatAtCoolPeak + &
+                        (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
+          CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
+          CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
+          IF (CoilOutHumRat > CoilInHumRat) THEN
+            IF (CoilInHumRat > 0.016d0) THEN
+              CoilOutHumRat = 0.5d0*CoilInHumRat
+            ELSE
+              CoilOutHumRat = CoilInHumRat
+            END IF
+          END IF
+          DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
                       * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
-        FanCoil(FanCoilNum)%DesCoolingLoad = DesCoilLoad
-        IF (DesCoilLoad >= SmallLoad) THEN
+          FanCoil(FanCoilNum)%DesCoolingLoad = DesCoilLoad
+          IF (DesCoilLoad >= SmallLoad) THEN
 
-          rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidName, &
+            rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidName, &
                          5.d0, &
                          PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidIndex, &
                          'SizeFanCoilUnit')
 
-          Cp  = GetSpecificHeatGlycol(PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidName, &
+            Cp  = GetSpecificHeatGlycol(PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidName, &
                          5.d0, &
                          PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidIndex, &
                          'SizeFanCoilUnit')
 
-          FanCoil(FanCoilNum)%MaxColdWaterVolFlow = DesCoilLoad / &
-                                                     ( PlantSizData(PltSizCoolNum)%DeltaT * &
-                                                      Cp * rho )
+            MaxColdWaterVolFlowDes = DesCoilLoad / &
+                                   ( PlantSizData(PltSizCoolNum)%DeltaT * &
+                                   Cp * rho )
+          ELSE
+            MaxColdWaterVolFlowDes = 0.0d0
+          END IF
         ELSE
-          FanCoil(FanCoilNum)%MaxColdWaterVolFlow = 0.0
-        END IF
-        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
-                                'Maximum Cold Water Flow [m3/s]', FanCoil(FanCoilNum)%MaxColdWaterVolFlow)
-      ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
-        CALL ShowContinueError('Occurs in ' // TRIM(FanCoil(FanCoilNum)%UnitType) // ' Object=' &
+          CALL ShowSevereError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
+          CALL ShowContinueError('Occurs in ' // TRIM(FanCoil(FanCoilNum)%UnitType) // ' Object=' &
                                //TRIM(FanCoil(FanCoilNum)%Name))
-        ErrorsFound = .TRUE.
+          ErrorsFound = .TRUE.
+        END IF
       END IF
-
+      IF (IsAutosize) THEN
+        FanCoil(FanCoilNum)%MaxColdWaterVolFlow = MaxColdWaterVolFlowDes
+        CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                                'Design Size Maximum Cold Water Flow [m3/s]', MaxColdWaterVolFlowDes)
+      ELSE ! Hard size with sizing data
+        IF (FanCoil(FanCoilNum)%MaxColdWaterVolFlow > 0.0d0 .AND. MaxColdWaterVolFlowDes > 0.0d0) THEN
+          MaxColdWaterVolFlowUser = FanCoil(FanCoilNum)%MaxColdWaterVolFlow
+          CALL ReportSizingOutput(FanCoil(FanCoilNum)%UnitType, FanCoil(FanCoilNum)%Name, &
+                                'Design Size Maximum Cold Water Flow [m3/s]', MaxColdWaterVolFlowDes, &
+                                'User-Specified Maximum Cold Water Flow [m3/s]', MaxColdWaterVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxColdWaterVolFlowDes - MaxColdWaterVolFlowUser)/MaxColdWaterVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeFanCoilUnit: Potential issue with equipment sizing for ' &
+                                    //TRIM(FanCoil(FanCoilNum)%UnitType)//' '//TRIM(FanCoil(FanCoilNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Cold Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxColdWaterVolFlowUser,5))// '[m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Cold Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxColdWaterVolFlowDes,5))// '[m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
   ! set the design air flow rates for the heating and cooling coils
   IF (SameString(FanCoil(FanCoilNum)%CCoilType,'CoilSystem:Cooling:Water:HeatExchangerAssisted')) THEN
@@ -1285,7 +1498,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
 
 END SUBROUTINE SizeFanCoilUnit
 
-SUBROUTINE Sim4PipeFanCoil(FanCoilNum,ZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
+SUBROUTINE Sim4PipeFanCoil(FanCoilNum,ZoneNum,ControlledZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -1319,6 +1532,7 @@ SUBROUTINE Sim4PipeFanCoil(FanCoilNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
   LOGICAL, INTENT (IN)     :: FirstHVACIteration ! TRUE if 1st HVAC simulation of system timestep
   INTEGER, INTENT (INOUT)  :: FanCoilNum         ! number of the current fan coil unit being simulated
   INTEGER, INTENT (IN)     :: ZoneNum            ! number of zone being served
+  INTEGER, INTENT (IN)     :: ControlledZoneNum  ! index into ZoneEqupConfig
   REAL(r64), INTENT (OUT)  :: PowerMet           ! Sensible power supplied (W)
   REAL(r64), INTENT (OUT)  :: LatOutputProvided  ! Latent power supplied (kg/s), negative = dehumidification
 
@@ -1363,7 +1577,6 @@ REAL (r64)   :: Relax
 REAL (r64)   :: DelPLR
 REAL(r64)    :: mdot
 
-
           ! FLOW
 FanElecPower = 0.0d0
 ! initialize local variables
@@ -1383,10 +1596,10 @@ MinWaterFlow = 0.0d0
 OutletNode = FanCoil(FanCoilNum)%AirOutNode
 InletNode = FanCoil(FanCoilNum)%AirInNode
 AirMassFlow = Node(InletNode)%MassFlowRate
-Error = 1.0
-AbsError = 2.0 * SmallLoad
+Error = 1.0d0
+AbsError = 2.0d0 * SmallLoad
 Iter = 0
-Relax = 1.0
+Relax = 1.0d0
 
 ! select capacity control method
 SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
@@ -1416,7 +1629,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWCompNum)
 
     ! obtain unit output with no active heating/cooling
-    CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutNoHC)
+    CALL Calc4PipeFanCoil(FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutNoHC)
     ! get the loads at the coils
     QCoilHeatSP = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP - QUnitOutNoHC
     QCoilCoolSP = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP - QUnitOutNoHC
@@ -1430,7 +1643,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%CWLoopSide, &
                                 FanCoil(FanCoilNum)%CWBranchNum, &
                                 FanCoil(FanCoilNum)%CWCompNum)
-      CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutMaxHC)
+      CALL Calc4PipeFanCoil(FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMaxHC)
       IF(QUnitOutMaxHC .LT. QCoilCoolSP)THEN
         ! more cooling than required, find reduced water flow rate to meet the load
         ControlNode = FanCoil(FanCoilNum)%ColdControlNode
@@ -1453,7 +1666,8 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              CompErrIndex=FanCoil(FanCoilNum)%CompErrIndex, &
                              LoopNum     = FanCoil(FanCoilNum)%CWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%CWLoopSide, &
-                             BranchIndex = FanCoil(FanCoilNum)%CWBranchNum)
+                             BranchIndex = FanCoil(FanCoilNum)%CWBranchNum, &
+                             ControlledZoneIndex = ControlledZoneNum)
       END IF
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
@@ -1467,7 +1681,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWLoopSide, &
                                 FanCoil(FanCoilNum)%HWBranchNum, &
                                 FanCoil(FanCoilNum)%HWCompNum)
-      CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutMaxHC)
+      CALL Calc4PipeFanCoil(FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMaxHC)
       IF(QUnitOutMaxHC .GT. QCoilHeatSP)THEN
         ! more heating than required, find reduced water flow rate to meet the load
         ControlNode = FanCoil(FanCoilNum)%HotControlNode
@@ -1490,7 +1704,8 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              CompErrIndex=FanCoil(FanCoilNum)%CompErrIndex, &
                              LoopNum     = FanCoil(FanCoilNum)%HWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%HWLoopSide, &
-                             BranchIndex = FanCoil(FanCoilNum)%HWBranchNum)
+                             BranchIndex = FanCoil(FanCoilNum)%HWBranchNum, &
+                             ControlledZoneIndex = ControlledZoneNum)
       ENDIF
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
@@ -1500,7 +1715,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
     END IF
 
     ! CR9155 Remove specific humidity calculations
-    SpecHumOut = Node(OutletNode)%HumRat 
+    SpecHumOut = Node(OutletNode)%HumRat
     SpecHumIn  = Node(InletNode)%HumRat
     LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
     QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -1521,12 +1736,12 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
     IF (UnitOn .and. (FanCoil(FanCoilNum)%CapCtrlMeth_Num == CCM_CycFan)) THEN
       QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired
       Node(InletNode)%MassFlowRateMax = FanCoil(FanCoilNum)%LowSpeedRatio * FanCoil(FanCoilNum)%MaxAirMassFlow
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
       FanCoil(FanCoilNum)%SpeedFanSel = 1
       FanCoil(FanCoilNum)%SpeedFanRatSel = FanCoil(FanCoilNum)%LowSpeedRatio
       IF (ABS(QUnitOutMax) .lt. ABS(QZnReq)) THEN
         Node(InletNode)%MassFlowRateMax = FanCoil(fanCoilNum)%MedSpeedRatio * FanCoil(FanCoilNum)%MaxAirMassFlow
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
         FanCoil(FanCoilNum)%SpeedFanSel = 2
         FanCoil(FanCoilNum)%SpeedFanRatSel = FanCoil(FanCoilNum)%MedSpeedRatio
       END IF
@@ -1559,7 +1774,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWBranchNum, &
                                 FanCoil(FanCoilNum)%HWCompNum)
 
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutNOHC)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutNOHC)
 
       IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < (-1.d0*SmallLoad) .and. &
           TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
@@ -1577,10 +1792,10 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         ControlOffset = FanCoil(FanCoilNum)%ColdControlOffset
 
         ! get the maximum output of the fcu
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
         ! calculate the PLR, if load greater than output, PLR = 1 (output = max)
         If(QUnitOutMax .Ne. 0.0d0) PLR = ABS(QZnReq/QUnitOutMax)
-        if (PLR .gt. 1.0d0) PLR = 1.0
+        if (PLR .gt. 1.0d0) PLR = 1.0d0
 
         ! adjust the PLR to meet the cooling load calling Calc4PipeFanCoil repeatedly with the PLR adjusted
         do while (ABS(Error) > ControlOffset .and. ABS(AbsError) > SmallLoad .and. Iter < MaxIterCycl .and. PLR.ne.1.0d0 )
@@ -1594,7 +1809,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%CWLoopSide, &
                                 FanCoil(FanCoilNum)%CWBranchNum, &
                                 FanCoil(FanCoilNum)%CWCompNum)
-          CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+          CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
           Error = (QZnReq - QUnitOut)/QZnReq
           AbsError = QZnReq - QUnitOut
           DelPLR = (QZnReq-QUnitOut)/QUnitOutMax
@@ -1618,7 +1833,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         END IF
 
         ! at the end calculate output with adjusted PLR
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
 
       ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > SmallLoad .and. &
                TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
@@ -1638,7 +1853,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         ControlOffset = FanCoil(FanCoilNum)%HotControlOffset
 
         ! get the maximum output of the fcu
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
         ! calculate the PLR, if load greater than output, PLR = 1 (output = max)
         If(QUnitOutMax .Ne. 0.0d0) PLR = ABS (QZnReq/QUnitOutMax)
         if (PLR .gt. 1.0d0) PLR = 1.0d0
@@ -1657,7 +1872,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWBranchNum, &
                                 FanCoil(FanCoilNum)%HWCompNum)
 
-          CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+          CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
           Error = (QZnReq - QUnitOut)/QZnReq
           AbsError = QZnReq - QUnitOut
           DelPLR = (QZnReq-QUnitOut)/QUnitOutMax
@@ -1681,10 +1896,10 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         END IF
 
         ! at the end calculate output with adjusted PLR
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
 
         !this part of the code is just if we want ventilation in the deadband zone
-        !ELSE IF (AirMassFlow .gt. 0.) THEN
+        !ELSE IF (AirMassFlow .gt. 0.0d0) THEN
         ! if fan scheduled available : just ventilation, PLR = 1
         !QUnitOut = QUnitOutNOHC
         !PLR = 1.
@@ -1695,12 +1910,12 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         Node(OutletNode)%MassFlowRate = 0.0d0
         FanCoil(FanCoilNum)%SpeedFanSel = 0
         PLR = 0.0d0
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut,PLR)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut,PLR)
       END IF
 
       AirMassFlow = Node(InletNode)%MassFlowRate
       ! CR9155 Remove specific humidity calculations
-      SpecHumOut = Node(OutletNode)%HumRat 
+      SpecHumOut = Node(OutletNode)%HumRat
       SpecHumIn  = Node(InletNode)%HumRat
       LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
       QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -1738,7 +1953,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWBranchNum, &
                                 FanCoil(FanCoilNum)%HWCompNum)
 
-    CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutNOHC)
+    CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutNOHC)
 
     IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < (-1.d0*SmallLoad) .and. &
         TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
@@ -1755,14 +1970,14 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       ControlOffset = FanCoil(FanCoilNum)%ColdControlOffset
 
       ! get the maximum output of the fcu
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
       ! calculate the PLR, if load greater than output, PLR = 1 (output = max)
       If(QUnitOutMax .Ne. 0.0d0) PLR = ABS(QZnReq/QUnitOutMax)
       if (PLR .gt. 1.0d0) PLR = 1.0d0
 
       ! adjust the PLR to meet the cooling load calling Calc4PipeFanCoil repeatedly with the PLR adjusted
       do while (ABS(Error) > ControlOffset .and. ABS(AbsError) > SmallLoad .and. Iter < MaxIterCycl .and. PLR.ne.1.0d0 )
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
         Error = (QZnReq - QUnitOut)/QZnReq
         AbsError = QZnReq - QUnitOut
         DelPLR = (QZnReq-QUnitOut)/QUnitOutMax
@@ -1786,7 +2001,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       END IF
 
       ! at the end calculate output with adjusted PLR
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
 
     ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > SmallLoad .and. &
              TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
@@ -1803,14 +2018,14 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       ControlOffset = FanCoil(FanCoilNum)%HotControlOffset
 
       ! get the maximum output of the fcu
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutMax)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOutMax)
       ! calculate the PLR, if load greater than output, PLR = 1 (output = max)
       If(QUnitOutMax .Ne. 0.0d0) PLR = ABS (QZnReq/QUnitOutMax)
       if (PLR .gt. 1.0d0) PLR = 1.0d0
 
       ! adjust the PLR to meet the heating load calling Calc4PipeFanCoil repeatedly with the PLR adjusted
       do while (ABS(Error) > ControlOffset .and. ABS(AbsError) > SmallLoad .and. Iter < MaxIterCycl .and. PLR.ne.1.0d0 )
-        CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+        CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
         Error = (QZnReq - QUnitOut)/QZnReq
         AbsError = QZnReq - QUnitOut
         DelPLR = (QZnReq-QUnitOut)/QUnitOutMax
@@ -1834,10 +2049,10 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       END IF
 
       ! at the end calculate output with adjusted PLR
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut, PLR)
 
       !this part of the code is just if we want ventilation in the deadband zone
-      !ELSE IF (AirMassFlow .gt. 0.) THEN
+      !ELSE IF (AirMassFlow .gt. 0.0d0) THEN
       ! if fan scheduled available : just ventilation, PLR = 1
       !QUnitOut = QUnitOutNOHC
       !PLR = 1.
@@ -1848,7 +2063,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       Node(OutletNode)%MassFlowRate = 0.0d0
       FanCoil(FanCoilNum)%SpeedFanSel = 0
       PLR = 0.0d0
-      CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut,PLR)
+      CALL Calc4PipeFanCoil (FanCoilNum,ControlledZoneNum,FirstHVACIteration,QUnitOut,PLR)
     END IF
 
     AirMassFlow = Node(InletNode)%MassFlowRate
@@ -1872,7 +2087,7 @@ END SELECT
 RETURN
 END SUBROUTINE Sim4PipeFanCoil
 
-SUBROUTINE Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,LoadMet,PLR)
+SUBROUTINE Calc4PipeFanCoil(FanCoilNum,ControlledZoneNum,FirstHVACIteration,LoadMet,PLR)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -1891,19 +2106,22 @@ SUBROUTINE Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,LoadMet,PLR)
 
           ! USE STATEMENTS:
 USE MixedAir,            ONLY: SimOAMixer
+USE SingleDuct,          ONLY: SimATMixer
 USE Fans,                ONLY: SimulateFanComponents
 USE WaterCoils,          ONLY: SimulateWaterCoilComponents
 USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
 USE Psychrometrics,      ONLY: PsyHFnTdbW
 USE DataHVACGlobals,     ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
+USE DataZoneEquipment,   ONLY: ZoneEquipConfig
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT (IN)  :: FanCoilNum         ! Unit index in fan coil array
+  INTEGER, INTENT (IN)  :: ControlledZoneNum  ! ZoneEquipConfig index
   LOGICAL, INTENT (IN)  :: FirstHVACIteration ! flag for 1st HVAV iteration in the time step
-  REAL(r64), INTENT (INOUT), OPTIONAL :: PLR                 ! Part Load Ratio, fraction of time step fancoil is on
-  REAL(r64),    INTENT (OUT) :: LoadMet            ! load met by unit (watts)
+  REAL(r64), INTENT (OUT) :: LoadMet          ! load met by unit (watts)
+  REAL(r64), INTENT (INOUT), OPTIONAL :: PLR  ! Part Load Ratio, fraction of time step fancoil is on
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1917,23 +2135,27 @@ USE DataHVACGlobals,     ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER :: OutletNode       ! unit air outlet node
 INTEGER :: InletNode        ! unit air inlet node
+INTEGER :: ATMixOutNode = 0 ! outlet node of ATM Mixer
+INTEGER :: ZoneNode = 0     ! zone node
 REAL(r64)    :: AirMassFlow      ! total mass flow through the unit
 REAL (r64)   :: PartLoad         ! if PLR present PartLoad = PLR
 REAL (r64)   :: OASchedValue     ! value of OASchedValue, =1 if not schedule
           ! FLOW
 
-! if PLR present in arguments, get his value, else default PLR = 1
+! if PLR present in arguments, get its value, else default PLR = 1
 IF (PRESENT(PLR)) THEN
   PartLoad = PLR
 ELSE
-  PartLoad = 1
+  PartLoad = 1.0d0
 END IF
 
 OutletNode = FanCoil(FanCoilNum)%AirOutNode
 InletNode = FanCoil(FanCoilNum)%AirInNode
+ZoneNode = ZoneEquipConfig(ControlledZoneNum)%ZoneNode
 
-! we assume we have a VAV, air mass flow rate is the average on a timestep
-IF (GetCurrentScheduleValue(FanCoil(FanCoilNum)%SchedPtr) .gt. 0.0)   &
+! Assume the unit is able to vary the flow. A cycling unit is treated as
+! if it were variable flow, with the flow being the averaqe flow over the time step
+IF (GetCurrentScheduleValue(FanCoil(FanCoilNum)%SchedPtr) .gt. 0.0d0)   &
      Node(InletNode)%MassFlowRate = PartLoad * Node(InletNode)%MassFlowRateMax
 
 ! use the value of the outside air schedule if present
@@ -1943,20 +2165,32 @@ ELSE
   OASchedValue = 1.0D0
 END IF
 
-! Don't let the outside air flow be > supply air flow and get the value of the schedule for the OA
-IF (FanCoil(FanCoilNum)%CapCtrlMeth_Num .eq. CCM_CycFan) THEN
-  Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate =    &
-     MIN(OASchedValue * Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRateMax * PartLoad * FanCoil(FanCoilNum)%SpeedFanRatSel,&
-                                        Node(InletNode)%MassFlowRate)
+IF (FanCoil(FanCoilNum)%ATMixerExists) THEN
+  ATMixOutNode = FanCoil(FanCoilNum)%ATMixerOutNode
+  IF (FanCoil(FanCoilNum)%ATMixerType == ATMixer_InletSide) THEN
+    ! set the primary air inlet mass flow rate
+    Node(FanCoil(FanCoilNum)%ATMixerPriNode)%MassFlowRate = MIN(Node(FanCoil(FanCoilNum)%ATMixerPriNode)%MassFlowRateMaxAvail, &
+                                                              Node(InletNode)%MassFlowRate)
+    ! now calculate the the mixer outlet conditions (and the secondary air inlet flow rate)
+    ! the mixer outlet flow rate has already been set above (it is the "inlet" node flow rate)
+    CALL SimATMixer(FanCoil(FanCoilNum)%ATMixerName,FirstHVACIteration,FanCoil(FanCoilNum)%ATMixerIndex)
+  END IF
+  AirMassFlow = Node(InletNode)%MassFlowRate
 ELSE
-  Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate =    &
-     MIN(OASchedValue * Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRateMax * PartLoad, Node(InletNode)%MassFlowRate)
+  ! OutdoorAir:Mixer
+  IF (FanCoil(FanCoilNum)%CapCtrlMeth_Num .eq. CCM_CycFan) THEN
+    Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate =   &
+        MIN(OASchedValue * Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRateMax * &
+        PartLoad * FanCoil(FanCoilNum)%SpeedFanRatSel,Node(InletNode)%MassFlowRate)
+  ELSE
+    Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate =   &
+        MIN(OASchedValue * Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRateMax * &
+        PartLoad, Node(InletNode)%MassFlowRate)
+  END IF
+  Node(FanCoil(FanCoilNum)%AirReliefNode)%MassFlowRate = Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate
+  AirMassFlow = Node(InletNode)%MassFlowRate
+  CALL SimOAMixer(FanCoil(FanCoilNum)%OAMixName,FirstHVACIteration,FanCoil(FanCoilNum)%OAMixIndex)
 END IF
-
-Node(FanCoil(FanCoilNum)%AirReliefNode)%MassFlowRate = Node(FanCoil(FanCoilNum)%OutsideAirNode)%MassFlowRate
-AirMassFlow = Node(InletNode)%MassFlowRate
-
-CALL SimOAMixer(FanCoil(FanCoilNum)%OAMixName,FirstHVACIteration,FanCoil(FanCoilNum)%OAMixIndex)
 
 IF(FanCoil(FanCoilNum)%CapCtrlMeth_Num .eq. CCM_CycFan)THEN
   ! cycling fan coil unit calculation
@@ -1996,8 +2230,26 @@ ELSE
 
 END IF
 
-LoadMet = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
+IF (FanCoil(FanCoilNum)%ATMixerExists) THEN
+  IF (FanCoil(FanCoilNum)%ATMixerType == ATMixer_SupplySide) THEN
+    ! Now calculate the ATM mixer if it is on the supply side of the zone unit
+    CALL SimATMixer(FanCoil(FanCoilNum)%ATMixerName,FirstHVACIteration,FanCoil(FanCoilNum)%ATMixerIndex)
+  END IF
+END IF
+
+IF (FanCoil(FanCoilNum)%ATMixerExists) THEN
+  IF (FanCoil(FanCoilNum)%ATMixerType == ATMixer_SupplySide) THEN
+    LoadMet = Node(ATMixOutNode)%MassFlowRate * (PsyHFnTdbW(Node(ATMixOutNode)%Temp,Node(ZoneNode)%HumRat) &
+                                                 - PsyHFnTdbW(Node(ZoneNode)%Temp,Node(ZoneNode)%HumRat))
+  ELSE
+    ! ATM Mixer on inlet side
+    LoadMet = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(ZoneNode)%HumRat)  &
+                       - PsyHFnTdbW(Node(ZoneNode)%Temp,Node(ZoneNode)%HumRat))
+  END IF
+ELSE
+  LoadMet = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                        - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
+END IF
 
 RETURN
 END SUBROUTINE Calc4PipeFanCoil
@@ -2263,7 +2515,110 @@ INTEGER FUNCTION GetFanCoilMixedAirNode(FanCoilNum)
 
 END FUNCTION GetFanCoilMixedAirNode
 
+INTEGER FUNCTION GetFanCoilInletAirNode(FanCoilNum)
 
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B Griffith
+          !       DATE WRITTEN   Dec  2006
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! lookup function for inlet node for Fan Coil unit
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: FanCoilNum          !
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  IF (GetFanCoilInputFlag) THEN
+    CALL GetFanCoilUnits
+    GetFanCoilInputFlag = .FALSE.
+  END IF
+
+  GetFanCoilInletAirNode = 0
+  IF (FanCoilNum > 0 .and. FanCoilNum <= NumFanCoils) THEN
+    GetFanCoilInletAirNode = FanCoil(FanCoilNum)%AirOutNode
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetFanCoilInletAirNode
+
+SUBROUTINE GetFanCoilIndex(FanCoilName,FanCoilIndex)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the index for a given PT Unit
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: FanCoilName
+  INTEGER, INTENT(INOUT)       :: FanCoilIndex
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  LOGICAL ErrorsFound ! for error trapping
+
+  IF (GetFanCoilInputFlag) THEN
+    CALL GetFanCoilUnits
+    GetFanCoilInputFlag = .FALSE.
+  END IF
+
+  FanCoilIndex = FindItemInList(FanCoilName,FanCoil%Name,NumFanCoils)
+  IF (FanCoilIndex == 0) THEN
+      CALL ShowSevereError('GetFanCoilIndex: Fan Coil Unit not found='//TRIM(FanCoilName))
+  ENDIF
+  ErrorsFound=.TRUE.
+
+  RETURN
+
+END SUBROUTINE GetFanCoilIndex
 
 !     NOTICE
 !

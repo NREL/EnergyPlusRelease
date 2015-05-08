@@ -51,6 +51,7 @@ USE DataContaminantBalance, ONLY: Contaminant, ZoneAirCO2, ZoneAirCO2Temp, ZoneA
                                   ZoneAirGC, ZoneAirGCTemp, ZoneAirGCAvg, OutdoorGC
 USE ScheduleManager, ONLY: GetCurrentScheduleValue
 USE WindowComplexManager, ONLY: CalculateBasisLength
+USE DataWindowEquivalentLayer, ONLY: TotWinEquivLayerConstructs
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
 
@@ -305,6 +306,9 @@ SUBROUTINE GetHeatBalanceInput  ! Heat Balance Input Reader Manager
     CALL GetConstructData(ErrorsFound)   ! Read constructs from input file/transfer from legacy data structure
 
     CALL GetBuildingData(ErrorsFound)    ! Read building data from input file
+
+    ! Added SV 6/26/2013 to load scheduled surface gains
+    CALL GetScheduledSurfaceGains(ErrorsFound)
 
     ! Added TH 1/9/2009 to create thermochromic window constructions
     CALL CreateTCConstructions(ErrorsFound)
@@ -594,7 +598,7 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
      ENDIF
         ! Loads Convergence Tolerance Value
      LoadsConvergTol=BuildingNumbers(2)
-     IF (LoadsConvergTol <= 0.0) THEN
+     IF (LoadsConvergTol <= 0.0d0) THEN
        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
           ' value invalid, ['//  &
           TRIM(RoundSigDigits(LoadsConvergTol,3))//']')
@@ -602,7 +606,7 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
      ENDIF
         ! Temperature Convergence Tolerance Value
      TempConvergTol=BuildingNumbers(3)
-     IF (TempConvergTol <= 0.0) THEN
+     IF (TempConvergTol <= 0.0d0) THEN
        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//': '//TRIM(cNumericFieldNames(2))//  &
           ' value invalid, ['//  &
           TRIM(RoundSigDigits(TempConvergTol,3))//']')
@@ -1194,6 +1198,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   REAL(r64)    :: TransmittivityVis ! Glass transmittivity, visible
   LOGICAL      :: DoReport=.false.
   REAL(r64)    :: DenomRGas         ! Denominator for WindowGas calculations of NominalR
+  REAL(r64)    :: Openness          ! insect screen oppenness fraction = (1-d/s)^2
 
   ! Added TH 1/9/2009 to read the thermochromic glazings
   INTEGER :: iTC = 0
@@ -1222,8 +1227,16 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   EcoRoofMat=GetNumObjectsFound('Material:RoofVegetation')
   TotSimpleWindow = GetNumObjectsFound('WindowMaterial:SimpleGlazingSystem')
 
+  W5GlsMatEQL=GetNumObjectsFound('WindowMaterial:Glazing:EquivalentLayer')
+  TotShadesEQL=GetNumObjectsFound('WindowMaterial:Shade:EquivalentLayer')
+  TotDrapesEQL=GetNumObjectsFound('WindowMaterial:Drape:EquivalentLayer')
+  TotBlindsEQL=GetNumObjectsFound('WindowMaterial:Blind:EquivalentLayer')
+  TotScreensEQL=GetNumObjectsFound('WindowMaterial:Screen:EquivalentLayer')
+  W5GapMatEQL=GetNumObjectsFound('WindowMaterial:Gap:EquivalentLayer')
+
   TotMaterials=RegMat+RegRMat+AirMat+W5GlsMat+W5GlsMatAlt+W5GasMat+W5GasMatMixture+ &
-       TotShades+TotScreens+TotBlinds+EcoRoofMat+IRTMat+TotSimpleWindow+TotComplexShades+TotComplexGaps
+       TotShades+TotScreens+TotBlinds+EcoRoofMat+IRTMat+TotSimpleWindow+TotComplexShades+TotComplexGaps+ &
+       W5GlsMatEQL+TotShadesEQL+TotDrapesEQL+TotBlindsEQL+TotScreensEQL+W5GapMatEQL
 
   TotFfactorConstructs = GetNumObjectsFound('Construction:FfactorGroundFloor')
   TotCfactorConstructs = GetNumObjectsFound('Construction:CfactorUndergroundWall')
@@ -1235,7 +1248,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   ALLOCATE (Material(TotMaterials))! Allocate the array Size to the number of materials
 
   ALLOCATE(NominalR(TotMaterials))
-  NominalR=0.0
+  NominalR=0.0d0
 
   MaterNum=0
 
@@ -1292,7 +1305,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       Material(MaterNum)%AbsorpVisibleInput = .7d0
     ENDIF
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)            = Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
       Material(MaterNum)%Resistance = NominalR(MaterNum)
     ELSE
@@ -1382,9 +1395,9 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       Material(MaterNum)%Name = '~FC_Insulation_' // RoundSigDigits(Loop,0)
       Material(MaterNum)%ROnly = .true.
       Material(MaterNum)%Roughness = MediumRough
-      Material(MaterNum)%AbsorpSolar = 0.0
-      Material(MaterNum)%AbsorpThermal = 0.0
-      Material(MaterNum)%AbsorpVisible = 0.0
+      Material(MaterNum)%AbsorpSolar = 0.0d0
+      Material(MaterNum)%AbsorpThermal = 0.0d0
+      Material(MaterNum)%AbsorpVisible = 0.0d0
     ENDDO
     RegRMat = RegRMat + TotFfactorConstructs + TotCfactorConstructs
   ENDIF
@@ -1518,10 +1531,10 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%GlassTransDirtFactor= MaterialProps(12)
     Material(MaterNum)%YoungModulus         = MaterialProps(13)
     Material(MaterNum)%PoissonsRatio       = MaterialProps(14)
-    IF(MaterialProps(12) == 0.0) Material(MaterNum)%GlassTransDirtFactor = 1.0
+    IF(MaterialProps(12) == 0.0d0) Material(MaterNum)%GlassTransDirtFactor = 1.0d0
     Material(MaterNum)%AbsorpThermal       = Material(MaterNum)%AbsorpThermalBack
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
       Material(MaterNum)%Resistance = NominalR(MaterNum)
     ELSE
@@ -1561,84 +1574,84 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     ! Fixed CR 8413 - modeling spandrel panels as glazing systems
     IF(SameString(MaterialNames(2),'SpectralAverage')) THEN
 
-      IF(MaterialProps(2)+MaterialProps(3) > 1.0) THEN
+      IF(MaterialProps(2)+MaterialProps(3) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' + '//TRIM(cNumericFieldNames(3))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(2)+MaterialProps(4) > 1.0) THEN
+      IF(MaterialProps(2)+MaterialProps(4) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' + '//TRIM(cNumericFieldNames(4))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(5)+MaterialProps(6) > 1.0) THEN
+      IF(MaterialProps(5)+MaterialProps(6) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' + '//TRIM(cNumericFieldNames(6))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(5)+MaterialProps(7) > 1.0) THEN
+      IF(MaterialProps(5)+MaterialProps(7) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' + '//TRIM(cNumericFieldNames(7))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(8)+MaterialProps(9) > 1.0) THEN
+      IF(MaterialProps(8)+MaterialProps(9) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' + '//TRIM(cNumericFieldNames(9))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(8)+MaterialProps(10) > 1.0) THEN
+      IF(MaterialProps(8)+MaterialProps(10) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' + '//TRIM(cNumericFieldNames(10))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(2) < 0.0) THEN
+      IF(MaterialProps(2) < 0.0d0) THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' not >= 0.0')
         ErrorsFound=.true.
       END IF
 
-      IF(MaterialProps(2) > 1.0) THEN
+      IF(MaterialProps(2) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(3) < 0.0 .or. MaterialProps(3) > 1.0) THEN
+      IF(MaterialProps(3) < 0.0d0 .or. MaterialProps(3) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' not >= 0.0 and <= 1.0')
       END IF
 
-      IF(MaterialProps(4) < 0.0 .or. MaterialProps(4) > 1.0) THEN
+      IF(MaterialProps(4) < 0.0d0 .or. MaterialProps(4) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(4))//' not >= 0.0 and <= 1.0')
       END IF
 
-      IF(MaterialProps(5) < 0.0) THEN
+      IF(MaterialProps(5) < 0.0d0) THEN
         CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", minimal value.')
         CALL ShowWarningError(TRIM(cNumericFieldNames(5))//' not >= 0.0')
       END IF
 
-      IF(MaterialProps(5) > 1.0) THEN
+      IF(MaterialProps(5) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' not <= 1.0')
       END IF
 
-      IF(MaterialProps(6) < 0.0 .or. MaterialProps(6) > 1.0) THEN
+      IF(MaterialProps(6) < 0.0d0 .or. MaterialProps(6) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' not >= 0.0 and <= 1.0')
       END IF
 
-      IF(MaterialProps(7) < 0.0 .or. MaterialProps(7) > 1.0) THEN
+      IF(MaterialProps(7) < 0.0d0 .or. MaterialProps(7) > 1.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' not >= 0.0 and <= 1.0')
@@ -1646,37 +1659,37 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
     END IF
 
-    IF(MaterialProps(8) > 1.0) THEN
+    IF(MaterialProps(8) > 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' not <= 1.0')
     END IF
 
-    IF(MaterialProps(9) <= 0.0 .or. MaterialProps(9) >= 1.0) THEN
+    IF(MaterialProps(9) <= 0.0d0 .or. MaterialProps(9) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' not > 0.0 and < 1.0')
     END IF
 
-    IF(MaterialProps(10) <= 0.0 .or. MaterialProps(10) >= 1.0) THEN
+    IF(MaterialProps(10) <= 0.0d0 .or. MaterialProps(10) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' not > 0.0 and < 1.0')
     END IF
 
-    IF(MaterialProps(11) <= 0.0) THEN
+    IF(MaterialProps(11) <= 0.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' not > 0.0')
     END IF
 
-    IF(MaterialProps(13) < 0.0) THEN
+    IF(MaterialProps(13) < 0.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(13))//' not > 0.0')
     END IF
 
-    IF(MaterialProps(14) < 0.0 .or. MaterialProps(14) >= 1.0) THEN
+    IF(MaterialProps(14) < 0.0d0 .or. MaterialProps(14) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(14))//' not > 0.0 and < 1.0')
@@ -1751,17 +1764,17 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%AbsorpThermalBack   = MaterialProps(7)
     Material(MaterNum)%Conductivity        = MaterialProps(8)
     Material(MaterNum)%GlassTransDirtFactor= MaterialProps(9)
-    IF(MaterialProps(9) == 0.0) Material(MaterNum)%GlassTransDirtFactor = 1.0
+    IF(MaterialProps(9) == 0.0d0) Material(MaterNum)%GlassTransDirtFactor = 1.0d0
     Material(MaterNum)%AbsorpThermal       = Material(MaterNum)%AbsorpThermalBack
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
       Material(MaterNum)%Resistance = NominalR(MaterNum)
     ENDIF
 
     Material(MaterNum)%GlassSpectralDataPtr = 0
 
-    IF(MaterialProps(6)+MaterialProps(7) >= 1.0) THEN
+    IF(MaterialProps(6)+MaterialProps(7) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' + '//TRIM(cNumericFieldNames(7))//' not < 1.0')
@@ -1780,6 +1793,86 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     END IF
 
   ENDDO
+
+ ! Glass materials, equivalent layer (ASHWAT) method
+  CurrentModuleObject='WindowMaterial:Glazing:EquivalentLayer'
+  DO Loop=1,W5GlsMatEQL
+
+    !Call Input Get routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=GlassEquivalentLayer
+
+    !Load the material derived type from the input data.
+    Material(MaterNum)%Name                      = MaterialNames(1)
+    Material(MaterNum)%Roughness                 = VerySmooth
+    Material(MaterNum)%ROnly                     = .true.
+
+    Material(MaterNum)%TausFrontBeamBeam    = MaterialProps(1)
+    Material(MaterNum)%TausBackBeamBeam     = MaterialProps(2)
+    Material(MaterNum)%ReflFrontBeamBeam    = MaterialProps(3)
+    Material(MaterNum)%ReflBackBeamBeam     = MaterialProps(4)
+    Material(MaterNum)%TausFrontBeamBeamVis = MaterialProps(5)
+    Material(MaterNum)%TausBackBeamBeamVis  = MaterialProps(6)
+    Material(MaterNum)%ReflFrontBeamBeamVis = MaterialProps(7)
+    Material(MaterNum)%ReflBackBeamBeamVis  = MaterialProps(8)
+    Material(MaterNum)%TausFrontBeamDiff    = MaterialProps(9)
+    Material(MaterNum)%TausBackBeamDiff     = MaterialProps(10)
+    Material(MaterNum)%ReflFrontBeamDiff    = MaterialProps(11)
+    Material(MaterNum)%ReflBackBeamDiff     = MaterialProps(12)
+    Material(MaterNum)%TausFrontBeamDiffVis = MaterialProps(13)
+    Material(MaterNum)%TausBackBeamDiffVis  = MaterialProps(14)
+    Material(MaterNum)%ReflFrontBeamDiffVis = MaterialProps(15)
+    Material(MaterNum)%ReflBackBeamDiffVis  = MaterialProps(16)
+    Material(MaterNum)%TausDiffDiff         = MaterialProps(17)
+    Material(MaterNum)%ReflFrontDiffDiff    = MaterialProps(18)
+    Material(MaterNum)%ReflBackDiffDiff     = MaterialProps(19)
+    Material(MaterNum)%TausDiffDiffVis      = MaterialProps(20)
+    Material(MaterNum)%ReflFrontDiffDiffVis = MaterialProps(21)
+    Material(MaterNum)%ReflBackDiffDiffVis  = MaterialProps(22)
+    Material(MaterNum)%TausThermal          = MaterialProps(23)
+    Material(MaterNum)%EmissThermalFront    = MaterialProps(24)
+    Material(MaterNum)%EmissThermalBack     = MaterialProps(25)
+    ! Assumes thermal emissivity is the same as thermal absorptance
+    Material(MaterNum)%AbsorpThermalFront   = Material(MaterNum)%EmissThermalFront
+    Material(MaterNum)%AbsorpThermalBack    = Material(MaterNum)%EmissThermalBack
+    Material(MaterNum)%TransThermal         = Material(MaterNum)%TausThermal
+
+    IF(SameString(MaterialNames(2),'SpectralAverage')) Material(MaterNum)%GlassSpectralDataPtr = 0
+
+    !IF(Material(MaterNum)%GlassSpectralDataPtr == 0 .AND. SameString(MaterialNames(2),'Spectral')) THEN
+    !  ErrorsFound = .true.
+    !  CALL ShowSevereError(trim(CurrentModuleObject)//'="'//Trim(Material(MaterNum)%Name)// &
+    !        '" has '//TRIM(cAlphaFieldNames(2))//' = Spectral but has no matching MaterialProperty:GlazingSpectralData set')
+    !  IF (lAlphaFieldBlanks(3)) THEN
+    !    CALL ShowContinueError('...'//trim(cAlphaFieldNames(3))//' is blank.')
+    !  ELSE
+    !    CALL ShowContinueError('...'//trim(cAlphaFieldNames(3))//'="'//trim(MaterialNames(3))//  &
+    !       '" not found as item in MaterialProperty:GlazingSpectralData objects.')
+    !END IF
+    !END IF
+
+    IF(.not. SameString(MaterialNames(2),'SpectralAverage') ) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(trim(CurrentModuleObject)//'="'//Trim(Material(MaterNum)%Name)//'", invalid specification.')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(2))//' must be SpectralAverage, value='//  &
+         TRIM(MaterialNames(2)))
+    END IF
+
+
+  ENDDO  ! END OF DO LOOP FOR W5GlsMatEQL
 
   ! Window gas materials (for gaps with a single gas)
 
@@ -1804,7 +1897,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%Group=WindowGas
     Material(MaterNum)%GasType(1) = -1
     Material(MaterNum)%NumberOfGasesInMixture = 1
-    Material(MaterNum)%GasFract(1) = 1.0
+    Material(MaterNum)%GasFract(1) = 1.0d0
 
     !Load the material derived type from the input data.
 
@@ -1858,17 +1951,17 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 !                 //TRIM(MaterialNames(1))//' should be > 0.')
 !      END IF
 
-      IF(Material(MaterNum)%GasVis(1,1) <= 0.0) THEN
+      IF(Material(MaterNum)%GasVis(1,1) <= 0.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(3+ICoeff))//' not > 0.0')
       END IF
-      IF(Material(MaterNum)%GasCp(1,1) <= 0.0) THEN
+      IF(Material(MaterNum)%GasCp(1,1) <= 0.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(5+ICoeff))//' not > 0.0')
       END IF
-      IF(Material(MaterNum)%GasWght(1) <= 0.0) THEN
+      IF(Material(MaterNum)%GasWght(1) <= 0.0d0) THEN
         ErrorsFound = .true.
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' not > 0.0')
@@ -1878,7 +1971,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     ! Nominal resistance of gap at room temperature
     IF(.not.ErrorsFound) THEN
       DenomRGas=(Material(MaterNum)%GasCon(1,1) + Material(MaterNum)%GasCon(1,2)*300.0d0 + Material(MaterNum)%GasCon(1,3)*90000.0d0)
-      IF (DenomRGas > 0.0) THEN
+      IF (DenomRGas > 0.0d0) THEN
         NominalR(MaterNum)=Material(MaterNum)%Thickness/DenomRGas
       ELSE
         CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
@@ -1886,6 +1979,128 @@ SUBROUTINE GetMaterialData(ErrorsFound)
                          trim(RoundSigDigits(DenomRGas,3))//'].')
         ErrorsFound=.true.
       ENDIF
+    ENDIF
+
+  ENDDO
+
+  ! Window gap materials (for gaps with a single gas for EquivalentLayer)
+
+  CurrentModuleObject='WindowMaterial:Gap:EquivalentLayer'
+  DO Loop=1,W5GapMatEQL
+
+    !Call Input Get routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=GapEquivalentLayer
+    Material(MaterNum)%GasType(1) = -1
+    Material(MaterNum)%NumberOfGasesInMixture = 1
+    Material(MaterNum)%GasFract(1) = 1.0d0
+
+    !Load the material derived type from the input data.
+
+    Material(MaterNum)%Name = MaterialNames(1)
+    Material(MaterNum)%NumberOfGasesInMixture = 1
+    TypeOfGas = TRIM(MaterialNames(2))
+    Material(MaterNum)%GasName = TypeOfGas
+    IF(TypeOfGas == 'AIR')     Material(MaterNum)%GasType(1) = 1
+    IF(TypeOfGas == 'ARGON')   Material(MaterNum)%GasType(1) = 2
+    IF(TypeOfGas == 'KRYPTON') Material(MaterNum)%GasType(1) = 3
+    IF(TypeOfGas == 'XENON')   Material(MaterNum)%GasType(1) = 4
+    IF(TypeOfGas == 'CUSTOM')  Material(MaterNum)%GasType(1) = 0
+
+    IF(Material(MaterNum)%GasType(1) == -1) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+      CALL ShowContinueError(trim(cAlphaFieldNames(2))//' entered value="'//TRIM(TypeOfGas)//  &
+         '" should be Air, Argon, Krypton, Xenon')
+    END IF
+
+    Material(MaterNum)%Roughness=MediumRough
+
+    Material(MaterNum)%Thickness     = MaterialProps(1)
+    Material(MaterNum)%ROnly         = .true.
+
+    GasType = Material(MaterNum)%GasType(1)
+    IF(GasType >= 1 .AND. GasType <= 4) THEN
+      Material(MaterNum)%GasWght(1) = GasWght(GasType)
+      Material(MaterNum)%GasSpecHeatRatio(1) = GasSpecificHeatRatio(GasType)
+      DO ICoeff = 1,3
+        Material(MaterNum)%GasCon(1,ICoeff)   = GasCoeffsCon(GasType,ICoeff)
+        Material(MaterNum)%GasVis(1,ICoeff)   = GasCoeffsVis(GasType,ICoeff)
+        Material(MaterNum)%GasCp (1,ICoeff)   = GasCoeffsCp (GasType,ICoeff)
+      END DO
+    END IF
+
+    IF ( .NOT. lAlphaFieldBlanks(2)) THEN
+        ! Get gap vent type
+        IF (SameString(MaterialNames(3),'Sealed')) THEN
+            Material(MaterNum)%GapVentType  = 1
+        ELSEIF(SameString(MaterialNames(3),'VentedIndoor')) THEN
+            Material(MaterNum)%GapVentType  = 2
+        ELSEIF(SameString(MaterialNames(3),'VentedOutdoor')) THEN
+            Material(MaterNum)%GapVentType  = 3
+        ELSE
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal gap vent type.')
+            CALL ShowContinueError('Gap vent type allowed are Sealed, VentedIndoor, or VentedOutdoor.'// &
+                                   trim(cAlphaFieldNames(3))//' entered ='//trim(MaterialNames(3)))
+            Material(MaterNum)%GapVentType  = 1
+            !ErrorsFound=.true.
+        ENDIF
+    ELSE
+
+    ENDIF
+
+    IF(GasType == 0) THEN
+      DO ICoeff = 1,3
+        Material(MaterNum)%GasCon(1,ICoeff)    = MaterialProps(1+ICoeff)
+        Material(MaterNum)%GasVis(1,ICoeff)    = MaterialProps(4+ICoeff)
+        Material(MaterNum)%GasCp (1,ICoeff)    = MaterialProps(7+ICoeff)
+      END DO
+      Material(MaterNum)%GasWght(1)            = MaterialProps(11)
+      Material(MaterNum)%GasSpecHeatRatio(1)   = MaterialProps(12)
+
+      IF(Material(MaterNum)%GasVis(1,1) <= 0.0d0) THEN
+          ErrorsFound = .true.
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+          CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' not > 0.0')
+      END IF
+      IF(Material(MaterNum)%GasCp(1,1) <= 0.0d0) THEN
+          ErrorsFound = .true.
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+          CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' not > 0.0')
+      END IF
+      IF(Material(MaterNum)%GasWght(1) <= 0.0d0) THEN
+          ErrorsFound = .true.
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+          CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' not > 0.0')
+      END IF
+
+    ENDIF
+
+    ! Nominal resistance of gap at room temperature
+    IF(.not.ErrorsFound) THEN
+        DenomRGas=(Material(MaterNum)%GasCon(1,1) + Material(MaterNum)%GasCon(1,2)*300.0d0 +   &
+           Material(MaterNum)%GasCon(1,3)*90000.0d0)
+        IF (DenomRGas > 0.0d0) THEN
+           NominalR(MaterNum)=Material(MaterNum)%Thickness/DenomRGas
+        ELSE
+           CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+           CALL ShowContinueError('Nominal resistance of gap at room temperature calculated at a negative Conductivity=['//  &
+                               trim(RoundSigDigits(DenomRGas,3))//'].')
+           ErrorsFound=.true.
+        ENDIF
     ENDIF
 
   ENDDO
@@ -1957,7 +2172,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
     ! Nominal resistance of gap at room temperature (based on first gas in mixture)
     NominalR(MaterNum)=Material(MaterNum)%Thickness/(Material(MaterNum)%GasCon(1,1) + &
-       Material(MaterNum)%GasCon(1,2)*300.0 + Material(MaterNum)%GasCon(1,3)*90000.0)
+       Material(MaterNum)%GasCon(1,2)*300.0d0 + Material(MaterNum)%GasCon(1,3)*90000.0d0)
 
   ENDDO
 
@@ -2006,31 +2221,193 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%WinShadeAirFlowPermeability = MaterialProps(14)
     Material(MaterNum)%ROnly         = .true.
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
     ELSE
-      NominalR(MaterNum)=1.0
+      NominalR(MaterNum)=1.0d0
     ENDIF
 
-    IF(MaterialProps(1)+MaterialProps(2) >= 1.0) THEN
+    IF(MaterialProps(1)+MaterialProps(2) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' + '//TRIM(cNumericFieldNames(2))//' not < 1.0')
     END IF
 
-    IF(MaterialProps(3)+MaterialProps(4) >= 1.0) THEN
+    IF(MaterialProps(3)+MaterialProps(4) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' + '//TRIM(cNumericFieldNames(4))//' not < 1.0')
     END IF
 
-    IF(MaterialProps(5)+MaterialProps(6) >= 1.0) THEN
+    IF(MaterialProps(5)+MaterialProps(6) >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' + '//TRIM(cNumericFieldNames(6))//' not < 1.0')
     END IF
 
   ENDDO
+
+
+! Window Shade Materials
+
+  CurrentModuleObject='WindowMaterial:Shade:EquivalentLayer'
+  DO Loop=1,TotShadesEQL
+
+    MaterialProps=0
+
+    !Call Input Get routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=ShadeEquivalentLayer
+
+    Material(MaterNum)%Name            = MaterialNames(1)
+    Material(MaterNum)%Roughness       = MediumRough
+    Material(MaterNum)%ROnly           = .true.
+
+    !  Front side and back side have the same beam-Beam Transmittance
+    Material(MaterNum)%TausFrontBeamBeam    = MaterialProps(1)
+    Material(MaterNum)%TausBackBeamBeam     = MaterialProps(1)
+    Material(MaterNum)%TausFrontBeamDiff    = MaterialProps(2)
+    Material(MaterNum)%TausBackBeamDiff     = MaterialProps(3)
+    Material(MaterNum)%ReflFrontBeamDiff    = MaterialProps(4)
+    Material(MaterNum)%ReflBackBeamDiff     = MaterialProps(5)
+    Material(MaterNum)%TausFrontBeamBeamVis = MaterialProps(6)
+    Material(MaterNum)%TausFrontBeamDiffVis = MaterialProps(7)
+    Material(MaterNum)%ReflFrontBeamDiffVis = MaterialProps(8)
+    Material(MaterNum)%TausThermal          = MaterialProps(9)
+    Material(MaterNum)%EmissThermalFront    = MaterialProps(10)
+    Material(MaterNum)%EmissThermalBack     = MaterialProps(11)
+    ! Assumes thermal emissivity is the same as thermal absorptance
+    Material(MaterNum)%AbsorpThermalFront   = Material(MaterNum)%EmissThermalFront
+    Material(MaterNum)%AbsorpThermalBack    = Material(MaterNum)%EmissThermalBack
+    Material(MaterNum)%TransThermal         = Material(MaterNum)%TausThermal
+
+    IF(MaterialProps(1)+MaterialProps(2)+MaterialProps(4) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' + '//TRIM(cNumericFieldNames(2))//' + ' &
+                           //TRIM(cNumericFieldNames(4))//'not < 1.0')
+    END IF
+    IF(MaterialProps(1)+MaterialProps(3)+MaterialProps(5) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' + '//TRIM(cNumericFieldNames(3))//' + ' &
+                           //TRIM(cNumericFieldNames(5))//'not < 1.0')
+    END IF
+    !
+    IF(MaterialProps(6)+MaterialProps(7)+MaterialProps(8) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' + '//TRIM(cNumericFieldNames(7))//' + ' &
+                           //TRIM(cNumericFieldNames(8))//'not < 1.0')
+    END IF
+    !
+    IF(MaterialProps(9)+MaterialProps(10) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(10))//' not < 1.0')
+    END IF
+    IF(MaterialProps(9)+MaterialProps(11) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(11))//' not < 1.0')
+    END IF
+
+  ENDDO  ! END OF DO LOOP for TotShadesEQL
+
+
+  ! Window drape materials
+
+  CurrentModuleObject='WindowMaterial:Drape:EquivalentLayer'
+  DO Loop=1,TotDrapesEQL
+
+    MaterialProps=0
+
+    !Call Input Get routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=DrapeEquivalentLayer
+
+    Material(MaterNum)%Name            = MaterialNames(1)
+    Material(MaterNum)%Roughness       = MediumRough
+    Material(MaterNum)%ROnly           = .true.
+
+    !  Front side and back side have the same properties
+    Material(MaterNum)%TausFrontBeamBeam    = MaterialProps(1)
+    Material(MaterNum)%TausBackBeamBeam     = MaterialProps(1)
+
+    Material(MaterNum)%TausFrontBeamDiff    = MaterialProps(2)
+    Material(MaterNum)%TausBackBeamDiff     = MaterialProps(3)
+
+    Material(MaterNum)%ReflFrontBeamDiff    = MaterialProps(4)
+    Material(MaterNum)%ReflBackBeamDiff     = MaterialProps(5)
+    !
+    Material(MaterNum)%TausFrontBeamBeamVis = MaterialProps(6)
+    Material(MaterNum)%TausFrontBeamDiffVis = MaterialProps(7)
+    Material(MaterNum)%ReflFrontBeamDiffVis = MaterialProps(8)
+    !
+    Material(MaterNum)%TausThermal          = MaterialProps(9)
+    Material(MaterNum)%EmissThermalFront    = MaterialProps(10)
+    Material(MaterNum)%EmissThermalBack     = MaterialProps(11)
+    ! Assumes thermal emissivity is the same as thermal absorptance
+    Material(MaterNum)%AbsorpThermalFront   = Material(MaterNum)%EmissThermalFront
+    Material(MaterNum)%AbsorpThermalBack    = Material(MaterNum)%EmissThermalBack
+    Material(MaterNum)%TransThermal         = Material(MaterNum)%TausThermal
+
+    IF (.NOT. lNumericFieldBlanks(12) .AND. .NOT. lNumericFieldBlanks(13) ) THEN
+        IF ( MaterialProps(12) /= 0.0d0 .AND. MaterialProps(13) /= 0.0d0) THEN
+            Material(MaterNum)%PleatedDrapeWidth   = MaterialProps(12)
+            Material(MaterNum)%PleatedDrapeLength  = MaterialProps(13)
+            Material(MaterNum)%ISPleatedDrape = .true.
+        ENDIF
+    ELSE
+        Material(MaterNum)%ISPleatedDrape = .false.
+    ENDIF
+    IF(MaterialProps(1)+MaterialProps(2)+MaterialProps(4) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' + '//TRIM(cNumericFieldNames(2))//' + ' &
+                           //TRIM(cNumericFieldNames(4))//'not < 1.0')
+    END IF
+    !
+    IF(MaterialProps(6)+MaterialProps(7)+MaterialProps(8) >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(4))//' + '//TRIM(cNumericFieldNames(5))//' + ' &
+                           //TRIM(cNumericFieldNames(6))//'not < 1.0')
+    END IF
+    !
+    IF(MaterialProps(9)+MaterialProps(10) > 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(10))//' not < 1.0')
+    END IF
+
+  ENDDO  ! END OF DO LOOP for TotDrapesEQL
 
   ! Window Screen Materials
 
@@ -2068,13 +2445,13 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     END IF
     Material(MaterNum)%Roughness          = MediumRough
     Material(MaterNum)%ReflectShade       = MaterialProps(1)
-    IF(Material(MaterNum)%ReflectShade .LT. 0.0 .OR. Material(MaterNum)%ReflectShade .GT. 1.0)THEN
+    IF(Material(MaterNum)%ReflectShade .LT. 0.0d0 .OR. Material(MaterNum)%ReflectShade .GT. 1.0d0)THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' must be >= 0 and <= 1')
     END IF
     Material(MaterNum)%ReflectShadeVis    = MaterialProps(2)
-    IF(Material(MaterNum)%ReflectShadeVis .LT. 0.0 .OR. Material(MaterNum)%ReflectShadeVis .GT. 1.0)THEN
+    IF(Material(MaterNum)%ReflectShadeVis .LT. 0.0d0 .OR. Material(MaterNum)%ReflectShadeVis .GT. 1.0d0)THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' must be >= 0 and <= 1 for material ' &
@@ -2082,7 +2459,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     END IF
     Material(MaterNum)%AbsorpThermal      = MaterialProps(3)
     Material(MaterNum)%AbsorpThermalInput = MaterialProps(3)
-    IF(Material(MaterNum)%AbsorpThermal .LT. 0.0 .OR. Material(MaterNum)%AbsorpThermal .GT. 1.0)THEN
+    IF(Material(MaterNum)%AbsorpThermal .LT. 0.0d0 .OR. Material(MaterNum)%AbsorpThermal .GT. 1.0d0)THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' must be >= 0 and <= 1')
@@ -2090,9 +2467,9 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%Conductivity       = MaterialProps(4)
     Material(MaterNum)%Thickness          = MaterialProps(6) ! thickness = diameter
 
-    IF(MaterialProps(5) .GT. 0.0)THEN
+    IF(MaterialProps(5) .GT. 0.0d0)THEN
 !      SurfaceScreens(ScNum)%ScreenDiameterToSpacingRatio = MaterialProps(6)/MaterialProps(5) or 1-SQRT(Material(MaterNum)%Trans
-      IF(MaterialProps(6)/MaterialProps(5) .GE. 1.0)THEN
+      IF(MaterialProps(6)/MaterialProps(5) .GE. 1.0d0)THEN
         ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
         CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' must be less than '//TRIM(cNumericFieldNames(5)))
@@ -2107,7 +2484,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       MaterialProps(5) = 0.000000001d0
     END IF
 
-    IF(MaterialProps(6) .LE. 0.0)THEN
+    IF(MaterialProps(6) .LE. 0.0d0)THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' must be > 0.')
@@ -2170,29 +2547,29 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%AbsorpThermal      = Material(MaterNum)%AbsorpThermal * (1.0d0 - Material(MaterNum)%Trans)
     Material(MaterNum)%AbsorpThermalInput = Material(MaterNum)%AbsorpThermal
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)=(1.d0-Material(MaterNum)%Trans)*Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
     ELSE
-      NominalR(MaterNum)=1.0
+      NominalR(MaterNum)=1.0d0
       CALL ShowWarningError('Conductivity for material="'//TRIM(Material(MaterNum)%Name)//'" must be greater than' &
                           //' 0 for calculating Nominal R-value, Nominal R is defaulted to 1 and the simulation continues.')
     ENDIF
 
-    IF(Material(MaterNum)%Trans+Material(MaterNum)%ReflectShade >= 1.0) THEN
+    IF(Material(MaterNum)%Trans+Material(MaterNum)%ReflectShade >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError('Calculated solar transmittance + solar reflectance not < 1.0')
       CALL ShowContinueError('See Engineering Reference for calculation procedure for solar transmittance.')
     END IF
 
-    IF(Material(MaterNum)%TransVis+Material(MaterNum)%ReflectShadeVis >= 1.0) THEN
+    IF(Material(MaterNum)%TransVis+Material(MaterNum)%ReflectShadeVis >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError('Calculated visible transmittance + visible reflectance not < 1.0')
       CALL ShowContinueError('See Engineering Reference for calculation procedure for visible solar transmittance.')
     END IF
 
-    IF(Material(MaterNum)%TransThermal+Material(MaterNum)%AbsorpThermal >= 1.0) THEN
+    IF(Material(MaterNum)%TransThermal+Material(MaterNum)%AbsorpThermal >= 1.0d0) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowSevereError('Thermal hemispherical emissivity plus open area fraction (1-diameter/spacing)**2' &
@@ -2200,6 +2577,133 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     END IF
 
   END DO
+
+  CurrentModuleObject='WindowMaterial:Screen:EquivalentLayer'
+  DO Loop=1,TotScreensEQL
+
+    MaterialProps = 0
+
+    !Call GetObjectItem routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=ScreenEquivalentLayer
+
+    ! Load the material derived type from the input data.
+    ! WindowMaterial:Screen:EquivalentLayer,
+    Material(MaterNum)%Name                 = MaterialNames(1)
+    Material(MaterNum)%Roughness            = MediumRough
+    Material(MaterNum)%ROnly                = .true.
+    Material(MaterNum)%TausFrontBeamBeam    = MaterialProps(1)
+    Material(MaterNum)%TausBackBeamBeam     = MaterialProps(1)
+    Material(MaterNum)%TausFrontBeamDiff    = MaterialProps(2)
+    Material(MaterNum)%TausBackBeamDiff     = MaterialProps(2)
+    Material(MaterNum)%ReflFrontBeamDiff    = MaterialProps(3)
+    Material(MaterNum)%ReflBackBeamDiff     = MaterialProps(3)
+    Material(MaterNum)%TausFrontBeamBeamVis = MaterialProps(4)
+    Material(MaterNum)%TausFrontBeamDiffVis = MaterialProps(5)
+    Material(MaterNum)%ReflFrontDiffDiffVis = MaterialProps(6)
+    Material(MaterNum)%TausThermal          = MaterialProps(7)
+    Material(MaterNum)%EmissThermalFront    = MaterialProps(8)
+    Material(MaterNum)%EmissThermalBack     = MaterialProps(8)
+
+    ! Assumes thermal emissivity is the same as thermal absorptance
+    Material(MaterNum)%AbsorpThermalFront   = Material(MaterNum)%EmissThermalFront
+    Material(MaterNum)%AbsorpThermalBack    = Material(MaterNum)%EmissThermalBack
+    Material(MaterNum)%TransThermal         = Material(MaterNum)%TausThermal
+
+    IF(MaterialProps(3) .LT. 0.0d0 .OR. MaterialProps(3) .GT. 1.0d0)THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' must be >= 0 and <= 1')
+    END IF
+
+    IF(MaterialProps(6) .LT. 0.0d0 .OR. MaterialProps(6) .GT. 1.0d0)THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' must be >= 0 and <= 1 for material ' &
+                            //TRIM(Material(MaterNum)%Name)//'.')
+    END IF
+
+    IF ( .NOT. lNumericFieldBlanks(9) ) THEN
+        IF(MaterialProps(9) .GT. 0.00001d0)THEN
+           Material(MaterNum)%ScreenWireSpacing = MaterialProps(9)  ! screen wire spacing
+        ELSE
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+          CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' must be > 0.')
+          CALL ShowContinueError('...Setting screen wire spacing to a default value of 0.025m and simulation continues.')
+          Material(MaterNum)%ScreenWireSpacing = 0.025d0
+
+
+        ENDIF
+    ENDIF
+    IF ( .NOT. lNumericFieldBlanks(10) ) THEN
+        IF(MaterialProps(10) > 0.00001d0 .AND. MaterialProps(10) < Material(MaterNum)%ScreenWireSpacing)THEN
+           Material(MaterNum)%ScreenWireDiameter = MaterialProps(10)  ! screen wire spacing
+        ELSE
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
+          CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' must be > 0.')
+          CALL ShowContinueError('...Setting screen wire diameter to a default value of 0.005m and simulation continues.')
+          Material(MaterNum)%ScreenWireDiameter = 0.005d0
+        ENDIF
+    ENDIF
+
+    IF(Material(MaterNum)%ScreenWireSpacing .GT. 0.0d0)THEN
+        IF(Material(MaterNum)%ScreenWireDiameter/Material(MaterNum)%ScreenWireSpacing >= 1.0d0)THEN
+            ErrorsFound = .true.
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+            CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' must be less than '//TRIM(cNumericFieldNames(9)))
+        ELSE
+            !  Calculate direct normal transmittance (open area fraction)
+            Openness = (1.0d0 - Material(MaterNum)%ScreenWireDiameter/Material(MaterNum)%ScreenWireSpacing)**2
+            IF ( (Material(MaterNum)%TausFrontBeamBeam - Openness)/Openness > 0.01d0) THEN
+                CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", screen openness specified.')
+                CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' is > 1.0% of the value calculated from input fields:')
+                CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' and '//(TRIM(cNumericFieldNames(10))))
+                CALL ShowContinueError(' using the formula (1-diameter/spacing)**2')
+                CALL ShowContinueError(' ...the screen diameter is recalculated from the material openness specified ')
+                CALL ShowContinueError(' ...and wire spacing using the formula = wire spacing * (1.0 - SQRT(Opennes))')
+                Material(MaterNum)%ScreenWireDiameter =  Material(MaterNum)%ScreenWireSpacing &
+                                                      *  (1.0d0 - SQRT(Material(MaterNum)%TausFrontBeamBeam))
+                CALL ShowContinueError(' ...Recalculated '//TRIM(cNumericFieldNames(10))//'='//&
+                                      TRIM(RoundSigDigits(Material(MaterNum)%ScreenWireDiameter,4))//' m')
+            ENDIF
+        END IF
+    ENDIF
+
+    IF(Material(MaterNum)%TausFrontBeamBeam+Material(MaterNum)%ReflFrontBeamDiff >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError('Calculated solar transmittance + solar reflectance not < 1.0')
+      CALL ShowContinueError('See Engineering Reference for calculation procedure for solar transmittance.')
+    END IF
+
+    IF(Material(MaterNum)%TausFrontBeamBeamVis+Material(MaterNum)%ReflFrontDiffDiffVis >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError('Calculated visible transmittance + visible reflectance not < 1.0')
+      CALL ShowContinueError('See Engineering Reference for calculation procedure for visible solar transmittance.')
+    END IF
+    !
+    IF(Material(MaterNum)%TransThermal+Material(MaterNum)%AbsorpThermal >= 1.0d0) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowSevereError('Thermal hemispherical emissivity plus open area fraction (1-diameter/spacing)**2' &
+                           //' not < 1.0')
+    END IF
+
+  END DO  ! END OF DO LOOP FOR TotScreensEQL
 
 ! Window Blind Materials
 
@@ -2288,52 +2792,52 @@ SUBROUTINE GetMaterialData(ErrorsFound)
          ' Horizontal or Vertical.')
     END IF
 
-    IF((MaterialProps(6)+MaterialProps(7) >= 1.0)) THEN
+    IF((MaterialProps(6)+MaterialProps(7) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' + '//TRIM(cNumericFieldNames(7))//' not < 1.0')
     END IF
-    IF((MaterialProps(6)+MaterialProps(8) >= 1.0)) THEN
+    IF((MaterialProps(6)+MaterialProps(8) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' + '//TRIM(cNumericFieldNames(8))//' not < 1.0')
     END IF
 
-    IF((MaterialProps(9)+MaterialProps(10) >= 1.0)) THEN
+    IF((MaterialProps(9)+MaterialProps(10) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(10))//' not < 1.0')
     END IF
-    IF((MaterialProps(9)+MaterialProps(11) >= 1.0)) THEN
+    IF((MaterialProps(9)+MaterialProps(11) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(11))//' not < 1.0')
     END IF
 
-    IF((MaterialProps(12)+MaterialProps(13) >= 1.0).OR.(MaterialProps(12)+MaterialProps(14) >= 1.0)) THEN
+    IF((MaterialProps(12)+MaterialProps(13) >= 1.0d0).OR.(MaterialProps(12)+MaterialProps(14) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' + '//TRIM(cNumericFieldNames(13))//' not < 1.0 OR')
       CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' + '//TRIM(cNumericFieldNames(14))//' not < 1.0')
     END IF
 
-    IF((MaterialProps(12)+MaterialProps(13) >= 1.0)) THEN
+    IF((MaterialProps(12)+MaterialProps(13) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' + '//TRIM(cNumericFieldNames(13))//' not < 1.0')
     END IF
-    IF((MaterialProps(12)+MaterialProps(14) >= 1.0)) THEN
+    IF((MaterialProps(12)+MaterialProps(14) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' + '//TRIM(cNumericFieldNames(14))//' not < 1.0')
     END IF
 
-    IF((MaterialProps(15)+MaterialProps(16) >= 1.0)) THEN
+    IF((MaterialProps(15)+MaterialProps(16) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(15))//' + '//TRIM(cNumericFieldNames(16))//' not < 1.0')
     END IF
-    IF((MaterialProps(15)+MaterialProps(17) >= 1.0)) THEN
+    IF((MaterialProps(15)+MaterialProps(17) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(15))//' + '//TRIM(cNumericFieldNames(17))//' not < 1.0')
@@ -2376,12 +2880,12 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       CALL ShowContinueError(TRIM(cNumericFieldNames(14))//' must equal '//TRIM(cNumericFieldNames(17)))
     END IF
 
-    IF((MaterialProps(18)+MaterialProps(19) >= 1.0)) THEN
+    IF((MaterialProps(18)+MaterialProps(19) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(18))//' + '//TRIM(cNumericFieldNames(19))//' not < 1.0')
     END IF
-    IF((MaterialProps(18)+MaterialProps(20) >= 1.0)) THEN
+    IF((MaterialProps(18)+MaterialProps(20) >= 1.0d0)) THEN
       ErrorsFound = .true.
       CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
       CALL ShowContinueError(TRIM(cNumericFieldNames(18))//' + '//TRIM(cNumericFieldNames(20))//' not < 1.0')
@@ -2398,7 +2902,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     IF(Blind(Loop)%SlatWidth > Blind(Loop)%SlatSeparation) THEN
       MinSlatAngGeom = ASIN(Blind(Loop)%SlatThickness/(Blind(Loop)%SlatThickness + Blind(Loop)%SlatSeparation))/DegToRadians
     ELSE
-      MinSlatAngGeom = 0.0
+      MinSlatAngGeom = 0.0d0
     END IF
     MaxSlatAngGeom = 180.d0- MinSlatAngGeom
 
@@ -2471,6 +2975,160 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
   ENDDO
 
+
+! Window Blind Materials for EquivalentLayer Model
+
+  CurrentModuleObject='WindowMaterial:Blind:EquivalentLayer'
+  DO Loop=1,TotBlindsEQL
+
+    !Call Input Get routine to retrieve material data
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(MaterialNames(1),Material%Name,MaterNum,ErrorInName,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    MaterNum=MaterNum+1
+    Material(MaterNum)%Group=BlindEquivalentLayer
+
+    Material(MaterNum)%Name              = MaterialNames(1)
+    Material(MaterNum)%Roughness         = Rough
+    Material(MaterNum)%ROnly             = .true.
+
+    IF (SameString(MaterialNames(2),'Horizontal')) THEN
+      Material(MaterNum)%SlatOrientation        = Horizontal
+    ELSEIF (SameString(MaterialNames(2),'Vertical')) THEN
+      Material(MaterNum)%SlatOrientation        = Vertical
+    ENDIF
+    Material(MaterNum)%SlatWidth            = MaterialProps(1)
+    Material(MaterNum)%SlatSeparation       = MaterialProps(2)
+    Material(MaterNum)%SlatCrown            = MaterialProps(3)
+    Material(MaterNum)%SlatAngle            = MaterialProps(4)
+
+    Material(MaterNum)%TausFrontBeamDiff    = MaterialProps(5)
+    Material(MaterNum)%TausBackBeamDiff     = MaterialProps(6)
+    Material(MaterNum)%ReflFrontBeamDiff    = MaterialProps(7)
+    Material(MaterNum)%ReflBackBeamDiff     = MaterialProps(8)
+
+    IF (.NOT. lNumericFieldBlanks(9) .AND. .NOT. lNumericFieldBlanks(10) .AND. &
+        .NOT. lNumericFieldBlanks(11) .AND. .NOT. lNumericFieldBlanks(12)) THEN
+       Material(MaterNum)%TausFrontBeamDiffVis = MaterialProps(9)
+       Material(MaterNum)%TausBackBeamDiffVis  = MaterialProps(10)
+       Material(MaterNum)%ReflFrontBeamDiffVis = MaterialProps(11)
+       Material(MaterNum)%ReflBackBeamDiffVis  = MaterialProps(12)
+    ENDIF
+    IF (.NOT. lNumericFieldBlanks(13) .AND. .NOT. lNumericFieldBlanks(14) .AND. &
+        .NOT. lNumericFieldBlanks(15) ) THEN
+       Material(MaterNum)%TausDiffDiff         = MaterialProps(13)
+       Material(MaterNum)%ReflFrontDiffDiff    = MaterialProps(14)
+       Material(MaterNum)%ReflBackDiffDiff     = MaterialProps(15)
+     ENDIF
+    IF (.NOT. lNumericFieldBlanks(16) .AND. .NOT. lNumericFieldBlanks(17) .AND. &
+        .NOT. lNumericFieldBlanks(18) ) THEN
+       Material(MaterNum)%TausDiffDiffVis      = MaterialProps(13)
+       Material(MaterNum)%ReflFrontDiffDiffVis = MaterialProps(14)
+       Material(MaterNum)%ReflBackDiffDiffVis  = MaterialProps(15)
+     ENDIF
+    IF (.NOT. lNumericFieldBlanks(19) .AND. .NOT. lNumericFieldBlanks(20) .AND. &
+        .NOT. lNumericFieldBlanks(21) ) THEN
+       Material(MaterNum)%TausThermal          = MaterialProps(19)
+       Material(MaterNum)%EmissThermalFront    = MaterialProps(20)
+       Material(MaterNum)%EmissThermalBack     = MaterialProps(21)
+    ENDIF
+    ! Assumes thermal emissivity is the same as thermal absorptance
+    Material(MaterNum)%AbsorpThermalFront   = Material(MaterNum)%EmissThermalFront
+    Material(MaterNum)%AbsorpThermalBack    = Material(MaterNum)%EmissThermalBack
+    Material(MaterNum)%TransThermal         = Material(MaterNum)%TausThermal
+
+    ! By default all blinds have fixed slat angle,
+    !  they are used with window shading controls that adjust slat angles like MaximizeSolar or BlockBeamSolar
+    IF (.NOT. lAlphaFieldBlanks(3) ) THEN
+        IF (SameString(MaterialNames(3),'FixedSlatAngle')) THEN
+            Material(MaterNum)%SlatAngleType  = 0
+        ELSEIF(SameString(MaterialNames(3),'MaximizeSolar')) THEN
+            Material(MaterNum)%SlatAngleType  = 1
+        ELSEIF(SameString(MaterialNames(3),'BlockBeamSolar')) THEN
+            Material(MaterNum)%SlatAngleType  = 2
+        ELSE
+            Material(MaterNum)%SlatAngleType  = 0
+        ENDIF
+    ELSE
+        Material(MaterNum)%SlatAngleType  = 0
+    ENDIF
+    IF (Material(MaterNum)%SlatWidth < Material(MaterNum)%SlatSeparation) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Slat Seperation/Width')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatWidth,2))//  &
+         '] is less than '//TRIM(cNumericFieldNames(2))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatSeparation,2))//'].')
+      CALL ShowContinueError('This will allow direct beam to be transmitted when Slat angle = 0.')
+    END IF
+    IF (Material(MaterNum)%SlatSeparation < 0.001d0) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Slat Seperation')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatSeparation,2))//  &
+         '].'//' Slate spacing must be > 0.0')
+      CALL ShowContinueError('...Setting slate spacing to default value of 0.025 m and simulation continues.')
+      Material(MaterNum)%SlatSeparation = 0.025d0
+    END IF
+    IF (Material(MaterNum)%SlatWidth < 0.001d0 .OR. Material(MaterNum)%SlatWidth >= 2.0d0 * Material(MaterNum)%SlatSeparation) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Slat Width')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatWidth,2))//  &
+         '].'//' Slat width range is 0 < Width <= 2*Spacing')
+      CALL ShowContinueError('...Setting slate width equal to slate spacing and simulation continues.')
+      Material(MaterNum)%SlatWidth = Material(MaterNum)%SlatSeparation
+    END IF
+    IF (Material(MaterNum)%SlatCrown < 0.0d0 .OR. Material(MaterNum)%SlatCrown >= 0.5d0 * Material(MaterNum)%SlatWidth) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Slat Crown')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(3))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatCrown,2))//  &
+         '].'//' Slat crwon range is 0 <= crown < 0.5*Width')
+      CALL ShowContinueError('...Setting slate crown to 0.0 and simulation continues.')
+      Material(MaterNum)%SlatCrown = 0.0d0
+    END IF
+    IF (Material(MaterNum)%SlatAngle < -90.0d0 .OR. Material(MaterNum)%SlatAngle > 90.0d0) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Slat Angle')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(4))//' ['//TRIM(RoundSigDigits(Material(MaterNum)%SlatAngle,2))//  &
+         '].'//' Slat angle range is -90.0 <= Angle < 90.0')
+      CALL ShowContinueError('...Setting slate angle to 0.0 and simulation continues.')
+      Material(MaterNum)%SlatAngle = 0.0d0
+    END IF
+
+    IF(.not. SameString(MaterialNames(2),'Horizontal') .AND. .not. SameString(MaterialNames(2),'Vertical')) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(2))//'="'//trim(MaterialNames(2))//'", must be '//  &
+         ' Horizontal or Vertical.')
+    END IF
+
+    IF((MaterialProps(5)+MaterialProps(7) >= 1.0d0)) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(5))//' + '//TRIM(cNumericFieldNames(7))//' not < 1.0')
+    END IF
+    IF((MaterialProps(6)+MaterialProps(8) >= 1.0d0)) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' + '//TRIM(cNumericFieldNames(8))//' not < 1.0')
+    END IF
+    !
+    IF((MaterialProps(9)+MaterialProps(11) >= 1.0d0)) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' + '//TRIM(cNumericFieldNames(11))//' not < 1.0')
+    END IF
+    IF((MaterialProps(10)+MaterialProps(12) >= 1.0d0)) THEN
+      ErrorsFound = .true.
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value combination.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' + '//TRIM(cNumericFieldNames(12))//' not < 1.0')
+    END IF
+    !
+
+  ENDDO   ! END OF DO LOOP FOR TotBlindsEQL
+
   ! EcoRoof Materials
   !PSU 2006
   CurrentModuleObject='Material:RoofVegetation'
@@ -2532,7 +3190,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     Material(MaterNum)%InitMoisture  = MaterialProps(15)
 
 
-    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+    IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
       NominalR(MaterNum)            = Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
       Material(MaterNum)%Resistance = NominalR(MaterNum)
     ELSE
@@ -2580,7 +3238,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
       ALLOCATE (TCGlazings(Loop)%SpecTemp(MaterialNumProp))
       ALLOCATE (TCGlazings(Loop)%LayerName(MaterialNumProp))
       ALLOCATE (TCGlazings(Loop)%LayerPoint(MaterialNumProp))
-      TCGlazings(Loop)%SpecTemp = 0.0
+      TCGlazings(Loop)%SpecTemp = 0.0d0
       TCGlazings(Loop)%LayerName = ' '
       TCGlazings(Loop)%LayerPoint = 0
 
@@ -2796,7 +3454,7 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
                              'number of items in dataset = '//trim(TrimSigDigits(SpecDataNumProp)))
       CALL ShowContinueError('... remainder after div by 4 = '//trim(TrimSigDigits(MOD(SpecDataNumProp,4)))//  &
                                ', remainder items will be set to 0.0')
-      SpecDataProps(SpecDataNumProp+1:MIN(SpecDataNumProp+4,MaxSpectralDataElements*4))=0.0
+      SpecDataProps(SpecDataNumProp+1:MIN(SpecDataNumProp+4,MaxSpectralDataElements*4))=0.0d0
     ENDIF
     IF(TotLam > MaxSpectralDataElements) THEN
       ErrorsFound = .true.
@@ -3020,14 +3678,18 @@ SUBROUTINE GetConstructData(ErrorsFound)
   TotCfactorConstructs = GetNumObjectsFound('Construction:CfactorUndergroundWall')
   TotComplexFenStates  = GetNumObjectsFound('Construction:ComplexFenestrationState')
   TotWindow5Constructs = GetNumObjectsFound('Construction:WindowDataFile')
+  TotWinEquivLayerConstructs = GetNumObjectsFound('Construction:WindowEquivalentLayer')
+
   ALLOCATE(WConstructNames(TotWindow5Constructs))
   WConstructNames=' '
 
   TotConstructs       = TotRegConstructs + TotFfactorConstructs + TotCfactorConstructs &
-                        + TotSourceConstructs + TotComplexFenStates
+                      + TotSourceConstructs + TotComplexFenStates + TotWinEquivLayerConstructs
 
+  ALLOCATE(NominalRforNominalUCalculation(TotConstructs))
+  NominalRforNominalUCalculation=0.0d0
   ALLOCATE(NominalU(TotConstructs))
-  NominalU=0.0
+  NominalU=0.0d0
 
      !Allocate the array to the number of constructions/initialize selected variables
   ALLOCATE(Construct(TotConstructs))
@@ -3042,7 +3704,7 @@ SUBROUTINE GetConstructData(ErrorsFound)
   Construct%SolutionDimensions = 1       ! "default" is 1-D heat transfer
   Construct%SourceAfterLayer   = 0       ! this has no meaning if a source/sink is not present
   Construct%TempAfterLayer     = 0       ! this has no meaning if a source/sink is not present
-  Construct%ThicknessPerpend   = 0.0     ! this has no meaning if a source/sink is not present
+  Construct%ThicknessPerpend   = 0.0d0     ! this has no meaning if a source/sink is not present
 
   Construct%W5FrameDivider = 0
   Construct%FromWindow5DataFile = .FALSE.
@@ -3110,7 +3772,8 @@ SUBROUTINE GetConstructData(ErrorsFound)
            TRIM(Construct(ConstrNum)%Name)//', missing material = '//TRIM(ConstructAlphas(Layer)))
         ErrorsFound=.true.
       ELSE
-        NominalU(ConstrNum)=NominalU(ConstrNum)+NominalR(Construct(ConstrNum)%LayerPoint(Layer))
+        NominalRforNominalUCalculation(ConstrNum)=NominalRforNominalUCalculation(ConstrNum)+  &
+           NominalR(Construct(ConstrNum)%LayerPoint(Layer))
         IF (Material(Construct(ConstrNum)%LayerPoint(Layer))%Group ==  RegularMaterial  &
             .and. .not. Material(Construct(ConstrNum)%LayerPoint(Layer))%ROnly) THEN
           NoRegularMaterialsUsed=.false.
@@ -3219,7 +3882,7 @@ SUBROUTINE GetConstructData(ErrorsFound)
            ', missing material = '//TRIM(ConstructAlphas(Layer)))
         ErrorsFound=.true.
       ELSE
-        NominalU(TotRegConstructs+ConstrNum)=NominalU(TotRegConstructs+ConstrNum)+ &
+        NominalRforNominalUCalculation(TotRegConstructs+ConstrNum)=NominalRforNominalUCalculation(TotRegConstructs+ConstrNum)+ &
                                              NominalR(Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer))
         IF (Material(Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer))%Group ==  RegularMaterial  &
             .and. .not. Material(Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer))%ROnly) THEN
@@ -3232,13 +3895,73 @@ SUBROUTINE GetConstructData(ErrorsFound)
   END DO  ! ...end of Source Construction DO loop
 
   TotSourceConstructs = ConstrNum
-  TotConstructs       = TotRegConstructs + TotSourceConstructs
+  TotRegConstructs    = TotRegConstructs + TotSourceConstructs
+  TotConstructs       = TotRegConstructs
 
   IF (TotConstructs > 0 .and. NoRegularMaterialsUsed) THEN
     CALL ShowSevereError('This building has no thermal mass which can cause an unstable solution.')
     CALL ShowContinueError('Use Material object for all opaque material definitions except very light insulation layers.')
   ENDIF
 
+  ConstrNum=0
+  CurrentModuleObject='Construction:WindowEquivalentLayer'
+  DO Loop = 1, TotWinEquivLayerConstructs  ! Loop through all constructs with Window EquivalentLayer ...
+
+      !Get the object names for each construction from the input processor
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+    ErrorInName=.false.
+    IsBlank=.false.
+    CALL VerifyName(ConstructAlphas(0),Construct%Name,TotRegConstructs+ConstrNum,ErrorInName,  &
+               IsBlank,TRIM(CurrentModuleObject)//' Name')
+    IF (ErrorInName) THEN
+      ErrorsFound=.true.
+      CYCLE
+    ENDIF
+
+    ConstrNum=ConstrNum+1
+      !Assign Construction name to the Derived Type using the zeroth position of the array
+    Construct(TotRegConstructs+ConstrNum)%Name = ConstructAlphas(0)
+
+    ! Set the total number of layers for the construction
+    Construct(TotRegConstructs+ConstrNum)%TotLayers = ConstructNumAlpha-1
+    IF (Construct(TotRegConstructs+ConstrNum)%TotLayers < 1) THEN
+      CALL ShowSevereError('Construction '//TRIM(Construct(TotRegConstructs+ConstrNum)%Name)// &
+                           ' must have at least a single layer')
+      ErrorsFound=.true.
+    END IF
+
+    ! Loop through all of the layers of the construct to match the material names.
+    ! The loop index is the number minus 1
+    DO Layer = 1, ConstructNumAlpha-1
+
+      !Find the material in the list of materials
+      Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer) = FindIteminList(ConstructAlphas(Layer),Material%Name,TotMaterials)
+
+      IF (Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer) == 0) THEN
+        CALL ShowSevereError('Did not find matching material for '//TRIM(CurrentModuleObject)//' '//  &
+           TRIM(Construct(ConstrNum)%Name)// &
+           ', missing material = '//TRIM(ConstructAlphas(Layer)))
+        ErrorsFound=.true.
+      ELSE
+        IF (ConstructNumAlpha <= 2)THEN
+
+        ELSE
+           NominalRforNominalUCalculation(TotRegConstructs+ConstrNum)=NominalRforNominalUCalculation(TotRegConstructs+ConstrNum)+ &
+                                             NominalR(Construct(TotRegConstructs+ConstrNum)%LayerPoint(Layer))
+        ENDIF
+      ENDIF
+
+    END DO  ! ...end of the Layer DO loop
+    Construct(TotRegConstructs+ConstrNum)%EQLConsPtr = ConstrNum
+    Construct(TotRegConstructs+ConstrNum)%WindowTypeEQL = .TRUE.
+  END DO  ! ...end of TotWinEquivLayerConstructs DO loop
+
+  TotWinEquivLayerConstructs = ConstrNum
+  TotRegConstructs    = TotRegConstructs + TotWinEquivLayerConstructs
+  TotConstructs       = TotRegConstructs
 !-------------------------------------------------------------------------------
   ConstrNum = 0
 
@@ -3310,11 +4033,13 @@ SUBROUTINE GetConstructData(ErrorsFound)
     ! set some (default) properties of the Construction Derived Type
   DO ConstrNum = 1, TotConstructs
 
-    IF (NominalU(ConstrNum) /= 0.0) THEN
-      NominalU(ConstrNum)=1.0/NominalU(ConstrNum)
+    IF (NominalRforNominalUCalculation(ConstrNum) /= 0.0d0) THEN
+      NominalU(ConstrNum)=1.0d0/NominalRforNominalUCalculation(ConstrNum)
     ELSE
-      CALL ShowSevereError('Nominal U is zero, for construction='//TRIM(Construct(ConstrNum)%Name))
-      ErrorsFound=.true.
+      IF (.NOT. Construct(ConstrNum)%WindowTypeEQL) THEN
+        CALL ShowSevereError('Nominal U is zero, for construction='//TRIM(Construct(ConstrNum)%Name))
+        ErrorsFound=.true.
+      ENDIF
     ENDIF
 
     CALL CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
@@ -3436,7 +4161,7 @@ SUBROUTINE GetZoneData(ErrorsFound)
 
   DO Loop=1,NumOfZones
 
-    rNumericArgs=0.0       ! Zero out just in case
+    rNumericArgs=0.0d0       ! Zero out just in case
     CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -3506,10 +4231,11 @@ SUBROUTINE GetZoneData(ErrorsFound)
           Zone(ZoneLoop)%InsideConvectionAlgo=AdaptiveConvectionAlgorithm
 
         CASE DEFAULT
-          CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(Zone(ZoneLoop)%Name)//'".')
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(Zone(ZoneLoop)%Name)//'".')
           CALL ShowContinueError('Invalid value for '//TRIM(cAlphaFieldNames(2))//'="'//    &
-              TRIM(cAlphaArgs(2))//'", defaulting to TARP.')
-          Zone(ZoneLoop)%InsideConvectionAlgo=ASHRAETARP
+              TRIM(cAlphaArgs(2))//'".')
+          ErrorsFound=.true.
+!          Zone(ZoneLoop)%InsideConvectionAlgo=ASHRAETARP
 
       END SELECT
     ELSE
@@ -3518,7 +4244,7 @@ SUBROUTINE GetZoneData(ErrorsFound)
 
     ENDIF
 
-    IF (NumAlphas > 2 .and. cAlphaArgs(3) /= BlankString) THEN
+    IF (NumAlphas > 2 .and.  .not. lAlphaFieldBlanks(3)) THEN
       SELECT CASE (cAlphaArgs(3))
 
         CASE ('SIMPLECOMBINED', 'SIMPLE')
@@ -3552,10 +4278,11 @@ SUBROUTINE GetZoneData(ErrorsFound)
           Zone(ZoneLoop)%OutsideConvectionAlgo=AdaptiveConvectionAlgorithm
 
         CASE DEFAULT
-          CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(Zone(ZoneLoop)%Name)//'".')
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(Zone(ZoneLoop)%Name)//'".')
           CALL ShowContinueError('Invalid value for '//TRIM(cAlphaFieldNames(3))//'="'//    &
-              TRIM(cAlphaArgs(3))//'", defaulting to AdaptiveConvectionAlgorithm.')
-          Zone(ZoneLoop)%OutsideConvectionAlgo=AdaptiveConvectionAlgorithm
+              TRIM(cAlphaArgs(3))//'".')
+          ErrorsFound=.true.
+          !Zone(ZoneLoop)%OutsideConvectionAlgo=AdaptiveConvectionAlgorithm
 
       END SELECT
     ELSE
@@ -3569,6 +4296,13 @@ SUBROUTINE GetZoneData(ErrorsFound)
     IF (NumAlphas > 3) THEN
       IF (SameString('No',cAlphaArgs(4))) THEN
         Zone(ZoneLoop)%isPartOfTotalArea = .FALSE.
+      ELSEIF (SameString('Yes',cAlphaArgs(4)) .or. lAlphaFieldBlanks(4)) THEN
+        Zone(ZoneLoop)%isPartOfTotalArea = .TRUE.
+      ELSE
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(Zone(ZoneLoop)%Name)//'".')
+        CALL ShowContinueError('Invalid value for '//TRIM(cAlphaFieldNames(4))//'="'//    &
+            TRIM(cAlphaArgs(4))//'".')
+        ErrorsFound=.true.
       END IF
     END IF
 
@@ -3766,6 +4500,7 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
   USE DaylightingDevices,  ONLY: InitDaylightingDevices
   USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
 !  USE DataRoomAirModel, ONLY: IsZoneDV,IsZoneCV,HVACMassFlow, ZoneDVMixedFlag
+  USE WindowEquivalentLayer, ONLY: InitEquivalentLayerWindowCalculations
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -3797,6 +4532,7 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
     END IF
 
     CALL DisplayString('Initializing Window Optical Properties')
+    CALL InitEquivalentLayerWindowCalculations ! Initialize the EQL window optical properties
     CALL InitGlassOpticalCalculations ! Initialize the window optical properties
     CALL InitDaylightingDevices ! Initialize any daylighting devices
     CALL DisplayString('Initializing Solar Calculations')
@@ -3807,10 +4543,10 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
 
   IF (BeginEnvrnFlag) THEN
 
-    MaxHeatLoadPrevDay = 0.0
-    MaxCoolLoadPrevDay = 0.0
-    MaxTempPrevDay = 0.0
-    MinTempPrevDay = 0.0
+    MaxHeatLoadPrevDay = 0.0d0
+    MaxCoolLoadPrevDay = 0.0d0
+    MaxTempPrevDay = 0.0d0
+    MinTempPrevDay = 0.0d0
     MaxHeatLoadZone=-9999.d0
     MaxCoolLoadZone=-9999.d0
     MaxTempZone=-9999.d0
@@ -3821,11 +4557,11 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
     LoadZonePrevDay=-9999.d0
     TempZoneSecPrevDay=1000.d0
     TempZoneSecPrevDay=-9999.d0
-    WarmupTempDiff=0.0
-    WarmupLoadDiff=0.0
-    TempZoneRpt=0.0
-    LoadZoneRpt=0.0
-    MaxLoadZoneRpt=0.0
+    WarmupTempDiff=0.0d0
+    WarmupLoadDiff=0.0d0
+    TempZoneRpt=0.0d0
+    LoadZoneRpt=0.0d0
+    MaxLoadZoneRpt=0.0d0
     CountWarmupDayPoints=0
 
     DO Num=1,10
@@ -3944,27 +4680,27 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
   ALLOCATE(XMPT(NumOfZones))
   XMPT = 23.0d0
   ALLOCATE(MCPI(NumOfZones))
-  MCPI=0.0
+  MCPI=0.0d0
   ALLOCATE(MCPTI(NumOfZones))
-  MCPTI=0.0
+  MCPTI=0.0d0
   ALLOCATE(MCPV(NumOfZones))
-  MCPV=0.0
+  MCPV=0.0d0
   ALLOCATE(MCPTV(NumOfZones))
-  MCPTV=0.0
+  MCPTV=0.0d0
   ALLOCATE(MCPM(NumOfZones))
-  MCPM=0.0
+  MCPM=0.0d0
   ALLOCATE(MCPTM(NumOfZones))
-  MCPTM=0.0
+  MCPTM=0.0d0
   ALLOCATE(MixingMassFlowZone(NumOfZones))
-  MixingMassFlowZone=0.0
+  MixingMassFlowZone=0.0d0
   ALLOCATE(MixingMassFlowXHumRat(NumOfZones))
-  MixingMassFlowXHumRat=0.0
+  MixingMassFlowXHumRat=0.0d0
   ALLOCATE(ZoneLatentGain(NumOfZones))
-  ZoneLatentGain=0.0
+  ZoneLatentGain=0.0d0
   ALLOCATE(OAMFL(NumOfZones))
-  OAMFL=0.0
+  OAMFL=0.0d0
   ALLOCATE(VAMFL(NumOfZones))
-  VAMFL=0.0
+  VAMFL=0.0d0
   ALLOCATE(ZTAV(NumOfZones))
   ZTAV = 23.0d0
   ALLOCATE(ZTAVComf(NumOfZones))
@@ -3995,21 +4731,21 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
   ALLOCATE(SumHmARaW(NumOfZones))
   SumHmARaW=0.0d0
   ALLOCATE(MCPTE(NumOfZones))
-  MCPTE=0.0
+  MCPTE=0.0d0
   ALLOCATE(MCPE(NumOfZones))
-  MCPE=0.0
+  MCPE=0.0d0
   ALLOCATE(EAMFL(NumOfZones))
-  EAMFL=0.0
+  EAMFL=0.0d0
   ALLOCATE(MCPTC(NumOfZones))
-  MCPTC=0.0
+  MCPTC=0.0d0
   ALLOCATE(MCPC(NumOfZones))
-  MCPC=0.0
+  MCPC=0.0d0
   ALLOCATE(CTMFL(NumOfZones))
-  CTMFL=0.0
+  CTMFL=0.0d0
   ALLOCATE(MDotCPOA(NumOfZones))
-  MDotCPOA=0.0
+  MDotCPOA=0.0d0
   ALLOCATE(MDotOA(NumOfZones))
-  MDotOA=0.0
+  MDotOA=0.0d0
   IF (Contaminant%CO2Simulation) Then
     OutdoorCO2 = GetCurrentScheduleValue(Contaminant%CO2OutdoorSchedPtr)
     ALLOCATE(ZoneAirCO2(NumOfZones))
@@ -4029,13 +4765,13 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
     ZoneAirGCAvg=OutdoorGC
   END IF
   ALLOCATE(MaxTempPrevDay(NumofZones))
-           MaxTempPrevDay = 0.0
+           MaxTempPrevDay = 0.0d0
   ALLOCATE(MinTempPrevDay(NumofZones))
-           MinTempPrevDay = 0.0
+           MinTempPrevDay = 0.0d0
   ALLOCATE(MaxHeatLoadPrevDay(NumofZones))
-           MaxHeatLoadPrevDay = 0.0
+           MaxHeatLoadPrevDay = 0.0d0
   ALLOCATE(MaxCoolLoadPrevDay(NumofZones))
-           MaxCoolLoadPrevDay = 0.0
+           MaxCoolLoadPrevDay = 0.0d0
   ALLOCATE(MaxHeatLoadZone(NumofZones))
            MaxHeatLoadZone = -9999.d0
   ALLOCATE(MaxCoolLoadZone(NumofZones))
@@ -4045,27 +4781,27 @@ SUBROUTINE AllocateHeatBalArrays  ! Heat Balance Array Allocation
   ALLOCATE(MinTempZone(NumofZones))
            MinTempZone = 1000.d0
   ALLOCATE(TempZonePrevDay(NumofZones))
-           TempZonePrevDay = 0.0
+           TempZonePrevDay = 0.0d0
   ALLOCATE(LoadZonePrevDay(NumofZones))
-           LoadZonePrevDay = 0.0
+           LoadZonePrevDay = 0.0d0
   ALLOCATE(TempZoneSecPrevDay(NumofZones))
-           TempZoneSecPrevDay = 0.0
+           TempZoneSecPrevDay = 0.0d0
   ALLOCATE(LoadZoneSecPrevDay(NumofZones))
-           LoadZoneSecPrevDay = 0.0
+           LoadZoneSecPrevDay = 0.0d0
   ALLOCATE(WarmupTempDiff(NumofZones))
-           WarmupTempDiff = 0.0
+           WarmupTempDiff = 0.0d0
   ALLOCATE(WarmupLoadDiff(NumofZones))
-           WarmupLoadDiff = 0.0
+           WarmupLoadDiff = 0.0d0
   ALLOCATE(TempZone(NumofZones))
-           TempZone = 0.0
+           TempZone = 0.0d0
   ALLOCATE(LoadZone(NumofZones))
-           LoadZone = 0.0
+           LoadZone = 0.0d0
   ALLOCATE(TempZoneRpt(NumOfTimeStepInHour*24,NumofZones))
-           TempZoneRpt=0.0
+           TempZoneRpt=0.0d0
   ALLOCATE(LoadZoneRpt(NumOfTimeStepInHour*24,NumofZones))
-           LoadZoneRpt=0.0
+           LoadZoneRpt=0.0d0
   ALLOCATE(MaxLoadZoneRpt(NumOfTimeStepInHour*24,NumofZones))
-           MaxLoadZoneRpt=0.0
+           MaxLoadZoneRpt=0.0d0
   ALLOCATE(WarmupConvergenceValues(NumOfZones))
   ALLOCATE(TempZoneRptStdDev(NumOfTimeStepInHour*24))
   ALLOCATE(LoadZoneRptStdDev(NumOfTimeStepInHour*24))
@@ -4176,7 +4912,7 @@ SUBROUTINE RecKeepHeatBalance   ! Heat Balance Record Keeping Manager
   END DO
 
   731 Format(' Warmup Convergence Information, ',A,',',A,',',A,',',A,',',A)
-  732 Format('! <Warmup Convergence Information>,Zone Name,Time Step,Hour of Day,Warmup Temperature Difference {deltaC},'  &
+  732 Format('! <Warmup Convergence Information>,Zone Name,Time Step,Hour of Day,Warmup Temperature Difference {deltaC},',  &
          'Warmup Load Difference {W}')
 
   ! There is no hourly record keeping in the heat balance.
@@ -4442,7 +5178,7 @@ SUBROUTINE ReportWarmupConvergence
           IF (MaxLoadZoneRpt(Num,ZoneNum) > 1.d-4) THEN
             LoadZoneRpt(Num,ZoneNum)=LoadZoneRpt(Num,ZoneNum)/MaxLoadZoneRpt(Num,ZoneNum)
           ELSE
-            LoadZoneRpt(Num,ZoneNum)=0.0
+            LoadZoneRpt(Num,ZoneNum)=0.0d0
           ENDIF
         ENDDO
         AverageZoneLoad=SUM(LoadZoneRpt(1:CountWarmupDayPoints,ZoneNum))/REAL(CountWarmupDayPoints,r64)
@@ -4473,9 +5209,9 @@ SUBROUTINE ReportWarmupConvergence
   RETURN
 
 
-  730 Format('! <Warmup Convergence Information>,Zone Name,Environment Type/Name,'  &
-         'Average Warmup Temperature Difference {deltaC},'  &
-         'Std Dev Warmup Temperature Difference {deltaC},Max Temperature Pass/Fail Convergence,'  &
+  730 Format('! <Warmup Convergence Information>,Zone Name,Environment Type/Name,',  &
+         'Average Warmup Temperature Difference {deltaC},',  &
+         'Std Dev Warmup Temperature Difference {deltaC},Max Temperature Pass/Fail Convergence,',  &
          'Min Temperature Pass/Fail Convergence,Average Warmup Load Difference {W},Std Dev Warmup Load Difference {W},',  &
          'Heating Load Pass/Fail Convergence,Cooling Load Pass/Fail Convergence')
   731 Format(' Warmup Convergence Information',10(',',A))
@@ -4657,9 +5393,9 @@ SUBROUTINE GetFrameAndDividerData(ErrorsFound)
     FrameDivider(FrameDividerNum)%FrameWidth = FrameDividerProps(1)
     FrameDivider(FrameDividerNum)%FrameProjectionOut = FrameDividerProps(2)
     FrameDivider(FrameDividerNum)%FrameProjectionIn = FrameDividerProps(3)
-    IF(FrameDivider(FrameDividerNum)%FrameWidth == 0.0) THEN
-      FrameDivider(FrameDividerNum)%FrameProjectionOut = 0.0
-      FrameDivider(FrameDividerNum)%FrameProjectionIn = 0.0
+    IF(FrameDivider(FrameDividerNum)%FrameWidth == 0.0d0) THEN
+      FrameDivider(FrameDividerNum)%FrameProjectionOut = 0.0d0
+      FrameDivider(FrameDividerNum)%FrameProjectionIn = 0.0d0
     END IF
     FrameDivider(FrameDividerNum)%FrameConductance = FrameDividerProps(4)
     FrameDivider(FrameDividerNum)%FrEdgeToCenterGlCondRatio = FrameDividerProps(5)
@@ -4682,10 +5418,10 @@ SUBROUTINE GetFrameAndDividerData(ErrorsFound)
     FrameDivider(FrameDividerNum)%VertDividers = FrameDividerProps(11)
     FrameDivider(FrameDividerNum)%DividerProjectionOut = FrameDividerProps(12)
     FrameDivider(FrameDividerNum)%DividerProjectionIn = FrameDividerProps(13)
-    IF(FrameDivider(FrameDividerNum)%DividerWidth == 0.0 .OR. &
+    IF(FrameDivider(FrameDividerNum)%DividerWidth == 0.0d0 .OR. &
        FrameDivider(FrameDividerNum)%DividerType == Suspended) THEN
-      FrameDivider(FrameDividerNum)%DividerProjectionOut = 0.0
-      FrameDivider(FrameDividerNum)%DividerProjectionIn = 0.0
+      FrameDivider(FrameDividerNum)%DividerProjectionOut = 0.0d0
+      FrameDivider(FrameDividerNum)%DividerProjectionIn = 0.0d0
     END IF
     FrameDivider(FrameDividerNum)%DividerConductance = FrameDividerProps(14)
     FrameDivider(FrameDividerNum)%DivEdgeToCenterGlCondRatio = FrameDividerProps(15)
@@ -4698,14 +5434,14 @@ SUBROUTINE GetFrameAndDividerData(ErrorsFound)
     FrameDivider(FrameDividerNum)%InsideReveal = FrameDividerProps(22)
     FrameDivider(FrameDividerNum)%InsideRevealSolAbs = FrameDividerProps(23)
 
-    IF (FrameDivider(FrameDividerNum)%DividerWidth > 0.0 .and.   &
+    IF (FrameDivider(FrameDividerNum)%DividerWidth > 0.0d0 .and.   &
         (FrameDivider(FrameDividerNum)%HorDividers == 0 .and. FrameDivider(FrameDividerNum)%VertDividers == 0)) THEN
       CALL ShowWarningError(TRIM(CurrentModuleObject)//': In FrameAndDivider '//TRIM(FrameDivider(FrameDividerNum)%Name)// &
         ' '//TRIM(cNumericFieldNames(9))//' > 0 ')
       CALL ShowContinueError('...but '//TRIM(cNumericFieldNames(10))//' = 0 and '//  &
         TRIM(cNumericFieldNames(11))//' = 0.')
       CALL ShowContinueError('...'//TRIM(cNumericFieldNames(9))//' set to 0.')
-      FrameDivider(FrameDividerNum)%DividerWidth=0.0
+      FrameDivider(FrameDividerNum)%DividerWidth=0.0d0
     ENDIF
     ! Prevent InsideSillDepth < InsideReveal
     IF(FrameDivider(FrameDividerNum)%InsideSillDepth < FrameDivider(FrameDividerNum)%InsideReveal) THEN
@@ -4992,7 +5728,7 @@ END IF
                  TRIM(NextLine(1:100)))
           ErrorsFound=.true.
         ENDIF
-        IF(WinHeight(IGlSys) == 0.0 .OR. WinWidth(IGlSys) == 0.0) THEN
+        IF(WinHeight(IGlSys) == 0.0d0 .OR. WinWidth(IGlSys) == 0.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:'// &
             ' it has window height or width = 0 for glazing system '//TRIM(TrimSigDigits(IGlSys)))
@@ -5004,19 +5740,19 @@ END IF
             ' it has 0 or more than 4 glass layers in glazing system '//TRIM(TrimSigDigits(IGlSys)))
           ErrorsFound = .TRUE.
         END IF
-        IF( UvalCenter(IGlSys) <= 0.0) THEN
+        IF( UvalCenter(IGlSys) <= 0.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:'// &
             ' it has Center-of-Glass U-value <= 0 in glazing system '//TRIM(TrimSigDigits(IGlSys)))
           ErrorsFound = .TRUE.
         END IF
-        IF(SCCenter(IGlSys) <= 0.0) THEN
+        IF(SCCenter(IGlSys) <= 0.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:'// &
             ' it has Shading Coefficient <= 0 in glazing system '//TRIM(TrimSigDigits(IGlSys)))
           ErrorsFound = .TRUE.
         END IF
-        IF(SHGCCenter(IGlSys) <= 0.0) THEN
+        IF(SHGCCenter(IGlSys) <= 0.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:'// &
             ' it has SHGC <= 0 in glazing system '//TRIM(TrimSigDigits(IGlSys)))
@@ -5035,7 +5771,7 @@ END IF
     END DO
 
     ! Mullion width and orientation
-    MullionWidth = 0.0
+    MullionWidth = 0.0d0
     MullionOrientation = 'Vertical'
     IF(NGlSys == 2) THEN
       READ(Dataline(10)(20:),*,IOSTAT=ReadStat) MullionWidth
@@ -5045,7 +5781,7 @@ END IF
                  TRIM(DataLine(10)(1:100)))
           ErrorsFound=.true.
         ENDIF
-      MullionWidth = 0.001*MullionWidth
+      MullionWidth = 0.001d0*MullionWidth
       READ(Dataline(10)(89:),*,IOSTAT=ReadStat) MullionOrientation
         IF (ReadStat /= 0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of Mullion Orientation.')
@@ -5057,14 +5793,14 @@ END IF
 
     ! Frame data; if there are two glazing systems, the frame is assumed to be
     ! the same for both.
-    FrameWidth=0.0
-    FrameProjectionOut=0.0
-    FrameProjectionIn=0.0
-    FrameConductance=0.0
-    FrEdgeToCenterGlCondRatio=0.0
-    FrameSolAbsorp=0.0
-    FrameVisAbsorp=0.0
-    FrameEmis=0.0
+    FrameWidth=0.0d0
+    FrameProjectionOut=0.0d0
+    FrameProjectionIn=0.0d0
+    FrameConductance=0.0d0
+    FrEdgeToCenterGlCondRatio=0.0d0
+    FrameSolAbsorp=0.0d0
+    FrameVisAbsorp=0.0d0
+    FrameEmis=0.0d0
     READ(DataLine(11)(20:),*,IOStat=ReadStat) FrameWidth,FrameProjectionOut,FrameProjectionIn,FrameConductance, &
       FrEdgeToCenterGlCondRatio,FrameSolAbsorp,FrameVisAbsorp,FrameEmis
       IF (ReadStat /= 0) THEN
@@ -5073,8 +5809,8 @@ END IF
                TRIM(DataLine(11)(1:100)))
         ErrorsFound=.true.
       ENDIF
-      IF(FrameWidth > 0.0) THEN
-        IF(FrameConductance <= 0.0) THEN
+      IF(FrameWidth > 0.0d0) THEN
+        IF(FrameConductance <= 0.0d0) THEN
             CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used: it has Frame Conductance <= 0.0')
           ErrorsFound = .TRUE.
@@ -5085,12 +5821,12 @@ END IF
 !            ' from the Window5 data file cannot be used: it has Frame Edge-of-Glass Conduction Ratio < 1.0')
 !          ErrorsFound = .TRUE.
 !        END IF
-        IF(FrameSolAbsorp < 0.0 .OR. FrameSolAbsorp > 1.0) THEN
+        IF(FrameSolAbsorp < 0.0d0 .OR. FrameSolAbsorp > 1.0d0) THEN
             CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used: it has Frame Solar Absorptance < 0.0 or > 1.0')
           ErrorsFound = .TRUE.
         END IF
-        IF(FrameEmis <= 0.0 .OR. FrameEmis >= 1.0) THEN
+        IF(FrameEmis <= 0.0d0 .OR. FrameEmis >= 1.0d0) THEN
             CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used: it has Frame Emissivity <= 0.0 or >= 1.0')
           ErrorsFound = .TRUE.
@@ -5125,7 +5861,7 @@ END IF
         ErrorsFound=.true.
       ENDIF
       DividerType(IGlSys) = MakeUpperCase(DividerType(IGlSys))
-      IF(DividerWidth(IGlSys) > 0.0) THEN
+      IF(DividerWidth(IGlSys) > 0.0d0) THEN
         IF(HorDividers(IGlSys) == 0 .AND. VertDividers(IGlSys) == 0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:')
@@ -5133,27 +5869,27 @@ END IF
             ' has a divider but number of horizontal and vertical divider elements = 0')
           ErrorsFound = .TRUE.
         END IF
-        IF(DividerConductance(IGlSys) <= 0.0) THEN
+        IF(DividerConductance(IGlSys) <= 0.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:')
           CALL ShowContinueError('glazing system '//TRIM(TrimSigDigits(IGLSys))//' has Divider Conductance <= 0.0')
           ErrorsFound = .TRUE.
         END IF
-        IF(DivEdgeToCenterGlCondRatio(IGlSys) < 1.0) THEN
+        IF(DivEdgeToCenterGlCondRatio(IGlSys) < 1.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:')
           CALL ShowContinueError('glazing system '//TRIM(TrimSigDigits(IGLSys))// &
             ' has Divider Edge-Of-Glass Conduction Ratio < 1.0')
           ErrorsFound = .TRUE.
         END IF
-        IF(DividerSolAbsorp(IGlSys) < 0.0 .OR. DividerSolAbsorp(IGlSys) > 1.0) THEN
+        IF(DividerSolAbsorp(IGlSys) < 0.0d0 .OR. DividerSolAbsorp(IGlSys) > 1.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:')
           CALL ShowContinueError('glazing system '//TRIM(TrimSigDigits(IGLSys))// &
             ' has Divider Solar Absorptance < 0.0 or > 1.0')
           ErrorsFound = .TRUE.
         END IF
-        IF(DividerEmis(IGlSys) <= 0.0 .OR. DividerEmis(IGlSys) >= 1.0) THEN
+        IF(DividerEmis(IGlSys) <= 0.0d0 .OR. DividerEmis(IGlSys) >= 1.0d0) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Construction='//TRIM(DesiredConstructionName)// &
             ' from the Window5 data file cannot be used:')
           CALL ShowContinueError('glazing system '//TRIM(TrimSigDigits(IGLSys))// &
@@ -5174,8 +5910,8 @@ END IF
         DividerProjectionOut(IGlSys) = 0.001d0*DividerProjectionOut(IGlSys)
         DividerProjectionIn(IGlSys)  = 0.001d0*DividerProjectionIn(IGlSys)
       ELSE
-        DividerProjectionOut(IGlSys) = 0.0
-        DividerProjectionIn(IGlSys)  = 0.0
+        DividerProjectionOut(IGlSys) = 0.0d0
+        DividerProjectionIn(IGlSys)  = 0.0d0
       END IF
     END DO
 
@@ -5204,7 +5940,7 @@ END IF
     DEALLOCATE(NominalR)
     ALLOCATE(Material(TotMaterials))
     ALLOCATE(NominalR(TotMaterials))
-    NominalR=0.0
+    NominalR=0.0d0
     NominalR(1:TotMaterialsPrev)=NominalRSave
     DO loop = 1,TotMaterialsPrev
       Material(loop) = MaterialSave(loop)
@@ -5218,58 +5954,58 @@ END IF
       Material(loop)%Name=' '
       Material(loop)%Group=-1
       Material(loop)%Roughness=0
-      Material(loop)%Conductivity=0.0
-      Material(loop)%Density=0.0
-      Material(loop)%IsoMoistCap=0.0
-      Material(loop)%Porosity=0.0
-      Material(loop)%Resistance=0.0
-      Material(loop)%SpecHeat=0.0
-      Material(loop)%ThermGradCoef=0.0
-      Material(loop)%Thickness=0.0
-      Material(loop)%VaporDiffus=0.0
-      Material(loop)%AbsorpSolar=0.0
-      Material(loop)%AbsorpThermal=0.0
-      Material(loop)%AbsorpVisible=0.0
-      Material(loop)%ReflectShade=0.0
-      Material(loop)%Trans=0.0
-      Material(loop)%ReflectShadeVis=0.0
-      Material(loop)%TransVis=0.0
-      Material(loop)%GlassTransDirtFactor=1.0
+      Material(loop)%Conductivity=0.0d0
+      Material(loop)%Density=0.0d0
+      Material(loop)%IsoMoistCap=0.0d0
+      Material(loop)%Porosity=0.0d0
+      Material(loop)%Resistance=0.0d0
+      Material(loop)%SpecHeat=0.0d0
+      Material(loop)%ThermGradCoef=0.0d0
+      Material(loop)%Thickness=0.0d0
+      Material(loop)%VaporDiffus=0.0d0
+      Material(loop)%AbsorpSolar=0.0d0
+      Material(loop)%AbsorpThermal=0.0d0
+      Material(loop)%AbsorpVisible=0.0d0
+      Material(loop)%ReflectShade=0.0d0
+      Material(loop)%Trans=0.0d0
+      Material(loop)%ReflectShadeVis=0.0d0
+      Material(loop)%TransVis=0.0d0
+      Material(loop)%GlassTransDirtFactor=1.0d0
       Material(loop)%SolarDiffusing=.false.
-      Material(loop)%AbsorpThermalBack=0.0
-      Material(loop)%AbsorpThermalFront=0.0
-      Material(loop)%ReflectSolBeamBack=0.0
-      Material(loop)%ReflectSolBeamFront=0.0
-      Material(loop)%ReflectSolDiffBack=0.0
-      Material(loop)%ReflectSolDiffFront=0.0
-      Material(loop)%ReflectVisBeamBack=0.0
-      Material(loop)%ReflectVisBeamFront=0.0
-      Material(loop)%ReflectVisDiffBack=0.0
-      Material(loop)%ReflectVisDiffFront=0.0
-      Material(loop)%TransSolBeam=0.0
-      Material(loop)%TransThermal=0.0
-      Material(loop)%TransVisBeam=0.0
+      Material(loop)%AbsorpThermalBack=0.0d0
+      Material(loop)%AbsorpThermalFront=0.0d0
+      Material(loop)%ReflectSolBeamBack=0.0d0
+      Material(loop)%ReflectSolBeamFront=0.0d0
+      Material(loop)%ReflectSolDiffBack=0.0d0
+      Material(loop)%ReflectSolDiffFront=0.0d0
+      Material(loop)%ReflectVisBeamBack=0.0d0
+      Material(loop)%ReflectVisBeamFront=0.0d0
+      Material(loop)%ReflectVisDiffBack=0.0d0
+      Material(loop)%ReflectVisDiffFront=0.0d0
+      Material(loop)%TransSolBeam=0.0d0
+      Material(loop)%TransThermal=0.0d0
+      Material(loop)%TransVisBeam=0.0d0
       Material(loop)%GlassSpectralDataPtr=0
       Material(loop)%NumberOfGasesInMixture=0
-      Material(loop)%GasCon=0.0
-      Material(loop)%GasVis=0.0
-      Material(loop)%GasCp=0.0
+      Material(loop)%GasCon=0.0d0
+      Material(loop)%GasVis=0.0d0
+      Material(loop)%GasCp=0.0d0
       Material(loop)%GasType=0
-      Material(loop)%GasWght=0.0
-      Material(loop)%GasSpecHeatRatio=0.0
-      Material(loop)%GasFract=0.0
-      Material(loop)%WinShadeToGlassDist=0.0
-      Material(loop)%WinShadeTopOpeningMult=0.0
-      Material(loop)%WinShadeBottomOpeningMult=0.0
-      Material(loop)%WinShadeLeftOpeningMult=0.0
-      Material(loop)%WinShadeRightOpeningMult=0.0
-      Material(loop)%WinShadeAirFlowPermeability=0.0
+      Material(loop)%GasWght=0.0d0
+      Material(loop)%GasSpecHeatRatio=0.0d0
+      Material(loop)%GasFract=0.0d0
+      Material(loop)%WinShadeToGlassDist=0.0d0
+      Material(loop)%WinShadeTopOpeningMult=0.0d0
+      Material(loop)%WinShadeBottomOpeningMult=0.0d0
+      Material(loop)%WinShadeLeftOpeningMult=0.0d0
+      Material(loop)%WinShadeRightOpeningMult=0.0d0
+      Material(loop)%WinShadeAirFlowPermeability=0.0d0
       Material(loop)%BlindDataPtr=0
-      Material(loop)%EMPDVALUE=0.0
-      Material(loop)%MoistACoeff=0.0
-      Material(loop)%MoistBCoeff=0.0
-      Material(loop)%MoistCCoeff=0.0
-      Material(loop)%MoistDCoeff=0.0
+      Material(loop)%EMPDVALUE=0.0d0
+      Material(loop)%MoistACoeff=0.0d0
+      Material(loop)%MoistBCoeff=0.0d0
+      Material(loop)%MoistCCoeff=0.0d0
+      Material(loop)%MoistDCoeff=0.0d0
     END DO
 
     ! Glass objects
@@ -5301,8 +6037,8 @@ END IF
           Material(MaterNum)%AbsorpThermalFront,          &
           Material(MaterNum)%AbsorpThermalBack,           &
           LayerName
-        Material(MaterNum)%Thickness = 0.001*Material(MaterNum)%Thickness
-        IF (Material(MaterNum)%Thickness <= 0.0) THEN
+        Material(MaterNum)%Thickness = 0.001d0*Material(MaterNum)%Thickness
+        IF (Material(MaterNum)%Thickness <= 0.0d0) THEN
         ENDIF
         IF(NGlSys == 1) THEN
           Material(MaterNum)%Name = &
@@ -5313,7 +6049,7 @@ END IF
         END IF
         Material(MaterNum)%Roughness = VerySmooth
         Material(MaterNum)%AbsorpThermal = Material(MaterNum)%AbsorpThermalBack
-        IF (Material(MaterNum)%Thickness <= 0.0) THEN
+        IF (Material(MaterNum)%Thickness <= 0.0d0) THEN
           CALL ShowSevereError('SearchWindow5DataFile: Material="'//trim(Material(MaterNum)%Name)//  &
             '" has thickness of 0.0.  Will be set to thickness = .001 but inaccuracies may result.')
           CALL ShowContinueError('Line being read='//trim(NextLine))
@@ -5380,21 +6116,27 @@ END IF
 
     ! reallocate Construct types
     ALLOCATE(ConstructSave(TotConstructs))
+    ALLOCATE(NominalRSave(TotConstructs))
     ALLOCATE(NominalUSave(TotConstructs))
     DO loop = 1,TotConstructs
       ConstructSave(loop) = Construct(loop)
+      NominalRSave(loop) = NominalRforNominalUCalculation(loop)
       NominalUSave(loop) = NominalU(loop)
     END DO
     DEALLOCATE(Construct)
+    DEALLOCATE(NominalRforNominalUCalculation)
     DEALLOCATE(NominalU)
     TotConstructs = TotConstructs + NGlSys
     ALLOCATE(Construct(TotConstructs))
+    ALLOCATE(NominalRforNominalUCalculation(TotConstructs))
     ALLOCATE(NominalU(TotConstructs))
     DO loop = 1,TotConstructs-NGlSys
       Construct(loop) = ConstructSave(loop)
+      NominalRforNominalUCalculation(loop) = NominalRSave(loop)
       NominalU(loop) = NominalUSave(loop)
     END DO
     DEALLOCATE(ConstructSave)
+    DEALLOCATE(NominalRSave)
     DEALLOCATE(NominalUSave)
 
     READ(W5DataFileNum,fmtA,IOSTAT=ReadStat) NextLine
@@ -5415,8 +6157,8 @@ END IF
       DO loop = 1,MaxLayersInConstruct
         Construct(ConstrNum)%LayerPoint(loop) = 0
       END DO
-      Construct(ConstrNum)%InsideAbsorpSolar   = 0.0
-      Construct(ConstrNum)%OutsideAbsorpSolar  = 0.0
+      Construct(ConstrNum)%InsideAbsorpSolar   = 0.0d0
+      Construct(ConstrNum)%OutsideAbsorpSolar  = 0.0d0
       Construct(ConstrNum)%DayltPropPtr        = 0
       Construct(ConstrNum)%CTFCross            = 0.0D0
       Construct(ConstrNum)%CTFFlux             = 0.0D0
@@ -5433,32 +6175,32 @@ END IF
       Construct(ConstrNum)%CTFTUserSource      = 0.0D0
       Construct(ConstrNum)%NumHistories        = 0
       Construct(ConstrNum)%NumCTFTerms         = 0
-      Construct(ConstrNum)%UValue              = 0.0
+      Construct(ConstrNum)%UValue              = 0.0d0
       Construct(ConstrNum)%SourceSinkPresent   = .FALSE.
       Construct(ConstrNum)%SolutionDimensions  = 0
       Construct(ConstrNum)%SourceAfterLayer    = 0
       Construct(ConstrNum)%TempAfterLayer      = 0
-      Construct(ConstrNum)%ThicknessPerpend    = 0.0
-      Construct(ConstrNum)%AbsDiff             = 0.0
-      Construct(ConstrNum)%AbsDiffBack         = 0.0
-      Construct(ConstrNum)%AbsDiffShade        = 0.0
-      Construct(ConstrNum)%AbsDiffBackShade    = 0.0
-      Construct(ConstrNum)%ShadeAbsorpThermal  = 0.0
-      Construct(ConstrNum)%AbsBeamCoef         = 0.0
-      Construct(ConstrNum)%AbsBeamBackCoef     = 0.0
-      Construct(ConstrNum)%AbsBeamShadeCoef    = 0.0
-      Construct(ConstrNum)%AbsDiffIn           = 0.0
-      Construct(ConstrNum)%AbsDiffOut          = 0.0
-      Construct(ConstrNum)%TransDiff           = 0.0
-      Construct(ConstrNum)%TransDiffVis        = 0.0
-      Construct(ConstrNum)%ReflectSolDiffBack  = 0.0
-      Construct(ConstrNum)%ReflectSolDiffFront = 0.0
-      Construct(ConstrNum)%ReflectVisDiffBack  = 0.0
-      Construct(ConstrNum)%ReflectVisDiffFront = 0.0
-      Construct(ConstrNum)%TransSolBeamCoef    = 0.0
-      Construct(ConstrNum)%TransVisBeamCoef    = 0.0
-      Construct(ConstrNum)%ReflSolBeamFrontCoef= 0.0
-      Construct(ConstrNum)%ReflSolBeamBackCoef = 0.0
+      Construct(ConstrNum)%ThicknessPerpend    = 0.0d0
+      Construct(ConstrNum)%AbsDiff             = 0.0d0
+      Construct(ConstrNum)%AbsDiffBack         = 0.0d0
+      Construct(ConstrNum)%AbsDiffShade        = 0.0d0
+      Construct(ConstrNum)%AbsDiffBackShade    = 0.0d0
+      Construct(ConstrNum)%ShadeAbsorpThermal  = 0.0d0
+      Construct(ConstrNum)%AbsBeamCoef         = 0.0d0
+      Construct(ConstrNum)%AbsBeamBackCoef     = 0.0d0
+      Construct(ConstrNum)%AbsBeamShadeCoef    = 0.0d0
+      Construct(ConstrNum)%AbsDiffIn           = 0.0d0
+      Construct(ConstrNum)%AbsDiffOut          = 0.0d0
+      Construct(ConstrNum)%TransDiff           = 0.0d0
+      Construct(ConstrNum)%TransDiffVis        = 0.0d0
+      Construct(ConstrNum)%ReflectSolDiffBack  = 0.0d0
+      Construct(ConstrNum)%ReflectSolDiffFront = 0.0d0
+      Construct(ConstrNum)%ReflectVisDiffBack  = 0.0d0
+      Construct(ConstrNum)%ReflectVisDiffFront = 0.0d0
+      Construct(ConstrNum)%TransSolBeamCoef    = 0.0d0
+      Construct(ConstrNum)%TransVisBeamCoef    = 0.0d0
+      Construct(ConstrNum)%ReflSolBeamFrontCoef= 0.0d0
+      Construct(ConstrNum)%ReflSolBeamBackCoef = 0.0d0
       Construct(ConstrNum)%W5FrameDivider      = 0
       Construct(ConstrNum)%TotLayers = NGlass(IGlSys) + NGaps(IGlSys)
       Construct(ConstrNum)%TotGlassLayers = NGlass(IGlSys)
@@ -5487,7 +6229,7 @@ END IF
       ! Fill Construct with system transmission, reflection and absorption properties
 
       DO IPhi = 1,10
-        CosPhiIndepVar(IPhi) = COS((IPhi-1)*10.*DegToRadians)
+        CosPhiIndepVar(IPhi) = COS((IPhi-1)*10.0d0*DegToRadians)
       END DO
 
       READ(W5DataFileNum,fmtA,IOSTAT=ReadStat) NextLine
@@ -5519,7 +6261,7 @@ END IF
           CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount))//') in error (first 100 characters)='//  &
                  TRIM(NextLine(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Tsol < 0.0) .or. ANY(TSol > 1.0)) THEN
+      ELSEIF (ANY(Tsol < 0.0d0) .or. ANY(TSol > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of TSol values. (out of range [0,1])')
           CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount))//') in error (first 100 characters)='//  &
                  TRIM(NextLine(1:100)))
@@ -5539,7 +6281,7 @@ END IF
           CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount))//') in error (first 100 characters)='//  &
                  TRIM(NextLine(1:100)))
           ErrorsFound=.true.
-        ELSEIF (ANY(AbsSol(IGlass,:) < 0.0) .or. ANY(AbsSol(IGlass,:) > 1.0)) THEN
+        ELSEIF (ANY(AbsSol(IGlass,:) < 0.0d0) .or. ANY(AbsSol(IGlass,:) > 1.0d0)) THEN
           CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of AbsSol values. '//  &
                     '(out of range [0,1]) For Glass='//TRIM(TrimSigDigits(IGlass)))
           CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount))//') in error (first 100 characters)='//  &
@@ -5560,7 +6302,7 @@ END IF
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+1))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(1)(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Rfsol < 0.0) .or. ANY(RfSol > 1.0)) THEN
+      ELSEIF (ANY(Rfsol < 0.0d0) .or. ANY(RfSol > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of RfSol values. (out of range [0,1])')
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+1))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(1)(1:100)))
@@ -5572,7 +6314,7 @@ END IF
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+2))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(2)(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Rbsol < 0.0) .or. ANY(RbSol > 1.0)) THEN
+      ELSEIF (ANY(Rbsol < 0.0d0) .or. ANY(RbSol > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of RbSol values. (out of range [0,1])')
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+2))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(2)(1:100)))
@@ -5584,7 +6326,7 @@ END IF
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+3))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(3)(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Tvis < 0.0) .or. ANY(Tvis > 1.0)) THEN
+      ELSEIF (ANY(Tvis < 0.0d0) .or. ANY(Tvis > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of Tvis values. (out of range [0,1])')
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+3))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(3)(1:100)))
@@ -5596,7 +6338,7 @@ END IF
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+4))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(4)(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Rfvis < 0.0) .or. ANY(Rfvis > 1.0)) THEN
+      ELSEIF (ANY(Rfvis < 0.0d0) .or. ANY(Rfvis > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of Rfvis values. (out of range [0,1])')
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+4))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(4)(1:100)))
@@ -5608,7 +6350,7 @@ END IF
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+5))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(5)(1:100)))
         ErrorsFound=.true.
-      ELSEIF (ANY(Rbvis < 0.0) .or. ANY(Rbvis > 1.0)) THEN
+      ELSEIF (ANY(Rbvis < 0.0d0) .or. ANY(Rbvis > 1.0d0)) THEN
         CALL ShowSevereError('HeatBalanceManager: SearchWindow5DataFile: Error in Read of Rbvis values. (out of range [0,1])')
         CALL ShowContinueError('Line (~'//TRIM(TrimSigDigits(FileLineCount+5))//') in error (first 100 characters)='//  &
                               TRIM(DataLine(5)(1:100)))
@@ -5639,7 +6381,7 @@ END IF
       DO IPhi = 1,10
         Phi = REAL(IPhi-1,r64)*10.d0
         CosPhi = COS(Phi*DegToRadians)
-        if (abs(CosPhi) < .0001d0) CosPhi=0.0
+        if (abs(CosPhi) < .0001d0) CosPhi=0.0d0
         tsolFit(IPhi) = POLYF(CosPhi,Construct(ConstrNum)%TransSolBeamCoef(1:6))
         tvisFit(IPhi) = POLYF(CosPhi,Construct(ConstrNum)%TransVisBeamCoef(1:6))
         rfsolFit(IPhi)= POLYF(CosPhi,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
@@ -5649,16 +6391,18 @@ END IF
       END DO
       ! end
 
-      ! NominalU of this construction (actually the total resistance of all of its layers; gas layer
+      ! NominalRforNominalUCalculation of this construction (actually the total resistance of all of its layers; gas layer
       ! conductivity here ignores convective efffects in gap.)
-      NominalU(ConstrNum) = 0.
+      NominalRforNominalUCalculation(ConstrNum) = 0.0d0
       DO loop = 1,NGlass(IGlSys)+NGaps(IGlSys)
         MatNum = Construct(ConstrNum)%LayerPoint(loop)
         IF(Material(MatNum)%Group == WindowGlass) THEN
-          NominalU(ConstrNum) = NominalU(ConstrNum) + Material(MatNum)%Thickness/Material(MatNum)%Conductivity
+          NominalRforNominalUCalculation(ConstrNum) = NominalRforNominalUCalculation(ConstrNum) +   &
+             Material(MatNum)%Thickness/Material(MatNum)%Conductivity
         ELSE IF(Material(MatNum)%Group == WindowGas .OR. Material(MatNum)%Group == WindowGasMixture) THEN
             ! If mixture, use conductivity of first gas in mixture
-            NominalU(ConstrNum) = NominalU(ConstrNum) + Material(MatNum)%Thickness / &
+            NominalRforNominalUCalculation(ConstrNum) = NominalRforNominalUCalculation(ConstrNum) +   &
+                Material(MatNum)%Thickness / &
                 (Material(MatNum)%GasCon(1,1) + Material(MatNum)%GasCon(1,2)*300.0d0 + &
                  Material(MatNum)%GasCon(1,3)*90000.0d0)
         END IF
@@ -5670,7 +6414,7 @@ END IF
 
     TotFrameDividerPrev = TotFrameDivider
     DO IGlSys = 1,NGlSys
-      IF(FrameWidth > 0.0 .OR. DividerWidth(IGlSys) > 0.0) THEN
+      IF(FrameWidth > 0.0d0 .OR. DividerWidth(IGlSys) > 0.0d0) THEN
         TotFrameDivider = TotFrameDivider + 1
         Construct(TotConstructs-NGlSys+IGlSys)%W5FrameDivider = TotFrameDivider
       END IF
@@ -5690,7 +6434,7 @@ END IF
     END IF
 
     DO IGlSys = 1,NGlSys
-      IF(FrameWidth > 0.0 .OR. DividerWidth(IGlSys) > 0.0) THEN
+      IF(FrameWidth > 0.0d0 .OR. DividerWidth(IGlSys) > 0.0d0) THEN
         FrDivNum = Construct(TotConstructs-NGlSys+IGlSys)%W5FrameDivider
         FrameDivider(FrDivNum)%FrameWidth                = FrameWidth
         FrameDivider(FrDivNum)%FrameProjectionOut        = FrameProjectionOut
@@ -5730,11 +6474,11 @@ END IF
       END IF
     END DO
 
-   IF(FrameWidth > 0.0 .AND. DividerWidth(1) > 0.0) THEN
+   IF(FrameWidth > 0.0d0 .AND. DividerWidth(1) > 0.0d0) THEN
      CALL DisplayString('--Construction and associated frame and divider found')
-   ELSE IF(FrameWidth > 0.0) THEN
+   ELSE IF(FrameWidth > 0.0d0) THEN
      CALL DisplayString('--Construction and associated frame found')
-   ELSE IF(DividerWidth(1) > 0.0) THEN
+   ELSE IF(DividerWidth(1) > 0.0d0) THEN
      CALL DisplayString('--Construction and associated divider found')
    ELSE
      CALL DisplayString('--Construction without frame or divider found')
@@ -5929,21 +6673,21 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
     Construct(ConstrNum)%PerimeterExposed = PerimeterExposed
     Construct(ConstrNum)%Ffactor = Ffactor
 
-    IF (Ffactor <= 0 ) THEN
+    IF (Ffactor <= 0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // '="' //Trim(ConstructAlphas(1))// &
       '" has '//trim(cNumericFieldNames(1))//' <= 0.0, must be > 0.0.')
-      CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(Cfactor,2))//']')
+      CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(Ffactor,2))//']')
       ErrorsFound=.true.
     ENDIF
 
-    IF (Area <= 0 ) THEN
+    IF (Area <= 0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // '="' //Trim(ConstructAlphas(1))// &
       '" has '//trim(cNumericFieldNames(2))//' <= 0.0, must be > 0.0.')
       CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(Area,2))//']')
       ErrorsFound=.true.
     ENDIF
 
-    IF (PerimeterExposed < 0 ) THEN
+    IF (PerimeterExposed < 0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // '="' //Trim(ConstructAlphas(1))// &
       '" has '//trim(cNumericFieldNames(3))//' <= 0.0, must be > 0.0.')
       CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(PerimeterExposed,2))//']')
@@ -5962,14 +6706,14 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
 
     ! Calculate the thermal resistance of the fictitious insulation layer
     ! effective thermal resistance excludes inside and outside air films
-    IF (PerimeterExposed > 0.0) THEN
+    IF (PerimeterExposed > 0.0d0) THEN
       Reff = Area / (PerimeterExposed * Ffactor) - Rfilm_in - Rfilm_out
     ELSE  ! PerimeterExposed = 0 for underground floor, assume R-1000 (IP)
-      Reff = 177
+      Reff = 177.0d0
     ENDIF
 
     Rfic = Reff - Rcon
-    IF (Rfic <=0 ) THEN
+    IF (Rfic <=0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // '="' //Trim(ConstructAlphas(1))// &
       '" has calculated R value <= 0.0, must be > 0.0.')
       CALL ShowContinueError('Calculated value=['//trim(RoundSigDigits(Rfic,2))//'] Check definition.')
@@ -5981,7 +6725,7 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
 
     !excluding thermal resistance of inside or outside air film
     ! 1/Reff gets reported as the "U-Factor no Film" in the summary report Envelope Summary | Opaque Exterior
-    NominalU(ConstrNum) = Reff
+    NominalRforNominalUCalculation(ConstrNum) = Reff
   END DO
 
   ! Then create underground wall constructions defined with C factor method if any
@@ -6013,14 +6757,14 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
     Construct(ConstrNum)%Height = Height
     Construct(ConstrNum)%Cfactor = Cfactor
 
-    IF (Cfactor <= 0 ) THEN
+    IF (Cfactor <= 0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // ' ' //Trim(ConstructAlphas(1))// &
       ' has '//trim(cNumericFieldNames(1))//' <= 0.0, must be > 0.0.')
       CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(Cfactor,2))//']')
       ErrorsFound=.true.
     ENDIF
 
-    IF (Height <= 0 ) THEN
+    IF (Height <= 0.0d0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // ' ' //Trim(ConstructAlphas(1))// &
       ' has '//trim(cNumericFieldNames(2))//' <= 0.0, must be > 0.0.')
       CALL ShowContinueError('Entered value=['//trim(RoundSigDigits(Height,2))//']')
@@ -6043,7 +6787,7 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
     ELSEIF (Height >= 2.5d0) THEN
       Rsoilequ = 0.92d0
     ELSE  ! regression from ASHRAE 90.1-2010 SI TABLE C6.10.1 Effective R-Value of Soil, R2 = 0.9967
-      Rsoilequ = 0.0607 + 0.3479*Height
+      Rsoilequ = 0.0607d0 + 0.3479d0*Height
     ENDIF
 
     ! effective thermal resistance excludes inside and outside air films
@@ -6062,13 +6806,340 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
 
     !Reff includes the wall itself and soil, but excluding thermal resistance of inside or outside air film
     ! 1/Reff gets reported as the "U-Factor no Film" in the summary report Envelope Summary | Opaque Exterior
-    NominalU(ConstrNum) = Reff
+    NominalRforNominalUCalculation(ConstrNum) = Reff
   END DO
 
   RETURN
 
 END SUBROUTINE CreateFCfactorConstructions
 
+
+SUBROUTINE GetScheduledSurfaceGains(ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Simon Vidanovic
+          !       DATE WRITTEN   June 2013
+          !       MODIFIED
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Loads scheduled surface gains for solar incident on interior side of the surfaces and absorbed solar energy in
+          ! window layers
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  use DataIPShortCuts
+  use InputProcessor, only: GetObjectDefMaxArgs, GetObjectItem, VerifyName
+  use General, only: TrimSigDigits
+  use DataSurfaces, only: TotSurfaces, Surface, TotSurfIncSolSSG, SurfIncSolSSG, TotFenLayAbsSSG, FenLayAbsSSG
+  use DataHeatBalance, only: Construct, TotConstructs
+  use ScheduleManager, only: GetScheduleIndex
+
+  implicit none    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  logical, intent(inout) :: ErrorsFound ! If errors found in input
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  character(len=*), parameter :: RoutineName = 'GetScheduledSurfaceGains: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  integer :: NumArgs
+  integer :: NumAlpha
+  integer :: NumNumeric
+  integer :: Loop
+  logical :: ErrorInName
+  logical :: IsBlank
+  integer :: IOStat
+  integer :: SurfNum
+  integer :: ConstrNum
+  integer :: ScheduleNum
+  integer :: i
+  integer :: NumOfScheduledLayers
+  integer :: NumOfConstrLayers
+  logical :: NumOfLayersMatch
+  integer :: iZone
+
+  !-----------------------------------------------------------------------
+  !                SurfaceProperty:SolarIncidentInside
+  !-----------------------------------------------------------------------
+  cCurrentModuleObject='SurfaceProperty:SolarIncidentInside'
+
+  ! Check if IDD definition is correct
+  call GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumeric)
+  if (NumAlpha /= 4) then
+    call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//': Object Definition indicates '// &
+                         'not = 4 Alpha Objects, Number Indicated='//trim(TrimSigDigits(NumAlpha)))
+    ErrorsFound=.true.
+  endif
+
+  TotSurfIncSolSSG = GetNumObjectsFound(cCurrentModuleObject)
+  if (TotSurfIncSolSSG > 0) then
+    if (.not.allocated(SurfIncSolSSG)) then
+      allocate(SurfIncSolSSG(TotSurfIncSolSSG))
+    end if
+
+    do Loop=1, TotSurfIncSolSSG
+      call GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      ErrorInName=.false.
+      IsBlank=.false.
+      call VerifyName(cAlphaArgs(1),SurfIncSolSSG%Name,Loop,ErrorInName,IsBlank,trim(cCurrentModuleObject)//' Name')
+      if (ErrorInName) then
+        call ShowContinueError('...each SurfaceProperty:SolarIncidentInside name must not duplicate other '//&
+          'SurfaceProperty:SolarIncidentInside name')
+        ErrorsFound=.true.
+        cycle
+      endif
+
+      SurfincSolSSG(Loop)%Name = cAlphaArgs(1)
+
+      ! Assign surface number
+      SurfNum = FindIteminList(cAlphaArgs(2), Surface%Name, TotSurfaces)
+      if (SurfNum == 0) then
+        call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', object. Illegal value for '// &
+          trim(cAlphaFieldNames(2))//' has been found.')
+        call ShowContinueError(trim(cAlphaFieldNames(2))//' entered value = "'//trim(cAlphaArgs(2))//  &
+          '" no corresponding surface (ref BuildingSurface:Detailed) has been found in the input file.')
+        ErrorsFound=.true.
+      else
+        SurfincSolSSG(Loop)%SurfPtr = SurfNum
+      end if
+
+      ! Assign construction number
+      ConstrNum = FindIteminList(cAlphaArgs(3), Construct%Name, TotConstructs)
+      if (ConstrNum == 0) then
+        call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', object. Illegal value for '// &
+          trim(cAlphaFieldNames(3))//' has been found.')
+        call ShowContinueError(trim(cAlphaFieldNames(3))//' entered value = "'//trim(cAlphaArgs(3))//  &
+          '" no corresponding construction (ref Construction) has been found in the input file.')
+        ErrorsFound=.true.
+      else
+        SurfincSolSSG(Loop)%ConstrPtr = ConstrNum
+      end if
+
+      ! Assign schedule number
+      ScheduleNum = GetScheduleIndex(cAlphaArgs(4))
+      if (ScheduleNum == 0) then
+        call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', object. Illegal value for '// &
+          trim(cAlphaFieldNames(4))//' has been found.')
+        call ShowContinueError(trim(cAlphaFieldNames(4))//' entered value = "'//trim(cAlphaArgs(4))//  &
+          '" no corresponding schedule has been found in the input file.')
+        ErrorsFound=.true.
+      else
+        SurfincSolSSG(Loop)%SchedPtr = ScheduleNum
+      end if
+    end do
+  end if
+
+  !-----------------------------------------------------------------------
+  !                SurfaceProperty:SolarIncidentInside
+  !-----------------------------------------------------------------------
+  cCurrentModuleObject='ComplexFenestrationProperty:SolarAbsorbedLayers'
+
+  TotFenLayAbsSSG = GetNumObjectsFound(cCurrentModuleObject)
+  if (TotFenLayAbsSSG > 0) then
+    if (.not.allocated(FenLayAbsSSG)) then
+      allocate(FenLayAbsSSG(TotFenLayAbsSSG))
+    end if
+
+    do Loop=1, TotFenLayAbsSSG
+      call GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      ErrorInName=.false.
+      IsBlank=.false.
+      call VerifyName(cAlphaArgs(1),FenLayAbsSSG%Name,Loop,ErrorInName,IsBlank,trim(cCurrentModuleObject)//' Name')
+      if (ErrorInName) then
+        call ShowContinueError('...each ComplexFenestrationProperty:SolarAbsorbedLayers name must not duplicate other '//&
+          'ComplexFenestrationProperty:SolarAbsorbedLayers name')
+        ErrorsFound=.true.
+        cycle
+      endif
+
+      FenLayAbsSSG(Loop)%Name = cAlphaArgs(1)
+
+      ! Assign surface number
+      SurfNum = FindIteminList(cAlphaArgs(2), Surface%Name, TotSurfaces)
+      if (SurfNum == 0) then
+        call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', object. Illegal value for '// &
+          trim(cAlphaFieldNames(2))//' has been found.')
+        call ShowContinueError(trim(cAlphaFieldNames(2))//' entered value = "'//trim(cAlphaArgs(2))//  &
+          '" no corresponding surface (ref BuildingSurface:Detailed) has been found in the input file.')
+        ErrorsFound=.true.
+      else
+        FenLayAbsSSG(Loop)%SurfPtr = SurfNum
+      end if
+
+      ! Assign construction number
+      ConstrNum = FindIteminList(cAlphaArgs(3), Construct%Name, TotConstructs)
+      if (ConstrNum == 0) then
+        call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//', object. Illegal value for '// &
+          trim(cAlphaFieldNames(3))//' has been found.')
+        call ShowContinueError(trim(cAlphaFieldNames(3))//' entered value = "'//trim(cAlphaArgs(3))//  &
+          '" no corresponding construction (ref Construction) has been found in the input file.')
+        ErrorsFound=.true.
+      else
+        FenLayAbsSSG(Loop)%ConstrPtr = ConstrNum
+        NumOfScheduledLayers = NumAlpha - 3
+        NumOfLayersMatch = .false.
+        ! Check if number of layers in construction matches number of layers in schedule surface gains object
+        if (NumOfScheduledLayers == Construct(ConstrNum)%TotSolidLayers) then
+          NumOfLayersMatch = .true.
+        end if
+
+        if (.not. NumOfLayersMatch) then
+          call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//&
+                ', object. Number of scheduled surface gains for each layer does not match number of layers'//&
+                ' in referenced construction.')
+          call ShowContinueError(trim(cAlphaArgs(1))//' have '//trim(TrimSigDigits(NumOfScheduledLayers))//&
+                ' scheduled layers and '//trim(cAlphaArgs(3))//' have '//trim(TrimSigDigits(Construct(ConstrNum)%TotSolidLayers))//&
+                ' layers.')
+          ErrorsFound=.true.
+        end if
+
+        if (.not.allocated(FenLayAbsSSG(Loop)%SchedPtrs)) then
+          allocate(FenLayAbsSSG(Loop)%SchedPtrs(NumOfScheduledLayers))
+        end if
+
+        FenLayAbsSSG(Loop)%NumOfSched = NumOfScheduledLayers
+
+        do i = 1, NumOfScheduledLayers
+          ScheduleNum = GetScheduleIndex(cAlphaArgs(i + 3))
+          if (ScheduleNum == 0) then
+            call ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//&
+              ', object. Illegal value for '//trim(cAlphaFieldNames(NumOfScheduledLayers + 3))//' has been found.')
+            call ShowContinueError(trim(cAlphaFieldNames(NumOfScheduledLayers + 3))//' entered value = "'//&
+              trim(cAlphaArgs(NumOfScheduledLayers + 3))//'" no corresponding schedule has been found in the input file.')
+            ErrorsFound=.true.
+          else
+            FenLayAbsSSG(Loop)%SchedPtrs(i) = ScheduleNum
+          end if
+        end do
+      end if
+    end do
+  end if
+
+  ! Check if scheduled surface gains are assigined to each surface in every zone.  If not then warning message to user will be
+  ! issued
+  if ((TotSurfIncSolSSG > 0).or.(TotFenLayAbsSSG > 0)) then
+    do iZone = 1, NumOfZones
+      call CheckScheduledSurfaceGains(iZone)
+    end do
+  end if
+
+
+END SUBROUTINE GetScheduledSurfaceGains
+
+SUBROUTINE CheckScheduledSurfaceGains(ZoneNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Simon Vidanovic
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Check if all surfaces within zone are scheduled with surface gains. If not all surfaces within zone are scheduled,
+          ! warning message will be issued and program will continue to execute.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  use SolarShading, only: WindowScheduledSolarAbs, SurfaceScheduledSolarInc
+  use DataSurfaces
+
+  implicit none    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  integer, intent(in) :: ZoneNum ! Zone number for which error check will be performed
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  integer :: iSurf
+  integer :: iConst
+  integer :: SchedPtr ! scheduled surface gains pointer
+  logical :: ZoneUnscheduled ! true if all surfaces in the zone are unscheduled
+  logical :: ZoneScheduled ! true if all surfaces in the zone are scheduled
+
+  ZoneUnscheduled = .false.
+  ZoneScheduled = .false.
+
+  do iSurf = Zone(ZoneNum)%SurfaceFirst, Zone(ZoneNum)%SurfaceLast
+    iConst = Surface(iSurf)%Construction
+    if (Surface(iSurf)%Class == SurfaceClass_Window) then
+      SchedPtr = WindowScheduledSolarAbs(iSurf, iConst)
+    else
+      SchedPtr = SurfaceScheduledSolarInc(iSurf, iConst)
+    end if
+    if (iSurf == Zone(ZoneNum)%SurfaceFirst) then
+      if (SchedPtr /= 0) then
+        ZoneScheduled = .true.
+        ZoneUnscheduled = .false.
+      else
+        ZoneScheduled = .false.
+        ZoneUnscheduled = .true.
+      end if
+    else
+      if (SchedPtr /= 0) then
+        ZoneScheduled = ZoneScheduled
+        ZoneUnscheduled = .false.
+      else
+        ZoneScheduled = .false.
+        ZoneUnscheduled = ZoneUnscheduled
+      end if
+    end if
+
+    if ((.not.ZoneScheduled).and.(.not.ZoneUnscheduled)) then
+      ! zone is nor scheduled nor unscheduled
+      call ShowWarningError('Zone '//trim(Zone(ZoneNum)%Name)//' does not have all surfaces scheduled with surface gains.')
+      call ShowContinueError('If at least one surface in the zone is scheduled with surface gains, then all other surfaces'//&
+        ' within the same zone should be scheduled as well.')
+      exit
+    end if
+
+  end do
+
+  if ((.not.ZoneScheduled).and.(.not.ZoneUnscheduled)) then
+    do iSurf = Zone(ZoneNum)%SurfaceFirst, Zone(ZoneNum)%SurfaceLast
+      iConst = Surface(iSurf)%Construction
+      if (Surface(iSurf)%Class == SurfaceClass_Window) then
+        SchedPtr = WindowScheduledSolarAbs(iSurf, iConst)
+      else
+        SchedPtr = SurfaceScheduledSolarInc(iSurf, iConst)
+      end if
+
+      if (SchedPtr == 0) then
+        call ShowContinueError('Surface '//trim(Surface(iSurf)%Name)//' does not have scheduled surface gains.')
+      end if
+    end do
+  end if
+
+END SUBROUTINE CheckScheduledSurfaceGains
 
 SUBROUTINE CreateTCConstructions(ErrorsFound)
 
@@ -6133,20 +7204,26 @@ SUBROUTINE CreateTCConstructions(ErrorsFound)
 
   ! Increase Construct() and copy the extra constructions
   ALLOCATE(ConstructSave(TotConstructs))
+  ALLOCATE(NominalRSave(TotConstructs))
   ALLOCATE(NominalUSave(TotConstructs))
   DO Loop = 1,TotConstructs
     ConstructSave(Loop) = Construct(Loop)
+    NominalRSave(Loop) = NominalRforNominalUCalculation(Loop)
     NominalUSave(Loop) = NominalU(Loop)
   END DO
   DEALLOCATE(Construct)
+  DEALLOCATE(NominalRforNominalUCalculation)
   DEALLOCATE(NominalU)
   ALLOCATE(Construct(TotConstructs+NumNewConst))
+  ALLOCATE(NominalRforNominalUCalculation(TotConstructs+NumNewConst))
   ALLOCATE(NominalU(TotConstructs+NumNewConst))
   DO Loop = 1, TotConstructs
     Construct(Loop) = ConstructSave(Loop)
+    NominalRforNominalUCalculation(Loop) = NominalRSave(Loop)
     NominalU(Loop) = NominalUSave(Loop)
   END DO
   DEALLOCATE(ConstructSave)
+  DEALLOCATE(NominalRSave)
   DEALLOCATE(NominalUSave)
 
   NumNewConst=TotConstructs
@@ -6264,7 +7341,7 @@ SUBROUTINE SetupSimpleWindowGlazingSystem(MaterNum)
   ! Step 3. determine effective conductivity
 
   Material(MaterNum)%Conductivity = Material(MaterNum)%Thickness / Rlw
-  IF (Material(MaterNum)%Conductivity > 0.0) THEN
+  IF (Material(MaterNum)%Conductivity > 0.0d0) THEN
     NominalR(MaterNum) = Rlw
     Material(MaterNum)%Resistance = Rlw
   ELSE
@@ -6353,7 +7430,7 @@ SUBROUTINE SetupSimpleWindowGlazingSystem(MaterNum)
   InflowFraction = (Ros + 0.5d0*Rlw)/(Ros + Rlw + Ris)
 
   SolarAbsorb = (Material(MaterNum)%SimpleWindowSHGC - Material(MaterNum)%Trans) / InflowFraction
-  Material(MaterNum)%ReflectSolBeamBack  = 1.0 - Material(MaterNum)%Trans - SolarAbsorb
+  Material(MaterNum)%ReflectSolBeamBack  = 1.0d0 - Material(MaterNum)%Trans - SolarAbsorb
   Material(MaterNum)%ReflectSolBeamFront = Material(MaterNum)%ReflectSolBeamBack
 
   !step 6. determine visible properties.
@@ -6393,27 +7470,31 @@ END SUBROUTINE SetupSimpleWindowGlazingSystem
 
 SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
 
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Simon Vidanovic
-          !       DATE WRITTEN   March 2012
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
+  ! SUBROUTINE INFORMATION:
+  !       AUTHOR         Simon Vidanovic
+  !       DATE WRITTEN   March 2012
+  !       MODIFIED       May 2013 (Simon Vidanovic)
+  !       RE-ENGINEERED  na
 
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! get input for complex fenestration materials
+  ! PURPOSE OF THIS SUBROUTINE:
+  ! get input for complex fenestration materials
 
-          ! METHODOLOGY EMPLOYED:
-          ! usual GetInput processing.
+  ! METHODOLOGY EMPLOYED:
+  ! usual GetInput processing.
 
-          ! REFERENCES:
-          ! na
+  ! REFERENCES:
+  ! na
 
-          ! USE STATEMENTS:
+  ! USE STATEMENTS:
   USE DataHeatBalance, ONLY : Material
+  USE General, ONLY : RoundSigDigits
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   Integer, Intent(InOut) :: MaterNum ! num of material items thus far
   Logical, Intent(InOut) :: ErrorsFound
+
+  ! SUBROUTINE PARAMETER DEFINITIONS
+  character(len=*), parameter :: RoutineName = 'SetupComplexFenestrationMaterialInput: '
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: IOStat           ! IO Status when calling get input subroutine
@@ -6428,9 +7509,6 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
   INTEGER :: IOStatus   ! Used in GetObjectItem
   LOGICAL :: IsNotOK    ! Flag to verify name
   LOGICAL :: IsBlank    ! Flag for blank name
-  CHARACTER(len=MaxnameLength) :: TypeOfLayer ! Type of complex shading layer.  It is only used for temporary
-                                              ! storage and can be used to temporary store some other data in this routine
-  REAL(r64) :: temp ! For storing temporary variables
 
   !Reading WindowGap:SupportPillar
   cCurrentModuleObject = 'WindowGap:SupportPillar'
@@ -6447,9 +7525,10 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),SupportPillar%Name,Loop,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(1))//' has been found.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CYCLE
     ENDIF
 
@@ -6457,22 +7536,24 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     SupportPillar(Loop)%Spacing = rNumericArgs(1)
     SupportPillar(Loop)%Radius  = rNumericArgs(2)
 
-    IF(rNumericArgs(1) <= 0.0) THEN
+    IF(rNumericArgs(1) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(1))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(1))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' must be > 0, entered value = '//TRIM(RoundSigDigits(rNumericArgs(1),2)))
     END IF
 
-    IF(rNumericArgs(2) <= 0.0) THEN
+    IF(rNumericArgs(2) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(2))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' must be > 0, entered value = '//TRIM(RoundSigDigits(rNumericArgs(2),2)))
     END IF
   ENDDO
 
   !Reading WindowGap:DeflectionState
   cCurrentModuleObject = 'WindowGap:DeflectionState'
-  W7DeflectionStates = GetNumObjectsFound(cCurrentModuleObject);
+  W7DeflectionStates = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE (DeflectionState(W7DeflectionStates))
   DO Loop=1,W7DeflectionStates
     CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
@@ -6485,18 +7566,21 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),DeflectionState%Name,Loop,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(1))//' has been found.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CYCLE
     ENDIF
 
     DeflectionState(Loop)%Name    = cAlphaArgs(1)
     DeflectionState(Loop)%DeflectedThickness = rNumericArgs(1)
-    IF(rNumericArgs(1) < 0.0) THEN
+    IF(rNumericArgs(1) < 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(1))//' must be greater than or equal to 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(1))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' must be >= 0, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(1),2)))
     END IF
   ENDDO
 
@@ -6516,9 +7600,10 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),Material%Name,MaterNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(1))//' has been found.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CYCLE
     ENDIF
 
@@ -6530,24 +7615,27 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     Material(MaterNum)%Name    = cAlphaArgs(1)
 
     Material(MaterNum)%Thickness = rNumericArgs(1)
-    IF(rNumericArgs(1) <= 0.0) THEN
+    IF(rNumericArgs(1) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(1))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(1))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' must be > 0, entered '//TRIM(RoundSigDigits(rNumericArgs(1),2)))
     END IF
 
     Material(MaterNum)%Pressure   = rNumericArgs(2)
-    IF(rNumericArgs(2) <= 0.0) THEN
+    IF(rNumericArgs(2) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(2))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(2))//' must be > 0, entered '//TRIM(RoundSigDigits(rNumericArgs(2),2)))
     END IF
 
     IF( .NOT. lAlphaFieldBlanks(2) ) THEN
       Material(MaterNum)%GasPointer = FindIteminList(cAlphaArgs(2),Material%Name,TotMaterials)
     ELSE
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError('WindowMaterial:Gap does not have assigned gas.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(1))//' has been found.')
+      CALL ShowContinueError(TRIM(cCurrentModuleObject)//' does not have assigned WindowMaterial:Gas or WindowMaterial:GasMixutre.')
     END IF
     IF( .NOT. lAlphaFieldBlanks(3) ) THEN
         Material(MaterNum)%DeflectionStatePtr = FindIteminList(cAlphaArgs(3),DeflectionState%Name,W7DeflectionStates)
@@ -6576,9 +7664,10 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),ComplexShade%Name,Loop,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(1))//' has been found.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CYCLE
     ENDIF
 
@@ -6597,40 +7686,35 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
 
     CASE ('OTHERSHADINGTYPE')
       ComplexShade(Loop)%LayerType = csOtherShadingType
-    CASE ( 'VENETIAN')
+    CASE ('VENETIAN')
       ComplexShade(Loop)%LayerType = csVenetian
-    CASE ( 'WOVEN' )
+    CASE ('WOVEN')
       ComplexShade(Loop)%LayerType = csWoven
-    CASE ( 'PERFORATED' )
+    CASE ('PERFORATED')
       ComplexShade(Loop)%LayerType = csPerforated
     CASE ('BSDF')
       ComplexShade(Loop)%LayerType = csBSDF
     CASE DEFAULT
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
-                             '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2)))
       ErrorsFound = .true.
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(2))//' has been found.')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(2))//' entered value = "'//TRIM(cAlphaArgs(2))//  &
+         '" should be OtherShadingType, Venetian, Woven, Perforated or BSDF.')
     END SELECT
-
-    IF(ComplexShade(Loop)%LayerType == -1) THEN
-      ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(2))//'", Illegal value.')
-      CALL ShowContinueError(trim(cAlphaFieldNames(2))//' entered value="'//TRIM(TypeOfLayer)//  &
-         '" should be OtherShadingType, Venetian, Woven or Perforated.')
-    END IF
 
     ComplexShade(Loop)%Thickness              = rNumericArgs(1)
     Material(MaterNum)%Thickness              = rNumericArgs(1)
-    ComplexShade(Loop)%Conductivity            = rNumericArgs(2)
-    Material(MaterNum)%Conductivity            = rNumericArgs(2)
+    ComplexShade(Loop)%Conductivity           = rNumericArgs(2)
+    Material(MaterNum)%Conductivity           = rNumericArgs(2)
     ComplexShade(Loop)%IRTransmittance        = rNumericArgs(3)
     ComplexShade(Loop)%FrontEmissivity        = rNumericArgs(4)
-    ComplexShade(Loop)%BackEmissivity          = rNumericArgs(5)
+    ComplexShade(Loop)%BackEmissivity         = rNumericArgs(5)
 
     ! Simon: in heat balance radiation exchange routines AbsorpThermal is used
     ! and program will crash if value is not assigned.  Not sure if this is correct
     ! or some additional calculation is necessary. Simon TODO
     Material(MaterNum)%AbsorpThermal          = rNumericArgs(5)
-    Material(MaterNum)%AbsorpThermalFront      = rNumericArgs(4)
+    Material(MaterNum)%AbsorpThermalFront     = rNumericArgs(4)
     Material(MaterNum)%AbsorpThermalBack      = rNumericArgs(5)
 
     ComplexShade(Loop)%TopOpeningMultiplier          = rNumericArgs(6)
@@ -6652,112 +7736,134 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     !  NominalR(MaterNum)=1.0
     !ENDIF
 
-    IF(rNumericArgs(1) <= 0.0) THEN
+    IF(rNumericArgs(1) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(1))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(1))//' has been found.')
+      CALL ShowContinueError(trim(cNumericFieldNames(1))//' must be > 0, entered value = '//TRIM(RoundSigDigits(rNumericArgs(1),2)))
     END IF
 
-    IF(rNumericArgs(2) <= 0.0) THEN
+    IF(rNumericArgs(2) <= 0.0d0) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be greater than 0.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(2))//' has been found.')
+      CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be > 0, entered value = '//TRIM(RoundSigDigits(rNumericArgs(2),2)))
     END IF
 
-    IF((rNumericArgs(3) < 0.0).or.(rNumericArgs(3) > 1.0)) THEN
+    IF((rNumericArgs(3) < 0.0d0).or.(rNumericArgs(3) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(3))//' value must be between 0 and 1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(3))//' has been found.')
+      CALL ShowContinueError(trim(cNumericFieldNames(3))//' value must be >= 0 and <= 1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(3),2)))
     END IF
 
-    IF((rNumericArgs(4) < 0.0).or.(rNumericArgs(4) > 1.0)) THEN
+    IF((rNumericArgs(4) < 0.0d0).or.(rNumericArgs(4) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(4))//' value must be between 0 and 1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(4))//' has been found.')
+      CALL ShowContinueError(trim(cNumericFieldNames(4))//' value must be >= 0 and <= 1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(4),2)))
     END IF
 
-    IF((rNumericArgs(5) < 0.0).or.(rNumericArgs(5) > 1.0)) THEN
+    IF((rNumericArgs(5) < 0.0d0).or.(rNumericArgs(5) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(5))//' value must be between 0 and 1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(5))//' has been found.')
+      CALL ShowContinueError(trim(cNumericFieldNames(5))//' value must be >= 0 and <= 1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(5),2)))
     END IF
 
-    IF((rNumericArgs(6) < 0.0).or.(rNumericArgs(6) > 1.0)) THEN
+    IF((rNumericArgs(6) < 0.0d0).or.(rNumericArgs(6) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(6))//' must be >=0 or <=1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(6))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(6))//' must be >= 0 or <= 1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(6),2)))
     END IF
 
-    IF((rNumericArgs(7) < 0.0).or.(rNumericArgs(7) > 1.0)) THEN
+    IF((rNumericArgs(7) < 0.0d0).or.(rNumericArgs(7) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(7))//' must be >=0 or <=1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(7))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' must be >=0 or <=1, entered '//TRIM(RoundSigDigits(rNumericArgs(7),2)))
     END IF
 
-    IF((rNumericArgs(8) < 0.0).or.(rNumericArgs(8) > 1.0)) THEN
+    IF((rNumericArgs(8) < 0.0d0).or.(rNumericArgs(8) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(8))//' must be >=0 or <=1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(8))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(8))//' must be >=0 or <=1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(8),2)))
     END IF
 
-    IF((rNumericArgs(9) < 0.0).or.(rNumericArgs(9) > 1.0)) THEN
+    IF((rNumericArgs(9) < 0.0d0).or.(rNumericArgs(9) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(9))//' must be >=0 or <=1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(9))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' must be >=0 or <=1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(9),2)))
     END IF
 
-    IF((rNumericArgs(10) < 0.0).or.(rNumericArgs(10) > 1.0)) THEN
+    IF((rNumericArgs(10) < 0.0d0).or.(rNumericArgs(10) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cNumericFieldNames(10))//' must be >=0 or <=1.')
-    END IF
-
-    temp = rNumericArgs(6) + rNumericArgs(7) + rNumericArgs(8) + rNumericArgs(9) + rNumericArgs(10)
-
-    ! Check if sum of all multipliers is less than 100%.  Case <0 is covered in previous cases
-    IF(temp > 1.0) THEN
-      ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError('Sum of all opening  must be <=1.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(10))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' must be >=0 or <=1, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(10),2)))
     END IF
 
     if (ComplexShade(Loop)%LayerType == csVenetian) then
-      IF(rNumericArgs(11) <= 0.0) THEN
+      IF(rNumericArgs(11) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(11))//' must be >0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(11))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' must be >0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(11),2)))
       END IF
 
-      IF(rNumericArgs(12) <= 0.0) THEN
+      IF(rNumericArgs(12) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(12))//' must be >0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(12))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' must be >0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(12),2)))
       END IF
 
-      IF(rNumericArgs(13) <= 0.0) THEN
+      IF(rNumericArgs(13) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(13))//' must be >0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(13))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(13))//' must be >0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(13),2)))
       END IF
 
-      IF((rNumericArgs(14) < -90.0).or.(rNumericArgs(14) > 90.0)) THEN
+      IF((rNumericArgs(14) < -90.0d0).or.(rNumericArgs(14) > 90.0d0)) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(14))//' must be >=-90 and <=90.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(14))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(14))//' must be >=-90 and <=90, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(14),2)))
       END IF
 
-      IF(rNumericArgs(15) <= 0.0) THEN
+      IF(rNumericArgs(15) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(15))//' must be >0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(15))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(15))//' must be >0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(15),2)))
       END IF
 
-      IF((rNumericArgs(16) < 0.0).or.((rNumericArgs(16) > 0).and.(rNumericArgs(16) < (rNumericArgs(11)/2)))) THEN
+      IF((rNumericArgs(16) < 0.0d0).or.((rNumericArgs(16) > 0.0d0).and.(rNumericArgs(16) < (rNumericArgs(11)/2)))) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(MaterialNames(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(16))//' must be =0 or greater than SlatWidth/2.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(16))//' has been found.')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(16))//' must be =0 or greater than SlatWidth/2, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(16),2)))
       END IF
     end if
+
+    IF (ErrorsFound) CALL ShowFatalError('Error in complex fenestration material input.')
 
   ENDDO
 
@@ -6765,43 +7871,45 @@ END SUBROUTINE SetupComplexFenestrationMaterialInput
 
 SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         B. Griffith
-          !       DATE WRITTEN   June 2010
-          !       MODIFIED       January 2012 (Simon Vidanovic)
-          !       RE-ENGINEERED  na
+  ! SUBROUTINE INFORMATION:
+  !       AUTHOR         B. Griffith
+  !       DATE WRITTEN   June 2010
+  !       MODIFIED       January 2012 (Simon Vidanovic)
+  !       MODIFIED       May 2012 (Simon Vidanovic)
+  !       RE-ENGINEERED  na
 
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! get input for complex fenestration construction
+  ! PURPOSE OF THIS SUBROUTINE:
+  ! get input for complex fenestration construction
 
-          ! METHODOLOGY EMPLOYED:
-          ! usual GetInput processing.  Matrix input from MatrixDataManager
+  ! METHODOLOGY EMPLOYED:
+  ! usual GetInput processing.  Matrix input from MatrixDataManager
 
-          ! REFERENCES:
-          ! na
+  ! REFERENCES:
+  ! na
 
-          ! USE STATEMENTS:
+  ! USE STATEMENTS:
   USE DataIPShortCuts
   USE InputProcessor, ONLY: GetObjectDefMaxArgs
   USE MatrixDataManager
   USE DataBSDFWindow
+  USE General, ONLY : RoundSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  ! SUBROUTINE ARGUMENT DEFINITIONS:
   Integer, Intent(InOut) :: ConstrNum ! num of construction items thus far
   Logical, Intent(InOut) :: ErrorsFound
 
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  ! SUBROUTINE PARAMETER DEFINITIONS:
+  character(len=*), parameter :: RoutineName = 'SetupComlexFenestrationStateInput: '
 
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
+  ! INTERFACE BLOCK SPECIFICATIONS:
+  ! na
 
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
+  ! DERIVED TYPE DEFINITIONS:
+  ! na
 
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   !The following moved to DataBSDFWindow module:
   !INTEGER :: TotComplexFenStates   ! Number of complex fenestration construction definitions
   INTEGER :: I      !do loop index
@@ -6855,23 +7963,13 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
     WindowThermalModel(Loop)%Name = cAlphaArgs(1)
 
-    !SELECT CASE (cAlphaArgs(2))
-    !CASE ('TARCOG')
-    !  WindowThermalModel(Loop)%ThermalAlgorithm = taTarcog
-    !CASE ('WINKELMANN')
-    !  WindowThermalModel(Loop)%ThermalAlgorithm = taWinkelmann
-    !CASE DEFAULT
-    !  ErrorsFound = .true.
-    !  CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(2))//'", Illegal value.')
-    !  CALL ShowContinueError(trim(cAlphaFieldNames(2))//' entered value="'//TRIM(cAlphaArgs(2))//  &
-    !    '" should be Tarcog or Winkelmann.')
-    !END SELECT
-
     WindowThermalModel(Loop)%SDScalar = rNumericArgs(1)
-    IF((rNumericArgs(1) < 0).or.(rNumericArgs(1) > 1)) THEN
+    IF((rNumericArgs(1) < 0.0d0).or.(rNumericArgs(1) > 1.0d0)) THEN
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cNumericFieldNames(1))//'", Illegal value.')
-      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' not >= 0.0 and <= 1.0')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cNumericFieldNames(1))//' has been found.')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(1))//' should be >= 0.0 and <= 1.0, entered value = '// &
+        TRIM(RoundSigDigits(rNumericArgs(1),2)))
     END IF
 
     SELECT CASE (cAlphaArgs(2))
@@ -6883,8 +7981,9 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
       WindowThermalModel(Loop)%CalculationStandard = csEN673Design
     CASE DEFAULT
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cAlphaFieldNames(2))//' entered value="'//TRIM(cAlphaArgs(2))//  &
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(2))//' has been found.')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(2))//' entered value = "'//TRIM(cAlphaArgs(2))//  &
         '" should be ISO15099, EN673Declared or EN673Design.')
     END SELECT
 
@@ -6899,8 +7998,9 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
       WindowThermalModel(Loop)%ThermalModel = tmConvectiveScalarModel_WithSDThickness
     CASE DEFAULT
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cAlphaFieldNames(3))//' entered value="'//TRIM(cAlphaArgs(3))//  &
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(3))//' has been found.')
+      CALL ShowContinueError(trim(cAlphaFieldNames(3))//' entered value = "'//TRIM(cAlphaArgs(3))//  &
         '" should be ISO15099, ScaledCavityWidth, ConvectiveScalarModel_NoSDThickness or ConvectiveScalarModel_WithSDThickness.')
     END SELECT
 
@@ -6913,31 +8013,38 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
       WindowThermalModel(Loop)%DeflectionModel = dmMeasuredDeflection
     CASE DEFAULT
       ErrorsFound = .true.
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(cAlphaFieldNames(4))//' entered value="'//TRIM(cAlphaArgs(4))//  &
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(cAlphaFieldNames(4))//' has been found.')
+      CALL ShowContinueError(trim(cAlphaFieldNames(4))//' entered value = "'//TRIM(cAlphaArgs(4))//  &
         '" should be NoDeflection, TemperatureAndPressureInput or MeasuredDeflection.')
     END SELECT
 
     if (WindowThermalModel(Loop)%DeflectionModel == dmTemperatureAndPressureInput) then
       WindowThermalModel(Loop)%VacuumPressureLimit = rNumericArgs(2)
-      IF(rNumericArgs(2) <= 0.0) THEN
+      IF(rNumericArgs(2) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be greater than 0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(2))//' has been found.')
+        CALL ShowContinueError(trim(cNumericFieldNames(2))//' must be > 0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(2),2)))
       END IF
 
       WindowThermalModel(Loop)%InitialTemperature = rNumericArgs(3)
-      IF(rNumericArgs(3) <= 0.0) THEN
+      IF(rNumericArgs(3) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(3))//' must be greater than 0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(3))//' has been found.')
+        CALL ShowContinueError(trim(cNumericFieldNames(3))//' must be > 0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(3),2)))
       END IF
 
       WindowThermalModel(Loop)%InitialPressure    = rNumericArgs(4)
-      IF(rNumericArgs(4) <= 0.0) THEN
+      IF(rNumericArgs(4) <= 0.0d0) THEN
         ErrorsFound = .true.
-        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(cNumericFieldNames(4))//' must be greater than 0.')
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(cNumericFieldNames(4))//' has been found.')
+        CALL ShowContinueError(trim(cNumericFieldNames(4))//' must be > 0, entered value = '// &
+          TRIM(RoundSigDigits(rNumericArgs(4),2)))
       END IF
     end if
 
@@ -6970,7 +8077,7 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
         !Glass layer counter
     iMatGlass = 0
     !Simon TODO: This is to be confirmed.  If this is just initial value, then we might want to make better guess
-    NominalU(ConstrNum) = 0.1d0
+    NominalRforNominalUCalculation(ConstrNum) = 0.1d0
     !Simon TODO: If I do not put this, then it is considered that surface is NOT window
     Construct(ConstrNum)%TransDiff = 0.1d0    !This is a place holder to flag
                                               !the construction as a window until
@@ -6991,8 +8098,9 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     CASE DEFAULT
       ! throw error
       ErrorsFound=.true.
-      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(locAlphaFieldNames(2))//' entered value="'//TRIM(locAlphaArgs(2))//  &
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(locAlphaFieldNames(2))//' has been found.')
+      CALL ShowContinueError(TRIM(locAlphaFieldNames(2))//' entered value="'//TRIM(locAlphaArgs(2))//  &
         '" should be LBNLWindow or UserDefined.')
     END SELECT
 
@@ -7004,23 +8112,26 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     CASE DEFAULT
       ! throw error
       ErrorsFound=.true.
-      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
-      CALL ShowContinueError(trim(locAlphaFieldNames(3))//' entered value="'//TRIM(locAlphaArgs(3))//  &
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object. Illegal value for '// &
+          TRIM(locAlphaFieldNames(3))//' has been found.')
+      CALL ShowContinueError(trim(locAlphaFieldNames(3))//' entered value = "'//TRIM(locAlphaArgs(3))//  &
         '" should be Axisymmetric or None.')
     END SELECT
-    IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Error in state or basis definition.')
 
     !Simon: Assign thermal model number
     ThermalModelNum = FindIteminList(locAlphaArgs(4), WindowThermalModel%Name, TotThermalModels)
-    IF (ThermalModelNum == 0 ) THEN
-        CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
-        CALL ShowContinueError(trim(locAlphaFieldNames(4))//' entered value="'//TRIM(locAlphaArgs(4))//  &
-          '" no corresponding thermal model.')
-        CALL ShowFatalError ( 'Construction:ComplexFenestrationState: No corresponding thermal model parameters found' )
+    IF (ThermalModelNum == 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(locAlphaFieldNames(4))//' has been found.')
+      CALL ShowContinueError(trim(locAlphaFieldNames(4))//' entered value = "'//TRIM(locAlphaArgs(4))//  &
+        '" no corresponding thermal model (WindowThermalModel:Params) found in the input file.')
     ELSE
       Construct(ConstrNum)%BSDFInput%ThermalModel = ThermalModelNum
     ENDIF
 
+    ! ***************************************************************************************
+    ! Basis matrix
+    ! ***************************************************************************************
     Construct(ConstrNum)%BSDFInput%BasisMatIndex = MatrixIndex(locAlphaArgs(5))
     CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%BasisMatIndex, NumRows, NumCols)
     Construct(ConstrNum)%BSDFInput%BasisMatNrows=NumRows
@@ -7028,15 +8139,15 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
     IF (NumCols /= 2 .AND. NumCols /= 1) THEN
       ErrorsFound=.true.
-      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object. Illegal value for '// &
+        TRIM(locAlphaFieldNames(5))//' has been found.')
       CALL ShowContinueError(trim(locAlphaFieldNames(5))//' entered value="'//TRIM(locAlphaArgs(5))//  &
-          '" invalid matrix.')
-      Call ShowFatalError('Construction:ComplexFenestrationState: Basis matrix must be NX2 or NX1(axisymm).')
+          '" invalid matrix dimensions.  Basis matrix dimension can only be 2 x 1.')
     END IF
     ALLOCATE (Construct(ConstrNum)%BSDFInput%BasisMat( NumRows, NumCols) )
     CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%BasisMatIndex, Construct(ConstrNum)%BSDFInput%BasisMat)
-    IF( Construct(ConstrNum)%BSDFInput%BasisType  == BasisType_WINDOW )&
-     & CALL CalculateBasisLength ( Construct(ConstrNum)%BSDFInput, ConstrNum , Construct(ConstrNum)%BSDFInput%NBasis )
+    IF( Construct(ConstrNum)%BSDFInput%BasisType  == BasisType_WINDOW ) &
+      CALL CalculateBasisLength ( Construct(ConstrNum)%BSDFInput, ConstrNum , Construct(ConstrNum)%BSDFInput%NBasis )
 
     !determine number of layers and optical layers
     NumOfTotalLayers = (NumAlphas - 9)/3
@@ -7050,73 +8161,165 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     ! check for incomplete field set
     IF (Mod((NumAlphas - 9), 3) /= 0) Then
       !throw warning if incomplete field set
-      !Simon TODO: Check this error message with someone
-      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
-      CALL ShowFatalError(&
-       'Construction:ComplexFenestrationState: Incomplete field set.')
+      ErrorsFound = .true.
+      CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+        ' Incomplete field set found.')
+      CALL ShowContinueError(TRIM(locAlphaArgs(1))//' is missing some of the layers or/and gaps.')
     ENDIF
 
     IF ( Construct(ConstrNum)%BSDFInput%BasisSymmetryType  == BasisSymmetry_None ) THEN
-           !Non-Symmetric basis
+          !Non-Symmetric basis
+
+          NBasis=Construct(ConstrNum)%BSDFInput%NBasis
+
+          ! *******************************************************************************
+          ! Solar front transmittance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%SolFrtTransIndex = MatrixIndex(locAlphaArgs(6))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%SolFrtTransNrows=NumRows
           Construct(ConstrNum)%BSDFInput%SolFrtTransNcols=NumCols
 
-          IF (NumRows /= NumCols) ErrorsFound=.true.  !Check for square matrix--required since only 1 basis specified
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Solar front transmittance matrix "'//TRIM(locAlphaArgs(6))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Solar front transmittance matrix "'//TRIM(locAlphaArgs(6))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
           IF ( Construct(ConstrNum)%BSDFInput%BasisType == BasisType_Custom ) THEN
               Construct(ConstrNum)%BSDFInput%NBasis =NumRows  ! For custom basis, no rows in transmittance
                           ! matrix defines the basis length
           ENDIF
-          NBasis=Construct(ConstrNum)%BSDFInput%NBasis
-          IF (NumRows /= NBasis ) ErrorsFound = .TRUE.
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolFrtTrans( NumRows, NumCols) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, Construct(ConstrNum)%BSDFInput%SolFrtTrans)
 
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolFrtTrans( NumRows, NumCols) )
+          IF (Construct(ConstrNum)%BSDFInput%SolFrtTransIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Solar front transmittance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(6))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, Construct(ConstrNum)%BSDFInput%SolFrtTrans)
+          END IF
+
+          ! *******************************************************************************
+          ! Solar back reflectance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%SolBkReflIndex = MatrixIndex(locAlphaArgs(7))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%SolBkReflNrows=NumRows
           Construct(ConstrNum)%BSDFInput%SolBkReflNcols=NumCols
 
-          IF (NumRows /= NumCols) ErrorsFound=.true.  !Check for square matrix--required since only 1 basis specified
           IF (NumRows /= NBasis) THEN
-            ErrorsFound = .TRUE.  !All matrices must have same number of elements in row/column
-            CALL ShowFatalError('Construction:ComplexFenestrationState: Bidirectional Trans & Refl matrices not same size.')
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Solar back reflectance matrix "'//TRIM(locAlphaArgs(7))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
           ENDIF
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolBkRefl( NumRows, NumCols) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, Construct(ConstrNum)%BSDFInput%SolBkRefl)
 
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Solar bakc reflectance matrix "'//TRIM(locAlphaArgs(7))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolBkRefl( NumRows, NumCols) )
+          IF (Construct(ConstrNum)%BSDFInput%SolBkReflIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Solar back reflectance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(7))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, Construct(ConstrNum)%BSDFInput%SolBkRefl)
+          END IF
+
+          ! *******************************************************************************
+          ! Visible front transmittance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%VisFrtTransIndex = MatrixIndex(locAlphaArgs(8))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%VisFrtTransNrows=NumRows
           Construct(ConstrNum)%BSDFInput%VisFrtTransNcols=NumCols
-          IF (NumRows /= NumCols) ErrorsFound=.true.  !Check for square matrix--required since only 1 basis specified
-          IF (NumRows /= NBasis) THEN
-            ErrorsFound = .TRUE.  !All matrices must have same number of elements in row/column
-            CALL ShowFatalError('Construction:ComplexFenestrationState: Bidirectional Vis & Sol Trans matrices not same size.')
-          ENDIF
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisFrtTrans( NumRows, NumCols) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, Construct(ConstrNum)%BSDFInput%VisFrtTrans)
 
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Visible front transmittance matrix "'//TRIM(locAlphaArgs(8))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Visible front transmittance matrix "'//TRIM(locAlphaArgs(8))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisFrtTrans( NumRows, NumCols) )
+          IF (Construct(ConstrNum)%BSDFInput%VisFrtTransIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Visible front transmittance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(8))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, Construct(ConstrNum)%BSDFInput%VisFrtTrans)
+          END IF
+
+          ! *******************************************************************************
+          ! Visible back reflectance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%VisBkReflIndex = MatrixIndex(locAlphaArgs(9))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%VisBkReflNrows=NumRows
           Construct(ConstrNum)%BSDFInput%VisBkReflNcols=NumCols
-          IF (NumRows /= NumCols) ErrorsFound=.true.  !Check for square matrix--required since only 1 basis specified
+
           IF (NumRows /= NBasis) THEN
-            ErrorsFound = .TRUE.  !All matrices must have same number of elements in row/column
-            CALL ShowFatalError('Construction:ComplexFenestrationState: Bidirectional Vis Trans & Refl matrices not same size.')
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Visible back reflectance matrix "'//TRIM(locAlphaArgs(9))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
           ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Visible back reflectance "'//TRIM(locAlphaArgs(9))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
           ALLOCATE (Construct(ConstrNum)%BSDFInput%VisBkRefl( NumRows, NumCols) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, Construct(ConstrNum)%BSDFInput%VisBkRefl )
-
-          IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Trans & Reflect matrices must be square.')
-
-          !Check that the number of layers does not exceed the number of layers allowed in the thermal calculation
-          IF (Construct(ConstrNum)%BSDFInput%NumLayers > MaxSolidWinLayers ) THEN
-              CALL ShowFatalError(&
-          'Construction:ComplexFenestrationState: Number of absorbing layers exceeds maximum for thermal construction')
-          ENDIF
+          IF (Construct(ConstrNum)%BSDFInput%VisBkReflIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Visble back reflectance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(9))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, Construct(ConstrNum)%BSDFInput%VisBkRefl )
+          END IF
 
           !ALLOCATE(Construct(ConstrNum)%BSDFInput%Layer(NumOfOpticalLayers))
           DO layer = 1,  Construct(ConstrNum)%TotLayers
@@ -7130,86 +8333,249 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%MaterialIndex = Construct(ConstrNum)%LayerPoint(Layer)
 
               AlphaIndex = AlphaIndex + 1
+              ! *******************************************************************************
+              ! Front absorptance matrix
+              ! *******************************************************************************
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex = MatrixIndex(locAlphaArgs(AlphaIndex))
               CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, NumRows, NumCols)
-              IF (NumRows/=1) ErrorsFound=.true.
+
+              IF (NumRows /= 1) THEN
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))//' must have only one row.')
+              END IF
+
               IF (NumCols /= NBasis) THEN
-                ErrorsFound = .TRUE.  !All abs vectors must have same number of elements as row/column of Trans matrix
-                CALL ShowFatalError('Construction:ComplexFenestrationState: Frt Abs vector wrong length.')
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))// &
+                  ' must have same number of columns as it is defined by basis matrix.')
+                CALL ShowContinueError('Matrix has '//TRIM(RoundSigDigits(NumCols))//' number of columns, while basis'// &
+                  ' definition specifies '//TRIM(RoundSigDigits(NBasis))//' number of columns.')
               ENDIF
+
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%AbsNcols=NumCols
               ALLOCATE (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbs( NumRows, NumCols) )
-              CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, &
+              IF (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex == 0) THEN
+                ErrorsFound = .TRUE.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+                  ' Referenced Matrix:TwoDimension is missing from the input file.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//Trim(RoundSigDigits(currentOpticalLayer))//' is missing from the input file.')
+              ELSE
+                CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, &
                           Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbs)
+              END IF
 
               AlphaIndex = AlphaIndex + 1
+              ! *******************************************************************************
+              ! Back absorptance matrix
+              ! *******************************************************************************
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex = MatrixIndex(locAlphaArgs(AlphaIndex))
               CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, NumRows, NumCols)
-              IF (NumRows/=1.OR.NumCols/=Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%AbsNcols) ErrorsFound=.true.
+
+              IF (NumRows /= 1) THEN
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))//' must have only one row.')
+              END IF
+
               IF (NumCols /= NBasis) THEN
-                ErrorsFound = .TRUE.  !All abs vectors must have same number of elements as row/column of Trans matrix
-                CALL ShowFatalError('Construction:ComplexFenestrationState: Bk Abs vector wrong length.')
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))// &
+                  ' must have same number of columns as it is defined by basis matrix.')
+                CALL ShowContinueError('Matrix has '//TRIM(RoundSigDigits(NumCols))//' number of columns, while basis'// &
+                  ' definition specifies '//TRIM(RoundSigDigits(NBasis))//' number of columns.')
               ENDIF
+
               ALLOCATE (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbs( NumRows, NumCols) )
-              CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, &
+              IF (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex == 0) THEN
+                ErrorsFound = .TRUE.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+                  ' Referenced Matrix:TwoDimension is missing from the input file.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//Trim(RoundSigDigits(currentOpticalLayer))//' is missing from the input file.')
+              ELSE
+                CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, &
                           Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbs)
+              END IF
             end if !if (Mod(Layer, 2) <> 0) then
 
           ENDDO
-          IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Both Abs vects must be 1xN,same N.')
       ELSE
             !Axisymmetric basis
           NBasis=Construct(ConstrNum)%BSDFInput%NBasis  !Basis length has already been calculated
           ALLOCATE (BSDFTempMtrx( 1 , NBasis))
+
+          ! *******************************************************************************
+          ! Solar front transmittance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%SolFrtTransIndex = MatrixIndex(locAlphaArgs(6))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%SolFrtTransNrows=NBasis
           Construct(ConstrNum)%BSDFInput%SolFrtTransNcols=NBasis
-          IF(  (NumRows /= 1 ) .OR. (NumCols /= NBasis) ) ErrorsFound=.TRUE.      !Shape must match specs
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolFrtTrans( NBasis, NBasis) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, BSDFTempMtrx)
-          Construct(ConstrNum)%BSDFInput%SolFrtTrans = 0.
-          FORALL (I = 1 : NBasis )
-              Construct(ConstrNum)%BSDFInput%SolFrtTrans(I , I ) = BSDFTempMtrx(1,I)
-          END FORALL
 
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Solar front transmittance matrix "'//TRIM(locAlphaArgs(6))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Solar front transmittance matrix "'//TRIM(locAlphaArgs(6))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolFrtTrans( NBasis, NBasis) )
+          IF (Construct(ConstrNum)%BSDFInput%SolFrtTransIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Solar front transmittance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(6))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolFrtTransIndex, BSDFTempMtrx)
+
+            Construct(ConstrNum)%BSDFInput%SolFrtTrans = 0.
+            FORALL (I = 1 : NBasis )
+              Construct(ConstrNum)%BSDFInput%SolFrtTrans(I , I ) = BSDFTempMtrx(1,I)
+            END FORALL
+          END IF
+
+          ! *******************************************************************************
+          ! Solar back reflectance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%SolBkReflIndex = MatrixIndex(locAlphaArgs(7))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%SolBkReflNrows=NBasis
           Construct(ConstrNum)%BSDFInput%SolBkReflNcols=NBasis
-          IF(  (NumRows /= 1 ) .OR. (NumCols /= NBasis) ) ErrorsFound=.TRUE.      !Shape must match specs
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolBkRefl( NBasis, NBasis) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, BSDFTempMtrx)
-          Construct(ConstrNum)%BSDFInput%SolBkRefl = 0.
-           FORALL (I = 1 : NBasis )
-              Construct(ConstrNum)%BSDFInput%SolBkRefl(I , I ) = BSDFTempMtrx(1,I)
-          END FORALL
 
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Solar back reflectance matrix "'//TRIM(locAlphaArgs(7))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Solar back reflectance matrix "'//TRIM(locAlphaArgs(7))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%SolBkRefl( NBasis, NBasis) )
+          IF (Construct(ConstrNum)%BSDFInput%SolBkReflIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Solar back reflectance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(7))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%SolBkReflIndex, BSDFTempMtrx)
+            Construct(ConstrNum)%BSDFInput%SolBkRefl = 0.
+            FORALL (I = 1 : NBasis )
+              Construct(ConstrNum)%BSDFInput%SolBkRefl(I , I ) = BSDFTempMtrx(1,I)
+            END FORALL
+          END IF
+
+          ! *******************************************************************************
+          ! Visible front transmittance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%VisFrtTransIndex = MatrixIndex(locAlphaArgs(8))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%VisFrtTransNrows=NBasis
           Construct(ConstrNum)%BSDFInput%VisFrtTransNcols=NBasis
-          IF(  (NumRows /= 1 ) .OR. (NumCols /= NBasis) ) ErrorsFound=.TRUE.      !Shape must match specs
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisFrtTrans( NBasis , NBasis ) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, BSDFTempMtrx)
-          Construct(ConstrNum)%BSDFInput%VisFrtTrans = 0.
-          FORALL (I = 1 : NBasis )
-              Construct(ConstrNum)%BSDFInput%VisFrtTrans(I , I ) = BSDFTempMtrx(1,I)
-          END FORALL
 
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Visible front transmittance matrix "'//TRIM(locAlphaArgs(8))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Visible front transmittance matrix "'//TRIM(locAlphaArgs(8))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisFrtTrans( NBasis , NBasis ) )
+          IF (Construct(ConstrNum)%BSDFInput%VisFrtTransIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Visible front transmittance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(8))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisFrtTransIndex, BSDFTempMtrx)
+            Construct(ConstrNum)%BSDFInput%VisFrtTrans = 0.
+            FORALL (I = 1 : NBasis )
+              Construct(ConstrNum)%BSDFInput%VisFrtTrans(I , I ) = BSDFTempMtrx(1,I)
+            END FORALL
+          END IF
+
+          ! *******************************************************************************
+          ! Visible back reflectance
+          ! *******************************************************************************
           Construct(ConstrNum)%BSDFInput%VisBkReflIndex = MatrixIndex(locAlphaArgs(9))
           CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, NumRows, NumCols)
           Construct(ConstrNum)%BSDFInput%VisBkReflNrows=NBasis
           Construct(ConstrNum)%BSDFInput%VisBkReflNcols=NBasis
-          IF(  (NumRows /= 1 ) .OR. (NumCols /= NBasis) ) ErrorsFound=.TRUE.      !Shape must match specs
-          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisBkRefl( NBasis , NBasis ) )
-          CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, BSDFTempMtrx )
-          Construct(ConstrNum)%BSDFInput%VisBkRefl = 0.
-          FORALL (I = 1 : NBasis )
-              Construct(ConstrNum)%BSDFInput%VisBkRefl(I , I ) = BSDFTempMtrx(1,I)
-          END FORALL
 
-          IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Axisymmetric matrices wrong size.')
+          IF (NumRows /= NBasis) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Illegal matrix size has been found.')
+            CALL ShowContinueError('Visible back reflectance matrix "'//TRIM(locAlphaArgs(9))//'" is not the same size'// &
+              ' as it is defined by basis definition. Basis size is defined by Matrix:TwoDimension = "'// &
+              TRIM(locAlphaArgs(5))//'".')
+          ENDIF
+
+          IF (NumRows /= NumCols) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//'", object.'// &
+              ' Invalid BSDF matrix dimensions.')
+            CALL ShowContinueError('Visible back reflectance matrix "'//TRIM(locAlphaArgs(9))//'" must have'// &
+              ' the same number of rows and columns.')
+          END IF
+
+          ALLOCATE (Construct(ConstrNum)%BSDFInput%VisBkRefl( NBasis , NBasis ) )
+          IF (Construct(ConstrNum)%BSDFInput%VisBkReflIndex == 0) THEN
+            ErrorsFound = .TRUE.
+            CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+              ' Referenced Matrix:TwoDimension is missing from the input file.')
+            CALL ShowContinueError('Visible back reflectance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(9))// &
+              '" is missing from the input file.')
+          ELSE
+            CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%VisBkReflIndex, BSDFTempMtrx )
+            Construct(ConstrNum)%BSDFInput%VisBkRefl = 0.
+            FORALL (I = 1 : NBasis )
+              Construct(ConstrNum)%BSDFInput%VisBkRefl(I , I ) = BSDFTempMtrx(1,I)
+            END FORALL
+          END IF
 
           !determine number of layers
           !Construct(ConstrNum)%TotLayers = (NumAlphas - 9)/3
@@ -7228,38 +8594,90 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
             Construct(ConstrNum)%LayerPoint(Layer) = FindIteminList(locAlphaArgs(AlphaIndex),Material%Name,TotMaterials)
 
-            !Simon: Load only if optical layer
             if (Mod(Layer, 2) /= 0) then
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%MaterialIndex = Construct(ConstrNum)%LayerPoint(Layer)
 
+              ! *******************************************************************************
+              ! Front absorptance matrix
+              ! *******************************************************************************
               AlphaIndex = AlphaIndex + 1
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex = MatrixIndex(locAlphaArgs(AlphaIndex))
               CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, NumRows, NumCols)
-              IF (NumRows/=1) ErrorsFound=.TRUE.
+
+              IF (NumRows /= 1) THEN
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))//' must have only one row.')
+              END IF
+
               IF (NumCols /= NBasis) THEN
-                ErrorsFound = .TRUE.  !All abs vectors must have same number of elements as basis
-                CALL ShowFatalError('Construction:ComplexFenestrationState: Frt Abs vector wrong length.')
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))// &
+                  ' must have same number of columns as it is defined by basis matrix.')
+                CALL ShowContinueError('Matrix has '//TRIM(RoundSigDigits(NumCols))//' number of columns, while basis'// &
+                  ' definition specifies '//TRIM(RoundSigDigits(NBasis))//' number of columns.')
               ENDIF
+
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%AbsNcols=NumCols
               ALLOCATE (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbs( NumRows, NumCols) )
-              CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, &
-                          Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbs)
 
+              IF (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex == 0) THEN
+                ErrorsFound = .TRUE.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+                  ' Referenced Matrix:TwoDimension is missing from the input file.')
+                CALL ShowContinueError('Front absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//Trim(RoundSigDigits(currentOpticalLayer))//' is missing from the input file.')
+              ELSE
+                CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbsIndex, &
+                          Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%FrtAbs)
+              END IF
+
+              ! *******************************************************************************
+              ! Back absorptance matrix
+              ! *******************************************************************************
               AlphaIndex = AlphaIndex + 1
               Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex = MatrixIndex(locAlphaArgs(AlphaIndex))
               CALL Get2DMatrixDimensions(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, NumRows, NumCols)
-              IF (NumRows/=1.OR.NumCols/=Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%AbsNcols) ErrorsFound=.TRUE.
+
+              IF (NumRows /= 1) THEN
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))//' must have only one row.')
+              END IF
+
               IF (NumCols /= NBasis) THEN
-                ErrorsFound = .TRUE.  !All abs vectors must have same number of elements as basis
-                CALL ShowFatalError('Construction:ComplexFenestrationState: Bk Abs vector wrong length.')
+                ErrorsFound=.true.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//' = "'//TRIM(locAlphaArgs(1))//'", object.' &
+                  //' Incorrect matrix dimension.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//TRIM(RoundSigDigits(currentOpticalLayer))// &
+                  ' must have same number of columns as it is defined by basis matrix.')
+                CALL ShowContinueError('Matrix has '//TRIM(RoundSigDigits(NumCols))//' number of columns, while basis'// &
+                  ' definition specifies '//TRIM(RoundSigDigits(NBasis))//' number of columns.')
               ENDIF
+
               ALLOCATE (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbs( NumRows, NumCols) )
-              CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, &
+
+              IF (Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex == 0) THEN
+                ErrorsFound = .TRUE.
+                CALL ShowSevereError(RoutineName//TRIM(locCurrentModuleObject)//'="'//TRIM(locAlphaArgs(1))//', object.'// &
+                  ' Referenced Matrix:TwoDimension is missing from the input file.')
+                CALL ShowContinueError('Back absorbtance Matrix:TwoDimension = "'//TRIM(locAlphaArgs(AlphaIndex))// &
+                  '" for layer '//Trim(RoundSigDigits(currentOpticalLayer))//' is missing from the input file.')
+              ELSE
+                CALL Get2DMatrix(Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbsIndex, &
                           Construct(ConstrNum)%BSDFInput%Layer(currentOpticalLayer)%BkAbs)
+              END IF
             end if ! if (Mod(Layer, 2) <> 0) then
           ENDDO
 
-          IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Both Abs vects must be 1xN,same N.')
           DEALLOCATE (BSDFTempMtrx )
     ENDIF
     Construct(ConstrNum)%TypeIsWindow = .TRUE.
@@ -7273,6 +8691,8 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
   if (allocated(locAlphaFieldBlanks)) deallocate(locAlphaFieldBlanks)
   if (allocated(locAlphaArgs)) deallocate(locAlphaArgs)
   if (allocated(locNumericArgs)) deallocate(locNumericArgs)
+
+  IF (ErrorsFound) CALL ShowFatalError('Error in complex fenestration input.')
 
   RETURN
 

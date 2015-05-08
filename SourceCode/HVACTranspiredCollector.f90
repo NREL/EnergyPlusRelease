@@ -62,62 +62,62 @@ Type UTSCDataStruct
   INTEGER, ALLOCATABLE, DIMENSION(:)  :: ZoneNode      ! Air system node "pointer", should have zone node
   INTEGER                      :: Layout           = 0 ! 'Square' or 'Triangle'
   INTEGER                      :: Correlation      = 0 ! which heat exchanger effectiveness model
-  REAL(r64)                    :: HoleDia          = 0. ! Diameter of Perforations in Collector [m]
-  REAL(r64)                    :: Pitch            = 0. ! Distance between Perforations in Collector [m]
-  REAL(r64)                    :: LWEmitt          = 0. ! Thermal Emissivity of Collector Surface [dimensionless]
-  REAL(r64)                    :: SolAbsorp        = 0. ! Solar Absorbtivity of Collector Surface [dimensionless]
+  REAL(r64)                    :: HoleDia          = 0.d0 ! Diameter of Perforations in Collector [m]
+  REAL(r64)                    :: Pitch            = 0.d0 ! Distance between Perforations in Collector [m]
+  REAL(r64)                    :: LWEmitt          = 0.d0 ! Thermal Emissivity of Collector Surface [dimensionless]
+  REAL(r64)                    :: SolAbsorp        = 0.d0 ! Solar Absorbtivity of Collector Surface [dimensionless]
   INTEGER                      :: CollRoughness    = 1  ! surface roughness for exterior convection calcs.
-  REAL(r64)                    :: PlenGapThick     = 0. ! Depth of Plenum Behind Collector [m]
-  REAL(r64)                    :: PlenCrossArea    = 0. ! cross section area of plenum behind collector [m2]
+  REAL(r64)                    :: PlenGapThick     = 0.d0 ! Depth of Plenum Behind Collector [m]
+  REAL(r64)                    :: PlenCrossArea    = 0.d0 ! cross section area of plenum behind collector [m2]
   INTEGER                      :: NumSurfs         = 0  ! a single collector can have multiple surfaces underneath it
   INTEGER, ALLOCATABLE, DIMENSION(:) ::SurfPtrs    != 0  ! array of pointers for participating underlying surfaces
-  REAL(r64)                    :: Height           = 0. ! Overall Height of Collector  [m]
-  REAL(r64)                    :: AreaRatio        = 0. ! Ratio of actual surface are to projected surface area [dimensionless]
-  REAL(r64)                    :: CollectThick     = 0. ! Thickness of collector absorber plate material.  [m]
-  REAL(r64)                    :: Cv               = 0. ! volume-based effectiveness of openings for wind-driven vent when Passive
-  REAL(r64)                    :: Cd               = 0. ! discharge coefficient of openings for bouyancy-driven vent when Passive
+  REAL(r64)                    :: Height           = 0.d0 ! Overall Height of Collector  [m]
+  REAL(r64)                    :: AreaRatio        = 0.d0 ! Ratio of actual surface are to projected surface area [dimensionless]
+  REAL(r64)                    :: CollectThick     = 0.d0 ! Thickness of collector absorber plate material.  [m]
+  REAL(r64)                    :: Cv               = 0.d0 ! volume-based effectiveness of openings for wind-driven vent when Passive
+  REAL(r64)                    :: Cd               = 0.d0 ! discharge coefficient of openings for bouyancy-driven vent when Passive
   INTEGER                      :: NumOASysAttached = 0  ! =1 if no splitter, other wise set by Splitter object
   INTEGER                      :: FreeHeatSetpointSchedPtr = 0 ! used for controlling seperately from usual setpoint managers.
   INTEGER                      :: VsucErrIndex     = 0
  ! data from elswhere and calculated
-  REAL(r64)                    :: ActualArea       = 0. ! Overall Area of Collect with surface corrugations.
-  REAL(r64)                    :: ProjArea         = 0. ! Overall Area of Collector projected, as if flat [m2]
-  TYPE (vector)                :: Centroid         = vector(0.,0.,0.)  ! computed centroid
-  REAL(r64)                    :: Porosity         = 0. ! fraction of absorber plate [--]
+  REAL(r64)                    :: ActualArea       = 0.d0 ! Overall Area of Collect with surface corrugations.
+  REAL(r64)                    :: ProjArea         = 0.d0 ! Overall Area of Collector projected, as if flat [m2]
+  TYPE (vector)                :: Centroid         = vector(0.0d0,0.0d0,0.0d0 )  ! computed centroid
+  REAL(r64)                    :: Porosity         = 0.d0 ! fraction of absorber plate [--]
   LOGICAL                      :: isOn             = .false.  ! .true. means "on" or "ACTIVE" , .false means "off" or "PASSIVE
-  REAL(r64)                    :: Tplen            = 0. ! modeled drybulb temperature for air between collector and wall [C]
-  REAL(r64)                    :: Tcoll            = 0. ! modeled surface temperature for collector [C]
+  REAL(r64)                    :: Tplen            = 0.d0 ! modeled drybulb temperature for air between collector and wall [C]
+  REAL(r64)                    :: Tcoll            = 0.d0 ! modeled surface temperature for collector [C]
   REAL(r64)                    :: TplenLast        = 22.5d0 ! Old Value for modeled drybulb temp if air between collector and wall [C]
   REAL(r64)                    :: TcollLast        = 22.0d0 ! Old value for modeled surface temperature for collector [C]
-  REAL(r64)                    :: HrPlen           = 0  ! Modeled radiation coef for OSCM [W/m2-C]
-  REAL(r64)                    :: HcPlen           = 0. ! Modeled Convection coef for OSCM [W/m2-C]
-  REAL(r64)                    :: MdotVent         = 0. ! air mass flow exchanging with ambient when passive.
-  REAL(r64)                    :: HdeltaNPL        = 0. ! lenth scale for bouyancy-driven vent when Passive [m]
-  REAL(r64)                    :: TairHX           = 0. ! air drybulb of air leaving collector when Active [C]
-  REAL(r64)                    :: InletMDot        = 0. ! flow rate from outdoor mixer controller
-  REAL(r64)                    :: InletTempDB      = 0.
-  REAL(r64)                    :: Tilt             = 0. ! Tilt from area weighted average of underlying surfaces
-  REAL(r64)                    :: Azimuth          = 0. ! Azimuth from area weighted average of underlying surfaces
-  REAL(r64)                    :: QdotSource       = 0. ! Source/sink term
+  REAL(r64)                    :: HrPlen           = 0.0d0  ! Modeled radiation coef for OSCM [W/m2-C]
+  REAL(r64)                    :: HcPlen           = 0.d0 ! Modeled Convection coef for OSCM [W/m2-C]
+  REAL(r64)                    :: MdotVent         = 0.d0 ! air mass flow exchanging with ambient when passive.
+  REAL(r64)                    :: HdeltaNPL        = 0.d0 ! lenth scale for bouyancy-driven vent when Passive [m]
+  REAL(r64)                    :: TairHX           = 0.d0 ! air drybulb of air leaving collector when Active [C]
+  REAL(r64)                    :: InletMDot        = 0.d0 ! flow rate from outdoor mixer controller
+  REAL(r64)                    :: InletTempDB      = 0.d0
+  REAL(r64)                    :: Tilt             = 0.d0 ! Tilt from area weighted average of underlying surfaces
+  REAL(r64)                    :: Azimuth          = 0.d0 ! Azimuth from area weighted average of underlying surfaces
+  REAL(r64)                    :: QdotSource       = 0.d0 ! Source/sink term
   ! reporting data
-  REAL(r64)                    :: Isc              = 0. ! total incident solar on collector [W]
-  REAL(r64)                    :: HXeff            = 0. ! heat exchanger effectiveness [--]
-  REAL(r64)                    :: Vsuction         = 0. ! Average suction face velocity [m/s]
-  REAL(r64)                    :: PassiveACH       = 0. ! air changes per hour when passive [1/hr]
-  REAL(r64)                    :: PassiveMdotVent  = 0. ! Total Nat Vent air change rate  [kg/s]
-  REAL(r64)                    :: PassiveMdotWind  = 0. ! Nat Vent air change rate from Wind-driven [kg/s]
-  REAL(r64)                    :: PassiveMdotTherm = 0. ! Nat. Vent air change rate from bouyancy-driven flow [kg/s]
-  REAL(r64)                    :: PlenumVelocity   = 0. ! effective velocity inside plenum [m/s]
-  REAL(r64)                    :: SupOutTemp       = 0. ! supply air outlet temperature [C]
-  REAL(r64)                    :: SupOutHumRat     = 0. ! supply air outlet humidity ratio [kg water/kg dry air]
-  REAL(r64)                    :: SupOutEnth       = 0. ! supply air outlet enthalpy [J/kg]
-  REAL(r64)                    :: SupOutMassFlow   = 0. ! supply air outlet mass flow rate [kg/s]
-  REAL(r64)                    :: SensHeatingRate  = 0. ! rate of sensible heat being added to the supply (primary) air [W]
-  REAL(r64)                    :: SensHeatingEnergy= 0. ! sensible heat added to the supply (primary) air [J]
-  REAL(r64)                    :: SensCoolingRate  = 0. ! rate of sensible heat being removed from the supply (primary) air [W]
-  REAL(r64)                    :: SensCoolingEnergy= 0. ! sensible heat removed from the supply (primary) air [J]
-  REAL(r64)                    :: UTSCEfficiency   = 0. ! Total Efficiency (with wall) SensHeatingRate/IncidentRadiation[--]
-  REAL(r64)                    :: UTSCCollEff      = 0. ! Collector-only Efficiency [--]
+  REAL(r64)                    :: Isc              = 0.d0 ! total incident solar on collector [W]
+  REAL(r64)                    :: HXeff            = 0.d0 ! heat exchanger effectiveness [--]
+  REAL(r64)                    :: Vsuction         = 0.d0 ! Average suction face velocity [m/s]
+  REAL(r64)                    :: PassiveACH       = 0.d0 ! air changes per hour when passive [1/hr]
+  REAL(r64)                    :: PassiveMdotVent  = 0.d0 ! Total Nat Vent air change rate  [kg/s]
+  REAL(r64)                    :: PassiveMdotWind  = 0.d0 ! Nat Vent air change rate from Wind-driven [kg/s]
+  REAL(r64)                    :: PassiveMdotTherm = 0.d0 ! Nat. Vent air change rate from bouyancy-driven flow [kg/s]
+  REAL(r64)                    :: PlenumVelocity   = 0.d0 ! effective velocity inside plenum [m/s]
+  REAL(r64)                    :: SupOutTemp       = 0.d0 ! supply air outlet temperature [C]
+  REAL(r64)                    :: SupOutHumRat     = 0.d0 ! supply air outlet humidity ratio [kg water/kg dry air]
+  REAL(r64)                    :: SupOutEnth       = 0.d0 ! supply air outlet enthalpy [J/kg]
+  REAL(r64)                    :: SupOutMassFlow   = 0.d0 ! supply air outlet mass flow rate [kg/s]
+  REAL(r64)                    :: SensHeatingRate  = 0.d0 ! rate of sensible heat being added to the supply (primary) air [W]
+  REAL(r64)                    :: SensHeatingEnergy= 0.d0 ! sensible heat added to the supply (primary) air [J]
+  REAL(r64)                    :: SensCoolingRate  = 0.d0 ! rate of sensible heat being removed from the supply (primary) air [W]
+  REAL(r64)                    :: SensCoolingEnergy= 0.d0 ! sensible heat removed from the supply (primary) air [J]
+  REAL(r64)                    :: UTSCEfficiency   = 0.d0 ! Total Efficiency (with wall) SensHeatingRate/IncidentRadiation[--]
+  REAL(r64)                    :: UTSCCollEff      = 0.d0 ! Collector-only Efficiency [--]
 End Type UTSCDataStruct
 
           ! MODULE VARIABLE DECLARATIONS:
@@ -220,8 +220,8 @@ SUBROUTINE SimTranspiredCollector(CompName, CompIndex)
               < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)).and. &
          ANY((Node(UTSC(CompIndex)%ZoneNode)%Temp+ TempControlTol)  &   ! free heating helpful
               < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)) ) ) .AND. &
-       (GetCurrentScheduleValue(UTSC(CompIndex)%SchedPtr) > 0.0) .AND. &  !availability Schedule
-       (UTSC(CompIndex)%InletMdot > 0.0)   )  THEN  ! OA system is setting mass flow
+       (GetCurrentScheduleValue(UTSC(CompIndex)%SchedPtr) > 0.0d0) .AND. &  !availability Schedule
+       (UTSC(CompIndex)%InletMdot > 0.0d0)   )  THEN  ! OA system is setting mass flow
 
      UTSC(CompIndex)%isOn = .TRUE.
   ELSE
@@ -337,7 +337,7 @@ SUBROUTINE GetTranspiredCollectorInput
     ErrorsFound=.true.
   ENDIF
   ALLOCATE(Alphas(MaxNumAlphas))
-  Numbers = 0.0
+  Numbers = 0.0d0
   Alphas  = ' '
 
   numUTSC = GetNumObjectsFound(CurrentModuleObject)
@@ -370,14 +370,14 @@ SUBROUTINE GetTranspiredCollectorInput
          ErrorsFound=.true.
       ENDIF
       IF (.NOT.ALLOCATED(AlphasSplit)) Allocate(AlphasSplit(MaxNumAlphasSplit))
-      NumbersSplit = 0.0
+      NumbersSplit = 0.0d0
       AlphasSplit  = ' '
       Do ItemSplit = 1, NumUTSCSplitter
          CALL GetObjectItem(CurrentModuleMultiObject,ItemSplit,AlphasSplit,NumAlphasSplit, &
                                 NumbersSplit,NumNumbersSplit,IOStatusSplit)
          If (.NOT.( SameString(AlphasSplit(1),Alphas(1)) ) ) Cycle
          SplitterNameOK(ItemSplit) = .true.
-         UTSC(Item)%NumOASysAttached = floor(NumAlphasSplit/4.)
+         UTSC(Item)%NumOASysAttached = floor(NumAlphasSplit/4.0d0)
          IF (MOD((NumAlphasSplit),4) /= 1) THEN
            CALL ShowSevereError('GetTranspiredCollectorInput: '//TRIM(CurrentModuleMultiObject)//  &
                          ' Object Definition indicates not uniform quadtuples of nodes for '//  &
@@ -615,7 +615,7 @@ SUBROUTINE GetTranspiredCollectorInput
     UTSC(Item)%SolAbsorp     = Numbers(4)
     UTSC(Item)%Height        = Numbers(5)
     UTSC(Item)%PlenGapThick  = Numbers(6)
-    IF (UTSC(Item)%PlenGapThick <= 0.0) THEN
+    IF (UTSC(Item)%PlenGapThick <= 0.0d0) THEN
          CALL ShowSevereError('Plenum gap must be greater than Zero in '//TRIM(CurrentModuleObject)//' ='//TRIM(UTSC(Item)%Name))
          CYCLE
     ENDIF
@@ -637,9 +637,9 @@ SUBROUTINE GetTranspiredCollectorInput
     !  need to update this for slots as well as holes
     SELECT CASE (UTSC(Item)%Layout)
     CASE(Layout_Triangle)  ! 'TRIANGLE'
-      UTSC(Item)%Porosity      = 0.907d0*(UTSC(Item)%HoleDia / UTSC(Item)%Pitch)**2.       !Kutscher equation, Triangle layout
+      UTSC(Item)%Porosity      = 0.907d0*(UTSC(Item)%HoleDia / UTSC(Item)%Pitch)**2.0d0        !Kutscher equation, Triangle layout
     CASE(Layout_Square)  ! 'SQUARE'
-      UTSC(Item)%Porosity      = (PI/4.d0)*(UTSC(Item)%HoleDia**2.)/(UTSC(Item)%Pitch**2.) !Waterloo equation, square layout
+      UTSC(Item)%Porosity      = (PI/4.d0)*(UTSC(Item)%HoleDia**2.0d0)/(UTSC(Item)%Pitch**2.0d0) !Waterloo equation, square layout
     END SELECT
     TiltRads                 = ABS(AvgTilt) * DegToRadians
     TempHdeltaNPL            = SIN(TiltRads)*UTSC(Item)%Height / 4.0d0
@@ -814,15 +814,15 @@ SUBROUTINE InitTranspiredCollector(UTSCNum)
   UTSC(UTSCNum)%InletMdot   = Sum(Node(UTSC(UTSCNum)%InletNode)%MassFlowRate)
 
   UTSC(UTSCNum)%isOn     = .false.  ! intialize then turn on if appropriate
-  UTSC(UTSCNum)%Tplen    = 0.0
-  UTSC(UTSCNum)%Tcoll    = 0.0
-  UTSC(UTSCNum)%MdotVent = 0.0
-  UTSC(UTSCNum)%TairHX   = 0.0
-  UTSC(UTSCNum)%HXeff    = 0.0
-  UTSC(UTSCNum)%Isc      = 0.0
+  UTSC(UTSCNum)%Tplen    = 0.0d0
+  UTSC(UTSCNum)%Tcoll    = 0.0d0
+  UTSC(UTSCNum)%MdotVent = 0.0d0
+  UTSC(UTSCNum)%TairHX   = 0.0d0
+  UTSC(UTSCNum)%HXeff    = 0.0d0
+  UTSC(UTSCNum)%Isc      = 0.0d0
 
-  UTSC(UTSCNum)%UTSCEfficiency  = 0.0
-  UTSC(UTSCNum)%UTSCCollEff     = 0.0
+  UTSC(UTSCNum)%UTSCEfficiency  = 0.0d0
+  UTSC(UTSCNum)%UTSCCollEff     = 0.0d0
 
 
   RETURN
@@ -1003,17 +1003,17 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
     ! now collect average values for things associated with the underlying surface(s)
   NumSurfs = UTSC(UTSCNum)%numSurfs
   ALLOCATE(HSkyARR(NumSurfs))
-  HSkyARR = 0.0
+  HSkyARR = 0.0d0
   ALLOCATE(HGroundARR(NumSurfs))
-  HGroundARR = 0.0
+  HGroundARR = 0.0d0
   ALLOCATE(HAirARR(NumSurfs))
-  HAirARR = 0.0
+  HAirARR = 0.0d0
   ALLOCATE(LocalWindArr(NumSurfs))
-  LocalWindArr = 0.0
+  LocalWindArr = 0.0d0
  ! ALLOCATE(IscARR(NumSurfs))
  ! IscARR = 0.0
   Allocate(HPlenARR(NumSurfs))
-  HPlenARR = 0.0
+  HPlenARR = 0.0d0
 !  ALLOCATE(TsoARR(NumSurfs))
 !  TsoARR = 0.0
 
@@ -1024,8 +1024,8 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
   Do thisSurf =1, NumSurfs
     SurfPtr = UTSC(UTSCNum)%SurfPtrs(thisSurf)
     ! Initializations for this surface
-    HMovInsul     = 0.0
-    HExt          = 0.0
+    HMovInsul     = 0.0d0
+    HExt          = 0.0d0
     LocalWindArr(thisSurf) = Surface(SurfPtr)%WindSpeed
     CALL InitExteriorConvectionCoeff( SurfPtr,HMovInsul,Roughness,AbsExt,TempExt, &
                                 HExt,HSkyARR(thisSurf),HGroundARR(thisSurf),HAirARR(thisSurf) )
@@ -1054,12 +1054,12 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
   IF (Vwind > 5.0d0) THEN
     Hcwind = 5.62d0 +3.9d0*(Vwind - 5.0d0)  !McAdams forced convection correlation
   ELSE
-    Hcwind = 0.0
+    Hcwind = 0.0d0
   ENDIF
 
-  If (IsRain) Hcwind = 1000.0
+  If (IsRain) Hcwind = 1000.0d0
 
-  HXeff = 0.0 ! init
+  HXeff = 0.0d0 ! init
 
   SELECT CASE (UTSC(UTSCnum)%Correlation)
 
@@ -1070,7 +1070,7 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
 
     NuD   = 2.75d0*( (((P/D)**(-1.2d0))*(ReD**0.43d0)) + (0.011d0 * Por * ReD*((Vwind/Vsuction)**0.48d0) ))
     U     = k * NuD/ D
-    HXeff = 1 - exp(-1.d0*((U * AlessHoles)/ (mdot * CpAir)) )
+    HXeff = 1.0d0 - exp(-1.d0*((U * AlessHoles)/ (mdot * CpAir)) )
 
   CASE(Correlation_VanDeckerHollandsBrunger2001)  ! VanDeckerHollandsBrunger2001
     t     = UTSC(UTSCNum)%CollectThick
@@ -1078,18 +1078,18 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
     ReW   = Vwind * P / nu
     ReB   = Vholes * P / nu
     ReH   = (Vsuction * D)/(nu * Por)
-    IF (ReD > 0.0) THEN
-      If (ReW > 0.0) THEN
-        HXeff = (1.d0 - (1.d0 + ReS * MAX(1.733d0 * ReW**(-0.5d0), 0.02136d0) )**(-1.0) ) &
-                * (1.d0 - (1.d0 + 0.2273d0 * (ReB**0.5d0))**(- 1.0) ) &
+    IF (ReD > 0.0d0) THEN
+      If (ReW > 0.0d0) THEN
+        HXeff = (1.d0 - (1.d0 + ReS * MAX(1.733d0 * ReW**(-0.5d0), 0.02136d0) )**(-1.0d0) ) &
+                * (1.d0 - (1.d0 + 0.2273d0 * (ReB**0.5d0))**(- 1.0d0) ) &
                 * EXP( -0.01895d0*(P/D) - (20.62d0/ReH) * (t/D) )
       ELSE
-        HXeff = (1.d0 - (1.d0 + ReS *  0.02136d0 )**(-1.0) ) &
-                * (1.d0 - (1.d0 + 0.2273d0 * ReB**0.5d0)**(- 1.0) ) &
+        HXeff = (1.d0 - (1.d0 + ReS *  0.02136d0 )**(-1.0d0) ) &
+                * (1.d0 - (1.d0 + 0.2273d0 * ReB**0.5d0)**(- 1.0d0) ) &
                 * EXP( -0.01895d0*(P/D) - (20.62d0/ReH) * (t/D) )
       ENDIF
     ELSE
-      HXeff = 0.0
+      HXeff = 0.0d0
     ENDIF
   END SELECT
 
@@ -1110,7 +1110,7 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
   If (Taplen > Tamb) Then
     SensHeatingRate = Mdot*CpAir*(Taplen - Tamb)
   ELSE
-    SensHeatingRate = 0
+    SensHeatingRate = 0.0d0
   endif
 
   !now fill results into derived types
@@ -1132,20 +1132,20 @@ SUBROUTINE CalcActiveTranspiredCollector(UTSCnum)
   UTSC(UTSCNum)%SupOutMassFlow    = Mdot
   UTSC(UTSCNum)%SensHeatingRate   = SensHeatingRate
   UTSC(UTSCNum)%SensHeatingEnergy = SensHeatingRate * TimeStepSys * SecInHour
-  UTSC(UTSCNum)%PassiveACH        = 0.0
-  UTSC(UTSCNum)%PassiveMdotVent   = 0.0
-  UTSC(UTSCNum)%PassiveMdotWind   = 0.0
-  UTSC(UTSCNum)%PassiveMdotTherm  = 0.0
-  IF (Isc > 10.0)  THEN
+  UTSC(UTSCNum)%PassiveACH        = 0.0d0
+  UTSC(UTSCNum)%PassiveMdotVent   = 0.0d0
+  UTSC(UTSCNum)%PassiveMdotWind   = 0.0d0
+  UTSC(UTSCNum)%PassiveMdotTherm  = 0.0d0
+  IF (Isc > 10.0d0)  THEN
     UTSC(UTSCNum)%UTSCEfficiency  = SensHeatingRate / (Isc * A)
     IF (TaHX > Tamb) THen
        UTSC(UTSCNum)%UTSCCollEff     = Mdot*CpAir*(TaHX - Tamb) / (Isc * A)
     ELSE
-       UTSC(UTSCNum)%UTSCCollEff     = 0.0
+       UTSC(UTSCNum)%UTSCCollEff     = 0.0d0
     ENDIF
   ELSE
-    UTSC(UTSCNum)%UTSCEfficiency  = 0.0
-    UTSC(UTSCNum)%UTSCCollEff     = 0.0
+    UTSC(UTSCNum)%UTSCEfficiency  = 0.0d0
+    UTSC(UTSCNum)%UTSCCollEff     = 0.0d0
   ENDIF
 
   RETURN
@@ -1260,22 +1260,22 @@ SUBROUTINE CalcPassiveTranspiredCollector(UTSCNum)
   UTSC(UTSCNum)%Tcoll             = TmpTscoll
   UTSC(UTSCNum)%HrPlen            = HrPlen
   UTSC(UTSCNum)%HcPlen            = HcPlen
-  UTSC(UTSCNum)%TairHX            = 0.0
-  UTSC(UTSCNum)%InletMdot         = 0.0
+  UTSC(UTSCNum)%TairHX            = 0.0d0
+  UTSC(UTSCNum)%InletMdot         = 0.0d0
   UTSC(UTSCNum)%InletTempDB       = Tamb
-  UTSC(UTSCNum)%Vsuction          = 0.0
-  UTSC(UTSCNum)%PlenumVelocity    = 0.0
+  UTSC(UTSCNum)%Vsuction          = 0.0d0
+  UTSC(UTSCNum)%PlenumVelocity    = 0.0d0
   UTSC(UTSCNum)%SupOutTemp        = Tamb
   UTSC(UTSCNum)%SupOutHumRat      = OutHumRatAmb
   UTSC(UTSCNum)%SupOutEnth        = OutEnthalpy
-  UTSC(UTSCNum)%SupOutMassFlow    = 0.0
-  UTSC(UTSCNum)%SensHeatingRate   = 0.0
-  UTSC(UTSCNum)%SensHeatingEnergy = 0.0
+  UTSC(UTSCNum)%SupOutMassFlow    = 0.0d0
+  UTSC(UTSCNum)%SensHeatingRate   = 0.0d0
+  UTSC(UTSCNum)%SensHeatingEnergy = 0.0d0
   UTSC(UTSCNum)%PassiveACH        = (MdotVent/RhoAir) *(1.d0/(UTSC(UTSCNum)%ProjArea*UTSC(UTSCNum)%PlenGapThick))*SecInHour
   UTSC(UTSCNum)%PassiveMdotVent   = MdotVent
   UTSC(UTSCNum)%PassiveMdotWind   = VdotWind * RhoAir
   UTSC(UTSCNum)%PassiveMdotTherm  = VdotThermal * RhoAir
-  UTSC(UTSCNum)%UTSCEfficiency    = 0.0
+  UTSC(UTSCNum)%UTSCEfficiency    = 0.0d0
 
 
   RETURN

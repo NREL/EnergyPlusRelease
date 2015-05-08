@@ -133,7 +133,7 @@ PUBLIC   ! Data Only Module
    REAL(r64)     :: VolFlowRateStdRho         = 0.d0 ! volume flow rate at standard density [m3/s]
    REAL(r64)     :: VolFlowRateCrntRho        = 0.d0 ! volume flow rate at current density, only used for air nodes [m3/s]
    REAL(r64)     :: WetbulbTemp               = 0.d0 ! wetbulb temperature [C]
-   REAL(r64)     :: AirDensity                = 0.d0 ! reported air density at standard density [kg/m3]
+   REAL(r64)     :: Density                   = 0.d0 ! reported density at current temperature [kg/m3]
    REAL(r64)     :: AirDewpointTemp           = 0.d0 ! reported system node dewpoint temperature [C]
  END TYPE MoreNodeData
 
@@ -162,7 +162,7 @@ PUBLIC   ! Data Only Module
               0.0D0,        & ! MassFlowRateRequest {kg/s}
               0.0D0,        & ! MassFlowRate {kg/s}
               0.0D0,        & ! MassFlowRateMin {kg/s}
-              0.0D0,        & ! MassFlowRateMax {kg/s}
+              0.0D0,        & ! MassFlowRateMax {kg/s}  !Objexx:Note SensedNodeFlagValue is default initializer
               0.0D0,        & ! MassFlowRateMinAvail {kg/s}
               0.0D0,        & ! MassFlowRateMaxAvail {kg/s}
               0.0D0,        & ! MassFlowRateSetPoint {kg/s}
@@ -186,7 +186,8 @@ PUBLIC   ! Data Only Module
               0.0D0,        & ! CO2 {ppm}
               0.0D0,        & ! CO2 setpoint {ppm}
               0.0D0,        & ! Generic contaminant {ppm}
-              0.0D0)          ! Generic contaminant setpoint {ppm}
+              0.0D0,        & ! Generic contaminant setpoint {ppm}
+              .FALSE.)        ! Set to true when node has SPM which follows wetbulb
 
  TYPE (MoreNodeData), ALLOCATABLE, DIMENSION(:) :: MoreNodeInfo
  TYPE (MarkedNodeData), ALLOCATABLE, DIMENSION(:) :: MarkedNode

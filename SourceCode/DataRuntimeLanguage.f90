@@ -197,7 +197,7 @@ END TYPE EMSProgramCallManagementType
 TYPE ErlValueType
   ! instance data structure for the values taken by Erl variables, nested structure in ErlVariable
   INTEGER                        :: Type            = 0   ! value type, eg. ValueNumber,
-  REAL(r64)                      :: Number          = 0.0 ! numeric value instance for Erl variable
+  REAL(r64)                      :: Number          = 0.0d0 ! numeric value instance for Erl variable
   CHARACTER(len=2*MaxNameLength) :: String          = ''  ! string data types in Erl (not used yet)
   INTEGER                        :: Variable        = 0   ! Pointer to another Erl variable
 !  Might be good to change names to VariableNum and ExpressionNum just to be clear
@@ -387,6 +387,12 @@ SUBROUTINE ValidateEMSVariableName(cModuleObject,cFieldValue,cFieldName,errFlag,
   IF (SCAN(TRIM(cFieldValue), '+') > 0) THEN
     CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
     CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot contain "+" characters.')
+    errFlag=.true.
+    ErrorsFound = .TRUE.
+  ENDIF
+  IF (SCAN(TRIM(cFieldValue), '.') > 0) THEN
+    CALL ShowSevereError(TRIM(cModuleObject)//'="'//TRIM(cFieldValue)//'", Invalid variable name entered.')
+    CALL ShowContinueError('...'//TRIM(cFieldName)//'; Names used as EMS variables cannot contain "." characters.')
     errFlag=.true.
     ErrorsFound = .TRUE.
   ENDIF

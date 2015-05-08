@@ -63,7 +63,7 @@ TYPE HXAssistedCoilParameters
   INTEGER                      :: HXAssistedCoilInletNodeNum=0  ! Inlet node to HXAssistedCoolingCoil compound object
   INTEGER                      :: HXAssistedCoilOutletNodeNum=0 ! Outlet node to HXAssistedCoolingCoil compound object
   INTEGER                      :: HXExhaustAirInletNodeNum   =0   ! Inlet node number for air-to-air heat exchanger
-  REAL(r64)                    :: MassFlowRate               =0.0 ! Mass flow rate through HXAssistedCoolingCoil compound object
+  REAL(r64)                    :: MassFlowRate               =0.0d0 ! Mass flow rate through HXAssistedCoolingCoil compound object
   INTEGER                      :: MaxIterCounter             =0   ! used in warning messages
   INTEGER                      :: MaxIterIndex               =0   ! used in warning messages
 END TYPE HXAssistedCoilParameters
@@ -111,6 +111,7 @@ PUBLIC GetHXDXCoilName
 PUBLIC GetHXCoilType
 PUBLIC GetHXCoilTypeAndName
 PUBLIC GetCoilMaxWaterFlowRate
+PUBLIC GetHXCoilAirFlowRate
 PUBLIC VerifyHeatExchangerParent
 PUBLIC GetActualDXCoilIndex
 
@@ -225,7 +226,7 @@ SUBROUTINE SimHXAssistedCoolingCoil(HXAssistedCoilName,FirstHVACIteration,CompOp
       Call CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp,PartLoadRatio, HXUnitOn, FanOpMode, &
                                      OnOffAirFlow = AirFlowRatio, EconomizerFlag=EconomizerFlag)
     ELSE
-      AirFlowRatio = 1.0
+      AirFlowRatio = 1.0d0
       Call CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp,PartLoadRatio, HXUnitOn, FanOpMode, &
                                      OnOffAirFlow = AirFlowRatio, EconomizerFlag=EconomizerFlag)
     END IF
@@ -345,7 +346,7 @@ SUBROUTINE GetHXAssistedCoolingCoilInput
     ALLOCATE(cNumericFields(MaxNums))
     cNumericFields=' '
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
     ALLOCATE(lAlphaBlanks(MaxAlphas))
     lAlphaBlanks=.TRUE.
     ALLOCATE(lNumericBlanks(MaxNums))
@@ -739,8 +740,8 @@ SUBROUTINE InitHXAssistedCoolingCoil(HXAssistedCoilNum)
     Node(HXAssistedCoil(HXAssistedCoilNum)%HXAssistedCoilInletNodeNum)%MassFlowRate
 
   IF(HXAssistedCoil(HXAssistedCoilNum)%CoolingCoilType_Num == CoilDX_CoolingSingleSpeed)THEN
-    DXCoilFullLoadOutAirTemp(HXAssistedCoil(HXAssistedCoilNum)%CoolingCoilIndex)   = 0.0
-    DXCoilFullLoadOutAirHumRat(HXAssistedCoil(HXAssistedCoilNum)%CoolingCoilIndex) = 0.0
+    DXCoilFullLoadOutAirTemp(HXAssistedCoil(HXAssistedCoilNum)%CoolingCoilIndex)   = 0.0d0
+    DXCoilFullLoadOutAirHumRat(HXAssistedCoil(HXAssistedCoilNum)%CoolingCoilIndex) = 0.0d0
   END IF
 
  RETURN
@@ -808,10 +809,10 @@ SUBROUTINE CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp
   INTEGER          :: CompanionCoilIndexNum      ! Index to DX coil
 
   AirMassFlow = HXAssistedCoil(HXAssistedCoilNum)%MassFlowRate
-  Error = 1.0 ! Initialize error (CoilOutputTemp last iteration minus current CoilOutputTemp)
+  Error = 1.0d0 ! Initialize error (CoilOutputTemp last iteration minus current CoilOutputTemp)
   Iter = 0 ! Initialize iteration counter to zero
 
-  IF(FirstHVACIteration) CoilOutputTempLast = -99.0 ! Initialize coil output temp
+  IF(FirstHVACIteration) CoilOutputTempLast = -99.0d0 ! Initialize coil output temp
 
 ! Set mass flow rate at inlet of exhaust side of heat exchanger to supply side air mass flow rate entering this compound object
   Node(HXAssistedCoil(HXAssistedCoilNum)%HXExhaustAirInletNodeNum)%MassFlowRate = AirMassFlow
@@ -826,7 +827,7 @@ SUBROUTINE CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp
 ! A large number of iterations are required to get to result (~36 iterations to get to PLR=0 node conditions).
 ! Reset node data to minimize iteration. This initialization reduces the number of iterations by 50%.
 ! CAUTION: Do not use Node(x) = Node(y) here, this can overwrite the coil outlet node setpoint.
-  IF(PartLoadRatio .EQ. 0.0) THEN
+  IF(PartLoadRatio .EQ. 0.0d0) THEN
     Node(HXAssistedCoil(HXAssistedCoilNum)%HXExhaustAirInletNodeNum)%Temp = &
         Node(HXAssistedCoil(HXAssistedCoilNum)%HXAssistedCoilInletNodeNum)%Temp
     Node(HXAssistedCoil(HXAssistedCoilNum)%HXExhaustAirInletNodeNum)%HumRat = &
@@ -838,7 +839,7 @@ SUBROUTINE CalcHXAssistedCoolingCoil(HXAssistedCoilNum,FirstHVACIteration,CompOp
   END IF
 
 ! Force at least 2 iterations to pass outlet node information
-  DO WHILE ((ABS(Error) .GT. 0.0005 .AND. Iter .LE. MaxIter) .OR. Iter .LT. 2)
+  DO WHILE ((ABS(Error) .GT. 0.0005d0 .AND. Iter .LE. MaxIter) .OR. Iter .LT. 2)
 
     Call SimHeatRecovery(HXAssistedCoil(HXAssistedCoilNum)%HeatExchangerName,FirstHVACIteration,  &
                          HXAssistedCoil(HXAssistedCoilNum)%HeatExchangerIndex, FanOpMode, &
@@ -1027,7 +1028,7 @@ SUBROUTINE CheckHXAssistedCoolingCoilSchedule(CompType,CompName,Value,CompIndex)
       CALL ShowFatalError('CheckHXAssistedCoolingCoilSchedule: HX Assisted Coil not found='//TRIM(CompName))
     ENDIF
     CompIndex=HXAssistedCoilNum
-    Value=1.0  ! not scheduled?
+    Value=1.0d0  ! not scheduled?
   ELSE
     HXAssistedCoilNum=CompIndex
     IF (HXAssistedCoilNum > TotalNumHXAssistedCoils .or. HXAssistedCoilNum < 1) THEN
@@ -1043,7 +1044,7 @@ SUBROUTINE CheckHXAssistedCoolingCoilSchedule(CompType,CompName,Value,CompIndex)
                           TRIM(HXAssistedCoil(HXAssistedCoilNum)%Name))
     ENDIF
 
-    Value=1.0  ! not scheduled?
+    Value=1.0d0  ! not scheduled?
   ENDIF
 
   RETURN
@@ -1072,6 +1073,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
           ! USE STATEMENTS:
   USE InputProcessor,  ONLY: FindItem,SameString
   USE DXCoils, ONLY: GetDXCoilCapacity => GetCoilCapacity
+  USE WaterCoils, ONLY: GetWaterCoilCapacity
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1118,6 +1120,14 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
         CALL ShowRecurringWarningErrorAtEnd('Requested DX Coil from CoilSystem:Cooling:DX:HeatExchangerAssisted not found',ErrCount)
       END IF
     ENDIF
+  ELSE IF (SameString(CoilType,'CoilSystem:Cooling:Water:HeatExchangerAssisted')) THEN
+    IF (WhichCoil /= 0) THEN
+       ! coil does not have capacity in input so mine information from DX cooling coil
+      CoilCapacity=GetWaterCoilCapacity(HXAssistedCoil(WhichCoil)%CoolingCoilType,HXAssistedCoil(WhichCoil)%CoolingCoilName,ErrFlag)
+      IF(ErrFlag)THEN
+        CALL ShowRecurringWarningErrorAtEnd('Requested DX Coil from CoilSystem:Cooling:DX:HeatExchangerAssisted not found',ErrCount)
+      END IF
+    ENDIF
   ELSE
     WhichCoil=0
   ENDIF
@@ -1126,7 +1136,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
     CALL ShowSevereError('GetCoilCapacity: Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
     CALL ShowContinueError('... Coil Capacity returned as -1000.')
     ErrorsFound=.true.
-    CoilCapacity=-1000.
+    CoilCapacity=-1000.0d0
   ENDIF
 
   IF(ErrFlag)ErrorsFound=.true.
@@ -1427,6 +1437,7 @@ FUNCTION GetCoilWaterInletNode(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
       CALL ShowSevereError('GetCoilWaterInletNode: Invalid Cooling Coil for HX Assisted Coil, Type="'//  &
          TRIM(HXAssistedCoil(WhichCoil)%CoolingCoilType)//'" Name="'//TRIM(CoilName)//'"')
       ErrorsFound=.true.
+      NodeNumber=0 !Objexx:Return Added line to set return value
     ENDIF
   ELSE
     CALL ShowSevereError('GetCoilInletNode: Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
@@ -1834,7 +1845,7 @@ FUNCTION GetCoilMaxWaterFlowRate(CoilType,CoilName,ErrorsFound) RESULT(MaxWaterF
     IF (SameString(CoilType,'CoilSystem:Cooling:DX:HeatExchangerAssisted')) THEN
       IF (WhichCoil /= 0) THEN
         ! coil does not specify MaxWaterFlowRate
-        MaxWaterFlowRate=0.0
+        MaxWaterFlowRate=0.0d0
         CALL ShowRecurringWarningErrorAtEnd('Requested Max Water Flow Rate from CoilSystem:Cooling:DX:HeatExchangerAssisted N/A',  &
              ErrCount)
       ENDIF
@@ -1851,18 +1862,99 @@ FUNCTION GetCoilMaxWaterFlowRate(CoilType,CoilName,ErrorsFound) RESULT(MaxWaterF
       CALL ShowSevereError('GetCoilMaxWaterFlowRate: Could not find Coil, Type="'//TRIM(CoilType)//  &
                            '" Name="'//TRIM(CoilName)//'"')
       ErrorsFound=.true.
-      MaxWaterFlowRate=-1000.
+      MaxWaterFlowRate=-1000.d0
     ENDIF
   ELSE
     CALL ShowSevereError('GetCoilMaxWaterFlowRate: Could not find Coil, Type="'//TRIM(CoilType)//  &
                          '" Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    MaxWaterFlowRate=-1000.
+    MaxWaterFlowRate=-1000.d0
   END IF
 
   RETURN
 
 END FUNCTION GetCoilMaxWaterFlowRate
+
+FUNCTION GetHXCoilAirFlowRate(CoilType,CoilName,ErrorsFound) RESULT(MaxAirFlowRate)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad
+          !       DATE WRITTEN   September 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the max air flow rate for the given HX and returns it.  If
+          ! incorrect coil type or name is given, errorsfound is returned as true and capacity is returned
+          ! as negative.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItem,SameString
+  USE HeatRecovery,    ONLY: GetSupplyAirFlowRate
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  REAL(r64)                    :: MaxAirFlowRate  ! returned max air flow rate of matched HX
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+  INTEGER, SAVE :: ErrCount=0
+
+  ! Obtains and allocates HXAssistedCoolingCoil related parameters from input file
+  IF (GetCoilsInputFlag) THEN  ! First time subroutine has been called, get input data
+    ! Get the HXAssistedCoolingCoil input
+    CALL GetHXAssistedCoolingCoilInput
+    GetCoilsInputFlag=.false. ! Set logic flag to disallow getting the input data on future calls to this subroutine
+  End If
+
+  IF(TotalNumHXAssistedCoils .GT. 0)THEN
+
+    WhichCoil=FindItem(CoilName,HXAssistedCoil%Name,TotalNumHXAssistedCoils)
+
+    IF (SameString(CoilType,'CoilSystem:Cooling:DX:HeatExchangerAssisted') .OR. &
+        SameString(CoilType,'CoilSystem:Cooling:Water:HeatExchangerAssisted')) THEN
+      IF (WhichCoil /= 0) THEN
+        MaxAirFlowRate=GetSupplyAirFlowRate(HXAssistedCoil(WhichCoil)%HeatExchangerName,ErrorsFound)
+      ENDIF
+    ELSE
+      WhichCoil=0
+    ENDIF
+
+    IF (WhichCoil == 0) THEN
+      CALL ShowSevereError('GetHXCoilAirFlowRate: Could not find HX, Type="'//TRIM(CoilType)//  &
+                           '" Name="'//TRIM(CoilName)//'"')
+      ErrorsFound=.true.
+      MaxAirFlowRate=-1000.d0
+    ENDIF
+  ELSE
+    CALL ShowSevereError('GetHXCoilAirFlowRate: Could not find HX, Type="'//TRIM(CoilType)//  &
+                         '" Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    MaxAirFlowRate=-1000.d0
+  END IF
+
+  RETURN
+
+END FUNCTION GetHXCoilAirFlowRate
 
 FUNCTION VerifyHeatExchangerParent(HXType,HXName) RESULT(Found)
 

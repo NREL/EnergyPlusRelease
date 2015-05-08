@@ -48,12 +48,12 @@ TYPE TemperValveData
     INTEGER :: PltPumpOutletNodeNum = 0   ! node number for the pump outlet (for flow rate)
   ! Calculated and from elsewhere
     LOGICAL :: Init                 = .true. ! flag for initializationL true means do the initializations
-    REAL(r64)    :: FlowDivFract         = 0.0 ! Fraction of flow sent down diversion path
-    REAL(r64)    :: Stream2SourceTemp    = 0.0 ! Temperature [C] of stream 2 being mixed
-    REAL(r64)    :: InletTemp            = 0.0 ! Temperature [C] of inlet to valve
-    REAL(r64)    :: SetpointTemp         = 0.0 ! setpoint Temperatures [C] at control node.
-    REAL(r64)    :: MixedMassFlowRate    = 0.0 ! Flow rate downstream of mixer [kg/s]
-    REAL(r64)    :: DivertedFlowRate     = 0.0 ! flow rate through tempering valve's diversion path [kg/s]
+    REAL(r64)    :: FlowDivFract         = 0.0d0 ! Fraction of flow sent down diversion path
+    REAL(r64)    :: Stream2SourceTemp    = 0.0d0 ! Temperature [C] of stream 2 being mixed
+    REAL(r64)    :: InletTemp            = 0.0d0 ! Temperature [C] of inlet to valve
+    REAL(r64)    :: SetpointTemp         = 0.0d0 ! setpoint Temperatures [C] at control node.
+    REAL(r64)    :: MixedMassFlowRate    = 0.0d0 ! Flow rate downstream of mixer [kg/s]
+    REAL(r64)    :: DivertedFlowRate     = 0.0d0 ! flow rate through tempering valve's diversion path [kg/s]
    !loop topology variables
    INTEGER       :: LoopNum         =0
    INTEGER       :: LoopSideNum     =0
@@ -159,9 +159,9 @@ SUBROUTINE SimPlantValves(CompTypeNum,CompName,CompNum,RunFlag,InitLoopEquip,  &
   ENDIF
 
   IF (InitLoopEquip) THEN
-    MinCap = 0.0
-    MaxCap = 0.0
-    OptCap = 0.0
+    MinCap = 0.0d0
+    MaxCap = 0.0d0
+    OptCap = 0.0d0
     RETURN
   ENDIF
 
@@ -619,26 +619,26 @@ SUBROUTINE CalcPlantValves(CompTypeNum,CompNum)
       Ts2 = TemperValve(CompNum)%Stream2SourceTemp
 
       IF (Ts2 <= Tset) THEN
-        TemperValve(CompNum)%FlowDivFract = 0.0
+        TemperValve(CompNum)%FlowDivFract = 0.0d0
       ELSE  ! Divert some or all flow
         IF (Tin < Ts2) THEN
           TemperValve(CompNum)%FlowDivFract = (Ts2 - Tset) / (Ts2 - Tin)
         ELSE
-          TemperValve(CompNum)%FlowDivFract = 1.0
+          TemperValve(CompNum)%FlowDivFract = 1.0d0
         END IF
       END IF
     ELSEIF (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 1) THEN ! don't recalc diversion, just reuse current flows
-      IF (TemperValve(CompNum)%MixedMassFlowRate > 0.0) Then
+      IF (TemperValve(CompNum)%MixedMassFlowRate > 0.0d0) Then
         TemperValve(CompNum)%FlowDivFract = Node(TemperValve(CompNum)%PltOutletNodeNum)%MassFlowRate &
                                            / TemperValve(CompNum)%MixedMassFlowRate
       ELSE
-        TemperValve(CompNum)%FlowDivFract = 0.0
+        TemperValve(CompNum)%FlowDivFract = 0.0d0
       ENDIF
 
     END IF
 
-    IF (TemperValve(CompNum)%FlowDivFract < 0.0) TemperValve(CompNum)%FlowDivFract = 0.0
-    IF (TemperValve(CompNum)%FlowDivFract > 1.0) TemperValve(CompNum)%FlowDivFract = 1.0
+    IF (TemperValve(CompNum)%FlowDivFract < 0.0d0) TemperValve(CompNum)%FlowDivFract = 0.0d0
+    IF (TemperValve(CompNum)%FlowDivFract > 1.0d0) TemperValve(CompNum)%FlowDivFract = 1.0d0
 
   CASE DEFAULT
     ! should not come here. would have been caught in init routine

@@ -38,6 +38,7 @@ TYPE OutsideEnergySourceSpecs
   CHARACTER(len=MaxNameLength) :: ScheduleID         = ' '  ! equipment availability schedule
   CHARACTER(len=MaxNameLength) :: Name               = ' '  ! user identifier
   REAL(r64)                    :: NomCap             = 0.d0 ! design nominal capacity of district service
+  INTEGER                      :: CapFractionSchedNum = 0   ! capacity modifier schedule number
   INTEGER                      :: InletNodeNum       = 0    ! Node number on the inlet side of the plant
   INTEGER                      :: OutletNodeNum      = 0    ! Node number on the inlet side of the plant
   REAL(r64)                    :: EnergyTransfer     = 0.d0 ! cooling energy provided in time step
@@ -56,10 +57,10 @@ TYPE OutsideEnergySourceSpecs
 END TYPE OutsideEnergySourceSpecs
 
 TYPE ReportVars
-  REAL(r64)         :: MassFlowRate   =0.0
-  REAL(r64)         :: InletTemp      =0.0
-  REAL(r64)         :: OutletTemp     =0.0
-  REAL(r64)         :: EnergyTransfer =0.0
+  REAL(r64)         :: MassFlowRate   =0.0d0
+  REAL(r64)         :: InletTemp      =0.0d0
+  REAL(r64)         :: OutletTemp     =0.0d0
+  REAL(r64)         :: EnergyTransfer =0.0d0
 END TYPE ReportVars
 
   !MODULE VARIABLE DECLARATIONS:
@@ -165,7 +166,7 @@ SUBROUTINE SimOutsideEnergy(EnergyType,EquipName,EquipFlowCtrl,CompIndex,RunFlag
           !CALCULATE
   IF (InitLoopEquip) THEN
     CALL InitSimVars(EqNum,MassFlowRate,InletTemp,OutletTemp, MyLoad)
-    MinCap = 0.0
+    MinCap = 0.0d0
     MaxCap = EnergySource(EqNum)%NomCap
     OptCap = EnergySource(EqNum)%NomCap
     RETURN
@@ -205,6 +206,8 @@ SUBROUTINE GetOutsideEnergySourcesInput
     USE DataIPShortCuts
     USE NodeInputManager, ONLY: GetOnlySingleNode
     USE BranchNodeConnections, ONLY: TestCompSet
+    USE ScheduleManager,       ONLY: GetScheduleIndex, CheckScheduleValueMinMax
+    USE DataGlobals,           ONLY: ScheduleAlwaysOn
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -250,7 +253,8 @@ SUBROUTINE GetOutsideEnergySourcesInput
   DO IndexCounter = 1 , NumDistrictUnitsHeat
     EnergySourceNum = EnergySourceNum + 1
     CALL GetObjectItem(cCurrentModuleObject,EnergySourceNum,cAlphaArgs,NumAlphas, &
-                       rNumericArgs,NumNums,IOSTAT)
+                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
+                        AlphaFieldNames= cAlphaFieldNames)
 
     IF (EnergySourceNum > 1) THEN
       IsNotOK=.false.
@@ -273,9 +277,26 @@ SUBROUTINE GetOutsideEnergySourcesInput
                NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
     CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(2),cAlphaArgs(3),'Hot Water Nodes')
     EnergySource(EnergySourceNum)%NomCap             = rNumericArgs(1)
-    EnergySource(EnergySourceNum)%EnergyTransfer = 0.0
-    EnergySource(EnergySourceNum)%EnergyRate = 0.0
+    EnergySource(EnergySourceNum)%EnergyTransfer = 0.0d0
+    EnergySource(EnergySourceNum)%EnergyRate = 0.0d0
     EnergySource(EnergySourceNum)%EnergyType = EnergyType_DistrictHeating
+    IF (.not. lAlphaFieldBlanks(4)) THEN
+      EnergySource(EnergySourceNum)%CapFractionSchedNum =  GetScheduleIndex(cAlphaArgs(4))
+      IF (EnergySource(EnergySourceNum)%CapFractionSchedNum == 0) THEN
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(EnergySource(EnergySourceNum)%Name)// &
+                             '", is not valid')
+        CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'" was not found.')
+        ErrorsFound=.TRUE.
+      ENDIF
+      IF (.not. CheckScheduleValueMinMax(EnergySource(EnergySourceNum)%CapFractionSchedNum, '>=', 0.0d0) ) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(EnergySource(EnergySourceNum)%Name)// &
+                             '", is not valid')
+        CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'" should not have negative values.')
+        CALL ShowContinueError('Negative values will be treated as zero, and the simulation continues.')
+      ENDIF
+    ELSE
+      EnergySource(EnergySourceNum)%CapFractionSchedNum= ScheduleAlwaysOn
+    ENDIF
   END DO
 
   IF (ErrorsFound) THEN
@@ -308,7 +329,8 @@ SUBROUTINE GetOutsideEnergySourcesInput
   DO IndexCounter = 1 , NumDistrictUnitsCool
     EnergySourceNum = EnergySourceNum + 1
     CALL GetObjectItem(cCurrentModuleObject,IndexCounter,cAlphaArgs,NumAlphas, &
-                       rNumericArgs,NumNums,IOSTAT)
+                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
+                        AlphaFieldNames= cAlphaFieldNames)
 
     IF (EnergySourceNum > 1) THEN
       IsNotOK=.false.
@@ -331,9 +353,27 @@ SUBROUTINE GetOutsideEnergySourcesInput
                NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
     CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(2),cAlphaArgs(3),'Chilled Water Nodes')
     EnergySource(EnergySourceNum)%NomCap          = rNumericArgs(1)
-    EnergySource(EnergySourceNum)%EnergyTransfer = 0.0
-    EnergySource(EnergySourceNum)%EnergyRate = 0.0
+    EnergySource(EnergySourceNum)%EnergyTransfer = 0.0d0
+    EnergySource(EnergySourceNum)%EnergyRate = 0.0d0
     EnergySource(EnergySourceNum)%EnergyType = EnergyType_DistrictCooling
+    IF (.not. lAlphaFieldBlanks(4)) THEN
+      EnergySource(EnergySourceNum)%CapFractionSchedNum =  GetScheduleIndex(cAlphaArgs(4))
+      IF (EnergySource(EnergySourceNum)%CapFractionSchedNum == 0) THEN
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(EnergySource(EnergySourceNum)%Name)// &
+                             '", is not valid')
+        CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'" was not found.')
+        ErrorsFound=.TRUE.
+      ENDIF
+      IF (.not. CheckScheduleValueMinMax(EnergySource(EnergySourceNum)%CapFractionSchedNum, '>=', 0.0d0) ) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(EnergySource(EnergySourceNum)%Name)// &
+                             '", is not valid')
+        CALL ShowContinueError(TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'" should not have negative values.')
+        CALL ShowContinueError('Negative values will be treated as zero, and the simulation continues.')
+      ENDIF
+    ELSE
+      EnergySource(EnergySourceNum)%CapFractionSchedNum= ScheduleAlwaysOn
+    ENDIF
+
   END DO
 
   IF (ErrorsFound) THEN
@@ -515,6 +555,7 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
 
           ! USE STATEMENTS:
   USE FluidProperties, ONLY : GetSpecificHeatGlycol
+  USE ScheduleManager, ONLY : GetCurrentScheduleValue
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -545,6 +586,8 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
   REAL(r64)   :: LoopMinTemp
   REAL(r64)   :: LoopMaxTemp
   REAL(r64)   :: Cp ! local cp at current temp
+  REAL(r64)   :: CurrentCap
+  REAL(r64)   :: CapFraction
 
           !FLOW
 
@@ -561,8 +604,11 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
   Cp = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,InletTemp,PlantLoop(loopNum)%FluidIndex,'SimDistrictEnergy')
 
 !  apply power limit from input
-  IF ( ABS(MyLoad)  > EnergySource(DistrictEqNum)%NomCap) THEN
-    MyLoad = SIGN(EnergySource(DistrictEqNum)%NomCap, MyLoad)
+  CapFraction = GetCurrentScheduleValue( EnergySource(DistrictEqNum)%CapFractionSchedNum)
+  CapFraction = MAX(0.d0, CapFraction) ! ensure non negative
+  CurrentCap = EnergySource(DistrictEqNum)%NomCap * CapFraction
+  IF ( ABS(MyLoad)  > CurrentCap) THEN
+    MyLoad = SIGN(CurrentCap, MyLoad)
   ENDIF
 
   IF (EnergySource(DistrictEqNum)%EnergyType == EnergyType_DistrictCooling) THEN
@@ -575,9 +621,14 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
   IF ((MassFlowRate > 0.d0) .AND. RunFlag ) THEN
     OutletTemp = (MyLoad + MassFlowRate * cp * InletTemp) / (MassFlowRate * cp)
     !apply loop limits on temperature result to keep in check
-    OutletTemp = MAX(OutletTemp, LoopMinTemp)
-    OutletTemp = MIN(OutletTemp, LoopMaxTemp)
-
+    IF (OutletTemp < LoopMinTemp) THEN
+      OutletTemp = MAX(OutletTemp, LoopMinTemp)
+      MyLoad =  MassFlowRate * cp * (OutletTemp - InletTemp)
+    ENDIF
+    IF (OutletTemp > LoopMaxTemp) THEN
+      OutletTemp = MIN(OutletTemp, LoopMaxTemp)
+      MyLoad =  MassFlowRate * cp * (OutletTemp - InletTemp)
+    ENDIF
   ELSE
     OutletTemp = InletTemp
     MyLoad = 0.d0

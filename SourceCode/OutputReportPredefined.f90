@@ -243,21 +243,29 @@ INTEGER :: pdrSizing
 INTEGER :: pdstZoneClSize
 INTEGER :: pdchZnClCalcDesLd
 INTEGER :: pdchZnClUserDesLd
+INTEGER :: pdchZnClUserDesLdPerArea
 INTEGER :: pdchZnClCalcDesAirFlow
 INTEGER :: pdchZnClUserDesAirFlow
 INTEGER :: pdchZnClDesDay
 INTEGER :: pdchZnClPkTime
-INTEGER :: pdchZnClPkTemp
-INTEGER :: pdchZnClPkHum
+INTEGER :: pdchZnClPkTstatTemp
+INTEGER :: pdchZnClPkIndTemp
+INTEGER :: pdchZnClPkIndHum
+INTEGER :: pdchZnClPkOATemp
+INTEGER :: pdchZnClPkOAHum
 INTEGER :: pdstZoneHtSize
 INTEGER :: pdchZnHtCalcDesLd
 INTEGER :: pdchZnHtUserDesLd
+INTEGER :: pdchZnHtUserDesLdPerArea
 INTEGER :: pdchZnHtCalcDesAirFlow
 INTEGER :: pdchZnHtUserDesAirFlow
 INTEGER :: pdchZnHtDesDay
 INTEGER :: pdchZnHtPkTime
-INTEGER :: pdchZnHtPkTemp
-INTEGER :: pdchZnHtPkHum
+INTEGER :: pdchZnHtPkTstatTemp
+INTEGER :: pdchZnHtPkIndTemp
+INTEGER :: pdchZnHtPkIndHum
+INTEGER :: pdchZnHtPkOATemp
+INTEGER :: pdchZnHtPkOAHum
 INTEGER :: pdstSystemSize
 INTEGER :: pdchSysSizCalcClAir
 INTEGER :: pdchSysSizUserClAir
@@ -640,7 +648,7 @@ TYPE TableEntryType
   INTEGER                       :: indexColumn   = 0
   INTEGER                       :: subTableIndex = 0
   INTEGER                       :: uniqueObjName = 0
-  REAL(r64)                     :: origRealEntry = 0.0
+  REAL(r64)                     :: origRealEntry = 0.0d0
   INTEGER                       :: significantDigits = 0
   LOGICAL                       :: origEntryIsReal = .FALSE.
 END TYPE
@@ -653,7 +661,7 @@ TYPE CompSizeTableEntryType
   CHARACTER(len=MaxNameLength)  :: typeField     = ''
   CHARACTER(len=MaxNameLength)  :: nameField     = ''
   CHARACTER(len=MaxNameLength)  :: description   = ''
-  REAL(r64)                     :: valField      = 0.0
+  REAL(r64)                     :: valField      = 0.0d0
   LOGICAL                       :: active        = .false.
   LOGICAL                       :: written       = .false.
 END TYPE
@@ -676,10 +684,10 @@ INTEGER                                           :: numShadowRelate
 INTEGER, PARAMETER                                :: recKindSurface = 1
 INTEGER, PARAMETER                                :: recKindSubsurface = 2
 
-REAL(r64) :: TotalNotMetHeatingOccupiedForABUPS = 0.0
-REAL(r64) :: TotalNotMetCoolingOccupiedForABUPS = 0.0
-REAL(r64) :: TotalNotMetOccupiedForABUPS = 0.0
-REAL(r64) :: TotalTimeNotSimpleASH55EitherForABUPS = 0.0
+REAL(r64) :: TotalNotMetHeatingOccupiedForABUPS = 0.0d0
+REAL(r64) :: TotalNotMetCoolingOccupiedForABUPS = 0.0d0
+REAL(r64) :: TotalNotMetOccupiedForABUPS = 0.0d0
+REAL(r64) :: TotalTimeNotSimpleASH55EitherForABUPS = 0.0d0
 
 CONTAINS
 
@@ -972,23 +980,31 @@ pdstZoneClSize =  newPreDefSubTable(pdrSizing,'Zone Cooling')
 
 pdchZnClCalcDesLd     = newPreDefColumn(pdstZoneClSize,'Calculated Design Load [W]')
 pdchZnClUserDesLd     = newPreDefColumn(pdstZoneClSize,'User Design Load [W]')
+pdchZnClUserDesLdPerArea = newPreDefColumn(pdstZoneClSize,'User Design Load per Area [W/m2]')
 pdchZnClCalcDesAirFlow = newPreDefColumn(pdstZoneClSize,'Calculated Design Air Flow [m3/s]')
 pdchZnClUserDesAirFlow = newPreDefColumn(pdstZoneClSize,'User Design Air Flow [m3/s]')
 pdchZnClDesDay         = newPreDefColumn(pdstZoneClSize,'Design Day Name')
 pdchZnClPkTime         = newPreDefColumn(pdstZoneClSize,'Date/Time Of Peak')
-pdchZnClPkTemp         = newPreDefColumn(pdstZoneClSize,'Temperature at Peak [C]')
-pdchZnClPkHum          = newPreDefColumn(pdstZoneClSize,'Humidity Ratio at Peak [kgWater/kgAir]')
+pdchZnClPkTstatTemp    = newPreDefColumn(pdstZoneClSize,'Thermostat Setpoint Temperature at Peak Load [C]')
+pdchZnClPkIndTemp      = newPreDefColumn(pdstZoneClSize,'Indoor Temperature at Peak Load [C]')
+pdchZnClPkIndHum       = newPreDefColumn(pdstZoneClSize,'Indoor Humidity Ratio at Peak Load [kgWater/kgAir]')
+pdchZnClPkOATemp       = newPreDefColumn(pdstZoneClSize,'Outdoor Temperature at Peak Load [C]')
+pdchZnClPkOAHum        = newPreDefColumn(pdstZoneClSize,'Outdoor Humidity Ratio at Peak Load [kgWater/kgAir]')
 
 pdstZoneHtSize =  newPreDefSubTable(pdrSizing,'Zone Heating')
 
 pdchZnHtCalcDesLd      = newPreDefColumn(pdstZoneHtSize,'Calculated Design Load [W]')
 pdchZnHtUserDesLd      = newPreDefColumn(pdstZoneHtSize,'User Design Load [W]')
+pdchZnHtUserDesLdPerArea = newPreDefColumn(pdstZoneHtSize,'User Design Load per Area [W/m2]')
 pdchZnHtCalcDesAirFlow = newPreDefColumn(pdstZoneHtSize,'Calculated Design Air Flow [m3/s]')
 pdchZnHtUserDesAirFlow = newPreDefColumn(pdstZoneHtSize,'User Design Air Flow [m3/s]')
 pdchZnHtDesDay         = newPreDefColumn(pdstZoneHtSize,'Design Day Name')
 pdchZnHtPkTime         = newPreDefColumn(pdstZoneHtSize,'Date/Time Of Peak')
-pdchZnHtPkTemp         = newPreDefColumn(pdstZoneHtSize,'Temperature at Peak [C]')
-pdchZnHtPkHum          = newPreDefColumn(pdstZoneHtSize,'Humidity Ratio at Peak [kgWater/kgAir]')
+pdchZnHtPkTstatTemp    = newPreDefColumn(pdstZoneHtSize,'Thermostat Setpoint Temperature at Peak Load [C]')
+pdchZnHtPkIndTemp      = newPreDefColumn(pdstZoneHtSize,'Indoor Temperature at Peak Load [C]')
+pdchZnHtPkIndHum       = newPreDefColumn(pdstZoneHtSize,'Indoor Humidity Ratio at Peak Load [kgWater/kgAir]')
+pdchZnHtPkOATemp       = newPreDefColumn(pdstZoneHtSize,'Outdoor Temperature at Peak Load [C]')
+pdchZnHtPkOAHum        = newPreDefColumn(pdstZoneHtSize,'Outdoor Humidity Ratio at Peak Load [kgWater/kgAir]')
 
 pdstSystemSize  =  newPreDefSubTable(pdrSizing,'System Design Air Flow Rates')
 

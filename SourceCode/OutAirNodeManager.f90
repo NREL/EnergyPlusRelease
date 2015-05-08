@@ -192,7 +192,7 @@ SUBROUTINE GetOutAirNodesInput
   ALLOCATE(cNumericFields(MaxNums))
   cNumericFields=' '
   ALLOCATE(Numbers(MaxNums))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(lAlphaBlanks(MaxAlphas))
   lAlphaBlanks=.TRUE.
   ALLOCATE(lNumericBlanks(MaxNums))
@@ -359,7 +359,7 @@ SUBROUTINE InitOutAirNodes
   ! Do the begin time step initialization
     DO OutsideAirNodeNum = 1, NumOutsideAirNodes
       NodeNum = OutsideAirNodeList(OutsideAirNodeNum)
-      IF (Node(NodeNum)%Height < 0.0) THEN
+      IF (Node(NodeNum)%Height < 0.0d0) THEN
         ! Note -- this setting is different than the DataEnvironment "AT" settings.
         Node(NodeNum)%OutAirDryBulb = OutDryBulbTemp
         Node(NodeNum)%OutAirWetBulb = OutWetBulbTemp
@@ -382,7 +382,7 @@ SUBROUTINE InitOutAirNodes
 
       Node(NodeNum)%Temp = Node(NodeNum)%OutAirDryBulb
       Node(NodeNum)%Press = OutBaroPress
-      Node(NodeNum)%Quality = 0.0
+      Node(NodeNum)%Quality = 0.0d0
       ! Add contaminants
       IF (Contaminant%CO2Simulation) Node(NodeNum)%CO2 = OutdoorCo2
       IF (Contaminant%GenericContamSimulation) Node(NodeNum)%GenContam = OutdoorGC
@@ -526,7 +526,7 @@ SUBROUTINE CheckAndAddAirNodeNumber(NodeNumber,Okay)
           'OutdoorAir:Node','OutdoorAir:Node',NodeConnectionType_OutsideAir, &
             NumOutsideAirNodes,ObjectIsNotParent,IncrementFluidStreamYes)
       DEALLOCATE(TmpNums)
-      IF (Node(NodeNumber)%Height < 0.0) THEN
+      IF (Node(NodeNumber)%Height < 0.0d0) THEN
         Node(NodeNumber)%OutAirDryBulb = OutDryBulbTemp
         Node(NodeNumber)%OutAirWetBulb = OutWetBulbTemp
       ELSE
@@ -537,7 +537,7 @@ SUBROUTINE CheckAndAddAirNodeNumber(NodeNumber,Okay)
       Node(NodeNumber)%HumRat = OutHumRat
       Node(NodeNumber)%Enthalpy = PsyHFnTdbW(Node(NodeNumber)%Temp,OutHumRat)
       Node(NodeNumber)%Press = OutBaroPress
-      Node(NodeNumber)%Quality = 0.0
+      Node(NodeNumber)%Quality = 0.0d0
       ! Add contaminants
       IF (Contaminant%CO2Simulation) Node(NodeNumber)%CO2 = OutdoorCo2
       IF (Contaminant%GenericContamSimulation) Node(NodeNumber)%GenContam = OutdoorGC

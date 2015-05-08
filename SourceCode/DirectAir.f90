@@ -46,20 +46,20 @@ TYPE DirectAirProps
   CHARACTER(len=MaxNameLength) :: Schedule =' '
   INTEGER :: ZoneSupplyAirNode             =0
   INTEGER :: SchedPtr                      =0
-  REAL(r64)    :: MaxAirVolFlowRate             =0.0 !Max Specified Volume Flow Rate of Sys [m3/sec]
-  REAL(r64)    :: AirMassFlowRateMax            =0.0 !Max mass flow [kg/sec]
-  REAL(r64)    :: InitMaxAvailMassFlow          =0.0 !The Initial max mass Flow to set the Control Flow Fraction
-  REAL(r64)    :: AirMassFlowFraction           =0.0
+  REAL(r64)    :: MaxAirVolFlowRate             =0.0d0 !Max Specified Volume Flow Rate of Sys [m3/sec]
+  REAL(r64)    :: AirMassFlowRateMax            =0.0d0 !Max mass flow [kg/sec]
+  REAL(r64)    :: InitMaxAvailMassFlow          =0.0d0 !The Initial max mass Flow to set the Control Flow Fraction
+  REAL(r64)    :: AirMassFlowFraction           =0.0d0
   Integer :: ZoneEquipAirInletNode         =0
   ! Simulation Data
-  REAL(r64)    :: SensOutputProvided                =0.0
+  REAL(r64)    :: SensOutputProvided                =0.0d0
   LOGICAL      :: EMSOverrideAirFlow            = .FALSE.  ! if true, EMS is calling to override flow rate
   REAL(r64)    :: EMSMassFlowRateValue          = 0.0D0  ! value EMS is directing to use for flow rate [kg/s]
   !Reporting Variables
-  REAL(r64)    :: HeatRate                      =0.0
-  REAL(r64)    :: CoolRate                      =0.0
-  REAL(r64)    :: HeatEnergy                    =0.0
-  REAL(r64)    :: CoolEnergy                    =0.0
+  REAL(r64)    :: HeatRate                      =0.0d0
+  REAL(r64)    :: CoolRate                      =0.0d0
+  REAL(r64)    :: HeatEnergy                    =0.0d0
+  REAL(r64)    :: CoolEnergy                    =0.0d0
 END TYPE DirectAirProps
 
 
@@ -404,7 +404,7 @@ SUBROUTINE InitDirectAir(DirectAirNum,FirstHVACIteration)
 
     Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%MassFlowRateMax = &
                                    DirectAir(DirectAirNum)%AirMassFlowRateMax
-    Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%MassFlowRateMin = 0.0
+    Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%MassFlowRateMin = 0.0d0
 
     MyEnvrnFlag(DirectAirNum) = .FALSE.
   END IF
@@ -417,24 +417,24 @@ SUBROUTINE InitDirectAir(DirectAirNum,FirstHVACIteration)
   ZoneNode = DirectAir(DirectAirNum)%ZoneSupplyAirNode
   IF (FirstHVACIteration) THEN
      !The first time through set the mass flow rate to the Max
-    IF ((Node(ZoneNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-       (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr) .gt. 0.0)) THEN
+    IF ((Node(ZoneNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+       (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr) .gt. 0.0d0)) THEN
       IF (.NOT. (SimulateAirflowNetwork .GT. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated)) THEN
        Node(ZoneNode)%MassFlowRate = DirectAir(DirectAirNum)%AirMassFlowRateMax
         Node(ZoneNode)%MassFlowRateMaxAvail = DirectAir(DirectAirNum)%AirMassFlowRateMax
         IF (DirectAir(DirectAirNum)%EMSOverrideAirFlow) &
             Node(ZoneNode)%MassFlowRate = DirectAir(DirectAirNum)%EMSMassFlowRateValue
       ENDIF
-      Node(ZoneNode)%MassFlowRateMinAvail = 0.0
+      Node(ZoneNode)%MassFlowRateMinAvail = 0.0d0
     ELSE
-      Node(ZoneNode)%MassFlowRate = 0.0
-      Node(ZoneNode)%MassFlowRateMaxAvail = 0.0
+      Node(ZoneNode)%MassFlowRate = 0.0d0
+      Node(ZoneNode)%MassFlowRateMaxAvail = 0.0d0
     END IF
   ELSE
   !When not FirstHCAVIteration
     IF (.NOT. DirectAir(DirectAirNum)%EMSOverrideAirFlow) THEN
-      IF ((Node(ZoneNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-         (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr) > 0.0)) THEN
+      IF ((Node(ZoneNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr) > 0.0d0)) THEN
         IF (Node(ZoneNode)%MassFlowRateMaxAvail < Node(ZoneNode)%MassFlowRateMax) THEN
           Node(ZoneNode)%MassFlowRate = Node(ZoneNode)%MassFlowRateMaxAvail
         ELSE IF (Node(ZoneNode)%MassFlowRateMinAvail > Node(ZoneNode)%MassFlowRateMin) THEN
@@ -443,8 +443,8 @@ SUBROUTINE InitDirectAir(DirectAirNum,FirstHVACIteration)
           Node(ZoneNode)%MassFlowRate = Node(ZoneNode)%MassFlowRateMaxAvail
         END IF
       ELSE
-        Node(ZoneNode)%MassFlowRate = 0.0
-        Node(ZoneNode)%MassFlowRateMaxAvail = 0.0
+        Node(ZoneNode)%MassFlowRate = 0.0d0
+        Node(ZoneNode)%MassFlowRateMaxAvail = 0.0d0
       END IF
     ELSE ! EMS override on
       Node(ZoneNode)%MassFlowRate = DirectAir(DirectAirNum)%EMSMassFlowRateValue
@@ -459,10 +459,10 @@ SUBROUTINE InitDirectAir(DirectAirNum,FirstHVACIteration)
   END IF
 
  !Set reporting varialbes to zero for the Direct Air Output
- DirectAir(DirectAirNum)%HeatRate = 0.0
- DirectAir(DirectAirNum)%CoolRate = 0.0
- DirectAir(DirectAirNum)%HeatEnergy = 0.0
- DirectAir(DirectAirNum)%CoolEnergy = 0.0
+ DirectAir(DirectAirNum)%HeatRate = 0.0d0
+ DirectAir(DirectAirNum)%CoolRate = 0.0d0
+ DirectAir(DirectAirNum)%HeatEnergy = 0.0d0
+ DirectAir(DirectAirNum)%CoolEnergy = 0.0d0
 
 
   RETURN
@@ -474,7 +474,7 @@ SUBROUTINE SizeDirectAir(DirectAirNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   January 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries 
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -491,6 +491,7 @@ SUBROUTINE SizeDirectAir(DirectAirNum)
   USE DataSizing
   USE InputProcessor
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -507,24 +508,63 @@ SUBROUTINE SizeDirectAir(DirectAirNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          ! na
+  REAL(r64)  :: MaxAirVolFlowRateDes   ! Design maximum air volume flow rate for reporting
+  REAL(r64)  :: MaxAirVolFlowRateUser  ! User hard-sized maximum air volume flow rate for reporting
+  LOGICAL    :: IsAutosize           ! Indicator to autosizing max air flow rate
+  LOGICAL    :: SizingDesRunThisZone
+  
+  IsAutosize = .FALSE.
+  MaxAirVolFlowRateDes = 0.0d0
+  MaxAirVolFlowRateUser = 0.0d0
+  SizingDesRunThisZone = .FALSE.
 
-  IF (DirectAir(DirectAirNum)%MaxAirVolFlowRate == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(TRIM(DirectAir(DirectAirNum)%cObjectName), DirectAir(DirectAirNum)%EquipID)
-      DirectAir(DirectAirNum)%MaxAirVolFlowRate = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                                      TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (DirectAir(DirectAirNum)%MaxAirVolFlowRate < SmallAirVolFlow) THEN
-        DirectAir(DirectAirNum)%MaxAirVolFlowRate = 0.0
-      END IF
-      CALL ReportSizingOutput(TRIM(DirectAir(DirectAirNum)%cObjectName), DirectAir(DirectAirNum)%EquipID, &
-                              'Maximum Air Flow Rate [m3/s]', DirectAir(DirectAirNum)%MaxAirVolFlowRate)
-
+  IF (CurZoneEqNum > 0) THEN
+      
+    IF (DirectAir(DirectAirNum)%MaxAirVolFlowRate == AutoSize) THEN  
+      IsAutosize = .TRUE.
     END IF
+    CALL CheckThisZoneForSizing(CurZoneEqNum, SizingDesRunThisZone)
 
-  END IF
+        ! Check if all are hard-sized
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisZone) THEN ! simulation should continue   
+      IF (DirectAir(DirectAirNum)%MaxAirVolFlowRate > 0.0d0) THEN  
+        CALL ReportSizingOutput(TRIM(DirectAir(DirectAirNum)%cObjectName), DirectAir(DirectAirNum)%EquipID, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', DirectAir(DirectAirNum)%MaxAirVolFlowRate)
+      END IF  
+    ELSE ! Autosize or hard-size with design run      
+      CALL CheckZoneSizing(TRIM(DirectAir(DirectAirNum)%cObjectName), DirectAir(DirectAirNum)%EquipID)      
+      MaxAirVolFlowRateDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                                  TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)      
+      IF (MaxAirVolFlowRateDes < SmallAirVolFlow) THEN
+      MaxAirVolFlowRateDes = 0.0d0
+      END IF  
+      IF (IsAutoSize) THEN      
+        DirectAir(DirectAirNum)%MaxAirVolFlowRate = MaxAirVolFlowRateDes
+        CALL ReportSizingOutput(DirectAir(DirectAirNum)%cObjectName, DirectAir(DirectAirNum)%EquipID, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateDes)
+      ELSE ! Hard-size with sizing data
+        IF (DirectAir(DirectAirNum)%MaxAirVolFlowRate > 0.0d0 .AND. MaxAirVolFlowRateDes > 0.0d0 &
+          .AND. SizingDesRunThisZone) THEN
+          MaxAirVolFlowRateUser = DirectAir(DirectAirNum)%MaxAirVolFlowRate
+          CALL ReportSizingOutput(DirectAir(DirectAirNum)%cObjectName, DirectAir(DirectAirNum)%EquipID, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateDes,  &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowRateDes - MaxAirVolFlowRateUser)/MaxAirVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeDirectAir: Potential issue with equipment sizing for AirTerminal:SingleDuct:Uncontrolled="' &
+                                     //    TRIM(DirectAir(DirectAirNum)%EquipID)//'".')
+              CALL ShowContinueError('User-Specified Maximum Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowRateUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowRateDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            ENDIF
+          ENDIF
+        END IF          
+      END IF
+    END IF
+  END IF  
 
   RETURN
 
@@ -584,7 +624,7 @@ SUBROUTINE CalcDirectAir(DirectAirNum,ControlledZoneNum,SensOutputProvided,LatOu
 
   MassFlowRate = Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%MassFlowRate
 
-  IF (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr).GT.0. &
+  IF (GetCurrentScheduleValue(DirectAir(DirectAirNum)%SchedPtr).GT. 0.0d0 &
       .AND. MassFlowRate.GT.SmallMassFlow) THEN
 
 !  Change this later ... should be using minimum humidity ratio in the calculation of enthalpy
@@ -597,8 +637,8 @@ SUBROUTINE CalcDirectAir(DirectAirNum,ControlledZoneNum,SensOutputProvided,LatOu
                                             Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat))
 
 !   CR9155 Remove specific humidity calculations
-    SpecHumOut = Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%HumRat 
-    SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat 
+    SpecHumOut = Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%HumRat
+    SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat
 
     LatOutputProvided = MassFlowRate * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s
 

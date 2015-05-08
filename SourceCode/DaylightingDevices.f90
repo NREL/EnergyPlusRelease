@@ -172,9 +172,9 @@ SUBROUTINE InitDaylightingDevices
 
           ! DERIVED TYPE DEFINITIONS:
   TYPE TDDPipeStoredData
-    REAL(r64)                    :: AspectRatio = 0.0 ! Aspect ratio, length / diameter
-    REAL(r64)                    :: Reflectance = 0.0 ! Reflectance of surface
-    REAL(r64), DIMENSION(NumOfAngles) :: TransBeam = 0.0   ! Table of beam transmittance vs. cosine angle
+    REAL(r64)                    :: AspectRatio = 0.0d0 ! Aspect ratio, length / diameter
+    REAL(r64)                    :: Reflectance = 0.0d0 ! Reflectance of surface
+    REAL(r64), DIMENSION(NumOfAngles) :: TransBeam = 0.0d0   ! Table of beam transmittance vs. cosine angle
   END TYPE TDDPipeStoredData
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
@@ -203,8 +203,8 @@ SUBROUTINE InitDaylightingDevices
   IF (NumOfTDDPipes > 0) THEN
     CALL DisplayString('Initializing Tubular Daylighting Devices')
     ! Setup COSAngle list for all TDDs
-    COSAngle(1) = 0.0
-    COSAngle(NumOfAngles) = 1.0
+    COSAngle(1) = 0.0d0
+    COSAngle(NumOfAngles) = 1.0d0
 
     dTheta = 90.0d0 * DegToRadians / (NumOfAngles - 1.0d0)
     Theta = 90.0d0 * DegToRadians
@@ -218,8 +218,8 @@ SUBROUTINE InitDaylightingDevices
     DO PipeNum = 1, NumOfTDDPipes
       ! Initialize optical properties
       TDDPipe(PipeNum)%AspectRatio = TDDPipe(PipeNum)%TotLength/TDDPipe(PipeNum)%Diameter
-      TDDPipe(PipeNum)%ReflectVis = 1.0 - Construct(TDDPipe(PipeNum)%Construction)%InsideAbsorpVis
-      TDDPipe(PipeNum)%ReflectSol = 1.0 - Construct(TDDPipe(PipeNum)%Construction)%InsideAbsorpSolar
+      TDDPipe(PipeNum)%ReflectVis = 1.0d0 - Construct(TDDPipe(PipeNum)%Construction)%InsideAbsorpVis
+      TDDPipe(PipeNum)%ReflectSol = 1.0d0 - Construct(TDDPipe(PipeNum)%Construction)%InsideAbsorpSolar
 
       ! Calculate the beam transmittance table for visible and solar spectrum
       ! First time thru use the visible reflectance
@@ -243,11 +243,11 @@ SUBROUTINE InitDaylightingDevices
           TDDPipeStored(NumStored)%Reflectance = Reflectance
 
           ! Set beam transmittances for 0 and 90 degrees
-          TDDPipeStored(NumStored)%TransBeam(1) = 0.0
-          TDDPipeStored(NumStored)%TransBeam(NumOfAngles) = 1.0
+          TDDPipeStored(NumStored)%TransBeam(1) = 0.0d0
+          TDDPipeStored(NumStored)%TransBeam(NumOfAngles) = 1.0d0
 
           ! Calculate intermediate beam transmittances between 0 and 90 degrees
-          Theta = 90.0 * DegToRadians
+          Theta = 90.0d0 * DegToRadians
           DO AngleNum = 2, NumOfAngles - 1
             Theta = Theta - dTheta
             TDDPipeStored(NumStored)%TransBeam(AngleNum) = CalcPipeTransBeam(Reflectance, TDDPipe(PipeNum)%AspectRatio, Theta)
@@ -272,7 +272,7 @@ SUBROUTINE InitDaylightingDevices
       TDDPipe(PipeNum)%TransSolHorizon = CalcTDDTransSolHorizon(PipeNum)
 
       ! Initialize thermal properties
-      SumTZoneLengths=0.0
+      SumTZoneLengths= 0.0d0
       DO TZoneNum = 1, TDDPipe(PipeNum)%NumOfTZones
         SumTZoneLengths = SumTZoneLengths + TDDPipe(PipeNum)%TZoneLength(TZoneNum)
 
@@ -321,17 +321,17 @@ SUBROUTINE InitDaylightingDevices
     ShelfSurf = Shelf(ShelfNum)%InSurf
     IF (ShelfSurf > 0) THEN
       ! Double surface area so that both sides of the shelf are treated as internal mass
-      Surface(ShelfSurf)%Area = 2.0 * Surface(ShelfSurf)%Area
+      Surface(ShelfSurf)%Area = 2.0d0* Surface(ShelfSurf)%Area
     END IF
 
     ShelfSurf = Shelf(ShelfNum)%OutSurf
     IF (ShelfSurf > 0) THEN
-      Shelf(ShelfNum)%OutReflectVis = 1.0 - Construct(Shelf(ShelfNum)%Construction)%OutsideAbsorpVis
-      Shelf(ShelfNum)%OutReflectSol = 1.0 - Construct(Shelf(ShelfNum)%Construction)%OutsideAbsorpSolar
+      Shelf(ShelfNum)%OutReflectVis = 1.0d0 - Construct(Shelf(ShelfNum)%Construction)%OutsideAbsorpVis
+      Shelf(ShelfNum)%OutReflectSol = 1.0d0 - Construct(Shelf(ShelfNum)%Construction)%OutsideAbsorpSolar
 
       IF (Shelf(ShelfNum)%ViewFactor < 0) CALL CalcViewFactorToShelf(ShelfNum)
 
-      IF (Shelf(ShelfNum)%ViewFactor + Surface(WinSurf)%ViewFactorSky + Surface(WinSurf)%ViewFactorGround > 1.0) THEN
+      IF (Shelf(ShelfNum)%ViewFactor + Surface(WinSurf)%ViewFactorSky + Surface(WinSurf)%ViewFactorGround > 1.0d0) THEN
         CALL ShowWarningError('DaylightingDevice:Shelf = '//TRIM(Shelf(ShelfNum)%Name)// &
           ':  Window view factors to sky ['//trim(RoundSigDigits(Surface(WinSurf)%ViewFactorSky,2))//'],')
         CALL ShowContinueError('ground ['//trim(RoundSigDigits(Surface(WinSurf)%ViewFactorGround,2))//  &
@@ -469,6 +469,11 @@ SUBROUTINE GetTDDInput
           ErrorsFound = .TRUE.
         END IF
 
+        IF (Construct(Surface(SurfNum)%Construction)%WindowTypeEQL) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
+            ':  Dome '//TRIM(cAlphaArgs(2))//' Equivalent Layer Window is not supported.')
+          ErrorsFound = .TRUE.
+        ENDIF
         ! Window multiplier is already handled in SurfaceGeometry.f90
 
         IF (.NOT. Surface(SurfNum)%ExtSolar) THEN
@@ -542,6 +547,12 @@ SUBROUTINE GetTDDInput
             ':  Diffuser '//TRIM(cAlphaArgs(3))//' must not have a frame/divider.')
           ErrorsFound = .TRUE.
         END IF
+
+        IF (Construct(Surface(SurfNum)%Construction)%WindowTypeEQL) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
+            ':  Diffuser '//TRIM(cAlphaArgs(2))//' Equivalent Layer Window is not supported.')
+          ErrorsFound = .TRUE.
+        ENDIF
 
         ! Window multiplier is already handled in SurfaceGeometry.f90
 
@@ -740,6 +751,13 @@ SUBROUTINE GetShelfInput
             ':  Window '//TRIM(cAlphaArgs(2))//' must have 4 sides.')
           ErrorsFound = .TRUE.
         END IF
+        !
+        IF (Construct(Surface(SurfNum)%Construction)%WindowTypeEQL) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
+            ':  Window '//TRIM(cAlphaArgs(2))//' Equivalent Layer Window is not supported.')
+          ErrorsFound = .TRUE.
+        ENDIF
+
 
         Shelf(ShelfNum)%Window = SurfNum
         Surface(SurfNum)%Shelf = ShelfNum
@@ -828,12 +846,12 @@ SUBROUTINE GetShelfInput
           IF (NumNumbers > 0) THEN
             Shelf(ShelfNum)%ViewFactor = rNumericArgs(1)
 
-            IF (rNumericArgs(1) == 0.0) THEN
+            IF (rNumericArgs(1) == 0.0d0) THEN
               CALL ShowWarningError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
                 ':  View factor to outside shelf is zero.  Shelf does not reflect on window.')
             END IF
           ELSE
-            Shelf(ShelfNum)%ViewFactor = -1.0 ! Flag to have the view factor calculated during initialization
+            Shelf(ShelfNum)%ViewFactor = -1.0d0! Flag to have the view factor calculated during initialization
           END IF
 
           Shelf(ShelfNum)%OutSurf = SurfNum
@@ -910,9 +928,9 @@ REAL(r64) FUNCTION CalcPipeTransBeam(R, A, Theta)
   REAL(r64)       :: xLimit       ! Limiting x value to prevent floating point underflow
 
           ! FLOW:
-  CalcPipeTransBeam = 0.0
+  CalcPipeTransBeam = 0.0d0
 
-  T = 0.0
+  T = 0.0d0
   i = 1.0d0 / N
 
   xLimit = (LOG(N**2.0d0*myLocalTiny)/LOG(R))/xTol
@@ -932,7 +950,7 @@ REAL(r64) FUNCTION CalcPipeTransBeam(R, A, Theta)
     s = s + i
   END DO
 
-  T = T / (N - 1.0) ! - 1.0, because started on i, not 0
+  T = T / (N - 1.0d0) ! - 1.0, because started on i, not 0
 
   CalcPipeTransBeam = T
 
@@ -987,8 +1005,8 @@ REAL(r64) FUNCTION CalcTDDTransSolIso(PipeNum)
   REAL(r64)           :: P          ! Angular distribution function
 
           ! FLOW:
-  FluxInc = 0.0
-  FluxTrans = 0.0
+  FluxInc = 0.0d0
+  FluxTrans = 0.0d0
 
   ! Integrate from 0 to Pi/2 altitude
   dPH = 90.0d0 * DegToRadians / NPH
@@ -1063,8 +1081,8 @@ REAL(r64) FUNCTION CalcTDDTransSolHorizon(PipeNum)
   REAL(r64)           :: COSI       ! Cosine of the incident angle
 
           ! FLOW:
-  FluxInc = 0.0
-  FluxTrans = 0.0
+  FluxInc = 0.0d0
+  FluxTrans = 0.0d0
 
   CosPhi = COS(PiOvr2 - Surface(TDDPipe(PipeNum)%Dome)%Tilt * DegToRadians)
   Theta = Surface(TDDPipe(PipeNum)%Dome)%Azimuth * DegToRadians
@@ -1091,7 +1109,7 @@ REAL(r64) FUNCTION CalcTDDTransSolHorizon(PipeNum)
     CalcTDDTransSolHorizon = FluxTrans / FluxInc
 
   ELSE ! Dome is nearly horizontal and has almost no view of the horizon
-    CalcTDDTransSolHorizon = 0.0 ! = TransTDD(PipeNum, ???, SolarBeam) ! Could change to an angle near the horizon
+    CalcTDDTransSolHorizon = 0.0d0 ! = TransTDD(PipeNum, ???, SolarBeam) ! Could change to an angle near the horizon
   END IF
 
   RETURN
@@ -1226,7 +1244,7 @@ RECURSIVE REAL(r64) FUNCTION TransTDD(PipeNum, COSI, RadiationType)
   REAL(r64)                     :: transDiff
 
           ! FLOW:
-  TransTDD = 0.0
+  TransTDD = 0.0d0
 
   ! Get constructions of each TDD component
   constDome = Surface(TDDPipe(PipeNum)%Dome)%Construction
@@ -1290,7 +1308,7 @@ REAL(r64) FUNCTION InterpolatePipeTransBeam(COSI, transBeam)
   REAL(r64)                                :: m, b
 
           ! FLOW:
-  InterpolatePipeTransBeam = 0.0
+  InterpolatePipeTransBeam = 0.0d0
 
   ! Linearly interpolate transBeam/COSAngle table to get value at current cosine of the angle
   Lo = FindArrayIndex(COSI, COSAngle)
@@ -1302,7 +1320,7 @@ REAL(r64) FUNCTION InterpolatePipeTransBeam(COSI, transBeam)
 
     InterpolatePipeTransBeam = m * COSI + b
   ELSE
-    InterpolatePipeTransBeam = 0.0
+    InterpolatePipeTransBeam = 0.0d0
   END IF
 
   RETURN
@@ -1483,7 +1501,7 @@ SUBROUTINE CalcViewFactorToShelf(ShelfNum)
   NumMatch = 0
   DO VWin = 1, 4
     DO VShelf = 1, 4
-      IF (Distance(Surface(Shelf(ShelfNum)%Window)%Vertex(VWin), Surface(Shelf(ShelfNum)%OutSurf)%Vertex(VShelf)) == 0.0) &
+      IF (Distance(Surface(Shelf(ShelfNum)%Window)%Vertex(VWin), Surface(Shelf(ShelfNum)%OutSurf)%Vertex(VShelf)) == 0.0d0) &
         NumMatch = NumMatch + 1
     END DO
   END DO
@@ -1505,7 +1523,7 @@ SUBROUTINE CalcViewFactorToShelf(ShelfNum)
   E3 = ((M**2) * (1.0d0 + M**2 + N**2) / ((1.0d0 + M**2) * (M**2 + N**2)))**(M**2)
   E4 = ((N**2) * (1.0d0 + M**2 + N**2) / ((1.0d0 + N**2) * (M**2 + N**2)))**(N**2)
 
-  Shelf(ShelfNum)%ViewFactor = (1.0 / (Pi * M)) * (E1 + 0.25d0 * LOG(E2 * E3 * E4))
+  Shelf(ShelfNum)%ViewFactor = (1.0d0 / (Pi * M)) * (E1 + 0.25d0 * LOG(E2 * E3 * E4))
 
   RETURN
 

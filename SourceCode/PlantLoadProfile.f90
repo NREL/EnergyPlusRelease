@@ -38,24 +38,24 @@ TYPE PlantProfileData
   LOGICAL                      :: Init = .TRUE.            ! Flag for initialization:  TRUE means do the init
   LOGICAL                      :: InitSizing = .TRUE.      ! Flag for initialization of plant sizing
   INTEGER                      :: InletNode = 0
-  REAL(r64)                    :: InletTemp = 0.0          ! Inlet temperature (C)
+  REAL(r64)                    :: InletTemp = 0.0d0          ! Inlet temperature (C)
   INTEGER                      :: OutletNode = 0
-  REAL(r64)                    :: OutletTemp = 0.0         ! Outlet temperature (C)
+  REAL(r64)                    :: OutletTemp = 0.0d0         ! Outlet temperature (C)
   INTEGER                      :: LoadSchedule = 0         ! Pointer to schedule object
   LOGICAL                      :: EMSOverridePower  = .FALSE. ! if true, then EMS is calling to override power level
   REAL(r64)                    :: EMSPowerValue  = 0.0D0  ! value EMS is directing to use for power [W]
-  REAL(r64)                    :: PeakVolFlowRate = 0.0    ! Peak volumetric flow rate, also water consumption rate (m3/s)
+  REAL(r64)                    :: PeakVolFlowRate = 0.0d0    ! Peak volumetric flow rate, also water consumption rate (m3/s)
   INTEGER                      :: FlowRateFracSchedule = 0 ! Pointer to schedule object
-  REAL(r64)                    :: VolFlowRate = 0.0        ! Volumetric flow rate (m3/s)
-  REAL(r64)                    :: MassFlowRate = 0.0       ! Mass flow rate (kg/s)
+  REAL(r64)                    :: VolFlowRate = 0.0d0        ! Volumetric flow rate (m3/s)
+  REAL(r64)                    :: MassFlowRate = 0.0d0       ! Mass flow rate (kg/s)
   LOGICAL                      :: EMSOverrideMassFlow = .FALSE. !
   REAL(r64)                    :: EMSMassFlowValue    = 0.0D0 !
 
   ! Report variables
-  REAL(r64)                    :: Power = 0.0              ! Power required to meet the load (W)
-  REAL(r64)                    :: Energy = 0.0             ! Energy required to meet the load (J)
-  REAL(r64)                    :: HeatingEnergy = 0.0      ! Heating Energy required to meet the load (J)
-  REAL(r64)                    :: CoolingEnergy = 0.0      ! Cooling Energy required to meet the load (J)
+  REAL(r64)                    :: Power = 0.0d0              ! Power required to meet the load (W)
+  REAL(r64)                    :: Energy = 0.0d0             ! Energy required to meet the load (J)
+  REAL(r64)                    :: HeatingEnergy = 0.0d0      ! Heating Energy required to meet the load (J)
+  REAL(r64)                    :: CoolingEnergy = 0.0d0      ! Cooling Energy required to meet the load (J)
   LOGICAL                      :: SetLoopIndexFlag = .TRUE.
 END TYPE PlantProfileData
 
@@ -352,7 +352,7 @@ SUBROUTINE InitPlantProfile(ProfileNum )
     ! Clear node initial conditions
     !DSU? can we centralize these temperature inits
 !    Node(InletNode)%Temp = 0.0
-    Node(OutletNode)%Temp = 0.0
+    Node(OutletNode)%Temp = 0.0d0
 
     FluidDensityInit = GetDensityGlycol(PlantLoop(PlantProfile(ProfileNum)%WLoopNum)%FluidName,  &
                                   InitConvTemp, &
@@ -471,11 +471,11 @@ SUBROUTINE ReportPlantProfile(ProfileNum)
           ! FLOW:
   PlantProfile(ProfileNum)%Energy = PlantProfile(ProfileNum)%Power * TimeStepSys * SecInHour
 
-  IF (PlantProfile(ProfileNum)%Energy .GE. 0.0) THEN
+  IF (PlantProfile(ProfileNum)%Energy .GE. 0.0d0) THEN
     PlantProfile(ProfileNum)%HeatingEnergy = PlantProfile(ProfileNum)%Energy
-    PlantProfile(ProfileNum)%CoolingEnergy = 0.0
+    PlantProfile(ProfileNum)%CoolingEnergy = 0.0d0
   ELSE
-    PlantProfile(ProfileNum)%HeatingEnergy = 0.0
+    PlantProfile(ProfileNum)%HeatingEnergy = 0.0d0
     PlantProfile(ProfileNum)%CoolingEnergy = ABS(PlantProfile(ProfileNum)%Energy)
   ENDIF
 

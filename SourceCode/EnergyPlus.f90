@@ -620,7 +620,7 @@ USE DataSystemVariables
 !                                  parameter = found
 !                                  Set output string to start with non-blank character
 
-          DataOut=ADJUSTL(LINEOut(IEQ+1:))
+          DataOut=ADJUSTL(LINE(IEQ+1:))
           Found=.true.
           EXIT
 

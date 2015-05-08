@@ -38,14 +38,14 @@ PRIVATE
   ! DERIVED TYPE DEFINITIONS
 TYPE, PUBLIC :: SplitterConditions  ! public because USEd by SimAirServingZones and the Direct Air Unit
   CHARACTER(len=MaxNameLength) :: SplitterName=' '  ! Name of the Splitter
-  REAL(r64)    :: InletTemp=0.0
-  REAL(r64)    :: InletHumRat=0.0
-  REAL(r64)    :: InletEnthalpy=0.0
-  REAL(r64)    :: InletPressure=0.0
+  REAL(r64)    :: InletTemp=0.0d0
+  REAL(r64)    :: InletHumRat=0.0d0
+  REAL(r64)    :: InletEnthalpy=0.0d0
+  REAL(r64)    :: InletPressure=0.0d0
   INTEGER      :: InletNode=0
-  REAL(r64)    :: InletMassFlowRate=0.0  !MassFlow through the Splitter being Simulated [kg/Sec]
-  REAL(r64)    :: InletMassFlowRateMaxAvail=0.0  !Max Avail MassFlow through the Splitter being Simulated [kg/Sec]
-  REAL(r64)    :: InletMassFlowRateMinAvail=0.0  !Min Avail MassFlow through the Splitter being Simulated [kg/Sec]
+  REAL(r64)    :: InletMassFlowRate=0.0d0  !MassFlow through the Splitter being Simulated [kg/Sec]
+  REAL(r64)    :: InletMassFlowRateMaxAvail=0.0d0  !Max Avail MassFlow through the Splitter being Simulated [kg/Sec]
+  REAL(r64)    :: InletMassFlowRateMinAvail=0.0d0  !Min Avail MassFlow through the Splitter being Simulated [kg/Sec]
   INTEGER      :: NumOutletNodes=0
   INTEGER, DIMENSION(:), ALLOCATABLE :: OutletNode
   REAL(r64), DIMENSION(:), ALLOCATABLE    :: OutletMassFlowRate
@@ -269,7 +269,7 @@ SUBROUTINE GetSplitterInput
     ALLOCATE(lNumericBlanks(NumNums))
     lNumericBlanks=.TRUE.
     ALLOCATE(NumArray(NumNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
     DO SplitterNum = 1,  NumSplitters
       CALL GetObjectItem(CurrentModuleObject,SplitterNum,AlphArray,NumAlphas, &
@@ -299,9 +299,9 @@ SUBROUTINE GetSplitterInput
       ALLOCATE(SplitterCond(SplitterNum)%OutletEnthalpy(SplitterCond(SplitterNum)%NumOutletNodes))
       ALLOCATE(SplitterCond(SplitterNum)%OutletPressure(SplitterCond(SplitterNum)%NumOutletNodes))
 
-      SplitterCond(SplitterNum)%InletMassFlowRate = 0.0
-      SplitterCond(SplitterNum)%InletMassFlowRateMaxAvail = 0.0
-      SplitterCond(SplitterNum)%InletMassFlowRateMinAvail = 0.0
+      SplitterCond(SplitterNum)%InletMassFlowRate = 0.0d0
+      SplitterCond(SplitterNum)%InletMassFlowRateMaxAvail = 0.0d0
+      SplitterCond(SplitterNum)%InletMassFlowRateMinAvail = 0.0d0
 
       DO NodeNum = 1, SplitterCond(SplitterNum)%NumOutletNodes
 
@@ -459,14 +459,14 @@ SUBROUTINE InitAirLoopSplitter(SplitterNum, FirstHVACIteration, FirstCall)
   ! iteration through and the splitter first pass.  After the first iteration the ADU sets the
   ! correct flow and that is used and passed back upstream.
   IF (FirstHVACIteration .AND. FirstCall) THEN
-    IF(Node(InletNode)%MassFlowRate > 0.0) Then
+    IF(Node(InletNode)%MassFlowRate > 0.0d0) Then
      DO NodeNum = 1, SplitterCond(SplitterNum)%NumOutletNodes
        OutletNode = SplitterCond(SplitterNum)%OutletNode(NodeNum)
        Node(OutletNode)%MassFlowRate = Node(InletNode)%MassFlowRate/  &
                                        SplitterCond(SplitterNum)%NumOutletNodes
      END DO
     END IF
-    IF(Node(InletNode)%MassFlowRateMaxAvail > 0.0) Then
+    IF(Node(InletNode)%MassFlowRateMaxAvail > 0.0d0) Then
      DO NodeNum = 1, SplitterCond(SplitterNum)%NumOutletNodes
        OutletNode = SplitterCond(SplitterNum)%OutletNode(NodeNum)
        Node(OutletNode)%MassFlowRateMaxAvail = Node(InletNode)%MassFlowRateMaxAvail/  &
@@ -482,14 +482,14 @@ SUBROUTINE InitAirLoopSplitter(SplitterNum, FirstHVACIteration, FirstCall)
   ! for some operational or algorithm dependency.  This IF block should catch that condition
   ! and then pass the NO flow condition downstream to the waiting ADU's.  Most of the time
   ! this IF is jumped over.
-    IF(Node(InletNode)%MassFlowRateMaxAvail == 0.0) Then
+    IF(Node(InletNode)%MassFlowRateMaxAvail == 0.0d0) Then
 
        DO NodeNum = 1, SplitterCond(SplitterNum)%NumOutletNodes
 
          OutletNode = SplitterCond(SplitterNum)%OutletNode(NodeNum)
-         Node(OutletNode)%MassFlowRate = 0.0
-         Node(OutletNode)%MassFlowRateMaxAvail = 0.0
-         Node(OutletNode)%MassFlowRateMinAvail = 0.0
+         Node(OutletNode)%MassFlowRate = 0.0d0
+         Node(OutletNode)%MassFlowRateMaxAvail = 0.0d0
+         Node(OutletNode)%MassFlowRateMinAvail = 0.0d0
 
        END DO
     End IF !For Node inlet Max Avail = 0.0
@@ -590,9 +590,9 @@ SUBROUTINE CalcAirLoopSplitter(SplitterNum, FirstCall)
    ! summed and then assigned upstream to the inlet node.
    ! Overall Mass Continuity Equation to get inlet mass flow rates
    !Zero the inlet Totals before the Inlets are summed
-   SplitterCond(SplitterNum)%InletMassFlowRate         = 0.0
-   SplitterCond(SplitterNum)%InletMassFlowRateMaxAvail = 0.0
-   SplitterCond(SplitterNum)%InletMassFlowRateMinAvail = 0.0
+   SplitterCond(SplitterNum)%InletMassFlowRate         = 0.0d0
+   SplitterCond(SplitterNum)%InletMassFlowRateMaxAvail = 0.0d0
+   SplitterCond(SplitterNum)%InletMassFlowRateMinAvail = 0.0d0
 
    DO OutletNodeNum = 1, SplitterCond(SplitterNum)%NumOutletNodes
      SplitterCond(SplitterNum)%InletMassFlowRate = SplitterCond(SplitterNum)%InletMassFlowRate + &
@@ -803,15 +803,15 @@ FUNCTION GetSplitterOutletNumber(SplitterName,SplitterNum,ErrorsFound) RESULT(Sp
   Else
     WhichSplitter = SplitterNum
   End If
-  
+
   IF (WhichSplitter /= 0) THEN
-    SplitterOutletNumber = SplitterCond(WhichSplitter)%NumOutletNodes  
+    SplitterOutletNumber = SplitterCond(WhichSplitter)%NumOutletNodes
   ENDIF
 
   IF (WhichSplitter == 0) THEN
     CALL ShowSevereError('GetSplitterOuletNumber: Could not find Splitter = "'//TRIM(SplitterName)//'"')
     ErrorsFound=.true.
-    SplitterOutletNumber = 0  
+    SplitterOutletNumber = 0
   ENDIF
 
   RETURN
@@ -872,11 +872,11 @@ FUNCTION GetSplitterNodeNumbers(SplitterName,SplitterNum,ErrorsFound) RESULT(Spl
   Else
     WhichSplitter = SplitterNum
   End If
-  
+
   IF (WhichSplitter /= 0) THEN
     ALLOCATE(SplitterNodeNumbers(SplitterCond(WhichSplitter)%NumOutletNodes+2))
-    SplitterNodeNumbers(1) = SplitterCond(WhichSplitter)%InletNode  
-    SplitterNodeNumbers(2) = SplitterCond(WhichSplitter)%NumOutletNodes  
+    SplitterNodeNumbers(1) = SplitterCond(WhichSplitter)%InletNode
+    SplitterNodeNumbers(2) = SplitterCond(WhichSplitter)%NumOutletNodes
     Do I=1,SplitterNodeNumbers(2)
       SplitterNodeNumbers(i+2) = SplitterCond(WhichSplitter)%OutletNode(I)
     End Do

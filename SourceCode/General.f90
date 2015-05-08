@@ -203,8 +203,8 @@ RECURSIVE SUBROUTINE SolveRegulaFalsi(Eps, MaxIte, Flag, XRes, f, X_0, X_1, Par)
     IF (Cont) THEN
 
     ! reassign values (only if further iteration required)
-      IF ( Y0 < 0. ) THEN
-        IF ( YTemp < 0. ) THEN
+      IF ( Y0 < 0.0d0 ) THEN
+        IF ( YTemp < 0.0d0 ) THEN
           X0 = XTemp
           Y0 = YTemp
         ELSE
@@ -212,7 +212,7 @@ RECURSIVE SUBROUTINE SolveRegulaFalsi(Eps, MaxIte, Flag, XRes, f, X_0, X_1, Par)
           Y1 = YTemp
         END IF
       ELSE
-        IF ( YTemp < 0. ) THEN
+        IF ( YTemp < 0.0d0 ) THEN
           X1 = XTemp
           Y1 = YTemp
         ELSE
@@ -276,7 +276,7 @@ REAL(r64) :: locSwitchFac
 locSwitchFac = MIN(SwitchFac, 1.d0)
 locSwitchFac = MAX(locSwitchFac, 0.d0)
 
-InterpSw = (1.-locSwitchFac)*A + locSwitchFac*B
+InterpSw = (1.0d0-locSwitchFac)*A + locSwitchFac*B
 RETURN
 END FUNCTION InterpSw
 
@@ -320,7 +320,7 @@ REAL(r64) InterpFac      ! Interpolation factor
 INTEGER IAlpha      ! Profile angle index
 
 IF(ProfAng > PiOvr2 .OR. ProfAng < -PiOvr2) THEN
-  InterpBlind = 0.0
+  InterpBlind = 0.0d0
 ELSE
   IAlpha = 1 + INT((ProfAng+PiOvr2)/DeltaAngRad)
   InterpFac = (ProfAng - (-PiOvr2 + DeltaAngRad*(IAlpha-1)))/DeltaAngRad
@@ -363,11 +363,11 @@ INTEGER IAlpha      ! Profile angle index
 
 ! DeltaAng = Pi/36
 IF(ProfAng > PiOvr2 .OR. ProfAng < -PiOvr2) THEN
-  InterpProfAng = 0.0
+  InterpProfAng = 0.0d0
 ELSE
   IAlpha = 1 + INT((ProfAng+PiOvr2)/DeltaAngRad)
   InterpFac = (ProfAng - (-PiOvr2 + DeltaAngRad*(IAlpha-1)))/DeltaAngRad
-  InterpProfAng = (1-InterpFac)*PropArray(IAlpha) + InterpFac*PropArray(IAlpha+1)
+  InterpProfAng = (1.0d0-InterpFac)*PropArray(IAlpha) + InterpFac*PropArray(IAlpha+1)
 END IF
 RETURN
 END FUNCTION InterpProfAng
@@ -408,7 +408,7 @@ REAL(r64) InterpFac      ! Interpolation factor
 INTEGER IBeta       ! Slat angle index
 REAL(r64) SlatAng1
 
-IF(SlatAng > Pi .OR. SlatAng < 0.0) THEN
+IF(SlatAng > Pi .OR. SlatAng < 0.0d0) THEN
 !  InterpSlatAng = 0.0
 !  RETURN
 !END IF
@@ -472,7 +472,7 @@ REAL(r64) ValA,ValB      ! Property values at given SlatAngle to be interpolated
 REAL(r64) SlatAng1
 REAL(r64) ProfAng1
 
-IF(SlatAng > Pi .OR. SlatAng < 0.0 .OR. ProfAng > PiOvr2 .OR. ProfAng < -PiOvr2) THEN
+IF(SlatAng > Pi .OR. SlatAng < 0.0d0 .OR. ProfAng > PiOvr2 .OR. ProfAng < -PiOvr2) THEN
 !  InterpProfSlatAng = 0.0
 !  RETURN
   SlatAng1 = MIN(MAX(SlatAng,0.0d0),PI)
@@ -548,25 +548,25 @@ REAL(r64) CosProfAng     ! Cosine of profile angle
 CosProfAng = COS(ProfAng)
 gamma = SlatAng - ProfAng
 wbar = SlatSeparation
-IF(CosProfAng /= 0.0) wbar = SlatWidth * COS(gamma)/CosProfAng
-BlindBeamBeamTrans = MAX(0.0d0,1.-ABS(wbar/SlatSeparation))
+IF(CosProfAng /= 0.0d0) wbar = SlatWidth * COS(gamma)/CosProfAng
+BlindBeamBeamTrans = MAX(0.0d0,1.0d0-ABS(wbar/SlatSeparation))
 
-IF(BlindBeamBeamTrans > 0.) THEN
+IF(BlindBeamBeamTrans > 0.0d0) THEN
 
   ! Correction factor that accounts for finite thickness of slats. It is used to modify the
   ! blind transmittance to account for reflection and absorption by the slat edges.
   ! fEdge is ratio of area subtended by edge of slat to area between tops of adjacent slats.
 
-  fEdge  = 0.
-  fEdge1 = 0.
+  fEdge  = 0.0d0
+  fEdge1 = 0.0d0
   IF(ABS(SIN(gamma))>0.01d0) THEN
-    IF((SlatAng > 0.0 .AND. SlatAng <= PiOvr2 .AND. ProfAng <= SlatAng) .OR. &
+    IF((SlatAng > 0.0d0 .AND. SlatAng <= PiOvr2 .AND. ProfAng <= SlatAng) .OR. &
        (SlatAng > PiOvr2 .AND. SlatAng <= Pi .AND. ProfAng > -(Pi-SlatAng))) &
       fEdge1 = SlatThickness * ABS(SIN(gamma)) / &
                   ((SlatSeparation + SlatThickness/ABS(SIN(SlatAng)))*CosProfAng)
     fEdge = MIN(1.0d0,ABS(fEdge1))
   END IF
-  BlindBeamBeamTrans = BlindBeamBeamTrans * (1.-fEdge)
+  BlindBeamBeamTrans = BlindBeamBeamTrans * (1.0d0-fEdge)
 
 END IF
 
@@ -611,8 +611,8 @@ REAL(r64), DIMENSION(6), INTENT(IN)  :: A   ! Polynomial coefficients
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
           ! na
 
-IF(X < 0.0 .OR. X > 1.0) THEN
-  POLYF = 0.
+IF(X < 0.0d0 .OR. X > 1.0d0) THEN
+  POLYF = 0.0d0
 ELSE
   POLYF = X*(A(1)+X*(A(2)+X*(A(3)+X*(A(4)+X*(A(5)+X*A(6))))))
 END IF
@@ -744,6 +744,8 @@ FUNCTION rTrimSigDigits(RealValue,SigDigits) RESULT(OutputString)
           ! USE STATEMENTS:
           ! na
 
+  !USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY : IEEE_IS_NAN ! Use IEEE_IS_NAN when GFortran supports it
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
@@ -768,7 +770,7 @@ FUNCTION rTrimSigDigits(RealValue,SigDigits) RESULT(OutputString)
   CHARACTER(len=10) EString    ! E string retained from original string
   LOGICAL IncludeDot           ! True when decimal point output
 
-  IF (RealValue /= 0.0) THEN
+  IF (RealValue /= 0.0d0) THEN
     WRITE(String,*) RealValue
   ELSE
     String='0.000000000000000000000000000'
@@ -792,7 +794,7 @@ FUNCTION rTrimSigDigits(RealValue,SigDigits) RESULT(OutputString)
   ELSE
     String=String(1:DotPos-1)
   ENDIF
-  IF (IsNAN(RealValue)) THEN
+  IF (ISNAN(RealValue)) THEN ! Use IEEE_IS_NAN when GFortran supports it
     String='NAN'
   ENDIF
   OutputString=ADJUSTL(String)
@@ -871,6 +873,8 @@ FUNCTION rRoundSigDigits(RealValue,SigDigits) RESULT(OutputString)
           ! USE STATEMENTS:
           ! na
 
+  !USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY : IEEE_IS_NAN ! Use IEEE_IS_NAN when GFortran supports it
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
@@ -902,7 +906,7 @@ FUNCTION rRoundSigDigits(RealValue,SigDigits) RESULT(OutputString)
   CHARACTER(len=1) Char2Rep    ! Character (digit) to be replaced
   LOGICAL IncludeDot           ! True when decimal point output
 
-  IF (RealValue /= 0.0) THEN
+  IF (RealValue /= 0.0d0) THEN
     WRITE(String,*) RealValue
   ELSE
     String='0.000000000000000000000000000'
@@ -966,7 +970,7 @@ FUNCTION rRoundSigDigits(RealValue,SigDigits) RESULT(OutputString)
   ELSE
     String=String(1:DotPos-1)
   ENDIF
-  IF (IsNAN(RealValue)) THEN
+  IF (ISNAN(RealValue)) THEN ! Use IEEE_IS_NAN when GFortran supports it
     String='NAN'
   ENDIF
   OutputString=ADJUSTL(String)
@@ -1131,7 +1135,7 @@ SUBROUTINE MovingAvg(DataIn,NumDataItems,NumItemsInAvg,SmoothedData)
     TempData(i) = DataIn(i)
     TempData(NumDataItems+i) = DataIn(i)
     TempData(2*NumDataItems+i) = DataIn(i)
-    SmoothedData(i) = 0.0
+    SmoothedData(i) = 0.0d0
   END DO
 
   DO i=1,NumDataItems
@@ -1988,7 +1992,7 @@ SUBROUTINE ITERATE(ResultX,Tol,X0,Y0,X1,Y1,Iter,Cnvg)
 
           ! Check for convergence by comparing change in X
       IF (Iter .ne. 1) THEN
-        IF (ABS(X0-X1) .LT. Tol .OR. Y0 .EQ. 0.) THEN
+        IF (ABS(X0-X1) .LT. Tol .OR. Y0 .EQ. 0.0d0) THEN
           ResultX = X0
           Cnvg=1
           RETURN
@@ -2001,7 +2005,7 @@ SUBROUTINE ITERATE(ResultX,Tol,X0,Y0,X1,Y1,Iter,Cnvg)
 
           ! New guess is specified by Perturb
         IF (ABS(X0) .GT. small) THEN
-          ResultX = X0*(1.+Perturb)
+          ResultX = X0*(1.0d0+Perturb)
         ELSE
           ResultX = Perturb
         ENDIF
@@ -2608,7 +2612,7 @@ END SUBROUTINE EncodeMonDayHrMin
             ! na
 
             ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-    REAL(r64)         :: Remainder = 0.0
+    REAL(r64)         :: Remainder = 0.0d0
 
 
     ! Get number of hours
@@ -2616,13 +2620,13 @@ END SUBROUTINE EncodeMonDayHrMin
     Hours = INT( Time/HourToSec )
 
     ! Compute remainder in seconds
-    Remainder = (Time - Hours*3600)
+    Remainder = (Time - Hours*3600.0d0)
 
     ! Correct number of hours whenever Remainder >= 60 to fix round-off errors
     ! E.g., Time = 2.0 would return Hours=1 and Minutes=60 instead of Hours=2!
-    DO WHILE ( ANINT(Remainder/MinToSec,r64) .GE. 60.0 )
+    DO WHILE ( ANINT(Remainder/MinToSec,r64) .GE. 60.0d0 )
       Hours = Hours + 1
-      Remainder = (Time - Hours*3600)
+      Remainder = (Time - Hours*3600.0d0)
     END DO
 
 
@@ -2630,12 +2634,12 @@ END SUBROUTINE EncodeMonDayHrMin
     Minutes = INT(Remainder/MinToSec)
 
     ! Compute remainder in seconds
-    Remainder = (Time - Hours*3600 - Minutes*60)
+    Remainder = (Time - Hours*3600.0d0 - Minutes*60.0d0)
 
     ! Correct number of minutes whenever Remainder >= 60 to fix round-off errors
-    DO WHILE ( ANINT(Remainder,r64) .GE. 60.0 )
+    DO WHILE ( ANINT(Remainder,r64) .GE. 60.0d0 )
       Minutes = Minutes + 1
-      Remainder = (Time - Hours*3600 - Minutes*60)
+      Remainder = (Time - Hours*3600.0d0 - Minutes*60.0d0)
     END DO
 
     ! Compute seconds
@@ -2968,7 +2972,7 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 !     DoReport=SchRpt
 !      IF (PRESENT(Option1)) Option1=SchRptOption
     CASE ('SURFACES')
-      SELECT CASE (MakeUPPERCase(ReportKey))
+      SELECT CASE (MakeUPPERCase(ReportKey)) !Objexx:OPTIONAL ReportKey used without PRESENT check
         CASE ('COSTINFO')
           DoReport=CostInfo
         CASE ('DXF')

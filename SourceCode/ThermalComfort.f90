@@ -26,7 +26,7 @@ MODULE ThermalComfort
 USE DataPrecisionGlobals
 USE DataGlobals
 USE DataHeatBalance,   ONLY: MRT, People, Zone, ZoneAveraged, SurfaceWeighted, AngleFactor, TotPeople
-USE DataEnvironment,   ONLY: OutBaroPress
+USE DataEnvironment,   ONLY: OutBaroPress, OutDryBulbTemp
 USE DataHeatBalFanSys, ONLY: MAT, ZTAV, ZoneAirHumRat,ZoneComfortControlsFanger, ZoneAirHumRatAvg, &
                              ZTAVComf, ZoneAirHumRatAvgComf
 USE ScheduleManager,   ONLY: GetCurrentScheduleValue
@@ -60,15 +60,16 @@ TYPE, PUBLIC :: ThermalComfortDataType
   REAL(r64) :: KsuTSV = 0.0d0
   REAL(r64) :: ThermalComfortMRT = 0.0d0
   REAL(r64) :: ThermalComfortOpTemp = 0.0d0
+  REAL(r64) :: ClothingValue = 0.0d0
   INTEGER :: ThermalComfortAdaptiveASH5590 = 0
   INTEGER :: ThermalComfortAdaptiveASH5580 = 0
   INTEGER :: ThermalComfortAdaptiveCEN15251CatI = 0
   INTEGER :: ThermalComfortAdaptiveCEN15251CatII = 0
   INTEGER :: ThermalComfortAdaptiveCEN15251CatIII = 0
-  REAL(r64) :: TComfASH55 = 0
-  REAL(r64) :: TComfCEN15251 = 0
-  REAL(r64) :: ASHRAE55RunningMeanOutdoorTemp = 0
-  REAL(r64) :: CEN15251RunningMeanOutdoorTemp = 0
+  REAL(r64) :: TComfASH55 = 0.0d0
+  REAL(r64) :: TComfCEN15251 = 0.0d0
+  REAL(r64) :: ASHRAE55RunningMeanOutdoorTemp = 0.0d0
+  REAL(r64) :: CEN15251RunningMeanOutdoorTemp = 0.0d0
 END TYPE
 
 TYPE ThermalComfortInASH55Type
@@ -183,6 +184,7 @@ REAL(r64) :: VasoconstrictFac  = 0.0d0 ! Constriction factor of blood vessel
 REAL(r64) :: VasodilationFac   = 0.0d0 ! Dilation factor of blood vessel
 REAL(r64) :: WorkEff           = 0.0d0 ! Energy cosumption by external work; w/m2
 INTEGER :: ZoneNum        = 0   ! Zone number
+REAL(r64) :: TemporarySixAMTemperature           = 0.0d0 ! Temperature at 6am
 
 !time that any zone is not comfortable based on simple ASHRAE 55 using summer clothes
 REAL(r64) :: AnyZoneTimeNotSimpleASH55Summer = 0.0d0
@@ -227,6 +229,7 @@ PRIVATE CalcSatVapPressFromTemp
 PRIVATE CalcRadTemp
 PRIVATE GetAngleFactorList
 PRIVATE CalcAngleFactorMRT
+PRIVATE DynamicClothingModel
 
 CONTAINS
 
@@ -280,6 +283,22 @@ SUBROUTINE ManageThermalComfort(InitializeOnly)
       IF (ANY(People%AdaptiveCEN15251)) CEN15251Flag = .true.
     ENDIF
   END IF
+
+ IF (DayOfSim == 1) THEN
+  IF (HourOfDay < 7) THEN
+  TemporarySixAMTemperature = 1.868132
+  ELSE IF (HourOfDay == 7) THEN
+    IF (TimeStep == 1) THEN
+      TemporarySixAMTemperature = OutDryBulbTemp
+    END IF
+  END IF
+ ELSE
+  IF (HourOfDay == 7) THEN
+     IF (TimeStep == 1) THEN
+        TemporarySixAMTemperature = OutDryBulbTemp
+     END IF
+   END IF
+ END IF
 
   IF (InitializeOnly) RETURN
 
@@ -385,6 +404,8 @@ SUBROUTINE InitThermalComfort
       CALL SetupOutputVariable('Zone Thermal Comfort Mean Radiant Temperature [C]',ThermalComfortData(Loop)%ThermalComfortMRT, &
                               'Zone','State',People(Loop)%Name)
       CALL SetupOutputVariable('Zone Thermal Comfort Operative Temperature [C]',ThermalComfortData(Loop)%ThermalComfortOpTemp, &
+                              'Zone','State',People(Loop)%Name)
+      CALL SetupOutputVariable('Zone Thermal Comfort Clothing Value [clo]',ThermalComfortData(Loop)%ClothingValue, &
                               'Zone','State',People(Loop)%Name)
     END IF
 
@@ -542,6 +563,7 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
     REAL(r64) :: P4   ! Intermediate variables to calculate clothed body ratio and clothing temperature
     REAL(r64) :: XF   ! Intermediate variables to calculate clothed body ratio and clothing temperature
     REAL(r64) :: XN   ! Intermediate variables to calculate clothed body ratio and clothing temperature
+    REAL(r64) :: IntermediateClothing
 !    REAL(r64) :: SkinTempComf        ! Skin temperature required to achieve thermal comfort; C
 
     REAL(r64) :: PMV  ! temporary variable to store calculated Fanger PMV value
@@ -563,9 +585,9 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
           ! UCSD-CV
           ELSEIF (IsZoneCV(ZoneNum)) THEN
               IF (ZoneUCSDCV(ZoneNum)%VforComfort == VComfort_Jet) THEN
-                AirTemp = ZTJET(ZoneNum)%In
+                AirTemp = ZTJET(ZoneNum)
               ELSEIF (ZoneUCSDCV(ZoneNum)%VforComfort== VComfort_Recirculation) THEN
-                 AirTemp = ZTJET(ZoneNum)%Med
+                 AirTemp = ZTJET(ZoneNum)
               ELSE
                 ! Thermal comfort control uses Tset to determine PMV setpoint value, otherwise use zone temp
                 If (PRESENT(PNum)) then
@@ -589,14 +611,41 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
             RelHum = PsyRhFnTdbWPb(ZTAVComf(ZoneNum),ZoneAirHumRatAvgComf(ZoneNum),OutBaroPress)
           End If
           People(PeopleNum)%TemperatureInZone =  AirTemp
-          People(PeopleNum)%RelativeHumidityInZone =  RelHum * 100.0
+          People(PeopleNum)%RelativeHumidityInZone =  RelHum * 100.0d0
 
           ! Metabolic rate of body (W/m2)
           ActLevel = GetCurrentScheduleValue(People(PeopleNum)%ActivityLevelPtr)/BodySurfArea
           ! Energy consumption by external work (W/m2)
           WorkEff = GetCurrentScheduleValue(People(PeopleNum)%WorkEffPtr)*ActLevel
           ! Clothing unit
-          CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+          SELECT CASE (People(PeopleNum)%ClothingType)
+            CASE (1)
+              CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+            CASE (2)
+              ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+              ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+              CALL DynamicClothingModel
+              CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+            CASE (3)
+              IntermediateClothing = GetCurrentScheduleValue(People(PeopleNum)%ClothingMethodPtr)
+              IF(IntermediateClothing .EQ. 1.0d0) THEN
+                CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+                ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+              ELSE IF(IntermediateClothing .EQ. 2.0d0) THEN
+                ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+                ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+                CALL DynamicClothingModel
+                CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+              ELSE
+                CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+                CALL ShowWarningError('PEOPLE="'//TRIM(People(PeopleNum)%Name)// &
+                     '", Scheduled clothing value will be used rather than clothing calculation method.')
+              ENDIF
+            CASE DEFAULT
+              CALL ShowSevereError('PEOPLE="'//TRIM(People(PeopleNum)%Name)// &
+                        '", Incorrect Clothing Type')
+          END SELECT
+
           IF (IsZoneCV(ZoneNum)) THEN
             IF (ZoneUCSDCV(ZoneNum)%VforComfort == VComfort_Jet) THEN
                 AirVel = Ujet(ZoneNum)
@@ -721,9 +770,9 @@ SUBROUTINE CalcThermalComfortFanger(PNum,Tset,PMVResult)
           ThermalComfortData(PeopleNum)%CloSurfTemp       = CloSurfTemp
 
           ! Calculate the Fanger PPD (Predicted Percentage of Dissatisfied), as a %
-          PPD = 100.0 - 95.0*EXP(-0.03353d0*PMV**4 - 0.2179d0*PMV**2)
-          IF (PPD < 0.0 ) PPD = 0.0
-          IF (PPD > 100.0 ) PPD = 100.0
+          PPD = 100.0d0 - 95.0d0*EXP(-0.03353d0*PMV**4 - 0.2179d0*PMV**2)
+          IF (PPD < 0.0d0 ) PPD = 0.0d0
+          IF (PPD > 100.0d0 ) PPD = 100.0d0
 
           ThermalComfortData(PeopleNum)%FangerPPD = PPD
   END DO
@@ -832,6 +881,7 @@ SUBROUTINE CalcThermalComfortPierce
   REAL(r64) :: StdVapPressSET       ! Standard vapor pressure at standar effective temperature
   REAL(r64) :: TotEvapHeatResist    ! Total evaporative heat resistance
   REAL(r64) :: UnevapSweat          ! Unevaporated sweat; g/m2/hr
+  REAL(r64) :: IntermediateClothing
 
         ! FLOW:
 
@@ -852,7 +902,32 @@ SUBROUTINE CalcThermalComfortPierce
     ! Energy consumption by external work (W/m2)
     WorkEff = GetCurrentScheduleValue(People(PeopleNum)%WorkEffPtr)*ActLevel
     ! Clothing unit
-    CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+      SELECT CASE (People(PeopleNum)%ClothingType)
+        CASE (1)
+          CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+        CASE (2)
+          ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+          ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+          CALL DynamicClothingModel
+          CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+        CASE (3)
+          IntermediateClothing = GetCurrentScheduleValue(People(PeopleNum)%ClothingMethodPtr)
+          IF(IntermediateClothing .EQ. 1.0d0) THEN
+            CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+            ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+          ELSE IF(IntermediateClothing .EQ. 2.0d0) THEN
+            ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+            ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+            CALL DynamicClothingModel
+            CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+          ELSE
+            CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+            CALL ShowWarningError('Scheduled clothing value will be used rather than clothing calculation method.')
+          ENDIF
+        CASE DEFAULT
+          CALL ShowSevereError('Incorrect Clothing Type')
+      END SELECT
+
     AirVel  = GetCurrentScheduleValue(People(PeopleNum)%AirVelocityPtr)
 
     VapPress = CalcSatVapPressFromTemp(AirTemp)
@@ -1034,18 +1109,18 @@ SUBROUTINE CalcThermalComfortPierce
       END IF
 
       ! When EvapHeatLossMax<0. condensation on skin occurs.
-      IF(EvapHeatLossMax <= 0.) THEN
-        SkinWetDiff = 0.
-        EvapHeatLossDiff = 0.
+      IF(EvapHeatLossMax <= 0.0d0) THEN
+        SkinWetDiff = 0.0d0
+        EvapHeatLossDiff = 0.0d0
         EvapHeatLoss = EvapHeatLossMax
         SkinWetTot = EvapEff
         SkinWetSweat = EvapEff
-        EvapHeatLossRegSweat = 0.
+        EvapHeatLossRegSweat = 0.0d0
       END IF
 
       ! UnevapSweat = unevaporated sweat in grams/sq.m/hr
       UnevapSweat = (RegSweat*.68d0 - SkinWetSweat*EvapHeatLossMax)/0.68d0
-      IF(UnevapSweat <= 0.) UnevapSweat=0.
+      IF(UnevapSweat <= 0.0d0) UnevapSweat=0.0d0
 
       ! Vapor pressure at skin (as measured by dewpoint sensors)
       SkinVapPress=SkinWetTot*SatSkinVapPress + (1.d0 - SkinWetTot)*VapPress
@@ -1078,8 +1153,8 @@ SUBROUTINE CalcThermalComfortPierce
       StdVapPressET = CalcSatVapPressFromTemp(ET)
       StdVapPressET = StdVapPressET*VapPressConv
       EnergyBalErrET = SkinHeatLoss - H*EffectCloThermEff*(SkinTemp - ET) - &
-                       SkinWetTot*LewisRat*Hc*CloPermeatEff*(SatSkinVapPress - StdVapPressET/2.)
-      IF (EnergyBalErrET >= 0.) EXIT
+                       SkinWetTot*LewisRat*Hc*CloPermeatEff*(SatSkinVapPress - StdVapPressET/2.0d0)
+      IF (EnergyBalErrET >= 0.0d0) EXIT
       ET = ET + 0.1d0
     END DO
 
@@ -1113,8 +1188,8 @@ SUBROUTINE CalcThermalComfortPierce
       StdVapPressSET = CalcSatVapPressFromTemp(SET)
       StdVapPressSET = StdVapPressSET*VapPressConv
       EnergyBalErrSET = SkinHeatLoss - HStd*StdEffectCloThermEff*(SkinTemp - SET) - &
-                        SkinWetTot*LewisRat*HcStd*StdCloPermeatEff*(SatSkinVapPress - StdVapPressSET/2.)
-      IF (EnergyBalErrSET >= 0.) EXIT
+                        SkinWetTot*LewisRat*HcStd*StdCloPermeatEff*(SatSkinVapPress - StdVapPressSET/2.0d0)
+      IF (EnergyBalErrSET >= 0.0d0) EXIT
       SET = SET + 0.1d0
     END DO
 
@@ -1230,6 +1305,7 @@ SUBROUTINE CalcThermalComfortKSU
   REAL(r64) :: TimeExpos             ! Time period in the exposure, hr
   REAL(r64) :: TimeInterval          ! Time interval of outputs desired, hr
   REAL(r64) :: TSVMax                ! Maximum value of thermal sensation vote
+  REAL(r64) :: IntermediateClothing
 
 ! FLOW:
 
@@ -1237,13 +1313,13 @@ SUBROUTINE CalcThermalComfortKSU
 
 ! NEXT GROUP OF VARIABLE ARE FIXED FOR BLAST PROGRAM - UNACCLIMATED MAN
 ! THE TSV MODEL CAN BE APPLIED TO UNACCLIMATED MAN ONLY.
-  TimeInterval = 1.
-  TSVMax = 4.
+  TimeInterval = 1.d0
+  TSVMax = 4.d0
   StartDayNum = 1
   LastDayNum = 1
   IncreDayNum = 1
-  TimeExpos = 1.
-  TempDiffer = 0.5
+  TimeExpos = 1.d0
+  TempDiffer = 0.5d0
 
   DO PeopleNum = 1, TotPeople
 ! THE NEXT SIX VARIABLES WILL BE READ IN FROM INPUT DECK
@@ -1259,7 +1335,33 @@ SUBROUTINE CalcThermalComfortKSU
     RelHum  = PsyRhFnTdbWPb(ZTAV(ZoneNum),ZoneAirHumRat(ZoneNum),OutBaroPress)
     ActLevel = GetCurrentScheduleValue(People(PeopleNum)%ActivityLevelPtr)/BodySurfArea
     WorkEff = GetCurrentScheduleValue(People(PeopleNum)%WorkEffPtr)*ActLevel
-    CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+    SELECT CASE (People(PeopleNum)%ClothingType)
+      CASE (1)
+        CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+      CASE (2)
+        ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+        ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+        CALL DynamicClothingModel
+        CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+      CASE (3)
+        IntermediateClothing = GetCurrentScheduleValue(People(PeopleNum)%ClothingMethodPtr)
+        IF(IntermediateClothing .EQ. 1.0d0) THEN
+          CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+          ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+        ELSE IF(IntermediateClothing .EQ. 2.0d0) THEN
+          ThermalComfortData(PeopleNum)%ThermalComfortOpTemp = (RadTemp+AirTemp)/2.0d0
+          ThermalComfortData(PeopleNum)%ClothingValue = CloUnit
+          CALL DynamicClothingModel
+          CloUnit = ThermalComfortData(PeopleNum)%ClothingValue
+        ELSE
+          CloUnit = GetCurrentScheduleValue(People(PeopleNum)%ClothingPtr)
+          CALL ShowWarningError('PEOPLE="'//TRIM(People(PeopleNum)%Name)// &
+                     '", Scheduled clothing value will be used rather than clothing calculation method.')
+        ENDIF
+      CASE DEFAULT
+        CALL ShowSevereError('PEOPLE="'//TRIM(People(PeopleNum)%Name)//'", Incorrect Clothing Type')
+    END SELECT
+
     AirVel  = GetCurrentScheduleValue(People(PeopleNum)%AirVelocityPtr)
     IntHeatProd = ActLevel - WorkEff
 ! THE FOLLOWING ARE TYPICAL VALUES SET FOR BLAST RUNS
@@ -1289,13 +1391,13 @@ SUBROUTINE CalcThermalComfortKSU
     DO NumDay = StartDayNum,LastDayNum,IncreDayNum
 !  INITIAL CONDITIONS IN AN EXPOSURE
       DayNum=REAL(NumDay,r64)
-      Time = 0.0
+      Time = 0.0d0
       TimeChange = .01d0
       SweatSuppFac = 1.d0
       Temp(1) = CoreTemp
       Temp(2) = SkinTemp
-      Coeff(1) = 0.
-      Coeff(2) = 0.
+      Coeff(1) = 0.0d0
+      Coeff(2) = 0.0d0
 !  PHYSIOLOGICAL ADJUSTMENTS IN HEAT ACCLIMATION.
       AcclPattern = 1.d0 - EXP(-0.12d0*(DayNum - 1.0d0))
       CoreTempNeut = 36.9d0 - 0.6d0*AcclPattern
@@ -1455,7 +1557,7 @@ SUBROUTINE DERIV(TempIndiceNum,Temp,TempChange)
   ! CONTROLLING FUNCTIONS :
   ! SHIVERING RESPONSE IN W/M**2.
   ShivResponse = 20.d0*CoreSignalShivMax*SkinSignalShivMax + 5.d0*SkinSignalShivMax
-  IF(CoreTemp >= 37.1d0) ShivResponse = 0.
+  IF(CoreTemp >= 37.1d0) ShivResponse = 0.0d0
 
   ! SWEAT FUNCTION IN W/M**2.
   WeighFac = 260.d0+70.d0*AcclPattern
@@ -1468,12 +1570,12 @@ SUBROUTINE DERIV(TempIndiceNum,Temp,TempChange)
   ! MAXIMUM EVAPORATIVE POWER, EvapHeatLossMax, IN W/M**2.
   SkinVapPress = CalcSatVapPressFromTemp(SkinTemp)
   EvapHeatLossMax = 2.2d0*Hc*(SkinVapPress - VapPress)*CloPermeatEff
-  IF(EvapHeatLossMax > 0.0) THEN
+  IF(EvapHeatLossMax > 0.0d0) THEN
     SkinWetSweat = EvapHeatLossDrySweat/EvapHeatLossMax
     EvapHeatLossDiff = 0.408d0*(SkinVapPress - VapPress)
     EvapHeatLoss = SkinWetSweat*EvapHeatLossMax+(1.d0 - SkinWetSweat)*EvapHeatLossDiff
     SkinWetTot = EvapHeatLoss/EvapHeatLossMax
-    IF(Time == 0.) THEN
+    IF(Time == 0.0d0) THEN
       EvapHeatLossSweat = EvapHeatLossDrySweat
       EvapHeatLossSweatPrev = EvapHeatLossDrySweat
     END IF
@@ -1481,18 +1583,18 @@ SUBROUTINE DERIV(TempIndiceNum,Temp,TempChange)
 
   ! ITERATION  FOR SWEAT WHEN SkinWetTot IS GREATER THAT 0.4.
       IterNum = 0
-      IF(SkinWetSweat > 1.) SkinWetSweat = 1.
+      IF(SkinWetSweat > 1.0d0) SkinWetSweat = 1.d0
       DO
         EvapHeatLossSweatEst = EvapHeatLossSweatPrev
         SkinWetSweat = EvapHeatLossSweatEst/EvapHeatLossMax
 
-        IF(SkinWetSweat > 1.) SkinWetSweat = 1.
+        IF(SkinWetSweat > 1.0d0) SkinWetSweat = 1.d0
 
         EvapHeatLossDiff = 0.408d0*(SkinVapPress - VapPress)
         EvapHeatLoss = (1.d0 - SkinWetTot)*EvapHeatLossDiff + EvapHeatLossSweat
         SkinWetTot = EvapHeatLoss/EvapHeatLossMax
 
-        IF(SkinWetTot > 1.) SkinWetTot = 1.
+        IF(SkinWetTot > 1.0d0) SkinWetTot = 1.d0
 
         SkinWetSignal = MAX(0.d0,SkinWetTot - .4d0)
         SweatSuppFac = 0.5d0 + 0.5d0*EXP(-5.6d0*SkinWetSignal)
@@ -1503,8 +1605,8 @@ SUBROUTINE DERIV(TempIndiceNum,Temp,TempChange)
         Err = EvapHeatLossSweatEst - EvapHeatLossSweatEstNew
 
         IF (IterNum /= 0) THEN
-          IF((ErrPrev*Err) < 0.) EvapHeatLossSweat = (EvapHeatLossSweatEst + EvapHeatLossSweatEstNew)/2.
-          IF((ErrPrev*Err) >= 0.) EvapHeatLossSweat = EvapHeatLossSweatEstNew
+          IF((ErrPrev*Err) < 0.0d0) EvapHeatLossSweat = (EvapHeatLossSweatEst + EvapHeatLossSweatEstNew)/2.0d0
+          IF((ErrPrev*Err) >= 0.0d0) EvapHeatLossSweat = EvapHeatLossSweatEstNew
         END IF
 
   ! STOP CRITERION FOR THE ITERATION.
@@ -1520,8 +1622,8 @@ SUBROUTINE DERIV(TempIndiceNum,Temp,TempChange)
     END IF
 
   ELSE
-    SkinWetSweat = 1.
-    SkinWetTot = 1.
+    SkinWetSweat = 1.d0
+    SkinWetTot = 1.d0
     EvapHeatLossSweat = 0.5d0*EvapHeatLossDrySweat
     EvapHeatLoss = EvapHeatLossSweat
   END IF
@@ -1635,7 +1737,7 @@ SUBROUTINE RKG(NEQ,H,X,Y,DY,C)
   CALL DERIV (NEQ,Y,DY)
 
   DO I = 1,NEQ
-    B = (H*DY(I) - 2.d0*C(I))/6.
+    B = (H*DY(I) - 2.d0*C(I))/6.0d0
     Y(I) = Y(I) + B
     C(I) = C(I) + 3.d0*B - H2*DY(I)
   END DO
@@ -1709,7 +1811,7 @@ SUBROUTINE GetAngleFactorList
 
   DO Item = 1, NumOfAngleFactorLists
 
-    AllAngleFacSummed = 0.0
+    AllAngleFacSummed = 0.0d0
 
     CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
@@ -1836,7 +1938,7 @@ REAL(r64) FUNCTION CalcAngleFactorMRT(AngleFacNum)
 
           ! FLOW:
 
-  SurfTempAngleFacSummed = 0.0
+  SurfTempAngleFacSummed = 0.0d0
 
   DO SurfNum = 1, AngleFactorList(AngleFacNum)%TotAngleFacSurfaces
 
@@ -1974,8 +2076,8 @@ REAL(r64) FUNCTION CalcRadTemp(PeopleListNum)
   END SELECT
 
   ! If high temperature radiant heater present and on, then must account for this in MRT calculation
-  IF (QHTRadSysToPerson(ZoneNum) > 0.0 .OR. QHWBaseboardToPerson(ZoneNum) > 0.0 .OR. &
-        QSteamBaseboardToPerson(ZoneNum) > 0.0 .OR. QElecBaseboardToPerson(ZoneNum) > 0.0) THEN
+  IF (QHTRadSysToPerson(ZoneNum) > 0.0d0 .OR. QHWBaseboardToPerson(ZoneNum) > 0.0d0 .OR. &
+        QSteamBaseboardToPerson(ZoneNum) > 0.0d0 .OR. QElecBaseboardToPerson(ZoneNum) > 0.0d0) THEN
     RadTemp = RadTemp + KelvinConv  ! Convert to Kelvin
     RadTemp = ((RadTemp**4)+((QHTRadSysToPerson(ZoneNum)+QHWBaseboardToPerson(ZoneNum)+ &
                 QSteamBaseboardToPerson(ZoneNum) + QElecBaseboardToPerson(ZoneNum))/ &
@@ -2036,9 +2138,9 @@ INTEGER :: iZone
 REAL(r64) :: allowedHours
 LOGICAL :: showWarning
 
-AnyZoneTimeNotSimpleASH55Summer = 0
-AnyZoneTimeNotSimpleASH55Winter = 0
-AnyZoneTimeNotSimpleASH55Either = 0
+AnyZoneTimeNotSimpleASH55Summer = 0.0d0
+AnyZoneTimeNotSimpleASH55Winter = 0.0d0
+AnyZoneTimeNotSimpleASH55Either = 0.0d0
 
 !assume the zone is unoccupied
 ThermalComfortInASH55%ZoneIsOccupied = .FALSE.
@@ -2107,7 +2209,7 @@ DO iZone = 1, NumOfZones
                          23.9d0, 0.012d0,  &
                          26.3d0, 0.0d0)
     IF (isComfortableWithSummerClothes) THEN
-      ThermalComfortInASH55(iZone)%timeNotSummer = 0
+      ThermalComfortInASH55(iZone)%timeNotSummer = 0.0d0
     ELSE
       ThermalComfortInASH55(iZone)%timeNotSummer = TimeStepZone
       ThermalComfortInASH55(iZone)%totalTimeNotSummer = &
@@ -2115,7 +2217,7 @@ DO iZone = 1, NumOfZones
       AnyZoneTimeNotSimpleASH55Summer = TimeStepZone
     END IF
     IF (isComfortableWithWinterClothes) THEN
-      ThermalComfortInASH55(iZone)%timeNotWinter = 0
+      ThermalComfortInASH55(iZone)%timeNotWinter = 0.0d0
     ELSE
       ThermalComfortInASH55(iZone)%timeNotWinter = TimeStepZone
       ThermalComfortInASH55(iZone)%totalTimeNotWinter = &
@@ -2123,7 +2225,7 @@ DO iZone = 1, NumOfZones
       AnyZoneTimeNotSimpleASH55Winter = TimeStepZone
     END IF
     IF (isComfortableWithSummerClothes .OR. isComfortableWithWinterClothes) THEN
-      ThermalComfortInASH55(iZone)%timeNotEither = 0
+      ThermalComfortInASH55(iZone)%timeNotEither = 0.0d0
     ELSE
       ThermalComfortInASH55(iZone)%timeNotEither = TimeStepZone
       ThermalComfortInASH55(iZone)%totalTimeNotEither = &
@@ -2132,9 +2234,9 @@ DO iZone = 1, NumOfZones
     END IF
   ELSE
     !when no one present in that portion of the zone then no one can be uncomfortable
-    ThermalComfortInASH55(iZone)%timeNotSummer = 0
-    ThermalComfortInASH55(iZone)%timeNotWinter = 0
-    ThermalComfortInASH55(iZone)%timeNotEither = 0
+    ThermalComfortInASH55(iZone)%timeNotSummer = 0.0d0
+    ThermalComfortInASH55(iZone)%timeNotWinter = 0.0d0
+    ThermalComfortInASH55(iZone)%timeNotEither = 0.0d0
   END IF
 END DO
 ! accumulate total time
@@ -2143,7 +2245,7 @@ TotalAnyZoneTimeNotSimpleASH55Winter = TotalAnyZoneTimeNotSimpleASH55Winter + An
 TotalAnyZoneTimeNotSimpleASH55Either = TotalAnyZoneTimeNotSimpleASH55Either + AnyZoneTimeNotSimpleASH55Either
 !was EndEnvrnsFlag prior to CR7562
 IF (EndDesignDayEnvrnsFlag) THEN
-  allowedHours = NumOfDayInEnvrn * 24 * 0.04d0
+  allowedHours = REAL(NumOfDayInEnvrn,r64) * 24.d0 * 0.04d0
   !first check if warning should be printed
   showWarning = .FALSE.
   DO iZone = 1, NumOfZones
@@ -2188,13 +2290,13 @@ IF (EndDesignDayEnvrnsFlag) THEN
   TotalTimeNotSimpleASH55EitherForABUPS = TotalAnyZoneTimeNotSimpleASH55Either
   !reset accumulation for new environment
   DO iZone = 1, NumOfZones
-    ThermalComfortInASH55(iZone)%totalTimeNotWinter = 0
-    ThermalComfortInASH55(iZone)%totalTimeNotSummer = 0
-    ThermalComfortInASH55(iZone)%totalTimeNotEither = 0
+    ThermalComfortInASH55(iZone)%totalTimeNotWinter = 0.0d0
+    ThermalComfortInASH55(iZone)%totalTimeNotSummer = 0.0d0
+    ThermalComfortInASH55(iZone)%totalTimeNotEither = 0.0d0
   END DO
-  TotalAnyZoneTimeNotSimpleASH55Winter = 0
-  TotalAnyZoneTimeNotSimpleASH55Summer = 0
-  TotalAnyZoneTimeNotSimpleASH55Either = 0
+  TotalAnyZoneTimeNotSimpleASH55Winter = 0.0d0
+  TotalAnyZoneTimeNotSimpleASH55Summer = 0.0d0
+  TotalAnyZoneTimeNotSimpleASH55Either = 0.0d0
   ! report how the aggregation is conducted
   SELECT CASE (kindOfSim)
     CASE(ksDesignDay)
@@ -2259,17 +2361,17 @@ LOGICAL :: testCooling
 
 ! Get the load predicted - the sign will indicate if heating or cooling
 ! was called for
-AnyZoneNotMetHeating = 0.0
-AnyZoneNotMetCooling = 0.0
-AnyZoneNotMetOccupied = 0.0
-AnyZoneNotMetHeatingOccupied = 0.0
-AnyZoneNotMetCoolingOccupied = 0.0
+AnyZoneNotMetHeating = 0.0d0
+AnyZoneNotMetCooling = 0.0d0
+AnyZoneNotMetOccupied = 0.0d0
+AnyZoneNotMetHeatingOccupied = 0.0d0
+AnyZoneNotMetCoolingOccupied = 0.0d0
 DO iZone = 1, NumOfZones
   SensibleLoadPredictedNoAdj = ZoneSysEnergyDemand(iZone)%TotalOutputRequired
-  ThermalComfortSetpoint(iZone)%notMetCooling = 0
-  ThermalComfortSetpoint(iZone)%notMetHeating = 0
-  ThermalComfortSetpoint(iZone)%notMetCoolingOccupied = 0
-  ThermalComfortSetpoint(iZone)%notMetHeatingOccupied = 0
+  ThermalComfortSetpoint(iZone)%notMetCooling = 0.0d0
+  ThermalComfortSetpoint(iZone)%notMetHeating = 0.0d0
+  ThermalComfortSetpoint(iZone)%notMetCoolingOccupied = 0.0d0
+  ThermalComfortSetpoint(iZone)%notMetHeatingOccupied = 0.0d0
   SELECT CASE (TempControlType(iZone))
     CASE (SingleHeatingSetPoint)
       testHeating = .TRUE.
@@ -2297,13 +2399,13 @@ DO iZone = 1, NumOfZones
       ThermalComfortSetpoint(iZone)%notMetHeating = TimeStepZone
       ThermalComfortSetpoint(iZone)%totalNotMetHeating = &
           ThermalComfortSetpoint(iZone)%totalNotMetHeating + TimeStepZone
-      IF (AnyZoneNotMetHeating .EQ. 0.0) AnyZoneNotMetHeating = TimeStepZone
+      IF (AnyZoneNotMetHeating .EQ. 0.0d0) AnyZoneNotMetHeating = TimeStepZone
       IF (ThermalComfortInASH55(iZone)%ZoneIsOccupied) THEN
         ThermalComfortSetpoint(iZone)%notMetHeatingOccupied = TimeStepZone
         ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied = &
             ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied + TimeStepZone
-        IF (AnyZoneNotMetHeatingOccupied .EQ. 0.0) AnyZoneNotMetHeatingOccupied = TimeStepZone
-        IF (AnyZoneNotMetOccupied .EQ. 0.0) AnyZoneNotMetOccupied = TimeStepZone
+        IF (AnyZoneNotMetHeatingOccupied .EQ. 0.0d0) AnyZoneNotMetHeatingOccupied = TimeStepZone
+        IF (AnyZoneNotMetOccupied .EQ. 0.0d0) AnyZoneNotMetOccupied = TimeStepZone
       END IF
     END IF
   ELSEIF (testCooling .AND. (SensibleLoadPredictedNoAdj .LT. 0)) THEN !cooling
@@ -2316,13 +2418,13 @@ DO iZone = 1, NumOfZones
       ThermalComfortSetpoint(iZone)%notMetCooling = TimeStepZone
       ThermalComfortSetpoint(iZone)%totalNotMetCooling = &
           ThermalComfortSetpoint(iZone)%totalNotMetCooling + TimeStepZone
-      IF (AnyZoneNotMetCooling .EQ. 0.0) AnyZoneNotMetCooling = TimeStepZone
+      IF (AnyZoneNotMetCooling .EQ. 0.0d0) AnyZoneNotMetCooling = TimeStepZone
       IF (ThermalComfortInASH55(iZone)%ZoneIsOccupied) THEN
         ThermalComfortSetpoint(iZone)%notMetCoolingOccupied = TimeStepZone
         ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied = &
             ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied + TimeStepZone
-        IF (AnyZoneNotMetCoolingOccupied .EQ. 0.0) AnyZoneNotMetCoolingOccupied = TimeStepZone
-        IF (AnyZoneNotMetOccupied .EQ. 0.0) AnyZoneNotMetOccupied = TimeStepZone
+        IF (AnyZoneNotMetCoolingOccupied .EQ. 0.0d0) AnyZoneNotMetCoolingOccupied = TimeStepZone
+        IF (AnyZoneNotMetOccupied .EQ. 0.0d0) AnyZoneNotMetOccupied = TimeStepZone
       END IF
     END IF
   ENDIF
@@ -2351,15 +2453,15 @@ IF (EndDesignDayEnvrnsFlag) THEN
   TotalNotMetOccupiedForABUPS = TotalAnyZoneNotMetOccupied
   !reset counters
   DO iZone = 1, NumOfZones
-    ThermalComfortSetpoint(iZone)%totalNotMetHeating = 0.0
-    ThermalComfortSetpoint(iZone)%totalNotMetCooling = 0.0
-    ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied = 0.0
-    ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied = 0.0
+    ThermalComfortSetpoint(iZone)%totalNotMetHeating = 0.0d0
+    ThermalComfortSetpoint(iZone)%totalNotMetCooling = 0.0d0
+    ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied = 0.0d0
+    ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied = 0.0d0
   END DO
-  TotalAnyZoneNotMetHeating = 0.0
-  TotalAnyZoneNotMetCooling = 0.0
-  TotalAnyZoneNotMetHeatingOccupied = 0.0
-  TotalAnyZoneNotMetCoolingOccupied = 0.0
+  TotalAnyZoneNotMetHeating = 0.0d0
+  TotalAnyZoneNotMetCooling = 0.0d0
+  TotalAnyZoneNotMetHeatingOccupied = 0.0d0
+  TotalAnyZoneNotMetCoolingOccupied = 0.0d0
   ! report how the aggregation is conducted
   SELECT CASE (kindOfSim)
     CASE(ksDesignDay)
@@ -2457,7 +2559,7 @@ IF (initiate) THEN  ! not optional on initiate=true.  would otherwise check for 
   inavgdrybulb=avgdrybulb
 ELSE
   weathersimulation=.false.
-  inavgdrybulb=0.0
+  inavgdrybulb=0.0d0
 ENDIF
 
 IF (initiate .and. weathersimulation) THEN
@@ -2503,7 +2605,7 @@ IF (initiate .and. weathersimulation) THEN
         READ(unit=epwFile,fmt='(A)',iostat=readStat)
       END DO
       DO i = 1, 30
-        avgDryBulbASH = 0
+        avgDryBulbASH = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2522,7 +2624,7 @@ IF (initiate .and. weathersimulation) THEN
       calcEndHr = 24 * calcEndDay
       calcStartHr  = 24 * (calcStartDay - 1) + 1
       DO i = 1, calcEndDay
-        avgDryBulbASH = 0
+        avgDryBulbASH = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2539,7 +2641,7 @@ IF (initiate .and. weathersimulation) THEN
         READ(unit=epwFile,fmt='(A)',iostat=readStat)
       END DO
       DO i = 1, 30-calcEndDay
-        avgDryBulbASH = 0
+        avgDryBulbASH = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2626,7 +2728,7 @@ DO PeopleNum = 1, TotPeople
     ! Monthly temp out of range
     ThermalComfortData(PeopleNum)%ThermalComfortAdaptiveASH5590 = -1
     ThermalComfortData(PeopleNum)%ThermalComfortAdaptiveASH5580 = -1
-    ThermalComfortData(PeopleNum)%TComfASH55 = -1
+    ThermalComfortData(PeopleNum)%TComfASH55 = -1.0d0
   END IF
 END DO
 
@@ -2704,7 +2806,7 @@ IF (initiate) THEN  ! not optional on initiate=true.  would otherwise check for 
   runningAverageCEN=0.0d0
 ELSE
   weathersimulation=.false.
-  inavgdrybulb=0.0
+  inavgdrybulb=0.0d0
 ENDIF
 
 IF (initiate .and. weathersimulation) THEN
@@ -2726,9 +2828,9 @@ IF (initiate .and. weathersimulation) THEN
       DO i = 1, calcStartHr - 1
         READ(unit=epwFile,fmt='(A)',iostat=readStat)
       END DO
-      runningAverageCEN = 0
+      runningAverageCEN = 0.0d0
       DO i = 1, 7
-        avgDryBulbCEN = 0
+        avgDryBulbCEN = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2747,7 +2849,7 @@ IF (initiate .and. weathersimulation) THEN
       calcEndHr = 24 * calcEndDay
       calcStartHr  = 24 * (calcStartDay - 1) + 1
       DO i = 1, calcEndDay
-        avgDryBulbCEN = 0
+        avgDryBulbCEN = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2764,7 +2866,7 @@ IF (initiate .and. weathersimulation) THEN
         READ(unit=epwFile,fmt='(A)',iostat=readStat)
       END DO
       DO i = 1, 7-calcEndDay
-        avgDryBulbCEN = 0
+        avgDryBulbCEN = 0.0d0
         DO j = 1, 24
           READ(unit=epwFile,fmt='(A)',iostat=readStat) epwLine
           DO ind = 1, 6
@@ -2865,12 +2967,57 @@ DO PeopleNum = 1, TotPeople
     ThermalComfortData(PeopleNum)%ThermalComfortAdaptiveCEN15251CatI = -1
     ThermalComfortData(PeopleNum)%ThermalComfortAdaptiveCEN15251CatII = -1
     ThermalComfortData(PeopleNum)%ThermalComfortAdaptiveCEN15251CatIII = -1
-    ThermalComfortData(PeopleNum)%TComfCEN15251 = -1
+    ThermalComfortData(PeopleNum)%TComfCEN15251 = -1.0d0
   END IF
 END DO
 
 END SUBROUTINE CalcThermalComfortAdaptiveCEN15251
 
+
+SUBROUTINE DynamicClothingModel
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Kwang Ho Lee
+          !       DATE WRITTEN   June 2013
+          !       MODIFIED
+          !       RE-ENGINEERED  na
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+
+! USE DataRoomAirModel, ONLY: AirModel, RoomAirModel_Mixing
+
+IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+REAL(r64) :: TemporaryVariable
+
+ IF (TemporarySixAMTemperature < -5.0d0) THEN
+    ThermalComfortData(PeopleNum)%ClothingValue = 1.0d0
+ ELSE IF ((TemporarySixAMTemperature >= -5.0d0).AND.(TemporarySixAMTemperature < 5.0d0)) THEN
+    ThermalComfortData(PeopleNum)%ClothingValue = 0.818d0 - 0.0364d0 * TemporarySixAMTemperature
+ ELSE IF ((TemporarySixAMTemperature >= 5.0d0).AND.(TemporarySixAMTemperature < 26.0d0)) THEN
+    TemporaryVariable = -0.1635d0 - 0.0066d0 * TemporarySixAMTemperature
+    ThermalComfortData(PeopleNum)%ClothingValue = 10.0d0**(TemporaryVariable)
+ ELSE IF (TemporarySixAMTemperature >= 26.0d0) THEN
+    ThermalComfortData(PeopleNum)%ClothingValue = 0.46d0
+ END IF
+
+END SUBROUTINE DynamicClothingModel
 
 !     NOTICE
 !

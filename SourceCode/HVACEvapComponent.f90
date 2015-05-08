@@ -13,6 +13,8 @@ Module EvaporativeCoolers
   ! To encapsulate the data and algorithms required for
   ! Evaporative Coolers Components for use in mechanical air systems
 
+  ! provide models for evaporative coolers as zone forced air units.
+
   ! METHODOLOGY EMPLOYED:
   ! various evaporative component models in this module
   !   different models share common module level data structure.
@@ -25,14 +27,15 @@ Module EvaporativeCoolers
   ! USE STATEMENTS:
   ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals, ONLY: BeginEnvrnFlag,BeginDayFlag, SysSizingCalc, SecInHour, ScheduleAlwaysOn
+USE DataGlobals, ONLY: BeginEnvrnFlag,BeginDayFlag, SysSizingCalc, SecInHour, ScheduleAlwaysOn, MaxNameLength
 USE DataInterfaces, ONLY: ShowContinueError, ShowSevereError,ShowFatalError, SetupOutputVariable, &
-                          ShowWarningError
+                          ShowWarningError, ShowContinueErrorTimeStamp,ShowRecurringWarningErrorAtEnd
 USE DataLoopNode
 Use DataEnvironment, ONLY: OUTBAROPRESS
 USE ScheduleManager
 Use Psychrometrics
 USE DataGlobalConstants
+USE DataZoneEquipment, ONLY: ZoneEvaporativeCoolerUnit_Num
   ! Use statements for access to subroutines in other modules
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
@@ -42,6 +45,13 @@ PRIVATE ! Everything private unless explicitly made public
   ! MODULE PARAMETER DEFINITIONS
 INTEGER, PARAMETER :: WaterSupplyFromMains = 101
 INTEGER, PARAMETER :: WaterSupplyFromTank  = 102
+
+INTEGER, PARAMETER :: BlowThruFan = 50
+INTEGER, PARAMETER :: DrawThruFan = 51
+
+INTEGER, PARAMETER :: ZoneTemperatureDeadbandOnOffCycling     = 20
+INTEGER, PARAMETER :: ZoneCoolingLoadOnOffCycling             = 21
+INTEGER, PARAMETER :: ZoneCoolingLoadVariableSpeedFan         = 22
 
   ! DERIVED TYPE DEFINITIONS
 TYPE EvapConditions
@@ -106,6 +116,7 @@ TYPE EvapConditions
 
   REAL(r64)    :: EvapWaterConsumpRate            = 0.0D0 ! Evap Water Consumption rate in m3/sec
   REAL(r64)    :: EvapWaterConsump                = 0.0D0 ! Evap Water Consumption in m3
+  REAL(r64)    :: EvapWaterStarvMakupRate         = 0.0D0 ! Evap water consumed but not really available from tank m3/s
   REAL(r64)    :: EvapWaterStarvMakup             = 0.0D0 ! Evap water consumed but not really available from tank m3
   REAL(r64)    :: SatEff                          = 0.0D0 !Reporting for Direct Stage and Ind Dry Saturation Efficiency
   REAL(r64)    :: StageEff                        = 0.0D0 !Reporting for Indirect Total Stage Efficiency
@@ -117,13 +128,91 @@ TYPE EvapConditions
                                                         ! rather than wetbulb-depression approach
 END TYPE EvapConditions
 
+
+  TYPE ZoneEvapCoolerUnitStruct
+    CHARACTER(len=MaxNameLength) :: Name   =' '    ! user identifier
+    INTEGER        :: ZoneEquipType        = ZoneEvaporativeCoolerUnit_Num
+    INTEGER        :: ZoneNodeNum          = 0
+    INTEGER        :: AvailSchedIndex      = 0     ! pointer to local availability schedule
+    CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
+    Logical        :: UnitIsAvailable = .FALSE.
+    INTEGER        :: FanAvailStatus  = 0
+    INTEGER        :: OAInletNodeNum       = 0     ! outdoor air inlet node index
+    INTEGER        :: UnitOutletNodeNum    = 0     ! Unit air outlet (to zone) node index
+    INTEGER        :: UnitReliefNodeNum    = 0     ! Unit relief air (from zone) node index (optional)
+    CHARACTER(len=MaxNameLength) :: FanObjectClassName = ' '
+    INTEGER        :: FanType_Num          = 0     !
+    CHARACTER(len=MaxNameLength) :: FanName = ' '
+    INTEGER        :: FanIndex             = 0
+    REAL(r64)      :: ActualFanVolFlowRate = 0.0d0
+    INTEGER        :: FanAvailSchedPtr     = 0
+    INTEGER        :: FanInletNodeNum      = 0
+    INTEGER        :: FanOutletNodeNum     = 0
+    REAL(r64)      :: DesignAirVolumeFlowRate = 0.0d0 !
+    REAL(r64)      :: DesignAirMassFlowRate = 0.0d0
+    REAL(r64)      :: DesignFanSpeedRatio   = 0.0d0 !
+    REAL(r64)      :: FanSpeedRatio        = 0.0d0 !
+
+    INTEGER        :: FanLocation          = 0
+    INTEGER        :: ControlSchemeType    = 0
+    REAL(r64)      :: TimeElapsed          = 0.0d0
+    REAL(r64)      :: ThrottlingRange      = 0.0d0  ! temperature range for hystersis type tstat contorl [Delta C]
+    LOGICAL        :: IsOnThisTimestep     = .FALSE.
+    LOGICAL        :: WasOnLastTimestep    = .FALSE.
+    REAL(r64)      :: ThresholdCoolingLoad = 0.0d0
+    CHARACTER(len=MaxNameLength) :: EvapCooler_1_ObjectClassName = ' '
+    CHARACTER(len=MaxNameLength) :: EvapCooler_1_Name = ' '
+    INTEGER        :: EvapCooler_1_Type_Num  = 0     !
+    INTEGER        :: EvapCooler_1_Index     = 0
+    LOGICAL        :: EvapCooler_1_AvailStatus = .FALSE.
+    CHARACTER(len=MaxNameLength) :: EvapCooler_2_ObjectClassName = ' '
+    CHARACTER(len=MaxNameLength) :: EvapCooler_2_Name = ' '
+    INTEGER        :: EvapCooler_2_Type_Num  = 0     !
+    INTEGER        :: EvapCooler_2_Index     = 0
+    LOGICAL        :: EvapCooler_2_AvailStatus = .FALSE.
+    REAL(r64)      :: OAInletRho           = 0.d0  ! fills internal variable, current inlet air density [kg/m3]
+    REAL(r64)      :: OAInletCp            = 0.d0  ! fills internal variable, current inlet air specific heat [J/kg-c]
+    REAL(r64)      :: OAInletTemp          = 0.d0  ! fills internal variable, current inlet air temperature [C]
+    REAL(r64)      :: OAInletHumRat        = 0.d0  ! fills internal variable, current inlet air humidity ratio [kg/kg]
+    REAL(r64)      :: OAInletMassFlowRate  = 0.d0  ! fills internal variable, current inlet air mass flow rate [kg/s]
+    REAL(r64)      :: UnitOutletTemp         = 0.d0  ! filled by actuator, component outlet temperature [C]
+    REAL(r64)      :: UnitOutletHumRat       = 0.d0  ! filled by actuator, component outlet humidity ratio [kg/kg]
+    REAL(r64)      :: UnitOutletMassFlowRate = 0.d0  ! filled by actuator, component outlet mass flow rate [kg/s]
+    REAL(r64)      :: UnitReliefTemp         = 0.d0  ! filled by actuator, component outlet temperature [C]
+    REAL(r64)      :: UnitReliefHumRat       = 0.d0  ! filled by actuator, component outlet humidity ratio [kg/kg]
+    REAL(r64)      :: UnitReliefMassFlowRate = 0.d0  ! filled by actuator, component outlet mass flow rate [kg/s]
+    REAL(r64)      :: UnitTotalCoolingRate   = 0.0d0 ! unit output to zone, total cooling rate [W]
+    REAL(r64)      :: UnitTotalCoolingEnergy = 0.0d0 ! unit output to zone, total cooling energy [J]
+    REAL(r64)      :: UnitSensibleCoolingRate= 0.0d0 ! unit output to zone, sensible cooling rate [W]
+    REAL(r64)      :: UnitSensibleCoolingEnergy = 0.0d0 ! unit output to zone, sensible cooling energy [J]
+    REAL(r64)      :: UnitLatentHeatingRate  = 0.0d0 ! unit output to zone, latent heating rate [W]
+    REAL(r64)      :: UnitLatentHeatingEnergy = 0.0d0 ! unit output to zone, latent heating energy [J]
+    REAL(r64)      :: UnitLatentCoolingRate = 0.0d0 ! unit output to zone, latent cooling rate [W]
+    REAL(r64)      :: UnitLatentCoolingEnergy = 0.0d0 ! unit output to zone, latent cooling energy [J]
+    REAL(r64)      :: UnitFanSpeedRatio = 0.d0 ! unit fan speed ratio, dimensionless [ ]
+
+    INTEGER        :: UnitVSControlMaxIterErrorIndex = 0 ! regula falsi errors, fan speed iteration limits
+    INTEGER        :: UnitVSControlLimitsErrorIndex  = 0 ! regula falsi errors, limits exceeded.
+
+  END TYPE
+
   ! MODULE VARIABLE DECLARATIONS:
+  LOGICAL,SAVE      :: GetInputEvapComponentsFlag = .TRUE. ! Flag set to make sure you get input once
   INTEGER     :: NumEvapCool=0             ! The Number of Evap Coolers found in the Input
   TYPE (EvapConditions), ALLOCATABLE, DIMENSION(:) :: EvapCond
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
 
+  INTEGER     :: NumZoneEvapUnits = 0
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckZoneEvapUnitName
+  TYPE (ZoneEvapCoolerUnitStruct), Allocatable, Dimension(:) :: ZoneEvapUnit
+  LOGICAL :: GetInputZoneEvapUnit = .TRUE.
+
+
   ! SUBROUTINE SPECIFICATIONS FOR MODULE EvapCoolers
+
+
+! component model routines
 PUBLIC  SimEvapCooler
 PRIVATE GetEvapInput
 PRIVATE InitEvapCooler
@@ -136,6 +225,14 @@ PRIVATE CalcIndirectResearchSpecialEvapCooler
 PRIVATE CalcDirectResearchSpecialEvapCooler
 PRIVATE UpdateEvapCooler
 PRIVATE ReportEvapCooler
+
+! zone unit routines
+PUBLIC  SimZoneEvaporativeCoolerUnit
+PRIVATE GetInputZoneEvaporativeCoolerUnit
+PRIVATE InitZoneEvaporativeCoolerUnit
+PRIVATE SizeZoneEvaporativeCoolerUnit
+PRIVATE CalcZoneEvaporativeCoolerUnit
+PRIVATE ReportZoneEvaporativeCoolerUnit
 
 CONTAINS
 
@@ -181,14 +278,14 @@ SUBROUTINE SimEvapCooler(CompName,CompIndex)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER           :: EvapCoolNum     ! The EvapCooler that you are currently loading input into
-  LOGICAL,SAVE      :: GetInputFlag = .True. ! Flag set to make sure you get input once
+
 
           ! FLOW:
 
   ! Obtains and Allocates EvapCooler related parameters from input file
-  IF (GetInputFlag) THEN  !First time subroutine has been entered
+  IF (GetInputEvapComponentsFlag) THEN  !First time subroutine has been entered
     CALL GetEvapInput
-    GetInputFlag=.false.
+    GetInputEvapComponentsFlag=.false.
   End If
 
 
@@ -841,6 +938,11 @@ SUBROUTINE InitEvapCooler(EvapCoolNum)
   !Check that setpoint is active
   IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
     DO EvapUnitNum = 1, NumEvapCool
+
+      !only check evap coolers that are supposed to have a control node
+      IF (( EvapCond(EvapCoolNum)%EvapCoolerType /= iEvapCoolerInDirectRDDSpecial) &
+          .AND.  (EvapCond(EvapCoolNum)%EvapCoolerType /= iEvapCoolerDirectResearchSpecial) ) CYCLE
+
       ControlNode = EvapCond(EvapUnitNum)%EvapControlNodeNum
       IF (ControlNode > 0) THEN
         IF (Node(ControlNode)%TempSetPoint == SensedNodeFlagValue) THEN
@@ -917,31 +1019,31 @@ SUBROUTINE InitEvapCooler(EvapCoolNum)
   ELSE
     EvapCond(EvapCoolNum)%SecInletMassFlowRate         = EvapCond(EvapCoolNum)%IndirectVolFlowRate * OutAirDensity
     EvapCond(EvapCoolNum)%SecInletMassFlowRateMaxAvail = EvapCond(EvapCoolNum)%IndirectVolFlowRate * OutAirDensity
-    EvapCond(EvapCoolNum)%SecInletMassFlowRateMinAvail = 0.0
+    EvapCond(EvapCoolNum)%SecInletMassFlowRateMinAvail = 0.0d0
     EvapCond(EvapCoolNum)%SecInletTemp                 = OutDryBulbTemp
     EvapCond(EvapCoolNum)%SecInletHumRat               = PsyWFnTdbTwbPb(OutDryBulbTemp,OutWetBulbTemp,OutBaroPress)
     EvapCond(EvapCoolNum)%SecInletEnthalpy             = OutEnthalpy
     EvapCond(EvapCoolNum)%SecInletPressure             = OutBaroPress
   ENDIF
 !Set the energy consumption to zero each time through for reporting
-  EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0
-  EvapCond(EvapCoolNum)%EvapCoolerPower  = 0.0
+  EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0d0
+  EvapCond(EvapCoolNum)%EvapCoolerPower  = 0.0d0
   EvapCond(EvapCoolNum)%DewPointBoundFlag = 0
 !Set the water consumption to zero each time through for reporting
-  EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
-  EvapCond(EvapCoolNum)%EvapWaterConsump     = 0.0
-  EvapCond(EvapCoolNum)%EvapWaterStarvMakup  = 0.0
+  EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
+  EvapCond(EvapCoolNum)%EvapWaterConsump     = 0.0d0
+  EvapCond(EvapCoolNum)%EvapWaterStarvMakup  = 0.0d0
 
 !Set the Saturation and Stage Efficiency to zero each time through for reporting
-  EvapCond(EvapCoolNum)%StageEff  = 0.0
-  EvapCond(EvapCoolNum)%SatEff    = 0.0
+  EvapCond(EvapCoolNum)%StageEff  = 0.0d0
+  EvapCond(EvapCoolNum)%SatEff    = 0.0d0
 
 ! These initializations are done every iteration
   OutNode = EvapCond(EvapCoolNum)%OutletNode
   ControlNode = EvapCond(EvapCoolNum)%EvapControlNodeNum
 
   IF (ControlNode.EQ.0) THEN
-    EvapCond(EvapCoolNum)%DesiredOutletTemp = 0.0
+    EvapCond(EvapCoolNum)%DesiredOutletTemp = 0.0d0
   ELSE IF (ControlNode.EQ.OutNode) THEN
     EvapCond(EvapCoolNum)%DesiredOutletTemp = Node(ControlNode)%TempSetPoint
   ELSE
@@ -1098,8 +1200,8 @@ SUBROUTINE CalcDirectEvapCooler(EvapCoolNum)
 
   ! If the Evaporative Cooler  is operating there should be some mass flow rate
   !  Also the evap cooler has to be scheduled to be available
-  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0)) THEN
+  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0)) THEN
 
 
    PadDepth = EvapCond(EvapCoolNum)%PadDepth
@@ -1115,14 +1217,14 @@ SUBROUTINE CalcDirectEvapCooler(EvapCoolNum)
 !******************************************************************************
 !   SAT EFF IS FOR DIFFERENT THICKNESS CELDEK PAD (CURVE FIT FROM DATA)
 !******************************************************************************
-  SatEff=0.792714+0.958569*PadDepth - 0.25193*AirVel                             &
-         - 1.03215*PadDepth**2 + 2.62659E-2*AirVel**2 + 0.914869*PadDepth*AirVel &
-         - 1.48241*AirVel*PadDepth**2 - 1.89919E-2*AirVel**3*PadDepth            &
-         + 1.13137*PadDepth**3*AirVel + 3.27622E-2*AirVel**3*PadDepth**2         &
-         - 0.145384*PadDepth**3*AirVel**2
+  SatEff=0.792714d0+0.958569d0*PadDepth - 0.25193d0*AirVel                           &
+         - 1.03215d0*PadDepth**2 + 2.62659d-2*AirVel**2 + 0.914869d0*PadDepth*AirVel &
+         - 1.48241d0*AirVel*PadDepth**2 - 1.89919d-2*AirVel**3*PadDepth              &
+         + 1.13137d0*PadDepth**3*AirVel + 3.27622d-2*AirVel**3*PadDepth**2           &
+         - 0.145384d0*PadDepth**3*AirVel**2
 
-  IF(SatEff.GE.1.0) SatEff=1.0
-  IF(SatEff < 0.0) THEN ! we have a serious problem.  Pad Area and/or depth not suitable for system air flow rates
+  IF(SatEff.GE.1.0d0) SatEff=1.0d0
+  IF(SatEff < 0.0d0) THEN ! we have a serious problem.  Pad Area and/or depth not suitable for system air flow rates
     Call ShowSevereError('EVAPCOOLER:DIRECT:CELDEKPAD: '//trim(EvapCond(EvapCoolNum)%EvapCoolerName)//' has a problem')
     Call ShowContinueError('Check size of Pad Area and/or Pad Depth in input')
     Call ShowContinueError('Cooler Effectiveness calculated as: '//trim(RoundSigDigits(SatEff,2)) )
@@ -1165,7 +1267,7 @@ SUBROUTINE CalcDirectEvapCooler(EvapCoolNum)
                  (EvapCond(EvapCoolNum)%OutletHumRat - EvapCond(EvapCoolNum)%InletHumRat) *  &
                   EvapCond(EvapCoolNum)%InletMassFlowRate/Rhowater
       ! A numerical check to keep from having very tiny negative water consumption values being reported
-      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0d0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
 
  Else
@@ -1178,9 +1280,9 @@ SUBROUTINE CalcDirectEvapCooler(EvapCoolNum)
 
       EvapCond(EvapCoolNum)%OutletEnthalpy = EvapCond(EvapCoolNum)%InletEnthalpy
 
-      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0
+      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0d0
 
-      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  End IF
  ! all of the mass flowrates are not changed across the evap cooler
@@ -1249,8 +1351,8 @@ SUBROUTINE CalcDryIndirectEvapCooler(EvapCoolNum)
 
   ! If the Evaporative Cooler  is operating there should be some mass flow rate
   !  Also the evap cooler has to be scheduled to be available
-  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0)) THEN
+  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0)) THEN
 
 
    PadDepth = EvapCond(EvapCoolNum)%IndirectPadDepth
@@ -1266,13 +1368,13 @@ SUBROUTINE CalcDryIndirectEvapCooler(EvapCoolNum)
 !******************************************************************************
 !   SAT EFF IS FOR DIFFERENT THICKNESS CELDEK PAD (CURVE FIT FROM DATA)
 !******************************************************************************
-  SatEff=0.792714+0.958569*PadDepth - 0.25193*AirVel                             &
-         - 1.03215*PadDepth**2 + 2.62659E-2*AirVel**2 + 0.914869*PadDepth*AirVel &
-         - 1.48241*AirVel*PadDepth**2 - 1.89919E-2*AirVel**3*PadDepth            &
-         + 1.13137*PadDepth**3*AirVel + 3.27622E-2*AirVel**3*PadDepth**2         &
-         - 0.145384*PadDepth**3*AirVel**2
+  SatEff=0.792714d0+0.958569d0*PadDepth - 0.25193d0*AirVel                           &
+         - 1.03215d0*PadDepth**2 + 2.62659d-2*AirVel**2 + 0.914869d0*PadDepth*AirVel &
+         - 1.48241d0*AirVel*PadDepth**2 - 1.89919d-2*AirVel**3*PadDepth              &
+         + 1.13137d0*PadDepth**3*AirVel + 3.27622d-2*AirVel**3*PadDepth**2         &
+         - 0.145384d0*PadDepth**3*AirVel**2
 
-  IF(SatEff.GE.1.0) SatEff=1.0
+  IF(SatEff.GE.1.0d0) SatEff=1.0d0
   EvapCond(EvapCoolNum)%SatEff = SatEff
 !***************************************************************************
 !   TEMP LEAVING DRY BULB IS CALCULATED FROM SATURATION EFFICIENCY AS THE
@@ -1345,12 +1447,12 @@ SUBROUTINE CalcDryIndirectEvapCooler(EvapCoolNum)
                                   , EvapCond(EvapCoolNum)%SecInletHumRat ) &
                 + PsyRhoAirFnPbTdbW(EvapCond(EvapCoolNum)%SecInletPressure  &
                                   , TDBSec     &
-                                  , HumratSec ) ) / 2.0
+                                  , HumratSec ) ) / 2.0d0
       EvapCond(EvapCoolNum)%EvapWaterConsumpRate =  &
                  (HumratSec - EvapCond(EvapCoolNum)%SecInletHumRat) *  &
                  EvapCond(EvapCoolNum)%IndirectVolFlowRate*RhoAir/RhoWater
       ! A numerical check to keep from having very tiny negative water consumption values being reported
-      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0d0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  Else
      ! The evap cooler is not running and does not change conditions from inlet to outlet
@@ -1362,9 +1464,9 @@ SUBROUTINE CalcDryIndirectEvapCooler(EvapCoolNum)
 
       EvapCond(EvapCoolNum)%OutletEnthalpy = EvapCond(EvapCoolNum)%InletEnthalpy
 
-      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0
+      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0d0
 
-      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  End IF
  ! all of the mass flowrates are not changed across the evap cooler
@@ -1431,8 +1533,8 @@ SUBROUTINE CalcWetIndirectEvapCooler(EvapCoolNum)
 
   ! If the Evaporative Cooler  is operating there should be some mass flow rate
   !  Also the evap cooler has to be scheduled to be available
-  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0)) THEN
+  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0)) THEN
 
 
 !******************************************************************************
@@ -1447,7 +1549,7 @@ SUBROUTINE CalcWetIndirectEvapCooler(EvapCoolNum)
               MIN(EvapCond(EvapCoolNum)%WetCoilFlowRatio*CFMAIR/CFMSEC, &
                   EvapCond(EvapCoolNum)%WetCoilMaxEfficiency)
 
-      IF(StageEff.GE.1.0) StageEff=1.0
+      IF(StageEff.GE.1.0d0) StageEff=1.0d0
 ! This is a rough approximation of the Total Indirect Stage Efficiency.  I think that
 !   this would mainly be used for evap sizing purposes.
       EvapCond(EvapCoolNum)%StageEff = StageEff
@@ -1501,9 +1603,9 @@ SUBROUTINE CalcWetIndirectEvapCooler(EvapCoolNum)
       QHX = CFMAir*RhoAir*(EvapCond(EvapCoolNum)%InletEnthalpy - EvapCond(EvapCoolNum)%OutletEnthalpy)
 
       RhoWater = RhoH2O(EvapCond(EvapCoolNum)%SecInletTemp)
-      EvapCond(EvapCoolNum)%EvapWaterConsumpRate =  (QHx/StageEff)/(2500000.0 * RhoWater)
+      EvapCond(EvapCoolNum)%EvapWaterConsumpRate =  (QHx/StageEff)/(2500000.0d0 * RhoWater)
       ! A numerical check to keep from having very tiny negative water consumption values being reported
-      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0d0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  Else
      ! The evap cooler is not running and does not change conditions from inlet to outlet
@@ -1515,9 +1617,9 @@ SUBROUTINE CalcWetIndirectEvapCooler(EvapCoolNum)
 
       EvapCond(EvapCoolNum)%OutletEnthalpy = EvapCond(EvapCoolNum)%InletEnthalpy
 
-      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0
+      EvapCond(EvapCoolNum)%EvapCoolerEnergy = 0.0d0
 
-      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  End IF
  ! all of the mass flowrates are not changed across the evap cooler
@@ -1581,17 +1683,17 @@ Subroutine CalcResearchSpecialPartLoad(EvapCoolNum)
   InletNode = EvapCond(EvapCoolNum)%InletNode
   ControlNode = EvapCond(EvapCoolNum)%EvapControlNodeNum
   DesOutTemp = EvapCond(EvapCoolNum)%DesiredOutletTemp
-  PartLoadFrac = 0.0
+  PartLoadFrac = 0.0d0
   CompName=EvapCond(EvapCoolNum)%EvapCoolerName
 
   ! If Evap Cooler runs with a cooling load then set PartLoadFrac on Cooling System and the Mass Flow
-  If((GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0) .and. &
+  If((GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0) .and. &
        (Node(InletNode)%MassFlowRate .gt. MinAirMassFlow) .and. &
        (Node(InletNode)%Temp > Node(ControlNode)%TempSetPoint) .and. &
        (ABS(Node(InletNode)%Temp - DesOutTemp) .gt. TempControlTol) ) Then
 
         ! Get full load result, depending on model
-        EvapCond(EvapCoolNum)%PartLoadFract = 1.0
+        EvapCond(EvapCoolNum)%PartLoadFract = 1.0d0
         SELECT CASE (EvapCond(EvapCoolNum)%EvapCoolerType)
         CASE (iEvapCoolerInDirectRDDSpecial)
           CALL CalcIndirectResearchSpecialEvapCooler(EvapCoolNum)
@@ -1703,14 +1805,14 @@ SUBROUTINE CalcIndirectResearchSpecialEvapCooler(EvapCoolNum)
   REAL(r64)  :: PurgeHumRat
   REAL(r64)  :: PurgeEnthalpy
   REAL(r64)  :: PurgeTemp
-  REAL(r64)  :: BlowDownVdot      =0.0
-  REAL(r64)  :: DriftVdot         =0.0
-  REAL(r64)  :: EvapVdot          =0.0
+  REAL(r64)  :: BlowDownVdot      =0.0d0
+  REAL(r64)  :: DriftVdot         =0.0d0
+  REAL(r64)  :: EvapVdot          =0.0d0
 
   ! If the Evaporative Cooler  is operating there should be some mass flow rate
   !  Also the evap cooler has to be scheduled to be available
-  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0)) THEN
+  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0)) THEN
 
 
 !******************************************************************************
@@ -1725,7 +1827,7 @@ SUBROUTINE CalcIndirectResearchSpecialEvapCooler(EvapCoolNum)
 
 ! This is model is for special indirect cooler with efficiency greater than 1.0
 
-      IF(StageEff.GE.1.5) StageEff=1.5
+      IF(StageEff.GE.1.5d0) StageEff=1.5d0
 
       EvapCond(EvapCoolNum)%StageEff = StageEff
 
@@ -1754,8 +1856,8 @@ SUBROUTINE CalcIndirectResearchSpecialEvapCooler(EvapCoolNum)
 
     SecVdot     = TotalVolFlow - TertVdot
 
-    IF (SecVdot .LT. 0.0) then ! all tertiary/releif air e.g. econonizer wide open
-      SecVdot =  0.0
+    IF (SecVdot .LT. 0.0d0) then ! all tertiary/releif air e.g. econonizer wide open
+      SecVdot =  0.0d0
       SecondaryInletWetBulbTemp  = PsyTwbFnTdbWPb(TertTemp, TertHumRate , OutBaroPress)
       SecondaryInletDewpointTemp = PsyTdpFnTdbTwbPb(TertTemp, SecondaryInletWetBulbTemp, OutBaroPress)
 
@@ -1848,17 +1950,17 @@ SUBROUTINE CalcIndirectResearchSpecialEvapCooler(EvapCoolNum)
       QHX = CFMAir*RhoAir*(EvapCond(EvapCoolNum)%InletEnthalpy - EvapCond(EvapCoolNum)%OutletEnthalpy)
 
       RhoWater = RhoH2O(OutDryBulbTemp)
-      EvapVdot=  (QHx)/(2500000.0 * RhoWater)
+      EvapVdot=  (QHx)/(2500000.0d0 * RhoWater)
       DriftVdot = EvapVdot * EvapCond(EvapCoolNum)%DriftFraction
       IF (EvapCond(EvapCoolNum)%BlowDownRatio > 0.0D0) THEN
         BlowDownVdot =  EvapVdot / (EvapCond(EvapCoolNum)%BlowDownRatio - 1) - DriftVdot
-        IF ( BlowDownVdot < 0.0 ) BlowDownVdot = 0.0
+        IF ( BlowDownVdot < 0.0d0 ) BlowDownVdot = 0.0d0
       ELSE
         BlowDownVdot = 0.0D0
       ENDIF
       EvapCond(EvapCoolNum)%EvapWaterConsumpRate =  EvapVdot + DriftVdot + BlowDownVdot
       ! A numerical check to keep from having very tiny negative water consumption values being reported
-      IF(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      IF(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0d0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
  ELSE
    ! The evap cooler is not running and does not change conditions from inlet to outlet
@@ -1928,14 +2030,14 @@ SUBROUTINE CalcDirectResearchSpecialEvapCooler(EvapCoolNum)
   REAL(r64)  :: TEWB        ! Entering Wet Bulb Temperature
   REAL(r64)  :: RhoWater
   REAL(r64)  :: PartLoad
-  REAL(r64)  :: BlowDownVdot      =0.0
-  REAL(r64)  :: DriftVdot         =0.0
-  REAL(r64)  :: EvapVdot          =0.0
+  REAL(r64)  :: BlowDownVdot      =0.0d0
+  REAL(r64)  :: DriftVdot         =0.0d0
+  REAL(r64)  :: EvapVdot          =0.0d0
 
   ! If the Evaporative Cooler  is operating there should be some mass flow rate
   !  Also the evap cooler has to be scheduled to be available
-  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0)) THEN
+  IF((EvapCond(EvapCoolNum)%InletMassFlowRate .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(EvapCond(EvapCoolNum)%SchedPtr) .gt. 0.0d0)) THEN
 
 !***************************************************************************
 !   TEMP LEAVING DRY BULB IS CALCULATED FROM SATURATION EFFICIENCY AS THE
@@ -1945,7 +2047,7 @@ SUBROUTINE CalcDirectResearchSpecialEvapCooler(EvapCoolNum)
       TEDB   = EvapCond(EvapCoolNum)%InletTemp
       SatEff = EvapCond(EvapCoolNum)%DirectEffectiveness
       PartLoad = EvapCond(EvapCoolNum)%PartLoadFract
-      IF (PartLoad .EQ. 1.0) THEN
+      IF (PartLoad .EQ. 1.0d0) THEN
         EvapCond(EvapCoolNum)%OutletTemp = TEDB-((TEDB-TEWB)*SatEff)
         EvapCond(EvapCoolNum)%OuletWetBulbTemp = TEWB
         EvapCond(EvapCoolNum)%OutletHumRat = PsyWFnTdbTwbPb(EvapCond(EvapCoolNum)%OutletTemp,TEWB,OutBaroPress)
@@ -2001,7 +2103,7 @@ SUBROUTINE CalcDirectResearchSpecialEvapCooler(EvapCoolNum)
       EvapCond(EvapCoolNum)%EvapWaterConsumpRate =  EvapVdot + DriftVdot + BlowDownVdot
 
       ! A numerical check to keep from having very tiny negative water consumption values being reported
-      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0
+      If(EvapCond(EvapCoolNum)%EvapWaterConsumpRate < 0.0d0) EvapCond(EvapCoolNum)%EvapWaterConsumpRate = 0.0d0
 
 
   Else
@@ -2077,7 +2179,7 @@ SUBROUTINE UpdateEvapCooler(EvapCoolNum)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   Integer             :: OutletNode
   Integer             :: InletNode
-  REAL(r64)           :: AvailWaterRate = 0.0
+  REAL(r64)           :: AvailWaterRate = 0.0d0
 
    OutletNode = EvapCond(EvapCoolNum)%OutletNode
    InletNode  = EvapCond(EvapCoolNum)%InletNode
@@ -2100,13 +2202,15 @@ SUBROUTINE UpdateEvapCooler(EvapCoolNum)
     endif
 
    !check if should be starved by restricted flow from tank
-    IF (EvapCond(EvapCoolNum)%EvapWaterSupplyMode == WaterSupplyFromTank) Then
+    IF (EvapCond(EvapCoolNum)%EvapWaterSupplyMode == WaterSupplyFromTank) THEN
       AvailWaterRate = &
       WaterStorage(EvapCond(EvapCoolNum)%EvapWaterSupTankID)%VdotAvailDemand(EvapCond(EvapCoolNum)%EvapWaterTankDemandARRID)
-      If (AvailWaterRate < EvapCond(EvapCoolNum)%EvapWaterConsumpRate) Then
-        EvapCond(EvapCoolNum)%EvapWaterStarvMakup = EvapCond(EvapCoolNum)%EvapWaterConsumpRate - AvailWaterRate
+      IF (AvailWaterRate < EvapCond(EvapCoolNum)%EvapWaterConsumpRate) THEN
+        EvapCond(EvapCoolNum)%EvapWaterStarvMakupRate = EvapCond(EvapCoolNum)%EvapWaterConsumpRate - AvailWaterRate
         EvapCond(EvapCoolNum)%EvapWaterConsumpRate = AvailWaterRate
-      endif
+      ELSE
+        EvapCond(EvapCoolNum)%EvapWaterStarvMakupRate = 0.d0
+      ENDIF
     ENDIF
 
   IF (Contaminant%CO2Simulation) Then
@@ -2169,12 +2273,1328 @@ SUBROUTINE ReportEvapCooler(EvapCoolNum)
    EvapCond(EvapCoolNum)%EvapCoolerPower= EvapCond(EvapCoolNum)%EvapCoolerPower
    EvapCond(EvapCoolNum)%EvapCoolerEnergy= EvapCond(EvapCoolNum)%EvapCoolerPower*TimeStepSys*SecInHour
 
-   ! Report Water comsumption in liters per timestep
-   EvapCond(EvapCoolNum)%EvapWaterConsump=EvapCond(EvapCoolNum)%EvapWaterConsumpRate*TimeStepSys*SecInHour
+   ! Report Water comsumption in cubic meters per timestep
+   EvapCond(EvapCoolNum)%EvapWaterConsump  = EvapCond(EvapCoolNum)%EvapWaterConsumpRate*TimeStepSys*SecInHour
+   EvapCond(EvapCoolNum)%EvapWaterStarvMakup = EvapCond(EvapCoolNum)%EvapWaterStarvMakupRate *TimeStepSys*SecInHour
 
 
   RETURN
 END Subroutine ReportEvapCooler
+
+!***************
+!Begin routines for zone HVAC Evaporative cooler unit
+!_______________________________________________________________________________________________________________________
+!***************
+
+SUBROUTINE SimZoneEvaporativeCoolerUnit(CompName,ZoneNum,SensibleOutputProvided,LatentOutputProvided,CompIndex)
+
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! public simulation routine for managing zone hvac evaporative cooler unit
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY : FindItemInList
+  USE General, ONLY : TrimSigDigits
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT    (IN) :: CompName            ! name of the packaged terminal heat pump
+  INTEGER,          INTENT    (IN) :: ZoneNum             ! number of zone being served
+  REAL(r64),        INTENT   (OUT) :: SensibleOutputProvided   ! sensible capacity delivered to zone
+  REAL(r64),        INTENT   (OUT) :: LatentOutputProvided   ! Latent add/removal  (kg/s), dehumid = negative
+  INTEGER,          INTENT (INOUT) :: CompIndex           ! index to zone hvac unit
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER    :: CompNum
+
+  IF (GetInputZoneEvapUnit) THEN
+    CALL GetInputZoneEvaporativeCoolerUnit
+    GetInputZoneEvapUnit=.FALSE.
+  END IF
+
+  ! Find the correct Equipment
+  IF (CompIndex == 0) THEN
+    CompNum = FindItemInList(CompName, ZoneEvapUnit%Name, NumZoneEvapUnits)
+    IF (CompNum == 0) THEN
+      CALL ShowFatalError('SimZoneEvaporativeCoolerUnit: Zone evaporative cooler unit not found.')
+    ENDIF
+    CompIndex = CompNum
+  ELSE
+    CompNum = CompIndex
+    IF (CompNum < 1 .OR. CompNum > NumZoneEvapUnits) THEN
+      CALL ShowFatalError('SimZoneEvaporativeCoolerUnit: Invalid CompIndex passed='//  &
+                           TRIM(TrimSigDigits(CompNum))// &
+                           ', Number of units ='//TRIM(TrimSigDigits(NumZoneEvapUnits))// &
+                           ', Entered Unit name = '//TRIM(CompName) )
+    ENDIF
+    IF(CheckZoneEvapUnitName(CompNum)) THEN
+      IF (CompName /= ZoneEvapUnit(CompNum)%Name) THEN
+        CALL ShowFatalError('SimZoneEvaporativeCoolerUnit: Invalid CompIndex passed='//  &
+                           TRIM(TrimSigDigits(CompNum))// &
+                           ', Unit name='//TRIM(CompName)//', stored unit name for that index='// &
+                           TRIM(ZoneEvapUnit(CompNum)%Name) )
+      ENDIF
+      CheckZoneEvapUnitName(CompNum) = .FALSE.
+    ENDIF
+  ENDIF
+
+  CALL InitZoneEvaporativeCoolerUnit(CompNum, ZoneNum)
+
+  CALL CalcZoneEvaporativeCoolerUnit(CompNum, ZoneNum, SensibleOutputProvided, LatentOutputProvided )
+
+  CALL ReportZoneEvaporativeCoolerUnit(CompNum)
+
+  RETURN
+
+END SUBROUTINE SimZoneEvaporativeCoolerUnit
+
+SUBROUTINE GetInputZoneEvaporativeCoolerUnit
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! get input for zone evap cooler unit
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE Fans,              ONLY: GetFanType, GetFanIndex, GetFanVolFlow, GetFanInletNode, GetFanOutletNode, GetFanAvailSchPtr
+  USE General,           ONLY: TrimSigDigits
+  USE InputProcessor,    ONLY: GetNumObjectsFound, GetObjectDefMaxArgs, GetObjectItem, &
+                                   FindItemInList, VerifyName
+  USE NodeInputManager,  ONLY: GetOnlySingleNode
+  USE DataHVACGlobals,   ONLY: ZoneComp, FanType_SimpleConstVolume, FanType_SimpleOnOff
+  USE DataZoneEquipment, ONLY: ZoneEvaporativeCoolerUnit_Num
+  USE BranchNodeConnections, ONLY: SetUpCompSets
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetInputZoneEvaporativeCoolerUnit: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength)   :: CurrentModuleObject ! Object type for getting and error messages
+  CHARACTER(len=MaxNameLength), &
+                   ALLOCATABLE, DIMENSION(:) :: Alphas     ! Alpha items for object
+  REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Numbers    ! Numeric items for object
+  CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAlphaFields   ! Alpha field names
+  CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cNumericFields ! Numeric field names
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaBlanks     ! Logical array, alpha field input BLANK = .true.
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericBlanks   ! Logical array, numeric field input BLANK = .true.
+  INTEGER                        :: NumAlphas  ! Number of Alphas for each GetObjectItem call
+  INTEGER                        :: NumNumbers ! Number of Numbers for each GetObjectItem call
+  INTEGER                        :: MaxAlphas     ! Maximum number of alpha fields in all objects
+  INTEGER                        :: MaxNumbers    ! Maximum number of numeric fields in all objects
+  INTEGER                        :: NumFields     ! Total number of fields in object
+  INTEGER                        :: IOStatus   ! Used in GetObjectItem
+  LOGICAL                        :: ErrorsFound=.FALSE.  ! Set to true if errors in input, fatal at end of routine
+  LOGICAL                        :: IsNotOK    ! Flag to verify name
+  LOGICAL                        :: IsBlank    ! Flag for blank name
+  LOGICAL                        :: ErrFlag
+  REAL(r64)                      :: FanVolFlow
+  INTEGER                        :: UnitLoop
+
+  IF (GetInputEvapComponentsFlag) THEN
+    CALL GetEvapInput
+    GetInputEvapComponentsFlag=.false.
+  End If
+
+  MaxNumbers = 0
+  MaxAlphas  = 0
+
+  CurrentModuleObject = 'ZoneHVAC:EvaporativeCoolerUnit'
+  NumZoneEvapUnits    = GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
+  MaxNumbers=MAX(MaxNumbers,NumNumbers)
+  MaxAlphas=MAX(MaxAlphas,NumAlphas)
+  ALLOCATE(Alphas(MaxAlphas))
+  Alphas=' '
+  ALLOCATE(Numbers(MaxNumbers))
+  Numbers=0.0d0
+  ALLOCATE(cAlphaFields(MaxAlphas))
+  cAlphaFields=' '
+  ALLOCATE(cNumericFields(MaxNumbers))
+  cNumericFields=' '
+  ALLOCATE(lAlphaBlanks(MaxAlphas))
+  lAlphaBlanks=.TRUE.
+  ALLOCATE(lNumericBlanks(MaxNumbers))
+  lNumericBlanks=.TRUE.
+
+  IF (NumZoneEvapUnits > 0) THEN
+    ALLOCATE (CheckZoneEvapUnitName(NumZoneEvapUnits))
+    CheckZoneEvapUnitName = .TRUE.
+    ALLOCATE (ZoneEvapUnit(NumZoneEvapUnits))
+
+    DO UnitLoop = 1, NumZoneEvapUnits
+      CALL GetObjectItem(CurrentModuleObject,UnitLoop,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+                       NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
+                       AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(Alphas(1),ZoneEvapUnit%Name,UnitLoop-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) Alphas(1)='xxxxx'
+      ENDIF
+      ZoneEvapUnit(UnitLoop)%Name = Alphas(1)
+      IF (lAlphaBlanks(2)) THEN
+        ZoneEvapUnit(UnitLoop)%AvailSchedIndex = ScheduleAlwaysOn
+      ELSE
+        ZoneEvapUnit(UnitLoop)%AvailSchedIndex  = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
+        IF (ZoneEvapUnit(UnitLoop)%AvailSchedIndex  .EQ. 0) THEN
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+          CALL ShowContinueError('invalid-not found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+          ErrorsFound=.TRUE.
+        ENDIF
+      END IF
+
+      IF (.NOT. lAlphaBlanks(3)) THEN
+        ZoneEvapUnit(UnitLoop)%AvailManagerListName = Alphas(3)
+        ZoneComp(ZoneEvaporativeCoolerUnit_Num)%ZoneCompAvailMgrs(UnitLoop)%AvailManagerListName = Alphas(3)
+      ENDIF
+
+      ZoneEvapUnit(UnitLoop)%OAInletNodeNum = &
+               GetOnlySingleNode(Alphas(4),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
+                            NodeType_Air,NodeConnectionType_OutsideAir,1,ObjectIsParent)
+
+      ZoneEvapUnit(UnitLoop)%UnitOutletNodeNum = &
+               GetOnlySingleNode(Alphas(5),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+
+      IF (.NOT. lAlphaBlanks(6)) THEN
+        ZoneEvapUnit(UnitLoop)%UnitReliefNodeNum = &
+               GetOnlySingleNode(Alphas(6),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+      ENDIF
+
+      ZoneEvapUnit(UnitLoop)%FanObjectClassName = Alphas(7)
+      ZoneEvapUnit(UnitLoop)%FanName            = Alphas(8)
+      ErrFlag = .FALSE.
+      CALL GetFanType(ZoneEvapUnit(UnitLoop)%FanName,ZoneEvapUnit(UnitLoop)%FanType_Num,ErrFlag,&
+                     CurrentModuleObject,ZoneEvapUnit(UnitLoop)%Name)
+      FanVolFlow = 0.d0
+      IF(ErrFlag)THEN
+        CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEvapUnit(UnitLoop)%Name))
+        ErrorsFound = .TRUE.
+      ELSE
+        CALL GetFanIndex(ZoneEvapUnit(UnitLoop)%FanName,ZoneEvapUnit(UnitLoop)%FanIndex,ErrFlag,CurrentModuleObject)
+        ZoneEvapUnit(UnitLoop)%FanInletNodeNum = &
+            GetFanInletNode(ZoneEvapUnit(UnitLoop)%FanObjectClassName,ZoneEvapUnit(UnitLoop)%FanName,ErrFlag)
+        ZoneEvapUnit(UnitLoop)%FanOutletNodeNum = &
+            GetFanOutletNode(ZoneEvapUnit(UnitLoop)%FanObjectClassName,ZoneEvapUnit(UnitLoop)%FanName,ErrFlag)
+        CALL GetFanVolFlow(ZoneEvapUnit(UnitLoop)%FanIndex,FanVolFlow)
+        ZoneEvapUnit(UnitLoop)%ActualFanVolFlowRate = FanVolFlow
+        ! Get the fan's availability schedule
+        ZoneEvapUnit(UnitLoop)%FanAvailSchedPtr = GetFanAvailSchPtr(ZoneEvapUnit(UnitLoop)%FanObjectClassName, &
+                                                                      ZoneEvapUnit(UnitLoop)%FanName,ErrFlag)
+        IF (ErrFlag) THEN
+          CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEvapUnit(UnitLoop)%Name))
+          ErrorsFound=.TRUE.
+        ENDIF
+      ENDIF
+
+      ZoneEvapUnit(UnitLoop)%DesignAirVolumeFlowRate = Numbers(1)
+
+      SELECT CASE (TRIM(Alphas(9)))
+      CASE ( 'BLOWTHROUGH' )
+        ZoneEvapUnit(UnitLoop)%FanLocation = BlowThruFan
+      CASE ( 'DRAWTHROUGH' )
+        ZoneEvapUnit(UnitLoop)%FanLocation = DrawThruFan
+      CASE DEFAULT
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid choice found '//TRIM(cAlphaFields(9))//'="'//TRIM(Alphas(9))//'".')
+        ErrorsFound=.TRUE.
+      END SELECT
+
+      SELECT CASE ( TRIM(Alphas(10)) )
+      CASE ( 'ZONETEMPERATUREDEADBANDONOFFCYCLING' )
+        ZoneEvapUnit(UnitLoop)%ControlSchemeType = ZoneTemperatureDeadbandOnOffCycling
+      CASE ( 'ZONECOOLINGLOADONOFFCYCLING' )
+        ZoneEvapUnit(UnitLoop)%ControlSchemeType = ZoneCoolingLoadOnOffCycling
+      CASE ( 'ZONECOOLINGLOADVARIABLESPEEDFAN' )
+        ZoneEvapUnit(UnitLoop)%ControlSchemeType = ZoneCoolingLoadVariableSpeedFan
+      CASE DEFAULT
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid choice found '//TRIM(cAlphaFields(10))//'="'//TRIM(Alphas(10))//'".')
+        ErrorsFound=.TRUE.
+      END SELECT
+
+      ZoneEvapUnit(UnitLoop)%ThrottlingRange = Numbers(2)
+      ZoneEvapUnit(UnitLoop)%ThresholdCoolingLoad = Numbers(3)
+
+      SELECT CASE (TRIM(Alphas(11)))
+
+      CASE ( 'EVAPORATIVECOOLER:DIRECT:CELDEKPAD')
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName = 'EvaporativeCooler:Direct:CelDekPad'
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_Type_Num = iEvapCoolerDirectCELDEKPAD
+      CASE ( 'EVAPORATIVECOOLER:DIRECT:RESEARCHSPECIAL')
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName = 'EvaporativeCooler:Direct:ResearchSpecial'
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_Type_Num = iEvapCoolerDirectResearchSpecial
+      CASE ( 'EVAPORATIVECOOLER:INDIRECT:CELDEKPAD' )
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName = 'EvaporativeCooler:Indirect:CelDekPad'
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_Type_Num = iEvapCoolerInDirectCELDEKPAD
+      CASE ( 'EVAPORATIVECOOLER:INDIRECT:WETCOIL' )
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName = 'EvaporativeCooler:Indirect:WetCoil'
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_Type_Num = iEvapCoolerInDirectWETCOIL
+      CASE ( 'EVAPORATIVECOOLER:INDIRECT:RESEARCHSPECIAL')
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName = 'EvaporativeCooler:Indirect:ResearchSpecial'
+        ZoneEvapUnit(UnitLoop)%EvapCooler_1_Type_Num = iEvapCoolerInDirectRDDSpecial
+      CASE DEFAULT
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid choice found '//TRIM(cAlphaFields(11))//'="'//TRIM(Alphas(11))//'".')
+        ErrorsFound=.TRUE.
+      END SELECT
+
+      ZoneEvapUnit(UnitLoop)%EvapCooler_1_Name  =  Alphas(12)
+      ZoneEvapUnit(UnitLoop)%EvapCooler_1_Index =  FindItemInList(Alphas(12), EvapCond%EvapCoolerName, NumEvapCool)
+      IF (ZoneEvapUnit(UnitLoop)%EvapCooler_1_Index == 0 ) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid, not found '//TRIM(cAlphaFields(12))//'="'//TRIM(Alphas(12))//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
+
+      IF (.NOT. lAlphaBlanks(13)) THEN
+        SELECT CASE (TRIM(Alphas(13)))
+
+        CASE ( 'EVAPORATIVECOOLER:DIRECT:CELDEKPAD')
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName = 'EvaporativeCooler:Direct:CelDekPad'
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Type_Num = iEvapCoolerDirectCELDEKPAD
+        CASE ( 'EVAPORATIVECOOLER:DIRECT:RESEARCHSPECIAL')
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName = 'EvaporativeCooler:Direct:ResearchSpecial'
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Type_Num = iEvapCoolerDirectResearchSpecial
+        CASE ( 'EVAPORATIVECOOLER:INDIRECT:CELDEKPAD' )
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName = 'EvaporativeCooler:Indirect:CelDekPad'
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Type_Num = iEvapCoolerInDirectCELDEKPAD
+        CASE ( 'EVAPORATIVECOOLER:INDIRECT:WETCOIL' )
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName = 'EvaporativeCooler:Indirect:WetCoil'
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Type_Num = iEvapCoolerInDirectWETCOIL
+        CASE ( 'EVAPORATIVECOOLER:INDIRECT:RESEARCHSPECIAL')
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName = 'EvaporativeCooler:Indirect:ResearchSpecial'
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Type_Num = iEvapCoolerInDirectRDDSpecial
+        CASE DEFAULT
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+          CALL ShowContinueError('invalid choice found '//TRIM(cAlphaFields(13))//'="'//TRIM(Alphas(13))//'".')
+          ErrorsFound=.TRUE.
+        END SELECT
+        IF (.NOT. lAlphaBlanks(14)) THEN
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Name  =  Alphas(14)
+          ZoneEvapUnit(UnitLoop)%EvapCooler_2_Index =  FindItemInList(Alphas(14), EvapCond%EvapCoolerName, NumEvapCool)
+          IF (ZoneEvapUnit(UnitLoop)%EvapCooler_2_Index == 0 ) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+            CALL ShowContinueError('invalid, not found '//TRIM(cAlphaFields(14))//'="'//TRIM(Alphas(14))//'".')
+            ErrorsFound=.TRUE.
+          ENDIF
+        ELSE
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+          CALL ShowContinueError('missing input for '//TRIM(cAlphaFields(14)))
+          ErrorsFound=.TRUE.
+        ENDIF
+      ENDIF
+
+      !Add fan to component sets array
+      CALL SetUpCompSets(CurrentModuleObject, ZoneEvapUnit(UnitLoop)%Name, &
+                          ZoneEvapUnit(UnitLoop)%FanObjectClassName, ZoneEvapUnit(UnitLoop)%FanName, &
+                          NodeID(ZoneEvapUnit(UnitLoop)%FanInletNodeNum), NodeID(ZoneEvapUnit(UnitLoop)%FanOutletNodeNum ) )
+
+      !Add first evap cooler to component sets array
+      CALL SetUpCompSets(CurrentModuleObject, ZoneEvapUnit(UnitLoop)%Name, &
+                          ZoneEvapUnit(UnitLoop)%EvapCooler_1_ObjectClassName, ZoneEvapUnit(UnitLoop)%EvapCooler_1_Name, &
+                          NodeID(EvapCond(ZoneEvapUnit(UnitLoop)%EvapCooler_1_Index)%InletNode), &
+                          NodeID(EvapCond(ZoneEvapUnit(UnitLoop)%EvapCooler_1_Index)%OutletNode ) )
+
+      IF (ZoneEvapUnit(UnitLoop)%EvapCooler_2_Index > 0) THEN
+        !Add second evap cooler to component sets array
+        CALL SetUpCompSets(CurrentModuleObject, ZoneEvapUnit(UnitLoop)%Name, &
+                            ZoneEvapUnit(UnitLoop)%EvapCooler_2_ObjectClassName, ZoneEvapUnit(UnitLoop)%EvapCooler_2_Name, &
+                            NodeID(EvapCond(ZoneEvapUnit(UnitLoop)%EvapCooler_2_Index)%InletNode), &
+                            NodeID(EvapCond(ZoneEvapUnit(UnitLoop)%EvapCooler_2_Index)%OutletNode ) )
+
+      ENDIF
+
+      ! check that fan type is consistent with control method
+      IF (ZoneEvapUnit(UnitLoop)%ControlSchemeType == ZoneCoolingLoadVariableSpeedFan) THEN ! must have a VS fan type
+        IF (ZoneEvapUnit(UnitLoop)%FanType_Num == FanType_SimpleConstVolume) THEN
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+          CALL ShowContinueError('Fan:ConstantVolume is not consistent with control method ZoneCoolingLoadVariableSpeedFan.')
+          CALL ShowContinueError('Change to a variable speed fan object type')
+          ErrorsFound=.TRUE.
+        ELSEIF (ZoneEvapUnit(UnitLoop)%FanType_Num == FanType_SimpleOnOff ) THEN
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(ZoneEvapUnit(UnitLoop)%Name)//'" invalid data.')
+          CALL ShowContinueError('Fan:OnOff is not consistent with control method ZoneCoolingLoadVariableSpeedFan.')
+          CALL ShowContinueError('Change to a variable speed fan object type')
+          ErrorsFound=.TRUE.
+        ENDIF
+
+      ENDIF
+
+    ENDDO ! unit loop
+
+  ENDIF
+
+
+!***********************************************************************************
+
+
+  DEALLOCATE(Alphas)
+  DEALLOCATE(Numbers)
+  DEALLOCATE(cAlphaFields)
+  DEALLOCATE(cNumericFields)
+  DEALLOCATE(lAlphaBlanks)
+  DEALLOCATE(lNumericBlanks)
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Errors found in getting input.')
+    CALL ShowContinueError('... Preceding condition causes termination.')
+  END IF
+
+  ! setup output variables
+  DO UnitLoop = 1, NumZoneEvapUnits
+
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Total Cooling Rate [W]', &
+                              ZoneEvapUnit(UnitLoop)%UnitTotalCoolingRate, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Total Cooling Energy [J]', &
+                              ZoneEvapUnit(UnitLoop)%UnitTotalCoolingEnergy, &
+                             'System','Sum', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Sensible Cooling Rate [W]', &
+                              ZoneEvapUnit(UnitLoop)%UnitSensibleCoolingRate, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Sensible Cooling Energy [J]', &
+                              ZoneEvapUnit(UnitLoop)%UnitSensibleCoolingEnergy, &
+                             'System','Sum', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Latent Heating Rate [W]', &
+                              ZoneEvapUnit(UnitLoop)%UnitLatentHeatingRate, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Latent Heating Energy [J]', &
+                              ZoneEvapUnit(UnitLoop)%UnitLatentHeatingEnergy, &
+                             'System','Sum', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Latent Cooling Rate [W]', &
+                              ZoneEvapUnit(UnitLoop)%UnitLatentCoolingRate, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Latent Cooling Energy [J]', &
+                              ZoneEvapUnit(UnitLoop)%UnitLatentCoolingEnergy, &
+                             'System','Sum', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Fan Speed Ratio []', &
+                              ZoneEvapUnit(UnitLoop)%UnitFanSpeedRatio, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+    CALL SetupOutputVariable('Zone Evaporative Cooler Unit Fan Availability Status []', &
+                              ZoneEvapUnit(UnitLoop)%FanAvailStatus, &
+                             'System','Average', ZoneEvapUnit(UnitLoop)%Name)
+  ENDDO
+
+  RETURN
+
+END SUBROUTINE GetInputZoneEvaporativeCoolerUnit
+
+SUBROUTINE InitZoneEvaporativeCoolerUnit(UnitNum, ZoneNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,          ONLY: TimeStep, TimeStepZone, WarmupFlag, HourOfDay
+  USE DataZoneEquipment,    ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, ZoneEquipConfig
+  USE DataHVACGlobals,      ONLY: ZoneComp, SysTimeElapsed
+  USE DataSizing,           ONLY: Autosize
+  USE DataEnvironment,      ONLY: StdRhoAir
+  USE Fans,                 ONLY: GetFanVolFlow
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT    (IN) :: UnitNum             ! unit number
+  INTEGER,          INTENT    (IN) :: ZoneNum             ! number of zone being served
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE. ! one time flag
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MySizeFlag
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyEnvrnFlag
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFanFlag
+  LOGICAL  :: errFlag
+  INTEGER :: Loop
+  LOGICAL,SAVE        :: ZoneEquipmentListChecked = .FALSE.  ! True after the Zone Equipment List has been checked for items
+  REAL(r64) :: TimeElapsed
+
+  IF (MyOneTimeFlag) THEN
+    ALLOCATE(MySizeFlag(NumZoneEvapUnits))
+    MySizeFlag = .TRUE.
+    ALLOCATE(MyEnvrnFlag(NumZoneEvapUnits))
+    MyEnvrnFlag = .TRUE.
+    ALLOCATE(MyFanFlag(NumZoneEvapUnits))
+    MyFanFlag = .TRUE.
+    MyOneTimeFlag = .FALSE.
+  END IF
+
+  IF (ALLOCATED(ZoneComp)) THEN
+    ZoneComp(ZoneEvapUnit(UnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(UnitNum)%ZoneNum = ZoneNum
+    ZoneEvapUnit(UnitNum)%FanAvailStatus = ZoneComp(ZoneEvapUnit(UnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(UnitNum)%AvailStatus
+  ENDIF
+
+  IF (.NOT. ZoneEquipmentListChecked .AND. ZoneEquipInputsFilled) THEN
+    ZoneEquipmentListChecked=.TRUE.
+    DO Loop=1,NumZoneEvapUnits
+      IF (CheckZoneEquipmentList('ZoneHVAC:EvaporativeCoolerUnit',ZoneEvapUnit(Loop)%Name)) THEN
+        ZoneEvapUnit(Loop)%ZoneNodeNum = ZoneEquipConfig(ZoneNum)%ZoneNode
+      ELSE
+        CALL ShowSevereError('InitZoneEvaporativeCoolerUnit: ZoneHVAC:EvaporativeCoolerUnit = '  &
+         // TRIM(ZoneEvapUnit(Loop)%Name)//  &
+           ', is not on any ZoneHVAC:EquipmentList.  It will not be simulated.')
+      ENDIF
+    ENDDO
+  ENDIF
+
+  IF ( .NOT. SysSizingCalc .AND. MySizeFlag(UnitNum) ) THEN
+    CALL SizeZoneEvaporativeCoolerUnit(UnitNum)
+    MySizeFlag(UnitNum) = .FALSE.
+  END IF
+
+  IF (MyFanFlag(UnitNum)) THEN
+    IF (ZoneEvapUnit(UnitNum)%ActualFanVolFlowRate /= Autosize) THEN
+      IF (ZoneEvapUnit(UnitNum)%ActualFanVolFlowRate > 0.d0) THEN
+        ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio = ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate &
+                                              / ZoneEvapUnit(UnitNum)%ActualFanVolFlowRate
+      ENDIF
+      MyFanFlag(UnitNum) = .FALSE.
+    ELSE
+      CALL GetFanVolFlow(ZoneEvapUnit(UnitNum)%FanIndex,ZoneEvapUnit(UnitNum)%ActualFanVolFlowRate)
+    ENDIF
+  ENDIF
+
+  IF (ZoneEvapUnit(UnitNum)%FanAvailSchedPtr > 0 ) THEN
+    ! include fan is not available, then unit is not available
+    IF ((GetCurrentScheduleValue(ZoneEvapUnit(UnitNum)%FanAvailSchedPtr)  > 0.d0 )     &
+       .AND. (GetCurrentScheduleValue(ZoneEvapUnit(UnitNum)%AvailSchedIndex)  > 0.d0 ) ) THEN
+      ! .AND. ( ZoneComp(ZoneEvapUnit(UnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(UnitNum)%AvailStatus) ) THEN
+      ZoneEvapUnit(UnitNum)%UnitIsAvailable = .TRUE.
+    ELSE
+      ZoneEvapUnit(UnitNum)%UnitIsAvailable = .FALSE.
+    ENDIF
+  ELSE
+    IF (GetCurrentScheduleValue(ZoneEvapUnit(UnitNum)%AvailSchedIndex)  > 0.d0 )  THEN
+       !.AND. ( ZoneComp(ZoneEvapUnit(UnitNum)%ZoneEquipType)%ZoneCompAvailMgrs(UnitNum)%AvailStatus) )THEN
+      ZoneEvapUnit(UnitNum)%UnitIsAvailable = .TRUE.
+    ELSE
+      ZoneEvapUnit(UnitNum)%UnitIsAvailable = .FALSE.
+    ENDIF
+  ENDIF
+
+  IF (GetCurrentScheduleValue(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%SchedPtr) > 0.d0 ) THEN
+    ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus = .TRUE.
+  ELSE
+    ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus = .FALSE.
+  ENDIF
+
+  IF ( ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0 ) THEN
+    IF (GetCurrentScheduleValue(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%SchedPtr) > 0.d0 ) THEN
+      ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus = .TRUE.
+    ELSE
+      ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus = .FALSE.
+    ENDIF
+  ENDIF
+! Do the Begin Environment initializations
+  IF (BeginEnvrnFlag .and. MyEnvrnFlag(UnitNum)) THEN
+
+    ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate = StdRhoAir * ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate
+    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMax      = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMin      = 0.d0
+    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMinAvail = 0.d0
+
+    Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMax      = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMin      = 0.d0
+    Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMinAvail = 0.d0
+
+    IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+      Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMax      = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMin      = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMinAvail = 0.d0
+    ENDIF
+    ZoneEvapUnit(UnitNum)%WasOnLastTimestep   = .FALSE.
+    ZoneEvapUnit(UnitNum)%IsOnThisTimestep    = .FALSE.
+    ZoneEvapUnit(UnitNum)%FanSpeedRatio             = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitFanSpeedRatio         = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitTotalCoolingRate      = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitTotalCoolingEnergy    = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitSensibleCoolingRate   = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitSensibleCoolingEnergy = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitLatentHeatingRate     = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitLatentHeatingEnergy   = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitLatentCoolingRate     = 0.d0
+    ZoneEvapUnit(UnitNum)%UnitLatentCoolingEnergy   = 0.d0
+    ZoneEvapUnit(UnitNum)%FanAvailStatus            = 0.d0
+
+    ! place default cold setpoints on control nodes of select evap coolers
+    IF ((ZoneEvapUnit(UnitNum)%EvapCooler_1_Type_Num == iEvapCoolerDirectResearchSpecial) &
+        .OR. (ZoneEvapUnit(UnitNum)%EvapCooler_1_Type_Num == iEvapCoolerInDirectRDDSpecial)) THEN
+      IF ( EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%EvapControlNodeNum > 0 ) THEN
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%EvapControlNodeNum)%TempSetPoint = -20.0d0
+      ENDIF
+    ENDIF
+    IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Type_Num == iEvapCoolerDirectResearchSpecial) &
+        .OR. (ZoneEvapUnit(UnitNum)%EvapCooler_2_Type_Num == iEvapCoolerInDirectRDDSpecial)) THEN
+      IF ( EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%EvapControlNodeNum > 0 ) THEN
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%EvapControlNodeNum)%TempSetPoint = -20.0d0
+      ENDIF
+    ENDIF
+
+    MyEnvrnFlag(UnitNum) = .FALSE.
+  ENDIF
+  IF (.NOT. BeginEnvrnFlag) THEN
+    MyEnvrnFlag(UnitNum) = .TRUE.
+  END IF
+
+
+  TimeElapsed = HourOfDay + TimeStep * TimeStepZone + SysTimeElapsed
+  IF (ZoneEvapUnit(UnitNum)%TimeElapsed /= TimeElapsed) THEN
+    ZoneEvapUnit(UnitNum)%WasOnLastTimestep = ZoneEvapUnit(UnitNum)%IsOnThisTimestep
+
+    ZoneEvapUnit(UnitNum)%TimeElapsed = TimeElapsed
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE InitZoneEvaporativeCoolerUnit
+
+SUBROUTINE SizeZoneEvaporativeCoolerUnit(UnitNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE DataSizing,          ONLY: Autosize, CurZoneEqNum, FinalZoneSizing
+  USE DataHVACGlobals,     ONLY: SmallAirVolFlow
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT    (IN) :: UnitNum             ! unit number
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  IF (ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate == AutoSize) THEN
+
+    IF (CurZoneEqNum > 0) THEN
+      CALL CheckZoneSizing('ZoneHVAC:EvaporativeCoolerUnit',ZoneEvapUnit(UnitNum)%Name)
+      ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
+      IF (ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate < SmallAirVolFlow) THEN
+        ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate = 0.d0
+      ENDIF
+      CALL ReportSizingOutput('ZoneHVAC:EvaporativeCoolerUnit', ZoneEvapUnit(UnitNum)%Name, &
+                              'Design Supply Air Flow Rate [m3/s]', ZoneEvapUnit(UnitNum)%DesignAirVolumeFlowRate)
+    ENDIF
+
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SizeZoneEvaporativeCoolerUnit
+
+SUBROUTINE CalcZoneEvaporativeCoolerUnit(UnitNum, ZoneNum, SensibleOutputProvided, LatentOutputProvided )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataHVACGlobals,       ONLY: SmallLoad
+  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand
+  USE DataHVACGlobals,       ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
+  USE Fans,                  ONLY: SimulateFanComponents
+  USE DataHeatBalFanSys,     ONLY: ZoneThermostatSetPointHi
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT    (IN) :: UnitNum             ! unit number
+  INTEGER,          INTENT    (IN) :: ZoneNum             ! number of zone being served
+  REAL(r64),        INTENT   (OUT) :: SensibleOutputProvided   ! sensible capacity delivered to zone
+  REAL(r64),        INTENT   (OUT) :: LatentOutputProvided   ! Latent add/removal  (kg/s), dehumid = negative
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: ZoneCoolingLoad
+  REAL(r64) :: MinHumRat
+  REAL(r64) :: CoolingLoadThreashold
+  REAL(r64) :: ZoneTemp
+  REAL(r64) :: CoolSetLowThrottle
+  REAL(r64) :: CoolSetHiThrottle
+
+  SELECT CASE (ZoneEvapUnit(UnitNum)%ControlSchemeType)
+
+  CASE (ZoneTemperatureDeadbandOnOffCycling)
+    ZoneTemp = Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum)%Temp
+    CoolSetLowThrottle  = ZoneThermostatSetPointHi(ZoneNum) - (0.5d0 * ZoneEvapUnit(UnitNum)%ThrottlingRange)
+    CoolSetHiThrottle   = ZoneThermostatSetPointHi(ZoneNum) + (0.5d0 * ZoneEvapUnit(UnitNum)%ThrottlingRange)
+
+    IF ((ZoneTemp < CoolSetLowThrottle) .OR. .NOT. ZoneEvapUnit(UnitNum)%UnitIsAvailable) THEN
+      ZoneEvapUnit(UnitNum)%IsOnThisTimestep = .FALSE.
+    ELSEIF (ZoneTemp > CoolSetHiThrottle) THEN
+      ZoneEvapUnit(UnitNum)%IsOnThisTimestep = .TRUE.
+    ELSE
+      IF (ZoneEvapUnit(UnitNum)%WasOnLastTimestep) THEN
+        ZoneEvapUnit(UnitNum)%IsOnThisTimestep = .TRUE.
+      ELSE
+        ZoneEvapUnit(UnitNum)%IsOnThisTimestep = .FALSE.
+      ENDIF
+    ENDIF
+
+    IF (ZoneEvapUnit(UnitNum)%IsOnThisTimestep) THEN
+
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate &
+                                                                * ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail  = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail =  &
+                           Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = &
+                                                                    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = &
+                                 Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ELSE ! not running
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) THEN
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = 0.d0
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ENDIF
+
+  CASE (ZoneCoolingLoadOnOffCycling)
+
+    ! get zone loads
+    ZoneCoolingLoad = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
+    CoolingLoadThreashold = -1.0d0 * ZoneEvapUnit(UnitNum)%ThresholdCoolingLoad
+
+    IF ((ZoneCoolingLoad < CoolingLoadThreashold) .AND. ZoneEvapUnit(UnitNum)%UnitIsAvailable) THEN
+
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate &
+                                                                * ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail  = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = &
+                                    Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = &
+                                                                    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = &
+                                           Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ELSE
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) THEN
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = 0.d0
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ENDIF
+
+  CASE (ZoneCoolingLoadVariableSpeedFan)
+    ! get zone loads
+    ZoneCoolingLoad = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
+    CoolingLoadThreashold = -1.0d0 * ZoneEvapUnit(UnitNum)%ThresholdCoolingLoad
+    IF ((ZoneCoolingLoad < CoolingLoadThreashold) .AND. ZoneEvapUnit(UnitNum)%UnitIsAvailable) THEN
+
+      !determine fan speed to meet load
+      CALL ControlVSEvapUnitToMeetLoad(UnitNum, ZoneNum, ZoneCoolingLoad)
+
+
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate &
+                                                                * ZoneEvapUnit(UnitNum)%FanSpeedRatio
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail  = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = &
+                                                                  Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = &
+                                                                    Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = &
+                                           Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                                 ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                                 ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ELSE
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanInletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = 0.d0
+      Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = 0.d0
+
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRate = 0.d0
+      Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) THEN
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%InletNode)%MassFlowRateMaxAvail = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRate = 0.d0
+        Node(EvapCond(ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)%OutletNode)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = 0.d0
+        Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = 0.d0
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+
+      IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+      ENDIF
+
+      IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+        CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+      ENDIF
+      IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+        CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex, &
+                                 ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                                 ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+      ENDIF
+    ENDIF
+  END SELECT
+
+! calculate sensible load met (unit serving Zone) using delta enthalpy at a constant (minimum) humidity ratio)
+  MinHumRat = MIN(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum )%HumRat,Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%HumRat)
+  SensibleOutputProvided   = Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate &
+                         * (PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%Temp,MinHumRat) &
+                                - PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum)%Temp,MinHumRat))
+  LatentOutputProvided = Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate * &
+                           (Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%HumRat &
+                                - Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum)%HumRat)
+  RETURN
+
+END SUBROUTINE CalcZoneEvaporativeCoolerUnit
+
+SUBROUTINE ControlVSEvapUnitToMeetLoad(UnitNum, ZoneNum, ZoneCoolingLoad)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,           ONLY: WarmupFlag
+  USE DataHVACGlobals,       ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
+  USE Fans,                  ONLY: SimulateFanComponents
+  USE General,               ONLY: SolveRegulaFalsi, RoundSigDigits
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT(IN)  :: UnitNum             ! unit number
+  INTEGER,          INTENT(IN)  :: ZoneNum             ! number of zone being served
+  REAL(r64),        INTENT(IN)  :: ZoneCoolingLoad     ! target cooling load
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER :: MaxIte   = 500          ! maximum number of iterations
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: MinHumRat
+  REAL(r64), DIMENSION(5) :: Par           ! Parameters passed to RegulaFalsi
+  REAL(r64) :: FanSpeedRatio
+  REAL(r64)          :: ErrorToler = 0.001d0   ! error tolerance
+  INTEGER            :: SolFla        ! Flag of RegulaFalsi solver
+  REAL(r64) :: FullFlowSensibleOutputProvided
+
+  ! first get full load result
+  ErrorToler = 0.01d0
+
+  ZoneEvapUnit(UnitNum)%FanSpeedRatio = ZoneEvapUnit(UnitNum)%DesignFanSpeedRatio
+  Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate &
+                                                            * ZoneEvapUnit(UnitNum)%FanSpeedRatio
+  Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail  = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = &
+                                                       Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate
+
+  IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+    Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = &
+                                                                Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  ENDIF
+  IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+    Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                              ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                              ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+  ENDIF
+
+  IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+    CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+  ENDIF
+
+  IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+    CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+  ENDIF
+  IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+    CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,&
+                              ZoneEvapUnit(UnitNum)%FanSpeedRatio,&
+                              ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+  ENDIF
+
+! calculate sensible load met using delta enthalpy at a constant (minimum) humidity ratio)
+  MinHumRat = MIN(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum )%HumRat,Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%HumRat)
+  FullFlowSensibleOutputProvided   = Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate &
+                         * (PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%Temp,MinHumRat) &
+                                - PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum)%Temp,MinHumRat))
+
+
+  IF (FullFlowSensibleOutputProvided < ZoneCoolingLoad) THEN ! find speed ratio by regula falsi numerical method
+    Par(1) = UnitNum
+    Par(2) = ZoneNum
+    Par(3) = ZoneEvapUnit(UnitNum)%ZoneNodeNum
+    Par(5) = ZoneCoolingLoad
+    FanSpeedRatio = 1.0d0
+
+    CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, FanSpeedRatio, VSEvapUnitLoadResidual, 0.0d0, 1.0d0, Par)
+    IF (SolFla == -1) THEN
+      IF (ZoneEvapUnit(UnitNum)%UnitVSControlMaxIterErrorIndex == 0) THEN
+        CALL ShowWarningError('Iteration limit exceeded calculating variable speed evap unit fan speed ratio, for unit='// &
+                      TRIM(ZoneEvapUnit(UnitNum)%Name))
+        CALL ShowContinueErrorTimeStamp(' ')
+        CALL ShowContinueError('Fan speed ratio returned='//RoundSigDigits(FanSpeedRatio,2))
+        CALL ShowContinueError('Check input for Fan Placement.')
+      ENDIF
+      CALL ShowRecurringWarningErrorAtEnd('Zone Evaporative Cooler unit control failed (iteration limit ['//  &
+                        trim(RoundSigDigits(MaxIte))//']) for ZoneHVAC:EvaporativeCoolerUnit ="'// &
+                        TRIM(ZoneEvapUnit(UnitNum)%Name),ZoneEvapUnit(UnitNum)%UnitVSControlMaxIterErrorIndex)
+
+    ELSE IF (SolFla == -2) THEN
+      IF (ZoneEvapUnit(UnitNum)%UnitVSControlLimitsErrorIndex == 0) THEN
+        CALL ShowWarningError('Variable speed evaporative cooler unit calculation failed: fan speed ratio limits exceeded,' &
+                      //' for unit = '//TRIM(ZoneEvapUnit(UnitNum)%Name))
+        CALL ShowContinueError('Check input for Fan Placement.')
+        CALL ShowContinueErrorTimeStamp(' ')
+        IF (WarmupFlag) CALL ShowContinueError ('Error occurred during warmup days.')
+      ENDIF
+      CALL ShowRecurringWarningErrorAtEnd('Zone Evaporative Cooler unit control failed (limits exceeded) ' &
+                        // 'for ZoneHVAC:EvaporativeCoolerUnit ="'// &
+                        TRIM(ZoneEvapUnit(UnitNum)%Name),ZoneEvapUnit(UnitNum)%UnitVSControlLimitsErrorIndex)
+    ENDIF
+    ZoneEvapUnit(UnitNum)%FanSpeedRatio = FanSpeedRatio
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE ControlVSEvapUnitToMeetLoad
+
+FUNCTION VSEvapUnitLoadResidual(FanSpeedRatio, Par) RESULT (Residual)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataHVACGlobals,       ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
+  USE Fans,                  ONLY: SimulateFanComponents
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)   :: FanSpeedRatio
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! parameters
+  REAL(r64)   :: Residual
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: UnitNum
+  INTEGER :: ZoneNum
+  INTEGER :: ZoneNodeNum
+  REAL(r64) :: LoadToBeMet      ! sensible load to be met
+  REAL(r64) :: MinHumRat
+  REAL(r64) :: SensibleOutputProvided
+
+
+  UnitNum = INT(Par(1))
+  ZoneNum = INT(Par(2))
+  ZoneNodeNum = INT(Par(3))
+  LoadToBeMet = Par(5)
+
+  Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate = ZoneEvapUnit(UnitNum)%DesignAirMassFlowRate &
+                                                            * FanSpeedRatio
+  Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRateMaxAvail  = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRateMaxAvail = &
+                                                Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate
+
+  IF (ZoneEvapUnit(UnitNum)%UnitReliefNodeNum > 0) THEN
+    Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%UnitReliefNodeNum)%MassFlowRateMaxAvail = &
+                                                                Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+  ENDIF
+  IF (ZoneEvapUnit(UnitNum)%FanLocation == BlowThruFan) THEN
+    Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRate = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    Node(ZoneEvapUnit(UnitNum)%FanOutletNodeNum)%MassFlowRateMaxAvail = Node(ZoneEvapUnit(UnitNum)%OAInletNodeNum)%MassFlowRate
+    CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,FanSpeedRatio,&
+                              ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+  ENDIF
+
+  IF (ZoneEvapUnit(UnitNum)%EvapCooler_1_AvailStatus) THEN
+    CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_1_Name , ZoneEvapUnit(UnitNum)%EvapCooler_1_Index)
+  ENDIF
+
+  IF ((ZoneEvapUnit(UnitNum)%EvapCooler_2_Index > 0) .AND. ZoneEvapUnit(UnitNum)%EvapCooler_2_AvailStatus) THEN
+    CALL SimEvapCooler(ZoneEvapUnit(UnitNum)%EvapCooler_2_Name , ZoneEvapUnit(UnitNum)%EvapCooler_2_Index)
+  ENDIF
+  IF (ZoneEvapUnit(UnitNum)%FanLocation == DrawThruFan) THEN
+    CALL SimulateFanComponents(ZoneEvapUnit(UnitNum)%FanName,.FALSE.,ZoneEvapUnit(UnitNum)%FanIndex,FanSpeedRatio,&
+                              ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+  ENDIF
+
+  MinHumRat = MIN(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum )%HumRat,Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%HumRat)
+  SensibleOutputProvided   = Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%MassFlowRate &
+                         * (PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%UnitOutletNodeNum)%Temp,MinHumRat) &
+                                - PsyHFnTdbW(Node(ZoneEvapUnit(UnitNum)%ZoneNodeNum)%Temp,MinHumRat))
+
+  Residual = SensibleOutputProvided - LoadToBeMet
+
+  RETURN
+
+END FUNCTION VSEvapUnitLoadResidual
+
+
+SUBROUTINE ReportZoneEvaporativeCoolerUnit(UnitNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! update output variables for the zone evap unit
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  Use DataHVACGlobals, ONLY: TimeStepSys
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT    (IN) :: UnitNum             ! unit number
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ZoneNodeNum
+  INTEGER :: UnitOutletNodeNum
+  REAL(r64) :: AirMassFlow
+  REAL(r64) :: MinHumRat
+  REAL(r64) :: QTotUnitOut
+  REAL(r64) :: QSensUnitOut
+
+  ZoneNodeNum       = ZoneEvapUnit(UnitNum)%ZoneNodeNum
+  UnitOutletNodeNum = ZoneEvapUnit(UnitNum)%UnitOutletNodeNum
+  AirMassFlow       = Node(UnitOutletNodeNum)%MassFlowRate
+  QTotUnitOut  = AirMassFlow * (Node(UnitOutletNodeNum)%Enthalpy - Node(ZoneNodeNum)%Enthalpy)
+  MinHumRat =  Min(Node(ZoneNodeNum)%HumRat, Node(UnitOutletNodeNum)%HumRat)
+  QSensUnitOut = AirMassFlow * (PsyHFnTdbW(Node(UnitOutletNodeNum)%Temp,MinHumRat, 'ReportZoneEvaporativeCoolerUnit') &
+                                                - PsyHFnTdbW(Node(ZoneNodeNum)%Temp,MinHumRat, 'ReportZoneEvaporativeCoolerUnit'))
+
+  ZoneEvapUnit(UnitNum)%UnitTotalCoolingRate    = ABS(MIN(0.0d0, QTotUnitOut))
+  ZoneEvapUnit(UnitNum)%UnitTotalCoolingEnergy  = ZoneEvapUnit(UnitNum)%UnitTotalCoolingRate *TimeStepSys*SecInHour
+  ZoneEvapUnit(UnitNum)%UnitSensibleCoolingRate = ABS(MIN(0.0d0, QSensUnitOut))
+  ZoneEvapUnit(UnitNum)%UnitSensibleCoolingEnergy = ZoneEvapUnit(UnitNum)%UnitSensibleCoolingRate *TimeStepSys*SecInHour
+  ZoneEvapUnit(UnitNum)%UnitLatentHeatingRate   = ABS(MAX(0.0d0, (QTotUnitOut - QSensUnitOut)))
+  ZoneEvapUnit(UnitNum)%UnitLatentHeatingEnergy = ZoneEvapUnit(UnitNum)%UnitLatentHeatingRate *TimeStepSys*SecInHour
+  ZoneEvapUnit(UnitNum)%UnitLatentCoolingRate   = ABS(MIN(0.0d0, (QTotUnitOut - QSensUnitOut)))
+  ZoneEvapUnit(UnitNum)%UnitLatentCoolingEnergy = ZoneEvapUnit(UnitNum)%UnitLatentCoolingRate *TimeStepSys*SecInHour
+  ZoneEvapUnit(UnitNum)%UnitFanSpeedRatio       = ZoneEvapUnit(UnitNum)%FanSpeedRatio
+
+  RETURN
+
+END SUBROUTINE ReportZoneEvaporativeCoolerUnit
 
 !        End of Reporting subroutines for the EvaporativeCoolers Module
 ! *****************************************************************************

@@ -25,12 +25,12 @@ USE DataHVACGlobals, ONLY: TurnFansOn, TurnFansOff, Main, Cooling, Heating, Othe
                            SmallAirVolFlow, UnbalExhMassFlow, BalancedExhMassFlow, NightVentOn, cFanTypes, &
                            FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, FanType_ZoneExhaust, &
                            FanType_ComponentModel, MinFrac, FixedMin !cpw22Aug2010 Added FanType_ComponentModel
-USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, WarmupFlag, SysSizingCalc, emsCallFromComponentGetInput
-USE EMSManager,            ONLY: ManageEMS
-USE DataInterfaces,  ONLY: SetupOutputVariable, ShowWarningError, ShowFatalError, ShowSevereError, &
-                           ShowContinueError, ShowRecurringWarningErrorAtEnd, ShowContinueErrorTimeStamp
+USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, WarmupFlag, SysSizingCalc, emsCallFromComponentGetInput, &
+                           DisplayExtraWarnings
+USE EMSManager,      ONLY: ManageEMS
+USE DataInterfaces
 Use DataEnvironment, ONLY: StdRhoAir
-USE Psychrometrics,  ONLY:PsyRhoAirFnPbTdbW, PsyTdbFnHW, PsyCpAirFnWTdb
+USE Psychrometrics,  ONLY: PsyRhoAirFnPbTdbW, PsyTdbFnHW, PsyCpAirFnWTdb
 
   ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -54,45 +54,46 @@ TYPE FanEquipConditions
   CHARACTER(len=MaxNameLength) :: AvailSchedName =' '  ! Fan Operation Schedule
   INTEGER      :: FanType_Num              =0    ! DataHVACGlobals fan type
   INTEGER      :: AvailSchedPtrNum         =0    ! Pointer to the availability schedule
-  REAL(r64)    :: InletAirMassFlowRate     =0.0  !MassFlow through the Fan being Simulated [kg/Sec]
+  REAL(r64)    :: InletAirMassFlowRate     =0.0d0  !MassFlow through the Fan being Simulated [kg/Sec]
 
-  REAL(r64)    :: OutletAirMassFlowRate    =0.0
-  REAL(r64)    :: MaxAirFlowRate           =0.0  !Max Specified Volume Flow Rate of Fan [m3/sec]
+  REAL(r64)    :: OutletAirMassFlowRate    =0.0d0
+  REAL(r64)    :: MaxAirFlowRate           =0.0d0  !Max Specified Volume Flow Rate of Fan [m3/sec]
+  LOGICAL      :: MaxAirFlowRateIsAutosizable = .FALSE. ! if true, then this type of fan could be autosize
   LOGICAL      :: MaxAirFlowRateEMSOverrideOn = .FALSE. ! if true, EMS wants to override fan size for Max Volume Flow Rate
   REAL(r64)    :: MaxAirFlowRateEMSOverrideValue = 0.d0 ! EMS value to use for override of  Max Volume Flow Rate
-  REAL(r64)    :: MinAirFlowRate           =0.0  !Min Specified Volume Flow Rate of Fan [m3/sec]
-  REAL(r64)    :: MaxAirMassFlowRate       =0.0  ! Max flow rate of fan in kg/sec
-  REAL(r64)    :: MinAirMassFlowRate       =0.0  ! Min flow rate of fan in kg/sec
+  REAL(r64)    :: MinAirFlowRate           =0.0d0  !Min Specified Volume Flow Rate of Fan [m3/sec]
+  REAL(r64)    :: MaxAirMassFlowRate       =0.0d0  ! Max flow rate of fan in kg/sec
+  REAL(r64)    :: MinAirMassFlowRate       =0.0d0  ! Min flow rate of fan in kg/sec
   INTEGER      :: FanMinAirFracMethod      = MinFrac   ! parameter for what method is used for min flow fraction
   REAL(r64)    :: FanMinFrac               = 0.0D0 ! Minimum fan air flow fraction
   REAL(r64)    :: FanFixedMin              = 0.0D0 ! Absolute minimum fan air flow [m3/s]
   LOGICAL      :: EMSMaxMassFlowOverrideOn = .FALSE. ! if true, then EMS is calling to override mass flow
   REAL(r64)    :: EMSAirMassFlowValue      = 0.0D0 ! value EMS is directing to use [kg/s]
-  REAL(r64)    :: InletAirTemp             =0.0
-  REAL(r64)    :: OutletAirTemp            =0.0
-  REAL(r64)    :: InletAirHumRat           =0.0
-  REAL(r64)    :: OutletAirHumRat          =0.0
-  REAL(r64)    :: InletAirEnthalpy         =0.0
-  REAL(r64)    :: OutletAirEnthalpy        =0.0
-  REAL(r64)    :: FanPower                 =0.0  !Power of the Fan being Simulated [kW]
-  REAL(r64)    :: FanEnergy                =0.0  !Fan energy in [kJ]
-  REAL(r64)    :: FanRuntimeFraction       =0.0  !Fraction of the timestep that the fan operates
-  REAL(r64)    :: DeltaTemp                =0.0  !Temp Rise across the Fan [C]
-  REAL(r64)    :: DeltaPress               =0.0  !Delta Pressure Across the Fan [N/m2]
+  REAL(r64)    :: InletAirTemp             =0.0d0
+  REAL(r64)    :: OutletAirTemp            =0.0d0
+  REAL(r64)    :: InletAirHumRat           =0.0d0
+  REAL(r64)    :: OutletAirHumRat          =0.0d0
+  REAL(r64)    :: InletAirEnthalpy         =0.0d0
+  REAL(r64)    :: OutletAirEnthalpy        =0.0d0
+  REAL(r64)    :: FanPower                 =0.0d0  !Power of the Fan being Simulated [kW]
+  REAL(r64)    :: FanEnergy                =0.0d0  !Fan energy in [kJ]
+  REAL(r64)    :: FanRuntimeFraction       =0.0d0  !Fraction of the timestep that the fan operates
+  REAL(r64)    :: DeltaTemp                =0.0d0  !Temp Rise across the Fan [C]
+  REAL(r64)    :: DeltaPress               =0.0d0  !Delta Pressure Across the Fan [N/m2]
   LOGICAL      :: EMSFanPressureOverrideOn = .FALSE. ! if true, then EMS is calling to override
   REAL(r64)    :: EMSFanPressureValue      = 0.0D0 ! EMS value for Delta Pressure Across the Fan [Pa]
 ! cpw22Aug2010 Clarify meaning of "fan efficiency"
-!  REAL(r64)    :: FanEff                   =0.0  !Fan total efficiency; motor and mechanical
+!  REAL(r64)    :: FanEff                   =0.0d0  !Fan total efficiency; motor and mechanical
   REAL(r64)    :: FanEff                   =0.0d0 !Fan total system efficiency (fan*belt*motor*VFD)
   LOGICAL      :: EMSFanEffOverrideOn      = .FALSE. ! if true, then EMS is calling to override
   REAL(r64)    :: EMSFanEffValue           = 0.0D0 ! EMS value for total efficiency of the Fan, fraction on 0..1
-  REAL(r64)    :: MotEff                   =0.0  !Fan motor efficiency
-  REAL(r64)    :: MotInAirFrac             =0.0  !Fraction of motor heat entering air stream
-  REAL(r64), Dimension(5):: FanCoeff            =0.0  !Fan Part Load Coefficients to match fan type
+  REAL(r64)    :: MotEff                   =0.0d0  !Fan motor efficiency
+  REAL(r64)    :: MotInAirFrac             =0.0d0  !Fraction of motor heat entering air stream
+  REAL(r64), Dimension(5):: FanCoeff            =0.0d0  !Fan Part Load Coefficients to match fan type
   ! Mass Flow Rate Control Variables
-  REAL(r64)    :: MassFlowRateMaxAvail     =0.0
-  REAL(r64)    :: MassFlowRateMinAvail     =0.0
-  REAL(r64)    :: RhoAirStdInit            =0.0
+  REAL(r64)    :: MassFlowRateMaxAvail     =0.0d0
+  REAL(r64)    :: MassFlowRateMinAvail     =0.0d0
+  REAL(r64)    :: RhoAirStdInit            =0.0d0
   INTEGER      :: InletNodeNum             =0
   INTEGER      :: OutletNodeNum            =0
   INTEGER      :: NVPerfNum                =0
@@ -162,12 +163,12 @@ END TYPE FanEquipConditions
 
 TYPE NightVentPerfData
   CHARACTER(len=MaxNameLength) :: FanName  =' ' ! Name of the fan that will use this data
-  REAL(r64)    :: FanEff                   =0.0 !Fan total efficiency; motor and mechanical
-  REAL(r64)    :: DeltaPress               =0.0 !Delta Pressure Across the Fan [N/m2]
-  REAL(r64)    :: MaxAirFlowRate           =0.0 !Max Specified Volume Flow Rate of Fan [m3/s]
-  REAL(r64)    :: MaxAirMassFlowRate       =0.0 ! Max flow rate of fan in kg/sec
-  REAL(r64)    :: MotEff                   =0.0 !Fan motor efficiency
-  REAL(r64)    :: MotInAirFrac             =0.0 !Fraction of motor heat entering air stream
+  REAL(r64)    :: FanEff                   =0.0d0 !Fan total efficiency; motor and mechanical
+  REAL(r64)    :: DeltaPress               =0.0d0 !Delta Pressure Across the Fan [N/m2]
+  REAL(r64)    :: MaxAirFlowRate           =0.0d0 !Max Specified Volume Flow Rate of Fan [m3/s]
+  REAL(r64)    :: MaxAirMassFlowRate       =0.0d0 ! Max flow rate of fan in kg/sec
+  REAL(r64)    :: MotEff                   =0.0d0 !Fan motor efficiency
+  REAL(r64)    :: MotInAirFrac             =0.0d0 !Fraction of motor heat entering air stream
 END TYPE NightVentPerfData
 
 
@@ -475,7 +476,7 @@ SUBROUTINE GetFanInput
     ALLOCATE(lNumericFieldBlanks(MaxNumbers))
     lNumericFieldBlanks=.false.
     ALLOCATE(rNumericArgs(MaxNumbers))
-    rNumericArgs=0.0
+    rNumericArgs=0.0d0
 
     NumFans = NumSimpFan + NumVarVolFan + NumZoneExhFan + NumOnOff + NumCompModelFan ! cpw1Mar2010 Add NumCompModelFan
     IF (NumFans > 0) THEN
@@ -517,13 +518,14 @@ SUBROUTINE GetFanInput
         Fan(FanNum)%FanEff        = rNumericArgs(1)
         Fan(FanNum)%DeltaPress    = rNumericArgs(2)
         Fan(FanNum)%MaxAirFlowRate= rNumericArgs(3)
-        IF (Fan(FanNum)%MaxAirFlowRate == 0.0) THEN
+        IF (Fan(FanNum)%MaxAirFlowRate == 0.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
              '" has specified 0.0 max air flow rate. It will not be used in the simulation.')
         ENDIF
+        Fan(FanNum)%MaxAirFlowRateIsAutosizable = .TRUE.
         Fan(FanNum)%MotEff        = rNumericArgs(4)
         Fan(FanNum)%MotInAirFrac  = rNumericArgs(5)
-        Fan(FanNum)%MinAirFlowRate= 0.0
+        Fan(FanNum)%MinAirFlowRate= 0.0d0
 
         Fan(FanNum)%InletNodeNum  = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
@@ -577,10 +579,11 @@ SUBROUTINE GetFanInput
         Fan(FanNum)%FanEff        = rNumericArgs(1)
         Fan(FanNum)%DeltaPress    = rNumericArgs(2)
         Fan(FanNum)%MaxAirFlowRate= rNumericArgs(3)
-        IF (Fan(FanNum)%MaxAirFlowRate == 0.0) THEN
+        IF (Fan(FanNum)%MaxAirFlowRate == 0.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
              '" has specified 0.0 max air flow rate. It will not be used in the simulation.')
         ENDIF
+        Fan(FanNum)%MaxAirFlowRateIsAutosizable = .TRUE.
         IF (SameString(cAlphaArgs(3) , 'Fraction')) THEN
           Fan(FanNum)%FanMinAirFracMethod = MinFrac
         ELSEIF (SameString(cAlphaArgs(3), 'FixedFlowRate')) THEN
@@ -600,9 +603,9 @@ SUBROUTINE GetFanInput
         Fan(FanNum)%FanCoeff(3)   = rNumericArgs(10)
         Fan(FanNum)%FanCoeff(4)   = rNumericArgs(11)
         Fan(FanNum)%FanCoeff(5)   = rNumericArgs(12)
-        IF (Fan(FanNum)%FanCoeff(1) == 0.0 .and. Fan(FanNum)%FanCoeff(2) == 0.0 .and.  &
-            Fan(FanNum)%FanCoeff(3) == 0.0 .and. Fan(FanNum)%FanCoeff(4) == 0.0 .and.  &
-            Fan(FanNum)%FanCoeff(5) == 0.0)  THEN
+        IF (Fan(FanNum)%FanCoeff(1) == 0.0d0 .and. Fan(FanNum)%FanCoeff(2) == 0.0d0 .and.  &
+            Fan(FanNum)%FanCoeff(3) == 0.0d0 .and. Fan(FanNum)%FanCoeff(4) == 0.0d0 .and.  &
+            Fan(FanNum)%FanCoeff(5) == 0.0d0)  THEN
             CALL ShowWarningError('Fan Coefficients are all zero.  No Fan power will be reported.')
             CALL ShowContinueError('For '//TRIM(cCurrentModuleObject)//', Fan='//TRIM(cAlphaArgs(1)))
         ENDIF
@@ -661,13 +664,14 @@ SUBROUTINE GetFanInput
         Fan(FanNum)%FanEff        = rNumericArgs(1)
         Fan(FanNum)%DeltaPress    = rNumericArgs(2)
         Fan(FanNum)%MaxAirFlowRate= rNumericArgs(3)
-        Fan(FanNum)%MotEff        = 1.0
-        Fan(FanNum)%MotInAirFrac  = 1.0
-        Fan(FanNum)%MinAirFlowRate= 0.0
+        Fan(FanNum)%MaxAirFlowRateIsAutosizable = .FALSE.
+        Fan(FanNum)%MotEff        = 1.0d0
+        Fan(FanNum)%MotInAirFrac  = 1.0d0
+        Fan(FanNum)%MinAirFlowRate= 0.0d0
         Fan(FanNum)%RhoAirStdInit = StdRhoAir
         Fan(FanNum)%MaxAirMassFlowRate = Fan(FanNum)%MaxAirFlowRate * Fan(FanNum)%RhoAirStdInit
 
-        IF (Fan(FanNum)%MaxAirFlowRate == 0.0) THEN
+        IF (Fan(FanNum)%MaxAirFlowRate == 0.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
               '" has specified 0.0 max air flow rate. It will not be used in the simulation.')
         ENDIF
@@ -792,11 +796,11 @@ SUBROUTINE GetFanInput
         Fan(FanNum)%FanEff        = rNumericArgs(1)
         Fan(FanNum)%DeltaPress    = rNumericArgs(2)
         Fan(FanNum)%MaxAirFlowRate= rNumericArgs(3)
-        IF (Fan(FanNum)%MaxAirFlowRate == 0.0) THEN
+        IF (Fan(FanNum)%MaxAirFlowRate == 0.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
               '" has specified 0.0 max air flow rate. It will not be used in the simulation.')
         ENDIF
-
+        Fan(FanNum)%MaxAirFlowRateIsAutosizable = .TRUE.
 !       the following two structure variables are set here, as well as in InitFan, for the Heat Pump:Water Heater object
 !       (Standard Rating procedure may be called before BeginEnvirFlag is set to TRUE, if so MaxAirMassFlowRate = 0)
         Fan(FanNum)%RhoAirStdInit = StdRhoAir
@@ -804,7 +808,7 @@ SUBROUTINE GetFanInput
 
         Fan(FanNum)%MotEff        = rNumericArgs(4)
         Fan(FanNum)%MotInAirFrac  = rNumericArgs(5)
-        Fan(FanNum)%MinAirFlowRate= 0.0
+        Fan(FanNum)%MinAirFlowRate= 0.0d0
 
         Fan(FanNum)%InletNodeNum  = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
@@ -839,12 +843,12 @@ SUBROUTINE GetFanInput
       IF (NumNightVentPerf > 0) THEN
         ALLOCATE(NightVentPerf(NumNightVentPerf))
         NightVentPerf%FanName = ' '
-        NightVentPerf%FanEff = 0.0
-        NightVentPerf%DeltaPress = 0.0
-        NightVentPerf%MaxAirFlowRate = 0.0
-        NightVentPerf%MotEff = 0.0
-        NightVentPerf%MotInAirFrac = 0.0
-        NightVentPerf%MaxAirMassFlowRate = 0.0
+        NightVentPerf%FanEff = 0.0d0
+        NightVentPerf%DeltaPress = 0.0d0
+        NightVentPerf%MaxAirFlowRate = 0.0d0
+        NightVentPerf%MotEff = 0.0d0
+        NightVentPerf%MotInAirFrac = 0.0d0
+        NightVentPerf%MaxAirMassFlowRate = 0.0d0
       END IF
       ! input the night ventilation performance objects
       DO NVPerfNum=1,NumNightVentPerf
@@ -929,6 +933,7 @@ SUBROUTINE GetFanInput
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
              '" has specified 0.0 max air flow rate. It will not be used in the simulation.')
         ENDIF
+        Fan(FanNum)%MaxAirFlowRateIsAutosizable = .TRUE.
         Fan(FanNum)%MinAirFlowRate= rNumericArgs(2)
 
         Fan(FanNum)%FanSizingFactor = rNumericArgs(3)    ! Fan max airflow sizing factor [-] cpw31Aug2010
@@ -1174,9 +1179,9 @@ SUBROUTINE InitFan(FanNum,FirstHVACIteration)
 
 
     !Initialize all report variables to a known state at beginning of simulation
-    Fan(FanNum)%FanPower = 0.0
-    Fan(FanNum)%DeltaTemp = 0.0
-    Fan(FanNum)%FanEnergy = 0.0
+    Fan(FanNum)%FanPower = 0.0d0
+    Fan(FanNum)%DeltaTemp = 0.0d0
+    Fan(FanNum)%FanEnergy = 0.0d0
 
     MyEnvrnFlag(FanNum) = .FALSE.
   END IF
@@ -1216,7 +1221,7 @@ SUBROUTINE InitFan(FanNum,FirstHVACIteration)
                                            Fan(FanNum)%MassFlowRateMinAvail)
   ELSE  ! zone exhaust fans
     Fan(FanNum)%MassFlowRateMaxAvail = Fan(FanNum)%MaxAirMassFlowRate
-    Fan(FanNum)%MassFlowRateMinAvail = 0.0
+    Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
     IF (Fan(FanNum)%FlowFractSchedNum > 0) THEN ! modulate flow
       Fan(FanNum)%InletAirMassFlowRate = Fan(FanNum)%MassFlowRateMaxAvail  &
                                 * GetCurrentScheduleValue(Fan(FanNum)%FlowFractSchedNum)
@@ -1243,6 +1248,7 @@ SUBROUTINE SizeFan(FanNum)
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   September 2001
           !       MODIFIED       Craig Wray August 2010 - added fan, belt, motor, and VFD component sizing
+          !                      August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1278,104 +1284,166 @@ SUBROUTINE SizeFan(FanNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) :: FanMinAirFlowRate
-  Integer :: NVPerfNum
-  CHARACTER(len=MaxNameLength) :: equipName
-  REAL(r64) :: RatedPower
-
-  !cpw31Aug2010 Add variables for component fan model sizing
-!unused062011  REAL(r64) DeltaPress         ! Delta Pressure Across the Fan (Fan Static Pressure Rise) [N/m2 = Pa]
-!unused062011  REAL(r64) FanAirPower        ! Air power for Fan being Simulated [W]
-!unused062011  REAL(r64) FanSpd             ! Fan shaft rotational speed [rpm]
-!unused062011  REAL(r64) FanTrq             ! Fan shaft torque [N-m]
-!unused062011  REAL(r64) FanWheelEff        ! Fan efficiency (mechanical) [-]
-!unused062011  REAL(r64) FanShaftPower      ! Shaft input power for Fan being Simulated [W]
-!unused062011  REAL(r64) BeltEff            ! Belt efficiency (mechanical) [-]
-!unused062011  REAL(r64) BeltInputPower     ! Belt input power for Fan being Simulated [W]
-!unused062011  REAL(r64) MotEff             ! Fan motor efficiency [-]
-!unused062011  REAL(r64) MotorInputPower    ! Motor input power for Fan being Simulated [W]
-!unused062011  REAL(r64) VFDEff             ! VFD efficiency (electrical) [-]
-!unused062011  REAL(r64) VFDInputPower      ! VFD input power for Fan being Simulated [W]
-!unused062011  REAL(r64) FanEff             ! Fan total system efficiency (fan*belt*motor*VFD) [-]
-
-  REAL(r64) RhoAir             ! Air density [kg/m3]
-  REAL(r64) FanVolFlow         ! Fan volumetric airflow [m3/s]
-  REAL(r64) DuctStaticPress    ! Duct static pressure setpoint [Pa]
-  REAL(r64) DeltaPressTot      ! Total pressure rise across fan [N/m2 = Pa]
-  REAL(r64) FanOutletVelPress  ! Fan outlet velocity pressure [Pa]
-  REAL(r64) EulerNum           ! Fan Euler number [-]
-  REAL(r64) NormalizedEulerNum ! Normalized Fan Euler number [-]
-  REAL(r64) FanDimFlow         ! Fan dimensionless airflow [-]
-  REAL(r64) FanSpdRadS         ! Fan shaft rotational speed [rad/s]
-  REAL(r64) MotorSpeed         ! Motor shaft rotational speed [rpm]
-  REAL(r64) XbeltMax           ! Factor for belt max eff curve [ln hp]
-  REAL(r64) FanTrqRatio        ! Ratio of fan torque to max fan torque [-]
-  REAL(r64) BeltPLEff          ! Belt normalized (part-load) efficiency [-]
-  REAL(r64) XmotorMax          ! Factor for motor max eff curve [ln hp]
-  REAL(r64) MotorOutPwrRatio   ! Ratio of motor output power to max motor output power [-]
-  REAL(r64) MotorPLEff         ! Motor normalized (part-load) efficiency [-]
+  REAL(r64) :: FanMinAirFlowRate  ! minimum air flow rate [m3/s]
+  Integer :: NVPerfNum            ! Index to night ventialation performance object
+  CHARACTER(len=MaxNameLength) :: equipName ! Equipment name
+  REAL(r64) :: RatedPower         ! Rated fan power [W]
+  REAL(r64) :: RhoAir             ! Air density [kg/m3]
+  REAL(r64) :: FanVolFlow         ! Fan volumetric airflow [m3/s]
+  REAL(r64) :: DuctStaticPress    ! Duct static pressure setpoint [Pa]
+  REAL(r64) :: DeltaPressTot      ! Total pressure rise across fan [N/m2 = Pa]
+  REAL(r64) :: FanOutletVelPress  ! Fan outlet velocity pressure [Pa]
+  REAL(r64) :: EulerNum           ! Fan Euler number [-]
+  REAL(r64) :: NormalizedEulerNum ! Normalized Fan Euler number [-]
+  REAL(r64) :: FanDimFlow         ! Fan dimensionless airflow [-]
+  REAL(r64) :: FanSpdRadS         ! Fan shaft rotational speed [rad/s]
+  REAL(r64) :: MotorSpeed         ! Motor shaft rotational speed [rpm]
+  REAL(r64) :: XbeltMax           ! Factor for belt max eff curve [ln hp]
+  REAL(r64) :: FanTrqRatio        ! Ratio of fan torque to max fan torque [-]
+  REAL(r64) :: BeltPLEff          ! Belt normalized (part-load) efficiency [-]
+  REAL(r64) :: XmotorMax          ! Factor for motor max eff curve [ln hp]
+  REAL(r64) :: MotorOutPwrRatio   ! Ratio of motor output power to max motor output power [-]
+  REAL(r64) :: MotorPLEff         ! Motor normalized (part-load) efficiency [-]
   REAL(r64) :: VFDSpdRatio    = 0.d0 ! Ratio of motor speed to motor max speed [-]
   REAL(r64) :: VFDOutPwrRatio = 0.d0 ! Ratio of VFD output power to max VFD output power [-]
+  LOGICAL   :: OASysFlag          ! Logical flag determines if parent object set OA Sys coil property
+  LOGICAL   :: AirLoopSysFlag     ! Logical flag determines if parent object set air loop coil property
+  REAL(r64) :: MaxAirFlowRateDes     ! Design maximum air flow rate for reporting
+  REAL(r64) :: MaxAirFlowRateUser    ! User hard-sized maximum air flow rate for reproting
+  REAL(r64) :: MinAirFlowRateDes     ! Design minimum air flow rate for reporting
+  REAL(r64) :: MinAirFlowRateUser    ! User hard-sized minimum air flow rate for reproting  
+  LOGICAL   :: IsAutosize            ! Indicator to autosize
+  LOGICAL   :: HardSizeNoDesRun      ! Indicator to hardsize with no disign run
+  LOGICAL :: SizingDesRunThisAirSys            ! true if a particular air system had a Sizing:System object and system sizing done
+  LOGICAL :: SizingDesRunThisZone              ! true if a particular zone had a Sizing:Zone object and zone sizing was done
 
-  FanMinAirFlowRate = 0.0
+  FanMinAirFlowRate = 0.0d0
   NVPerfNum  = Fan(FanNum)%NVPerfNum
+  MaxAirFlowRateDes = 0.0d0
+  MaxAirFlowRateUser = 0.0d0
+  IsAutosize = .FALSE.
+  IF (SysSizingRunDone .OR. ZoneSizingRunDone) THEN
+    HardSizeNoDesRun = .FALSE.
+  ELSE
+    HardSizeNoDesRun = .TRUE.
+  ENDIF
+
+  IF (CurSysNum > 0) THEN
+    CALL CheckThisAirSystemForSizing(CurSysNum, SizingDesRunThisAirSys )
+  ELSE
+    SizingDesRunThisAirSys =  .FALSE.
+  ENDIF
+  IF (CurZoneEqNum > 0) THEN
+    CALL CheckThisZoneForSizing(CurZoneEqNum, SizingDesRunThisZone)
+  ELSE
+    SizingDesRunThisZone =  .FALSE.
+  ENDIF
 
   IF (Fan(FanNum)%MaxAirFlowRate == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF  
 
-    IF (CurSysNum > 0) THEN
+  IF (CurSysNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisAirSys) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.  
+      IF (Fan(FanNum)%MaxAirFlowRate > 0.0d0) THEN
+        CALL ReportSizingOutput(Fan(FanNum)%FanType, Fan(FanNum)%FanName, &
+                   'User-Specified Maximum Flow Rate [m3/s]', Fan(FanNum)%MaxAirFlowRate)
+      END IF  
+    ELSE ! Autosize or hardsize with sizing run 
+
+      OASysFlag = .FALSE.
+      AirLoopSysFlag = .FALSE.
+      ! logicals used when parent sizes fan
+      IF (CurOASysNum > 0)OASysFlag = OASysEqSizing(CurOASysNum)%AirFlow
+      IF (CurSysNum > 0)AirLoopSysFlag = UnitarySysEqSizing(CurSysNum)%AirFlow
 
       CALL CheckSysSizing(TRIM(Fan(FanNum)%FanType) , &
                            Fan(FanNum)%FanName)
 
-      SELECT CASE(CurDuctType)
-        CASE(Main)
-          Fan(FanNum)%MaxAirFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
-        CASE(Cooling)
-          Fan(FanNum)%MaxAirFlowRate = FinalSysSizing(CurSysNum)%DesCoolVolFlow
-        CASE(Heating)
-          Fan(FanNum)%MaxAirFlowRate = FinalSysSizing(CurSysNum)%DesHeatVolFlow
-        CASE(Other)
-          Fan(FanNum)%MaxAirFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
-        CASE DEFAULT
-          Fan(FanNum)%MaxAirFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
-      END SELECT
-
-      FanMinAirFlowRate = Fan(FanNum)%MinAirFlowRate
-
-    ELSE IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(TRIM(Fan(FanNum)%FanType) , &
-                           Fan(FanNum)%FanName)
-      IF (.NOT. ZoneHeatingOnlyFan) THEN
-        Fan(FanNum)%MaxAirFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                         FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF(OASysFlag)THEN
+        MaxAirFlowRateDes = OASysEqSizing(CurOASysNum)%AirVolFlow
+      ELSE IF(AirLoopSysFlag)THEN
+        MaxAirFlowRateDes = UnitarySysEqSizing(CurSysNum)%AirVolFlow
       ELSE
-        Fan(FanNum)%MaxAirFlowRate = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+        SELECT CASE(CurDuctType)
+          CASE(Main)
+            MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
+          CASE(Cooling)
+            ! MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesCoolVolFlow
+            MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
+          CASE(Heating)
+            ! MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesHeatVolFlow
+            MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
+          CASE(Other)
+            MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
+          CASE DEFAULT
+            MaxAirFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
+        END SELECT
       END IF
 
+      FanMinAirFlowRate = Fan(FanNum)%MinAirFlowRate
     END IF
-
-    IF (Fan(FanNum)%MaxAirFlowRate < SmallAirVolFlow) THEN
-      Fan(FanNum)%MaxAirFlowRate = 0.0
-    END IF
-
-    IF (Fan(FanNum)%MaxAirFlowRateEMSOverrideOn) THEN
-      Fan(FanNum)%MaxAirFlowRate = Fan(FanNum)%MaxAirFlowRateEMSOverrideValue
-    ENDIF
-
-    CALL ReportSizingOutput(TRIM(Fan(FanNum)%FanType), &
-                            Fan(FanNum)%FanName, 'Maximum Flow Rate [m3/s]', Fan(FanNum)%MaxAirFlowRate)
-
-    IF ((Fan(FanNum)%FanType_Num == FanType_SimpleVAV .OR. Fan(FanNum)%FanType_Num == FanType_ComponentModel) &
-          .AND. Fan(FanNum)%MinAirFlowRate == AutoSize) THEN ! cpw22Aug2010 Add FanType_ComponentModel
-      CALL CheckSysSizing(TRIM(Fan(FanNum)%FanType) , &
+  ELSE IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisZone) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.  
+      IF (Fan(FanNum)%MaxAirFlowRate > 0.0d0) THEN
+        CALL ReportSizingOutput(Fan(FanNum)%FanType, Fan(FanNum)%FanName, &
+                   'User-Specified Maximum Flow Rate [m3/s]', Fan(FanNum)%MaxAirFlowRate)
+      END IF  
+    ELSE ! Autosize or hardsize with sizing run 
+      CALL CheckZoneSizing(TRIM(Fan(FanNum)%FanType) , &
                            Fan(FanNum)%FanName)
-      Fan(FanNum)%MinAirFlowRate = FanMinAirFlowRate
-      CALL ReportSizingOutput(TRIM(Fan(FanNum)%FanType), &
-                              Fan(FanNum)%FanName, 'Minimum Flow Rate [m3/s]', Fan(FanNum)%MinAirFlowRate)
-    END IF
-
+      IF(ZoneEqSizing(CurZoneEqNum)%AirFlow)THEN
+        MaxAirFlowRateDes = ZoneEqSizing(CurZoneEqNum)%AirVolFlow
+      ELSE
+        IF(ZoneCoolingOnlyFan)THEN
+          MaxAirFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
+        ELSE IF (ZoneHeatingOnlyFan) THEN
+          MaxAirFlowRateDes = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+        ELSE
+          MaxAirFlowRateDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                  FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+        END IF
+      END IF
+    END IF    
   END IF
+  
+  IF (MaxAirFlowRateDes < SmallAirVolFlow) THEN
+    MaxAirFlowRateDes = 0.0d0
+  END IF
+
+  IF (Fan(FanNum)%MaxAirFlowRateEMSOverrideOn) THEN
+    MaxAirFlowRateDes = Fan(FanNum)%MaxAirFlowRateEMSOverrideValue
+  ENDIF
+  
+  IF (.NOT. HardSizeNoDesRun) THEN
+    IF (IsAutosize) THEN
+      Fan(FanNum)%MaxAirFlowRate = MaxAirFlowRateDes  
+      CALL ReportSizingOutput(Fan(FanNum)%FanType, &
+                          Fan(FanNum)%FanName, 'Design Size Maximum Flow Rate [m3/s]', MaxAirFlowRateDes)
+    ELSE
+      IF (Fan(FanNum)%MaxAirFlowRate > 0.0d0 .AND. Fan(FanNum)%MaxAirFlowRateIsAutosizable .AND. MaxAirFlowRateDes > 0.0d0) THEN
+        MaxAirFlowRateUser = Fan(FanNum)%MaxAirFlowRate
+        CALL ReportSizingOutput(Fan(FanNum)%FanType, Fan(FanNum)%FanName, &
+                             'Design Size Maximum Flow Rate [m3/s]', MaxAirFlowRateDes, &
+                             'User-Specified Maximum Flow Rate [m3/s]', MaxAirFlowRateUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(MaxAirFlowRateDes - MaxAirFlowRateUser)/MaxAirFlowRateUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeHVACFans: Potential issue with equipment sizing for '// &
+                                    TRIM(Fan(FanNum)%FanType)//' = "'//TRIM(Fan(FanNum)%FanName)//'".')
+            CALL ShowContinueError('User-Specified Maximum Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxAirFlowRateUser,5))// ' [m3/s]')
+            CALL ShowContinueError('differs from Design Size Maximum Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxAirFlowRateDes,5))// ' [m3/s]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF      
+    END IF  
+  END IF  
+  
 
   !cpw31Aug2010 Add fan, belt, motor and VFD component autosizing and maximum efficiency calculations
   FanVolFlow = Fan(FanNum)%MaxAirFlowRate !Maximum volumetric airflow through fan [m3/s at standard conditions]
@@ -1636,7 +1704,7 @@ SUBROUTINE SizeFan(FanNum)
   CALL PreDefTableEntry(pdchFanVolFlow,equipName,FanVolFlow)
   RatedPower =  FanVolFlow * Fan(FanNum)%DeltaPress / Fan(FanNum)%FanEff ! total fan power
   CALL PreDefTableEntry(pdchFanPwr,equipName,RatedPower)
-  IF (FanVolFlow .NE. 0.0) THEN
+  IF (FanVolFlow .NE. 0.0d0) THEN
     CALL PreDefTableEntry(pdchFanPwrPerFlow,equipName,RatedPower/FanVolFlow)
   END IF
   CALL PreDefTableEntry(pdchFanMotorIn,equipName,Fan(FanNum)%MotInAirFrac)
@@ -1734,8 +1802,8 @@ SUBROUTINE SimSimpleFan(FanNum)
    MassFlow   = MAX(MassFlow,Fan(FanNum)%MinAirMassFlowRate)
    !
    !Determine the Fan Schedule for the Time step
-  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
-        .and. .NOT.LocalTurnFansOff  .and. Massflow>0.0) Then
+  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0d0 .or. LocalTurnFansOn) &
+        .and. .NOT.LocalTurnFansOff  .and. Massflow>0.0d0) Then
    !Fan is operating
    Fan(FanNum)%FanPower = MassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
    FanShaftPower = MotEff * Fan(FanNum)%FanPower  ! power delivered to shaft
@@ -1748,16 +1816,16 @@ SUBROUTINE SimSimpleFan(FanNum)
 
  Else
    !Fan is off and not operating no power consumed and mass flow rate.
-   Fan(FanNum)%FanPower = 0.0
-   FanShaftPower = 0.0
-   PowerLossToAir = 0.0
-   Fan(FanNum)%OutletAirMassFlowRate = 0.0
+   Fan(FanNum)%FanPower = 0.0d0
+   FanShaftPower = 0.0d0
+   PowerLossToAir = 0.0d0
+   Fan(FanNum)%OutletAirMassFlowRate = 0.0d0
    Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
    Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
    Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
    ! Set the Control Flow variables to 0.0 flow when OFF.
-   Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-   Fan(FanNum)%MassFlowRateMinAvail = 0.0
+   Fan(FanNum)%MassFlowRateMaxAvail = 0.0d0
+   Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
 
  End If
 
@@ -1868,8 +1936,8 @@ SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
   MassFlow    = MIN(MassFlow,Fan(FanNum)%MaxAirMassFlowRate)
 
    !Determine the Fan Schedule for the Time step
-  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
-        .and. .NOT. LocalTurnFansOff .and. Massflow>0.0) Then
+  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0d0 .or. LocalTurnFansOn) &
+        .and. .NOT. LocalTurnFansOff .and. Massflow>0.0d0) Then
     !Fan is operating - calculate power loss and enthalpy rise
     !  Fan(FanNum)%FanPower = PartLoadFrac*FullMassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
    ! Calculate and check limits on fraction of system flow
@@ -1883,7 +1951,7 @@ SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
 
     FlowFracForPower = MAX(MinFlowFrac,MIN(FlowFracActual,1.0d0))  ! limit flow fraction to allowed range
     IF (NightVentOn .AND. NVPerfNum > 0) THEN
-      PartLoadFrac = 1.0
+      PartLoadFrac = 1.0d0
     ELSE
       PartLoadFrac=Fan(FanNum)%FanCoeff(1) + Fan(FanNum)%FanCoeff(2)*FlowFracForPower +  &
                        Fan(FanNum)%FanCoeff(3)*FlowFracForPower**2 + Fan(FanNum)%FanCoeff(4)*FlowFracForPower**3 + &
@@ -1908,8 +1976,8 @@ SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
     !  A potential way to improve is to check the temperature rise across the fan first,
     !  if it is too high (say > 20C) then applies the code.
     DeltaTAcrossFan = Fan(FanNum)%OutletAirTemp - Fan(FanNum)%InletAirTemp
-    IF (DeltaTAcrossFan > 20.0) THEN
-        MinFlowFracLimitFanHeat = 0.10
+    IF (DeltaTAcrossFan > 20.0d0) THEN
+        MinFlowFracLimitFanHeat = 0.10d0
         IF (FlowFracForPower < MinFlowFracLimitFanHeat) THEN
           PartLoadFracatLowMin=Fan(FanNum)%FanCoeff(1) + Fan(FanNum)%FanCoeff(2)*MinFlowFracLimitFanHeat +  &
                     Fan(FanNum)%FanCoeff(3)*MinFlowFracLimitFanHeat**2 + Fan(FanNum)%FanCoeff(4)*MinFlowFracLimitFanHeat**3 + &
@@ -1934,16 +2002,16 @@ SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
 
   Else
     !Fan is off and not operating no power consumed and mass flow rate.
-    Fan(FanNum)%FanPower = 0.0
-    FanShaftPower = 0.0
-    PowerLossToAir = 0.0
-    Fan(FanNum)%OutletAirMassFlowRate = 0.0
+    Fan(FanNum)%FanPower = 0.0d0
+    FanShaftPower = 0.0d0
+    PowerLossToAir = 0.0d0
+    Fan(FanNum)%OutletAirMassFlowRate = 0.0d0
     Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
     Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
     Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
     ! Set the Control Flow variables to 0.0 flow when OFF.
-    Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-    Fan(FanNum)%MassFlowRateMinAvail = 0.0
+    Fan(FanNum)%MassFlowRateMaxAvail = 0.0d0
+    Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
   End If
 
   RETURN
@@ -2018,20 +2086,20 @@ SUBROUTINE SimOnOffFan(FanNum, SpeedRatio)
    IF (Fan(FanNum)%EMSMaxMassFlowOverrideOn) MassFlow = Fan(FanNum)%EMSAirMassFlowValue
    MassFlow   = MIN(MassFlow,Fan(FanNum)%MaxAirMassFlowRate)
    MassFlow   = MAX(MassFlow,Fan(FanNum)%MinAirMassFlowRate)
-   Fan(FanNum)%FanRuntimeFraction = 0.0
+   Fan(FanNum)%FanRuntimeFraction = 0.0d0
 
   ! Determine the Fan Schedule for the Time step
-  IF( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
-        .and. .NOT. LocalTurnFansOff .and. Massflow>0.0 .and. Fan(FanNum)%MaxAirMassFlowRate > 0.0) THEN
+  IF( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0d0 .or. LocalTurnFansOn) &
+        .and. .NOT. LocalTurnFansOff .and. Massflow>0.0d0 .and. Fan(FanNum)%MaxAirMassFlowRate > 0.0d0) THEN
     ! The actual flow fraction is calculated from MassFlow and the MaxVolumeFlow * AirDensity
    FlowFrac = MassFlow/(Fan(FanNum)%MaxAirMassFlowRate)
 
     ! Calculate the part load ratio, can't be greater than 1
    PartLoadRatio= MIN(1.0d0,FlowFrac)
    ! Fan is operating
-   IF (OnOffFanPartLoadFraction <= 0.0) THEN
+   IF (OnOffFanPartLoadFraction <= 0.0d0) THEN
      CALL ShowRecurringWarningErrorAtEnd('Fan:OnOff, OnOffFanPartLoadFraction <= 0.0, Reset to 1.0',ErrCount)
-     OnOffFanPartLoadFraction = 1.0 ! avoid divide by zero or negative PLF
+     OnOffFanPartLoadFraction = 1.0d0 ! avoid divide by zero or negative PLF
    END IF
 
    IF (OnOffFanPartLoadFraction < 0.7d0) THEN
@@ -2096,7 +2164,7 @@ SUBROUTINE SimOnOffFan(FanNum, SpeedRatio)
 
    ! OnOffFanPartLoadFraction is passed via DataHVACGlobals from the cooling or heating coil that is
    !   requesting the fan to operate in cycling fan/cycling coil mode
-   OnOffFanPartLoadFraction = 1.0 ! reset to 1 in case other on/off fan is called without a part load curve
+   OnOffFanPartLoadFraction = 1.0d0 ! reset to 1 in case other on/off fan is called without a part load curve
    FanShaftPower = Fan(FanNum)%MotEff * Fan(FanNum)%FanPower  ! power delivered to shaft
    PowerLossToAir = FanShaftPower + (Fan(FanNum)%FanPower - FanShaftPower) * Fan(FanNum)%MotInAirFrac
    Fan(FanNum)%OutletAirEnthalpy = Fan(FanNum)%InletAirEnthalpy + PowerLossToAir/MassFlow
@@ -2107,16 +2175,16 @@ SUBROUTINE SimOnOffFan(FanNum, SpeedRatio)
    Fan(FanNum)%OutletAirTemp = PsyTdbFnHW(Fan(FanNum)%OutletAirEnthalpy,Fan(FanNum)%OutletAirHumRat)
   ELSE
    ! Fan is off and not operating no power consumed and mass flow rate.
-   Fan(FanNum)%FanPower = 0.0
-   FanShaftPower = 0.0
-   PowerLossToAir = 0.0
-   Fan(FanNum)%OutletAirMassFlowRate = 0.0
+   Fan(FanNum)%FanPower = 0.0d0
+   FanShaftPower = 0.0d0
+   PowerLossToAir = 0.0d0
+   Fan(FanNum)%OutletAirMassFlowRate = 0.0d0
    Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
    Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
    Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
    ! Set the Control Flow variables to 0.0 flow when OFF.
-   Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-   Fan(FanNum)%MassFlowRateMinAvail = 0.0
+   Fan(FanNum)%MassFlowRateMaxAvail = 0.0d0
+   Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
   END IF
 
   RETURN
@@ -2189,8 +2257,8 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
 
 ! apply controls to determine if operating
   IF (Fan(FanNum)%AvailManagerMode == ExhaustFanCoupledToAvailManagers) THEN
-    IF ( (( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0) .OR. TurnFansOn ) &
-            .AND. .NOT. TurnFansOff .AND. MassFlow > 0.0 ) THEN ! available
+    IF ( (( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0d0) .OR. TurnFansOn ) &
+            .AND. .NOT. TurnFansOff .AND. MassFlow > 0.0d0 ) THEN ! available
       IF (Fan(FanNum)%MinTempLimitSchedNum > 0) THEN
         IF (Tin >= GetCurrentScheduleValue(Fan(FanNum)%MinTempLimitSchedNum)) THEN
           FanIsRunning = .TRUE.
@@ -2205,7 +2273,7 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
     ENDIF
 
   ELSEIF (Fan(FanNum)%AvailManagerMode == ExhaustFanDecoupledFromAvailManagers) THEN
-    IF ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0 .AND. MassFlow > 0.0 ) THEN
+    IF ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0d0 .AND. MassFlow > 0.0d0 ) THEN
       IF (Fan(FanNum)%MinTempLimitSchedNum > 0) THEN
         IF (Tin >= GetCurrentScheduleValue(Fan(FanNum)%MinTempLimitSchedNum)) THEN
           FanIsRunning = .TRUE.
@@ -2233,16 +2301,16 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
 
   ELSE
     !Fan is off and not operating no power consumed and mass flow rate.
-    Fan(FanNum)%FanPower = 0.0
-    PowerLossToAir = 0.0
-    Fan(FanNum)%OutletAirMassFlowRate = 0.0
+    Fan(FanNum)%FanPower = 0.0d0
+    PowerLossToAir = 0.0d0
+    Fan(FanNum)%OutletAirMassFlowRate = 0.0d0
     Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
     Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
     Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
    ! Set the Control Flow variables to 0.0 flow when OFF.
-    Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-    Fan(FanNum)%MassFlowRateMinAvail = 0.0
-    Fan(FanNum)%InletAirMassFlowRate = 0.0
+    Fan(FanNum)%MassFlowRateMaxAvail = 0.0d0
+    Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
+    Fan(FanNum)%InletAirMassFlowRate = 0.0d0
 
    END IF
 
@@ -2373,8 +2441,8 @@ SUBROUTINE SimComponentModelFan(FanNum)
 !  IF (Fan(FanNum)%EMSMaxMassFlowOverrideOn) MassFlow   = Fan(FanNum)%EMSAirMassFlowValue
 
   !Determine the Fan Schedule for the Time step
-  If((GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
-        .and. .NOT.LocalTurnFansOff .and. Massflow>0.0) Then
+  If((GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0d0 .or. LocalTurnFansOn) &
+        .and. .NOT.LocalTurnFansOff .and. Massflow>0.0d0) Then
     !Fan is operating - calculate fan pressure rise, component efficiencies and power, and also air enthalpy rise
 
    ! Calculate fan static pressure rise using fan volumetric flow, std air density, air-handling system characteristics,
@@ -2514,16 +2582,16 @@ SUBROUTINE SimComponentModelFan(FanNum)
 
   Else
     !Fan is OFF and not operating -- no power consumed and zero mass flow rate
-    Fan(FanNum)%FanPower = 0.0
+    Fan(FanNum)%FanPower = 0.0d0
     Fan(FanNum)%FanShaftPower = 0.0d0
-    PowerLossToAir = 0.0
-    Fan(FanNum)%OutletAirMassFlowRate = 0.0
+    PowerLossToAir = 0.0d0
+    Fan(FanNum)%OutletAirMassFlowRate = 0.0d0
     Fan(FanNum)%OutletAirHumRat = Fan(FanNum)%InletAirHumRat
     Fan(FanNum)%OutletAirEnthalpy = Fan(FanNum)%InletAirEnthalpy
     Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
     ! Set the Control Flow variables to 0.0 flow when OFF.
-    Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-    Fan(FanNum)%MassFlowRateMinAvail = 0.0
+    Fan(FanNum)%MassFlowRateMaxAvail = 0.0d0
+    Fan(FanNum)%MassFlowRateMinAvail = 0.0d0
 
     Fan(FanNum)%DeltaPress = 0.0d0
     Fan(FanNum)%FanAirPower = 0.0d0
@@ -2532,11 +2600,11 @@ SUBROUTINE SimComponentModelFan(FanNum)
     Fan(FanNum)%FanTrq = 0.0d0
     Fan(FanNum)%BeltEff = 0.0d0
     Fan(FanNum)%BeltInputPower = 0.0d0
-    Fan(FanNum)%MotEff = 0.0
+    Fan(FanNum)%MotEff = 0.0d0
     Fan(FanNum)%MotorInputPower = 0.0d0
     Fan(FanNum)%VFDEff = 0.0d0
     Fan(FanNum)%VFDInputPower = 0.0d0
-    Fan(FanNum)%FanEff = 0.0
+    Fan(FanNum)%FanEff = 0.0d0
   END IF
 
   RETURN
@@ -2793,7 +2861,7 @@ SUBROUTINE GetFanVolFlow(FanIndex, FanVolFlow)
           ! na
 
   IF(FanIndex .EQ. 0)THEN
-    FanVolFlow = 0.0
+    FanVolFlow = 0.0d0
   ELSE
     FanVolFlow = Fan(FanIndex)%MaxAirFlowRate
   END IF

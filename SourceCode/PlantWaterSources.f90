@@ -40,19 +40,21 @@ TYPE WaterSourceSpecs
   CHARACTER(len=MaxNameLength) :: Name     =' ' ! user identifier
   INTEGER           :: InletNodeNum  =0   ! Node number on the inlet side of the plant
   INTEGER           :: OutletNodeNum =0   ! Node number on the outlet side of the plant
-  REAL(r64)         :: DesVolFlowRate     =0.0 ! m**3/s - design nominal volumetric flow rate
-  REAL(r64)         :: MassFlowRateMax =0.0 ! kg/s - design mass flow rate
-  REAL(r64)         :: MassFlowRate = 0.0
+  REAL(r64)         :: DesVolFlowRate     =0.0d0 ! m**3/s - design nominal volumetric flow rate
+  REAL(r64)         :: MassFlowRateMax =0.0d0 ! kg/s - design mass flow rate
+  LOGICAL           :: EMSOverrideOnMassFlowRateMax = .FALSE. ! if true EMS is calling to override maximum mass flow
+  REAL(r64)         :: EMSOverrideValueMassFlowRateMax = 0.d0 ! value to use if EMS is overriding max mass flow
+  REAL(r64)         :: MassFlowRate = 0.0d0
   INTEGER           :: TempSpecType = 0 ! temperature specification type
   CHARACTER(len=MaxNameLength) :: TempSpecScheduleName = ''
   INTEGER           :: TempSpecScheduleNum = 0
-  REAL(r64)         :: BoundaryTemp = 0.0
-  REAL(r64)         :: OutletTemp = 0.0 !may be different if the flow is off
-  REAL(r64)         :: InletTemp = 0.0
-  REAL(r64)         :: HeatRate = 0.0
-  REAL(r64)         :: HeatEnergy = 0.0
+  REAL(r64)         :: BoundaryTemp = 0.0d0
+  REAL(r64)         :: OutletTemp = 0.0d0 !may be different if the flow is off
+  REAL(r64)         :: InletTemp = 0.0d0
+  REAL(r64)         :: HeatRate = 0.0d0
+  REAL(r64)         :: HeatEnergy = 0.0d0
   TYPE(PlantLocation) :: Location = PlantLocation(0,0,0,0)
-  REAL(r64)         :: SizFac                    = 0.0 ! sizing factor
+  REAL(r64)         :: SizFac                    = 0.0d0 ! sizing factor
   LOGICAL           :: CheckEquipName = .TRUE.
   LOGICAL           :: MyFlag = .TRUE.
   LOGICAL           :: MyEnvironFlag = .TRUE.
@@ -201,7 +203,8 @@ SUBROUTINE GetWaterSource
   USE BranchNodeConnections, ONLY: TestCompSet
   USE NodeInputManager, ONLY: GetOnlySingleNode
   USE ScheduleManager,    ONLY: GetScheduleIndex
-  USE DataInterfaces, ONLY: SetupOutputVariable
+  USE DataInterfaces, ONLY: SetupOutputVariable, SetupEMSActuator
+  USE DataGLobals, ONLY: AnyEnergyManagementSystemInModel
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -299,6 +302,12 @@ SUBROUTINE GetWaterSource
           WaterSource(SourceNum)%HeatRate,'System','Average',WaterSource(SourceNum)%Name)
      CALL SetupOutputVariable('Plant Temperature Source Component Heat Transfer Energy [J]', &
           WaterSource(SourceNum)%HeatEnergy,'System','Sum',WaterSource(SourceNum)%Name)
+     IF ( AnyEnergyManagementSystemInModel ) THEN
+       CALL SetupEMSActuator('PlantComponent:TemperatureSource', WaterSource(SourceNum)%Name, &
+                             'Maximum Mass Flow Rate', '[kg/s]', &
+                             WaterSource(SourceNum)%EMSOverrideOnMassFlowRateMax, &
+                             WaterSource(SourceNum)%EMSOverrideValueMassFlowRateMax)
+     ENDIF
   END DO
 
   RETURN
@@ -420,9 +429,14 @@ SUBROUTINE InitWaterSource(SourceNum ,RunFlag, MyLoad, FirstHVACIteration)
   ! If the mdot is already zero, then well, we still want to go to zero
   ! If the mdot is positive, just make sure we constrain it to the design value
   IF (WaterSource(SourceNum)%MassFlowRate < 0) THEN
-        WaterSource(SourceNum)%MassFlowRate = 0.0d0
+    WaterSource(SourceNum)%MassFlowRate = 0.0d0
   ELSE
-        WaterSource(SourceNum)%MassFlowRate = MIN(WaterSource(SourceNum)%MassFlowRate, WaterSource(SourceNum)%MassFlowRateMax)
+    IF (.NOT. WaterSource(SourceNum)%EMSOverrideOnMassFlowRateMax) THEN
+      WaterSource(SourceNum)%MassFlowRate = MIN(WaterSource(SourceNum)%MassFlowRate, WaterSource(SourceNum)%MassFlowRateMax)
+    ELSE
+      WaterSource(SourceNum)%MassFlowRate = MIN(WaterSource(SourceNum)%MassFlowRate, &
+                                                WaterSource(SourceNum)%EMSOverrideValueMassFlowRateMax)
+    ENDIF
   END IF
 
   CALL SetComponentFlowRate( WaterSource(SourceNum)%MassFlowRate,         &
@@ -563,7 +577,7 @@ SUBROUTINE CalcWaterSource(SourceNum,MyLoad,Runflag,EquipFlowCtrl)
   iDummy = EquipFlowCtrl
   lDummy = RunFlag
 
-    IF (WaterSource(SourceNum)%MassFlowRate > 0.0) THEN
+    IF (WaterSource(SourceNum)%MassFlowRate > 0.0d0) THEN
         WaterSource(SourceNum)%OutletTemp = WaterSource(SourceNum)%BoundaryTemp
         Cp = GetSpecificHeatGlycol(PlantLoop(WaterSource(SourceNum)%Location%LoopNum)%FluidName,  &
                                    WaterSource(SourceNum)%BoundaryTemp,                           &

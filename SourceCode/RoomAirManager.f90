@@ -349,7 +349,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
         thisHBsurfID = Zone(ZoneNum)%SurfaceFirst + thisSurfinZone - 1
         IF (Surface(thisHBsurfID)%Class == SurfaceClass_IntMass) THEN
           AirPatternZoneInfo(ZoneNum)%Surf(thisSurfinZone)%SurfID = thisHBsurfID
-          AirPatternZoneInfo(ZoneNum)%Surf(thisSurfinZone)%Zeta   = 0.5
+          AirPatternZoneInfo(ZoneNum)%Surf(thisSurfinZone)%Zeta   = 0.5d0
           CYCLE
         ENDIF
 
@@ -474,7 +474,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
      RoomAirPattern(thisPattern)%DeltaTleaving = rNumericArgs(3)
      RoomAirPattern(thisPattern)%DeltaTexhaust = rNumericArgs(4)
 
-     NumPairs = floor( (REAL(NumNumbers,r64) - 4.0)/2.0 )
+     NumPairs = floor( (REAL(NumNumbers,r64) - 4.0d0)/2.0d0 )
 
       ! TODO error checking
 
@@ -482,8 +482,8 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
      ALLOCATE( RoomAirPattern(thisPattern)%VertPatrn%DeltaTaiPatrn(NumPairs) )
 
      ! init these since they can't be in derived type
-     RoomAirPattern(thisPattern)%VertPatrn%ZetaPatrn     = 0.0
-     RoomAirPattern(thisPattern)%VertPatrn%DeltaTaiPatrn = 0.0
+     RoomAirPattern(thisPattern)%VertPatrn%ZetaPatrn     = 0.0d0
+     RoomAirPattern(thisPattern)%VertPatrn%DeltaTaiPatrn = 0.0d0
 
      DO i=0, NumPairs-1
 
@@ -528,7 +528,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
 
      ! init just allocated
      RoomAirPattern(thisPattern)%MapPatrn%SurfName = ' '
-     RoomAirPattern(thisPattern)%MapPatrn%DeltaTai = 0.0
+     RoomAirPattern(thisPattern)%MapPatrn%DeltaTai = 0.0d0
      RoomAirPattern(thisPattern)%MapPatrn%SurfID   = 0
 
      DO I=1, numPairs
@@ -887,8 +887,8 @@ SUBROUTINE GetMundtData(ErrorsFound)
     ! Initialize default values for Mundt model controls
     ALLOCATE (ConvectiveFloorSplit(NumOfZones))
     ALLOCATE (InfiltratFloorSplit(NumOfZones))
-    ConvectiveFloorSplit        = 0.0
-    InfiltratFloorSplit         = 0.0
+    ConvectiveFloorSplit        = 0.0d0
+    InfiltratFloorSplit         = 0.0d0
 
     cCurrentModuleObject = 'RoomAirSettings:OneNodeDisplacementVentilation'
     NumOfMundtContrl = GetNumObjectsFound(cCurrentModuleObject)
@@ -1175,7 +1175,7 @@ SUBROUTINE GetCrossVentData(ErrorsFound)
         CompNum = AirflowNetworkLinkageData(Loop2)%CompNum
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
         IF (AirflowNetworkCompData(CompNum)%CompTypeNum == CompTypeNum_SCR) THEN
-          IF (MultizoneSurfaceCrackData(TypeNum)%FlowExpo /= 0.50) THEN
+          IF (MultizoneSurfaceCrackData(TypeNum)%FlowExpo /= 0.50d0) THEN
             AirModel(ThisZone)%AirModelType=RoomAirModel_Mixing
             CALL ShowWarningError('Problem with '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
             CALL ShowWarningError('Roomair model will not be applied for Zone='//TRIM(cAlphaArgs(1))//'.')
@@ -1383,7 +1383,7 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
           !       DATE WRITTEN   March 2005
-          !       MODIFIED       na
+          !       MODIFIED       Aug, 2013, Sam Brunswick -- for RoomAirCrossCrossVent modifications
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1445,11 +1445,13 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
   INTEGER         :: contDoor             = 0 ! counter
   INTEGER         :: Loop                 = 0 ! counter
   INTEGER         :: Loop2                = 0 ! counter
-  REAL(r64)       :: Z1ZoneAux            = 0.0 ! Auxiliary variables
-  REAL(r64)       :: Z2ZoneAux            = 0.0 ! Auxiliary variables
-  REAL(r64)       :: Z1Zone               = 0.0 ! Auxiliary variables
-  REAL(r64)       :: Z2Zone               = 0.0 ! Auxiliary variables
-  REAL(r64)       :: CeilingHeightDiffMax = 0.1 ! Maximum difference between wall height and ceiling height
+  INTEGER         :: i                    = 0 ! counter
+  INTEGER         :: N                    = 0 ! counter
+  REAL(r64)       :: Z1ZoneAux            = 0.0d0 ! Auxiliary variables
+  REAL(r64)       :: Z2ZoneAux            = 0.0d0 ! Auxiliary variables
+  REAL(r64)       :: Z1Zone               = 0.0d0 ! Auxiliary variables
+  REAL(r64)       :: Z2Zone               = 0.0d0 ! Auxiliary variables
+  REAL(r64)       :: CeilingHeightDiffMax = 0.1d0 ! Maximum difference between wall height and ceiling height
   LOGICAL         :: SetZoneAux
   INTEGER, ALLOCATABLE, DIMENSION (:)   :: AuxSurf
   INTEGER         :: MaxSurf
@@ -1498,7 +1500,7 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
     ALLOCATE (AuxSurf(NumOfZones))
 
     ALLOCATE (ZoneCeilingHeight(NumOfZones*2))
-    ZoneCeilingHeight=0.0
+    ZoneCeilingHeight=0.0d0
 
 
     ! Arrays initializations
@@ -1514,12 +1516,12 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
     PosZ_Window   = 0
     PosZ_Door     = 0
     PosZ_Internal = 0
-    Hceiling      = 0.0
-    HWall         = 0.0
-    HFloor        = 0.0
-    HInternal     = 0.0
-    HWindow       = 0.0
-    HDoor         = 0.0
+    Hceiling      = 0.0d0
+    HWall         = 0.0d0
+    HFloor        = 0.0d0
+    HInternal     = 0.0d0
+    HWindow       = 0.0d0
+    HDoor         = 0.0d0
 
     ! Put the surface and zone information in Apos and PosZ arrays
     DO ZNum = 1,NumOfZones
@@ -1636,11 +1638,16 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
     IF (.NOT. allocated(AirflowNetworkSurfaceUCSDCV)) THEN
      ALLOCATE (AirflowNetworkSurfaceUCSDCV(NumofZones, 0:MaxSurf))
     ENDIF
+    IF (.NOT. allocated(CVJetRecFlows)) THEN
+     ALLOCATE (CVJetRecFlows(NumofZones, 0:MaxSurf))
+    ENDIF
     ALLOCATE (AuxAirflowNetworkSurf(NumofZones, 0:MaxSurf))
     ! Width and Height for airflow network surfaces
     IF (.NOT. allocated(SurfParametersCVDV)) THEN
      ALLOCATE (SurfParametersCVDV(NumOfLinksMultizone))
     ENDIF
+
+
 
     AirflowNetworkSurfaceUCSDCV=0
     ! Organize surfaces in vector AirflowNetworkSurfaceUCSDCV(Zone, surface indexes)
@@ -1657,8 +1664,8 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
             CompNum = AirflowNetworkLinkageData(Loop2)%CompNum
             TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
            IF (AirflowNetworkCompData(CompNum)%CompTypeNum == CompTypeNum_DOP) then
-              WidthFactMax=0.0
-              HeightFactMax=0.0
+              WidthFactMax=0.0d0
+              HeightFactMax=0.0d0
               DO Loop3=1,MultizoneCompDetOpeningData(TypeNum)%NumFac
                 If (Loop3 .eq. 1) then
                   WidthFact=MultizoneCompDetOpeningData(TypeNum)%WidthFac1
@@ -1688,7 +1695,7 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
             ELSE IF (AirflowNetworkCompData(CompNum)%CompTypeNum == CompTypeNum_SCR) then ! surface type = CRACK
               SurfParametersCVDV(Loop2)%Width=Surface(MultizoneSurfaceData(Loop2)%SurfNum)%Width/2
               AinCV= MultizoneSurfaceCrackData(TypeNum)%FlowCoef / &
-                       (BaseDischargeCoef*SQRT(2./PsyRhoAirFnPbTdbW(OutBaroPress,MAT(Loop),ZoneAirHumRat(Loop)) ))
+                       (BaseDischargeCoef*SQRT(2.0d0/PsyRhoAirFnPbTdbW(OutBaroPress,MAT(Loop),ZoneAirHumRat(Loop)) ))
               SurfParametersCVDV(Loop2)%Height=AinCV/SurfParametersCVDV(Loop2)%Width
             END IF
             ! calculate the surface Zmin and Zmax
@@ -1787,72 +1794,72 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       ALLOCATE (ZoneMXMX(NumOfZones))
       ALLOCATE (ZoneM2MX(NumOfZones))
 
-      MaxTempGrad = 0.0
-      AvgTempGrad = 0.0
-      TCMF=23.0
-      FracMinFlow   = 0.0
+      MaxTempGrad = 0.0d0
+      AvgTempGrad = 0.0d0
+      TCMF=23.0d0
+      FracMinFlow   = 0.0d0
 !      ZoneDVMixedFlagRep    = 0.0
       ZoneAirSystemON = .FALSE.
 !      ZoneDVMixedFlag=0
-      MATFloor = 23.0
-      XMATFloor = 23.0
-      XM2TFloor = 23.0
-      XM3TFloor = 23.0
-      XM4TFloor = 23.0
-      DSXMATFloor = 23.0
-      DSXM2TFloor = 23.0
-      DSXM3TFloor = 23.0
-      DSXM4TFloor = 23.0
-      MATOC = 23.0
-      XMATOC = 23.0
-      XM2TOC = 23.0
-      XM3TOC = 23.0
-      XM4TOC = 23.0
-      DSXMATOC = 23.0
-      DSXM2TOC = 23.0
-      DSXM3TOC = 23.0
-      DSXM4TOC = 23.0
-      MATMX = 23.0
-      XMATMX = 23.0
-      XM2TMX = 23.0
-      XM3TMX = 23.0
-      XM4TMX = 23.0
-      DSXMATMX = 23.0
-      DSXM2TMX = 23.0
-      DSXM3TMX = 23.0
-      DSXM4TMX = 23.0
-      ZTM1Floor = 23.0
-      ZTM2Floor = 23.0
-      ZTM3Floor = 23.0
-      ZTM1OC = 23.0
-      ZTM2OC = 23.0
-      ZTM3OC = 23.0
-      ZTM1MX = 23.0
-      ZTM2MX = 23.0
-      ZTM3MX = 23.0
-      Zone1Floor = 23.0
-      ZoneMXFloor = 23.0
-      ZoneM2Floor = 23.0
-      Zone1OC = 23.0
-      ZoneMXOC = 23.0
-      ZoneM2OC = 23.0
-      Zone1MX = 23.0
-      ZoneMXMX = 23.0
-      ZoneM2MX = 23.0
-      AIRRATFloor=0.0
-      AIRRATOC=0.0
-      AIRRATMX=0.0
-      ZTOC = 23.0
-      ZTMX = 23.0
-      ZTFLOOR = 23.0
-      HeightTransition = 0.0
-      Phi = 0.0
-      Hceiling      = 0.0
-      HWall         = 0.0
-      HFloor        = 0.0
-      HInternal     = 0.0
-      HWindow       = 0.0
-      HDoor         = 0.0
+      MATFloor = 23.0d0
+      XMATFloor = 23.0d0
+      XM2TFloor = 23.0d0
+      XM3TFloor = 23.0d0
+      XM4TFloor = 23.0d0
+      DSXMATFloor = 23.0d0
+      DSXM2TFloor = 23.0d0
+      DSXM3TFloor = 23.0d0
+      DSXM4TFloor = 23.0d0
+      MATOC = 23.0d0
+      XMATOC = 23.0d0
+      XM2TOC = 23.0d0
+      XM3TOC = 23.0d0
+      XM4TOC = 23.0d0
+      DSXMATOC = 23.0d0
+      DSXM2TOC = 23.0d0
+      DSXM3TOC = 23.0d0
+      DSXM4TOC = 23.0d0
+      MATMX = 23.0d0
+      XMATMX = 23.0d0
+      XM2TMX = 23.0d0
+      XM3TMX = 23.0d0
+      XM4TMX = 23.0d0
+      DSXMATMX = 23.0d0
+      DSXM2TMX = 23.0d0
+      DSXM3TMX = 23.0d0
+      DSXM4TMX = 23.0d0
+      ZTM1Floor = 23.0d0
+      ZTM2Floor = 23.0d0
+      ZTM3Floor = 23.0d0
+      ZTM1OC = 23.0d0
+      ZTM2OC = 23.0d0
+      ZTM3OC = 23.0d0
+      ZTM1MX = 23.0d0
+      ZTM2MX = 23.0d0
+      ZTM3MX = 23.0d0
+      Zone1Floor = 23.0d0
+      ZoneMXFloor = 23.0d0
+      ZoneM2Floor = 23.0d0
+      Zone1OC = 23.0d0
+      ZoneMXOC = 23.0d0
+      ZoneM2OC = 23.0d0
+      Zone1MX = 23.0d0
+      ZoneMXMX = 23.0d0
+      ZoneM2MX = 23.0d0
+      AIRRATFloor=0.0d0
+      AIRRATOC=0.0d0
+      AIRRATMX=0.0d0
+      ZTOC = 23.0d0
+      ZTMX = 23.0d0
+      ZTFLOOR = 23.0d0
+      HeightTransition = 0.0d0
+      Phi = 0.0d0
+      Hceiling      = 0.0d0
+      HWall         = 0.0d0
+      HFloor        = 0.0d0
+      HInternal     = 0.0d0
+      HWindow       = 0.0d0
+      HDoor         = 0.0d0
 
     ENDIF
 
@@ -1861,8 +1868,8 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       ALLOCATE (DVHcIn(TotSurfaces))
       ALLOCATE (ZoneDVMixedFlagRep(NumOfZones))
       ALLOCATE (ZoneDVMixedFlag(NumOfZones))
-      DVHcIn = 0.0
-      ZoneDVMixedFlagRep = 0.0
+      DVHcIn = 0.0d0
+      ZoneDVMixedFlagRep = 0.0d0
       ZoneDVMixedFlag = 0
       ! Output variables and DV zone flag
       DO Loop=1,NumOfZones
@@ -1894,11 +1901,11 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       ALLOCATE (ZoneUFPowInPlumes(NumOfZones))
       ALLOCATE (ZoneUFPowInPlumesfromWindows(NumOfZones))
       ZoneUFMixedFlag = 0
-      ZoneUFMixedFlagRep = 0.0
-      UFHcIn = 0.0
-      ZoneUFGamma = 0.0
-      ZoneUFPowInPlumes = 0.0
-      ZoneUFPowInPlumesfromWindows = 0.0
+      ZoneUFMixedFlagRep = 0.0d0
+      UFHcIn = 0.0d0
+      ZoneUFGamma = 0.0d0
+      ZoneUFPowInPlumes = 0.0d0
+      ZoneUFPowInPlumesfromWindows = 0.0d0
       ! Output variables and UF zone flag
       DO Loop=1,NumOfZones
         If (AirModel(loop)%AirModelType /= RoomAirModel_UCSDUFI) cycle  !don't set these up if they don't make sense
@@ -1956,48 +1963,44 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       ALLOCATE (ZTJET(NumOfZones))
       ! Most ZTJet takes defaults
       ALLOCATE (ZTREC(NumOfZones))
+      ALLOCATE (RoomOutflowTemp(NumOfZones))
       ! Most ZTrec takes defaults
       ALLOCATE (JetRecAreaRatio(NumOfZones))
-      ALLOCATE (UPsOFo(NumOfZones))
       ALLOCATE (Urec(NumOfZones))
       ALLOCATE (Ujet(NumOfZones))
+      ALLOCATE (Qrec(NumOfZones))
+      ALLOCATE (Qtot(NumOfZones))
+      ALLOCATE (RecInflowRatio(NumOfZones))
       ALLOCATE (Uhc(NumOfZones))
       ALLOCATE (Ain(NumOfZones))
       ALLOCATE (Tin(NumOfZones))
-      ALLOCATE (Lroom(NumOfZones))
-      ALLOCATE (IsWidth(NumOfZones))
-
+      ALLOCATE (Droom(NumOfZones))
+      ALLOCATE (Dstar(NumOfZones))
       ALLOCATE (ZoneCVisMixing(NumOfZones))
       ALLOCATE (Rfr(NumOfZones))
       ALLOCATE (ZoneCVhasREC(NumofZones))
 
-      ZTjet%In = 23.0
-      ZTjet%Out = 23.0
-      ZTjet%Med = 23.0
-      ZTjet%OutRoom = 23.0
-      ZTrec%In = 23.0
-      ZTrec%Out = 23.0
-      ZTrec%Med = 23.0
-      CVHcIn        = 0.0
-      ZTrec%OutRoom = -100.0
-      JetRecAreaRatio = 0.2
-      UPsOFo=1.0
-      Urec=0.2
-      Ujet=0.2
-      Uhc = 0.2
-      Ain=1.0
-      Tin = 23.0
-      Lroom=6.0
-      IsWidth=1
-      ZoneCVisMixing=0
-      Rfr=10.0
-      ZoneCVhasREC=1
-      Hceiling      = 0.0
-      HWall         = 0.0
-      HFloor        = 0.0
-      HInternal     = 0.0
-      HWindow       = 0.0
-      HDoor         = 0.0
+      ZTJET           = 23.0d0
+      RoomOutflowTemp = 23.0d0
+      ZTREC           = 23.0d0
+      CVHcIn          = 0.0d0
+      JetRecAreaRatio = 0.2d0
+      Urec=0.2d0
+      Ujet=0.2d0
+      Qrec=0.2d0
+      Uhc = 0.2d0
+      Ain=1.0d0
+      Tin = 23.0d0
+      Droom=6.0d0
+      ZoneCVisMixing=0.0d0
+      Rfr=10.0d0
+      ZoneCVhasREC=1.0d0
+      Hceiling      = 0.0d0
+      HWall         = 0.0d0
+      HFloor        = 0.0d0
+      HInternal     = 0.0d0
+      HWindow       = 0.0d0
+      HDoor         = 0.0d0
 
       DO Loop=1,NumOfZones
         IF (AirModel(loop)%AirModelType /= RoomAirModel_UCSDCV) cycle  !don't set these up if they don't make sense
@@ -2011,23 +2014,30 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
                                  TRIM(zone(loop)%Name))
           cycle
         ENDIF
-
         !CurrentModuleObject='RoomAirSettings:CrossVentilation'
-        CALL SetupOutputVariable('Room Air Zone Jet Region Temperature [C]',ZTjet(Loop)%In,'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Jet Region Temperature [C]',ZTjet(Loop),'Zone','Average',Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Recirculation Region Temperature [C]', &
-                                  ZTrec(Loop)%Med,'Zone','Average',Zone(Loop)%Name)
+                                  ZTrec(Loop),'Zone','Average',Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Jet Region Average Air Velocity [m/s]',Ujet(Loop),'Zone','Average',Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Recirculation Region Average Air Velocity [m/s]', &
                                   Urec(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Recirculation and Inflow Rate Ratio []',RecInflowRatio(Loop),'Zone','Average',  &
+            Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Inflow Opening Area [m2]',Ain(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Room Air Zone Room Length [m]',Lroom(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Room Air Zone Recirculation and Inflow Rate Ratio []',Rfr(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Room Length [m]',Dstar(Loop),'Zone','Average',Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Is Mixing Status []',ZoneCVisMixing(Loop),'Zone','State',Zone(Loop)%Name)
         CALL SetupOutputVariable('Room Air Zone Is Recirculating Status []',ZoneCVhasREC(Loop),  &
                                         'Zone','State',Zone(Loop)%Name)
-
+        DO i=1,AirflowNetworkSurfaceUCSDCV(ZoneNum,0)
+          N = AirflowNetworkLinkageData(i)%CompNum
+          IF (AirflowNetworkCompData(N)%CompTypeNum==CompTypeNum_DOP) THEN
+            SurfNum = MultizoneSurfaceData(i)%SurfNum
+            CALL SetupOutputVariable('Room Air Window Jet Region Average Air Velocity [m/s]',  &
+             CVJetRecFlows(Loop,i)%Ujet,'Zone','Average', &
+            MultizoneSurfaceData(i)%SurfName)
+          END IF
+        END DO
       ENDDO
-
     ENDIF
 
     MyEnvrnFlag = .TRUE.
@@ -2041,121 +2051,115 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
 
     IF (IsZoneDV(ZoneNum) .OR. IsZoneUI(ZoneNum)) THEN
 
-      MaxTempGrad(ZoneNum) = 0.0
-      AvgTempGrad(ZoneNum) = 0.0
-      TCMF(ZoneNum)=23.0
-      FracMinFlow(ZoneNum)   = 0.0
+      MaxTempGrad(ZoneNum) = 0.0d0
+      AvgTempGrad(ZoneNum) = 0.0d0
+      TCMF(ZoneNum)=23.0d0
+      FracMinFlow(ZoneNum)   = 0.0d0
       ZoneAirSystemON(ZoneNum) = .FALSE.
-      MATFloor(ZoneNum) = 23.0
-      XMATFloor(ZoneNum) = 23.0
-      XM2TFloor(ZoneNum) = 23.0
-      XM3TFloor(ZoneNum) = 23.0
-      XM4TFloor(ZoneNum) = 23.0
-      DSXMATFloor(ZoneNum) = 23.0
-      DSXM2TFloor(ZoneNum) = 23.0
-      DSXM3TFloor(ZoneNum) = 23.0
-      DSXM4TFloor(ZoneNum) = 23.0
-      MATOC(ZoneNum) = 23.0
-      XMATOC(ZoneNum) = 23.0
-      XM2TOC(ZoneNum) = 23.0
-      XM3TOC(ZoneNum) = 23.0
-      XM4TOC(ZoneNum) = 23.0
-      DSXMATOC(ZoneNum) = 23.0
-      DSXM2TOC(ZoneNum) = 23.0
-      DSXM3TOC(ZoneNum) = 23.0
-      DSXM4TOC(ZoneNum) = 23.0
-      MATMX(ZoneNum) = 23.0
-      XMATMX(ZoneNum) = 23.0
-      XM2TMX(ZoneNum) = 23.0
-      XM3TMX(ZoneNum) = 23.0
-      XM4TMX(ZoneNum) = 23.0
-      DSXMATMX(ZoneNum) = 23.0
-      DSXM2TMX(ZoneNum) = 23.0
-      DSXM3TMX(ZoneNum) = 23.0
-      DSXM4TMX(ZoneNum) = 23.0
-      ZTM1Floor(ZoneNum) = 23.0
-      ZTM2Floor(ZoneNum) = 23.0
-      ZTM3Floor(ZoneNum) = 23.0
-      Zone1Floor(ZoneNum) = 23.0
-      ZoneMXFloor(ZoneNum) = 23.0
-      ZoneM2Floor(ZoneNum) = 23.0
-      ZTM1OC(ZoneNum) = 23.0
-      ZTM2OC(ZoneNum) = 23.0
-      ZTM3OC(ZoneNum) = 23.0
-      Zone1OC(ZoneNum) = 23.0
-      ZoneMXOC(ZoneNum) = 23.0
-      ZoneM2OC(ZoneNum) = 23.0
-      ZTM1MX(ZoneNum) = 23.0
-      ZTM2MX(ZoneNum) = 23.0
-      ZTM3MX(ZoneNum) = 23.0
-      Zone1MX(ZoneNum) = 23.0
-      ZoneMXMX(ZoneNum) = 23.0
-      ZoneM2MX(ZoneNum) = 23.0
-      AIRRATFloor(ZoneNum)=0.0
-      AIRRATOC(ZoneNum)=0.0
-      AIRRATMX(ZoneNum)=0.0
-      ZTOC(ZoneNum) = 23.0
-      ZTMX(ZoneNum) = 23.0
-      ZTFLOOR(ZoneNum) = 23.0
-      HeightTransition(ZoneNum) = 0.0
-      Phi(ZoneNum) = 0.0
-      Hceiling      = 0.0
-      HWall         = 0.0
-      HFloor        = 0.0
-      HInternal     = 0.0
-      HWindow       = 0.0
-      HDoor         = 0.0
+      MATFloor(ZoneNum) = 23.0d0
+      XMATFloor(ZoneNum) = 23.0d0
+      XM2TFloor(ZoneNum) = 23.0d0
+      XM3TFloor(ZoneNum) = 23.0d0
+      XM4TFloor(ZoneNum) = 23.0d0
+      DSXMATFloor(ZoneNum) = 23.0d0
+      DSXM2TFloor(ZoneNum) = 23.0d0
+      DSXM3TFloor(ZoneNum) = 23.0d0
+      DSXM4TFloor(ZoneNum) = 23.0d0
+      MATOC(ZoneNum) = 23.0d0
+      XMATOC(ZoneNum) = 23.0d0
+      XM2TOC(ZoneNum) = 23.0d0
+      XM3TOC(ZoneNum) = 23.0d0
+      XM4TOC(ZoneNum) = 23.0d0
+      DSXMATOC(ZoneNum) = 23.0d0
+      DSXM2TOC(ZoneNum) = 23.0d0
+      DSXM3TOC(ZoneNum) = 23.0d0
+      DSXM4TOC(ZoneNum) = 23.0d0
+      MATMX(ZoneNum) = 23.0d0
+      XMATMX(ZoneNum) = 23.0d0
+      XM2TMX(ZoneNum) = 23.0d0
+      XM3TMX(ZoneNum) = 23.0d0
+      XM4TMX(ZoneNum) = 23.0d0
+      DSXMATMX(ZoneNum) = 23.0d0
+      DSXM2TMX(ZoneNum) = 23.0d0
+      DSXM3TMX(ZoneNum) = 23.0d0
+      DSXM4TMX(ZoneNum) = 23.0d0
+      ZTM1Floor(ZoneNum) = 23.0d0
+      ZTM2Floor(ZoneNum) = 23.0d0
+      ZTM3Floor(ZoneNum) = 23.0d0
+      Zone1Floor(ZoneNum) = 23.0d0
+      ZoneMXFloor(ZoneNum) = 23.0d0
+      ZoneM2Floor(ZoneNum) = 23.0d0
+      ZTM1OC(ZoneNum) = 23.0d0
+      ZTM2OC(ZoneNum) = 23.0d0
+      ZTM3OC(ZoneNum) = 23.0d0
+      Zone1OC(ZoneNum) = 23.0d0
+      ZoneMXOC(ZoneNum) = 23.0d0
+      ZoneM2OC(ZoneNum) = 23.0d0
+      ZTM1MX(ZoneNum) = 23.0d0
+      ZTM2MX(ZoneNum) = 23.0d0
+      ZTM3MX(ZoneNum) = 23.0d0
+      Zone1MX(ZoneNum) = 23.0d0
+      ZoneMXMX(ZoneNum) = 23.0d0
+      ZoneM2MX(ZoneNum) = 23.0d0
+      AIRRATFloor(ZoneNum)=0.0d0
+      AIRRATOC(ZoneNum)=0.0d0
+      AIRRATMX(ZoneNum)=0.0d0
+      ZTOC(ZoneNum) = 23.0d0
+      ZTMX(ZoneNum) = 23.0d0
+      ZTFLOOR(ZoneNum) = 23.0d0
+      HeightTransition(ZoneNum) = 0.0d0
+      Phi(ZoneNum) = 0.0d0
+      Hceiling      = 0.0d0
+      HWall         = 0.0d0
+      HFloor        = 0.0d0
+      HInternal     = 0.0d0
+      HWindow       = 0.0d0
+      HDoor         = 0.0d0
 
     END IF
 
     IF (IsZoneDV(ZoneNum)) THEN
 
-      DVHcIn = 0.0
-      ZoneDVMixedFlagRep(ZoneNum)    = 0.0
+      DVHcIn = 0.0d0
+      ZoneDVMixedFlagRep(ZoneNum)    = 0.0d0
       ZoneDVMixedFlag(ZoneNum)=0
 
     END IF
 
     IF (IsZoneUI(ZoneNum)) THEN
 
-      UFHcIn = 0.0
+      UFHcIn = 0.0d0
       ZoneUFMixedFlag(ZoneNum) = 0
-      ZoneUFMixedFlagRep(ZoneNum) = 0.0
-      ZoneUFGamma(ZoneNum) = 0.0
-      ZoneUFPowInPlumes(ZoneNum) = 0.0
-      ZoneUFPowInPlumesfromWindows(ZoneNum) = 0.0
+      ZoneUFMixedFlagRep(ZoneNum) = 0.0d0
+      ZoneUFGamma(ZoneNum) = 0.0d0
+      ZoneUFPowInPlumes(ZoneNum) = 0.0d0
+      ZoneUFPowInPlumesfromWindows(ZoneNum) = 0.0d0
 
     END IF
 
 
     IF (ISZoneCV(ZoneNum)) THEN
-      ZTjet(ZoneNum)%In = 23.0
-      ZTjet(ZoneNum)%Out = 23.0
-      ZTjet(ZoneNum)%Med = 23.0
-      ZTjet(ZoneNum)%OutRoom = 23.0
-      ZTrec(ZoneNum)%In = 23.0
-      ZTrec(ZoneNum)%Out = 23.0
-      ZTrec(ZoneNum)%Med = 23.0
-      CVHcIn        = 0.0
-      ZTrec(ZoneNum)%OutRoom = -100.0
-      JetRecAreaRatio(ZoneNum) = 0.2
-      UPsOFo(ZoneNum)=1.0
-      Urec(ZoneNum)=0.2
-      Ujet(ZoneNum)=0.2
-      Uhc(ZoneNum) = 0.2
-      Ain(ZoneNum)=1.0
-      Tin(ZoneNum) = 23.0
-      Lroom(ZoneNum)=6.0
-      IsWidth(ZoneNum)=1
-      ZoneCVisMixing(ZoneNum)=0
-      Rfr(ZoneNum)=10.0
-      ZoneCVhasREC(ZoneNum)=1
-      Hceiling      = 0.0
-      HWall         = 0.0
-      HFloor        = 0.0
-      HInternal     = 0.0
-      HWindow       = 0.0
-      HDoor         = 0.0
+      ZTjet(ZoneNum) = 23.0d0
+      RoomOutflowTemp(ZoneNum) = 23.0d0
+      ZTrec(ZoneNum) = 23.0d0
+      CVHcIn        = 0.0d0
+      JetRecAreaRatio(ZoneNum) = 0.2d0
+      Urec(ZoneNum)=0.2d0
+      Ujet(ZoneNum)=0.2d0
+      Uhc(ZoneNum) = 0.2d0
+      Ain(ZoneNum)=1.0d0
+      Tin(ZoneNum) = 23.0d0
+      Droom(ZoneNum)=6.0d0
+      Dstar(ZoneNum)=6.0d0
+      ZoneCVisMixing(ZoneNum)=0.0d0
+      Rfr(ZoneNum)=10.0d0
+      ZoneCVhasREC(ZoneNum)=1.0d0
+      Hceiling      = 0.0d0
+      HWall         = 0.0d0
+      HFloor        = 0.0d0
+      HInternal     = 0.0d0
+      HWindow       = 0.0d0
+      HDoor         = 0.0d0
 
     END IF
 

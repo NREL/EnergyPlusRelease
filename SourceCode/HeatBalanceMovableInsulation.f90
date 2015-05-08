@@ -91,16 +91,16 @@ SUBROUTINE EvalOutsideMovableInsulation(SurfNum,HMovInsul,RoughIndexMovInsul,Abs
           ! FLOW:
   MovInsulSchedVal = GetCurrentScheduleValue(Surface(SurfNum)%SchedMovInsulExt)
 
-  IF (MovInsulSchedVal <= 0.0) THEN ! Movable insulation not present at current time
+  IF (MovInsulSchedVal <= 0.0d0) THEN ! Movable insulation not present at current time
 
-    HMovInsul = 0.0
-    AbsExt    = 0.0
+    HMovInsul = 0.0d0
+    AbsExt    = 0.0d0
 
   ELSE  ! Movable insulation present-->calculate output parameters
 
           ! Double check resistance and conductivity to avoid divide by zero problems
-    IF ((Material(Surface(SurfNum)%MaterialMovInsulExt)%Resistance) <= 0.0) THEN
-      IF ((Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity) > 0.0) THEN
+    IF ((Material(Surface(SurfNum)%MaterialMovInsulExt)%Resistance) <= 0.0d0) THEN
+      IF ((Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity) > 0.0d0) THEN
         Material(Surface(SurfNum)%MaterialMovInsulExt)%Resistance =   &
            Material(Surface(SurfNum)%MaterialMovInsulExt)%Thickness/Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity
       ELSE
@@ -164,20 +164,20 @@ SUBROUTINE EvalInsideMovableInsulation(SurfNum,HMovInsul,AbsInt)
   REAL(r64)    :: MovInsulSchedVal   ! Value of the movable insulation schedule for current time
 
           ! FLOW:
-  MovInsulSchedVal = GetCurrentScheduleValue(Surface(SurfNum)%SchedMovInsulExt)
+  MovInsulSchedVal = GetCurrentScheduleValue(Surface(SurfNum)%SchedMovInsulInt)
 
-  IF (MovInsulSchedVal <= 0.0) THEN ! Movable insulation not present at current time
+  IF (MovInsulSchedVal <= 0.0d0) THEN ! Movable insulation not present at current time
 
-    HMovInsul = 0.0
-    AbsInt    = 0.0
+    HMovInsul = 0.0d0
+    AbsInt    = 0.0d0
 
   ELSE  ! Movable insulation present-->calculate output parameters
 
-    IF ((Material(Surface(SurfNum)%MaterialMovInsulExt)%Resistance) <= 0.0) THEN
-      IF (Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity > 0.0 .and.  &
-          Material(Surface(SurfNum)%MaterialMovInsulExt)%Thickness > 0.0) THEN
-        Material(Surface(SurfNum)%MaterialMovInsulExt)%Resistance=   &
-           Material(Surface(SurfNum)%MaterialMovInsulExt)%Thickness/Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity
+    IF ((Material(Surface(SurfNum)%MaterialMovInsulInt)%Resistance) <= 0.0d0) THEN
+      IF (Material(Surface(SurfNum)%MaterialMovInsulInt)%Conductivity > 0.0d0 .and.  &
+          Material(Surface(SurfNum)%MaterialMovInsulInt)%Thickness > 0.0d0) THEN
+        Material(Surface(SurfNum)%MaterialMovInsulInt)%Resistance=   &
+           Material(Surface(SurfNum)%MaterialMovInsulInt)%Thickness/Material(Surface(SurfNum)%MaterialMovInsulExt)%Conductivity
       ELSE
         CALL ShowFatalError('EvalInsideMovableInsulation: No resistance found for material ' &
                             //TRIM(Material(Surface(SurfNum)%MaterialMovInsulInt)%Name))

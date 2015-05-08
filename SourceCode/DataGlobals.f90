@@ -47,7 +47,7 @@ INTEGER, PARAMETER :: ksRunPeriodWeather = 3
 INTEGER, PARAMETER :: ZoneTSReporting = 1  ! value for Zone Time Step Reporting (UpdateDataAndReport)
 INTEGER, PARAMETER :: HVACTSReporting = 2  ! value for HVAC Time Step Reporting (UpdateDataAndReport)
 
-REAL(r64), PARAMETER    :: MaxEXPArg = 709.78        ! maximum exponent in EXP() function
+REAL(r64), PARAMETER    :: MaxEXPArg = 709.78D0      ! maximum exponent in EXP() function
 REAL(r64), PARAMETER    :: Pi = 3.141592653589793D0   ! Pi 3.1415926535897932384626435
 REAL(r64), PARAMETER    :: PiOvr2 = Pi/2.D0          ! Pi/2
 REAL(r64), PARAMETER    :: GravityConstant = 9.807D0

@@ -1,5 +1,5 @@
 ! Contents:
-! CentralGroundSourceHeatPump (CGSHP) System
+! CentralHeatPumpSystem (CGSHP) System
 ! ChillerHeaterPerformance:Electric:EIR
 !
 MODULE PlantCentralGSHP
@@ -48,13 +48,13 @@ LOGICAL, SAVE :: SimulHtgDominant = .FALSE.
 LOGICAL   :: GetInputWrapper   = .TRUE.  ! When TRUE, calls subroutine to read input file.
 INTEGER   :: NumWrappers               = 0   ! Number of Wrappers specified in input
 INTEGER   :: NumChillerheaters         = 0   ! Number of Chiller/heaters specified in input
-REAL(r64) :: CondenserFanPower         = 0.0 ! Condenser Fan Power (fan cycles with compressor) [W]
-REAL(r64) :: ChillerCapFT              = 0.0 ! Chiller/heater capacity fraction (evaluated as a function of temperature)
-REAL(r64) :: ChillerEIRFT              = 0.0 ! Chiller/heater electric input ratio (EIR = 1 / COP) as a function of temperature
-REAL(r64) :: ChillerEIRFPLR            = 0.0 ! Chiller/heater EIR as a function of part-load ratio (PLR)
-REAL(r64) :: ChillerPartLoadRatio      = 0.0 ! Chiller/heater part-load ratio (PLR)
-REAL(r64) :: ChillerCyclingRatio       = 0.0 ! Chiller/heater cycling ratio
-REAL(r64) :: ChillerFalseLoadRate      = 0.0 ! Chiller/heater false load over and above the water-side load [W]
+REAL(r64) :: CondenserFanPower         = 0.0d0 ! Condenser Fan Power (fan cycles with compressor) [W]
+REAL(r64) :: ChillerCapFT              = 0.0d0 ! Chiller/heater capacity fraction (evaluated as a function of temperature)
+REAL(r64) :: ChillerEIRFT              = 0.0d0 ! Chiller/heater electric input ratio (EIR = 1 / COP) as a function of temperature
+REAL(r64) :: ChillerEIRFPLR            = 0.0d0 ! Chiller/heater EIR as a function of part-load ratio (PLR)
+REAL(r64) :: ChillerPartLoadRatio      = 0.0d0 ! Chiller/heater part-load ratio (PLR)
+REAL(r64) :: ChillerCyclingRatio       = 0.0d0 ! Chiller/heater cycling ratio
+REAL(r64) :: ChillerFalseLoadRate      = 0.0d0 ! Chiller/heater false load over and above the water-side load [W]
 
   ! Type defining the component specifications
 TYPE CGSHPNodeData
@@ -112,100 +112,103 @@ TYPE ChillerheaterSpecs
   INTEGER   :: ChillerEIRFTErrorIndex       = 0     ! Used for negative EIR as a function of temp warnings
   INTEGER   :: ChillerEIRFPLRError          = 0     ! Used for negative EIR as a function of PLR warnings
   INTEGER   :: ChillerEIRFPLRErrorIndex     = 0     ! Used for negative EIR as a function of PLR warnings
+  INTEGER   :: ChillerEIRRefTempErrorIndex  = 0     ! Used for reference temperature problems
   INTEGER   :: DeltaTErrCount               = 0     ! Evaporator delta T equals 0 for variable flow chiller warning messages
   INTEGER   :: DeltaTErrCountIndex          = 0     ! Index to evaporator delta T = 0 for variable flow chiller warning messages
   INTEGER   :: CondMassFlowIndex            = 0     ! Index to condenser mass flow rate
-  REAL(r64) :: RefCapCooling                = 0.0   ! Referrence cooling-mode evaporator capacity [W]
-  REAL(r64) :: RefCOPCooling                = 0.0   ! Referrence cooling-mode COP
-  REAL(r64) :: TempRefEvapOutCooling        = 0.0   ! Referrence cooling-mode evaporator leaving temperature [C]
-  REAL(r64) :: TempRefCondInCooling         = 0.0   ! Referrence cooling-mode condenser entering temperature [C]
-  REAL(r64) :: TempRefCondOutCooling        = 0.0   ! Referrence cooling-mode condenser leaving temperature [C]
-  REAL(r64) :: MaxPartLoadRatCooling        = 0.0   ! Maximum Part load ratio in cooling mode
-  REAL(r64) :: OptPartLoadRatCooling        = 0.0   ! Optimum Part load ratio in cooling mode
-  REAL(r64) :: MinPartLoadRatCooling        = 0.0   ! minimum Part load ratio in cooling mode
-  REAL(r64) :: ClgHtgToCoolingCapRatio      = 0.0   ! ratio of clg/htg-mode evaporator capacity to cooling-mode evap. cap
-  REAL(r64) :: ClgHtgtoCogPowerRatio        = 0.0   ! ratio of clg/htg-mode evaporator power to cooling-mode evap. power
-  REAL(r64) :: RefCapClgHtg                 = 0.0   ! Referrence clg/htg-mode evaporator capacity [W]
-  REAL(r64) :: RefCOPClgHtg                 = 0.0   ! Referrence clg/htg-mode COP
-  REAL(r64) :: RefPowerClgHtg               = 0.0   ! Referrence clg/htg-mode evaporator power [W]
-  REAL(r64) :: TempRefEvapOutClgHtg         = 0.0   ! Referrence clg/htg-mode evaporator leaving temperature [C]
-  REAL(r64) :: TempRefCondInClgHtg          = 0.0   ! Referrence clg/htg-mode condenser entering temperature [C]
-  REAL(r64) :: TempRefCondOutClgHtg         = 0.0   ! Referrence clg/htg-mode condenser leaving temperature [C]
-  REAL(r64) :: TempLowLimitEvapOut          = 0.0   ! Low temperature shut off [C]
-  REAL(r64) :: MaxPartLoadRatClgHtg         = 0.0   ! Maximum Part load ratio in simultaneous heating/cooling mode
-  REAL(r64) :: OptPartLoadRatClgHtg         = 0.0   ! Optimum Part load ratio in simultaneous heating/cooling mode
-  REAL(r64) :: MinPartLoadRatClgHtg         = 0.0   ! minimum Part load ratio in simultaneous heating/cooling mode
+  REAL(r64) :: RefCapCooling                = 0.0d0   ! Reference cooling-mode evaporator capacity [W]
+  REAL(r64) :: RefCOPCooling                = 0.0d0   ! Reference cooling-mode COP
+  REAL(r64) :: TempRefEvapOutCooling        = 0.0d0   ! Reference cooling-mode evaporator leaving temperature [C]
+  REAL(r64) :: TempRefCondInCooling         = 0.0d0   ! Reference cooling-mode condenser entering temperature [C]
+  REAL(r64) :: TempRefCondOutCooling        = 0.0d0   ! Reference cooling-mode condenser leaving temperature [C]
+  REAL(r64) :: MaxPartLoadRatCooling        = 0.0d0   ! Maximum Part load ratio in cooling mode
+  REAL(r64) :: OptPartLoadRatCooling        = 0.0d0   ! Optimum Part load ratio in cooling mode
+  REAL(r64) :: MinPartLoadRatCooling        = 0.0d0   ! minimum Part load ratio in cooling mode
+  REAL(r64) :: ClgHtgToCoolingCapRatio      = 0.0d0   ! ratio of clg/htg-mode evaporator capacity to cooling-mode evap. cap
+  REAL(r64) :: ClgHtgtoCogPowerRatio        = 0.0d0   ! ratio of clg/htg-mode evaporator power to cooling-mode evap. power
+  REAL(r64) :: RefCapClgHtg                 = 0.0d0   ! Reference clg/htg-mode evaporator capacity [W]
+  REAL(r64) :: RefCOPClgHtg                 = 0.0d0   ! Reference clg/htg-mode COP
+  REAL(r64) :: RefPowerClgHtg               = 0.0d0   ! Reference clg/htg-mode evaporator power [W]
+  REAL(r64) :: TempRefEvapOutClgHtg         = 0.0d0   ! Reference clg/htg-mode evaporator leaving temperature [C]
+  REAL(r64) :: TempRefCondInClgHtg          = 0.0d0   ! Reference clg/htg-mode condenser entering temperature [C]
+  REAL(r64) :: TempRefCondOutClgHtg         = 0.0d0   ! Reference clg/htg-mode condenser leaving temperature [C]
+  REAL(r64) :: TempLowLimitEvapOut          = 0.0d0   ! Low temperature shut off [C]
+  REAL(r64) :: MaxPartLoadRatClgHtg         = 0.0d0   ! Maximum Part load ratio in simultaneous heating/cooling mode
+  REAL(r64) :: OptPartLoadRatClgHtg         = 0.0d0   ! Optimum Part load ratio in simultaneous heating/cooling mode
+  REAL(r64) :: MinPartLoadRatClgHtg         = 0.0d0   ! minimum Part load ratio in simultaneous heating/cooling mode
 
   TYPE (CGSHPNodeData) :: EvapInletNode             ! Chiller heater evaperator inlet node
   TYPE (CGSHPNodeData) :: EvapOutletNode            ! Chiller heater evaperator outlet node
   TYPE (CGSHPNodeData) :: CondInletNode             ! Chiller heater condenser inlet node
   TYPE (CGSHPNodeData) :: CondOutletNode            ! Chiller heater condenser outlet node
 
-  REAL(r64) :: EvapVolFlowRate              = 0.0   ! Reference water volumetric flow rate through the evaporator [m3/s]
-  REAL(r64) :: CondVolFlowRate              = 0.0   ! Reference water volumetric flow rate through the condenser [m3/s]
-  REAL(r64) :: CondMassFlowRateMax          = 0.0   ! Reference water mass flow rate through condenser [kg/s]
-  REAL(r64) :: EvapMassFlowRateMax          = 0.0   ! Reference water mass flow rate through evaporator [kg/s]
-  REAL(r64) :: Evapmdot                     = 0.0   ! Evaporator mass flow rate [kg/s]
-  REAL(r64) :: Condmdot                     = 0.0   ! Condenser mass flow rate [kg/s]
-  REAL(r64) :: DesignHotWaterVolFlowRate    = 0.0   ! Design hot water volumetric flow rate through the condenser [m3/s]
-  REAL(r64) :: OpenMotorEff                 = 0.0   ! Open chiller motor efficiency [fraction, 0 to 1]
-  REAL(r64) :: SizFac                       = 0.0   ! sizing factor
-  REAL(r64) :: RefCap                       = 0.0   ! Referrence evaporator capacity [W]
-  REAL(r64) :: RefCOP                       = 0.0   ! Referrence COP
-  REAL(r64) :: TempRefEvapOut               = 0.0   ! Referrence evaporator leaving temperature [C]
-  REAL(r64) :: TempRefCondIn                = 0.0   ! Referrence condenser entering temperature [C]
-  REAL(r64) :: TempRefCondOut               = 0.0   ! Referrence condenser leaving temperature [C]
-  REAL(r64) :: OptPartLoadRat               = 0.0   ! Optimal operating fraction of full load
-  REAL(r64) :: ChillerEIRFPLRMin            = 0.0   ! Minimum value of PLR from EIRFPLR curve
-  REAL(r64) :: ChillerEIRFPLRMax            = 0.0   ! Maximum value of PLR from EIRFPLR curve
+  REAL(r64) :: EvapVolFlowRate              = 0.0d0   ! Reference water volumetric flow rate through the evaporator [m3/s]
+  REAL(r64) :: tmpEvapVolFlowRate           = 0.0d0   ! temporary ref water vol flow rate for intermediate sizing [m3/s]
+  REAL(r64) :: CondVolFlowRate              = 0.0d0   ! Reference water volumetric flow rate through the condenser [m3/s]
+  REAL(r64) :: tmpCondVolFlowRate           = 0.0d0   ! temporary ref water vol flow rate for intermediate sizing [m3/s]
+  REAL(r64) :: CondMassFlowRateMax          = 0.0d0   ! Reference water mass flow rate through condenser [kg/s]
+  REAL(r64) :: EvapMassFlowRateMax          = 0.0d0   ! Reference water mass flow rate through evaporator [kg/s]
+  REAL(r64) :: Evapmdot                     = 0.0d0   ! Evaporator mass flow rate [kg/s]
+  REAL(r64) :: Condmdot                     = 0.0d0   ! Condenser mass flow rate [kg/s]
+  REAL(r64) :: DesignHotWaterVolFlowRate    = 0.0d0   ! Design hot water volumetric flow rate through the condenser [m3/s]
+  REAL(r64) :: OpenMotorEff                 = 0.0d0   ! Open chiller motor efficiency [fraction, 0 to 1]
+  REAL(r64) :: SizFac                       = 0.0d0   ! sizing factor
+  REAL(r64) :: RefCap                       = 0.0d0   ! Reference evaporator capacity [W]
+  REAL(r64) :: RefCOP                       = 0.0d0   ! Reference COP
+  REAL(r64) :: TempRefEvapOut               = 0.0d0   ! Reference evaporator leaving temperature [C]
+  REAL(r64) :: TempRefCondIn                = 0.0d0   ! Reference condenser entering temperature [C]
+  REAL(r64) :: TempRefCondOut               = 0.0d0   ! Reference condenser leaving temperature [C]
+  REAL(r64) :: OptPartLoadRat               = 0.0d0   ! Optimal operating fraction of full load
+  REAL(r64) :: ChillerEIRFPLRMin            = 0.0d0   ! Minimum value of PLR from EIRFPLR curve
+  REAL(r64) :: ChillerEIRFPLRMax            = 0.0d0   ! Maximum value of PLR from EIRFPLR curve
 END TYPE ChillerheaterSpecs
 
 TYPE CHReportVars
   INTEGER   :: CurrentMode                  = 0     ! 0-off; 1-cooling only; 2-heating-only; 3-simutaneouls heat/cool
-  REAL(r64) :: ChillerPartLoadRatio         = 0.0   ! Chiller PLR (Load/Capacity)
-  REAL(r64) :: ChillerCyclingRatio          = 0.0   ! Chiller cycling ratio (time on/time step)
-  REAL(r64) :: ChillerFalseLoad             = 0.0   ! Chiller false load over and above water side load [J]
-  REAL(r64) :: ChillerFalseLoadRate         = 0.0   ! Chiller false load rate over and above water side load [W]
-  REAL(r64) :: CoolingPower                 = 0.0   ! Chiller power, W
-  REAL(r64) :: HeatingPower                 = 0.0   ! Chiller power, W
-  REAL(r64) :: QEvap                        = 0.0   ! Evaporator heat transfer rate [W]
-  REAL(r64) :: QCond                        = 0.0   ! Condenser heat transfer rate [W]
-  REAL(r64) :: CoolingEnergy                = 0.0   ! Chiller electric consumption [J]
-  REAL(r64) :: HeatingEnergy                = 0.0   ! Chiller electric consumption [J]
-  REAL(r64) :: EvapEnergy                   = 0.0   ! Evaporator heat transfer energy [J]
-  REAL(r64) :: CondEnergy                   = 0.0   ! Condenser heat transfer energy [J]
-  REAL(r64) :: CondInletTemp                = 0.0   ! Condenser inlet temperature [C]
-  REAL(r64) :: EvapInletTemp                = 0.0   ! Evaporator inlet temperature [C]
-  REAL(r64) :: CondOutletTemp               = 0.0   ! Condenser outlet temperature [C]
-  REAL(r64) :: EvapOutletTemp               = 0.0   ! Evaporator outlet temperature [C]
-  REAL(r64) :: Evapmdot                     = 0.0   ! Evaporator mass flow rate [kg/s]
-  REAL(r64) :: Condmdot                     = 0.0   ! Condenser mass flow rate [kg/s]
-  REAL(r64) :: ActualCOP                    = 0.0   ! Coefficient of performance
-  REAL(r64) :: ChillerCapFT                 = 0.0   ! Chiller capacity curve output value
-  REAL(r64) :: ChillerEIRFT                 = 0.0   ! Chiller EIRFT curve output value
-  REAL(r64) :: ChillerEIRFPLR               = 0.0   ! Chiller EIRFPLR curve output value
-  REAL(r64) :: CondenserFanPowerUse         = 0.0   ! Air-cooled condenser fan power [W]
-  REAL(r64) :: CondenserFanEnergy           = 0.0   ! Air-cooled condenser fan energy [J]
-  REAL(r64) :: CondenserFanEnergyConsumption= 0.0   ! ""Should be checked"" For now, leave it
-  REAL(r64) :: ChillerPartLoadRatioSimul    = 0.0   ! Chiller PLR (Load/Capacity) for simul clg/htg mode
-  REAL(r64) :: ChillerCyclingRatioSimul     = 0.0   ! Chiller cycling ratio (time on/time step) for simul clg/htg mode
-  REAL(r64) :: ChillerFalseLoadSimul        = 0.0   ! Chiller false load for simul clg/htg mode [J]
-  REAL(r64) :: ChillerFalseLoadRateSimul    = 0.0   ! Chiller false load rate for simul clg/htg mode [W]
-  REAL(r64) :: CoolingPowerSimul            = 0.0   ! Chiller power for simul clg/htg mode [W]
-  REAL(r64) :: QEvapSimul                   = 0.0   ! Evaporator heat transfer rate for simul clg/htg mode [W]
-  REAL(r64) :: QCondSimul                   = 0.0   ! Evaporator heat transfer rate for simul clg/htg mode [W]
-  REAL(r64) :: CoolingEnergySimul           = 0.0   ! Chiller electric consumption for simul clg/htg mode [J]
-  REAL(r64) :: EvapEnergySimul              = 0.0   ! Evaporator heat transfer energy for simul clg/htg mode [J]
-  REAL(r64) :: CondEnergySimul              = 0.0   ! Condenser heat transfer energy for simul clg/htg mode [J]
-  REAL(r64) :: EvapInletTempSimul           = 0.0   ! Evaporator inlet temperature for simul clg/htg mode [C]
-  REAL(r64) :: EvapOutletTempSimul          = 0.0   ! Evaporator outlet temperature for simul clg/htg mode [C]
-  REAL(r64) :: EvapmdotSimul                = 0.0   ! Evaporator mass flow rate for simul clg/htg mode [kg/s]
-  REAL(r64) :: CondInletTempSimul           = 0.0   ! Condenser inlet temperature for simul clg/htg mode [C]
-  REAL(r64) :: CondOutletTempSimul          = 0.0   ! Condenser outlet temperature for simul clg/htg mode [C]
-  REAL(r64) :: CondmdotSimul                = 0.0   ! Condenser mass flow rate for simul clg/htg mode [kg/s]
-  REAL(r64) :: ChillerCapFTSimul            = 0.0   ! Chiller capacity curve output value for simul clg/htg mode
-  REAL(r64) :: ChillerEIRFTSimul            = 0.0   ! Chiller EIRFT curve output value for simul clg/htg mode
-  REAL(r64) :: ChillerEIRFPLRSimul          = 0.0   ! Chiller EIRFPLR curve output value for simul clg/htg mode
+  REAL(r64) :: ChillerPartLoadRatio         = 0.0d0   ! Chiller PLR (Load/Capacity)
+  REAL(r64) :: ChillerCyclingRatio          = 0.0d0   ! Chiller cycling ratio (time on/time step)
+  REAL(r64) :: ChillerFalseLoad             = 0.0d0   ! Chiller false load over and above water side load [J]
+  REAL(r64) :: ChillerFalseLoadRate         = 0.0d0   ! Chiller false load rate over and above water side load [W]
+  REAL(r64) :: CoolingPower                 = 0.0d0   ! Chiller power, W
+  REAL(r64) :: HeatingPower                 = 0.0d0   ! Chiller power, W
+  REAL(r64) :: QEvap                        = 0.0d0   ! Evaporator heat transfer rate [W]
+  REAL(r64) :: QCond                        = 0.0d0   ! Condenser heat transfer rate [W]
+  REAL(r64) :: CoolingEnergy                = 0.0d0   ! Chiller electric consumption [J]
+  REAL(r64) :: HeatingEnergy                = 0.0d0   ! Chiller electric consumption [J]
+  REAL(r64) :: EvapEnergy                   = 0.0d0   ! Evaporator heat transfer energy [J]
+  REAL(r64) :: CondEnergy                   = 0.0d0   ! Condenser heat transfer energy [J]
+  REAL(r64) :: CondInletTemp                = 0.0d0   ! Condenser inlet temperature [C]
+  REAL(r64) :: EvapInletTemp                = 0.0d0   ! Evaporator inlet temperature [C]
+  REAL(r64) :: CondOutletTemp               = 0.0d0   ! Condenser outlet temperature [C]
+  REAL(r64) :: EvapOutletTemp               = 0.0d0   ! Evaporator outlet temperature [C]
+  REAL(r64) :: Evapmdot                     = 0.0d0   ! Evaporator mass flow rate [kg/s]
+  REAL(r64) :: Condmdot                     = 0.0d0   ! Condenser mass flow rate [kg/s]
+  REAL(r64) :: ActualCOP                    = 0.0d0   ! Coefficient of performance
+  REAL(r64) :: ChillerCapFT                 = 0.0d0   ! Chiller capacity curve output value
+  REAL(r64) :: ChillerEIRFT                 = 0.0d0   ! Chiller EIRFT curve output value
+  REAL(r64) :: ChillerEIRFPLR               = 0.0d0   ! Chiller EIRFPLR curve output value
+  REAL(r64) :: CondenserFanPowerUse         = 0.0d0   ! Air-cooled condenser fan power [W]
+  REAL(r64) :: CondenserFanEnergy           = 0.0d0   ! Air-cooled condenser fan energy [J]
+  REAL(r64) :: CondenserFanEnergyConsumption= 0.0d0   ! ""Should be checked"" For now, leave it
+  REAL(r64) :: ChillerPartLoadRatioSimul    = 0.0d0   ! Chiller PLR (Load/Capacity) for simul clg/htg mode
+  REAL(r64) :: ChillerCyclingRatioSimul     = 0.0d0   ! Chiller cycling ratio (time on/time step) for simul clg/htg mode
+  REAL(r64) :: ChillerFalseLoadSimul        = 0.0d0   ! Chiller false load for simul clg/htg mode [J]
+  REAL(r64) :: ChillerFalseLoadRateSimul    = 0.0d0   ! Chiller false load rate for simul clg/htg mode [W]
+  REAL(r64) :: CoolingPowerSimul            = 0.0d0   ! Chiller power for simul clg/htg mode [W]
+  REAL(r64) :: QEvapSimul                   = 0.0d0   ! Evaporator heat transfer rate for simul clg/htg mode [W]
+  REAL(r64) :: QCondSimul                   = 0.0d0   ! Evaporator heat transfer rate for simul clg/htg mode [W]
+  REAL(r64) :: CoolingEnergySimul           = 0.0d0   ! Chiller electric consumption for simul clg/htg mode [J]
+  REAL(r64) :: EvapEnergySimul              = 0.0d0   ! Evaporator heat transfer energy for simul clg/htg mode [J]
+  REAL(r64) :: CondEnergySimul              = 0.0d0   ! Condenser heat transfer energy for simul clg/htg mode [J]
+  REAL(r64) :: EvapInletTempSimul           = 0.0d0   ! Evaporator inlet temperature for simul clg/htg mode [C]
+  REAL(r64) :: EvapOutletTempSimul          = 0.0d0   ! Evaporator outlet temperature for simul clg/htg mode [C]
+  REAL(r64) :: EvapmdotSimul                = 0.0d0   ! Evaporator mass flow rate for simul clg/htg mode [kg/s]
+  REAL(r64) :: CondInletTempSimul           = 0.0d0   ! Condenser inlet temperature for simul clg/htg mode [C]
+  REAL(r64) :: CondOutletTempSimul          = 0.0d0   ! Condenser outlet temperature for simul clg/htg mode [C]
+  REAL(r64) :: CondmdotSimul                = 0.0d0   ! Condenser mass flow rate for simul clg/htg mode [kg/s]
+  REAL(r64) :: ChillerCapFTSimul            = 0.0d0   ! Chiller capacity curve output value for simul clg/htg mode
+  REAL(r64) :: ChillerEIRFTSimul            = 0.0d0   ! Chiller EIRFT curve output value for simul clg/htg mode
+  REAL(r64) :: ChillerEIRFPLRSimul          = 0.0d0   ! Chiller EIRFPLR curve output value for simul clg/htg mode
 END TYPE CHReportVars
 
 TYPE WrapperSpecs  ! This will be used for Wrapper Object. This object will decide the mode of Chiller
@@ -222,15 +225,15 @@ TYPE WrapperSpecs  ! This will be used for Wrapper Object. This object will deci
   INTEGER   :: GLHEInletNodeNum        = 0   ! Node number on the inlet side of the plant (GLHE Water side)
   INTEGER   :: GLHEOutletNodeNum       = 0   ! Node number on the outlet side of the plant (GLHE Water side)
   INTEGER   :: NumOfComp               = 0   ! Number of Components under the wrapper
-  REAL(r64) :: CHWMassFlowRate         = 0.0 ! Chilled water mass flow rate
-  REAL(r64) :: HWMassFlowRate          = 0.0 ! Hot water mass flow rate
-  REAL(r64) :: GLHEMassFlowRate        = 0.0 ! Condenser water mass flow rate
-  REAL(r64) :: CHWMassFlowRateMax      = 0.0 ! Maximum chilled water mass flow rate
-  REAL(r64) :: HWMassFlowRateMax       = 0.0 ! Maximum hot water mass flow rate
-  REAL(r64) :: GLHEMassFlowRateMax     = 0.0 ! Maximum condenser water mass flow rate
-  REAL(r64) :: WrapperCoolingLoad      = 0.0 ! Cooling demand for the central heat pump system
-  REAL(r64) :: WrapperHeatingLoad      = 0.0 ! Heating demand for the central heat pump system
-  REAL(r64) :: AncilliaryPower         = 0.0 ! Wrapper Ancilliary Power
+  REAL(r64) :: CHWMassFlowRate         = 0.0d0 ! Chilled water mass flow rate
+  REAL(r64) :: HWMassFlowRate          = 0.0d0 ! Hot water mass flow rate
+  REAL(r64) :: GLHEMassFlowRate        = 0.0d0 ! Condenser water mass flow rate
+  REAL(r64) :: CHWMassFlowRateMax      = 0.0d0 ! Maximum chilled water mass flow rate
+  REAL(r64) :: HWMassFlowRateMax       = 0.0d0 ! Maximum hot water mass flow rate
+  REAL(r64) :: GLHEMassFlowRateMax     = 0.0d0 ! Maximum condenser water mass flow rate
+  REAL(r64) :: WrapperCoolingLoad      = 0.0d0 ! Cooling demand for the central heat pump system
+  REAL(r64) :: WrapperHeatingLoad      = 0.0d0 ! Heating demand for the central heat pump system
+  REAL(r64) :: AncilliaryPower         = 0.0d0 ! Wrapper Ancilliary Power
 
   Type (WrapperComponentSpecs), ALLOCATABLE, DIMENSION(:)  :: WrapperComp
   TYPE (ChillerheaterSpecs),    ALLOCATABLE, DIMENSION(:)  :: Chillerheater       ! Dimension to number of machines
@@ -256,46 +259,46 @@ TYPE WrapperSpecs  ! This will be used for Wrapper Object. This object will deci
   INTEGER   :: CHWMassFlowIndex   = 0     ! Chilled water flow index
   INTEGER   :: HWMassFlowIndex    = 0     ! Hot water flow index
   INTEGER   :: GLHEMassFlowIndex  = 0     ! Condenser side flow index
-  REAL(r64) :: SizingFactor       = 1.0   ! Sizing factor to adjust the capacity
-  REAL(r64) :: CHWVolFlowRate     = 0.0   ! Chilled water volume flow rate [kg/s]
-  REAL(r64) :: HWVolFlowRate      = 0.0   ! Hot water volume flow rate [kg/s]
-  REAL(r64) :: GLHEVolFlowRate    = 0.0   ! Geo-field volume flow rate [kg/s]
+  REAL(r64) :: SizingFactor       = 1.0d0   ! Sizing factor to adjust the capacity
+  REAL(r64) :: CHWVolFlowRate     = 0.0d0   ! Chilled water volume flow rate [kg/s]
+  REAL(r64) :: HWVolFlowRate      = 0.0d0   ! Hot water volume flow rate [kg/s]
+  REAL(r64) :: GLHEVolFlowRate    = 0.0d0   ! Geo-field volume flow rate [kg/s]
 END TYPE WrapperSpecs
 
 TYPE WrapperReportVars
-  REAL(r64) :: Power                   = 0.0   ! Wrapper power, W
-  REAL(r64) :: QCHW                    = 0.0   ! Chilled water heat transfer rate [W]
-  REAL(r64) :: QHW                     = 0.0   ! Hot Water heat transfer rate [W]
-  REAL(r64) :: QGLHE                   = 0.0   ! Geo-field heat transfer rate [W]
-  REAL(r64) :: TotElecCooling          = 0.0   ! Wrapper cooling electric consumption [J]
-  REAL(r64) :: TotElecHeating          = 0.0   ! Wrapper heating electric consumption [J]
-  REAL(r64) :: CoolingEnergy           = 0.0   ! Chilled water heat transfer energy [J]
-  REAL(r64) :: HeatingEnergy           = 0.0   ! Hot Water heat transfer energy [J]
-  REAL(r64) :: GLHEEnergy              = 0.0   ! Geo-field heat transfer energy [J]
-  REAL(r64) :: TotElecCoolingPwr       = 0.0   ! Wrapper cooling electric consumption rate [W]
-  REAL(r64) :: TotElecHeatingPwr       = 0.0   ! Wrapper heating electric consumption rate [W]
-  REAL(r64) :: CoolingRate             = 0.0   ! Chilled water heat transfer rate [W]
-  REAL(r64) :: HeatingRate             = 0.0   ! Hot Water heat transfer rate [W]
-  REAL(r64) :: GLHERate                = 0.0   ! Geo-field heat transfer rate [W]
-  REAL(r64) :: CHWInletTemp            = 0.0   ! Chilled water inlet temperature [C]
-  REAL(r64) :: HWInletTemp             = 0.0   ! Hot water inlet temperature [C]
-  REAL(r64) :: GLHEInletTemp           = 0.0   ! Geo-field inlet temperature [C]
-  REAL(r64) :: CHWOutletTemp           = 0.0   ! Chilled water Outlet temperature [C]
-  REAL(r64) :: HWOutletTemp            = 0.0   ! Hot water Outlet temperature [C]
-  REAL(r64) :: GLHEOutletTemp          = 0.0   ! Geo-field Outlet temperature [C]
-  REAL(r64) :: CHWmdot                 = 0.0   ! Chilled water mass flow rate [kg/s]
-  REAL(r64) :: HWmdot                  = 0.0   ! Hot water mass flow rate [kg/s]
-  REAL(r64) :: GLHEmdot                = 0.0   ! Geo-field mass flow rate [kg/s]
-  REAL(r64) :: TotElecCoolingSimul     = 0.0   ! Wrapper cooling electric consumption [J]
-  REAL(r64) :: CoolingEnergySimul      = 0.0   ! Chilled water heat transfer energy [J]
-  REAL(r64) :: TotElecCoolingPwrSimul  = 0.0   ! Wrapper cooling electric consumption rate [W]
-  REAL(r64) :: CoolingRateSimul        = 0.0   ! Chilled water heat transfer rate [W]
-  REAL(r64) :: CHWInletTempSimul       = 0.0   ! Chilled water inlet temperature [C]
-  REAL(r64) :: GLHEInletTempSimul      = 0.0   ! Geo-field inlet temperature [C]
-  REAL(r64) :: CHWOutletTempSimul      = 0.0   ! Chilled water Outlet temperature [C]
-  REAL(r64) :: GLHEOutletTempSimul     = 0.0   ! Geo-field Outlet temperature [C]
-  REAL(r64) :: CHWmdotSimul            = 0.0   ! Chilled water mass flow rate [kg/s]
-  REAL(r64) :: GLHEmdotSimul           = 0.0   ! Geo-field mass flow rate [kg/s]
+  REAL(r64) :: Power                   = 0.0d0   ! Wrapper power, W
+  REAL(r64) :: QCHW                    = 0.0d0   ! Chilled water heat transfer rate [W]
+  REAL(r64) :: QHW                     = 0.0d0   ! Hot Water heat transfer rate [W]
+  REAL(r64) :: QGLHE                   = 0.0d0   ! Geo-field heat transfer rate [W]
+  REAL(r64) :: TotElecCooling          = 0.0d0   ! Wrapper cooling electric consumption [J]
+  REAL(r64) :: TotElecHeating          = 0.0d0   ! Wrapper heating electric consumption [J]
+  REAL(r64) :: CoolingEnergy           = 0.0d0   ! Chilled water heat transfer energy [J]
+  REAL(r64) :: HeatingEnergy           = 0.0d0   ! Hot Water heat transfer energy [J]
+  REAL(r64) :: GLHEEnergy              = 0.0d0   ! Geo-field heat transfer energy [J]
+  REAL(r64) :: TotElecCoolingPwr       = 0.0d0   ! Wrapper cooling electric consumption rate [W]
+  REAL(r64) :: TotElecHeatingPwr       = 0.0d0   ! Wrapper heating electric consumption rate [W]
+  REAL(r64) :: CoolingRate             = 0.0d0   ! Chilled water heat transfer rate [W]
+  REAL(r64) :: HeatingRate             = 0.0d0   ! Hot Water heat transfer rate [W]
+  REAL(r64) :: GLHERate                = 0.0d0   ! Geo-field heat transfer rate [W]
+  REAL(r64) :: CHWInletTemp            = 0.0d0   ! Chilled water inlet temperature [C]
+  REAL(r64) :: HWInletTemp             = 0.0d0   ! Hot water inlet temperature [C]
+  REAL(r64) :: GLHEInletTemp           = 0.0d0   ! Geo-field inlet temperature [C]
+  REAL(r64) :: CHWOutletTemp           = 0.0d0   ! Chilled water Outlet temperature [C]
+  REAL(r64) :: HWOutletTemp            = 0.0d0   ! Hot water Outlet temperature [C]
+  REAL(r64) :: GLHEOutletTemp          = 0.0d0   ! Geo-field Outlet temperature [C]
+  REAL(r64) :: CHWmdot                 = 0.0d0   ! Chilled water mass flow rate [kg/s]
+  REAL(r64) :: HWmdot                  = 0.0d0   ! Hot water mass flow rate [kg/s]
+  REAL(r64) :: GLHEmdot                = 0.0d0   ! Geo-field mass flow rate [kg/s]
+  REAL(r64) :: TotElecCoolingSimul     = 0.0d0   ! Wrapper cooling electric consumption [J]
+  REAL(r64) :: CoolingEnergySimul      = 0.0d0   ! Chilled water heat transfer energy [J]
+  REAL(r64) :: TotElecCoolingPwrSimul  = 0.0d0   ! Wrapper cooling electric consumption rate [W]
+  REAL(r64) :: CoolingRateSimul        = 0.0d0   ! Chilled water heat transfer rate [W]
+  REAL(r64) :: CHWInletTempSimul       = 0.0d0   ! Chilled water inlet temperature [C]
+  REAL(r64) :: GLHEInletTempSimul      = 0.0d0   ! Geo-field inlet temperature [C]
+  REAL(r64) :: CHWOutletTempSimul      = 0.0d0   ! Chilled water Outlet temperature [C]
+  REAL(r64) :: GLHEOutletTempSimul     = 0.0d0   ! Geo-field Outlet temperature [C]
+  REAL(r64) :: CHWmdotSimul            = 0.0d0   ! Chilled water mass flow rate [kg/s]
+  REAL(r64) :: GLHEmdotSimul           = 0.0d0   ! Geo-field mass flow rate [kg/s]
 END TYPE WrapperReportVars
 
 TYPE (WrapperSpecs),       ALLOCATABLE, DIMENSION(:)  :: Wrapper
@@ -395,9 +398,9 @@ SUBROUTINE SimCentralGroundSourceHeatPump(WrapperName,EquipFlowCtrl, CompIndex,L
 
   IF (InitLoopEquip) THEN ! Initializagion loop if not done
     CALL InitWrapper(WrapperNum,RunFlag,FirstIteration,MyLoad,LoopNum)
-        MinCap = 0
-        MaxCap = 0
-        OptCap = 0
+        MinCap = 0.0d0
+        MaxCap = 0.0d0
+        OptCap = 0.0d0
     IF (LoopNum == Wrapper(WrapperNum)%CWLoopNum) THEN ! Chilled water loop
       IF (Wrapper(WrapperNum)%ControlMode == SmartMixing) THEN ! control mode is SmartMixing
         DO NumChillerHeater = 1 , Wrapper(WrapperNum)%ChillerHeaterNums
@@ -427,7 +430,7 @@ SUBROUTINE SimCentralGroundSourceHeatPump(WrapperName,EquipFlowCtrl, CompIndex,L
     END IF ! End of loop determination
 
     IF (GetSizingFactor) THEN
-        SizingFactor = 1.0  ! Always equal to one now. The conponent may have its own sizing factor
+        SizingFactor = 1.0d0  ! Always equal to one now. The conponent may have its own sizing factor
     END IF
 
     RETURN
@@ -541,6 +544,9 @@ SUBROUTINE SizeWrapper(WrapperNum)
   INTEGER             :: SourceSideOutletNode ! Heat pump source side outlet node index number
   INTEGER             :: DummyInletNode       ! Dummy inlet node index number
   INTEGER             :: DummyOutletNode      ! Dummy outlet node index number
+  REAL(r64)           :: TotalEvapVolFlowRate
+  REAL(r64)           :: TotalCondVolFlowRate
+  REAL(r64)           :: TotalHotWaterVolFlowRate
 
     ! get all the nodes' indices
   CHWInletNodeNum   = Wrapper(WrapperNum)%CHWInletNodeNum
@@ -574,10 +580,12 @@ SUBROUTINE SizeWrapper(WrapperNum)
           IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
             tmpEvapVolFlowRate = PlantSizData(PltSizNum)%DesVolFlowRate *   &
                                  Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%SizFac
+            Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpEvapVolFlowRate = tmpEvapVolFlowRate
             IF (PlantSizesOkayToFinalize) Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%EvapVolFlowRate = &
               tmpEvapVolFlowRate
           ELSE
             tmpEvapVolFlowRate = 0.d0
+            Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpEvapVolFlowRate = tmpEvapVolFlowRate
             IF (PlantSizesOkayToFinalize) Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%EvapVolFlowRate = &
                tmpEvapVolFlowRate
           END IF
@@ -593,10 +601,8 @@ SUBROUTINE SizeWrapper(WrapperNum)
         END IF
       END IF
 
-      CALL RegisterPlantCompDesignFlow(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%EvapInletNodeNum,tmpEvapVolFlowRate)
-
-         ! auto-size the Referrence Cooling Capacity
-         ! each individule chiller heater module is sized to be capable of supporting the total load on the wrapper
+         ! auto-size the Reference Cooling Capacity
+         ! each individual chiller heater module is sized to be capable of supporting the total load on the wrapper
       IF (Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%RefCapCooling  == AutoSize) THEN
         IF (PltSizNum > 0) THEN
           IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
@@ -620,9 +626,10 @@ SUBROUTINE SizeWrapper(WrapperNum)
                              'Reference Capacity [W]', &
                              Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%RefCapCooling)
         ELSE
-          CALL ShowSevereError('Autosizing of CGSHP Chiller Heater reference capacity requires a loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in CGSHP Chiller Heater Performance object=' &
-               //TRIM(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%Name))
+          CALL ShowSevereError('SizeExhaustAbsorber: ChillerHeaterPerformance:Electric:EIR="'//  &
+             trim(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%Name)//'", autosize error.')
+          CALL ShowContinueError('Autosizing of CGSHP Chiller Heater reference capacity requires')
+          CALL ShowContinueError('a cooling loop Sizing:Plant object.')
           ErrorsFound = .TRUE.
         END IF
         Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%RefCapClgHtg = &
@@ -644,13 +651,15 @@ SUBROUTINE SizeWrapper(WrapperNum)
                                 PlantLoop(Wrapper(WrapperNum)%GLHELoopNum)%FluidIndex, &
                                 'SizeCGSHPChillerHeater')
             tmpCondVolFlowRate = tmpNomCap * &
-                        (1. + (1./Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%RefCOPCooling) * &
+                        (1.0d0 + (1.0d0/Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%RefCOPCooling) * &
                         Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%OpenMotorEff) / &
                        ( PlantSizData(PltSizCondNum)%DeltaT * Cp * rho )
+            Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpCondVolFlowRate = tmpCondVolFlowRate
             IF (PlantSizesOkayToFinalize) Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%CondVolFlowRate = &
                tmpCondVolFlowRate
           ELSE
-              tmpCondVolFlowRate = 0.d0
+            tmpCondVolFlowRate = 0.d0
+            Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpCondVolFlowRate = tmpCondVolFlowRate
             IF (PlantSizesOkayToFinalize) Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%CondVolFlowRate = &
                tmpCondVolFlowRate
           END IF
@@ -659,16 +668,15 @@ SUBROUTINE SizeWrapper(WrapperNum)
                               'Reference Condenser Water Flow Rate [m3/s]', &
                               Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%CondVolFlowRate)
         ELSE
-          CALL ShowContinueError('Autosizing of CGSHP Chiller Heater condenser flow rate requires a condenser')
-          CALL ShowContinueError('loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in CGSHP Chiller Heater Performance object='// &
-               TRIM(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%Name))
+          CALL ShowSevereError('SizeExhaustAbsorber: ChillerHeaterPerformance:Electric:EIR="'//  &
+             trim(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%Name)//'", autosize error.')
+          CALL ShowContinueError('Autosizing of CGSHP Chiller Heater condenser flow rate requires')
+          CALL ShowContinueError('a condenser loop Sizing:Plant object.')
           ErrorsFound = .TRUE.
         END IF
       END IF
 
-        ! save the reference condenser water volumetric flow rate for use by the condenser water loop sizing algorithms
-      CALL RegisterPlantCompDesignFlow(Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%CondInletNodeNum,tmpCondVolFlowRate)
+
       IF (PlantSizesOkayToFinalize) THEN
             !create predefined report
         equipName = Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%Name
@@ -682,6 +690,22 @@ SUBROUTINE SizeWrapper(WrapperNum)
       END IF
 
     END DO
+
+    ! sum individual volume flows and register wrapper inlets
+    TotalEvapVolFlowRate = 0.d0
+    TotalCondVolFlowRate = 0.d0
+    TotalHotWaterVolFlowRate = 0.d0
+    DO NumChillerHeater = 1 , Wrapper(WrapperNum)%ChillerHeaterNums
+      TotalEvapVolFlowRate = TotalEvapVolFlowRate + Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpEvapVolFlowRate
+      TotalCondVolFlowRate = TotalCondVolFlowRate + Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%tmpCondVolFlowRate
+      TotalHotWaterVolFlowRate = TotalHotWaterVolFlowRate &
+                             + Wrapper(WrapperNum)%ChillerHeater(NumChillerHeater)%DesignHotWaterVolFlowRate
+    ENDDO
+
+    CALL RegisterPlantCompDesignFlow(Wrapper(WrapperNum)%CHWInletNodeNum,TotalEvapVolFlowRate)
+    CALL RegisterPlantCompDesignFlow(Wrapper(WrapperNum)%HWInletNodeNum,TotalHotWaterVolFlowRate)
+        ! save the reference condenser water volumetric flow rate for use by the condenser water loop sizing algorithms
+    CALL RegisterPlantCompDesignFlow(Wrapper(WrapperNum)%GLHEInletNodeNum,TotalCondVolFlowRate)
 
     RETURN
 
@@ -758,8 +782,9 @@ SUBROUTINE GetWrapperInput
   INTEGER :: TotalNumCH           = 0  ! total number of chiller heaters (with identical multiplier)
   INTEGER :: TotalNumHP           = 0  ! total number of heat pumps (with identical multiplier)
   INTEGER :: NumChillerheaters    = 0  ! total number of chiller heater (without identical multiplier)
-  INTEGER :: ChillerHeaterNum     = 1  ! chiller heater index pointer
+  INTEGER :: ChillerHeaterNum     = 1  ! chiller heater index pointer for current wrapper object
   INTEGER :: HeatPumpNum          = 1  ! heat pump index pointer
+  INTEGER :: NumChHtrPerWrapper   = 0  ! total number of chiller heaters (including identical units) per wrapper
 
   IF (AllocatedFlag) RETURN
     cCurrentModuleObject = 'CentralHeatPumpSystem'
@@ -785,6 +810,9 @@ SUBROUTINE GetWrapperInput
 
     Wrapper(WrapperNum)%Name = cAlphaArgs(1)
 
+    ! intialize nth chiller heater index (including identical units) for current wrapper
+    NumChHtrPerWrapper = 0
+
     IsNotOK=.false.
     IsBlank=.false.
     CALL VerifyName(cAlphaArgs(1),Wrapper%Name,WrapperNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
@@ -799,71 +827,77 @@ SUBROUTINE GetWrapperInput
       Wrapper(WrapperNum)%ControlMode         = SmartMixing
     END IF
 
-      Wrapper(WrapperNum)%CHWInletNodeNum    = &  !node name : connection should be careful!
-               GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
-      Wrapper(WrapperNum)%CHWOutletNodeNum   = &
-               GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
-      CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(3),cAlphaArgs(4),'Chilled Water Nodes')
+    Wrapper(WrapperNum)%CHWInletNodeNum    = &  !node name : connection should be careful!
+              GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+    Wrapper(WrapperNum)%CHWOutletNodeNum   = &
+              GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+    CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(3),cAlphaArgs(4),'Chilled Water Nodes')
 
-      Wrapper(WrapperNum)%GLHEInletNodeNum    = &  !node name : connection should be careful!
-               GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
-      Wrapper(WrapperNum)%GLHEOutletNodeNum   = &
-               GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
-      CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),'GLHE Nodes')
+    Wrapper(WrapperNum)%GLHEInletNodeNum    = &  !node name : connection should be careful!
+              GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Inlet, 2, ObjectIsNotParent)
+    Wrapper(WrapperNum)%GLHEOutletNodeNum   = &
+              GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Outlet, 2, ObjectIsNotParent)
+    CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),'GLHE Nodes')
 
-      Wrapper(WrapperNum)%HWInletNodeNum    = &  !node name : connection should be careful!
-               GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
-      Wrapper(WrapperNum)%HWOutletNodeNum   = &
-               GetOnlySingleNode(cAlphaArgs(8),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
-      CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(7),cAlphaArgs(8),'Hot Water Nodes')
+    Wrapper(WrapperNum)%HWInletNodeNum    = &  !node name : connection should be careful!
+              GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Inlet, 3, ObjectIsNotParent)
+    Wrapper(WrapperNum)%HWOutletNodeNum   = &
+              GetOnlySingleNode(cAlphaArgs(8),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+              NodeType_Water,NodeConnectionType_Outlet, 3, ObjectIsNotParent)
+    CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(7),cAlphaArgs(8),'Hot Water Nodes')
 
-      Wrapper(WrapperNum)%AncilliaryPower      = rNumericArgs(1)
-      Wrapper(WrapperNum)%AncilliaryPwSchedule = cAlphaArgs(9)
-        IF (lAlphaFieldBlanks(9)) THEN
-          Wrapper(WrapperNum)%SchedPtr  = 0
-        ELSE
-          Wrapper(WrapperNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(9))
-        END IF
+    Wrapper(WrapperNum)%AncilliaryPower      = rNumericArgs(1)
+    Wrapper(WrapperNum)%AncilliaryPwSchedule = cAlphaArgs(9)
+    IF (lAlphaFieldBlanks(9)) THEN
+      Wrapper(WrapperNum)%SchedPtr  = 0
+    ELSE
+      Wrapper(WrapperNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(9))
+    END IF
 
-      NumberOfComp = (NumAlphas-9)/3
-      Wrapper(WrapperNum)%NumOfComp = NumberOfComp
-      ALLOCATE(Wrapper(WrapperNum)%WrapperComp(NumberOfComp))
+    NumberOfComp = (NumAlphas-9)/3
+    Wrapper(WrapperNum)%NumOfComp = NumberOfComp
+    ALLOCATE(Wrapper(WrapperNum)%WrapperComp(NumberOfComp))
 
-      IF (Wrapper(WrapperNum)%NumOfComp == 0) THEN
-        CALL ShowSevereError('GetWrapperInput: No component names on '//  &
-            TRIM(cCurrentModuleObject)//'='//TRIM(Wrapper(WrapperNum)%Name))
-        ErrorsFound=.true.
-      ELSE
-        Comp=0
-        DO Loop=10,NumAlphas,3
-          Comp = Comp + 1
-          Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectType=cAlphaArgs(Loop)
-          Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperComponentName=cAlphaArgs(Loop+1)
-          Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectSch=cAlphaArgs(Loop+2)
-            IF (lAlphaFieldBlanks(Loop+2)) THEN
-               Wrapper(WrapperNum)%WrapperComp(Comp)%CHSchedPtr = ScheduleAlwaysOn
-            ELSE
-               Wrapper(WrapperNum)%WrapperComp(Comp)%CHSchedPtr = GetScheduleIndex(cAlphaArgs(Loop+2))
-            END IF
-          Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum=rNumericArgs(1+Comp)
-          IF (Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectType == &
-            MakeUPPERCase('ChillerHeaterPerformance:Electric:EIR')) THEN
-            IF (Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum > 1) THEN
-                NumChillerheaters=NumChillerheaters+Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum
-            ELSE
-                NumChillerheaters=NumChillerheaters+1
-            END IF
+    IF (Wrapper(WrapperNum)%NumOfComp == 0) THEN
+      CALL ShowSevereError('GetWrapperInput: No component names on '//  &
+          TRIM(cCurrentModuleObject)//'='//TRIM(Wrapper(WrapperNum)%Name))
+      ErrorsFound=.true.
+    ELSE
+      Comp=0
+      DO Loop=10,NumAlphas,3
+        Comp = Comp + 1
+        Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectType=cAlphaArgs(Loop)
+        Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperComponentName=cAlphaArgs(Loop+1)
+        Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectSch=cAlphaArgs(Loop+2)
+          IF (lAlphaFieldBlanks(Loop+2)) THEN
+              Wrapper(WrapperNum)%WrapperComp(Comp)%CHSchedPtr = ScheduleAlwaysOn
+          ELSE
+              Wrapper(WrapperNum)%WrapperComp(Comp)%CHSchedPtr = GetScheduleIndex(cAlphaArgs(Loop+2))
           END IF
-        END DO
+        Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum=rNumericArgs(1+Comp)
+        IF (Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectType == &
+          MakeUPPERCase('ChillerHeaterPerformance:Electric:EIR')) THEN
 
-      Wrapper(WrapperNum)%ChillerHeaterNums=NumChillerheaters !TotalNumCH
-      END IF
+          ! count number of chiller heaters (including identical units) for current wrapper
+          IF (Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum > 1) THEN
+              NumChHtrPerWrapper = NumChHtrPerWrapper+Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum
+          ELSE
+              NumChHtrPerWrapper = NumChHtrPerWrapper+1
+          END IF
+
+          ! count total number of chiller heaters (not including identical units) for ALL wrappers
+          NumChillerheaters = NumChillerheaters + 1
+
+        END IF
+      END DO
+
+      Wrapper(WrapperNum)%ChillerHeaterNums = NumChHtrPerWrapper
+    END IF
 
     IF (ErrorsFound) THEN
       CALL ShowFatalError('GetWrapperInput: Invalid '//TRIM(cCurrentModuleObject)//  &
@@ -880,105 +914,114 @@ SUBROUTINE GetWrapperInput
 
   IF (NumChillerHeaters>0) THEN
     IF (CHAllocatedFlag) RETURN
-      ALLOCATE (Chillerheater(NumChillerheaters))
-      ALLOCATE (ChillerheaterReport(NumChillerheaters))
 
       DO WrapperNum = 1 , NumWrappers
         ALLOCATE (Wrapper(WrapperNum)%Chillerheater(Wrapper(WrapperNum)%ChillerHeaterNums))
         ALLOCATE (Wrapper(WrapperNum)%ChillerheaterReport(Wrapper(WrapperNum)%ChillerHeaterNums))
       END DO
         CALL GetChillerheaterInput
-             CHAllocatedFlag = .TRUE.
+        CHAllocatedFlag = .TRUE.
   END IF
 
   DO WrapperNum = 1 , NumWrappers
+    ChillerHeaterNum = 0  ! intialize nth chiller heater index (including identical units) for current wrapper
     DO comp=1, Wrapper(WrapperNum)%NumOfComp
       IF (Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectType == &
                             MakeUPPERCase('ChillerHeaterPerformance:Electric:EIR')) THEN
         CompName=Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperComponentName
-        CompIndex = FindItemInList(CompName,Chillerheater%Name,NumChillerheaters )
+        CompIndex = FindItemInList(CompName,Chillerheater%Name,UBound(Chillerheater%Name,1) )
+          ! User may enter invalid name rather than selecting one from the object list
+        IF (CompIndex <= 0) THEN
+          CALL ShowSevereError('GetWrapperInput: Invalid Chiller Heater Modules Performance Component Name =' //TRIM(compname))
+          CALL ShowContinueError('Select the name of ChillerHeaterPerformance:Electric:EIR object(s) from the object list.')
+          CALL ShowFatalError('Program terminates due to preceding condition.')
+        ENDIF
         Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperPerformanceObjectIndex=CompIndex
         IF (Chillerheater(CompIndex)%VariableFlow) THEN
           Wrapper(WrapperNum)%VariableFlowCH = .TRUE.
         END IF
         DO i_CH=1 , Wrapper(WrapperNum)%WrapperComp(Comp)%WrapperIdenticalObjectNum
+          ! increment nth chiller heater index (including identical units) for current wrapper
+          ChillerHeaterNum = ChillerHeaterNum+1
           Wrapper(WrapperNum)%ChillerHeater(ChillerHeaterNum)       = Chillerheater(CompIndex)
           Wrapper(WrapperNum)%ChillerHeaterReport(ChillerHeaterNum) = ChillerheaterReport(CompIndex)
-          ChillerHeaterNum = ChillerHeaterNum+1
         END DO
       ENDIF
     END DO
   END DO
 
-  NumChillerheaters = ChillerHeaterNum - 1
-
+    !Release memory from temporary arrays; values now copied into their associated Wrapper in above loop
   IF (ALLOCATED(Chillerheater)) DEALLOCATE(Chillerheater)
+  IF (ALLOCATED(ChillerheaterReport)) DEALLOCATE(ChillerheaterReport)
 
-    DO WrapperNum = 1 , NumWrappers
-      CALL SetupOutputVariable('Chiller Heater System Cooling Electric Energy [J]', &
-           WrapperReport(WrapperNum)%TotElecCooling,'System','Sum',Wrapper(WrapperNum)%Name,  &
-                                 ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
+    !Set up output variables
+  DO WrapperNum = 1 , NumWrappers
+    CALL SetupOutputVariable('Chiller Heater System Cooling Electric Energy [J]', &
+          WrapperReport(WrapperNum)%TotElecCooling,'System','Sum',Wrapper(WrapperNum)%Name,  &
+                                ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Electric Energy [J]', &
-            WrapperReport(WrapperNum)%TotElecHeating,'System','Sum',Wrapper(WrapperNum)%Name,  &
-                                 ResourceTypeKey='ELECTRICITY',EndUseKey='Heating',GroupKey='Plant')
+    CALL SetupOutputVariable('Chiller Heater System Heating Electric Energy [J]', &
+          WrapperReport(WrapperNum)%TotElecHeating,'System','Sum',Wrapper(WrapperNum)%Name,  &
+                                ResourceTypeKey='ELECTRICITY',EndUseKey='Heating',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Electric Power [W]', &
-        WrapperReport(WrapperNum)%TotElecCoolingPwr, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Cooling Electric Power [W]', &
+      WrapperReport(WrapperNum)%TotElecCoolingPwr, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Electric Power [W]', &
-           WrapperReport(WrapperNum)%TotElecHeatingPwr,'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Heating Electric Power [W]', &
+          WrapperReport(WrapperNum)%TotElecHeatingPwr,'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Energy [J]', &
-           WrapperReport(WrapperNum)%CoolingEnergy, 'System','Sum',Wrapper(WrapperNum)%Name,  &
-                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
+    CALL SetupOutputVariable('Chiller Heater System Cooling Energy [J]', &
+          WrapperReport(WrapperNum)%CoolingEnergy, 'System','Sum',Wrapper(WrapperNum)%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Energy [J]', &
-           WrapperReport(WrapperNum)%HeatingEnergy,'System','Sum',Wrapper(WrapperNum)%Name,  &
-                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BOILER',GroupKey='Plant')
+    CALL SetupOutputVariable('Chiller Heater System Heating Energy [J]', &
+          WrapperReport(WrapperNum)%HeatingEnergy,'System','Sum',Wrapper(WrapperNum)%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BOILER',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Chiller Heater System Source Heat Transfer Energy [J]', &
-           WrapperReport(WrapperNum)%GLHEEnergy,'System','Sum',Wrapper(WrapperNum)%Name,  &
-                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
+    CALL SetupOutputVariable('Chiller Heater System Source Heat Transfer Energy [J]', &
+          WrapperReport(WrapperNum)%GLHEEnergy,'System','Sum',Wrapper(WrapperNum)%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Rate [W]', &
-           WrapperReport(WrapperNum)%CoolingRate, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Cooling Rate [W]', &
+          WrapperReport(WrapperNum)%CoolingRate, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Rate [W]', &
-           WrapperReport(WrapperNum)%HeatingRate,'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Heating Rate [W]', &
+          WrapperReport(WrapperNum)%HeatingRate,'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Source Heat Transfer Rate [W]', &
-           WrapperReport(WrapperNum)%GLHERate,'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Source Heat Transfer Rate [W]', &
+          WrapperReport(WrapperNum)%GLHERate,'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Mass Flow Rate [kg/s]', &
-           WrapperReport(WrapperNum)%CHWmdot, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Cooling Mass Flow Rate [kg/s]', &
+          WrapperReport(WrapperNum)%CHWmdot, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Mass Flow Rate [kg/s]', &
-           WrapperReport(WrapperNum)%HWmdot, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Heating Mass Flow Rate [kg/s]', &
+          WrapperReport(WrapperNum)%HWmdot, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Source Mass Flow Rate [kg/s]', &
-           WrapperReport(WrapperNum)%GLHEmdot, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Source Mass Flow Rate [kg/s]', &
+          WrapperReport(WrapperNum)%GLHEmdot, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Inlet Temperature [C]', &
-           WrapperReport(WrapperNum)%CHWInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Cooling Inlet Temperature [C]', &
+          WrapperReport(WrapperNum)%CHWInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Inlet Temperature [C]', &
-           WrapperReport(WrapperNum)%HWInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Heating Inlet Temperature [C]', &
+          WrapperReport(WrapperNum)%HWInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Source Inlet Temperature [C]', &
-           WrapperReport(WrapperNum)%GLHEInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Source Inlet Temperature [C]', &
+          WrapperReport(WrapperNum)%GLHEInletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Cooling Outlet Temperature [C]', &
-           WrapperReport(WrapperNum)%CHWOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Cooling Outlet Temperature [C]', &
+          WrapperReport(WrapperNum)%CHWOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Heating Outlet Temperature [C]', &
-           WrapperReport(WrapperNum)%HWOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Heating Outlet Temperature [C]', &
+          WrapperReport(WrapperNum)%HWOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-      CALL SetupOutputVariable('Chiller Heater System Source Outlet Temperature [C]', &
-           WrapperReport(WrapperNum)%GLHEOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
+    CALL SetupOutputVariable('Chiller Heater System Source Outlet Temperature [C]', &
+          WrapperReport(WrapperNum)%GLHEOutletTemp, 'System','Average',Wrapper(WrapperNum)%Name)
 
-    IF (ChillerHeaterNum > 0) THEN
-      DO ChillerHeaterNum = 1, NumChillerheaters
+    IF (Wrapper(WrapperNum)%ChillerHeaterNums > 0) THEN
+
+      DO ChillerHeaterNum = 1, Wrapper(WrapperNum)%ChillerHeaterNums
+
         CALL SetupOutputVariable('Chiller Heater Operation Mode Unit '//  &
             TRIM(TrimSigDigits(ChillerHeaterNum))//' []', &
             Wrapper(WrapperNum)%ChillerheaterReport(ChillerHeaterNum)%CurrentMode,'System','Average',&
@@ -1093,8 +1136,7 @@ SUBROUTINE GetWrapperInput
             TRIM(TrimSigDigits(ChillerHeaterNum))//' [kg/s]', &
             Wrapper(WrapperNum)%ChillerheaterReport(ChillerHeaterNum)%Condmdot,'System','Average',&
             Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%Name)
-      END DO ! End of individual chiller heater count
-
+      END DO ! End of individual chiller heater count for current wrapper
 
     END IF ! End of individual chiller heater output
 
@@ -1124,10 +1166,7 @@ SUBROUTINE GetChillerheaterInput
   USE BranchNodeConnections, ONLY: TestCompSet
   USE NodeInputManager,      ONLY: GetOnlySingleNode
   USE CurveManager,          ONLY: GetCurveIndex, GetCurveMinMaxValues
-  !!USE FluidProperties,       ONLY: FindGlycol
   USE CurveManager,          ONLY: CurveValue
-  !!USE GlobalNames,           ONLY: VerifyUniqueChillerName
-  !!USE OutAirNodeManager,     ONLY: CheckAndAddAirNodeNumber
   USE PlantUtilities,        ONLY: RegisterPlantCompDesignFlow
   USE ScheduleManager,       ONLY: GetScheduleIndex
   USE General,               ONLY: TrimSigDigits, RoundSigDigits
@@ -1168,7 +1207,13 @@ SUBROUTINE GetChillerheaterInput
     CHErrorsFound=.true.
   END IF
 
-    ! Load arrays with electric EIR chiller data
+      ! Allocate temporary Chillerheater and ChillerheaterReport arrays
+  IF (ALLOCATED(Chillerheater)) DEALLOCATE (Chillerheater)
+  IF (ALLOCATED(ChillerheaterReport)) DEALLOCATE (ChillerheaterReport)
+  ALLOCATE (Chillerheater(NumChillerheaters))
+  ALLOCATE (ChillerheaterReport(NumChillerheaters))
+
+      ! Load arrays with electric EIR chiller data
   DO ChillerHeaterNum = 1 , NumChillerheaters
     CALL GetObjectItem(cCurrentModuleObject,ChillerHeaterNum,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
@@ -1267,13 +1312,13 @@ SUBROUTINE GetChillerheaterInput
 
       ! Chiller rated performance data
     Chillerheater(ChillerHeaterNum)%RefCapCooling = rNumericArgs(1)
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Entered in '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CHErrorsFound=.true.
     END IF
     Chillerheater(ChillerHeaterNum)%RefCOPCooling = rNumericArgs(2)
-    IF (rNumericArgs(2) == 0.0) THEN
+    IF (rNumericArgs(2) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Entered in '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       CHErrorsFound=.true.
@@ -1285,7 +1330,7 @@ SUBROUTINE GetChillerheaterInput
     Chillerheater(ChillerHeaterNum)%ClgHtgToCoolingCapRatio = rNumericArgs(6)
     Chillerheater(ChillerHeaterNum)%RefCapClgHtg = rNumericArgs(6) * Chillerheater(ChillerHeaterNum)%RefCapCooling
 
-    IF (rNumericArgs(6) == 0.0) THEN
+    IF (rNumericArgs(6) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Entered in '//TRIM(cNumericFieldNames(6))//'='//TRIM(RoundSigDigits(rNumericArgs(6),2)))
       CHErrorsFound=.true.
@@ -1297,7 +1342,7 @@ SUBROUTINE GetChillerheaterInput
     Chillerheater(ChillerHeaterNum)%RefCOPClgHtg = Chillerheater(ChillerHeaterNum)%RefCapClgHtg / &
                                                    Chillerheater(ChillerHeaterNum)%RefPowerClgHtg
 
-    IF (rNumericArgs(7) == 0.0) THEN
+    IF (rNumericArgs(7) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Entered in '//TRIM(cNumericFieldNames(7))//'='//TRIM(RoundSigDigits(rNumericArgs(7),2)))
       CHErrorsFound=.true.
@@ -1316,10 +1361,10 @@ SUBROUTINE GetChillerheaterInput
     Chillerheater(ChillerHeaterNum)%SizFac                    = rNumericArgs(18)
 
 
-    IF (Chillerheater(ChillerHeaterNum)%SizFac <= 0.0) Chillerheater(ChillerHeaterNum)%SizFac = 1.0d0
+    IF (Chillerheater(ChillerHeaterNum)%SizFac <= 0.0d0) Chillerheater(ChillerHeaterNum)%SizFac = 1.0d0
 
-    IF(Chillerheater(ChillerHeaterNum)%OpenMotorEff .LT. 0.0 .OR. &
-       Chillerheater(ChillerHeaterNum)%OpenMotorEff .GT. 1.0) THEN
+    IF(Chillerheater(ChillerHeaterNum)%OpenMotorEff .LT. 0.0d0 .OR. &
+       Chillerheater(ChillerHeaterNum)%OpenMotorEff .GT. 1.0d0) THEN
        CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
        CALL ShowContinueError(TRIM(cNumericFieldNames(14))//' = '//TRIM(RoundSigDigits(rNumericArgs(14),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(14))//' must be greater than or equal to zero' )
@@ -1332,7 +1377,7 @@ SUBROUTINE GetChillerheaterInput
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerCAPFTCooling, &
                           Chillerheater(ChillerHeaterNum)%TempRefEvapOutCooling, &
                           Chillerheater(ChillerHeaterNum)%TempRefCondInCooling)
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Capacity ratio as a function of temperature curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//  &
                         TRIM(cAlphaArgs(1)))
@@ -1344,7 +1389,7 @@ SUBROUTINE GetChillerheaterInput
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFTCooling, &
                           Chillerheater(ChillerHeaterNum)%TempRefEvapOutCooling, &
                           Chillerheater(ChillerHeaterNum)%TempRefCondInCooling)
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Energy input ratio as a function of temperature curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//  &
                         TRIM(cAlphaArgs(1)))
@@ -1355,7 +1400,7 @@ SUBROUTINE GetChillerheaterInput
     IF (Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRCooling > 0) THEN
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRCooling, 1.0d0)
 
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Energy input ratio as a function of part-load ratio curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//  &
                         TRIM(cAlphaArgs(1)))
@@ -1367,7 +1412,7 @@ SUBROUTINE GetChillerheaterInput
       FoundNegValue = .FALSE.
       DO CurveCheck = 0, 10, 1
         CurveValTmp = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRCooling, REAL(CurveCheck/10.0d0,r64))
-        IF(CurveValTmp .LT. 0.0) FoundNegValue = .TRUE.
+        IF(CurveValTmp .LT. 0.0d0) FoundNegValue = .TRUE.
         CurveValArray(CurveCheck+1) = INT(CurveValTmp*100.0d0)/100.0d0
       END DO
       IF(FoundNegValue)THEN
@@ -1385,7 +1430,7 @@ SUBROUTINE GetChillerheaterInput
     IF (Chillerheater(ChillerHeaterNum)%ChillerCAPFTHeating > 0) THEN
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerCAPFTHeating, &
                           Chillerheater(ChillerHeaterNum)%TempRefEvapOutClgHtg,Chillerheater(ChillerHeaterNum)%TempRefCondInClgHtg)
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Capacity ratio as a function of temperature curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
@@ -1395,7 +1440,7 @@ SUBROUTINE GetChillerheaterInput
     IF (Chillerheater(ChillerHeaterNum)%ChillerEIRFTHeating > 0) THEN
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFTHeating, &
                           Chillerheater(ChillerHeaterNum)%TempRefEvapOutClgHtg,Chillerheater(ChillerHeaterNum)%TempRefCondInClgHtg)
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Energy input ratio as a function of temperature curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
@@ -1405,7 +1450,7 @@ SUBROUTINE GetChillerheaterInput
     IF (Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRHeating > 0) THEN
       CurveVal = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRHeating, 1.0d0)
 
-      IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
+      IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0)THEN
         CALL ShowWarningError('Energy input ratio as a function of part-load ratio curve output is not equal to 1.0')
         CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
@@ -1416,7 +1461,7 @@ SUBROUTINE GetChillerheaterInput
       FoundNegValue = .FALSE.
       DO CurveCheck = 0, 10, 1
         CurveValTmp = CurveValue(Chillerheater(ChillerHeaterNum)%ChillerEIRFPLRHeating, REAL(CurveCheck/10.0d0,r64))
-        IF(CurveValTmp .LT. 0.0) FoundNegValue = .TRUE.
+        IF(CurveValTmp .LT. 0.0d0) FoundNegValue = .TRUE.
         CurveValArray(CurveCheck+1) = INT(CurveValTmp*100.0d0)/100.0d0
       END DO
       IF(FoundNegValue)THEN
@@ -1676,9 +1721,9 @@ SUBROUTINE InitWrapper(WrapperNum,RunFlag,FirstIteration,myLoad,LoopNum)
     IF (PlantSizeNotComplete) CALL SizeWrapper(WrapperNum)
       IF (Wrapper(WrapperNum)%ControlMode==SmartMixing) THEN
 
-          Wrapper(WrapperNum)%CHWVolFlowRate = 0.0
-          Wrapper(WrapperNum)%HWVolFlowRate = 0.0
-          Wrapper(WrapperNum)%GLHEVolFlowRate = 0.0
+          Wrapper(WrapperNum)%CHWVolFlowRate = 0.0d0
+          Wrapper(WrapperNum)%HWVolFlowRate = 0.0d0
+          Wrapper(WrapperNum)%GLHEVolFlowRate = 0.0d0
 
         DO ChillerHeaterNum = 1, Wrapper(WrapperNum)%ChillerHeaterNums
           Wrapper(WrapperNum)%CHWVolFlowRate = Wrapper(WrapperNum)%CHWVolFlowRate + &
@@ -1839,7 +1884,7 @@ END SUBROUTINE InitWrapper
 
 SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,EquipFlowCtrl,LoopNum)
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         DAeho Kang, PNNL
+          !       AUTHOR         Daeho Kang, PNNL
           !       DATE WRITTEN   Feb 2013
           !       MODIFIED       na
           !       RE-ENGINEERED  na
@@ -1940,7 +1985,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
   REAL(r64) :: CondDensity             ! Condenser water density
   REAL(r64) :: ActualCOP               ! Actual performance of individual chiller heater
 
-  EvaporatorLoad = 0.0
+  EvaporatorLoad = 0.0d0
   EvaporatorLoad = Wrapper(WrapperNum)%WrapperCoolingLoad
   LoopSideNum = Wrapper(WrapperNum)%CWLoopSideNum
   CHWInletMassFlowRate = Node(Wrapper(WrapperNum)%CHWInletNodeNum)%MassFlowRate
@@ -2008,8 +2053,16 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
       CompNum = CompNum + 1
     END IF
 
+    IF (CompNum > Wrapper(WrapperNum)%NumOfComp) THEN
+      CALL ShowSevereError('CalcChillerModel: ChillerHeater="'//trim(Wrapper(WrapperNum)%Name)//  &
+         '", calculated component number too big.')
+      CALL ShowContinueError('Max number of components=['//trim(RoundSigDigits(Wrapper(WrapperNum)%NumOfComp))//  &
+         '], indicated component number=['//trim(RoundSigDigits(CompNum))//'].')
+      CALL ShowFatalError('Program terminates due to preceding condition.')
+    ENDIF
+
       ! Check whether this chiller heater needs to run
-    IF (EvaporatorLoad > 0.0 .AND. (GetCurrentScheduleValue(Wrapper(WrapperNum)%WrapperComp(CompNum)%CHSchedPtr) > 0)) THEN
+    IF (EvaporatorLoad > 0.0d0 .AND. (GetCurrentScheduleValue(Wrapper(WrapperNum)%WrapperComp(CompNum)%CHSchedPtr) > 0.0d0)) THEN
         IsLoadCoolRemaining = .TRUE.
 
         ! Calculate density ratios to adjust mass flow rates from initialized ones
@@ -2144,7 +2197,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
             ' ChillerHeater Capacity as a Function of Temperature curve output is negative warning continues...' &
             , Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%ChillerCapFTErrorIndex, ChillerCapFT, ChillerCapFT)
         END IF
-        ChillerCapFT = 0.0
+        ChillerCapFT = 0.0d0
       END IF
 
         ! Calculate the specific heat of chilled water
@@ -2167,7 +2220,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
       IF(AvailChillerCap .GT. 0)THEN
         PartLoadRat = MAX(0.0d0, MIN(CoolingLoadToMeet/AvailChillerCap,MaxPartLoadRat))
       ELSE
-        PartLoadRat = 0.0
+        PartLoadRat = 0.0d0
       END IF
 
       IF(Wrapper(WrapperNum)%ChillerHeater(ChillerHeaterNum)%PossibleSubCooling) THEN
@@ -2212,7 +2265,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
           END IF ! End of flow control decision
         END IF ! End of operation mode
       ELSE
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = EvapInletTemp
       END IF
 
@@ -2223,7 +2276,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
            EvapDeltaTemp = EvapInletTemp - EvapOutletTemp
            QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
         ELSE
-          QEvaporator = 0.0
+          QEvaporator = 0.0d0
           EvapOutletTemp = EvapInletTemp
         END IF
       END IF
@@ -2236,16 +2289,16 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
           EvapDeltaTemp = Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%EvapOutletNode%TempMin - EvapOutletTemp
           QEvaporator = EvapMassFlowRate*Cp*EvapDeltaTemp
         ELSE
-          QEvaporator = 0.0
+          QEvaporator = 0.0d0
           EvapOutletTemp = EvapInletTemp
         END IF
       END IF
 
         ! Calculate part load once more since evaporator capacity might be modified
-      IF(AvailChillerCap .GT. 0.0)THEN
+      IF(AvailChillerCap .GT. 0.0d0)THEN
         PartLoadRat = MAX(0.0d0,MIN((QEvaporator/AvailChillerCap),MaxPartLoadRat))
       ELSE
-        PartLoadRat = 0.0
+        PartLoadRat = 0.0d0
       END IF
 
         ! Chiller cycles below minimum part load ratio, FRAC = amount of time chiller is ON during this time step
@@ -2255,10 +2308,10 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
       ChillerCyclingRatio = FRAC
 
         ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
-      IF(AvailChillerCap .GT. 0.0)THEN
+      IF(AvailChillerCap .GT. 0.0d0)THEN
         PartLoadRat = Max(PartLoadRat,MinPartLoadRat)
       ELSE
-        PartLoadRat = 0.0
+        PartLoadRat = 0.0d0
       END IF
 
         ! set the module level variable used for reporting PLR
@@ -2267,7 +2320,7 @@ SUBROUTINE CalcChillerModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteration,Equi
       ! calculate the load due to false loading on chiller over and above water side load
       ChillerFalseLoadRate = (AvailChillerCap * PartLoadRat * FRAC) - QEvaporator
       IF(ChillerFalseLoadRate .LT. SmallLoad) THEN
-         ChillerFalseLoadRate = 0.0
+         ChillerFalseLoadRate = 0.0d0
       END IF
 
         ! Determine chiller compressor power and transfer heat calculation
@@ -2582,11 +2635,20 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
       CondDeltaTemp = CondOutletTemp - CondInletTemp
 
       IF(CondDeltaTemp < 0.d0) THEN ! Hot water temperature is greater than the maximum
-        CALL ShowSevereError('ChillerHeaterPerformance:Electric:EIR "'// &
-             TRIM(Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%Name)//'":')
-        CALL ShowContinueError(' Reference Simultaneous Cooling-Heating Mode Leaving Condenser Water Temperature is below &
-                               condenser inlet temperature of (' // TRIM(RoundSigDigits(CondInletTemp,1))//').')
-        CALL ShowContinueError(' Reset reference temeprature to one greater than the inlet temperature ')
+        IF (Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%ChillerEIRRefTempErrorIndex == 0) THEN
+          CALL ShowSevereMessage('CalcChillerHeaterModel: ChillerHeaterPerformance:Electric:EIR="'// &
+               TRIM(Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%Name)//'", DeltaTemp < 0')
+          CALL ShowContinueError(' Reference Simultaneous Cooling-Heating Mode Leaving Condenser Water Temperature ['//  &
+             trim(RoundSigDigits(CondOutletTemp,1))//']')
+          CALL ShowContinueError('is below condenser inlet temperature of [' // TRIM(RoundSigDigits(CondInletTemp,1))//'].')
+          CALL ShowContinueErrorTimeStamp(' ')
+          CALL ShowContinueError(' Reset reference temperature to one greater than the inlet temperature ')
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('ChillerHeaterPerformance:Electric:EIR="'// &
+             TRIM(Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%Name)//'": Reference temperature problems continue.',   &
+             Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%ChillerEIRRefTempErrorIndex,  &
+             ReportMaxOf=CondDeltaTemp,ReportMinOf=CondDeltaTemp,  &
+             ReportMaxUnits='deltaC',ReportMinUnits='deltaC')
         QCondenser = 0.d0
         IsLoadHeatRemaining = .FALSE.
       END IF
@@ -2666,9 +2728,9 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
           CurrentMode = 2
         END IF
 
-        ChillerCapFT = 0.0
-        ChillerEIRFT = 0.0
-        ChillerEIRFPLR = 0.0
+        ChillerCapFT = 0.0d0
+        ChillerEIRFT = 0.0d0
+        ChillerEIRFPLR = 0.0d0
 
           ! Assign curve values to local data array
         Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%RefCap =  &
@@ -2732,7 +2794,7 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
              ' ChillerHeater Capacity as a Function of Temperature curve output is negative warning continues...' &
             , Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%ChillerCapFTErrorIndex, ChillerCapFT, ChillerCapFT)
           END IF
-          ChillerCapFT = 0.0
+          ChillerCapFT = 0.0d0
         END IF
 
           ! Available chiller capacity as a function of temperature
@@ -2742,7 +2804,7 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
         IF(AvailChillerCap > 0)THEN
           PartLoadRat = MAX(0.0d0, MIN((ChillerRefCap/AvailChillerCap),MaxPartLoadRat))
         ELSE
-          PartLoadRat = 0.0
+          PartLoadRat = 0.0d0
         END IF
 
         Cp  = GetSpecificHeatGlycol(PlantLoop(Wrapper(WrapperNum)%HWLoopNum)%FluidName,  &
@@ -2784,21 +2846,22 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
         END IF
 
           ! Evaporator operates at full load
-        IF(AvailChillerCap .GT. 0.0)THEN
+        IF(AvailChillerCap .GT. 0.0d0)THEN
           PartLoadRat = MAX(0.0d0,MIN((QEvaporator/AvailChillerCap),MaxPartLoadRat))
         ELSE
-          PartLoadRat = 0.0
+          PartLoadRat = 0.0d0
         END IF
 
           ! Chiller cycles below minimum part load ratio, FRAC = amount of time chiller is ON during this time step
         IF (PartLoadRat .LT. MinPartLoadRat) FRAC = MIN(1.0d0,(PartLoadRat/MinPartLoadRat))
+          IF (FRAC <= 0.0d0) FRAC = 1.0 ! CR 9303 COP reporting issue, it should be greater than zero in this routine
             ChillerCyclingRatio = FRAC
 
           ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
-        IF(AvailChillerCap .GT. 0.0)THEN
+        IF(AvailChillerCap .GT. 0.0d0)THEN
            PartLoadRat = Max(PartLoadRat,MinPartLoadRat)
         ELSE
-          PartLoadRat = 0.0
+          PartLoadRat = 0.0d0
         END IF
           ! Evaporator part load ratio
         ChillerPartLoadRatio = PartLoadRat
@@ -2806,7 +2869,7 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
           ! calculate the load due to false loading on chiller over and above water side load
         ChillerFalseLoadRate = (AvailChillerCap * PartLoadRat * FRAC) - QEvaporator
         IF(ChillerFalseLoadRate .LT. SmallLoad) THEN
-           ChillerFalseLoadRate = 0.0
+           ChillerFalseLoadRate = 0.0d0
         END IF
 
         ChillerEIRFT = MAX(0.d0,CurveValue(Wrapper(WrapperNum)%Chillerheater(ChillerHeaterNum)%ChillerEIRFT,  &
@@ -2832,9 +2895,9 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
           ! Calculate temperatures for constant flow and mass flow rate for variable flow
           ! Limit mass for this chiller heater to the available mass at given temperature conditions
           ! when mass calculated to meet the load is greater than the maximum available
-          ! then recalculate heating load this chillr heater can meet
+          ! then recalculate heating load this chiller heater can meet
         IF (CurrentMode == 2 .OR. SimulHtgDominant) THEN
-          IF(CondMassFlowRate > MassFlowTolerance .AND. CondDeltaTemp > 0.0) THEN
+          IF(CondMassFlowRate > MassFlowTolerance .AND. CondDeltaTemp > 0.0d0) THEN
             IF (Wrapper(WrapperNum)%VariableFlowCH) THEN ! Variable flow
               CondMassFlowRateCalc = QCondenser/CondDeltaTemp/Cp
               IF (CondMassFlowRateCalc > CondMassFlowRate) THEN
@@ -2856,7 +2919,7 @@ SUBROUTINE CalcChillerHeaterModel(WrapperNum,OpMode,MyLoad,Runflag,FirstIteratio
               CondOutletTemp = CondOutletTempCalc
             END IF
           ELSE
-            QCondenser = 0.0
+            QCondenser = 0.0d0
             CondOutletTemp = CondInletTemp
           END IF
         END IF
@@ -3075,16 +3138,16 @@ SUBROUTINE CalcWrapperModel(WrapperNum,MyLoad,Runflag,FirstIteration,EquipFlowCt
   END IF
 
     ! Initialize local variables
-  WrapperElecPowerCool = 0.0
-  WrapperElecPowerHeat = 0.0
-  WrapperCoolRate = 0.0
-  WrapperHeatRate = 0.0
-  WrapperGLHERate = 0.0
-  WrapperElecEnergyCool = 0.0
-  WrapperElecEnergyHeat = 0.0
-  WrapperCoolEnergy = 0.0
-  WrapperHeatEnergy = 0.0
-  WrapperGLHEEnergy = 0.0
+  WrapperElecPowerCool = 0.0d0
+  WrapperElecPowerHeat = 0.0d0
+  WrapperCoolRate = 0.0d0
+  WrapperHeatRate = 0.0d0
+  WrapperGLHERate = 0.0d0
+  WrapperElecEnergyCool = 0.0d0
+  WrapperElecEnergyHeat = 0.0d0
+  WrapperCoolEnergy = 0.0d0
+  WrapperHeatEnergy = 0.0d0
+  WrapperGLHEEnergy = 0.0d0
 
   IF (LoopNum == Wrapper(WrapperNum)%CWLoopNum) THEN
     IF (Wrapper(WrapperNum)%ControlMode == SmartMixing) THEN
@@ -3094,12 +3157,12 @@ SUBROUTINE CalcWrapperModel(WrapperNum,MyLoad,Runflag,FirstIteration,EquipFlowCt
         CALL UpdateChillerRecords(WrapperNum)
 
           ! Initialize local variables only for calculating mass-weighed temperatures
-        CHWOutletTemp  = 0
-        HWOutletTemp   = 0
-        GLHEOutletTemp = 0
-        CHWOutletMassFlowRate  = 0.0
-        HWOutletMassFlowRate   = 0.0
-        GLHEOutletMassFlowRate = 0.0
+        CHWOutletTemp  = 0.0d0
+        HWOutletTemp   = 0.0d0
+        GLHEOutletTemp = 0.0d0
+        CHWOutletMassFlowRate  = 0.0d0
+        HWOutletMassFlowRate   = 0.0d0
+        GLHEOutletMassFlowRate = 0.0d0
 
         DO ChillerHeaterNum=1,ChillerHeaterNums
 
@@ -3270,12 +3333,12 @@ SUBROUTINE CalcWrapperModel(WrapperNum,MyLoad,Runflag,FirstIteration,EquipFlowCt
         CALL UpdateChillerHeaterRecords(WrapperNum)
 
           ! Calculate individual CH units's temperatures and mass flow rates
-        CHWOutletTemp  = 0
-        HWOutletTemp   = 0
-        GLHEOutletTemp = 0
-        CHWOutletMassFlowRate  = 0.0
-        HWOutletMassFlowRate   = 0.0
-        GLHEOutletMassFlowRate = 0.0
+        CHWOutletTemp  = 0.0d0
+        HWOutletTemp   = 0.0d0
+        GLHEOutletTemp = 0.0d0
+        CHWOutletMassFlowRate  = 0.0d0
+        HWOutletMassFlowRate   = 0.0d0
+        GLHEOutletMassFlowRate = 0.0d0
 
         IF (SimulHtgDominant .OR. SimulClgDominant) THEN
           IF (SimulClgDominant) THEN

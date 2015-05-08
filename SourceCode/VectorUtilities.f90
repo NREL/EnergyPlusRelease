@@ -102,9 +102,9 @@ INTERFACE OPERATOR (.twodcross.)
 END INTERFACE
 
   !MODULE PARAMETER DEFINITIONS
-TYPE (vector), PRIVATE, PARAMETER :: XUnit=vector(1.,0.,0.)
-TYPE (vector), PRIVATE, PARAMETER :: YUnit=vector(0.,1.,0.)
-TYPE (vector), PRIVATE, PARAMETER :: ZUnit=vector(0.,0.,1.)
+TYPE (vector), PRIVATE, PARAMETER :: XUnit=vector(1.0d0,0.0d0,0.0d0 )
+TYPE (vector), PRIVATE, PARAMETER :: YUnit=vector(0.0d0,1.0d0,0.0d0 )
+TYPE (vector), PRIVATE, PARAMETER :: ZUnit=vector(0.0d0,0.0d0,1.0d0 )
 
   ! DERIVED TYPE DEFINITIONS
   ! na
@@ -312,9 +312,9 @@ CONTAINS
       TYPE (vector) :: vector_times_int
       TYPE (vector), INTENT(IN) :: vec_1
       INTEGER, INTENT(IN) :: int_2
-      vector_times_int%x = vec_1%x * REAL(int_2)
-      vector_times_int%y = vec_1%y * REAL(int_2)
-      vector_times_int%z = vec_1%z * REAL(int_2)
+      vector_times_int%x = vec_1%x * REAL(int_2,r64)
+      vector_times_int%y = vec_1%y * REAL(int_2,r64)
+      vector_times_int%z = vec_1%z * REAL(int_2,r64)
       RETURN
    END FUNCTION vector_times_int
 
@@ -332,9 +332,9 @@ CONTAINS
       TYPE (vector) :: int_times_vector
       INTEGER, INTENT(IN) :: int_1
       TYPE (vector), INTENT(IN) :: vec_2
-      int_times_vector%x = REAL(int_1) * vec_2%x
-      int_times_vector%y = REAL(int_1) * vec_2%y
-      int_times_vector%z = REAL(int_1) * vec_2%z
+      int_times_vector%x = REAL(int_1,r64) * vec_2%x
+      int_times_vector%y = REAL(int_1,r64) * vec_2%y
+      int_times_vector%z = REAL(int_1,r64) * vec_2%z
       RETURN
    END FUNCTION int_times_vector
 
@@ -373,9 +373,9 @@ CONTAINS
       TYPE (vector) :: vector_div_int
       TYPE (vector), INTENT(IN) :: vec_1
       INTEGER, INTENT(IN) :: int_2
-      vector_div_int%x = vec_1%x / REAL(int_2)
-      vector_div_int%y = vec_1%y / REAL(int_2)
-      vector_div_int%z = vec_1%z / REAL(int_2)
+      vector_div_int%x = vec_1%x / REAL(int_2,r64)
+      vector_div_int%y = vec_1%y / REAL(int_2,r64)
+      vector_div_int%z = vec_1%z / REAL(int_2,r64)
       RETURN
    END FUNCTION vector_div_int
 
@@ -602,14 +602,14 @@ CONTAINS
    real(r64) :: veclen
 
      veclen=VecLength(vec)
-     if (veclen /= 0.0) then
+     if (veclen /= 0.0d0) then
        VecNormalize%x=vec%x/veclen
        VecNormalize%y=vec%y/veclen
        VecNormalize%z=vec%z/veclen
      else
-       VecNormalize%x=0.0
-       VecNormalize%y=0.0
-       VecNormalize%z=0.0
+       VecNormalize%x=0.0d0
+       VecNormalize%y=0.0d0
+       VecNormalize%z=0.0d0
      endif
 
    return
@@ -738,8 +738,8 @@ CONTAINS
 !    double costheta = dot(z3,Ref_CS[2]);
    costheta = z3 .dot. zunit
 
-!    if ( fabs(costheta) < 1.) { // normal cases
-   if (abs(costheta) < 1.) then
+!    if ( fabs(costheta) < 1.0d0) { // normal cases
+   if (abs(costheta) < 1.0d0) then
 !    // azimuth
 !    Vec3d    x2 = cross(Ref_CS[2],z3); // order is important; x2 = x1
 !    RotAng[0] = atan2(dot(x2,Ref_CS[1]),dot(x2,Ref_CS[0]));
@@ -764,7 +764,7 @@ CONTAINS
      az=az/degtoradians
      az=MOD(450.d0 - az, 360.d0)
      az=az+90.d0
-     if (az < 0.0) az=az+360.d0
+     if (az < 0.0d0) az=az+360.d0
      az=mod(az,360.d0)
 
      ! Normalize the azimuth angle so it is positive
@@ -788,7 +788,7 @@ CONTAINS
 
      ! SUBROUTINE ARGUMENT DEFINITIONS:
      integer :: nverts       ! Number of vertices in the surface
-     type(vector),target :: verts(0:nverts-1)  ! Structure of the surface
+     type(vector),target :: verts(0:)  ! Structure of the surface !Objexx:Arg Changed verts(0:nverts-1) to assumed shape for compatibility with passed allocatable
      type(planeeq) :: plane  ! Equation of plane from inputs
      logical :: error ! returns true for degenerate surface
 
@@ -1110,7 +1110,7 @@ CONTAINS
      real(r64) dist
 
      IsCoPlanar=.true.
-     MaxDist=0.0
+     MaxDist=0.0d0
      ErrorVertex=0
 
      ! Use first three to determine plane
@@ -1702,7 +1702,7 @@ subroutine generate_ears(nvert, vertex, ears, nears, r_vertices, nrverts, c_vert
   ! initialize, always recalculate
   ears=0
   r_vertices=0
-  rangles=0.0
+  rangles=0.0d0
   nears=0
   nrverts=0
   c_vertices=0

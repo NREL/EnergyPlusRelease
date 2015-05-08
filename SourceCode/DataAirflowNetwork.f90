@@ -93,7 +93,7 @@ TYPE AirflowNetworkSimuProp ! Basic parameters for AirflowNetwork simulation
  REAL(r64)     :: RelTol = 1.0d-5        ! Relative airflow convergence
  REAL(r64)     :: AbsTol = 1.0d-5        ! Absolute airflow convergence
  REAL(r64)     :: ConvLimit = -0.5d0       ! Convergence acceleration limit
- REAL(r64)     :: MaxPressure = 500      ! Maximum pressure change in an element [Pa]
+ REAL(r64)     :: MaxPressure = 500.0d0      ! Maximum pressure change in an element [Pa]
  REAL(r64)     :: Azimuth = 0.0d0          ! Azimuth Angle of Long Axis of Building, not used at WPCCntr = "INPUT"
  REAL(r64)     :: AspectRatio = 1.0d0      ! Ratio of Building Width Along Short Axis to Width Along Long Axis
  INTEGER  :: NWind = 0              ! Number of wind directions
@@ -103,7 +103,7 @@ TYPE AirflowNetworkSimuProp ! Basic parameters for AirflowNetwork simulation
  INTEGER  :: OpenFactorErrCount =0   ! Large opening error count at Open factor > 1.0
  INTEGER  :: OpenFactorErrIndex =0   ! Large opening error error index at Open factor > 1.0
  CHARACTER(len=32)  :: InitType = 'ZeroNodePressures' ! Initialization flag type:
-                                                        ! "ZERO NODE PRESSURES", or "Linear Initialization Method"
+                                                        ! "ZeroNodePressures", or "LinearInitializationMethod"
 END TYPE AirflowNetworkSimuProp
 
 TYPE MultizoneZoneProp ! Zone information
@@ -143,7 +143,7 @@ TYPE MultizoneSurfaceProp ! Surface information
  REAL(r64)     :: Height =     0.0d0        ! Surface Height
  REAL(r64)     :: Width =      0.0d0        ! Surface width
  REAL(r64)     :: CHeight =    0.0d0        ! Surface central height in z direction
- CHARACTER(len=20)  :: VentControl='ZoneLevel' ! Ventilation Control Mode: TEMPERATURE, ENTHALPIC, CONSTANT, ZONELEVEL or NOVENT
+ CHARACTER(len=20)  :: VentControl='ZONELEVEL' ! Ventilation Control Mode: TEMPERATURE, ENTHALPIC, CONSTANT, ZONELEVEL or NOVENT
  CHARACTER(len=MaxNameLength)  :: VentSchName=' ' ! ! Name of ventilation temperature control schedule
  REAL(r64)     :: ModulateFactor  =0.0d0    ! Limit Value on Multiplier for Modulating Venting Open Factor
  REAL(r64)     :: LowValueTemp = 0.0d0      ! Lower Value on Inside/Outside Temperature Difference for
@@ -175,7 +175,7 @@ TYPE MultizoneCompDetOpeningProp ! Large detailed opening component
  CHARACTER(len=MaxNameLength)  :: Name = ' ' ! Name of large detailed opening component
  REAL(r64)     :: FlowCoef    = 0.0d0             ! Air Mass Flow Coefficient When Window or Door Is Closed
  REAL(r64)     :: FlowExpo    = 0.0d0             ! Air Mass Flow exponent When Window or Door Is Closed
- CHARACTER(len=32) :: TypeName = 'NonPivoted' ! Name of Large vertical opening type
+ CHARACTER(len=32) :: TypeName = 'NONPIVOTED' ! Name of Large vertical opening type
  INTEGER  :: LVOType     = 0               ! Large vertical opening type number
  REAL(r64)     :: LVOValue    = 0.0d0             ! Extra crack length for LVO type 1 with multiple openable parts,
                                            ! or Height of pivoting axis for LVO type 2
@@ -524,9 +524,30 @@ TYPE(AirflowNetworkLinkReportData), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkL
 TYPE(AirflowNetworkNodeReportData), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkNodeReport
 TYPE(AirflowNetworkLinkReportData), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkLinkReport1
 
-TYPE (AirflowNetworkSimuProp):: AirflowNetworkSimu=AirflowNetworkSimuProp(' ','NoMultizoneOrDistribution',  &
-                  'Input',0,' ',' ',' ',500,0,1.0d-5,1.0d-5,-0.5,500.,0.0,1.0,0,1.0d-4,  &
-                  0,0,0,0,'ZeroNodePressures')
+TYPE (AirflowNetworkSimuProp), SAVE ::   &
+   AirflowNetworkSimu=AirflowNetworkSimuProp  &
+   (' ',  &       ! unique object name
+    'NoMultizoneOrDistribution', & ! AirflowNetwork control
+    'Input',  &   ! Wind pressure coefficient input control
+    0,  &         ! Integer equivalent for WPCCntr field
+    ' ',  &       ! CP Array name at WPCCntr = "INPUT"
+    ' ',  &       ! Building type
+    ' ',  &       ! Height Selection
+    500,  &       ! Maximum number of iteration
+    0,  &         ! Initialization flag
+    1.0d-5,  &    ! Relative airflow convergence
+    1.0d-5,  &    ! Absolute airflow convergence
+    -0.5d0,  &    ! Convergence acceleration limit
+    500.0d0, &    ! Maximum pressure change in an element [Pa]
+    0.0d0,  &     ! Azimuth Angle of Long Axis of Building
+    1.0d0,  &     ! Ratio of Building Width Along Short Axis to Width Along Long Axis
+    0,  &         ! Number of wind directions
+    1.0d-4,  &    ! Minimum pressure difference
+    0,  &         ! Exterior large opening error count during HVAC system operation
+    0,  &         ! Exterior large opening error index during HVAC system operation
+    0,  &         ! Large opening error count at Open factor > 1.0
+    0,  &         ! Large opening error error index at Open factor > 1.0
+    'ZeroNodePressures') ! Initialization flag type
 
 TYPE (AirflowNetworkNodeProp), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkNodeData
 TYPE (AirflowNetworkCompProp), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkCompData
@@ -598,11 +619,12 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: ANGC    ! Local zone air generic contami
 INTEGER :: AirflowNetworkNumOfExhFan = 0   ! Number of zone exhaust fans
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: AirflowNetworkZoneExhaustFan ! Logical to use zone exhaust fans
 LOGICAL :: AirflowNetworkFanActivated = .FALSE. ! Supply fan activation flag
+LOGICAL :: AirflowNetworkUnitarySystem = .FALSE. ! set to TRUE for unitary systems (to make answers equal, will remove eventually)
 ! Multispeed HP only
 INTEGER :: MultiSpeedHPIndicator     = 0   ! Indicator for multispeed heat pump use
 ! Addiitonal airflow needed for an VAV fan to compensate the leakage losses and supply pathway pressure losses [kg/s]
 REAL(r64) :: VAVTerminalRatio = 0.d0       ! The terminal flow ratio when a supply VAV fan reach its max flow rate
-LOGICAL :: VAVSystem = .FALSE.             ! This flag is used to represent a VAV system 
+LOGICAL :: VAVSystem = .FALSE.             ! This flag is used to represent a VAV system
 
 TYPE AiflowNetworkReportProp
  REAL(r64) :: MultiZoneInfiSenGainW =0.0d0

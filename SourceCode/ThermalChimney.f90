@@ -43,9 +43,9 @@ TYPE ThermalChimneyData
     CHARACTER(len=MaxNameLength) :: RealZoneName   =' '
     INTEGER :: SchedPtr                            =0
     CHARACTER(len=MaxNameLength) :: SchedName      =' '
-    REAL(r64)                   :: AbsorberWallWidth    =0.0
-    REAL(r64)                   :: AirOutletCrossArea   =0.0
-    REAL(r64)                    :: DischargeCoeff       =0.0
+    REAL(r64)                   :: AbsorberWallWidth    =0.0d0
+    REAL(r64)                   :: AirOutletCrossArea   =0.0d0
+    REAL(r64)                    :: DischargeCoeff       =0.0d0
     INTEGER                :: TotZoneToDistrib     =0
     INTEGER, ALLOCATABLE, DIMENSION(:) :: ZonePtr        !
     CHARACTER(len=MaxNameLength), &
@@ -56,16 +56,16 @@ TYPE ThermalChimneyData
 END TYPE ThermalChimneyData
 
 Type ThermChimZnReportVars
-  REAL(r64)    :: ThermalChimneyHeatLoss      =0.0 ! Heat Gain {Joules} due to ThermalChimney
-  REAL(r64)    :: ThermalChimneyHeatGain      =0.0 ! Heat Loss {Joules} due to ThermalChimney
-  REAL(r64)    :: ThermalChimneyVolume        =0.0 ! Volume of Air {m3} due to ThermalChimney
-  REAL(r64)    :: ThermalChimneyMass          =0.0 ! Mass of Air {kg} due to ThermalChimney
+  REAL(r64)    :: ThermalChimneyHeatLoss      =0.0d0 ! Heat Gain {Joules} due to ThermalChimney
+  REAL(r64)    :: ThermalChimneyHeatGain      =0.0d0 ! Heat Loss {Joules} due to ThermalChimney
+  REAL(r64)    :: ThermalChimneyVolume        =0.0d0 ! Volume of Air {m3} due to ThermalChimney
+  REAL(r64)    :: ThermalChimneyMass          =0.0d0 ! Mass of Air {kg} due to ThermalChimney
 END TYPE ThermChimZnReportVars
 
 Type ThermChimReportVars
-  REAL(r64)    :: OverallTCVolumeFlow        =0.0 ! Volume of Air {m3/s} due to ThermalChimney
-  REAL(r64)    :: OverallTCMassFlow          =0.0 ! Mass of Air {kg/s} due to ThermalChimney
-  REAL(r64)    :: OutletAirTempThermalChim   =0.0 ! Air Temp {C} of ThermalChimney
+  REAL(r64)    :: OverallTCVolumeFlow        =0.0d0 ! Volume of Air {m3/s} due to ThermalChimney
+  REAL(r64)    :: OverallTCMassFlow          =0.0d0 ! Mass of Air {kg/s} due to ThermalChimney
+  REAL(r64)    :: OutletAirTempThermalChim   =0.0d0 ! Air Temp {C} of ThermalChimney
 END TYPE ThermChimReportVars
 
 TYPE (ThermalChimneyData), ALLOCATABLE, DIMENSION(:) :: ThermalChimneySys
@@ -245,7 +245,8 @@ DO Loop=1, TotThermalChimney
       ErrorsFound = .TRUE.
     ELSEIF (.not. Zone(ThermalChimneySys(Loop)%RealZonePtr)%HasWindow) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid Zone')
-      CALL ShowContinueError('invalid - no window(s) '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'".')
+      CALL ShowContinueError('...invalid - no window(s) in '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'".')
+      CALL ShowContinueError('...thermal chimney zones must have window(s).')
       ErrorsFound = .TRUE.
     ENDIF
     ThermalChimneySys(Loop)%RealZoneName = cAlphaArgs(2)
@@ -263,22 +264,22 @@ DO Loop=1, TotThermalChimney
     END IF
 
     ThermalChimneySys(Loop)%AbsorberWallWidth = rNumericArgs(1)
-    IF (ThermalChimneySys(Loop)%AbsorberWallWidth < 0.0) THEN
+    IF (ThermalChimneySys(Loop)%AbsorberWallWidth < 0.0d0) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
            trim(cNumericFieldNames(1))//' must be >= 0, entered value=['//trim(RoundSigDigits(rNumericArgs(1),2))//'].')
       ErrorsFound = .TRUE.
     END IF
 
     ThermalChimneySys(Loop)%AirOutletCrossArea = rNumericArgs(2)
-    IF (ThermalChimneySys(Loop)%AirOutletCrossArea < 0.0) THEN
+    IF (ThermalChimneySys(Loop)%AirOutletCrossArea < 0.0d0) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
            trim(cNumericFieldNames(2))//' must be >= 0, entered value=['//trim(RoundSigDigits(rNumericArgs(2),2))//'].')
       ErrorsFound = .TRUE.
     END IF
 
     ThermalChimneySys(Loop)%DischargeCoeff = rNumericArgs(3)
-    IF ((ThermalChimneySys(Loop)%DischargeCoeff <= 0.0) .OR. &
-        (ThermalChimneySys(Loop)%DischargeCoeff >  1.0)) THEN
+    IF ((ThermalChimneySys(Loop)%DischargeCoeff <= 0.0d0) .OR. &
+        (ThermalChimneySys(Loop)%DischargeCoeff >  1.0d0)) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
            trim(cNumericFieldNames(3))//' must be > 0 and <=1.0, entered value=['//trim(RoundSigDigits(rNumericArgs(3),2))//'].')
       ErrorsFound = .TRUE.
@@ -291,7 +292,7 @@ DO Loop=1, TotThermalChimney
     ALLOCATE(ThermalChimneySys(Loop)%RatioThermChimAirFlow(ThermalChimneySys(Loop)%TotZoneToDistrib))
     ALLOCATE(ThermalChimneySys(Loop)%EachAirInletCrossArea(ThermalChimneySys(Loop)%TotZoneToDistrib))
 
-    AllRatiosSummed = 0.0
+    AllRatiosSummed = 0.0d0
     DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
       ThermalChimneySys(Loop)%ZoneName(TCZoneNum)  = cAlphaArgs(TCZoneNum+3)
       ThermalChimneySys(Loop)%ZonePtr(TCZoneNum)   = FindIteminList(cAlphaArgs(TCZoneNum+3),Zone%Name,NumOfZones)
@@ -313,22 +314,22 @@ DO Loop=1, TotThermalChimney
         ErrorsFound=.true.
       END IF
 
-      IF (ThermalChimneySys(Loop)%DistanceThermChimInlet(TCZoneNum) < 0.0) THEN
+      IF (ThermalChimneySys(Loop)%DistanceThermChimInlet(TCZoneNum) < 0.0d0) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
               trim(cNumericFieldNames(3*TCZoneNum+1))//' must be >= 0, entered value=['//  &
               trim(RoundSigDigits(rNumericArgs(3*TCZoneNum+1),2))//'].')
         ErrorsFound = .TRUE.
       END IF
 
-      IF ((ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum) <= 0.0) .OR. &
-          (ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum) >  1.0)) THEN
+      IF ((ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum) <= 0.0d0) .OR. &
+          (ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum) >  1.0d0)) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
                 trim(cNumericFieldNames(3*TCZoneNum+2))//' must be > 0 and <=1.0, entered value=['//  &
                 trim(RoundSigDigits(rNumericArgs(3*TCZoneNum+2),2))//'].')
         ErrorsFound = .TRUE.
       END IF
 
-      IF (ThermalChimneySys(Loop)%EachAirInletCrossArea(TCZoneNum) < 0.0) THEN
+      IF (ThermalChimneySys(Loop)%EachAirInletCrossArea(TCZoneNum) < 0.0d0) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
               trim(cNumericFieldNames(3*TCZoneNum+3))//' must be >= 0, entered value=['//  &
               trim(RoundSigDigits(rNumericArgs(3*TCZoneNum+3),2))//'].')
@@ -340,7 +341,7 @@ DO Loop=1, TotThermalChimney
     END DO  ! DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
 
           ! Error trap if the sum of fractions is not equal to 1.0
-    IF (ABS(AllRatiosSummed-1.0) > FlowFractionTolerance) THEN
+    IF (ABS(AllRatiosSummed-1.0d0) > FlowFractionTolerance) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
                 'sum of fractions, must be =1.0, entered value (summed from entries)=['//  &
                 trim(RoundSigDigits(AllRatiosSummed,4))//'].')
@@ -567,8 +568,8 @@ DO Loop=1, TotThermalChimney
   ! start off with first surface in zone widths
   majorW = Surface(Zone(ZoneNum)%SurfaceFirst)%Width
   minorW = majorW
-  TempmajorW = 0.0
-  TemporaryWallSurfTemp = -10000.0
+  TempmajorW = 0.0d0
+  TemporaryWallSurfTemp = -10000.0d0
 
 
   ! determine major width and minor width
@@ -621,20 +622,20 @@ DO Loop=1, TotThermalChimney
   AirOutletCrossAreaTC           = ThermalChimneySys(Loop)%AirOutletCrossArea
   DischargeCoeffTC               = ThermalChimneySys(Loop)%DischargeCoeff
 
-  AirInletCrossArea = 0.0
+  AirInletCrossArea = 0.0d0
   DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
      AirInletCrossArea = AirInletCrossArea + ThermalChimneySys(Loop)%EachAirInletCrossArea(TCZoneNum)
   END DO
 
-  RoomAirTemp = 0.0
+  RoomAirTemp = 0.0d0
   DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
      TCZoneNumCounter = ThermalChimneySys(Loop)%ZonePtr(TCZoneNum)
      RoomAirTemp = RoomAirTemp + ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum) * MAT(TCZoneNumCounter)
   END DO
   RoomAirTemp = RoomAirTemp + KelvinConv
 
-  Process1 = 0.0
-  Process2 = 0.0
+  Process1 = 0.0d0
+  Process2 = 0.0d0
   DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
      TCZoneNumCounter = ThermalChimneySys(Loop)%ZonePtr(TCZoneNum)
      Process1 = Process1 + PsyHFnTdbW(MAT(TCZoneNumCounter),ZoneAirHumRat(TCZoneNumCounter)) *   &
@@ -676,7 +677,7 @@ DO Loop=1, TotThermalChimney
 
    DO ThermChimLoop1=1, NTC
     DO ThermChimLoop2=1, NTC
-     EquaCoef(ThermChimLoop1, ThermChimLoop2)=0.
+     EquaCoef(ThermChimLoop1, ThermChimLoop2)=0.0d0
     END DO
    END DO
 
@@ -692,7 +693,7 @@ DO Loop=1, TotThermalChimney
 
     AirRelativeCrossArea = AirOutletCrossAreaTC / AirInletCrossArea
     IF (ThermChimSubTemp(NTC) <= RoomAirTemp) THEN
-       TempTCVolumeAirFlowRate(IterationLoop) = 0.
+       TempTCVolumeAirFlowRate(IterationLoop) = 0.0d0
     ELSE
        TempTCVolumeAirFlowRate(IterationLoop) = DischargeCoeffTC * AirOutletCrossAreaTC *    &
                             ((  2.d0*((ThermChimSubTemp(NTC)-RoomAirTemp)/RoomAirTemp)  &
@@ -712,7 +713,7 @@ DO Loop=1, TotThermalChimney
 
    DO ThermChimLoop1=1, NTC
     DO ThermChimLoop2=1, NTC
-     EquaCoef(ThermChimLoop1, ThermChimLoop2)=0.
+     EquaCoef(ThermChimLoop1, ThermChimLoop2)=0.0d0
     END DO
    END DO
 
@@ -728,7 +729,7 @@ DO Loop=1, TotThermalChimney
 
     AirRelativeCrossArea = AirOutletCrossAreaTC / AirInletCrossArea
     IF (ThermChimSubTemp(NTC) <= RoomAirTemp) THEN
-       TCVolumeAirFlowRate = 0.
+       TCVolumeAirFlowRate = 0.0d0
     ELSE
        TCVolumeAirFlowRate = DischargeCoeffTC * AirOutletCrossAreaTC *    &
                             ((  2.d0*((ThermChimSubTemp(NTC)-RoomAirTemp)/RoomAirTemp)  &
@@ -742,16 +743,16 @@ DO Loop=1, TotThermalChimney
      CpAir            = PsyCpAirFnWTdb(ZoneAirHumRat(TCZoneNumCounter),MAT(TCZoneNumCounter))
      MCPThermChim(TCZoneNumCounter) = TCVolumeAirFlowRate * AirDensity * CpAir *   &
                                       ThermalChimneySys(Loop)%RatioThermChimAirFlow(TCZoneNum)
-     IF (MCPThermChim(TCZoneNumCounter) <= 0.) THEN
-        MCPThermChim(TCZoneNumCounter) = 0.
+     IF (MCPThermChim(TCZoneNumCounter) <= 0.0d0) THEN
+        MCPThermChim(TCZoneNumCounter) = 0.0d0
      END IF
      ThermChimAMFL(TCZoneNumCounter) = MCPThermChim(TCZoneNumCounter) / CpAir
      MCPTThermChim(TCZoneNumCounter) = MCPThermChim(TCZoneNumCounter) * Zone(TCZoneNumCounter)%OutDryBulbTemp
   END DO
 
   MCPThermChim(ZoneNum) = TCVolumeAirFlowRate * AirDensity * CpAir
-  IF (MCPThermChim(ZoneNum) <= 0.) THEN
-     MCPThermChim(ZoneNum) = 0.
+  IF (MCPThermChim(ZoneNum) <= 0.0d0) THEN
+     MCPThermChim(ZoneNum) = 0.0d0
   END IF
   ThermChimAMFL(ZoneNum) = MCPThermChim(ZoneNum) / CpAir
   MCPTThermChim(ZoneNum) = MCPThermChim(ZoneNum) * Zone(ZoneNum)%OutDryBulbTemp
@@ -763,18 +764,18 @@ DO Loop=1, TotThermalChimney
      END IF
   ThermalChimneyReport(Loop)%OutletAirTempThermalChim = ThermChimSubTemp(NTC) - KelvinConv
 
-  IF (GetCurrentScheduleValue(ThermalChimneySys(Loop)%SchedPtr) <= 0.) THEN
+  IF (GetCurrentScheduleValue(ThermalChimneySys(Loop)%SchedPtr) <= 0.0d0) THEN
      DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
         TCZoneNumCounter = ThermalChimneySys(Loop)%ZonePtr(TCZoneNum)
-        MCPThermChim(TCZoneNumCounter) = 0.
-        ThermChimAMFL(TCZoneNumCounter) = 0.
-        MCPTThermChim(TCZoneNumCounter) = 0.
+        MCPThermChim(TCZoneNumCounter) = 0.0d0
+        ThermChimAMFL(TCZoneNumCounter) = 0.0d0
+        MCPTThermChim(TCZoneNumCounter) = 0.0d0
      END DO
-     MCPThermChim(ZoneNum) = 0.
-     ThermChimAMFL(ZoneNum) = 0.
-     MCPTThermChim(ZoneNum) = 0.
-     ThermalChimneyReport(Loop)%OverallTCVolumeFlow = 0.
-     ThermalChimneyReport(Loop)%OverallTCMassFlow = 0.
+     MCPThermChim(ZoneNum) = 0.0d0
+     ThermChimAMFL(ZoneNum) = 0.0d0
+     MCPTThermChim(ZoneNum) = 0.0d0
+     ThermalChimneyReport(Loop)%OverallTCVolumeFlow = 0.0d0
+     ThermalChimneyReport(Loop)%OverallTCMassFlow = 0.0d0
      ThermalChimneyReport(Loop)%OutletAirTempThermalChim = MAT(ZoneNum)
   END IF
 
@@ -835,20 +836,20 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
     ZnRptThermChim(ZoneLoop)%ThermalChimneyVolume   = (MCPThermChim(ZoneLoop)/CpAir/AirDensity)*TSMult
     ZnRptThermChim(ZoneLoop)%ThermalChimneyMass     = (MCPThermChim(ZoneLoop)/CpAir)*TSMult
 
-    ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatLoss = 0.0
-    ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatGain = 0.0
+    ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatLoss = 0.0d0
+    ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatGain = 0.0d0
 
       IF (ZT(ZoneLoop) > Zone(ZoneLoop)%OutDryBulbTemp) THEN
 
         ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatLoss = MCPThermChim(ZoneLoop)*(ZT(ZoneLoop)-Zone(ZoneLoop)%OutDryBulbTemp)* &
                                          TSMult
-        ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatGain=0.0
+        ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatGain=0.0d0
 
       ELSE IF (ZT(ZoneLoop) <= Zone(ZoneLoop)%OutDryBulbTemp) THEN
 
         ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatGain = MCPThermChim(ZoneLoop)*(Zone(ZoneLoop)%OutDryBulbTemp-ZT(ZoneLoop))* &
                                          TSMult
-        ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatLoss =0.0
+        ZnRptThermChim(ZoneLoop)%ThermalChimneyHeatLoss =0.0d0
 
       END IF
 
@@ -938,7 +939,7 @@ END SUBROUTINE ReportThermalChimney
 
   ThermChimSubTemp(NTC)=EquaConst(NTC)/EquaCoef(NTC, NTC)
   DO ThermChimLoop2=NTC-1, 1, -1
-   ThermalChimSum=0
+   ThermalChimSum=0.0d0
    DO ThermChimLoop3=ThermChimLoop2+1, NTC
     ThermalChimSum=ThermalChimSum+EquaCoef(ThermChimLoop2, ThermChimLoop3)*ThermChimSubTemp(ThermChimLoop3)
    END DO

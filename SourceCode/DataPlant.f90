@@ -51,7 +51,7 @@ INTEGER, PARAMETER :: WetBulbTDBOpSchemeType             =  8         ! Scheme T
 INTEGER, PARAMETER :: DewpointTDBOpSchemeType            =  9         ! Scheme Type for Wet bulb range based Operation
 INTEGER, PARAMETER :: CompSetPtBasedSchemeType           = 10         !*Sankar Temp Based Control
 INTEGER, PARAMETER :: UncontrolledOpSchemeType           = 11         ! Scheme Type for Uncontrolled Operation
-!INTEGER, PARAMETER :: EMSOpSchemeType                    = 12         ! Scheme Type for EMS based operation
+INTEGER, PARAMETER :: EMSOpSchemeType                    = 12         ! Scheme Type for EMS based operation user Define scheme
 INTEGER, PARAMETER :: PumpOpSchemeType                   = 13         ! Not really an opscheme, just a placeholder
 INTEGER, PARAMETER :: DemandOpSchemeType                 = 14         ! Plcaeholder for demand side equipment such as coils
 INTEGER, PARAMETER :: FreeRejectionOpSchemeType          = 15         ! Scheme Type for waterside economizers and the like
@@ -176,7 +176,7 @@ CHARACTER(len=MaxNameLength), PARAMETER    :: PressureSimType(4)      = (/'NONE 
                                                                           'LOOPFLOWCORRECTION ',    &
                                                                           'PRESSURESIMULATION '/)
 ! Parameters for Component/Equipment Types  (ref: TypeOf in CompData)
-INTEGER, PARAMETER :: NumSimPlantEquipTypes=86
+INTEGER, PARAMETER :: NumSimPlantEquipTypes=89
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: SimPlantEquipTypes=  &
       (/'BOILER:HOTWATER                                         ', & !01
         'BOILER:STEAM                                            ', & !02
@@ -263,7 +263,11 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: SimPlantEquipTy
         'GROUNDHEATEXCHANGER:HORIZONTALTRENCH                    ', & !83
         'HEATEXCHANGER:FLUIDTOFLUID                              ', & !84
         'PLANTCOMPONENT:TEMPERATURESOURCE                        ', & !85
-        'CENTRALHEATPUMPSYSTEM                                   '/)  !86
+        'CENTRALHEATPUMPSYSTEM                                   ', & !86
+        'AIRLOOPHVAC:UNITARYSYSTEM                               ', & !87
+        'COIL:COOLING:DX:SINGLESPEED:THERMALSTORAGE              ', & !88
+        'COOLINGTOWER:VARIABLESPEED:MERKEL                       '/)  !89
+
 
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ccSimPlantEquipTypes=  &
       (/'Boiler:HotWater                                         ', & !01
@@ -351,7 +355,10 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ccSimPlantEquip
         'GroundHeatExchanger:HorizontalTrench                    ', & !83
         'HeatExchanger:FluidToFluid                              ', & !84
         'PlantComponent:TemperatureSource                        ', & !85
-        'CentralHeatPumpSystem                                   '/)  !86
+        'CentralHeatPumpSystem                                   ', & !86
+        'AirloopHVAC:UnitarySystem                               ', & !87
+        'Coil:Cooling:DX:SingleSpeed:ThermalStorage              ', & !88
+        'CoolingTower:VariableSpeed:Merkel                       '/)  !89
 
 INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
  (/LoopType_Plant,     &     ! 01  BOILER:HOTWATER
@@ -440,7 +447,10 @@ INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
    LoopType_Both,      &     ! 83  GroundHeatExchanger:HorizontalTrench
    LoopType_Both,      &     ! 84  HeatExchanger:FluidToFluid
    LoopType_Both,      &     ! 85  PlantComponent:TemperatureSource
-   LoopType_Plant/)          ! 86  PlantCentralGroundSourceWrapper
+   LoopType_Plant,     &     ! 86  PlantCentralGroundSourceWrapper
+   LoopType_Plant,     &     ! 87  AirloopHVAC:UnitarySystem
+   LoopType_Both,      &     ! 88  Coil:Cooling:DX:SingleSpeed:ThermalStorage
+   LoopType_Both/)           ! 89  CoolingTower:VariableSpeed:Merkel 
 
 INTEGER, PARAMETER :: TypeOf_Other                       = -1
 INTEGER, PARAMETER :: TypeOf_Boiler_Simple               =  1
@@ -529,6 +539,9 @@ INTEGER, PARAMETER :: TypeOf_GrndHtExchgHorizTrench      = 83
 INTEGER, PARAMETER :: TypeOf_FluidToFluidPlantHtExchg    = 84
 INTEGER, PARAMETER :: TypeOf_WaterSource                 = 85
 INTEGER, PARAMETER :: TypeOf_CentralGroundSourceHeatPump = 86
+INTEGER, PARAMETER :: TypeOf_UnitarySystemRecovery       = 87
+INTEGER, PARAMETER :: TypeOf_PackagedTESCoolingCoil      = 88
+INTEGER, PARAMETER :: TypeOf_CoolingTower_VarSpdMerkel   = 89
 
 ! Parameters for General Equipment Types
 INTEGER, PARAMETER :: NumGeneralEquipTypes               = 23
@@ -582,7 +595,7 @@ INTEGER, PARAMETER :: GenEquipTypes_Refrigeration        = 21
 INTEGER, PARAMETER :: GenEquipTypes_PlantComponent       = 22
 INTEGER, PARAMETER :: GenEquipTypes_CentralHeatPumpSystem= 23
 
-CHARACTER(len=*), PARAMETER, DIMENSION (0:11) :: OpSchemeTypes = &
+CHARACTER(len=*), PARAMETER, DIMENSION (0:12) :: OpSchemeTypes = &
                    (/'Load Range Based Operation                       ',   &  ! long since Deprecated, remove?
                      'PLANTEQUIPMENTOPERATION:HEATINGLOAD              ',   &
                      'PLANTEQUIPMENTOPERATION:COOLINGLOAD              ',   &
@@ -594,6 +607,7 @@ CHARACTER(len=*), PARAMETER, DIMENSION (0:11) :: OpSchemeTypes = &
                      'PLANTEQUIPMENTOPERATION:OUTDOORWETBULBDIFFERENCE ',   &
                      'PLANTEQUIPMENTOPERATION:OUTDOORDEWPOINTDIFFERENCE',   &
                      'PLANTEQUIPMENTOPERATION:COMPONENTSETPOINT        ',   &
+                     'PLANTEQUIPMENTOPERATION:USERDEFINED              ',   &
                      'PLANTEQUIPMENTOPERATION:UNCONTROLLED             '/)
 
   ! DERIVED TYPE DEFINITIONS:
@@ -690,15 +704,15 @@ TYPE CompData
   LOGICAL                          :: EMSLoadOverrideOn     = .FALSE. ! EMS is calling to override load dispatched to component
   REAL(r64)                        :: EMSLoadOverrideValue  = 0.0d0   ! EMS value to use for load when overridden [W] always positive.
   INTEGER                          :: HowLoadServed         = HowMet_Unknown ! nature of component in terms of how it can meet load
-  REAL(r64)                        :: MinOutletTemp         = 0.0     ! Component exit lower limit temperature
-  REAL(r64)                        :: MaxOutletTemp         = 0.0     ! Component exit upper limit temperature
+  REAL(r64)                        :: MinOutletTemp         = 0.0d0     ! Component exit lower limit temperature
+  REAL(r64)                        :: MaxOutletTemp         = 0.0d0     ! Component exit upper limit temperature
   LOGICAL                          :: FreeCoolCntrlShutDown = .FALSE. ! true if component was shut down because of free cooling
   REAL(r64)                        :: FreeCoolCntrlMinCntrlTemp   = 0.D0  ! current control temp value for free cooling controls
   INTEGER                          :: FreeCoolCntrlMode     = 0 ! type of sensor used for free cooling controls
   INTEGER                          :: FreeCoolCntrlNodeNum  = 0 ! chiller condenser inlet node number for free cooling controls
   INTEGER                          :: IndexInLoopSidePumps  = 0       ! If I'm a pump, this tells my index in PL(:)%LS(:)%Pumps
-  REAL(r64)                        :: TempDesCondIn         = 0
-  REAL(r64)                        :: TempDesEvapOut        = 0
+  REAL(r64)                        :: TempDesCondIn         = 0.0d0
+  REAL(r64)                        :: TempDesEvapOut        = 0.0d0
 END TYPE CompData
 
 TYPE BranchData
@@ -744,6 +758,8 @@ TYPE EquipListCompData
   INTEGER                          :: DemandNodeNum        ! COMP SETPOINT CTRL ONLY--The 'keyWord' identifying each item in list
   CHARACTER(len=MaxNameLength)     :: SetPointNodeName   = ' '     ! COMP SETPOINT CTRL ONLY--The name of each item in the list
   INTEGER                          :: SetpointNodeNum      ! COMP SETPOINT CTRL ONLY--The 'keyWord' identifying each item in list
+  REAL(r64)                        :: EMSIntVarRemainingLoadValue = 0.d0 ! EMS internal variable remaining load, neg cooling [W]
+  REAL(r64)                        :: EMSActuatorDispatchedLoadValue = 0.d0 ! EMS actuator for dispatched load, neg= cooling [W]
 END TYPE EquipListCompData
 
 TYPE EquipOpList                          ! DSU
@@ -769,6 +785,10 @@ TYPE OperationData                          ! DSU
   INTEGER                          :: EquipListNumForLastStage = 0    ! points to the equipment list with the highest upper limit
   CHARACTER(len=MaxNameLength)     :: ReferenceNodeName     = ' '     ! DELTA CTRL ONLY--for calculation of delta Temp
   INTEGER                          :: ReferenceNodeNumber              ! DELTA CTRL ONLY--for calculation of delta Temp
+  INTEGER    :: ErlSimProgramMngr = 0   ! EMS:ProgramManager to always run when this model is called
+  INTEGER    :: ErlInitProgramMngr= 0   ! EMS:ProgramManager to run when this model is initialized and setup
+  REAL(r64)  :: EMSIntVarLoopDemandRate = 0.d0 ! EMS internal variable for loop-level demand rate, neg cooling [W]
+  LOGICAL    :: MyEnvrnFlag = .TRUE.
 END TYPE OperationData                        ! DSU
 
 TYPE ConnectedLoopData                        ! DSU
@@ -1152,7 +1172,7 @@ INTEGER                            :: TotNumLoops           = 0       ! number o
 INTEGER                            :: TotNumHalfLoops       = 0       ! number of half loops (2 * TotNumLoops)
 LOGICAL                            :: PlantSizeNotComplete  = .TRUE.
 LOGICAL                            :: PlantSizesOkayToFinalize = .FALSE. ! true if plant sizing is finishing and can save results
-
+LOGICAL                            :: AnyEMSPlantOpSchemesInModel = .FALSE.
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: EconBranchNum                   ! Branch num on which economizer is placed
 INTEGER, ALLOCATABLE, DIMENSION(:) :: EconCompNum                     ! Component num of economizer in the economizer branch

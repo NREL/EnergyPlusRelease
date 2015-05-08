@@ -36,8 +36,8 @@ INTEGER, PARAMETER :: iPushSystemTimestepHistories  = 6
 
 TYPE :: ZoneComfortControlsFangerData
   INTEGER :: FangerType                                =0   ! Index for Fanger type
-  REAL(r64)    :: LowPMV                               =0.0 ! Low PMV value
-  REAL(r64)    :: HighPMV                              =0.0 ! High PMV Value
+  REAL(r64)    :: LowPMV                               =0.0d0 ! Low PMV value
+  REAL(r64)    :: HighPMV                              =0.0d0 ! High PMV Value
   INTEGER :: DualPMVErrCount                           =0   ! Dual PMV setpoint error count
   INTEGER :: DualPMVErrIndex                           =0   ! Dual PMV setpoint error index
 END TYPE ZoneComfortControlsFangerData
@@ -157,8 +157,7 @@ REAL(r64), Allocatable, Dimension(:)   :: SumHmARaW !SUM OF ZONE AREA*Moist CONV
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: TempZoneThermostatSetpoint
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneThermostatSetPointHi
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZoneThermostatSetPointLo
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: CoolingSetPointOffset  !PH 3/2/04
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: HeatingSetPointOffset  !PH 3/2/04
+
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: LoadCorrectionFactor  !PH 3/3/04
 
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: CrossMixingFlag ! TRUE when a zone is mixing

@@ -45,20 +45,20 @@ TYPE AirLoopCompData  !data for an individual component
   INTEGER                        :: NumMeteredVars = 0
   INTEGER                        :: NumSubcomps    = 0
   INTEGER                        :: EnergyTransComp= 0   !1=EnergyTransfer, 0=No EnergyTransfer  Flag needed for reporting
-  REAL(r64)                      :: Capacity =0.0 ! ventilation load factor
+  REAL(r64)                      :: Capacity =0.0d0 ! ventilation load factor
   INTEGER                        :: OpMode = 0
-  REAL(r64)                      :: TotPlantSupplyElec    =0.0
-  REAL(r64)                      :: PlantSupplyElecEff    =0.0
-  REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0
-  REAL(r64)                      :: TotPlantSupplyGas     =0.0
-  REAL(r64)                      :: PlantSupplyGasEff     =0.0
-  REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0
-  REAL(r64)                      :: TotPlantSupplyPurch   =0.0
-  REAL(r64)                      :: PlantSupplyPurchEff   =0.0
-  REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0
-  REAL(r64)                      :: TotPlantSupplyOther   =0.0
-  REAL(r64)                      :: PlantSupplyOtherEff   =0.0
-  REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0
+  REAL(r64)                      :: TotPlantSupplyElec    =0.0d0
+  REAL(r64)                      :: PlantSupplyElecEff    =0.0d0
+  REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0d0
+  REAL(r64)                      :: TotPlantSupplyGas     =0.0d0
+  REAL(r64)                      :: PlantSupplyGasEff     =0.0d0
+  REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0d0
+  REAL(r64)                      :: TotPlantSupplyPurch   =0.0d0
+  REAL(r64)                      :: PlantSupplyPurchEff   =0.0d0
+  REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0d0
+  REAL(r64)                      :: TotPlantSupplyOther   =0.0d0
+  REAL(r64)                      :: PlantSupplyOtherEff   =0.0d0
+  REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0d0
   INTEGER                        :: AirSysToPlantPtr      = 0 !=0 No plant loop connection, >0 index to AirSysToPlant array
   TYPE(MeterData),ALLOCATABLE, &
                    DIMENSION(:)  :: MeteredVar    !Index of energy output report data
@@ -69,10 +69,10 @@ END TYPE AirLoopCompData
 TYPE AirLoopBranchData ! a branch is a sequence of components
   CHARACTER(len=MaxNameLength)   :: Name              =' ' ! Name of the branch
   CHARACTER(len=MaxNameLength)   :: ControlType       =' ' ! Control type for the branch (not used)
-  REAL(r64)                      :: MinVolFlowRate    =0.0 ! minimum flow rate for the branch (m3/s)
-  REAL(r64)                      :: MaxVolFlowRate    =0.0 ! maximum flow rate for the branch (m3/s)
-  REAL(r64)                      :: MinMassFlowRate   =0.0 ! minimum mass flow rate for the branch (kg/s)
-  REAL(r64)                      :: MaxMassFlowRate   =0.0 ! maximum mass flow rate for the branch (kg/s)
+  REAL(r64)                      :: MinVolFlowRate    =0.0d0 ! minimum flow rate for the branch (m3/s)
+  REAL(r64)                      :: MaxVolFlowRate    =0.0d0 ! maximum flow rate for the branch (m3/s)
+  REAL(r64)                      :: MinMassFlowRate   =0.0d0 ! minimum mass flow rate for the branch (kg/s)
+  REAL(r64)                      :: MaxMassFlowRate   =0.0d0 ! maximum mass flow rate for the branch (kg/s)
   INTEGER                        :: TotalComponents   =0   ! Total number of high level components on the branch
   INTEGER,ALLOCATABLE,DIMENSION(:) :: FirstCompIndex  ! Gives the component index in AllComp that corresponds to Comp
   INTEGER,ALLOCATABLE,DIMENSION(:) :: LastCompIndex   ! Gives comp index in AllComp that corresponds to last subcomponent
@@ -118,7 +118,7 @@ END TYPE AirLoopMixerData
 ! DefinePrimaryAirSystem contains the data for a primary air HVAC system
 TYPE :: DefinePrimaryAirSystem ! There is an array of these for each primary air system
   CHARACTER(len=MaxNameLength)                      :: Name =' '               ! name of the system
-  REAL(r64)                                         :: DesignVolFlowRate = 0.0 ! the design total supply air flow rate (m3/s)
+  REAL(r64)                                         :: DesignVolFlowRate = 0.0d0 ! the design total supply air flow rate (m3/s)
   INTEGER                                           :: NumControllers    = 0   ! number of controllers on this air path
   CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerName ! name of each controller on this system
   CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerType ! type of each controller on this system

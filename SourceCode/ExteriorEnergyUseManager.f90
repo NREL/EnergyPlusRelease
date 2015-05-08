@@ -57,29 +57,29 @@ INTEGER, PARAMETER, PUBLIC :: AstroClockOverride = 2 !exterior lights controlled
 TYPE, PUBLIC :: ExteriorLightUsage
   CHARACTER(len=MaxNameLength) :: Name = ' '             ! Descriptive name -- will show on reporting
   INTEGER                      :: SchedPtr = 0           ! Can be scheduled
-  REAL(r64)                    :: DesignLevel = 0.0      ! Consumption in Watts
-  REAL(r64)                    :: Power = 0.0            ! Power = DesignLevel * ScheduleValue
-  REAL(r64)                    :: CurrentUse = 0.0       ! Use for this time step
+  REAL(r64)                    :: DesignLevel = 0.0d0      ! Consumption in Watts
+  REAL(r64)                    :: Power = 0.0d0            ! Power = DesignLevel * ScheduleValue
+  REAL(r64)                    :: CurrentUse = 0.0d0       ! Use for this time step
   INTEGER                      :: ControlMode = 1        ! Control mode Schedule Only or Astronomical Clock plus schedule
 
   LOGICAL                      :: ManageDemand = .FALSE. ! Flag to indicate whether to use demand limiting
-  REAL(r64)                    :: DemandLimit = 0.0      ! Demand limit set by demand manager [W]
+  REAL(r64)                    :: DemandLimit = 0.0d0      ! Demand limit set by demand manager [W]
   LOGICAL                      :: PowerActuatorOn  = .FALSE.       ! EMS flag
   REAL(r64)                    :: PowerActuatorValue     ! EMS value
-  REAL(r64)                    :: SumConsumption = 0.0   ! sum of electric consumption [J] for reporting
-  REAL(r64)                    :: SumTimeNotZeroCons = 0.0 ! sum of time of positive electric consumption [hr]
+  REAL(r64)                    :: SumConsumption = 0.0d0   ! sum of electric consumption [J] for reporting
+  REAL(r64)                    :: SumTimeNotZeroCons = 0.0d0 ! sum of time of positive electric consumption [hr]
 END TYPE
 
 TYPE, PUBLIC :: ExteriorEquipmentUsage
   CHARACTER(len=MaxNameLength) :: Name = ' '             ! Descriptive name -- will show on reporting
   INTEGER                      :: FuelType = 0
   INTEGER                      :: SchedPtr = 0           ! Can be scheduled
-  REAL(r64)                    :: DesignLevel = 0.0      ! Design Consumption (Watts, except for Water Equipment)
-  REAL(r64)                    :: Power = 0.0            ! Power = DesignLevel * ScheduleValue
-  REAL(r64)                    :: CurrentUse = 0.0       ! Use for this time step
+  REAL(r64)                    :: DesignLevel = 0.0d0      ! Design Consumption (Watts, except for Water Equipment)
+  REAL(r64)                    :: Power = 0.0d0            ! Power = DesignLevel * ScheduleValue
+  REAL(r64)                    :: CurrentUse = 0.0d0       ! Use for this time step
 
   LOGICAL                      :: ManageDemand = .FALSE. ! Flag to indicate whether to use demand limiting
-  REAL(r64)                    :: DemandLimit = 0.0      ! Demand limit set by demand manager [W]
+  REAL(r64)                    :: DemandLimit = 0.0d0      ! Demand limit set by demand manager [W]
 END TYPE
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -204,7 +204,7 @@ SUBROUTINE GetExteriorEnergyUseInput
   LOGICAL :: IsBlank
   REAL(r64)    :: SchMax           ! Max value of schedule for item
   REAL(r64)    :: SchMin           ! Min value of schedule for item
-  REAL(r64)    :: sumDesignLevel = 0 !for predefined report of design level total
+  REAL(r64)    :: sumDesignLevel = 0.0d0 !for predefined report of design level total
 
 
   NumExteriorLights=GetNumObjectsFound('Exterior:Lights')
@@ -245,15 +245,15 @@ SUBROUTINE GetExteriorEnergyUseInput
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ExteriorLights(Item)%SchedPtr)
       SchMax=GetScheduleMaxValue(ExteriorLights(Item)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
              ' minimum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(2))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
              ' maximum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(2))//  &
@@ -379,15 +379,15 @@ SUBROUTINE GetExteriorEnergyUseInput
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ExteriorEquipment(NumExteriorEqs)%SchedPtr)
       SchMax=GetScheduleMaxValue(ExteriorEquipment(NumExteriorEqs)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
              ' minimum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
              ' maximum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(3))//  &
@@ -430,15 +430,15 @@ SUBROUTINE GetExteriorEnergyUseInput
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ExteriorEquipment(NumExteriorEqs)%SchedPtr)
       SchMax=GetScheduleMaxValue(ExteriorEquipment(NumExteriorEqs)%SchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
              ' minimum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
              ' maximum, is < 0.0 for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
           CALL ShowContinueError(TRIM(cAlphaArgs(3))//  &
@@ -645,8 +645,8 @@ SUBROUTINE ReportExteriorEnergyUse
     CASE (AstroClockOverride)
 
       IF (SunIsUP) THEN
-        ExteriorLights(Item)%Power = 0.0
-        ExteriorLights(Item)%CurrentUse = 0.0
+        ExteriorLights(Item)%Power = 0.0d0
+        ExteriorLights(Item)%CurrentUse = 0.0d0
       ELSE
         ExteriorLights(Item)%Power = ExteriorLights(Item)%DesignLevel * GetCurrentScheduleValue(ExteriorLights(Item)%SchedPtr)
         ExteriorLights(Item)%CurrentUse = ExteriorLights(Item)%Power * TimeStepZone * SecInHour

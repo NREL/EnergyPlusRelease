@@ -52,8 +52,8 @@ PUBLIC ! Everything private unless explicitly made public
 
 
     LOGICAL :: ManageDemand                          =.FALSE. ! Flag to indicate whether to use demand limiting
-    REAL(r64) :: HeatingResetLimit                       =0.0 ! Lowest heating setpoint that can be set by demand manager [C]
-    REAL(r64) :: CoolingResetLimit                       =0.0 ! Highest cooling setpoint that can be set by demand manager [C]
+    REAL(r64) :: HeatingResetLimit                       =0.0d0 ! Lowest heating setpoint that can be set by demand manager [C]
+    REAL(r64) :: CoolingResetLimit                       =0.0d0 ! Highest cooling setpoint that can be set by demand manager [C]
     LOGICAL   :: EMSOverrideHeatingSetpointOn          = .FALSE. ! EMS is calling to override heating setpoint
     REAL(r64) :: EMSOverrideHeatingSetpointValue       = 0.0D0   ! value EMS is directing to use for heating setpoint [C]
     LOGICAL   :: EMSOverrideCoolingSetpointOn          = .FALSE. ! EMS is calling to override cooling setpoint
@@ -62,7 +62,7 @@ PUBLIC ! Everything private unless explicitly made public
     LOGICAL :: OperativeTempControl                      = .FALSE.  ! flag to indicate whether control based on Operative Temp
     LOGICAL :: OpTempCntrlModeScheduled                  = .FALSE.  ! flag to indicate if radiative fraction is scheduled,
                                                                     ! else constant
-    REAL(r64) :: FixedRadiativeFraction                  = 0.0  ! weighting factor for mean radiant temp for Operative temperature
+    REAL(r64) :: FixedRadiativeFraction                  = 0.0d0  ! weighting factor for mean radiant temp for Operative temperature
     INTEGER :: OpTempRadiativeFractionSched              = 0 ! index of schedule for when fraction is scheduled
 
 
@@ -120,15 +120,15 @@ PUBLIC ! Everything private unless explicitly made public
 
 
     LOGICAL :: ManageDemand                          =.FALSE. ! Flag to indicate whether to use demand limiting
-    REAL(r64) :: HeatingResetLimit                            =0.0 ! Lowest heating setpoint that can be set by demand manager [C]
-    REAL(r64) :: CoolingResetLimit                            =0.0 ! Highest cooling setpoint that can be set by demand manager [C]
+    REAL(r64) :: HeatingResetLimit                            =0.0d0 ! Lowest heating setpoint that can be set by demand manager [C]
+    REAL(r64) :: CoolingResetLimit                            =0.0d0 ! Highest cooling setpoint that can be set by demand manager [C]
     LOGICAL   :: EMSOverrideHeatingSetpointOn          = .FALSE. ! EMS is calling to override heating setpoint
     REAL(r64) :: EMSOverrideHeatingSetpointValue       = 0.0D0   ! value EMS is directing to use for heating setpoint
     LOGICAL   :: EMSOverrideCoolingSetpointOn          = .FALSE. ! EMS is calling to override cooling setpoint
     REAL(r64) :: EMSOverrideCoolingSetpointValue       = 0.0D0   ! value EMS is directing to use for cooling setpoint
 
-    REAL(r64) :: TdbMaxSetPoint                              =50.0 ! Maximum dry-bulb temperature setpoint [C]
-    REAL(r64) :: TdbMinSetPoint                              = 0.0 ! Minimum dry-bulb temperature setpoint [C]
+    REAL(r64) :: TdbMaxSetPoint                              =50.0d0 ! Maximum dry-bulb temperature setpoint [C]
+    REAL(r64) :: TdbMinSetPoint                              = 0.0d0 ! Minimum dry-bulb temperature setpoint [C]
     CHARACTER(len=MaxNameLength) :: AverageMethodName ='PEOPLE AVERGAE' ! Averaging Method for Zones with Multiple People Objects
     CHARACTER(len=MaxNameLength) :: AverageObjectName =' '    ! Object Name for Specific Object Average
     INTEGER :: AverageMethodNum                         =0    ! Numerical value for averaging method
@@ -141,12 +141,33 @@ PUBLIC ! Everything private unless explicitly made public
     INTEGER :: TdbDualMinErrIndex =0                          ! Dual heating setpoint error index
   END TYPE ZoneComfortControls
 
+  TYPE :: ZoneSatgedControls
+    CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the thermostat
+    CHARACTER(len=MaxNameLength) :: ZoneName             =' ' ! Name of the zone
+    INTEGER                      :: ActualZoneNum        =0   ! Index number of zone
+    CHARACTER(len=MaxNameLength) :: HeatSetBaseSchedName =' ' ! Name of the schedule which provides zone heating setpoint base
+    INTEGER :: HSBchedIndex                              =0   ! Index for this schedule
+    CHARACTER(len=MaxNameLength) :: CoolSetBaseSchedName =' ' ! Name of the schedule which provides zone cooling setpoint base
+    INTEGER :: CSBchedIndex                              =0   ! Index for this schedule
+    INTEGER :: NumOfHeatStages                           =0   ! Number of heating stages
+    INTEGER :: NumOfCoolStages                           =0   ! Number of cooling stages
+    REAL(r64) :: HeatThroRange                           =0.0 ! Heating throttling tempeature range
+    REAL(r64) :: CoolThroRange                           =0.0 ! Cooling throttling tempeature range
+    REAL(r64), DIMENSION(:), ALLOCATABLE :: HeatTOffset       ! Heating temperature offset
+    REAL(r64), DIMENSION(:), ALLOCATABLE :: CoolTOffset       ! Cooling temperature offset
+    REAL(r64) :: HeatSetpoint                            =0.0 ! Heating throttling tempeature range
+    REAL(r64) :: CoolSetpoint                            =0.0 ! Cooling throttling tempeature range
+    INTEGER :: StageErrCount                             =0   ! Staged setpoint erro count
+    INTEGER :: StageErrIndex                             =0   ! Staged setpoint erro index
+  END TYPE ZoneSatgedControls
+  
   TYPE TStatObject
     CHARACTER(len=MaxNameLength) :: Name  =' '
     INTEGER :: ZoneOrZoneListPtr          =0
     INTEGER :: NumOfZones                 =0
     INTEGER :: TempControlledZoneStartPtr =0
     INTEGER :: ComfortControlledZoneStartPtr =0
+    INTEGER :: StageControlledZoneStartPtr =0
     LOGICAL :: ZoneListActive             =.false.
   END TYPE
 
@@ -157,6 +178,8 @@ PUBLIC ! Everything private unless explicitly made public
   TYPE (ZoneComfortControls), ALLOCATABLE, DIMENSION(:)  :: ComfortControlledZone
   TYPE (TStatObject), ALLOCATABLE, DIMENSION(:) :: TStatObjects
   TYPE (TStatObject), ALLOCATABLE, DIMENSION(:) :: ComfortTStatObjects
+  TYPE (TStatObject), ALLOCATABLE, DIMENSION(:) :: StagedTStatObjects
+  TYPE (ZoneSatgedControls), ALLOCATABLE, DIMENSION(:)     :: StageControlledZone
   INTEGER :: NumTempControlledZones  =0
   INTEGER :: NumHumidityControlZones =0
   INTEGER :: NumComfortControlledZones  =0
@@ -166,6 +189,9 @@ PUBLIC ! Everything private unless explicitly made public
   INTEGER :: NumTempAndHumidityControlledZones = 0   ! number of zones with over cool control
   LOGICAL :: AnyOpTempControl = .FALSE.              ! flag set true if any zones have op temp control
   LOGICAL :: AnyZoneTempAndHumidityControl = .FALSE. ! flag set true if any zones have over cool control
+  LOGICAL, ALLOCATABLE, DIMENSION(:)   :: StageZoneLogic      ! Logical array, A zone with staged thermostat = .true.
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: OccRoomTSetPointHeat ! occupied heating set point for optimum start period
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: OccRoomTSetPointCool ! occupied cooling set point for optimum start period
 
 !     NOTICE
 !

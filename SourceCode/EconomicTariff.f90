@@ -225,7 +225,7 @@ TYPE EconVarType
   INTEGER                        :: tariffIndx    = 0   !index of the tariff name in the tariff array
   INTEGER                        :: kindOfObj     = 0   !enumerated list for the kind of economics object
   INTEGER                        :: index         = 0   !pointer to item in specific array
-  REAL(r64),DIMENSION(MaxNumMonths)   :: values        = 0   !values
+  REAL(r64),DIMENSION(MaxNumMonths)   :: values        = 0.0d0   !values
   ! the following items are not part of the object description
   LOGICAL                        :: isArgument    = .FALSE. !flag if the variable is ever used as an argument (value needed)
   LOGICAL                        :: isAssigned    = .FALSE. !flag if the variable is ever assigned to
@@ -260,8 +260,8 @@ TYPE TariffType
   INTEGER                        :: kindElectricMtr = 0  !kind of electric meter - see enumerated list above, 0 is not electric
   INTEGER                        :: resourceNum     = 0  !based on list of DataGlobalConstants
   INTEGER                        :: convChoice      = 0  !enumerated choice index of the conversion factor
-  REAL(r64)                      :: energyConv      = 0  !energy conversion factor
-  REAL(r64)                      :: demandConv      = 0  !demand conversion factor
+  REAL(r64)                      :: energyConv      = 0.0d0  !energy conversion factor
+  REAL(r64)                      :: demandConv      = 0.0d0  !demand conversion factor
   CHARACTER(len=MaxNameLength)   :: periodSchedule  = '' !name of the period schedule (time of day)
   INTEGER                        :: periodSchIndex  = 0  !index to the period schedule
   CHARACTER(len=MaxNameLength)   :: seasonSchedule  = '' !name of the season schedule (winter/summer)
@@ -269,11 +269,11 @@ TYPE TariffType
   CHARACTER(len=MaxNameLength)   :: monthSchedule   = '' !name of month schedule (when months end)
   INTEGER                        :: monthSchIndex   = 0  !index to the month schedule
   INTEGER                        :: demandWindow    = 0  !enumerated list of the kind of demand window
-  REAL(r64)                      :: demWinTime      = 0  !length of time for the demand window
-  REAL(r64)                      :: monthChgVal     = 0  !monthly charge value
+  REAL(r64)                      :: demWinTime      = 0.0d0  !length of time for the demand window
+  REAL(r64)                      :: monthChgVal     = 0.0d0  !monthly charge value
   INTEGER                        :: monthChgPt      = 0  !pointer to a variable that contains the monthly charge
                                                          !if 0 then use monthChgVal
-  REAL(r64)                      :: minMonthChgVal  = 0  !minimum monthly charge value
+  REAL(r64)                      :: minMonthChgVal  = 0.0d0  !minimum monthly charge value
   INTEGER                        :: minMonthChgPt   = 0  !pointer to a variable that contains the minimum monthly charge
                                                          !if 0 then use minMonthChgVal
   CHARACTER(len=MaxNameLength)   :: chargeSchedule  = '' !name of the charge schedule (for real time pricing)
@@ -341,16 +341,16 @@ TYPE TariffType
   INTEGER                        :: nativeBelowCustomerBaseEnergy  = 0
 
   !arrays for holding gathered values
-  REAL(r64),DIMENSION(countPeriod,MaxNumMonths)  :: gatherEnergy   = 0
-  REAL(r64),DIMENSION(countPeriod,MaxNumMonths)  :: gatherDemand   = 0
-  REAL(r64)                                 :: collectTime    = 0
-  REAL(r64)                                 :: collectEnergy  = 0
+  REAL(r64),DIMENSION(countPeriod,MaxNumMonths)  :: gatherEnergy   = 0.0d0
+  REAL(r64),DIMENSION(countPeriod,MaxNumMonths)  :: gatherDemand   = 0.0d0
+  REAL(r64)                                 :: collectTime    = 0.0d0
+  REAL(r64)                                 :: collectEnergy  = 0.0d0
   !arryas for holding real time pricing gathered values
-  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPcost             = 0
-  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPaboveBaseCost    = 0
-  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPbelowBaseCost    = 0
-  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPaboveBaseEnergy  = 0
-  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPbelowBaseEnergy  = 0
+  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPcost             = 0.0d0
+  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPaboveBaseCost    = 0.0d0
+  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPbelowBaseCost    = 0.0d0
+  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPaboveBaseEnergy  = 0.0d0
+  REAL(r64),DIMENSION(MaxNumMonths)         :: RTPbelowBaseEnergy  = 0.0d0
 
   INTEGER,DIMENSION(MaxNumMonths)           :: seasonForMonth = 0
   !overall qualification of the rate
@@ -358,8 +358,8 @@ TYPE TariffType
   INTEGER                        :: ptDisqualifier            = 0
   !overall selection and annual cost
   LOGICAL                        :: isSelected                = .FALSE.
-  REAL(r64)                      :: totalAnnualCost           = 0
-  REAL(r64)                      :: totalAnnualEnergy         = 0
+  REAL(r64)                      :: totalAnnualCost           = 0.0d0
+  REAL(r64)                      :: totalAnnualEnergy         = 0.0d0
 END TYPE
 TYPE (TariffType), ALLOCATABLE, DIMENSION(:)     :: tariff
 INTEGER                                          :: numTariff = 0
@@ -369,7 +369,7 @@ TYPE QualifyType
   INTEGER                        :: tariffIndx     = 0 !index of the tariff name in the tariff array
   INTEGER                        :: sourcePt       = 0 !index of the variable in the variable array
   LOGICAL                        :: isMaximum      = .FALSE. !indicator if maximum test otherwise minimum
-  REAL(r64)                      :: thresholdVal   = 0 !value of the threshold
+  REAL(r64)                      :: thresholdVal   = 0.0d0 !value of the threshold
   INTEGER                        :: thresholdPt    = 0 !pointer to the variable holding the values
   INTEGER                        :: season         = 0 !enumerated list of the kind of season
   LOGICAL                        :: isConsecutive  = .FALSE. !indicator if consecutive months otherwise count
@@ -384,7 +384,7 @@ TYPE ChargeSimpleType
   INTEGER                        :: sourcePt       = 0 !index of the variable in the variable array
   INTEGER                        :: season         = 0 !enumerated list of the kind of season
   INTEGER                        :: categoryPt     = 0 !index of the category in the variable array
-  REAL(r64)                      :: costPerVal     = 0 !cost per unit value
+  REAL(r64)                      :: costPerVal     = 0.0d0 !cost per unit value
   INTEGER                        :: costPerPt      = 0 !cost per unit index in the variable array (0 is flag for no variable)
 END TYPE
 TYPE (ChargeSimpleType), ALLOCATABLE, DIMENSION(:) :: chargeSimple
@@ -397,12 +397,12 @@ TYPE ChargeBlockType
   INTEGER                        :: season         = 0 !enumerated list of the kind of season
   INTEGER                        :: categoryPt     = 0 !index of the category in the variable array
   INTEGER                        :: remainingPt    = 0 !index of the remaining into variable in the variable array
-  REAL(r64)                      :: blkSzMultVal   = 0 !block size multiplier value
+  REAL(r64)                      :: blkSzMultVal   = 0.0d0 !block size multiplier value
   INTEGER                        :: blkSzMultPt    = 0 !block size variable in the variable array (0 is flag for no variable)
   INTEGER                        :: numBlk         = 0 !number of blocks used
-  REAL(r64),DIMENSION(maxNumBlk)      :: blkSzVal       = 0 !array of block size values
+  REAL(r64),DIMENSION(maxNumBlk)      :: blkSzVal       = 0.0d0 !array of block size values
   INTEGER,DIMENSION(maxNumBlk)   :: blkSzPt        = 0 !block size variables index to the variable array (0 is no variable)
-  REAL(r64),DIMENSION(maxNumBlk)      :: blkCostVal     = 0 !array of block cost values
+  REAL(r64),DIMENSION(maxNumBlk)      :: blkCostVal     = 0.0d0 !array of block cost values
   INTEGER,DIMENSION(maxNumBlk)   :: blkCostPt      = 0 !block cost variables index to the variable array (0 is no variable)
 END TYPE
 TYPE (ChargeBlockType), ALLOCATABLE, DIMENSION(:)  :: chargeBlock
@@ -415,9 +415,9 @@ TYPE RatchetType
   INTEGER                        :: adjustmentPt   = 0 !index fo the adjustment variable in the variable array
   INTEGER                        :: seasonFrom     = 0 !enumerated list of the kind of season
   INTEGER                        :: seasonTo       = 0 !enumerated list of the kind of season
-  REAL(r64)                      :: multiplierVal  = 0 !value of the ratchet multiplier
+  REAL(r64)                      :: multiplierVal  = 0.0d0 !value of the ratchet multiplier
   INTEGER                        :: multiplierPt   = 0 !multiplier variable in the variable array (0 for no variable)
-  REAL(r64)                      :: offsetVal      = 0 !value of the ratchet offset
+  REAL(r64)                      :: offsetVal      = 0.0d0 !value of the ratchet offset
   INTEGER                        :: offsetPt       = 0 !offset variable in the variable array (0 for no variable)
 END TYPE
 TYPE (RatchetType), ALLOCATABLE, DIMENSION(:)      :: ratchet
@@ -440,13 +440,12 @@ INTEGER                                            :: sizeSteps = 0
 
 TYPE StackType
   INTEGER                        :: varPt          = 0 !pointer to item in specific array
-  REAL(r64),DIMENSION(MaxNumMonths)   :: values         = 0 !values
+  REAL(r64),DIMENSION(MaxNumMonths)   :: values         = 0.0d0 !values
 END TYPE
 TYPE (StackType), ALLOCATABLE, DIMENSION(:)      :: stack
 TYPE (StackType), ALLOCATABLE, DIMENSION(:)      :: stackCopy
 INTEGER                                          :: topOfStack = 0
 INTEGER                                          :: sizeStack  = 0
-
 
 
 
@@ -675,7 +674,7 @@ DO iInObj = 1 , NumTariff
   IF (KeyCount .EQ. 0) THEN
     CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" missing meter')
     CALL ShowContinueError('Meter referenced is not present due to a lack of equipment that uses that energy source/meter:"'//  &
-       tariff(iInObj)%reportMeter//'".')
+       trim(tariff(iInObj)%reportMeter)//'".')
     tariff(iInObj)%reportMeterIndx = 0
   ELSE
     ALLOCATE(NamesOfKeys(KeyCount))
@@ -884,14 +883,14 @@ DO iInObj = 1 , NumTariff
   END IF
   ! initialize gathering arrays
   tariff(iInObj)%seasonForMonth = 0
-  tariff(iInObj)%gatherEnergy = 0
-  tariff(iInObj)%gatherDemand = 0
+  tariff(iInObj)%gatherEnergy = 0.0d0
+  tariff(iInObj)%gatherDemand = 0.0d0
   !assume that the tariff is qualified
   tariff(iInObj)%isQualified = .TRUE.
   tariff(iInObj)%ptDisqualifier = 0
   !assume that the tariff is not selected
   tariff(iInObj)%isSelected = .FALSE.
-  tariff(iInObj)%totalAnnualCost = 0
+  tariff(iInObj)%totalAnnualCost = 0.0d0
   !now create the Table Of Contents entries for an HTML file
   CALL AddTOCEntry('Tariff Report',tariff(iInObj)%tariffName)
   !associate the resource number with each tariff
@@ -973,8 +972,9 @@ DO iInObj = 1 , NumQualify
   ELSE IF (SameString(cAlphaArgs(4),'Maximum')) THEN
     qualify(iInObj)%isMaximum = .TRUE.
   ELSE
-    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
-    CALL ShowContinueError(trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'" -- setting to "Maximum".')
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError(trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'".')
+    ErrorsFound=.true.
     qualify(iInObj)%isMaximum = .TRUE.
   END IF
   !value of the threshold
@@ -990,7 +990,8 @@ DO iInObj = 1 , NumQualify
     qualify(iInObj)%isConsecutive  = .TRUE.
   ELSE
     CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
-    CALL ShowContinueError(trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'" -- setting to "Consecutive".')
+    CALL ShowContinueError(trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+    ErrorsFound=.true.
     qualify(iInObj)%isConsecutive  = .TRUE.
   END IF
   !number of months the test must be good for
@@ -1180,7 +1181,7 @@ DO iInObj = 1 , numChargeBlock
                                   varNotYetDefined,kindCategory,iInObj,chargeBlock(iInObj)%tariffIndx)
   !block size multiplier
   IF (LEN_TRIM(cAlphaArgs(7)) .EQ. 0) THEN  !if blank
-    chargeBlock(iInObj)%blkSzMultVal = 1  !default is 1 if left blank
+    chargeBlock(iInObj)%blkSzMultVal = 1.0d0  !default is 1 if left blank
     chargeBlock(iInObj)%blkSzMultPt = 0
   ELSE
     chargeBlock(iInObj)%blkSzMultVal = ProcessNumber(cAlphaArgs(7),isNotNumeric)
@@ -1370,8 +1371,9 @@ DO iInObj = 1 , numEconVarObj
     econVar(variablePt)%varUnitType = varUnitTypeCurrency
   ELSE
     econVar(variablePt)%varUnitType = varUnitTypeDimensionless
-    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
-    CALL ShowContinueError('invalid '//trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'". Dimensionless assumed.')
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError('invalid '//trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'".')
+    ErrorsFound=.true.
   END IF
   !move number inputs into econVar
   DO jVal = 1, NumNums
@@ -1468,14 +1470,16 @@ DO iInObj = 1 , numComputation
       computation(tariffPt)%firstStep = 0
       computation(tariffPt)%lastStep = -1
       computation(tariffPt)%isUserDef = .FALSE.
-      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
       CALL ShowContinueError('... No lines in the computation can be interpreted ')
+      ErrorsFound=.true.
     ELSE
       computation(tariffPt)%isUserDef = .TRUE.
     END IF
   ELSE
-    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
     CALL ShowContinueError('... not found '//trim(cAlphaFieldNames(2))//'="'// TRIM(cAlphaArgs(2))//'".')
+    ErrorsFound=.true.
   END IF
 END DO
 END SUBROUTINE GetInputEconomicsComputation
@@ -2444,11 +2448,11 @@ econVar(numEconVar)%name = ''
 econVar(numEconVar)%tariffIndx = 0
 econVar(numEconVar)%kindOfObj = 0
 econVar(numEconVar)%index = 0
-econVar(numEconVar)%values = 0
+econVar(numEconVar)%values = 0.0d0
 econVar(numEconVar)%isArgument = .FALSE.
 econVar(numEconVar)%isAssigned = .FALSE.
 econVar(numEconVar)%specific = varNotYetDefined
-econVar(numEconVar)%values = 0
+econVar(numEconVar)%values = 0.0d0
 econVar(numEconVar)%operator = 0
 econVar(numEconVar)%firstOperand = 1
 econVar(numEconVar)%lastOperand = 0
@@ -3392,7 +3396,7 @@ IF (numTariff .GE. 1) THEN
     IF (tariff(iTariff)%reportMeterIndx .NE. 0) THEN
       curInstantValue = GetCurrentMeterValue(tariff(iTariff)%reportMeterIndx)
     ELSE
-      curInstantValue = 0
+      curInstantValue = 0.0d0
     END IF
     ! remember the demand is still energy over a period of time divided by the
     ! length of time. This gathers the energy also.
@@ -3463,8 +3467,8 @@ IF (numTariff .GE. 1) THEN
         END IF
       END IF
       ! reset the counters
-      tariff(iTariff)%collectEnergy = 0
-      tariff(iTariff)%collectTime   = 0
+      tariff(iTariff)%collectEnergy = 0.0d0
+      tariff(iTariff)%collectTime   = 0.0d0
     END IF
   END DO
 END IF
@@ -3613,7 +3617,7 @@ IF (numTariff .GE. 1) THEN
         CASE (1:) !all positive values are a reference to an econVar
           CALL pushStack(econVar(curStep)%values,curStep)
         CASE (opSUM)
-          a = 0
+          a = 0.0d0
           DO kStack = 1,topOfStack
             CALL popStack(b,bPt)
             a = a + b
@@ -3634,7 +3638,7 @@ IF (numTariff .GE. 1) THEN
             IF (b(lMonth) .NE. 0) THEN
               c(lMonth) = a(lMonth) / b(lMonth)
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3685,7 +3689,7 @@ IF (numTariff .GE. 1) THEN
             IF (a(lMonth) .GT. b(lMonth)) THEN
               c(lMonth) = a(lMonth) - b(lMonth)
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3702,7 +3706,7 @@ IF (numTariff .GE. 1) THEN
           END DO
           ! if all months are zero then hugeValue still in annual but should be zero
           IF (annualAggregate .EQ. hugeValue) THEN
-            annualAggregate = 0
+            annualAggregate = 0.0d0
           END IF
           c = annualAggregate
           CALL pushStack(c,noVar)
@@ -3719,13 +3723,13 @@ IF (numTariff .GE. 1) THEN
           END DO
           ! if all months are zero then hugeValue still in annual but should be zero
           IF (annualAggregate .EQ. -hugeValue) THEN
-            annualAggregate = 0
+            annualAggregate = 0.0d0
           END IF
           c = annualAggregate
           CALL pushStack(c,noVar)
         CASE (opANNUALSUM)
           !takes the maximum but ignores zeros
-          annualAggregate = 0
+          annualAggregate = 0.0d0
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             annualAggregate = annualAggregate + a(lMonth)
@@ -3734,7 +3738,7 @@ IF (numTariff .GE. 1) THEN
           CALL pushStack(c,noVar)
         CASE (opANNUALAVERAGE)
           !takes the annual sum but ignores zeros
-          annualAggregate = 0
+          annualAggregate = 0.0d0
           annualCnt = 0
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
@@ -3747,7 +3751,7 @@ IF (numTariff .GE. 1) THEN
           IF (annualCnt .NE. 0) THEN
             c = annualAggregate / annualCnt
           ELSE
-            c = 0
+            c = 0.0d0
           END IF
           CALL pushStack(c,noVar)
         CASE (opANNUALOR)
@@ -3760,9 +3764,9 @@ IF (numTariff .GE. 1) THEN
           END DO
           ! if any months is not zero then "true"
           IF (annualCnt .GE. 1) THEN
-            c = 1
+            c = 1.0d0
           ELSE
-            c = 0
+            c = 0.0d0
           END IF
           CALL pushStack(c,noVar)
         CASE (opANNUALAND)
@@ -3775,9 +3779,9 @@ IF (numTariff .GE. 1) THEN
           END DO
           ! if all months are not zero then "true"
           IF (annualCnt .EQ. MaxNumMonths) THEN
-            c = 1
+            c = 1.0d0
           ELSE
-            c = 0
+            c = 0.0d0
           END IF
           CALL pushStack(c,noVar)
         CASE (opANNUALMAXIMUMZERO)
@@ -3819,9 +3823,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .GT. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3830,9 +3834,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .GE. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3841,9 +3845,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .LT. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3852,9 +3856,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .LE. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3863,9 +3867,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .EQ. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3874,9 +3878,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .NE. b(lMonth)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3885,9 +3889,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF ((a(lMonth) .NE. 0) .AND. (b(lMonth) .NE. 0)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3896,9 +3900,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF ((a(lMonth) .NE. 0) .OR. (b(lMonth) .NE. 0)) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -3906,9 +3910,9 @@ IF (numTariff .GE. 1) THEN
           CALL popStack(a,aPt)
           DO lMonth = 1,MaxNumMonths
             IF (a(lMonth) .EQ. 0) THEN
-              c(lMonth) = 1
+              c(lMonth) = 1.0d0
             ELSE
-              c(lMonth) = 0
+              c(lMonth) = 0.0d0
             END IF
           END DO
           CALL pushStack(c,noVar)
@@ -4079,7 +4083,7 @@ ELSE
   CALL ShowWarningError('UtilityCost:Tariff: stack underflow in calculation of utility bills. On variable: ' &
                         // TRIM(econVar(variablePointer)%name))
   variablePointer = 0
-  monthlyArray = 0
+  monthlyArray = 0.0d0
   topOfStack = 0
 END IF
 topOfStack = topOfStack - 1
@@ -4156,7 +4160,7 @@ SELECT CASE (chargeSimple(indexInChg)%season)
   CASE (seasonFall)
     seasonMask = econVar(tariff(curTariff)%nativeIsAutumn)%values
   CASE (seasonAnnual)
-    seasonMask = 1  !all months are 1
+    seasonMask = 1.0d0  !all months are 1
 END SELECT
 ! finally perform calculations
 resultChg = sourceVals * costPer * seasonMask
@@ -4238,7 +4242,7 @@ SELECT CASE (chargeBlock(indexInChg)%season)
   CASE (seasonFall)
     seasonMask = econVar(tariff(curTariff)%nativeIsAutumn)%values
   CASE (seasonAnnual)
-    seasonMask = 1  !all months are 1
+    seasonMask = 1.0d0  !all months are 1
 END SELECT
 ! get block size multiplier
 IF (chargeBlock(indexInChg)%blkSzMultPt .NE. 0) THEN
@@ -4249,7 +4253,7 @@ END IF
 !initially set the remaing energy or demand to the source
 remainVals = sourceVals
 !initially set the result (cost) to zero
-resultChg = 0
+resultChg = 0.0d0
 !loop through the blocks performing calculations
 DO iBlk = 1, chargeBlock(indexInChg)%numBlk
   IF (chargeBlock(indexInChg)%blkSzPt(iBlk) .NE. 0) THEN
@@ -4273,7 +4277,7 @@ DO iBlk = 1, chargeBlock(indexInChg)%numBlk
           amountForBlk(jMonth) = curBlkSz(jMonth) * blkSzMult(jMonth)
         END IF
       ELSE
-        amountForBlk(jMonth) = 0
+        amountForBlk(jMonth) = 0.0d0
       END IF
       resultChg(jMonth) = resultChg(jMonth) + amountForBlk(jMonth) * curBlkCost(jMonth)
       remainVals(jMonth) = remainVals(jMonth) - amountForBlk(jMonth)
@@ -4395,10 +4399,10 @@ SELECT CASE (ratchet(indexInChg)%seasonFrom)
     seasonFromMask = econVar(tariff(curTariff)%nativeIsAutumn)%values
     isMonthly = .FALSE.
   CASE (seasonAnnual)
-    seasonFromMask = 1  !all months are 1
+    seasonFromMask = 1.0d0  !all months are 1
     isMonthly = .FALSE.
   CASE (seasonMonthly)
-    seasonFromMask = 1  !all months are 1
+    seasonFromMask = 1.0d0  !all months are 1
     isMonthly = .TRUE.
 END SELECT
 ! find proper season to mask
@@ -4412,7 +4416,7 @@ SELECT CASE (ratchet(indexInChg)%seasonTo)
   CASE (seasonFall)
     seasonToMask = econVar(tariff(curTariff)%nativeIsAutumn)%values
   CASE (seasonAnnual)
-    seasonToMask = 1  !all months are 1
+    seasonToMask = 1.0d0  !all months are 1
 END SELECT
 ! finally perform calculations
 IF (isMonthly) THEN
@@ -4535,12 +4539,12 @@ SELECT CASE (qualify(indexInQual)%season)
   CASE (seasonFall)
     seasonMask = econVar(tariff(curTariff)%nativeIsAutumn)%values
   CASE (seasonAnnual)
-    seasonMask = 1  !all months are 1
+    seasonMask = 1.0d0  !all months are 1
 END SELECT
 !any months with no energy use are excluded from the qualification process
 DO iMonth = 1, MaxNumMonths
   IF (econVar(tariff(curTariff)%nativeTotalEnergy)%values(iMonth) .EQ. 0) THEN
-    seasonMask(iMonth) = 0
+    seasonMask(iMonth) = 0.0d0
   END IF
 END DO
 ! finally perform calculations
@@ -4772,7 +4776,7 @@ REAL(r64)    :: bigNumber
 bigNumber = HUGE(bigNumber)
 DO iTariff = 1, numTariff
   !nativeTotalEnergy
-  monthVal = 0
+  monthVal = 0.0d0
   DO jPeriod = 1, countPeriod
     DO kMonth = 1, MaxNumMonths
       monthVal(kMonth) = monthVal(kMonth) + tariff(iTariff)%gatherEnergy(jPeriod,kMonth)
@@ -4791,7 +4795,7 @@ DO iTariff = 1, numTariff
   !if no maximum was set just set to zero
   DO kMonth = 1, MaxNumMonths
     IF (monthVal(kMonth) .EQ. -bigNumber) THEN
-      monthVal(kMonth) = 0
+      monthVal(kMonth) = 0.0d0
     END IF
   END DO
   econVar(tariff(iTariff)%nativeTotalDemand)%values = monthVal
@@ -4817,78 +4821,78 @@ DO iTariff = 1, numTariff
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativePeakExceedsOffPeak)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativePeakExceedsOffPeak)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativePeakExceedsOffPeak)%values(kMonth) = 0.0d0
     ENDIF
     !nativeOffPeakExceedsPeak
     monthVal(kMonth) = tariff(iTariff)%gatherDemand(periodOffPeak,kMonth) - tariff(iTariff)%gatherDemand(periodPeak,kMonth)
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativeOffPeakExceedsPeak)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativeOffPeakExceedsPeak)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeOffPeakExceedsPeak)%values(kMonth) = 0.0d0
     ENDIF
     !nativePeakExceedsMidPeak
     monthVal(kMonth) = tariff(iTariff)%gatherDemand(periodPeak,kMonth) - tariff(iTariff)%gatherDemand(periodMidPeak,kMonth)
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativePeakExceedsMidPeak)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativePeakExceedsOffPeak)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativePeakExceedsOffPeak)%values(kMonth) = 0.0d0
     ENDIF
     !nativeMidPeakExceedsPeak
     monthVal(kMonth) = tariff(iTariff)%gatherDemand(periodMidPeak,kMonth) - tariff(iTariff)%gatherDemand(periodPeak,kMonth)
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativeMidPeakExceedsPeak)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativeMidPeakExceedsPeak)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeMidPeakExceedsPeak)%values(kMonth) = 0.0d0
     ENDIF
     !nativePeakExceedsShoulder
     monthVal(kMonth) = tariff(iTariff)%gatherDemand(periodPeak,kMonth) - tariff(iTariff)%gatherDemand(periodShoulder,kMonth)
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativePeakExceedsShoulder)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativePeakExceedsShoulder)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativePeakExceedsShoulder)%values(kMonth) = 0.0d0
     ENDIF
     !nativeShoulderExceedsPeak
     monthVal(kMonth) = tariff(iTariff)%gatherDemand(periodShoulder,kMonth) - tariff(iTariff)%gatherDemand(periodPeak,kMonth)
     IF (monthVal(kMonth) .GT. 0) THEN
       econVar(tariff(iTariff)%nativeShoulderExceedsPeak)%values(kMonth) = monthVal(kMonth)
     ELSE
-      econVar(tariff(iTariff)%nativeShoulderExceedsPeak)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeShoulderExceedsPeak)%values(kMonth) = 0.0d0
     ENDIF
     !nativeIsWinter
     !nativeIsNotWinter
     IF (tariff(iTariff)%seasonForMonth(kMonth) .EQ. seasonWinter) THEN
-      econVar(tariff(iTariff)%nativeIsWinter)%values(kMonth) = 1
-      econVar(tariff(iTariff)%nativeIsNotWinter)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeIsWinter)%values(kMonth) = 1.0d0
+      econVar(tariff(iTariff)%nativeIsNotWinter)%values(kMonth) = 0.0d0
     ELSE
-      econVar(tariff(iTariff)%nativeIsWinter)%values(kMonth) = 0
-      econVar(tariff(iTariff)%nativeIsNotWinter)%values(kMonth) = 1
+      econVar(tariff(iTariff)%nativeIsWinter)%values(kMonth) = 0.0d0
+      econVar(tariff(iTariff)%nativeIsNotWinter)%values(kMonth) = 1.0d0
     END IF
     !nativeIsSpring
     !nativeIsNotSpring
     IF (tariff(iTariff)%seasonForMonth(kMonth) .EQ. seasonSpring) THEN
-      econVar(tariff(iTariff)%nativeIsSpring)%values(kMonth) = 1
-      econVar(tariff(iTariff)%nativeIsNotSpring)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeIsSpring)%values(kMonth) = 1.0d0
+      econVar(tariff(iTariff)%nativeIsNotSpring)%values(kMonth) = 0.0d0
     ELSE
-      econVar(tariff(iTariff)%nativeIsSpring)%values(kMonth) = 0
-      econVar(tariff(iTariff)%nativeIsNotSpring)%values(kMonth) = 1
+      econVar(tariff(iTariff)%nativeIsSpring)%values(kMonth) = 0.0d0
+      econVar(tariff(iTariff)%nativeIsNotSpring)%values(kMonth) = 1.0d0
     END IF
     !nativeIsSummer
     !nativeIsNotSummer
     IF (tariff(iTariff)%seasonForMonth(kMonth) .EQ. seasonSummer) THEN
-      econVar(tariff(iTariff)%nativeIsSummer)%values(kMonth) = 1
-      econVar(tariff(iTariff)%nativeIsNotSummer)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeIsSummer)%values(kMonth) = 1.0d0
+      econVar(tariff(iTariff)%nativeIsNotSummer)%values(kMonth) = 0.0d0
     ELSE
-      econVar(tariff(iTariff)%nativeIsSummer)%values(kMonth) = 0
-      econVar(tariff(iTariff)%nativeIsNotSummer)%values(kMonth) = 1
+      econVar(tariff(iTariff)%nativeIsSummer)%values(kMonth) = 0.0d0
+      econVar(tariff(iTariff)%nativeIsNotSummer)%values(kMonth) = 1.0d0
     END IF
     !nativeIsAutumn
     !nativeIsNotAutumn
     IF (tariff(iTariff)%seasonForMonth(kMonth) .EQ. seasonFall) THEN
-      econVar(tariff(iTariff)%nativeIsAutumn)%values(kMonth) = 1
-      econVar(tariff(iTariff)%nativeIsNotAutumn)%values(kMonth) = 0
+      econVar(tariff(iTariff)%nativeIsAutumn)%values(kMonth) = 1.0d0
+      econVar(tariff(iTariff)%nativeIsNotAutumn)%values(kMonth) = 0.0d0
     ELSE
-      econVar(tariff(iTariff)%nativeIsAutumn)%values(kMonth) = 0
-      econVar(tariff(iTariff)%nativeIsNotAutumn)%values(kMonth) = 1
+      econVar(tariff(iTariff)%nativeIsAutumn)%values(kMonth) = 0.0d0
+      econVar(tariff(iTariff)%nativeIsNotAutumn)%values(kMonth) = 1.0d0
     END IF
     !nativePeakAndShoulderEnergy
     econVar(tariff(iTariff)%nativePeakAndShoulderEnergy)%values(kMonth) = &
@@ -5005,13 +5009,13 @@ INTEGER :: iTariff
 IF (numTariff .GT. 0) THEN
   elecFacilMeter = GetMeterIndex('ELECTRICITY:FACILITY')
   gasFacilMeter = GetMeterIndex('GAS:FACILITY')
-  elecTotalEne = 0
-  gasTotalEne = 0
-  otherTotalEne = 0
-  elecTotalCost = 0
-  gasTotalCost = 0
-  otherTotalCost = 0
-  allTotalCost = 0
+  elecTotalEne = 0.0d0
+  gasTotalEne = 0.0d0
+  otherTotalEne = 0.0d0
+  elecTotalCost = 0.0d0
+  gasTotalCost = 0.0d0
+  otherTotalCost = 0.0d0
+  allTotalCost = 0.0d0
   elecUnits = 0
   gasUnits = 0
   othrUnits = 0
@@ -5087,7 +5091,7 @@ SUBROUTINE WriteTabularTariffReports
           ! na
 
           ! USE STATEMENTS:
-USE OutputReportTabular, ONLY: WriteReportHeaders, WriteSubtitle, WriteTable, RealToStr,&
+USE OutputReportTabular, ONLY: WriteReportHeaders, WriteSubtitle, WriteTable, RealToStr, writeTextLine, &
                                buildingGrossFloorArea,  buildingConditionedFloorArea, DetermineBuildingFloorArea, &
                                LookupSItoIP, convertIP, unitsStyle, unitsStyleInchPound
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
@@ -5135,7 +5139,7 @@ CHARACTER(len=MaxNameLength) :: perAreaUnitName = ''
 
 
   ! compute floor area if no ABUPS
-  IF (buildingConditionedFloorArea == 0.0) THEN
+  IF (buildingConditionedFloorArea == 0.0d0) THEN
     CALL DetermineBuildingFloorArea
   ENDIF
 
@@ -5151,6 +5155,7 @@ CHARACTER(len=MaxNameLength) :: perAreaUnitName = ''
 
 
 IF (numTariff .GT. 0) THEN
+  CALL DisplayString('Writing Tariff Reports')
   econVar%isReported = .FALSE.
   !CALL selectTariff moved to the end of computeTariff.
   CALL showWarningsBasedOnTotal
@@ -5175,10 +5180,10 @@ IF (numTariff .GT. 0) THEN
   rowHead(1) = 'Cost [~~$~~]'
   rowHead(2) = 'Cost per Total Building Area ' // TRIM(perAreaUnitName)
   rowHead(3) = 'Cost per Net Conditioned Building Area ' // TRIM(perAreaUnitName)
-  elecTotalCost = 0
-  gasTotalCost = 0
-  otherTotalCost = 0
-  allTotalCost = 0
+  elecTotalCost = 0.0d0
+  gasTotalCost = 0.0d0
+  otherTotalCost = 0.0d0
+  allTotalCost = 0.0d0
   DO iTariff = 1, numTariff
     IF (tariff(iTariff)%isSelected) THEN
       allTotalCost = allTotalCost + tariff(iTariff)%totalAnnualCost
@@ -5196,13 +5201,13 @@ IF (numTariff .GT. 0) THEN
   tableBody(1,2) = TRIM(RealToStr(gasTotalCost,2))
   tableBody(1,3) = TRIM(RealToStr(otherTotalCost,2))
   tableBody(1,4) = TRIM(RealToStr(allTotalCost,2))
-  If (buildingGrossFloorArea > 0.0) then
+  If (buildingGrossFloorArea > 0.0d0) then
    tableBody(2,1) = TRIM(RealToStr((elecTotalCost/buildingGrossFloorArea) * perAreaUnitConv, 2))
    tableBody(2,2) = TRIM(RealToStr((gasTotalCost/buildingGrossFloorArea) * perAreaUnitConv,2))
    tableBody(2,3) = TRIM(RealToStr((otherTotalCost/buildingGrossFloorArea) * perAreaUnitConv,2))
    tableBody(2,4) = TRIM(RealToStr((allTotalCost/buildingGrossFloorArea) * perAreaUnitConv,2))
   endif
-  IF (buildingConditionedFloorArea > 0.0) THEN
+  IF (buildingConditionedFloorArea > 0.0d0) THEN
    tableBody(3,1) = TRIM(RealToStr((elecTotalCost/buildingConditionedFloorArea) * perAreaUnitConv, 2))
    tableBody(3,2) = TRIM(RealToStr((gasTotalCost/buildingConditionedFloorArea) * perAreaUnitConv,2))
    tableBody(3,3) = TRIM(RealToStr((otherTotalCost/buildingConditionedFloorArea) * perAreaUnitConv,2))
@@ -5335,11 +5340,12 @@ IF (numTariff .GT. 0) THEN
         tableBody(7,1) = 'CCF'
     END SELECT
     columnWidth = 14 !array assignment - same for all columns
+    CALL WriteSubtitle('General')
     CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         'Tariff Report',&
                                          tariff(iTariff)%tariffName,&
-                                        '')
+                                        'General')
     DEALLOCATE(columnHead)
     DEALLOCATE(rowHead)
     DEALLOCATE(columnWidth)
@@ -5437,19 +5443,19 @@ IF (numTariff .GT. 0) THEN
     !---- Computation
     !
     IF (computation(iTariff)%isUserDef) THEN
-      CALL WriteSubtitle('Computation -  User Defined')
+      CALL writeTextLine('Computation -  User Defined',.TRUE.)
     ELSE
-      CALL WriteSubtitle('Computation -  Automatic')
+      CALL writeTextLine('Computation -  Automatic',.TRUE.)
     END IF
     outString = ''
     DO lStep = computation(iTariff)%firstStep,computation(iTariff)%lastStep
       curStep = steps(lStep)
       SELECT CASE (curStep)
         CASE (0)  !end of line
-          CALL writeSubtitle(outString)
+          CALL writeTextLine(outString)
           outString = ''
         CASE (1:) !all positive values are a reference to an econVar
-          outString = econVar(curStep)%name // ' ' // TRIM(outString)
+          outString = TRIM(econVar(curStep)%name) // ' ' // TRIM(outString)
         CASE (opSUM)
           outString = 'SUM ' // TRIM(outString)
         CASE (opMULTIPLY)
@@ -5611,7 +5617,7 @@ REAL(r64) :: maximumVal
 REAL(r64) :: curVal
 INTEGER :: jMonth
 
-sumVal = 0
+sumVal = 0.0d0
 maximumVal = -HUGE(maximumVal)
 DO jMonth = 1,12 !note not all months get printed out if more than 12 are used.- need to fix this later
   curVal = econVar(varPointer)%values(jMonth)
@@ -5890,8 +5896,8 @@ DO iTariff = 1, numTariff
   ! compute the total annual cost of each tariff
   totalVarPt = tariff(iTariff)%ptTotal
   totEneVarPt = tariff(iTariff)%nativeTotalEnergy
-  annualTotal = 0
-  annEneTotal = 0
+  annualTotal = 0.0d0
+  annEneTotal = 0.0d0
   DO jMonth = 1,MaxNumMonths
     annualTotal = annualTotal + econVar(totalVarPt)%values(jMonth)
     annEneTotal = annEneTotal + econVar(totEneVarPt)%values(jMonth)
@@ -6080,7 +6086,7 @@ INTEGER :: iTariff
 INTEGER :: jMonth
 INTEGER :: totalVarPt
 
-outMonthlyCosts = 0
+outMonthlyCosts = 0.0d0
 DO iTariff = 1, numTariff
   IF (Tariff(iTariff)%isSelected) THEN
     IF (Tariff(iTariff)%resourceNum .EQ. inResourceNumber) THEN

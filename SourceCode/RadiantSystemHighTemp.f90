@@ -31,9 +31,8 @@ MODULE HighTempRadiantSystem
   ! USE STATEMENTS:
   ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals,       ONLY : MaxNameLength, BeginTimeStepFlag, SysSizingCalc, ScheduleAlwaysOn
-USE DataInterfaces,    ONLY : ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, SetupOutputVariable,  &
-                              CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
+USE DataGlobals,       ONLY : MaxNameLength, BeginTimeStepFlag, SysSizingCalc, ScheduleAlwaysOn, DisplayExtraWarnings
+USE DataInterfaces 
 USE DataHVACGlobals,   ONLY: SmallLoad
 
   ! Use statements for access to subroutines in other modules
@@ -72,18 +71,18 @@ TYPE HighTempRadiantSystemData
   CHARACTER(len=MaxNameLength)   :: ZoneName          =' ' ! Name of zone the system is serving
   INTEGER                        :: ZonePtr           =0   ! Point to this zone in the Zone derived type
   INTEGER                        :: HeaterType        =0   ! Type of heater (gas or electric)
-  REAL(r64)                      :: MaxPowerCapac     =0.0 ! Maximum capacity of the radiant heater in Watts
-  REAL(r64)                      :: CombustionEffic   =0.0 ! Combustion efficiency (only valid for a gas heater)
-  REAL(r64)                      :: FracRadiant       =0.0 ! Fraction of heater power that is given off as radiant heat
-  REAL(r64)                      :: FracLatent        =0.0 ! Fraction of heater power that is given off as latent heat
-  REAL(r64)                      :: FracLost          =0.0 ! Fraction of heater power that is lost to the outside environment
-  REAL(r64)                      :: FracConvect       =0.0 ! Fraction of heater power that is given off as convective heat
+  REAL(r64)                      :: MaxPowerCapac     =0.0d0 ! Maximum capacity of the radiant heater in Watts
+  REAL(r64)                      :: CombustionEffic   =0.0d0 ! Combustion efficiency (only valid for a gas heater)
+  REAL(r64)                      :: FracRadiant       =0.0d0 ! Fraction of heater power that is given off as radiant heat
+  REAL(r64)                      :: FracLatent        =0.0d0 ! Fraction of heater power that is given off as latent heat
+  REAL(r64)                      :: FracLost          =0.0d0 ! Fraction of heater power that is lost to the outside environment
+  REAL(r64)                      :: FracConvect       =0.0d0 ! Fraction of heater power that is given off as convective heat
                                                            ! (by definition this is 1 minus the sum of all other fractions)
   INTEGER                        :: ControlType       =0   ! Control type for the system (MAT, MRT, or op temp)
-  REAL(r64)                      :: ThrottlRange      =0.0 ! Throttling range for heating [C]
+  REAL(r64)                      :: ThrottlRange      =0.0d0 ! Throttling range for heating [C]
   CHARACTER(len=MaxNameLength)   :: SetptSched        =' ' ! Schedule name for the zone setpoint temperature
   INTEGER                        :: SetptSchedPtr     =0   ! Schedule index for the zone setpoint temperature
-  REAL(r64)                      :: FracDistribPerson =0.0 ! Fraction of fraction radiant incident on a "person" in the space
+  REAL(r64)                      :: FracDistribPerson =0.0d0 ! Fraction of fraction radiant incident on a "person" in the space
   INTEGER                        :: TotSurfToDistrib  =0   ! Total number of surfaces the heater sends radiation to
   CHARACTER(len=MaxNameLength), &
            ALLOCATABLE, DIMENSION(:) :: SurfaceName       ! Surface name in the list of surfaces heater sends radiation to
@@ -91,12 +90,12 @@ TYPE HighTempRadiantSystemData
   REAL(r64),    ALLOCATABLE, DIMENSION(:) :: FracDistribToSurf ! Fraction of fraction radiant incident on the surface
   ! Other parameters
   ! Report data
-  REAL(r64)                    :: ElecPower           =0.0 ! system electric consumption in Watts
-  REAL(r64)                    :: ElecEnergy          =0.0 ! system electric consumption in Joules
-  REAL(r64)                    :: GasPower            =0.0 ! system gas consumption in Watts
-  REAL(r64)                    :: GasEnergy           =0.0 ! system gas consumption in Joules
-  REAL(r64)                    :: HeatPower           =0.0 ! actual heating sent to zone (convective and radiative) in Watts
-  REAL(r64)                    :: HeatEnergy          =0.0 ! actual heating sent to zone (convective and radiative) in Joules
+  REAL(r64)                    :: ElecPower           =0.0d0 ! system electric consumption in Watts
+  REAL(r64)                    :: ElecEnergy          =0.0d0 ! system electric consumption in Joules
+  REAL(r64)                    :: GasPower            =0.0d0 ! system gas consumption in Watts
+  REAL(r64)                    :: GasEnergy           =0.0d0 ! system gas consumption in Joules
+  REAL(r64)                    :: HeatPower           =0.0d0 ! actual heating sent to zone (convective and radiative) in Watts
+  REAL(r64)                    :: HeatEnergy          =0.0d0 ! actual heating sent to zone (convective and radiative) in Joules
 END TYPE HighTempRadiantSystemData
 
 TYPE(HighTempRadiantSystemData), DIMENSION(:), ALLOCATABLE :: HighTempRadSys
@@ -407,9 +406,9 @@ SUBROUTINE GetHighTempRadiantSystem
       CALL ShowSevereError('Fractions radiant, latent, and lost sum up to greater than 1 for'//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
       ErrorsFound = .TRUE.
-      HighTempRadSys(Item)%FracConvect = 0.0
+      HighTempRadSys(Item)%FracConvect = 0.0d0
     ELSE
-      HighTempRadSys(Item)%FracConvect = 1.0 - AllFracsSummed
+      HighTempRadSys(Item)%FracConvect = 1.0d0 - AllFracsSummed
     END IF
 
           ! Process the temperature control type
@@ -434,7 +433,7 @@ SUBROUTINE GetHighTempRadiantSystem
 
     HighTempRadSys(Item)%ThrottlRange = rNumericArgs(6)
     IF (HighTempRadSys(Item)%ThrottlRange < MinThrottlingRange) THEN
-      HighTempRadSys(Item)%ThrottlRange = 1.0
+      HighTempRadSys(Item)%ThrottlRange = 1.0d0
       CALL ShowWarningError(TRIM(cNumericFieldNames(6))//' is below the minimum allowed.')
       CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Thus, the throttling range value has been reset to 1.0')
@@ -671,7 +670,7 @@ SUBROUTINE SizeHighTempRadiantSystem(RadSysNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -687,6 +686,7 @@ SUBROUTINE SizeHighTempRadiantSystem(RadSysNum)
           ! USE STATEMENTS:
   USE DataSizing
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -703,23 +703,59 @@ SUBROUTINE SizeHighTempRadiantSystem(RadSysNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS
+  REAL(r64) :: MaxPowerCapacDes    ! Design maximum capacity for reproting
+  REAL(r64) :: MaxPowerCapacUser   ! User hard-sized maximum capacity for reproting
+  LOGICAL   :: IsAutosize          ! Indicator to autosizing nominal capacity
+
+  IsAutosize = .FALSE.
+  MaxPowerCapacDes = 0.0d0
+  MaxPowerCapacUser = 0.0d0
 
   IF (HighTempRadSys(RadSysNum)%MaxPowerCapac == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
-
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation should continue
+      IF (HighTempRadSys(RadSysNum)%MaxPowerCapac > 0.0d0) THEN
+        CALL ReportSizingOutput('ZoneHVAC:HighTemperatureRadiant', HighTempRadSys(RadSysNum)%Name, &
+                              'User-Specified Maximum Power Input [W]', HighTempRadSys(RadSysNum)%MaxPowerCapac)
+      END IF
+    ELSE ! Autosize or hard-size with sizing run
       CALL CheckZoneSizing('ZoneHVAC:HighTemperatureRadiant', HighTempRadSys(RadSysNum)%Name)
       IF ((CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor) >= SmallLoad) THEN
-        HighTempRadSys(RadSysNum)%MaxPowerCapac =   &
+        MaxPowerCapacDes =   &
           (CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor) / &
           (HighTempRadSys(RadSysNum)%FracRadiant + HighTempRadSys(RadSysNum)%FracConvect)
       ELSE
-        HighTempRadSys(RadSysNum)%MaxPowerCapac = 0.0
+        MaxPowerCapacDes = 0.0d0
       END IF
-      CALL ReportSizingOutput('ZoneHVAC:HighTemperatureRadiant', HighTempRadSys(RadSysNum)%Name, &
-                              'Maximum Power Input [W]', HighTempRadSys(RadSysNum)%MaxPowerCapac)
+      IF (IsAutosize) THEN
+        HighTempRadSys(RadSysNum)%MaxPowerCapac = MaxPowerCapacDes
+        CALL ReportSizingOutput('ZoneHVAC:HighTemperatureRadiant', HighTempRadSys(RadSysNum)%Name, &
+                              'Design Size Maximum Power Input [W]', MaxPowerCapacDes)
+      ELSE ! Hard-size with sizing data
+        IF (HighTempRadSys(RadSysNum)%MaxPowerCapac > 0.0d0 .AND. MaxPowerCapacDes > 0.0d0) THEN
+          MaxPowerCapacUser = HighTempRadSys(RadSysNum)%MaxPowerCapac
+          CALL ReportSizingOutput('ZoneHVAC:HighTemperatureRadiant', HighTempRadSys(RadSysNum)%Name, &
+                              'Design Size Maximum Power Input [W]', MaxPowerCapacDes, &
+                              'User-Specified Maximum Power Input [W]', MaxPowerCapacUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxPowerCapacDes - MaxPowerCapacUser)/MaxPowerCapacUser ) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeHighTempRadiantSystem: Potential issue with equipment sizing for ' &
+                                      // 'ZoneHVAC:HighTemperatureRadiant = "'//  &
+                                      TRIM(HighTempRadSys(RadSysNum)%Name)//'".')
+              CALL ShowContinueError('User-Specified Maximum Power Input of '// &
+                                      TRIM(RoundSigDigits(MaxPowerCapacUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Maximum Power Input of ' // &
+                                      TRIM(RoundSigDigits(MaxPowerCapacDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
   RETURN
@@ -788,7 +824,7 @@ SUBROUTINE CalcHighTempRadiantSystem(RadSysNum)
           ! FLOW:
           ! initialize local variables
   ZoneNum  = HighTempRadSys(RadSysNum)%ZonePtr
-  HeatFrac = 0.0
+  HeatFrac = 0.0d0
 
   IF (GetCurrentScheduleValue(HighTempRadSys(RadSysNum)%SchedPtr) <= 0) THEN
 
@@ -801,8 +837,8 @@ SUBROUTINE CalcHighTempRadiantSystem(RadSysNum)
 
           ! Determine the current setpoint temperature and the temperature at which the unit should be completely off
     SetptTemp = GetCurrentScheduleValue(HighTempRadSys(RadSysNum)%SetptSchedPtr)
-    OffTemp   = SetptTemp + 0.5*HighTempRadSys(RadSysNum)%ThrottlRange
-    OpTemp    = (MAT(ZoneNum) + MRT(ZoneNum))/2.0 ! Approximate the "operative" temperature
+    OffTemp   = SetptTemp + 0.5d0*HighTempRadSys(RadSysNum)%ThrottlRange
+    OpTemp    = (MAT(ZoneNum) + MRT(ZoneNum))/2.0d0 ! Approximate the "operative" temperature
 
           ! Determine the fraction of maximum power to the unit (limiting the fraction range from zero to unity)
     SELECT CASE (HighTempRadSys(RadSysNum)%ControlType)
@@ -811,11 +847,11 @@ SUBROUTINE CalcHighTempRadiantSystem(RadSysNum)
       CASE (MRTControl)
         HeatFrac = (OffTemp - MRT(ZoneNum))/HighTempRadSys(RadSysNum)%ThrottlRange
       CASE (OperativeControl)
-        OpTemp   = 0.5*(MAT(ZoneNum)+MRT(ZoneNum))
+        OpTemp   = 0.5d0*(MAT(ZoneNum)+MRT(ZoneNum))
         HeatFrac = (OffTemp - OpTemp)/HighTempRadSys(RadSysNum)%ThrottlRange
     END SELECT
-    IF (HeatFrac < 0.0) HeatFrac = 0.0d0
-    IF (HeatFrac > 1.0) HeatFrac = 1.0d0
+    IF (HeatFrac < 0.0d0) HeatFrac = 0.0d0
+    IF (HeatFrac > 1.0d0) HeatFrac = 1.0d0
 
           ! Set the heat source for the high temperature electric radiant system
     QHTRadSource(RadSysNum) = HeatFrac*HighTempRadSys(RadSysNum)%MaxPowerCapac
@@ -868,7 +904,7 @@ SUBROUTINE CalcHighTempRadiantSystemSP(FirstHVACIteration,RadSysNum)
   INTEGER, INTENT(IN) :: RadSysNum          ! name of the low temperature radiant system
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL, PARAMETER    :: TempConvToler = 0.1 ! Temperature controller tries to converge to within 0.1C
+  REAL, PARAMETER    :: TempConvToler = 0.1d0 ! Temperature controller tries to converge to within 0.1C
   INTEGER, PARAMETER :: MaxIterations = 10  ! Maximum number of iterations to achieve temperature control
                                             ! (10 interval halvings achieves control to 0.1% of capacity)
                                             ! These two parameters are intended to achieve reasonable control
@@ -920,7 +956,7 @@ SUBROUTINE CalcHighTempRadiantSystemSP(FirstHVACIteration,RadSysNum)
       CASE (MRTSPControl)
         ZoneTemp = MRT(ZoneNum)
       CASE (OperativeSPControl)
-        ZoneTemp = 0.5*(MAT(ZoneNum)+MRT(ZoneNum))
+        ZoneTemp = 0.5d0*(MAT(ZoneNum)+MRT(ZoneNum))
     END SELECT
 
     IF (ZoneTemp < (SetptTemp-TempConvToler)) THEN
@@ -928,16 +964,16 @@ SUBROUTINE CalcHighTempRadiantSystemSP(FirstHVACIteration,RadSysNum)
           ! Use simple interval halving to find the best operating fraction to achieve proper temperature control
       IterNum     = 0
       ConvergFlag = .FALSE.
-      HeatFracMax = 1.0
-      HeatFracMin = 0.0
+      HeatFracMax = 1.0d0
+      HeatFracMin = 0.0d0
 
       DO WHILE ( (IterNum <= MaxIterations) .AND. (.NOT. ConvergFlag) )
 
           ! In the first iteration (IterNum=0), try full capacity and see if that is the best solution
         IF (IterNum == 0) THEN
-          HeatFrac = 1.0
+          HeatFrac = 1.0d0
         ELSE
-          HeatFrac = (HeatFracMin + HeatFracMax) / 2.0
+          HeatFrac = (HeatFracMin + HeatFracMax) / 2.0d0
         END IF
 
           ! Set the heat source for the high temperature radiant system
@@ -958,7 +994,7 @@ SUBROUTINE CalcHighTempRadiantSystemSP(FirstHVACIteration,RadSysNum)
           CASE (MRTControl)
             ZoneTemp = MRT(ZoneNum)
           CASE (OperativeControl)
-            ZoneTemp = 0.5*(MAT(ZoneNum)+MRT(ZoneNum))
+            ZoneTemp = 0.5d0*(MAT(ZoneNum)+MRT(ZoneNum))
         END SELECT
 
         IF ( (ABS(ZoneTemp-SetptTemp)) <= TempConvToler ) THEN
@@ -1083,8 +1119,8 @@ SUBROUTINE UpdateHighTempRadiantSystem(RadSysNum,LoadMet)
         CALL CalcHeatBalanceInsideSurf(ZoneNum)
   END SELECT
 
-  IF (QHTRadSource(RadSysNum) <= 0.0) THEN
-    LoadMet  = 0.0      ! System wasn't running so it can't meet a load
+  IF (QHTRadSource(RadSysNum) <= 0.0d0) THEN
+    LoadMet  = 0.0d0      ! System wasn't running so it can't meet a load
   ELSE
     ZoneNum = HighTempRadSys(RadSysNum)%ZonePtr
     LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) + SumConvHTRadSys(ZoneNum)
@@ -1331,11 +1367,11 @@ SUBROUTINE ReportHighTempRadiantSystem(RadSysNum)
   IF (HighTempRadSys(RadSysNum)%HeaterType == Gas) THEN
     HighTempRadSys(RadSysNum)%GasPower   = QHTRadSource(RadSysNum)/HighTempRadSys(RadSysNum)%CombustionEffic
     HighTempRadSys(RadSysNum)%GasEnergy  = HighTempRadSys(RadSysNum)%GasPower*TimeStepSys*SecInHour
-    HighTempRadSys(RadSysNum)%ElecPower  = 0.0
-    HighTempRadSys(RadSysNum)%ElecEnergy = 0.0
+    HighTempRadSys(RadSysNum)%ElecPower  = 0.0d0
+    HighTempRadSys(RadSysNum)%ElecEnergy = 0.0d0
   ELSE IF (HighTempRadSys(RadSysNum)%HeaterType == Electric) THEN
-    HighTempRadSys(RadSysNum)%GasPower   = 0.0
-    HighTempRadSys(RadSysNum)%GasEnergy  = 0.0
+    HighTempRadSys(RadSysNum)%GasPower   = 0.0d0
+    HighTempRadSys(RadSysNum)%GasEnergy  = 0.0d0
     HighTempRadSys(RadSysNum)%ElecPower  = QHTRadSource(RadSysNum)
     HighTempRadSys(RadSysNum)%ElecEnergy = HighTempRadSys(RadSysNum)%ElecPower*TimeStepSys*SecInHour
   ELSE
@@ -1383,7 +1419,7 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
   REAL(r64)           :: Area        ! Effective surface area
 
           ! FLOW:
-  SumHATsurf = 0.0
+  SumHATsurf = 0.0d0
 
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
@@ -1396,17 +1432,17 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
         Area = Area + SurfaceWindow(SurfNum)%DividerArea
       END IF
 
-      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
+      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
         ! Window frame contribution
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%FrameArea &
-          * (1.0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
+          * (1.0d0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
       END IF
 
-      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
+      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0d0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
            .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntBlindOn) THEN
         ! Window divider contribution (only from shade or blind for window with divider and interior shade or blind)
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%DividerArea &
-          * (1.0 + 2.0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
+          * (1.0d0 + 2.0d0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
       END IF
     END IF
 

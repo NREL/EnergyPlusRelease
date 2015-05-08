@@ -60,21 +60,25 @@ TYPE FluidCoolerspecs
 
   LOGICAL    :: Available                    = .TRUE. ! need an array of logicals--load identifiers of available equipment
   LOGICAL    :: ON                           = .TRUE. ! Simulate the machine at it's operating part load ratio
-  REAL(r64)  :: DesignWaterFlowRate             = 0.0 ! Design water flow rate through the fluid cooler [m3/s]
-  REAL(r64)  :: DesWaterMassFlowRate            = 0.0 ! Design water flow rate through the fluid cooler [kg/s]
-  REAL(r64)  :: HighSpeedAirFlowRate            = 0.0 ! Air flow rate through the fluid cooler at high speed [m3/s]
-  REAL(r64)  :: HighSpeedFanPower               = 0.0 ! Fan power at high fan speed [W]
-  REAL(r64)  :: HighSpeedFluidCoolerUA          = 0.0 ! UA of fluid cooler at high fan speed [W/C]
-  REAL(r64)  :: LowSpeedAirFlowRate             = 0.0 ! Air flow rate through fluid cooler at low speed [m3/s]
-  REAL(r64)  :: LowSpeedFanPower                = 0.0 ! Fan power at low fan speed [W]
-  REAL(r64)  :: LowSpeedFluidCoolerUA           = 0.0 ! UA of fluid cooler at low fan speed [W/C]
-  REAL(r64)  :: DesignEnteringWaterTemp         = 0.0 ! Entering water temperature at design conditions
-  REAL(r64)  :: DesignLeavingWaterTemp          = 0.0 ! Entering water temperature at design conditions
-  REAL(r64)  :: DesignEnteringAirTemp           = 0.0 ! Entering water temperature at design conditions
-  REAL(r64)  :: DesignEnteringAirWetbulbTemp      = 0.0 ! Entering water temperature at design condition
-  REAL(r64)  :: FluidCoolerMassFlowRateMultiplier = 0.0 ! Maximum fluid cooler flow rate is this multiplier * design flow rate
-  REAL(r64)  :: FluidCoolerNominalCapacity        = 0.0 ! Nominal capacity of the fluid cooler [W] at high speed
-  REAL(r64)  :: FluidCoolerLowSpeedNomCap         = 0.0 ! Nominal capacity of the fluid cooler [W] at low speed
+  REAL(r64)  :: DesignWaterFlowRate             = 0.0d0 ! Design water flow rate through the fluid cooler [m3/s]
+  REAL(r64)  :: DesWaterMassFlowRate            = 0.0d0 ! Design water flow rate through the fluid cooler [kg/s]
+  REAL(r64)  :: HighSpeedAirFlowRate            = 0.0d0 ! Air flow rate through the fluid cooler at high speed [m3/s]
+  REAL(r64)  :: HighSpeedFanPower               = 0.0d0 ! Fan power at high fan speed [W]
+  REAL(r64)  :: HighSpeedFluidCoolerUA          = 0.0d0 ! UA of fluid cooler at high fan speed [W/C]
+  REAL(r64)  :: LowSpeedAirFlowRate             = 0.0d0 ! Air flow rate through fluid cooler at low speed [m3/s]
+  REAL(r64)  :: LowSpeedAirFlowRateSizingFactor = 0.0d0 ! sizing factor for low speed air flow rate []
+  REAL(r64)  :: LowSpeedFanPower                = 0.0d0 ! Fan power at low fan speed [W]
+  REAL(r64)  :: LowSpeedFanPowerSizingFactor    = 0.0d0 ! sizing factor for low speed fan power []
+  REAL(r64)  :: LowSpeedFluidCoolerUA           = 0.0d0 ! UA of fluid cooler at low fan speed [W/C]
+  REAL(r64)  :: LowSpeedFluidCoolerUASizingFactor = 0.0d0 ! sizing factor for low speed UA []
+  REAL(r64)  :: DesignEnteringWaterTemp         = 0.0d0 ! Entering water temperature at design conditions
+  REAL(r64)  :: DesignLeavingWaterTemp          = 0.0d0 ! Entering water temperature at design conditions
+  REAL(r64)  :: DesignEnteringAirTemp           = 0.0d0 ! Entering water temperature at design conditions
+  REAL(r64)  :: DesignEnteringAirWetbulbTemp      = 0.0d0 ! Entering water temperature at design condition
+  REAL(r64)  :: FluidCoolerMassFlowRateMultiplier = 0.0d0 ! Maximum fluid cooler flow rate is this multiplier * design flow rate
+  REAL(r64)  :: FluidCoolerNominalCapacity        = 0.0d0 ! Nominal capacity of the fluid cooler [W] at high speed
+  REAL(r64)  :: FluidCoolerLowSpeedNomCap         = 0.0d0 ! Nominal capacity of the fluid cooler [W] at low speed
+  REAL(r64)  :: FluidCoolerLowSpeedNomCapSizingFactor = 0.0d0 !sizing factor for low speed capacity []
   INTEGER    :: WaterInletNodeNum               = 0  ! Node number on the water inlet side of the fluid cooler
   INTEGER    :: WaterOutletNodeNum              = 0  ! Node number on the water outlet side of the fluid cooler
   INTEGER    :: OutdoorAirInletNodeNum          = 0  ! Node number of outdoor air inlet for the fluid cooler
@@ -98,20 +102,20 @@ TYPE FluidCoolerspecs
 END TYPE FluidCoolerspecs
 
 TYPE FluidCoolerInletConds
-  REAL(r64) :: WaterTemp      = 0.0  ! Fluid cooler water inlet temperature (C)
-  REAL(r64) :: AirTemp        = 0.0  ! Fluid cooler air inlet dry-bulb temperature (C)
-  REAL(r64) :: AirWetBulb     = 0.0  ! Fluid cooler air inlet wet-bulb temperature (C)
-  REAL(r64) :: AirPress       = 0.0  ! Fluid cooler air barometric pressure
-  REAL(r64) :: AirHumRat      = 0.0  ! Fluid cooler air inlet humidity ratio (kg/kg)
+  REAL(r64) :: WaterTemp      = 0.0d0  ! Fluid cooler water inlet temperature (C)
+  REAL(r64) :: AirTemp        = 0.0d0  ! Fluid cooler air inlet dry-bulb temperature (C)
+  REAL(r64) :: AirWetBulb     = 0.0d0  ! Fluid cooler air inlet wet-bulb temperature (C)
+  REAL(r64) :: AirPress       = 0.0d0  ! Fluid cooler air barometric pressure
+  REAL(r64) :: AirHumRat      = 0.0d0  ! Fluid cooler air inlet humidity ratio (kg/kg)
 END TYPE FluidCoolerInletConds
 
 TYPE ReportVars
-  REAL(r64)    :: InletWaterTemp         = 0.0  ! Fluid cooler inlet water temperature (C)
-  REAL(r64)    :: OutletWaterTemp        = 0.0  ! Fluid cooler outlet water temperature (C)
-  REAL(r64)    :: WaterMassFlowRate      = 0.0  ! Fluid cooler water mass flow rate (m3/s)
-  REAL(r64)    :: Qactual                = 0.0  ! Fluid cooler heat rejection rate (W)
-  REAL(r64)    :: FanPower               = 0.0  ! Fluid cooler fan power (W)
-  REAL(r64)    :: FanEnergy              = 0.0  ! Fluid cooler fan energy consumption (J)
+  REAL(r64)    :: InletWaterTemp         = 0.0d0  ! Fluid cooler inlet water temperature (C)
+  REAL(r64)    :: OutletWaterTemp        = 0.0d0  ! Fluid cooler outlet water temperature (C)
+  REAL(r64)    :: WaterMassFlowRate      = 0.0d0  ! Fluid cooler water mass flow rate (m3/s)
+  REAL(r64)    :: Qactual                = 0.0d0  ! Fluid cooler heat rejection rate (W)
+  REAL(r64)    :: FanPower               = 0.0d0  ! Fluid cooler fan power (W)
+  REAL(r64)    :: FanEnergy              = 0.0d0  ! Fluid cooler fan energy consumption (J)
 END TYPE ReportVars
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -121,17 +125,17 @@ INTEGER           :: NumSimpleFluidCoolers          = 0      ! Number of similar
 ! across sim, update, and report routines.  Simulation manager must be careful
 ! in models with multiple fluid coolers.
 
-REAL(r64)  :: InletWaterTemp           = 0.0    ! CW temperature at fluid cooler inlet
-REAL(r64)  :: OutletWaterTemp          = 0.0    ! CW temperature at fluid cooler outlet
+REAL(r64)  :: InletWaterTemp           = 0.0d0    ! CW temperature at fluid cooler inlet
+REAL(r64)  :: OutletWaterTemp          = 0.0d0    ! CW temperature at fluid cooler outlet
 INTEGER    :: WaterInletNode           = 0      ! Node number at fluid cooler inlet
 INTEGER    :: WaterOutletNode          = 0      ! Node number at fluid cooler outlet
-REAL(r64)  :: WaterMassFlowRate        = 0.0    ! WaterMassFlowRate through fluid cooler
+REAL(r64)  :: WaterMassFlowRate        = 0.0d0    ! WaterMassFlowRate through fluid cooler
 !DSU this is plant level stuff now  :: FluidCoolerMassFlowRateMax     = 0.0    ! Max Hardware Mass Flow Rate
 !DSU this is plant level stuff now  :: FluidCoolerMassFlowRateMin     = 0.0    ! Min Hardware Mass Flow Rate
 !DSU this is plant level stuff now  :: LoopMassFlowRateMaxAvail = 0.0    ! Max Loop Mass Flow Rate available
 !DSU this is plant level stuff now  :: LoopMassFlowRateMinAvail = 0.0    ! Min Loop Mass Flow Rate available
-REAL(r64)  :: Qactual                  = 0.0    ! Fluid cooler heat transfer
-REAL(r64)  :: FanPower                 = 0.0    ! Fluid cooler fan power used
+REAL(r64)  :: Qactual                  = 0.0d0    ! Fluid cooler heat transfer
+REAL(r64)  :: FanPower                 = 0.0d0    ! Fluid cooler fan power used
 
 TYPE (FluidCoolerspecs),      ALLOCATABLE, DIMENSION(:) :: SimpleFluidCooler         ! dimension to number of machines
 TYPE (FluidCoolerInletConds), ALLOCATABLE, DIMENSION(:) :: SimpleFluidCoolerInlet    ! inlet conditions
@@ -257,7 +261,7 @@ SUBROUTINE SimFluidCoolers(FluidCoolerType,FluidCoolerName, CompIndex, RunFlag,I
         IF (InitLoopEquip) THEN
           CALL InitFluidCooler(FluidCoolerNum, RunFlag)
           IF (.NOT. PlantSizesOkayToFinalize) CALL SizeFluidCooler(FluidCoolerNum)
-          MinCap = 0.0
+          MinCap = 0.0d0
           MaxCap = SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity
           OptCap = SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity
           RETURN
@@ -271,7 +275,7 @@ SUBROUTINE SimFluidCoolers(FluidCoolerType,FluidCoolerName, CompIndex, RunFlag,I
         IF (InitLoopEquip) THEN
           CALL InitFluidCooler(FluidCoolerNum, RunFlag)
           IF (.NOT. PlantSizesOkayToFinalize) CALL SizeFluidCooler(FluidCoolerNum)
-          MinCap = 0.0 ! signifies non-load based model (i.e. forward
+          MinCap = 0.0d0 ! signifies non-load based model (i.e. forward
           MaxCap = SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity
           OptCap = SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity
           RETURN
@@ -351,7 +355,7 @@ SUBROUTINE GetFluidCoolerInput
     LOGICAL        :: IsNotOK                   ! Flag to verify name
     LOGICAL        :: IsBlank                   ! Flag for blank name
     LOGICAL, SAVE  :: ErrorsFound=.false.       ! Logical flag set .true. if errors found while getting input data
-    REAL(r64), DIMENSION(12)         :: NumArray              ! Numeric input data array
+    REAL(r64), DIMENSION(16)         :: NumArray              ! Numeric input data array
     CHARACTER(len=MaxNameLength),DIMENSION(5) :: AlphArray   ! Character string input data array
 
 !! LKL - still more renaming stuff to go.
@@ -529,7 +533,7 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
     SimpleFluidCooler(FluidCoolerNum)%Name                              = AlphArray(1)
     SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType                   = TRIM(cCurrentModuleObject)
     SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num               = FluidCooler_TwoSpeed
-    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerMassFlowRateMultiplier = 2.5
+    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerMassFlowRateMultiplier = 2.5d0
     SimpleFluidCooler(FluidCoolerNum)%WaterInletNodeNum     = &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(cCurrentModuleObject),AlphArray(1), &
                NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
@@ -540,16 +544,20 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
 
     SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA        = NumArray(1)
     SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA         = NumArray(2)
-    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity    = NumArray(3)
-    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap     = NumArray(4)
-    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringWaterTemp       = NumArray(5)
-    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp         = NumArray(6)
-    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirWetbulbTemp  = NumArray(7)
-    SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate           = NumArray(8)
-    SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate          = NumArray(9)
-    SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower             = NumArray(10)
-    SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate           = NumArray(11)
-    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower              = NumArray(12)
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUASizingFactor = NumArray(3)
+    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity    = NumArray(4)
+    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap     = NumArray(5)
+    SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCapSizingFactor = NumArray(6)
+    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringWaterTemp       = NumArray(7)
+    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp         = NumArray(8)
+    SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirWetbulbTemp  = NumArray(9)
+    SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate           = NumArray(10)
+    SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate          = NumArray(11)
+    SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower             = NumArray(12)
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate           = NumArray(13)
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRateSizingFactor = NumArray(14)
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower              = NumArray(15)
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPowerSizingFactor    = NumArray(16)
 
 !   outdoor air inlet node
     IF (AlphArray(5) == Blank) THEN
@@ -570,29 +578,29 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
 !   wetbulb temperature must be specified for the both the performance input methods
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignEnteringWaterTemp <= 0.0d0) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(5))//'", entered value <= 0.0, but must be > 0 ')
+        trim(cNumericFieldNames(7))//'", entered value <= 0.0, but must be > 0 ')
        ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp <= 0.0d0) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(6))//'", entered value <= 0.0, but must be > 0 ')
+        trim(cNumericFieldNames(8))//'", entered value <= 0.0, but must be > 0 ')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirWetbulbTemp <= 0.0d0) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(7))//'", entered value <= 0.0, but must be > 0 ')
+        trim(cNumericFieldNames(9))//'", entered value <= 0.0, but must be > 0 ')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignEnteringWaterTemp <= &
                 SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", '//  &
-        trim(cNumericFieldNames(5))//' must be greater than '//trim(cNumericFieldNames(6))//'.')
+        trim(cNumericFieldNames(7))//' must be greater than '//trim(cNumericFieldNames(8))//'.')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirTemp <= &
                 SimpleFluidCooler(FluidCoolerNum)%DesignEnteringAirWetbulbTemp) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", '//  &
-        trim(cNumericFieldNames(6))//' must be greater than '//trim(cNumericFieldNames(7))//'.')
+        trim(cNumericFieldNames(8))//' must be greater than '//trim(cNumericFieldNames(9))//'.')
       ErrorsFound=.true.
     ENDIF
 
@@ -600,21 +608,21 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate <= 0.0d0 .AND. &
         SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate .NE. AutoSize) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'= "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(8))//'", entered value <= 0.0, but must be > 0 for '//  &
+        trim(cNumericFieldNames(10))//'", entered value <= 0.0, but must be > 0 for '//  &
         trim(cAlphaFieldNames(4))//'= "'//trim(AlphArray(4))//'".')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate <= 0.0d0 .AND. &
         SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate .NE. AutoSize) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'= "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(9))//'", entered value <= 0.0, but must be > 0 for '//  &
+        trim(cNumericFieldNames(11))//'", entered value <= 0.0, but must be > 0 for '//  &
         trim(cAlphaFieldNames(4))//'= "'//trim(AlphArray(4))//'".')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate <= 0.0d0 .AND. &
         SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate .NE. AutoSize) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//'= "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(11))//'", entered value <= 0.0, but must be > 0 for '//  &
+        trim(cNumericFieldNames(13))//'", entered value <= 0.0, but must be > 0 for '//  &
         trim(cAlphaFieldNames(4))//'= "'//trim(AlphArray(4))//'".')
       ErrorsFound=.true.
     ENDIF
@@ -631,14 +639,14 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
     IF (SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower <= 0.0d0 .AND. &
         SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower .NE. AutoSize) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(10))//'", entered value <= 0.0, but must be > 0 for '//  &
+        trim(cNumericFieldNames(12))//'", entered value <= 0.0, but must be > 0 for '//  &
         trim(cAlphaFieldNames(4))//' = "'//trim(AlphArray(4))//'".')
       ErrorsFound=.true.
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower <= 0.0d0 .AND. &
         SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower .NE. AutoSize) THEN
       CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-        trim(cNumericFieldNames(12))//'", entered value <= 0.0, but must be > 0 for '//  &
+        trim(cNumericFieldNames(15))//'", entered value <= 0.0, but must be > 0 for '//  &
         trim(cAlphaFieldNames(4))//' = "'//trim(AlphArray(4))//'".')
       ErrorsFound=.true.
     ENDIF
@@ -677,13 +685,13 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
       SimpleFluidCooler(FluidCoolerNum)%PerformanceInputMethod_Num = PIM_NominalCapacity
       IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity <= 0.0d0) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-          trim(cNumericFieldNames(3))//'", entered value <= 0.0, but must be > 0 for '//  &
+          trim(cNumericFieldNames(4))//'", entered value <= 0.0, but must be > 0 for '//  &
           trim(cAlphaFieldNames(4))//'= "'//trim(AlphArray(4))//'".')
         ErrorsFound=.true.
       ENDIF
       IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap <= 0.0d0) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//' = "'//trim(AlphArray(1))//'", invalid data for "'//   &
-          trim(cNumericFieldNames(4))//'", entered value <= 0.0, but must be > 0 for '//  &
+          trim(cNumericFieldNames(5))//'", entered value <= 0.0, but must be > 0 for '//  &
           trim(cAlphaFieldNames(4))//'= "'//trim(AlphArray(4))//'".')
         ErrorsFound=.true.
       ENDIF
@@ -812,17 +820,17 @@ SUBROUTINE InitSimVars
 
           !INITIALIZE MODULE LEVEL VARIABLES
 
-    InletWaterTemp           = 0.0    ! CW temperature at fluid cooler inlet
-    OutletWaterTemp          = 0.0    ! CW temperature at fluid cooler outlet
+    InletWaterTemp           = 0.0d0    ! CW temperature at fluid cooler inlet
+    OutletWaterTemp          = 0.0d0    ! CW temperature at fluid cooler outlet
     WaterInletNode           = 0      ! Node number at fluid cooler inlet
     WaterOutletNode          = 0      ! Node number at fluid cooler outlet
-    WaterMassFlowRate        = 0.0    ! WaterMassFlowRate through fluid cooler
+    WaterMassFlowRate        = 0.0d0    ! WaterMassFlowRate through fluid cooler
 !    FluidCoolerMassFlowRateMax     = 0.0    ! Max Hardware Mass Flow Rate
 !    FluidCoolerMassFlowRateMin     = 0.0    ! Min Hardware Mass Flow Rate
 !    LoopMassFlowRateMaxAvail = 0.0    ! Max Loop Mass Flow Rate available
 !    LoopMassFlowRateMinAvail = 0.0    ! Min Loop Mass Flow Rate available
-    Qactual                  = 0.0    ! Fluid cooler heat transfer
-    FanPower                 = 0.0    ! Fluid cooler fan power used
+    Qactual                  = 0.0d0    ! Fluid cooler heat transfer
+    FanPower                 = 0.0d0    ! Fluid cooler fan power used
 
 RETURN
 END SUBROUTINE InitSimVars
@@ -1047,7 +1055,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
   LOGICAL             :: ErrorsFound
 
   PltSizCondNum = 0
-  DesFluidCoolerLoad = 0.0
+  DesFluidCoolerLoad = 0.0d0
   tmpDesignWaterFlowRate = SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate
   tmpHighSpeedFanPower   = SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower
   tmpHighSpeedAirFlowRate= SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate
@@ -1107,7 +1115,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
       DesFluidCoolerLoad = rho * Cp * tmpDesignWaterFlowRate * PlantSizData(PltSizCondNum)%DeltaT
       SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity = DesFluidCoolerLoad
     ELSE
-      SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity = 0.0
+      SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity = 0.0d0
     ENDIF
   END IF
 
@@ -1287,7 +1295,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
           CALL ShowWarningError('Iteration limit exceeded in calculating fluid cooler UA.')
           CALL ShowContinueError('Autosizing of fluid cooler UA failed for fluid cooler = '//&
                                TRIM(SimpleFluidCooler(FluidCoolerNum)%Name))
-          CALL ShowContinueError('The final UA value =' //TRIM(RoundSigDigits(UA,2))//' W/C, and the simulation continues...')
+          CALL ShowContinueError('The final UA value =' //TRIM(RoundSigDigits(UA,2))//' W/K, and the simulation continues...')
         ELSEIF (SolFla == -2) THEN
           CALL SimSimpleFluidCooler(INT(Par(2)),Par(3),Par(4),UA0,OutWaterTempAtUA0)
           CALL SimSimpleFluidCooler(INT(Par(2)),Par(3),Par(4),UA1,OutWaterTempAtUA1)
@@ -1319,9 +1327,9 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
           CALL ShowContinueError('Design Fluid Cooler Water Inlet Temp [C]           = '// &
                                   TRIM(RoundSigDigits(SimpleFluidCoolerInlet(FluidCoolerNum)%WaterTemp,2)))
           CALL ShowContinueError('Calculated water outlet temp at low UA [C] (UA = '// &
-                                  TRIM(RoundSigDigits(UA0,2))//' W/C) = '// TRIM(RoundSigDigits(OutWaterTempAtUA0,2)))
+                                  TRIM(RoundSigDigits(UA0,2))//' W/K) = '// TRIM(RoundSigDigits(OutWaterTempAtUA0,2)))
           CALL ShowContinueError('Calculated water outlet temp at high UA [C](UA = '// &
-                                  TRIM(RoundSigDigits(UA1,2))//' W/C) = '// TRIM(RoundSigDigits(OutWaterTempAtUA1,2)))
+                                  TRIM(RoundSigDigits(UA1,2))//' W/K) = '// TRIM(RoundSigDigits(OutWaterTempAtUA1,2)))
           CALL ShowFatalError('Autosizing of Fluid Cooler UA failed for fluid cooler = '// &
                                   TRIM(SimpleFluidCooler(FluidCoolerNum)%Name))
         ENDIF
@@ -1335,12 +1343,12 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
       IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_SingleSpeed) THEN
         IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, &
                                 SimpleFluidCooler(FluidCoolerNum)%Name, &
-                               'U-factor Times Area Value at Design Air Flow Rate [W/C]', &
+                               'U-factor Times Area Value at Design Air Flow Rate [W/K]', &
                                 SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA)
       ELSEIF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_TwoSpeed) THEN
         IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, &
                                 SimpleFluidCooler(FluidCoolerNum)%Name, &
-                               'U-factor Times Area Value at High Fan Speed [W/C]', &
+                               'U-factor Times Area Value at High Fan Speed [W/K]', &
                                 SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA)
       ENDIF
     ELSE
@@ -1383,7 +1391,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
           CALL ShowWarningError('Iteration limit exceeded in calculating fluid cooler UA.')
           CALL ShowContinueError('Autosizing of fluid cooler UA failed for fluid cooler = '//&
                                TRIM(SimpleFluidCooler(FluidCoolerNum)%Name))
-          CALL ShowContinueError('The final UA value =' //TRIM(RoundSigDigits(UA,2))//' W/C, and the simulation continues...')
+          CALL ShowContinueError('The final UA value =' //TRIM(RoundSigDigits(UA,2))//' W/K, and the simulation continues...')
       ELSEIF (SolFla == -2) THEN
         CALL SimSimpleFluidCooler(INT(Par(2)),Par(3),Par(4),UA0,OutWaterTempAtUA0)
         CALL SimSimpleFluidCooler(INT(Par(2)),Par(3),Par(4),UA1,OutWaterTempAtUA1)
@@ -1415,51 +1423,63 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
         CALL ShowContinueError('Design Fluid Cooler Water Inlet Temp [C]           = '// &
                                 TRIM(RoundSigDigits(SimpleFluidCoolerInlet(FluidCoolerNum)%WaterTemp,2)))
         CALL ShowContinueError('Calculated water outlet temp at low UA [C] (UA = '// &
-                                TRIM(RoundSigDigits(UA0,2))//' W/C) = '// TRIM(RoundSigDigits(OutWaterTempAtUA0,2)))
+                                TRIM(RoundSigDigits(UA0,2))//' W/K) = '// TRIM(RoundSigDigits(OutWaterTempAtUA0,2)))
         CALL ShowContinueError('Calculated water outlet temp at high UA [C] (UA = '// &
-                                TRIM(RoundSigDigits(UA1,2))//' W/C) = '// TRIM(RoundSigDigits(OutWaterTempAtUA1,2)))
+                                TRIM(RoundSigDigits(UA1,2))//' W/K) = '// TRIM(RoundSigDigits(OutWaterTempAtUA1,2)))
         CALL ShowFatalError('Autosizing of Fluid Cooler UA failed for fluid cooler = '// &
                                 TRIM(SimpleFluidCooler(FluidCoolerNum)%Name))
       ENDIF
       SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA = UA
     ELSE
-      SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA = 0.0
+      SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA = 0.0d0
     ENDIF
     IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_SingleSpeed) THEN
       IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, &
                                                             SimpleFluidCooler(FluidCoolerNum)%Name, &
-                              'Fluid cooler UA value at design air flow rate based on nominal capacity input [W/C]', &
+                              'Fluid cooler UA value at design air flow rate based on nominal capacity input [W/K]', &
                               SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA)
     ELSEIF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_TwoSpeed) THEN
       IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, &
                                                                          SimpleFluidCooler(FluidCoolerNum)%Name, &
-                              'Fluid cooler UA value at high fan speed based on nominal capacity input [W/C]', &
+                              'Fluid cooler UA value at high fan speed based on nominal capacity input [W/K]', &
                               SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA)
     ENDIF
   ENDIF
 
   IF (SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate == AutoSize .AND. PlantSizesOkayToFinalize ) THEN
-    SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate = 0.5d0*SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate = SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRateSizingFactor &
+                                                             * SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate
     CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, SimpleFluidCooler(FluidCoolerNum)%Name, &
                               'Air Flow Rate at Low Fan Speed [m3/s]', SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate)
   ENDIF
 
   IF (SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower == AutoSize .AND. PlantSizesOkayToFinalize ) THEN
-      SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower = 0.16d0*SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower
+      SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower = SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPowerSizingFactor &
+                                                            * SimpleFluidCooler(FluidCoolerNum)%HighSpeedFanPower
       CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, SimpleFluidCooler(FluidCoolerNum)%Name, &
                               'Fan Power at Low Fan Speed [W]', SimpleFluidCooler(FluidCoolerNum)%LowSpeedFanPower)
   ENDIF
 
   IF (SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA == AutoSize .AND. PlantSizesOkayToFinalize ) THEN
-    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA = 0.6d0*SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA
+    SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA = &
+                                           SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUASizingFactor &
+                                              * SimpleFluidCooler(FluidCoolerNum)%HighSpeedFluidCoolerUA
     CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, SimpleFluidCooler(FluidCoolerNum)%Name, &
-                  'U-factor Times Area Value at Low Fan Speed [W/C]', SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA)
+                  'U-factor Times Area Value at Low Fan Speed [W/K]', SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA)
   ENDIF
 
   IF (SimpleFluidCooler(FluidCoolerNum)%PerformanceInputMethod_Num == PIM_NominalCapacity .AND. &
       SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_TwoSpeed) THEN
+    IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap == Autosize) THEN
+      SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap = &
+          SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCapSizingFactor &
+            * SimpleFluidCooler(FluidCoolerNum)%FluidCoolerNominalCapacity
+      CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, SimpleFluidCooler(FluidCoolerNum)%Name, &
+                  'Low Fan Speed Nominal Capacity [W]', SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap)
+    ENDIF
+
     IF (SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate >= SmallWaterVolFlow .AND.  &
-       SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap > 0.0) THEN
+       SimpleFluidCooler(FluidCoolerNum)%FluidCoolerLowSpeedNomCap > 0.0d0) THEN
       rho = GetDensityGlycol(PlantLoop(SimpleFluidCooler(FluidCoolerNum)%LoopNum)%FluidName,  &
                              InitConvTemp, &
                              PlantLoop(SimpleFluidCooler(FluidCoolerNum)%LoopNum)%FluidIndex,&
@@ -1533,7 +1553,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
       ENDIF
       SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA = UA
     ELSE
-      SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA = 0.0
+      SimpleFluidCooler(FluidCoolerNum)%LowSpeedFluidCoolerUA = 0.0d0
     ENDIF
     IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType, &
                              SimpleFluidCooler(FluidCoolerNum)%Name, &
@@ -1551,7 +1571,7 @@ SUBROUTINE SizeFluidCooler(FluidCoolerNum)
   ENDIF
 
   IF (SimpleFluidCooler(FluidCoolerNum)%FluidCoolerType_Num == FluidCooler_TwoSpeed) THEN
-    IF (SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate > 0.0) THEN
+    IF (SimpleFluidCooler(FluidCoolerNum)%DesignWaterFlowRate > 0.0d0) THEN
       IF (SimpleFluidCooler(FluidCoolerNum)%HighSpeedAirFlowRate <=   &
          SimpleFluidCooler(FluidCoolerNum)%LowSpeedAirFlowRate) THEN
         CALL ShowSevereError('FluidCooler:TwoSpeed  "'//TRIM(SimpleFluidCooler(FluidCoolerNum)%Name)//&
@@ -1659,9 +1679,9 @@ SUBROUTINE SingleSpeedFluidCooler(FluidCoolerNum)
     !set inlet and outlet nodes
   WaterInletNode     = SimpleFluidCooler(FluidCoolerNum)%WaterInletNodeNum
   WaterOutletNode    = SimpleFluidCooler(FluidCoolerNum)%WaterOutletNodeNum
-  Qactual            = 0.0
-  FanModeFrac        = 0.0
-  FanPower           = 0.0
+  Qactual            = 0.0d0
+  FanModeFrac        = 0.0d0
+  FanPower           = 0.0d0
   OutletWaterTemp    = Node(WaterInletNode)%Temp
   LoopNum            = SimpleFluidCooler(FluidCoolerNum)%LoopNum
   LoopSideNum        = SimpleFluidCooler(FluidCoolerNum)%LoopSideNum
@@ -1799,10 +1819,10 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
 
   WaterInletNode      = SimpleFluidCooler(FluidCoolerNum)%WaterInletNodeNum
   WaterOutletNode     = SimpleFluidCooler(FluidCoolerNum)%WaterOutletNodeNum
-  Qactual             = 0.0
-  FanPower            = 0.0
+  Qactual             = 0.0d0
+  FanPower            = 0.0d0
   OutletWaterTemp     = Node(WaterInletNode)%Temp
-  FanModeFrac         = 0.0
+  FanModeFrac         = 0.0d0
   LoopNum             = SimpleFluidCooler(FluidCoolerNum)%LoopNum
   LoopSideNum         = SimpleFluidCooler(FluidCoolerNum)%LoopSideNum
   SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
@@ -1821,7 +1841,7 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
   OutletWaterTempOFF      = Node(WaterInletNode)%Temp
   OutletWaterTemp1stStage = OutletWaterTempOFF
   OutletWaterTemp2ndStage = OutletWaterTempOFF
-  FanModeFrac             = 0.0
+  FanModeFrac             = 0.0d0
 
   IF (OutletWaterTempOFF < TempSetPoint) THEN !already there don't need to run the cooler
     RETURN
@@ -1850,7 +1870,7 @@ SUBROUTINE TwoSpeedFluidCooler(FluidCoolerNum)
 
     Call SimSimpleFluidCooler(FluidCoolerNum,WaterMassFlowRate,AirFlowRate,UAdesign,OutletWaterTemp2ndStage)
 
-    IF((OutletWaterTemp2ndStage .LE. TempSetPoint).AND. UAdesign .GT. 0.0)THEN
+    IF((OutletWaterTemp2ndStage .LE. TempSetPoint).AND. UAdesign .GT. 0.0d0)THEN
       ! Setpoint was met with pump ON and fan ON 2nd stage, calculate fan mode fraction
       FanModeFrac     = (TempSetPoint-OutletWaterTemp1stStage)/(OutletWaterTemp2ndStage-OutletWaterTemp1stStage)
       FanPower        = MAX((FanModeFrac * FanPowerHigh) + (1.d0-FanModeFrac)*FanPowerLow, 0.0D0)
@@ -1930,13 +1950,13 @@ SUBROUTINE SimSimpleFluidCooler(FluidCoolerNum,WaterMassFlowRate,AirFlowRate,UAd
 
   WaterInletNode    = SimpleFluidCooler(FluidCoolerNum)%WaterInletNodeNum
   WaterOutletNode   = SimpleFluidCooler(FluidCoolerNum)%WaterOutletNodeNum
-  Qactual           = 0
+  Qactual           = 0.0d0
   ! set local fluid cooler inlet and outlet temperature variables
   InletWaterTemp    = SimpleFluidCoolerInlet(FluidCoolerNum)%WaterTemp
   OutletWaterTemp   = InletWaterTemp
   InletAirTemp      = SimpleFluidCoolerInlet(FluidCoolerNum)%AirTemp
 
-  IF(UAdesign.EQ.0.0)RETURN
+  IF(UAdesign.EQ.0.0d0)RETURN
 
   ! set water and air properties
   AirDensity        = PsyRhoAirFnPbTdbW(SimpleFluidCoolerInlet(FluidCoolerNum)%AirPress,InletAirTemp,  &
@@ -1969,7 +1989,7 @@ SUBROUTINE SimSimpleFluidCooler(FluidCoolerNum,WaterMassFlowRate,AirFlowRate,UAd
   ! calculate new exiting dry bulb temperature of airstream
   OutletAirTemp = InletAirTemp + Qactual/AirCapacity
 
-  IF(Qactual .GE. 0.0)THEN
+  IF(Qactual .GE. 0.0d0)THEN
     OutletWaterTemp = InletWaterTemp - Qactual/ MdotCpWater
   ELSE
     OutletWaterTemp = InletWaterTemp
@@ -2113,7 +2133,7 @@ SUBROUTINE UpdateFluidCooler(FluidCoolerNum)
 
    ! Check if OutletWaterTemp is below the minimum condenser loop temp and warn user
    LoopMinTemp = PlantLoop(LoopNum)%MinTemp
-   IF(OutletWaterTemp.LT.LoopMinTemp .AND. WaterMassFlowRate > 0.0) THEN
+   IF(OutletWaterTemp.LT.LoopMinTemp .AND. WaterMassFlowRate > 0.0d0) THEN
      SimpleFluidCooler(FluidCoolerNum)%OutletWaterTempErrorCount = SimpleFluidCooler(FluidCoolerNum)%OutletWaterTempErrorCount &
                                                                          + 1
      WRITE(CharLowOutletTemp,LowTempFmt) LoopMinTemp
@@ -2134,7 +2154,7 @@ SUBROUTINE UpdateFluidCooler(FluidCoolerNum)
    END IF
 
    ! Check if water mass flow rate is small (e.g. no flow) and warn user
-   IF(WaterMassFlowRate .GT. 0.0 .AND. WaterMassFlowRate .LE. MassFlowTolerance)THEN
+   IF(WaterMassFlowRate .GT. 0.0d0 .AND. WaterMassFlowRate .LE. MassFlowTolerance)THEN
      SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount =   &
         SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount + 1
      IF (SimpleFluidCooler(FluidCoolerNum)%SmallWaterMassFlowErrorCount < 2) THEN
@@ -2241,9 +2261,9 @@ SUBROUTINE ReportFluidCooler(RunFlag, FluidCoolerNum)
     SimpleFluidCoolerReport(FluidCoolerNum)%InletWaterTemp         = Node(WaterInletNode)%Temp
     SimpleFluidCoolerReport(FluidCoolerNum)%OutletWaterTemp        = Node(WaterInletNode)%Temp
     SimpleFluidCoolerReport(FluidCoolerNum)%WaterMassFlowRate      = WaterMassFlowRate
-    SimpleFluidCoolerReport(FluidCoolerNum)%Qactual                = 0.0
-    SimpleFluidCoolerReport(FluidCoolerNum)%FanPower               = 0.0
-    SimpleFluidCoolerReport(FluidCoolerNum)%FanEnergy              = 0.0
+    SimpleFluidCoolerReport(FluidCoolerNum)%Qactual                = 0.0d0
+    SimpleFluidCoolerReport(FluidCoolerNum)%FanPower               = 0.0d0
+    SimpleFluidCoolerReport(FluidCoolerNum)%FanEnergy              = 0.0d0
 
   ELSE
     SimpleFluidCoolerReport(FluidCoolerNum)%InletWaterTemp         = Node(WaterInletNode)%Temp

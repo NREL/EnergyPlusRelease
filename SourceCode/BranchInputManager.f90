@@ -81,7 +81,7 @@ END TYPE
 TYPE BranchData
   CHARACTER(len=MaxNameLength)   :: Name              = Blank ! Name for this Branch
   CHARACTER(len=MaxNameLength)   :: AssignedLoopName  = Blank ! Loop Name for this branch
-  REAL(r64)                      :: MaxFlowRate       = 0.0   ! Max Flow Rate of the Branch
+  REAL(r64)                      :: MaxFlowRate       = 0.0d0   ! Max Flow Rate of the Branch
   INTEGER                        :: PressureCurveType = 0     ! Integer index of pressure curve type
   INTEGER                        :: PressureCurveIndex= 0     ! Integer index of pressure curve
   INTEGER                        :: FluidType         = NodeType_Unknown ! Fluid type (see DataLoopNode)
@@ -128,6 +128,7 @@ LOGICAL :: GetBranchListInputFlag=.true.    ! Flag used to retrieve Input
 LOGICAL :: GetSplitterInputFlag=.true.      ! Flag used to retrieve Input
 LOGICAL :: GetMixerInputFlag=.true.         ! Flag used to retrieve Input
 LOGICAL :: GetConnectorListInputFlag=.true. ! Flag used to retrieve Input
+LOGICAL,PUBLIC :: InvalidBranchDefinitions=.false.
 
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in getting objects
 
@@ -141,6 +142,9 @@ PUBLIC  GetLoopSplitter
 PUBLIC  GetLoopMixer
 PUBLIC  TestBranchIntegrity
 PUBLIC  AuditBranches
+PUBLIC  GetAirBranchIndex
+PUBLIC  GetBranchFlow
+PUBLIC  GetBranchFanTypeName
 !PUBLIC  TestAirPathIntegrity
 !PRIVATE TestSupplyAirPathIntegrity
 !PRIVATE TestReturnAirPathIntegrity
@@ -154,6 +158,8 @@ PRIVATE GetBranchListInput
 PUBLIC  GetNumSplitterMixerInConntrList
 PUBLIC  GetFirstBranchInletNodeName
 PUBLIC  GetLastBranchOutletNodeName
+PUBLIC  CheckSystemBranchFlow
+PRIVATE CheckBranchForOASys
 !PUBLIC  MyPlantSizingIndex
 PRIVATE FindPlantLoopBranchConnection
 PRIVATE FindCondenserLoopBranchConnection
@@ -515,6 +521,293 @@ INTEGER FUNCTION NumCompsInBranch(BranchName)
 
 END FUNCTION NumCompsInBranch
 
+INTEGER FUNCTION GetAirBranchIndex(CompType, CompName)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   April 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns the branch index so that the calling
+          ! routine can search for a fan on this branch or use branch flow for sizing.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CompType
+  CHARACTER(len=*), INTENT(IN) :: CompName
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER BranchNum
+  INTEGER CompNum
+  INTEGER NumBranches
+
+  IF (GetBranchInputFlag) THEN
+    GetBranchInputFlag=.false.
+    CALL GetBranchInput
+  ENDIF
+
+  NumBranches=SIZE(BRANCH)
+
+  IF (NumBranches == 0) THEN
+    CALL ShowSevereError('GetAirBranchIndex:  Branch not found with component = '//TRIM(CompType)//' "'//TRIM(CompName)//'"')
+    GetAirBranchIndex=0
+  ELSE
+    BranchLoop: DO BranchNum = 1, NumBranches
+      DO CompNum = 1, Branch(BranchNum)%NumOfComponents
+        IF(SameString(CompType,Branch(BranchNum)%Component(CompNum)%CType) .AND. &
+           SameString(CompName,Branch(BranchNum)%Component(CompNum)%Name))THEN
+          GetAirBranchIndex=BranchNum
+          EXIT BranchLoop
+        END IF
+      END DO
+    END DO BranchLoop
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetAirBranchIndex
+
+REAL(r64) FUNCTION GetBranchFlow(BranchNum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   April 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns the branch index so that the calling
+          ! routine can search for a fan on this branch or use branch flow for sizing.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError
+  USE General, ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: BranchNum
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER NumBranches
+
+  IF (GetBranchInputFlag) THEN
+    GetBranchInputFlag=.false.
+    CALL GetBranchInput
+  ENDIF
+
+  NumBranches=SIZE(BRANCH)
+
+  IF (NumBranches == 0) THEN
+    CALL ShowSevereError('GetBranchFlow:  Branch index not found = '//TrimSigDigits(BranchNum,0))
+    GetBranchFlow = 0.d0
+  ELSE
+    IF(BranchNum > 0 .AND. BranchNum <= NumBranches)THEN
+      GetBranchFlow = Branch(BranchNum)%MaxFlowRate
+    END IF
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetBranchFlow
+
+SUBROUTINE GetBranchFanTypeName(BranchNum, FanType, FanName, ErrFound)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   April 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns the branch fan flow rate so that the calling
+          ! routine can either use this flow or use then branch flow for sizing.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError
+  USE General, ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: BranchNum
+  CHARACTER(len=MaxNameLength), INTENT(INOUT) :: FanType
+  CHARACTER(len=MaxNameLength), INTENT(INOUT) :: FanName
+  LOGICAL :: ErrFound
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+  CHARACTER(len=1), PARAMETER :: Blank=' '
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER CompNum
+  INTEGER NumBranches
+
+  IF (GetBranchInputFlag) THEN
+    GetBranchInputFlag=.false.
+    CALL GetBranchInput
+  ENDIF
+
+  ErrFound = .FALSE.
+  NumBranches=SIZE(BRANCH)
+
+  FanType=Blank
+  FanName=Blank
+
+  IF (NumBranches == 0) THEN
+    CALL ShowSevereError('GetBranchFanTypeName:  Branch index not found = '//TrimSigDigits(BranchNum,0))
+    ErrFound = .TRUE.
+  ELSE
+    IF(BranchNum > 0 .AND. BranchNum <= NumBranches)THEN
+      DO CompNum = 1, Branch(BranchNum)%NumOfComponents
+        IF(SameString('Fan:OnOff',Branch(BranchNum)%Component(CompNum)%CType) .OR. &
+           SameString('Fan:ConstantVolume',Branch(BranchNum)%Component(CompNum)%CType) .OR. &
+           SameString('Fan:VariableVolume',Branch(BranchNum)%Component(CompNum)%CType))THEN
+          FanType=Branch(BranchNum)%Component(CompNum)%CType
+          FanName=Branch(BranchNum)%Component(CompNum)%Name
+          EXIT
+        END IF
+      END DO
+      IF(FanType == Blank)ErrFound = .TRUE.
+    ELSE
+      CALL ShowSevereError('GetBranchFanTypeName:  Branch index not found = '//TrimSigDigits(BranchNum,0))
+      ErrFound = .TRUE.
+    END IF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE GetBranchFanTypeName
+
+SUBROUTINE CheckBranchForOASys(CompType, CompName, OASysFlag, ErrFound)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   August 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns TRUE if the branch contains an OA System
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError
+  USE General, ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CompType
+  CHARACTER(len=*), INTENT(IN) :: CompName
+  LOGICAL, INTENT(INOUT)                   :: OASysFlag
+  LOGICAL, INTENT(INOUT)                   :: ErrFound
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+  CHARACTER(len=1), PARAMETER :: Blank=' '
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER CompNum        ! loop counter
+  INTEGER NumBranches    ! number of branches
+  INTEGER BranchNum      ! loop index
+  INTEGER AirBranchIndex ! index to branch containing CompType, CompName
+
+  IF (GetBranchInputFlag) THEN
+    GetBranchInputFlag=.false.
+    CALL GetBranchInput
+  ENDIF
+
+  ErrFound = .FALSE.
+  OASysFlag = .FALSE.
+  NumBranches=SIZE(BRANCH)
+
+  BranchLoop: DO BranchNum = 1, NumBranches
+    DO CompNum = 1, Branch(BranchNum)%NumOfComponents
+      IF(.NOT. SameString(CompType,Branch(BranchNum)%Component(CompNum)%CType) .AND. &
+         .NOT. SameString(CompName,Branch(BranchNum)%Component(CompNum)%Name))CYCLE
+      AirBranchIndex=BranchNum
+      EXIT BranchLoop
+    END DO
+  END DO BranchLoop
+
+  IF (AirBranchIndex == 0) THEN
+    CALL ShowSevereError('CheckBranchForOASys:  Branch index not found = '//TrimSigDigits(AirBranchIndex,0))
+    ErrFound = .TRUE.
+  ELSE
+    IF(AirBranchIndex > 0 .AND. AirBranchIndex <= NumBranches)THEN
+      DO CompNum = 1, Branch(AirBranchIndex)%NumOfComponents
+        IF(.not. SameString('AirLoopHVAC:OutdoorAirSystem',Branch(AirBranchIndex)%Component(CompNum)%CType))CYCLE
+        OASysFlag = .TRUE.
+        EXIT
+      END DO
+    ELSE
+      CALL ShowSevereError('CheckBranchForOASys:  Branch index not found = '//TrimSigDigits(AirBranchIndex,0))
+      ErrFound = .TRUE.
+    END IF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CheckBranchForOASys
+
 SUBROUTINE GetInternalBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressCurveIndex,NumComps,BComponents,ErrorsFound)
 
           ! SUBROUTINE INFORMATION:
@@ -571,7 +864,7 @@ SUBROUTINE GetInternalBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveTyp
   IF (Found == 0) THEN
     CALL ShowSevereError('GetInternalBranchData:  Branch not found='//TRIM(BranchName))
     ErrorsFound=.true.
-    BranchMaxFlow=0.0
+    BranchMaxFlow=0.0d0
     NumComps=0
   ELSE
     IF (Branch(Found)%AssignedLoopName == Blank) THEN
@@ -590,7 +883,7 @@ SUBROUTINE GetInternalBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveTyp
       CALL ShowContinueError('Branch already assigned to loop='//TRIM(Branch(Found)%AssignedLoopName))
       CALL ShowContinueError('New attempt to assign to loop='//TRIM(LoopName))
       ErrorsFound=.true.
-      BranchMaxFlow=0.0
+      BranchMaxFlow=0.0d0
       NumComps=0
     ELSE
       BranchMaxFlow=Branch(Found)%MaxFlowRate
@@ -1201,6 +1494,92 @@ FUNCTION GetLastBranchOutletNodeName(BranchListName) RESULT(OutletNodeName)
 
 END FUNCTION GetLastBranchOutletNodeName
 
+SUBROUTINE CheckSystemBranchFlow(SystemType,SystemName,BranchFlow,BranchFanFlow,ErrFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   August 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine is used to check the branch flow rate with respect to system flow rate
+
+          ! METHODOLOGY EMPLOYED:
+          ! Obtains branch and branch fan flow rate.
+          !
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing
+  USE DataHVACGlobals,    ONLY: SmallAirVolFlow
+  USE General,            ONLY: TrimSigDigits
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: SystemType    ! type of air loop equipment
+  CHARACTER(len=*), INTENT(IN) :: SystemName    ! name of air loop equipment
+  REAL(r64),INTENT(INOUT)      :: BranchFlow    ! branch volumetric flow rate [m3/s]
+  REAL(r64), INTENT(IN)        :: BranchFanFlow ! branch flow rate [m3/s]
+  LOGICAL, INTENT(INOUT)       :: ErrFound      ! logical error flag
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER   :: BranchNum          ! Index to branch on air loop
+  INTEGER   :: SizeBranch         ! size of branch list
+  LOGICAL   :: OASysFlag          ! TRUE when outdoor air system exists
+  CHARACTER(len=MaxNameLength) :: BranchName  ! name of air loop branch
+
+  IF (GetBranchInputFlag) THEN
+    GetBranchInputFlag=.false.
+    CALL GetBranchInput
+  ENDIF
+
+  SizeBranch = SIZE(Branch)
+  BranchNum = GetAirBranchIndex(TRIM(SystemType),TRIM(SystemName))
+  BranchName = ' '
+  BranchFlow = 0.0d0
+  ErrFound = .FALSE.
+  OASysFlag = .FALSE.
+
+  IF(BranchNum .GT. 0 .AND. BranchNum .LE. SizeBranch)THEN
+    BranchFlow = Branch(BranchNum)%MaxFlowRate
+    BranchName = Branch(BranchNum)%Name
+  ELSE
+    ErrFound = .TRUE.
+    CALL ShowSevereError('CheckSystemBranchFlow: Branch index not found = '//TrimSigDigits(BranchNum,0))
+    CALL ShowContinueError('Branch search for system type and name = '//TRIM(SystemType)//' "'//TRIM(SystemName)//'"')
+  END IF
+
+  IF(BranchFanFlow .GT. 0.0d0 .AND. .NOT. ErrFound)THEN
+    IF(BranchFlow .NE. Autosize)THEN
+      CALL CheckBranchForOASys(TRIM(SystemType),TRIM(SystemName), OASysFlag, ErrFound)
+      IF(ABS(BranchFlow-BranchFanFlow) .GT. SmallAirVolFlow .AND. OASysFlag)THEN
+        CALL ShowWarningError('Branch maximum flow rate differs from system flow rate.')
+        CALL ShowContinueError('Branch = '//TRIM(BranchName)//' has volume flow rate = '// &
+                               TRIM(TrimSigDigits(BranchFlow,6))//' m3/s.')
+        CALL ShowContinueError('System = '//TRIM(SystemType)//' "'//TRIM(SystemName)//'" has volume flow rate = '// &
+            TRIM(TrimSigDigits(BranchFanFlow,6))//' m3/s.')
+        CALL ShowContinueError('A branch flow rate that is different from the system flow rate can cause'// &
+                             ' discrepancies with outdoor air control.')
+      END IF
+    END IF
+  END IF
+
+  RETURN
+
+END SUBROUTINE CheckSystemBranchFlow
+
 !==================================================================================
 !   Routines that get the input for the internal branch management structure
 !==================================================================================
@@ -1317,7 +1696,7 @@ SUBROUTINE GetBranchInput
         ALLOCATE(Alphas(NumAlphas))
         Alphas=' '
         ALLOCATE(Numbers(NumNumbers))
-        Numbers=0.0
+        Numbers=0.0d0
         ALLOCATE(cAlphaFields(NumAlphas))
         cAlphaFields=' '
         ALLOCATE(cNumericFields(NumNumbers))
@@ -1463,6 +1842,7 @@ SUBROUTINE GetBranchInput
         IF (ErrFound) THEN
           CALL ShowSevereError(RoutineName//' Invalid '//TRIM(CurrentModuleObject)//  &
              ' Input, preceding condition(s) will likely cause termination.')
+          InvalidBranchDefinitions=.true.
         ENDIF
         CALL TestInletOutletNodes(ErrFound)
         GetInputFlag=.false.
@@ -1557,7 +1937,7 @@ SUBROUTINE GetBranchListInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -1740,7 +2120,7 @@ SUBROUTINE GetConnectorListInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -1826,8 +2206,8 @@ SUBROUTINE GetConnectorListInput
         CurMixer=.false.
         MixerNum=FindItemInList(ConnectorLists(Count)%ConnectorName(Loop),Mixers%Name,NumMixers)
         IF (MixerNum == 0) THEN
-          CALL ShowSevereError('Invalid Connector:Mixer(none)='//TRIM(ConnectorLists(Count)%ConnectorName(Loop)//  &
-                       ', referenced by '//TRIM(CurrentModuleObject)//'='//TRIM(ConnectorLists(Count)%Name)))
+          CALL ShowSevereError('Invalid Connector:Mixer(none)='//TRIM(ConnectorLists(Count)%ConnectorName(Loop))//  &
+                       ', referenced by '//TRIM(CurrentModuleObject)//'='//TRIM(ConnectorLists(Count)%Name))
           ErrorsFound=.true.
           CYCLE
         ENDIF
@@ -1998,7 +2378,7 @@ SUBROUTINE GetSplitterInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -2256,7 +2636,7 @@ SUBROUTINE GetMixerInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -2718,7 +3098,7 @@ SUBROUTINE FindAirPlantCondenserLoopFromBranchList(BranchListName,LoopType,LoopS
    LoopSupplyDemandAir=Blank
    FoundLoopName=Blank
    FoundLoopNum=0
-   FoundLoopVolFlowRate=0.0
+   FoundLoopVolFlowRate=0.0d0
    MatchedLoop=.false.
    LoopType=Blank
 
@@ -2731,7 +3111,7 @@ SUBROUTINE FindAirPlantCondenserLoopFromBranchList(BranchListName,LoopType,LoopS
      LoopSupplyDemandAir=Blank
      FoundLoopName=Blank
      FoundLoopNum=0
-     FoundLoopVolFlowRate=0.0
+     FoundLoopVolFlowRate=0.0d0
      MatchedLoop=.false.
 
      ! Try Condenser
@@ -2744,7 +3124,7 @@ SUBROUTINE FindAirPlantCondenserLoopFromBranchList(BranchListName,LoopType,LoopS
      LoopSupplyDemandAir=Blank
      FoundLoopName=Blank
      FoundLoopNum=0
-     FoundLoopVolFlowRate=0.0
+     FoundLoopVolFlowRate=0.0d0
      MatchedLoop=.false.
 
      ! Try Air
@@ -3057,7 +3437,7 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
         ENDIF
       ENDDO
       Branch(Found)%FluidType=BranchFluidType
-      IF (IsAirBranch .and. Branch(Found)%MaxFlowRate == 0.0) THEN
+      IF (IsAirBranch .and. Branch(Found)%MaxFlowRate == 0.0d0) THEN
         CALL ShowSevereError('Branch='//TRIM(Branch(Found)%Name)//' is an air branch with zero max flow rate.')
         ErrFound=.true.
       ENDIF

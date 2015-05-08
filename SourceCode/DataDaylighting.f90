@@ -72,17 +72,17 @@ TYPE ZoneDaylightCalc
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: IllumSetPoint  ! =0.0  ! Illuminance setpoint at each reference point (lux)
   INTEGER  :: LightControlType          = 1   ! Lighting control type (same for all reference points)
                                               ! (1=continuous, 2=stepped, 3=continuous/off)
-  REAL(r64):: ViewAzimuthForGlare       =0.0  ! View direction relative to window for glare calculation (deg)
+  REAL(r64):: ViewAzimuthForGlare       =0.0d0  ! View direction relative to window for glare calculation (deg)
   INTEGER  :: MaxGlareallowed           = 0   ! Maximum allowable discomfort glare index
-  REAL(r64):: MinPowerFraction          = 0.0 ! Minimum fraction of power input that continuous dimming system can dim down to
-  REAL(r64):: MinLightFraction          =0.0  ! Minimum fraction of light output that continuous dimming system can dim down to
+  REAL(r64):: MinPowerFraction          = 0.0d0 ! Minimum fraction of power input that continuous dimming system can dim down to
+  REAL(r64):: MinLightFraction          =0.0d0  ! Minimum fraction of light output that continuous dimming system can dim down to
   INTEGER  :: LightControlSteps         = 0   ! Number of levels (excluding zero) of stepped control system
-  REAL(r64):: LightControlProbability   = 0.0 ! For manual control of stepped systems, probability that lighting will
+  REAL(r64):: LightControlProbability   = 0.0d0 ! For manual control of stepped systems, probability that lighting will
   INTEGER  :: TotalExtWindows           = 0   ! Total number of exterior windows in the zone
-  REAL(r64):: AveVisDiffReflect         =0.0  ! Area-weighted average inside surface visible reflectance of zone
+  REAL(r64):: AveVisDiffReflect         =0.0d0  ! Area-weighted average inside surface visible reflectance of zone
   REAL(r64),ALLOCATABLE, Dimension (:) :: RefPtPowerReductionFactor !=1.0  ! Electric power reduction factor at reference points
                                                                   ! due to daylighting
-  REAL(r64):: ZonePowerReductionFactor      =1.0  ! Electric power reduction factor for entire zone due to daylighting
+  REAL(r64):: ZonePowerReductionFactor      =1.0D0  ! Electric power reduction factor for entire zone due to daylighting
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: DaylIllumAtRefPt  !=0.0 ! Daylight illuminance at reference points (lux)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: GlareIndexAtRefPt !=0.0 ! Glare index at reference points
   INTEGER, ALLOCATABLE, DIMENSION(:) :: AdjIntWinZoneNums ! List of zone numbers of adjacent zones that have exterior windows and
@@ -98,10 +98,10 @@ TYPE ZoneDaylightCalc
   INTEGER, ALLOCATABLE, DIMENSION(:) ::  DayltgFacPtrsForExtWins ! Zone's daylighting factor pointers.
                                                                  ! Entries in this list have a one-to-one
                                                                  ! correspondence with the DayltgExtWinSurfNums list
-  REAL(r64):: MinIntWinSolidAng             =0.0 ! Minimum solid angle subtended by an interior window in a zone
-  REAL(r64):: TotInsSurfArea                =0.0 ! Total inside surface area of a daylit zone (m2)
-  REAL(r64):: FloorVisRefl                  =0.0 ! Area-weighted visible reflectance of floor of a daylit zone
-  REAL(r64):: InterReflIllFrIntWins         =0.0 ! Inter-reflected illuminance due to beam and diffuse solar passing
+  REAL(r64):: MinIntWinSolidAng             =0.0d0 ! Minimum solid angle subtended by an interior window in a zone
+  REAL(r64):: TotInsSurfArea                =0.0d0 ! Total inside surface area of a daylit zone (m2)
+  REAL(r64):: FloorVisRefl                  =0.0d0 ! Area-weighted visible reflectance of floor of a daylit zone
+  REAL(r64):: InterReflIllFrIntWins         =0.0d0 ! Inter-reflected illuminance due to beam and diffuse solar passing
                                              !  through a zone's interior windows (lux)
   REAL(r64),ALLOCATABLE, DIMENSION(:) :: BacLum          ! =0.0 ! Background luminance at each reference point (cd/m2)
   REAL(r64), ALLOCATABLE, DIMENSION(:,:)     :: SolidAngAtRefPt !(MaxRefPoints,50)
@@ -149,15 +149,15 @@ END TYPE ZoneDaylightCalc
 TYPE IllumMapData
   CHARACTER(len=MaxNameLength) :: Name     =' '  ! Map name
   INTEGER                      :: Zone     =0    ! Pointer to zone being mapped
-  REAL(r64)                    :: Z        =0.0  ! Elevation or height
-  REAL(r64)                    :: Xmin     =0.0  ! Minimum X value
-  REAL(r64)                    :: Xmax     =0.0  ! Maximum X value
+  REAL(r64)                    :: Z        =0.0d0  ! Elevation or height
+  REAL(r64)                    :: Xmin     =0.0d0  ! Minimum X value
+  REAL(r64)                    :: Xmax     =0.0d0  ! Maximum X value
   INTEGER                      :: Xnum     =0    ! Number of X reference points (going N-S)
-  REAL(r64)                    :: Xinc     =0.0  ! Increment between X reference points
-  REAL(r64)                    :: Ymin     =0.0  ! Minimum Y value
-  REAL(r64)                    :: Ymax     =0.0  ! Maximum Y value
+  REAL(r64)                    :: Xinc     =0.0d0  ! Increment between X reference points
+  REAL(r64)                    :: Ymin     =0.0d0  ! Minimum Y value
+  REAL(r64)                    :: Ymax     =0.0d0  ! Maximum Y value
   INTEGER                      :: Ynum     =0    ! Number of Y reference points (going E-W)
-  REAL(r64)                    :: Yinc     =0.0  ! Increment between Y reference points
+  REAL(r64)                    :: Yinc     =0.0d0  ! Increment between Y reference points
   INTEGER                      :: UnitNo   =0    ! Unit number for map output (later merged to final file)
   LOGICAL                      :: HeaderXLineLengthNeeded = .true. ! X header will likely be the longest line in the file
   INTEGER                      :: HeaderXLineLength = 0   ! actual length of this X header line

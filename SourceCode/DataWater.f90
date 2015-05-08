@@ -72,8 +72,8 @@ TYPE StorageTankDataStruct
     CHARACTER(len=MaxNameLength) :: OverflowTankName = ' ' !
     INTEGER                      :: OverflowTankID = 0 !
     INTEGER                      :: OverflowTankSupplyARRID = 0
-    REAL(r64)                    :: ValveOnCapacity = 0.0 ! tank capacity at lower control range [m3]
-    REAL(r64)                    :: ValveOffCapacity = 0.0 ! tank capacity at upper control range [m3]
+    REAL(r64)                    :: ValveOnCapacity = 0.0d0 ! tank capacity at lower control range [m3]
+    REAL(r64)                    :: ValveOffCapacity = 0.0d0 ! tank capacity at upper control range [m3]
     INTEGER                      :: ControlSupplyType = 0 ! mode for tank controlled resupply
     INTEGER                      :: GroundWellID = 0 !index "pointer" to well if present
     CHARACTER(len=MaxNameLength) :: SupplyTankName = ' ' !
@@ -203,8 +203,20 @@ LOGICAL    :: WaterSystemGetInputCalled = .FALSE.  ! set true once input data go
 LOGICAL    :: AnyIrrigationInModel   = .FALSE. ! control flag set true if irrigation input for ecoroof DJS PSU Dec 2006
 
 
-TYPE(SiteRainFallDataStruct)       :: RainFall=SiteRainFallDataStruct(0,0.0d0,0,0.0d0,0.0d0,0.0d0)
-TYPE(IrrigationDataStruct)         :: Irrigation=IrrigationDataStruct(0,0,0.0d0,0.0d0,0.4d0)
+TYPE(SiteRainFallDataStruct),SAVE :: RainFall=SiteRainFallDataStruct  &
+   (0,  &      ! type of rainfall modeling
+    0.0d0,  &  ! design annual rain
+    0,  &      ! rain sched id
+    0.0d0,  &  ! nominal annual rain
+    0.0d0,  &  ! current rate
+    0.0d0)     ! current amount
+TYPE(IrrigationDataStruct), SAVE  :: Irrigation=IrrigationDataStruct  &
+   (0,  &     ! type of irrigation modeling
+    0,  &     ! Irrigation schedule id
+    0.0d0,  & ! scheduled amount
+    0.0d0,  & ! actual amount
+    0.4d0)    ! irrigation threshold
+
 TYPE(StorageTankDataStruct),       DIMENSION(:) , ALLOCATABLE :: WaterStorage
 TYPE(RainfallCollectorDataStruct), DIMENSION(:), ALLOCATABLE :: RainCollector
 TYPE(GroundwaterWellDataStruct),   DIMENSION(:), ALLOCATABLE :: GroundwaterWell

@@ -30,6 +30,11 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 
           ! MODULE PARAMETER DEFINITIONS:
+
+  INTEGER, PUBLIC, PARAMETER :: ControllerSimple_Type        = 1
+  CHARACTER(LEN=*), PUBLIC, PARAMETER, DIMENSION(1:1) :: ControllerTypes =  &
+                     (/'Controller:WaterCoil'/)
+
   ! Controller action used in modules HVACControllers and ZoneControllers
   INTEGER, PARAMETER :: iNoAction        = 0
   INTEGER, PARAMETER :: iReverseAction   = 1

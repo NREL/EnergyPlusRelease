@@ -27,9 +27,8 @@ MODULE PoweredInductionUnits
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, NumOfZones, &
-                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
-                           SetupOutputVariable
+                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn, DisplayExtraWarnings
+USE DataInterfaces
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallTempDiff, SmallAirVolFlow, SingleCoolingSetPoint, &
                            SingleHeatingSetPoint, PlenumInducedMassFlow
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
@@ -63,16 +62,16 @@ TYPE PowIndUnitData
   INTEGER                      :: UnitType_Num       = 0   ! index for type of unit
   CHARACTER(len=MaxNameLength) :: Sched              =' '  ! availability schedule
   INTEGER                      :: SchedPtr           =0    ! index to schedule
-  REAL(r64)                    :: MaxTotAirVolFlow   =0.0  ! m3/s  (series)
-  REAL(r64)                    :: MaxTotAirMassFlow  =0.0  ! kg/s  (series)
-  REAL(r64)                    :: MaxPriAirVolFlow   =0.0  ! m3/s
-  REAL(r64)                    :: MaxPriAirMassFlow  =0.0  ! kg/s
-  REAL(r64)                    :: MinPriAirFlowFrac  =0.0  ! minimum primary air flow fraction
-  REAL(r64)                    :: MinPriAirMassFlow  =0.0  ! kg/s
-  REAL(r64)                    :: MaxSecAirVolFlow   =0.0  ! m3/s (parallel)
-  REAL(r64)                    :: MaxSecAirMassFlow  =0.0  ! kg/s (parallel)
-  REAL(r64)                    :: FanOnFlowFrac      =0.0  ! frac of primary air flow at which fan turns on (parallel)
-  REAL(r64)                    :: FanOnAirMassFlow   =0.0  ! primary air mass flow rate at which fan turns on (parallel)
+  REAL(r64)                    :: MaxTotAirVolFlow   =0.0d0  ! m3/s  (series)
+  REAL(r64)                    :: MaxTotAirMassFlow  =0.0d0  ! kg/s  (series)
+  REAL(r64)                    :: MaxPriAirVolFlow   =0.0d0  ! m3/s
+  REAL(r64)                    :: MaxPriAirMassFlow  =0.0d0  ! kg/s
+  REAL(r64)                    :: MinPriAirFlowFrac  =0.0d0  ! minimum primary air flow fraction
+  REAL(r64)                    :: MinPriAirMassFlow  =0.0d0  ! kg/s
+  REAL(r64)                    :: MaxSecAirVolFlow   =0.0d0  ! m3/s (parallel)
+  REAL(r64)                    :: MaxSecAirMassFlow  =0.0d0  ! kg/s (parallel)
+  REAL(r64)                    :: FanOnFlowFrac      =0.0d0  ! frac of primary air flow at which fan turns on (parallel)
+  REAL(r64)                    :: FanOnAirMassFlow   =0.0d0  ! primary air mass flow rate at which fan turns on (parallel)
   INTEGER                      :: PriAirInNode       =0    ! unit primary air inlet node number
   INTEGER                      :: SecAirInNode       =0    ! unit secondary air inlet node number
   INTEGER                      :: OutAirNode         =0    ! unit air outlet node number
@@ -90,17 +89,17 @@ TYPE PowIndUnitData
   CHARACTER(len=MaxNameLength) :: HCoil              =' '  ! name of heating coil component
   INTEGER                      :: HCoil_Index        =0    ! index to this heating coil
   INTEGER                      :: HCoil_FluidIndex   =0
-  REAL(r64)                    :: MaxVolHotWaterFlow =0.0  ! m3/s
-  REAL(r64)                    :: MaxVolHotSteamFlow =0.0   ! m3/s
-  REAL(r64)                    :: MaxHotWaterFlow    =0.0   ! kg/s
-  REAL(r64)                    :: MaxHotSteamFlow    =0.0   ! kg/s
-  REAL(r64)                    :: MinVolHotWaterFlow =0.0   ! m3/s
-  REAL(r64)                    :: MinHotSteamFlow    =0.0   ! kg/s
-  REAL(r64)                    :: MinVolHotSteamFlow =0.0   ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow    =0.0   ! kg/s
+  REAL(r64)                    :: MaxVolHotWaterFlow =0.0d0  ! m3/s
+  REAL(r64)                    :: MaxVolHotSteamFlow =0.0d0   ! m3/s
+  REAL(r64)                    :: MaxHotWaterFlow    =0.0d0   ! kg/s
+  REAL(r64)                    :: MaxHotSteamFlow    =0.0d0   ! kg/s
+  REAL(r64)                    :: MinVolHotWaterFlow =0.0d0   ! m3/s
+  REAL(r64)                    :: MinHotSteamFlow    =0.0d0   ! kg/s
+  REAL(r64)                    :: MinVolHotSteamFlow =0.0d0   ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow    =0.0d0   ! kg/s
   INTEGER                      :: HotControlNode     =0     ! hot water control node
   INTEGER                      :: HotCoilOutNodeNum  =0   ! outlet of coil
-  REAL(r64)                    :: HotControlOffset   =0.0   ! control tolerance
+  REAL(r64)                    :: HotControlOffset   =0.0d0   ! control tolerance
   INTEGER                      :: HWLoopNum          =0   ! index for plant loop with hot plant coil
   INTEGER                      :: HWLoopSide         =0   ! index for plant loop side for hot plant coil
   INTEGER                      :: HWBranchNum        =0   ! index for plant branch for hot plant coil
@@ -109,10 +108,10 @@ TYPE PowIndUnitData
   INTEGER                      :: ADUNum             =0     ! index of corresponding air distribution unit
   LOGICAL                      :: InducesPlenumAir   =.FALSE.  ! True if secondary air comes from the plenum
   ! Report data
-  REAL(r64)                    :: HeatingRate        =0.0   ! unit heat addition rate to zone [W]
-  REAL(r64)                    :: HeatingEnergy      =0.0   ! unit heat addition to zone [J]
-  REAL(r64)                    :: SensCoolRate       =0.0   ! unit sensible heat removal rate from zone [W]
-  REAL(r64)                    :: SensCoolEnergy     =0.0   ! unit sensible heat removal from zone [J]
+  REAL(r64)                    :: HeatingRate        =0.0d0   ! unit heat addition rate to zone [W]
+  REAL(r64)                    :: HeatingEnergy      =0.0d0   ! unit heat addition to zone [J]
+  REAL(r64)                    :: SensCoolRate       =0.0d0   ! unit sensible heat removal rate from zone [W]
+  REAL(r64)                    :: SensCoolEnergy     =0.0d0   ! unit sensible heat removal from zone [J]
 END TYPE PowIndUnitData
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -832,8 +831,8 @@ SecNode = PIU(PIUNum)%SecAirInNode
 ! Do the start of HVAC time step initializations
 IF (FirstHVACIteration) THEN
   ! check for upstream zero flow. If nonzero and schedule ON, set primary flow to max
-  IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .GT. 0.0 .AND. &
-      Node(PriNode)%MassFlowRate .GT. 0.0) THEN
+  IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .GT. 0.0d0 .AND. &
+      Node(PriNode)%MassFlowRate .GT. 0.0d0) THEN
     IF (PIU(PIUNum)%UnitType.EQ.'AirTerminal:SingleDuct:SeriesPIU:Reheat') THEN
       Node(PriNode)%MassFlowRate = PIU(PIUNum)%MaxPriAirMassFlow
       Node(SecNode)%MassFlowRate = MAX( 0.0d0, PIU(PIUNum)%MaxTotAirMassFlow - PIU(PIUNum)%MaxPriAirMassFlow )
@@ -842,12 +841,12 @@ IF (FirstHVACIteration) THEN
       Node(SecNode)%MassFlowRate = PIU(PIUNum)%MaxSecAirMassFlow
     END IF
   ELSE
-    Node(PriNode)%MassFlowRate = 0.0
-    Node(SecNode)%MassFlowRate = 0.0
+    Node(PriNode)%MassFlowRate = 0.0d0
+    Node(SecNode)%MassFlowRate = 0.0d0
   END IF
   ! reset the max and min avail flows
-  IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .GT. 0.0 .AND. &
-      Node(PriNode)%MassFlowRateMaxAvail .GT. 0.0) THEN
+  IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .GT. 0.0d0 .AND. &
+      Node(PriNode)%MassFlowRateMaxAvail .GT. 0.0d0) THEN
     IF (PIU(PIUNum)%UnitType.EQ.'AirTerminal:SingleDuct:SeriesPIU:Reheat') THEN
       Node(PriNode)%MassFlowRateMaxAvail = PIU(PIUNum)%MaxPriAirMassFlow
       Node(PriNode)%MassFlowRateMinAvail = PIU(PIUNum)%MinPriAirMassFlow
@@ -857,13 +856,13 @@ IF (FirstHVACIteration) THEN
       Node(PriNode)%MassFlowRateMaxAvail = PIU(PIUNum)%MaxPriAirMassFlow
       Node(PriNode)%MassFlowRateMinAvail = PIU(PIUNum)%MinPriAirMassFlow
       Node(SecNode)%MassFlowRateMaxAvail = PIU(PIUNum)%MaxSecAirMassFlow
-      Node(SecNode)%MassFlowRateMinAvail = 0.0
+      Node(SecNode)%MassFlowRateMinAvail = 0.0d0
     END IF
   ELSE
-    Node(PriNode)%MassFlowRateMaxAvail = 0.0
-    Node(PriNode)%MassFlowRateMinAvail = 0.0
-    Node(SecNode)%MassFlowRateMaxAvail = 0.0
-    Node(SecNode)%MassFlowRateMinAvail = 0.0
+    Node(PriNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(PriNode)%MassFlowRateMinAvail = 0.0d0
+    Node(SecNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(SecNode)%MassFlowRateMinAvail = 0.0d0
   END IF
 END IF
 
@@ -879,7 +878,7 @@ SUBROUTINE SizePIU(PIUNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   January 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -901,6 +900,7 @@ SUBROUTINE SizePIU(PIUNum)
   USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -938,74 +938,216 @@ SUBROUTINE SizePIU(PIUNum)
   REAL(r64)           :: rho
   REAL(r64)           :: Cp
   INTEGER             :: DummyWaterIndex = 1
+  LOGICAL             :: IsAutosize             ! Indicator to autosize
+  REAL(r64)           :: MaxPriAirVolFlowDes    ! Autosized maximum primary air flow for reporting
+  REAL(r64)           :: MaxPriAirVolFlowUser   ! Hardsized maximum primary air flow for reporting
+  REAL(r64)           :: MaxTotAirVolFlowDes    ! Autosized maximum air flow for reporting
+  REAL(r64)           :: MaxTotAirVolFlowUser   ! Hardsized maximum air flow for reporting
+  REAL(r64)           :: MaxSecAirVolFlowDes    ! Autosized maximum secondary air flow for reporting
+  REAL(r64)           :: MaxSecAirVolFlowUser   ! Hardsized maximum secondary air flow for reporting
+  REAL(r64)           :: MinPriAirFlowFracDes   ! Autosized minimum primary air flow fraction for reporting
+  REAL(r64)           :: MinPriAirFlowFracUser  ! Hardsized minimum primary air flow fraction for reporting
+  REAL(r64)           :: FanOnFlowFracDes       ! Autosized fan on flow fraction for reporting
+  REAL(r64)           :: FanOnFlowFracUser      ! Hardsized fan on flow fraction for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowDes  ! Autosized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowUser ! Hardsized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowDes  ! Autosized maximum hot steam flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowUser ! Hardsized maximum hot steam flow for reporting
 
   PltSizHeatNum = 0
-  DesMassFlow = 0.0
+  DesMassFlow = 0.0d0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxPriAirVolFlowDes = 0.0d0
+  MaxPriAirVolFlowUser = 0.0d0
+  MaxTotAirVolFlowDes = 0.0d0
+  MaxTotAirVolFlowUser = 0.0d0
+  MaxSecAirVolFlowDes = 0.0d0
+  MaxSecAirVolFlowUser = 0.0d0
+  MinPriAirFlowFracDes = 0.0d0
+  MinPriAirFlowFracUser = 0.0d0
+  FanOnFlowFracDes = 0.0d0
+  FanOnFlowFracUser = 0.0d0
+  MaxVolHotWaterFlowDes = 0.0d0
+  MaxVolHotWaterFlowUser = 0.0d0
+  MaxVolHotSteamFlowDes = 0.0d0
+  MaxVolHotSteamFlowUser = 0.0d0
+
   IF (PIU(PIUNum)%MaxPriAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
-      PIU(PIUNum)%MaxPriAirVolFlow = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (PIU(PIUNum)%MaxPriAirVolFlow < SmallAirVolFlow) THEN
-        PIU(PIUNum)%MaxPriAirVolFlow = 0.0
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MaxPriAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'User-Specified Maximum Primary Air Flow Rate [m3/s]', PIU(PIUNum)%MaxPriAirVolFlow)
       END IF
-      CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                              'Maximum Primary Air Flow Rate [m3/s]', PIU(PIUNum)%MaxPriAirVolFlow)
-    END IF
+    ELSE
+      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
+      MaxPriAirVolFlowDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF (MaxPriAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxPriAirVolFlowDes = 0.0d0
+      END IF
 
+      IF (IsAutosize) THEN
+        PIU(PIUNum)%MaxPriAirVolFlow = MaxPriAirVolFlowDes
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Maximum Primary Air Flow Rate [m3/s]', MaxPriAirVolFlowDes)
+      ELSE
+        IF (PIU(PIUNum)%MaxPriAirVolFlow > 0.0d0 .AND. MaxPriAirVolFlowDes > 0.0d0) THEN
+          MaxPriAirVolFlowUser = PIU(PIUNum)%MaxPriAirVolFlow
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Maximum Primary Air Flow Rate [m3/s]', MaxPriAirVolFlowDes, &
+                              'User-Specified Maximum Primary Air Flow Rate [m3/s]', MaxPriAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxPriAirVolFlowDes - MaxPriAirVolFlowUser)/MaxPriAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                   //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+              CALL ShowContinueError('User-Specified Primary Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxPriAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Primary Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxPriAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
   END IF
 
+  IsAutosize = .FALSE.
   IF (PIU(PIUNum)%MaxTotAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
-      PIU(PIUNum)%MaxTotAirVolFlow = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (PIU(PIUNum)%MaxTotAirVolFlow < SmallAirVolFlow) THEN
-        PIU(PIUNum)%MaxTotAirVolFlow = 0.0
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MaxTotAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', PIU(PIUNum)%MaxTotAirVolFlow)
       END IF
-      CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                              'Maximum Air Flow Rate [m3/s]', PIU(PIUNum)%MaxTotAirVolFlow)
+    ELSE
+      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
+      MaxTotAirVolFlowDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF (MaxTotAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxTotAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        PIU(PIUNum)%MaxTotAirVolFlow = MaxTotAirVolFlowDes
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxTotAirVolFlowDes)
+      ELSE
+        IF (PIU(PIUNum)%MaxTotAirVolFlow > 0.0d0 .AND. MaxTotAirVolFlowDes> 0.0d0) THEN
+          MaxTotAirVolFlowUser = PIU(PIUNum)%MaxTotAirVolFlow
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxTotAirVolFlowDes, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', MaxTotAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxTotAirVolFlowDes - MaxTotAirVolFlowUser)/MaxTotAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                    //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxTotAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxTotAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (PIU(PIUNum)%MaxSecAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
-      PIU(PIUNum)%MaxSecAirVolFlow = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (PIU(PIUNum)%MaxSecAirVolFlow < SmallAirVolFlow) THEN
-        PIU(PIUNum)%MaxSecAirVolFlow = 0.0
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MaxSecAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'User-Specified Maximum Secondary Air Flow Rate [m3/s]', PIU(PIUNum)%MaxSecAirVolFlow)
       END IF
-      CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                              'Maximum Secondary Air Flow Rate [m3/s]', PIU(PIUNum)%MaxSecAirVolFlow)
+    ELSE
+      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
+      MaxSecAirVolFlowDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF (MaxSecAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxSecAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        PIU(PIUNum)%MaxSecAirVolFlow = MaxSecAirVolFlowDes
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                                'Design Size Maximum Secondary Air Flow Rate [m3/s]', MaxSecAirVolFlowDes)
+      ELSE
+        IF (PIU(PIUNum)%MaxSecAirVolFlow > 0.0d0 .AND. MaxSecAirVolFlowDes > 0.0d0) THEN
+          MaxSecAirVolFlowUser = PIU(PIUNum)%MaxSecAirVolFlow
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                                'Design Size Maximum Secondary Air Flow Rate [m3/s]', MaxSecAirVolFlowDes, &
+                                'User-Specified Maximum Secondary Air Flow Rate [m3/s]', MaxSecAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxSecAirVolFlowDes - MaxSecAirVolFlowUser)/MaxSecAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                   //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Secondary Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxSecAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Secondary Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxSecAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (PIU(PIUNum)%MinPriAirFlowFrac == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MinPriAirFlowFrac > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                            'User-Specified Minimum Primary Air Flow Fraction', PIU(PIUNum)%MinPriAirFlowFrac)
+      END IF
+    ELSE
       CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
       IF (PIU(PIUNum)%MaxPriAirVolFlow >= SmallAirVolFlow .AND. &
           TermUnitFinalZoneSizing(CurZoneEqNum)%MinOA >= SmallAirVolFlow) THEN
-        PIU(PIUNum)%MinPriAirFlowFrac = TermUnitFinalZoneSizing(CurZoneEqNum)%MinOA / PIU(PIUNum)%MaxPriAirVolFlow
+        MinPriAirFlowFracDes = TermUnitFinalZoneSizing(CurZoneEqNum)%MinOA / PIU(PIUNum)%MaxPriAirVolFlow
       ELSE
-        PIU(PIUNum)%MinPriAirFlowFrac = 0.0
+        MinPriAirFlowFracDes = 0.0d0
       END IF
-      CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                              'Minimum Primary Air Flow Fraction', PIU(PIUNum)%MinPriAirFlowFrac)
-
+      IF (IsAutosize) THEN
+        PIU(PIUNum)%MinPriAirFlowFrac = MinPriAirFlowFracDes
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Minimum Primary Air Flow Fraction', MinPriAirFlowFracDes)
+      ELSE
+        IF (PIU(PIUNum)%MinPriAirFlowFrac > 0.0d0 .AND. MinPriAirFlowFracDes > 0.0d0) THEN
+          MinPriAirFlowFracUser = PIU(PIUNum)%MinPriAirFlowFrac
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Minimum Primary Air Flow Fraction', MinPriAirFlowFracDes, &
+                              'User-Specified Minimum Primary Air Flow Fraction', MinPriAirFlowFracUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MinPriAirFlowFracDes - MinPriAirFlowFracUser)/MinPriAirFlowFracUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                   //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+              CALL ShowContinueError('User-Specified Minimum Primary Air Flow Fraction of '// &
+                                      TRIM(RoundSigDigits(MinPriAirFlowFracUser,1)))
+              CALL ShowContinueError('differs from Design Size Minimum Primary Air Flow Fraction of ' // &
+                                      TRIM(RoundSigDigits(MinPriAirFlowFracDes,1)))
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
   IF (CurZoneEqNum > 0) THEN
@@ -1018,113 +1160,207 @@ SUBROUTINE SizePIU(PIUNum)
     END SELECT
   END IF
 
+  IsAutosize = .FALSE.
   IF (PIU(PIUNum)%FanOnFlowFrac == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
-      PIU(PIUNum)%FanOnFlowFrac = PIU(PIUNum)%MinPriAirFlowFrac
-      CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                              'Fan On Flow Fraction', PIU(PIUNum)%FanOnFlowFrac)
-
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
-  IF ((PIU(PIUNum)%MaxVolHotWaterFlow == AutoSize).or.(PIU(PIUNum)%MaxVolHotSteamFlow == AutoSize)) THEN
-    IF (CurZoneEqNum > 0) THEN
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%FanOnFlowFrac > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'User-Specified Fan On Flow Fraction', PIU(PIUNum)%FanOnFlowFrac)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
+      FanOnFlowFracDes = PIU(PIUNum)%MinPriAirFlowFrac
+      IF (IsAutosize) THEN
+        PIU(PIUNum)%FanOnFlowFrac = FanOnFlowFracDes
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Fan On Flow Fraction', FanOnFlowFracDes)
+      ELSE
+        IF (PIU(PIUNum)%FanOnFlowFrac > 0.0d0 .AND. FanOnFlowFracDes > 0.0d0) THEN
+          FanOnFlowFracUser = PIU(PIUNum)%FanOnFlowFrac
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'Design Size Fan On Flow Fraction', FanOnFlowFracDes, &
+                              'User-Specified Fan On Flow Fraction', FanOnFlowFracUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(FanOnFlowFracDes - FanOnFlowFracUser)/FanOnFlowFracUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                   //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+              CALL ShowContinueError('User-Specified Fan On Flow Fraction of '// &
+                                      TRIM(RoundSigDigits(FanOnFlowFracUser,1)))
+              CALL ShowContinueError('differs from Design Size Fan On Flow Fraction of ' // &
+                                      TRIM(RoundSigDigits(FanOnFlowFracDes,1)))
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
+  END IF
 
+  IsAutosize = .FALSE.
+  IF (PIU(PIUNum)%MaxVolHotWaterFlow == AutoSize) THEN !.or.()) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MaxVolHotWaterFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                            'User-Specified Maximum Reheat Water Flow Rate [m3/s]', PIU(PIUNum)%MaxVolHotWaterFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(PIU(PIUNum)%UnitType,PIU(PIUNum)%Name)
       IF (SameString(PIU(PIUNum)%HCoilType,'Coil:Heating:Water')) THEN
 
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',PIU(PIUNum)%HCoil,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',PIU(PIUNum)%HCoil,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', PIU(PIUNum)%HCoil, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', PIU(PIUNum)%HCoil, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
+          IF (PltSizHeatNum > 0) THEN
 
-        IF (PltSizHeatNum > 0) THEN
-
-          IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * PIU(PIUNum)%MinPriAirFlowFrac + &
-                          TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1. - PIU(PIUNum)%MinPriAirFlowFrac)
-            CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * PIU(PIUNum)%MinPriAirFlowFrac + &
+                           TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1.0d0 - PIU(PIUNum)%MinPriAirFlowFrac)
+              CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                             * DesMassFlow * (CoilOutTemp-CoilInTemp)
 
-            rho = GetDensityGlycol(PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidName, &
+              rho = GetDensityGlycol(PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidIndex, &
                                      'SizePIU')
-            Cp = GetSpecificHeatGlycol(PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidName, &
+              Cp = GetSpecificHeatGlycol(PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(PIU(PIUNum)%HWLoopNum)%FluidIndex, &
                                      'SizePIU')
 
-            PIU(PIUNum)%MaxVolHotWaterFlow = DesCoilLoad / &
-                                               ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                 Cp * rho )
+              MaxVolHotWaterFlowDes = DesCoilLoad / &
+                                    ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                    Cp * rho )
+            ELSE
+              MaxVolHotWaterFlowDes = 0.0d0
+            END IF
           ELSE
-            PIU(PIUNum)%MaxVolHotWaterFlow = 0.0
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in' //  TRIM(PIU(PIUNum)%UnitType) // ' Object='//TRIM(PIU(PIUNum)%Name))
+            ErrorsFound = .TRUE.
           END IF
-
-          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                                  'Maximum Reheat Water Flow Rate [m3/s]', PIU(PIUNum)%MaxVolHotWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in' //  TRIM(PIU(PIUNum)%UnitType) // ' Object='//TRIM(PIU(PIUNum)%Name))
-          ErrorsFound = .TRUE.
         END IF
-      ELSEIF (SameString(PIU(PIUNum)%HCoilType,'Coil:Heating:Steam')) THEN
+        IF (IsAutosize) THEN
+          PIU(PIUNum)%MaxVolHotWaterFlow = MaxVolHotWaterFlowDes
+          CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                                  'Design Size Maximum Reheat Water Flow Rate [m3/s]', MaxVolHotWaterFlowDes)
+        ELSE ! Hardsize with sizing data
+          IF (PIU(PIUNum)%MaxVolHotWaterFlow > 0.0d0 .AND. MaxVolHotWaterFlowDes > 0.0d0) THEN
+            MaxVolHotWaterFlowUser = PIU(PIUNum)%MaxVolHotWaterFlow
+            CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                                  'Design Size Maximum Reheat Water Flow Rate [m3/s]', MaxVolHotWaterFlowDes, &
+                                  'User-Specified Maximum Reheat Water Flow Rate [m3/s]', MaxVolHotWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotWaterFlowDes - MaxVolHotWaterFlowUser)/MaxVolHotWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                       //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Reheat Water Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowUser,5))//' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Reheat Water Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowDes,5))//' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
+      ELSE
+        PIU(PIUNum)%MaxVolHotWaterFlow = 0.0d0
+      END IF
+    END IF
+  END IF
+
+  IsAutosize = .FALSE.
+  IF (PIU(PIUNum)%MaxVolHotSteamFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (PIU(PIUNum)%MaxVolHotWaterFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                              'User-Specified Maximum Reheat Steam Flow Rate [m3/s]', PIU(PIUNum)%MaxVolHotWaterFlow)
+      END IF
+    ELSE
+      IF (SameString(PIU(PIUNum)%HCoilType,'Coil:Heating:Steam')) THEN
 
         CoilSteamInletNode = GetCoilSteamInletNode('Coil:Heating:Steam',PIU(PIUNum)%HCoil,ErrorsFound)
         CoilSteamOutletNode = GetCoilSteamOutletNode('Coil:Heating:Steam',PIU(PIUNum)%HCoil,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', PIU(PIUNum)%HCoil, CoilSteamInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', PIU(PIUNum)%HCoil, CoilSteamInletNode, &
                                        CoilSteamOutletNode, ErrorsFound)
+          IF (PltSizHeatNum > 0) THEN
 
-        IF (PltSizHeatNum > 0) THEN
-
-          IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * PIU(PIUNum)%MinPriAirFlowFrac + &
-                          TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1. - PIU(PIUNum)%MinPriAirFlowFrac)
-            CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * PIU(PIUNum)%MinPriAirFlowFrac + &
+                           TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1.0d0 - PIU(PIUNum)%MinPriAirFlowFrac)
+              CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                             * DesMassFlow * (CoilOutTemp-CoilInTemp)
-            TempSteamIn= 100.00
-            EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
-            EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
-            LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
-            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
-            Cp = GetSpecificHeatGlycol('WATER', PlantSizData(PltSizHeatNum)%ExitTemp, DummyWaterIndex, 'SizePIU')
-            PIU(PIUNum)%MaxVolHotSteamFlow =DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
-              PlantSizData(PltSizHeatNum)%DeltaT * Cp))
+              TempSteamIn= 100.00d0
+              EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
+              EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
+              LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
+              SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,PIU(PIUNum)%HCoil_FluidIndex,'SizePIU')
+              Cp = GetSpecificHeatGlycol('WATER', PlantSizData(PltSizHeatNum)%ExitTemp, DummyWaterIndex, 'SizePIU')
+              MaxVolHotSteamFlowDes = DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
+                                    PlantSizData(PltSizHeatNum)%DeltaT * Cp))
+            ELSE
+              MaxVolHotSteamFlowDes = 0.0d0
+            END IF
           ELSE
-            PIU(PIUNum)%MaxVolHotSteamFlow = 0.0
+            CALL ShowSevereError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in' //  TRIM(PIU(PIUNum)%UnitType) // ' Object='//TRIM(PIU(PIUNum)%Name))
+            ErrorsFound = .TRUE.
           END IF
-
+        END IF
+        IF (IsAutosize) THEN
+          PIU(PIUNum)%MaxVolHotSteamFlow = MaxVolHotSteamFlowDes
           CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
-                                  'Maximum Reheat Steam Flow [m3/s]', PIU(PIUNum)%MaxVolHotSteamFlow)
+                                  'Design Size Maximum Reheat Steam Flow [m3/s]', MaxVolHotSteamFlowDes)
         ELSE
-          CALL ShowContinueError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in' //  TRIM(PIU(PIUNum)%UnitType) // ' Object='//TRIM(PIU(PIUNum)%Name))
-          ErrorsFound = .TRUE.
+          IF (PIU(PIUNum)%MaxVolHotSteamFlow > 0.0d0 .AND. MaxVolHotSteamFlowDes > 0.0d0) THEN
+            MaxVolHotSteamFlowUser = PIU(PIUNum)%MaxVolHotSteamFlow
+            CALL ReportSizingOutput(PIU(PIUNum)%UnitType, PIU(PIUNum)%Name, &
+                                  'Design Size Maximum Reheat Steam Flow [m3/s]', MaxVolHotSteamFlowDes, &
+                                  'User-Specified Maximum Reheat Steam Flow [m3/s]', MaxVolHotSteamFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotSteamFlowDes - MaxVolHotSteamFlowUser)/MaxVolHotSteamFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizePIU: Potential issue with equipment sizing for ' &
+                                      //TRIM(PIU(PIUNum)%UnitType)//' '//TRIM(PIU(PIUNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Reheat Steam Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowUser,5))//' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Reheat Steam Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowDes,5))//' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
         END IF
       ELSE
-        PIU(PIUNum)%MaxVolHotWaterFlow = 0.0
-        PIU(PIUNum)%MaxVolHotSteamFlow = 0.0
-
+        PIU(PIUNum)%MaxVolHotSteamFlow = 0.0d0
       END IF
-
     END IF
-
   END IF
 
   IF (CurZoneEqNum > 0) THEN
     TermUnitSizing(CurZoneEqNum)%MinFlowFrac = PIU(PIUNum)%MinPriAirFlowFrac
     TermUnitSizing(CurZoneEqNum)%MaxHWVolFlow = PIU(PIUNum)%MaxVolHotWaterFlow
     TermUnitSizing(CurZoneEqNum)%MaxSTVolFlow = PIU(PIUNum)%MaxVolHotSteamFlow
+    TermUnitSizing(CurZoneEqNum)%InducesPlenumAir = PIU(PIUNum)%InducesPlenumAir
     IF (PIU(PIUNum)%HCoilType_Num == HCoilType_SimpleHeating) THEN
       CALL SetCoilDesFlow(PIU(PIUNum)%HCoilType,PIU(PIUNum)%HCoil,TermUnitSizing(CurZoneEqNum)%AirVolFlow,&
                           ErrorsFound)
@@ -1229,11 +1465,11 @@ REAL(r64)    :: mdot ! local plant fluid flow rate kg/s
 
           ! FLOW
 
-FanElecPower = 0.0
+FanElecPower = 0.0d0
 ! initialize local variables
-FanDeltaTemp = 0.0
-OutletTempNeeded = 0.0
-MixTempNeeded = 0.0
+FanDeltaTemp = 0.0d0
+OutletTempNeeded = 0.0d0
+MixTempNeeded = 0.0d0
 UnitOn = .TRUE.
 PriOn = .TRUE.
 HCoilOn = .TRUE.
@@ -1267,14 +1503,14 @@ IF (ControlNode.GT.0) THEN
      MinSteamFlow = Node(ControlNode)%MassFlowRateMinAvail
   END IF
 END IF
-IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .LE. 0.0) UnitOn = .FALSE.
+IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .LE. 0.0d0) UnitOn = .FALSE.
 IF (PriAirMassFlow.LE.SmallMassFlow .OR. PriAirMassFlowMax.LE.SmallMassFlow) PriOn = .FALSE.
 ! Set the mass flow rates
 IF (UnitOn) THEN
   ! unit is on
   IF (.NOT. PriOn) THEN
     ! no primary air flow
-    PriAirMassFlow = 0.0
+    PriAirMassFlow = 0.0d0
     SecAirMassFlow = PIU(PIUNum)%MaxTotAirMassFlow
   ELSE IF (CurDeadBandOrSetback(ZoneNum) .OR. ABS(QZnReq).LT.SmallLoad) THEN
     ! in deadband or very small load: set primary air flow to the minimum
@@ -1288,7 +1524,7 @@ IF (UnitOn) THEN
     ! cooling: set the primary air flow rate to meet the load.
     ! First calculate the fan temperature rise
     ! use only secondary air for this calculation
-    Node(PriNode)%MassFlowRate = 0.0
+    Node(PriNode)%MassFlowRate = 0.0d0
     Node(SecNode)%MassFlowRate = PIU(PIUNum)%MaxTotAirMassFlow
     CALL SimAirMixer(PIU(PIUNum)%MixerName,PIU(PIUNum)%Mixer_Num) ! fire the mixer
     CALL SimulateFanComponents(PIU(PIUNum)%FanName,FirstHVACIteration,PIU(PIUNum)%Fan_Index) ! fire the fan
@@ -1310,8 +1546,8 @@ IF (UnitOn) THEN
   END IF
 ELSE
   ! unit is off ; no flow
-  PriAirMassFlow = 0.0
-  SecAirMassFlow = 0.0
+  PriAirMassFlow = 0.0d0
+  SecAirMassFlow = 0.0d0
 END IF
 ! Set inlet node flowrates
 Node(PriNode)%MassFlowRate = PriAirMassFlow
@@ -1363,7 +1599,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
     END IF
   CASE(HCoilType_SteamAirHeating) ! COIL:STEAM:AIRHEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1373,7 +1609,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
 
   CASE(HCoilType_Electric) ! COIL:ELECTRIC:HEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1383,7 +1619,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
 
   CASE(HCoilType_Gas)  ! COIL:GAS:HEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1397,14 +1633,14 @@ PowerMet = Node(OutletNode)%MassFlowRate * (PsyHFnTdbW(Node(OutletNode)%Temp,Nod
                                           - PsyHFnTdbW(Node(ZoneNode)%Temp,Node(ZoneNode)%HumRat))
 PIU(PIUNum)%HeatingRate = MAX(0.0d0,PowerMet)
 PIU(PIUNum)%SensCoolRate = ABS(MIN(constant_zero,PowerMet))
-IF (Node(OutletNode)%MassFlowRate .EQ. 0.0) THEN
-  Node(PriNode)%MassFlowRate = 0.0
-  Node(SecNode)%MassFlowRate = 0.0
+IF (Node(OutletNode)%MassFlowRate .EQ. 0.0d0) THEN
+  Node(PriNode)%MassFlowRate = 0.0d0
+  Node(SecNode)%MassFlowRate = 0.0d0
 END IF
 IF (PIU(PIUNum)%InducesPlenumAir) THEN
   PlenumInducedMassFlow = Node(SecNode)%MassFlowRate
 ELSE
-  PlenumInducedMassFlow = 0.0
+  PlenumInducedMassFlow = 0.0d0
 END IF
 Node(OutletNode)%MassFlowRateMax = PIU(PIUNum)%MaxTotAirMassFlow
 
@@ -1499,9 +1735,9 @@ REAL(r64)    :: mdot ! local fluid flow rate kg/s
 
           ! FLOW
 
-FanElecPower = 0.0
+FanElecPower = 0.0d0
 ! initialize local variables
-FanDeltaTemp = 0.0
+FanDeltaTemp = 0.0d0
 UnitOn = .TRUE.
 PriOn = .TRUE.
 HCoilOn = .TRUE.
@@ -1531,14 +1767,14 @@ IF (ControlNode > 0) THEN
    MinWaterFlow = Node(ControlNode)%MassFlowRateMinAvail
   End If
 END IF
-IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .LE. 0.0) UnitOn = .FALSE.
+IF (GetCurrentScheduleValue(PIU(PIUNum)%SchedPtr) .LE. 0.0d0) UnitOn = .FALSE.
 IF (PriAirMassFlow.LE.SmallMassFlow .OR. PriAirMassFlowMax.LE.SmallMassFlow) PriOn = .FALSE.
 ! Set the mass flow rates
 IF (UnitOn) THEN
   ! unit is on
   IF (.NOT. PriOn) THEN
     ! no primary air flow
-    PriAirMassFlow = 0.0
+    PriAirMassFlow = 0.0d0
     SecAirMassFlow = PIU(PIUNum)%MaxSecAirMassFlow
   ELSE IF (CurDeadBandOrSetback(ZoneNum) .OR. ABS(QZnReq).LT.SmallLoad) THEN
     ! in deadband or very small load: set primary air flow to the minimum
@@ -1553,7 +1789,7 @@ IF (UnitOn) THEN
     ! First calculate the fan temperature rise
     Node(SecNode)%MassFlowRate = PIU(PIUNum)%MaxSecAirMassFlow
     Node(SecNode)%MassFlowRateMaxAvail = PIU(PIUNum)%MaxSecAirMassFlow
-    Node(PriNode)%MassFlowRate = 0.0
+    Node(PriNode)%MassFlowRate = 0.0d0
     CALL SimulateFanComponents(PIU(PIUNum)%FanName,FirstHVACIteration,PIU(PIUNum)%Fan_Index) ! fire the fan
     CALL SimAirMixer(PIU(PIUNum)%MixerName,PIU(PIUNum)%Mixer_Num) ! fire the mixer
     FanDeltaTemp = Node(HCoilInAirNode)%Temp - Node(SecNode)%Temp
@@ -1563,7 +1799,7 @@ IF (UnitOn) THEN
     PriAirMassFlow = MIN(MAX(PriAirMassFlow,PriAirMassFlowMin),PriAirMassFlowMax)
     ! check for fan on or off
     IF (PriAirMassFlow.GT.PIU(PIUNum)%FanOnAirMassFlow) THEN
-      SecAirMassFlow = 0.0 ! Fan is off; no secondary air
+      SecAirMassFlow = 0.0d0 ! Fan is off; no secondary air
     ELSE
       ! fan is on; recalc primary air flow
       ! CpAir*PriAirMassFlow*(Node(PriNode)%Temp - Node(ZoneNodeNum)%Temp) +
@@ -1576,8 +1812,8 @@ IF (UnitOn) THEN
   END IF
 ELSE
   ! unit is off; no flow
-  PriAirMassFlow = 0.0
-  SecAirMassFlow = 0.0
+  PriAirMassFlow = 0.0d0
+  SecAirMassFlow = 0.0d0
 END IF
 ! Set inlet node flowrates
 Node(PriNode)%MassFlowRate = PriAirMassFlow
@@ -1626,7 +1862,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
     END IF
   CASE(HCoilType_SteamAirHeating)  ! COIL:STEAM:AIRHEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1635,7 +1871,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
                                        QCoilReq=QCoilReq,CompIndex=PIU(PIUNum)%HCoil_Index)
   CASE(HCoilType_Electric)  ! COIL:ELECTRIC:HEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1645,7 +1881,7 @@ SELECT CASE(PIU(PIUNum)%HCoilType_Num)
 
   CASE(HCoilType_Gas)  ! COIL:GAS:HEATING
     IF ( .NOT. HCoilOn) THEN
-      QCoilReq = 0.0
+      QCoilReq = 0.0d0
     ELSE
       QCoilReq = QToHeatSetPt - Node(HCoilInAirNode)%MassFlowRate * CpAirZn * (Node(HCoilInAirNode)%Temp-Node(ZoneNode)%Temp)
     END IF
@@ -1658,14 +1894,14 @@ PowerMet = Node(OutletNode)%MassFlowRate * (PsyHFnTdbW(Node(OutletNode)%Temp,Nod
                                           - PsyHFnTdbW(Node(ZoneNode)%Temp,Node(ZoneNode)%HumRat))
 PIU(PIUNum)%HeatingRate = MAX(0.0d0,PowerMet)
 PIU(PIUNum)%SensCoolRate = ABS(MIN(constant_zero,PowerMet))
-IF (Node(OutletNode)%MassFlowRate .EQ. 0.0) THEN
-  Node(PriNode)%MassFlowRate = 0.0
-  Node(SecNode)%MassFlowRate = 0.0
+IF (Node(OutletNode)%MassFlowRate .EQ. 0.0d0) THEN
+  Node(PriNode)%MassFlowRate = 0.0d0
+  Node(SecNode)%MassFlowRate = 0.0d0
 END IF
 IF (PIU(PIUNum)%InducesPlenumAir) THEN
   PlenumInducedMassFlow = Node(SecNode)%MassFlowRate
 ELSE
-  PlenumInducedMassFlow = 0.0
+  PlenumInducedMassFlow = 0.0d0
 END IF
 Node(OutletNode)%MassFlowRateMax = PIU(PIUNum)%MaxPriAirMassFlow
 

@@ -33,7 +33,7 @@ IMPLICIT NONE         ! Enforce explicit typing of all variables
 PRIVATE ! Everything private unless explicitly made public
 
   ! MODULE PARAMETER DEFINITIONS:
-  ! na
+LOGICAL :: GetAirDistUnitsFlag = .TRUE.  ! If TRUE, Air Distribution Data has not been read in yet
 
   ! DERIVED TYPE DEFINITIONS:
   ! na
@@ -95,15 +95,11 @@ SUBROUTINE ManageZoneAirLoopEquipment(ZoneAirLoopEquipName, FirstHVACIteration, 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL             :: SimZone
-  LOGICAL,SAVE :: GetInputFlag = .True.  ! Flag set to make sure you get input once
   INTEGER :: AirDistUnitNum
 
   ! Beginning of Code
 
-  IF (GetInputFlag) THEN
-    CALL GetZoneAirLoopEquipment
-    GetInputFlag = .FALSE.
-  END IF
+  CALL GetZoneAirLoopEquipment
 
   ! Find the correct Zone Air Distribution Unit Equipment
   IF (CompIndex == 0) THEN
@@ -167,7 +163,8 @@ SUBROUTINE GetZoneAirLoopEquipment
   USE DataLoopNode
   USE BranchNodeConnections, ONLY: SetUpCompSets
   USE DataZoneEquipment,     ONLY: ZoneEquipConfig,ZoneEquipList
-  USE DualDuct ,             ONLY: GetDualDuctOutdoorAirRecircUse
+  USE DualDuct,              ONLY: GetDualDuctOutdoorAirRecircUse
+  USE SingleDuct,            ONLY: GetATMixerPriNode
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -201,7 +198,15 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
   CHARACTER(len=MaxNameLength), DIMENSION(2) :: cNumericFields ! Numeric field names
   LOGICAL, DIMENSION(4) :: lAlphaBlanks     ! Logical array, alpha field input BLANK = .true.
   LOGICAL, DIMENSION(2) :: lNumericBlanks   ! Logical array, numeric field input BLANK = .true.
-  LOGICAL       :: DualDuctRecircIsUsed   !local temporary for deciding if recirc side used by dual duct terminal
+  LOGICAL :: DualDuctRecircIsUsed   !local temporary for deciding if recirc side used by dual duct terminal
+  INTEGER :: ATMixerPriNode=0       ! primary air inlet node for air terminal mixers
+  
+    ! make sure the input data is read in only once
+    IF (.not. GetAirDistUnitsFlag) THEN
+      RETURN
+    ELSE
+      GetAirDistUnitsFlag = .FALSE.
+    END IF
 
     CurrentModuleObject = 'ZoneHVAC:AirDistributionUnit'
 
@@ -251,12 +256,12 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
           CALL ShowContinueError(TRIM(cNumericFields(2))//' must be less than 1.0')
           ErrorsFound=.true.
         END IF
-        IF (AirDistUnit(AirDistUnitNum)%UpStreamLeakFrac > 0.0) THEN
+        IF (AirDistUnit(AirDistUnitNum)%UpStreamLeakFrac > 0.0d0) THEN
           AirDistUnit(AirDistUnitNum)%UpStreamLeak = .TRUE.
         ELSE
           AirDistUnit(AirDistUnitNum)%UpStreamLeak = .FALSE.
         END IF
-        IF (AirDistUnit(AirDistUnitNum)%DownStreamLeakFrac > 0.0) THEN
+        IF (AirDistUnit(AirDistUnitNum)%DownStreamLeakFrac > 0.0d0) THEN
           AirDistUnit(AirDistUnitNum)%DownStreamLeak = .TRUE.
         ELSE
           AirDistUnit(AirDistUnitNum)%DownStreamLeak = .FALSE.
@@ -347,6 +352,26 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
           END IF
         ELSEIF (SameString(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum),'AirTerminal:SingleDuct:UserDefined')) THEN
           AirDistUnit(AirDistUnitNum)%EquipType_Num(AirDistCompUnitNum)=SingleDuctUserDefined
+        ELSEIF (SameString(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum),'AirTerminal:SingleDuct:InletSideMixer')) THEN
+          AirDistUnit(AirDistUnitNum)%EquipType_Num(AirDistCompUnitNum)=SingleDuctInletATMixer
+          CALL GetATMixerPriNode(AirDistUnit(AirDistUnitNum)%EquipName(1),ATMixerPriNode)
+          AirDistUnit(AirDistUnitNum)%InletNodeNum = ATMixerPriNode
+          IF (AirDistUnit(AirDistUnitNum)%UpStreamLeak .or. AirDistUnit(AirDistUnitNum)%DownStreamLeak) THEN
+            CALL ShowSevereError('Error found in '//TRIM(CurrentModuleObject)//' = '//TRIM(AirDistUnit(AirDistUnitNum)%Name))
+            CALL ShowContinueError('Simple duct leakage model not available for '//TRIM(cAlphaFields(3))//' = '//  &
+                                    TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum)))
+            ErrorsFound=.true.
+          END IF
+        ELSEIF (SameString(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum),'AirTerminal:SingleDuct:SupplySideMixer')) THEN
+          AirDistUnit(AirDistUnitNum)%EquipType_Num(AirDistCompUnitNum)=SingleDuctSupplyATMixer
+          CALL GetATMixerPriNode(AirDistUnit(AirDistUnitNum)%EquipName(1),ATMixerPriNode)
+          AirDistUnit(AirDistUnitNum)%InletNodeNum = ATMixerPriNode
+          IF (AirDistUnit(AirDistUnitNum)%UpStreamLeak .or. AirDistUnit(AirDistUnitNum)%DownStreamLeak) THEN
+            CALL ShowSevereError('Error found in '//TRIM(CurrentModuleObject)//' = '//TRIM(AirDistUnit(AirDistUnitNum)%Name))
+            CALL ShowContinueError('Simple duct leakage model not available for '//TRIM(cAlphaFields(3))//' = '//  &
+                                    TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum)))
+            ErrorsFound=.true.
+          END IF
         ELSE
           CALL ShowSevereError('Error found in '//TRIM(CurrentModuleObject)//' = '//TRIM(AirDistUnit(AirDistUnitNum)%Name))
           CALL ShowContinueError('Invalid '//TRIM(cAlphaFields(3))//' = '//  &
@@ -453,10 +478,10 @@ SUBROUTINE InitZoneAirLoopEquipment(FirstHVACIteration, AirDistUnitNum)
           ! na
 
   ! every time step
-  AirDistUnit(AirDistUnitNum)%MassFlowRateDnStrLk = 0.0
-  AirDistUnit(AirDistUnitNum)%MassFlowRateTU = 0.0
-  AirDistUnit(AirDistUnitNum)%MassFlowRateZSup = 0.0
-  AirDistUnit(AirDistUnitNum)%MassFlowRateSup = 0.0
+  AirDistUnit(AirDistUnitNum)%MassFlowRateDnStrLk = 0.0d0
+  AirDistUnit(AirDistUnitNum)%MassFlowRateTU = 0.0d0
+  AirDistUnit(AirDistUnitNum)%MassFlowRateZSup = 0.0d0
+  AirDistUnit(AirDistUnitNum)%MassFlowRateSup = 0.0d0
 
   RETURN
 
@@ -521,16 +546,16 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
   REAL(r64) :: MassFlowRateMaxAvail        ! max avail mass flow rate excluding leaks [kg/s]
   REAL(r64) :: MassFlowRateMinAvail        ! min avail mass flow rate excluding leaks [kg/s]
   REAL(r64) :: MassFlowRateUpStreamLeakMax ! max upstream leak flow rate [kg/s]
-  REAL(r64) :: DesFlowRatio=0.0            ! ratio of system to sum of zones design flow rate
-  REAL(r64) :: SpecHumOut=0.0              ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
-  REAL(r64) :: SpecHumIn=0.0               ! Specific humidity ratio of inlet air (kg moisture / kg moist air)
+  REAL(r64) :: DesFlowRatio=0.0d0            ! ratio of system to sum of zones design flow rate
+  REAL(r64) :: SpecHumOut=0.0d0              ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
+  REAL(r64) :: SpecHumIn=0.0d0               ! Specific humidity ratio of inlet air (kg moisture / kg moist air)
 
       DO AirDistCompNum = 1, AirDistUnit(AirDistUnitNum)%NumComponents
-         NonAirSysOutput = 0.0
+         NonAirSysOutput = 0.0d0
          InNodeNum = AirDistUnit(AirDistUnitNum)%InletNodeNum
          OutNodeNum = AirDistUnit(AirDistUnitNum)%OutletNodeNum
-         MassFlowRateMaxAvail = 0.0
-         MassFlowRateMinAvail = 0.0
+         MassFlowRateMaxAvail = 0.0d0
+         MassFlowRateMinAvail = 0.0d0
          ! check for no plenum
          ! set the max and min avail flow rates taking into acount the upstream leak
          IF (InNodeNum > 0) THEN
@@ -549,7 +574,7 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
                Node(InNodeNum)%MassFlowRateMaxAvail = MassFlowRateMaxAvail - MassFlowRateUpStreamLeakMax
              ELSE
                AirDistUnit(AirDistUnitNum)%MassFlowRateUpStrLk = MassFlowRateMaxAvail
-               Node(InNodeNum)%MassFlowRateMaxAvail = 0.0
+               Node(InNodeNum)%MassFlowRateMaxAvail = 0.0d0
              END IF
              Node(InNodeNum)%MassFlowRateMinAvail = MAX(0.0d0, MassFlowRateMinAvail &
                                                              -AirDistUnit(AirDistUnitNum)%MassFlowRateUpStrLk)
@@ -627,6 +652,10 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
             CALL SimAirTerminalUserDefined(AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompNum),FirstHVACIteration, &
                                     ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
                                            AirDistUnit(AirDistUnitNum)%EquipIndex(AirDistCompNum))
+                                           
+          CASE (SingleDuctInletATMixer)
+          
+          CASE (SingleDuctSupplyATMixer)
 
           CASE DEFAULT
             CALL ShowSevereError('Error found in ZoneHVAC:AirDistributionUnit='//TRIM(AirDistUnit(AirDistUnitNum)%Name))
@@ -642,10 +671,10 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
              Node(InNodeNum)%MassFlowRateMinAvail = MassFlowRateMinAvail
            END IF
            IF ( (AirDistUnit(AirDistUnitNum)%UpStreamLeak .OR. AirDistUnit(AirDistUnitNum)%DownStreamLeak) .AND. &
-                MassFlowRateMaxAvail > 0.0 ) THEN
+                MassFlowRateMaxAvail > 0.0d0 ) THEN
              AirDistUnit(AirDistUnitNum)%MassFlowRateTU = Node(InNodeNum)%MassFlowRate
              AirDistUnit(AirDistUnitNum)%MassFlowRateZSup = AirDistUnit(AirDistUnitNum)%MassFlowRateTU * &
-                                                            (1.-AirDistUnit(AirDistUnitNum)%DownStreamLeakFrac)
+                                                            (1.0d0-AirDistUnit(AirDistUnitNum)%DownStreamLeakFrac)
              AirDistUnit(AirDistUnitNum)%MassFlowRateDnStrLk = AirDistUnit(AirDistUnitNum)%MassFlowRateTU * &
                                                               AirDistUnit(AirDistUnitNum)%DownStreamLeakFrac
              AirDistUnit(AirDistUnitNum)%MassFlowRateSup = AirDistUnit(AirDistUnitNum)%MassFlowRateTU &
@@ -677,8 +706,8 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
       ! Sign convention: LatOutputProvided <0 Zone is dehumidified
       !                  LatOutputProvided >0 Zone is humidified
       ! CR9155 Remove specific humidity calculations
-      SpecHumOut = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%HumRat 
-      SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat 
+      SpecHumOut = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%HumRat
+      SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat
       LatOutputProvided = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%MassFlowRate * &
                           (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 

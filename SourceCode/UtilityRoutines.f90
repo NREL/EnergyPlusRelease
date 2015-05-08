@@ -156,13 +156,13 @@ SUBROUTINE AbortEnergyPlus(NoIdf,NoIDD)
 #ifdef EP_Detailed_Timings
                              CALL epStopTime('EntireRun=')
 #endif
-  IF (Elapsed_Time < 0.0) Elapsed_Time=0.0
+  IF (Elapsed_Time < 0.0d0) Elapsed_Time=0.0d0
   Hours=Elapsed_Time/3600.d0
-  Elapsed_Time=Elapsed_Time-Hours*3600
-  Minutes=Elapsed_Time/60.d0
-  Elapsed_Time=Elapsed_Time-Minutes*60
+  Elapsed_Time=Elapsed_Time-Hours*3600.0d0
+  Minutes=Elapsed_Time/60.0d0
+  Elapsed_Time=Elapsed_Time-Minutes*60.0d0
   Seconds=Elapsed_Time
-  IF (Seconds < 0.0) Seconds=0.0
+  IF (Seconds < 0.0d0) Seconds=0.0d0
   WRITE(Elapsed,ETimeFmt) Hours,Minutes,Seconds
 
   CALL ShowMessage('EnergyPlus Warmup Error Summary. During Warmup: '//TRIM(NumWarningsDuringWarmup)//  &
@@ -215,6 +215,8 @@ SUBROUTINE CloseMiscOpenFiles
 
           ! USE STATEMENTS:
   USE DaylightingManager, ONLY: CloseReportIllumMaps, CloseDFSFile
+  USE DataGlobals, ONLY: OutputFileDebug
+  USE DataReportingFlags, ONLY: DebugOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -231,6 +233,7 @@ SUBROUTINE CloseMiscOpenFiles
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=20) DebugPosition
 
 
 !      LOGICAL :: exists, opened
@@ -239,6 +242,21 @@ SUBROUTINE CloseMiscOpenFiles
 
       CALL CloseReportIllumMaps
       CALL CloseDFSFile
+
+  !  In case some debug output was produced, it appears that the
+  !  position on the INQUIRE will not be 'ASIS' (3 compilers tested)
+  !  So, will want to keep....
+
+  INQUIRE(OutputFileDebug,POSITION=DebugPosition)
+  IF (TRIM(DebugPosition) /= 'ASIS') THEN
+    DebugOutput=.True.
+  ENDIF
+  IF (DebugOutput) THEN
+    CLOSE (OutputFileDebug)
+  ELSE
+    CLOSE (OutputFileDebug,STATUS='DELETE')
+  END IF
+
 
   RETURN
 
@@ -381,12 +399,12 @@ SUBROUTINE EndEnergyPlus
 #ifdef EP_Detailed_Timings
                              CALL epStopTime('EntireRun=')
 #endif
-  Hours=Elapsed_Time/3600.
-  Elapsed_Time=Elapsed_Time-Hours*3600
-  Minutes=Elapsed_Time/60.
-  Elapsed_Time=Elapsed_Time-Minutes*60
+  Hours=Elapsed_Time/3600.0d0
+  Elapsed_Time=Elapsed_Time-Hours*3600.0d0
+  Minutes=Elapsed_Time/60.0d0
+  Elapsed_Time=Elapsed_Time-Minutes*60.0d0
   Seconds=Elapsed_Time
-  IF (Seconds < 0.0) Seconds=0.0
+  IF (Seconds < 0.0d0) Seconds=0.0d0
   WRITE(Elapsed,ETimeFmt) Hours,Minutes,Seconds
 
   CALL ShowMessage('EnergyPlus Warmup Error Summary. During Warmup: '//TRIM(NumWarningsDuringWarmup)//  &

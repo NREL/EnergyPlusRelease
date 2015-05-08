@@ -127,20 +127,7 @@ INTEGER, PARAMETER :: UseCompressorOffFlow = 2 ! set compressor OFF air flow rat
 ! Compressor operation
 INTEGER, PARAMETER :: On =  1              ! normal compressor operation
 INTEGER, PARAMETER :: Off = 0              ! signal DXCoil that compressor shouldn't run
-! Furnace/Unitary System Types
-INTEGER, PARAMETER :: Furnace_HeatOnly = 1
-INTEGER, PARAMETER :: Furnace_HeatCool = 2
-INTEGER, PARAMETER :: UnitarySys_HeatOnly = 3
-INTEGER, PARAMETER :: UnitarySys_HeatCool = 4
-INTEGER, PARAMETER :: UnitarySys_HeatPump_AirToAir = 5
-INTEGER, PARAMETER :: UnitarySys_HeatPump_WaterToAir = 6
-CHARACTER(len=*), PARAMETER, DIMENSION(6) :: cFurnaceTypes=  &
-       (/'AirLoopHVAC:Unitary:Furnace:HeatOnly  ',  &
-         'AirLoopHVAC:Unitary:Furnace:HeatCool  ',  &
-         'AirLoopHVAC:UnitaryHeatOnly           ',  &
-         'AirLoopHVAC:UnitaryHeatCool           ',  &
-         'AirLoopHVAC:UnitaryHeatPump:AirToAir  ',  &
-         'AirLoopHVAC:UnitaryHeatPump:WaterToAir'/)
+
 
 ! Dehumidification control modes (DehumidControlMode)
 INTEGER, PARAMETER :: DehumidControl_None       = 0
@@ -191,51 +178,51 @@ TYPE FurnaceEquipConditions
   INTEGER      :: FanPlace                         =0 ! fan placement; 1=blow through, 2=draw through
   INTEGER      :: NodeNumofControlledZone          =0 ! Node number of controlled zone air node
   INTEGER      :: WatertoAirHPType                 =0 !Type of water to air heat pump model used
-  REAL(r64)    :: CoolingConvergenceTolerance      =0.0 ! Convergence tolerance for cooling,
+  REAL(r64)    :: CoolingConvergenceTolerance      =0.0d0 ! Convergence tolerance for cooling,
                                                         !   ratio (CoolingCoilLoad - FurnaceCoolingOutput)/CoolingCoilLoad
-  REAL(r64)    :: HeatingConvergenceTolerance      =0.0 ! Convergence tolerance for heating,
+  REAL(r64)    :: HeatingConvergenceTolerance      =0.0d0 ! Convergence tolerance for heating,
                                                         !   ratio (HeatingCoilLoad - HeatPumpheatingOutput)/HeatingCoilLoad
-  REAL(r64)    :: DesignHeatingCapacity            =0.0 ! Nominal Capacity of Heating Coil [W]
-  REAL(r64)    :: DesignCoolingCapacity            =0.0 ! Nominal Capacity of Cooling Coil [W]
-  REAL(r64)    :: CoolingCoilSensDemand            =0.0 ! Sensible demand on Cooling Coil [W]
-  REAL(r64)    :: HeatingCoilSensDemand            =0.0 ! Sensible demand on Heating Coil [W]
-  REAL(r64)    :: CoolingCoilLatentDemand          =0.0 ! Latent demand on Cooling Coil [W]
-  REAL(r64)    :: DesignSuppHeatingCapacity        =0.0 ! Nominal Capacity of Supplemental Heating Coil [W]
-  REAL(r64)    :: DesignFanVolFlowRate             =0.0 ! Vol Flow through the Furnace being Simulated [m**3/Sec]
+  REAL(r64)    :: DesignHeatingCapacity            =0.0d0 ! Nominal Capacity of Heating Coil [W]
+  REAL(r64)    :: DesignCoolingCapacity            =0.0d0 ! Nominal Capacity of Cooling Coil [W]
+  REAL(r64)    :: CoolingCoilSensDemand            =0.0d0 ! Sensible demand on Cooling Coil [W]
+  REAL(r64)    :: HeatingCoilSensDemand            =0.0d0 ! Sensible demand on Heating Coil [W]
+  REAL(r64)    :: CoolingCoilLatentDemand          =0.0d0 ! Latent demand on Cooling Coil [W]
+  REAL(r64)    :: DesignSuppHeatingCapacity        =0.0d0 ! Nominal Capacity of Supplemental Heating Coil [W]
+  REAL(r64)    :: DesignFanVolFlowRate             =0.0d0 ! Vol Flow through the Furnace being Simulated [m**3/Sec]
   LOGICAL      :: DesignFanVolFlowRateEMSOverrideOn=.FALSE. ! if true, then EMS is calling to override autosize fan flow
   REAL(r64)    :: DesignFanVolFlowRateEMSOverrideValue=0.d0 ! EMS value for override of fan flow rate autosize [m3/s]
-  REAL(r64)    :: DesignMassFlowRate               =0.0 ! Design mass flow rate through furnace [kg/s]
-  REAL(r64)    :: MaxCoolAirVolFlow                =0.0 ! supply air volumetric flow rate during cooling operation [m3/s]
+  REAL(r64)    :: DesignMassFlowRate               =0.0d0 ! Design mass flow rate through furnace [kg/s]
+  REAL(r64)    :: MaxCoolAirVolFlow                =0.0d0 ! supply air volumetric flow rate during cooling operation [m3/s]
   LOGICAL      :: MaxCoolAirVolFlowEMSOverrideOn   =.FALSE. !if true, EMS is calling to override autosize flow during cooling
   REAL(r64)    :: MaxCoolAirVolFlowEMSOverrideValue=0.d0 ! EMS value for override of flow during cooling [m3/s]
-  REAL(r64)    :: MaxHeatAirVolFlow                =0.0 ! supply air volumetric flow rate during cooling operation [m3/s]
+  REAL(r64)    :: MaxHeatAirVolFlow                =0.0d0 ! supply air volumetric flow rate during cooling operation [m3/s]
   LOGICAL      :: MaxHeatAirVolFlowEMSOverrideOn   =.FALSE. ! if true, EMS is calling to override autosize flow during heating
   REAL(r64)    :: MaxHeatAirVolFlowEMSOverrideValue=0.d0  ! EMS value for override of flow during heating operation [m3/s]
-  REAL(r64)    :: MaxNoCoolHeatAirVolFlow          =0.0 ! supply air volumetric flow rate when no cooling or heating [m3/s]
+  REAL(r64)    :: MaxNoCoolHeatAirVolFlow          =0.0d0 ! supply air volumetric flow rate when no cooling or heating [m3/s]
   LOGICAL      :: MaxNoCoolHeatAirVolFlowEMSOverrideOn = .FALSE. ! if true, EMS is calling to override autosize no heatcool rate
   REAL(r64)    :: MaxNoCoolHeatAirVolFlowEMSOverrideValue=0.d0 ! EMS value for override of flow during no heat cool [m3/s]
-  REAL(r64)    :: MaxCoolAirMassFlow               =0.0 ! supply air mass flow rate during cooling operation [kg/s]
-  REAL(r64)    :: MaxHeatAirMassFlow               =0.0 ! supply air mass flow rate during heating operation [kg/s]
-  REAL(r64)    :: MaxNoCoolHeatAirMassFlow         =0.0 ! supply air mass flow rate when no cooling or heating [kg/s]
-  REAL(r64)    :: MaxHeatCoilFluidFlow             =0.0 ! water or steam mass flow rate for heating coil [kg/s]
-  REAL(r64)    :: MaxSuppCoilFluidFlow             =0.0 ! water or steam mass flow rate for supplemental heating coil [kg/s]
+  REAL(r64)    :: MaxCoolAirMassFlow               =0.0d0 ! supply air mass flow rate during cooling operation [kg/s]
+  REAL(r64)    :: MaxHeatAirMassFlow               =0.0d0 ! supply air mass flow rate during heating operation [kg/s]
+  REAL(r64)    :: MaxNoCoolHeatAirMassFlow         =0.0d0 ! supply air mass flow rate when no cooling or heating [kg/s]
+  REAL(r64)    :: MaxHeatCoilFluidFlow             =0.0d0 ! water or steam mass flow rate for heating coil [kg/s]
+  REAL(r64)    :: MaxSuppCoilFluidFlow             =0.0d0 ! water or steam mass flow rate for supplemental heating coil [kg/s]
 
-  REAL(r64)    :: ControlZoneMassFlowFrac          =0.0 ! Fraction of furnace flow to control zone
+  REAL(r64)    :: ControlZoneMassFlowFrac          =0.0d0 ! Fraction of furnace flow to control zone
   REAL(r64)    :: DesignMaxOutletTemp              =9999.0d0 ! Maximum supply air temperature from furnace heater [C]
-  REAL(r64)    :: MdotFurnace                      =0.0 ! Mass flow rate through furnace [kg/s]
-  REAL(r64)    :: FanPartLoadRatio                 =0.0 ! Part load ratio of furnace fan (mdot actual/mdot design)
-  REAL(r64)    :: CompPartLoadRatio                =0.0 ! Part load ratio of furnace compressor (load / steady-state output)
-  REAL(r64)    :: WSHPRuntimeFrac                  =0.0 ! Runtime fraction of water source heat pump
-  REAL(r64)    :: CoolPartLoadRatio                =0.0 ! Cooling part load ratio
-  REAL(r64)    :: HeatPartLoadRatio                =0.0 ! Heating part load ratio
-  REAL(r64)    :: MinOATCompressor                 =0.0 ! Minimum outdoor operating temperature for heat pump compressor
-  REAL(r64)    :: MaxOATSuppHeat                   =0.0 ! Maximum outdoor dry-bulb temperature for
+  REAL(r64)    :: MdotFurnace                      =0.0d0 ! Mass flow rate through furnace [kg/s]
+  REAL(r64)    :: FanPartLoadRatio                 =0.0d0 ! Part load ratio of furnace fan (mdot actual/mdot design)
+  REAL(r64)    :: CompPartLoadRatio                =0.0d0 ! Part load ratio of furnace compressor (load / steady-state output)
+  REAL(r64)    :: WSHPRuntimeFrac                  =0.0d0 ! Runtime fraction of water source heat pump
+  REAL(r64)    :: CoolPartLoadRatio                =0.0d0 ! Cooling part load ratio
+  REAL(r64)    :: HeatPartLoadRatio                =0.0d0 ! Heating part load ratio
+  REAL(r64)    :: MinOATCompressor                 =0.0d0 ! Minimum outdoor operating temperature for heat pump compressor
+  REAL(r64)    :: MaxOATSuppHeat                   =0.0d0 ! Maximum outdoor dry-bulb temperature for
   INTEGER      :: CondenserNodeNum                 =0   ! Node number of outdoor condenser/compressor
-  REAL(r64)    :: MaxONOFFCyclesperHour            =0.0 ! Maximum ON/OFF Cycling Rate [cycles/hr]
-  REAL(r64)    :: HPTimeConstant                   =0.0 ! Heat Pump Time Constant [s]
-  REAL(r64)    :: OnCyclePowerFraction             =0.0 ! Fraction of on-cycle power use [~]
+  REAL(r64)    :: MaxONOFFCyclesperHour            =0.0d0 ! Maximum ON/OFF Cycling Rate [cycles/hr]
+  REAL(r64)    :: HPTimeConstant                   =0.0d0 ! Heat Pump Time Constant [s]
+  REAL(r64)    :: OnCyclePowerFraction             =0.0d0 ! Fraction of on-cycle power use [~]
                                                         ! supplemental heating coil operation
-  REAL(r64)    :: FanDelayTime                     =0.0 ! Fan delay time, time delay for the HP's fan to
+  REAL(r64)    :: FanDelayTime                     =0.0d0 ! Fan delay time, time delay for the HP's fan to
                                                         ! shut off after compressor cycle off  [s]
   Logical      :: Humidistat                       =.FALSE. ! Humidistat control (heatcool units only and not heatpump)
   Logical      :: InitHeatPump                     =.FALSE. ! Heat pump initialization flag (for error reporting)
@@ -252,16 +239,16 @@ TYPE FurnaceEquipConditions
   Integer      :: HeatingMaxIterIndex              =0   ! Index to recurring warning message
   Integer      :: HeatingMaxIterIndex2             =0   ! Index to recurring warning message
   Integer      :: HeatingRegulaFalsiFailedIndex    =0   ! Index to recurring warning messages
-  REAL(r64)    :: ActualFanVolFlowRate             =0.0 ! Volumetric flow rate from fan object
-  REAL(r64)    :: HeatingSpeedRatio                =1.0 ! Fan speed ratio in heating mode
-  REAL(r64)    :: CoolingSpeedRatio                =1.0 ! Fan speed ratio in cooling mode
-  REAL(r64)    :: NoHeatCoolSpeedRatio             =1.0 ! Fan speed ratio when no cooling or heating
+  REAL(r64)    :: ActualFanVolFlowRate             =0.0d0 ! Volumetric flow rate from fan object
+  REAL(r64)    :: HeatingSpeedRatio                =1.0d0 ! Fan speed ratio in heating mode
+  REAL(r64)    :: CoolingSpeedRatio                =1.0d0 ! Fan speed ratio in cooling mode
+  REAL(r64)    :: NoHeatCoolSpeedRatio             =1.0d0 ! Fan speed ratio when no cooling or heating
   INTEGER      :: ZoneInletNode                    =0   ! Zone inlet node number in the controlled zone
-  REAL(r64)    :: SenLoadLoss                      =0.0 ! Air distribution system sensible loss
-  REAL(r64)    :: LatLoadLoss                      =0.0 ! Air distribution system latent loss
-  REAL(r64)    :: SensibleLoadMet                  =0.0 ! System sensible load
-  REAL(r64)    :: LatentLoadMet                    =0.0 ! System latent load
-  REAL(r64)    :: DehumidInducedHeatingDemandRate  =0.0 ! Additional heating demand on supplemental heater
+  REAL(r64)    :: SenLoadLoss                      =0.0d0 ! Air distribution system sensible loss
+  REAL(r64)    :: LatLoadLoss                      =0.0d0 ! Air distribution system latent loss
+  REAL(r64)    :: SensibleLoadMet                  =0.0d0 ! System sensible load
+  REAL(r64)    :: LatentLoadMet                    =0.0d0 ! System latent load
+  REAL(r64)    :: DehumidInducedHeatingDemandRate  =0.0d0 ! Additional heating demand on supplemental heater
                                                         ! when heat pumps operate on dehumidification mode
   INTEGER      :: CoilOutletNode                   = 0  ! outlet node for hot water and steam heating coil
   INTEGER      :: LoopNum                          = 0  ! plant loop index for water and steam heating coil
@@ -286,17 +273,17 @@ TYPE FurnaceEquipConditions
   INTEGER  :: HeatCoolMode          = 0  ! System operating mode (0 = floating, 1 = cooling, 2 = heating)
   INTEGER  :: NumOfSpeedCooling     =0   ! The number of speeds for cooling
   INTEGER  :: NumOfSpeedHeating     =0   ! The number of speeds for heating
-  REAL(r64):: IdleSpeedRatio        = 0  !idle air fan ratio
-  REAL(r64):: IdleVolumeAirRate = 0  ! idle air flow rate
-  REAL(r64):: IdleMassFlowRate      = 0  ! idle air flow rate
-  REAL(r64):: FanVolFlow            = 0  ! fan volumetric flow rate
+  REAL(r64):: IdleSpeedRatio        = 0.0d0  !idle air fan ratio
+  REAL(r64):: IdleVolumeAirRate = 0.0d0  ! idle air flow rate
+  REAL(r64):: IdleMassFlowRate      = 0.0d0  ! idle air flow rate
+  REAL(r64):: FanVolFlow            = 0.0d0  ! fan volumetric flow rate
   LOGICAL  :: CheckFanFlow      = .TRUE. ! Supply airflow check
-  REAL(r64):: HeatVolumeFlowRate(MaxSpedLevels) = 0 ! Supply air volume flow rate during heating operation
-  REAL(r64):: HeatMassFlowRate(MaxSpedLevels) = 0 ! Supply air mass flow rate during heating operation
-  REAL(r64):: CoolVolumeFlowRate(MaxSpedLevels) = 0  ! Supply air volume flow rate during cooling operation
-  REAL(r64):: CoolMassFlowRate(MaxSpedLevels) = 0  ! Supply air mass flow rate during cooling operation
-  REAL(r64):: MSHeatingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in heating mode
-  REAL(r64):: MSCoolingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in cooling mode
+  REAL(r64):: HeatVolumeFlowRate(MaxSpedLevels) = 0.0d0 ! Supply air volume flow rate during heating operation
+  REAL(r64):: HeatMassFlowRate(MaxSpedLevels) = 0.0d0 ! Supply air mass flow rate during heating operation
+  REAL(r64):: CoolVolumeFlowRate(MaxSpedLevels) = 0.0d0  ! Supply air volume flow rate during cooling operation
+  REAL(r64):: CoolMassFlowRate(MaxSpedLevels) = 0.0d0  ! Supply air mass flow rate during cooling operation
+  REAL(r64):: MSHeatingSpeedRatio(MaxSpedLevels) = 0.0d0  ! Fan speed ratio in heating mode
+  REAL(r64):: MSCoolingSpeedRatio(MaxSpedLevels) = 0.0d0  ! Fan speed ratio in cooling mode
   INTEGER :: CompSpeedNum=0
   REAL(r64) :: CompSpeedRatio=0.0d0
   INTEGER :: ErrIndexCyc=0
@@ -311,15 +298,15 @@ END TYPE FurnaceEquipConditions
   TYPE (FurnaceEquipConditions), ALLOCATABLE, DIMENSION(:) :: Furnace
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
-  REAL(r64)    :: ModifiedHeatCoilLoad=0.0 ! used to adjust heating coil capacity if outlet temp > DesignMaxOutletTemp,
+  REAL(r64)    :: ModifiedHeatCoilLoad=0.0d0 ! used to adjust heating coil capacity if outlet temp > DesignMaxOutletTemp,
                                       ! used for Coil:Gas:Heating and Coil:Electric:Heating coils only.
-  REAL(r64)    :: OnOffAirFlowRatioSave = 0.0 ! Saves the OnOffAirFlowRatio calculated in RegulaFalsi CALLs.
-  REAL(r64)    :: OnOffFanPartLoadFractionSave = 0.0 ! Global part-load fraction passed to fan object
-  REAL(r64)    :: CompOnMassFlow    = 0.0 ! Supply air mass flow rate w/ compressor ON [kg/s]
-  REAL(r64)    :: CompOffMassFlow   = 0.0 ! Supply air mass flow rate w/ compressor OFF [kg/s]
-  REAL(r64)    :: CompOnFlowRatio   = 0.0 ! fan flow ratio when coil on
-  REAL(r64)    :: CompOffFlowRatio  = 0.0 ! fan flow ratio when coil off
-  REAL(r64)    :: FanSpeedRatio     = 0.0 ! ratio of air flow ratio passed to fan object
+  REAL(r64)    :: OnOffAirFlowRatioSave = 0.0d0 ! Saves the OnOffAirFlowRatio calculated in RegulaFalsi CALLs.
+  REAL(r64)    :: OnOffFanPartLoadFractionSave = 0.0d0 ! Global part-load fraction passed to fan object
+  REAL(r64)    :: CompOnMassFlow    = 0.0d0 ! Supply air mass flow rate w/ compressor ON [kg/s]
+  REAL(r64)    :: CompOffMassFlow   = 0.0d0 ! Supply air mass flow rate w/ compressor OFF [kg/s]
+  REAL(r64)    :: CompOnFlowRatio   = 0.0d0 ! fan flow ratio when coil on
+  REAL(r64)    :: CompOffFlowRatio  = 0.0d0 ! fan flow ratio when coil off
+  REAL(r64)    :: FanSpeedRatio     = 0.0d0 ! ratio of air flow ratio passed to fan object
   REAL(r64)    :: CoolHeatPLRRat    = 1.0d0 ! ratio of cooling to heating PLR, used for cycling fan RH control
   LOGICAL      :: HeatingLoad       = .FALSE.
   LOGICAL      :: CoolingLoad       = .FALSE.
@@ -328,7 +315,7 @@ END TYPE FurnaceEquipConditions
   LOGICAL      :: HPDehumidificationLoadFlag = .FALSE. ! true if there is dehumidification load (heat pumps only)
   REAL(r64)    :: TempSteamIn       = 100.0d0   !  steam coil steam inlet temperature
   !starting add variables for variable speed water source heat pump
-  REAL(r64)    :: SaveCompressorPLR      = 0.0  ! holds compressor PLR from active DX coil
+  REAL(r64)    :: SaveCompressorPLR      = 0.0d0  ! holds compressor PLR from active DX coil
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject   ! Object type for getting and error messages
   !ending varibles for variable speed water source heat pump
 
@@ -461,7 +448,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
   REAL(r64)                     :: H2OHtOfVap             ! Heat of vaporization of air
   INTEGER                       :: FurnaceInletNode       ! Inlet node to furnace or unitary system
   REAL(r64)                     :: FurnaceSavMdot         ! saved furnace inlet air mass flow rate [m3/s]
-  REAL(r64)                     :: Dummy = 0.0
+  REAL(r64)                     :: Dummy = 0.0d0
   INTEGER                       :: CompOp                 ! compressor operation; 1=on, 0=off
   REAL(r64)                     :: OnOffAirFlowRatio      ! Ratio of compressor ON air flow to AVERAGE air flow over time step
   INTEGER                       :: FanOpMode              ! Fan operating mode (1=CycFanCycCoil, 2=ContFanCycCoil)
@@ -512,7 +499,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
   ENDIF
 
   HXUnitOn   = .FALSE.
-  OnOffAirFlowRatio = 0.0
+  OnOffAirFlowRatio = 0.0d0
   ! here we need to deal with sequenced zone equip
   IF (Furnace(FurnaceNum)%ZoneSequenceCoolingNum > 0 .and. Furnace(FurnaceNum)%ZoneSequenceHeatingNum > 0) THEN
     ZoneLoadToCoolSPSequenced = ZoneSysEnergyDemand(Furnace(FurnaceNum)%ControlZoneNum)%&
@@ -583,7 +570,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
 
    IF(Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
        ! variable speed cooling coil
-       HeatCoilLoad=0.0
+       HeatCoilLoad=0.0d0
        Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
    ELSE
      ! calculate the system flow rate
@@ -593,8 +580,8 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
        CompOp = Off
        Call CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,ZoneLoad,MoistureLoad, &
                                          HeatCoilLoad, ReheatCoilLoad, OnOffAirFlowRatio, HXUnitOn)
-       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0 &
-           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0)) THEN
+       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0d0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0d0 &
+           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0d0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0d0)) THEN
          ! compressor on (reset inlet air mass flow rate to starting value)
          Node(FurnaceInletNode)%MassFlowRate = FurnaceSavMdot
          CompOp = On
@@ -652,7 +639,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
   CASE(UnitarySys_HeatPump_AirToAir)
    IF(Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
        ! variable speed heat pump
-       HeatCoilLoad=0.0
+       HeatCoilLoad=0.0d0
        Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
    ELSE
      ! Update the furnace flow rates
@@ -662,8 +649,8 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
        CompOp = Off
        Call CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,ZoneLoad,MoistureLoad, &
                                          HeatCoilLoad, ReheatCoilLoad, OnOffAirFlowRatio, HXUnitOn)
-       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0 &
-           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0)) THEN
+       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0d0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0d0 &
+           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0d0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0d0)) THEN
          ! compressor on (reset inlet air mass flow rate to starting value)
          CompOp = On
          Node(FurnaceInletNode)%MassFlowRate = FurnaceSavMdot
@@ -721,8 +708,8 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
        CompOp = Off
        Call CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,ZoneLoad,MoistureLoad, &
                                          HeatCoilLoad, ReheatCoilLoad, OnOffAirFlowRatio, HXUnitOn)
-       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0 &
-           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0)) THEN
+       IF (Furnace(FurnaceNum)%CoolPartLoadRatio >= 1.0d0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio >= 1.0d0 &
+           .OR. (Furnace(FurnaceNum)%CoolPartLoadRatio <= 0.0d0 .AND. Furnace(FurnaceNum)%HeatPartLoadRatio <= 0.0d0)) THEN
          ! compressor on (reset inlet air mass flow rate to starting value)
          CompOp = On
          Node(FurnaceInletNode)%MassFlowRate = FurnaceSavMdot
@@ -763,11 +750,11 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
      ELSE IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_ParEst) THEN
 
       ! simulate the heat pump
-       HeatCoilLoad=0.0
+       HeatCoilLoad=0.0d0
        CALL CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,CompOp,ZoneLoad,MoistureLoad)
      ELSE IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
        ! simulate the heat pump
-       HeatCoilLoad=0.0
+       HeatCoilLoad=0.0d0
        Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
 
      ELSE IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedLooUpTable) THEN
@@ -780,14 +767,14 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
   END SELECT
 
   ! set the econo lockout flags
-  IF (Furnace(FurnaceNum)%CompPartLoadRatio > 0.0 .AND. &
+  IF (Furnace(FurnaceNum)%CompPartLoadRatio > 0.0d0 .AND. &
       AirLoopControlInfo(AirLoopNum)%CanLockoutEconoWithCompressor) THEN
     AirLoopControlInfo(AirLoopNum)%ReqstEconoLockoutWithCompressor = .TRUE.
   ELSE
     AirLoopControlInfo(AirLoopNum)%ReqstEconoLockoutWithCompressor = .FALSE.
   END IF
 
-  IF ((HeatCoilLoad > 0.0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio > 0.0) .AND. &
+  IF ((HeatCoilLoad > 0.0d0 .OR. Furnace(FurnaceNum)%HeatPartLoadRatio > 0.0d0) .AND. &
       (AirLoopControlInfo(AirLoopNum)%CanLockoutEconoWithCompressor .OR. &
        AirLoopControlInfo(AirLoopNum)%CanLockoutEconoWithHeating)) THEN
     AirLoopControlInfo(AirLoopNum)%ReqstEconoLockoutWithHeating = .TRUE.
@@ -887,7 +874,7 @@ SUBROUTINE GetFurnaceInput
     USE OutAirNodeManager,          ONLY: CheckOutAirNodeNumber
     USE DataIPShortCuts
     USE EMSManager,                 ONLY: ManageEMS
-
+    USE HVACControllers,            ONLY: CheckCoilWaterInletNode
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
 
@@ -1019,7 +1006,7 @@ SUBROUTINE GetFurnaceInput
     ALLOCATE(Alphas(MaxAlphas))
     Alphas=' '
     ALLOCATE(Numbers(MaxNumbers))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(cAlphaFields(MaxAlphas))
     cAlphaFields=' '
     ALLOCATE(cNumericFields(MaxNumbers))
@@ -1042,7 +1029,7 @@ SUBROUTINE GetFurnaceInput
 
         FanInletNode          = 0
         FanOutletNode         = 0
-        FanVolFlowRate        = 0.0
+        FanVolFlowRate        = 0.0d0
         HeatingCoilInletNode  = 0
         HeatingCoilOutletNode = 0
 
@@ -1242,7 +1229,7 @@ SUBROUTINE GetFurnaceInput
 
             ! Check fan's schedule for cycling fan operation if constant volume fan is used
             IF(Furnace(FurnaceNum)%FanSchedPtr .GT. 0 .AND. Furnace(FurnaceNum)%FanType_Num == FanType_SimpleConstVolume)THEN
-              IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.,'<=',1.)) THEN
+              IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.0d0,'<=',1.0d0)) THEN
                 CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
                 CALL ShowContinueError('For '//TRIM(cAlphaFields(7))//' = '//TRIM(Alphas(7)))
                 CALL ShowContinueError('Fan operating mode must be continuous (fan operating mode schedule values > 0).')
@@ -1373,6 +1360,17 @@ SUBROUTINE GetFurnaceInput
                   ErrorsFound = .TRUE.
                 END IF
 
+                ! check if user has also used a water coil controller, which they should not do
+                ErrFlag = .FALSE.
+                CALL CheckCoilWaterInletNode(Furnace(FurnaceNum)%CoilControlNode, ErrFlag)
+                IF (.NOT. ErrFlag) THEN ! then did find a controller so that is bad
+                  CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name) &
+                                      //' has a conflicting Controller:WaterCoil object' )
+                  CALL ShowContinueError('Hot water coils are controlled directly by unitary and furnace systems.')
+                  CALL ShowContinueError('No water coil controller should be input for the coil.')
+                  ErrorsFound = .TRUE.
+                ENDIF
+
             ENDIF
 
         ELSEIF (SameString(HeatingCoilType,'Coil:Heating:Steam')) THEN
@@ -1402,7 +1400,7 @@ SUBROUTINE GetFurnaceInput
 
                 ! Get the Heating Coil steam max volume flow rate
                 Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%HeatingCoilIndex,ErrFlag)
-                IF (Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
+                IF (Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0d0)THEN
                    SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
                    SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetUnitaryHeatOnly')
                    Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = Furnace(FurnaceNum)%MaxHeatCoilFluidFlow * SteamDensity
@@ -1565,7 +1563,7 @@ SUBROUTINE GetFurnaceInput
           ENDIF
         ENDIF
         IF (Furnace(FurnaceNum)%DesignFanVolFlowRate /= AutoSize) THEN
-          IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0) THEN
+          IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0d0) THEN
             CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             CALL ShowContinueError('... The '//TRIM(cNumericFields(2))//' <= 0.0, it must be > 0.0.')
             CALL ShowContinueError('... Entered value = '//TRIM(RoundSigDigits(Furnace(FurnaceNum)%DesignFanVolFlowRate,2)))
@@ -1580,7 +1578,7 @@ SUBROUTINE GetFurnaceInput
         Furnace(FurnaceNum)%AirFlowControl          = UseCompressorOnFlow
 
         !Set heating convergence tolerance
-        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001
+        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001d0
 
        END DO  !End of the HeatOnly Furnace Loop
 
@@ -1591,7 +1589,7 @@ SUBROUTINE GetFurnaceInput
 
         FanInletNode          = 0
         FanOutletNode         = 0
-        FanVolFlowRate        = 0.0
+        FanVolFlowRate        = 0.0d0
         CoolingCoilInletNode  = 0
         CoolingCoilOutletNode = 0
         HeatingCoilInletNode  = 0
@@ -1792,7 +1790,7 @@ SUBROUTINE GetFurnaceInput
 
             ! Check fan's schedule for cycling fan operation if constant volume fan is used
             IF(Furnace(FurnaceNum)%FanSchedPtr .GT. 0 .AND. Furnace(FurnaceNum)%FanType_Num == FanType_SimpleConstVolume)THEN
-              IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.,'<=',1.)) THEN
+              IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.0d0,'<=',1.0d0)) THEN
                 CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
                 CALL ShowContinueError('For '//TRIM(cAlphaFields(7))//' = '//TRIM(Alphas(7)))
                 CALL ShowContinueError('Fan operating mode must be continuous (fan operating mode schedule values > 0).')
@@ -1934,6 +1932,16 @@ SUBROUTINE GetFurnaceInput
                   ErrorsFound = .TRUE.
                 END IF
 
+                ! check if user has also used a water coil controller, which they should not do
+                ErrFlag = .FALSE.
+                CALL CheckCoilWaterInletNode(Furnace(FurnaceNum)%CoilControlNode, ErrFlag)
+                IF (.NOT. ErrFlag) THEN ! then did find a controller so that is bad
+                  CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name) &
+                                      //' has a conflicting Controller:WaterCoil object' )
+                  CALL ShowContinueError('Hot water coils are controlled directly by unitary and furnace systems.')
+                  CALL ShowContinueError('No water coil controller should be input for the coil.')
+                  ErrorsFound = .TRUE.
+                ENDIF
             ENDIF
 
         ELSEIF (SameString(HeatingCoilType,'Coil:Heating:Steam')) THEN
@@ -1963,7 +1971,7 @@ SUBROUTINE GetFurnaceInput
 
                 ! Get the Heating Coil steam max volume flow rate
                 Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%HeatingCoilIndex,ErrFlag)
-                IF (Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
+                IF (Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0d0)THEN
                    SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
                    SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetAirLoopHVACHeatCoolInput')
                    Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = Furnace(FurnaceNum)%MaxHeatCoilFluidFlow * SteamDensity
@@ -2338,6 +2346,17 @@ SUBROUTINE GetFurnaceInput
                   ErrorsFound = .TRUE.
                 END IF
 
+                ! check if user has also used a water coil controller, which they should not do
+                ErrFlag = .FALSE.
+                CALL CheckCoilWaterInletNode(Furnace(FurnaceNum)%CoilControlNode, ErrFlag)
+                IF (.NOT. ErrFlag) THEN ! then did find a controller so that is bad
+                  CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name) &
+                                      //' has a conflicting Controller:WaterCoil object' )
+                  CALL ShowContinueError('Hot water coils are controlled directly by unitary and furnace systems.')
+                  CALL ShowContinueError('No water coil controller should be input for the coil.')
+                  ErrorsFound = .TRUE.
+                ENDIF
+
             ENDIF
 
           ELSEIF (SameString(ReheatingCoilType,'Coil:Heating:Steam')) THEN
@@ -2367,7 +2386,7 @@ SUBROUTINE GetFurnaceInput
 
                 ! Get the Heating Coil steam max volume flow rate
                 Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%SuppHeatCoilIndex,ErrFlag)
-                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0d0)THEN
                    SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
                    SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetAirLoopHVACHeatCoolInput')
                    Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = &
@@ -2749,12 +2768,12 @@ SUBROUTINE GetFurnaceInput
         END IF
 
         IF(Furnace(FurnaceNum)%FanSchedPtr .GT. 0)THEN
-          IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>=',0.,'<=',0.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>=',0.0d0,'<=',0.0d0)) THEN
 !           set air flow control mode:
 !             UseCompressorOnFlow = operate at last cooling or heating air flow requested when compressor is off
 !             UseCompressorOffFlow = operate at value specified by user
 !           AirFlowControl only valid if fan opmode = ContFanCycComp
-            IF (Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow .EQ. 0.0) THEN
+            IF (Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow .EQ. 0.0d0) THEN
               Furnace(FurnaceNum)%AirFlowControl = UseCompressorOnFlow
             ELSE
               Furnace(FurnaceNum)%AirFlowControl = UseCompressorOffFlow
@@ -2773,10 +2792,10 @@ SUBROUTINE GetFurnaceInput
         ENDIF
 
         !Set heating convergence tolerance
-        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001
+        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001d0
 
         !Set cooling convergence tolerance
-        Furnace(FurnaceNum)%CoolingConvergenceTolerance = 0.001
+        Furnace(FurnaceNum)%CoolingConvergenceTolerance = 0.001d0
 
       END DO  !End of the HeatCool Furnace Loop
 
@@ -3263,6 +3282,17 @@ SUBROUTINE GetFurnaceInput
                   ErrorsFound = .TRUE.
                 END IF
 
+                ! check if user has also used a water coil controller, which they should not do
+                ErrFlag = .FALSE.
+                CALL CheckCoilWaterInletNode(Furnace(FurnaceNum)%CoilControlNode, ErrFlag)
+                IF (.NOT. ErrFlag) THEN ! then did find a controller so that is bad
+                  CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name) &
+                                      //' has a conflicting Controller:WaterCoil object' )
+                  CALL ShowContinueError('Hot water coils are controlled directly by unitary and furnace systems.')
+                  CALL ShowContinueError('No water coil controller should be input for the coil.')
+                  ErrorsFound = .TRUE.
+                ENDIF
+
             ENDIF
 
         ELSEIF (SameString(SuppHeatCoilType,'Coil:Heating:Steam')) THEN
@@ -3292,7 +3322,7 @@ SUBROUTINE GetFurnaceInput
 
                 ! Get the Heating Coil steam max volume flow rate
                 Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%SuppHeatCoilIndex,ErrFlag)
-                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0d0)THEN
                    SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
                    SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetAirLoopHVACHeatCoolInput')
                    Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = &
@@ -3349,7 +3379,7 @@ SUBROUTINE GetFurnaceInput
 
         IF (Furnace(FurnaceNum)%FanType_Num == FanType_SimpleConstVolume)THEN
           IF(Furnace(FurnaceNum)%FanSchedPtr .GT. 0)THEN
-            IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.,'<=',1.)) THEN
+            IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>',0.0d0,'<=',1.0d0)) THEN
               CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
               CALL ShowContinueError('For '//TRIM(cAlphaFields(7))//' = '//TRIM(Alphas(7)))
               CALL ShowContinueError('Fan operating mode must be continuous (fan operating mode schedule values > 0).')
@@ -3541,12 +3571,12 @@ SUBROUTINE GetFurnaceInput
         END IF
 
         IF(Furnace(FurnaceNum)%FanSchedPtr .GT. 0)THEN
-          IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>=',0.,'<=',0.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax(Furnace(FurnaceNum)%FanSchedPtr,'>=',0.0d0,'<=',0.0d0)) THEN !Objexx Range is 0 to 0?
 !           set air flow control mode:
 !             UseCompressorOnFlow = operate at last cooling or heating air flow requested when compressor is off
 !             UseCompressorOffFlow = operate at value specified by user
 !           AirFlowControl only valid if fan opmode = ContFanCycComp
-            IF (Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow .EQ. 0.0) THEN
+            IF (Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow .EQ. 0.0d0) THEN
               Furnace(FurnaceNum)%AirFlowControl = UseCompressorOnFlow
             ELSE
               Furnace(FurnaceNum)%AirFlowControl = UseCompressorOffFlow
@@ -3610,7 +3640,7 @@ SUBROUTINE GetFurnaceInput
         END IF
 
         !Set heating convergence tolerance
-        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001
+        Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001d0
 
 
         !Set minimum OAT for heat pump compressor operation
@@ -3668,7 +3698,7 @@ SUBROUTINE GetFurnaceInput
         ENDIF
 
         !Set cooling convergence tolerance
-        Furnace(FurnaceNum)%CoolingConvergenceTolerance = 0.001
+        Furnace(FurnaceNum)%CoolingConvergenceTolerance = 0.001d0
 
         !Set the furnace max outlet temperature
         Furnace(FurnaceNum)%DesignMaxOutletTemp = Numbers(4)
@@ -4091,6 +4121,17 @@ SUBROUTINE GetFurnaceInput
                   CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
                   ErrorsFound = .TRUE.
                 END IF
+                ! check if user has also used a water coil controller, which they should not do
+                ErrFlag = .FALSE.
+                CALL CheckCoilWaterInletNode(Furnace(FurnaceNum)%CoilControlNode, ErrFlag)
+                IF (.NOT. ErrFlag) THEN ! then did find a controller so that is bad
+                  CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name) &
+                                      //' has a conflicting Controller:WaterCoil object' )
+                  CALL ShowContinueError('Hot water coils are controlled directly by unitary and furnace systems.')
+                  CALL ShowContinueError('No water coil controller should be input for the coil.')
+                  ErrorsFound = .TRUE.
+                ENDIF
+
 
             ENDIF
 
@@ -4121,7 +4162,7 @@ SUBROUTINE GetFurnaceInput
 
                 ! Get the Heating Coil steam max volume flow rate
                 Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%SuppHeatCoilIndex,ErrFlag)
-                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+                IF (Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0d0)THEN
                    SteamIndex = 0      ! Function GetSatDensityRefrig will look up steam index if 0 is passed
                    SteamDensity=GetSatDensityRefrig("STEAM",TempSteamIn,1.0d0,SteamIndex,'GetAirLoopHVACHeatCoolInput')
                    Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = &
@@ -4408,7 +4449,7 @@ SUBROUTINE GetFurnaceInput
           ENDIF
         ENDIF
         IF (FanVolFlowRate /= AutoSize .and. Furnace(FurnaceNum)%DesignFanVolFlowRate /= AutoSize) THEN
-          IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0) THEN
+          IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0d0) THEN
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             CALL ShowContinueError('... has a Design Fan Flow Rate <= 0.0, it must be >0.0')
             CALL ShowContinueError('... Entered value='//TRIM(RoundSigDigits(Furnace(FurnaceNum)%DesignFanVolFlowRate,2)))
@@ -4768,8 +4809,8 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   INTEGER :: NumAirLoopZones = 0                       ! number of zone inlet nodes in an air loop
   INTEGER :: ZoneInletNodeNum = 0                      ! zone inlet nodes node number
   LOGICAL :: FlowFracFlagReady = .TRUE.                ! one time flag for calculating flow fraction through controlled zone
-  REAL(r64) :: SumOfMassFlowRateMax = 0.0              ! the sum of mass flow rates at inlet to zones in an airloop
-  REAL(r64) :: CntrlZoneTerminalUnitMassFlowRateMax = 0.0  ! Maximum mass flow rate through controlled zone terminal unit
+  REAL(r64) :: SumOfMassFlowRateMax = 0.0d0              ! the sum of mass flow rates at inlet to zones in an airloop
+  REAL(r64) :: CntrlZoneTerminalUnitMassFlowRateMax = 0.0d0  ! Maximum mass flow rate through controlled zone terminal unit
   INTEGER :: EquipNum = 0  ! local do loop index for equipment listed for a zone
   INTEGER :: InletNodeNum = 0 ! local do loop index for inlet nodes to a zone
 
@@ -4777,7 +4818,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   REAL(r64)           :: mdot               =0.0d0     ! local temporary for mass flow rate (kg/s)
   REAL(r64)           :: rho                =0.0d0     ! local for fluid density
   INTEGER             :: SteamIndex         =0         ! index of steam quality for steam heating coil
-  REAL(r64)           :: SteamDensity       =0.0       ! density of steam at 100C, used for steam heating coils
+  REAL(r64)           :: SteamDensity       =0.0d0       ! density of steam at 100C, used for steam heating coils
   REAL(r64)           :: CoilMaxVolFlowRate =0.0d0     ! coil fluid maximum volume flow rate
   REAL(r64)           :: QACTUAL            =0.0d0     ! coil actual capacity
   REAL(r64)           :: SUPHEATERLOAD      =0.0d0     ! SUPPLEMENTAL HEATER LOAD
@@ -4827,7 +4868,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   IF ( .NOT. SysSizingCalc .AND. MySizeFlag(FurnaceNum)) THEN
     ! for each furnace, do the sizing once.
     CALL SizeFurnace(FurnaceNum,FirstHVACIteration)
-    Furnace(FurnaceNum)%ControlZoneMassFlowFrac = 1.0
+    Furnace(FurnaceNum)%ControlZoneMassFlowFrac = 1.0d0
 
     MySizeFlag(FurnaceNum) = .FALSE.
     ! Pass the fan cycling schedule index up to the air loop. Set the air loop unitary system flag.
@@ -4865,7 +4906,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
              '... Fan ['//TRIM(cFanTypes(Furnace(FurnaceNum)%FanType_Num))//  &
              '] Max Value='//TRIM(RoundSigDigits(FanVolFlowRate,2)))
       ENDIF
-      IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0) THEN
+      IF (Furnace(FurnaceNum)%DesignFanVolFlowRate <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))//'='//TRIM(Furnace(FurnaceNum)%Name)//  &
              ' has a Design Fan Volume Flow Rate <= 0.0, it must be >0.0')
         CALL ShowContinueError('... Entered value='//TRIM(RoundSigDigits(Furnace(FurnaceNum)%DesignFanVolFlowRate,2)))
@@ -4895,7 +4936,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
         ENDIF
         Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
                                                    Furnace(FurnaceNum)%HeatingCoilName,ErrorsFound)
-        IF(Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
+        IF(Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0d0)THEN
           rho = GetDensityGlycol(PlantLoop(Furnace(FurnaceNum)%LoopNum)%FluidName, &
                                  InitConvTemp, &
                                  PlantLoop(Furnace(FurnaceNum)%LoopNum)%FluidIndex, &
@@ -4917,7 +4958,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
         ENDIF
         Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = &
                    GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%HeatingCoilIndex,ErrorsFound)
-        IF(Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0)THEN
+        IF(Furnace(FurnaceNum)%MaxHeatCoilFluidFlow .GT. 0.0d0)THEN
           SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
           SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitFurnace')
           Furnace(FurnaceNum)%MaxHeatCoilFluidFlow = Furnace(FurnaceNum)%MaxHeatCoilFluidFlow * SteamDensity
@@ -4955,7 +4996,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
         ENDIF
         Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = GetCoilMaxWaterFlowRate('Coil:Heating:Water',  &
                                                    Furnace(FurnaceNum)%SuppHeatCoilName,ErrorsFound)
-        IF(Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+        IF(Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0d0)THEN
             rho = GetDensityGlycol(PlantLoop(Furnace(FurnaceNum)%LoopNumSupp)%FluidName, &
                                    InitConvTemp, &
                                    PlantLoop(Furnace(FurnaceNum)%LoopNumSupp)%FluidIndex, &
@@ -4975,7 +5016,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
           CALL ShowFatalError('InitFurnace: Program terminated for previous conditions.')
         ENDIF
         Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = GetCoilMaxSteamFlowRate(Furnace(FurnaceNum)%SuppHeatCoilIndex,ErrorsFound)
-        IF(Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0)THEN
+        IF(Furnace(FurnaceNum)%MaxSuppCoilFluidFlow .GT. 0.0d0)THEN
           SteamIndex = 0 ! Function GetSatDensityRefrig will look up steam index if 0 is passed
           SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,SteamIndex,'InitFurnace')
           Furnace(FurnaceNum)%MaxSuppCoilFluidFlow = Furnace(FurnaceNum)%MaxSuppCoilFluidFlow * SteamDensity
@@ -5094,7 +5135,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 
   IF(MyFanFlag(FurnaceNum))THEN
     IF(Furnace(FurnaceNum)%ActualFanVolFlowRate /= Autosize)THEN
-      IF(Furnace(FurnaceNum)%ActualFanVolFlowRate .GT. 0.0)THEN
+      IF(Furnace(FurnaceNum)%ActualFanVolFlowRate .GT. 0.0d0)THEN
         Furnace(FurnaceNum)%HeatingSpeedRatio = Furnace(FurnaceNum)%MaxHeatAirVolFlow/Furnace(FurnaceNum)%ActualFanVolFlowRate
         Furnace(FurnaceNum)%CoolingSpeedRatio = Furnace(FurnaceNum)%MaxCoolAirVolFlow/Furnace(FurnaceNum)%ActualFanVolFlowRate
         Furnace(FurnaceNum)%NoHeatCoolSpeedRatio = &
@@ -5191,7 +5232,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
       END DO ZonesLoop
   ENDIF
   IF (ALLOCATED(AirToZoneNodeInfo) .AND. FlowFracFlagReady ) THEN
-      SumOfMassFlowRateMax = 0.0  ! initialize the sum of the maximum flows
+      SumOfMassFlowRateMax = 0.0d0  ! initialize the sum of the maximum flows
       DO ZoneInSysIndex = 1, NumAirLoopZones
          ZoneInletNodeNum = AirToZoneNodeInfo(AirLoopNum)%TermUnitCoolInletNodes(ZoneInSysIndex)
          SumOfMassFlowRateMax = SumOfMassFlowRateMax + Node(ZoneInletNodeNum)%MassFlowRateMax
@@ -5199,7 +5240,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
             CntrlZoneTerminalUnitMassFlowRateMax = Node(ZoneInletNodeNum)%MassFlowRateMax
          ENDIF
       END DO
-      IF (SumOfMassFlowRateMax /= 0.0 .AND. MyFlowFracFlag(FurnaceNum)) THEN
+      IF (SumOfMassFlowRateMax /= 0.0d0 .AND. MyFlowFracFlag(FurnaceNum)) THEN
           IF (CntrlZoneTerminalUnitMassFlowRateMax >= SmallAirVolFlow ) THEN
               Furnace(FurnaceNum)%ControlZoneMassFlowFrac = CntrlZoneTerminalUnitMassFlowRateMax/SumOfMassFlowRateMax
           ELSE
@@ -5223,17 +5264,18 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
     If (SimulateAirflowNetwork > AirflowNetworkControlMultizone) Then
       DeltaMassRate = Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%MassFlowrate - &
                     Node(ZoneInNode)%MassFlowrate/Furnace(FurnaceNum)%ControlZoneMassFlowFrac
-      If (DeltaMassRate .LT. 0.0) DeltaMassRate = 0.0d0
+      If (DeltaMassRate .LT. 0.0d0) DeltaMassRate = 0.0d0
     Else
       MassFlowRate = Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%MassFlowrate
-      DeltaMassRate = 0.0
+      DeltaMassRate = 0.0d0
     End If
     Furnace(FurnaceNum)%SenLoadLoss = MassFlowRate * (PsyHFnTdbW(Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%Temp,MinHumRat)- &
        PsyHFnTdbW(Node(ZoneInNode)%Temp,MinHumRat)) + DeltaMassRate * &
       (PsyHFnTdbW(Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%Temp,MinHumRat) - &
        PsyHFnTdbW(Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%Temp,MinHumRat))
-    If (ABS(Furnace(FurnaceNum)%SensibleLoadMet) > 0.0) Then
-      If (ABS(Furnace(FurnaceNum)%SenLoadLoss/Furnace(FurnaceNum)%SensibleLoadMet) < 0.001) Furnace(FurnaceNum)%SenLoadLoss = 0.0
+    If (ABS(Furnace(FurnaceNum)%SensibleLoadMet) > 0.0d0) Then
+      If (ABS(Furnace(FurnaceNum)%SenLoadLoss/Furnace(FurnaceNum)%SensibleLoadMet) < 0.001d0)   &
+         Furnace(FurnaceNum)%SenLoadLoss = 0.0d0
     End If
     IF(Furnace(FurnaceNum)%Humidistat)THEN
       MaxTemp = Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%Temp
@@ -5241,14 +5283,15 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
         PsyHFnTdbW(MaxTemp,Node(ZoneInNode)%HumRat)) + DeltaMassRate * &
         (PsyHFnTdbW(MaxTemp,Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%HumRat) - &
         PsyHFnTdbW(MaxTemp,Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%HumRat))
-      If (ABS(Furnace(FurnaceNum)%LatentLoadMet) > 0.0) Then
-        If (ABS(Furnace(FurnaceNum)%LatLoadLoss/Furnace(FurnaceNum)%LatentLoadMet) < 0.001) Furnace(FurnaceNum)%LatLoadLoss = 0.0
+      If (ABS(Furnace(FurnaceNum)%LatentLoadMet) > 0.0d0) Then
+        If (ABS(Furnace(FurnaceNum)%LatLoadLoss/Furnace(FurnaceNum)%LatentLoadMet) < 0.001d0)   &
+           Furnace(FurnaceNum)%LatLoadLoss = 0.0d0
       End If
     End If
   End If
 
   IF (Furnace(FurnaceNum)%FanSchedPtr .GT. 0) THEN
-    IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanSchedPtr) .EQ. 0.0) THEN
+    IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanSchedPtr) .EQ. 0.0d0) THEN
       Furnace(FurnaceNum)%OpMode = CycFanCycCoil
     ELSE
       Furnace(FurnaceNum)%OpMode = ContFanCycCoil
@@ -5297,18 +5340,18 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   IF(Furnace(FurnaceNum)%FurnaceType_Num .NE. Furnace_HeatOnly .AND. &
      Furnace(FurnaceNum)%FurnaceType_Num .NE. UnitarySys_HeatOnly)THEN
 
-    IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) THEN
+    IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) THEN
       IF ( (HeatingLoad .OR. CoolingLoad) .OR. &
-           (Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0) ) THEN
-        PartLoadRatio = 1.0
+           (Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0d0) ) THEN
+        PartLoadRatio = 1.0d0
       ELSE
-        PartLoadRatio = 0.0
+        PartLoadRatio = 0.0d0
       END IF
     ELSE
-      PartLoadRatio = 0.0
+      PartLoadRatio = 0.0d0
     END IF
   ELSE
-    PartLoadRatio   = 1.0
+    PartLoadRatio   = 1.0d0
   END IF
 
   ! get current time step operating capacity of water and steam coils
@@ -5449,7 +5492,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
             End Do
           END IF
           IF(Furnace(FurnaceNum)%FanVolFlow .LT. Furnace(FurnaceNum)%IdleVolumeAirRate .AND. &
-             Furnace(FurnaceNum)%IdleVolumeAirRate .NE. 0.0)THEN
+             Furnace(FurnaceNum)%IdleVolumeAirRate .NE. 0.0d0)THEN
             CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
                        //TRIM(TrimSigDigits(Furnace(FurnaceNum)%FanVolFlow,7))//' in fan object ' &
                        //' is less than the MSHP system air flow rate when no ' &
@@ -5485,8 +5528,8 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
                                              Furnace(FurnaceNum)%HeatMassFlowRate(NumOfSpeedHeating))
           Node(InNode)%MassFlowRateMaxAvail = MAX(Furnace(FurnaceNum)%CoolMassFlowRate(NumOfSpeedCooling), &
                                                   Furnace(FurnaceNum)%HeatMassFlowRate(NumOfSpeedHeating))
-          Node(InNode)%MassFlowRateMin = 0.0
-          Node(InNode)%MassFlowRateMinAvail = 0.0
+          Node(InNode)%MassFlowRateMin = 0.0d0
+          Node(InNode)%MassFlowRateMinAvail = 0.0d0
           Node(OutNode) = Node(InNode)
         END IF
       END IF
@@ -5504,7 +5547,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 ! Check ventilation/fan load for constant fan systems to see if load to be met changes
 ! Same IF logic used in Subroutine SetAverageAirFlow to determine if unit is ON or OFF
 
-  IF(OpMode .EQ. ContFanCycCoil .AND. GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .GT. 0.0 .AND. &
+  IF(OpMode .EQ. ContFanCycCoil .AND. GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .GT. 0.0d0 .AND. &
      ( (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanAvailSchedPtr) .GT. 0.0d0 .OR. TurnFansOn) &
           .AND. .NOT. TurnFansOff) )THEN
 
@@ -5540,7 +5583,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 !        IF((SensibleOutput .LT. QToHeatSetPt .AND. .NOT. Furnace(FurnaceNum)%Humidistat) .OR. &
 !           (SensibleOutput .LT. QToHeatSetPt .AND. Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .GE. 0.0))THEN
         IF((SensibleOutput .LT. QToHeatSetPt .AND. .NOT. Furnace(FurnaceNum)%Humidistat) .OR. &
-           (SensibleOutput .LT. QToHeatSetPt .AND. Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .GE. 0.0))THEN
+           (SensibleOutput .LT. QToHeatSetPt .AND. Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .GE. 0.0d0))THEN
           QZnReq = QToHeatSetPt
           CoolingLoad = .FALSE.
 !         Don't set mode TRUE unless mode is allowed. Also check for floating zone.
@@ -5692,7 +5735,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 
 
 ! AirflowNetwork global variable
-  LoopHeatingCoilMaxRTF = 0
+  LoopHeatingCoilMaxRTF = 0.0d0
   RETURN
 
 END SUBROUTINE InitFurnace
@@ -5754,7 +5797,7 @@ SUBROUTINE SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMod
     ! constant fan mode
       IF ( HeatingLoad ) THEN
 !       IF a heating and moisture load exists, operate at the cooling mass flow rate ELSE operate at the heating flow rate
-        IF(MoistureLoad .LT. 0.0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
+        IF(MoistureLoad .LT. 0.0d0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
            Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat)THEN
           CompOnMassFlow = Furnace(FurnaceNum)%MaxCoolAirMassFlow
           CompOnFlowRatio = Furnace(FurnaceNum)%CoolingSpeedRatio
@@ -5772,7 +5815,7 @@ SUBROUTINE SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMod
 !     Set equal the mass flow rate when no heating or cooling is needed if no moisture load exists.
 !     If the user has set the off mass flow rate to 0, set according to the last operating mode.
       ELSE
-        IF(MoistureLoad .LT. 0.0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
+        IF(MoistureLoad .LT. 0.0d0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
            Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat)THEN
           CompOnMassFlow = Furnace(FurnaceNum)%MaxCoolAirMassFlow
           CompOnFlowRatio = Furnace(FurnaceNum)%CoolingSpeedRatio
@@ -5796,7 +5839,7 @@ SUBROUTINE SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMod
 !     UseCompressorOnFlow is used when the user does not enter a value for no cooling or heating flow rate
       IF (Furnace(FurnaceNum)%AirFlowControl .EQ. UseCompressorOnFlow) THEN
         IF (Furnace(FurnaceNum)%LastMode .EQ. HeatingMode) THEN
-          IF(MoistureLoad .LT. 0.0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
+          IF(MoistureLoad .LT. 0.0d0 .AND. Furnace(FurnaceNum)%Humidistat .AND. &
            Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat)THEN
             CompOffMassFlow = Furnace(FurnaceNum)%MaxCoolAirMassFlow
             CompOffFlowRatio = Furnace(FurnaceNum)%CoolingSpeedRatio
@@ -5816,10 +5859,10 @@ SUBROUTINE SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMod
     ELSE
 !     cycling fan mode
       IF ( HeatingLoad .OR. &
-           (Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0 .AND. &
+           (Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0d0 .AND. &
            Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat ) ) THEN
 
-        IF(Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0 .AND. &
+        IF(Furnace(FurnaceNum)%Humidistat .AND. MoistureLoad .LT. 0.0d0 .AND. &
            Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat)THEN
           CompOnMassFlow = Furnace(FurnaceNum)%MaxCoolAirMassFlow
           CompOnFlowRatio = Furnace(FurnaceNum)%CoolingSpeedRatio
@@ -5889,9 +5932,11 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
 
           ! USE STATEMENTS:
   USE DataSizing
+  USE General,                   ONLY: TrimSigDigits
+  USE BranchInputManager,        ONLY: CheckSystemBranchFlow
   USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
   USE WatertoAirheatPumpSimple,  ONLY: SimWatertoAirHPSimple
-  USE VariableSpeedCoils,   ONLY: SimVariableSpeedCoils, VarSpeedCoil
+  USE VariableSpeedCoils,        ONLY: SimVariableSpeedCoils, VarSpeedCoil
   USE ReportSizingManager,       ONLY: ReportSizingOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -5914,12 +5959,14 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
   INTEGER :: ThisCtrlZoneNum ! the controlled zone number of the control zone !!!
   INTEGER :: ControlledZoneNum
   INTEGER :: Iter !iteration count
-  REAL(r64) :: MulSpeedFlowScale !variable speed air flow scaling factor
+  REAL(r64) :: MulSpeedFlowScale ! variable speed air flow scaling factor
+  LOGICAL :: ErrFound ! flag returned from mining functions
+  REAL(r64) :: BranchFlow ! branch volumetric flow rate [m3/s]
 
   ThisCtrlZoneNum = 0
-  DXCoolCap = 0.0
-  UnitaryHeatCap = 0.0
-  SuppHeatCap = 0.0
+  DXCoolCap = 0.0d0
+  UnitaryHeatCap = 0.0d0
+  SuppHeatCap = 0.0d0
   IF (Furnace(FurnaceNum)%CoolingCoilType_Num == CoilDX_CoolingSingleSpeed) THEN
     CALL SimDXCoil(Blank,On,.TRUE.,0.0d0,Furnace(FurnaceNum)%CoolingCoilIndex, 1)
   ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == CoilDX_CoolingHXAssisted) THEN
@@ -6006,7 +6053,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
         Furnace(FurnaceNum)%DesignFanVolFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        Furnace(FurnaceNum)%DesignFanVolFlowRate = 0.0
+        Furnace(FurnaceNum)%DesignFanVolFlowRate = 0.0d0
       END IF
 
       IF (Furnace(FurnaceNum)%DesignFanVolFlowRateEMSOverrideOn) THEN
@@ -6029,7 +6076,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
         Furnace(FurnaceNum)%MaxHeatAirVolFlow = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        Furnace(FurnaceNum)%MaxHeatAirVolFlow = 0.0
+        Furnace(FurnaceNum)%MaxHeatAirVolFlow = 0.0d0
       END IF
 
       IF (Furnace(FurnaceNum)%MaxHeatAirVolFlowEMSOverrideOn) THEN
@@ -6051,7 +6098,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
         Furnace(FurnaceNum)%MaxCoolAirVolFlow = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        Furnace(FurnaceNum)%MaxCoolAirVolFlow = 0.0
+        Furnace(FurnaceNum)%MaxCoolAirVolFlow = 0.0d0
       END IF
 
       IF (Furnace(FurnaceNum)%MaxCoolAirVolFlowEMSOverrideOn) THEN
@@ -6074,7 +6121,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
         Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = 0.0
+        Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = 0.0d0
       END IF
 
       IF (Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlowEMSOverrideOn) THEN
@@ -6108,7 +6155,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       END IF
 
       IF (Furnace(FurnaceNum)%DesignHeatingCapacity < SmallLoad) THEN
-        Furnace(FurnaceNum)%DesignHeatingCapacity = 0.0
+        Furnace(FurnaceNum)%DesignHeatingCapacity = 0.0d0
       END IF
 
       CALL ReportSizingOutput(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num), Furnace(FurnaceNum)%Name, &
@@ -6127,7 +6174,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
       IF (DXCoolCap >= SmallLoad) THEN
         Furnace(FurnaceNum)%DesignCoolingCapacity = DXCoolCap
       ELSE
-        Furnace(FurnaceNum)%DesignCoolingCapacity = 0.0
+        Furnace(FurnaceNum)%DesignCoolingCapacity = 0.0d0
       END IF
       CALL ReportSizingOutput(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num), Furnace(FurnaceNum)%Name, &
                               'Nominal Cooling Capacity [W]', &
@@ -6166,7 +6213,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
           Furnace(FurnaceNum)%DesignSuppHeatingCapacity = MAX(Furnace(FurnaceNum)%DesignSuppHeatingCapacity, &
                                                               Furnace(FurnaceNum)%DesignCoolingCapacity)
           IF (Furnace(FurnaceNum)%DesignSuppHeatingCapacity < SmallLoad) THEN
-            Furnace(FurnaceNum)%DesignSuppHeatingCapacity = 0.0
+            Furnace(FurnaceNum)%DesignSuppHeatingCapacity = 0.0d0
           ENDIF
         END IF
 
@@ -6175,7 +6222,7 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
         IF (Furnace(FurnaceNum)%Humidistat .AND. Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat) THEN
           Furnace(FurnaceNum)%DesignSuppHeatingCapacity = Furnace(FurnaceNum)%DesignCoolingCapacity
         ELSE
-          Furnace(FurnaceNum)%DesignSuppHeatingCapacity = 0.0
+          Furnace(FurnaceNum)%DesignSuppHeatingCapacity = 0.0d0
         END IF
 
       ENDIF
@@ -6191,10 +6238,17 @@ SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
   UnitaryHeatCap = Furnace(FurnaceNum)%DesignHeatingCapacity
   SuppHeatCap = Furnace(FurnaceNum)%DesignSuppHeatingCapacity
 
+  BranchFlow = 0.0d0
+  ErrFound  = .FALSE.
+  ! check branch flow rate vs system flow rate. Branch must match system of OA system is present
+  CALL CheckSystemBranchFlow(TRIM(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num)), &
+                  Furnace(FurnaceNum)%Name,BranchFlow,Furnace(FurnaceNum)%DesignFanVolFlowRate, ErrFound)
+  IF(ErrFound)CALL ShowContinueError('...occurs in '//TRIM(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))// &
+                                     ' "'//TRIM(Furnace(FurnaceNum)%Name))
+
   RETURN
 
 END SUBROUTINE SizeFurnace
-
 
  ! End Initialization Section of the Module
 !******************************************************************************
@@ -6246,7 +6300,7 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER,   PARAMETER ::  MaxIter = 15           ! maximum number of iterations
-  REAL(r64), PARAMETER ::  MinPLR = 0.0           ! minimum part load ratio allowed
+  REAL(r64), PARAMETER ::  MinPLR = 0.0d0           ! minimum part load ratio allowed
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -6259,7 +6313,7 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)         :: cpair
-  REAL(r64)         :: Error = 1.0
+  REAL(r64)         :: Error = 1.0d0
   REAL(r64)         :: SystemSensibleLoad   ! Sensible load to be met by furnace (W)
   REAL(r64)         :: FullSensibleOutput   ! Full sensible output of furnace (W)
   REAL(r64)         :: FullLatentOutput     ! Full latent output of furnace = 0 (W)
@@ -6285,7 +6339,7 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
   FurnaceInletNode = Furnace(FurnaceNum)%FurnaceInletNodeNum
   OpMode = Furnace(FurnaceNum)%OpMode
   Furnace(FurnaceNum)%MdotFurnace = Furnace(FurnaceNum)%DesignMassFlowRate
-  Furnace(FurnaceNum)%CoolPartLoadRatio = 0.0
+  Furnace(FurnaceNum)%CoolPartLoadRatio = 0.0d0
 !  OnOffAirFlowRatio = 1.0
 
 
@@ -6295,12 +6349,12 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
   IF(FirstHVACIteration) THEN
     HeatCoilLoad = ZoneLoad
-    OnOffFanPartLoadFraction = 1.0
+    OnOffFanPartLoadFraction = 1.0d0
     Node(FurnaceInletNode)%MassFlowRate = Furnace(FurnaceNum)%MdotFurnace
   ELSE
     ! If Furnace runs then set HeatCoilLoad on Heating Coil and the Mass Flow
-    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) .and. &
-         (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0) .and. &
+    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) .and. &
+         (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0d0) .and. &
           (HeatingLoad)) THEN
 
 
@@ -6311,14 +6365,14 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
       ! Get no load result
       IF (OpMode .EQ. CycFanCycCoil) THEN
-        Node(FurnaceInletNode)%MassFlowRate = 0.0
+        Node(FurnaceInletNode)%MassFlowRate = 0.0d0
       END IF
       IF (OpMode .EQ. ContFanCycCoil) THEN
-        OnOffFanPartLoadFraction = 1.0 ! The on/off fan will not cycle, so set part-load fraction = 1
+        OnOffFanPartLoadFraction = 1.0d0 ! The on/off fan will not cycle, so set part-load fraction = 1
       END IF
 
 !     Set the inlet mass flow rate based on user specified coil OFF flow rate
-      PartLoadRatio = 0.0
+      PartLoadRatio = 0.0d0
       CALL SetAverageAirFlow(FurnaceNum, PartLoadRatio, OnOffAirFlowRatio)
 
       CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,On,0.0d0,0.0d0,0.0d0,0.0d0,NoSensibleOutput,NoLatentOutput, &
@@ -6329,8 +6383,8 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
 
       ! Set fan part-load fraction equal to 1 while getting full load result
-      OnOffFanPartLoadFraction = 1.0
-      OnOffAirFlowRatio        = 1.0
+      OnOffFanPartLoadFraction = 1.0d0
+      OnOffAirFlowRatio        = 1.0d0
 
       ! Get full load result
       CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,On,0.0d0,1.0d0,HeatCoilLoad,0.0d0,FullSensibleOutput, &
@@ -6338,7 +6392,7 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
 
       ! Since we are heating, we expect FullSensibleOutput to be > 0 and FullSensibleOutput > NoSensibleOutput
-      ! Check that this is the case; if not set PartLoadRatio = 0.0 (off) and return
+      ! Check that this is the case; if not set PartLoadRatio = 0.0d0 (off) and return
 
 
       IF(FullSensibleOutput.GT.NoSensibleOutput)THEN
@@ -6396,7 +6450,7 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
 
 
          IF(PartLoadRatio.eq.MinPLR)EXIT
-         IF(PartLoadRatio.eq.1.0)EXIT
+         IF(PartLoadRatio.eq.1.0d0)EXIT
          Iter = Iter + 1
          IF(Iter.eq.7)IterRelax=0.7d0
          IF(Iter.eq.15)IterRelax=0.4d0
@@ -6431,12 +6485,12 @@ SUBROUTINE CalcNewZoneHeatOnlyFlowRates(FurnaceNum,FirstHVACIteration,ZoneLoad,H
        Furnace(FurnaceNum)%MdotFurnace = Node(FurnaceInletNode)%MassFlowRate
 
 
-    ELSEIF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) .and. &
-       (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0) .and. (OpMode .EQ. ContFanCycCoil)) THEN
-      HeatCoilLoad = 0.0
+    ELSEIF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) .and. &
+       (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0d0) .and. (OpMode .EQ. ContFanCycCoil)) THEN
+      HeatCoilLoad = 0.0d0
     ELSE ! no heating and no flow
-      Furnace(FurnaceNum)%MdotFurnace = 0.0
-      HeatCoilLoad = 0.0
+      Furnace(FurnaceNum)%MdotFurnace = 0.0d0
+      HeatCoilLoad = 0.0d0
     END IF   ! End of the Scheduled Furnace If block
 
 
@@ -6542,7 +6596,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER,   PARAMETER  ::  MaxIter = 100        ! maximum number of iterations
-  REAL(r64), PARAMETER  ::  MinPLR  = 0.0        ! minimum part load ratio allowed
+  REAL(r64), PARAMETER  ::  MinPLR  = 0.0d0        ! minimum part load ratio allowed
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -6707,7 +6761,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 ! also exists, the heating PLR must be available for the cooling coil calculations.
 !*********** Heating Section ************
     ! If Furnace runs with a heating load then set HeatCoilLoad on Heating Coil and the Mass Flow
-    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) .and. &
+    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) .and. &
 !         (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0) .and. &
           (HeatingLoad)) THEN
 
@@ -6769,7 +6823,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
           SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
           Par(1)  = REAL(FurnaceNum,r64)
           Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-          IF(FirstHVACIteration)Par(2)=1.0
+          IF(FirstHVACIteration)Par(2)=1.0d0
           Par(3)  = REAL(OpMode,r64)
           Par(4)  = REAL(CompOp,r64)
           Par(5)  = SystemSensibleLoad
@@ -6949,7 +7003,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
         IF(FullSensibleOutput .LE. SystemSensibleLoad)THEN
           PartLoadRatio = 1.0d0
 !         save modified HeatCoilLoad in case it was reset because outlet temp > DesignMaxOutletTemp
-          IF(ModifiedHeatCoilLoad .GT. 0.0)THEN
+          IF(ModifiedHeatCoilLoad .GT. 0.0d0)THEN
             HeatCoilLoad = ModifiedHeatCoilLoad
           ELSE
             HeatCoilLoad = Furnace(FurnaceNum)%DesignHeatingCapacity
@@ -6965,7 +7019,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
           SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
           Par(1)  = REAL(FurnaceNum,r64)
           Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-          IF(FirstHVACIteration)Par(2)=1.0
+          IF(FirstHVACIteration)Par(2)=1.0d0
           Par(3)  = REAL(OpMode,r64)
           Par(4)  = REAL(CompOp,r64)
           Par(5)  = SystemSensibleLoad
@@ -6979,7 +7033,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 !         OnOffAirFlowRatio is updated during the above iteration. Reset to correct value based on PLR.
           OnOffAirFlowRatio = OnOffAirFlowRatioSave
 !         Reset HeatCoilLoad calculated in CalcFurnaceResidual (in case it was reset because output temp > DesignMaxOutletTemp)
-          IF(ModifiedHeatCoilLoad .GT. 0.0)THEN
+          IF(ModifiedHeatCoilLoad .GT. 0.0d0)THEN
             HeatCoilLoad = ModifiedHeatCoilLoad
           ELSE
             HeatCoilLoad = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadRatio
@@ -6998,7 +7052,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
                    0.0d0, TempMaxPLR, HeatCoilLoad,0.0d0, TempHeatOutput, TempLatentOutput, OnOffAirFlowRatio, .FALSE.)
             END DO
             TempMinPLR = TempMaxPLR
-            DO WHILE((TempHeatOutput - SystemSensibleLoad) .GT. 0.0 .AND. TempMinPLR .GT. 0.0d0)
+            DO WHILE((TempHeatOutput - SystemSensibleLoad) .GT. 0.0d0 .AND. TempMinPLR .GT. 0.0d0)
 !             pull upper limit of HeatingPLR down to last valid limit (i.e. heat output still exceeds SystemSensibleLoad)
               TempMaxPLR = TempMinPLR
 !             find minimum limit of HeatingPLR
@@ -7010,7 +7064,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
             END DO
 !           Now solve again with tighter PLR limits
             CALL SolveRegulaFalsi(HeatErrorToler,MaxIter,SolFlag,PartLoadRatio,CalcFurnaceResidual,TempMinPLR,TempMaxPLR,Par)
-            IF(ModifiedHeatCoilLoad .GT. 0.0)THEN
+            IF(ModifiedHeatCoilLoad .GT. 0.0d0)THEN
               HeatCoilLoad = ModifiedHeatCoilLoad
             ELSE
               HeatCoilLoad = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadRatio
@@ -7075,10 +7129,10 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 ! Simulate if scheduled ON and cooling load or if a moisture load exists when using a humidistat
 ! Check of HeatingLatentOutput is used to reduce overshoot during simultaneous heating and cooling
 ! Setback flag is used to avoid continued RH control when Tstat is setback (RH should float down)
-    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0 .and. CoolingLoad) .or. &
+    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0 .and. CoolingLoad) .or. &
        (Furnace(FurnaceNum)%Humidistat .AND. &
         Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat .and. &
-       (SystemMoistureLoad.lt.0.0 .OR. (SystemMoistureLoad .GE. 0.0 .AND. &
+       (SystemMoistureLoad.lt.0.0d0 .OR. (SystemMoistureLoad .GE. 0.0d0 .AND. &
        HeatingLatentOutput .GT. SystemMoistureLoad .AND. .NOT. Setback(Furnace(FurnaceNum)%ControlZoneNum))))) THEN
 
 
@@ -7111,7 +7165,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
          Furnace(FurnaceNum)%HeatPartLoadRatio .GT. 0.0d0 .AND. &
          Furnace(FurnaceNum)%Humidistat .AND. &
          Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat .AND. &
-        (SystemMoistureLoad.lt.0.0 .OR. (SystemMoistureLoad .GE. 0.0 .AND. &
+        (SystemMoistureLoad.lt.0.0d0 .OR. (SystemMoistureLoad .GE. 0.0d0 .AND. &
          HeatingLatentOutput .GT. SystemMoistureLoad .AND. .NOT. Setback(Furnace(FurnaceNum)%ControlZoneNum)))) THEN
          CoolingHeatingPLRRatio = MIN(1.0d0,PartLoadRatio/Furnace(FurnaceNum)%HeatPartLoadRatio)
         CALL SetAverageAirFlow(FurnaceNum, MAX(PartLoadRatio,Furnace(FurnaceNum)%HeatPartLoadRatio), OnOffAirFlowRatio)
@@ -7155,7 +7209,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 !     3) Set PLR if load is out of range or RegulaFalsi on PLR if system can meet the load
 !
       IF(FullSensibleOutput.LT.NoCoolOutput)THEN
-        IF(CoolCoilLoad .NE. 0.0 .OR. HPDehumidificationLoadFlag)THEN
+        IF(CoolCoilLoad .NE. 0.0d0 .OR. HPDehumidificationLoadFlag)THEN
 
 !           check bounds on sensible output prior to iteration using RegulaFalsi
 !           Negative value represents cooling load, IF FullSensibleOutput .GT. CoolCoilLoad, load is greater than capacity
@@ -7172,7 +7226,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
               SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
               Par(1)  = REAL(FurnaceNum,r64)
               Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-              IF(FirstHVACIteration)Par(2)=1.0
+              IF(FirstHVACIteration)Par(2)=1.0d0
               Par(3)  = REAL(OpMode,r64)
               Par(4)  = REAL(CompOp,r64)
               Par(5)  = CoolCoilLoad
@@ -7239,12 +7293,12 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 !       IF this furnace uses MultiMode control AND there is a moisture load AND the moisture load met by the furnace in
 !       cooling only mode above is sufficient to meet the moisture demand OR there is no sensible load (PLR=0 from above)
 !       then set LatentPartLoadRatio to 0 (no additional dehumidification is required).
-        IF(Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_Multimode .AND. ((SystemMoistureLoad .LT. 0.0 .AND. &
-           TempLatentOutput .LT. SystemMoistureLoad) .OR. PartLoadRatio .EQ. 0.0)) THEN
+        IF(Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_Multimode .AND. ((SystemMoistureLoad .LT. 0.0d0 .AND. &
+           TempLatentOutput .LT. SystemMoistureLoad) .OR. PartLoadRatio .EQ. 0.0d0)) THEN
           LatentPartLoadRatio = 0.0d0
 !       ELSE calculate a new PLR for valid dehumidification control types if a moisture load exists.
         ELSE IF(Furnace(FurnaceNum)%DehumidControlType_Num /= DehumidControl_None .AND. &
-             (SystemMoistureLoad .LT. 0.0 .OR. (SystemMoistureLoad .GE. 0.0 .AND. TempLatentOutput .GT. SystemMoistureLoad &
+             (SystemMoistureLoad .LT. 0.0d0 .OR. (SystemMoistureLoad .GE. 0.0d0 .AND. TempLatentOutput .GT. SystemMoistureLoad &
              .AND. .NOT. Setback(Furnace(FurnaceNum)%ControlZoneNum))))THEN
 
 !         IF the furnace uses dehumidification control MultiMode, turn on the HX and calculate the latent output with
@@ -7292,7 +7346,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
             SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
             Par(1)  = REAL(FurnaceNum,r64)
             Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-            IF(FirstHVACIteration)Par(2)=1.0
+            IF(FirstHVACIteration)Par(2)=1.0d0
             Par(3)  = REAL(OpMode,r64)
             Par(4)  = REAL(CompOp,r64)
 !           Multimode always controls to meet the SENSIBLE load (however, HXUnitOn is now TRUE)
@@ -7317,7 +7371,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 !           Par(10) used only with cycling fan.
 !           Par(10) is the heating coil PLR, set this value only if there is a heating load (heating PLR > 0)
 !           and the latent PLR is being calculated. Otherwise set Par(10) to 0.
-            IF(OpMode .EQ. CycFanCycCoil .AND. Furnace(FurnaceNum)%HeatPartLoadRatio .GT. 0.0d0 .AND. Par(7) .EQ. 0.0)THEN
+            IF(OpMode .EQ. CycFanCycCoil .AND. Furnace(FurnaceNum)%HeatPartLoadRatio .GT. 0.0d0 .AND. Par(7) .EQ. 0.0d0)THEN
               Par(10) = Furnace(FurnaceNum)%HeatPartLoadRatio
             ELSE
               Par(10) = 0.0d0
@@ -7352,7 +7406,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
                                        HXUnitOn, CoolingHeatingPLRRatio)
               END DO
               TempMinPLR = TempMaxPLR
-              DO WHILE((TempLatentOutput - SystemMoistureLoad) .LT. 0.0 .AND. TempMinPLR .GT. 0.0d0)
+              DO WHILE((TempLatentOutput - SystemMoistureLoad) .LT. 0.0d0 .AND. TempMinPLR .GT. 0.0d0)
 !               pull upper limit of LatentPLR down to last valid limit (i.e. latent output still exceeds SystemMoisuterLoad)
 !               CR7558 - relax final limits to allow HX assisted coils to converge
                 TempMaxPLR = TempMinPLR + 0.001d0
@@ -7539,14 +7593,14 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
         ELSEIF(QToHeatSetPt .GE. 0.0d0)THEN
 !         Calculate the reheat coil load as the sensible capacity of the DX cooling coil only. Let
 !         the heating coil pick up the load due to outdoor air.
-          ReheatCoilLoad = MAX(0.0d0,(ActualSensibleOutput-NoCoolOutput)*(-1.0))
+          ReheatCoilLoad = MAX(0.0d0,(ActualSensibleOutput-NoCoolOutput)*(-1.0d0))
 !         Dehumidification is not required
           IF (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatPump_AirToAir .OR. &
              (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatPump_WaterToAir .AND. &
               Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_Simple )) THEN
               ReheatCoilLoad = MAX(QToHeatSetPt,QToHeatSetPt-ActualSensibleOutput)
           ENDIF
-          Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = MAX(0.0d0,ActualSensibleOutput*(-1.0))
+          Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = MAX(0.0d0,ActualSensibleOutput*(-1.0d0))
         ELSE
           ReheatCoilLoad = 0.0d0
         END IF
@@ -7556,7 +7610,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
       END IF
     END IF !End of cooling section IF statement
 
-    IF(NoHeatOutput .GT. SystemSensibleLoad .AND. ReHeatCoilLoad .GT. 0.0) THEN
+    IF(NoHeatOutput .GT. SystemSensibleLoad .AND. ReHeatCoilLoad .GT. 0.0d0) THEN
     ! Reduce reheat coil load if you are controlling high humidity but outside air
     ! and/or the supply air fan is providing enough heat to meet the system sensible load.
     ! This will bring the zone temp closer to the heating setpoint temp.
@@ -7592,8 +7646,8 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 !*********HVAC Scheduled OFF*************
     ! No heating or cooling or dehumidification
 !!!LKL discrepancy with < 0?
-    IF(GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .eq. 0.0 .OR. &
-       Node(FurnaceInletNode)%MassFlowRate .eq. 0.0) THEN
+    IF(GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .eq. 0.0d0 .OR. &
+       Node(FurnaceInletNode)%MassFlowRate .eq. 0.0d0) THEN
       Furnace(FurnaceNum)%MdotFurnace = 0.0d0
       CoolCoilLoad = 0.0d0
       HeatCoilLoad = 0.0d0
@@ -7658,7 +7712,7 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER,   PARAMETER    ::  MaxIter = 600    ! maximum number of iterations
-  REAL(r64), PARAMETER    ::  MinPLR = 0.0     ! minimum part load ratio allowed
+  REAL(r64), PARAMETER    ::  MinPLR = 0.0d0     ! minimum part load ratio allowed
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -7691,7 +7745,7 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
   INTEGER           :: OpMode               ! Mode of Operation (fan cycling = 1 or fan continuous = 2)
   REAL(r64),SAVE         :: CoolPartLoadRatio    ! Part load ratio (greater of sensible or latent part load ratio for cooling)
   REAL(r64),SAVE         :: HeatPartLoadRatio    ! Part load ratio (greater of sensible or latent part load ratio for cooling)
-  REAL(r64),SAVE         :: Dummy=0.0            ! Dummy var. for generic calc. furnace output arg. (n/a for heat pump)
+  REAL(r64),SAVE         :: Dummy=0.0d0            ! Dummy var. for generic calc. furnace output arg. (n/a for heat pump)
   LOGICAL           :: HumControl           ! Logical flag signaling when dehumidification is required
   REAL(r64)         :: SuppHeatCoilLoad     ! Load passed to supplemental heater (W)
   REAL(r64)  :: CoolErrorToler       ! convergence tolerance used in cooling mode
@@ -7700,7 +7754,7 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
   REAL(r64)         :: Par(9)               ! parameters passed to iteration routine
 
   ! Set local variables
-  Dummy = 0.0
+  Dummy = 0.0d0
   OnOffAirFlowRatio = 1.0d0
   FurnaceOutletNode = Furnace(FurnaceNum)%FurnaceOutletNodeNum
   FurnaceInletNode  = Furnace(FurnaceNum)%FurnaceInletNodeNum
@@ -7726,14 +7780,14 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
   !     divided by the part load factor (OnOffFanPartLoadFraction)
   !     in order to match the run time fraction of the cycling
   !     fan with the run time fraction of the cycling compressor
- IF(FirstHVACIteration) OnOffFanPartLoadFraction = 1.0
+ IF(FirstHVACIteration) OnOffFanPartLoadFraction = 1.0d0
 
  !Calc Zone sensible loads for heating (+) and cooling (-)
  TotalZoneSensLoad = ZoneLoad
 
  !Set latent load for heating
  IF(HeatingLoad)THEN
-   TotalZoneLatentLoad = 0.0
+   TotalZoneLatentLoad = 0.0d0
 
  !Set latent load for cooling and no sensible load condition
  ELSE
@@ -7742,13 +7796,13 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
 
 !*********COOLING CALCULATIONS****************
             !IF scheduled on...
-    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0                    .AND. &
+    IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0                    .AND. &
             !AND air flow rate is greater than zero...
-        Node(FurnaceInletNode)%MassFlowRate .gt. 0.0)                                     .AND. &
+        Node(FurnaceInletNode)%MassFlowRate .gt. 0.0d0)                                     .AND. &
             !AND the air system has a cooling load and is not set back or in the deadband...
        ((CoolingLoad) .OR.  &
             !OR the system is controlled by a humidistat and there is a latent load
-       (Furnace(FurnaceNum)%Humidistat.AND.Furnace(FurnaceNum)%CoolingCoilLatentDemand.lt.0.0))) THEN
+       (Furnace(FurnaceNum)%Humidistat.AND.Furnace(FurnaceNum)%CoolingCoilLatentDemand.lt.0.0d0))) THEN
 
          !Set the air flow rate to the design flow rate and set the fan operation fraction to 1 (continuous operation)
          Node(FurnaceInletNode)%MassFlowRate=Furnace(FurnaceNum)%DesignMassFlowRate
@@ -7758,13 +7812,13 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
 !         OpMode = ContFanCycCoil
 
          !Set the input parameters for CalcFurnaceOutput
-             Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0
-             Furnace(FurnaceNum)%CoolingCoilLatentDemand = 0.0
-             Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0
-             Furnace(FurnaceNum)%CompPartLoadRatio = 0.0    !compressor off
+             Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0d0
+             Furnace(FurnaceNum)%CoolingCoilLatentDemand = 0.0d0
+             Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0d0
+             Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0    !compressor off
              Furnace(FurnaceNum)%InitHeatPump = .TRUE.      !initialization call to Calc Furnace
-             Furnace(FurnaceNum)%WSHPRuntimeFrac = 0.0
-             CoolPartLoadRatio = 0.0
+             Furnace(FurnaceNum)%WSHPRuntimeFrac = 0.0d0
+             CoolPartLoadRatio = 0.0d0
 
         !Get no load result in order to calculate the effect of the fan and the mixed air equipment
          CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,HeatPartLoadRatio, &
@@ -7795,8 +7849,8 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
         HPCoilSensCapacity = ZoneSensLoadMetFanONCompON - ZoneSensLoadMetFanONCompOFF
 
         !Calculate the part load ratio for continuous fan operation with cycling coil
-        IF(HPCoilSensCapacity == 0.0) Then
-           CoolPartLoadRatio = 0.0
+        IF(HPCoilSensCapacity == 0.0d0) Then
+           CoolPartLoadRatio = 0.0d0
         Else
            CoolPartLoadRatio = MAX(MinPLR,MIN(1.0d0,&
                    ABS(HPCoilSensDemand) / ABS(HPCoilSensCapacity)))
@@ -7810,10 +7864,10 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
           HPCoilSensDemand = ABS(ZoneSensLoadMetFanONCompON - ZoneSensLoadMetFanONCompOFF)
           Furnace(FurnaceNum)%CoolingCoilSensDemand = HPCoilSensDemand
         ELSEIF(ZoneSensLoadMetFanONCompOFF .LT. TotalZoneSensLoad)THEN
-          CoolPartLoadRatio = 0.0
-          Furnace(FurnaceNum)%CompPartLoadRatio = 0.0    !compressor OFF
-          Furnace(FurnaceNum)%WSHPRuntimeFrac   = 0.0
-          Furnace(FurnaceNum)%CoolingCoilSensDemand = 0.0
+          CoolPartLoadRatio = 0.0d0
+          Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0    !compressor OFF
+          Furnace(FurnaceNum)%WSHPRuntimeFrac   = 0.0d0
+          Furnace(FurnaceNum)%CoolingCoilSensDemand = 0.0d0
           CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,HeatPartLoadRatio, &
                Dummy, Dummy, ZoneSensLoadMetFanONCompOFF, ZoneLatLoadMetFanONCompOFF, OnOffAirFlowRatio, .FALSE.)
         ELSE
@@ -7821,15 +7875,15 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
           CoolErrorToler = Furnace(FurnaceNum)%CoolingConvergenceTolerance
           SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
           Par(1)  = REAL(FurnaceNum,r64)
-          Par(2)  = 0.0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-          IF(FirstHVACIteration)Par(2)=1.0
+          Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
+          IF(FirstHVACIteration)Par(2)=1.0d0
           Par(3)  = REAL(OpMode,r64)
           Par(4)  = REAL(CompOp,r64)
           Par(5)  = TotalZoneSensLoad
           Par(6)  = 1.0d0 ! FLAG, 0.0 if heating load, 1.0 if cooling or moisture load
           Par(7)  = 1.0d0 ! FLAG, 0.0 if latent load, 1.0 if sensible load to be met
           Par(8)  = ZoneSensLoadMetFanONCompOFF ! Output with fan ON compressor OFF
-          Par(9)  = 0.0 ! HX is off for water-to-air HP
+          Par(9)  = 0.0d0 ! HX is off for water-to-air HP
 !         CoolErrorToler is in fraction of load, MaxIter = 600, SolFalg = # of iterations or error as appropriate
           CALL SolveRegulaFalsi(CoolErrorToler, MaxIter, SolFlag, CoolPartLoadRatio, CalcWaterToAirResidual, 0.0d0, 1.0d0, Par)
           IF (SolFlag == -1 .AND. .NOT. WarmupFlag .AND. .NOT. FirstHVACIteration) THEN
@@ -7852,7 +7906,7 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
             END IF
           ELSE IF (SolFlag == -2 .AND. .NOT. WarmupFlag .AND. .NOT. FirstHVACIteration) THEN
             CoolPartLoadRatio = MAX(MinPLR,MIN(1.0d0,ABS(HPCoilSensDemand ) / ABS(HPCoilSensCapacity)))
-            OnOffFanPartLoadFraction = 1.0
+            OnOffFanPartLoadFraction = 1.0d0
             CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio, &
                                    0.0d0,0.0d0,0.0d0, ZoneSensLoadMet, ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
             IF((ZoneSensLoadMet - TotalZoneSensLoad)/TotalZoneSensLoad .GT. CoolErrorToler)THEN
@@ -7882,25 +7936,25 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
 
 !*********HEATING CALCULATIONS****************
     ! If Furnace runs with a heating load then set HeatCoilLoad on Heating Coil and the Mass Flow
-    ELSEIF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) .and. &
-          (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0) .and. &
+    ELSEIF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) .and. &
+          (Node(FurnaceInletNode)%MassFlowRate .gt. 0.0d0) .and. &
           HeatingLoad) THEN
 
          !Set the air flow rate to the design flow rate and set the fan operation fraction to 1 (continuous operation)
          Node(FurnaceInletNode)%MassFlowRate=Furnace(FurnaceNum)%DesignMassFlowRate
-         OnOffFanPartLoadFraction = 1.0 !see 'Note' under INITIAL CALCULATIONS
+         OnOffFanPartLoadFraction = 1.0d0 !see 'Note' under INITIAL CALCULATIONS
 
 !         !Set the operation flag to run the fan continuously
 !         OpMode = ContFanCycCoil
 
          !Set the input parameters for CalcFurnaceOutput
-             Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0
-             Furnace(FurnaceNum)%CoolingCoilLatentDemand = 0.0
-             Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0
-             Furnace(FurnaceNum)%CompPartLoadRatio = 0.0    !compressor off
+             Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0d0
+             Furnace(FurnaceNum)%CoolingCoilLatentDemand = 0.0d0
+             Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0d0
+             Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0    !compressor off
              Furnace(FurnaceNum)%InitHeatPump = .TRUE.      !initialization call to Calc Furnace
-             Furnace(FurnaceNum)%WSHPRuntimeFrac = 0.0
-             HeatPartLoadRatio = 0.0
+             Furnace(FurnaceNum)%WSHPRuntimeFrac = 0.0d0
+             HeatPartLoadRatio = 0.0d0
 
         !Get no load result in order to calculate the effect of the fan and the mixed air equipment
          CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,HeatPartLoadRatio, &
@@ -7932,8 +7986,8 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
         HPCoilSensCapacity = ZoneSensLoadMetFanONCompON - ZoneSensLoadMetFanONCompOFF
 
         !Calculate the part load ratio for continuous fan operation with cycling coil
-        If(HPCoilSensCapacity == 0.0) Then
-           HeatPartLoadRatio = 0.0
+        If(HPCoilSensCapacity == 0.0d0) Then
+           HeatPartLoadRatio = 0.0d0
         Else
            HeatPartLoadRatio = MAX(MinPLR,MIN(1.0d0,&
                                            ABS(HPCoilSensDemand) / ABS(HPCoilSensCapacity)))
@@ -7948,10 +8002,10 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
           HPCoilSensDemand = ABS(ZoneSensLoadMetFanONCompON - ZoneSensLoadMetFanONCompOFF)
           Furnace(FurnaceNum)%HeatingCoilSensDemand = HPCoilSensDemand
         ELSEIF(ZoneSensLoadMetFanONCompOFF .GT. TotalZoneSensLoad)THEN
-          HeatPartLoadRatio = 0.0
+          HeatPartLoadRatio = 0.0d0
           ZoneSensLoadMet = ZoneSensLoadMetFanONCompOFF
-          Furnace(FurnaceNum)%CompPartLoadRatio = 0.0    !compressor ON
-          Furnace(FurnaceNum)%WSHPRuntimeFrac   = 0.0
+          Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0    !compressor ON
+          Furnace(FurnaceNum)%WSHPRuntimeFrac   = 0.0d0
           CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,&
                  HeatPartLoadRatio, Dummy, Dummy, ZoneSensLoadMet,ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
          ELSE
@@ -7959,15 +8013,15 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
           HeatErrorToler = Furnace(FurnaceNum)%HeatingConvergenceTolerance
           SolFlag = 0    ! # of iterations if positive, -1 means failed to converge, -2 means bounds are incorrect
           Par(1)  = REAL(FurnaceNum,r64)
-          Par(2)  = 0.0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
-          IF(FirstHVACIteration)Par(2)=1.0
+          Par(2)  = 0.0d0  ! FLAG, if 1.0 then FirstHVACIteration equals TRUE, if 0.0 then FirstHVACIteration equals false
+          IF(FirstHVACIteration)Par(2)=1.0d0
           Par(3)  = REAL(OpMode,r64)
           Par(4)  = REAL(CompOp,r64)
           Par(5)  = TotalZoneSensLoad
-          Par(6)  = 0.0 ! FLAG, 0.0 if heating load, 1.0 if cooling or moisture load
+          Par(6)  = 0.0d0 ! FLAG, 0.0 if heating load, 1.0 if cooling or moisture load
           Par(7)  = 1.0d0 ! FLAG, 0.0 if latent load, 1.0 if sensible load to be met
           Par(8)  = ZoneSensLoadMetFanONCompOFF ! Output with fan ON compressor OFF
-          Par(9)  = 0.0 ! HX is OFF for water-to-air HP
+          Par(9)  = 0.0d0 ! HX is OFF for water-to-air HP
 !         HeatErrorToler is in fraction of load, MaxIter = 600, SolFalg = # of iterations or error as appropriate
           CALL SolveRegulaFalsi(HeatErrorToler, MaxIter, SolFlag, HeatPartLoadRatio, CalcWaterToAirResidual, 0.0d0, 1.0d0, Par)
           OnOffFanPartLoadFraction = OnOffFanPartLoadFractionSave
@@ -8012,7 +8066,7 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
         END IF
 
 !       CALL supplemental heater if required
-        IF((TotalZoneSensLoad - ZoneSensLoadMet) .GT. SmallLoad .AND. HeatPartLoadRatio .GE. 1.0)THEN
+        IF((TotalZoneSensLoad - ZoneSensLoadMet) .GT. SmallLoad .AND. HeatPartLoadRatio .GE. 1.0d0)THEN
           SuppHeatCoilLoad = TotalZoneSensLoad - ZoneSensLoadMet
           CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,&
                HeatPartLoadRatio, SuppHeatCoilLoad, Dummy, ZoneSensLoadMet,ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
@@ -8023,22 +8077,22 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
         END IF
 
 !**********HVAC Scheduled ON, but no cooling, dehumidification or heating load*********
-    ELSEIF(GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0) THEN
+    ELSEIF(GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0) THEN
       Furnace(FurnaceNum)%InitHeatPump = .TRUE.      !initialization call to Calc Furnace
-      HeatPartLoadRatio  = 0.0
-      CoolPartLoadRatio = 0.0
+      HeatPartLoadRatio  = 0.0d0
+      CoolPartLoadRatio = 0.0d0
       OnOffFanPartLoadFraction = 1.0d0 !!see 'Note' under INITIAL CALCULATIONS
     !set report variables
-      Furnace(FurnaceNum)%CompPartLoadRatio = 0.0
-      Furnace(FurnaceNum)%CoolingCoilSensDemand=0.0
-      Furnace(FurnaceNum)%CoolingCoilLatentDemand=0.0
-      Furnace(FurnaceNum)%HeatingCoilSensDemand=0.0
+      Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0
+      Furnace(FurnaceNum)%CoolingCoilSensDemand=0.0d0
+      Furnace(FurnaceNum)%CoolingCoilLatentDemand=0.0d0
+      Furnace(FurnaceNum)%HeatingCoilSensDemand=0.0d0
       IF(OpMode .EQ. CycFanCycCoil)THEN
-        Furnace(FurnaceNum)%MdotFurnace = 0.0
+        Furnace(FurnaceNum)%MdotFurnace = 0.0d0
         OnOffFanPartLoadFraction        = 1.0d0 !see 'Note' under INITIAL CALCULATIONS
         CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,&
          HeatPartLoadRatio, Dummy, Dummy, ZoneSensLoadMet,ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
-         Furnace(FurnaceNum)%MdotFurnace = 0.0
+         Furnace(FurnaceNum)%MdotFurnace = 0.0d0
       ElSE !continuous fan, cycling coil
         CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,&
          HeatPartLoadRatio, Dummy, Dummy, ZoneSensLoadMet,ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
@@ -8046,17 +8100,17 @@ SUBROUTINE CalcWaterToAirHeatpump(AirLoopNum, FurnaceNum,FirstHVACIteration,Comp
 !*********No heating or cooling or dehumidification*********
     ELSE
       Furnace(FurnaceNum)%InitHeatPump = .TRUE.      !initialization call to Calc Furnace
-      Furnace(FurnaceNum)%MdotFurnace = 0.0
-      HeatPartLoadRatio   = 0.0
-      CoolPartLoadRatio   = 0.0
+      Furnace(FurnaceNum)%MdotFurnace = 0.0d0
+      HeatPartLoadRatio   = 0.0d0
+      CoolPartLoadRatio   = 0.0d0
       OnOffFanPartLoadFraction = 1.0d0 !see 'Note' under INITIAL CALCULATIONS
-      Furnace(FurnaceNum)%CompPartLoadRatio = 0.0
-      Furnace(FurnaceNum)%CoolingCoilSensDemand  = 0.0
-      Furnace(FurnaceNum)%CoolingCoilLatentDemand= 0.0
-      Furnace(FurnaceNum)%HeatingCoilSensDemand  = 0.0
+      Furnace(FurnaceNum)%CompPartLoadRatio = 0.0d0
+      Furnace(FurnaceNum)%CoolingCoilSensDemand  = 0.0d0
+      Furnace(FurnaceNum)%CoolingCoilLatentDemand= 0.0d0
+      Furnace(FurnaceNum)%HeatingCoilSensDemand  = 0.0d0
       CALL CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,OpMode,CompOp,CoolPartLoadRatio,&
          HeatPartLoadRatio, Dummy, Dummy, ZoneSensLoadMet,ZoneLatLoadMet, OnOffAirFlowRatio, .FALSE.)
-      Furnace(FurnaceNum)%MdotFurnace = 0.0
+      Furnace(FurnaceNum)%MdotFurnace = 0.0d0
   END IF
 
 
@@ -8146,7 +8200,7 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
   REAL(r64)        :: mdot                ! hot water or steam heating coil fluid mass flow rates
   REAL(r64)        :: QCoilReq            ! heating coil load
   REAL(r64)        :: QActual             ! heating coil load met or delivered
-  REAL(r64)        :: MinWaterFlow   = 0  ! minimum fluid flow rates
+  REAL(r64)        :: MinWaterFlow   = 0.0d0  ! minimum fluid flow rates
   INTEGER          :: LoopNumber          ! plant loop index for water and steam supplemental heating coil
   INTEGER          :: LoopSideNumber      ! plant loop side  index for  water and steam supp. heating coil
   INTEGER          :: BranchNumber        ! plant loop branch index for water and steam supp. heating coil
@@ -8235,7 +8289,7 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
       CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
     END IF
 !   Simulate the supplemental heating coil
-    IF(Furnace(FurnaceNum)%DehumidControlType_Num .EQ. DehumidControl_CoolReheat .AND. ReHeatCoilLoad .GT. 0.0)THEN
+    IF(Furnace(FurnaceNum)%DehumidControlType_Num .EQ. DehumidControl_CoolReheat .AND. ReHeatCoilLoad .GT. 0.0d0)THEN
       SuppHeatingCoilFlag = .TRUE.
       CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,ReHeatCoilLoad,FanOpMode,QActual)
     ELSE
@@ -8288,7 +8342,7 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
         CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
       END IF
 !     Simulate the supplemental heating coil
-      IF(Furnace(FurnaceNum)%DehumidControlType_Num .EQ. DehumidControl_CoolReheat .AND. ReHeatCoilLoad .GT. 0.0)THEN
+      IF(Furnace(FurnaceNum)%DehumidControlType_Num .EQ. DehumidControl_CoolReheat .AND. ReHeatCoilLoad .GT. 0.0d0)THEN
          SuppHeatingCoilFlag = .TRUE. ! if true simulates supplemental heating coil
          CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,ReheatCoilLoad,FanOpMode, QActual)
        ELSE
@@ -8312,7 +8366,7 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
               Furnace(FurnaceNum)%InitHeatPump, &
               Furnace(FurnaceNum)%CoolingCoilSensDemand, &
               Furnace(FurnaceNum)%CoolingCoilLatentDemand,CompOp, CoolPartLoadRatio)
-     Dummy=0.0
+     Dummy=0.0d0
      CALL SimWatertoAirHP(Blank, &
               Furnace(FurnaceNum)%HeatingCoilIndex,  &
               Furnace(FurnaceNum)%DesignMassFlowRate,FanOpMode,FirstHVACIteration,WSHPRuntimeFrac,&
@@ -8441,7 +8495,7 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
          - PsyHFnTdbW(MaxTemp,Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%HumRat)) &
          - Furnace(FurnaceNum)%LatLoadLoss
   ELSE
-    LatentLoadMet = 0.0
+    LatentLoadMet = 0.0d0
   END IF
   Furnace(FurnaceNum)%LatentLoadMet = LatentLoadMet
 
@@ -8532,10 +8586,10 @@ FUNCTION CalcFurnaceResidual(PartLoadRatio, Par) RESULT (Residuum)
 
   IF(Par(6) .EQ. 1.0d0)THEN
    CoolPartLoadRatio   = PartLoadRatio
-   HeatPartLoadRatio   = 0.0
-   HeatCoilLoad        = 0.0
+   HeatPartLoadRatio   = 0.0d0
+   HeatCoilLoad        = 0.0d0
   ELSE
-   CoolPartLoadRatio   = 0.0
+   CoolPartLoadRatio   = 0.0d0
    HeatPartLoadRatio   = PartLoadRatio
 
    IF(Furnace(FurnaceNum)%HeatingCoilType_Num .EQ. Coil_HeatingGas .OR. &
@@ -8544,7 +8598,7 @@ FUNCTION CalcFurnaceResidual(PartLoadRatio, Par) RESULT (Residuum)
       Furnace(FurnaceNum)%HeatingCoilType_Num .EQ. Coil_HeatingSteam )THEN
       HeatCoilLoad      = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadRatio
    ELSE
-      HeatCoilLoad      = 0.0
+      HeatCoilLoad      = 0.0d0
    END IF
   END IF
 
@@ -8675,10 +8729,10 @@ FUNCTION CalcWaterToAirResidual(PartLoadRatio, Par) RESULT (Residuum)
 
   IF(Par(6) .EQ. 1.0d0)THEN
    CoolPartLoadRatio   = PartLoadRatio
-   HeatPartLoadRatio   = 0.0
-   HeatCoilLoad        = 0.0
+   HeatPartLoadRatio   = 0.0d0
+   HeatCoilLoad        = 0.0d0
   ELSE
-   CoolPartLoadRatio   = 0.0
+   CoolPartLoadRatio   = 0.0d0
    HeatPartLoadRatio   = PartLoadRatio
   END IF
   ZoneSensLoadMetFanONCompOFF = Par(8)
@@ -8688,15 +8742,15 @@ FUNCTION CalcWaterToAirResidual(PartLoadRatio, Par) RESULT (Residuum)
        !update the fan part load factor
        !see 'Note' under INITIAL CALCULATIONS
   IF(Par(6) .EQ. 1.0d0)THEN
-   IF(RuntimeFrac > 0.0)THEN
+   IF(RuntimeFrac > 0.0d0)THEN
      OnOffFanPartLoadFraction = CoolPartLoadRatio/RuntimeFrac
    ELSE
-     OnOffFanPartLoadFraction = 1
+     OnOffFanPartLoadFraction = 1.0d0
    ENDIF
   ELSE
-   IF(RuntimeFrac > 0.0)THEN
+   IF(RuntimeFrac > 0.0d0)THEN
      OnOffFanPartLoadFraction = PartLoadRatio/RuntimeFrac
-!   Else IF(RuntimeFrac == 0.0)THEN
+!   Else IF(RuntimeFrac == 0.0d0)THEN
 !     OnOffFanPartLoadFraction = 0.0
    ELSE
      OnOffFanPartLoadFraction = 1.0d0
@@ -8719,16 +8773,16 @@ FUNCTION CalcWaterToAirResidual(PartLoadRatio, Par) RESULT (Residuum)
   HPCoilSensDemand = LoadToBeMet  - RuntimeFrac*ZoneSensLoadMetFanONCompOFF
 !  HPCoilSensDemand = LoadToBeMet  - PartLoadRatio*ZoneSensLoadMetFanONCompOFF
   IF(Par(6) .EQ. 1.0d0)THEN
-    Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0
+    Furnace(FurnaceNum)%HeatingCoilSensDemand   = 0.0d0
     Furnace(FurnaceNum)%CoolingCoilSensDemand   = ABS(HPCoilSensDemand)
   ELSE
     Furnace(FurnaceNum)%HeatingCoilSensDemand   = HPCoilSensDemand
-    Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0
+    Furnace(FurnaceNum)%CoolingCoilSensDemand   = 0.0d0
   END IF
   Furnace(FurnaceNum)%InitHeatPump = .FALSE.      !initialization call to Calc Furnace
 
     !Calculate the zone loads met and the new part load ratio and for the specified run time
-   Dummy=0.0
+   Dummy=0.0d0
    OnOffAirFlowRatio = 1.0d0
    IF(Par(9) .EQ. 1.0d0)THEN
      HXUnitOn = .TRUE.
@@ -8896,11 +8950,11 @@ SUBROUTINE HeatPumpRunFrac(FurnaceNum,PLR,errflag,RuntimeFrac)
 
   !Initialize
   errflag = .FALSE.
-  error = 1
+  error = 1.0d0
   NumIteration = 0
 
   !Initial guess for part load fraction
-  PLF1 = 1
+  PLF1 = 1.0d0
 
   !Calculate PLF using successive substitution until convergence
   !is achieved
@@ -8909,14 +8963,14 @@ SUBROUTINE HeatPumpRunFrac(FurnaceNum,PLR,errflag,RuntimeFrac)
 
     IF (PLR.EQ.1) THEN
         ! Set part load fraction, PLF1=1.0 if PLR=1.0 and exit loop
-        PLF1 = 1
+        PLF1 = 1.0d0
         EXIT LOOPPLF
     END IF
 
     IF (NumIteration.GT.100)THEN
         ! Exit loop if interation exceed 100
         errflag = .TRUE.
-        PLF1 = 1
+        PLF1 = 1.0d0
         EXIT LOOPPLF
     END IF
 
@@ -8933,7 +8987,7 @@ SUBROUTINE HeatPumpRunFrac(FurnaceNum,PLR,errflag,RuntimeFrac)
             ! small A value, thus Exp(-1/A) = 0
             PLF2 = 1 - A
         ELSE
-            PLF2 = 1 - A * (1 - Exp(-1.d0 / A))
+            PLF2 = 1.0d0 - A * (1.0d0 - Exp(-1.0d0 / A))
         END IF
         error = ABS((PLF2 - PLF1) / PLF1)
         PLF1 = PLF2
@@ -8942,21 +8996,21 @@ SUBROUTINE HeatPumpRunFrac(FurnaceNum,PLR,errflag,RuntimeFrac)
 
   !Adjust PLF for the off cycle power consumption if
   !on-cycle power use is specified by the user
-  IF (pr>0.0) THEN
+  IF (pr>0.0d0) THEN
     PartLoadFactor = PLR / ((PLR / PLF1) + (1 - PLR / PLF1) * pr)
   ELSE
     PartLoadFactor=PLF1
   END IF
 
-  IF (PartLoadFactor <= 0.0)THEN
-     PartLoadFactor = 0
-     RuntimeFrac = 0
+  IF (PartLoadFactor <= 0.0d0)THEN
+     PartLoadFactor = 0.0d0
+     RuntimeFrac = 0.0d0
      errflag = .TRUE.
   ELSE
      RuntimeFrac = PLR / PartLoadFactor
   ENDIF
 
-  IF (RuntimeFrac > 1. ) THEN
+  IF (RuntimeFrac > 1.0d0 ) THEN
      RuntimeFrac = 1.0d0
   END IF
 
@@ -9147,15 +9201,15 @@ Select Case (CoilTypeNum)
              MinWaterFlow = 0.0d0
              Par(1) = REAL(FurnaceNum,r64)
              IF (FirstHVACIteration) THEN
-               Par(2) = 1.
+               Par(2) = 1.d0
              ELSE
-               Par(2) = 0.
+               Par(2) = 0.0d0
              END IF
              Par(3) = QCoilLoad
              IF (SuppHeatingCoilFlag) THEN
-               Par(4) = 1.
+               Par(4) = 1.d0
              ELSE
-               Par(4) = 0.
+               Par(4) = 0.0d0
              END IF
              CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
                                    MinWaterFlow, MaxHotWaterFlow, Par)
@@ -9267,13 +9321,13 @@ FUNCTION HotWaterCoilResidual(HWFlow, Par) RESULT (Residuum)
   LOGICAL               :: SuppHeatingCoilFlag       ! .true. if supplemental heating coil
 
   FurnaceNum = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0d0) THEN
     FirstHVACIteration = .TRUE.
   ELSE
     FirstHVACIteration = .FALSE.
   END IF
   QCoilRequested =  Par(3)
-  IF (Par(4) > 0.0) THEN
+  IF (Par(4) > 0.0d0) THEN
     SuppHeatingCoilFlag = .TRUE.
   ELSE
     SuppHeatingCoilFlag = .FALSE.
@@ -9308,6 +9362,8 @@ FUNCTION HotWaterCoilResidual(HWFlow, Par) RESULT (Residuum)
   ENDIF
   IF (QCoilRequested /= 0.0d0) THEN
     Residuum = (QCoilActual - QCoilRequested)/ QCoilRequested
+  ELSE !Objexx:Return ELSE added to assure return value is set
+    Residuum = 0.0d0
   ENDIF
   RETURN
 END FUNCTION HotWaterCoilResidual
@@ -9371,7 +9427,7 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
   INTEGER :: ZoneNum           ! Controlled zone number
   REAL(r64)    :: QTotUnitOut  ! capacity output
   INTEGER :: SpeedNum  = 1         ! Speed number
-  REAL(r64)    :: SupHeaterLoad = 0.0 ! supplement heater load
+  REAL(r64)    :: SupHeaterLoad = 0.0d0 ! supplement heater load
   INTEGER :: CompOp            ! compressor operation; 1=on, 0=off
   INTEGER :: AirLoopNumber     ! Index to air loop
   REAL(r64)    :: SaveMassFlowRate  ! saved inlet air mass flow rate [kg/s]
@@ -9391,11 +9447,11 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
                                             ! to be removed by furnace/unitary system
 
   ! zero the fan, DX coils, and supplemental electric heater electricity consumption
-  FanElecPower         = 0.0
-  DXElecHeatingPower   = 0.0
-  DXElecCoolingPower   = 0.0
-  SaveCompressorPLR    = 0.0
-  ElecHeatingCoilPower = 0.0
+  FanElecPower         = 0.0d0
+  DXElecHeatingPower   = 0.0d0
+  DXElecCoolingPower   = 0.0d0
+  SaveCompressorPLR    = 0.0d0
+  ElecHeatingCoilPower = 0.0d0
 
   SystemSensibleLoad = QZnReq
   TotalZoneSensibleLoad = QZnReq
@@ -9434,7 +9490,7 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
     END IF
   END IF
 
-  OnOffFanPartLoadFraction = 1.0
+  OnOffFanPartLoadFraction = 1.0d0
 
   AirLoopNumber = ZoneEquipConfig(Furnace(FurnaceNum)%ControlZoneNum)%AirLoopNum
 
@@ -9456,7 +9512,7 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
      TotalZoneSensibleLoad = QZnReq
      TotalZoneLatentLoad = QLatReq
 
-    IF (SpeedNum .EQ. Furnace(FurnaceNum)%NumOfSpeedCooling .AND. SpeedRatio .EQ. 1.0) THEN
+    IF (SpeedNum .EQ. Furnace(FurnaceNum)%NumOfSpeedCooling .AND. SpeedRatio .EQ. 1.0d0) THEN
       ! compressor on (reset inlet air mass flow rate to starting value)
       Node(InletNode)%MassFlowRate = SaveMassFlowRate
       CompOp = On
@@ -9478,10 +9534,10 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
     SaveCompressorPLR = PartLoadFrac
   ELSE
      IF(SpeedNum > 1)  THEN
-       SaveCompressorPLR = 1.0
+       SaveCompressorPLR = 1.0d0
      END IF
 
-     IF (PartLoadFrac .eq. 1.0 .and. SaveCompressorPLR < 1.0) then
+     IF (PartLoadFrac .eq. 1.0d0 .and. SaveCompressorPLR < 1.0d0) then
        PartLoadFrac = SaveCompressorPLR
      End IF
   END IF
@@ -9490,10 +9546,10 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
   TotalZoneSensibleLoad = QZnReq
   TotalZoneLatentLoad = QLatReq
   !     Calculate the reheat coil output
-  IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0 .and. CoolingLoad) .AND. &
+  IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0 .and. CoolingLoad) .AND. &
        (Furnace(FurnaceNum)%Humidistat .AND. &
         Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat .and. &
-       (QLatReq.lt.0.0))) THEN ! if a Humidistat is installed and dehumdification control type is CoolReheat
+       (QLatReq.lt.0.0d0))) THEN ! if a Humidistat is installed and dehumdification control type is CoolReheat
     CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,ActualSensibleOutput, &
                     QLatUnitOut, TotalZoneSensibleLoad,TotalZoneLatentLoad, OnOffAirFlowRatio,ReheatCoilLoad)
     IF (Furnace(FurnaceNum)%ZoneSequenceHeatingNum > 0) THEN
@@ -9513,16 +9569,16 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
 !       Heating mode and dehumidification is required
     ELSEIF(QToHeatSetPt .GE. 0.0d0)THEN
       ReheatCoilLoad = MAX(QToHeatSetPt,QToHeatSetPt-ActualSensibleOutput)
-      Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = MAX(0.0d0,ActualSensibleOutput*(-1.0))
+      Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = MAX(0.0d0,ActualSensibleOutput*(-1.0d0))
     ELSE
       ReheatCoilLoad = 0.0d0
     END IF
 
-   SupHeaterLoad = 0.0
+   SupHeaterLoad = 0.0d0
    CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,1,0.0d0,0.0d0,NoCompOutput, QLatUnitOut, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad)
 
-    IF(NoCompOutput > SystemSensibleLoad .AND. SystemSensibleLoad > 0.0 .AND. ReHeatCoilLoad > 0.0) THEN
+    IF(NoCompOutput > SystemSensibleLoad .AND. SystemSensibleLoad > 0.0d0 .AND. ReHeatCoilLoad > 0.0d0) THEN
      !Reduce reheat coil load if you are controlling high humidity but outside air
 ! and/or the supply air fan is providing enough heat to meet the system sensible load.
 ! This will bring the zone temp closer to the heating setpoint temp.
@@ -9535,7 +9591,7 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
 
   TotalZoneSensibleLoad = QZnReq
   TotalZoneLatentLoad = QLatReq
-  IF(ReHeatCoilLoad > 0.0) THEN
+  IF(ReHeatCoilLoad > 0.0d0) THEN
      CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
                 TotalZoneSensibleLoad,TotalZoneLatentLoad,OnOffAirFlowRatio,ReHeatCoilLoad)
   ELSE
@@ -9554,14 +9610,14 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
   Node(InletNode)%MassFlowRateMaxAvail = AirMassFlow
   Node(OutletNode)%MassFlowRateMaxAvail = AirMassFlow
 
-  If(.NOT. FirstHVACIteration .AND. AirMassFlow > 0.0 .AND. AirLoopNumber > 0 ) THEN
+  If(.NOT. FirstHVACIteration .AND. AirMassFlow > 0.0d0 .AND. AirLoopNumber > 0 ) THEN
       TotBranchNum = PrimaryAirSystem(AirLoopNumber)%NumOutletBranches
       IF(TotBranchNum .EQ. 1) THEN
          ZoneSideNodeNum = AirToZoneNodeInfo(AirLoopNumber)%ZoneEquipSupplyNodeNum(1)
 ! THE MASS FLOW PRECISION of the system solver is not enough for some small air flow rate iterations , BY DEBUGGING
 ! it may cause mass flow rate occilations between airloop and zoneequip
 ! specify the air flow rate directly for one-to-one system, when the iteration deviation is closing the solver precision level
-         IF(ABS(AirMassFlow - Node(ZoneSideNodeNum)%MassFlowRate) < 0.02) &
+         IF(ABS(AirMassFlow - Node(ZoneSideNodeNum)%MassFlowRate) < 0.02d0) &
          ! 0.02 is 2 * HVACFlowRateToler, in order to accomodate the system solver precision level
            Node(ZoneSideNodeNum)%MassFlowRateMaxAvail = AirMassFlow
            Node(ZoneSideNodeNum)%MassFlowRate = AirMassFlow
@@ -9575,32 +9631,32 @@ SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, On
   ! report variables
   Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = ReheatCoilLoad
   IF(QZnReq > SmallLoad ) THEN !HEATING LOAD
-     Furnace(FurnaceNum)%CoolingCoilSensDemand = 0.0
+     Furnace(FurnaceNum)%CoolingCoilSensDemand = 0.0d0
      Furnace(FurnaceNum)%HeatingCoilSensDemand = QZnReq
   ELSE
      Furnace(FurnaceNum)%CoolingCoilSensDemand = ABS(QZnReq)
-     Furnace(FurnaceNum)%HeatingCoilSensDemand = 0.0
+     Furnace(FurnaceNum)%HeatingCoilSensDemand = 0.0d0
   END IF
 
   Furnace(FurnaceNum)%CompPartLoadRatio = SaveCompressorPLR
   IF (Furnace(FurnaceNum)%OpMode .EQ. CycFanCycCoil) THEN
-    If (SupHeaterLoad >0.0) Then
-      Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
+    If (SupHeaterLoad >0.0d0) Then
+      Furnace(FurnaceNum)%FanPartLoadRatio = 1.0d0
     Else
       If (SpeedNum .LT. 2) Then
         Furnace(FurnaceNum)%FanPartLoadRatio = PartLoadFrac
       Else
-        Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
+        Furnace(FurnaceNum)%FanPartLoadRatio = 1.0d0
       End If
     End If
   ELSE
     IF (UnitOn) THEN
-      Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
+      Furnace(FurnaceNum)%FanPartLoadRatio = 1.0d0
     ELSE
       If (SpeedNum .LT. 2) Then
         Furnace(FurnaceNum)%FanPartLoadRatio = PartLoadFrac
       Else
-        Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
+        Furnace(FurnaceNum)%FanPartLoadRatio = 1.0d0
       End If
     END IF
   END IF
@@ -9654,7 +9710,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !
   INTEGER, PARAMETER :: MaxIte   = 500          ! maximum number of iterations
-  REAL(r64), PARAMETER    :: MinPLF   = 0.0          ! minimum part load factor allowed
+  REAL(r64), PARAMETER    :: MinPLF   = 0.0d0          ! minimum part load factor allowed
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -9678,27 +9734,27 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
   INTEGER,SAVE       :: ErrCountVar=0 ! Counter used to minimize the occurrence of output warnings
 
   ! FLOW
-  SupHeaterLoad = 0.0
-  PartLoadFrac  = 0.0
-  SpeedRatio    = 0.0
+  SupHeaterLoad = 0.0d0
+  PartLoadFrac  = 0.0d0
+  SpeedRatio    = 0.0d0
   SpeedNum = 1
-  LatOutput = 0.0
-  ErrorToler = 0.001 !Error tolerance for convergence from input deck
+  LatOutput = 0.0d0
+  ErrorToler = 0.001d0 !Error tolerance for convergence from input deck
 
   !dehumidification load has the priority
- IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0 .and. CoolingLoad) .AND. &
+ IF((GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .gt. 0.0d0 .and. CoolingLoad) .AND. &
        (Furnace(FurnaceNum)%Humidistat .AND. &
         Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat .and. &
-       (QLatReq.lt.0.0))) THEN
-    QZnReq = 0.0
+       (QLatReq.lt.0.0d0))) THEN
+    QZnReq = 0.0d0
   ELSE
-    QLatReq = 0.0
+    QLatReq = 0.0d0
   END IF
 
-  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .EQ. 0.0) RETURN
+  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .EQ. 0.0d0) RETURN
 
   ! Get result when DX coil is off
-  SupHeaterLoad = 0.0
+  SupHeaterLoad = 0.0d0
   CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,NoCompOutput, LatOutput, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad)
 
@@ -9711,8 +9767,8 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
   END IF
 
   ! Get full load result
-  PartLoadFrac  = 1.0
-  SpeedRatio    = 1.0
+  PartLoadFrac  = 1.0d0
+  SpeedRatio    = 1.0d0
   If (Furnace(FurnaceNum)%HeatCoolMode == HeatingMode) Then
     IF (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool) THEN
         SpeedNum = Furnace(FurnaceNum)%NumOfSpeedCooling
@@ -9723,7 +9779,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
     SpeedNum = Furnace(FurnaceNum)%NumOfSpeedCooling
   ELSE
     SpeedNum = 1
-    PartLoadFrac  = 0.0
+    PartLoadFrac  = 0.0d0
   End If
 
   CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,FullOutput, LatOutput, &
@@ -9732,48 +9788,48 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
   IF(QLatReq < (-1.d0*SmallLoad) ) THEN !dehumidification mode
   !  ! If the QLatReq <= LatOutput the unit needs to run full out
     IF (QLatReq <= LatOutput) THEN
-      PartLoadFrac = 1.0
-      SpeedRatio   = 1.0
+      PartLoadFrac = 1.0d0
+      SpeedRatio   = 1.0d0
       Furnace(FurnaceNum)%CompPartLoadRatio = PartLoadFrac
       Furnace(FurnaceNum)%CompSpeedRatio = SpeedRatio
       Furnace(FurnaceNum)%CompSpeedNum = SpeedNum
       RETURN
     END IF
-    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+    ErrorToler = 0.001d0 !Error tolerance for convergence from input deck
   ELSE IF (QZnReq .LT. (-1.d0*SmallLoad)) THEN
   ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCompOutput
   ! Check that this is the case; if not set PartLoadFrac = 0.0 (off) and return
-    IF (FullOutput >= 0.0 .OR. FullOutput >= NoCompOutput) THEN
-      PartLoadFrac = 0.0
-      SpeedRatio   = 0.0
+    IF (FullOutput >= 0.0d0 .OR. FullOutput >= NoCompOutput) THEN
+      PartLoadFrac = 0.0d0
+      SpeedRatio   = 0.0d0
       SpeedNum = 1
       RETURN
     END IF
 !  ! If the QZnReq <= FullOutput the unit needs to run full out
     IF (QZnReq <= FullOutput) THEN
-      PartLoadFrac = 1.0
-      SpeedRatio   = 1.0
+      PartLoadFrac = 1.0d0
+      SpeedRatio   = 1.0d0
       Furnace(FurnaceNum)%CompPartLoadRatio = PartLoadFrac
       Furnace(FurnaceNum)%CompSpeedRatio = SpeedRatio
       Furnace(FurnaceNum)%CompSpeedNum = SpeedNum
       RETURN
     END IF
-    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+    ErrorToler = 0.001d0 !Error tolerance for convergence from input deck
   ELSE
   ! Since we are heating, we expect FullOutput to be > 0 and FullOutput > NoCompOutput
   ! Check that this is the case; if not set PartLoadFrac = 0.0 (off)
-    IF (FullOutput <= 0.0 .OR. FullOutput <= NoCompOutput) THEN
-      PartLoadFrac = 0.0
-      SpeedRatio   = 0.0
+    IF (FullOutput <= 0.0d0 .OR. FullOutput <= NoCompOutput) THEN
+      PartLoadFrac = 0.0d0
+      SpeedRatio   = 0.0d0
       SpeedNum = 1
   ! may need supplemental heating so don't return in heating mode
     END IF
     IF (QZnReq  >=  FullOutput) THEN
-      PartLoadFrac = 1.0
-      SpeedRatio   = 1.0
+      PartLoadFrac = 1.0d0
+      SpeedRatio   = 1.0d0
   ! may need supplemental heating so don't return in heating mode
     END IF
-    ErrorToler = 0.001 !Error tolerance for convergence from input deck
+    ErrorToler = 0.001d0 !Error tolerance for convergence from input deck
   END IF
 
   IF ((QZnReq .GT. SmallLoad .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. (-1.d0*SmallLoad) .AND. QZnReq > FullOutput) &
@@ -9782,27 +9838,27 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
     Par(1) = FurnaceNum
     Par(2) = ZoneNum
     IF (FirstHVACIteration) THEN
-      Par(3) = 1.0
+      Par(3) = 1.0d0
     ELSE
-      Par(3) = 0.0
+      Par(3) = 0.0d0
     END IF
     Par(4) = OpMode
     Par(5) = QZnReq
     Par(6) = OnOffAirFlowRatio
     Par(7) = SupHeaterLoad
     Par(9) = CompOp
-    Par(10) = 1.0
+    Par(10) = 1.0d0
     ! Check whether the low speed coil can meet the load or not
     CALL CalcVarSpeedHeatPump(FurnaceNum, FirstHVACIteration,CompOp,1, 0.0d0, 1.0d0,LowOutput, LatOutput,  &
                         QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
     IF ((QZnReq .GT. SmallLoad .AND. QZnReq <= LowOutput) .OR. (QZnReq .LT. (-1.d0*SmallLoad) .AND. QZnReq >= LowOutput) &
               .OR. (QLatReq < (-1.d0*SmallLoad) .AND. QLatReq > LatOutput)) THEN
         ! Calculate the part load fraction
-      SpeedRatio = 0.0
+      SpeedRatio = 0.0d0
       SpeedNum = 1
 
-      IF(QLatReq < 0.0) THEN !calculate latent heat residual
-        Par(10) = 0.0
+      IF(QLatReq < 0.0d0) THEN !calculate latent heat residual
+        Par(10) = 0.0d0
         Par(5) = QLatReq
       END IF
 
@@ -9827,8 +9883,8 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
       END IF
     Else
       ! Check to see which speed to meet the load
-      PartLoadFrac = 1.0
-      SpeedRatio = 1.0
+      PartLoadFrac = 1.0d0
+      SpeedRatio = 1.0d0
       If ((QZnReq .LT. (-1.d0*SmallLoad)) .OR. (QLatReq < (-1.d0*SmallLoad))) Then ! Cooling
         DO I=2,Furnace(FurnaceNum)%NumOfSpeedCooling
           CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
@@ -9857,7 +9913,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
       Par(8) = SpeedNum
 
       IF(QLatReq < (-1.d0*SmallLoad) ) THEN !calculate latent heat residual
-        Par(10) = 0.0
+        Par(10) = 0.0d0
         Par(5) = QLatReq
       END IF
 
@@ -9888,15 +9944,15 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
   ! occurs with constant fan mode when compressor is on or off
   ! occurs with cycling fan mode when compressor PLR is equal to 1
   IF ((QZnReq .GT. SmallLoad .AND. QZnReq .GT. FullOutput) .AND. (Furnace(FurnaceNum)%SuppHeatCoilIndex /= 0))THEN
-    PartLoadFrac  = 1.0
-    SpeedRatio  = 1.0
+    PartLoadFrac  = 1.0d0
+    SpeedRatio  = 1.0d0
     IF(Furnace(FurnaceNum)%NumOfSpeedHeating > 0) &
             SpeedNum = Furnace(FurnaceNum)%NumOfSpeedHeating !maximum heating speed, avoid zero for cooling only mode
 
     IF(OutDryBulbTemp .LE. Furnace(FurnaceNum)%MaxOATSuppHeat)THEN
       SupHeaterLoad = QZnReq - FullOutput
     ELSE
-      SupHeaterLoad = 0.0
+      SupHeaterLoad = 0.0d0
     END IF
     CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,QZnReq,  &
                         QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
@@ -9904,7 +9960,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
 
 ! check the outlet of the supplemental heater to be lower than the maximum supplemental heater supply air temperature
   IF (Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%Temp .GT. Furnace(FurnaceNum)%DesignMaxOutletTemp .AND. &
-                                                             SupHeaterLoad .GT. 0.0) THEN
+                                                             SupHeaterLoad .GT. 0.0d0) THEN
 
 !   If the supply air temperature is to high, turn off the supplemental heater to recalculate the outlet temperature
     CALL CalcNonDXHeatingCoils(FurnaceNum,.TRUE.,FirstHVACIteration,0.0d0,OpMode,QCoilActual)
@@ -9919,7 +9975,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
                       (Furnace(FurnaceNum)%DesignMaxOutletTemp - Node(Furnace(FurnaceNum)%FurnaceOutletNodeNum)%Temp)
 
     ELSE
-      SupHeaterLoad = 0.0
+      SupHeaterLoad = 0.0d0
     END IF
   END IF
 
@@ -9930,7 +9986,7 @@ SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,
   Furnace(FurnaceNum)%CoolingCoilLatentDemand = ABS(QLatReq)
 
   IF (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil) THEN
-    Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
+    Furnace(FurnaceNum)%FanPartLoadRatio = 1.0d0
   ELSE
     Furnace(FurnaceNum)%FanPartLoadRatio = PartLoadFrac
   END IF
@@ -10005,10 +10061,10 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
   InletNode  = Furnace(FurnaceNum)%FurnaceInletNodeNum
   OutletNode = Furnace(FurnaceNum)%FurnaceOutletNodeNum
 
-  HeatCoilLoad = 0.0
-  SaveCompressorPLR = 0.0
-  SavePartloadRatio = 0.0
-  ErrorToler = 0.001
+  HeatCoilLoad = 0.0d0
+  SaveCompressorPLR = 0.0d0
+  SavePartloadRatio = 0.0d0
+  ErrorToler = 0.001d0
   ! Set inlet air mass flow rate based on PLR and compressor on/off air flow rates
   CALL SetVSHPAirFlow(FurnaceNum,PartLoadFrac,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
 
@@ -10024,7 +10080,7 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
         (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
     HeatCoilLoad      = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadFrac
   ELSE
-    HeatCoilLoad      = 0.0
+    HeatCoilLoad      = 0.0d0
   END IF
 
   AirMassFlow = Node(InletNode)%MassFlowRate
@@ -10229,7 +10285,7 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
          - PsyHFnTdbW(MaxTemp,Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%HumRat)) &
          - Furnace(FurnaceNum)%LatLoadLoss
   ELSE
-    LatentLoadMet = 0.0
+    LatentLoadMet = 0.0d0
   END IF
   Furnace(FurnaceNum)%LatentLoadMet = LatentLoadMet
 
@@ -10302,7 +10358,7 @@ REAL(r64) FUNCTION VSHPCyclingResidual(PartLoadFrac,Par)
   FurnaceNum  = INT(Par(1))
   ZoneNum = INT(Par(2))
   ! FirstHVACIteration is a logical, Par is REAL(r64), so make 1.0=TRUE and 0.0=FALSE
-  IF(Par(3) .EQ. 1.0)THEN
+  IF(Par(3) .EQ. 1.0d0)THEN
     FirstHVACIteration = .TRUE.
   ELSE
     FirstHVACIteration = .FALSE.
@@ -10327,8 +10383,8 @@ REAL(r64) FUNCTION VSHPCyclingResidual(PartLoadFrac,Par)
                           QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad)
 
   ResScale = abs(LoadToBeMet)
-  IF (ResScale < 100.0) THEN
-    ResScale = 100.0
+  IF (ResScale < 100.0d0) THEN
+    ResScale = 100.0d0
   ELSE
     ResScale =  LoadToBeMet
   END IF
@@ -10410,7 +10466,7 @@ REAL(r64) FUNCTION VSHPSpeedResidual(SpeedRatio,Par)
   FurnaceNum = INT(Par(1))
   ZoneNum = INT(Par(2))
   ! FirstHVACIteration is a logical, Par is REAL(r64), so make 1.0=TRUE and 0.0=FALSE
-  IF(Par(3) .EQ. 1.0)THEN
+  IF(Par(3) .EQ. 1.0d0)THEN
     FirstHVACIteration = .TRUE.
   ELSE
     FirstHVACIteration = .FALSE.
@@ -10436,8 +10492,8 @@ REAL(r64) FUNCTION VSHPSpeedResidual(SpeedRatio,Par)
                           QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad)
 
   ResScale = abs(LoadToBeMet)
-  IF (ResScale < 100.0) THEN
-    ResScale = 100.0
+  IF (ResScale < 100.0d0) THEN
+    ResScale = 100.0d0
   ELSE
     ResScale =  LoadToBeMet
   END IF
@@ -10500,16 +10556,16 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
   InletNode      = Furnace(FurnaceNum)%FurnaceInletNodeNum
   OutNode = Furnace(FurnaceNum)%FurnaceOutletNodeNum
 
-  MSHPMassFlowRateLow = 0.0             ! Mass flow rate at low speed
-  MSHPMassFlowRateHigh = 0.0            ! Mass flow rate at high speed
+  MSHPMassFlowRateLow = 0.0d0             ! Mass flow rate at low speed
+  MSHPMassFlowRateHigh = 0.0d0            ! Mass flow rate at high speed
 
 
   IF (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil) THEN
    CompOffMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
    CompOffFlowRatio = Furnace(FurnaceNum)%IdleSpeedRatio
   ELSE
-   CompOffMassFlow = 0.0
-   CompOffFlowRatio = 0.0
+   CompOffMassFlow = 0.0d0
+   CompOffFlowRatio = 0.0d0
   END IF
 
   IF (HeatingLoad .AND. (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
@@ -10518,7 +10574,7 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
       MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
       MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
       AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
-      IF(CompOffFlowRatio .GT. 0.0)THEN
+      IF(CompOffFlowRatio .GT. 0.0d0)THEN
         FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
       ELSE
         FanSpeedRatio     = CompOnFlowRatio
@@ -10558,7 +10614,7 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
 
       ! Set up fan flow rate during compressor off time
       If (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil .AND. Present(SpeedNum)) Then
-        IF (Furnace(FurnaceNum)%AirFlowControl .EQ. UseCompressorOnFlow .AND. CompOnMassFlow > 0.0) THEN
+        IF (Furnace(FurnaceNum)%AirFlowControl .EQ. UseCompressorOnFlow .AND. CompOnMassFlow > 0.0d0) THEN
           IF(SpeedNum == 1) THEN  !LOWEST SPEED USE IDLE FLOW
             CompOffMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
             CompOffFlowRatio = Furnace(FurnaceNum)%IdleSpeedRatio
@@ -10578,7 +10634,7 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
           FanSpeedRatio       = CompOnFlowRatio
         Else
           AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
-          IF(CompOffFlowRatio .GT. 0.0)THEN
+          IF(CompOffFlowRatio .GT. 0.0d0)THEN
             FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
           ELSE
             FanSpeedRatio     = CompOnFlowRatio
@@ -10586,7 +10642,7 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
         End If
       Else
         AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
-        IF(CompOffFlowRatio .GT. 0.0)THEN
+        IF(CompOffFlowRatio .GT. 0.0d0)THEN
           FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
         ELSE
           FanSpeedRatio       = CompOnFlowRatio
@@ -10594,16 +10650,16 @@ SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,Sp
       End If
   END IF
 
-  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .EQ. 0.0) THEN
-    Node(InletNode)%MassFlowRate              = 0.0
-    OnOffAirFlowRatio                         = 0.0
+  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .EQ. 0.0d0) THEN
+    Node(InletNode)%MassFlowRate              = 0.0d0
+    OnOffAirFlowRatio                         = 0.0d0
   ELSE
     Node(InletNode)%MassFlowRate              = AverageUnitMassFlow
     Node(InletNode)%MassFlowRateMaxAvail      = AverageUnitMassFlow
-    IF (AverageUnitMassFlow .GT. 0.0) THEN
+    IF (AverageUnitMassFlow .GT. 0.0d0) THEN
       OnOffAirFlowRatio                       = CompOnMassFlow / AverageUnitMassFlow
     ELSE
-      OnOffAirFlowRatio                       = 0.0
+      OnOffAirFlowRatio                       = 0.0d0
     END IF
   END IF
 
@@ -10706,32 +10762,32 @@ SUBROUTINE SetOnOffMassFlowRateVSCoil(FurnaceNum, ZoneNum, FirstHVACIteration, A
       CompOnMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(1)
       CompOnFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(1)
     ELSE
-      CompOnMassFlow = 0.0
-      CompOnFlowRatio = 0.0
+      CompOnMassFlow = 0.0d0
+      CompOnFlowRatio = 0.0d0
     END IF
-    CompOffMassFlow = 0.0
-    CompOffFlowRatio = 0.0
+    CompOffMassFlow = 0.0d0
+    CompOffFlowRatio = 0.0d0
   END IF
 
   ! Set the inlet node mass flow rate
-  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanAvailSchedPtr) .gt. 0.0 .AND. CompOnMassFlow .NE. 0.0) THEN
-    OnOffAirFlowRatio = 1.0
+  IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanAvailSchedPtr) .gt. 0.0d0 .AND. CompOnMassFlow .NE. 0.0d0) THEN
+    OnOffAirFlowRatio = 1.0d0
     IF(FirstHVACIteration)THEN
       Node(InNode)%MassFlowRate = CompOnMassFlow
-      PartLoadRatio            = 0.0
+      PartLoadRatio            = 0.0d0
     ELSE
       IF (Furnace(FurnaceNum)%HeatCoolMode /= 0) THEN
-        PartLoadRatio  = 1.0
+        PartLoadRatio  = 1.0d0
       ELSE
-        PartLoadRatio  = 0.0
+        PartLoadRatio  = 0.0d0
       END IF
     END IF
   ELSE
-    PartLoadRatio  = 0.0
-    Node(InNode)%MassFlowRate           = 0.0
-    Node(OutNode)%MassFlowRate          = 0.0
-    Node(OutNode)%MassFlowRateMaxAvail  = 0.0
-    OnOffAirFlowRatio      = 1.0
+    PartLoadRatio  = 0.0d0
+    Node(InNode)%MassFlowRate           = 0.0d0
+    Node(OutNode)%MassFlowRate          = 0.0d0
+    Node(OutNode)%MassFlowRateMaxAvail  = 0.0d0
+    OnOffAirFlowRatio      = 1.0d0
   END IF
 
 ! Set the system mass flow rates

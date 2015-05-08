@@ -308,7 +308,7 @@ SUBROUTINE CalcTempDistModel(ZoneNum)
   !first determine availability
   AvailTest = GetCurrentScheduleValue(AirPatternZoneInfo(ZoneNum)%AvailSchedID)
 
-  If ((AvailTest /= 1.0) .OR. ( .NOT. AirPatternZoneInfo(ZoneNum)%IsUsed) ) Then
+  If ((AvailTest /= 1.0d0) .OR. ( .NOT. AirPatternZoneInfo(ZoneNum)%IsUsed) ) Then
   ! model not to be used. Use complete mixing method
 
     AirPatternZoneInfo(ZoneNum)%Tstat     = AirPatternZoneInfo(ZoneNum)%TairMean
@@ -470,7 +470,7 @@ SUBROUTINE FigureHeightPattern(PattrnID, ZoneNum)
   REAL(r64)    :: fractBtwn
   REAL(r64)    :: tmpDeltaTai
 
-  tmpDeltaTai = 0.0
+  tmpDeltaTai = 0.0d0
   Tmean = AirPatternZoneInfo(ZoneNum)%TairMean
 
   Do i=1, AirPatternZoneInfo(ZoneNum)%totNumSurfs
@@ -486,7 +486,7 @@ SUBROUTINE FigureHeightPattern(PattrnID, ZoneNum)
         ELSE !trap array bounds
           hiSideZeta  = lowSideZeta
         ENDIF
-        IF ((hiSideZeta - lowSideZeta) /= 0.0) THEN !
+        IF ((hiSideZeta - lowSideZeta) /= 0.0d0) THEN !
           fractBtwn   = (thisZeta - lowSideZeta)/(hiSideZeta - lowSideZeta)
           tmpDeltaTai =  RoomAirPattern(PattrnID)%VertPatrn%DeltaTaiPatrn(lowSideID) &
                        + fractBtwn * ( RoomAirPattern(PattrnID)%VertPatrn%DeltaTaiPatrn(highsideID)  &
@@ -595,7 +595,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
     ELSE ! interpolate
 
      IF ((RoomAirPattern(PattrnID)%TwoGradPatrn%UpperBoundTempScale -   &
-            RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) /= 0.0) then
+            RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) /= 0.0d0) then
       ! bad user input. should be trapped during get input in RoomAirManager.f90
       Grad  = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
      ELSE
@@ -619,7 +619,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
       Grad = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
     ELSE ! interpolate
       IF ((RoomAirPattern(PattrnID)%TwoGradPatrn%UpperBoundTempScale -  &
-             RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) == 0.0) then
+             RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) == 0.0d0) then
         ! bad user input, trapped during get input
         Grad  = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
       ELSE
@@ -643,7 +643,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
       Grad = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
     ELSE ! interpolate
       IF ((RoomAirPattern(PattrnID)%TwoGradPatrn%UpperBoundTempScale -   &
-               RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) == 0.0) then
+               RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundTempScale) == 0.0d0) then
         ! bad user input, trapped during get input
         Grad  = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
       ELSE
@@ -667,7 +667,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
       Grad = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
     ELSE ! interpolate
       IF ((RoomAirPattern(PattrnID)%TwoGradPatrn%UpperBoundHeatRateScale -   &
-             RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundHeatRateScale) == 0.0) then
+             RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundHeatRateScale) == 0.0d0) then
         Grad  = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
       ELSE
 
@@ -690,7 +690,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
       Grad = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
     ELSE ! interpolate
       IF ((RoomAirPattern(PattrnID)%TwoGradPatrn%UpperBoundHeatRateScale -   &
-               RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundHeatRateScale) == 0.0) then
+               RoomAirPattern(PattrnID)%TwoGradPatrn%LowerBoundHeatRateScale) == 0.0d0) then
         Grad  = RoomAirPattern(PattrnID)%TwoGradPatrn%LowGradient
       ELSE
 
@@ -704,12 +704,12 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
 
   END SELECT
 
-  ZetaTmean = 0.5 ! by definition,
+  ZetaTmean = 0.5d0 ! by definition,
 
   DO i=1, AirPatternZoneInfo(ZoneNum)%totNumSurfs
     thisZeta = AirPatternZoneInfo(ZoneNum)%surf(i)%zeta
 
-    DeltaHeight = -1.0*(ZetaTmean - thisZeta)* AirPatternZoneInfo(ZoneNum)%ZoneHeight
+    DeltaHeight = -1.0d0*(ZetaTmean - thisZeta)* AirPatternZoneInfo(ZoneNum)%ZoneHeight
 
     tempDeltaTai = DeltaHeight * Grad
 
@@ -717,13 +717,13 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
 
   ENDDO
 
-  AirPatternZoneInfo(ZoneNum)%Tstat    =  -1.0*(0.5*AirPatternZoneInfo(ZoneNum)%ZoneHeight- &
+  AirPatternZoneInfo(ZoneNum)%Tstat    =  -1.0d0*(0.5d0*AirPatternZoneInfo(ZoneNum)%ZoneHeight- &
                                                 RoomAirPattern(PattrnID)%TwoGradPatrn%TstatHeight) &
                                             * Grad + Tmean
-  AirPatternZoneInfo(ZoneNum)%Tleaving =  -1.0*(0.5*AirPatternZoneInfo(ZoneNum)%ZoneHeight-   &
+  AirPatternZoneInfo(ZoneNum)%Tleaving =  -1.0d0*(0.5d0*AirPatternZoneInfo(ZoneNum)%ZoneHeight-   &
                                                 RoomAirPattern(PattrnID)%TwoGradPatrn%TleavingHeight) &
                                             * Grad + Tmean
-  AirPatternZoneInfo(ZoneNum)%Texhaust  =  -1.0*(0.5*AirPatternZoneInfo(ZoneNum)%ZoneHeight-  &
+  AirPatternZoneInfo(ZoneNum)%Texhaust  =  -1.0d0*(0.5d0*AirPatternZoneInfo(ZoneNum)%ZoneHeight-  &
                                                  RoomAirPattern(PattrnID)%TwoGradPatrn%TexhaustHeight) &
                                             * Grad + Tmean
 
@@ -783,11 +783,11 @@ SUBROUTINE FigureConstGradPattern(PattrnID, ZoneNum)
   Tmean = AirPatternZoneInfo(ZoneNum)%TairMean
   Grad  = RoomAirPattern(PattrnID)%GradPatrn%Gradient
 
-  ZetaTmean = 0.5 ! by definition,
+  ZetaTmean = 0.5d0 ! by definition,
 
   DO i=1, AirPatternZoneInfo(ZoneNum)%totNumSurfs
     thisZeta = AirPatternZoneInfo(ZoneNum)%surf(i)%zeta
-    DeltaHeight = -1.0*(ZetaTmean - thisZeta)* AirPatternZoneInfo(ZoneNum)%ZoneHeight
+    DeltaHeight = -1.0d0*(ZetaTmean - thisZeta)* AirPatternZoneInfo(ZoneNum)%ZoneHeight
     tempDeltaTai = DeltaHeight * Grad
     AirPatternZoneInfo(ZoneNum)%surf(i)%TadjacentAir = tempDeltaTai + Tmean
   ENDDO
@@ -867,18 +867,18 @@ END SUBROUTINE FigureConstGradPattern
 
    !this next Do block is copied from SurfaceGeometry.f90 with modification for just floor Z
    ! used find floor z.
-    FloorCount=0.0
-    ZFlrAvg=0.0
-    ZMax=0.0
-    ZMin=0.0
+    FloorCount=0.0d0
+    ZFlrAvg=0.0d0
+    ZMax=0.0d0
+    ZMin=0.0d0
     Count=0
     DO SurfNum=Zone(thisZone)%SurfaceFirst,Zone(thisZone)%SurfaceLast
       IF (Surface(SurfNum)%Class == SurfaceClass_Floor) THEN
         ! Use Average Z for surface, more important for roofs than floors...
-        FloorCount=FloorCount+1.0
+        FloorCount=FloorCount+1.0d0
         Z1=MINVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%Z)
         Z2=MAXVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%Z)
-        ZFlrAvg=ZFlrAvg+(Z1+Z2)/2.
+        ZFlrAvg=ZFlrAvg+(Z1+Z2)/2.0d0
       ENDIF
       IF (Surface(SurfNum)%Class == SurfaceClass_Wall) THEN
         ! Use Wall calculation in case no floor in zone
@@ -891,7 +891,7 @@ END SUBROUTINE FigureConstGradPattern
         ZMin=MIN(ZMin,MINVAL(Surface(SurfNum)%Vertex(1:Surface(SurfNum)%Sides)%Z))
       ENDIF
     ENDDO
-    IF (FloorCount > 0.0) THEN
+    IF (FloorCount > 0.0d0) THEN
       ZFlrAvg=ZFlrAvg/FloorCount
     ELSE
       ZFlrAvg=ZMin
@@ -1043,12 +1043,12 @@ END SUBROUTINE FigureConstGradPattern
      MassFlowRA  = Node(ReturnNode)%MassFlowRate / ZoneMult
      TempZoneAir = AirPatternZoneInfo(ZoneNum)%Tleaving ! key difference from
      TempRetAir  = TempZoneAir
-     WinGapFlowtoRA = 0.0
-     WinGapTtoRA = 0.0
-     WinGapFlowTtoRA = 0.0
+     WinGapFlowtoRA = 0.0d0
+     WinGapTtoRA = 0.0d0
+     WinGapFlowTtoRA = 0.0d0
 
      DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
-       IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0 .AND.   &
+       IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0d0 .AND.   &
           SurfaceWindow(SurfNum)%AirflowDestination == AirFlowWindow_Destination_ReturnAir) THEN
          FlowThisTS = PsyRhoAirFnPbTdbW(OutBaroPress,SurfaceWindow(SurfNum)%TAirFlowGapOutlet, Node(ZoneNode)%HumRat) * &
            SurfaceWindow(SurfNum)%AirFlowThisTS * Surface(SurfNum)%Width
@@ -1056,11 +1056,11 @@ END SUBROUTINE FigureConstGradPattern
          WinGapFlowTtoRA = WinGapFlowTtoRA + FlowThisTS * SurfaceWindow(SurfNum)%TAirFlowGapOutlet
        END IF
      END DO
-     IF(WinGapFlowtoRA > 0.0) WinGapTtoRA = WinGapFlowTtoRA / WinGapFlowtoRA
+     IF(WinGapFlowtoRA > 0.0d0) WinGapTtoRA = WinGapFlowTtoRA / WinGapFlowtoRA
 
      IF (.NOT. Zone(ZoneNum)%NoHeatToReturnAir) THEN
-       IF(MassFlowRA > 0.0) Then
-         IF(WinGapFlowtoRA > 0.0) THEN
+       IF(MassFlowRA > 0.0d0) Then
+         IF(WinGapFlowtoRA > 0.0d0) THEN
            ! Add heat-to-return from window gap airflow
            IF(MassFlowRA >= WinGapFlowtoRA) THEN
              TempRetAir = (WinGapFlowTtoRA + (MassFlowRA-WinGapFlowtoRA)*TempZoneAir)/MassFlowRA
@@ -1089,11 +1089,11 @@ END SUBROUTINE FigureConstGradPattern
          END IF
        ELSE  ! No return air flow
          ! Assign all heat-to-return from window gap airflow to zone air
-         IF(WinGapFlowToRA > 0.0) &
+         IF(WinGapFlowToRA > 0.0d0) &
            SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + &
              WinGapFlowToRA * CpAir * (WinGapTtoRA - TempZoneAir)
          ! Assign all heat-to-return from lights to zone air
-         IF(QRetAir > 0.0) &
+         IF(QRetAir > 0.0d0) &
            SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + QRetAir
          Node(ReturnNode)%Temp = Node(ZoneNode)%Temp
        END IF

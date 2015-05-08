@@ -111,8 +111,8 @@ CHARACTER(LEN=*), parameter :: validChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi
 TYPE OutputTableBinnedType
   CHARACTER(len=MaxNameLength)   :: keyValue      =' ' ! the key value (usually an asterisk to indicate all variables
   CHARACTER(len=MaxNameLength)   :: varOrMeter    =' ' ! the name of the variable or meter
-  REAL(r64)                      :: intervalStart =0.0 ! The lowest value for the intervals being binned into.
-  REAL(r64)                      :: intervalSize  =0.0 ! The size of the bins starting with Interval start.
+  REAL(r64)                      :: intervalStart =0.0d0 ! The lowest value for the intervals being binned into.
+  REAL(r64)                      :: intervalSize  =0.0d0 ! The size of the bins starting with Interval start.
   INTEGER                        :: intervalCount =0   ! The number of bins used. The number of hours below the start of
                                                        ! the lowest bin and above the value of the last bin are also shown.
   INTEGER                        :: resIndex      =0   ! result index - pointer to BinResults array
@@ -126,8 +126,8 @@ TYPE OutputTableBinnedType
 END TYPE
 
 TYPE BinResultsType
-  REAL(r64),DIMENSION(12)             :: mnth          =0.0 ! monthly bins
-  REAL(r64),DIMENSION(24)             :: hrly          =0.0 ! hourly bins
+  REAL(r64),DIMENSION(12)             :: mnth          =0.0d0 ! monthly bins
+  REAL(r64),DIMENSION(24)             :: hrly          =0.0d0 ! hourly bins
 END TYPE
 
 TYPE BinObjVarIDType
@@ -136,11 +136,11 @@ TYPE BinObjVarIDType
 END TYPE
 
 TYPE BinStatisticsType
-  REAL(r64)                      :: sum           =0.0 !sum of the variable
-  REAL(r64)                      :: sum2          =0.0 !sum of the variable squared
+  REAL(r64)                      :: sum           =0.0d0 !sum of the variable
+  REAL(r64)                      :: sum2          =0.0d0 !sum of the variable squared
   INTEGER                        :: n             =0   !number of items in sum
-  REAL(r64)                      :: minimum       =0.0 !minimum value
-  REAL(r64)                      :: maximum       =0.0 !maximum value
+  REAL(r64)                      :: minimum       =0.0d0 !minimum value
+  REAL(r64)                      :: maximum       =0.0d0 !maximum value
 END TYPE
 
 ! arrays for time binned results
@@ -202,10 +202,10 @@ TYPE MonthlyColumnsType
   INTEGER                        :: stepType     =0   ! Variable time step is Zone=1 or HVAC=2
   CHARACTER(len=MaxNameLength)   :: units        =' ' ! the units string, may be blank
   INTEGER                        :: aggType      =0   ! index to the type of aggregation (see list of parameters)
-  REAL(r64),DIMENSION(12)        :: reslt        =0.0 ! monthly results
-  REAL(r64),DIMENSION(12)        :: duration     =0.0 ! the time during which results are summed for use in averages
+  REAL(r64),DIMENSION(12)        :: reslt        =0.0d0 ! monthly results
+  REAL(r64),DIMENSION(12)        :: duration     =0.0d0 ! the time during which results are summed for use in averages
   INTEGER,DIMENSION(12)          :: timeStamp    =0   ! encoded timestamp of max or min
-  REAL(r64)                      :: aggForStep   =0.0 ! holds the aggregation for the HVAC time steps when smaller than
+  REAL(r64)                      :: aggForStep   =0.0d0 ! holds the aggregation for the HVAC time steps when smaller than
                                                       ! the zone timestep
 END TYPE
 
@@ -260,7 +260,7 @@ INTEGER,DIMENSION(maxNumStyles)         :: TabularOutputFile = 0   ! file number
 CHARACTER(LEN=1),DIMENSION(maxNumStyles):: del               = ' ' ! the delimiter to use
 INTEGER,DIMENSION(maxNumStyles)         :: TableStyle        = 0   ! see list of parameters
 
-REAL(r64)        :: timeInYear      =0.0
+REAL(r64)        :: timeInYear      =0.0d0
 
 ! Flags for predefined tabular reports
 LOGICAL   ::    displayTabularBEPS =.false.
@@ -280,7 +280,7 @@ INTEGER, DIMENSION(numResourceTypes)            :: meterNumTotalsBEPS =0
 INTEGER, DIMENSION(numSourceTypes)              :: meterNumTotalsSource =0
 LOGICAL, DIMENSION(numSourceTypes)              :: fuelfactorsused=.false.
 LOGICAL, DIMENSION(numResourceTypes)            :: ffUsed=.false.
-REAL(r64), DIMENSION(numResourceTypes)          :: SourceFactors = 0.0
+REAL(r64), DIMENSION(numResourceTypes)          :: SourceFactors = 0.0d0
 LOGICAL, DIMENSION(numResourceTypes)            :: ffSchedUsed =.false.
 INTEGER, DIMENSION(numResourceTypes)            :: ffSchedIndex = 0
 INTEGER, DIMENSION(numEndUses,numResourceTypes) :: meterNumEndUseBEPS =0
@@ -290,79 +290,79 @@ CHARACTER(len=32), DIMENSION(numResourceTypes)  :: resourceTypeNames =' '
 CHARACTER(len=32), DIMENSION(numSourceTypes)    :: sourceTypeNames   =' '
 CHARACTER(len=32), DIMENSION(numEndUses)        :: endUseNames       =' '
 ! arrays that hold the actual values for the year
-REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBEPS   =0.0
-REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBySourceBEPS =0.0
-REAL(r64), DIMENSION(numSourceTypes)                 :: gatherTotalsSource =0.0
-REAL(r64), DIMENSION(numSourceTypes)                 :: gatherTotalsBySource =0.0
-REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherEndUseBEPS   =0.0
-REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherEndUseBySourceBEPS   =0.0
+REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBEPS   =0.0d0
+REAL(r64), DIMENSION(numResourceTypes)               :: gatherTotalsBySourceBEPS =0.0d0
+REAL(r64), DIMENSION(numSourceTypes)                 :: gatherTotalsSource =0.0d0
+REAL(r64), DIMENSION(numSourceTypes)                 :: gatherTotalsBySource =0.0d0
+REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherEndUseBEPS   =0.0d0
+REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherEndUseBySourceBEPS   =0.0d0
 REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)             :: gatherEndUseSubBEPS
 ! arrays the hold the demand values
-REAL(r64), DIMENSION(numResourceTypes)               :: gatherDemandTotal  =0.0
-REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherDemandEndUse  =0.0
+REAL(r64), DIMENSION(numResourceTypes)               :: gatherDemandTotal  =0.0d0
+REAL(r64), DIMENSION(numEndUses,numResourceTypes)    :: gatherDemandEndUse  =0.0d0
 REAL(r64), ALLOCATABLE, DIMENSION(:,:,:)             :: gatherDemandEndUseSub
 INTEGER, DIMENSION(numResourceTypes)                 :: gatherDemandTimeStamp = 0
 ! to keep track of hours for the BEPS report gathering
-REAL(r64)                           :: gatherElapsedTimeBEPS =0.0
+REAL(r64)                           :: gatherElapsedTimeBEPS =0.0d0
 ! for normalization of results
-REAL(r64)  , PUBLIC                             :: buildingGrossFloorArea       =0.0
-REAL(r64)  , PUBLIC                             :: buildingConditionedFloorArea =0.0
+REAL(r64)  , PUBLIC                             :: buildingGrossFloorArea       =0.0d0
+REAL(r64)  , PUBLIC                             :: buildingConditionedFloorArea =0.0d0
 ! keep track if schedules are used in fuel factors
 LOGICAL  ::  fuelFactorSchedulesUsed = .FALSE.
 ! for electic load components on BEPS report
 INTEGER                                         :: meterNumPowerFuelFireGen       =0
-REAL(r64)                                       :: gatherPowerFuelFireGen         =0.0
+REAL(r64)                                       :: gatherPowerFuelFireGen         =0.0d0
 INTEGER                                         :: meterNumPowerPV                =0
-REAL(r64)                                       :: gatherPowerPV                  =0.0
+REAL(r64)                                       :: gatherPowerPV                  =0.0d0
 INTEGER                                         :: meterNumPowerWind              =0
-REAL(r64)                                       :: gatherPowerWind                =0.0
-REAL(r64)                                       :: OverallNetEnergyFromStorage    =0.0
+REAL(r64)                                       :: gatherPowerWind                =0.0d0
+REAL(r64)                                       :: OverallNetEnergyFromStorage    =0.0d0
 INTEGER                                         :: meterNumPowerHTGeothermal      =0
-REAL(r64)                                       :: gatherPowerHTGeothermal        =0.0
+REAL(r64)                                       :: gatherPowerHTGeothermal        =0.0d0
 INTEGER                                         :: meterNumElecProduced           =0
-REAL(r64)                                       :: gatherElecProduced             =0.0
+REAL(r64)                                       :: gatherElecProduced             =0.0d0
 INTEGER                                         :: meterNumElecPurchased          =0
-REAL(r64)                                       :: gatherElecPurchased            =0.0
+REAL(r64)                                       :: gatherElecPurchased            =0.0d0
 INTEGER                                         :: meterNumElecSurplusSold        =0
-REAL(r64)                                       :: gatherElecSurplusSold          =0.0
+REAL(r64)                                       :: gatherElecSurplusSold          =0.0d0
 ! for on site thermal source components on BEPS report
 INTEGER                                         :: meterNumWaterHeatRecovery      =0
-REAL(r64)                                       :: gatherWaterHeatRecovery        =0.0
+REAL(r64)                                       :: gatherWaterHeatRecovery        =0.0d0
 INTEGER                                         :: meterNumAirHeatRecoveryCool    =0
-REAL(r64)                                       :: gatherAirHeatRecoveryCool      =0.0
+REAL(r64)                                       :: gatherAirHeatRecoveryCool      =0.0d0
 INTEGER                                         :: meterNumAirHeatRecoveryHeat    =0
-REAL(r64)                                       :: gatherAirHeatRecoveryHeat      =0.0
+REAL(r64)                                       :: gatherAirHeatRecoveryHeat      =0.0d0
 INTEGER                                         :: meterNumHeatHTGeothermal       =0
-REAL(r64)                                       :: gatherHeatHTGeothermal         =0.0
+REAL(r64)                                       :: gatherHeatHTGeothermal         =0.0d0
 INTEGER                                         :: meterNumHeatSolarWater         =0
-REAL(r64)                                       :: gatherHeatSolarWater           =0.0
+REAL(r64)                                       :: gatherHeatSolarWater           =0.0d0
 INTEGER                                         :: meterNumHeatSolarAir           =0
-REAL(r64)                                       :: gatherHeatSolarAir             =0.0
+REAL(r64)                                       :: gatherHeatSolarAir             =0.0d0
 ! for on site water components on BEPS report
 INTEGER                                         :: meterNumRainWater       =0
-REAL(r64)                                       :: gatherRainWater         =0.0
+REAL(r64)                                       :: gatherRainWater         =0.0d0
 INTEGER                                         :: meterNumCondensate      =0
-REAL(r64)                                       :: gatherCondensate        =0.0
+REAL(r64)                                       :: gatherCondensate        =0.0d0
 INTEGER                                         :: meterNumGroundwater      =0
-REAL(r64)                                       :: gatherWellwater        =0.0
+REAL(r64)                                       :: gatherWellwater        =0.0d0
 INTEGER                                         :: meterNumMains         =0
-REAL(r64)                                       :: gatherMains           =0.0
+REAL(r64)                                       :: gatherMains           =0.0d0
 INTEGER                                         :: meterNumWaterEndUseTotal     =0
-REAL(r64)                                       :: gatherWaterEndUseTotal       =0.0
+REAL(r64)                                       :: gatherWaterEndUseTotal       =0.0d0
 ! for source energy conversion factors on BEPS report
-REAL(r64)                                       :: sourceFactorElectric           =0.0
-REAL(r64)                                       :: sourceFactorNaturalGas         =0.0
-REAL(r64)                                       :: efficiencyDistrictCooling     =0.0
-REAL(r64)                                       :: efficiencyDistrictHeating     =0.0
-REAL(r64)                                       :: sourceFactorSteam              =0.0
-REAL(r64)                                       :: sourceFactorGasoline           =0.0
-REAL(r64)                                       :: sourceFactorDiesel             =0.0
-REAL(r64)                                       :: sourceFactorCoal               =0.0
-REAL(r64)                                       :: sourceFactorFuelOil1           =0.0
-REAL(r64)                                       :: sourceFactorFuelOil2           =0.0
-REAL(r64)                                       :: sourceFactorPropane            =0.0
-REAL(r64)                                       :: sourceFactorOtherFuel1         =0.0
-REAL(r64)                                       :: sourceFactorOtherFuel2         =0.0
+REAL(r64)                                       :: sourceFactorElectric           =0.0d0
+REAL(r64)                                       :: sourceFactorNaturalGas         =0.0d0
+REAL(r64)                                       :: efficiencyDistrictCooling     =0.0d0
+REAL(r64)                                       :: efficiencyDistrictHeating     =0.0d0
+REAL(r64)                                       :: sourceFactorSteam              =0.0d0
+REAL(r64)                                       :: sourceFactorGasoline           =0.0d0
+REAL(r64)                                       :: sourceFactorDiesel             =0.0d0
+REAL(r64)                                       :: sourceFactorCoal               =0.0d0
+REAL(r64)                                       :: sourceFactorFuelOil1           =0.0d0
+REAL(r64)                                       :: sourceFactorFuelOil2           =0.0d0
+REAL(r64)                                       :: sourceFactorPropane            =0.0d0
+REAL(r64)                                       :: sourceFactorOtherFuel1         =0.0d0
+REAL(r64)                                       :: sourceFactorOtherFuel2         =0.0d0
 
 INTEGER,DIMENSION(8)        :: td
 !(1)   Current year
@@ -442,8 +442,10 @@ REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: surfDelaySeq
 INTEGER,PUBLIC :: maxUniqueKeyCount=0
 
 ! for the XML report must keep track fo the active sub-table name and report set by other routines
-CHARACTER(len=MaxNameLength) :: activeSubTableName
-CHARACTER(len=MaxNameLength) :: activeReportName
+CHARACTER(len=MaxNameLength) :: activeSubTableName = ''
+CHARACTER(len=MaxNameLength) :: activeReportNameNoSpace = ''
+CHARACTER(len=MaxNameLength) :: activeReportName = ''
+CHARACTER(len=MaxNameLength) :: activeForName = ''
 CHARACTER(len=MaxNameLength) :: prevReportName = ''
 
 
@@ -480,6 +482,7 @@ CHARACTER(len=MaxNameLength) :: prevReportName = ''
  PUBLIC       WriteReportHeaders
  PUBLIC       writeSubtitle
  PUBLIC       WriteTable
+ PUBLIC       writeTextLine
  PRIVATE      WriteTableOfContents
  PRIVATE      WriteZoneLoadComponentTable
  PUBLIC      DetermineBuildingFloorArea
@@ -651,7 +654,7 @@ CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
 ALLOCATE(AlphArray(NumAlphas))
 AlphArray = ''
 ALLOCATE(NumArray(NumNums))
-NumArray=0.0
+NumArray=0.0d0
 DO TabNum = 1 , MonthlyInputCount
   CALL GetObjectItem(CurrentModuleObject,TabNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
@@ -1050,9 +1053,9 @@ MonthlyColumns%stepType  = 0
 MonthlyColumns%units     = ' '
 MonthlyColumns%aggType   = 0
 DO ColNum = 1, MonthlyColumnsCount
-  MonthlyColumns(ColNum)%reslt     = 0
+  MonthlyColumns(ColNum)%reslt     = 0.0d0
   MonthlyColumns(ColNum)%timeStamp = 0
-  MonthlyColumns(ColNum)%duration  = 0
+  MonthlyColumns(ColNum)%duration  = 0.0d0
 END DO
 
 ColumnsRecount = 0
@@ -1208,8 +1211,8 @@ DO TabNum = 1 , MonthlyInputCount
        ! set accumulator values to default as appropriate for aggregation type
         SELECT CASE (MonthlyColumns(mColumn)%aggType)
           CASE (aggTypeSumOrAvg)
-            MonthlyColumns(mColumn)%reslt = 0
-            MonthlyColumns(mColumn)%duration = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
+            MonthlyColumns(mColumn)%duration = 0.0d0
           CASE (aggTypeMaximum)
             MonthlyColumns(mColumn)%reslt = -HUGE(BigNum)
             MonthlyColumns(mColumn)%timeStamp = 0
@@ -1217,22 +1220,22 @@ DO TabNum = 1 , MonthlyInputCount
             MonthlyColumns(mColumn)%reslt = HUGE(BigNum)
             MonthlyColumns(mColumn)%timeStamp = 0
           CASE (aggTypeValueWhenMaxMin)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursZero)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursNonZero)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursPositive)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursNonPositive)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursNegative)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeHoursNonNegative)
-            MonthlyColumns(mColumn)%reslt = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
           CASE (aggTypeSumOrAverageHoursShown)
-            MonthlyColumns(mColumn)%reslt = 0
-            MonthlyColumns(mColumn)%duration = 0
+            MonthlyColumns(mColumn)%reslt = 0.0d0
+            MonthlyColumns(mColumn)%duration = 0.0d0
           CASE (aggTypeMaximumDuringHoursShown)
             MonthlyColumns(mColumn)%reslt = -HUGE(BigNum)
             MonthlyColumns(mColumn)%timeStamp = 0
@@ -1341,9 +1344,9 @@ CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
 ALLOCATE(AlphArray(NumAlphas))
 AlphArray=' '
 ALLOCATE(NumArray(NumNums))
-NumArray=0.0
+NumArray=0.0d0
 
-timeInYear=0 !intialize the time in year counter
+timeInYear=0.0d0 !intialize the time in year counter
 ! determine size of array that holds the IDF description
 OutputTableBinnedCount = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(OutputTableBinned(OutputTableBinnedCount))
@@ -1396,7 +1399,7 @@ DO iInObj = 1 , OutputTableBinnedCount
     OutputTableBinned(iInObj)%intervalCount = 20
   END IF
   IF (OutputTableBinned(iInObj)%intervalSize .LT. 0) THEN
-    OutputTableBinned(iInObj)%intervalSize = 1000
+    OutputTableBinned(iInObj)%intervalSize = 1000.0d0
   END IF
   OutputTableBinned(iInObj)%resIndex = BinResultsTableCount + 1  !the next results report
   ! find maximum number of intervals
@@ -1477,21 +1480,21 @@ END DO
 ! clear the binning arrays to zeros
 ! - not completely sure this approach will work
 DO indx = 1, 12
-  BinResults(1:BinResultsTableCount,1:BinResultsIntervalCount)%mnth(indx) = 0
-  BinResultsBelow(1:BinResultsTableCount)%mnth(indx) = 0
-  BinResultsAbove(1:BinResultsTableCount)%mnth(indx) = 0
+  BinResults(1:BinResultsTableCount,1:BinResultsIntervalCount)%mnth(indx) = 0.0d0
+  BinResultsBelow(1:BinResultsTableCount)%mnth(indx) = 0.0d0
+  BinResultsAbove(1:BinResultsTableCount)%mnth(indx) = 0.0d0
 END DO
 DO indx = 1, 24
-  BinResults(1:BinResultsTableCount,1:BinResultsIntervalCount)%hrly(indx) = 0
-  BinResultsBelow(1:BinResultsTableCount)%hrly(indx) = 0
-  BinResultsAbove(1:BinResultsTableCount)%hrly(indx) = 0
+  BinResults(1:BinResultsTableCount,1:BinResultsIntervalCount)%hrly(indx) = 0.0d0
+  BinResultsBelow(1:BinResultsTableCount)%hrly(indx) = 0.0d0
+  BinResultsAbove(1:BinResultsTableCount)%hrly(indx) = 0.0d0
 END DO
 ! initialize statistics counters
 BinStatistics%minimum = HUGE(bigVal)
 BinStatistics%maximum = -HUGE(bigVal)
 BinStatistics%n       = 0
-BinStatistics%sum     = 0
-BinStatistics%sum2    = 0
+BinStatistics%sum     = 0.0d0
+BinStatistics%sum2    = 0.0d0
 
 DEALLOCATE(AlphArray)
 DEALLOCATE(NumArray)
@@ -1548,7 +1551,7 @@ CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
 ALLOCATE(AlphArray(NumAlphas))
 AlphArray=' '
 ALLOCATE(NumArray(NumNums))
-NumArray=0.0
+NumArray=0.0d0
 
 NumTabularStyle = GetNumObjectsFound(CurrentModuleObject)
 
@@ -1740,7 +1743,7 @@ IF (NumTabularPredefined .EQ. 1) THEN
   AlphArray = ''
   ! don't really need the NumArray since not expecting any numbers but the call requires it
   ALLOCATE(NumArray(NumNums))
-  NumArray = 0
+  NumArray = 0.0d0
   ! get the object
   CALL GetObjectItem(CurrentModuleObject,1,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
@@ -1999,17 +2002,17 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   END DO
 
   ! initialize the gathering arrays to zero
-  gatherTotalsBEPS   = 0.0
-  gatherTotalsBySourceBEPS   = 0.0
-  gatherTotalsSource = 0.0
-  gatherTotalsBySource = 0.0
-  gatherEndUseBEPS   = 0.0
-  gatherEndUseBySourceBEPS   = 0.0
+  gatherTotalsBEPS   = 0.0d0
+  gatherTotalsBySourceBEPS   = 0.0d0
+  gatherTotalsSource = 0.0d0
+  gatherTotalsBySource = 0.0d0
+  gatherEndUseBEPS   = 0.0d0
+  gatherEndUseBySourceBEPS   = 0.0d0
   ! End use subs must be dynamically allocated to accomodate the end use with the most subcategories
   ALLOCATE(gatherEndUseSubBEPS(numResourceTypes,numEndUses,MaxNumSubcategories))
-  gatherEndUseSubBEPS = 0.0
+  gatherEndUseSubBEPS = 0.0d0
   ALLOCATE(gatherDemandEndUseSub(numResourceTypes,numEndUses,MaxNumSubcategories))
-  gatherDemandEndUseSub = 0.0
+  gatherDemandEndUseSub = 0.0d0
 
   ! get meter numbers for other meters relating to electric load components
   meterNumPowerFuelFireGen =   GetMeterIndex('Cogeneration:ElectricityProduced')
@@ -2027,13 +2030,13 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   END IF
 
   ! initialize the gathering variables for the electric load components
-  gatherPowerFuelFireGen = 0
-  gatherPowerPV = 0
-  gatherPowerWind = 0
-  gatherPowerHTGeothermal = 0
-  gatherElecProduced = 0
-  gatherElecPurchased = 0
-  gatherElecSurplusSold = 0
+  gatherPowerFuelFireGen = 0.0d0
+  gatherPowerPV = 0.0d0
+  gatherPowerWind = 0.0d0
+  gatherPowerHTGeothermal = 0.0d0
+  gatherElecProduced = 0.0d0
+  gatherElecPurchased = 0.0d0
+  gatherElecSurplusSold = 0.0d0
 
   ! get meter numbers for onsite thermal components on BEPS report
   meterNumWaterHeatRecovery =    GetMeterIndex('HeatRecovery:EnergyTransfer')
@@ -2043,12 +2046,12 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   meterNumHeatSolarWater =       GetMeterIndex('SolarWater:Facility')
   meterNumHeatSolarAir =         GetMeterIndex('HeatProduced:SolarAir')
   ! initialize the gathering variables for onsite thermal components on BEPS report
-  gatherWaterHeatRecovery = 0
-  gatherAirHeatRecoveryCool = 0
-  gatherAirHeatRecoveryHeat = 0
-  gatherHeatHTGeothermal = 0
-  gatherHeatSolarWater = 0
-  gatherHeatSolarAir = 0
+  gatherWaterHeatRecovery = 0.0d0
+  gatherAirHeatRecoveryCool = 0.0d0
+  gatherAirHeatRecoveryHeat = 0.0d0
+  gatherHeatHTGeothermal = 0.0d0
+  gatherHeatSolarWater = 0.0d0
+  gatherHeatSolarAir = 0.0d0
 
   ! get meter numbers for water components on BEPS report
   meterNumRainWater =     GetMeterIndex('Rainwater:OnSiteWater')
@@ -2058,11 +2061,11 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   meterNumWaterEndUseTotal =   GetMeterIndex('Water:Facility')
 
   ! initialize the gathering variables for water components on BEPS report
-  gatherRainWater        = 0.0
-  gatherCondensate       = 0.0
-  gatherWellwater        = 0.0
-  gatherMains            = 0.0
-  gatherWaterEndUseTotal = 0.0
+  gatherRainWater        = 0.0d0
+  gatherCondensate       = 0.0d0
+  gatherWellwater        = 0.0d0
+  gatherMains            = 0.0d0
+  gatherWaterEndUseTotal = 0.0d0
 
 END IF
 END SUBROUTINE GetInputTabularPredefined
@@ -2121,7 +2124,7 @@ IF (NumTabularPredefined .EQ. 1) THEN
   AlphArray = ''
   ! don't really need the NumArray since not expecting any numbers but the call requires it
   ALLOCATE(NumArray(NumNums))
-  NumArray = 0
+  NumArray = 0.0d0
   ! get the object
   CALL GetObjectItem(CurrentModuleObject,1,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
@@ -2629,9 +2632,12 @@ IF (NamedMonthly(35)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Power','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Energy','',aggTypeHoursNonZero)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller Evaporator Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Evaporator Cooling Rate','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller Condenser Heat Transfer Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller COP','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller COP','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Part Load Ratio','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Part Load Ratio','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(36)%show) THEN
   curReport = AddMonthlyReport('TowerReportMonthly',2)
@@ -2654,6 +2660,8 @@ IF (NamedMonthly(37)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Boiler Outlet Temperature','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Boiler Mass Flow Rate','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Boiler Ancillary Electric Power','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Part Load Ratio','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Part Load Ratio','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(38)%show) THEN
   curReport = AddMonthlyReport('DXReportMonthly',2)
@@ -3460,8 +3468,8 @@ DO iStyle = 1, numStyles
                           'Entire Facility')) // '">Source Energy End Use Components Summary</a>'
     ENDIF
     IF (DoCostEstimate) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Construction Cost Estimate Summary', &
-                          'Entire Facility')) // '">Construction Cost Estimate Summary</a>'
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Component Cost Economics Summary', &
+                          'Entire Facility')) // '">Component Cost Economics Summary</a>'
     ENDIF
     IF (displayComponentSizing) THEN
       WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Component Sizing Summary', &
@@ -3618,7 +3626,7 @@ DO iInObj = 1, OutputTableBinnedCount
   curScheduleIndex = OutputTableBinned(iInObj)%scheduleIndex
   !if a schedule was used, check if it was non-zero value
   IF (curScheduleIndex .NE. 0) THEN
-    IF (GetCurrentScheduleValue(curScheduleIndex) .NE. 0) THEN
+    IF (GetCurrentScheduleValue(curScheduleIndex) .NE. 0.0d0) THEN
       gatherThisTime = .TRUE.
     ELSE
       gatherThisTime = .FALSE.
@@ -3786,9 +3794,9 @@ DO iTable = 1, MonthlyTablesCount
       oldTimeStamp = MonthlyColumns(curCol)%timeStamp(Month)
       oldDuration = MonthlyColumns(curCol)%duration(Month)
       ! Zero the revised values (as default if not set later in SELECT)
-      newResultValue = 0
+      newResultValue = 0.0d0
       newTimeStamp = 0
-      newDuration = 0
+      newDuration = 0.0d0
       activeNewValue = .FALSE.
       ! the current timestamp
       minuteCalculated = DetermineMinuteForReporting(IndexTypeKey)
@@ -4527,15 +4535,15 @@ REAL(r64),PARAMETER :: FracToMin=60.0d0
 INTEGER :: iZone = 0
 INTEGER :: iRadiant = 0
 INTEGER :: curZone = 0
-REAL(r64) :: eqpSens = 0.0
-REAL(r64) :: total = 0.0
+REAL(r64) :: eqpSens = 0.0d0
+REAL(r64) :: total = 0.0d0
 ! the following arrays store the radiant total for each timestep
 REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: radiantHeat
 REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: radiantCool
 INTEGER  :: timestepTimeStamp = 0
-REAL(r64) :: bldgHtPk = 0.0
-REAL(r64) :: bldgClPk = 0.0
-REAL(r64) :: timeStepRatio = 0.0
+REAL(r64) :: bldgHtPk = 0.0d0
+REAL(r64) :: bldgClPk = 0.0d0
+REAL(r64) :: timeStepRatio = 0.0d0
 LOGICAL, SAVE :: firstTime=.true.
 
 integer ActualTimeMin
@@ -4566,7 +4574,7 @@ DO iZone = 1, NumOfZones
   ZonePreDefRep(iZone)%SHGSAnLiteAdd =  ZonePreDefRep(iZone)%SHGSAnLiteAdd + ZnRpt(iZone)%LtsTotGain * timeStepRatio
   !HVAC Input Sensible Air Heating
   !HVAC Input Sensible Air Cooling
-  IF ((ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0.0) THEN
+  IF ((ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0.0d0) THEN
     ZonePreDefRep(iZone)%SHGSAnHvacHt =  ZonePreDefRep(iZone)%SHGSAnHvacHt +   &
        ZnAirRpt(iZone)%SumMCpDTsystem * TimeStepSys * SecInHour &
        + ZnAirRpt(iZone)%SumNonAirSystem * TimeStepSys * SecInHour
@@ -4577,7 +4585,7 @@ DO iZone = 1, NumOfZones
   END IF
   !Interzone Air Transfer Heat Addition
   !Interzone Air Transfer Heat Removal
-  IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0) THEN
+  IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0d0) THEN
     ZonePreDefRep(iZone)%SHGSAnIzaAdd =  ZonePreDefRep(iZone)%SHGSAnIzaAdd +   &
        ZnAirRpt(iZone)%SumMCpDTzones * TimeStepSys * SecInHour
   ELSE
@@ -4590,7 +4598,7 @@ DO iZone = 1, NumOfZones
   ZonePreDefRep(iZone)%SHGSAnWindRem = ZonePreDefRep(iZone)%SHGSAnWindRem - ZoneWinHeatLossRepEnergy(iZone) * timeStepRatio
   !Infiltration Heat Addition
   !Infiltration Heat Removal
-  IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0) THEN
+  IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0d0) THEN
     ZonePreDefRep(iZone)%SHGSAnInfilAdd = ZonePreDefRep(iZone)%SHGSAnInfilAdd +   &
        ZnAirRpt(iZone)%SumMCpDtInfil * TimeStepSys * SecInHour
   ELSE
@@ -4605,7 +4613,7 @@ DO iZone = 1, NumOfZones
      ZnRpt(iZone)%GasConGain + ZnRpt(iZone)%HWConGain + ZnRpt(iZone)%SteamConGain +   &
      ZnRpt(iZone)%OtherConGain) &
           * timeStepRatio
-  IF (eqpSens .GT. 0.0) THEN
+  IF (eqpSens .GT. 0.0d0) THEN
     ZonePreDefRep(iZone)%SHGSAnEquipAdd = ZonePreDefRep(iZone)%SHGSAnEquipAdd + eqpSens
   ELSE
     ZonePreDefRep(iZone)%SHGSAnEquipRem = ZonePreDefRep(iZone)%SHGSAnEquipRem + eqpSens
@@ -4690,7 +4698,7 @@ DO iZone = 1, NumOfZones
       !HVAC Input Sensible Air Heating
       !HVAC Input Sensible Air Cooling
       ZonePreDefRep(iZone)%SHGSHtHvacHt = ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem
-      ZonePreDefRep(iZone)%SHGSHtHvacCl = 0.0
+      ZonePreDefRep(iZone)%SHGSHtHvacCl = 0.0d0
       ! HVAC Input Heated Surface Heating
       ! HVAC Input Cooled Surface Cooling
       ZonePreDefRep(iZone)%SHGSHtSurfHt = radiantHeat(iZone)
@@ -4705,31 +4713,31 @@ DO iZone = 1, NumOfZones
                   + ZnRpt(iZone)%HWRadGainRate + ZnRpt(iZone)%SteamRadGainRate + ZnRpt(iZone)%OtherRadGainRate &
                   + ZnRpt(iZone)%ElecConGainRate + ZnRpt(iZone)%GasConGainRate + ZnRpt(iZone)%HWConGainRate &
                   + ZnRpt(iZone)%SteamConGainRate + ZnRpt(iZone)%OtherConGainRate
-      IF (eqpSens .GT. 0.0) THEN
+      IF (eqpSens .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSHtEquipAdd = eqpSens
-        ZonePreDefRep(iZone)%SHGSHtEquipRem = 0.0
+        ZonePreDefRep(iZone)%SHGSHtEquipRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSHtEquipAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSHtEquipAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSHtEquipRem = eqpSens
       END IF
       !Window Heat Addition
       !Window Heat Removal
       ZonePreDefRep(iZone)%SHGSHtWindAdd = ZoneWinHeatGainRep(iZone)
       ZonePreDefRep(iZone)%SHGSHtWindRem = -ZoneWinHeatLossRep(iZone)
-      IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0) THEN
+      IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSHtIzaAdd = ZnAirRpt(iZone)%SumMCpDTzones
-        ZonePreDefRep(iZone)%SHGSHtIzaRem = 0.0
+        ZonePreDefRep(iZone)%SHGSHtIzaRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSHtIzaAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSHtIzaAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSHtIzaRem = ZnAirRpt(iZone)%SumMCpDTzones
       ENDIF
       !Infiltration Heat Addition
       !Infiltration Heat Removal
-      IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0) THEN
+      IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSHtInfilAdd = ZnAirRpt(iZone)%SumMCpDtInfil
-        ZonePreDefRep(iZone)%SHGSHtInfilRem = 0.0
+        ZonePreDefRep(iZone)%SHGSHtInfilRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSHtInfilAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSHtInfilAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSHtInfilRem = ZnAirRpt(iZone)%SumMCpDtInfil
       ENDIF
       ! Opaque Surface Conduction and Other Heat Addition
@@ -4751,9 +4759,9 @@ DO iZone = 1, NumOfZones
       total = -total !want to know the negative value of the sum since the row should add up to zero
       IF (total .GT. 0) THEN
         ZonePreDefRep(iZone)%SHGSHtOtherAdd = total
-        ZonePreDefRep(iZone)%SHGSHtOtherRem = 0.0
+        ZonePreDefRep(iZone)%SHGSHtOtherRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSHtOtherAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSHtOtherAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSHtOtherRem = total
       ENDIF
     END IF
@@ -4771,7 +4779,7 @@ DO iZone = 1, NumOfZones
       ZonePreDefRep(iZone)%clPtTimeStamp = timestepTimeStamp
       !HVAC Input Sensible Air Heating
       !HVAC Input Sensible Air Cooling
-      ZonePreDefRep(iZone)%SHGSClHvacHt = 0.0
+      ZonePreDefRep(iZone)%SHGSClHvacHt = 0.0d0
       ZonePreDefRep(iZone)%SHGSClHvacCl = ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem
       ! HVAC Input Heated Surface Heating
       ! HVAC Input Cooled Surface Cooling
@@ -4787,31 +4795,31 @@ DO iZone = 1, NumOfZones
                   + ZnRpt(iZone)%HWRadGainRate + ZnRpt(iZone)%SteamRadGainRate + ZnRpt(iZone)%OtherRadGainRate &
                   + ZnRpt(iZone)%ElecConGainRate + ZnRpt(iZone)%GasConGainRate + ZnRpt(iZone)%HWConGainRate &
                   + ZnRpt(iZone)%SteamConGainRate + ZnRpt(iZone)%OtherConGainRate
-      IF (eqpSens .GT. 0.0) THEN
+      IF (eqpSens .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSClEquipAdd = eqpSens
-        ZonePreDefRep(iZone)%SHGSClEquipRem = 0.0
+        ZonePreDefRep(iZone)%SHGSClEquipRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSClEquipAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSClEquipAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSClEquipRem = eqpSens
       END IF
       !Window Heat Addition
       !Window Heat Removal
       ZonePreDefRep(iZone)%SHGSClWindAdd = ZoneWinHeatGainRep(iZone)
       ZonePreDefRep(iZone)%SHGSClWindRem = -ZoneWinHeatLossRep(iZone)
-      IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0) THEN
+      IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSClIzaAdd = ZnAirRpt(iZone)%SumMCpDTzones
-        ZonePreDefRep(iZone)%SHGSClIzaRem = 0.0
+        ZonePreDefRep(iZone)%SHGSClIzaRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSClIzaAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSClIzaAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSClIzaRem = ZnAirRpt(iZone)%SumMCpDTzones
       ENDIF
       !Infiltration Heat Addition
       !Infiltration Heat Removal
-      IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0) THEN
+      IF (ZnAirRpt(iZone)%SumMCpDtInfil .GT. 0.0d0) THEN
         ZonePreDefRep(iZone)%SHGSClInfilAdd = ZnAirRpt(iZone)%SumMCpDtInfil
-        ZonePreDefRep(iZone)%SHGSClInfilRem = 0.0
+        ZonePreDefRep(iZone)%SHGSClInfilRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSClInfilAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSClInfilAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSClInfilRem = ZnAirRpt(iZone)%SumMCpDtInfil
       ENDIF
       ! Opaque Surface Conduction and Other Heat Addition
@@ -4833,9 +4841,9 @@ DO iZone = 1, NumOfZones
       total = -total !want to know the negative value of the sum since the row should add up to zero
       IF (total .GT. 0) THEN
         ZonePreDefRep(iZone)%SHGSClOtherAdd = total
-        ZonePreDefRep(iZone)%SHGSClOtherRem = 0.0
+        ZonePreDefRep(iZone)%SHGSClOtherRem = 0.0d0
       ELSE
-        ZonePreDefRep(iZone)%SHGSClOtherAdd = 0.0
+        ZonePreDefRep(iZone)%SHGSClOtherAdd = 0.0d0
         ZonePreDefRep(iZone)%SHGSClOtherRem = total
       ENDIF
     END IF
@@ -4844,8 +4852,8 @@ END DO
 !------------------------------------
 ! BUILDING PEAK COOLING AND HEATING
 !------------------------------------
-bldgHtPk = 0.0
-bldgClPk = 0.0
+bldgHtPk = 0.0d0
+bldgClPk = 0.0d0
 DO iZone = 1, NumOfZones
   IF ((ZnAirRpt(iZone)%SumMCpDTsystem  + radiantHeat(iZone) + ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0) THEN
     bldgHtPk = bldgHtPk + ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone) + ZnAirRpt(iZone)%SumNonAirSystem
@@ -4864,22 +4872,22 @@ IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
   CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
   BuildingPreDefRep%htPtTimeStamp = timestepTimeStamp
   !reset building level results to zero prior to accumulating across zones
-  BuildingPreDefRep%SHGSHtHvacHt = 0.0
-  BuildingPreDefRep%SHGSHtHvacCl = 0.0
-  BuildingPreDefRep%SHGSHtSurfHt = 0.0
-  BuildingPreDefRep%SHGSHtSurfCl = 0.0
-  BuildingPreDefRep%SHGSHtPeoplAdd = 0.0
-  BuildingPreDefRep%SHGSHtLiteAdd = 0.0
-  BuildingPreDefRep%SHGSHtEquipAdd = 0.0
-  BuildingPreDefRep%SHGSHtWindAdd = 0.0
-  BuildingPreDefRep%SHGSHtIzaAdd = 0.0
-  BuildingPreDefRep%SHGSHtInfilAdd = 0.0
-  BuildingPreDefRep%SHGSHtOtherAdd = 0.0
-  BuildingPreDefRep%SHGSHtEquipRem = 0.0
-  BuildingPreDefRep%SHGSHtWindRem = 0.0
-  BuildingPreDefRep%SHGSHtIzaRem = 0.0
-  BuildingPreDefRep%SHGSHtInfilRem = 0.0
-  BuildingPreDefRep%SHGSHtOtherRem = 0.0
+  BuildingPreDefRep%SHGSHtHvacHt = 0.0d0
+  BuildingPreDefRep%SHGSHtHvacCl = 0.0d0
+  BuildingPreDefRep%SHGSHtSurfHt = 0.0d0
+  BuildingPreDefRep%SHGSHtSurfCl = 0.0d0
+  BuildingPreDefRep%SHGSHtPeoplAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtLiteAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtEquipAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtWindAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtIzaAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtInfilAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtOtherAdd = 0.0d0
+  BuildingPreDefRep%SHGSHtEquipRem = 0.0d0
+  BuildingPreDefRep%SHGSHtWindRem = 0.0d0
+  BuildingPreDefRep%SHGSHtIzaRem = 0.0d0
+  BuildingPreDefRep%SHGSHtInfilRem = 0.0d0
+  BuildingPreDefRep%SHGSHtOtherRem = 0.0d0
   DO iZone = 1, NumOfZones
     !HVAC Input Sensible Air Heating
     !HVAC Input Sensible Air Cooling
@@ -4899,7 +4907,7 @@ IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
                   + ZnRpt(iZone)%HWRadGainRate + ZnRpt(iZone)%SteamRadGainRate + ZnRpt(iZone)%OtherRadGainRate &
                   + ZnRpt(iZone)%ElecConGainRate + ZnRpt(iZone)%GasConGainRate + ZnRpt(iZone)%HWConGainRate &
                   + ZnRpt(iZone)%SteamConGainRate + ZnRpt(iZone)%OtherConGainRate
-    IF (eqpSens .GT. 0.0) THEN
+    IF (eqpSens .GT. 0.0d0) THEN
       BuildingPreDefRep%SHGSHtEquipAdd = BuildingPreDefRep%SHGSHtEquipAdd + eqpSens
     ELSE
       BuildingPreDefRep%SHGSHtEquipRem = BuildingPreDefRep%SHGSHtEquipRem + eqpSens
@@ -4908,7 +4916,7 @@ IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
     !Window Heat Removal
     BuildingPreDefRep%SHGSHtWindAdd = BuildingPreDefRep%SHGSHtWindAdd + ZoneWinHeatGainRep(iZone)
     BuildingPreDefRep%SHGSHtWindRem = BuildingPreDefRep%SHGSHtWindRem -ZoneWinHeatLossRep(iZone)
-    IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0) THEN
+    IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0d0) THEN
       BuildingPreDefRep%SHGSHtIzaAdd = BuildingPreDefRep%SHGSHtIzaAdd + ZnAirRpt(iZone)%SumMCpDTzones
     ELSE
       BuildingPreDefRep%SHGSHtIzaRem = BuildingPreDefRep%SHGSHtIzaRem + ZnAirRpt(iZone)%SumMCpDTzones
@@ -4955,22 +4963,22 @@ IF (bldgClPk .LT. BuildingPreDefRep%clPeak) THEN
   CALL EncodeMonDayHrMin(timestepTimeStamp,Month,DayOfMonth,HourOfDay,ActualTimeMin)
   BuildingPreDefRep%clPtTimeStamp = timestepTimeStamp
   !reset building level results to zero prior to accumulating across zones
-  BuildingPreDefRep%SHGSClHvacHt = 0.0
-  BuildingPreDefRep%SHGSClHvacCl = 0.0
-  BuildingPreDefRep%SHGSClSurfHt = 0.0
-  BuildingPreDefRep%SHGSClSurfCl = 0.0
-  BuildingPreDefRep%SHGSClPeoplAdd = 0.0
-  BuildingPreDefRep%SHGSClLiteAdd = 0.0
-  BuildingPreDefRep%SHGSClEquipAdd = 0.0
-  BuildingPreDefRep%SHGSClWindAdd = 0.0
-  BuildingPreDefRep%SHGSClIzaAdd = 0.0
-  BuildingPreDefRep%SHGSClInfilAdd = 0.0
-  BuildingPreDefRep%SHGSClOtherAdd = 0.0
-  BuildingPreDefRep%SHGSClEquipRem = 0.0
-  BuildingPreDefRep%SHGSClWindRem = 0.0
-  BuildingPreDefRep%SHGSClIzaRem = 0.0
-  BuildingPreDefRep%SHGSClInfilRem = 0.0
-  BuildingPreDefRep%SHGSClOtherRem = 0.0
+  BuildingPreDefRep%SHGSClHvacHt = 0.0d0
+  BuildingPreDefRep%SHGSClHvacCl = 0.0d0
+  BuildingPreDefRep%SHGSClSurfHt = 0.0d0
+  BuildingPreDefRep%SHGSClSurfCl = 0.0d0
+  BuildingPreDefRep%SHGSClPeoplAdd = 0.0d0
+  BuildingPreDefRep%SHGSClLiteAdd = 0.0d0
+  BuildingPreDefRep%SHGSClEquipAdd = 0.0d0
+  BuildingPreDefRep%SHGSClWindAdd = 0.0d0
+  BuildingPreDefRep%SHGSClIzaAdd = 0.0d0
+  BuildingPreDefRep%SHGSClInfilAdd = 0.0d0
+  BuildingPreDefRep%SHGSClOtherAdd = 0.0d0
+  BuildingPreDefRep%SHGSClEquipRem = 0.0d0
+  BuildingPreDefRep%SHGSClWindRem = 0.0d0
+  BuildingPreDefRep%SHGSClIzaRem = 0.0d0
+  BuildingPreDefRep%SHGSClInfilRem = 0.0d0
+  BuildingPreDefRep%SHGSClOtherRem = 0.0d0
   DO iZone = 1, NumOfZones
     !HVAC Input Sensible Air Heating
     !HVAC Input Sensible Air Cooling
@@ -4990,7 +4998,7 @@ IF (bldgClPk .LT. BuildingPreDefRep%clPeak) THEN
                   + ZnRpt(iZone)%HWRadGainRate + ZnRpt(iZone)%SteamRadGainRate + ZnRpt(iZone)%OtherRadGainRate &
                   + ZnRpt(iZone)%ElecConGainRate + ZnRpt(iZone)%GasConGainRate + ZnRpt(iZone)%HWConGainRate &
                   + ZnRpt(iZone)%SteamConGainRate + ZnRpt(iZone)%OtherConGainRate
-    IF (eqpSens .GT. 0.0) THEN
+    IF (eqpSens .GT. 0.0d0) THEN
       BuildingPreDefRep%SHGSClEquipAdd = BuildingPreDefRep%SHGSClEquipAdd + eqpSens
     ELSE
       BuildingPreDefRep%SHGSClEquipRem = BuildingPreDefRep%SHGSClEquipRem + eqpSens
@@ -4999,7 +5007,7 @@ IF (bldgClPk .LT. BuildingPreDefRep%clPeak) THEN
     !Window Heat Removal
     BuildingPreDefRep%SHGSClWindAdd = BuildingPreDefRep%SHGSClWindAdd + ZoneWinHeatGainRep(iZone)
     BuildingPreDefRep%SHGSClWindRem = BuildingPreDefRep%SHGSClWindRem - ZoneWinHeatLossRep(iZone)
-    IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0) THEN
+    IF (ZnAirRpt(iZone)%SumMCpDTzones .GT. 0.0d0) THEN
       BuildingPreDefRep%SHGSClIzaAdd = BuildingPreDefRep%SHGSClIzaAdd + ZnAirRpt(iZone)%SumMCpDTzones
     ELSE
       BuildingPreDefRep%SHGSClIzaRem = BuildingPreDefRep%SHGSClIzaRem + ZnAirRpt(iZone)%SumMCpDTzones
@@ -5329,7 +5337,7 @@ IF (fileExists) THEN
             CALL PreDefTableEntry(pdchWthrVal, trim(curNameWithSIUnits), lineIn(13:13+lnPtr-2))
           ENDIF
         else
-          CALL PreDefTableEntry(pdchWthrVal, 'Elevatopm', 'not found')
+          CALL PreDefTableEntry(pdchWthrVal, 'Elevation', 'not found')
         ENDIF
       CASE (StdPressureLine) ! Standard Pressure at Elevation -- 101265Pa
         CALL PreDefTableEntry(pdchWthrVal, 'Standard Pressure at Elevation', lineIn(35:))
@@ -5342,7 +5350,11 @@ IF (fileExists) THEN
         IF (ashPtr .GT. 0) THEN
           isASHRAE = .TRUE.
           iscalc = .true.
-          ashDesYear=lineIn(ashPtr-5:ashPtr-1)
+          IF (ashPtr > 5) THEN !Objexx:BoundsViolation IF block added to protect against ashPtr<=5
+             ashDesYear=lineIn(ashPtr-5:ashPtr-1)
+          ELSE
+             ashDesYear=''
+          ENDIF
           CALL PreDefTableEntry(pdchWthrVal, 'Weather File Design Conditions ', 'Climate Design Data '//  &
              ashDesYear//'ASHRAE Handbook')
         ELSEIF (INDEX(lineIn,'not calculated') > 0 .or. lineIn == ' ') THEN
@@ -5829,37 +5841,37 @@ INTEGER :: iLight
 INTEGER :: zonePt
 INTEGER :: iZone
 INTEGER :: jPeople
-REAL(r64) :: totalVolume = 0.0
+REAL(r64) :: totalVolume = 0.0d0
 INTEGER :: numUncondZones = 0
 INTEGER :: numCondZones = 0
 INTEGER :: StartOfWeek
-REAL(r64) :: HrsPerWeek = 0.0
+REAL(r64) :: HrsPerWeek = 0.0d0
 REAL(r64) :: consumptionTotal
 REAL(r64) :: convertJtoGJ
 ! sensible heat gain report totals
-REAL(r64) :: totalHvacHt = 0.0
-REAL(r64) :: totalHvacCl = 0.0
-REAL(r64) :: totalSurfHt = 0.0
-REAL(r64) :: totalSurfCl = 0.0
-REAL(r64) :: totalPeoplAdd = 0.0
-REAL(r64) :: totalLiteAdd = 0.0
-REAL(r64) :: totalEquipAdd = 0.0
-REAL(r64) :: totalWindAdd = 0.0
-REAL(r64) :: totalIzaAdd = 0.0
-REAL(r64) :: totalInfilAdd = 0.0
-REAL(r64) :: totalOtherAdd = 0.0
-REAL(r64) :: totalEquipRem = 0.0
-REAL(r64) :: totalWindRem = 0.0
-REAL(r64) :: totalIzaRem = 0.0
-REAL(r64) :: totalInfilRem = 0.0
-REAL(r64) :: totalOtherRem = 0.0
+REAL(r64) :: totalHvacHt = 0.0d0
+REAL(r64) :: totalHvacCl = 0.0d0
+REAL(r64) :: totalSurfHt = 0.0d0
+REAL(r64) :: totalSurfCl = 0.0d0
+REAL(r64) :: totalPeoplAdd = 0.0d0
+REAL(r64) :: totalLiteAdd = 0.0d0
+REAL(r64) :: totalEquipAdd = 0.0d0
+REAL(r64) :: totalWindAdd = 0.0d0
+REAL(r64) :: totalIzaAdd = 0.0d0
+REAL(r64) :: totalInfilAdd = 0.0d0
+REAL(r64) :: totalOtherAdd = 0.0d0
+REAL(r64) :: totalEquipRem = 0.0d0
+REAL(r64) :: totalWindRem = 0.0d0
+REAL(r64) :: totalIzaRem = 0.0d0
+REAL(r64) :: totalInfilRem = 0.0d0
+REAL(r64) :: totalOtherRem = 0.0d0
 
 convertJtoGJ = 1.0d0/1000000000.0d0
 StartOfWeek = RunPeriodStartDayOfWeek
 IF (StartOfWeek .EQ. 0) StartOfWeek = 2 !if the first day of the week has not been set yet, assume monday
 
 !Interior Connected Lighting Power
-consumptionTotal = 0.0
+consumptionTotal = 0.0d0
 DO iLight = 1, TotLights
   zonePt = Lights(iLight)%ZonePtr
   IF (Zone(zonePt)%SystemZoneNodeNumber .GT. 0) THEN                                           !conditioned y/n
@@ -5885,7 +5897,7 @@ END DO
 CALL PreDefTableEntry(pdchInLtConsump,'Interior Lighting Total',consumptionTotal)
 
 !Exterior Lighting
-consumptionTotal = 0.0
+consumptionTotal = 0.0d0
 DO iLight = 1, NumExteriorLights
   IF (ExteriorLights(iLight)%ControlMode .EQ. 1) THEN                          !photocell/schedule
     CALL PreDefTableEntry(pdchExLtAvgHrSchd,ExteriorLights(iLight)%Name,ScheduleAverageHoursPerWeek( &
@@ -6197,7 +6209,7 @@ INTEGER    :: curTable
 INTEGER    :: curCol
 REAL(r64)  :: curVal
 REAL(r64)  :: curConversionFactor
-REAL(r64)  :: curConversionOffset = 0
+REAL(r64)  :: curConversionOffset = 0.0d0
 INTEGER    :: columnUsedCount
 INTEGER    :: columnRecount
 INTEGER    :: digitsShown
@@ -6248,7 +6260,7 @@ verySmall = -1.0D280
 SELECT CASE (unitsStyle)
   CASE (unitsStyleNone)
     energyUnitsString = 'J  '
-    energyUnitsConversionFactor = 1
+    energyUnitsConversionFactor = 1.0d0
   CASE (unitsStyleJtoKWH)
     energyUnitsString = 'kWh'
     energyUnitsConversionFactor = 1.0d0/3600000.0d0
@@ -6307,11 +6319,11 @@ DO iInput = 1, MonthlyInputCount
         IF (sameString(MonthlyColumns(curCol)%units,'J')) THEN
           curUnits = energyUnitsString
           curConversionFactor = energyUnitsConversionFactor
-          curConversionOffset = 0
+          curConversionOffset = 0.0d0
         ELSE !if not joules don't perform conversion
           curUnits = MonthlyColumns(curCol)%units
-          curConversionFactor = 1.0
-          curConversionOffset = 0
+          curConversionFactor = 1.0d0
+          curConversionOffset = 0.0d0
         END IF
       END IF
       SELECT CASE (MonthlyColumns(curCol)%aggType)
@@ -6320,8 +6332,8 @@ DO iInput = 1, MonthlyInputCount
           ! put in the name of the variable for the column
           columnHead(columnRecount) = TRIM(MonthlyColumns(curCol)%varName) // TRIM(curAggString) // &
                                       ' [' // TRIM(curUnits)  // ']'
-          sumVal = 0
-          sumDuration = 0
+          sumVal = 0.0d0
+          sumDuration = 0.0d0
           maxVal = -HUGE(maxVal)
           minVal = HUGE(maxVal)
           DO lMonth = 1, 12
@@ -6330,7 +6342,7 @@ DO iInput = 1, MonthlyInputCount
                 curVal = ((MonthlyColumns(curCol)%reslt(lMonth) / MonthlyColumns(curCol)%duration(lMonth)) &
                          * curConversionFactor) + curConversionOffset
               ELSE
-                curVal = 0
+                curVal = 0.0d0
               END IF
               sumVal = sumVal + (MonthlyColumns(curCol)%reslt(lMonth) * curConversionFactor) + curConversionOffset
               sumDuration = sumDuration + MonthlyColumns(curCol)%duration(lMonth)
@@ -6369,7 +6381,7 @@ DO iInput = 1, MonthlyInputCount
           columnRecount = columnRecount + 1
           ! put in the name of the variable for the column
           columnHead(columnRecount) = TRIM(MonthlyColumns(curCol)%varName) // TRIM(curAggString) // ' [HOURS]'
-          sumVal = 0
+          sumVal = 0.0d0
           maxVal = -HUGE(maxVal)
           minVal = HUGE(maxVal)
           DO lMonth = 1, 12
@@ -6524,11 +6536,12 @@ DO iInput = 1, MonthlyInputCount
       END SELECT
     END DO !KColumn
     CALL WriteReportHeaders(MonthlyInput(iInput)%name,MonthlyTables(curTable)%keyValue,isAverage)
+    CALL WriteSubtitle("Custom Monthly Report")
     CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.TRUE.) !transpose monthly XML tables.
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         MonthlyInput(iInput)%name,&
                                         MonthlyTables(curTable)%keyValue,&
-                                        '')
+                                        'Custom Monthly Report')
     DEALLOCATE (columnHead)
     DEALLOCATE (columnWidth)
     DEALLOCATE (tableBody)
@@ -6693,7 +6706,7 @@ DO iInObj = 1 , OutputTableBinnedCount
     IF (OutputTableBinned(iInObj)%scheduleIndex == 0) THEN
       repNameWithUnitsandscheduleName = curNameAndUnits
     ELSE
-      repNameWithUnitsandscheduleName = curNameAndUnits // &
+      repNameWithUnitsandscheduleName = TRIM(curNameAndUnits) // &
                                ' [' // TRIM(OutputTableBinned(iInObj)%ScheduleName) // ']'
     ENDIF
     CALL WriteReportHeaders(repNameWithUnitsandscheduleName, BinObjVarID(repIndex)%namesOfObj, OutputTableBinned(iInObj)%avgSum)
@@ -6708,7 +6721,7 @@ DO iInObj = 1 , OutputTableBinnedCount
       END DO
       tableBody(14+kHour, nCol+2) = TRIM(RealToStr(rowTotal,2))
     END DO
-    tableTotal = 0
+    tableTotal = 0.0d0
     DO kMonth = 1, 12
       tableBody(2+kMonth,1) = RealToStr(BinResultsBelow(repIndex)%mnth(kMonth),2)
       tableBody(2+kMonth,curIntervalCount+2) = RealToStr(BinResultsAbove(repIndex)%mnth(kMonth),2)
@@ -6723,14 +6736,14 @@ DO iInObj = 1 , OutputTableBinnedCount
     END DO
     ! compute total row
     DO nCol = 1, curIntervalCount
-      colTotal=0
+      colTotal=0.0d0
       DO kMonth = 1, 12
         colTotal = colTotal + BinResults(repIndex,nCol)%mnth(kMonth)
       END DO
       tableBody(39,nCol+1) = TRIM(RealToStr(colTotal,2))
     END DO
-    aboveTotal = 0
-    belowTotal = 0
+    aboveTotal = 0.0d0
+    belowTotal = 0.0d0
     DO kMonth = 1, 12
       aboveTotal = aboveTotal + BinResultsAbove(repIndex)%mnth(kMonth)
       belowTotal = belowTotal + BinResultsBelow(repIndex)%mnth(kMonth)
@@ -6740,11 +6753,12 @@ DO iInObj = 1 , OutputTableBinnedCount
     tableBody(39,curIntervalCount+3) = TRIM(RealToStr(tableTotal,2))
     CALL writeTextLine('Values in table are in hours.')
     CALL writeTextLine(' ')
+    CALL WriteSubtitle("Time Bin Results")
     CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.TRUE.) !transpose XML tables
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         repNameWithUnitsandscheduleName,&
                                         BinObjVarID(repIndex)%namesOfObj,&
-                                        '')
+                                        'Time Bin Results')
     !create statistics table
     rowHeadStat(1) = 'Minimum'
     rowHeadStat(2) = 'Mean minus two standard deviations'
@@ -6761,12 +6775,12 @@ DO iInObj = 1 , OutputTableBinnedCount
         repStDev = SQRT((BinStatistics(repIndex)%sum2 - ((BinStatistics(repIndex)%sum ** 2)/BinStatistics(repIndex)%n)) &
                    / (BinStatistics(repIndex)%n - 1))
       ELSE
-        repStDev = 0
+        repStDev = 0.0d0
       END IF
       repMean = BinStatistics(repIndex)%sum / BinStatistics(repIndex)%n
     ELSE
-      repStDev = 0
-      repMean = 0
+      repStDev = 0.0d0
+      repMean = 0.0d0
     END IF
     IF (unitsStyle .EQ. unitsStyleInchPound) THEN
       tableBodyStat(1,1) = RealToStr(ConvertIP(indexUnitConv,BinStatistics(repIndex)%minimum),2)
@@ -6918,25 +6932,25 @@ REAL(r64),DIMENSION(6)                         :: leedIndProc
 REAL(r64),DIMENSION(6)                         :: leedElevEsc
 CHARACTER(len=MaxNameLength)                   :: subCatName
 REAL(r64)                                      :: nonMisc
-REAL(r64)                                      :: leedSiteIntLite = 0.0
-REAL(r64)                                      :: leedSiteSpHeat = 0.0
-REAL(r64)                                      :: leedSiteSpCool = 0.0
-REAL(r64)                                      :: leedSiteFanInt = 0.0
-REAL(r64)                                      :: leedSiteSrvWatr = 0.0
-REAL(r64)                                      :: leedSiteRecept = 0.0
-REAL(r64)                                      :: leedSiteMisc = 0.0
-REAL(r64)                                      :: leedSiteTotal = 0.0
+REAL(r64)                                      :: leedSiteIntLite = 0.0d0
+REAL(r64)                                      :: leedSiteSpHeat = 0.0d0
+REAL(r64)                                      :: leedSiteSpCool = 0.0d0
+REAL(r64)                                      :: leedSiteFanInt = 0.0d0
+REAL(r64)                                      :: leedSiteSrvWatr = 0.0d0
+REAL(r64)                                      :: leedSiteRecept = 0.0d0
+REAL(r64)                                      :: leedSiteMisc = 0.0d0
+REAL(r64)                                      :: leedSiteTotal = 0.0d0
 REAL(r64)                                      :: unconvert
 
 IF (displayTabularBEPS) THEN
   ! show the headers of the report
   CALL WriteReportHeaders('Annual Building Utility Performance Summary','Entire Facility',isAverage)
   ! show the number of hours that the table applies to
-  CALL writeSubtitle('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours')
-  IF (gatherElapsedTimeBEPS .LT. 8759.0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
-    CALL writeSubtitle('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.')
+  CALL writeTextLine('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours',.TRUE.)
+  IF (gatherElapsedTimeBEPS .LT. 8759.0d0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
+    CALL writeTextLine('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.',.TRUE.)
   END IF
-  CALL writeSubtitle('')
+  CALL writeTextLine('',.TRUE.)
   ! determine building floor areas
   CALL DetermineBuildingFloorArea
   ! collapse the gatherEndUseBEPS array to the resource groups displayed
@@ -6995,19 +7009,19 @@ IF (displayTabularBEPS) THEN
   SELECT CASE (unitsStyle)
     CASE (unitsStyleJtoKWH)
       largeConversionFactor = 3600000.d0
-      kConversionFactor = 1
-      waterConversionFactor = 1
-      areaConversionFactor = 1
+      kConversionFactor = 1.0d0
+      waterConversionFactor = 1.0d0
+      areaConversionFactor = 1.0d0
     CASE (unitsStyleInchPound)
       largeConversionFactor =  getSpecificUnitDivider('J','kBtu')    !1054351.84 J to kBtu
-      kConversionFactor = 1
+      kConversionFactor = 1.0d0
       waterConversionFactor = getSpecificUnitDivider('m3','gal')     !0.003785413 m3 to gal
       areaConversionFactor = getSpecificUnitDivider('m2','ft2')      !0.092893973 m2 to ft2
     CASE DEFAULT
       largeConversionFactor = 1000000000.d0
-      kConversionFactor =  1000
-      waterConversionFactor = 1
-      areaConversionFactor = 1
+      kConversionFactor =  1000.0d0
+      waterConversionFactor = 1.0d0
+      areaConversionFactor = 1.0d0
   END SELECT
 
   ! convert floor areas
@@ -7052,7 +7066,7 @@ IF (displayTabularBEPS) THEN
   ENDIF
   ! determine which resource is the primary heating resourse
   resourcePrimaryHeating = 0
-  heatingMaximum = 0
+  heatingMaximum = 0.0d0
   DO iResource = 1, 5 !don't do water
     IF (collapsedEndUse(endUseHeating, iResource) .GT. heatingMaximum) THEN
       heatingMaximum = collapsedEndUse(endUseHeating, iResource)
@@ -7130,12 +7144,12 @@ IF (displayTabularBEPS) THEN
                 + gatherTotalsBEPS(14) & !otherfuel2
                                       ) / largeConversionFactor
 
-  IF (efficiencyDistrictCooling .EQ. 0)  efficiencyDistrictCooling = 1
-  IF (efficiencyDistrictHeating .EQ. 0)  efficiencyDistrictHeating = 1
+  IF (efficiencyDistrictCooling .EQ. 0)  efficiencyDistrictCooling = 1.0d0
+  IF (efficiencyDistrictHeating .EQ. 0)  efficiencyDistrictHeating = 1.0d0
 
 
   ! source emissions already have the source factors included in the calcs.
-  TotalSourceEnergyUse=0.0
+  TotalSourceEnergyUse=0.0d0
   !  electricity
   if (fuelfactorsused(1)) then
     TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsSource(1)
@@ -7213,7 +7227,7 @@ IF (displayTabularBEPS) THEN
     netSourceElecPurchasedSold = netElecPurchasedSold*sourceFactorElectric*largeConversionFactor  ! back to J
   endif
 
-  netSourceEnergyUse=0.0
+  netSourceEnergyUse=0.0d0
   !  natural gas
   if (fuelfactorsused(2)) then
     netSourceEnergyUse=netSourceEnergyUse+gatherTotalsSource(2)
@@ -7586,12 +7600,12 @@ IF (displayTabularBEPS) THEN
   END DO
   !complete the LEED end use table using the same values
   ! for certain rows in the LEED table the subcategories are necessary so first compute those values
-  leedFansParkFromFan = 0.0
-  leedFansParkFromExtFuelEquip = 0.0
-  leedIntLightProc = 0.0
-  leedCook = 0.0
-  leedIndProc = 0.0
-  leedElevEsc = 0.0
+  leedFansParkFromFan = 0.0d0
+  leedFansParkFromExtFuelEquip = 0.0d0
+  leedIntLightProc = 0.0d0
+  leedCook = 0.0d0
+  leedIndProc = 0.0d0
+  leedElevEsc = 0.0d0
 
   DO iResource = 1, 5    ! don't bother with water
     DO jEndUse = 1, NumEndUses
@@ -7666,7 +7680,7 @@ IF (displayTabularBEPS) THEN
     processFraction = (useVal(5,colElectricity) + useVal(13,colElectricity))/useVal(15,colElectricity)
     processElecCost = LEEDelecCostTotal * processFraction
   ELSE
-    processElecCost = 0
+    processElecCost = 0.0d0
   END IF
   CALL PreDefTableEntry(pdchLeedEcsProc,'Electricity',processElecCost,2)
   CALL addFootNoteSubTable(pdstLeedEneCostSum,'Process energy cost based on ratio of process to total energy.')
@@ -7703,7 +7717,7 @@ IF (displayTabularBEPS) THEN
     processFraction = (useVal(5,colGas) + useVal(13,colGas))/useVal(15,colGas)
     processGasCost = LEEDgasCostTotal * processFraction
   ELSE
-    processGasCost = 0
+    processGasCost = 0.0d0
   END IF
   CALL PreDefTableEntry(pdchLeedEcsProc,'Natural Gas',processGasCost,2)
 
@@ -7756,25 +7770,25 @@ IF (displayTabularBEPS) THEN
   CALL PreDefTableEntry(pdchLeedEusProc,'Additional',unconvert * (useVal(5,colAdditionalFuel) + useVal(13,colAdditionalFuel) &
                                                              + useVal(5,colPurchCool) + useVal(13,colPurchCool) &
                                                              + useVal(5,colPurchHeat) + useVal(13,colPurchHeat)) ,2)
-  IF ((useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat)) .GT. 0.001) THEN
+  IF ((useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat)) .GT. 0.001d0) THEN
               processFraction = (useVal(5,colAdditionalFuel) + useVal(13,colAdditionalFuel) &
                               + useVal(5,colPurchCool) + useVal(13,colPurchCool) &
                               + useVal(5,colPurchHeat) + useVal(13,colPurchHeat))&
                               /(useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat))
   ELSE
-     processFraction = 0.0
+     processFraction = 0.0d0
   END IF
   processOthrCost = LEEDothrCostTotal * processFraction
   CALL PreDefTableEntry(pdchLeedEcsProc,'Additional',processOthrCost,2)
   CALL PreDefTableEntry(pdchLeedEcsProc,'Total',processElecCost + processGasCost + processOthrCost,2)
   ! accumulate for percentage table
-  leedSiteIntLite = 0
-  leedSiteSpHeat = 0
-  leedSiteSpCool = 0
-  leedSiteFanInt = 0
-  leedSiteSrvWatr = 0
-  leedSiteRecept = 0
-  leedSiteTotal  = 0
+  leedSiteIntLite = 0.0d0
+  leedSiteSpHeat = 0.0d0
+  leedSiteSpCool = 0.0d0
+  leedSiteFanInt = 0.0d0
+  leedSiteSrvWatr = 0.0d0
+  leedSiteRecept = 0.0d0
+  leedSiteTotal  = 0.0d0
   DO iResource = 1, 5    ! don't bother with water
     leedSiteIntLite = leedSiteIntLite + useVal(3,iResource) - leedIntLightProc(iResource)
     leedSiteSpHeat = leedSiteSpHeat + useVal(1,iResource)
@@ -7849,13 +7863,13 @@ IF (displayTabularBEPS) THEN
             - collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
         END DO
         !if just a small value remains set it to zero
-        IF (ABS(endUseSubOther(jEndUse,iResource)) .GT. 0.01) THEN
+        IF (ABS(endUseSubOther(jEndUse,iResource)) .GT. 0.01d0) THEN
           needOtherRow(jEndUse) = .TRUE.
         ELSE
-          endUseSubOther(jEndUse,iResource) = 0
+          endUseSubOther(jEndUse,iResource) = 0.0d0
         END IF
       ELSE
-        endUseSubOther(jEndUse,iResource) = 0
+        endUseSubOther(jEndUse,iResource) = 0.0d0
       END IF
     END DO
   END DO
@@ -8027,7 +8041,7 @@ IF (displayTabularBEPS) THEN
       columnHead(6) = 'Water Intensity [m3/m2]'
   END SELECT
 
-  CALL writeSubtitle('Normalized Metrics')
+  CALL writeTextLine('Normalized Metrics',.TRUE.)
 
   ! write the conditioned area based table
   tableBody = ''
@@ -8122,16 +8136,16 @@ IF (displayTabularBEPS) THEN
 
   ! show annual percentages
   IF (collapsedTotal(1) .GT. 0) THEN
-    tableBody(1,2)  = TRIM(RealToStr(100. * gatherPowerFuelFireGen / collapsedTotal(1),2))
-    tableBody(2,2)  = TRIM(RealToStr(100. * gatherPowerHTGeothermal / collapsedTotal(1),2))
-    tableBody(3,2)  = TRIM(RealToStr(100. * gatherPowerPV / collapsedTotal(1),2))
-    tableBody(4,2)  = TRIM(RealToStr(100. * gatherPowerWind / collapsedTotal(1),2))
-    tableBody(5,2)  = TRIM(RealToStr(100. * OverallNetEnergyFromStorage / collapsedTotal(1),2))
-    tableBody(6,2)  = TRIM(RealToStr(100. * gatherElecProduced / collapsedTotal(1),2))
-    tableBody(8,2)  = TRIM(RealToStr(100. * gatherElecPurchased / collapsedTotal(1),2))
-    tableBody(9,2)  = TRIM(RealToStr(100. * gatherElecSurplusSold / collapsedTotal(1),2))
-    tableBody(10,2)  = TRIM(RealToStr(100. * (gatherElecPurchased - gatherElecSurplusSold) / collapsedTotal(1),2))
-    tableBody(12,2) = TRIM(RealToStr(100. * (gatherElecProduced + (gatherElecPurchased - gatherElecSurplusSold)) /   &
+    tableBody(1,2)  = TRIM(RealToStr(100.0d0 * gatherPowerFuelFireGen / collapsedTotal(1),2))
+    tableBody(2,2)  = TRIM(RealToStr(100.0d0 * gatherPowerHTGeothermal / collapsedTotal(1),2))
+    tableBody(3,2)  = TRIM(RealToStr(100.0d0 * gatherPowerPV / collapsedTotal(1),2))
+    tableBody(4,2)  = TRIM(RealToStr(100.0d0 * gatherPowerWind / collapsedTotal(1),2))
+    tableBody(5,2)  = TRIM(RealToStr(100.0d0 * OverallNetEnergyFromStorage / collapsedTotal(1),2))
+    tableBody(6,2)  = TRIM(RealToStr(100.0d0 * gatherElecProduced / collapsedTotal(1),2))
+    tableBody(8,2)  = TRIM(RealToStr(100.0d0 * gatherElecPurchased / collapsedTotal(1),2))
+    tableBody(9,2)  = TRIM(RealToStr(100.0d0 * gatherElecSurplusSold / collapsedTotal(1),2))
+    tableBody(10,2) = TRIM(RealToStr(100.0d0 * (gatherElecPurchased - gatherElecSurplusSold) / collapsedTotal(1),2))
+    tableBody(12,2) = TRIM(RealToStr(100.0d0 * (gatherElecProduced + (gatherElecPurchased - gatherElecSurplusSold)) /   &
                                                collapsedTotal(1),2))
     tableBody(13,2) = TRIM(RealToStr(100.0d0,2))
   END IF
@@ -8206,12 +8220,12 @@ IF (displayTabularBEPS) THEN
   tableBody(7,1)  = TRIM(RealToStr(totalOnsiteHeat,2))
 
   IF (totalOnsiteHeat .GT. 0) THEN
-    tableBody(1,2)  = TRIM(RealToStr(100. * gatherWaterHeatRecovery / totalOnsiteHeat,2))
-    tableBody(2,2)  = TRIM(RealToStr(100. * gatherAirHeatRecoveryCool / totalOnsiteHeat,2))
-    tableBody(3,2)  = TRIM(RealToStr(100. * gatherAirHeatRecoveryHeat / totalOnsiteHeat,2))
-    tableBody(4,2)  = TRIM(RealToStr(100. * gatherHeatHTGeothermal / totalOnsiteHeat,2))
-    tableBody(5,2)  = TRIM(RealToStr(100. * gatherHeatSolarWater / totalOnsiteHeat,2))
-    tableBody(6,2)  = TRIM(RealToStr(100. * gatherHeatSolarAir / totalOnsiteHeat,2))
+    tableBody(1,2)  = TRIM(RealToStr(100.0d0 * gatherWaterHeatRecovery / totalOnsiteHeat,2))
+    tableBody(2,2)  = TRIM(RealToStr(100.0d0 * gatherAirHeatRecoveryCool / totalOnsiteHeat,2))
+    tableBody(3,2)  = TRIM(RealToStr(100.0d0 * gatherAirHeatRecoveryHeat / totalOnsiteHeat,2))
+    tableBody(4,2)  = TRIM(RealToStr(100.0d0 * gatherHeatHTGeothermal / totalOnsiteHeat,2))
+    tableBody(5,2)  = TRIM(RealToStr(100.0d0 * gatherHeatSolarWater / totalOnsiteHeat,2))
+    tableBody(6,2)  = TRIM(RealToStr(100.0d0 * gatherHeatSolarAir / totalOnsiteHeat,2))
     tableBody(7,2)  = TRIM(RealToStr(100.0d0,2))
   END IF
 
@@ -8288,9 +8302,9 @@ IF (displayTabularBEPS) THEN
     finalStorage    = SUM(WaterSTorage%ThisTimeStepVolume)
     StorageChange   = initialStorage-finalStorage
   else
-    initialStorage  = 0.0
-    finalStorage    = 0.0
-    StorageChange   = 0.0
+    initialStorage  = 0.0d0
+    finalStorage    = 0.0d0
+    StorageChange   = 0.0d0
   endif
   tableBody(6,1)  = TRIM(RealToStr(initialStorage / waterConversionFactor,2))
   tableBody(7,1)  = TRIM(RealToStr(finalStorage / waterConversionFactor,2))
@@ -8304,17 +8318,17 @@ IF (displayTabularBEPS) THEN
 !
 
   IF (gatherWaterEndUseTotal .GT. 0) THEN
-    tableBody(1,2)  = TRIM(RealToStr(100. * gatherRainWater / gatherWaterEndUseTotal,2))
-    tableBody(2,2)  = TRIM(RealToStr(100. * gatherCondensate / gatherWaterEndUseTotal,2))
-    tableBody(3,2)  = TRIM(RealToStr(100. * gatherWellwater / gatherWaterEndUseTotal,2))
-    tableBody(4,2)  = TRIM(RealToStr(100. * totalOnsiteWater / gatherWaterEndUseTotal,2))
-    tableBody(6,2)  = TRIM(RealToStr(100. * initialStorage/ gatherWaterEndUseTotal,2))
-    tableBody(7,2)  = TRIM(RealToStr(100. * finalStorage / gatherWaterEndUseTotal,2))
-    tableBody(8,2)  = TRIM(RealToStr(100. * StorageChange/ gatherWaterEndUseTotal,2))
+    tableBody(1,2)  = TRIM(RealToStr(100.0d0 * gatherRainWater / gatherWaterEndUseTotal,2))
+    tableBody(2,2)  = TRIM(RealToStr(100.0d0 * gatherCondensate / gatherWaterEndUseTotal,2))
+    tableBody(3,2)  = TRIM(RealToStr(100.0d0 * gatherWellwater / gatherWaterEndUseTotal,2))
+    tableBody(4,2)  = TRIM(RealToStr(100.0d0 * totalOnsiteWater / gatherWaterEndUseTotal,2))
+    tableBody(6,2)  = TRIM(RealToStr(100.0d0 * initialStorage/ gatherWaterEndUseTotal,2))
+    tableBody(7,2)  = TRIM(RealToStr(100.0d0 * finalStorage / gatherWaterEndUseTotal,2))
+    tableBody(8,2)  = TRIM(RealToStr(100.0d0 * StorageChange/ gatherWaterEndUseTotal,2))
 
-    tableBody(10,2)  = TRIM(RealToStr(100. * gatherMains / gatherWaterEndUseTotal,2))
+    tableBody(10,2)  = TRIM(RealToStr(100.0d0 * gatherMains / gatherWaterEndUseTotal,2))
 
-    tableBody(12,2)  = TRIM(RealToStr(100. * totalWater / gatherWaterEndUseTotal,2))
+    tableBody(12,2)  = TRIM(RealToStr(100.0d0 * totalWater / gatherWaterEndUseTotal,2))
     tableBody(13,2)  = TRIM(RealToStr(100.0d0,2))
   END IF
 !
@@ -8342,7 +8356,7 @@ IF (displayTabularBEPS) THEN
   columnWidth = 14 !array assignment - same for all columns
   ALLOCATE(tableBody(2,1))
 
-  CALL writeSubtitle('Comfort and Setpoint Not Met Summary')
+  CALL writeSubtitle('Setpoint Not Met Criteria')
 
   curNameWithSIUnits = 'Degrees [deltaC]'
   curNameAndUnits = curNameWithSIUnits
@@ -8363,6 +8377,10 @@ IF (displayTabularBEPS) THEN
   ENDIF
 
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+  CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                      'AnnualBuildingUtilityPerformanceSummary',&
+                                      'Entire Facility',&
+                                      'Setpoint Not Met Criteria')
 
   DEALLOCATE(columnHead)
   DEALLOCATE(rowHead)
@@ -8374,6 +8392,8 @@ IF (displayTabularBEPS) THEN
   ALLOCATE(columnWidth(1))
   columnWidth = 14 !array assignment - same for all columns
   ALLOCATE(tableBody(3,1))
+
+  CALL writeSubtitle('Comfort and Setpoint Not Met Summary')
 
   columnHead(1) = 'Facility [Hours]'
 
@@ -8410,9 +8430,9 @@ IF (displayTabularBEPS) THEN
   !
   !---- End Notes
   !
-  CALL writeSubtitle('Note 1: An asterisk (*) indicates that the feature is not yet implemented.')
-  !CALL writeSubtitle('Note 2: The source energy conversion factors used are: ')
-  !CALL writeSubtitle('        1.05 for all fuels, 1 for district, and 3 for electricity.')
+  CALL writeTextLine('Note 1: An asterisk (*) indicates that the feature is not yet implemented.')
+  !CALL writeTextLine('Note 2: The source energy conversion factors used are: ')
+  !CALL writeTextLine('        1.05 for all fuels, 1 for district, and 3 for electricity.')
 END IF
 END SUBROUTINE WriteBEPSTable
 
@@ -8483,11 +8503,11 @@ IF (displaySourceEnergyEndUseSummary) THEN
   ! show the headers of the report
   CALL WriteReportHeaders('Source Energy End Use Components Summary','Entire Facility',isAverage)
   ! show the number of hours that the table applies to
-  CALL writeSubtitle('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours')
-  IF (gatherElapsedTimeBEPS .LT. 8759.0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
-    CALL writeSubtitle('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.')
+  CALL writeTextLine('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours',.TRUE.)
+  IF (gatherElapsedTimeBEPS .LT. 8759.0d0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
+    CALL writeTextLine('WARNING: THE REPORT DOES NOT REPRESENT A FULL ANNUAL SIMULATION.',.TRUE.)
   END IF
-  CALL writeSubtitle('')
+  CALL writeTextLine('',.TRUE.)
   ! determine building floor areas
   CALL DetermineBuildingFloorArea
   ! collapse the gatherEndUseBEPS array to the resource groups displayed
@@ -8528,13 +8548,13 @@ IF (displaySourceEnergyEndUseSummary) THEN
   SELECT CASE (unitsStyle)
     CASE (unitsStyleJtoKWH)
       largeConversionFactor = 3600000.d0
-      areaConversionFactor = 1
+      areaConversionFactor = 1.0d0
     CASE (unitsStyleInchPound)
       largeConversionFactor =  getSpecificUnitDivider('J','kBtu')    !1054351.84 J to kBtu
       areaConversionFactor = getSpecificUnitDivider('m2','ft2')      !0.092893973 m2 to ft2
     CASE DEFAULT
       largeConversionFactor = 1000000.d0 ! to MJ
-      areaConversionFactor = 1
+      areaConversionFactor = 1.0d0
   END SELECT
 
   ! convert floor areas
@@ -8669,7 +8689,7 @@ IF (displaySourceEnergyEndUseSummary) THEN
     END DO
   END IF
 
-  CALL writeSubtitle('Normalized Metrics')
+  CALL writeTextLine('Normalized Metrics',.TRUE.)
 
   ! heading for the entire sub-table
   CALL writeSubtitle('Source Energy End Use Components Per Conditioned Floor Area')
@@ -8794,7 +8814,7 @@ IF (displayDemandEndUse) THEN
   ! show the headers of the report
   CALL WriteReportHeaders('Demand End Use Components Summary','Entire Facility',isAverage)
   ! totals - select which additional fuel to display and which other district heating
-  collapsedTotal=0.0
+  collapsedTotal=0.0d0
   collapsedTotal(1) = gatherDemandTotal(1)    !electricity
   collapsedTimeStep(1) = gatherDemandTimeStamp(1)
   collapsedTotal(2) = gatherDemandTotal(2)    !natural gas
@@ -8808,14 +8828,14 @@ IF (displayDemandEndUse) THEN
   ! If an additional fuel is non-zero, a footnote to the table is added.
   ! First step is to see if any additional fuels are non-zero
   additionalFuelNonZeroCount = 0
-  IF (gatherDemandTotal(6) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(8) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(9) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(10) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(11) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(12) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(13) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
-  IF (gatherDemandTotal(14) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(6) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(8) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(9) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(10) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(11) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(12) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(13) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(14) .GT. 0.0d0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
   IF (additionalFuelNonZeroCount .GT. 1) THEN
     footnote = 'Additional fuels have non-zero demand but are not shown on this report.'
   END IF
@@ -8860,7 +8880,7 @@ IF (displayDemandEndUse) THEN
   collapsedTimeStep(3) = gatherDemandTimeStamp(additionalFuelSelected)
   collapsedTotal(3) = gatherDemandTotal(additionalFuelSelected)
   !set flag if both puchased heating and steam both have positive demand
-  bothDistrHeatNonZero = (gatherDemandTotal(4) .GT. 0.0) .AND. (gatherDemandTotal(5) .GT. 0.0)
+  bothDistrHeatNonZero = (gatherDemandTotal(4) .GT. 0.0d0) .AND. (gatherDemandTotal(5) .GT. 0.0d0)
   !select the district heating source that has a larger demand
   IF (gatherDemandTotal(4) .GT. gatherDemandTotal(5)) THEN
     distrHeatSelected = 4 ! purchased heating
@@ -8882,12 +8902,12 @@ IF (displayDemandEndUse) THEN
     powerConversion = getSpecificUnitMultiplier('W','kBtuh')
     flowConversion = getSpecificUnitMultiplier('m3/s','gal/min')
   ELSE
-    powerConversion = 1
-    flowConversion = 1
+    powerConversion = 1.0d0
+    flowConversion = 1.0d0
   END IF
 
   ! collapse the gatherEndUseBEPS array to the resource groups displayed
-  collapsedEndUse=0.0
+  collapsedEndUse=0.0d0
   DO jEndUse=1,numEndUses
     collapsedEndUse(jEndUse,1) = gatherDemandEndUse(jEndUse,1) * powerConversion    !electricity
     collapsedEndUse(jEndUse,2) = gatherDemandEndUse(jEndUse,2) * powerConversion    !natural gas
@@ -9034,12 +9054,12 @@ IF (displayDemandEndUse) THEN
 
     !complete the LEED end use table using the same values
   ! for certain rows in the LEED table the subcategories are necessary so first compute those values
-  leedFansParkFromFan = 0.0
-  leedFansParkFromExtFuelEquip = 0.0
-  leedIntLightProc = 0.0
-  leedCook = 0.0
-  leedIndProc = 0.0
-  leedElevEsc = 0.0
+  leedFansParkFromFan = 0.0d0
+  leedFansParkFromExtFuelEquip = 0.0d0
+  leedIntLightProc = 0.0d0
+  leedCook = 0.0d0
+  leedIndProc = 0.0d0
+  leedElevEsc = 0.0d0
   DO iResource = 1, 5    ! don't bother with water
     DO jEndUse = 1, NumEndUses
       IF (EndUseCategory(jEndUse)%NumSubcategories > 0) THEN
@@ -9344,10 +9364,10 @@ REAL(r64) :: IPvaluePer
 
   If (.not. DoCostEstimate)  RETURN
 
-  CALL WriteReportHeaders('Construction Cost Estimate Summary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Component Cost Economics Summary','Entire Facility',isAverage)
 
   ! compute floor area if no ABUPS
-  IF (buildingConditionedFloorArea == 0.0) THEN
+  IF (buildingConditionedFloorArea == 0.0d0) THEN
     CALL DetermineBuildingFloorArea
   ENDIF
 
@@ -9380,7 +9400,7 @@ REAL(r64) :: IPvaluePer
     rowHead(10)   = 'Cost Per Conditioned Building Area (~~$~~/m2)'
     m2_unitConv = 1.0d0
   END IF
-  TableBodyData = 0.0
+  TableBodyData = 0.0d0
   TableBody     = ''
 
   TableBodyData(1,1) = RefrncBldg%LineItemTot
@@ -9388,11 +9408,11 @@ REAL(r64) :: IPvaluePer
   TableBodyData(2,1) = RefrncBldg%MiscCostperSqMeter * buildingConditionedFloorArea
   TableBody(2,1)     = TRIM(RealToStr(TableBodyData(2,1),2))
 
-  IF (RefrncBldg%RegionalModifier /= 1.0) THEN
+  IF (RefrncBldg%RegionalModifier /= 1.0d0) THEN
     TableBodyData(3,1) = (RefrncBldg%LineItemTot + RefrncBldg%MiscCostperSqMeter * buildingConditionedFloorArea) &
-                         *(RefrncBldg%RegionalModifier - 1.0)
+                         *(RefrncBldg%RegionalModifier - 1.0d0)
   ELSE
-    TableBodyData(3,1) = 0.0
+    TableBodyData(3,1) = 0.0d0
   ENDIF
 
   RefBldgConstCost   = SUM(TableBodyData(1:3,1))
@@ -9411,7 +9431,7 @@ REAL(r64) :: IPvaluePer
   RefrncBldg%GrandTotal = SUM(TableBodyData(1:8,1))
   TableBodyData(9,1) = RefrncBldg%GrandTotal
   TableBody(9,1)     = TRIM(RealToStr(TableBodyData(9,1),2))
-  IF (buildingConditionedFloorArea .GT. 0.0) THEN
+  IF (buildingConditionedFloorArea .GT. 0.0d0) THEN
     TableBodyData(10,1) = TableBodyData(9,1) / (buildingConditionedFloorArea * m2_unitConv)
   endif
   TableBody(10,1)     = TRIM(RealToStr(TableBodyData(10,1),2))
@@ -9420,11 +9440,11 @@ REAL(r64) :: IPvaluePer
   TableBody(1,2)     = trim(RealToStr(TableBodyData(1,2),2))
   TableBodyData(2,2) = CurntBldg%MiscCostperSqMeter * buildingConditionedFloorArea
   TableBody(2,2)     = trim(RealToStr(TableBodyData(2,2),2))
-  IF (CurntBldg%RegionalModifier /= 1.0) THEN
+  IF (CurntBldg%RegionalModifier /= 1.0d0) THEN
     TableBodyData(3,2) = (CurntBldg%LineItemTot + CurntBldg%MiscCostperSqMeter * buildingConditionedFloorArea) &
-                         *(CurntBldg%RegionalModifier - 1.0)
+                         *(CurntBldg%RegionalModifier - 1.0d0)
   ELSE
-    TableBodyData(3,2) = 0.0
+    TableBodyData(3,2) = 0.0d0
   ENDIF
   TableBody(3,2)     = trim(RealToStr(TableBodyData(3,2),2))
 
@@ -9504,7 +9524,7 @@ REAL(r64) :: IPvaluePer
         tableBody(item, 3) = trim(RealToStr(IPqty, 2))
         tableBody(item, 4) = trim(IPunitName)
         IPsingleValue = convertIP(unitConvIndex,1.0d0)
-        IF (IPsingleValue .NE. 0.0) THEN
+        IF (IPsingleValue .NE. 0.0d0) THEN
           IPvaluePer = CostLineItem(item)%ValuePer / IPsingleValue
           tableBody(item, 5) = trim(RealToStr(IPvaluePer, 2))
         END IF
@@ -9585,8 +9605,10 @@ INTEGER, parameter :: wwrcEast = 3
 INTEGER, parameter :: wwrcSouth = 4
 INTEGER, parameter :: wwrcWest = 5
 INTEGER, parameter :: wwrrWall = 1
-INTEGER, parameter :: wwrrWindow = 2
-INTEGER, parameter :: wwrrWWR = 3
+INTEGER, parameter :: wwrrAbvGndWall = 2
+INTEGER, parameter :: wwrrWindow = 3
+INTEGER, parameter :: wwrrWWR = 4
+INTEGER, parameter :: wwrrAbvGndWWR = 5
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -9616,6 +9638,10 @@ REAL(r64) :: wallAreaN
 REAL(r64) :: wallAreaS
 REAL(r64) :: wallAreaE
 REAL(r64) :: wallAreaW
+REAL(r64) :: aboveGroundWallAreaN
+REAL(r64) :: aboveGroundWallAreaS
+REAL(r64) :: aboveGroundWallAreaE
+REAL(r64) :: aboveGroundWallAreaW
 REAL(r64) :: windowAreaN
 REAL(r64) :: windowAreaS
 REAL(r64) :: windowAreaE
@@ -9625,11 +9651,16 @@ REAL(r64) :: wallAreaNcond
 REAL(r64) :: wallAreaScond
 REAL(r64) :: wallAreaEcond
 REAL(r64) :: wallAreaWcond
+REAL(r64) :: aboveGroundWallAreaNcond
+REAL(r64) :: aboveGroundWallAreaScond
+REAL(r64) :: aboveGroundWallAreaEcond
+REAL(r64) :: aboveGroundWallAreaWcond
 REAL(r64) :: windowAreaNcond
 REAL(r64) :: windowAreaScond
 REAL(r64) :: windowAreaEcond
 REAL(r64) :: windowAreaWcond
 LOGICAL :: isConditioned
+LOGICAL :: isAboveGround
 
 REAL(r64) :: roofArea
 REAL(r64) :: skylightArea
@@ -9659,19 +9690,20 @@ CHARACTER(len=MaxNameLength) :: m3_unitName = ''
 CHARACTER(len=MaxNameLength) :: Wm2_unitName = ''
 
 !zone summary total
-REAL(r64), DIMENSION(4) :: zstArea = 0.0
-REAL(r64), DIMENSION(4) :: zstVolume = 0.0
-REAL(r64), DIMENSION(4) :: zstWallArea = 0.0
-REAL(r64), DIMENSION(4) :: zstWindowArea = 0.0
-REAL(r64), DIMENSION(4) :: zstLight = 0.0
-REAL(r64), DIMENSION(4) :: zstPeople = 0.0
-REAL(r64), DIMENSION(4) :: zstPlug = 0.0
+REAL(r64), DIMENSION(4) :: zstArea = 0.0d0
+REAL(r64), DIMENSION(4) :: zstVolume = 0.0d0
+REAL(r64), DIMENSION(4) :: zstWallArea = 0.0d0
+REAL(r64), DIMENSION(4) :: zstWindowArea = 0.0d0
+REAL(r64), DIMENSION(4) :: zstLight = 0.0d0
+REAL(r64), DIMENSION(4) :: zstPeople = 0.0d0
+REAL(r64), DIMENSION(4) :: zstPlug = 0.0d0
 
 ! misc
 REAL(r64) :: pdiff
 LOGICAL :: DetailedWWR
 REAL(r64) :: TotalWallArea
 REAL(r64) :: TotalWindowArea
+REAL(r64) :: TotalAboveGroundWallArea
 
 ! all arrays are in the format: (row, columnm)
 IF (displayTabularVeriSum) THEN
@@ -9755,45 +9787,55 @@ IF (displayTabularVeriSum) THEN
   !
   !---- Window Wall Ratio Sub-Table
   !
-  CALL writeSubtitle('ENVELOPE')
+  CALL writeTextLine('ENVELOPE',.TRUE.)
 
-  ALLOCATE(rowHead(3))
+  ALLOCATE(rowHead(5))
   ALLOCATE(columnHead(5))
   ALLOCATE(columnWidth(5))
   columnWidth = 14 !array assignment - same for all columns
-  ALLOCATE(tableBody(3,5))
+  ALLOCATE(tableBody(5,5))
 
-  columnHead(1) = 'Total'
-  columnHead(2) = 'North (315 to 45 deg)'
-  columnHead(3) = 'East (45 to 135 deg)'
-  columnHead(4) = 'South (135 to 225 deg)'
-  columnHead(5) = 'West (225 to 315 deg)'
+  columnHead(wwrcTotal) = 'Total'
+  columnHead(wwrcNorth) = 'North (315 to 45 deg)'
+  columnHead(wwrcEast) = 'East (45 to 135 deg)'
+  columnHead(wwrcSouth) = 'South (135 to 225 deg)'
+  columnHead(wwrcWest) = 'West (225 to 315 deg)'
 
-  rowHead(1)  = 'Gross Wall Area ' // TRIM(m2_unitName)
-  rowHead(2)  = 'Window Opening Area ' // TRIM(m2_unitName)
-  rowHead(3)  = 'Window-Wall Ratio [%]'
+  rowHead(wwrrWall)  = 'Gross Wall Area ' // TRIM(m2_unitName)
+  rowHead(wwrrAbvGndWall)  = 'Above Ground Wall Area ' // TRIM(m2_unitName)
+  rowHead(wwrrWindow)  = 'Window Opening Area ' // TRIM(m2_unitName)
+  rowHead(wwrrWWR)  = 'Gross Window-Wall Ratio [%]'
+  rowHead(wwrrAbvGndWWR)  = 'Above Ground Window-Wall Ratio [%]'
 
-  wallAreaN = 0.0
-  wallAreaS = 0.0
-  wallAreaE = 0.0
-  wallAreaW = 0.0
-  windowAreaN = 0.0
-  windowAreaS = 0.0
-  windowAreaE = 0.0
-  windowAreaW = 0.0
-  wallAreaNcond = 0.0
-  wallAreaScond = 0.0
-  wallAreaEcond = 0.0
-  wallAreaWcond = 0.0
-  windowAreaNcond = 0.0
-  windowAreaScond = 0.0
-  windowAreaEcond = 0.0
-  windowAreaWcond = 0.0
-  roofArea = 0.0
-  skylightArea = 0.0
-  totLightPower = 0.0
-  totNumPeople = 0.0
-  totPlugProcess = 0.0
+  wallAreaN = 0.0d0
+  wallAreaS = 0.0d0
+  wallAreaE = 0.0d0
+  wallAreaW = 0.0d0
+  aboveGroundWallAreaN = 0.0d0
+  aboveGroundWallAreaS = 0.0d0
+  aboveGroundWallAreaE = 0.0d0
+  aboveGroundWallAreaW = 0.0d0
+  windowAreaN = 0.0d0
+  windowAreaS = 0.0d0
+  windowAreaE = 0.0d0
+  windowAreaW = 0.0d0
+  wallAreaNcond = 0.0d0
+  wallAreaScond = 0.0d0
+  wallAreaEcond = 0.0d0
+  wallAreaWcond = 0.0d0
+  aboveGroundWallAreaNcond = 0.0d0
+  aboveGroundWallAreaScond = 0.0d0
+  aboveGroundWallAreaEcond = 0.0d0
+  aboveGroundWallAreaWcond = 0.0d0
+  windowAreaNcond = 0.0d0
+  windowAreaScond = 0.0d0
+  windowAreaEcond = 0.0d0
+  windowAreaWcond = 0.0d0
+  roofArea = 0.0d0
+  skylightArea = 0.0d0
+  totLightPower = 0.0d0
+  totNumPeople = 0.0d0
+  totPlugProcess = 0.0d0
   kOpaque = 0
 
   DetailedWWR=(GetNumSectionsFound('DETAILEDWWR_DEBUG') > 0)
@@ -9806,9 +9848,9 @@ IF (displayTabularVeriSum) THEN
   DO iSurf = 1, TotSurfaces
     !only exterior surfaces including underground
     IF (.not. Surface(iSurf)%HeatTransSurf) CYCLE
-    IF ((Surface(iSurf)%ExtBoundCond == ExternalEnvironment)    .or.  &
-        (Surface(iSurf)%ExtBoundCond == OtherSideCondModeledExt)  .or.  &
-        (Surface(iSurf)%ExtBoundCond == Ground)                 .or.   &
+    isAboveGround = (Surface(iSurf)%ExtBoundCond == ExternalEnvironment) .or.  &
+        (Surface(iSurf)%ExtBoundCond == OtherSideCondModeledExt)
+    IF (isAboveGround  .or. (Surface(iSurf)%ExtBoundCond == Ground)  .or.   &
         (Surface(iSurf)%ExtBoundCond == GroundFCfactorMethod)) THEN
       curAzimuth = Surface(iSurf)%Azimuth
       curArea = Surface(iSurf)%GrossArea
@@ -9833,15 +9875,31 @@ IF (displayTabularVeriSum) THEN
             IF ((curAzimuth .GE. 315.d0) .OR. (curAzimuth .LT. 45.d0)) THEN
               wallAreaN = wallAreaN + curArea * mult
               IF (isConditioned) wallAreaNcond = wallAreaNcond + curArea * mult
+              IF (isAboveGround) THEN
+                aboveGroundWallAreaN = aboveGroundWallAreaN + curArea * mult
+                IF (isConditioned) aboveGroundWallAreaNcond = aboveGroundWallAreaNcond + curArea * mult
+              ENDIF
             ELSE IF ((curAzimuth .GE. 45.d0) .AND. (curAzimuth .LT. 135.d0)) THEN
               wallAreaE = wallAreaE + curArea * mult
               IF (isConditioned) wallAreaEcond = wallAreaEcond + curArea * mult
+              IF (isAboveGround) THEN
+                aboveGroundWallAreaE = aboveGroundWallAreaE + curArea * mult
+                IF (isConditioned) aboveGroundWallAreaEcond = aboveGroundWallAreaEcond + curArea * mult
+              ENDIF
             ELSE IF ((curAzimuth .GE. 135.d0) .AND. (curAzimuth .LT. 225.d0)) THEN
               wallAreaS = wallAreaS + curArea * mult
               IF (isConditioned) wallAreaScond = wallAreaScond + curArea * mult
+              IF (isAboveGround) THEN
+                aboveGroundWallAreaS = aboveGroundWallAreaS + curArea * mult
+                IF (isConditioned) aboveGroundWallAreaScond = aboveGroundWallAreaScond + curArea * mult
+              ENDIF
             ELSE IF ((curAzimuth .GE. 225.d0) .AND. (curAzimuth .LT. 315.d0)) THEN
               wallAreaW = wallAreaW + curArea * mult
               IF (isConditioned) wallAreaWcond = wallAreaWcond + curArea * mult
+              IF (isAboveGround) THEN
+                aboveGroundWallAreaW = aboveGroundWallAreaW + curArea * mult
+                IF (isConditioned) aboveGroundWallAreaWcond = aboveGroundWallAreaWcond + curArea * mult
+              ENDIF
             ENDIF
             IF (DetailedWWR) THEN
               WRITE(OutputFileDebug,'(A)') trim(Surface(iSurf)%Name)//',Wall,'//trim(RoundSigDigits(curArea*mult,1))//  &
@@ -9891,6 +9949,7 @@ IF (displayTabularVeriSum) THEN
   END DO
 
   TotalWallArea=wallAreaN + wallAreaS + wallAreaE + wallAreaW
+  TotalAboveGroundWallArea=aboveGroundWallAreaN+aboveGroundWallAreaS+aboveGroundWallAreaE+aboveGroundWallAreaW
   TotalWindowArea=windowAreaN + windowAreaS + windowAreaE + windowAreaW
   IF (DetailedWWR) THEN
     WRITE(OutputFileDebug,'(A)') '========================'
@@ -9910,19 +9969,31 @@ IF (displayTabularVeriSum) THEN
   tableBody(wwrrWall,wwrcSouth) = TRIM(RealToStr(wallAreaS * m2_unitConv,2))
   tableBody(wwrrWall,wwrcEast) =  TRIM(RealToStr(wallAreaE * m2_unitConv,2))
   tableBody(wwrrWall,wwrcWest) =  TRIM(RealToStr(wallAreaW * m2_unitConv,2))
-  tableBody(wwrrWall,wwrcTotal) =  TRIM(RealToStr((TotalWallArea) * m2_unitConv,2))
+  tableBody(wwrrWall,wwrcTotal) =  TRIM(RealToStr(TotalWallArea * m2_unitConv,2))
+
+  tableBody(wwrrAbvGndWall,wwrcNorth) = TRIM(RealToStr(aboveGroundWallAreaN * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcSouth) = TRIM(RealToStr(aboveGroundWallAreaS * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcEast) =  TRIM(RealToStr(aboveGroundWallAreaE * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcWest) =  TRIM(RealToStr(aboveGroundWallAreaW * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcTotal) =  TRIM(RealToStr(TotalAboveGroundWallArea * m2_unitConv,2))
 
   tableBody(wwrrWindow,wwrcNorth) = TRIM(RealToStr(windowAreaN * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcSouth) = TRIM(RealToStr(windowAreaS * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcEast) =  TRIM(RealToStr(windowAreaE * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcWest) =  TRIM(RealToStr(windowAreaW * m2_unitConv,2))
-  tableBody(wwrrWindow,wwrcTotal) =  TRIM(RealToStr((TotalWindowArea) * m2_unitConv,2))
+  tableBody(wwrrWindow,wwrcTotal) =  TRIM(RealToStr(TotalWindowArea * m2_unitConv,2))
 
   tableBody(wwrrWWR,wwrcNorth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaN , wallAreaN),2))
   tableBody(wwrrWWR,wwrcSouth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaS , wallAreaS),2))
   tableBody(wwrrWWR,wwrcEast) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaE , wallAreaE),2))
   tableBody(wwrrWWR,wwrcWest) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaW , wallAreaW),2))
   tableBody(wwrrWWR,wwrcTotal) =  TRIM(RealToStr(100.d0 * SafeDivide(TotalWindowArea , TotalWallArea),2))
+
+  tableBody(wwrrAbvGndWWR,wwrcNorth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaN , aboveGroundWallAreaN),2))
+  tableBody(wwrrAbvGndWWR,wwrcSouth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaS , aboveGroundWallAreaS),2))
+  tableBody(wwrrAbvGndWWR,wwrcEast) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaE , aboveGroundWallAreaE),2))
+  tableBody(wwrrAbvGndWWR,wwrcWest) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaW , aboveGroundWallAreaW),2))
+  tableBody(wwrrAbvGndWWR,wwrcTotal)=TRIM(RealToStr(100.d0*SafeDivide(TotalWindowArea,TotalAboveGroundWallArea),2))
 
   CALL writeSubtitle('Window-Wall Ratio')
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
@@ -9940,23 +10011,29 @@ IF (displayTabularVeriSum) THEN
   !
   !---- Conditioned Window Wall Ratio Sub-Table
   !
-  ALLOCATE(rowHead(3))
+  ALLOCATE(rowHead(5))
   ALLOCATE(columnHead(5))
   ALLOCATE(columnWidth(5))
   columnWidth = 14 !array assignment - same for all columns
-  ALLOCATE(tableBody(3,5))
+  ALLOCATE(tableBody(5,5))
 
-  columnHead(1) = 'Total'
-  columnHead(2) = 'North (315 to 45 deg)'
-  columnHead(3) = 'East (45 to 135 deg)'
-  columnHead(4) = 'South (135 to 225 deg)'
-  columnHead(5) = 'West (225 to 315 deg)'
+ columnHead(wwrcTotal) = 'Total'
+  columnHead(wwrcNorth) = 'North (315 to 45 deg)'
+  columnHead(wwrcEast) = 'East (45 to 135 deg)'
+  columnHead(wwrcSouth) = 'South (135 to 225 deg)'
+  columnHead(wwrcWest) = 'West (225 to 315 deg)'
 
-  rowHead(1)  = 'Gross Wall Area ' // TRIM(m2_unitName)
-  rowHead(2)  = 'Window Opening Area ' // TRIM(m2_unitName)
-  rowHead(3)  = 'Window-Wall Ratio [%]'
+  rowHead(wwrrWall)  = 'Gross Wall Area ' // TRIM(m2_unitName)
+  rowHead(wwrrAbvGndWall)  = 'Above Ground Wall Area ' // TRIM(m2_unitName)
+  rowHead(wwrrWindow)  = 'Window Opening Area ' // TRIM(m2_unitName)
+  rowHead(wwrrWWR)  = 'Gross Window-Wall Ratio [%]'
+  rowHead(wwrrAbvGndWWR)  = 'Above Ground Window-Wall Ratio [%]'
 
 !calculations appear in last block with normal window-wall ratio table
+
+  TotalWallArea=wallAreaNcond + wallAreaScond + wallAreaEcond + wallAreaWcond
+  TotalAboveGroundWallArea=aboveGroundWallAreaNcond+aboveGroundWallAreaScond+aboveGroundWallAreaEcond+aboveGroundWallAreaWcond
+  TotalWindowArea=windowAreaNcond + windowAreaScond + windowAreaEcond + windowAreaWcond
 
   tableBody = ''
 
@@ -9964,23 +10041,31 @@ IF (displayTabularVeriSum) THEN
   tableBody(wwrrWall,wwrcSouth) = TRIM(RealToStr(wallAreaScond * m2_unitConv,2))
   tableBody(wwrrWall,wwrcEast) =  TRIM(RealToStr(wallAreaEcond * m2_unitConv,2))
   tableBody(wwrrWall,wwrcWest) =  TRIM(RealToStr(wallAreaWcond * m2_unitConv,2))
-  tableBody(wwrrWall,wwrcTotal) =  TRIM(RealToStr(  &
-     (wallAreaNcond + wallAreaScond + wallAreaEcond + wallAreaWcond) * m2_unitConv,2))
+  tableBody(wwrrWall,wwrcTotal) =  TRIM(RealToStr(TotalWallArea * m2_unitConv,2))
+
+  tableBody(wwrrAbvGndWall,wwrcNorth) = TRIM(RealToStr(aboveGroundWallAreaNcond * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcSouth) = TRIM(RealToStr(aboveGroundWallAreaScond * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcEast) =  TRIM(RealToStr(aboveGroundWallAreaEcond * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcWest) =  TRIM(RealToStr(aboveGroundWallAreaWcond * m2_unitConv,2))
+  tableBody(wwrrAbvGndWall,wwrcTotal) =  TRIM(RealToStr(TotalAboveGroundWallArea * m2_unitConv,2))
 
   tableBody(wwrrWindow,wwrcNorth) = TRIM(RealToStr(windowAreaNcond * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcSouth) = TRIM(RealToStr(windowAreaScond * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcEast) =  TRIM(RealToStr(windowAreaEcond * m2_unitConv,2))
   tableBody(wwrrWindow,wwrcWest) =  TRIM(RealToStr(windowAreaWcond * m2_unitConv,2))
-  tableBody(wwrrWindow,wwrcTotal) =  TRIM(RealToStr(  &
-     (windowAreaNcond + windowAreaScond + windowAreaEcond + windowAreaWcond) * m2_unitConv,2))
+  tableBody(wwrrWindow,wwrcTotal) =  TRIM(RealToStr(TotalWindowArea * m2_unitConv,2))
 
   tableBody(wwrrWWR,wwrcNorth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaNcond , wallAreaNcond),2))
   tableBody(wwrrWWR,wwrcSouth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaScond , wallAreaScond),2))
   tableBody(wwrrWWR,wwrcEast) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaEcond , wallAreaEcond),2))
   tableBody(wwrrWWR,wwrcWest) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaWcond , wallAreaWcond),2))
-  tableBody(wwrrWWR,wwrcTotal) =  TRIM(RealToStr(SafeDivide( (100.d0 *   &
-                              (windowAreaNcond + windowAreaScond + windowAreaEcond + windowAreaWcond)) , &
-                              (wallAreaNcond + wallAreaScond + wallAreaEcond + wallAreaWcond) ),2))
+  tableBody(wwrrWWR,wwrcTotal) =  TRIM(RealToStr(100.d0 * SafeDivide(TotalWindowArea,TotalWallArea),2))
+
+  tableBody(wwrrAbvGndWWR,wwrcNorth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaNcond , aboveGroundWallAreaNcond),2))
+  tableBody(wwrrAbvGndWWR,wwrcSouth) = TRIM(RealToStr(100.d0 * SafeDivide(windowAreaScond , aboveGroundWallAreaScond),2))
+  tableBody(wwrrAbvGndWWR,wwrcEast) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaEcond , aboveGroundWallAreaEcond),2))
+  tableBody(wwrrAbvGndWWR,wwrcWest) =  TRIM(RealToStr(100.d0 * SafeDivide(windowAreaWcond , aboveGroundWallAreaWcond),2))
+  tableBody(wwrrAbvGndWWR,wwrcTotal)=TRIM(RealToStr(100.d0*SafeDivide(TotalWindowArea,TotalAboveGroundWallArea),2))
 
   CALL writeSubtitle('Conditioned Window-Wall Ratio')
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
@@ -10062,7 +10147,7 @@ IF (displayTabularVeriSum) THEN
   !
   !---- Space Summary Sub-Table
   !
-  CALL writeSubtitle('PERFORMANCE')
+  CALL writeTextLine('PERFORMANCE',.TRUE.)
 
   ALLOCATE(rowHead(NumOfZones + 4))
   ALLOCATE(columnHead(10))
@@ -10123,7 +10208,7 @@ IF (displayTabularVeriSum) THEN
     tableBody(iZone,6) = TRIM(RealToStr(Zone(iZone)%ExtGrossWallArea * m2_unitConv,2))
     tableBody(iZone,7) = TRIM(RealToStr(Zone(iZone)%ExtWindowArea * m2_unitConv,2))
     ! lighting density
-    totLightPower = 0
+    totLightPower = 0.0d0
     DO iLight = 1, TotLights
       IF (iZone .EQ. Lights(iLight)%ZonePtr) THEN
         totLightPower = totLightPower + Lights(iLight)%DesignLevel
@@ -10133,7 +10218,7 @@ IF (displayTabularVeriSum) THEN
       tableBody(iZone,8) = TRIM(RealToStr(Wm2_unitConv * totLightPower / Zone(iZone)%FloorArea,4))
     END IF
     ! people density
-    totNumPeople = 0
+    totNumPeople = 0.0d0
     DO iPeople = 1, TotPeople
       IF (iZone .EQ. People(iPeople)%ZonePtr) THEN
         totNumPeople = totNumPeople + People(iPeople)%NumberOfPeople
@@ -10143,7 +10228,7 @@ IF (displayTabularVeriSum) THEN
       tableBody(iZone,9) = TRIM(RealToStr(Zone(iZone)%FloorArea * m2_unitConv / totNumPeople,2))
     END IF
     ! plug and process density
-    totPlugProcess =  0
+    totPlugProcess =  0.0d0
     DO iPlugProc = 1, TotElecEquip
       IF (iZone .EQ. ZoneElectric(iPlugProc)%ZonePtr) THEN
         totPlugProcess = totPlugProcess + ZoneElectric(iPlugProc)%DesignLevel
@@ -10785,7 +10870,7 @@ IF (displayComponentSizing) THEN
           ELSE
             curValue = curValueSI
           END IF
-          IF (ABS(curValue) .GE. 1) THEN
+          IF (ABS(curValue) .GE. 1.0d0) THEN
             tableBody(foundObj,foundDesc) = TRIM(RealToStr(curValue,2))
           ELSE
             tableBody(foundObj,foundDesc) = TRIM(RealToStr(curValue,6))
@@ -10796,7 +10881,8 @@ IF (displayComponentSizing) THEN
     END DO
     !write the table
     CALL writeSubtitle(CompSizeTableEntry(foundEntry)%typeField)
-    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.FALSE.,'User-Specified values were used. '// &
+                                            'Design Size values were used if no User-Specified values were provided.')
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         'ComponentSizingSummary',&
                                         'Entire Facility',&
@@ -11062,97 +11148,97 @@ IMPLICIT NONE
 LOGICAL, SAVE     :: DoAllocate = .TRUE.
 
 IF (DoAllocate) THEN
-	!For many of the following arrays the last dimension is the number of environments and is same as sizing arrays
+    !For many of the following arrays the last dimension is the number of environments and is same as sizing arrays
   ALLOCATE(radiantPulseUsed(NumOfZones,0:TotDesDays+TotRunDesPersDays))
-  radiantPulseUsed = 0.0
+  radiantPulseUsed = 0.0d0
   ALLOCATE(radiantPulseTimestep(NumOfZones,0:TotDesDays+TotRunDesPersDays))
-  radiantPulseTimestep = 0.0
+  radiantPulseTimestep = 0
   ALLOCATE(radiantPulseReceived(TotSurfaces,0:TotDesDays+TotRunDesPersDays))
-  radiantPulseReceived = 0.0
+  radiantPulseReceived = 0.0d0
   ALLOCATE(loadConvectedNormal(TotSurfaces,0:NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  loadConvectedNormal = 0.0
+  loadConvectedNormal = 0.0d0
   ALLOCATE(loadConvectedWithPulse(TotSurfaces,0:NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  loadConvectedWithPulse = 0.0
+  loadConvectedWithPulse = 0.0d0
   ALLOCATE(netSurfRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  netSurfRadSeq = 0.0
+  netSurfRadSeq = 0.0d0
   ALLOCATE(decayCurveCool(TotSurfaces,NumOfTimeStepInHour*24))
-  decayCurveCool = 0.0
+  decayCurveCool = 0.0d0
   ALLOCATE(decayCurveHeat(TotSurfaces,NumOfTimeStepInHour*24))
-  decayCurveHeat = 0.0
+  decayCurveHeat = 0.0d0
   ALLOCATE(ITABSFseq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  ITABSFseq = 0.0
+  ITABSFseq = 0.0d0
   ALLOCATE(TMULTseq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  TMULTseq = 0.0
+  TMULTseq = 0.0d0
   ALLOCATE(peopleInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  peopleInstantSeq = 0.0
+  peopleInstantSeq = 0.0d0
   ALLOCATE(peopleLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  peopleLatentSeq = 0.0
+  peopleLatentSeq = 0.0d0
   ALLOCATE(peopleRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  peopleRadSeq = 0.0
+  peopleRadSeq = 0.0d0
   ALLOCATE(peopleDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  peopleDelaySeq = 0.0
+  peopleDelaySeq = 0.0d0
   ALLOCATE(lightInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  lightInstantSeq = 0.0
+  lightInstantSeq = 0.0d0
   ALLOCATE(lightRetAirSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  lightRetAirSeq = 0.0
+  lightRetAirSeq = 0.0d0
   ALLOCATE(lightLWRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  lightLWRadSeq = 0.0
+  lightLWRadSeq = 0.0d0
   ALLOCATE(lightSWRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  lightSWRadSeq = 0.0
+  lightSWRadSeq = 0.0d0
   ALLOCATE(lightDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  lightLWRadSeq = 0.0
+  lightLWRadSeq = 0.0d0
   ALLOCATE(equipInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  equipInstantSeq = 0.0
+  equipInstantSeq = 0.0d0
   ALLOCATE(equipLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  equipLatentSeq = 0.0
+  equipLatentSeq = 0.0d0
   ALLOCATE(equipRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  equipRadSeq = 0.0
+  equipRadSeq = 0.0d0
   ALLOCATE(equipDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  equipDelaySeq = 0.0
+  equipDelaySeq = 0.0d0
   ALLOCATE(refrigInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  refrigInstantSeq = 0.0
+  refrigInstantSeq = 0.0d0
   ALLOCATE(refrigRetAirSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  refrigRetAirSeq = 0.0
+  refrigRetAirSeq = 0.0d0
   ALLOCATE(refrigLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  refrigLatentSeq = 0.0
+  refrigLatentSeq = 0.0d0
   ALLOCATE(waterUseInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  waterUseInstantSeq = 0.0
+  waterUseInstantSeq = 0.0d0
   ALLOCATE(waterUseLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  waterUseLatentSeq = 0.0
+  waterUseLatentSeq = 0.0d0
   ALLOCATE(hvacLossInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  hvacLossInstantSeq = 0.0
+  hvacLossInstantSeq = 0.0d0
   ALLOCATE(hvacLossRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  hvacLossRadSeq = 0.0
+  hvacLossRadSeq = 0.0d0
   ALLOCATE(hvacLossDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  hvacLossDelaySeq = 0.0
+  hvacLossDelaySeq = 0.0d0
   ALLOCATE(powerGenInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  powerGenInstantSeq = 0.0
+  powerGenInstantSeq = 0.0d0
   ALLOCATE(powerGenRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  powerGenRadSeq = 0.0
+  powerGenRadSeq = 0.0d0
   ALLOCATE(powerGenDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  powerGenDelaySeq = 0.0
+  powerGenDelaySeq = 0.0d0
   ALLOCATE(infilInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  infilInstantSeq = 0.0
+  infilInstantSeq = 0.0d0
   ALLOCATE(infilLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  infilLatentSeq = 0.0
+  infilLatentSeq = 0.0d0
   ALLOCATE(zoneVentInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  zoneVentInstantSeq = 0.0
+  zoneVentInstantSeq = 0.0d0
   ALLOCATE(zoneVentLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  zoneVentLatentSeq = 0.0
+  zoneVentLatentSeq = 0.0d0
   ALLOCATE(interZoneMixInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  interZoneMixInstantSeq = 0.0
+  interZoneMixInstantSeq = 0.0d0
   ALLOCATE(interZoneMixLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  interZoneMixLatentSeq = 0.0
+  interZoneMixLatentSeq = 0.0d0
   ALLOCATE(feneCondInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  feneCondInstantSeq = 0.0
+  feneCondInstantSeq = 0.0d0
 !  ALLOCATE(feneSolarInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-!  feneSolarInstantSeq = 0.0
+!  feneSolarInstantSeq = 0.0d0
   ALLOCATE(feneSolarRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  feneSolarRadSeq = 0.0
+  feneSolarRadSeq = 0.0d0
   ALLOCATE(feneSolarDelaySeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  feneSolarDelaySeq = 0.0
+  feneSolarDelaySeq = 0.0d0
   ALLOCATE(surfDelaySeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
-  surfDelaySeq = 0.0
+  surfDelaySeq = 0.0d0
   DoAllocate = .FALSE.
 END IF
 END SUBROUTINE AllocateLoadComponentArrays
@@ -11274,12 +11360,12 @@ DO SurfNum = 1, TotSurfaces
     END IF
     IF (TimeOfPulse == 0) TimeOfPulse=1
     DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
-      IF (radiantPulseReceived(surfNum,CoolDesSelected) .NE. 0.0) THEN
+      IF (radiantPulseReceived(surfNum,CoolDesSelected) .NE. 0.0d0) THEN
         diff = loadConvectedWithPulse(surfNum,TimeStep,CoolDesSelected) &
                                   - loadConvectedNormal(surfNum,TimeStep,CoolDesSelected)
         decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = -diff / radiantPulseReceived(surfNum,CoolDesSelected)
       ELSE
-        decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+        decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = 0.0d0
       END IF
     END DO
   END IF
@@ -11295,12 +11381,12 @@ DO SurfNum = 1, TotSurfaces
     END IF
     IF (TimeOfPulse == 0) TimeOfPulse=1
     DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
-      IF (radiantPulseReceived(surfNum,HeatDesSelected) .NE. 0.0) THEN
+      IF (radiantPulseReceived(surfNum,HeatDesSelected) .NE. 0.0d0) THEN
         diff = loadConvectedWithPulse(surfNum,TimeStep,HeatDesSelected) &
                                   - loadConvectedNormal(surfNum,TimeStep,HeatDesSelected)
         decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = -diff  / radiantPulseReceived(surfNum,HeatDesSelected)
       ELSE
-        decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+        decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = 0.0d0
       END IF
     END DO
   END IF
@@ -11353,7 +11439,7 @@ INTEGER :: TimeStepInDay = 0
 
 IF (CompLoadReportIsReq .AND. .NOT. isPulseZoneSizing) THEN
   TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
-  feneCondInstantSeq(:,TimeStepInDay,CurOverallSimDay) = 0
+  feneCondInstantSeq(:,TimeStepInDay,CurOverallSimDay) = 0.0d0
   DO iSurf = 1, TotSurfaces
     ZoneNum = Surface(iSurf)%Zone
     IF (ZoneNum .EQ. 0) CYCLE
@@ -11552,14 +11638,14 @@ IF (ALLOCATED(CalcFinalZoneSizing)) THEN
       END IF
       IF (desSelected .EQ. 0)  CYCLE
       DO kTimeStep = 1, NumOfTimeStepInHour*24
-        peopleConvIntoZone = 0.0
-        equipConvIntoZone = 0.0
-        hvacLossConvIntoZone = 0.0
-        powerGenConvIntoZone = 0.0
-        lightLWConvIntoZone = 0.0
-        lightSWConvIntoZone = 0.0
-        feneSolarConvIntoZone = 0.0
-        adjFeneSurfNetRadSeq = 0.0
+        peopleConvIntoZone = 0.0d0
+        equipConvIntoZone = 0.0d0
+        hvacLossConvIntoZone = 0.0d0
+        powerGenConvIntoZone = 0.0d0
+        lightLWConvIntoZone = 0.0d0
+        lightSWConvIntoZone = 0.0d0
+        feneSolarConvIntoZone = 0.0d0
+        adjFeneSurfNetRadSeq = 0.0d0
         DO jSurf = 1,TotSurfaces
           IF (.NOT. Surface(jSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
           IF (Surface(jSurf)%Zone .EQ. iZone) THEN
@@ -11572,13 +11658,13 @@ IF (ALLOCATED(CalcFinalZoneSizing)) THEN
             powerGenRadIntoSurf(kTimeStep) = powerGenRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
             lightLWRadIntoSurf(kTimeStep) = lightLWRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
             !for each time step, step back through time and apply decay curve
-            peopleConvFromSurf = 0.0
-            equipConvFromSurf = 0.0
-            hvacLossConvFromSurf = 0.0
-            powerGenConvFromSurf = 0.0
-            lightLWConvFromSurf = 0.0
-            lightSWConvFromSurf = 0.0
-            feneSolarConvFromSurf = 0.0
+            peopleConvFromSurf = 0.0d0
+            equipConvFromSurf = 0.0d0
+            hvacLossConvFromSurf = 0.0d0
+            powerGenConvFromSurf = 0.0d0
+            lightLWConvFromSurf = 0.0d0
+            lightSWConvFromSurf = 0.0d0
+            feneSolarConvFromSurf = 0.0d0
             DO mStepBack = 1,kTimeStep
               IF (isCooling) THEN
                 peopleConvFromSurf = peopleConvFromSurf + peopleRadIntoSurf(kTimeStep - mStepBack + 1) &
@@ -11790,7 +11876,7 @@ REAL(r64) :: powerConversion
 INTEGER :: tempConvIndx !temperature conversion index
 CHARACTER(len=MaxNameLength) :: stringWithTemp
 INTEGER :: curExtBoundCond
-
+REAL(r64) :: mult !zone multiplier
 
 ! all arrays are in the format: (row, column)
 CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:)     :: columnHead
@@ -11813,7 +11899,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     powerConversion = getSpecificUnitMultiplier('W','Btu/h') !or kBtuh?
     tempConvIndx = getSpecificUnitIndex('C','F')
   ELSE
-    powerConversion = 1
+    powerConversion = 1.0d0
     tempConvIndx = 0 !when zero is used with ConvertIP the value is returned unconverted
   END IF
 
@@ -11827,6 +11913,8 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
 
   DO iZone = 1, NumOfZones
     IF (.not. ZoneEquipConfig(iZone)%IsControlled) CYCLE
+    mult = Zone(iZone)%Multiplier * Zone(iZone)%ListMultiplier
+    IF (mult .EQ. 0.0) mult = 1.0
 
     !
     !---- Cooling Peak Load Components Sub-Table
@@ -11887,9 +11975,9 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     rowHead(rGrdTot) = 'Grand Total'
 
     tableBody = ''
-    totalColumn = 0.0
-    percentColumn = 0.0
-    grandTotalRow = 0.0
+    totalColumn = 0.0d0
+    percentColumn = 0.0d0
+    grandTotalRow = 0.0d0
 
     CoolDesSelected = CalcFinalZoneSizing(iZone)%CoolDDNum
     timeCoolMax = CalcFinalZoneSizing(iZone)%TimeStepNumAtCoolMax
@@ -12070,7 +12158,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
       grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
 
       !opaque surfaces - must combine individual surfaces by class and other side conditions
-      delayOpaque = 0.0
+      delayOpaque = 0.0d0
       DO kSurf = 1,TotSurfaces
         IF (.NOT. Surface(kSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
         IF (Surface(kSurf)%Zone .EQ. iZone) THEN
@@ -12133,7 +12221,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     END IF
 
     !GRAND TOTAL ROW
-    totalGrandTotal = 0
+    totalGrandTotal = 0.0d0
     DO k = 1,cLatent
       tableBody(rGrdTot,k)  = TRIM(RealToStr(grandTotalRow(k),2))
       totalGrandTotal = totalGrandTotal + grandTotalRow(k)
@@ -12143,7 +12231,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     !TOTAL COLUMN AND PERCENT COLUMN
     DO k = 1,rOpqDoor !to last row before total
       tableBody(k,cTotal) = TRIM(RealToStr(totalColumn(k),2))
-      IF (totalGrandTotal .NE. 0.0) THEN
+      IF (totalGrandTotal .NE. 0.0d0) THEN
         tableBody(k,cPerc) = TRIM(RealToStr(100 * totalColumn(k)/totalGrandTotal,2))
       END IF
     END DO
@@ -12207,8 +12295,8 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
 
       !Outside  Wet Bulb Temperature
       !use standard sea level air pressure because air pressure is not tracked with sizing data
-      IF (CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .LT. 1.0 .AND.     &
-          CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .GT. 0.0) THEN
+      IF (CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .LT. 1.0d0 .AND.     &
+          CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .GT. 0.0d0) THEN
         tableBody(3,1) = TRIM(RealToStr(convertIP(tempConvIndx, &
                                      PsyTwbFnTdbWPb(CalcFinalZoneSizing(iZone)%CoolOutTempSeq(timeCoolMax), &
                                      CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax), &
@@ -12233,13 +12321,13 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     END IF
 
     !Peak Design Sensible Load
-    tableBody(8,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%DesCoolLoad * powerConversion,2))
-
+    tableBody(8,1) = TRIM(RealToStr((CalcFinalZoneSizing(iZone)%DesCoolLoad / mult) * powerConversion,2))
+    
     !Estimated Instant + Delayed Sensible Load
     tableBody(9,1) = TRIM(RealToStr(grandTotalRow(cSensInst) + grandTotalRow(cSensDelay),2))
 
     !Difference
-    tableBody(10,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%DesCoolLoad * powerConversion &
+    tableBody(10,1) = TRIM(RealToStr((CalcFinalZoneSizing(iZone)%DesCoolLoad / mult) * powerConversion &
                          - (grandTotalRow(cSensInst) + grandTotalRow(cSensDelay)),2))
 
     CALL writeSubtitle('Cooling Peak Conditions')
@@ -12390,9 +12478,9 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     rowHead(rGrdTot) = 'Grand Total'
 
     tableBody = ''
-    totalColumn = 0.0
-    percentColumn = 0.0
-    grandTotalRow = 0.0
+    totalColumn = 0.0d0
+    percentColumn = 0.0d0
+    grandTotalRow = 0.0d0
 
     HeatDesSelected = CalcFinalZoneSizing(iZone)%HeatDDNum
     timeHeatMax = CalcFinalZoneSizing(iZone)%TimeStepNumAtHeatMax
@@ -12573,7 +12661,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
       grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
 
       !opaque surfaces - must combine individual surfaces by class and other side conditions
-      delayOpaque = 0.0
+      delayOpaque = 0.0d0
       DO kSurf = 1,TotSurfaces
         IF (.NOT. Surface(kSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
         IF (Surface(kSurf)%Zone .EQ. iZone) THEN
@@ -12636,7 +12724,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     END IF
 
     !GRAND TOTAL ROW
-    totalGrandTotal = 0
+    totalGrandTotal = 0.0d0
     DO k = 1,cLatent
       tableBody(rGrdTot,k)  = TRIM(RealToStr(grandTotalRow(k),2))
       totalGrandTotal = totalGrandTotal + grandTotalRow(k)
@@ -12646,7 +12734,7 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     !TOTAL COLUMN AND PERCENT COLUMN
     DO k = 1,rOpqDoor !to last row before total
       tableBody(k,cTotal) = TRIM(RealToStr(totalColumn(k),2))
-      IF (totalGrandTotal .NE. 0.0) THEN
+      IF (totalGrandTotal .NE. 0.0d0) THEN
         tableBody(k,cPerc) = TRIM(RealToStr(100 * totalColumn(k)/totalGrandTotal,2))
       END IF
     END DO
@@ -12710,8 +12798,8 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
 
       !Outside  Wet Bulb Temperature
       !use standard sea level air pressure because air pressure is not tracked with sizing data
-      IF (CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .LT. 1.0 .AND.       &
-          CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .GT. 0.0) THEN
+      IF (CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .LT. 1.0d0 .AND.       &
+          CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .GT. 0.0d0) THEN
         tableBody(3,1) = TRIM(RealToStr(convertIP(tempConvIndx, &
                                        PsyTwbFnTdbWPb(CalcFinalZoneSizing(iZone)%HeatOutTempSeq(timeHeatMax), &
                                        CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax), &
@@ -12736,13 +12824,13 @@ IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
     END IF
 
     !Peak Design Sensible Load
-    tableBody(8,1) = TRIM(RealToStr(-CalcFinalZoneSizing(iZone)%DesHeatLoad * powerConversion,2))    !change sign
+    tableBody(8,1) = TRIM(RealToStr((-CalcFinalZoneSizing(iZone)%DesHeatLoad / mult) * powerConversion,2))    !change sign
 
     !Estimated Instant + Delayed Sensible Load
     tableBody(9,1) = TRIM(RealToStr(grandTotalRow(cSensInst) + grandTotalRow(cSensDelay),2))
 
     !Difference
-    tableBody(10,1) = TRIM(RealToStr(-CalcFinalZoneSizing(iZone)%DesHeatLoad * powerConversion &
+    tableBody(10,1) = TRIM(RealToStr((-CalcFinalZoneSizing(iZone)%DesHeatLoad /mult) * powerConversion &
                              - (grandTotalRow(cSensInst) + grandTotalRow(cSensDelay)),2))
 
     CALL writeSubtitle('Heating Peak Conditions')
@@ -12919,6 +13007,8 @@ END DO
 activeSubTableName = ''
 !save the report name if the subtable name is not available during XML processing
 activeReportName = modifiedReportName
+!save the "for" which is the object name in the report for HTML comment that contains the report, for, and subtable
+activeForName = objectName
 END SUBROUTINE WriteReportHeaders
 
 SUBROUTINE writeSubtitle(subtitle)
@@ -12954,6 +13044,8 @@ DO iStyle = 1, numStyles
       WRITE(TabularOutputFile(iStyle),fmta) ''
     CASE (tableStyleHTML)
       WRITE(TabularOutputFile(iStyle),fmta) '<b>'// TRIM(subtitle) // '</b><br><br>'
+      WRITE(TabularOutputFile(iStyle),fmta) '<!-- FullName:' // TRIM(activeReportName) //'_' // &
+                                            TRIM(activeForName) //'_' // TRIM(subtitle) // '-->'
     CASE (tableStyleXML)
       !save the active subtable name for the XML reporting
       activeSubTableName = subtitle
@@ -12962,7 +13054,7 @@ DO iStyle = 1, numStyles
 END DO
 END SUBROUTINE WriteSubtitle
 
-SUBROUTINE writeTextLine(lineOfText)
+SUBROUTINE writeTextLine(lineOfText,isBold)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Jason Glazer
           !       DATE WRITTEN   April 2007
@@ -12975,6 +13067,7 @@ IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
 CHARACTER(len=*),INTENT(IN) :: lineOfText
+LOGICAL,INTENT(IN),OPTIONAL :: isBold
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
 CHARACTER(len=*), PARAMETER :: fmta="(A)"
@@ -12987,13 +13080,24 @@ CHARACTER(len=*), PARAMETER :: fmta="(A)"
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER :: iStyle
+LOGICAL :: useBold
+
+IF (Present(isBold)) THEN
+  useBold = isBold
+ELSE
+  useBold = .FALSE.
+END IF
 
 DO iStyle = 1, numStyles
   SELECT CASE (TableStyle(iStyle))
     CASE (tableStyleComma,tableStyleTab,tableStyleFixed)
       WRITE(TabularOutputFile(iStyle),fmta) TRIM(lineOfText)
     CASE (tableStyleHTML)
-      WRITE(TabularOutputFile(iStyle),fmta) TRIM(lineOfText) // '<br>'
+      IF (useBold) THEN
+        WRITE(TabularOutputFile(iStyle),fmta) '<b>'// TRIM(lineOfText) // '</b><br><br>'
+      ELSE
+        WRITE(TabularOutputFile(iStyle),fmta) TRIM(lineOfText) // '<br>'
+      END IF
     CASE (tableStyleXML)
       IF (LEN_TRIM(lineOfText) .NE. 0) THEN
         WRITE(TabularOutputFile(iStyle),fmta) '<note>' // TRIM(lineOfText) // '</note>'
@@ -13280,13 +13384,13 @@ DO iStyle = 1, numStyles
       IF (.NOT. isTableBlank) THEN
         !if report name and subtable name the same add "record" to the end
         activeSubTableName = ConvertToElementTag(activeSubTableName)
-        activeReportName = ConvertToElementTag(activeReportName)
-        IF (SameString(activeSubTableName,activeReportName)) THEN
+        activeReportNameNoSpace = ConvertToElementTag(activeReportName)
+        IF (SameString(activeSubTableName,activeReportNameNoSpace)) THEN
           activeSubTableName = TRIM(activeSubTableName) // 'Record'
         END IF
         !if no subtable name use the report name and add "record" to the end
         IF (LEN_TRIM(activeSubTableName) .EQ. 0) THEN
-          activeSubTableName = TRIM(activeReportName) // 'Record'
+          activeSubTableName = TRIM(activeReportNameNoSpace) // 'Record'
         END IF
         ! if a single column table, transpose it automatically
         IF ((colsBody .EQ. 1) .AND. (rowsBody .GT. 1)) THEN
@@ -13295,6 +13399,9 @@ DO iStyle = 1, numStyles
         ! first convert all row and column headers into tags compatible with XML strings
         DO jRow = 1, rowsBody
           rowLabelTags(jRow) = ConvertToElementTag(rowLabels(jRow))
+          IF (LEN_TRIM(rowLabelTags(jRow)) .EQ. 0) THEN
+            rowLabelTags(jRow) = "none"
+          END IF
           rowUnitStrings(jRow) = GetUnitSubString(rowLabels(jRow))
           IF (SameString(rowUnitStrings(jRow),'Invalid/Undefined')) THEN
             rowUnitStrings(jRow) = ''
@@ -13302,6 +13409,9 @@ DO iStyle = 1, numStyles
         END DO
         DO iCol = 1, colsBody
           columnLabelTags(iCol) = ConvertToElementTag(columnLabels(iCol))
+          IF (LEN_TRIM(columnLabelTags(iCol)) .EQ. 0) THEN
+            columnLabelTags(iCol) = "none"
+          END IF
           columnUnitStrings(iCol) = GetUnitSubString(columnLabels(iCol))
           IF (SameString(columnUnitStrings(iCol),'Invalid/Undefined')) THEN
             columnUnitStrings(iCol) = ''
@@ -13399,6 +13509,11 @@ DO iStyle = 1, numStyles
   END SELECT
 END DO
 DEALLOCATE(colLabelMulti)
+DEALLOCATE(rowLabelTags)
+DEALLOCATE(columnLabelTags)
+DEALLOCATE(rowUnitStrings)
+DEALLOCATE(columnUnitStrings)
+DEALLOCATE(bodyEsc)
 RETURN
 END SUBROUTINE WriteTable
 
@@ -13676,8 +13791,8 @@ REAL(r64)     :: curZoneArea
 INTEGER  :: iZone
 !INTEGER  :: found
 
-buildingGrossFloorArea = 0
-buildingConditionedFloorArea = 0
+buildingGrossFloorArea = 0.0d0
+buildingConditionedFloorArea = 0.0d0
 DO iZone=1,NumOfZones
   curZoneArea = Zone(iZone)%FloorArea * Zone(iZone)%Multiplier * Zone(iZone)%ListMultiplier
 
@@ -13687,12 +13802,12 @@ DO iZone=1,NumOfZones
   !if (NumZoneReturnPlenums > 0) THEN
   !  found = FindItemInList(Zone(iZone)%Name, ZoneRetPlenCond%ZoneName, NumZoneReturnPlenums)
   !endif
-  !IF (found /= 0)  curZoneArea = 0.0
+  !IF (found /= 0)  curZoneArea = 0.0d0
   !found = 0
   !if (NumZoneSupplyPlenums > 0) THEN
   !  found = FindItemInList(Zone(iZone)%Name, ZoneSupPlenCond%ZoneName, NumZoneSupplyPlenums)
   !endif
-  !IF (found /= 0)  curZoneArea = 0.0
+  !IF (found /= 0)  curZoneArea = 0.0d0
 
   IF (Zone(iZone)%isPartOfTotalArea) THEN
     buildingGrossFloorArea = buildingGrossFloorArea + curZoneArea
@@ -13766,7 +13881,7 @@ REAL(r64) :: fBC
 fAB = (qy - y1) * (x2 - x1) - (qx - x1) * (y2 - y1)
 fCA = (qy - y3) * (x1 - x3) - (qx - x3) * (y1 - y3)
 fBC = (qy - y2) * (x3 - x2) - (qx - x2) * (y3 - y2)
-IF ((fAB * fBC) .GE. 0. .AND. (fBC * fCA) .GE. 0.) THEN
+IF ((fAB * fBC) .GE. 0.0d0 .AND. (fBC * fCA) .GE. 0.0d0) THEN
   isInTriangle = .TRUE.
 ELSE
   isInTriangle = .FALSE.
@@ -14712,7 +14827,7 @@ IF (unitConvIndex .EQ. 0) THEN
 ELSEIF ((unitConvIndex .GT. 0) .AND. (unitConvIndex .LE. UnitConvSize)) THEN
   ConvertIP = (SIvalue * UnitConv(unitConvIndex)%mult) + UnitConv(unitConvIndex)%offset
 ELSE
-  ConvertIP = 0
+  ConvertIP = 0.0d0
 END IF
 END FUNCTION ConvertIP
 
@@ -14757,7 +14872,7 @@ REAL(r64), INTENT(IN)                   :: SIvalue
 IF ((unitConvIndex .GT. 0) .AND. (unitConvIndex .LE. UnitConvSize)) THEN
   ConvertIPdelta = SIvalue * UnitConv(unitConvIndex)%mult
 ELSE
-  ConvertIPdelta = 0
+  ConvertIPdelta = 0.0d0
 END IF
 END FUNCTION ConvertIPdelta
 
@@ -14810,8 +14925,8 @@ IF ((unitConvIndex .GT. 0) .AND. (unitConvIndex .LE. UnitConvSize)) THEN
   offset = UnitConv(unitConvIndex)%offset
   IPunit = TRIM(UnitConv(unitConvIndex)%ipName)
 ELSE
-  multiplier = 0
-  offset = 0
+  multiplier = 0.0d0
+  offset = 0.0d0
   IPunit = ''
 END IF
 END SUBROUTINE GetUnitConversion
@@ -14872,7 +14987,7 @@ END DO
 IF (found .NE. 0) THEN
   getSpecificUnitMultiplier = UnitConv(found)%mult
 ELSE
-  getSpecificUnitMultiplier = 0
+  getSpecificUnitMultiplier = 0.0d0
 END IF
 END FUNCTION getSpecificUnitMultiplier
 
@@ -14925,7 +15040,7 @@ mult = getSpecificUnitMultiplier(SIunit,IPunit)
 IF (mult .NE. 0) THEN
   getSpecificUnitDivider = 1/mult
 ELSE
-  getSpecificUnitDivider = 0
+  getSpecificUnitDivider = 0.0d0
 END IF
 END FUNCTION getSpecificUnitDivider
 
@@ -14981,7 +15096,7 @@ END DO
 IF (found .NE. 0) THEN
   getSpecificUnitIndex = found
 ELSE
-  getSpecificUnitIndex = 0
+  getSpecificUnitIndex = 0.0d0
 END IF
 END FUNCTION getSpecificUnitIndex
 

@@ -42,16 +42,16 @@ MODULE MundtSimMgr
     TYPE DefineLinearModelNode
         CHARACTER(Len=MaxNameLength)    :: AirNodeName    =' '  ! Name of air nodes
         INTEGER                         :: ClassType      =0    ! Type of air nodes
-        REAL(r64)                       :: Height         =0.0  ! Z coordinates [m] node's Control Vol. center
-        REAL(r64)                       :: Temp           =0.0  ! Surface temperature BC
+        REAL(r64)                       :: Height         =0.0d0  ! Z coordinates [m] node's Control Vol. center
+        REAL(r64)                       :: Temp           =0.0d0  ! Surface temperature BC
         LOGICAL, ALLOCATABLE, DIMENSION(:)  :: SurfMask         ! Limit of 60 surfaces at current sizing
     END TYPE DefineLinearModelNode
 
     TYPE DefineSurfaceSettings
-        REAL(r64)                       :: Area           =0.0  !m2
-        REAL(r64)                       :: Temp           =0.0  !surface temperature BC
-        REAL(r64)                       :: Hc             =0.0  !convective film coeff BC
-        REAL(r64)                       :: TMeanAir       =0.0  !effective near-surface air temp from air model solution
+        REAL(r64)                       :: Area           =0.0d0  !m2
+        REAL(r64)                       :: Temp           =0.0d0  !surface temperature BC
+        REAL(r64)                       :: Hc             =0.0d0  !convective film coeff BC
+        REAL(r64)                       :: TMeanAir       =0.0d0  !effective near-surface air temp from air model solution
     END TYPE DefineSurfaceSettings
 
     TYPE DefineZoneData
@@ -80,14 +80,14 @@ MODULE MundtSimMgr
     INTEGER, DIMENSION(:), ALLOCATABLE                          :: RoomNodeIDS      ! ids of the first NumRoomNode Air Nodes
     INTEGER, DIMENSION(:), ALLOCATABLE                          :: ID1dSurf         ! numbers used to identify surfaces
     INTEGER                                                     :: MundtZoneNum    =0 ! index of zones using Mundt model
-    REAL(r64)                                                   :: ZoneHeight      =0.0 ! zone height
-    REAL(r64)                                                   :: ZoneFloorArea   =0.0 ! zone floor area
-    REAL(r64)                                                   :: QventCool       =0.0 ! heat gain due to ventilation
-    REAL(r64)                                                   :: ConvIntGain     =0.0 ! heat gain due to internal gains
-    REAL(r64)                                                   :: SupplyAirTemp   =0.0 ! supply air temperature
-    REAL(r64)                                                   :: SupplyAirVolumeRate =0.0 ! supply air volume flowrate
-    REAL(r64)                                                   :: ZoneAirDensity  =0.0  ! zone air density
-    REAL(r64)                                                   :: QsysCoolTot     =0.0  ! zone sensible cooling load
+    REAL(r64)                                                   :: ZoneHeight      =0.0d0 ! zone height
+    REAL(r64)                                                   :: ZoneFloorArea   =0.0d0 ! zone floor area
+    REAL(r64)                                                   :: QventCool       =0.0d0 ! heat gain due to ventilation
+    REAL(r64)                                                   :: ConvIntGain     =0.0d0 ! heat gain due to internal gains
+    REAL(r64)                                                   :: SupplyAirTemp   =0.0d0 ! supply air temperature
+    REAL(r64)                                                   :: SupplyAirVolumeRate =0.0d0 ! supply air volume flowrate
+    REAL(r64)                                                   :: ZoneAirDensity  =0.0d0  ! zone air density
+    REAL(r64)                                                   :: QsysCoolTot     =0.0d0  ! zone sensible cooling load
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE MundtSimMgr
 
@@ -285,14 +285,14 @@ SUBROUTINE InitMundtModel
     ALLOCATE (MundtAirSurf(NumOfMundtZones,MaxNumOfSurfs))
     ALLOCATE (LineNode(NumOfMundtZones,MaxNumOfAirNodes))
     ID1dSurf=(/ (SurfNum, SurfNum = 1, MaxNumOfSurfs) /)
-    MundtAirSurf%Area       = 0.0
-    MundtAirSurf%Temp       = 25.0
-    MundtAirSurf%Hc         = 0.0
-    MundtAirSurf%TMeanAir   = 25.0
+    MundtAirSurf%Area       = 0.0d0
+    MundtAirSurf%Temp       = 25.0d0
+    MundtAirSurf%Hc         = 0.0d0
+    MundtAirSurf%TMeanAir   = 25.0d0
     LineNode%AirNodeName    = ' '
     LineNode%ClassType      = -1
-    LineNode%Height         = 0.0
-    LineNode%Temp           = 25.0
+    LineNode%Height         = 0.0d0
+    LineNode%Temp           = 25.0d0
 
     ! get constant data (unchanged over time) for surfaces and air nodes
     DO MundtZoneIndex =1, NumOfMundtZones
@@ -465,11 +465,11 @@ SUBROUTINE GetSurfHBDataForMundtModel(ZoneNum)
     SupplyAirVolumeRate=ZoneMassFlowRate/ZoneAirDensity
     IF (ZoneMassFlowRate.LE.0.0001d0) THEN
         ! system is off
-        QsysCoolTot = 0.0
+        QsysCoolTot = 0.0d0
     ELSE
         ! determine supply air conditions
-        SumSysMCp = 0.0
-        SumSysMCpT = 0.0
+        SumSysMCp = 0.0d0
+        SumSysMCpT = 0.0d0
         DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
             NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
             MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
@@ -478,7 +478,7 @@ SUBROUTINE GetSurfHBDataForMundtModel(ZoneNum)
             SumSysMCpT = SumSysMCpT + MassFlowRate * CpAir * NodeTemp
         END DO
         ! prevent dividing by zero due to zero supply air flow rate
-        IF (SumSysMCp.LE.0.0) THEN
+        IF (SumSysMCp.LE.0.0d0) THEN
             SupplyAirTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(1))%Temp
         ELSE
             ! a weighted average of the inlet temperatures
@@ -587,9 +587,9 @@ SUBROUTINE SetupMundtModel(ZoneNum,ErrorsFound)
       NumFloorSurfs = COUNT(LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
       FloorSurfSetIDs = PACK(ID1dsurf,LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
       ! initialize floor surface data (a must since NumFloorSurfs is varied among zones)
-      FloorSurf%Temp = 25.0
-      FloorSurf%Hc   = 0.0
-      FloorSurf%Area = 0.0
+      FloorSurf%Temp = 25.0d0
+      FloorSurf%Hc   = 0.0d0
+      FloorSurf%Area = 0.0d0
       ! get floor surface data
       DO SurfNum = 1, NumFloorSurfs
         FloorSurf(SurfNum)%Temp = MundtAirSurf(MundtZoneNum,FloorSurfSetIDs(SurfNum))%Temp
@@ -678,7 +678,7 @@ SUBROUTINE CalcMundtModel(ZoneNum)
                  /((ZoneAirDensity*CpAir*SupplyAirVolumeRate)+(FloorSumHA))
 
     ! prevent dividing by zero due to zero cooling load (or zero supply air flow rate)
-    IF (QsysCoolTot.LE.0.0) THEN
+    IF (QsysCoolTot.LE.0.0d0) THEN
         TLeaving = SupplyAirTemp
     ELSE
     ! Eq 2.3 in ASHRAE RP 1222 Final report

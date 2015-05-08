@@ -45,10 +45,10 @@ PRIVATE
 
   ! MODULE VARIABLE DECLARATIONS:
 
-  REAL(r64) :: CumRunoff = 0.0  ! Cumulative runoff, updated each time step (m) mult by roof area to get volume
-  REAL(r64) :: CumET = 0.0      ! Cumulative evapotranspiration from soil and plants (m)
-  REAL(r64) :: CumPrecip = 0.0
-  REAL(r64) :: CumIrrigation = 0.0 ! Cumulative irrigation, updated each time step (m) mult by roof area to get volume
+  REAL(r64) :: CumRunoff = 0.0d0  ! Cumulative runoff, updated each time step (m) mult by roof area to get volume
+  REAL(r64) :: CumET = 0.0d0      ! Cumulative evapotranspiration from soil and plants (m)
+  REAL(r64) :: CumPrecip = 0.0d0
+  REAL(r64) :: CumIrrigation = 0.0d0 ! Cumulative irrigation, updated each time step (m) mult by roof area to get volume
   REAL(r64) :: CurrentRunoff
   REAL(r64) :: CurrentET
   REAL(r64) :: CurrentPrecipitation  ! units of (m) per timestep
@@ -258,7 +258,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
   IF(SurfaceWindow(SurfNum)%StormWinFlag==1) ConstrNum = Surface(SurfNum)%StormWinConstruction
   RoughSurf    = Material(Construct(ConstrNum)%LayerPoint(1))%Roughness
   AbsThermSurf = Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpThermal
-  HMovInsul    = 0.0
+  HMovInsul    = 0.0d0
 
   IF (Surface(SurfNum)%ExtWind) THEN
      CALL InitExteriorConvectionCoeff(SurfNum,HMovInsul,RoughSurf,AbsThermSurf,TH(SurfNum,1,1), &
@@ -351,16 +351,16 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Tfold = OutDryBulbTempAt(Surface(SurfNum)%Centroid%Z)    !OutDrybulbTemp           ! initial guess
     Tg=10.0d0
     Tf=10.0d0
-    VFluxf=0.0
-    VFluxg=0.0
-    CumRunoff = 0.0
-    CumET = 0.0
-    CumPrecip = 0.0
-    CumIrrigation = 0.0
-    CurrentRunoff = 0.0
-    CurrentET = 0.0
-    CurrentPrecipitation = 0.0
-    CurrentIrrigation = 0.0
+    VFluxf=0.0d0
+    VFluxg=0.0d0
+    CumRunoff = 0.0d0
+    CumET = 0.0d0
+    CumPrecip = 0.0d0
+    CumIrrigation = 0.0d0
+    CurrentRunoff = 0.0d0
+    CurrentET = 0.0d0
+    CurrentPrecipitation = 0.0d0
+    CurrentIrrigation = 0.0d0
     MyEnvrnFlag=.false.
   ENDIF
 
@@ -391,7 +391,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     ELSE
        Qsoilpart1 = -CTFConstOutPart(SurfNum)                             &
                  + Construct(ConstrNum)%CTFCross(0)*TempSurfIn(SurfNum)
-       F1temp = 0.0
+       F1temp = 0.0d0
     END IF
 
     Qsoilpart2 = Construct(ConstrNum)%CTFOutside(0) - F1temp*Construct(ConstrNum)%CTFCross(0)
@@ -467,13 +467,13 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
 
     ! This routine is to calculate ground moisture factor. This factor is from *****
     Mg = moisture / MoistureMax ! m^3/m^3.
-    dOne = 1.0d0- sigmaf *(0.6d0*(1-rn)+0.1d0*(1-Mg))
+    dOne = 1.0d0- sigmaf *(0.6d0*(1.0d0-rn)+0.1d0*(1.0d0-Mg))
 
     !Latent heat of vaporation at leaf surface temperature. The source of this
     !equation is Henderson-Sellers (1984)
     Lef = 1.91846d6 * ( (Tif+KelvinConv)/(Tif+KelvinConv-33.91d0) )**2
     !Check to see if ice is sublimating or frost is forming.
-    if (tfold .lt. 0.0 ) Lef= 2.838d6  ! per FASST documentation p.15 after eqn. 37.
+    if (tfold .lt. 0.0d0 ) Lef= 2.838d6  ! per FASST documentation p.15 after eqn. 37.
 
     !Derivative of Saturation vapor pressure, which is used in the calculation of
     !derivative of saturation specific humidity.
@@ -489,7 +489,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     !Latent heat vaporization  at the ground temperature
     Leg = 1.91846d6*(Tgk/(Tgk-33.91d0))**2
     !Check to see if ice is sublimating or frost is forming.
-    if (tgold .lt. 0.0 ) Leg= 2.838d6  ! per FASST documentation p.15 after eqn. 37.
+    if (tgold .lt. 0.0d0 ) Leg= 2.838d6  ! per FASST documentation p.15 after eqn. 37.
 
     desg = 611.2d0*exp(17.67d0*(Tg/(Tg+KelvinConv-29.65d0))) *      &
        (17.67d0*Tg*(-1.0d0)*(Tg+KelvinConv-29.65d0)**(-2) + 17.67d0/(KelvinConv-29.65d0 + Tg))
@@ -504,7 +504,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
     Rib = 2.0d0*g1*Za*(Taf-Tg) / ( (Tafk+Tgk)*Waf**2 )   !Richardson Number
 
     ! Compute the stability factor Gammah
-    IF (Rib < 0.0) THEN
+    IF (Rib < 0.0d0) THEN
       Gammah = (1.0d0-16.0d0*Rib)**(-0.5d0)
     ELSE
       IF (Rib >= 0.19d0) THEN
@@ -553,8 +553,8 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
                                             ! how much evaporation has taken place...
     Vfluxf= -1.0d0*Lf/Lef/990.0d0               ! water evapotranspire rate [m/s]
     Vfluxg= -1.0d0*Lg/Leg/990.0d0               ! water evapotranspire rate [m/s]
-    if (Vfluxf .LT. 0.0) Vfluxf = 0.0       ! According to FASST Veg. Models p. 11, eqn 26-27, if Qfsat > qaf the actual
-    if (Vfluxg .LT. 0.0) Vfluxg = 0.0       ! evaporative fluxes should be set to zero (delta_c = 1 or 0).
+    if (Vfluxf .LT. 0.0d0) Vfluxf = 0.0d0       ! According to FASST Veg. Models p. 11, eqn 26-27, if Qfsat > qaf the actual
+    if (Vfluxg .LT. 0.0d0) Vfluxg = 0.0d0       ! evaporative fluxes should be set to zero (delta_c = 1 or 0).
 
     ! P1, P2, P3 corespond to first, second and third terms of equation 37 in the main report.
 
@@ -670,7 +670,7 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
           ! na
 
   !Soil Parameters from Reference listed in the code:
-  REAL(r64), PARAMETER :: alpha=23d0   !These parameters are empirical constants
+  REAL(r64), PARAMETER :: alpha=23.0d0   !These parameters are empirical constants
   REAL(r64), PARAMETER :: n=1.27d0     !These parameters are empirical constants
   REAL(r64), PARAMETER :: lambda=0.5d0 !These parameters are empirical constants
   !This is another parameter of the soil which describes the soil conductivity at the saturation point (m/s)
@@ -734,8 +734,8 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   !DJS 2011 FEB - Since we no longer use CTF with soil-dependent properties (Do not RECALL INITCONDUCTION...
   !DJS 2011 FEB - we may be able to get away with NO limits on rates of change when using CFD routine.
   !DJS 2011 FEB - for now we stick with 20% per quarter hour.
-   RatioMax = 1.0 + 0.20*minutespertimestep/15.0
-   RatioMin = 1.0 - 0.20*minutespertimestep/15.0
+   RatioMax = 1.0d0 + 0.20d0*minutespertimestep/15.0d0
+   RatioMin = 1.0d0 - 0.20d0*minutespertimestep/15.0d0
 
   If (UpdatebeginFlag) then
 
@@ -773,7 +773,7 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
     UpdatebeginFlag = .FALSE.
   endif
 
-  CurrentRunoff = 0.0 ! Initialize current time step runoff as it is used in several spots below...
+  CurrentRunoff = 0.0d0 ! Initialize current time step runoff as it is used in several spots below...
 
   ! FIRST Subtract water evaporated by plants and at soil surface
   Moisture = Moisture - (Vfluxg)*MinutesPerTimeStep*60.0d0/TopDepth  ! soil surface evaporation
@@ -787,9 +787,9 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
   ! NEXT Add Precipitation to surface soil moisture variable (if a schedule exists)
   IF (.not. WarmupFlag) THEN
-  CurrentPrecipitation = 0.0 ! first initialize to zero
+  CurrentPrecipitation = 0.0d0 ! first initialize to zero
   ENDIF
-  CurrentPrecipitation = 0.0 ! first initialize to zero
+  CurrentPrecipitation = 0.0d0 ! first initialize to zero
   If (Rainfall%ModeID ==RainSchedDesign) then
     CurrentPrecipitation = Rainfall%CurrentAmount !  units of m
     Moisture = Moisture + CurrentPrecipitation/TopDepth  ! x (m) evenly put into top layer
@@ -799,8 +799,8 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   Endif
 
   ! NEXT Add Irrigation to surface soil moisture variable (if a schedule exists)
-    CurrentIrrigation = 0.0 ! first initialize to zero
-    irrigation%actualamount=0.0
+    CurrentIrrigation = 0.0d0 ! first initialize to zero
+    irrigation%actualamount=0.0d0
     If (Irrigation%ModeID == IrrSchedDesign) then
       CurrentIrrigation = irrigation%ScheduledAmount ! units of m
       irrigation%actualamount=CurrentIrrigation
@@ -937,7 +937,7 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
 
     !Now make sure the rate of liquid leaving the soil is more than one drop per hour
     IF((SoilConductivityAveRoot*3600.d0) .LE. (2.33d-7)) THEN
-         SoilConductivityAveRoot=0
+         SoilConductivityAveRoot=0.0d0
     END IF
 
 

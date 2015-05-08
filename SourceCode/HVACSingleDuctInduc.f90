@@ -25,10 +25,8 @@ MODULE HVACSingleDuctInduc
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, &
-                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
-                           SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd, &
-                           ShowContinueErrorTimeStamp
+                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn, DisplayExtraWarnings
+USE DataInterfaces
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
           ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -50,9 +48,9 @@ TYPE IndUnitData
   INTEGER                      :: UnitType_Num        =0   ! index to type of unit
   CHARACTER(len=MaxNameLength) :: Sched               =' ' ! availability schedule
   INTEGER                      :: SchedPtr            =0   ! index to schedule
-  REAL(r64)                    :: MaxTotAirVolFlow    =0.0 ! m3/s (autosizable)
-  REAL(r64)                    :: MaxTotAirMassFlow   =0.0 ! kg/s
-  REAL(r64)                    :: InducRatio          =2.5 ! ratio of induced air flow to primary air flow
+  REAL(r64)                    :: MaxTotAirVolFlow    =0.0d0 ! m3/s (autosizable)
+  REAL(r64)                    :: MaxTotAirMassFlow   =0.0d0 ! kg/s
+  REAL(r64)                    :: InducRatio          =2.5d0 ! ratio of induced air flow to primary air flow
   INTEGER                      :: PriAirInNode        =0   ! unit primary air inlet node number
   INTEGER                      :: SecAirInNode        =0   ! unit induced air inlet node number
   INTEGER                      :: OutAirNode          =0   ! unit air outlet node number
@@ -62,11 +60,11 @@ TYPE IndUnitData
   CHARACTER(len=MaxNameLength) :: HCoil               =' ' ! name of heating coil component
   INTEGER                      :: HCoil_Num           =0   ! index to this coil
   INTEGER                      :: HCoil_PlantTypeNum  =0   !
-  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0 ! m3/s (autosizable)
-  REAL(r64)                    :: MaxHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: MinVolHotWaterFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: HotControlOffset    =0.0 ! control tolerance
+  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0d0 ! m3/s (autosizable)
+  REAL(r64)                    :: MaxHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: MinVolHotWaterFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: HotControlOffset    =0.0d0 ! control tolerance
   INTEGER                      :: HWLoopNum           =0   ! index for plant loop with hot water coil
   INTEGER                      :: HWLoopSide          =0   ! index for plant loop side for hot water coil
   INTEGER                      :: HWBranchNum         =0   ! index for plant branch for hot water coil
@@ -79,11 +77,11 @@ TYPE IndUnitData
   CHARACTER(len=MaxNameLength) :: CCoil               =' ' ! name of cooling coil component
   INTEGER                      :: CCoil_Num           =0   ! index to this coil
   INTEGER                      :: CCoil_PlantTypeNum  =0   !
-  REAL(r64)                    :: MaxVolColdWaterFlow =0.0 ! m3/s (autosizable)
-  REAL(r64)                    :: MaxColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MinVolColdWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: ColdControlOffset   =0.0 ! control tolerance
+  REAL(r64)                    :: MaxVolColdWaterFlow =0.0d0 ! m3/s (autosizable)
+  REAL(r64)                    :: MaxColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MinVolColdWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: ColdControlOffset   =0.0d0 ! control tolerance
   INTEGER                      :: CWLoopNum           =0   ! index for plant loop with chilled water coil
   INTEGER                      :: CWLoopSide          =0   ! index for plant loop side for chilled water coil
   INTEGER                      :: CWBranchNum         =0   ! index for plant branch for chilled water coil
@@ -94,11 +92,11 @@ TYPE IndUnitData
 
   CHARACTER(len=MaxNameLength) :: MixerName           =' ' ! name of air mixer component
   INTEGER                      :: Mixer_Num           =0   ! index to this mixer
-  REAL(r64)                    :: MaxPriAirMassFlow   =0.0 ! kg/s
-  REAL(r64)                    :: MaxSecAirMassFlow   =0.0 ! kg/s
+  REAL(r64)                    :: MaxPriAirMassFlow   =0.0d0 ! kg/s
+  REAL(r64)                    :: MaxSecAirMassFlow   =0.0d0 ! kg/s
   INTEGER                      :: ADUNum              =0   ! index of corresponding air distribution unit
-  REAL(r64)                    :: DesCoolingLoad      = 0.0 ! used for reporting during coil sizing
-  REAL(r64)                    :: DesHeatingLoad      = 0.0 ! used for reporting during coil sizing
+  REAL(r64)                    :: DesCoolingLoad      = 0.0d0 ! used for reporting during coil sizing
+  REAL(r64)                    :: DesHeatingLoad      = 0.0d0 ! used for reporting during coil sizing
 END TYPE IndUnitData
           ! MODULE VARIABLE DECLARATIONS:
 TYPE (IndUnitData), ALLOCATABLE, DIMENSION(:)         :: IndUnit
@@ -316,7 +314,7 @@ SUBROUTINE GetIndUnits
   ALLOCATE(cNumericFields(NumNumbers))
   cNumericFields=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(lAlphaBlanks(NumAlphas))
   lAlphaBlanks=.true.
   ALLOCATE(lNumericBlanks(NumNumbers))
@@ -624,8 +622,8 @@ SUBROUTINE InitIndUnit(IUNum,FirstHVACIteration)
     ! set the mass flow rates from the input volume flow rates
     IF (SameString(IndUnit(IUNum)%UnitType,'AirTerminal:SingleDuct:ConstantVolume:FourPipeInduction')) THEN
       IndUnit(IUNum)%MaxTotAirMassFlow = RhoAir * IndUnit(IUNum)%MaxTotAirVolFlow
-      IndUnit(IUNum)%MaxPriAirMassFlow = IndUnit(IUNum)%MaxTotAirMassFlow / (1.+IndRat)
-      IndUnit(IUNum)%MaxSecAirMassFlow = IndRat*IndUnit(IUNum)%MaxTotAirMassFlow / (1.+IndRat)
+      IndUnit(IUNum)%MaxPriAirMassFlow = IndUnit(IUNum)%MaxTotAirMassFlow / (1.0d0+IndRat)
+      IndUnit(IUNum)%MaxSecAirMassFlow = IndRat*IndUnit(IUNum)%MaxTotAirMassFlow / (1.0d0+IndRat)
       Node(PriNode)%MassFlowRateMax = IndUnit(IUNum)%MaxPriAirMassFlow
       Node(PriNode)%MassFlowRateMin = IndUnit(IUNum)%MaxPriAirMassFlow
       Node(SecNode)%MassFlowRateMax = IndUnit(IUNum)%MaxSecAirMassFlow
@@ -685,19 +683,19 @@ SUBROUTINE InitIndUnit(IUNum,FirstHVACIteration)
   ! Do the start of HVAC time step initializations
   IF (FirstHVACIteration) THEN
     ! check for upstream zero flow. If nonzero and schedule ON, set primary flow to max
-    IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .GT. 0.0 .AND. &
-        Node(PriNode)%MassFlowRate .GT. 0.0) THEN
+    IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .GT. 0.0d0 .AND. &
+        Node(PriNode)%MassFlowRate .GT. 0.0d0) THEN
       IF (SameString(IndUnit(IUNum)%UnitType,'AirTerminal:SingleDuct:ConstantVolume:FourPipeInduction')) THEN
         Node(PriNode)%MassFlowRate = IndUnit(IUNum)%MaxPriAirMassFlow
         Node(SecNode)%MassFlowRate = IndUnit(IUNum)%MaxSecAirMassFlow
       END IF
     ELSE
-      Node(PriNode)%MassFlowRate = 0.0
-      Node(SecNode)%MassFlowRate = 0.0
+      Node(PriNode)%MassFlowRate = 0.0d0
+      Node(SecNode)%MassFlowRate = 0.0d0
     END IF
     ! reset the max and min avail flows
-    IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .GT. 0.0 .AND. &
-        Node(PriNode)%MassFlowRateMaxAvail .GT. 0.0) THEN
+    IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .GT. 0.0d0 .AND. &
+        Node(PriNode)%MassFlowRateMaxAvail .GT. 0.0d0) THEN
       IF (SameString(IndUnit(IUNum)%UnitType,'AirTerminal:SingleDuct:ConstantVolume:FourPipeInduction')) THEN
         Node(PriNode)%MassFlowRateMaxAvail = IndUnit(IUNum)%MaxPriAirMassFlow
         Node(PriNode)%MassFlowRateMinAvail = IndUnit(IUNum)%MaxPriAirMassFlow
@@ -705,10 +703,10 @@ SUBROUTINE InitIndUnit(IUNum,FirstHVACIteration)
         Node(SecNode)%MassFlowRateMinAvail = IndUnit(IUNum)%MaxSecAirMassFlow
       END IF
     ELSE
-      Node(PriNode)%MassFlowRateMaxAvail = 0.0
-      Node(PriNode)%MassFlowRateMinAvail = 0.0
-      Node(SecNode)%MassFlowRateMaxAvail = 0.0
-      Node(SecNode)%MassFlowRateMinAvail = 0.0
+      Node(PriNode)%MassFlowRateMaxAvail = 0.0d0
+      Node(PriNode)%MassFlowRateMinAvail = 0.0d0
+      Node(SecNode)%MassFlowRateMaxAvail = 0.0d0
+      Node(SecNode)%MassFlowRateMinAvail = 0.0d0
     END IF
   END IF
 
@@ -721,7 +719,7 @@ SUBROUTINE SizeIndUnit(IUNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   June 22 2004
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -743,7 +741,7 @@ SUBROUTINE SizeIndUnit(IUNum)
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE DataPlant,           ONLY: PlantLoop, MyPlantSizingIndex
-
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -771,101 +769,174 @@ SUBROUTINE SizeIndUnit(IUNum)
   LOGICAL             :: ErrorsFound
   REAL(r64)           :: Cp ! local fluid specific heat
   REAL(r64)           :: rho ! local fluid density
+  LOGICAL             :: IsAutosize
+  REAL(r64)           ::  MaxTotAirVolFlowDes     ! Desing size maximum air volume flow for reproting
+  REAL(r64)           ::  MaxTotAirVolFlowUser    ! User hard-sized maximum air volume flow for reporting
+  REAL(r64)           ::  MaxVolHotWaterFlowDes   ! Desing size maximum hot water flow for reproting
+  REAL(r64)           ::  MaxVolHotWaterFlowUser  ! User hard-sized maximum hot water flow for reporting
+  REAL(r64)           ::  MaxVolColdWaterFlowDes  ! Desing size maximum cold water flow for reproting
+  REAL(r64)           ::  MaxVolColdWaterFlowUser ! User hard-sized maximum cold water flow for reporting
 
   PltSizHeatNum = 0
   PltSizCoolNum = 0
-  DesPriVolFlow = 0.0
-  CpAir = 0.0
+  DesPriVolFlow = 0.0d0
+  CpAir = 0.0d0
   RhoAir = StdRhoAir
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxTotAirVolFlowDes = 0.0d0
+  MaxTotAirVolFlowUser = 0.0d0
+  MaxVolHotWaterFlowDes = 0.0d0
+  MaxVolHotWaterFlowUser = 0.0d0
+  MaxVolColdWaterFlowDes = 0.0d0
+  MaxVolColdWaterFlowUser = 0.0d0
 
   IF (IndUnit(IUNum)%MaxTotAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name)
-      IndUnit(IUNum)%MaxTotAirVolFlow = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                             TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (IndUnit(IUNum)%MaxTotAirVolFlow < SmallAirVolFlow) THEN
-        IndUnit(IUNum)%MaxTotAirVolFlow = 0.0
-      END IF
-      CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
-                              'Maximum Total Air Flow Rate [m3/s]', IndUnit(IUNum)%MaxTotAirVolFlow)
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
 
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation continue
+      IF (IndUnit(IUNum)%MaxTotAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                              'User-Specified Maximum Total Air Flow Rate [m3/s]', IndUnit(IUNum)%MaxTotAirVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name)
+      MaxTotAirVolFlowDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                            TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF (MaxTotAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxTotAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        IndUnit(IUNum)%MaxTotAirVolFlow = MaxTotAirVolFlowDes
+        CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                              'Design Size Maximum Total Air Flow Rate [m3/s]', MaxTotAirVolFlowDes)
+      ELSE
+        IF (IndUnit(IUNum)%MaxTotAirVolFlow > 0.0d0 .AND. MaxTotAirVolFlowDes > 0.0d0) THEN
+          MaxTotAirVolFlowUser = IndUnit(IUNum)%MaxTotAirVolFlow
+          CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                              'Design Size Maximum Total Air Flow Rate [m3/s]', MaxTotAirVolFlowDes, &
+                              'User-Specified Maximum Total Air Flow Rate [m3/s]', MaxTotAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxTotAirVolFlowDes - MaxTotAirVolFlowUser)/MaxTotAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeHVACSingleDuctInduction: Potential issue with equipment sizing for ' &
+                                    //  TRIM(IndUnit(IUNum)%UnitType)//' = "'//TRIM(IndUnit(IUNum)%Name)//'".')
+              CALL ShowContinueError('User-Specified Maximum Total Air Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxTotAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Total Air Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxTotAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
+  END IF
+
+  IsAutosize = .FALSE.
   IF (IndUnit(IUNum)%MaxVolHotWaterFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation continue
+      IF (IndUnit(IUNum)%MaxVolHotWaterFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                          'User-Specified Maximum Hot Water Flow Rate [m3/s]', IndUnit(IUNum)%MaxVolHotWaterFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name)
 
       IF (SameString(IndUnit(IUNum)%HCoilType,'Coil:Heating:Water')) THEN
 
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',IndUnit(IUNum)%HCoil,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',IndUnit(IUNum)%HCoil,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', IndUnit(IUNum)%HCoil, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', IndUnit(IUNum)%HCoil, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
+          IF (PltSizHeatNum > 0) THEN
 
-        IF (PltSizHeatNum > 0) THEN
-
-          IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            DesPriVolFlow = IndUnit(IUNum)%MaxTotAirVolFlow / (1.d0+IndUnit(IUNum)%InducRatio)
-            CpAir = PsyCpAirFnWTdb(TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat,  &
+            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              DesPriVolFlow = IndUnit(IUNum)%MaxTotAirVolFlow / (1.d0+IndUnit(IUNum)%InducRatio)
+              CpAir = PsyCpAirFnWTdb(TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat,  &
                                      TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp)
             ! the design heating coil load is the zone load minus whatever the central system does. Note that
             ! DesHeatCoilInTempTU is really the primary air inlet temperature for the unit.
-            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak > 0.0) THEN
-              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor - &
+              IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak > 0.0d0) THEN
+                DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor - &
                               CpAir*RhoAir*DesPriVolFlow* &
                              (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU -   &
                               TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak)
-            ELSE
-              DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(ZoneSizThermSetPtLo(CurZoneEqNum) -   &
+              ELSE
+                DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(ZoneSizThermSetPtLo(CurZoneEqNum) -   &
                                     TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU)
+              END IF
+              IndUnit(IUNum)%DesHeatingLoad = DesCoilLoad
+              Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidName, &
+                                       60.d0, &
+                                       PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidIndex, &
+                                       'SizeIndUnit' )
+
+              rho = GetDensityGlycol( PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidName, &
+                                       60.d0, &
+                                       PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidIndex, &
+                                       'SizeIndUnit' )
+
+              MaxVolHotWaterFlowDes = DesCoilLoad / &
+                                    ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                     Cp * rho )
+              MaxVolHotWaterFlowDes = MAX(MaxVolHotWaterFlowDes,0.0d0)
+            ELSE
+              MaxVolHotWaterFlowDes = 0.0d0
             END IF
-            IndUnit(IUNum)%DesHeatingLoad = DesCoilLoad
-            Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidName, &
-                                       60.d0, &
-                                       PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidIndex, &
-                                       'SizeIndUnit' )
-
-            rho = GetDensityGlycol( PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidName, &
-                                       60.d0, &
-                                       PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidIndex, &
-                                       'SizeIndUnit' )
-
-            IndUnit(IUNum)%MaxVolHotWaterFlow = DesCoilLoad / &
-                                               ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                 Cp * rho )
-            IndUnit(IUNum)%MaxVolHotWaterFlow = MAX(IndUnit(IUNum)%MaxVolHotWaterFlow,0.0d0)
           ELSE
-            IndUnit(IUNum)%MaxVolHotWaterFlow = 0.0
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in' //  TRIM(IndUnit(IUNum)%UnitType) // ' Object='//TRIM(IndUnit(IUNum)%Name))
+            ErrorsFound = .TRUE.
           END IF
-
-          CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
-                                  'Maximum Hot Water Flow Rate [m3/s]', IndUnit(IUNum)%MaxVolHotWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in' //  TRIM(IndUnit(IUNum)%UnitType) // ' Object='//TRIM(IndUnit(IUNum)%Name))
-          ErrorsFound = .TRUE.
         END IF
-
+        IF (IsAutosize) THEN
+            IndUnit(IUNum)%MaxVolHotWaterFlow = MaxVolHotWaterFlowDes
+            CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                                  'Design Size Maximum Hot Water Flow Rate [m3/s]', MaxVolHotWaterFlowDes)
+        ELSE
+          IF (IndUnit(IUNum)%MaxVolHotWaterFlow > 0.0d0 .AND. MaxVolHotWaterFlowDes > 0.0d0) THEN
+            MaxVolHotWaterFlowUser = IndUnit(IUNum)%MaxVolHotWaterFlow
+            CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                                  'Design Size Maximum Hot Water Flow Rate [m3/s]', MaxVolHotWaterFlowDes, &
+                                  'User-Specified Maximum Hot Water Flow Rate [m3/s]', MaxVolHotWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotWaterFlowDes - MaxVolHotWaterFlowUser)/MaxVolHotWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeHVACSingleDuctInduction: Potential issue with equipment sizing for '// &
+                                    TRIM(IndUnit(IUNum)%UnitType)//' = "'//TRIM(IndUnit(IUNum)%Name)//'".')
+                CALL ShowContinueError('User-Specified Maximum Hot Water Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxVolHotWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Hot Water Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxVolHotWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       ELSE
-
-        IndUnit(IUNum)%MaxVolHotWaterFlow = 0.0
-
+        IndUnit(IUNum)%MaxVolHotWaterFlow = 0.0d0
       END IF
-
     END IF
-
   END IF
 
-IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+  IsAutosize = .FALSE.
+  IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation continue
+      IF (IndUnit(IUNum)%MaxVolColdWaterFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                          'User-Specified Maximum Cold Water Flow Rate [m3/s]', IndUnit(IUNum)%MaxVolColdWaterFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name)
 
       IF (SameString(IndUnit(IUNum)%CCoilType,'Coil:Cooling:Water') .or. &
@@ -873,62 +944,79 @@ IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
 
         CoilWaterInletNode = GetCoilWaterInletNode(IndUnit(IUNum)%CCoilType,IndUnit(IUNum)%CCoil,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode(IndUnit(IUNum)%CCoilType,IndUnit(IUNum)%CCoil,ErrorsFound)
-        PltSizCoolNum = MyPlantSizingIndex(IndUnit(IUNum)%CCoilType, IndUnit(IUNum)%CCoil, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PltSizCoolNum = MyPlantSizingIndex(IndUnit(IUNum)%CCoilType, IndUnit(IUNum)%CCoil, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
+          IF (PltSizCoolNum > 0) THEN
 
-        IF (PltSizCoolNum > 0) THEN
-
-          IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
-            DesPriVolFlow = IndUnit(IUNum)%MaxTotAirVolFlow / (1.d0+IndUnit(IUNum)%InducRatio)
-            CpAir = PsyCpAirFnWTdb(TermUnitFinalZoneSizing(CurZoneEqNum)%CoolDesHumRat,  &
+            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
+              DesPriVolFlow = IndUnit(IUNum)%MaxTotAirVolFlow / (1.d0+IndUnit(IUNum)%InducRatio)
+              CpAir = PsyCpAirFnWTdb(TermUnitFinalZoneSizing(CurZoneEqNum)%CoolDesHumRat,  &
                                    TermUnitFinalZoneSizing(CurZoneEqNum)%CoolDesTemp)
             ! the design cooling coil load is the zone load minus whatever the central system does. Note that
             ! DesCoolCoilInTempTU is really the primary air inlet temperature for the unit.
-            IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0) THEN
-              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesCoolLoad * CalcFinalZoneSizing(CurZoneEqNum)%CoolSizingFactor - &
+              IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0d0) THEN
+                DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesCoolLoad * CalcFinalZoneSizing(CurZoneEqNum)%CoolSizingFactor - &
                             CpAir*RhoAir*DesPriVolFlow* &
                             (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak -   &
                              TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU)
-            ELSE
-              DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU   &
+              ELSE
+                DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU   &
                                          - ZoneSizThermSetPtHi(CurZoneEqNum))
+              END IF
+              IndUnit(IUNum)%DesCoolingLoad = DesCoilLoad
+              Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidName, &
+                                       5.0d0, &
+                                       PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidIndex, &
+                                       'SizeIndUnit' )
+
+              rho = GetDensityGlycol( PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidName, &
+                                       5.0d0, &
+                                       PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidIndex, &
+                                       'SizeIndUnit' )
+
+
+              MaxVolColdWaterFlowDes = DesCoilLoad / &
+                                     ( PlantSizData(PltSizCoolNum)%DeltaT * &
+                                     Cp * rho )
+              MaxVolColdWaterFlowDes = MAX(MaxVolColdWaterFlowDes,0.0d0)
+            ELSE
+              MaxVolColdWaterFlowDes = 0.0d0
             END IF
-            IndUnit(IUNum)%DesCoolingLoad = DesCoilLoad
-            Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidName, &
-                                       5.0d0, &
-                                       PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidIndex, &
-                                       'SizeIndUnit' )
-
-            rho = GetDensityGlycol( PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidName, &
-                                       5.0d0, &
-                                       PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidIndex, &
-                                       'SizeIndUnit' )
-
-
-            IndUnit(IUNum)%MaxVolColdWaterFlow = DesCoilLoad / &
-                                               ( PlantSizData(PltSizCoolNum)%DeltaT * &
-                                                 Cp * rho )
-            IndUnit(IUNum)%MaxVolColdWaterFlow = MAX(IndUnit(IUNum)%MaxVolColdWaterFlow,0.0d0)
           ELSE
-            IndUnit(IUNum)%MaxVolColdWaterFlow = 0.0
+            CALL ShowSevereError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in' //  TRIM(IndUnit(IUNum)%UnitType) // ' Object='//TRIM(IndUnit(IUNum)%Name))
+            ErrorsFound = .TRUE.
           END IF
-
-          CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
-                                  'Maximum Cold Water Flow Rate [m3/s]', IndUnit(IUNum)%MaxVolColdWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in' //  TRIM(IndUnit(IUNum)%UnitType) // ' Object='//TRIM(IndUnit(IUNum)%Name))
-          ErrorsFound = .TRUE.
         END IF
-
+        IF (IsAutosize) THEN
+          IndUnit(IUNum)%MaxVolColdWaterFlow = MaxVolColdWaterFlowDes
+          CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                                  'Design Size Maximum Cold Water Flow Rate [m3/s]', MaxVolColdWaterFlowDes)
+        ELSE
+          IF (IndUnit(IUNum)%MaxVolColdWaterFlow > 0.0d0 .AND. MaxVolColdWaterFlowDes > 0.0d0) THEN
+            MaxVolColdWaterFlowUser = IndUnit(IUNum)%MaxVolColdWaterFlow
+            CALL ReportSizingOutput(IndUnit(IUNum)%UnitType, IndUnit(IUNum)%Name, &
+                                  'Design Size Maximum Cold Water Flow Rate [m3/s]', MaxVolColdWaterFlowDes, &
+                                  'User-Specified Maximum Cold Water Flow Rate [m3/s]', MaxVolColdWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolColdWaterFlowDes - MaxVolColdWaterFlowUser)/MaxVolColdWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeHVACSingleDuctInduction: Potential issue with equipment sizing for '// &
+                                    TRIM(IndUnit(IUNum)%UnitType)//' = "'//TRIM(IndUnit(IUNum)%Name)//'".')
+                CALL ShowContinueError('User-Specified Maximum Cold Water Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxVolColdWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Cold Water Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxVolColdWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       ELSE
-
-        IndUnit(IUNum)%MaxVolColdWaterFlow = 0.0
-
+        IndUnit(IUNum)%MaxVolColdWaterFlow = 0.0d0
       END IF
-
     END IF
-
   END IF
 
   IF (CurZoneEqNum > 0) THEN
@@ -1031,7 +1119,7 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
   INTEGER   :: CWOutletNode
 
   UnitOn = .TRUE.
-  PowerMet = 0.0
+  PowerMet = 0.0d0
   InducRat = IndUnit(IUNum)%InducRatio
   PriNode = IndUnit(IUNum)%PriAirInNode
   SecNode = IndUnit(IUNum)%SecAirInNode
@@ -1086,7 +1174,7 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
                                IndUnit(IUNum)%CWBranchNum,  &
                                IndUnit(IUNum)%CWCompNum)
 
-  IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .LE. 0.0) UnitOn = .FALSE.
+  IF (GetCurrentScheduleValue(IndUnit(IUNum)%SchedPtr) .LE. 0.0d0) UnitOn = .FALSE.
   IF (PriAirMassFlow.LE.SmallMassFlow) UnitOn = .FALSE.
 
   ! Set the unit's air inlet nodes mass flow rates
@@ -1106,9 +1194,9 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
       IF (PowerMet > QToHeatSetPt + SmallLoad) THEN
         Par(1) = REAL(IUNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.d0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0d0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = MinColdWaterFlow
@@ -1154,9 +1242,9 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
       IF (PowerMet < QToCoolSetPt - SmallLoad) THEN
         Par(1) = REAL(IUNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.d0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0d0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = MinHotWaterFlow
@@ -1363,7 +1451,7 @@ FUNCTION FourPipeIUHeatingResidual(HWFlow, Par) RESULT (Residuum)
   REAL(r64)    :: UnitOutput
 
   IUIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0d0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.
@@ -1421,7 +1509,7 @@ FUNCTION FourPipeIUCoolingResidual(CWFlow, Par) RESULT (Residuum)
   REAL(r64)    :: UnitOutput
 
   IUIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0d0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.

@@ -248,7 +248,7 @@ SUBROUTINE GetZoneContaminanInputs
   MaxNumber=MAX(MaxNumber,NumNumber)
   ALLOCATE(IHGNumbers(MaxNumber))
   ALLOCATE(AlphaName(MaxAlpha))
-  IHGNumbers=0.0
+  IHGNumbers=0.0d0
   AlphaName=' '
 
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:Constant'
@@ -257,7 +257,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCGenConstant
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -293,15 +293,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericConstant(Loop)%GCGenerateRateSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericConstant(Loop)%GCGenerateRateSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -327,15 +327,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericConstant(Loop)%GCRemovalCoefSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericConstant(Loop)%GCRemovalCoefSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(4))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(4))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(4))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(4))//  &
@@ -371,7 +371,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCGenPDriven
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -413,15 +413,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericPDriven(Loop)%GCGenRateCoefSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericPDriven(Loop)%GCGenRateCoefSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -476,7 +476,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCGenCutoff
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -512,15 +512,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericCutoff(Loop)%GCGenerateRateSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericCutoff(Loop)%GCGenerateRateSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -568,7 +568,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCGenDecay
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -604,15 +604,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericDecay(Loop)%GCEmiRateSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericDecay(Loop)%GCEmiRateSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -662,7 +662,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCBLDiff
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -698,15 +698,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericBLDiff(Loop)%GCTranCoefSchedPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericBLDiff(Loop)%GCTranCoefSchedPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -756,7 +756,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCDVS
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -792,15 +792,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericDVS(Loop)%GCDepoVeloPtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericDVS(Loop)%GCDepoVeloPtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -840,7 +840,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   DO Loop=1,TotGCDRS
     AlphaName='  '
-    IHGNumbers=0.0
+    IHGNumbers=0.0d0
     CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -876,15 +876,15 @@ SUBROUTINE GetZoneContaminanInputs
     ELSE  ! check min/max on schedule
       SchMin=GetScheduleMinValue(ZoneContamGenericDRS(Loop)%GCDepoRatePtr)
       SchMax=GetScheduleMaxValue(ZoneContamGenericDRS(Loop)%GCDepoRatePtr)
-      IF (SchMin < 0.0 .or. SchMax < 0.0) THEN
-        IF (SchMin < 0.0) THEN
+      IF (SchMin < 0.0d0 .or. SchMax < 0.0d0) THEN
+        IF (SchMin < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', minimum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
                              '". Minimum is ['//TRIM(RoundSigDigits(SchMin,1))//']. Values must be >= 0.0.')
           ErrorsFound=.true.
         ENDIF
-        IF (SchMax < 0.0) THEN
+        IF (SchMax < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                              '", '//TRIM(cAlphaFieldNames(3))//', maximum is < 0.0')
           CALL ShowContinueError('Schedule="'//TRIM(AlphaName(3))//  &
@@ -1032,7 +1032,8 @@ SUBROUTINE GetZoneContaminanSetpoints
         ErrorsFound = .TRUE.
       ELSE
         ! Check validity of control types.
-        ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr,'>=',0.0,'<=',1.0)
+        ValidScheduleType=  &
+           CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr,'>=',0.0d0,'<=',1.0d0)
         IF (.not. ValidScheduleType) THEN
           CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
              trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'"')
@@ -1053,8 +1054,8 @@ SUBROUTINE GetZoneContaminanSetpoints
       ErrorsFound = .TRUE.
     ELSE
       ! Check validity of control types.
-      ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%SPSchedIndex,'>=',0.0,  &
-                                                       '<=',2000.0)
+      ValidScheduleType=  &
+         CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%SPSchedIndex,'>=',0.0d0,'<=',2000.0d0)
       IF (.not. ValidScheduleType) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
            trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'"')
@@ -1067,8 +1068,8 @@ SUBROUTINE GetZoneContaminanSetpoints
     ContaminantControlledZone(ContControlledZoneNum)%ZoneMinCO2SchedIndex=GetScheduleIndex(cAlphaArgs(5))
     IF (ContaminantControlledZone(ContControlledZoneNum)%ZoneMinCO2SchedIndex .GT. 0) THEN
       ! Check validity of control types.
-      ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%ZoneMinCO2SchedIndex,'>=',0.0,  &
-                                                       '<=',2000.0)
+      ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%ZoneMinCO2SchedIndex,  &
+             '>=',0.0d0,'<=',2000.0d0)
       IF (.not. ValidScheduleType) THEN
         CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
            trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'"')
@@ -1093,7 +1094,7 @@ SUBROUTINE GetZoneContaminanSetpoints
         ELSE
         ! Check validity of control types.
           ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedPtr,  &
-             '>=',0.0,'<=',1.0)
+             '>=',0.0d0,'<=',1.0d0)
           IF (.not. ValidScheduleType) THEN
             CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
                trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(6))//'"')
@@ -1196,45 +1197,45 @@ SUBROUTINE InitZoneContSetpoints
     ! CO2
     IF (Contaminant%CO2Simulation) Then
       ALLOCATE(ZoneCO2Setpoint(NumOfZones))
-      ZoneCO2Setpoint=0.0
+      ZoneCO2Setpoint=0.0d0
       ALLOCATE(CO2PredictedRate(NumOfZones))
-      CO2PredictedRate=0.0
+      CO2PredictedRate=0.0d0
       ALLOCATE(CO2ZoneTimeMinus1(NumOfZones))
-      CO2ZoneTimeMinus1=0.0
+      CO2ZoneTimeMinus1=0.0d0
       ALLOCATE(CO2ZoneTimeMinus2(NumOfZones))
-      CO2ZoneTimeMinus2=0.0
+      CO2ZoneTimeMinus2=0.0d0
       ALLOCATE(CO2ZoneTimeMinus3(NumOfZones))
-      CO2ZoneTimeMinus3=0.0
+      CO2ZoneTimeMinus3=0.0d0
       ALLOCATE(CO2ZoneTimeMinus4(NumOfZones))
-      CO2ZoneTimeMinus4=0.0
+      CO2ZoneTimeMinus4=0.0d0
       ALLOCATE(DSCO2ZoneTimeMinus1(NumOfZones))
-      DSCO2ZoneTimeMinus1=0.0
+      DSCO2ZoneTimeMinus1=0.0d0
       ALLOCATE(DSCO2ZoneTimeMinus2(NumOfZones))
-      DSCO2ZoneTimeMinus2=0.0
+      DSCO2ZoneTimeMinus2=0.0d0
       ALLOCATE(DSCO2ZoneTimeMinus3(NumOfZones))
-      DSCO2ZoneTimeMinus3=0.0
+      DSCO2ZoneTimeMinus3=0.0d0
       ALLOCATE(DSCO2ZoneTimeMinus4(NumOfZones))
-      DSCO2ZoneTimeMinus4=0.0
+      DSCO2ZoneTimeMinus4=0.0d0
       ALLOCATE(CO2ZoneTimeMinus1Temp(NumOfZones))
-      CO2ZoneTimeMinus1Temp=0.0
+      CO2ZoneTimeMinus1Temp=0.0d0
       ALLOCATE(CO2ZoneTimeMinus2Temp(NumOfZones))
-      CO2ZoneTimeMinus2Temp=0.0
+      CO2ZoneTimeMinus2Temp=0.0d0
       ALLOCATE(CO2ZoneTimeMinus3Temp(NumOfZones))
-      CO2ZoneTimeMinus3Temp=0.0
+      CO2ZoneTimeMinus3Temp=0.0d0
       ALLOCATE(ZoneCO2MX(NumOfZones))
       ZoneCO2MX = 0.0d0
       ALLOCATE(ZoneCO2M2(NumOfZones))
       ZoneCO2M2 = 0.0d0
       ALLOCATE(ZoneCO21(NumOfZones))
-      ZoneCO21=0.0
+      ZoneCO21=0.0d0
 
       ALLOCATE(ZoneSysContDemand(NumOfZones))
       ALLOCATE(ZoneCO2Gain(NumOfZones))
-      ZoneCO2Gain=0.0
+      ZoneCO2Gain=0.0d0
       ALLOCATE(ZoneCO2GainFromPeople(NumOfZones))
-      ZoneCO2GainFromPeople=0.0
+      ZoneCO2GainFromPeople=0.0d0
       ALLOCATE(MixingMassFlowCO2(NumOfZones))
-      MixingMassFlowCO2=0.0
+      MixingMassFlowCO2=0.0d0
       ALLOCATE(ZoneAirDensityCO(NumOfZones))
       ZoneAirDensityCO = 0.d0
       !
@@ -1247,7 +1248,7 @@ SUBROUTINE InitZoneContSetpoints
     END IF
 
     ALLOCATE(CONTRAT(NumOfZones))
-    CONTRAT = 0.0
+    CONTRAT = 0.0d0
 
     ! Allocate Derived Types
 
@@ -1270,43 +1271,43 @@ SUBROUTINE InitZoneContSetpoints
     ! Generic contaminant
     IF (Contaminant%GenericContamSimulation) Then
       ALLOCATE(ZoneGCSetpoint(NumOfZones))
-      ZoneGCSetpoint=0.0
+      ZoneGCSetpoint=0.0d0
       ALLOCATE(GCPredictedRate(NumOfZones))
-      GCPredictedRate=0.0
+      GCPredictedRate=0.0d0
       ALLOCATE(GCZoneTimeMinus1(NumOfZones))
-      GCZoneTimeMinus1=0.0
+      GCZoneTimeMinus1=0.0d0
       ALLOCATE(GCZoneTimeMinus2(NumOfZones))
-      GCZoneTimeMinus2=0.0
+      GCZoneTimeMinus2=0.0d0
       ALLOCATE(GCZoneTimeMinus3(NumOfZones))
-      GCZoneTimeMinus3=0.0
+      GCZoneTimeMinus3=0.0d0
       ALLOCATE(GCZoneTimeMinus4(NumOfZones))
-      GCZoneTimeMinus4=0.0
+      GCZoneTimeMinus4=0.0d0
       ALLOCATE(DSGCZoneTimeMinus1(NumOfZones))
-      DSGCZoneTimeMinus1=0.0
+      DSGCZoneTimeMinus1=0.0d0
       ALLOCATE(DSGCZoneTimeMinus2(NumOfZones))
-      DSGCZoneTimeMinus2=0.0
+      DSGCZoneTimeMinus2=0.0d0
       ALLOCATE(DSGCZoneTimeMinus3(NumOfZones))
-      DSGCZoneTimeMinus3=0.0
+      DSGCZoneTimeMinus3=0.0d0
       ALLOCATE(DSGCZoneTimeMinus4(NumOfZones))
-      DSGCZoneTimeMinus4=0.0
+      DSGCZoneTimeMinus4=0.0d0
       ALLOCATE(GCZoneTimeMinus1Temp(NumOfZones))
-      GCZoneTimeMinus1Temp=0.0
+      GCZoneTimeMinus1Temp=0.0d0
       ALLOCATE(GCZoneTimeMinus2Temp(NumOfZones))
-      GCZoneTimeMinus2Temp=0.0
+      GCZoneTimeMinus2Temp=0.0d0
       ALLOCATE(GCZoneTimeMinus3Temp(NumOfZones))
-      GCZoneTimeMinus3Temp=0.0
+      GCZoneTimeMinus3Temp=0.0d0
       ALLOCATE(ZoneGCMX(NumOfZones))
       ZoneGCMX = 0.0d0
       ALLOCATE(ZoneGCM2(NumOfZones))
       ZoneGCM2 = 0.0d0
       ALLOCATE(ZoneGC1(NumOfZones))
-      ZoneGC1=0.0
+      ZoneGC1=0.0d0
 
       IF(.NOT. ALLOCATED(ZoneSysContDemand)) ALLOCATE(ZoneSysContDemand(NumOfZones))
       ALLOCATE(ZoneGCGain(NumOfZones))
-      ZoneGCGain=0.0
+      ZoneGCGain=0.0d0
       ALLOCATE(MixingMassFlowGC(NumOfZones))
-      MixingMassFlowGC=0.0
+      MixingMassFlowGC=0.0d0
       ALLOCATE(ZoneAirDensityGC(NumOfZones))
       ZoneAirDensityGC = 0.d0
       !
@@ -1319,7 +1320,7 @@ SUBROUTINE InitZoneContSetpoints
     END IF
 
     ALLOCATE(CONTRATGC(NumOfZones))
-    CONTRATGC = 0.0
+    CONTRATGC = 0.0d0
 
     ! Allocate Derived Types
 
@@ -1342,7 +1343,7 @@ SUBROUTINE InitZoneContSetpoints
   ! Do the Begin Environment initializations
   IF (MyEnvrnFlag .AND. BeginEnvrnFlag) THEN
     IF (Contaminant%CO2Simulation) Then
-      CONTRAT = 0.0
+      CONTRAT = 0.0d0
       CO2ZoneTimeMinus1 = OutdoorCO2
       CO2ZoneTimeMinus2 = OutdoorCO2
       CO2ZoneTimeMinus3 = OutdoorCO2
@@ -1363,7 +1364,7 @@ SUBROUTINE InitZoneContSetpoints
       ZoneCO2M2 = OutdoorCO2
     END IF
     IF (Contaminant%GenericContamSimulation) Then
-      CONTRAT = 0.0
+      CONTRAT = 0.0d0
       GCZoneTimeMinus1 = OutdoorGC
       GCZoneTimeMinus2 = OutdoorGC
       GCZoneTimeMinus3 = OutdoorGC
@@ -1464,7 +1465,7 @@ SUBROUTINE InitZoneContSetpoints
       GCGain = ZoneContamGenericConstant(Loop)%GCGenerateRate * &
           GetCurrentScheduleValue(ZoneContamGenericConstant(Loop)%GCGenerateRateSchedPtr) - &
           ZoneContamGenericConstant(Loop)%GCRemovalCoef * &
-          GetCurrentScheduleValue(ZoneContamGenericConstant(Loop)%GCRemovalCoefSchedPtr) * ZoneAirGC(ZoneNum)*1.0E-6
+          GetCurrentScheduleValue(ZoneContamGenericConstant(Loop)%GCRemovalCoefSchedPtr) * ZoneAirGC(ZoneNum)*1.0d-6
       ZoneContamGenericConstant(Loop)%GCGenRate = GCGain
     End Do
 
@@ -1503,7 +1504,7 @@ SUBROUTINE InitZoneContSetpoints
       Sch = GetCurrentScheduleValue(ZoneContamGenericDecay(Loop)%GCEmiRateSchedPtr)
       ZoneNum = ZoneContamGenericDecay(Loop)%ActualZoneNum
       If (Sch .eq. 0.0d0 .OR. BeginEnvrnFlag .OR. WarmupFlag) Then
-        ZoneContamGenericDecay(Loop)%GCTime = 0.0
+        ZoneContamGenericDecay(Loop)%GCTime = 0.0d0
       Else
         ZoneContamGenericDecay(Loop)%GCTime = ZoneContamGenericDecay(Loop)%GCTime + TimeStepZone*SecInHour
       End If
@@ -1519,10 +1520,10 @@ SUBROUTINE InitZoneContSetpoints
       Cs = Surface(SurfNum)%GenericContam
       Sch = GetCurrentScheduleValue(ZoneContamGenericBLDiff(Loop)%GCTranCoefSchedPtr)
       GCGain = ZoneContamGenericBLDiff(Loop)%GCTranCoef * Sch * Surface(SurfNum)%Area * Surface(SurfNum)%Multiplier * &
-               (Cs/ZoneContamGenericBLDiff(Loop)%GCHenryCoef-ZoneAirGC(ZoneNum))*1.0E-6
+               (Cs/ZoneContamGenericBLDiff(Loop)%GCHenryCoef-ZoneAirGC(ZoneNum))*1.0d-6
       ZoneContamGenericBLDiff(Loop)%GCGenRate = GCGain
       ! Surface concentration level based on steady-state assumption
-      Surface(SurfNum)%GenericContam = Cs - GCGain*1.0E6/Surface(SurfNum)%Multiplier/Surface(SurfNum)%Area
+      Surface(SurfNum)%GenericContam = Cs - GCGain*1.0d6/Surface(SurfNum)%Multiplier/Surface(SurfNum)%Area
     End Do
 
     ! From deposition velocity sink model
@@ -1531,7 +1532,7 @@ SUBROUTINE InitZoneContSetpoints
       ZoneNum = Surface(SurfNum)%Zone
       Sch = GetCurrentScheduleValue(ZoneContamGenericDVS(Loop)%GCDepoVeloPtr)
       GCGain = -ZoneContamGenericDVS(Loop)%GCDepoVelo*Surface(SurfNum)%Area*Sch*ZoneAirGC(ZoneNum)* &
-               Surface(SurfNum)%Multiplier*1.0E-6
+               Surface(SurfNum)%Multiplier*1.0d-6
       ZoneContamGenericDVS(Loop)%GCGenRate = GCGain
     End Do
 
@@ -1539,7 +1540,7 @@ SUBROUTINE InitZoneContSetpoints
     DO Loop = 1, TotGCDRS
       ZoneNum = ZoneContamGenericDRS(Loop)%ActualZoneNum
       Sch = GetCurrentScheduleValue(ZoneContamGenericDRS(Loop)%GCDepoRatePtr)
-      GCGain = - ZoneContamGenericDRS(Loop)%GCDepoRate*Zone(Zonenum)%Volume*Sch*ZoneAirGC(ZoneNum)*1.0E-6
+      GCGain = - ZoneContamGenericDRS(Loop)%GCDepoRate*Zone(Zonenum)%Volume*Sch*ZoneAirGC(ZoneNum)*1.0d-6
       ZoneContamGenericDRS(Loop)%GCGenRate = GCGain
     End Do
 
@@ -1700,9 +1701,9 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
 
     IF (Contaminant%CO2Simulation) Then
 
-      CO2PredictedRate(ZoneNum) = 0.0
-      LoadToCO2SetPoint=0.0
-      ZoneSysContDemand(ZoneNum)%OutputRequiredToCO2SP = 0.0
+      CO2PredictedRate(ZoneNum) = 0.0d0
+      LoadToCO2SetPoint=0.0d0
+      ZoneSysContDemand(ZoneNum)%OutputRequiredToCO2SP = 0.0d0
 
       ! Check to see if this is a "CO2 controlled zone"
       ControlledCO2ZoneFlag = .FALSE.
@@ -1736,7 +1737,7 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
 
         ! Calculate Co2 from infiltration + humidity added from latent load
         ! to determine system added/subtracted moisture.
-        CO2Gain = ZoneCO2Gain(ZoneNum)*RhoAir*1.0E6
+        CO2Gain = ZoneCO2Gain(ZoneNum)*RhoAir*1.0d6
 
         SysTimeStepInSeconds = SecInHour * TimeStepSys
 
@@ -1775,7 +1776,7 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
           CASE (UseEulerMethod)
             LoadToCO2SetPoint = C*(ZoneAirCO2Setpoint-ZoneCO21(ZoneNum)) + A*ZoneAirCO2Setpoint - B
         END SELECT
-        If (ZoneAirCO2Setpoint .GT. OutdoorCO2 .AND. LoadToCo2SetPoint < 0.0) Then
+        If (ZoneAirCO2Setpoint .GT. OutdoorCO2 .AND. LoadToCo2SetPoint < 0.0d0) Then
           ZoneSysContDemand(ZoneNum)%OutputRequiredToCO2SP = LoadToCo2SetPoint/(OutdoorCO2 - ZoneAirCO2Setpoint)
         End If
       End If
@@ -1788,9 +1789,9 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
 
     IF (Contaminant%GenericContamSimulation) Then
 
-      GCPredictedRate(ZoneNum) = 0.0
-      LoadToGCSetPoint=0.0
-      ZoneSysContDemand(ZoneNum)%OutputRequiredToGCSP = 0.0
+      GCPredictedRate(ZoneNum) = 0.0d0
+      LoadToGCSetPoint=0.0d0
+      ZoneSysContDemand(ZoneNum)%OutputRequiredToGCSP = 0.0d0
 
       ! Check to see if this is a "GC controlled zone"
       ControlledGCZoneFlag = .FALSE.
@@ -1824,7 +1825,7 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
 
         ! Calculate generic contaminant from infiltration + humidity added from latent load
         ! to determine system added/subtracted moisture.
-        GCGain = ZoneGCGain(ZoneNum)*RhoAir*1.0E6
+        GCGain = ZoneGCGain(ZoneNum)*RhoAir*1.0d6
 
         SysTimeStepInSeconds = SecInHour * TimeStepSys
 
@@ -1863,7 +1864,7 @@ SUBROUTINE PredictZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
           CASE (UseEulerMethod)
             LoadToGCSetPoint = C*(ZoneAirGCSetpoint-ZoneGC1(ZoneNum)) + A*ZoneAirGCSetpoint - B
         END SELECT
-        If (ZoneAirGCSetpoint .GT. OutdoorGC .AND. LoadToGCSetPoint < 0.0) Then
+        If (ZoneAirGCSetpoint .GT. OutdoorGC .AND. LoadToGCSetPoint < 0.0d0) Then
           ZoneSysContDemand(ZoneNum)%OutputRequiredToGCSP = LoadToGCSetPoint/(OutdoorGC - ZoneAirGCSetpoint)
         End If
       End If
@@ -2155,14 +2156,14 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
   DO ZoneNum = 1, NumOfZones
 
     IF (Contaminant%CO2Simulation) Then
-      AZ(ZoneNum) = 0.0
-      BZ(ZoneNum) = 0.0
-      CZ(ZoneNum) = 0.0
+      AZ(ZoneNum) = 0.0d0
+      BZ(ZoneNum) = 0.0d0
+      CZ(ZoneNum) = 0.0d0
     End If
     IF (Contaminant%GenericContamSimulation) Then
-      AZGC(ZoneNum) = 0.0
-      BZGC(ZoneNum) = 0.0
-      CZGC(ZoneNum) = 0.0
+      AZGC(ZoneNum) = 0.0d0
+      BZGC(ZoneNum) = 0.0d0
+      CZGC(ZoneNum) = 0.0d0
     End If
     ! Update variables
     IF (ShortenTimeStepSys) THEN
@@ -2215,11 +2216,11 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
     END IF
 
     ! Start to calculate zone CO2 and genric contaminant levels
-    CO2MassFlowRate = 0.0
-    GCMassFlowRate = 0.0
-    ZoneMassFlowRate = 0.0
-    ExhMassFlowRate = 0.0
-    TotExitMassFlowRate = 0.0
+    CO2MassFlowRate = 0.0d0
+    GCMassFlowRate = 0.0d0
+    ZoneMassFlowRate = 0.0d0
+    ExhMassFlowRate = 0.0d0
+    TotExitMassFlowRate = 0.0d0
     ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
 
     ! Check to see if this is a controlled zone
@@ -2318,7 +2319,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
         END IF
       END DO
       ! Do not allow exhaust mass flow for a plenum zone
-      ExhMassFlowRate = 0.0
+      ExhMassFlowRate = 0.0d0
       TotExitMassFlowRate = ExhMassFlowRate + ZoneMassFlowRate
 
     ELSE IF (ZoneSupPlenumAirFlag) THEN
@@ -2336,7 +2337,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
       ZoneMassFlowRate = ZoneMassFlowRate + &
                            Node(ZoneSupPlenCond(ZoneSupPlenumNum)%InletNode)%MassFlowRate / ZoneMult
       ! Do not allow exhaust mass flow for a plenum zone
-      ExhMassFlowRate = 0.0
+      ExhMassFlowRate = 0.0d0
       TotExitMassFlowRate = ExhMassFlowRate + ZoneMassFlowRate
     END IF
 
@@ -2352,11 +2353,11 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
 
     IF (Contaminant%CO2Simulation) ZoneAirDensityCO(ZoneNum) = RhoAir
     ! Calculate Co2 internal gain
-    IF (Contaminant%CO2Simulation) CO2Gain = ZoneCO2Gain(ZoneNum)*RhoAir*1.0E6
-    IF (Contaminant%GenericContamSimulation) GCGain = ZoneGCGain(ZoneNum)*RhoAir*1.0E6
+    IF (Contaminant%CO2Simulation) CO2Gain = ZoneCO2Gain(ZoneNum)*RhoAir*1.0d6
+    IF (Contaminant%GenericContamSimulation) GCGain = ZoneGCGain(ZoneNum)*RhoAir*1.0d6
 
     ! Check for the flow and NO flow condition
-    IF (ZoneMassFlowRate .GT. 0.0) THEN
+    IF (ZoneMassFlowRate .GT. 0.0d0) THEN
       IF (Contaminant%CO2Simulation) Then
         B = CO2Gain+((oamfl(ZoneNum)+vamfl(ZoneNum)+eamfl(ZoneNum)+ctmfl(ZoneNum))* OutdoorCO2) &
                                +(CO2MassFlowRate) &
@@ -2372,7 +2373,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
         end if
         C = RhoAir*Zone(ZoneNum)%Volume*ZoneVolCapMultpCO2/SysTimeStepInSeconds
       End If
-    ELSE IF (ZoneMassFlowRate .LE. 0.0) THEN
+    ELSE IF (ZoneMassFlowRate .LE. 0.0d0) THEN
       IF (Contaminant%CO2Simulation) Then
         B = CO2Gain+((oamfl(ZoneNum)+vamfl(ZoneNum)+eamfl(ZoneNum)+ctmfl(ZoneNum)+ExhMassFlowRate)* OutdoorCO2) &
                                + MixingMassFlowCO2(ZoneNum)
@@ -2415,7 +2416,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
       END SELECT
 
       ! Set the CO2 to zero if the zone has been large sinks
-      IF (ZoneAirCO2Temp(ZoneNum) .LT. 0.0) ZoneAirCO2Temp(ZoneNum) = 0.0
+      IF (ZoneAirCO2Temp(ZoneNum) .LT. 0.0d0) ZoneAirCO2Temp(ZoneNum) = 0.0d0
 
       ZoneAirCO2(ZoneNum) = ZoneAirCO2Temp(ZoneNum)
 
@@ -2426,7 +2427,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
       END IF
     END IF
 
-    IF (ZoneMassFlowRate .GT. 0.0) THEN
+    IF (ZoneMassFlowRate .GT. 0.0d0) THEN
       IF (Contaminant%GenericContamSimulation) Then
         B = GCGain+((oamfl(ZoneNum)+vamfl(ZoneNum)+eamfl(ZoneNum)+ctmfl(ZoneNum))* OutdoorGC) &
                                +(GCMassFlowRate) &
@@ -2442,7 +2443,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
         end if
         C = RhoAir*Zone(ZoneNum)%Volume*ZoneVolCapMultpGenContam/SysTimeStepInSeconds
       End If
-    ELSE IF (ZoneMassFlowRate .LE. 0.0) THEN
+    ELSE IF (ZoneMassFlowRate .LE. 0.0d0) THEN
       IF (Contaminant%GenericContamSimulation) Then
         B = GCGain+((oamfl(ZoneNum)+vamfl(ZoneNum)+eamfl(ZoneNum)+ctmfl(ZoneNum)+ExhMassFlowRate)* OutdoorGC) &
                                + MixingMassFlowGC(ZoneNum)
@@ -2485,7 +2486,7 @@ SUBROUTINE CorrectZoneContaminants(ShortenTimeStepSys, UseZoneTimeStepHistory, P
       END SELECT
 
       ! Set the generic contaminant to zero if the zone has been large sinks
-      IF (ZoneAirGCTemp(ZoneNum) .LT. 0.0) ZoneAirGCTemp(ZoneNum) = 0.0
+      IF (ZoneAirGCTemp(ZoneNum) .LT. 0.0d0) ZoneAirGCTemp(ZoneNum) = 0.0d0
 
       ZoneAirGC(ZoneNum) = ZoneAirGCTemp(ZoneNum)
 

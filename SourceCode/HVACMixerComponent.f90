@@ -41,14 +41,14 @@ REAL(r64), PARAMETER :: MassFlowTol = 0.001d0
   ! DERIVED TYPE DEFINITIONS
 TYPE, PUBLIC :: MixerConditions
   CHARACTER(len=MaxNameLength) :: MixerName=' '  ! Name of the Mixer
-  REAL(r64)    :: OutletTemp=0.0
-  REAL(r64)    :: OutletHumRat=0.0
-  REAL(r64)    :: OutletEnthalpy=0.0
-  REAL(r64)    :: OutletPressure=0.0
+  REAL(r64)    :: OutletTemp=0.0d0
+  REAL(r64)    :: OutletHumRat=0.0d0
+  REAL(r64)    :: OutletEnthalpy=0.0d0
+  REAL(r64)    :: OutletPressure=0.0d0
   INTEGER      :: OutletNode=0
-  REAL(r64)    :: OutletMassFlowRate=0.0 !MassFlow through the Mixer being Simulated [kg/Sec]
-  REAL(r64)    :: OutletMassFlowRateMaxAvail=0.0 ! [kg/Sec]
-  REAL(r64)    :: OutletMassFlowRateMinAvail=0.0 ! [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRate=0.0d0 !MassFlow through the Mixer being Simulated [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRateMaxAvail=0.0d0 ! [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRateMinAvail=0.0d0 ! [kg/Sec]
   LOGICAL      :: InitFlag=.false.
   INTEGER      :: NumInletNodes=0
   INTEGER, DIMENSION(:), ALLOCATABLE ::InletNode
@@ -256,7 +256,7 @@ SUBROUTINE GetMixerInput
     ALLOCATE(lNumericBlanks(NumNums))
     lNumericBlanks=.TRUE.
     ALLOCATE(NumArray(NumNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
     DO MixerNum = 1,  NumMixers
       CALL GetObjectItem(CurrentModuleObject,MixerNum,AlphArray,NumAlphas, &
@@ -290,20 +290,20 @@ SUBROUTINE GetMixerInput
       ALLOCATE(MixerCond(MixerNum)%InletPressure(MixerCond(MixerNum)%NumInletNodes))
 
       MixerCond(MixerNum)%InletNode = 0
-      MixerCond(MixerNum)%InletMassFlowRate = 0.0
-      MixerCond(MixerNum)%InletMassFlowRateMaxAvail = 0.0
-      MixerCond(MixerNum)%InletMassFlowRateMinAvail = 0.0
-      MixerCond(MixerNum)%InletTemp = 0.0
-      MixerCond(MixerNum)%InletHumRat = 0.0
-      MixerCond(MixerNum)%InletEnthalpy = 0.0
-      MixerCond(MixerNum)%InletPressure = 0.0
-      MixerCond(MixerNum)%OutletMassFlowRate = 0.0
-      MixerCond(MixerNum)%OutletMassFlowRateMaxAvail = 0.0
-      MixerCond(MixerNum)%OutletMassFlowRateMinAvail = 0.0
-      MixerCond(MixerNum)%OutletTemp = 0.0
-      MixerCond(MixerNum)%OutletHumRat = 0.0
-      MixerCond(MixerNum)%OutletEnthalpy = 0.0
-      MixerCond(MixerNum)%OutletPressure = 0.0
+      MixerCond(MixerNum)%InletMassFlowRate = 0.0d0
+      MixerCond(MixerNum)%InletMassFlowRateMaxAvail = 0.0d0
+      MixerCond(MixerNum)%InletMassFlowRateMinAvail = 0.0d0
+      MixerCond(MixerNum)%InletTemp = 0.0d0
+      MixerCond(MixerNum)%InletHumRat = 0.0d0
+      MixerCond(MixerNum)%InletEnthalpy = 0.0d0
+      MixerCond(MixerNum)%InletPressure = 0.0d0
+      MixerCond(MixerNum)%OutletMassFlowRate = 0.0d0
+      MixerCond(MixerNum)%OutletMassFlowRateMaxAvail = 0.0d0
+      MixerCond(MixerNum)%OutletMassFlowRateMinAvail = 0.0d0
+      MixerCond(MixerNum)%OutletTemp = 0.0d0
+      MixerCond(MixerNum)%OutletHumRat = 0.0d0
+      MixerCond(MixerNum)%OutletEnthalpy = 0.0d0
+      MixerCond(MixerNum)%OutletPressure = 0.0d0
 
       DO NodeNum = 1, MixerCond(MixerNum)%NumInletNodes
 
@@ -481,13 +481,13 @@ SUBROUTINE CalcAirMixer(MixerNum)
 
 
    !Reset the totals to zero before they are summed.
-   MixerCond(MixerNum)%OutletMassFlowRate = 0.0
-   MixerCond(MixerNum)%OutletMassFlowRateMaxAvail = 0.0
-   MixerCond(MixerNum)%OutletMassFlowRateMinAvail = 0.0
-   MixerCond(MixerNum)%OutletTemp = 0.0
-   MixerCond(MixerNum)%OutletHumRat = 0.0
-   MixerCond(MixerNum)%OutletPressure = 0.0
-   MixerCond(MixerNum)%OutletEnthalpy = 0.0
+   MixerCond(MixerNum)%OutletMassFlowRate = 0.0d0
+   MixerCond(MixerNum)%OutletMassFlowRateMaxAvail = 0.0d0
+   MixerCond(MixerNum)%OutletMassFlowRateMinAvail = 0.0d0
+   MixerCond(MixerNum)%OutletTemp = 0.0d0
+   MixerCond(MixerNum)%OutletHumRat = 0.0d0
+   MixerCond(MixerNum)%OutletPressure = 0.0d0
+   MixerCond(MixerNum)%OutletEnthalpy = 0.0d0
 
 
 
@@ -500,7 +500,7 @@ SUBROUTINE CalcAirMixer(MixerNum)
                                                  MixerCond(MixerNum)%InletMassFlowRateMinAvail(InletNodeNum)
    END DO
 
-   If(MixerCond(MixerNum)%OutletMassFlowRate .gt. 0.0) Then
+   If(MixerCond(MixerNum)%OutletMassFlowRate .gt. 0.0d0) Then
 
       ! Mass balance on moisture to get outlet air humidity ratio
 

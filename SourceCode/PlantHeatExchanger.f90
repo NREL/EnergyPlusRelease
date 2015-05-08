@@ -383,10 +383,10 @@ SUBROUTINE GetFluidHeatExchangerInput
 
       FluidHX(CompLoop)%SupplySideLoop%InletNodeNum = &
         GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Inlet, 2, ObjectIsNotParent)
       FluidHX(CompLoop)%SupplySideLoop%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Outlet, 2, ObjectIsNotParent)
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),  &
              'Loop Supply Side Plant Nodes')
       FluidHX(CompLoop)%SupplySideLoop%DesignVolumeFlowRate = rNumericArgs(2)
@@ -2029,7 +2029,7 @@ SUBROUTINE CalcFluidHeatExchanger(CompNum, SupSideMdot, DmdSideMdot)
 
         Effectiveness = 0.d0
       ELSE
-        Effectiveness = 1.d0/( (1.d0/(1-EXP(-NTU))) + (CapRatio/(1.d0 - EXP(-CapRatio*NTU) ) ) - ( 1.d0/ NTU) )
+        Effectiveness = 1.d0/( (1.d0/(1.d0-EXP(-NTU))) + (CapRatio/(1.d0 - EXP(-CapRatio*NTU) ) ) - ( 1.d0/ NTU) )
         Effectiveness = MIN(1.0d0,Effectiveness)
       ENDIF
 
@@ -2079,11 +2079,11 @@ SUBROUTINE CalcFluidHeatExchanger(CompNum, SupSideMdot, DmdSideMdot)
             Effectiveness = 1.d0
           ENDIF
         ELSE
-          EXPCheckValue2 = -(1/CapRatio)*(1 - EXP(-CapRatio*NTU) )
+          EXPCheckValue2 = -(1.0d0/CapRatio)*(1.0d0 - EXP(-CapRatio*NTU) )
           IF (EXPCheckValue2 < EXP_LowerLimit) THEN
             Effectiveness = 1.d0
           ELSE
-            Effectiveness = 1.d0 - EXP(-(1/CapRatio)*(1 - EXP(-CapRatio*NTU) ) )
+            Effectiveness = 1.0d0 - EXP(-(1.0d0/CapRatio)*(1.0d0 - EXP(-CapRatio*NTU) ) )
             Effectiveness = MIN(1.d0,Effectiveness)
           ENDIF
         ENDIF
@@ -2100,7 +2100,7 @@ SUBROUTINE CalcFluidHeatExchanger(CompNum, SupSideMdot, DmdSideMdot)
         ELSE
           Effectiveness = 1.d0
         ENDIF
-      ELSEIF (CapRatio*EXP(-NTU*(1.d0-CapRatio)) == 1.0) THEN
+      ELSEIF (CapRatio*EXP(-NTU*(1.d0-CapRatio)) == 1.0d0) THEN
         IF (-NTU >= EXP_LowerLimit) THEN
           Effectiveness = 1.d0-EXP(-NTU)
           Effectiveness = MIN(1.d0,Effectiveness)

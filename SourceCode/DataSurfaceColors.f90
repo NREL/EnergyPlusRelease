@@ -242,7 +242,7 @@ SUBROUTINE SetUpSchemeColors(SchemeName,ColorType)
     allocate(lNumericBlanks(numNumbers))
 
     cAlphas(1:numAlphas)=' '
-    rNumerics(1:numNumbers)=0.0
+    rNumerics(1:numNumbers)=0.0d0
 
     CALL GetObjectItem(CurrentModuleObject,numptr,cAlphas,numAlphas,rNumerics,numNumbers,status,  &
                    AlphaBlank=lAlphablanks,NumBlank=lNumericblanks,  &

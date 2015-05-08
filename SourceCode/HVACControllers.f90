@@ -140,11 +140,6 @@ PRIVATE
                        'Flow rate                     '/)
 
 
-  INTEGER, PARAMETER :: ControllerSimple_Type        = 1
-  CHARACTER(LEN=*), PARAMETER, DIMENSION(1:1) :: ControllerTypes =  &
-                     (/'Controller:WaterCoil'/)
-
-
 ! DERIVED TYPE DEFINITIONS
   TYPE SolutionTrackerType
     LOGICAL      :: DefinedFlag   = .TRUE.    ! Flag set to TRUE when tracker is up-to-date. FALSE otherwise.
@@ -331,6 +326,7 @@ PRIVATE
   PUBLIC  CreateHVACStepFullString
   PRIVATE CheckControllerListOrder
   PUBLIC  CheckCoilWaterInletNode
+  PUBLIC  GetControllerActuatorNodeNum
 
 CONTAINS
 
@@ -727,7 +723,7 @@ SUBROUTINE GetControllerInput
   ALLOCATE(cNumericFields(NumNums))
   cNumericFields=' '
   ALLOCATE(NumArray(NumNums))
-  NumArray=0.0
+  NumArray=0.0d0
   ALLOCATE(lAlphaBlanks(NumAlphas))
   lAlphaBlanks=.true.
   ALLOCATE(lNumericBlanks(NumNums))
@@ -1012,7 +1008,7 @@ SUBROUTINE ResetController(ControlNum, FirstHVACIteration, DoWarmRestartFlag, Is
     ControllerProps(ControlNum)%DoWarmRestartFlag = .FALSE.
     ! If no speculative warm restart then reset stored mode and actucated value
     ControllerProps(ControlNum)%Mode = iModeNone
-    ControllerProps(ControlNum)%NextActuatedValue = 0.0
+    ControllerProps(ControlNum)%NextActuatedValue = 0.0d0
   END IF
 
   ! Only set once per HVAC iteration.
@@ -1278,8 +1274,8 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
     CALL SizeController(ControlNum)
 
     !Check to make sure that the Minimum Flow rate is less than the max.
-    IF (ControllerProps(ControlNum)%MaxVolFlowActuated == 0.0) THEN
-      ControllerProps(ControlNum)%MinVolFlowActuated = 0.0
+    IF (ControllerProps(ControlNum)%MaxVolFlowActuated == 0.0d0) THEN
+      ControllerProps(ControlNum)%MinVolFlowActuated = 0.0d0
     ELSE IF (ControllerProps(ControlNum)%MinVolFlowActuated .GE. ControllerProps(ControlNum)%MaxVolFlowActuated) THEN
       CALL ShowFatalError( &
         'Controller:WaterCoil, Minimum control flow is > or = Maximum control flow; '// &
@@ -1338,7 +1334,7 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
     ! Reset solution trackers
     ControllerProps(ControlNum)%SolutionTrackers%DefinedFlag   = .FALSE.
     ControllerProps(ControlNum)%SolutionTrackers%Mode          = iModeNone
-    ControllerProps(ControlNum)%SolutionTrackers%ActuatedValue = 0.0
+    ControllerProps(ControlNum)%SolutionTrackers%ActuatedValue = 0.0d0
 
     MyEnvrnFlag(ControlNum) = .FALSE.
   END IF
@@ -2192,8 +2188,8 @@ SUBROUTINE CheckSimpleController(ControlNum, IsConvergedFlag)
       !
       ! This check is perfomed by looking at the component mass flow rate at the sensed node.
       ! Since the components have been simulated before getting here, if they are zero they should be OFF.
-      IF (Node(SensedNode)%MassFlowRate == 0.0) THEN
-        IF ( ControllerProps(ControlNum)%ActuatedValue == 0.0 ) THEN
+      IF (Node(SensedNode)%MassFlowRate == 0.0d0) THEN
+        IF ( ControllerProps(ControlNum)%ActuatedValue == 0.0d0 ) THEN
           IsConvergedFlag = .TRUE.
           RETURN
         END IF
@@ -3054,7 +3050,7 @@ SUBROUTINE WriteAirLoopStatistics( FileUnit, ThisPrimaryAirSystem, ThisAirLoopSt
   ! Warm restart success ratio
   NumWarmRestarts = ThisAirLoopStats%NumSuccessfulWarmRestarts + ThisAirLoopStats%NumFailedWarmRestarts
   IF ( NumWarmRestarts == 0 ) THEN
-    WarmRestartSuccessRatio = 0
+    WarmRestartSuccessRatio = 0.0d0
   ELSE
     WarmRestartSuccessRatio = REAL(ThisAirLoopStats%NumSuccessfulWarmRestarts,r64) / REAL(NumWarmRestarts,r64)
   END IF
@@ -3078,7 +3074,7 @@ SUBROUTINE WriteAirLoopStatistics( FileUnit, ThisPrimaryAirSystem, ThisAirLoopSt
 
   ! Average number of iterations needed by controllers to simulate the specified air loop
   IF ( ThisAirLoopStats%NumCalls == 0 ) THEN
-    AvgIterations = 0
+    AvgIterations = 0.0d0
   ELSE
     AvgIterations = REAL(ThisAirLoopStats%TotIterations,r64)/REAL(ThisAirLoopStats%NumCalls,r64)
   END IF
@@ -3116,7 +3112,7 @@ SUBROUTINE WriteAirLoopStatistics( FileUnit, ThisPrimaryAirSystem, ThisAirLoopSt
 
     ! Average number of iterations needed by controllers to simulate the specified air loop
     IF ( NumCalls == 0 ) THEN
-      AvgIterations = 0
+      AvgIterations = 0.0d0
     ELSE
       AvgIterations = REAL(TotIterations,r64) / REAL(NumCalls,r64)
     END IF
@@ -3141,7 +3137,7 @@ SUBROUTINE WriteAirLoopStatistics( FileUnit, ThisPrimaryAirSystem, ThisAirLoopSt
 
       ! Average number of iterations needed by controllers to simulate the specified air loop
       IF ( ThisAirLoopStats%ControllerStats(AirLoopControlNum)%NumCalls(iModeNum) == 0 ) THEN
-        AvgIterations = 0
+        AvgIterations = 0.0d0
       ELSE
         AvgIterations = &
           REAL(ThisAirLoopStats%ControllerStats(AirLoopControlNum)%TotIterations(iModeNum),r64) / &
@@ -4073,6 +4069,61 @@ SUBROUTINE CheckCoilWaterInletNode(WaterInletNodeNum, NodeNotFound)
   RETURN
 
 END SUBROUTINE CheckCoilWaterInletNode
+
+SUBROUTINE GetControllerActuatorNodeNum(ControllerName, WaterInletNodeNum, NodeNotFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   September 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This subroutine finds the controllers actuator node number
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: ControllerName    ! name of coil controller
+  INTEGER, INTENT(OUT)         :: WaterInletNodeNum   ! input actuator node number
+  LOGICAL, INTENT(OUT)         :: NodeNotFound      ! true if matching actuator node not found
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ControlNum
+
+  IF (GetControllerInputFlag) THEN
+    CALL GetControllerInput
+    GetControllerInputFlag=.false.
+  ENDIF
+
+  NodeNotFound = .TRUE.
+  ControlNum = FindItemInList(ControllerName,ControllerProps%ControllerName,NumControllers)
+  IF( ControlNum > 0 .AND. ControlNum <= NumControllers) THEN
+    WaterInletNodeNum = ControllerProps(ControlNum)%ActuatedNode
+    NodeNotFound = .FALSE.
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetControllerActuatorNodeNum
 
 ! *****************************************************************************
 

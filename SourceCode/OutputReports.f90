@@ -300,24 +300,24 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64), dimension(4) :: StemX =(/-10.,-10.,-10.,-10./)
-  REAL(r64), dimension(4) :: StemY =(/3.,3.,0.,0./)
-  REAL(r64), dimension(4) :: StemZ =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head1X =(/-10.,-10.,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: Head1Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head2X =(/-10.,-10.,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: Head2Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide1X =(/-10.5,-10.5,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: NSide1Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide2X =(/-10.5,-10.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide2Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide3X =(/-9.5,-9.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide3Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide3Z =(/.1,0.,0.,.1/)
+  REAL(r64), dimension(4) :: StemX =(/-10.d0,-10.d0,-10.d0,-10.d0/)
+  REAL(r64), dimension(4) :: StemY =(/3.d0,3.d0,0.d0,0.d0/)
+  REAL(r64), dimension(4) :: StemZ =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head1X =(/-10.d0,-10.d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: Head1Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head2X =(/-10.d0,-10.d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: Head2Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide1X =(/-10.5d0,-10.5d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: NSide1Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide2X =(/-10.5d0,-10.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide2Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide3X =(/-9.5d0,-9.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide3Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide3Z =(/.1d0,0.d0,0.d0,.1d0/)
 !  integer, dimension(7) :: colorno=(/3,4,5,6,2,8,9/)
   integer unit              ! Unit number on which to write file
   integer surf              ! Loop variable for surfaces
@@ -402,8 +402,8 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
     write(unit,708) 'Color Scheme',',',TRIM(ColorScheme)
   ENDIF
 
-  minx=99999.
-  miny=99999.
+  minx=99999.d0
+  miny=99999.d0
   do surf=1,totsurfaces
     if (surface(surf)%class == SurfaceClass_IntMass) CYCLE
     do vert=1,surface(surf)%sides
@@ -429,14 +429,14 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
 
   ! This writes "True North" above the Arrow Head
   write(unit,710) 'Text - True North'
-  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.,StemY(1),StemZ(1)
+  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.0d0 ,StemY(1),StemZ(1)
   800 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .25',/,'  1',/,'True North',/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
     '210',/,'0.0',/,'220',/,'0.0',/,'230',/,'1.0')
 
   write(unit,710) 'Text - Building Title'
-  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.,StemY(1)-4.,StemZ(1),'Building - '//TRIM(BuildingName)
+  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.0d0,StemY(1)-4.0d0 ,StemZ(1),'Building - '//TRIM(BuildingName)
   801 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .4',/,'  1',/,A,/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
@@ -506,7 +506,7 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
       endif
     else  ! polygon
       if (.not. TriangulateFace) then
-        minz=99999.
+        minz=99999.d0
         do vert=1,surface(surf)%sides
           minz=MIN(minz,surface(surf)%vertex(vert)%z)
         enddo
@@ -573,7 +573,7 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
         endif
       else  ! polygon surface
         if (.not. TriangulateFace) then
-          minz=99999.
+          minz=99999.d0
           do vert=1,surface(surf)%sides
             minz=MIN(minz,surface(surf)%vertex(vert)%z)
           enddo
@@ -626,7 +626,7 @@ SUBROUTINE DXFOut(PolygonAction,ColorScheme)
         endif
       else  ! polygon attached shading
         if (.not. TriangulateFace) then
-          minz=99999.
+          minz=99999.d0
           do vert=1,surface(surf)%sides
             minz=MIN(minz,surface(surf)%vertex(vert)%z)
           enddo
@@ -803,24 +803,24 @@ SUBROUTINE DXFOutLines(ColorScheme)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64), dimension(4) :: StemX =(/-10.,-10.,-10.,-10./)
-  REAL(r64), dimension(4) :: StemY =(/3.,3.,0.,0./)
-  REAL(r64), dimension(4) :: StemZ =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head1X =(/-10.,-10.,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: Head1Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head2X =(/-10.,-10.,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: Head2Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide1X =(/-10.5,-10.5,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: NSide1Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide2X =(/-10.5,-10.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide2Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide3X =(/-9.5,-9.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide3Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide3Z =(/.1,0.,0.,.1/)
+  REAL(r64), dimension(4) :: StemX =(/-10.d0,-10.d0,-10.d0,-10.d0/)
+  REAL(r64), dimension(4) :: StemY =(/3.d0,3.d0,0.d0,0.d0/)
+  REAL(r64), dimension(4) :: StemZ =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head1X =(/-10.d0,-10.d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: Head1Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head2X =(/-10.d0,-10.d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: Head2Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide1X =(/-10.5d0,-10.5d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: NSide1Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide2X =(/-10.5d0,-10.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide2Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide3X =(/-9.5d0,-9.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide3Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide3Z =(/.1d0,0.d0,0.d0,.1d0/)
 !  integer, dimension(7) :: colorno=(/3,4,5,6,2,8,9/)
   integer unit              ! Unit number on which to write file
   integer surf              ! Loop variable for surfaces
@@ -872,8 +872,8 @@ SUBROUTINE DXFOutLines(ColorScheme)
   ENDIF
 
 
-  minx=99999.
-  miny=99999.
+  minx=99999.d0
+  miny=99999.d0
   do surf=1,totsurfaces
     if (surface(surf)%class == SurfaceClass_IntMass) CYCLE
     do vert=1,surface(surf)%sides
@@ -899,14 +899,14 @@ SUBROUTINE DXFOutLines(ColorScheme)
 
   ! This writes "True North" above the Arrow Head
   write(unit,710) 'Text - True North'
-  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.,StemY(1),StemZ(1)
+  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.0d0 ,StemY(1),StemZ(1)
   800 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .25',/,'  1',/,'True North',/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
     '210',/,'0.0',/,'220',/,'0.0',/,'230',/,'1.0')
 
   write(unit,710) 'Text - Building Title'
-  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.,StemY(1)-4.,StemZ(1),'Building - '//TRIM(BuildingName)
+  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.0d0,StemY(1)-4.0d0 ,StemZ(1),'Building - '//TRIM(BuildingName)
   801 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .4',/,'  1',/,A,/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
@@ -969,7 +969,7 @@ SUBROUTINE DXFOutLines(ColorScheme)
     write(cSurfNum,*) surfcount
     cSurfNum=adjustl(cSurfNum)
     ShadeType=TRIM(ShadeType)//'_'//TRIM(cSurfNum)
-    minz=99999.
+    minz=99999.d0
     do vert=1,surface(surf)%sides
       minz=MIN(minz,surface(surf)%vertex(vert)%z)
     enddo
@@ -1034,7 +1034,7 @@ SUBROUTINE DXFOutLines(ColorScheme)
 
       write(unit,710) trim(surface(surf)%ZoneName)//':'//trim(surface(surf)%Name)
       TempZoneName=TRIM(TempZoneName)//'_'//TRIM(cSurfNum)
-      minz=99999.
+      minz=99999.d0
       do vert=1,surface(surf)%sides
         minz=MIN(minz,surface(surf)%vertex(vert)%z)
       enddo
@@ -1083,7 +1083,7 @@ SUBROUTINE DXFOutLines(ColorScheme)
 
       write(unit,710) trim(surface(surf)%ZoneName)//':'//trim(surface(surf)%Name)
       TempZoneName=TRIM(TempZoneName)//'_'//TRIM(cSurfNum)
-      minz=99999.
+      minz=99999.d0
       do vert=1,surface(surf)%sides
         minz=MIN(minz,surface(surf)%vertex(vert)%z)
       enddo
@@ -1233,24 +1233,24 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64), dimension(4) :: StemX =(/-10.,-10.,-10.,-10./)
-  REAL(r64), dimension(4) :: StemY =(/3.,3.,0.,0./)
-  REAL(r64), dimension(4) :: StemZ =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head1X =(/-10.,-10.,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: Head1Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: Head2X =(/-10.,-10.,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: Head2Y =(/3.,3.,2.133975,2.133975/)
-  REAL(r64), dimension(4) :: Head2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide1X =(/-10.5,-10.5,-10.5,-10.5/)
-  REAL(r64), dimension(4) :: NSide1Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide1Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide2X =(/-10.5,-10.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide2Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide2Z =(/.1,0.,0.,.1/)
-  REAL(r64), dimension(4) :: NSide3X =(/-9.5,-9.5,-9.5,-9.5/)
-  REAL(r64), dimension(4) :: NSide3Y =(/4.5,4.5,3.5,3.5/)
-  REAL(r64), dimension(4) :: NSide3Z =(/.1,0.,0.,.1/)
+  REAL(r64), dimension(4) :: StemX =(/-10.d0,-10.d0,-10.d0,-10.d0/)
+  REAL(r64), dimension(4) :: StemY =(/3.d0,3.d0,0.d0,0.d0/)
+  REAL(r64), dimension(4) :: StemZ =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head1X =(/-10.d0,-10.d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: Head1Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: Head2X =(/-10.d0,-10.d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: Head2Y =(/3.d0,3.d0,2.133975d0,2.133975d0/)
+  REAL(r64), dimension(4) :: Head2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide1X =(/-10.5d0,-10.5d0,-10.5d0,-10.5d0/)
+  REAL(r64), dimension(4) :: NSide1Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide1Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide2X =(/-10.5d0,-10.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide2Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide2Z =(/.1d0,0.d0,0.d0,.1d0/)
+  REAL(r64), dimension(4) :: NSide3X =(/-9.5d0,-9.5d0,-9.5d0,-9.5d0/)
+  REAL(r64), dimension(4) :: NSide3Y =(/4.5d0,4.5d0,3.5d0,3.5d0/)
+  REAL(r64), dimension(4) :: NSide3Z =(/.1d0,0.d0,0.d0,.1d0/)
 !  integer, dimension(7) :: colorno=(/3,4,5,6,2,8,9/)
   integer unit              ! Unit number on which to write file
   integer surf              ! Loop variable for surfaces
@@ -1301,8 +1301,8 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
     write(unit,708) 'Color Scheme',',',TRIM(ColorScheme)
   ENDIF
 
-  minx=99999.
-  miny=99999.
+  minx=99999.d0
+  miny=99999.d0
   do surf=1,totsurfaces
     if (surface(surf)%class == SurfaceClass_IntMass) CYCLE
     do vert=1,surface(surf)%sides
@@ -1328,14 +1328,14 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
 
   ! This writes "True North" above the Arrow Head
   write(unit,710) 'Text - True North'
-  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.,StemY(1),StemZ(1)
+  write(unit,800) DXFcolorno(colorno_Text),StemX(1)-1.0d0 ,StemY(1),StemZ(1)
   800 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .25',/,'  1',/,'True North',/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
     '210',/,'0.0',/,'220',/,'0.0',/,'230',/,'1.0')
 
   write(unit,710) 'Text - Building Title'
-  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.,StemY(1)-4.,StemZ(1),'Building - '//TRIM(BuildingName)
+  write(unit,801) DXFcolorno(colorno_Text),StemX(1)-4.0d0,StemY(1)-4.0d0 ,StemZ(1),'Building - '//TRIM(BuildingName)
   801 format('  0',/,'TEXT',/,'  8',/,'1',/,'  6',/,'Continuous',/,  &
     ' 62',/,I3,/,' 10',/,f15.5,/,' 20',/,f15.5,/,' 30',/,f15.5,/,  &
     ' 40',/,' .4',/,'  1',/,A,/,' 41',/,' 0.0',/,'  7',/,'MONOTXT',/,  &
@@ -1398,7 +1398,7 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
     write(cSurfNum,*) surfcount
     cSurfNum=adjustl(cSurfNum)
     ShadeType=TRIM(ShadeType)//'_'//TRIM(cSurfNum)
-    minz=99999.
+    minz=99999.d0
     do vert=1,surface(surf)%sides
       minz=MIN(minz,surface(surf)%vertex(vert)%z)
     enddo
@@ -1453,7 +1453,7 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
 
       write(unit,710) trim(surface(surf)%ZoneName)//':'//trim(surface(surf)%Name)
       TempZoneName=TRIM(SaveZoneName)//'_'//TRIM(cSurfNum)
-      minz=99999.
+      minz=99999.d0
       do vert=1,surface(surf)%sides
         minz=MIN(minz,surface(surf)%vertex(vert)%z)
       enddo
@@ -1494,7 +1494,7 @@ SUBROUTINE DXFOutWireFrame(ColorScheme)
 
       write(unit,710) trim(surface(surf)%ZoneName)//':'//trim(surface(surf)%Name)
       TempZoneName=TRIM(SaveZoneName)//'_'//TRIM(cSurfNum)
-      minz=99999.
+      minz=99999.d0
       do vert=1,surface(surf)%sides
         minz=MIN(minz,surface(surf)%vertex(vert)%z)
       enddo
@@ -1658,6 +1658,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
   CHARACTER(len=3)  :: SolarDiffusing
   integer fd
   character(len=MaxNameLength) :: AlgoName
+  logical :: isWithConvCoefValid
 
   if (totsurfaces > 0 .and. .not. allocated(surface)) then
     ! no error needed, probably in end processing, just return
@@ -1792,46 +1793,17 @@ SUBROUTINE DetailsForSurfaces(RptType)
         write(unit,704,advance='No') 'HeatTransfer',trim(Surface(surf)%Name),trim(cSurfaceClass(Surface(surf)%class)),  &
                                                                               trim(BaseSurfName), trim(AlgoName)
 
+        ! NOTE - THIS CODE IS REPEATED IN SurfaceGeometry.F90 IN SetupZoneGeometry
         ! Calculate Nominal U-value with convection/film coefficients for reporting by adding on
         ! prescribed R-values for interior and exterior convection coefficients as found in ASHRAE 90.1-2004, Appendix A
         if (Surface(surf)%Construction > 0 .and. Surface(surf)%Construction <= TotConstructs) THEN
-          cNominalUwithConvCoeffs=' '
-          SELECT CASE (Surface(surf)%class)
-            CASE (SurfaceClass_Wall)
-              ! Interior:  vertical, still air, Rcin = 0.68 ft2-F-hr/BTU
-              ! Exterior:  vertical, exterior wind exposure, Rcout = 0.17 ft2-F-hr/BTU
-              IF (NominalU(Surface(surf)%Construction) > 0.0) THEN
-                NominalUwithConvCoeffs = 1.0d0 / (0.1197548d0 + (1.0d0 / NominalU(Surface(surf)%Construction)) + 0.0299387d0)
-              ELSE
-                cNominalUwithConvCoeffs = '[invalid]'
-              ENDIF
-            CASE (SurfaceClass_Floor)
-              ! Interior:  horizontal, still air, heat flow downward, Rcin = 0.92 ft2-F-hr/BTU
-              ! Exterior:  horizontal, semi-exterior (crawlspace), Rcout = 0.46 ft2-F-hr/BTU
-              IF (NominalU(Surface(surf)%Construction) > 0.0) THEN
-                NominalUwithConvCoeffs = 1.0d0 / (0.1620212d0 + (1.0d0 / NominalU(Surface(surf)%Construction)) + 0.0810106d0)
-              ELSE
-                cNominalUwithConvCoeffs = '[invalid]'
-              ENDIF
-            CASE (SurfaceClass_Roof)
-              ! Interior:  horizontal, still air, heat flow upward, Rcin = 0.61 ft2-F-hr/BTU
-              ! Exterior:  horizontal, semi-exterior (attic), Rcout = 0.46 ft2-F-hr/BTU
-              IF (NominalU(Surface(surf)%Construction) > 0.0) THEN
-                NominalUwithConvCoeffs = 1.0d0 / (0.1074271d0 + (1.0d0 / NominalU(Surface(surf)%Construction)) + 0.0810106d0)
-              ELSE
-                cNominalUwithConvCoeffs = '[invalid]'
-              ENDIF
-            CASE DEFAULT
-              IF (NominalU(Surface(surf)%Construction) > 0.0) THEN
-                NominalUwithConvCoeffs = NominalU(Surface(surf)%Construction)
-              ELSE
-                cNominalUwithConvCoeffs = '[invalid]'
-              ENDIF
-          END SELECT
-          IF (cNominalUwithConvCoeffs == ' ') THEN
+          NominalUwithConvCoeffs = ComputeNominalUwithConvCoeffs(surf,isWithConvCoefValid)
+          ConstructionName=Construct(Surface(surf)%Construction)%Name
+          IF (isWithConvCoefValid) THEN
             cNominalUwithConvCoeffs=RoundSigDigits(NominalUwithConvCoeffs,3)
-          ENDIF
-
+          ELSE
+            cNominalUwithConvCoeffs = '[invalid]'
+          END IF
           IF ((Surface(surf)%class == SurfaceClass_Window) .OR. (Surface(surf)%class == SurfaceClass_TDD_Dome)) THEN
             ! SurfaceClass_Window also covers glass doors and TDD:Diffusers
             cNominalU='N/A'
@@ -1846,24 +1818,9 @@ SUBROUTINE DetailsForSurfaces(RptType)
         else
           CNominalUwithConvCoeffs = '**'
           CNominalU = '**'
-        endif
-
-        if (Surface(surf)%Construction > 0 .and. Surface(surf)%Construction <= TotConstructs) THEN
-          ConstructionName=Construct(Surface(surf)%Construction)%Name
-        else
           ConstructionName='**invalid**'
         endif
-!        ! save the U-value nominal for use later in tabular report
-!        Surface(surf)%UNomWOFilm = cNominalU
-!        Surface(surf)%UNomFilm = cNominalUwithConvCoeffs
-!        !populate the predefined report related to u-values with films
-!        !only exterior surfaces including underground
-!        IF ((Surface(surf)%ExtBoundCond .EQ. ExternalEnvironment) .OR. (Surface(surf)%ExtBoundCond .EQ. Ground)) THEN
-!          SELECT CASE (Surface(surf)%Class)
-!            CASE (SurfaceClass_Wall,SurfaceClass_Floor,SurfaceClass_Roof)
-!              CALL PreDefTableEntry(pdchOpUfactFilm,Surface(surf)%Name,surface(surf)%UNomFilm)
-!          END SELECT
-!        END IF
+
         write(unit,7041,advance='No')trim(ConstructionName),trim(cNominalU),trim(cNominalUwithConvCoeffs),trim(SolarDiffusing),  &
                             trim(RoundSigDigits(Surface(surf)%Area,2)),trim(RoundSigDigits(Surface(surf)%GrossArea,2)),   &
                             trim(RoundSigDigits(Surface(surf)%NetAreaShadowCalc,2)),  &
@@ -1961,7 +1918,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
 ! if window, report frame/divider as appropriate
         if (Surface(surf)%FrameDivider > 0) then
           fd=Surface(surf)%FrameDivider
-          if (FrameDivider(fd)%FrameWidth > 0.0) then
+          if (FrameDivider(fd)%FrameWidth > 0.0d0) then
             SELECT CASE (Surface(surf)%HeatTransferAlgorithm)
             CASE (HeatTransferModel_None)
               AlgoName = 'None'
@@ -1986,7 +1943,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
                trim(RoundSigDigits(SurfaceWindow(surf)%FrameArea/Surface(surf)%Multiplier,2)),'*','N/A','N/A',  &
                              trim(RoundSigDigits(FrameDivider(fd)%FrameWidth,2)),'N/A'
           endif
-          if (FrameDivider(fd)%DividerWidth > 0.0) then
+          if (FrameDivider(fd)%DividerWidth > 0.0d0) then
             if (FrameDivider(fd)%DividerType == DividedLite) then
               write(unit,704,advance='No') 'Frame/Divider',trim(FrameDivider(fd)%Name),  &
                                           'Divider:DividedLite',trim(Surface(surf)%Name)

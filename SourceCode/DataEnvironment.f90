@@ -190,6 +190,10 @@ FUNCTION OutDryBulbTempAt(Z) RESULT(LocalOutDryBulbTemp)
           ! REFERENCES:
           ! 1976 U.S. Standard Atmosphere. 1976. U.S. Government Printing Office, Washington, D.C.
 
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowFatalError
+  USE General, ONLY: RoundSigDigits
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
@@ -203,11 +207,17 @@ FUNCTION OutDryBulbTempAt(Z) RESULT(LocalOutDryBulbTemp)
 
   IF (SiteTempGradient == 0.0d0) THEN
     LocalOutDryBulbTemp = OutDryBulbTemp
-  ELSE IF (Z <= 0.0) THEN
+  ELSE IF (Z <= 0.0d0) THEN
     LocalOutDryBulbTemp = BaseTemp
   ELSE
     LocalOutDryBulbTemp = BaseTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
   END IF
+
+  IF (LocalOutDryBulbTemp < -100.d0) THEN
+    CALL ShowSevereError('OutDryBulbTempAt: outdoor drybulb temperature < -100 C')
+    CALL ShowContinueError('...check heights, this height=['//trim(RoundSigDigits(Z,0))//'].')
+    CALL ShowFatalError('Program terminates due to preceding condition(s).')
+  ENDIF
 
   RETURN
 
@@ -230,6 +240,10 @@ FUNCTION OutWetBulbTempAt(Z) RESULT(LocalOutWetBulbTemp)
           ! REFERENCES:
           ! 1976 U.S. Standard Atmosphere. 1976. U.S. Government Printing Office, Washington, D.C.
 
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowFatalError
+  USE General, ONLY: RoundSigDigits
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
@@ -241,13 +255,19 @@ FUNCTION OutWetBulbTempAt(Z) RESULT(LocalOutWetBulbTemp)
 
   BaseTemp = OutWetBulbTemp + WeatherFileTempModCoeff
 
-  IF (SiteTempGradient == 0.0) THEN
+  IF (SiteTempGradient == 0.0d0) THEN
     LocalOutWetBulbTemp = OutWetBulbTemp
-  ELSE IF (Z <= 0.0) THEN
+  ELSE IF (Z <= 0.0d0) THEN
     LocalOutWetBulbTemp = BaseTemp
   ELSE
     LocalOutWetBulbTemp = BaseTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
   END IF
+
+  IF (LocalOutWetBulbTemp < -100.d0) THEN
+    CALL ShowSevereError('OutWetBulbTempAt: outdoor wetbulb temperature < -100 C')
+    CALL ShowContinueError('...check heights, this height=['//trim(RoundSigDigits(Z,0))//'].')
+    CALL ShowFatalError('Program terminates due to preceding condition(s).')
+  ENDIF
 
   RETURN
 
@@ -271,6 +291,10 @@ FUNCTION OutDewPointTempAt(Z) RESULT(LocalOutDewPointTemp)
           ! REFERENCES:
           ! 1976 U.S. Standard Atmosphere. 1976. U.S. Government Printing Office, Washington, D.C.
 
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowFatalError
+  USE General, ONLY: RoundSigDigits
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! FUNCTION ARGUMENT DEFINITIONS:
@@ -284,11 +308,17 @@ FUNCTION OutDewPointTempAt(Z) RESULT(LocalOutDewPointTemp)
 
   IF (SiteTempGradient == 0.0d0) THEN
     LocalOutDewPointTemp = OutDewPointTemp
-  ELSE IF (Z <= 0.0) THEN
+  ELSE IF (Z <= 0.0d0) THEN
     LocalOutDewPointTemp = BaseTemp
   ELSE
     LocalOutDewPointTemp = BaseTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
   END IF
+
+  IF (LocalOutDewPointTemp < -100.d0) THEN
+    CALL ShowSevereError('OutDewPointTempAt: outdoor dewpoint temperature < -100 C')
+    CALL ShowContinueError('...check heights, this height=['//trim(RoundSigDigits(Z,0))//'].')
+    CALL ShowFatalError('Program terminates due to preceding condition(s).')
+  ENDIF
 
   RETURN
 
@@ -318,7 +348,7 @@ FUNCTION WindSpeedAt(Z) RESULT(LocalWindSpeed)
   REAL(r64), INTENT(IN) :: Z                ! Height above ground (m)
   REAL(r64)        :: LocalWindSpeed   ! Return result for function (m/s)
 
-  IF (Z <= 0.0) THEN
+  IF (Z <= 0.0d0) THEN
     LocalWindSpeed = 0.0d0
   ELSE IF (SiteWindExp == 0.0d0) THEN
     LocalWindSpeed = WindSpeed
@@ -369,7 +399,7 @@ FUNCTION OutBaroPressAt(Z) RESULT(LocalAirPressure)
 
   BaseTemp = OutDryBulbTempAt(Z) + KelvinConv
 
-  IF (Z <= 0.0) THEN
+  IF (Z <= 0.0d0) THEN
     LocalAirPressure = 0.0d0
   ELSE IF (SiteTempGradient == 0.0d0) THEN
     LocalAirPressure = OutBaroPress
@@ -382,7 +412,7 @@ FUNCTION OutBaroPressAt(Z) RESULT(LocalAirPressure)
 
 END FUNCTION OutBaroPressAt
 
-SUBROUTINE SetOutBulbTempAt(NumItems, Heights, DryBulb, WetBulb)
+SUBROUTINE SetOutBulbTempAt(NumItems, Heights, DryBulb, WetBulb, Settings)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Noel Keen (LBL)/Linda Lawrie
@@ -400,7 +430,8 @@ SUBROUTINE SetOutBulbTempAt(NumItems, Heights, DryBulb, WetBulb)
           ! na
 
           ! USE STATEMENTS:
-          ! na
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowFatalError
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -409,6 +440,7 @@ SUBROUTINE SetOutBulbTempAt(NumItems, Heights, DryBulb, WetBulb)
   REAL(r64), INTENT(IN), DIMENSION(:) :: Heights
   REAL(r64), INTENT(INOUT), DIMENSION(:) :: DryBulb
   REAL(r64), INTENT(INOUT), DIMENSION(:) :: WetBulb
+  CHARACTER(len=*), INTENT(IN) :: Settings
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -424,30 +456,100 @@ SUBROUTINE SetOutBulbTempAt(NumItems, Heights, DryBulb, WetBulb)
   REAL(r64) :: BaseDryTemp, BaseWetTemp         ! Base temperature at Z = 0 (C)
   REAL(r64) :: Z ! Centroid value
 
-
   BaseDryTemp = OutDryBulbTemp + WeatherFileTempModCoeff
   BaseWetTemp = OutWetBulbTemp + WeatherFileTempModCoeff
 
-
   IF (SiteTempGradient == 0.0d0) THEN
-     DryBulb = OutDryBulbTemp
-     WetBulb = OutWetBulbTemp
+    DryBulb = OutDryBulbTemp
+    WetBulb = OutWetBulbTemp
   ELSE
-     DO i=1, NumItems
-        Z = Heights(i)
-        IF (Z <= 0.0d0) THEN
-           DryBulb(i) = BaseDryTemp
-           WetBulb(i) = BaseWetTemp
-        ELSE
-           DryBulb(i) = BaseDryTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
-           WetBulb(i) = BaseWetTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
-        ENDIF
-     ENDDO
+    DO i=1, NumItems
+      Z = Heights(i)
+      IF (Z <= 0.0d0) THEN
+        DryBulb(i) = BaseDryTemp
+        WetBulb(i) = BaseWetTemp
+      ELSE
+        DryBulb(i) = BaseDryTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
+        WetBulb(i) = BaseWetTemp - SiteTempGradient * EarthRadius * Z / (EarthRadius + Z)
+      ENDIF
+    ENDDO
+    IF (ANY(DryBulb < -100.d0) .or. ANY(WetBulb < -100.d0)) THEN
+      CALL ShowSevereError('SetOutBulbTempAt: '//trim(Settings)//' Outdoor Temperatures < -100 C')
+      CALL ShowContinueError('...check '//trim(Settings)//' Heights - Maximum '//trim(Settings)//' Height=['//  &
+           trim(RoundSigDigits(MAXVAL(Heights),0))//'].')
+      IF (MAXVAL(Heights) >= 20000.d0) THEN
+        CALL ShowContinueError('...according to your maximum Z height, your building is somewhere in the Stratosphere.')
+      ENDIF
+      CALL ShowFatalError('Program terminates due to preceding condition(s).')
+    ENDIF
   END IF
 
   RETURN
 
 END SUBROUTINE SetOutBulbTempAt
+
+SUBROUTINE SetWindSpeedAt(NumItems, Heights, LocalWindSpeed, Settings)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   June 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Routine provides facility for doing bulk Set Windspeed at Height.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces, ONLY: ShowSevereError, ShowContinueError, ShowFatalError
+  USE General, ONLY: RoundSigDigits
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,   INTENT(IN) :: NumItems
+  REAL(r64), INTENT(IN), DIMENSION(:) :: Heights
+  REAL(r64), INTENT(INOUT), DIMENSION(:) :: LocalWindSpeed
+  CHARACTER(len=*), INTENT(IN) :: Settings
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  integer :: i    ! Loop Control
+  REAL(r64) :: Z ! Centroid value
+
+  IF (SiteWindExp == 0.0d0) THEN
+    LocalWindSpeed = WindSpeed
+  ELSE
+    DO i=1, NumItems
+      Z = Heights(i)
+      IF (Z <= 0.0d0) THEN
+        LocalWindSpeed(i) = 0.0d0
+      ELSE
+        !  [Met] - at meterological Station, Height of measurement is usually 10m above ground
+        !  LocalWindSpeed = Windspeed [Met] * (Wind Boundary LayerThickness [Met]/Height [Met])**Wind Exponent[Met] &
+        !                     * (Height above ground / Site Wind Boundary Layer Thickness) ** Site Wind Exponent
+        !
+        LocalWindSpeed(i) = WindSpeed * WeatherFileWindModCoeff * (Z / SiteWindBLHeight) ** SiteWindExp
+      ENDIF
+    ENDDO
+  END IF
+
+  RETURN
+
+END SUBROUTINE SetWindSpeedAt
 
 !     NOTICE
 !

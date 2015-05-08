@@ -60,45 +60,45 @@ INTEGER, PARAMETER :: PollFactorNumTypes=10
           ! DERIVED TYPE DEFINITIONS:
 TYPE ComponentProps
   INTEGER :: FuelFactorType=0
-  REAL(r64)    :: Source = 0.0
-  REAL(r64)    :: CO2Pollution = 0.0
-  REAL(r64)    :: COPollution = 0.0
-  REAL(r64)    :: CH4Pollution = 0.0
-  REAL(r64)    :: NOxPollution = 0.0
-  REAL(r64)    :: N2OPollution = 0.0
-  REAL(r64)    :: SO2Pollution = 0.0
-  REAL(r64)    :: PMPollution = 0.0
-  REAL(r64)    :: PM10Pollution = 0.0
-  REAL(r64)    :: PM25Pollution = 0.0
-  REAL(r64)    :: NH3Pollution = 0.0
-  REAL(r64)    :: NMVOCPollution = 0.0
-  REAL(r64)    :: HgPollution = 0.0
-  REAL(r64)    :: PbPollution = 0.0
-  REAL(r64)    :: WaterPollution = 0.0
-  REAL(r64)    :: NucHiPollution = 0.0
-  REAL(r64)    :: NucLoPollution = 0.0
+  REAL(r64)    :: Source = 0.0d0
+  REAL(r64)    :: CO2Pollution = 0.0d0
+  REAL(r64)    :: COPollution = 0.0d0
+  REAL(r64)    :: CH4Pollution = 0.0d0
+  REAL(r64)    :: NOxPollution = 0.0d0
+  REAL(r64)    :: N2OPollution = 0.0d0
+  REAL(r64)    :: SO2Pollution = 0.0d0
+  REAL(r64)    :: PMPollution = 0.0d0
+  REAL(r64)    :: PM10Pollution = 0.0d0
+  REAL(r64)    :: PM25Pollution = 0.0d0
+  REAL(r64)    :: NH3Pollution = 0.0d0
+  REAL(r64)    :: NMVOCPollution = 0.0d0
+  REAL(r64)    :: HgPollution = 0.0d0
+  REAL(r64)    :: PbPollution = 0.0d0
+  REAL(r64)    :: WaterPollution = 0.0d0
+  REAL(r64)    :: NucHiPollution = 0.0d0
+  REAL(r64)    :: NucLoPollution = 0.0d0
 END TYPE
 
 TYPE CoefficientProps
   INTEGER :: FuelFactorType=0
   LOGICAL :: FuelFactorUsed=.false.
-  REAL(r64)    :: Source = 0.0
-  REAL(r64)    :: CO2 = 0.0
-  REAL(r64)    :: CO = 0.0
-  REAL(r64)    :: CH4 = 0.0
-  REAL(r64)    :: NOx = 0.0
-  REAL(r64)    :: N2O = 0.0
-  REAL(r64)    :: SO2 = 0.0
-  REAL(r64)    :: PM = 0.0
-  REAL(r64)    :: PM10 = 0.0
-  REAL(r64)    :: PM25 = 0.0
-  REAL(r64)    :: NH3 = 0.0
-  REAL(r64)    :: NMVOC = 0.0
-  REAL(r64)    :: Hg = 0.0
-  REAL(r64)    :: Pb = 0.0
-  REAL(r64)    :: Water = 0.0
-  REAL(r64)    :: NucHi = 0.0
-  REAL(r64)    :: NucLo = 0.0
+  REAL(r64)    :: Source = 0.0d0
+  REAL(r64)    :: CO2 = 0.0d0
+  REAL(r64)    :: CO = 0.0d0
+  REAL(r64)    :: CH4 = 0.0d0
+  REAL(r64)    :: NOx = 0.0d0
+  REAL(r64)    :: N2O = 0.0d0
+  REAL(r64)    :: SO2 = 0.0d0
+  REAL(r64)    :: PM = 0.0d0
+  REAL(r64)    :: PM10 = 0.0d0
+  REAL(r64)    :: PM25 = 0.0d0
+  REAL(r64)    :: NH3 = 0.0d0
+  REAL(r64)    :: NMVOC = 0.0d0
+  REAL(r64)    :: Hg = 0.0d0
+  REAL(r64)    :: Pb = 0.0d0
+  REAL(r64)    :: Water = 0.0d0
+  REAL(r64)    :: NucHi = 0.0d0
+  REAL(r64)    :: NucLo = 0.0d0
   INTEGER :: SourceSched = 0
   INTEGER :: CO2Sched = 0
   INTEGER :: COSched = 0
@@ -134,14 +134,14 @@ TYPE PollutionProps
   TYPE (ComponentProps) :: OtherFuel2Comp
 
   !Total for all of the Pollutants
-  REAL(r64)    :: N2OPollutTotal = 0.0
-  REAL(r64)    :: CH4PollutTotal = 0.0
-  REAL(r64)    :: CO2PollutTotal = 0.0
+  REAL(r64)    :: N2OPollutTotal = 0.0d0
+  REAL(r64)    :: CH4PollutTotal = 0.0d0
+  REAL(r64)    :: CO2PollutTotal = 0.0d0
 
   !Total Carbon Equivalent Components
-  REAL(r64)    :: TotCarbonEquivFromN2O = 0.0
-  REAL(r64)    :: TotCarbonEquivFromCH4 = 0.0
-  REAL(r64)    :: TotCarbonEquivFromCO2 = 0.0
+  REAL(r64)    :: TotCarbonEquivFromN2O = 0.0d0
+  REAL(r64)    :: TotCarbonEquivFromCH4 = 0.0d0
+  REAL(r64)    :: TotCarbonEquivFromCO2 = 0.0d0
 
   !Fuel Type Coefficients
   TYPE (CoefficientProps) :: ElecCoef
@@ -156,29 +156,29 @@ TYPE PollutionProps
   TYPE (CoefficientProps) :: OtherFuel2Coef
 
   !Total Carbon Equivalent Coeffs
-  REAL(r64)    :: CarbonEquivN2O = 0.0
-  REAL(r64)    :: CarbonEquivCH4 = 0.0
-  REAL(r64)    :: CarbonEquivCO2 = 0.0
+  REAL(r64)    :: CarbonEquivN2O = 0.0d0
+  REAL(r64)    :: CarbonEquivCH4 = 0.0d0
+  REAL(r64)    :: CarbonEquivCO2 = 0.0d0
 
-  REAL(r64)    :: PurchHeatEffic = 0.0
-  REAL(r64)    :: PurchCoolCOP   = 0.0
-  REAL(r64)    :: SteamConvEffic = 0.0
+  REAL(r64)    :: PurchHeatEffic = 0.0d0
+  REAL(r64)    :: PurchCoolCOP   = 0.0d0
+  REAL(r64)    :: SteamConvEffic = 0.0d0
 END TYPE PollutionProps
 
 TYPE FuelTypeProps
 !FuelType Names
   CHARACTER(len=MaxNameLength), DIMENSION(1:PollFactorNumTypes) :: FuelTypeNames=' '
 !Fuel Types used with the Pollution Factors
-  REAL(r64)    :: Elec = 0.0
-  REAL(r64)    :: NatGas = 0.0
-  REAL(r64)    :: FuelOil1 = 0.0
-  REAL(r64)    :: FuelOil2 = 0.0
-  REAL(r64)    :: Coal = 0.0
-  REAL(r64)    :: Gasoline = 0.0
-  REAL(r64)    :: Propane = 0.0
-  REAL(r64)    :: Diesel = 0.0
-  REAL(r64)    :: OtherFuel1 = 0.0
-  REAL(r64)    :: OtherFuel2 = 0.0
+  REAL(r64)    :: Elec = 0.0d0
+  REAL(r64)    :: NatGas = 0.0d0
+  REAL(r64)    :: FuelOil1 = 0.0d0
+  REAL(r64)    :: FuelOil2 = 0.0d0
+  REAL(r64)    :: Coal = 0.0d0
+  REAL(r64)    :: Gasoline = 0.0d0
+  REAL(r64)    :: Propane = 0.0d0
+  REAL(r64)    :: Diesel = 0.0d0
+  REAL(r64)    :: OtherFuel1 = 0.0d0
+  REAL(r64)    :: OtherFuel2 = 0.0d0
   REAL(r64)    :: ElecPurch = 0.0D0
   REAL(r64)    :: ElecSold  = 0.0D0
 !Facility Meter Indexes
@@ -199,83 +199,86 @@ TYPE FuelTypeProps
   INTEGER :: ElecPurchasedFacilityIndex=0
   INTEGER :: ElecSurplusSoldFacilityIndex=0
 !Facility Meter Values used in Pollution Calcs
-  REAL(r64)    :: ElecFacility=0.0
-  REAL(r64)    :: DieselFacility=0.0
-  REAL(r64)    :: PurchCoolFacility=0.0
-  REAL(r64)    :: PurchHeatFacility=0.0
-  REAL(r64)    :: NatGasFacility=0.0
-  REAL(r64)    :: GasolineFacility=0.0
-  REAL(r64)    :: CoalFacility=0.0
-  REAL(r64)    :: FuelOil1Facility=0.0
-  REAL(r64)    :: FuelOil2Facility=0.0
-  REAL(r64)    :: PropaneFacility=0.0
-  REAL(r64)    :: OtherFuel1Facility=0.0
-  REAL(r64)    :: OtherFuel2Facility=0.0
-  REAL(r64)    :: ElecProducedFacility=0.0
-  REAL(r64)    :: SteamFacility=0.0
+  REAL(r64)    :: ElecFacility=0.0d0
+  REAL(r64)    :: DieselFacility=0.0d0
+  REAL(r64)    :: PurchCoolFacility=0.0d0
+  REAL(r64)    :: PurchHeatFacility=0.0d0
+  REAL(r64)    :: NatGasFacility=0.0d0
+  REAL(r64)    :: GasolineFacility=0.0d0
+  REAL(r64)    :: CoalFacility=0.0d0
+  REAL(r64)    :: FuelOil1Facility=0.0d0
+  REAL(r64)    :: FuelOil2Facility=0.0d0
+  REAL(r64)    :: PropaneFacility=0.0d0
+  REAL(r64)    :: OtherFuel1Facility=0.0d0
+  REAL(r64)    :: OtherFuel2Facility=0.0d0
+  REAL(r64)    :: ElecProducedFacility=0.0d0
+  REAL(r64)    :: SteamFacility=0.0d0
   REAL(r64)    :: ElecPurchasedFacility=0.0D0
   REAL(r64)    :: ElecSurplusSoldFacility=0.0D0
 END TYPE FuelTypeProps
 
           ! MODULE VARIABLE DECLARATIONS:
-TYPE (PollutionProps):: Pollution=PollutionProps(                       &
-  ComponentProps(ElecPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),     &
-  ComponentProps(ElecPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),     &
-  ComponentProps(ElecPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),     &
-  ComponentProps(NatGasPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
-  ComponentProps(FuelOil1PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0), &
-  ComponentProps(FuelOil2PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0), &
-  ComponentProps(CoalPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),     &
-  ComponentProps(GasolinePollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0), &
-  ComponentProps(PropanePollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),  &
-  ComponentProps(DieselPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
-  ComponentProps(OtherFuel1PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
-  ComponentProps(OtherFuel2PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
+TYPE (PollutionProps), SAVE :: Pollution=PollutionProps(                       &
+  ComponentProps(ElecPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),     &
+  ComponentProps(ElecPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),     &
+  ComponentProps(ElecPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),     &
+  ComponentProps(NatGasPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),   &
+  ComponentProps(FuelOil1PollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0), &
+  ComponentProps(FuelOil2PollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0), &
+  ComponentProps(CoalPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),     &
+  ComponentProps(GasolinePollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0), &
+  ComponentProps(PropanePollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),  &
+  ComponentProps(DieselPollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),   &
+  ComponentProps(OtherFuel1PollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),   &
+  ComponentProps(OtherFuel2PollFactor,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0),   &
   !Total for all of the Pollutants
-  0.0,0.0,0.0,                                                          &
+  0.0d0,0.0d0,0.0d0,                                                          &
   !Total Carbon Equivalent Components
-  0.0,0.0,0.0,                                                          &
+  0.0d0,0.0d0,0.0d0,                                                          &
 !
 !  !Fuel Types
    CoefficientProps(ElecPollFactor,.false., &
-   3.167,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+   3.167d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(NatGasPollFactor,.false., &
-   1.084,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+   1.084d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(FuelOil1PollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(FuelOil2PollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(CoalPollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(GasolinePollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(PropanePollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(DieselPollFactor,.false., &
-    1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.05d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(OtherFuel1PollFactor,.false., &
-    1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.0d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
    CoefficientProps(OtherFUel2PollFactor,.false., &
-    1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+    1.0d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
   !Total Carbon Equivalent Coeffs
-  0.0,0.0,0.0,                                                                      &
+  0.d0,0.d0,0.d0,                                                                      &
   ! Purchased Efficiencies
-  0.0,0.0,0.0)
+  0.d0,0.d0,0.d0)
 
-TYPE (FuelTypeProps) :: FuelType =FuelTypeProps(' ',                 &
-              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,       &
-              0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0,0.0,                   &
-              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)
+TYPE (FuelTypeProps), SAVE :: FuelType =FuelTypeProps(' ',                   &
+!Fuel Types used with the Pollution Factors
+              0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,   &
+!Facility Meter Indexes
+              0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,                                 &
+!Facility Meter Values used in Pollution Calcs
+              0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0)
 
 LOGICAL :: PollutionReportSetup = .False.
 LOGICAL :: GetInputFlagPollution = .True.
@@ -490,17 +493,17 @@ SUBROUTINE GetPollutionFactorInput
 
     IF (NumEnvImpactFactors > 0) THEN
       !If Heating Efficiency defined by the User is negative or zero then a default of 30% will be assigned.
-      If(rNumericArgs(1) > 0.0) Then
+      If(rNumericArgs(1) > 0.0d0) Then
         Pollution%PurchHeatEffic = rNumericArgs(1)
       End If
 
       !If COP defined by the User is negative or zero then a default of 3.0 will be assigned.
-      If(rNumericArgs(2) > 0.0) Then
+      If(rNumericArgs(2) > 0.0d0) Then
         Pollution%PurchCoolCOP =  rNumericArgs(2)
       End If
 
       !If Steam Conversion Efficiency defined by the User is negative or zero then a default of 25% will be assigned.
-      If(rNumericArgs(1) > 0.0) Then
+      If(rNumericArgs(1) > 0.0d0) Then
         Pollution%SteamConvEffic = rNumericArgs(3)
       End If
 
@@ -2209,7 +2212,7 @@ SUBROUTINE CheckFFSchedule(currentModuleObject,resourceType,fieldName,scheduleNa
     CALL ShowSevereError(currentModuleObject//': '//resourceType//', invalid '//fieldName//  &
            '="'//scheduleName//'" not found.')
     errorsFound = .true.
-  ELSEIF (.NOT. CheckScheduleValueMinMax(schedulePtr,'>=',0.)) THEN
+  ELSEIF (.NOT. CheckScheduleValueMinMax(schedulePtr,'>=',0.0d0)) THEN
     CALL ShowSevereError(currentModuleObject//': '//resourceType//', invalid '//fieldName//  &
            '="'//scheduleName//'" invalid values.')
     CALL ShowContinueError('Schedule values must be (>=0.).')
@@ -2278,19 +2281,19 @@ END SUBROUTINE CheckFFSchedule
 
 !     For each pollution/fuel type, Schedule values are allowed.  Thus, calculations are bundled.
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%CO2Pollution     = 0.0
+        Pollution%ElecComp%CO2Pollution     = 0.0d0
         IF (Pollution%ElecCoef%CO2Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%CO2/1000.0d0
         ELSE
@@ -2299,7 +2302,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%CO2Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%CO2Pollution   = 0.0
+        Pollution%NatGasComp%CO2Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%CO2Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%CO2/1000.0d0
         ELSE
@@ -2308,7 +2311,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%CO2Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%CO2Pollution  = 0.0
+        Pollution%FuelOil1Comp%CO2Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%CO2Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%CO2/1000.0d0
         ELSE
@@ -2317,7 +2320,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%CO2Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%CO2Pollution  = 0.0
+        Pollution%FuelOil2Comp%CO2Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%CO2Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%CO2/1000.0d0
         ELSE
@@ -2326,7 +2329,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%CO2Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%CO2Pollution  = 0.0
+        Pollution%CoalComp%CO2Pollution  = 0.0d0
         IF (Pollution%CoalCoef%CO2Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%CO2/1000.0d0
         ELSE
@@ -2335,7 +2338,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%CO2Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%CO2Pollution  = 0.0
+        Pollution%GasolineComp%CO2Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%CO2Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%CO2/1000.0d0
         ELSE
@@ -2344,7 +2347,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%CO2Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%CO2Pollution  = 0.0
+        Pollution%PropaneComp%CO2Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%CO2Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%CO2/1000.0d0
         ELSE
@@ -2353,7 +2356,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%CO2Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%CO2Pollution  = 0.0
+        Pollution%DieselComp%CO2Pollution  = 0.0d0
         IF (Pollution%DieselCoef%CO2Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%CO2/1000.0d0
         ELSE
@@ -2363,7 +2366,7 @@ END SUBROUTINE CheckFFSchedule
       ENDIF
 
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%CO2Pollution  = 0.0
+        Pollution%OtherFuel1Comp%CO2Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%CO2Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%CO2/1000.0d0
         ELSE
@@ -2373,7 +2376,7 @@ END SUBROUTINE CheckFFSchedule
       ENDIF
 
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%CO2Pollution  = 0.0
+        Pollution%OtherFuel2Comp%CO2Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%CO2Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%CO2/1000.0d0
         ELSE
@@ -2394,19 +2397,19 @@ END SUBROUTINE CheckFFSchedule
                         Pollution%OtherFuel1Comp%CO2Pollution    +      &
                         Pollution%OtherFuel2Comp%CO2Pollution
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%NOxPollution     = 0.0
+        Pollution%ElecComp%NOxPollution     = 0.0d0
         IF (Pollution%ElecCoef%NOxSched == 0) THEN
           ElecValue = Pollution%ElecCoef%NOx/1000.0d0
         ELSE
@@ -2415,7 +2418,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%NOxPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%NOxPollution   = 0.0
+        Pollution%NatGasComp%NOxPollution   = 0.0d0
         IF (Pollution%NatGasCoef%NOxSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%NOx/1000.0d0
         ELSE
@@ -2424,7 +2427,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%NOxPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%NOxPollution  = 0.0
+        Pollution%FuelOil1Comp%NOxPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%NOxSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%NOx/1000.0d0
         ELSE
@@ -2433,7 +2436,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%NOxPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%NOxPollution  = 0.0
+        Pollution%FuelOil2Comp%NOxPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%NOxSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%NOx/1000.0d0
         ELSE
@@ -2442,7 +2445,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%NOxPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%NOxPollution  = 0.0
+        Pollution%CoalComp%NOxPollution  = 0.0d0
         IF (Pollution%CoalCoef%NOxSched == 0) THEN
           CoalValue = Pollution%CoalCoef%NOx/1000.0d0
         ELSE
@@ -2451,7 +2454,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%NOxPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%NOxPollution  = 0.0
+        Pollution%GasolineComp%NOxPollution  = 0.0d0
         IF (Pollution%GasolineCoef%NOxSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%NOx/1000.0d0
         ELSE
@@ -2460,7 +2463,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%NOxPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%NOxPollution  = 0.0
+        Pollution%PropaneComp%NOxPollution  = 0.0d0
         IF (Pollution%PropaneCoef%NOxSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%NOx/1000.0d0
         ELSE
@@ -2469,7 +2472,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%NOxPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%NOxPollution  = 0.0
+        Pollution%DieselComp%NOxPollution  = 0.0d0
         IF (Pollution%DieselCoef%NOxSched == 0) THEN
           DieselValue = Pollution%DieselCoef%NOx/1000.0d0
         ELSE
@@ -2478,7 +2481,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%NOxPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%NOxPollution  = 0.0
+        Pollution%OtherFuel1Comp%NOxPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%NOxSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%NOx/1000.0d0
         ELSE
@@ -2487,7 +2490,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%NOxPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%NOxPollution  = 0.0
+        Pollution%OtherFuel2Comp%NOxPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%NOxSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%NOx/1000.0d0
         ELSE
@@ -2496,19 +2499,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%NOxPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%CH4Pollution     = 0.0
+        Pollution%ElecComp%CH4Pollution     = 0.0d0
         IF (Pollution%ElecCoef%CH4Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%CH4/1000.0d0
         ELSE
@@ -2517,7 +2520,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%CH4Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%CH4Pollution   = 0.0
+        Pollution%NatGasComp%CH4Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%CH4Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%CH4/1000.0d0
         ELSE
@@ -2526,7 +2529,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%CH4Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%CH4Pollution  = 0.0
+        Pollution%FuelOil1Comp%CH4Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%CH4Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%CH4/1000.0d0
         ELSE
@@ -2535,7 +2538,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%CH4Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%CH4Pollution  = 0.0
+        Pollution%FuelOil2Comp%CH4Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%CH4Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%CH4/1000.0d0
         ELSE
@@ -2544,7 +2547,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%CH4Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%CH4Pollution  = 0.0
+        Pollution%CoalComp%CH4Pollution  = 0.0d0
         IF (Pollution%CoalCoef%CH4Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%CH4/1000.0d0
         ELSE
@@ -2553,7 +2556,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%CH4Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%CH4Pollution  = 0.0
+        Pollution%GasolineComp%CH4Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%CH4Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%CH4/1000.0d0
         ELSE
@@ -2562,7 +2565,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%CH4Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%CH4Pollution  = 0.0
+        Pollution%PropaneComp%CH4Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%CH4Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%CH4/1000.0d0
         ELSE
@@ -2571,7 +2574,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%CH4Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%CH4Pollution  = 0.0
+        Pollution%DieselComp%CH4Pollution  = 0.0d0
         IF (Pollution%DieselCoef%CH4Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%CH4/1000.0d0
         ELSE
@@ -2580,7 +2583,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%CH4Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%CH4Pollution  = 0.0
+        Pollution%OtherFuel1Comp%CH4Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%CH4Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%CH4/1000.0d0
         ELSE
@@ -2589,7 +2592,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%CH4Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%CH4Pollution  = 0.0
+        Pollution%OtherFuel2Comp%CH4Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%CH4Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%CH4/1000.0d0
         ELSE
@@ -2609,19 +2612,19 @@ END SUBROUTINE CheckFFSchedule
                         Pollution%OtherFuel1Comp%CH4Pollution    +      &
                         Pollution%OtherFuel1Comp%CH4Pollution
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%COPollution     = 0.0
+        Pollution%ElecComp%COPollution     = 0.0d0
         IF (Pollution%ElecCoef%COSched == 0) THEN
           ElecValue = Pollution%ElecCoef%CO/1000.0d0
         ELSE
@@ -2630,7 +2633,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%COPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%COPollution   = 0.0
+        Pollution%NatGasComp%COPollution   = 0.0d0
         IF (Pollution%NatGasCoef%COSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%CO/1000.0d0
         ELSE
@@ -2639,7 +2642,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%COPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%COPollution  = 0.0
+        Pollution%FuelOil1Comp%COPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%COSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%CO/1000.0d0
         ELSE
@@ -2648,7 +2651,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%COPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%COPollution  = 0.0
+        Pollution%FuelOil2Comp%COPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%COSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%CO/1000.0d0
         ELSE
@@ -2657,7 +2660,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%COPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%COPollution  = 0.0
+        Pollution%CoalComp%COPollution  = 0.0d0
         IF (Pollution%CoalCoef%COSched == 0) THEN
           CoalValue = Pollution%CoalCoef%CO/1000.0d0
         ELSE
@@ -2666,7 +2669,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%COPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%COPollution  = 0.0
+        Pollution%GasolineComp%COPollution  = 0.0d0
         IF (Pollution%GasolineCoef%COSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%CO/1000.0d0
         ELSE
@@ -2675,7 +2678,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%COPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%COPollution  = 0.0
+        Pollution%PropaneComp%COPollution  = 0.0d0
         IF (Pollution%PropaneCoef%COSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%CO/1000.0d0
         ELSE
@@ -2684,7 +2687,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%COPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%COPollution  = 0.0
+        Pollution%DieselComp%COPollution  = 0.0d0
         IF (Pollution%DieselCoef%COSched == 0) THEN
           DieselValue = Pollution%DieselCoef%CO/1000.0d0
         ELSE
@@ -2693,7 +2696,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%COPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%COPollution  = 0.0
+        Pollution%OtherFuel1Comp%COPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%COSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%CO/1000.0d0
         ELSE
@@ -2702,7 +2705,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%COPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%COPollution  = 0.0
+        Pollution%OtherFuel2Comp%COPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%COSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%CO/1000.0d0
         ELSE
@@ -2711,19 +2714,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%COPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%N2OPollution     = 0.0
+        Pollution%ElecComp%N2OPollution     = 0.0d0
         IF (Pollution%ElecCoef%N2OSched == 0) THEN
           ElecValue = Pollution%ElecCoef%N2O/1000.0d0
         ELSE
@@ -2732,7 +2735,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%N2OPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%N2OPollution   = 0.0
+        Pollution%NatGasComp%N2OPollution   = 0.0d0
         IF (Pollution%NatGasCoef%N2OSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%N2O/1000.0d0
         ELSE
@@ -2741,7 +2744,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%N2OPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%N2OPollution  = 0.0
+        Pollution%FuelOil1Comp%N2OPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%N2OSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%N2O/1000.0d0
         ELSE
@@ -2750,7 +2753,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%N2OPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%N2OPollution  = 0.0
+        Pollution%FuelOil2Comp%N2OPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%N2OSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%N2O/1000.0d0
         ELSE
@@ -2759,7 +2762,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%N2OPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%N2OPollution  = 0.0
+        Pollution%CoalComp%N2OPollution  = 0.0d0
         IF (Pollution%CoalCoef%N2OSched == 0) THEN
           CoalValue = Pollution%CoalCoef%N2O/1000.0d0
         ELSE
@@ -2768,7 +2771,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%N2OPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%N2OPollution  = 0.0
+        Pollution%GasolineComp%N2OPollution  = 0.0d0
         IF (Pollution%GasolineCoef%N2OSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%N2O/1000.0d0
         ELSE
@@ -2777,7 +2780,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%N2OPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%N2OPollution  = 0.0
+        Pollution%PropaneComp%N2OPollution  = 0.0d0
         IF (Pollution%PropaneCoef%N2OSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%N2O/1000.0d0
         ELSE
@@ -2786,7 +2789,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%N2OPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%N2OPollution  = 0.0
+        Pollution%DieselComp%N2OPollution  = 0.0d0
         IF (Pollution%DieselCoef%N2OSched == 0) THEN
           DieselValue = Pollution%DieselCoef%N2O/1000.0d0
         ELSE
@@ -2795,7 +2798,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%N2OPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%N2OPollution  = 0.0
+        Pollution%OtherFuel1Comp%N2OPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%N2OSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%N2O/1000.0d0
         ELSE
@@ -2804,7 +2807,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%N2OPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%N2OPollution  = 0.0
+        Pollution%OtherFuel2Comp%N2OPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%N2OSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%N2O/1000.0d0
         ELSE
@@ -2824,19 +2827,19 @@ END SUBROUTINE CheckFFSchedule
                         Pollution%OtherFuel1Comp%N2OPollution    +      &
                         Pollution%OtherFuel2Comp%N2OPollution
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%SO2Pollution     = 0.0
+        Pollution%ElecComp%SO2Pollution     = 0.0d0
         IF (Pollution%ElecCoef%SO2Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%SO2/1000.0d0
         ELSE
@@ -2845,7 +2848,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%SO2Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%SO2Pollution   = 0.0
+        Pollution%NatGasComp%SO2Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%SO2Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%SO2/1000.0d0
         ELSE
@@ -2854,7 +2857,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%SO2Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%SO2Pollution  = 0.0
+        Pollution%FuelOil1Comp%SO2Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%SO2Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%SO2/1000.0d0
         ELSE
@@ -2863,7 +2866,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%SO2Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%SO2Pollution  = 0.0
+        Pollution%FuelOil2Comp%SO2Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%SO2Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%SO2/1000.0d0
         ELSE
@@ -2872,7 +2875,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%SO2Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%SO2Pollution  = 0.0
+        Pollution%CoalComp%SO2Pollution  = 0.0d0
         IF (Pollution%CoalCoef%SO2Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%SO2/1000.0d0
         ELSE
@@ -2881,7 +2884,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%SO2Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%SO2Pollution  = 0.0
+        Pollution%GasolineComp%SO2Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%SO2Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%SO2/1000.0d0
         ELSE
@@ -2890,7 +2893,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%SO2Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%SO2Pollution  = 0.0
+        Pollution%PropaneComp%SO2Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%SO2Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%SO2/1000.0d0
         ELSE
@@ -2899,7 +2902,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%SO2Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%SO2Pollution  = 0.0
+        Pollution%DieselComp%SO2Pollution  = 0.0d0
         IF (Pollution%DieselCoef%SO2Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%SO2/1000.0d0
         ELSE
@@ -2908,7 +2911,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%SO2Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%SO2Pollution  = 0.0
+        Pollution%OtherFuel1Comp%SO2Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%SO2Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%SO2/1000.0d0
         ELSE
@@ -2917,7 +2920,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%SO2Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%SO2Pollution  = 0.0
+        Pollution%OtherFuel2Comp%SO2Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%SO2Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%SO2/1000.0d0
         ELSE
@@ -2926,19 +2929,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%SO2Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%PMPollution     = 0.0
+        Pollution%ElecComp%PMPollution     = 0.0d0
         IF (Pollution%ElecCoef%PMSched == 0) THEN
           ElecValue = Pollution%ElecCoef%PM/1000.0d0
         ELSE
@@ -2947,7 +2950,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%PMPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%PMPollution   = 0.0
+        Pollution%NatGasComp%PMPollution   = 0.0d0
         IF (Pollution%NatGasCoef%PMSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%PM/1000.0d0
         ELSE
@@ -2956,7 +2959,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%PMPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%PMPollution  = 0.0
+        Pollution%FuelOil1Comp%PMPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%PMSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%PM/1000.0d0
         ELSE
@@ -2965,7 +2968,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%PMPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%PMPollution  = 0.0
+        Pollution%FuelOil2Comp%PMPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%PMSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%PM/1000.0d0
         ELSE
@@ -2974,7 +2977,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%PMPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%PMPollution  = 0.0
+        Pollution%CoalComp%PMPollution  = 0.0d0
         IF (Pollution%CoalCoef%PMSched == 0) THEN
           CoalValue = Pollution%CoalCoef%PM/1000.0d0
         ELSE
@@ -2983,7 +2986,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%PMPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%PMPollution  = 0.0
+        Pollution%GasolineComp%PMPollution  = 0.0d0
         IF (Pollution%GasolineCoef%PMSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%PM/1000.0d0
         ELSE
@@ -2992,7 +2995,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%PMPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%PMPollution  = 0.0
+        Pollution%PropaneComp%PMPollution  = 0.0d0
         IF (Pollution%PropaneCoef%PMSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%PM/1000.0d0
         ELSE
@@ -3001,7 +3004,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%PMPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%PMPollution  = 0.0
+        Pollution%DieselComp%PMPollution  = 0.0d0
         IF (Pollution%DieselCoef%PMSched == 0) THEN
           DieselValue = Pollution%DieselCoef%PM/1000.0d0
         ELSE
@@ -3010,7 +3013,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%PMPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%PMPollution  = 0.0
+        Pollution%OtherFuel1Comp%PMPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%PMSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%PM/1000.0d0
         ELSE
@@ -3019,7 +3022,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%PMPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%PMPollution  = 0.0
+        Pollution%OtherFuel2Comp%PMPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%PMSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%PM/1000.0d0
         ELSE
@@ -3028,19 +3031,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%PMPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%PM10Pollution     = 0.0
+        Pollution%ElecComp%PM10Pollution     = 0.0d0
         IF (Pollution%ElecCoef%PM10Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%PM10/1000.0d0
         ELSE
@@ -3049,7 +3052,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%PM10Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%PM10Pollution   = 0.0
+        Pollution%NatGasComp%PM10Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%PM10Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%PM10/1000.0d0
         ELSE
@@ -3058,7 +3061,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%PM10Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%PM10Pollution  = 0.0
+        Pollution%FuelOil1Comp%PM10Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%PM10Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%PM10/1000.0d0
         ELSE
@@ -3067,7 +3070,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%PM10Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%PM10Pollution  = 0.0
+        Pollution%FuelOil2Comp%PM10Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%PM10Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%PM10/1000.0d0
         ELSE
@@ -3076,7 +3079,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%PM10Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%PM10Pollution  = 0.0
+        Pollution%CoalComp%PM10Pollution  = 0.0d0
         IF (Pollution%CoalCoef%PM10Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%PM10/1000.0d0
         ELSE
@@ -3085,7 +3088,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%PM10Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%PM10Pollution  = 0.0
+        Pollution%GasolineComp%PM10Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%PM10Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%PM10/1000.0d0
         ELSE
@@ -3094,7 +3097,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%PM10Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%PM10Pollution  = 0.0
+        Pollution%PropaneComp%PM10Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%PM10Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%PM10/1000.0d0
         ELSE
@@ -3103,7 +3106,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%PM10Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%PM10Pollution  = 0.0
+        Pollution%DieselComp%PM10Pollution  = 0.0d0
         IF (Pollution%DieselCoef%PM10Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%PM10/1000.0d0
         ELSE
@@ -3112,7 +3115,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%PM10Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%PM10Pollution  = 0.0
+        Pollution%OtherFuel1Comp%PM10Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%PM10Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%PM10/1000.0d0
         ELSE
@@ -3121,7 +3124,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%PM10Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%PM10Pollution  = 0.0
+        Pollution%OtherFuel2Comp%PM10Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%PM10Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%PM10/1000.0d0
         ELSE
@@ -3130,19 +3133,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%PM10Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%PM25Pollution     = 0.0
+        Pollution%ElecComp%PM25Pollution     = 0.0d0
         IF (Pollution%ElecCoef%PM25Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%PM25/1000.0d0
         ELSE
@@ -3151,7 +3154,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%PM25Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%PM25Pollution   = 0.0
+        Pollution%NatGasComp%PM25Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%PM25Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%PM25/1000.0d0
         ELSE
@@ -3160,7 +3163,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%PM25Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%PM25Pollution  = 0.0
+        Pollution%FuelOil1Comp%PM25Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%PM25Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%PM25/1000.0d0
         ELSE
@@ -3169,7 +3172,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%PM25Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%PM25Pollution  = 0.0
+        Pollution%FuelOil2Comp%PM25Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%PM25Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%PM25/1000.0d0
         ELSE
@@ -3178,7 +3181,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%PM25Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%PM25Pollution  = 0.0
+        Pollution%CoalComp%PM25Pollution  = 0.0d0
         IF (Pollution%CoalCoef%PM25Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%PM25/1000.0d0
         ELSE
@@ -3187,7 +3190,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%PM25Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%PM25Pollution  = 0.0
+        Pollution%GasolineComp%PM25Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%PM25Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%PM25/1000.0d0
         ELSE
@@ -3196,7 +3199,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%PM25Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%PM25Pollution  = 0.0
+        Pollution%PropaneComp%PM25Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%PM25Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%PM25/1000.0d0
         ELSE
@@ -3205,7 +3208,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%PM25Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%PM25Pollution  = 0.0
+        Pollution%DieselComp%PM25Pollution  = 0.0d0
         IF (Pollution%DieselCoef%PM25Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%PM25/1000.0d0
         ELSE
@@ -3214,7 +3217,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%PM25Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%PM25Pollution  = 0.0
+        Pollution%OtherFuel1Comp%PM25Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%PM25Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%PM25/1000.0d0
         ELSE
@@ -3223,7 +3226,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%PM25Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%PM25Pollution  = 0.0
+        Pollution%OtherFuel2Comp%PM25Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%PM25Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%PM25/1000.0d0
         ELSE
@@ -3232,19 +3235,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%PM25Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%NH3Pollution     = 0.0
+        Pollution%ElecComp%NH3Pollution     = 0.0d0
         IF (Pollution%ElecCoef%NH3Sched == 0) THEN
           ElecValue = Pollution%ElecCoef%NH3/1000.0d0
         ELSE
@@ -3253,7 +3256,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%NH3Pollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%NH3Pollution   = 0.0
+        Pollution%NatGasComp%NH3Pollution   = 0.0d0
         IF (Pollution%NatGasCoef%NH3Sched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%NH3/1000.0d0
         ELSE
@@ -3262,7 +3265,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%NH3Pollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%NH3Pollution  = 0.0
+        Pollution%FuelOil1Comp%NH3Pollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%NH3Sched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%NH3/1000.0d0
         ELSE
@@ -3271,7 +3274,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%NH3Pollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%NH3Pollution  = 0.0
+        Pollution%FuelOil2Comp%NH3Pollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%NH3Sched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%NH3/1000.0d0
         ELSE
@@ -3280,7 +3283,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%NH3Pollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%NH3Pollution  = 0.0
+        Pollution%CoalComp%NH3Pollution  = 0.0d0
         IF (Pollution%CoalCoef%NH3Sched == 0) THEN
           CoalValue = Pollution%CoalCoef%NH3/1000.0d0
         ELSE
@@ -3289,7 +3292,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%NH3Pollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%NH3Pollution  = 0.0
+        Pollution%GasolineComp%NH3Pollution  = 0.0d0
         IF (Pollution%GasolineCoef%NH3Sched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%NH3/1000.0d0
         ELSE
@@ -3298,7 +3301,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%NH3Pollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%NH3Pollution  = 0.0
+        Pollution%PropaneComp%NH3Pollution  = 0.0d0
         IF (Pollution%PropaneCoef%NH3Sched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%NH3/1000.0d0
         ELSE
@@ -3307,7 +3310,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%NH3Pollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%NH3Pollution  = 0.0
+        Pollution%DieselComp%NH3Pollution  = 0.0d0
         IF (Pollution%DieselCoef%NH3Sched == 0) THEN
           DieselValue = Pollution%DieselCoef%NH3/1000.0d0
         ELSE
@@ -3316,7 +3319,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%NH3Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%NH3Pollution  = 0.0
+        Pollution%OtherFuel1Comp%NH3Pollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%NH3Sched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%NH3/1000.0d0
         ELSE
@@ -3325,7 +3328,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%NH3Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%NH3Pollution  = 0.0
+        Pollution%OtherFuel2Comp%NH3Pollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%NH3Sched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%NH3/1000.0d0
         ELSE
@@ -3334,19 +3337,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%NH3Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%NMVOCPollution     = 0.0
+        Pollution%ElecComp%NMVOCPollution     = 0.0d0
         IF (Pollution%ElecCoef%NMVOCSched == 0) THEN
           ElecValue = Pollution%ElecCoef%NMVOC/1000.0d0
         ELSE
@@ -3355,7 +3358,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%NMVOCPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%NMVOCPollution   = 0.0
+        Pollution%NatGasComp%NMVOCPollution   = 0.0d0
         IF (Pollution%NatGasCoef%NMVOCSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%NMVOC/1000.0d0
         ELSE
@@ -3364,7 +3367,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%NMVOCPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%NMVOCPollution  = 0.0
+        Pollution%FuelOil1Comp%NMVOCPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%NMVOCSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%NMVOC/1000.0d0
         ELSE
@@ -3373,7 +3376,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%NMVOCPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%NMVOCPollution  = 0.0
+        Pollution%FuelOil2Comp%NMVOCPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%NMVOCSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%NMVOC/1000.0d0
         ELSE
@@ -3382,7 +3385,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%NMVOCPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%NMVOCPollution  = 0.0
+        Pollution%CoalComp%NMVOCPollution  = 0.0d0
         IF (Pollution%CoalCoef%NMVOCSched == 0) THEN
           CoalValue = Pollution%CoalCoef%NMVOC/1000.0d0
         ELSE
@@ -3391,7 +3394,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%NMVOCPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%NMVOCPollution  = 0.0
+        Pollution%GasolineComp%NMVOCPollution  = 0.0d0
         IF (Pollution%GasolineCoef%NMVOCSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%NMVOC/1000.0d0
         ELSE
@@ -3400,7 +3403,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%NMVOCPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%NMVOCPollution  = 0.0
+        Pollution%PropaneComp%NMVOCPollution  = 0.0d0
         IF (Pollution%PropaneCoef%NMVOCSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%NMVOC/1000.0d0
         ELSE
@@ -3409,7 +3412,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%NMVOCPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%NMVOCPollution  = 0.0
+        Pollution%DieselComp%NMVOCPollution  = 0.0d0
         IF (Pollution%DieselCoef%NMVOCSched == 0) THEN
           DieselValue = Pollution%DieselCoef%NMVOC/1000.0d0
         ELSE
@@ -3418,7 +3421,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%NMVOCPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%NMVOCPollution  = 0.0
+        Pollution%OtherFuel1Comp%NMVOCPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%NMVOCSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%NMVOC/1000.0d0
         ELSE
@@ -3427,7 +3430,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%NMVOCPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%NMVOCPollution  = 0.0
+        Pollution%OtherFuel2Comp%NMVOCPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%NMVOCSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%NMVOC/1000.0d0
         ELSE
@@ -3436,19 +3439,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%NMVOCPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%HgPollution     = 0.0
+        Pollution%ElecComp%HgPollution     = 0.0d0
         IF (Pollution%ElecCoef%HgSched == 0) THEN
           ElecValue = Pollution%ElecCoef%Hg/1000.0d0
         ELSE
@@ -3457,7 +3460,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%HgPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%HgPollution   = 0.0
+        Pollution%NatGasComp%HgPollution   = 0.0d0
         IF (Pollution%NatGasCoef%HgSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%Hg/1000.0d0
         ELSE
@@ -3466,7 +3469,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%HgPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%HgPollution  = 0.0
+        Pollution%FuelOil1Comp%HgPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%HgSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%Hg/1000.0d0
         ELSE
@@ -3475,7 +3478,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%HgPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%HgPollution  = 0.0
+        Pollution%FuelOil2Comp%HgPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%HgSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%Hg/1000.0d0
         ELSE
@@ -3484,7 +3487,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%HgPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%HgPollution  = 0.0
+        Pollution%CoalComp%HgPollution  = 0.0d0
         IF (Pollution%CoalCoef%HgSched == 0) THEN
           CoalValue = Pollution%CoalCoef%Hg/1000.0d0
         ELSE
@@ -3493,7 +3496,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%HgPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%HgPollution  = 0.0
+        Pollution%GasolineComp%HgPollution  = 0.0d0
         IF (Pollution%GasolineCoef%HgSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%Hg/1000.0d0
         ELSE
@@ -3502,7 +3505,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%HgPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%HgPollution  = 0.0
+        Pollution%PropaneComp%HgPollution  = 0.0d0
         IF (Pollution%PropaneCoef%HgSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%Hg/1000.0d0
         ELSE
@@ -3511,7 +3514,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%HgPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%HgPollution  = 0.0
+        Pollution%DieselComp%HgPollution  = 0.0d0
         IF (Pollution%DieselCoef%HgSched == 0) THEN
           DieselValue = Pollution%DieselCoef%Hg/1000.0d0
         ELSE
@@ -3520,7 +3523,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%HgPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%HgPollution  = 0.0
+        Pollution%OtherFuel1Comp%HgPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%HgSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%Hg/1000.0d0
         ELSE
@@ -3529,7 +3532,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%HgPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%HgPollution  = 0.0
+        Pollution%OtherFuel2Comp%HgPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%HgSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%Hg/1000.0d0
         ELSE
@@ -3538,19 +3541,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%HgPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%PbPollution     = 0.0
+        Pollution%ElecComp%PbPollution     = 0.0d0
         IF (Pollution%ElecCoef%PbSched == 0) THEN
           ElecValue = Pollution%ElecCoef%Pb/1000.0d0
         ELSE
@@ -3559,7 +3562,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%PbPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%PbPollution   = 0.0
+        Pollution%NatGasComp%PbPollution   = 0.0d0
         IF (Pollution%NatGasCoef%PbSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%Pb/1000.0d0
         ELSE
@@ -3568,7 +3571,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%PbPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%PbPollution  = 0.0
+        Pollution%FuelOil1Comp%PbPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%PbSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%Pb/1000.0d0
         ELSE
@@ -3577,7 +3580,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%PbPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%PbPollution  = 0.0
+        Pollution%FuelOil2Comp%PbPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%PbSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%Pb/1000.0d0
         ELSE
@@ -3586,7 +3589,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%PbPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%PbPollution  = 0.0
+        Pollution%CoalComp%PbPollution  = 0.0d0
         IF (Pollution%CoalCoef%PbSched == 0) THEN
           CoalValue = Pollution%CoalCoef%Pb/1000.0d0
         ELSE
@@ -3595,7 +3598,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%PbPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%PbPollution  = 0.0
+        Pollution%GasolineComp%PbPollution  = 0.0d0
         IF (Pollution%GasolineCoef%PbSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%Pb/1000.0d0
         ELSE
@@ -3604,7 +3607,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%PbPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%PbPollution  = 0.0
+        Pollution%PropaneComp%PbPollution  = 0.0d0
         IF (Pollution%PropaneCoef%PbSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%Pb/1000.0d0
         ELSE
@@ -3613,7 +3616,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%PbPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%PbPollution  = 0.0
+        Pollution%DieselComp%PbPollution  = 0.0d0
         IF (Pollution%DieselCoef%PbSched == 0) THEN
           DieselValue = Pollution%DieselCoef%Pb/1000.0d0
         ELSE
@@ -3622,7 +3625,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%PbPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%PbPollution  = 0.0
+        Pollution%OtherFuel1Comp%PbPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%PbSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%Pb/1000.0d0
         ELSE
@@ -3631,7 +3634,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%PbPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%PbPollution  = 0.0
+        Pollution%OtherFuel2Comp%PbPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%PbSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%Pb/1000.0d0
         ELSE
@@ -3640,19 +3643,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%PbPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%WaterPollution     = 0.0
+        Pollution%ElecComp%WaterPollution     = 0.0d0
         IF (Pollution%ElecCoef%WaterSched == 0) THEN
           ElecValue = Pollution%ElecCoef%Water
         ELSE
@@ -3661,7 +3664,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%WaterPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%WaterPollution   = 0.0
+        Pollution%NatGasComp%WaterPollution   = 0.0d0
         IF (Pollution%NatGasCoef%WaterSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%Water
         ELSE
@@ -3670,7 +3673,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%WaterPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%WaterPollution  = 0.0
+        Pollution%FuelOil1Comp%WaterPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%WaterSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%Water
         ELSE
@@ -3679,7 +3682,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%WaterPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%WaterPollution  = 0.0
+        Pollution%FuelOil2Comp%WaterPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%WaterSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%Water
         ELSE
@@ -3688,7 +3691,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%WaterPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%WaterPollution  = 0.0
+        Pollution%CoalComp%WaterPollution  = 0.0d0
         IF (Pollution%CoalCoef%WaterSched == 0) THEN
           CoalValue = Pollution%CoalCoef%Water
         ELSE
@@ -3697,7 +3700,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%WaterPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%WaterPollution  = 0.0
+        Pollution%GasolineComp%WaterPollution  = 0.0d0
         IF (Pollution%GasolineCoef%WaterSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%Water
         ELSE
@@ -3706,7 +3709,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%WaterPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%WaterPollution  = 0.0
+        Pollution%PropaneComp%WaterPollution  = 0.0d0
         IF (Pollution%PropaneCoef%WaterSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%Water
         ELSE
@@ -3715,7 +3718,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%WaterPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%WaterPollution  = 0.0
+        Pollution%DieselComp%WaterPollution  = 0.0d0
         IF (Pollution%DieselCoef%WaterSched == 0) THEN
           DieselValue = Pollution%DieselCoef%Water
         ELSE
@@ -3724,7 +3727,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%WaterPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%WaterPollution  = 0.0
+        Pollution%OtherFuel1Comp%WaterPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%WaterSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%Water
         ELSE
@@ -3733,7 +3736,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%WaterPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%WaterPollution  = 0.0
+        Pollution%OtherFuel2Comp%WaterPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%WaterSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%Water
         ELSE
@@ -3742,19 +3745,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%WaterPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%NucHiPollution     = 0.0
+        Pollution%ElecComp%NucHiPollution     = 0.0d0
         IF (Pollution%ElecCoef%NucHiSched == 0) THEN
           ElecValue = Pollution%ElecCoef%NucHi/1000.0d0
         ELSE
@@ -3763,7 +3766,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%NucHiPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%NucHiPollution   = 0.0
+        Pollution%NatGasComp%NucHiPollution   = 0.0d0
         IF (Pollution%NatGasCoef%NucHiSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%NucHi/1000.0d0
         ELSE
@@ -3772,7 +3775,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%NucHiPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%NucHiPollution  = 0.0
+        Pollution%FuelOil1Comp%NucHiPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%NucHiSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%NucHi/1000.0d0
         ELSE
@@ -3781,7 +3784,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%NucHiPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%NucHiPollution  = 0.0
+        Pollution%FuelOil2Comp%NucHiPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%NucHiSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%NucHi/1000.0d0
         ELSE
@@ -3790,7 +3793,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%NucHiPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%NucHiPollution  = 0.0
+        Pollution%CoalComp%NucHiPollution  = 0.0d0
         IF (Pollution%CoalCoef%NucHiSched == 0) THEN
           CoalValue = Pollution%CoalCoef%NucHi/1000.0d0
         ELSE
@@ -3799,7 +3802,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%NucHiPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%NucHiPollution  = 0.0
+        Pollution%GasolineComp%NucHiPollution  = 0.0d0
         IF (Pollution%GasolineCoef%NucHiSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%NucHi/1000.0d0
         ELSE
@@ -3808,7 +3811,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%NucHiPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%NucHiPollution  = 0.0
+        Pollution%PropaneComp%NucHiPollution  = 0.0d0
         IF (Pollution%PropaneCoef%NucHiSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%NucHi/1000.0d0
         ELSE
@@ -3817,7 +3820,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%NucHiPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%NucHiPollution  = 0.0
+        Pollution%DieselComp%NucHiPollution  = 0.0d0
         IF (Pollution%DieselCoef%NucHiSched == 0) THEN
           DieselValue = Pollution%DieselCoef%NucHi/1000.0d0
         ELSE
@@ -3826,7 +3829,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%NucHiPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%NucHiPollution  = 0.0
+        Pollution%OtherFuel1Comp%NucHiPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%NucHiSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%NucHi/1000.0d0
         ELSE
@@ -3835,7 +3838,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%NucHiPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%NucHiPollution  = 0.0
+        Pollution%OtherFuel2Comp%NucHiPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%NucHiSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%NucHi/1000.0d0
         ELSE
@@ -3844,19 +3847,19 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel2Comp%NucHiPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
       ENDIF
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
-        Pollution%ElecComp%NucLoPollution     = 0.0
+        Pollution%ElecComp%NucLoPollution     = 0.0d0
         IF (Pollution%ElecCoef%NucLoSched == 0) THEN
           ElecValue = Pollution%ElecCoef%NucLo
         ELSE
@@ -3865,7 +3868,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%ElecComp%NucLoPollution     = (FuelType%Elec/1.0d6)*ElecValue
       ENDIF
       IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
-        Pollution%NatGasComp%NucLoPollution   = 0.0
+        Pollution%NatGasComp%NucLoPollution   = 0.0d0
         IF (Pollution%NatGasCoef%NucLoSched == 0) THEN
           NatGasValue = Pollution%NatGasCoef%NucLo
         ELSE
@@ -3874,7 +3877,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%NatGasComp%NucLoPollution   = (FuelType%NatGas/1.0d6)*NatGasValue
       ENDIF
       IF (Pollution%FuelOil1Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil1Comp%NucLoPollution  = 0.0
+        Pollution%FuelOil1Comp%NucLoPollution  = 0.0d0
         IF (Pollution%FuelOil1Coef%NucLoSched == 0) THEN
           FuelOil1Value = Pollution%FuelOil1Coef%NucLo
         ELSE
@@ -3883,7 +3886,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil1Comp%NucLoPollution  = (FuelType%FuelOil1/1.0d6)*FuelOil1Value
       ENDIF
       IF (Pollution%FuelOil2Coef%FuelFactorUsed) THEN
-        Pollution%FuelOil2Comp%NucLoPollution  = 0.0
+        Pollution%FuelOil2Comp%NucLoPollution  = 0.0d0
         IF (Pollution%FuelOil2Coef%NucLoSched == 0) THEN
           FuelOil2Value = Pollution%FuelOil2Coef%NucLo
         ELSE
@@ -3892,7 +3895,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%FuelOil2Comp%NucLoPollution = (FuelType%FuelOil2/1.0d6)*FuelOil2Value
       ENDIF
       IF (Pollution%CoalCoef%FuelFactorUsed) THEN
-        Pollution%CoalComp%NucLoPollution  = 0.0
+        Pollution%CoalComp%NucLoPollution  = 0.0d0
         IF (Pollution%CoalCoef%NucLoSched == 0) THEN
           CoalValue = Pollution%CoalCoef%NucLo
         ELSE
@@ -3901,7 +3904,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%CoalComp%NucLoPollution     = (FuelType%Coal/1.0d6)*CoalValue
       ENDIF
       IF (Pollution%GasolineCoef%FuelFactorUsed) THEN
-        Pollution%GasolineComp%NucLoPollution  = 0.0
+        Pollution%GasolineComp%NucLoPollution  = 0.0d0
         IF (Pollution%GasolineCoef%NucLoSched == 0) THEN
           GasolineValue = Pollution%GasolineCoef%NucLo
         ELSE
@@ -3910,7 +3913,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%GasolineComp%NucLoPollution      = (FuelType%Gasoline/1.0d6)*GasolineValue
       ENDIF
       IF (Pollution%PropaneCoef%FuelFactorUsed) THEN
-        Pollution%PropaneComp%NucLoPollution  = 0.0
+        Pollution%PropaneComp%NucLoPollution  = 0.0d0
         IF (Pollution%PropaneCoef%NucLoSched == 0) THEN
           PropaneValue = Pollution%PropaneCoef%NucLo
         ELSE
@@ -3919,7 +3922,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%PropaneComp%NucLoPollution     = (FuelType%Propane/1.0d6)*PropaneValue
       ENDIF
       IF (Pollution%DieselCoef%FuelFactorUsed) THEN
-        Pollution%DieselComp%NucLoPollution  = 0.0
+        Pollution%DieselComp%NucLoPollution  = 0.0d0
         IF (Pollution%DieselCoef%NucLoSched == 0) THEN
           DieselValue = Pollution%DieselCoef%NucLo
         ELSE
@@ -3928,7 +3931,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%NucLoPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
       IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel1Comp%NucLoPollution  = 0.0
+        Pollution%OtherFuel1Comp%NucLoPollution  = 0.0d0
         IF (Pollution%OtherFuel1Coef%NucLoSched == 0) THEN
           OtherFuel1Value = Pollution%OtherFuel1Coef%NucLo
         ELSE
@@ -3937,7 +3940,7 @@ END SUBROUTINE CheckFFSchedule
         Pollution%OtherFuel1Comp%NucLoPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
       ENDIF
       IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
-        Pollution%OtherFuel2Comp%NucLoPollution  = 0.0
+        Pollution%OtherFuel2Comp%NucLoPollution  = 0.0d0
         IF (Pollution%OtherFuel2Coef%NucLoSched == 0) THEN
           OtherFuel2Value = Pollution%OtherFuel2Coef%NucLo
         ELSE
@@ -3950,16 +3953,16 @@ END SUBROUTINE CheckFFSchedule
       Pollution%TotCarbonEquivFromCH4  = Pollution%CH4PollutTotal*Pollution%CarbonEquivCH4
       Pollution%TotCarbonEquivFromCO2 = Pollution%CO2PollutTotal*Pollution%CarbonEquivCO2
 
-      ElecValue     = 0.0
-      NatGasValue   = 0.0
-      FuelOil1Value = 0.0
-      FuelOil2Value = 0.0
-      CoalValue     = 0.0
-      GasolineValue = 0.0
-      PropaneValue  = 0.0
-      DieselValue   = 0.0
-      OtherFuel1Value   = 0.0
-      OtherFuel2Value   = 0.0
+      ElecValue     = 0.0d0
+      NatGasValue   = 0.0d0
+      FuelOil1Value = 0.0d0
+      FuelOil2Value = 0.0d0
+      CoalValue     = 0.0d0
+      GasolineValue = 0.0d0
+      PropaneValue  = 0.0d0
+      DieselValue   = 0.0d0
+      OtherFuel1Value   = 0.0d0
+      OtherFuel2Value   = 0.0d0
 
       IF (Pollution%ElecCoef%SourceSched .NE. 0) THEN
         Pollution%ElecComp%Source   = FuelType%Elec*Pollution%ElecCoef%Source &
@@ -4113,7 +4116,7 @@ END SUBROUTINE CheckFFSchedule
     !defined COP.
     FuelType%Elec = FuelType%ElecFacility - FuelType%ElecProducedFacility +   &
                     FuelType%PurchCoolFacility/Pollution%PurchCoolCOP
-    If(FuelType%Elec .le. 0.0) FuelType%Elec = 0.0
+    If(FuelType%Elec .le. 0.0d0) FuelType%Elec = 0.0d0
 
     !The Natural Gas fuel type will be summed from the meters with the District Heating using an efficiency.
     FuelType%NatGas = FuelType%NatGasFacility +    &
@@ -4204,7 +4207,7 @@ SUBROUTINE GetFuelFactorInfo(fuelName,fuelFactorUsed,fuelSourceFactor,fuelFactor
     ENDIF
 
     fuelFactorUsed=.false.
-    fuelSourceFactor=0.0
+    fuelSourceFactor=0.0d0
     fuelFactorScheduleUsed=.false.
     ffScheduleIndex = 0
 

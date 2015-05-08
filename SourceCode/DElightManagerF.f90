@@ -370,7 +370,7 @@ SUBROUTINE DElightInputGenerator
             iTotNumDElightRefPtObjs = GetNumObjectsFound(cModuleObjectRefPt)
 
             ! Loop through the Daylighting:DElight:Reference Point objects checking for the current DElight Zone host
-            rTotalZoneFraction = 0.0    ! init Zone Fraction accumulator
+            rTotalZoneFraction = 0.0d0    ! init Zone Fraction accumulator
             DO iRefPt = 1, iTotNumDElightRefPtObjs
 
                 ! Get the data items for the current DElight Reference Point object
@@ -422,23 +422,23 @@ SUBROUTINE DElightInputGenerator
                 CALL ShowWarningError('  Only first 100 Reference Points included in DElight analysis')
             ENDIF
             ALLOCATE(ZoneDayLight(izone)%DaylRefPtAbsCoord(ZoneDaylight(izone)%TotalDElightRefPts,3))
-            ZoneDayLight(izone)%DaylRefPtAbsCoord=0.0
+            ZoneDayLight(izone)%DaylRefPtAbsCoord=0.0d0
 
             ! RJH 2008-03-07: Allocate and Init DaylIllumAtRefPt array for this DElight zone
             ALLOCATE(ZoneDaylight(izone)%DaylIllumAtRefPt(ZoneDaylight(izone)%TotalDElightRefPts))
-            ZoneDaylight(izone)%DaylIllumAtRefPt=0.0
+            ZoneDaylight(izone)%DaylIllumAtRefPt=0.0d0
             ! following not used in DElight but allocated for convenience
             ALLOCATE(ZoneDaylight(izone)%GlareIndexAtRefPt(ZoneDaylight(izone)%TotalDElightRefPts))
-            ZoneDaylight(izone)%GlareIndexAtRefPt = 0.0
+            ZoneDaylight(izone)%GlareIndexAtRefPt = 0.0d0
 
             ! Register Warning if total Zone Fraction for all DElight RefPts < 1.0
-            IF (rTotalZoneFraction < 1.0) THEN
+            IF (rTotalZoneFraction < 1.0d0) THEN
                 CALL ShowWarningError('Total Electric Lighting Zone Fraction less than 1.0 for DElight Zone =' &
                 //TRIM(AlphaArrayDElight(1)))
             ENDIF
 
             ! Register Error if total Zone Fraction for all DElight RefPts > 1.0
-            IF (rTotalZoneFraction > 1.0) THEN
+            IF (rTotalZoneFraction > 1.0d0) THEN
                 CALL ShowSevereError('Total Electric Lighting Zone Fraction greater than 1.0 for DElight Zone =' &
                 //TRIM(AlphaArrayDElight(1)))
                 ErrorsFound=.true.
@@ -542,9 +542,9 @@ SUBROUTINE DElightInputGenerator
                         iMatlLayer = Construct(iconstruct)%LayerPoint(1)
                         ! Get the outside visible reflectance of this material layer
                         ! (since Construct(iconstruct)%ReflectVisDiffFront always appears to == 0.0)
-                        rExtVisRefl = 1.0 - Material(iMatlLayer)%AbsorpVisible
+                        rExtVisRefl = 1.0d0 - Material(iMatlLayer)%AbsorpVisible
                     ELSE
-                        rExtVisRefl = 0.0
+                        rExtVisRefl = 0.0d0
                     ENDIF
 
                     ! Remove any blanks from the Surface Name for ease of input to DElight
@@ -581,7 +581,7 @@ SUBROUTINE DElightInputGenerator
                             IF (Surface(iwndo)%BaseSurfName == Surface(isurf)%Name) THEN
 
                               ! Error if window has multiplier > 1 since this causes incorrect illuminance calc
-                              IF (Surface(iwndo)%Multiplier > 1.0) THEN
+                              IF (Surface(iwndo)%Multiplier > 1.0d0) THEN
                                 CALL ShowSevereError('Multiplier > 1.0 for window '//TRIM(Surface(iwndo)%Name)// &
                                  ' not allowed since it is in a zone with DElight daylighting.')
                                 ErrorsFound=.true.
@@ -1080,8 +1080,8 @@ SUBROUTINE CheckForGeometricTransform(DoTransform,OldAspectRatio,NewAspectRatio)
   !begin execution
   !get user input...
   doTransform=.false.
-  OldAspectRatio = 1.0
-  NewAspectRatio = 1.0
+  OldAspectRatio = 1.0d0
+  NewAspectRatio = 1.0d0
 
   IF (GetNumObjectsFound(CurrentModuleObject) == 1) then
      CALL GetObjectItem(CurrentModuleObject,1,cAlphas,NAlphas,rNumerics,NNum,IOSTAT,  &

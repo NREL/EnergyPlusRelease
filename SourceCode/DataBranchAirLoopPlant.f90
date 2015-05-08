@@ -74,7 +74,7 @@ END TYPE PlantPressureCurveData
 
           ! MODULE VARIABLE DECLARATIONS:
 TYPE(PlantPressureCurveData), ALLOCATABLE, DIMENSION(:) :: PressureCurve
-INTEGER :: NumPressureCurves
+INTEGER :: NumPressureCurves=0
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE
 

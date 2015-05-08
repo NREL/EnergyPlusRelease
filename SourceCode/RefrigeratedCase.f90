@@ -284,102 +284,102 @@ TYPE, PRIVATE :: RefrigCaseData
   INTEGER          :: ZoneNodeNum =0             ! Index to Zone Node
   INTEGER          :: ActualZoneNum =0           ! Index to Zone
   INTEGER          :: ZoneRANode = 0             ! Node number of return node in zone
-  REAL(r64)        :: RatedAmbientTemp=0.0       ! Rated ambient (zone) temperature
-  REAL(r64)        :: RatedAmbientRH=0.0         ! Rated ambient (zone) relative humidity
-  REAL(r64)        :: RatedAmbientDewPoint=0.0   ! Rated ambient (zone) dew point temperature
-  REAL(r64)        :: RateTotCapPerLength=0.0            ! Gross total cooling capacity at rated conditions [W/m]
-  REAL(r64)        :: RatedLHR=0.0               ! Latent heat ratio (lat cap/total cap) at rated conditions
-  REAL(r64)        :: RatedRTF=0.0               ! Run time fraction at rated conditions
+  REAL(r64)        :: RatedAmbientTemp=0.0d0       ! Rated ambient (zone) temperature
+  REAL(r64)        :: RatedAmbientRH=0.0d0         ! Rated ambient (zone) relative humidity
+  REAL(r64)        :: RatedAmbientDewPoint=0.0d0   ! Rated ambient (zone) dew point temperature
+  REAL(r64)        :: RateTotCapPerLength=0.0d0            ! Gross total cooling capacity at rated conditions [W/m]
+  REAL(r64)        :: RatedLHR=0.0d0               ! Latent heat ratio (lat cap/total cap) at rated conditions
+  REAL(r64)        :: RatedRTF=0.0d0               ! Run time fraction at rated conditions
   INTEGER          :: LatCapCurvePtr=0           ! Index for latent case credit modifier curve
   INTEGER          :: DefCapCurvePtr=0           ! Index for defrost load modifier curve
   INTEGER          :: LatentEnergyCurveType=0    ! Type of latent case credit curve:
                                                  ! 1=Case Temperature Method, 2=RH cubic, 3=DP cubic
   INTEGER          :: DefrostEnergyCurveType=0   ! Type of defrost energy curve:
                                                  ! 1=Case Temperature Method, 2=RH cubic, 3=DP cubic
-  REAL(r64)        :: STDFanPower=0.0            ! Standard power of case fan [W/m] for case credit calc
-  REAL(r64)        :: OperatingFanPower=0.0      ! Operating power of refrigerated case fan [W/m]
-  REAL(r64)        :: RatedLightingPower=0.0  ! Rated (consis w RateTotCapPerLength) power of refrigerated case lights [W/m]
-  REAL(r64)        :: LightingPower=0.0          ! Installed power of refrigerated case lights [W/m]
+  REAL(r64)        :: STDFanPower=0.0d0            ! Standard power of case fan [W/m] for case credit calc
+  REAL(r64)        :: OperatingFanPower=0.0d0      ! Operating power of refrigerated case fan [W/m]
+  REAL(r64)        :: RatedLightingPower=0.0d0  ! Rated (consis w RateTotCapPerLength) power of refrigerated case lights [W/m]
+  REAL(r64)        :: LightingPower=0.0d0          ! Installed power of refrigerated case lights [W/m]
   INTEGER          :: LightingSchedPtr=0         ! Index to the correct case lighting schedule
-  REAL(r64)        :: AntiSweatPower=0.0         ! Rated power of refrigerated case anti-sweat heaters [W/m]
-  REAL(r64)        :: MinimumASPower=0.0         ! Minimum power output of case anti-sweat heaters [W/m]
+  REAL(r64)        :: AntiSweatPower=0.0d0         ! Rated power of refrigerated case anti-sweat heaters [W/m]
+  REAL(r64)        :: MinimumASPower=0.0d0         ! Minimum power output of case anti-sweat heaters [W/m]
   INTEGER          :: AntiSweatControlType=0     ! Type of anti-sweat heater control:
                                                  ! 0=None,1=Constant,2=Linear,3=DewPoint,4=HeatBalance
-  REAL(r64)        :: HumAtZeroAS=0.0            ! Relative humidity for zero AS heater output using linear control
-  REAL(r64)        :: Height=0.0                 ! case height for AS heater with heat balance control
+  REAL(r64)        :: HumAtZeroAS=0.0d0            ! Relative humidity for zero AS heater output using linear control
+  REAL(r64)        :: Height=0.0d0                 ! case height for AS heater with heat balance control
   INTEGER          :: DefrostType=0              ! Case defrost control type, Off-cycle,Timed,Hot-gas,Electric
-  REAL(r64)        :: DefrostPower=0.0           ! Rated power of refrigerated case defrost [W/m]
+  REAL(r64)        :: DefrostPower=0.0d0           ! Rated power of refrigerated case defrost [W/m]
   INTEGER          :: DefrostSchedPtr=0          ! Index to the correct defrost schedule
   INTEGER          :: DefrostDripDownSchedPtr=0  ! Index to the correct fail-safe schedule
-  REAL(r64)        :: Length=0.0                 ! Length of refrigerated case [m]
-  REAL(r64)        :: Temperature=0.0            ! Rated case temperature [C]
-  REAL(r64)        :: RAFrac=0.0                 ! HVAC under case return air fraction [0-1]
+  REAL(r64)        :: Length=0.0d0                 ! Length of refrigerated case [m]
+  REAL(r64)        :: Temperature=0.0d0            ! Rated case temperature [C]
+  REAL(r64)        :: RAFrac=0.0d0                 ! HVAC under case return air fraction [0-1]
   INTEGER          :: StockingSchedPtr=0         ! Index to the correct product stocking schedule
-  REAL(r64)        :: LightingFractionToCase=0.0 ! Fraction of lighting energy that directly contributes to the
+  REAL(r64)        :: LightingFractionToCase=0.0d0 ! Fraction of lighting energy that directly contributes to the
                                                  ! case cooling load. The remainder contributes to the zone load
                                                  ! (air heat balance).
-  REAL(r64)        :: ASHeaterFractionToCase=0.0 ! Fraction of anti-sweat heater energy that results in a direct
+  REAL(r64)        :: ASHeaterFractionToCase=0.0d0 ! Fraction of anti-sweat heater energy that results in a direct
                                                  ! heat load to the case. The remainder is a heating load
                                                  ! to the zone where the refrigerated case is located.
-  REAL(r64)        :: DesignSensCaseCredit=0.0   ! Design sensible case credit applied to zone load
-  REAL(r64)        :: EvapTempDesign=0.0         ! Design evaporator temperature
-  REAL(r64)        :: RefrigInventory=0.0        ! Design refrigerant inventory [kg/m]
-  REAL(r64)        :: DesignRefrigInventory=0.0  ! Design refrigerant inventory [kg total for the case]
+  REAL(r64)        :: DesignSensCaseCredit=0.0d0   ! Design sensible case credit applied to zone load
+  REAL(r64)        :: EvapTempDesign=0.0d0         ! Design evaporator temperature
+  REAL(r64)        :: RefrigInventory=0.0d0        ! Design refrigerant inventory [kg/m]
+  REAL(r64)        :: DesignRefrigInventory=0.0d0  ! Design refrigerant inventory [kg total for the case]
 
-  REAL(r64)        :: DesignRatedCap=0.0         ! Design total case capacity=RatedTotCap*Length [W]
-  REAL(r64)        :: DesignLatentCap=0.0        ! Design latent case capacity=DesignRAtedCap*LatentHeatRatio*RTF [W]
-  REAL(r64)        :: DesignDefrostCap=0.0       ! Design defrost case capacity=DefrostPower*Length [W]
-  REAL(r64)        :: DesignLighting=0.0         ! Design case lighting=LightingPower*Length [W]
-  REAL(r64)        :: DesignFanPower=0.0         ! Design power of case fan=Operatingpower*Length [W]
-  REAL(r64)        :: StoredEnergy=0.0           ! Cumulative Stored Energy not met by evaporator [J]
-  REAL(r64)        :: StoredEnergySaved=0.0      ! Cumulative Stored Energy not met by evaporator [J]
+  REAL(r64)        :: DesignRatedCap=0.0d0         ! Design total case capacity=RatedTotCap*Length [W]
+  REAL(r64)        :: DesignLatentCap=0.0d0        ! Design latent case capacity=DesignRAtedCap*LatentHeatRatio*RTF [W]
+  REAL(r64)        :: DesignDefrostCap=0.0d0       ! Design defrost case capacity=DefrostPower*Length [W]
+  REAL(r64)        :: DesignLighting=0.0d0         ! Design case lighting=LightingPower*Length [W]
+  REAL(r64)        :: DesignFanPower=0.0d0         ! Design power of case fan=Operatingpower*Length [W]
+  REAL(r64)        :: StoredEnergy=0.0d0           ! Cumulative Stored Energy not met by evaporator [J]
+  REAL(r64)        :: StoredEnergySaved=0.0d0      ! Cumulative Stored Energy not met by evaporator [J]
   INTEGER          :: CaseCreditFracSchedPtr=0   ! Index to the case credit reduction schedule
 
 ! Report Variables
-  REAL(r64)        :: TotalCoolingLoad=0.0 ! Refrigerated case total cooling rate (W)
-  REAL(r64)        :: TotalCoolingEnergy=0.0     ! Refrigerated case total cooling energy (J)
-  REAL(r64)        :: SensCoolingEnergyRate=0.0  ! Refrigerated case sensible cooling rate (W)
-  REAL(r64)        :: SensCoolingEnergy=0.0      ! Refrigerated case sensible cooling energy (J)
-  REAL(r64)        :: LatCoolingEnergyRate=0.0   ! Refrigerated case latent cooling rate (W)
-  REAL(r64)        :: LatCoolingEnergy=0.0       ! Refrigerated case latent cooling energy (J)
+  REAL(r64)        :: TotalCoolingLoad=0.0d0 ! Refrigerated case total cooling rate (W)
+  REAL(r64)        :: TotalCoolingEnergy=0.0d0     ! Refrigerated case total cooling energy (J)
+  REAL(r64)        :: SensCoolingEnergyRate=0.0d0  ! Refrigerated case sensible cooling rate (W)
+  REAL(r64)        :: SensCoolingEnergy=0.0d0      ! Refrigerated case sensible cooling energy (J)
+  REAL(r64)        :: LatCoolingEnergyRate=0.0d0   ! Refrigerated case latent cooling rate (W)
+  REAL(r64)        :: LatCoolingEnergy=0.0d0       ! Refrigerated case latent cooling energy (J)
 
   REAL(r64)        :: SensZoneCreditRate=0.d0    ! Refrigerated case sensible zone credit rate (W)
-  REAL(r64)        :: SensZoneCreditCoolRate=0.0 ! Refrigerated case sensible cooling zone credit rate (W)
-  REAL(r64)        :: SensZoneCreditCool=0.0     ! Refrigerated case sensible cooling zone credit energy (J)
-  REAL(r64)        :: SensZoneCreditHeatRate=0.0 ! Refrigerated case sensible heating zone credit rate (W)
-  REAL(r64)        :: SensZoneCreditHeat=0.0     ! Refrigerated case sensible heating zone credit energy (J)
-  REAL(r64)        :: LatZoneCreditRate=0.0      ! Refrigerated case latent zone credit rate (W)
-  REAL(r64)        :: LatZoneCredit=0.0          ! Refrigerated case latent zone credit energy (J)
+  REAL(r64)        :: SensZoneCreditCoolRate=0.0d0 ! Refrigerated case sensible cooling zone credit rate (W)
+  REAL(r64)        :: SensZoneCreditCool=0.0d0     ! Refrigerated case sensible cooling zone credit energy (J)
+  REAL(r64)        :: SensZoneCreditHeatRate=0.0d0 ! Refrigerated case sensible heating zone credit rate (W)
+  REAL(r64)        :: SensZoneCreditHeat=0.0d0     ! Refrigerated case sensible heating zone credit energy (J)
+  REAL(r64)        :: LatZoneCreditRate=0.0d0      ! Refrigerated case latent zone credit rate (W)
+  REAL(r64)        :: LatZoneCredit=0.0d0          ! Refrigerated case latent zone credit energy (J)
   REAL(r64)        :: SensHVACCreditRate=0.d0    ! Refrigerated case sensible HVAC credit rate (W)
-  REAL(r64)        :: SensHVACCreditCoolRate=0.0 ! Refrigerated case sensible cooling HVAC credit rate (W)
-  REAL(r64)        :: SensHVACCreditCool=0.0     ! Refrigerated case sensible cooling HVAC credit energy (J)
-  REAL(r64)        :: SensHVACCreditHeatRate=0.0 ! Refrigerated case sensible heating HVAC credit rate (W)
-  REAL(r64)        :: SensHVACCreditHeat=0.0     ! Refrigerated case sensible heating HVAC credit energy (J)
-  REAL(r64)        :: LatHVACCreditRate=0.0      ! Refrigerated case latent HVAC credit rate (W)
-  REAL(r64)        :: LatHVACCredit=0.0          ! Refrigerated case latent HVAC credit energy (J)
+  REAL(r64)        :: SensHVACCreditCoolRate=0.0d0 ! Refrigerated case sensible cooling HVAC credit rate (W)
+  REAL(r64)        :: SensHVACCreditCool=0.0d0     ! Refrigerated case sensible cooling HVAC credit energy (J)
+  REAL(r64)        :: SensHVACCreditHeatRate=0.0d0 ! Refrigerated case sensible heating HVAC credit rate (W)
+  REAL(r64)        :: SensHVACCreditHeat=0.0d0     ! Refrigerated case sensible heating HVAC credit energy (J)
+  REAL(r64)        :: LatHVACCreditRate=0.0d0      ! Refrigerated case latent HVAC credit rate (W)
+  REAL(r64)        :: LatHVACCredit=0.0d0          ! Refrigerated case latent HVAC credit energy (J)
 
-  REAL(r64)        :: ElecAntiSweatPower=0.0     ! Refrigerated case anti-sweat heater rate (W)
-  REAL(r64)        :: ElecAntiSweatConsumption=0.0 ! Refrigerated case anti-sweat heater energy (J)
-  REAL(r64)        :: ElecFanPower=0.0           ! Refrigerated case fan electric power (W)
-  REAL(r64)        :: ElecFanConsumption=0.0     ! Refrigerated case fan electric energy (J)
-  REAL(r64)        :: ElecLightingPower=0.0      ! Refrigerated case lighting electric power (W)
-  REAL(r64)        :: ElecLightingConsumption=0.0 ! Refrigerated case lighting electric energy (J)
-  REAL(r64)        :: ElecDefrostPower=0.0       ! Refrigerated case defrost rate (W)
-  REAL(r64)        :: ElecDefrostConsumption=0.0 ! Refrigerated case defrost energy (J)
-  REAL(r64)        :: DefEnergyCurveValue=0.0    ! Refrigerated case defrost capacity modifier
-  REAL(r64)        :: LatEnergyCurveValue=0.0    ! Refrigerated case latent capacity modifier
-  REAL(r64)        :: MaxKgFrost=0.0             ! Amount of frost formation to initiate defrost for On Demand
-  REAL(r64)        :: Rcase=0.0                  ! Case wall resistance for AS heater calc (h-sqm-C/W)
-  REAL(r64)        :: DefrostEnergy = 0.0        ! Refrigerated case defrost energy (J)
-  REAL(r64)        :: StockingEnergy = 0.0       ! Refrigerated case product stocking energy (J)
-  REAL(r64)        :: WarmEnvEnergy = 0.0        ! Refrigerated case extra sensible energy due to warm zone ambient (J)
-  REAL(r64)        :: KgFrost = 0.0              ! Amount of frost on case evaporator (Kg)
-  REAL(r64)        :: DefrostEnergySaved = 0.0   ! Refrigerated case defrost energy (J)
-  REAL(r64)        :: StockingEnergySaved = 0.0  ! Refrigerated case product stocking energy (J)
-  REAL(r64)        :: WarmEnvEnergySaved = 0.0   ! Refrigerated case extra sensible energy due to warm zone ambient (J)
-  REAL(r64)        :: KgFrostSaved = 0.0         ! Amount of frost on case evaporator (Kg)
-  REAL(r64)        :: HotDefrostCondCredit = 0.0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
-  REAL(r64)        :: DeltaDefrostEnergy = 0.0   ! Used to reverse accumulation if the zone/load time step is repeated (J)
+  REAL(r64)        :: ElecAntiSweatPower=0.0d0     ! Refrigerated case anti-sweat heater rate (W)
+  REAL(r64)        :: ElecAntiSweatConsumption=0.0d0 ! Refrigerated case anti-sweat heater energy (J)
+  REAL(r64)        :: ElecFanPower=0.0d0           ! Refrigerated case fan electric power (W)
+  REAL(r64)        :: ElecFanConsumption=0.0d0     ! Refrigerated case fan electric energy (J)
+  REAL(r64)        :: ElecLightingPower=0.0d0      ! Refrigerated case lighting electric power (W)
+  REAL(r64)        :: ElecLightingConsumption=0.0d0 ! Refrigerated case lighting electric energy (J)
+  REAL(r64)        :: ElecDefrostPower=0.0d0       ! Refrigerated case defrost rate (W)
+  REAL(r64)        :: ElecDefrostConsumption=0.0d0 ! Refrigerated case defrost energy (J)
+  REAL(r64)        :: DefEnergyCurveValue=0.0d0    ! Refrigerated case defrost capacity modifier
+  REAL(r64)        :: LatEnergyCurveValue=0.0d0    ! Refrigerated case latent capacity modifier
+  REAL(r64)        :: MaxKgFrost=0.0d0             ! Amount of frost formation to initiate defrost for On Demand
+  REAL(r64)        :: Rcase=0.0d0                  ! Case wall resistance for AS heater calc (h-sqm-C/W)
+  REAL(r64)        :: DefrostEnergy = 0.0d0        ! Refrigerated case defrost energy (J)
+  REAL(r64)        :: StockingEnergy = 0.0d0       ! Refrigerated case product stocking energy (J)
+  REAL(r64)        :: WarmEnvEnergy = 0.0d0        ! Refrigerated case extra sensible energy due to warm zone ambient (J)
+  REAL(r64)        :: KgFrost = 0.0d0              ! Amount of frost on case evaporator (Kg)
+  REAL(r64)        :: DefrostEnergySaved = 0.0d0   ! Refrigerated case defrost energy (J)
+  REAL(r64)        :: StockingEnergySaved = 0.0d0  ! Refrigerated case product stocking energy (J)
+  REAL(r64)        :: WarmEnvEnergySaved = 0.0d0   ! Refrigerated case extra sensible energy due to warm zone ambient (J)
+  REAL(r64)        :: KgFrostSaved = 0.0d0         ! Amount of frost on case evaporator (Kg)
+  REAL(r64)        :: HotDefrostCondCredit = 0.0d0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
+  REAL(r64)        :: DeltaDefrostEnergy = 0.0d0   ! Used to reverse accumulation if the zone/load time step is repeated (J)
 END TYPE RefrigCaseData
 
 TYPE, PRIVATE :: RefrigRackData
@@ -398,18 +398,18 @@ TYPE, PRIVATE :: RefrigRackData
   REAL(r64)        :: LaggedUsedWaterHeater      ! Heat reclaim used to heat water in previous zone/load time step(W)
   REAL(r64)        :: LaggedUsedHVACCoil         ! Heat reclaim used to heat HVAC coil in previous zone/load time step(W)
   REAL(r64)        :: EvapEffect=0.9d0             ! Effectiveness of evaporative condenser
-  REAL(r64)        :: CondenserAirFlowRate=0.0   ! Evaporative condenser air volume flow rate (m3/s)
-  REAL(r64)        :: EvapPumpPower=0.0          ! Evaporative cooling water pump power (W)
-  REAL(r64)        :: ActualEvapPumpPower=0.0    ! Evaporative cooling water pump power, if adjusted (W)
-  REAL(r64)        :: EvapPumpConsumption=0.0    ! Evaporative cooling water pump electric consumption (J)
-  REAL(r64)        :: EvapWaterConsumpRate=0.0   ! Evaporative condenser water consumption rate (m3/s)
-  REAL(r64)        :: EvapWaterConsumption=0.0   ! Evaporative condenser water consumption (m3)
+  REAL(r64)        :: CondenserAirFlowRate=0.0d0   ! Evaporative condenser air volume flow rate (m3/s)
+  REAL(r64)        :: EvapPumpPower=0.0d0          ! Evaporative cooling water pump power (W)
+  REAL(r64)        :: ActualEvapPumpPower=0.0d0    ! Evaporative cooling water pump power, if adjusted (W)
+  REAL(r64)        :: EvapPumpConsumption=0.0d0    ! Evaporative cooling water pump electric consumption (J)
+  REAL(r64)        :: EvapWaterConsumpRate=0.0d0   ! Evaporative condenser water consumption rate (m3/s)
+  REAL(r64)        :: EvapWaterConsumption=0.0d0   ! Evaporative condenser water consumption (m3)
   INTEGER          :: EvapSchedPtr=0             ! Index to the correct evap condenser availability schedule
-  REAL(r64)        :: BasinHeaterPowerFTempDiff= 0.0 ! Basin heater capacity per degree K below setpoint (W/K)
-  REAL(r64)        :: BasinHeaterSetPointTemp= 2.0 ! Setpoint temperature for basin heater operation (C)
-  REAL(r64)        :: BasinHeaterPower=0.0       ! Power demand from basin heater (W)
-  REAL(r64)        :: BasinHeaterConsumption=0.0 ! Electric consumption from basin heater (J)
-  REAL(r64)        :: RatedCOP=0.0               ! Rated coefficient of performance for compressor rack (W/W)
+  REAL(r64)        :: BasinHeaterPowerFTempDiff= 0.0d0 ! Basin heater capacity per degree K below setpoint (W/K)
+  REAL(r64)        :: BasinHeaterSetPointTemp= 2.0d0 ! Setpoint temperature for basin heater operation (C)
+  REAL(r64)        :: BasinHeaterPower=0.0d0       ! Power demand from basin heater (W)
+  REAL(r64)        :: BasinHeaterConsumption=0.0d0 ! Electric consumption from basin heater (J)
+  REAL(r64)        :: RatedCOP=0.0d0               ! Rated coefficient of performance for compressor rack (W/W)
   INTEGER          :: COPFTempPtr=0              ! Index to the correct COP curve object
   INTEGER          :: NumCases=0                 ! Total number of refrigerated cases attached to each rack
   INTEGER          :: NumCoils=0                 ! Total number of air chillers attached to each rack
@@ -420,21 +420,21 @@ TYPE, PRIVATE :: RefrigRackData
   INTEGER          :: OutsideAirNodeNum  = 0     ! Outside air node number
   INTEGER          :: HeatRejectionZoneNum = 0   ! Heat rejection zone number used when walk-ins present and ht rej to zone
   INTEGER          :: HeatRejectionZoneNodeNum = 0 ! Heat rejection zone node number used when walk-ins present and ht rej to zone
-  REAL(r64)        :: TotalRackLoad=0.0          ! Total capacity of all refrigerated cases on rack
-  REAL(r64)        :: RackCompressorCOP=0.0      ! Rack compressor COP at specific operating conditions
-  REAL(r64)        :: RackCompressorPower=0.0    ! Total rack compressor power (W)
-  REAL(r64)        :: RackElecConsumption =0.0   ! Total rack compressor electric consumption (J)
-  REAL(r64)        :: RackCapacity=0.0           ! Total rack delivered capacity (W)
-  REAL(r64)        :: RackCoolingEnergy=0.0      ! Total rack delivered energy (J)
-  REAL(r64)        :: CondenserFanPower=0.0      ! Condenser fan power (W)
+  REAL(r64)        :: TotalRackLoad=0.0d0          ! Total capacity of all refrigerated cases on rack
+  REAL(r64)        :: RackCompressorCOP=0.0d0      ! Rack compressor COP at specific operating conditions
+  REAL(r64)        :: RackCompressorPower=0.0d0    ! Total rack compressor power (W)
+  REAL(r64)        :: RackElecConsumption =0.0d0   ! Total rack compressor electric consumption (J)
+  REAL(r64)        :: RackCapacity=0.0d0           ! Total rack delivered capacity (W)
+  REAL(r64)        :: RackCoolingEnergy=0.0d0      ! Total rack delivered energy (J)
+  REAL(r64)        :: CondenserFanPower=0.0d0      ! Condenser fan power (W)
   INTEGER          :: TotCondFTempPtr=0          ! Index for condenser fan power modifier curve
                                                  ! (function of outdoor temperature)
-  REAL(r64)        :: ActualCondenserFanPower=0.0  ! Rack condenser fan power (W)
-  REAL(r64)        :: CondenserFanConsumption=0.0  ! Rack condenser fan electric consumption (J)
-  REAL(r64)        :: SensZoneCreditHeatRate=0.0 ! Rack sensible heating zone credit rate (W)
-  REAL(r64)        :: SensZoneCreditHeat=0.0     ! Rack sensible heating zone credit energy (J)
-  REAL(r64)        :: SensHVACCreditHeatRate=0.0 ! Rack sensible heating HVAC credit rate (W)
-  REAL(r64)        :: SensHVACCreditHeat=0.0     ! Rack sensible heating HVAC credit energy (J)
+  REAL(r64)        :: ActualCondenserFanPower=0.0d0  ! Rack condenser fan power (W)
+  REAL(r64)        :: CondenserFanConsumption=0.0d0  ! Rack condenser fan electric consumption (J)
+  REAL(r64)        :: SensZoneCreditHeatRate=0.0d0 ! Rack sensible heating zone credit rate (W)
+  REAL(r64)        :: SensZoneCreditHeat=0.0d0     ! Rack sensible heating zone credit energy (J)
+  REAL(r64)        :: SensHVACCreditHeatRate=0.0d0 ! Rack sensible heating HVAC credit rate (W)
+  REAL(r64)        :: SensHVACCreditHeat=0.0d0     ! Rack sensible heating HVAC credit energy (J)
   INTEGER          :: EvapFreezeWarnIndex = 0    ! Recurring freeze warning index
   INTEGER          :: NoFlowWarnIndex = 0        ! No cooling water when needed warning index
   INTEGER          :: HighTempWarnIndex = 0      ! Water outlet high temp warning index
@@ -442,7 +442,7 @@ TYPE, PRIVATE :: RefrigRackData
   INTEGER          :: HighFlowWarnIndex = 0      ! Water outlet high flow warning index
   INTEGER          :: HighInletWarnIndex = 0     ! Water inlet high temp warning index
   INTEGER          :: InletNode = 0              ! Water-cooled condenser inlet node number
-  REAL(r64)        :: InletTemp = 0.0            ! Water-cooling condenser inlet temperature (C)
+  REAL(r64)        :: InletTemp = 0.0d0            ! Water-cooling condenser inlet temperature (C)
   INTEGER          :: OutletNode = 0             ! Water-cooled condenser outlet node number
   INTEGER          :: PlantTypeOfNum = 0         ! Water-cooled condenser plant equipment type
   INTEGER          :: PlantLoopNum = 0           ! Water-cooled condenser plant loop number
@@ -450,17 +450,17 @@ TYPE, PRIVATE :: RefrigRackData
   INTEGER          :: PlantBranchNum = 0         ! Water-cooled condenser plant branch number
   INTEGER          :: PlantCompNum   = 0         ! Water-cooled condenser plant component number
 
-  REAL(r64)        :: OutletTemp = 0.0           ! Water-cooling condenser outlet temperature (C)
+  REAL(r64)        :: OutletTemp = 0.0d0           ! Water-cooling condenser outlet temperature (C)
 
   INTEGER          :: OutletTempSchedPtr = 0     ! Schedule pointer for condenser outlet temp setting
-  REAL(r64)        :: VolFlowRate = 0.0          ! Water-cooled condenser volumetric flow rate (m3/s)
-  REAL(r64)        :: DesVolFlowRate = 0.0       ! Water-cooled condenser design volumetric flow rate (m3/s)
-  REAL(r64)        :: MassFlowRate = 0.0         ! Water-cooled condenser mass flow rate (kg/s)
-  REAL(r64)        :: CondLoad = 0.0             ! Total condenser load (W)
-  REAL(r64)        :: CondEnergy = 0.0           ! Condenser energy (J)
+  REAL(r64)        :: VolFlowRate = 0.0d0          ! Water-cooled condenser volumetric flow rate (m3/s)
+  REAL(r64)        :: DesVolFlowRate = 0.0d0       ! Water-cooled condenser design volumetric flow rate (m3/s)
+  REAL(r64)        :: MassFlowRate = 0.0d0         ! Water-cooled condenser mass flow rate (kg/s)
+  REAL(r64)        :: CondLoad = 0.0d0             ! Total condenser load (W)
+  REAL(r64)        :: CondEnergy = 0.0d0           ! Condenser energy (J)
   INTEGER          :: FlowType = 1               ! Water-cooled condenser loop flow type
-  REAL(r64)        :: VolFlowRateMax = 0.0       ! Maximum condenser volumetric flow rate (m3/s)
-  REAL(r64)        :: MassFlowRateMax = 0.0      ! Maximum condenser mass flow rate (kg/s)
+  REAL(r64)        :: VolFlowRateMax = 0.0d0       ! Maximum condenser volumetric flow rate (m3/s)
+  REAL(r64)        :: MassFlowRateMax = 0.0d0      ! Maximum condenser mass flow rate (kg/s)
   REAL(r64)        :: InletTempMin = 10.0d0      ! Minimum condenser water inlet temperature (C)
   REAL(r64)        :: OutletTempMax = 55.0d0     ! Maximum condenser water outlet temperature (C)
   REAL(r64)        :: TotalCoolingLoad = 0.0d0
@@ -513,74 +513,74 @@ TYPE, PRIVATE :: RefrigSystemData
 
 
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: MechSCLoad  ! Mechanical subcooler load on system from other systems(W)
-  REAL(r64)   :: AverageCompressorCOP=0.0   ! Average COP for compressers on this system (W)
-  REAL(r64)   :: CpSatLiqCond = 0.0         ! Spec Heat of sat liquid at condensing pressure  (J/kg-C)
-  REAL(r64)   :: CpSatVapEvap = 0.0         ! Spec Heat of saturated vapor exiting evaporator (J/kg-C)
-  REAL(r64)   :: FlowRatioIntercooler = 0.0 ! Refrigerant mass flow ratio through coil-side of shell-and-coil intercooler
-  REAL(r64)   :: HCaseIn = 0.0              ! Case inlet enthalpy (after subcoolers and pipe P drops) (J/kg)
-  REAL(r64)   :: HCompIn = 0.0              ! Compressor inlet enthalpy  (J/kg)
-  REAL(r64)   :: HCompOut = 0.0             ! Compressor outlet enthalpy (J/kg)
-  REAL(r64)   :: HSatLiqCond = 0.0          ! Enthalpy of sat liquid at condensing pressure  (J/kg)
-  REAL(r64)   :: HCaseOut = 0.0             ! Enthalpy of refrigerant leaving cases, after superheat (J/kg)
-  REAL(r64)   :: IntercoolerEffectiveness=0.0  ! Shell-and-coil intercooler effectiveness
-  REAL(r64)   :: LSHXTrans = 0.0            ! Liquid suction subcooler load transferred within same suction group, W
-  REAL(r64)   :: LSHXTransEnergy = 0.0      ! Liquid suction subcooler load transferred within same suction group, J
-  REAL(r64)   :: NetHeatRejectLoad = 0.0    ! Portion of TotalCondenser load due to this system (after heat recovery) W
-  REAL(r64)   :: NetHeatRejectEnergy = 0.0  ! Portion of TotalCondenser energy due to this system (after heat recovery) J
-  REAL(r64)   :: Pintercooler = 0.0         ! Pressure in the intercooler (two-stage systems only) (Pa)
-  REAL(r64)   :: PipeHeatLoad = 0.0         ! Total suction pipe heat gains, optional (W)
-  REAL(r64)   :: PipeHeatEnergy = 0.0       ! Total suction pipe heat gains, optional (J)
-  REAL(r64)   :: RefMassFlowtoLoads=0.0     ! Total system refrigerant mass flow through cases(kg/s)
-  REAL(r64)   :: RefMassFlowComps=0.0       ! Total system refrigerant mass flow through compressors(kg/s)
-  REAL(r64)   :: RefMassFlowHiStageComps=0.0  ! Total system refrigerant mass flow through high-stage compressors(two-stage systems only) (kg/s)
-  REAL(r64)   :: RefInventory=0.0           ! Approximate refrigerant inventory entered by user (kg)
-  REAL(r64)   :: SumMechSCLoad = 0.0        ! Total cooling load of all mech subcoolers served by suction group (W)
-  REAL(r64)   :: SumMechSCBenefit= 0.0      ! Total cooling provided by mech subcoolers cooling liquid condensate in this system (W)
-  REAL(r64)   :: SumCascadeCondCredit = 0.0 ! Sum of cond cred for hot brine/gas defrost on cases etc served by
+  REAL(r64)   :: AverageCompressorCOP=0.0d0   ! Average COP for compressers on this system (W)
+  REAL(r64)   :: CpSatLiqCond = 0.0d0         ! Spec Heat of sat liquid at condensing pressure  (J/kg-C)
+  REAL(r64)   :: CpSatVapEvap = 0.0d0         ! Spec Heat of saturated vapor exiting evaporator (J/kg-C)
+  REAL(r64)   :: FlowRatioIntercooler = 0.0d0 ! Refrigerant mass flow ratio through coil-side of shell-and-coil intercooler
+  REAL(r64)   :: HCaseIn = 0.0d0              ! Case inlet enthalpy (after subcoolers and pipe P drops) (J/kg)
+  REAL(r64)   :: HCompIn = 0.0d0              ! Compressor inlet enthalpy  (J/kg)
+  REAL(r64)   :: HCompOut = 0.0d0             ! Compressor outlet enthalpy (J/kg)
+  REAL(r64)   :: HSatLiqCond = 0.0d0          ! Enthalpy of sat liquid at condensing pressure  (J/kg)
+  REAL(r64)   :: HCaseOut = 0.0d0             ! Enthalpy of refrigerant leaving cases, after superheat (J/kg)
+  REAL(r64)   :: IntercoolerEffectiveness=0.0d0  ! Shell-and-coil intercooler effectiveness
+  REAL(r64)   :: LSHXTrans = 0.0d0            ! Liquid suction subcooler load transferred within same suction group, W
+  REAL(r64)   :: LSHXTransEnergy = 0.0d0      ! Liquid suction subcooler load transferred within same suction group, J
+  REAL(r64)   :: NetHeatRejectLoad = 0.0d0    ! Portion of TotalCondenser load due to this system (after heat recovery) W
+  REAL(r64)   :: NetHeatRejectEnergy = 0.0d0  ! Portion of TotalCondenser energy due to this system (after heat recovery) J
+  REAL(r64)   :: Pintercooler = 0.0d0         ! Pressure in the intercooler (two-stage systems only) (Pa)
+  REAL(r64)   :: PipeHeatLoad = 0.0d0         ! Total suction pipe heat gains, optional (W)
+  REAL(r64)   :: PipeHeatEnergy = 0.0d0       ! Total suction pipe heat gains, optional (J)
+  REAL(r64)   :: RefMassFlowtoLoads=0.0d0     ! Total system refrigerant mass flow through cases(kg/s)
+  REAL(r64)   :: RefMassFlowComps=0.0d0       ! Total system refrigerant mass flow through compressors(kg/s)
+  REAL(r64)   :: RefMassFlowHiStageComps=0.0d0  ! Total system refrigerant mass flow through high-stage compressors(two-stage systems only) (kg/s)
+  REAL(r64)   :: RefInventory=0.0d0           ! Approximate refrigerant inventory entered by user (kg)
+  REAL(r64)   :: SumMechSCLoad = 0.0d0        ! Total cooling load of all mech subcoolers served by suction group (W)
+  REAL(r64)   :: SumMechSCBenefit= 0.0d0      ! Total cooling provided by mech subcoolers cooling liquid condensate in this system (W)
+  REAL(r64)   :: SumCascadeCondCredit = 0.0d0 ! Sum of cond cred for hot brine/gas defrost on cases etc served by
                                             !    cascade condenser cooled by this system (W)
-  REAL(r64)   :: SumCascadeLoad = 0.0       ! Total cooling load of all cascade condensers served by suction group (W)
-  REAL(r64)   :: SumSecondaryLoopLoad = 0.0 ! Total cooling loads for all secondary loops served by this suction group (W)
-  REAL(r64)   :: SumUASuctionPiping   =0.0  ! Sum of U*A for system suction piping (W/C)
-  REAL(r64)   :: TCaseOut = 0.0             ! Case out temperature including case superheat (C)
-  REAL(r64)   :: TCondense = 0.0            ! Condensing temperature (Tsat for P discharge) (C)
-  REAL(r64)   :: TCompIn = 0.0              ! Compressor inlet temperature (after case and LSHX superheat and pipe delta P) (C)
+  REAL(r64)   :: SumCascadeLoad = 0.0d0       ! Total cooling load of all cascade condensers served by suction group (W)
+  REAL(r64)   :: SumSecondaryLoopLoad = 0.0d0 ! Total cooling loads for all secondary loops served by this suction group (W)
+  REAL(r64)   :: SumUASuctionPiping   =0.0d0  ! Sum of U*A for system suction piping (W/C)
+  REAL(r64)   :: TCaseOut = 0.0d0             ! Case out temperature including case superheat (C)
+  REAL(r64)   :: TCondense = 0.0d0            ! Condensing temperature (Tsat for P discharge) (C)
+  REAL(r64)   :: TCompIn = 0.0d0              ! Compressor inlet temperature (after case and LSHX superheat and pipe delta P) (C)
   REAL(r64)   :: TCondenseMin = 0.d0         ! Minimum allowed condensing temperature (C)
   REAL(r64)   :: TCondenseMinInput = 0.d0    ! Minimum allowed condensing temperature, user's original input value (C)
   LOGICAL     :: EMSOverrideOnTCondenseMin = .FALSE. ! if true, EMS is calling to override minimum allowed condensing temperature
   REAL(r64)   :: EMSOverrideValueTCondenseMin = 0.d0 ! value to use when EMS override is true [C]
-  REAL(r64)   :: TEvapDesign = 0.0          ! Min (on sys) design case/walkin/secondary evap temp
+  REAL(r64)   :: TEvapDesign = 0.0d0          ! Min (on sys) design case/walkin/secondary evap temp
                                             !  (also basis for floating evap T calc) (C)
-  REAL(r64)   :: TEvapNeeded = 0.0          ! Max Case evap temperature to maintain lowest case T on system (C)
-  REAL(r64)   :: Tintercooler = 0.0         ! Temperature in the intercooler (two-stage systems only) (Pa)
-  REAL(r64)   :: TLiqInActual = 0.0         ! Actual liquid temperature entering TXV after subcooling (C)
-  REAL(r64)   :: TotalCondDefrostCredit=0.0 ! sum of heat reclaimed for hot gas and hot brine defrost for
+  REAL(r64)   :: TEvapNeeded = 0.0d0          ! Max Case evap temperature to maintain lowest case T on system (C)
+  REAL(r64)   :: Tintercooler = 0.0d0         ! Temperature in the intercooler (two-stage systems only) (Pa)
+  REAL(r64)   :: TLiqInActual = 0.0d0         ! Actual liquid temperature entering TXV after subcooling (C)
+  REAL(r64)   :: TotalCondDefrostCredit=0.0d0 ! sum of heat reclaimed for hot gas and hot brine defrost for
                                             !    cases/WI/sec served directly [W]
-  REAL(r64)   :: TotalCoolingEnergy=0.0     ! Total energy of all refrigerated cases and walkins served directly (J)
-  REAL(r64)   :: TotalCoolingLoad=0.0       ! Total load of all refrigerated cases and walkins served directly (W)
-  REAL(r64)   :: TotalSystemLoad = 0.0      ! Includes cases, walk-ins, and transfer loads (cascade, second, subcooler), W
-  REAL(r64)   :: TotCompPower=0.0           ! Total power for compressers on this system (for single-stage systems) or
+  REAL(r64)   :: TotalCoolingEnergy=0.0d0     ! Total energy of all refrigerated cases and walkins served directly (J)
+  REAL(r64)   :: TotalCoolingLoad=0.0d0       ! Total load of all refrigerated cases and walkins served directly (W)
+  REAL(r64)   :: TotalSystemLoad = 0.0d0      ! Includes cases, walk-ins, and transfer loads (cascade, second, subcooler), W
+  REAL(r64)   :: TotCompPower=0.0d0           ! Total power for compressers on this system (for single-stage systems) or
                                             ! total power for low-stage compressors on this system (for two-stage systems) (W)
-  REAL(r64)   :: TotCompElecConsump=0.0     ! Total Elec consump for compressers on this system (for single-stage systems) or
+  REAL(r64)   :: TotCompElecConsump=0.0d0     ! Total Elec consump for compressers on this system (for single-stage systems) or
                                             ! total elec consump for low-stage compressors on this system (for two-stage systems) (J)
-  REAL(r64)   :: TotCompCapacity=0.0        ! Total design capacity for compressers on this system (for single-stage systems) or
+  REAL(r64)   :: TotCompCapacity=0.0d0        ! Total design capacity for compressers on this system (for single-stage systems) or
                                             ! total design capacity for low-stage compressors on this system (for two-stage systems) (W)
-  REAL(r64)   :: TotCompCoolingEnergy=0.0   ! Total cooling energy from compressers on this system (for single-stage systems) or
+  REAL(r64)   :: TotCompCoolingEnergy=0.0d0   ! Total cooling energy from compressers on this system (for single-stage systems) or
                                             ! total cooling energy from low-stage compressors on this system (for two-stage systems) (J)
-  REAL(r64)   :: TotHiStageCompCapacity=0.0 ! Total design capacity for high-stage compressers on this system (two-stage systems only) (W)
-  REAL(r64)   :: TotHiStageCompCoolingEnergy=0.0 ! Total cooling energy from high-stage compressers on this system (two-stage systems only) (J)
-  REAL(r64)   :: TotHiStageCompElecConsump=0.0  ! Total Elec consump for high-stage compressers on this system (two-stage systems only) (J)
-  REAL(r64)   :: TotHiStageCompPower=0.0    ! Total power for high-stage compressers on this system (two-stage systems only) (W)
-  REAL(r64)   :: TotCompElecConsumpTwoStage=0.0  ! Total Elec consump for the low- and high-stage compressors on this system (two-stage systems only) (J)
-  REAL(r64)   :: TotRejectHeatRecovered = 0.0 ! Total reject heat recovered for hot gas or hot brine defrost or
+  REAL(r64)   :: TotHiStageCompCapacity=0.0d0 ! Total design capacity for high-stage compressers on this system (two-stage systems only) (W)
+  REAL(r64)   :: TotHiStageCompCoolingEnergy=0.0d0 ! Total cooling energy from high-stage compressers on this system (two-stage systems only) (J)
+  REAL(r64)   :: TotHiStageCompElecConsump=0.0d0  ! Total Elec consump for high-stage compressers on this system (two-stage systems only) (J)
+  REAL(r64)   :: TotHiStageCompPower=0.0d0    ! Total power for high-stage compressers on this system (two-stage systems only) (W)
+  REAL(r64)   :: TotCompElecConsumpTwoStage=0.0d0  ! Total Elec consump for the low- and high-stage compressors on this system (two-stage systems only) (J)
+  REAL(r64)   :: TotRejectHeatRecovered = 0.0d0 ! Total reject heat recovered for hot gas or hot brine defrost or
                                             !     desuperheater coils (W)
-  REAL(r64)   :: TotTransferLoad = 0.0      ! Total load from other systems transferred to this sytem, incl mech subcoolers,
+  REAL(r64)   :: TotTransferLoad = 0.0d0      ! Total load from other systems transferred to this sytem, incl mech subcoolers,
                                             ! cascade, and secondary loops (W)
-  REAL(r64)   :: TotTransferEnergy= 0.0     ! Total energy from other systems transferred to this sytem, incl mech subcoolers,
+  REAL(r64)   :: TotTransferEnergy= 0.0d0     ! Total energy from other systems transferred to this sytem, incl mech subcoolers,
                                             ! cascade, and secondary loops (J)
-  REAL(r64)   :: UnmetEnergy=0.0            ! Accumulative loads unmet by total compressors (for single-stage systems) or
+  REAL(r64)   :: UnmetEnergy=0.0d0            ! Accumulative loads unmet by total compressors (for single-stage systems) or
                                             ! by low-stage compressors (for two-stage systems) on this system (J)
   REAL(r64)   :: UnmetHiStageEnergy=0.0d0   ! Accumulative loads unmet by total high-stage compressors (two-stage systems only) on this system (J)
-  REAL(r64)   :: UnmetEnergySaved=0.0       ! Accumulative loads unmet by total compressors (for single-stage systems) on this system (J)
+  REAL(r64)   :: UnmetEnergySaved=0.0d0       ! Accumulative loads unmet by total compressors (for single-stage systems) on this system (J)
 END TYPE RefrigSystemData
 
 TYPE, PRIVATE :: TransRefrigSystemData
@@ -749,34 +749,34 @@ TYPE, PRIVATE :: RefrigCondenserData
   INTEGER     :: CascadeSinkSystemID= 0     ! System ID number for system absorbing condenser heat
   !INTEGER     :: ServiceType      = 1       ! Index to warehouse or supermarket (only applies to cascade condensers)
                                             ! 1 = supermarket, 2=warehouse
-  REAL(r64)   :: CascadeRatedEvapTemp = 0.0 ! Rated evaporating temperature in cascade condenser
-  REAL(r64)   :: MinCondLoad = 0.0          ! minimun condenser load for air-cooled cond (W)
-  REAL(r64)   :: TempSlope = 0.0            ! slope for deltaT as function of heat rej for air-cooled cond (C/W)
+  REAL(r64)   :: CascadeRatedEvapTemp = 0.0d0 ! Rated evaporating temperature in cascade condenser
+  REAL(r64)   :: MinCondLoad = 0.0d0          ! minimun condenser load for air-cooled cond (W)
+  REAL(r64)   :: TempSlope = 0.0d0            ! slope for deltaT as function of heat rej for air-cooled cond (C/W)
   REAL(r64)   :: EvapEffect=0.9d0           ! Effectiveness of evaporative condenser
-  REAL(r64)   :: RatedAirFlowRate=0.0       ! Evaporative condenser air volume flow rate (m3/s)
-  REAL(r64)   :: EvapPumpPower=0.0          ! Evaporative cooling water pump power (W)
-  REAL(r64)   :: ActualEvapPumpPower=0.0    ! Evaporative cooling water pump power, if adjusted (W)
-  REAL(r64)   :: EvapPumpConsumption=0.0    ! Evaporative cooling water pump electric consumption (J)
-  REAL(r64)   :: EvapWaterConsumpRate=0.0   ! Evaporative condenser water consumption rate (m3/s)
-  REAL(r64)   :: EvapWaterConsumption=0.0   ! Evaporative condenser water consumption (m3)
-  REAL(r64)   :: BasinHeaterPowerFTempDiff= 0.0 ! Basin heater capacity per degree K below setpoint (W/K)
+  REAL(r64)   :: RatedAirFlowRate=0.0d0       ! Evaporative condenser air volume flow rate (m3/s)
+  REAL(r64)   :: EvapPumpPower=0.0d0          ! Evaporative cooling water pump power (W)
+  REAL(r64)   :: ActualEvapPumpPower=0.0d0    ! Evaporative cooling water pump power, if adjusted (W)
+  REAL(r64)   :: EvapPumpConsumption=0.0d0    ! Evaporative cooling water pump electric consumption (J)
+  REAL(r64)   :: EvapWaterConsumpRate=0.0d0   ! Evaporative condenser water consumption rate (m3/s)
+  REAL(r64)   :: EvapWaterConsumption=0.0d0   ! Evaporative condenser water consumption (m3)
+  REAL(r64)   :: BasinHeaterPowerFTempDiff= 0.0d0 ! Basin heater capacity per degree K below setpoint (W/K)
   REAL(r64)   :: BasinHeaterSetPointTemp= 2.0d0 ! Setpoint temperature for basin heater operation (C)
-  REAL(r64)   :: BasinHeaterPower=0.0       ! Power demand from basin heater (W)
-  REAL(r64)   :: BasinHeaterConsumption=0.0 ! Electric consumption from basin heater (J)
-  REAL(r64)   :: FanMinAirFlowRatio = 0.0   ! Minimum power fraction for fan (dimensionless between 0 and 1.0)
-  REAL(r64)   :: RatedFanPower=0.0          ! Rated Condenser fan power (W)
-  REAL(r64)   :: ActualFanPower=0.0         ! Condenser fan power (W)
-  REAL(r64)   :: FanElecEnergy=0.0          ! Condenser fan electric consumption (J)
-  REAL(r64)   :: InletTemp = 0.0            ! Water-cooling condenser inlet temperature (C)
-  REAL(r64)   :: OutletTemp = 0.0           ! Water-cooling condenser outlet temperature (C)
-  REAL(r64)   :: VolFlowRate = 0.0          ! Water-cooled condenser volumetric flow rate (m3/s)
-  REAL(r64)   :: DesVolFlowRate = 0.0       ! Water-cooled condenser design volumetric flow rate (m3/s)
-  REAL(r64)   :: MassFlowRate = 0.0         ! Water-cooled condenser water mass flow rate (kg/s)
-  REAL(r64)   :: RatedTCondense = 0.0       ! Condenser rated saturated condensing Temperature (C)
-  REAL(r64)   :: CondLoad = 0.0             ! Total condenser load (W)
-  REAL(r64)   :: CondEnergy = 0.0           ! Condenser energy (J)
-  REAL(r64)   :: VolFlowRateMax = 0.0       ! Maximum condenser volumetric flow rate (m3/s)
-  REAL(r64)   :: MassFlowRateMax = 0.0      ! Maximum condenser mass flow rate (kg/s)
+  REAL(r64)   :: BasinHeaterPower=0.0d0       ! Power demand from basin heater (W)
+  REAL(r64)   :: BasinHeaterConsumption=0.0d0 ! Electric consumption from basin heater (J)
+  REAL(r64)   :: FanMinAirFlowRatio = 0.0d0   ! Minimum power fraction for fan (dimensionless between 0 and 1.0)
+  REAL(r64)   :: RatedFanPower=0.0d0          ! Rated Condenser fan power (W)
+  REAL(r64)   :: ActualFanPower=0.0d0         ! Condenser fan power (W)
+  REAL(r64)   :: FanElecEnergy=0.0d0          ! Condenser fan electric consumption (J)
+  REAL(r64)   :: InletTemp = 0.0d0            ! Water-cooling condenser inlet temperature (C)
+  REAL(r64)   :: OutletTemp = 0.0d0           ! Water-cooling condenser outlet temperature (C)
+  REAL(r64)   :: VolFlowRate = 0.0d0          ! Water-cooled condenser volumetric flow rate (m3/s)
+  REAL(r64)   :: DesVolFlowRate = 0.0d0       ! Water-cooled condenser design volumetric flow rate (m3/s)
+  REAL(r64)   :: MassFlowRate = 0.0d0         ! Water-cooled condenser water mass flow rate (kg/s)
+  REAL(r64)   :: RatedTCondense = 0.0d0       ! Condenser rated saturated condensing Temperature (C)
+  REAL(r64)   :: CondLoad = 0.0d0             ! Total condenser load (W)
+  REAL(r64)   :: CondEnergy = 0.0d0           ! Condenser energy (J)
+  REAL(r64)   :: VolFlowRateMax = 0.0d0       ! Maximum condenser volumetric flow rate (m3/s)
+  REAL(r64)   :: MassFlowRateMax = 0.0d0      ! Maximum condenser mass flow rate (kg/s)
   REAL(r64)   :: InletTempMin = 10.0d0      ! Minimum condenser water inlet temperature (C)
   REAL(r64)   :: OutletTempMax = 55.0d0     ! Maximum condenser water outlet temperature (C)
   REAL(r64)   :: RatedSubcool = 0.d0        ! Subcooling included in capacity rating curves (C)
@@ -861,16 +861,16 @@ TYPE, PRIVATE :: RefrigCompressorData
   INTEGER  :: NumSysAttach       = 0      ! Number of systems attached to compressor, error if /=1
   INTEGER  :: SuperheatRatingType= 0      ! Type of manufacturer's rating info re superheat
   INTEGER  :: SubcoolRatingType  = 0      ! Type of manufacturer's rating info re subcooling
-  REAL(r64) :: Capacity          = 0.0    ! Comprssor delivered capacity (W)
-  REAL(r64) :: CoolingEnergy     = 0.0    ! Compressor delivered energy (J)
-  REAL(r64) :: Efficiency        = 0.0    ! Compressor efficiency (0 to 1)
-  REAL(r64) :: ElecConsumption   = 0.0    ! Compressor electric consumption (J)
-  REAL(r64) :: LoadFactor        = 0.0    ! Fraction of the time the compressor runs to meet the load (0 to 1)
-  REAL(r64) :: MassFlow          = 0.0    ! Compressor mass flow (kg/s)
-  REAL(r64) :: NomCap            = 0.0    ! Nominal compressor capacity at ARI 540 rating conditions
-  REAL(r64) :: Power             = 0.0    ! Compressor power (W)
-  REAL(r64) :: RatedSuperheat    = 0.0    ! Rated Superheat at compressor suction (C)
-  REAL(r64) :: RatedSubcool      = 0.0    ! Rated Subcooling, note may not match condenser rating (C)
+  REAL(r64) :: Capacity          = 0.0d0    ! Comprssor delivered capacity (W)
+  REAL(r64) :: CoolingEnergy     = 0.0d0    ! Compressor delivered energy (J)
+  REAL(r64) :: Efficiency        = 0.0d0    ! Compressor efficiency (0 to 1)
+  REAL(r64) :: ElecConsumption   = 0.0d0    ! Compressor electric consumption (J)
+  REAL(r64) :: LoadFactor        = 0.0d0    ! Fraction of the time the compressor runs to meet the load (0 to 1)
+  REAL(r64) :: MassFlow          = 0.0d0    ! Compressor mass flow (kg/s)
+  REAL(r64) :: NomCap            = 0.0d0    ! Nominal compressor capacity at ARI 540 rating conditions
+  REAL(r64) :: Power             = 0.0d0    ! Compressor power (W)
+  REAL(r64) :: RatedSuperheat    = 0.0d0    ! Rated Superheat at compressor suction (C)
+  REAL(r64) :: RatedSubcool      = 0.0d0    ! Rated Subcooling, note may not match condenser rating (C)
   CHARACTER(len=MaxNameLength) :: EndUseSubcategory='General'! Compressor end-use subcategory
   LOGICAL   :: TransFlag = .FALSE.          ! Flag to indicate if compressor can operate in transcritical region
 
@@ -878,7 +878,7 @@ END TYPE RefrigCompressorData
 
 
 TYPE, PRIVATE :: CaseRAFractionData
-  REAL(r64)                    :: TotalCaseRAFraction = 0.0  ! Sum case return air fraction for error checking
+  REAL(r64)                    :: TotalCaseRAFraction = 0.0d0  ! Sum case return air fraction for error checking
   CHARACTER(len=MaxNameLength) :: ZoneName=' '               ! Zone or Location of Refrigerated Case
 END TYPE CaseRAFractionData
 
@@ -889,12 +889,12 @@ TYPE, PRIVATE :: SubcoolerData
                                           ! cool liquid to mechanical, needed for character comparison after systems read
   INTEGER   :: SubcoolerType       = 0    ! Specifies subcooler type(0=liquid suction heat exchanger,1=mechanical)
   INTEGER   :: MechSourceSysID     = 0    ! ID number of refrigeration system providing cool liquid to mechanical
-  REAL(r64) :: MechSCTransLoad     = 0.0  ! Mechanical subcooler load transferred between suction groups, W
-  REAL(r64) :: MechSCTransEnergy   = 0.0  ! Mechanical subcooler energy transferred between suction groups, W
-  REAL(r64) :: LiqSuctDesignDelT   = 0.0  ! Liquid suction subcooler design subcooling, C
-  REAL(r64) :: LiqSuctDesignTliqIn = 0.0  ! Liquid suction subcooler design inlet temperature liquid, C
-  REAL(r64) :: LiqSuctDesignTvapIn = 0.0  ! Liquid suction subcooler design inlet temperature vapor, C
-  REAL(r64) :: MechControlTliqOut  = 0.0  ! Mechanical subcooler design outlet temperature subcooled liquid, C
+  REAL(r64) :: MechSCTransLoad     = 0.0d0  ! Mechanical subcooler load transferred between suction groups, W
+  REAL(r64) :: MechSCTransEnergy   = 0.0d0  ! Mechanical subcooler energy transferred between suction groups, W
+  REAL(r64) :: LiqSuctDesignDelT   = 0.0d0  ! Liquid suction subcooler design subcooling, C
+  REAL(r64) :: LiqSuctDesignTliqIn = 0.0d0  ! Liquid suction subcooler design inlet temperature liquid, C
+  REAL(r64) :: LiqSuctDesignTvapIn = 0.0d0  ! Liquid suction subcooler design inlet temperature vapor, C
+  REAL(r64) :: MechControlTliqOut  = 0.0d0  ! Mechanical subcooler design outlet temperature subcooled liquid, C
 END TYPE SubcoolerData
 
 TYPE, PRIVATE :: SecondaryLoopData
@@ -922,52 +922,52 @@ TYPE, PRIVATE :: SecondaryLoopData
   !INTEGER     :: ServiceType        = 1   ! Index to warehouse or supermarket
                                           ! 1 = supermarket, 2=warehouse
   INTEGER     :: VarSpeedCurvePtr   =0    ! Pointer for variable speed pump power curve
-  REAL(r64)   :: AvailLoadCoils     =0.0  ! Used to determine amount of avail heat for warehouse coils
-  REAL(r64)   :: CpBrineRated       =0.0  ! Specific heat of secondary loop fluid at rated average
+  REAL(r64)   :: AvailLoadCoils     =0.0d0  ! Used to determine amount of avail heat for warehouse coils
+  REAL(r64)   :: CpBrineRated       =0.0d0  ! Specific heat of secondary loop fluid at rated average
                                           !    brine temperature (J/kg-C)
-  REAL(r64)   :: ChillerRefInventory = 0.0 ! Refrigerant inventory on cold side of loop heat exchanger
-  REAL(r64)   :: CircRate           = 0   ! For PhaseChange loop = mass flow at pump/mass gas out load (dimensionless)
-  REAL(r64)   :: CoolingLoadRated   =0.0  ! Rated capacity of heat exchanger serving secondary loop (W)
-  REAL(r64)   :: DensityBrineRated  =0.0  ! Density of secondary loop fluid at
+  REAL(r64)   :: ChillerRefInventory = 0.0d0 ! Refrigerant inventory on cold side of loop heat exchanger
+  REAL(r64)   :: CircRate           = 0.0d0   ! For PhaseChange loop = mass flow at pump/mass gas out load (dimensionless)
+  REAL(r64)   :: CoolingLoadRated   =0.0d0  ! Rated capacity of heat exchanger serving secondary loop (W)
+  REAL(r64)   :: DensityBrineRated  =0.0d0  ! Density of secondary loop fluid at
                                           !    rated average brine temperature (J/kg-C)
-  REAL(r64)   :: DistPipeHeatGain   =0.0  ! Secondary fluid distribution piping heat gain (W)
-  REAL(r64)   :: DistPipeHeatGainEnergy   =0.0  ! Secondary fluid distribution piping heat gain (J)
-  REAL(r64)   :: FlowVolActual     =0.0  ! Actual Mass flow rate of circ fluid(kg/s)
-  REAL(r64)   :: HotDefrostCondCredit = 0.0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
-  REAL(r64)   :: HeatExchangeEta    =0.0  ! Heat exchanger effectiveness (dimensionless)
-  REAL(r64)   :: MaxVolFlow         =0.0  ! Defined by minimum of chiller or pump ratings (m3/s)
-  REAL(r64)   :: MaxLoad            =0.0  ! Defined by minimum of chiller rating or loat at MaxVolFlow (W)
-  REAL(r64)   :: PumpTotRatedPower  =0.0  ! Total pump rated power on loop (W)
-  REAL(r64)   :: PumpPowerToHeat    =0.0  ! Fraction of pump power converted to heat in circ fluid (dimensionless)
-  REAL(r64)   :: PumpIncrementFlowVol=0.0 ! Circ fluid flow for each pump or pump stage (m3/s)
-  REAL(r64)   :: PumpIncrementPower =0.0 ! Pump power for each pump or pump stage (W)
-  REAL(r64)   :: PumpPowerTotal     =0.0  ! Total Pump Power Secondary Loop (report variable)(W)
-  REAL(r64)   :: PumpElecEnergyTotal =0.0 ! Total pump energy secondary loop (report variable)(W)
-  REAL(r64)   :: ReceiverHeatGain   =0.0  ! Secondary fluid Receiver heat gain (W)
-  REAL(r64)   :: ReceiverHeatGainEnergy  =0.0  ! Secondary fluid Receiver heat gain (J)
-  REAL(r64)   :: RefInventory       =0.0  ! Approximate refrigerant inventory entered by user (kg)
-  REAL(r64)   :: SumUADistPiping    =0.0  ! Sum of U*A for secondary fluid dist piping (W/C)
-  REAL(r64)   :: SumUAReceiver      =0.0  ! Sum of U*A for secondary fluid receiver (W/C)
-  REAL(r64)   :: TBrineAverage      =0.0  ! (C)
-  REAL(r64)   :: TBrineInRated      =0.0  ! Entering brine temperature based upon rated range,approach,
+  REAL(r64)   :: DistPipeHeatGain   =0.0d0  ! Secondary fluid distribution piping heat gain (W)
+  REAL(r64)   :: DistPipeHeatGainEnergy   =0.0d0  ! Secondary fluid distribution piping heat gain (J)
+  REAL(r64)   :: FlowVolActual     =0.0d0  ! Actual Mass flow rate of circ fluid(kg/s)
+  REAL(r64)   :: HotDefrostCondCredit = 0.0d0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
+  REAL(r64)   :: HeatExchangeEta    =0.0d0  ! Heat exchanger effectiveness (dimensionless)
+  REAL(r64)   :: MaxVolFlow         =0.0d0  ! Defined by minimum of chiller or pump ratings (m3/s)
+  REAL(r64)   :: MaxLoad            =0.0d0  ! Defined by minimum of chiller rating or loat at MaxVolFlow (W)
+  REAL(r64)   :: PumpTotRatedPower  =0.0d0  ! Total pump rated power on loop (W)
+  REAL(r64)   :: PumpPowerToHeat    =0.0d0  ! Fraction of pump power converted to heat in circ fluid (dimensionless)
+  REAL(r64)   :: PumpIncrementFlowVol=0.0d0 ! Circ fluid flow for each pump or pump stage (m3/s)
+  REAL(r64)   :: PumpIncrementPower =0.0d0 ! Pump power for each pump or pump stage (W)
+  REAL(r64)   :: PumpPowerTotal     =0.0d0  ! Total Pump Power Secondary Loop (report variable)(W)
+  REAL(r64)   :: PumpElecEnergyTotal =0.0d0 ! Total pump energy secondary loop (report variable)(W)
+  REAL(r64)   :: ReceiverHeatGain   =0.0d0  ! Secondary fluid Receiver heat gain (W)
+  REAL(r64)   :: ReceiverHeatGainEnergy  =0.0d0  ! Secondary fluid Receiver heat gain (J)
+  REAL(r64)   :: RefInventory       =0.0d0  ! Approximate refrigerant inventory entered by user (kg)
+  REAL(r64)   :: SumUADistPiping    =0.0d0  ! Sum of U*A for secondary fluid dist piping (W/C)
+  REAL(r64)   :: SumUAReceiver      =0.0d0  ! Sum of U*A for secondary fluid receiver (W/C)
+  REAL(r64)   :: TBrineAverage      =0.0d0  ! (C)
+  REAL(r64)   :: TBrineInRated      =0.0d0  ! Entering brine temperature based upon rated range,approach,
                                           !    and evap Temp (C)
-  REAL(r64)   :: TCondense          =0.0  ! Rated condensing temperature for heat exchanger serving
+  REAL(r64)   :: TCondense          =0.0d0  ! Rated condensing temperature for heat exchanger serving
                                           !    secondary loop with phase change(C)
-  REAL(r64)   :: TEvapDesign        =0.0  ! Rated evaporating temperature for heat exchanger serving
+  REAL(r64)   :: TEvapDesign        =0.0d0  ! Rated evaporating temperature for heat exchanger serving
                                           !    secondary loop (C)
-  REAL(r64)   :: TApproachDifRated  =0.0  ! Rated approach temperature diff for heat exchanger serving
+  REAL(r64)   :: TApproachDifRated  =0.0d0  ! Rated approach temperature diff for heat exchanger serving
                                           !    secondary loop (C)
-  REAL(r64)   :: TRangeDifRated     =0.0  ! Rated range temperature diff for heat exchanger serving
+  REAL(r64)   :: TRangeDifRated     =0.0d0  ! Rated range temperature diff for heat exchanger serving
                                           !    secondary loop (C)
-  REAL(r64)   :: TMinNeeded         =0.0  ! Lowest Tbrine to case or walk-in needed on loop (C)
-  REAL(r64)   :: TotalCoolingLoad   =0.0  ! Total load (cases + walk-ins + pump heat + distribution pipe heat gain)
+  REAL(r64)   :: TMinNeeded         =0.0d0  ! Lowest Tbrine to case or walk-in needed on loop (C)
+  REAL(r64)   :: TotalCoolingLoad   =0.0d0  ! Total load (cases + walk-ins + pump heat + distribution pipe heat gain)
                                           !     on this system (W)
-  REAL(r64)   :: TotalCoolingEnergy =0.0  ! Total energy (cases + walk-ins + pump heat + distribution pipe heat gain)
+  REAL(r64)   :: TotalCoolingEnergy =0.0d0  ! Total energy (cases + walk-ins + pump heat + distribution pipe heat gain)
                                           !    on this system (J)
-  REAL(r64)   :: TotalRefrigLoad    =0.0  ! Total load (cases + walk-ins) on this system (W)
-  REAL(r64)   :: TotalRefrigEnergy  =0.0  ! Total energy (cases + walk-ins) on this system (J)
-  REAL(r64)   :: UnMetEnergy        =0.0  ! Load that is greater than capacity of loop heat exchanger, accumulates (J)
-  REAL(r64)   :: UnMetEnergySaved   =0.0  ! Load that is greater than capacity of loop heat exchanger, accumulates (J)
+  REAL(r64)   :: TotalRefrigLoad    =0.0d0  ! Total load (cases + walk-ins) on this system (W)
+  REAL(r64)   :: TotalRefrigEnergy  =0.0d0  ! Total energy (cases + walk-ins) on this system (J)
+  REAL(r64)   :: UnMetEnergy        =0.0d0  ! Load that is greater than capacity of loop heat exchanger, accumulates (J)
+  REAL(r64)   :: UnMetEnergySaved   =0.0d0  ! Load that is greater than capacity of loop heat exchanger, accumulates (J)
 END TYPE SecondaryLoopData
 
 TYPE, PRIVATE ::  TransferLoadListDef                          ! Derived Type for Transfer Load (Secondary and Cascade) Lists
@@ -999,29 +999,29 @@ TYPE, PRIVATE ::  WalkInData
   INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneNodeNum             ! Index to Zone Node
   INTEGER, ALLOCATABLE, DIMENSION(:) :: ZoneNum                 ! Index to Zone
   REAL(r64)        :: CircFanConsumption ! Operating energy of  Walk In fan [J]
-  REAL(r64)        :: CircFanPower=0.0   ! Operating power of  Walk In fan [W]
-  REAL(r64)        :: CoilFanPower=0.0   ! Operating power of  Walk In evap coil fan [W]
-  REAL(r64)        :: IceTemp= 0.0      ! Temperature of Ice Mass [C]
-  REAL(r64)        :: IceTempSaved = 0.0 ! Temperature of Ice Mass [C]
-  REAL(r64)        :: DefrostCapacity=0.0       ! Design defrost WalkIn capacity [W]
-  REAL(r64)        :: DeltaFreezeKgFrost = 0.0  ! Used to reverse accumulation if the zone/load time step is repeated (kg)
-  REAL(r64)        :: DefEnergyFraction=0.0     ! Portion of defrost energy available to melt ice,
+  REAL(r64)        :: CircFanPower=0.0d0   ! Operating power of  Walk In fan [W]
+  REAL(r64)        :: CoilFanPower=0.0d0   ! Operating power of  Walk In evap coil fan [W]
+  REAL(r64)        :: IceTemp= 0.0d0      ! Temperature of Ice Mass [C]
+  REAL(r64)        :: IceTempSaved = 0.0d0 ! Temperature of Ice Mass [C]
+  REAL(r64)        :: DefrostCapacity=0.0d0       ! Design defrost WalkIn capacity [W]
+  REAL(r64)        :: DeltaFreezeKgFrost = 0.0d0  ! Used to reverse accumulation if the zone/load time step is repeated (kg)
+  REAL(r64)        :: DefEnergyFraction=0.0d0     ! Portion of defrost energy available to melt ice,
                                                 !    used with fluid defrost with temp termination (dimensionless)
-  REAL(r64)        :: DesignFanPower=0.0        ! Design power of fans [W]
-  REAL(r64)        :: DesignLighting=0.0        ! Design  lighting (includes task and display lights)[W]
-  REAL(r64)        :: DesignRatedCap=0.0        ! Design total capacity [W]
-  REAL(r64)        :: DesignRefrigInventory=0.0 ! Design refrigerant inventory [kg]
-  REAL(r64)        :: FloorArea=0.0             ! Floor area of  Walk In [m2]
-  REAL(r64)        :: FloorUvalue=0.0           ! U-value of Walk In floor [W/m2-C]
-  REAL(r64)        :: HeaterPower=0.0           ! Rated power of  Walk In   heaters [W/m]
-  REAL(r64)        :: HotDefrostCondCredit = 0.0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
-  REAL(r64)        :: KgFrost = 0.0             ! Amount of frost on WalkIn evaporator (Kg)
-  REAL(r64)        :: StoredEnergy = 0.0        ! Cumulative Stored Energy not met by evaporator [J]
-  REAL(r64)        :: KgFrostSaved = 0.0        ! Amount of frost on WalkIn evaporator (Kg)
-  REAL(r64)        :: StoredEnergySaved = 0.0   ! Cumulative Stored Energy not met by evaporator [J]
-  REAL(r64)        :: Temperature=0.0           ! Rated temperature [C]
-  REAL(r64)        :: TEvapDesign=0.0           ! Design evaporator temperature (or brine inlet T) [C]
-  REAL(r64)        :: TotalFanPower=0.0         ! Sum of coil and circ fan power  [W]
+  REAL(r64)        :: DesignFanPower=0.0d0        ! Design power of fans [W]
+  REAL(r64)        :: DesignLighting=0.0d0        ! Design  lighting (includes task and display lights)[W]
+  REAL(r64)        :: DesignRatedCap=0.0d0        ! Design total capacity [W]
+  REAL(r64)        :: DesignRefrigInventory=0.0d0 ! Design refrigerant inventory [kg]
+  REAL(r64)        :: FloorArea=0.0d0             ! Floor area of  Walk In [m2]
+  REAL(r64)        :: FloorUvalue=0.0d0           ! U-value of Walk In floor [W/m2-C]
+  REAL(r64)        :: HeaterPower=0.0d0           ! Rated power of  Walk In   heaters [W/m]
+  REAL(r64)        :: HotDefrostCondCredit = 0.0d0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
+  REAL(r64)        :: KgFrost = 0.0d0             ! Amount of frost on WalkIn evaporator (Kg)
+  REAL(r64)        :: StoredEnergy = 0.0d0        ! Cumulative Stored Energy not met by evaporator [J]
+  REAL(r64)        :: KgFrostSaved = 0.0d0        ! Amount of frost on WalkIn evaporator (Kg)
+  REAL(r64)        :: StoredEnergySaved = 0.0d0   ! Cumulative Stored Energy not met by evaporator [J]
+  REAL(r64)        :: Temperature=0.0d0           ! Rated temperature [C]
+  REAL(r64)        :: TEvapDesign=0.0d0           ! Design evaporator temperature (or brine inlet T) [C]
+  REAL(r64)        :: TotalFanPower=0.0d0         ! Sum of coil and circ fan power  [W]
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: AreaGlassDr
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: UValueGlassDr
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: HeightGlassDr
@@ -1032,23 +1032,23 @@ TYPE, PRIVATE ::  WalkInData
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: UValue
 
 ! Report Variables
-  REAL(r64)        :: ElecHeaterPower=0.0         !  Walk In heater rate (W)
-  REAL(r64)        :: ElecHeaterConsumption=0.0   !  Walk In heater energy (J)
-  REAL(r64)        :: ElecFanPower=0.0            !  Walk In fan electric power (W)
-  REAL(r64)        :: ElecFanConsumption=0.0      !  Walk In fan electric energy (J)
-  REAL(r64)        :: ElecLightingPower=0.0       !  Walk In lighting electric power (W)
-  REAL(r64)        :: ElecLightingConsumption=0.0 !  Walk In lighting electric energy (J)
-  REAL(r64)        :: ElecDefrostPower=0.0        !  Walk In defrost rate (W)
-  REAL(r64)        :: ElecDefrostConsumption=0.0  !  Walk In defrost energy (J)
-  REAL(r64)        :: TotalCoolingLoad =0.0       !  Walk In total cooling rate (W)
-  REAL(r64)        :: TotalCoolingEnergy=0.0     !  Walk In total cooling energy (J)
-  REAL(r64)        :: TotalElecPower=0.0          !  Walk In total electric
+  REAL(r64)        :: ElecHeaterPower=0.0d0         !  Walk In heater rate (W)
+  REAL(r64)        :: ElecHeaterConsumption=0.0d0   !  Walk In heater energy (J)
+  REAL(r64)        :: ElecFanPower=0.0d0            !  Walk In fan electric power (W)
+  REAL(r64)        :: ElecFanConsumption=0.0d0      !  Walk In fan electric energy (J)
+  REAL(r64)        :: ElecLightingPower=0.0d0       !  Walk In lighting electric power (W)
+  REAL(r64)        :: ElecLightingConsumption=0.0d0 !  Walk In lighting electric energy (J)
+  REAL(r64)        :: ElecDefrostPower=0.0d0        !  Walk In defrost rate (W)
+  REAL(r64)        :: ElecDefrostConsumption=0.0d0  !  Walk In defrost energy (J)
+  REAL(r64)        :: TotalCoolingLoad =0.0d0       !  Walk In total cooling rate (W)
+  REAL(r64)        :: TotalCoolingEnergy=0.0d0     !  Walk In total cooling energy (J)
+  REAL(r64)        :: TotalElecPower=0.0d0          !  Walk In total electric
                                                   !   (fans, heaters, lighting, and elec defrost) rate (W)
-  REAL(r64)        :: TotalElecConsumption=0.0    !  Walk In total electric energy (J)
-  REAL(r64)        :: TotLatCoolingEnergyRate=0.0   !  Walk In latent cooling rate (W)
-  REAL(r64)        :: TotLatCoolingEnergy=0.0       !  Walk In latent cooling energy (J)
-  REAL(r64)        :: TotSensCoolingEnergyRate=0.0  !  Walk In sensible cooling rate (W)
-  REAL(r64)        :: TotSensCoolingEnergy=0.0      !  Walk In sensible cooling energy (J)
+  REAL(r64)        :: TotalElecConsumption=0.0d0    !  Walk In total electric energy (J)
+  REAL(r64)        :: TotLatCoolingEnergyRate=0.0d0   !  Walk In latent cooling rate (W)
+  REAL(r64)        :: TotLatCoolingEnergy=0.0d0       !  Walk In latent cooling energy (J)
+  REAL(r64)        :: TotSensCoolingEnergyRate=0.0d0  !  Walk In sensible cooling rate (W)
+  REAL(r64)        :: TotSensCoolingEnergy=0.0d0      !  Walk In sensible cooling energy (J)
 
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: LatZoneCreditRate       !Amount of latent energy provided to zone(W)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: LatZoneCredit           !Amount of latent energy provided to zone(J)
@@ -1059,17 +1059,17 @@ TYPE, PRIVATE ::  WalkInData
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SensZoneCreditHeat      !Amount of sensible heat provided to the zone (J)
 END TYPE  WalkInData
 TYPE CaseWIZoneReportData
-  REAL(r64) :: LatCoolingToZoneRate   = 0.0 ! Positive for reporting Net latent credit to zone on sys time step from cases/walkins (W)
-  REAL(r64) :: LatCoolingToZoneEnergy = 0.0
-  REAL(r64) :: SenCoolingToZoneRate   = 0.0 ! Positive for reporting Net sensible cooling to zone on sys time step from cases/walkins (W)
-  REAL(r64) :: SenCoolingToZoneEnergy = 0.0
-  REAL(r64) :: HeatingToZoneRate   = 0.0 ! Positive for reporting Net sensible credit to zone on sys time step from cases/walkins (W)
-  REAL(r64) :: HeatingToZoneEnergy = 0.0
-  REAL(r64) :: TotCoolingToZoneRate   = 0.0 ! Positive for reporting Net total cooling credit to zone from cases/walkins (W)
-  REAL(r64) :: TotCoolingToZoneEnergy = 0.0
-  REAL(r64) :: TotHtXferToZoneRate   = 0.0 ! Gives negative for cooling, positive for heating net to zone from cases/walkins (W)
-  REAL(r64) :: TotHtXferToZoneEnergy   = 0.0
-  REAL(r64) :: SenCaseCreditToZoneEnergy   = 0.0 ! Negative (heat out zone) positive (heat into zone) (rate found in CaseCreditData) (J)
+  REAL(r64) :: LatCoolingToZoneRate   = 0.0d0 ! Positive for reporting Net latent credit to zone on sys time step from cases/walkins (W)
+  REAL(r64) :: LatCoolingToZoneEnergy = 0.0d0
+  REAL(r64) :: SenCoolingToZoneRate   = 0.0d0 ! Positive for reporting Net sensible cooling to zone on sys time step from cases/walkins (W)
+  REAL(r64) :: SenCoolingToZoneEnergy = 0.0d0
+  REAL(r64) :: HeatingToZoneRate   = 0.0d0 ! Positive for reporting Net sensible credit to zone on sys time step from cases/walkins (W)
+  REAL(r64) :: HeatingToZoneEnergy = 0.0d0
+  REAL(r64) :: TotCoolingToZoneRate   = 0.0d0 ! Positive for reporting Net total cooling credit to zone from cases/walkins (W)
+  REAL(r64) :: TotCoolingToZoneEnergy = 0.0d0
+  REAL(r64) :: TotHtXferToZoneRate   = 0.0d0 ! Gives negative for cooling, positive for heating net to zone from cases/walkins (W)
+  REAL(r64) :: TotHtXferToZoneEnergy   = 0.0d0
+  REAL(r64) :: SenCaseCreditToZoneEnergy   = 0.0d0 ! Negative (heat out zone) positive (heat into zone) (rate found in CaseCreditData) (J)
 END TYPE CaseWIZoneReportData
 
 TYPE, PRIVATE ::  WarehouseCoilData
@@ -1099,62 +1099,62 @@ TYPE, PRIVATE ::  WarehouseCoilData
   INTEGER          :: VerticalLocation = 0       ! Index to coil location, floor, ceiling, or middle
   INTEGER          :: ZoneNodeNum=0              ! Index to the zone node for the zone served by this coil
   INTEGER          :: ZoneNum=0                  ! Index to the zone served by this coil
-  REAL(r64)        :: CorrMaterial=0.0           ! Correction factor from manufacturer's rating for coil material, default 1.0
-  REAL(r64)        :: CorrRefrigerant=0.0        ! Correction factor from manufacturer's rating for refrigerant, default 1.0
-  REAL(r64)        :: DefrostCapacity=0.0        ! Design defrost Coil capacity [W]
-  REAL(r64)        :: DefrostPower=0.0           ! Defrost power for electric defrost (W)
-  REAL(r64)        :: DeltaFreezeKgFrost = 0.0   ! Used to reverse accumulation if the zone/load time step is repeated (kg)
-  REAL(r64)        :: DefEnergyFraction=0.0      ! Portion of defrost energy available to melt ice,
+  REAL(r64)        :: CorrMaterial=0.0d0           ! Correction factor from manufacturer's rating for coil material, default 1.0
+  REAL(r64)        :: CorrRefrigerant=0.0d0        ! Correction factor from manufacturer's rating for refrigerant, default 1.0
+  REAL(r64)        :: DefrostCapacity=0.0d0        ! Design defrost Coil capacity [W]
+  REAL(r64)        :: DefrostPower=0.0d0           ! Defrost power for electric defrost (W)
+  REAL(r64)        :: DeltaFreezeKgFrost = 0.0d0   ! Used to reverse accumulation if the zone/load time step is repeated (kg)
+  REAL(r64)        :: DefEnergyFraction=0.0d0      ! Portion of defrost energy available to melt ice,
                                                  !    used with fluid defrost with temp termination (dimensionless)
-  REAL(r64)        :: DesignRefrigInventory=0.0  ! Design refrigerant inventory [kg]
-  REAL(r64)        :: FanMinAirFlowRatio = 0.0   ! Minimum air flow ratio set to preserve fan motor, dimensionless
-  REAL(r64)        :: HeaterPower=0.0            ! Rated power of  coil heaters [W/m]
-  REAL(r64)        :: HotDefrostCondCredit = 0.0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
-  REAL(r64)        :: IceTemp= 0.0               ! Temperature of Ice Mass [C]
-  REAL(r64)        :: IceTempSaved = 0.0         ! Temperature of Ice Mass [C]
-  REAL(r64)        :: KgFrost = 0.0              ! Amount of frost on coil evaporator (Kg)
-  REAL(r64)        :: KgFrostSaved = 0.0         ! Amount of frost on coil evaporator (Kg)
-  REAL(r64)        :: MaxTemperatureDif = 0.0    ! Maximum difference between Tevap and Tair inlet, limits capacity during initial pull-down (deltaC)
-  REAL(r64)        :: RatedAirVolumeFlow = 0.0   ! Rated air flow through coil (m3/s)
-  REAL(r64)        :: RatedCapTotal=0.0          ! Rated total heat capacity, both latent and sensible [W]
-  REAL(r64)        :: RatedFanPower=0.0          ! Rated power of fans [W]
-  REAL(r64)        :: RatedRH = 0.0              ! Rated RH corresponding to RatedCapacityTotal [decimal 0 to 1]
-  REAL(r64)        :: RatedSensibleCap=0.0       ! Rated total capacity at sensible heat ratio of 1.0 [W]
-  REAL(r64)        :: RatedTemperatureDif=0.0    ! Rated temperature difference DT1, T air in minus evaporating temperature [W]
-  REAL(r64)        :: ReqLoad = 0.0              ! Load requested to meet zone load [W]
-  REAL(r64)        :: SensHeatRatio = 0.0        ! Sensible heat ratio (sensible/total), dimensionless
-  REAL(r64)        :: SHRCorrection60=0.0        ! Correction factor corresponding to sensible heat ratio of 0.6 [ dimensionless]
-  REAL(r64)        :: Temperature=0.0            ! Rated temperature [C]
-  REAL(r64)        :: TEvapDesign=0.0            ! Design evaporator temperature (or brine inlet T) [C]
-  REAL(r64)        :: ThermalDefrostPower=0.0    ! Thermal defrost load used to communicate with derate routine even if not electric defrost [W]
-  REAL(r64)        :: UnitLoadFactorSens=0.0     ! Rated sensible capacity [W/C]
+  REAL(r64)        :: DesignRefrigInventory=0.0d0  ! Design refrigerant inventory [kg]
+  REAL(r64)        :: FanMinAirFlowRatio = 0.0d0   ! Minimum air flow ratio set to preserve fan motor, dimensionless
+  REAL(r64)        :: HeaterPower=0.0d0            ! Rated power of  coil heaters [W/m]
+  REAL(r64)        :: HotDefrostCondCredit = 0.0d0 ! Used to credit condenser when heat reclaim used for hot gas/brine defrost (W)
+  REAL(r64)        :: IceTemp= 0.0d0               ! Temperature of Ice Mass [C]
+  REAL(r64)        :: IceTempSaved = 0.0d0         ! Temperature of Ice Mass [C]
+  REAL(r64)        :: KgFrost = 0.0d0              ! Amount of frost on coil evaporator (Kg)
+  REAL(r64)        :: KgFrostSaved = 0.0d0         ! Amount of frost on coil evaporator (Kg)
+  REAL(r64)        :: MaxTemperatureDif = 0.0d0    ! Maximum difference between Tevap and Tair inlet, limits capacity during initial pull-down (deltaC)
+  REAL(r64)        :: RatedAirVolumeFlow = 0.0d0   ! Rated air flow through coil (m3/s)
+  REAL(r64)        :: RatedCapTotal=0.0d0          ! Rated total heat capacity, both latent and sensible [W]
+  REAL(r64)        :: RatedFanPower=0.0d0          ! Rated power of fans [W]
+  REAL(r64)        :: RatedRH = 0.0d0              ! Rated RH corresponding to RatedCapacityTotal [decimal 0 to 1]
+  REAL(r64)        :: RatedSensibleCap=0.0d0       ! Rated total capacity at sensible heat ratio of 1.0 [W]
+  REAL(r64)        :: RatedTemperatureDif=0.0d0    ! Rated temperature difference DT1, T air in minus evaporating temperature [W]
+  REAL(r64)        :: ReqLoad = 0.0d0              ! Load requested to meet zone load [W]
+  REAL(r64)        :: SensHeatRatio = 0.0d0        ! Sensible heat ratio (sensible/total), dimensionless
+  REAL(r64)        :: SHRCorrection60=0.0d0        ! Correction factor corresponding to sensible heat ratio of 0.6 [ dimensionless]
+  REAL(r64)        :: Temperature=0.0d0            ! Rated temperature [C]
+  REAL(r64)        :: TEvapDesign=0.0d0            ! Design evaporator temperature (or brine inlet T) [C]
+  REAL(r64)        :: ThermalDefrostPower=0.0d0    ! Thermal defrost load used to communicate with derate routine even if not electric defrost [W]
+  REAL(r64)        :: UnitLoadFactorSens=0.0d0     ! Rated sensible capacity [W/C]
 
 ! Report Variables
-  REAL(r64)        :: ElecHeaterPower=0.0         ! Coil heater rate (W)
-  REAL(r64)        :: ElecHeaterConsumption=0.0   ! Coil heater energy (J)
-  REAL(r64)        :: ElecFanPower=0.0            ! Coil fan electric power (W)
-  REAL(r64)        :: ElecFanConsumption=0.0      ! Coil fan electric energy (J)
-  REAL(r64)        :: ElecDefrostPower=0.0        ! Coil defrost rate (W)
-  REAL(r64)        :: ElecDefrostConsumption=0.0  ! Coil defrost energy (J)
-  REAL(r64)        :: LatCreditRate= 0.0          ! Latent heat removed from the zone [W]
-  REAL(r64)        :: LatLoadServed=0.0           ! Latent load met by coil (J)
-  REAL(r64)        :: LatKgPerS_ToZone =0.0       ! Latent load met by coil (kg/s)
-  REAL(r64)        :: LatCreditEnergy= 0.0        ! Latent heat removed from the zone [J]
-  REAL(r64)        :: ReportSensCoolCreditRate=0.0   ! Coil cooling credit to zone (net) [W]
-  REAL(r64)        :: ReportHeatingCreditRate=0.0    ! Coil heating credit to zone (net) [J]
-  REAL(r64)        :: ReportSensCoolCreditEnergy=0.0 ! Coil cooling credit to zone (net) [W]
-  REAL(r64)        :: ReportHeatingCreditEnergy=0.0  ! Coil heating credit to zone (net) [J]
-  REAL(r64)        :: ReportTotalCoolCreditRate =0.0 ! Coil cooling sens + latent credit to zone[W]
-  REAL(r64)        :: ReportTotalCoolCreditEnergy =0.0 ! Coil cooling sens + latent credit to zone[J]
-  REAL(r64)        :: SensCreditRate = 0.0        ! Net Sensible heat removed from the zone [W]
-  REAL(r64)        :: SensCreditEnergy = 0.0      ! Net Sensible heat removed from the zone [J]
-  REAL(r64)        :: SensCoolingEnergyRate=0.0   ! Gross Coil sensible cooling rate (W)
-  REAL(r64)        :: SensCoolingEnergy=0.0       ! Gross Coil sensible cooling energy (J)
-  REAL(r64)        :: TotalCoolingLoad=0.0        ! Gross total cooling rate (W)
-  REAL(r64)        :: TotalCoolingEnergy=0.0      ! Gross total cooling energy (J)
-  REAL(r64)        :: TotalElecPower=0.0          ! Coil total electric
+  REAL(r64)        :: ElecHeaterPower=0.0d0         ! Coil heater rate (W)
+  REAL(r64)        :: ElecHeaterConsumption=0.0d0   ! Coil heater energy (J)
+  REAL(r64)        :: ElecFanPower=0.0d0            ! Coil fan electric power (W)
+  REAL(r64)        :: ElecFanConsumption=0.0d0      ! Coil fan electric energy (J)
+  REAL(r64)        :: ElecDefrostPower=0.0d0        ! Coil defrost rate (W)
+  REAL(r64)        :: ElecDefrostConsumption=0.0d0  ! Coil defrost energy (J)
+  REAL(r64)        :: LatCreditRate= 0.0d0          ! Latent heat removed from the zone [W]
+  REAL(r64)        :: LatLoadServed=0.0d0           ! Latent load met by coil (J)
+  REAL(r64)        :: LatKgPerS_ToZone =0.0d0       ! Latent load met by coil (kg/s)
+  REAL(r64)        :: LatCreditEnergy= 0.0d0        ! Latent heat removed from the zone [J]
+  REAL(r64)        :: ReportSensCoolCreditRate=0.0d0   ! Coil cooling credit to zone (net) [W]
+  REAL(r64)        :: ReportHeatingCreditRate=0.0d0    ! Coil heating credit to zone (net) [J]
+  REAL(r64)        :: ReportSensCoolCreditEnergy=0.0d0 ! Coil cooling credit to zone (net) [W]
+  REAL(r64)        :: ReportHeatingCreditEnergy=0.0d0  ! Coil heating credit to zone (net) [J]
+  REAL(r64)        :: ReportTotalCoolCreditRate =0.0d0 ! Coil cooling sens + latent credit to zone[W]
+  REAL(r64)        :: ReportTotalCoolCreditEnergy =0.0d0 ! Coil cooling sens + latent credit to zone[J]
+  REAL(r64)        :: SensCreditRate = 0.0d0        ! Net Sensible heat removed from the zone [W]
+  REAL(r64)        :: SensCreditEnergy = 0.0d0      ! Net Sensible heat removed from the zone [J]
+  REAL(r64)        :: SensCoolingEnergyRate=0.0d0   ! Gross Coil sensible cooling rate (W)
+  REAL(r64)        :: SensCoolingEnergy=0.0d0       ! Gross Coil sensible cooling energy (J)
+  REAL(r64)        :: TotalCoolingLoad=0.0d0        ! Gross total cooling rate (W)
+  REAL(r64)        :: TotalCoolingEnergy=0.0d0      ! Gross total cooling energy (J)
+  REAL(r64)        :: TotalElecPower=0.0d0          ! Coil total electric
                                                   !   (fans, heaters, and elec defrost) rate (W)
-  REAL(r64)        :: TotalElecConsumption=0.0    ! Coil total electric energy (J)
+  REAL(r64)        :: TotalElecConsumption=0.0d0    ! Coil total electric energy (J)
 END TYPE  WarehouseCoilData
 
 
@@ -1171,24 +1171,24 @@ TYPE  AirChillerSetData
   INTEGER   :: NumCoils = 0               ! Number of individual chillers in set
   INTEGER   :: ZoneNum = 0                ! ID number of zone where chiller set is located
   INTEGER   :: ZoneNodeNum = 0            ! ID number of zone node giving mixed conditions of zone where chiller set is located
-  REAL(r64) :: QZnReqSens = 0.0           ! Sensible heat needed by the zone to reach setpoint [W]
+  REAL(r64) :: QZnReqSens = 0.0d0           ! Sensible heat needed by the zone to reach setpoint [W]
 END TYPE  AirChillerSetData
 
 TYPE CoilCreditData  !used to sum impact of all coils within a zone
-  REAL(r64) :: LatCreditToZoneRate   = 0.0 ! Net latent credit to zone on sys time step from coil (W)
-  REAL(r64) :: LatCreditToZoneEnergy = 0.0
-  REAL(r64) :: LatKgPerS_ToZoneRate  = 0.0 ! Latent water to zone on sys time step from coils, neg when water removed (kg/s)
-  REAL(r64) :: SenCreditToZoneRate   = 0.0 ! Net sensible credit to zone on sys time step from coil (W)
-  REAL(r64) :: SenCreditToZoneEnergy = 0.0
-  REAL(r64) :: ReportH20RemovedKgPerS_FromZoneRate  = 0.0 ! same but positive for reporting purposes (kg/s)
-  REAL(r64) :: ReportLatCreditToZoneRate   = 0.0 ! Positive for reporting Net latent credit to zone on sys time step from coil (W)
-  REAL(r64) :: ReportLatCreditToZoneEnergy = 0.0
-  REAL(r64) :: ReportHeatingToZoneRate   = 0.0 ! Positive for reporting Net sensible credit to zone on sys time step from coil (W)
-  REAL(r64) :: ReportHeatingToZoneEnergy = 0.0
-  REAL(r64) :: ReportSenCoolingToZoneRate   = 0.0 ! Positive for reporting Net sensible credit to zone on sys time step from coil (W)
-  REAL(r64) :: ReportSenCoolingToZoneEnergy = 0.0
-  REAL(r64) :: ReportTotCoolingToZoneRate   = 0.0 ! Positive for reporting Net total cooling credit to zone from chillers (W)
-  REAL(r64) :: ReportTotCoolingToZoneEnergy = 0.0
+  REAL(r64) :: LatCreditToZoneRate   = 0.0d0 ! Net latent credit to zone on sys time step from coil (W)
+  REAL(r64) :: LatCreditToZoneEnergy = 0.0d0
+  REAL(r64) :: LatKgPerS_ToZoneRate  = 0.0d0 ! Latent water to zone on sys time step from coils, neg when water removed (kg/s)
+  REAL(r64) :: SenCreditToZoneRate   = 0.0d0 ! Net sensible credit to zone on sys time step from coil (W)
+  REAL(r64) :: SenCreditToZoneEnergy = 0.0d0
+  REAL(r64) :: ReportH20RemovedKgPerS_FromZoneRate  = 0.0d0 ! same but positive for reporting purposes (kg/s)
+  REAL(r64) :: ReportLatCreditToZoneRate   = 0.0d0 ! Positive for reporting Net latent credit to zone on sys time step from coil (W)
+  REAL(r64) :: ReportLatCreditToZoneEnergy = 0.0d0
+  REAL(r64) :: ReportHeatingToZoneRate   = 0.0d0 ! Positive for reporting Net sensible credit to zone on sys time step from coil (W)
+  REAL(r64) :: ReportHeatingToZoneEnergy = 0.0d0
+  REAL(r64) :: ReportSenCoolingToZoneRate   = 0.0d0 ! Positive for reporting Net sensible credit to zone on sys time step from coil (W)
+  REAL(r64) :: ReportSenCoolingToZoneEnergy = 0.0d0
+  REAL(r64) :: ReportTotCoolingToZoneRate   = 0.0d0 ! Positive for reporting Net total cooling credit to zone from chillers (W)
+  REAL(r64) :: ReportTotCoolingToZoneEnergy = 0.0d0
 END TYPE CoilCreditData
 
           ! MODULE VARIABLE DECLARATIONS:
@@ -1239,7 +1239,7 @@ INTEGER, PRIVATE :: NumunusedWalkIns     = 0    ! Number of refrigeration compre
 LOGICAL          :: MyReferPlantScanFlag = .TRUE.
 
 ! Refrigerated case variables
-REAL(r64)      :: CaseRAFactor        =0.0   ! Factor determining case credit allocation (e.g. % to zone or HVAC)
+REAL(r64)      :: CaseRAFactor        =0.0d0   ! Factor determining case credit allocation (e.g. % to zone or HVAC)
 LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowStockingWarning ! Used for one-time warning message for possible case
                                                          ! input error regarding stocking
 LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowFrostWarning    ! Used for one-time warning message for possible case
@@ -1251,21 +1251,21 @@ LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowUnMetWIEnergyWarning ! Used for one-tim
 LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowWIFrostWarning ! Used for one-time warning message
 
 ! Refrigeration compressor rack variables
-REAL(r64)      :: TotalRackDeliveredCapacity =0.0 ! Total capacity of all refrigerated cases attached to rack (W)
-REAL(r64)      :: TotalCompressorPower       =0.0 ! Total compressor electric power (W)
-REAL(r64)      :: CompressorCOPactual        =0.0 ! Compressor coefficient of performance at specific operating conditions (W/W)
-REAL(r64)      :: RackSenCreditToZone        =0.0 ! Amount of condenser heat applied to zone load (W)
-REAL(r64)      :: RackSenCreditToHVAC        =0.0 ! Amount of condenser heat applied to HVAC RA duct (W)
+REAL(r64)      :: TotalRackDeliveredCapacity =0.0d0 ! Total capacity of all refrigerated cases attached to rack (W)
+REAL(r64)      :: TotalCompressorPower       =0.0d0 ! Total compressor electric power (W)
+REAL(r64)      :: CompressorCOPactual        =0.0d0 ! Compressor coefficient of performance at specific operating conditions (W/W)
+REAL(r64)      :: RackSenCreditToZone        =0.0d0 ! Amount of condenser heat applied to zone load (W)
+REAL(r64)      :: RackSenCreditToHVAC        =0.0d0 ! Amount of condenser heat applied to HVAC RA duct (W)
 INTEGER        :: InletNode                  =0   ! Water-cooled condenser inlet node number
 INTEGER        :: OutletNode                 =0   ! Water-cooled condenser outlet node number
 LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowCOPWarning      ! Used for one-time warning message for possible rack
                                                          ! input error regarding COP
 ! Refrigeration condenser variables (used for both racks and detailed systems)
-REAL(r64)      :: TotalCondenserFanPower     =0.0 ! Total condenser fan electric power (W)
-REAL(r64)      :: TotalCondenserPumpPower    =0.0 ! Total condenser pump electric power (W)
-REAL(r64)      :: TotalCondenserHeat         =0.0 ! Total condenser heat from compressor rack (W)
-REAL(r64)      :: TotalBasinHeatPower        =0.0 ! Total condenser basin water heater power (W)
-REAL(r64)      :: TotalEvapWaterUseRate      =0.0 ! Total condenser water use rate (m3/s)
+REAL(r64)      :: TotalCondenserFanPower     =0.0d0 ! Total condenser fan electric power (W)
+REAL(r64)      :: TotalCondenserPumpPower    =0.0d0 ! Total condenser pump electric power (W)
+REAL(r64)      :: TotalCondenserHeat         =0.0d0 ! Total condenser heat from compressor rack (W)
+REAL(r64)      :: TotalBasinHeatPower        =0.0d0 ! Total condenser basin water heater power (W)
+REAL(r64)      :: TotalEvapWaterUseRate      =0.0d0 ! Total condenser water use rate (m3/s)
 
 ! Refrigeration system variables
 LOGICAL, ALLOCATABLE,DIMENSION(:) :: ShowUnmetEnergyWarning ! Used for one-time warning message for possible
@@ -1661,54 +1661,54 @@ SUBROUTINE GetRefrigerationInput
   INTEGER    :: ZoneID            = 0       ! Index to zone
   INTEGER    :: ZoneIndex         = 0       ! Index to zone
   INTEGER    :: ZoneNum           = 0       ! Index to zone
-  REAL(r64)  :: CalcCircRate      = 0.0     ! Calculted circ rate in secondary phase change loop, dimensionless
-  REAL(r64)  :: CalcTotFlowVol    = 0.0     ! Secondary loop flow in phase change liquid overfeed system (m3/s)
-  REAL(r64)  :: CaseHeatGain      = 0.0     ! Case sensible heat gain used for error messages
-  REAL(r64)  :: CapacityAtMaxVolFlow = 0.0  ! Secondary loop capacity (W)
-  REAL(r64)  :: CpBrineRated      = 0.0     ! specific heat of circ fluid in secondary loop
-  REAL(r64)  :: Capmin             =0.0     ! min heat rej for heat rej curve for air cooled condenser (W)
-  REAL(r64)  :: Capmax             =0.0     ! max heat rej for heat rej curve for air cooled condenser (W)
-  REAL(r64)  :: DeltaCap1          =0.0     ! fraction dif in capacity for input error check
-  REAL(r64)  :: DeltaCap2          =0.0     ! fraction dif in capacity for input error check
-  REAL(r64)  :: DeltaHPhaseChange  = 0.0    ! Secondary loop enthalpy change in condenser w overfeed system (J/g)
-  REAL(r64)  :: DelTempMin         =0.0     ! min temperature for heat rej curve for air cooled condenser (C)
-  REAL(r64)  :: DelTempMax         =0.0     ! max temperature for heat rej curve for air cooled condenser (C)
-  REAL(r64)  :: DensityBrineRated  = 0.0    ! density of circ fluid in secondary loop
-  REAL(r64)  :: DensityPhaseChange = 0.0    ! Secondary loop density at condensing temperature w overfeed system (g/m3)
-  REAL(r64)  :: DesignSensibleCap  = 0.0    ! Case sensible capacity used for error messages
-  REAL(r64)  :: DiffCircRates      =0.0     ! Difference between calculated and specified circ rates, fraction
-  REAL(r64)  :: ErrSecondPumpPower = 0.0    ! Used to check consistency when both head and power input
-  REAL(r64)  :: FlowMassRated      =0.0     ! Design mass flow rate of circ fluid in secondary loop(kg/s)
+  REAL(r64)  :: CalcCircRate      = 0.0d0     ! Calculted circ rate in secondary phase change loop, dimensionless
+  REAL(r64)  :: CalcTotFlowVol    = 0.0d0     ! Secondary loop flow in phase change liquid overfeed system (m3/s)
+  REAL(r64)  :: CaseHeatGain      = 0.0d0     ! Case sensible heat gain used for error messages
+  REAL(r64)  :: CapacityAtMaxVolFlow = 0.0d0  ! Secondary loop capacity (W)
+  REAL(r64)  :: CpBrineRated      = 0.0d0     ! specific heat of circ fluid in secondary loop
+  REAL(r64)  :: Capmin             =0.0d0     ! min heat rej for heat rej curve for air cooled condenser (W)
+  REAL(r64)  :: Capmax             =0.0d0     ! max heat rej for heat rej curve for air cooled condenser (W)
+  REAL(r64)  :: DeltaCap1          =0.0d0     ! fraction dif in capacity for input error check
+  REAL(r64)  :: DeltaCap2          =0.0d0     ! fraction dif in capacity for input error check
+  REAL(r64)  :: DeltaHPhaseChange  = 0.0d0    ! Secondary loop enthalpy change in condenser w overfeed system (J/g)
+  REAL(r64)  :: DelTempMin         =0.0d0     ! min temperature for heat rej curve for air cooled condenser (C)
+  REAL(r64)  :: DelTempMax         =0.0d0     ! max temperature for heat rej curve for air cooled condenser (C)
+  REAL(r64)  :: DensityBrineRated  = 0.0d0    ! density of circ fluid in secondary loop
+  REAL(r64)  :: DensityPhaseChange = 0.0d0    ! Secondary loop density at condensing temperature w overfeed system (g/m3)
+  REAL(r64)  :: DesignSensibleCap  = 0.0d0    ! Case sensible capacity used for error messages
+  REAL(r64)  :: DiffCircRates      =0.0d0     ! Difference between calculated and specified circ rates, fraction
+  REAL(r64)  :: ErrSecondPumpPower = 0.0d0    ! Used to check consistency when both head and power input
+  REAL(r64)  :: FlowMassRated      =0.0d0     ! Design mass flow rate of circ fluid in secondary loop(kg/s)
   REAL(r64)  :: GCOutletH          = 0.0d0  ! Gas cooler outlet enthalpy (J/kg)
-  REAL(r64)  :: NominalSecondaryCapacity = 0.0  ! Rated Capacity from input data, W
-  REAL(r64)  :: NominalSecondaryRefLoad = 0.0   ! Load from all connected cases and walkins, W
-  REAL(r64)  :: NominalTotalCascadeLoad = 0.0   ! Load from all connected cascade condensers, W
-  REAL(r64)  :: NominalTotalCaseCap=0.0     ! Total of nominal case capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalCoilCap=0.0     ! Total of nominal case capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalWalkInCap=0.0   ! Total of nominal walk-in capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalSecondaryCap=0.0    ! Total of nominal secondary capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalCaseCapMT=0.0   ! Total of nominal medium temperature case capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalTotalCaseCapLT=0.0   ! Total of nominal low temperature case capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalTotalWalkInCapMT=0.0 ! Total of nominal medium temperature walk-in capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalTotalWalkInCapLT=0.0 ! Total of nominal low temperature walk-in capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalTotalCoolingCap=0.0  ! Total of nominal load capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalCompCap=0.0     ! Total of nominal compressor capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalHiStageCompCap=0.0  ! Total of nominal high-stage compressor capacities, used for rough input check (W)
-  REAL(r64)  :: NominalTotalCompCapHP=0.0   ! Total of nominal high pressure compressor capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalTotalCompCapLP=0.0   ! Total of nominal low pressure compressor capacities, used for rough input check (W) (Transcritical CO2)
-  REAL(r64)  :: NominalCondCap     =0.0     ! Nominal Condenser capacity, used for rough input check (W)
-  REAL(r64)  :: Pcond = 0.0                 ! Condensing Pressure (Pa)
-  REAL(r64)  :: Pevap = 0.0                 ! Evaporating Pressure (Pa)
-  REAL(r64)  :: PumpTotRatedHead   =0.0     ! Total pump rated head on secondary loop (Pa)
-  REAL(r64)  :: PumpTotRatedFlowVol = 0.0   ! Rated flow from input pump data, m3/s
-  REAL(r64)  :: Rcase             = 0.0     ! Case thermal resistance used with anti-sweat heater control
-  REAL(r64)  :: RcaseDenom        = 0.0     ! Denominator of case thermal resistance calculation for anti-sweat
-  REAL(r64)  :: SecondaryFlowVolRated= 0.0  ! Rated flow of secondary fluid, used to calculate capacity (m3/s)
-  REAL(r64)  :: TBrineOutRated =  0.0       ! Rated temperature of circ fluid LEAVING heat exchanger,C
-  REAL(r64)  :: TBrineInRated  =  0.0       ! Rated temperature of circ fluid going INTO heat exchanger, C
-  REAL(r64)  :: TBrineAverage  =  0.0       ! Rated average of inlet and outlet temps, used for property look up, C
-  REAL(r64)  :: TempRAFraction    = 0.0     ! Temporary sum of Return Air fraction per zone for reporting
-  REAL(r64)  :: TestDelta      =  0.0      ! Used to compare secondary loop rated capacity to calculated capacity, fraction
+  REAL(r64)  :: NominalSecondaryCapacity = 0.0d0  ! Rated Capacity from input data, W
+  REAL(r64)  :: NominalSecondaryRefLoad = 0.0d0   ! Load from all connected cases and walkins, W
+  REAL(r64)  :: NominalTotalCascadeLoad = 0.0d0   ! Load from all connected cascade condensers, W
+  REAL(r64)  :: NominalTotalCaseCap=0.0d0     ! Total of nominal case capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalCoilCap=0.0d0     ! Total of nominal case capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalWalkInCap=0.0d0   ! Total of nominal walk-in capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalSecondaryCap=0.0d0    ! Total of nominal secondary capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalCaseCapMT=0.0d0   ! Total of nominal medium temperature case capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalTotalCaseCapLT=0.0d0   ! Total of nominal low temperature case capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalTotalWalkInCapMT=0.0d0 ! Total of nominal medium temperature walk-in capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalTotalWalkInCapLT=0.0d0 ! Total of nominal low temperature walk-in capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalTotalCoolingCap=0.0d0  ! Total of nominal load capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalCompCap=0.0d0     ! Total of nominal compressor capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalHiStageCompCap=0.0d0  ! Total of nominal high-stage compressor capacities, used for rough input check (W)
+  REAL(r64)  :: NominalTotalCompCapHP=0.0d0   ! Total of nominal high pressure compressor capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalTotalCompCapLP=0.0d0   ! Total of nominal low pressure compressor capacities, used for rough input check (W) (Transcritical CO2)
+  REAL(r64)  :: NominalCondCap     =0.0d0     ! Nominal Condenser capacity, used for rough input check (W)
+  REAL(r64)  :: Pcond = 0.0d0                 ! Condensing Pressure (Pa)
+  REAL(r64)  :: Pevap = 0.0d0                 ! Evaporating Pressure (Pa)
+  REAL(r64)  :: PumpTotRatedHead   =0.0d0     ! Total pump rated head on secondary loop (Pa)
+  REAL(r64)  :: PumpTotRatedFlowVol = 0.0d0   ! Rated flow from input pump data, m3/s
+  REAL(r64)  :: Rcase             = 0.0d0     ! Case thermal resistance used with anti-sweat heater control
+  REAL(r64)  :: RcaseDenom        = 0.0d0     ! Denominator of case thermal resistance calculation for anti-sweat
+  REAL(r64)  :: SecondaryFlowVolRated= 0.0d0  ! Rated flow of secondary fluid, used to calculate capacity (m3/s)
+  REAL(r64)  :: TBrineOutRated =  0.0d0       ! Rated temperature of circ fluid LEAVING heat exchanger,C
+  REAL(r64)  :: TBrineInRated  =  0.0d0       ! Rated temperature of circ fluid going INTO heat exchanger, C
+  REAL(r64)  :: TBrineAverage  =  0.0d0       ! Rated average of inlet and outlet temps, used for property look up, C
+  REAL(r64)  :: TempRAFraction    = 0.0d0     ! Temporary sum of Return Air fraction per zone for reporting
+  REAL(r64)  :: TestDelta      =  0.0d0      ! Used to compare secondary loop rated capacity to calculated capacity, fraction
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: Numbers                ! Numeric items for object
   REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: DayValues            ! Array of schedule values
 
@@ -1852,7 +1852,7 @@ SUBROUTINE GetRefrigerationInput
   ALLOCATE(Alphas(MaxNumAlphasAll))
   Alphas=' '
   ALLOCATE(Numbers(MaxNumNumbersAll))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFieldNames(MaxNumAlphasAll))
   cAlphaFieldNames=' '
   ALLOCATE(cNumericFieldNames(MaxNumNumbersAll))
@@ -1896,7 +1896,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check availability schedule for values between 0 and 1
     IF (RefrigCase(CaseNum)%SchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%SchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%SchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -1930,46 +1930,46 @@ SUBROUTINE GetRefrigerationInput
     ENDIF
 
     RefrigCase(CaseNum)%RatedAmbientTemp = Numbers(1)
-    IF(Numbers(1) <= 0.0) THEN
+    IF(Numbers(1) <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(1))//' must be greater than 0 C')
       ErrorsFound = .TRUE.
     END IF
 
     RefrigCase(CaseNum)%RatedAmbientRH   = Numbers(2)
-    IF(Numbers(2) <= 0.0 .OR. Numbers(2) >= 100.0d0) THEN
+    IF(Numbers(2) <= 0.0d0 .OR. Numbers(2) >= 100.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(2))//' must be greater than 0% and less than 100%')
       ErrorsFound = .TRUE.
     END IF
     RefrigCase(CaseNum)%RatedAmbientDewPoint = &
            PsyTdpFnWPb(PsyWFnTdbRhPb(RefrigCase(CaseNum)%RatedAmbientTemp, &
-                                     (RefrigCase(CaseNum)%RatedAmbientRH / 100.0), &
+                                     (RefrigCase(CaseNum)%RatedAmbientRH / 100.0d0), &
                                       StdBaroPress),StdBaroPress)
 
     RefrigCase(CaseNum)%RateTotCapPerLength      = Numbers(3)
-    IF(Numbers(3) <= 0.0) THEN
+    IF(Numbers(3) <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(3))//' must be greater than 0 W/m')
       ErrorsFound = .TRUE.
     END IF
 
     RefrigCase(CaseNum)%RatedLHR         = Numbers(4)
-    IF(Numbers(4) < 0.0 .OR. Numbers(4) > 1.0d0) THEN
+    IF(Numbers(4) < 0.0d0 .OR. Numbers(4) > 1.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(4))//' must be >= 0 and <= 1')
       ErrorsFound = .TRUE.
     END IF
 
     RefrigCase(CaseNum)%RatedRTF         = Numbers(5)
-    IF(Numbers(5) <= 0.0 .OR. Numbers(5) > 1.0d0) THEN
+    IF(Numbers(5) <= 0.0d0 .OR. Numbers(5) > 1.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(5))//' must be > 0 and <= to 1')
       ErrorsFound = .TRUE.
     END IF
 
     RefrigCase(CaseNum)%Length           = Numbers(6)
-    IF(Numbers(6) <= 0.0) THEN
+    IF(Numbers(6) <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(6))//' must be greater than 0 m')
       ErrorsFound = .TRUE.
@@ -2010,7 +2010,7 @@ SUBROUTINE GetRefrigerationInput
     NumNum = 8
     IF (.NOT. lNumericBlanks(NumNum)) THEN
       RefrigCase(CaseNum)%STDFanPower        = Numbers(NumNum)
-      IF(Numbers(NumNum) < 0.0) THEN
+      IF(Numbers(NumNum) < 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
         ErrorsFound = .TRUE.
@@ -2022,7 +2022,7 @@ SUBROUTINE GetRefrigerationInput
     NumNum = 9
     IF (.NOT. lNumericBlanks(NumNum)) THEN
       RefrigCase(CaseNum)%OperatingFanPower  = Numbers(NumNum)
-      IF(Numbers(NumNum) < 0.0) THEN
+      IF(Numbers(NumNum) < 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
         ErrorsFound = .TRUE.
@@ -2034,7 +2034,7 @@ SUBROUTINE GetRefrigerationInput
     NumNum = 10
     IF (.NOT. lNumericBlanks(NumNum)) THEN
       RefrigCase(CaseNum)%RatedLightingPower       = Numbers(NumNum)
-      IF(Numbers(NumNum) < 0.0) THEN
+      IF(Numbers(NumNum) < 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
         ErrorsFound = .TRUE.
@@ -2046,7 +2046,7 @@ SUBROUTINE GetRefrigerationInput
     NumNum = 11
     IF (.NOT. lNumericBlanks(NumNum)) THEN
       RefrigCase(CaseNum)%LightingPower      = Numbers(NumNum)
-      IF(Numbers(NumNum) < 0.0) THEN
+      IF(Numbers(NumNum) < 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
         ErrorsFound = .TRUE.
@@ -2068,7 +2068,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check lighting schedule for values between 0 and 1
     IF (RefrigCase(CaseNum)%LightingSchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%LightingSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%LightingSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(Alphas(6)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2092,7 +2092,7 @@ SUBROUTINE GetRefrigerationInput
 
     NumNum = 13
     RefrigCase(CaseNum)%AntiSweatPower  = Numbers(NumNum)
-    IF(Numbers(NumNum) < 0.0) THEN
+    IF(Numbers(NumNum) < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
       ErrorsFound = .TRUE.
@@ -2100,7 +2100,7 @@ SUBROUTINE GetRefrigerationInput
 
     NumNum = 14
     RefrigCase(CaseNum)%MinimumASPower  = Numbers(NumNum)
-    IF(Numbers(NumNum) < 0.0) THEN
+    IF(Numbers(NumNum) < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 W/m')
       ErrorsFound = .TRUE.
@@ -2108,7 +2108,7 @@ SUBROUTINE GetRefrigerationInput
 
     IF (SameString(Alphas(7),'None')) THEN
       RefrigCase(CaseNum)%AntiSweatControlType = ASNone
-      RefrigCase(CaseNum)%AntiSweatPower = 0.0
+      RefrigCase(CaseNum)%AntiSweatPower = 0.0d0
     ELSEIF (SameString(Alphas(7),'Constant')) THEN
       RefrigCase(CaseNum)%AntiSweatControlType = ASConstant
     ELSEIF (SameString(Alphas(7),'Linear')) THEN
@@ -2148,7 +2148,7 @@ SUBROUTINE GetRefrigerationInput
 
     NumNum = 16
     RefrigCase(CaseNum)%Height        = Numbers(NumNum)
-    IF(Numbers(NumNum) < 0.0) THEN
+    IF(Numbers(NumNum) < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than or equal to 0 m')
       ErrorsFound = .TRUE.
@@ -2166,8 +2166,8 @@ SUBROUTINE GetRefrigerationInput
 
 !   initialize case resistance for anti-sweat heater control type = Heat Balance Method
     IF(RefrigCase(CaseNum)%AntiSweatControlType == ASHeatBalance) THEN
-       IF(RefrigCase(CaseNum)%Height == 0.0) THEN
-         Rcase = 0.0
+       IF(RefrigCase(CaseNum)%Height == 0.0d0) THEN
+         Rcase = 0.0d0
        ELSE
          RcaseDenom = ((RefrigCase(CaseNum)%AntiSweatPower / &
                         RefrigCase(CaseNum)%Height) - &
@@ -2177,7 +2177,7 @@ SUBROUTINE GetRefrigerationInput
                   RefrigCase(CaseNum)%Temperature) / RcaseDenom
        END IF
        RefrigCase(CaseNum)%Rcase = MAX(0.0d0,Rcase)
-       IF(RefrigCase(CaseNum)%Rcase == 0.0) THEN
+       IF(RefrigCase(CaseNum)%Rcase == 0.0d0) THEN
          CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                                  '" A case thermal resistance of 0 was calculated for anti-sweat heater performance using the')
          CALL ShowContinueError(' Heat Balance Method control type. Anti-sweat heater performance cannot be calculated '// &
@@ -2229,8 +2229,8 @@ SUBROUTINE GetRefrigerationInput
         ErrorsFound = .TRUE.
       END IF
       !   disregard defrost power for Off-Cycle or None defrost types
-      IF((DefType==DefOffCycle .OR. DefType==DefOffCycle) .AND.(RefrigCase(CaseNum)%DefrostPower > 0.0)) THEN
-        RefrigCase(CaseNum)%DefrostPower=0.0
+      IF((DefType==DefOffCycle .OR. DefType==DefOffCycle) .AND.(RefrigCase(CaseNum)%DefrostPower > 0.0d0)) THEN
+        RefrigCase(CaseNum)%DefrostPower=0.0d0
         CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' for '//TRIM(cAlphaFieldNames(8))// &
                            ' None or Off-Cycle will be set to 0 and simulation continues.')
@@ -2242,7 +2242,7 @@ SUBROUTINE GetRefrigerationInput
     !defrost power needed to calculate heat gain to case even if not needed for electric consumption
     IF((DefType==DefHotFluid   .OR. DefType==DefHotFluidTerm   .OR. &
         DefType==DefElectric .OR. DefType==DefElectricTerm ) .AND. &
-        RefrigCase(CaseNum)%DefrostPower <= 0.0) THEN
+        RefrigCase(CaseNum)%DefrostPower <= 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than 0 W/m'//' for '//&
                            TRIM(cAlphaFieldNames(8))//' '//TRIM(Alphas(8)))
@@ -2260,7 +2260,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check defrost schedule for values between 0 and 1
     IF (RefrigCase(CaseNum)%DefrostSchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%DefrostSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%DefrostSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//'".')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(Alphas(9)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2271,11 +2271,11 @@ SUBROUTINE GetRefrigerationInput
 !   count the number of defrost cycles
     StartCycle = .FALSE.
     NumDefCycles = 0
-    DayValues = 0
+    DayValues = 0.0d0
     CALL GetScheduleValuesForDay(RefrigCase(CaseNum)%DefrostSchedPtr,DayValues,1)
     DO HRNum = 1,24
       DO TSNum = 1,NumOfTimeStepInHour
-        IF(DayValues(HRNum,TSNum) > 0.0) THEN
+        IF(DayValues(HRNum,TSNum) > 0.0d0) THEN
           IF(.NOT. StartCycle) THEN
             NumDefCycles = NumDefCycles + 1
             StartCycle = .TRUE.
@@ -2309,7 +2309,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check defrost drip-down schedule for values between 0 and 1
     IF (RefrigCase(CaseNum)%DefrostDripDownSchedPtr > 0 .AND. (.NOT. lAlphaBlanks(10)))THEN
-      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%DefrostDripDownSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%DefrostDripDownSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//'".')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(10))//' = '//TRIM(Alphas(10)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2437,7 +2437,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check case credit fraction schedule for values between 0 and 1
     IF (RefrigCase(CaseNum)%CaseCreditFracSchedPtr > 0) THEN
-      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%CaseCreditFracSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax(RefrigCase(CaseNum)%CaseCreditFracSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//'".')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(14))//' = '//TRIM(Alphas(14)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2517,7 +2517,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check availability schedule for values between 0 and 1
     IF ( WalkIn( WalkInID)%SchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%SchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%SchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(Alphas(2)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2526,7 +2526,7 @@ SUBROUTINE GetRefrigerationInput
     END IF
 
     WalkIn(WalkInID)%DesignRatedCap      = Numbers(1)
-    IF(Numbers(1) <= 0.0) THEN
+    IF(Numbers(1) <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//&
                            '", '//TRIM(cNumericFieldNames(1))//' must be greater than 0 W')
       ErrorsFound = .TRUE.
@@ -2570,7 +2570,7 @@ SUBROUTINE GetRefrigerationInput
 
 !   check heater schedule for values between 0 and 1
     IF ( WalkIn( WalkInID)%HeaterSchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%HeaterSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%HeaterSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2590,7 +2590,7 @@ SUBROUTINE GetRefrigerationInput
       WalkIn( WalkInID)%CircFanPower  = 0.0d0
     ELSE
       WalkIn( WalkInID)%CircFanPower  = Numbers(6)
-      IF(Numbers(7) < 0.0) THEN
+      IF(Numbers(7) < 0.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//&
                            '", '//TRIM(cNumericFieldNames(6))//' must be greater than >= 0 W')
         ErrorsFound = .TRUE.
@@ -2618,7 +2618,7 @@ SUBROUTINE GetRefrigerationInput
     END IF ! schedule name not blank
 !   check Lighting schedule for values between 0 and 1
     IF ( WalkIn( WalkInID)%LightingSchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%LightingSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%LightingSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2667,7 +2667,7 @@ SUBROUTINE GetRefrigerationInput
     END IF
 !   check defrost schedule for values between 0 and 1
     IF ( WalkIn( WalkInID)%DefrostSchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%DefrostSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%DefrostSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = "'//TRIM( WalkIn( WalkInID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//'='//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2687,7 +2687,7 @@ SUBROUTINE GetRefrigerationInput
       END IF
       ! check schedule for values between 0 and 1
       IF ( WalkIn( WalkInID)%DefrostDripDownSchedPtr > 0)THEN
-        IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%DefrostDripDownSchedPtr,'>=',0.,'<=',1.)) THEN
+        IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%DefrostDripDownSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//'"')
           CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
           CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -2871,7 +2871,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
           ErrorsFound=.TRUE.
         ELSE
 !       check schedule for values between 0 and 1
-          IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%GlassDoorOpenSchedPtr(ZoneID),'>=',0.,'<=',1.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%GlassDoorOpenSchedPtr(ZoneID),'>=',0.0d0,'<=',1.0d0)) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WalkIn( WalkInID)%Name)//&
                         '", Zone="'//TRIM( WalkIn( WalkInID)%ZoneName(ZoneID))//'"')
             CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AStart + 1))// &
@@ -2908,7 +2908,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
           ErrorsFound=.TRUE.
         ELSE
 !       check schedule for values between 0 and 1
-          IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%StockDoorOpenSchedPtr(ZoneID),'>=',0.,'<=',1.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax( WalkIn( WalkInID)%StockDoorOpenSchedPtr(ZoneID),'>=',0.0d0,'<=',1.0d0)) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WalkIn( WalkInID)%Name)//&
                         '", Zone="'//TRIM( WalkIn( WalkInID)%ZoneName(ZoneID))//'"')
             CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AStart + 2))// &
@@ -2979,7 +2979,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
 
 !   check availability schedule for values between 0 and 1
     IF ( WarehouseCoil(CoilID)%SchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%SchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%SchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WarehouseCoil(CoilID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -3037,7 +3037,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (UnitLoadFactorSens)
 !N1
        NumNum = 1
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%UnitLoadFactorSens = Numbers(NumNum)
        ELSE
          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WarehouseCoil(CoilID)%Name)//&
@@ -3047,14 +3047,14 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (RatedCapacityTotal)
 !N2
        NumNum = 2 !advance past rating in W/C to N2 with rating in W
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
 !N3
          NumNum = 3 !read rated RH only for this type of rating at N3
          IF(lNumericBlanks(NumNum)) THEN
-          WarehouseCoil(CoilID)%RatedRH = 0.85
+          WarehouseCoil(CoilID)%RatedRH = 0.85d0
          ELSE
-           IF(Numbers(NumNum) <= 0.0 .OR. Numbers(NumNum) >= 100.0d0) THEN
+           IF(Numbers(NumNum) <= 0.0d0 .OR. Numbers(NumNum) >= 100.0d0) THEN
              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
                            '", '//TRIM(cNumericFieldNames(NumNum))//' must be greater than 0% and less than 100%')
              ErrorsFound = .TRUE.
@@ -3069,7 +3069,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC1Std)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)
          WarehouseCoil(CoilID)%SCIndex = 1
        ELSE
@@ -3080,7 +3080,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC1Nom)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)/EuropeanWetCoilFactor(1)
          WarehouseCoil(CoilID)%SCIndex = 1
@@ -3092,7 +3092,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC2Std)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)
          WarehouseCoil(CoilID)%SCIndex = 2
        ELSE
@@ -3103,7 +3103,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC2Nom)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)/EuropeanWetCoilFactor(2)
          WarehouseCoil(CoilID)%SCIndex = 2
@@ -3115,7 +3115,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC3Std)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)
          WarehouseCoil(CoilID)%SCIndex = 3
        ELSE
@@ -3126,7 +3126,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC3Nom)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)/EuropeanWetCoilFactor(3)
          WarehouseCoil(CoilID)%SCIndex = 3
@@ -3138,7 +3138,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC4Std)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)
          WarehouseCoil(CoilID)%SCIndex = 4
        ELSE
@@ -3149,7 +3149,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC4Nom)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)/EuropeanWetCoilFactor(4)
          WarehouseCoil(CoilID)%SCIndex = 4
@@ -3161,7 +3161,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC5Std)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)
          WarehouseCoil(CoilID)%SCIndex = 5
        ELSE
@@ -3172,7 +3172,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
      CASE (EuropeanSC5Nom)
 !N2
        NumNum = 2 !advance past rating in W/C to rating in W at N2
-       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0) THEN
+       IF(.NOT. lNumericBlanks(NumNum) .AND. Numbers(NumNum) > 0.0d0) THEN
          WarehouseCoil(CoilID)%RatedCapTotal = Numbers(NumNum)
          WarehouseCoil(CoilID)%RatedSensibleCap = Numbers(NumNum)/EuropeanWetCoilFactor(5)
          WarehouseCoil(CoilID)%SCIndex = 5
@@ -3245,13 +3245,25 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
     IF((lAlphaBlanks(AlphaNum)) .AND. (WarehouseCoil(CoilID)%RatingType /= RatedCapacityTotal)) THEN
       ! For all except RatedCapacityTotal - default to linear capacity factor approximating Nelson August 2010 ASHRAE journal
       WarehouseCoil(CoilID)%SHRCorrectionType = SHR60
+    ELSEIF (WarehouseCoil(CoilID)%RatingType == RatedCapacityTotal) THEN
+      ! For RatedCapacityTotal, the manufacturer's coil performance map is required
+      ! Specify the performance map with TabularRHxDT1xTRoom
+      WarehouseCoil(CoilID)%SHRCorrectionType = TabularRH_DT1_TRoom
+      IF (.NOT.(SameString(Alphas(AlphaNum),'TabularRHxDT1xTRoom'))) THEN
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
+              '", invalid '//TRIM(cAlphaFieldNames(AlphaNum))//'="'//TRIM(Alphas(AlphaNum))//'".')
+        CALL ShowContinueError('The "CapacityTotalSpecificConditions" Capacity Rating Type has been specified '//&
+              'for this air chiller.  This rating type requires ')
+        CALL ShowContinueError('the "TabularRHxDT1xTRoom" correction curve.  Verify that a valid '//&
+              '"TabularRHxDT1xTRoom" curve is specified in "'//TRIM(cAlphaFieldNames(AlphaNum+1))//'".')
+      ENDIF
     ELSEIF (SameString(Alphas(AlphaNum),'LinearSHR60')) THEN
        WarehouseCoil(CoilID)%SHRCorrectionType = SHR60
     ELSEIF (SameString(Alphas(AlphaNum),'QuadraticSHR')) THEN
        WarehouseCoil(CoilID)%SHRCorrectionType = QuadraticSHR
     ELSEIF (SameString(Alphas(AlphaNum),'European')) THEN
        WarehouseCoil(CoilID)%SHRCorrectionType = European
-    ELSEIF (SameString(Alphas(AlphaNum),'TabularRH_DT1_TRoom')) THEN
+    ELSEIF (SameString(Alphas(AlphaNum),'TabularRHxDT1xTRoom')) THEN
        WarehouseCoil(CoilID)%SHRCorrectionType = TabularRH_DT1_TRoom
     ELSE
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WarehouseCoil(CoilID)%Name)//&
@@ -3281,6 +3293,16 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
         ! This is a place holder, currently use embedded constants for European ratings, future may want a curve
       CASE (QuadraticSHR)
         WarehouseCoil(CoilID)%SHRCorrectionCurvePtr = GetCurveIndex(Alphas(AlphaNum)) ! convert curve name to number
+        IF (lAlphaBlanks(AlphaNum)) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
+                           '", invalid  '//TRIM(cAlphaFieldNames(AlphaNum))//' is blank, required.')
+          ErrorsFound=.true.
+        ELSEIF (WarehouseCoil(CoilID)%SHRCorrectionCurvePtr == 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
+                           '", invalid  ')
+          CALL ShowContinueError('...invalid curve '//TRIM(cAlphaFieldNames(AlphaNum))//'="'//trim(Alphas(AlphaNum))//'".')
+          ErrorsFound=.true.
+        ENDIF
         !error checks for curve type entered and curve name
         IF(.NOT. SameString(GetCurveType(WarehouseCoil(CoilID)%SHRCorrectionCurvePtr),'QUADRATIC')) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
@@ -3289,11 +3311,21 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
         END IF
       CASE (TabularRH_DT1_TRoom)
         WarehouseCoil(CoilID)%SHRCorrectionCurvePtr = GetCurveIndex(Alphas(AlphaNum)) ! convert curve name to number
-        IF(WarehouseCoil(CoilID)%SHRCorrectionCurvePtr == 0) THEN
+        IF (lAlphaBlanks(AlphaNum)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
-                           '", not found  '//TRIM(cAlphaFieldNames(AlphaNum)))
-          ErrorsFound = .TRUE.
-        END IF !valid table name
+                           '", invalid  '//TRIM(cAlphaFieldNames(AlphaNum))//' is blank, required.')
+          ErrorsFound=.true.
+        ELSEIF (WarehouseCoil(CoilID)%SHRCorrectionCurvePtr == 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
+                           '", invalid  ')
+          CALL ShowContinueError('...invalid curve '//TRIM(cAlphaFieldNames(AlphaNum))//'="'//trim(Alphas(AlphaNum))//'".')
+          ErrorsFound=.true.
+        ENDIF
+!        IF(WarehouseCoil(CoilID)%SHRCorrectionCurvePtr == 0) THEN
+!          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(WarehouseCoil(CoilID)%Name)//&
+!                           '", not found  '//TRIM(cAlphaFieldNames(AlphaNum)))
+!          ErrorsFound = .TRUE.
+!        END IF !valid table name
     END SELECT  !SHRCorrectionType
 
     NumNum = NumNum + 1 !N10
@@ -3313,7 +3345,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
                              '", invalid  '//TRIM(cAlphaFieldNames(AlphaNum))//' not found: '//TRIM(Alphas(AlphaNum)))
         ErrorsFound=.TRUE.
       ELSE !   check heater schedule for values between 0 and 1
-        IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%HeaterSchedPtr,'>=',0.,'<=',1.)) THEN
+        IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%HeaterSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WarehouseCoil(CoilID)%Name)//'"')
           CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
           CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -3402,7 +3434,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
                            '", invalid  '//TRIM(cAlphaFieldNames(AlphaNum))//' not found: '//TRIM(Alphas(AlphaNum)))
       ErrorsFound=.TRUE.
     ELSE !   check defrost schedule for values between 0 and 1
-      IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%DefrostSchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%DefrostSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = "'//TRIM( WarehouseCoil(CoilID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//'='//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -3420,7 +3452,7 @@ NStart = NumWINumberFieldsBeforeZoneInput +1
                            '", invalid  '//TRIM(cAlphaFieldNames(AlphaNum))//' not found: '//TRIM(Alphas(AlphaNum)))
         ErrorsFound=.TRUE.
       ELSE   ! check schedule for values between 0 and 1
-        IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%DefrostDripDownSchedPtr,'>=',0.,'<=',1.)) THEN
+        IF (.NOT. CheckScheduleValueMinMax( WarehouseCoil(CoilID)%DefrostDripDownSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( WarehouseCoil(CoilID)%Name)//'"')
           CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
           CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -3526,7 +3558,7 @@ END IF !NumRefrigerationAirChillers > 0
 
 !   check availability schedule for values between 0 and 1
     IF ( AirChillerSet(SetID)%SchedPtr > 0)THEN
-      IF (.NOT. CheckScheduleValueMinMax( AirChillerSet(SetID)%SchedPtr,'>=',0.,'<=',1.)) THEN
+      IF (.NOT. CheckScheduleValueMinMax( AirChillerSet(SetID)%SchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM( AirChillerSet(SetID)%Name)//'"')
         CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(AlphaNum))//' = '//TRIM(Alphas(AlphaNum)))
         CALL ShowContinueError('schedule values must be (>=0., <=1.)')
@@ -3723,7 +3755,7 @@ IF(NumRefrigeratedRacks > 0) THEN
 
     RefrigRack(RackNum)%RatedCOP                   = Numbers(1)
 
-    IF(RefrigRack(RackNum)%RatedCOP <= 0.0) THEN
+    IF(RefrigRack(RackNum)%RatedCOP <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
                            '" '//TRIM(cNumericFieldNames(1))//' must be greater than 0.0')
       ErrorsFound = .TRUE.
@@ -3745,7 +3777,7 @@ IF(NumRefrigeratedRacks > 0) THEN
     END IF
 
     RefrigRack(RackNum)%CondenserFanPower = Numbers(2)
-    IF(Numbers(2) < 0.0) THEN
+    IF(Numbers(2) < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
                            '" '//TRIM(cNumericFieldNames(2))//' must be greater than or equal to 0 Watts.')
       ErrorsFound = .TRUE.
@@ -3852,7 +3884,7 @@ IF(NumRefrigeratedRacks > 0) THEN
        RefrigRack(RackNum)%EvapSchedPtr = GetScheduleIndex(Alphas(10))  ! convert schedule name to pointer
        !   check availability schedule for values >= 0
        IF (RefrigRack(RackNum)%EvapSchedPtr > 0)THEN
-         IF (.NOT. CheckScheduleValueMinMax(RefrigRack(RackNum)%EvapSchedPtr,'>=',0.)) THEN
+         IF (.NOT. CheckScheduleValueMinMax(RefrigRack(RackNum)%EvapSchedPtr,'>=',0.0d0)) THEN
            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//'" .')
            CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(10))//' = '//TRIM(Alphas(10)))
            CALL ShowContinueError('schedule values must be (>=0.).')
@@ -3896,7 +3928,7 @@ IF(NumRefrigeratedRacks > 0) THEN
     END IF
 
     RefrigRack(RackNum)%EvapPumpPower = Numbers(11)
-    IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%EvapPumpPower < 0.0 &
+    IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%EvapPumpPower < 0.0d0 &
        .AND. RefrigRack(RackNum)%EvapPumpPower /= AutoCalculate) THEN
        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
             '", '//TRIM(cNumericFieldNames(11))//' cannot be less than zero.')
@@ -4034,6 +4066,7 @@ IF(NumRefrigeratedRacks > 0) THEN
     END IF  ! numcases > 0
 
     IF (NumCoils > 0) THEN
+      RefrigRack(RackNum)%CoilFlag = .TRUE.
       DO CoilIndex = 1, NumCoils
          CoilNum=RefrigRack(RackNum)%CoilNum(CoilIndex)
          !mark all Coils on rack as used by this system (checking for unused or non-unique Coils)
@@ -4153,7 +4186,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     endif
     !elevation capacity correction on air-cooled condensers, Carrier correlation more conservative than Trane
     Condenser(CondNum)%RatedCapacity = Condenser(CondNum)%RatedCapacity*(1.d0 - 7.17D-5*Elevation)
-    IF(Condenser(CondNum)%RatedCapacity > 0.) THEN
+    IF(Condenser(CondNum)%RatedCapacity > 0.d0) THEN
       CALL GetCurveMinMaxValues(Condenser(CondNum)%CapCurvePtr,DelTempMin,DelTempMax)
       Capmin=CurveValue(Condenser(CondNum)%CapCurvePtr,DelTempMin)*(1.d0 - 7.17D-5*Elevation)!Mar 2011 bug fix
       Capmax=CurveValue(Condenser(CondNum)%CapCurvePtr,DelTempMax)*(1.d0 - 7.17D-5*Elevation)!Mar 2011 bug
@@ -4183,7 +4216,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     END IF   !Set fan control type
 
     IF(.NOT. lNumericBlanks(2)) Condenser(CondNum)%RatedFanPower = Numbers(2)
-    IF((lNumericBlanks(2)) .OR. (Numbers(2) < 0.0)) THEN
+    IF((lNumericBlanks(2)) .OR. (Numbers(2) < 0.0d0)) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Condenser(CondNum)%Name)//&
                            '" '//TRIM(cNumericFieldNames(2))//' must be input greater than or equal to 0 Watts.')
       ErrorsFound = .TRUE.
@@ -4425,7 +4458,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
        Condenser(CondNum)%EvapSchedPtr = GetScheduleIndex(Alphas(5))  ! convert schedule name to pointer
        !   check availability schedule for values >= 0
        IF (Condenser(CondNum)%EvapSchedPtr > 0)THEN
-         IF (.NOT. CheckScheduleValueMinMax(Condenser(CondNum)%EvapSchedPtr,'>=',0.)) THEN
+         IF (.NOT. CheckScheduleValueMinMax(Condenser(CondNum)%EvapSchedPtr,'>=',0.0d0)) THEN
              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Condenser(CondNum)%Name)//&
                    '" .')
              CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(Alphas(5)))
@@ -4736,7 +4769,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
       endif
       ! elevation capacity correction on air-cooled condensers, Carrier correlation more conservative than Trane
       GasCooler(GCNum)%RatedCapacity = GasCooler(GCNum)%RatedCapacity*(1.d0 - 7.17D-5*Elevation)
-      IF(GasCooler(GCNum)%RatedCapacity > 0.) THEN
+      IF(GasCooler(GCNum)%RatedCapacity > 0.0d0) THEN
         CALL GetCurveMinMaxValues(GasCooler(GCNum)%CapCurvePtr,DelTempMin,DelTempMax)
         Capmin=CurveValue(GasCooler(GCNum)%CapCurvePtr,DelTempMin)*(1.d0 - 7.17D-5*Elevation)
         Capmax=CurveValue(GasCooler(GCNum)%CapCurvePtr,DelTempMax)*(1.d0 - 7.17D-5*Elevation)
@@ -4763,9 +4796,9 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     END IF   !Set fan control type
 
     ! Gas cooler fan power
-    GasCooler(GCNum)%RatedFanPower = 5000.0  ! default value
+    GasCooler(GCNum)%RatedFanPower = 5000.0d0  ! default value
     IF(.NOT. lNumericBlanks(1)) GasCooler(GCNum)%RatedFanPower = Numbers(1)
-    IF(Numbers(1) < 0.0) THEN
+    IF(Numbers(1) < 0.0d0) THEN
       CALL ShowSevereError(TRIM(RoutineName)//TRIM(CurrentModuleObject)//'="'//TRIM(GasCooler(GCNum)%Name)//&
                            '" '//TRIM(cNumericFieldNames(1))//' must be input greater than or equal to 0 Watts.')
       ErrorsFound = .TRUE.
@@ -4789,7 +4822,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
                             '" '//TRIM(cNumericFieldNames(3))//' is low (less than 25C).  Consider raising the '//&
                             'transition temperature to operate for longer periods of time in the subcritical region.')
     END IF
-    IF(GasCooler(GCNum)%TransitionTemperature > 30.978) THEN
+    IF(GasCooler(GCNum)%TransitionTemperature > 30.978d0) THEN
       CALL ShowWarningError(TRIM(RoutineName)//TRIM(CurrentModuleObject)//'="'//TRIM(GasCooler(GCNum)%Name)//&
                             '" '//TRIM(cNumericFieldNames(3))//' is greater than the critical temperature of carbon '//&
                             'dioxide.  The default value (27C) will be used.')
@@ -4817,7 +4850,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     ! Gas cooler minimum condensing temperature for subcritical operation
     GasCooler(GCNum)%MinCondTemp = 1.0d1    ! default value
     IF(.NOT. lNumericBlanks(6)) GasCooler(GCNum)%MinCondTemp = Numbers(6)
-    IF(GasCooler(GCNum)%MinCondTemp > 30.9) THEN
+    IF(GasCooler(GCNum)%MinCondTemp > 30.9d0) THEN
       CALL ShowSevereError(TRIM(RoutineName)//TRIM(CurrentModuleObject)//'="'//TRIM(GasCooler(GCNum)%Name)//&
                             '" '//TRIM(cNumericFieldNames(6))//' must be less than the critical temperature of carbon '//&
                             'dioxide (31C).')
@@ -5183,7 +5216,7 @@ ELSE !FluidType = FluidTypePhaseChange     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     CalcCircRate = DensityPhaseChange * DeltaHPhaseChange * PumpTotRatedFlowVol / &
                    Secondary(SecondaryNum)%CoolingLoadRated
     DiffCircRates = (CalcCircRate - Secondary(SecondaryNum)%CircRate)/Secondary(SecondaryNum)%CircRate
-    IF(ABS(DiffCircRates) > .3)THEN
+    IF(ABS(DiffCircRates) > .3d0)THEN
       CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
              ' '//TRIM(cNumericFieldNames(7))//' Produces a circulating rate of '//&
              TRIM(RoundSigDigits(CalcCircRate,2))//' ; '//' A circulating rate of '//&
@@ -5376,7 +5409,7 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 NumNum = 14
 Secondary(SecondaryNum)%ChillerRefInventory = 0.d0
 IF (.NOT. lNumericBlanks(NumNum))Secondary(SecondaryNum)%ChillerRefInventory = Numbers(NumNum)
-IF (Secondary(SecondaryNum)%ChillerRefInventory < 0.0) THEN
+IF (Secondary(SecondaryNum)%ChillerRefInventory < 0.0d0) THEN
     Secondary(SecondaryNum)%ChillerRefInventory = 0.d0
     CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
                '", The value specified for '//TRIM(cNumericFieldNames(NumNum))//' is less than zero. The default'//&
@@ -6128,7 +6161,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
       IF(Condenser(CondNum)%RatedAirFlowRate==AutoCalculate)    THEN
         Condenser(CondNum)%RatedAirFlowRate = AirVolRateEvapCond * Condenser(CondNum)%RatedCapacity
       END IF
-      IF (Condenser(CondNum)%RatedAirFlowRate <= 0.0 ) THEN
+      IF (Condenser(CondNum)%RatedAirFlowRate <= 0.0d0 ) THEN
          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Condenser(CondNum)%Name)//&
             '", Evaporative Condenser Air Volume Flow Rate cannot be less than or equal to zero.')
          ErrorsFound = .TRUE.
@@ -6136,7 +6169,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
       IF(Condenser(CondNum)%EvapPumpPower==AutoCalculate) THEN
         Condenser(CondNum)%EvapPumpPower = CondPumpRatePower * Condenser(CondNum)%RatedCapacity
       END IF
-      IF(Condenser(CondNum)%EvapPumpPower < 0.0 ) THEN
+      IF(Condenser(CondNum)%EvapPumpPower < 0.0d0 ) THEN
          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Condenser(CondNum)%Name)//&
             '", Design Evaporative Condenser Water Pump Power cannot be less than zero.')
          ErrorsFound = .TRUE.
@@ -6153,8 +6186,16 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
                             'must be input.')
         ErrorsFound = .TRUE.
     ELSE  !     Entry for Alphas(AlphaNum) can be either a compressor name or a compressorlist name
-       ListNum=FindItemInList(Alphas(AlphaNum),CompressorLists%Name,NumCompressorLists)
-       CompNum=FindItemInList(Alphas(AlphaNum),Compressor%Name,NumSimulationCompressors)
+       IF (NumCompressorLists > 0 ) THEN
+         ListNum=FindItemInList(Alphas(AlphaNum),CompressorLists%Name,NumCompressorLists)
+       ELSE
+         ListNum=0
+       ENDIF
+       IF (NumSimulationCompressors > 0) THEN
+         CompNum=FindItemInList(Alphas(AlphaNum),Compressor%Name,NumSimulationCompressors)
+       ELSE
+         CompNum=0
+       ENDIF
        IF((ListNum == 0) .AND. (CompNum == 0)) THEN  ! name doesn't match either a compressor or a compressor list
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' '//&
                              TRIM(cAlphaFieldNames(AlphaNum))//', has an invalid '//&
@@ -6350,7 +6391,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
   ! Shell-and-coil intercooler effectiveness
   IF(.NOT. lNumericBlanks(4)) THEN
     System(RefrigSysNum)%IntercoolerEffectiveness = Numbers(4)
-    IF(System(RefrigSysNum)%IntercoolerEffectiveness<0.0 .OR. System(RefrigSysNum)%IntercoolerEffectiveness>1.0) THEN
+    IF(System(RefrigSysNum)%IntercoolerEffectiveness<0.0d0 .OR. System(RefrigSysNum)%IntercoolerEffectiveness>1.0d0) THEN
        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(System(RefrigSysNum)%Name)//&
                '", The specified value for the')
        CALL ShowContinueError(TRIM(cNumericFieldNames(4))//' = '//&
@@ -7047,7 +7088,7 @@ IF (NumTransRefrigSystems >0) THEN
       TransSystem(TransRefrigSysNum)%PReceiver = 4.0d6
   END IF
 
-  ! Check receiver temperature against minimum condensing temeprature (from gas cooler input) and design evaporator temperatures
+  ! Check receiver temperature against minimum condensing temperature (from gas cooler input) and design evaporator temperatures
   TransSystem(TransRefrigSysNum)%TReceiver = GetSatTemperatureRefrig(TransSystem(TransRefrigSysNum)%RefrigerantName, &
                                              TransSystem(TransRefrigSysNum)%PReceiver,RefrigIndex,'GetRefrigerationInput')
   IF (TransSystem(TransRefrigSysNum)%TReceiver >   &
@@ -7091,7 +7132,7 @@ IF (NumTransRefrigSystems >0) THEN
   IF (.NOT. lNumericBlanks(2)) THEN
       TransSystem(TransRefrigSysNum)%SCEffectiveness = Numbers(2)
   ELSE  ! Default value effectiveness = 0.4
-      TransSystem(TransRefrigSysNum)%PReceiver = 0.4
+      TransSystem(TransRefrigSysNum)%PReceiver = 0.4d0
   END IF
   ! Check subcooler effectiveness value, must be value between 0 and 1
   IF ((TransSystem(TransRefrigSysNum)%SCEffectiveness < 0).OR. &
@@ -8959,10 +9000,10 @@ SUBROUTINE InitRefrigeration
   INTEGER       :: IRack            =  0
   INTEGER       :: SecondID         =  0
   !Used to adjust accumulative variables when time step is repeated
-  REAL(r64)         :: MyCurrentTime         =  0.0    ! Used to determine whether the zone time step is a repetition
-  REAL(r64),SAVE    :: MyCurrentTimeSaved    =  0.0    ! Used to determine whether the zone time step is a repetition
-  REAL(r64),SAVE    :: MyStepStartTime       =  0.0    ! Used to determine whether the system time step is a repetition
-  REAL(r64),SAVE    :: MyStepStartTimeSaved  =  0.0    ! Used to determine whether the system time step is a repetition
+  REAL(r64)         :: MyCurrentTime         =  0.0d0    ! Used to determine whether the zone time step is a repetition
+  REAL(r64),SAVE    :: MyCurrentTimeSaved    =  0.0d0    ! Used to determine whether the zone time step is a repetition
+  REAL(r64),SAVE    :: MyStepStartTime       =  0.0d0    ! Used to determine whether the system time step is a repetition
+  REAL(r64),SAVE    :: MyStepStartTimeSaved  =  0.0d0    ! Used to determine whether the system time step is a repetition
   REAL(r64)         :: TimeStepFraction      = 0.0d0   ! Used to calculate my current time
 
 ! Zero display case, air-coil, and walk-in cooler credits (summed by zone)
@@ -8972,120 +9013,120 @@ SUBROUTINE InitRefrigeration
 ! suction piping, and receiver shells to zone
   IF (NumOfZones > 0 ) THEN
     IF(UseSysTimeStep) THEN
-      CoilSysCredit%SenCreditToZoneRate   = 0.0
-      CoilSysCredit%ReportSenCoolingToZoneRate   = 0.0
-      CoilSysCredit%SenCreditToZoneEnergy = 0.0
-      CoilSysCredit%ReportSenCoolingToZoneEnergy = 0.0
-      CoilSysCredit%LatCreditToZoneRate   = 0.0
-      CoilSysCredit%ReportLatCreditToZoneRate   = 0.0
-      CoilSysCredit%LatCreditToZoneEnergy = 0.0
-      CoilSysCredit%ReportLatCreditToZoneEnergy = 0.0
-      CoilSysCredit%LatKgPerS_ToZoneRate  = 0.0
-      CoilSysCredit%ReportH20RemovedKgPerS_FromZoneRate  = 0.0
-      CoilSysCredit%ReportTotCoolingToZoneRate     = 0.0
-      CoilSysCredit%ReportTotCoolingToZoneEnergy = 0.0
+      CoilSysCredit%SenCreditToZoneRate   = 0.0d0
+      CoilSysCredit%ReportSenCoolingToZoneRate   = 0.0d0
+      CoilSysCredit%SenCreditToZoneEnergy = 0.0d0
+      CoilSysCredit%ReportSenCoolingToZoneEnergy = 0.0d0
+      CoilSysCredit%LatCreditToZoneRate   = 0.0d0
+      CoilSysCredit%ReportLatCreditToZoneRate   = 0.0d0
+      CoilSysCredit%LatCreditToZoneEnergy = 0.0d0
+      CoilSysCredit%ReportLatCreditToZoneEnergy = 0.0d0
+      CoilSysCredit%LatKgPerS_ToZoneRate  = 0.0d0
+      CoilSysCredit%ReportH20RemovedKgPerS_FromZoneRate  = 0.0d0
+      CoilSysCredit%ReportTotCoolingToZoneRate     = 0.0d0
+      CoilSysCredit%ReportTotCoolingToZoneEnergy = 0.0d0
     END IF !usesystimestep = .true.
 
     !Can arrive here when load call to refrigeration looks for cases/walkin systems and usetimestep is .false.
     IF((.NOT. UseSysTimeStep).AND.((NumSimulationCases > 0).OR.( NumSimulationWalkIns > 0)))THEN
-      RefrigCaseCredit%SenCaseCreditToZone = 0.0
-      RefrigCaseCredit%LatCaseCreditToZone = 0.0
-      RefrigCaseCredit%SenCaseCreditToHVAC = 0.0
-      RefrigCaseCredit%LatCaseCreditToHVAC = 0.0
-      CaseWIZoneReport%SenCaseCreditToZoneEnergy = 0.0
-      CaseWIZoneReport%LatCoolingToZoneRate   = 0.0
-      CaseWIZoneReport%LatCoolingToZoneRate   = 0.0
-      CaseWIZoneReport%LatCoolingToZoneEnergy = 0.0
-      CaseWIZoneReport%SenCoolingToZoneRate   = 0.0
-      CaseWIZoneReport%SenCoolingToZoneEnergy = 0.0
-      CaseWIZoneReport%HeatingToZoneRate   = 0.0
-      CaseWIZoneReport%HeatingToZoneEnergy = 0.0
-      CaseWIZoneReport%TotCoolingToZoneRate   = 0.0
-      CaseWIZoneReport%TotCoolingToZoneEnergy = 0.0
-      CaseWIZoneReport%TotHtXferToZoneRate = 0.0
-      CaseWIZoneReport%TotHtXferToZoneEnergy = 0.0
+      RefrigCaseCredit%SenCaseCreditToZone = 0.0d0
+      RefrigCaseCredit%LatCaseCreditToZone = 0.0d0
+      RefrigCaseCredit%SenCaseCreditToHVAC = 0.0d0
+      RefrigCaseCredit%LatCaseCreditToHVAC = 0.0d0
+      CaseWIZoneReport%SenCaseCreditToZoneEnergy = 0.0d0
+      CaseWIZoneReport%LatCoolingToZoneRate   = 0.0d0
+      CaseWIZoneReport%LatCoolingToZoneRate   = 0.0d0
+      CaseWIZoneReport%LatCoolingToZoneEnergy = 0.0d0
+      CaseWIZoneReport%SenCoolingToZoneRate   = 0.0d0
+      CaseWIZoneReport%SenCoolingToZoneEnergy = 0.0d0
+      CaseWIZoneReport%HeatingToZoneRate   = 0.0d0
+      CaseWIZoneReport%HeatingToZoneEnergy = 0.0d0
+      CaseWIZoneReport%TotCoolingToZoneRate   = 0.0d0
+      CaseWIZoneReport%TotCoolingToZoneEnergy = 0.0d0
+      CaseWIZoneReport%TotHtXferToZoneRate = 0.0d0
+      CaseWIZoneReport%TotHtXferToZoneEnergy = 0.0d0
     ENDIF
   ENDIF
 
   IF (NumSimulationCases > 0) THEN
     !RefrigCase ALLOCATED to NumSimulationCases
-    RefrigCase%TotalCoolingLoad         = 0.0
-    RefrigCase%TotalCoolingEnergy       = 0.0
-    RefrigCase%SensCoolingEnergyRate    = 0.0
-    RefrigCase%SensCoolingEnergy        = 0.0
-    RefrigCase%LatCoolingEnergyRate     = 0.0
-    RefrigCase%LatCoolingEnergy         = 0.0
+    RefrigCase%TotalCoolingLoad         = 0.0d0
+    RefrigCase%TotalCoolingEnergy       = 0.0d0
+    RefrigCase%SensCoolingEnergyRate    = 0.0d0
+    RefrigCase%SensCoolingEnergy        = 0.0d0
+    RefrigCase%LatCoolingEnergyRate     = 0.0d0
+    RefrigCase%LatCoolingEnergy         = 0.0d0
     RefrigCase%SensZoneCreditRate       = 0.d0
-    RefrigCase%SensZoneCreditCoolRate   = 0.0
-    RefrigCase%SensZoneCreditCool       = 0.0
-    RefrigCase%SensZoneCreditHeatRate   = 0.0
-    RefrigCase%SensZoneCreditHeat       = 0.0
-    RefrigCase%LatZoneCreditRate        = 0.0
-    RefrigCase%LatZoneCredit            = 0.0
-    RefrigCase%SensHVACCreditRate       = 0.0
-    RefrigCase%SensHVACCreditCoolRate   = 0.0
-    RefrigCase%SensHVACCreditCool       = 0.0
-    RefrigCase%SensHVACCreditHeatRate   = 0.0
-    RefrigCase%SensHVACCreditHeat       = 0.0
-    RefrigCase%LatHVACCreditRate        = 0.0
-    RefrigCase%LatHVACCredit            = 0.0
-    RefrigCase%ElecFanPower             = 0.0
-    RefrigCase%ElecFanConsumption       = 0.0
-    RefrigCase%ElecAntiSweatPower       = 0.0
-    RefrigCase%ElecAntiSweatConsumption = 0.0
-    RefrigCase%ElecLightingPower        = 0.0
-    RefrigCase%ElecLightingConsumption  = 0.0
-    RefrigCase%ElecDefrostPower         = 0.0
-    RefrigCase%ElecDefrostConsumption   = 0.0
-    RefrigCase%DefEnergyCurveValue      = 0.0
-    RefrigCase%LatEnergyCurveValue      = 0.0
-    RefrigCase%HotDefrostCondCredit     = 0.0
+    RefrigCase%SensZoneCreditCoolRate   = 0.0d0
+    RefrigCase%SensZoneCreditCool       = 0.0d0
+    RefrigCase%SensZoneCreditHeatRate   = 0.0d0
+    RefrigCase%SensZoneCreditHeat       = 0.0d0
+    RefrigCase%LatZoneCreditRate        = 0.0d0
+    RefrigCase%LatZoneCredit            = 0.0d0
+    RefrigCase%SensHVACCreditRate       = 0.0d0
+    RefrigCase%SensHVACCreditCoolRate   = 0.0d0
+    RefrigCase%SensHVACCreditCool       = 0.0d0
+    RefrigCase%SensHVACCreditHeatRate   = 0.0d0
+    RefrigCase%SensHVACCreditHeat       = 0.0d0
+    RefrigCase%LatHVACCreditRate        = 0.0d0
+    RefrigCase%LatHVACCredit            = 0.0d0
+    RefrigCase%ElecFanPower             = 0.0d0
+    RefrigCase%ElecFanConsumption       = 0.0d0
+    RefrigCase%ElecAntiSweatPower       = 0.0d0
+    RefrigCase%ElecAntiSweatConsumption = 0.0d0
+    RefrigCase%ElecLightingPower        = 0.0d0
+    RefrigCase%ElecLightingConsumption  = 0.0d0
+    RefrigCase%ElecDefrostPower         = 0.0d0
+    RefrigCase%ElecDefrostConsumption   = 0.0d0
+    RefrigCase%DefEnergyCurveValue      = 0.0d0
+    RefrigCase%LatEnergyCurveValue      = 0.0d0
+    RefrigCase%HotDefrostCondCredit     = 0.0d0
   ENDIF ! NumSimulationCases
 
   IF (NumSimulationWalkIns > 0) THEN
     !WalkIn ALLOCATED to NumSimulationWalkIns
-    WalkIn%HotDefrostCondCredit     = 0.0
-    WalkIn%TotalCoolingLoad         = 0.0
-    WalkIn%TotalCoolingEnergy       = 0.0
-    WalkIn%TotSensCoolingEnergyRate = 0.0
-    WalkIn%TotSensCoolingEnergy     = 0.0
-    WalkIn%TotLatCoolingEnergyRate  = 0.0
-    WalkIn%TotLatCoolingEnergy      = 0.0
-    WalkIn%ElecFanPower             = 0.0
-    WalkIn%ElecFanConsumption       = 0.0
-    WalkIn%ElecHeaterPower          = 0.0
-    WalkIn%ElecHeaterConsumption    = 0.0
-    WalkIn%ElecLightingPower        = 0.0
-    WalkIn%ElecLightingConsumption  = 0.0
-    WalkIn%TotalElecPower           = 0.0
-    WalkIn%TotalElecConsumption     = 0.0
-    WalkIn%ElecDefrostPower         = 0.0
-    WalkIn%ElecDefrostConsumption   = 0.0
+    WalkIn%HotDefrostCondCredit     = 0.0d0
+    WalkIn%TotalCoolingLoad         = 0.0d0
+    WalkIn%TotalCoolingEnergy       = 0.0d0
+    WalkIn%TotSensCoolingEnergyRate = 0.0d0
+    WalkIn%TotSensCoolingEnergy     = 0.0d0
+    WalkIn%TotLatCoolingEnergyRate  = 0.0d0
+    WalkIn%TotLatCoolingEnergy      = 0.0d0
+    WalkIn%ElecFanPower             = 0.0d0
+    WalkIn%ElecFanConsumption       = 0.0d0
+    WalkIn%ElecHeaterPower          = 0.0d0
+    WalkIn%ElecHeaterConsumption    = 0.0d0
+    WalkIn%ElecLightingPower        = 0.0d0
+    WalkIn%ElecLightingConsumption  = 0.0d0
+    WalkIn%TotalElecPower           = 0.0d0
+    WalkIn%TotalElecConsumption     = 0.0d0
+    WalkIn%ElecDefrostPower         = 0.0d0
+    WalkIn%ElecDefrostConsumption   = 0.0d0
   ENDIF
 
   IF (HaveChillers) THEN
     !HaveChillers is TRUE when NumSimulationRefrigAirChillers > 0
     !WarehouseCoil ALLOCATED to NumSimulationRefrigAirChillers
-    WarehouseCoil%HotDefrostCondCredit     = 0.0
-    WarehouseCoil%TotalCoolingLoad         = 0.0
-    WarehouseCoil%TotalCoolingEnergy       = 0.0
-    WarehouseCoil%SensCoolingEnergyRate    = 0.0
-    WarehouseCoil%SensCoolingEnergy        = 0.0
-    WarehouseCoil%SensCreditRate           = 0.0
-    WarehouseCoil%LatKgPerS_ToZone         = 0.0
-    WarehouseCoil%SensHeatRatio            = 0.0
-    WarehouseCoil%LatCreditEnergy          = 0.0
-    WarehouseCoil%LatCreditRate            = 0.0
-    WarehouseCoil%ElecFanPower             = 0.0
-    WarehouseCoil%ElecFanConsumption       = 0.0
-    WarehouseCoil%ElecHeaterPower          = 0.0
-    WarehouseCoil%ElecHeaterConsumption    = 0.0
-    WarehouseCoil%TotalElecPower           = 0.0
-    WarehouseCoil%TotalElecConsumption     = 0.0
-    WarehouseCoil%ElecDefrostPower         = 0.0
-    WarehouseCoil%ElecDefrostConsumption   = 0.0
-    WarehouseCoil%ReportTotalCoolCreditRate   = 0.0
-    WarehouseCoil%ReportTotalCoolCreditEnergy   = 0.0
+    WarehouseCoil%HotDefrostCondCredit     = 0.0d0
+    WarehouseCoil%TotalCoolingLoad         = 0.0d0
+    WarehouseCoil%TotalCoolingEnergy       = 0.0d0
+    WarehouseCoil%SensCoolingEnergyRate    = 0.0d0
+    WarehouseCoil%SensCoolingEnergy        = 0.0d0
+    WarehouseCoil%SensCreditRate           = 0.0d0
+    WarehouseCoil%LatKgPerS_ToZone         = 0.0d0
+    WarehouseCoil%SensHeatRatio            = 0.0d0
+    WarehouseCoil%LatCreditEnergy          = 0.0d0
+    WarehouseCoil%LatCreditRate            = 0.0d0
+    WarehouseCoil%ElecFanPower             = 0.0d0
+    WarehouseCoil%ElecFanConsumption       = 0.0d0
+    WarehouseCoil%ElecHeaterPower          = 0.0d0
+    WarehouseCoil%ElecHeaterConsumption    = 0.0d0
+    WarehouseCoil%TotalElecPower           = 0.0d0
+    WarehouseCoil%TotalElecConsumption     = 0.0d0
+    WarehouseCoil%ElecDefrostPower         = 0.0d0
+    WarehouseCoil%ElecDefrostConsumption   = 0.0d0
+    WarehouseCoil%ReportTotalCoolCreditRate   = 0.0d0
+    WarehouseCoil%ReportTotalCoolCreditEnergy   = 0.0d0
     WarehouseCoil%ReportSensCoolCreditRate = 0.d0
     WarehouseCoil%ReportHeatingCreditRate  = 0.d0
     WarehouseCoil%ReportSensCoolCreditEnergy = 0.d0
@@ -9095,14 +9136,14 @@ SUBROUTINE InitRefrigeration
   IF (HaveRefrigRacks) THEN
     !HaveRefrigRacks TRUE when NumRefrigeratedRacks > 0
     !RefrigRack ALLOCATED to NumRefrigeratedRacks
-    RefrigRack%SensHVACCreditHeatRate    = 0.0
-    RefrigRack%SensHVACCreditHeat        = 0.0
-    RefrigRack%SensZoneCreditHeatRate    = 0.0
-    RefrigRack%SensZoneCreditHeat        = 0.0
-    RefrigRack%CondLoad                  = 0.0
-    RefrigRack%CondEnergy                = 0.0
-    RefrigRack%MassFlowRate              = 0.0
-    HeatReclaimRefrigeratedRack%AvailCapacity = 0.0
+    RefrigRack%SensHVACCreditHeatRate    = 0.0d0
+    RefrigRack%SensHVACCreditHeat        = 0.0d0
+    RefrigRack%SensZoneCreditHeatRate    = 0.0d0
+    RefrigRack%SensZoneCreditHeat        = 0.0d0
+    RefrigRack%CondLoad                  = 0.0d0
+    RefrigRack%CondEnergy                = 0.0d0
+    RefrigRack%MassFlowRate              = 0.0d0
+    HeatReclaimRefrigeratedRack%AvailCapacity = 0.0d0
     RefrigRack%RackElecConsumption       = 0.d0
     RefrigRack%CondenserFanConsumption   = 0.d0
     RefrigRack%EvapPumpConsumption       = 0.d0
@@ -9116,37 +9157,37 @@ SUBROUTINE InitRefrigeration
 
   IF (NumRefrigCondensers > 0) THEN
     !Condenser ALLOCATED to NumRefrigCondensers
-    Condenser%CondLoad                  = 0.0
-    Condenser%CondEnergy                = 0.0
-    Condenser%MassFlowRate              = 0.0
-    Condenser%ActualFanPower           = 0.0
-    Condenser%FanElecEnergy            = 0.0
-    Condenser%EvapWaterConsumpRate     = 0.0
-    Condenser%EvapWaterConsumption     = 0.0
-    Condenser%ActualEvapPumpPower      = 0.0
-    Condenser%EvapPumpConsumption      = 0.0
-    Condenser%ExternalHeatRecoveredLoad= 0.0
-    Condenser%ExternalEnergyRecovered  = 0.0
-    Condenser%InternalHeatRecoveredLoad= 0.0
-    Condenser%InternalEnergyRecovered  = 0.0
-    Condenser%TotalHeatRecoveredLoad   = 0.0
-    Condenser%TotalHeatRecoveredEnergy = 0.0
+    Condenser%CondLoad                  = 0.0d0
+    Condenser%CondEnergy                = 0.0d0
+    Condenser%MassFlowRate              = 0.0d0
+    Condenser%ActualFanPower           = 0.0d0
+    Condenser%FanElecEnergy            = 0.0d0
+    Condenser%EvapWaterConsumpRate     = 0.0d0
+    Condenser%EvapWaterConsumption     = 0.0d0
+    Condenser%ActualEvapPumpPower      = 0.0d0
+    Condenser%EvapPumpConsumption      = 0.0d0
+    Condenser%ExternalHeatRecoveredLoad= 0.0d0
+    Condenser%ExternalEnergyRecovered  = 0.0d0
+    Condenser%InternalHeatRecoveredLoad= 0.0d0
+    Condenser%InternalEnergyRecovered  = 0.0d0
+    Condenser%TotalHeatRecoveredLoad   = 0.0d0
+    Condenser%TotalHeatRecoveredEnergy = 0.0d0
     !   Condenser%LowTempWarn               = 0
     !N don't reset basin heat to zero when no load because heater would remain on
-    HeatReclaimRefrigCondenser%AvailCapacity = 0.0
-    HeatReclaimRefrigCondenser%AvailTemperature = 0.0
+    HeatReclaimRefrigCondenser%AvailCapacity = 0.0d0
+    HeatReclaimRefrigCondenser%AvailTemperature = 0.0d0
   ENDIF
 
   IF (NumSimulationGasCooler > 0) THEN
     !GasCooler ALLOCATED to NumSimulationGasCooler
-    GasCooler%GasCoolerLoad             = 0.0
-    GasCooler%GasCoolerEnergy           = 0.0
-    GasCooler%ActualFanPower            = 0.0
-    GasCooler%FanElecEnergy             = 0.0
-    GasCooler%InternalHeatRecoveredLoad = 0.0
-    GasCooler%InternalEnergyRecovered   = 0.0
-    GasCooler%TotalHeatRecoveredLoad    = 0.0
-    GasCooler%TotalHeatRecoveredEnergy  = 0.0
+    GasCooler%GasCoolerLoad             = 0.0d0
+    GasCooler%GasCoolerEnergy           = 0.0d0
+    GasCooler%ActualFanPower            = 0.0d0
+    GasCooler%FanElecEnergy             = 0.0d0
+    GasCooler%InternalHeatRecoveredLoad = 0.0d0
+    GasCooler%InternalEnergyRecovered   = 0.0d0
+    GasCooler%TotalHeatRecoveredLoad    = 0.0d0
+    GasCooler%TotalHeatRecoveredEnergy  = 0.0d0
   ENDIF
 
   IF (NumSimulationCompressors > 0) THEN
@@ -9158,39 +9199,39 @@ SUBROUTINE InitRefrigeration
   IF (HaveDetailedRefrig) THEN
     !HaveDetailedRefrig is TRUE when NumRefrigSystems > 0
     !System is ALLOCATED to NumRefrigSystems
-    System%TotalCoolingLoad                = 0.0
-    System%TotalCondDefrostCredit          = 0.0
-    System%SumSecondaryLoopLoad            = 0.0
-    System%SumMechSCBenefit                = 0.0
-    System%NetHeatRejectLoad               = 0.0
-    System%NetHeatRejectEnergy             = 0.0
-    System%AverageCompressorCOP            = 0.0
-    System%TotCompCapacity                 = 0.0
-    System%TotHiStageCompCapacity          = 0.0
-    System%TotCompElecConsump              = 0.0
-    System%TotHiStageCompElecConsump       = 0.0
-    System%TotCompElecConsumpTwoStage      = 0.0
-    System%TotCompPower                    = 0.0
-    System%TotHiStageCompPower             = 0.0
-    System%TotCompCoolingEnergy            = 0.0
-    System%TotHiStageCompCoolingEnergy     = 0.0
+    System%TotalCoolingLoad                = 0.0d0
+    System%TotalCondDefrostCredit          = 0.0d0
+    System%SumSecondaryLoopLoad            = 0.0d0
+    System%SumMechSCBenefit                = 0.0d0
+    System%NetHeatRejectLoad               = 0.0d0
+    System%NetHeatRejectEnergy             = 0.0d0
+    System%AverageCompressorCOP            = 0.0d0
+    System%TotCompCapacity                 = 0.0d0
+    System%TotHiStageCompCapacity          = 0.0d0
+    System%TotCompElecConsump              = 0.0d0
+    System%TotHiStageCompElecConsump       = 0.0d0
+    System%TotCompElecConsumpTwoStage      = 0.0d0
+    System%TotCompPower                    = 0.0d0
+    System%TotHiStageCompPower             = 0.0d0
+    System%TotCompCoolingEnergy            = 0.0d0
+    System%TotHiStageCompCoolingEnergy     = 0.0d0
   ENDIF
 
   IF (HaveDetailedTransRefrig) THEN
     !HaveDetailedTransRefrig is TRUE when NumTransRefrigSystems > 0
     !TransSystem is ALLOCATED to NumTransRefrigSystems
-    TransSystem%TotalCoolingLoadMT         = 0.0
-    TransSystem%TotalCoolingLoadLT         = 0.0
-    TransSystem%TotalCondDefrostCredit     = 0.0
-    TransSystem%NetHeatRejectLoad          = 0.0
-    TransSystem%NetHeatRejectEnergy        = 0.0
-    TransSystem%AverageCompressorCOP       = 0.0
-    TransSystem%TotCompCapacityHP          = 0.0
-    TransSystem%TotCompCapacityLP          = 0.0
-    TransSystem%TotCompElecConsump         = 0.0
-    TransSystem%TotCompPowerHP             = 0.0
-    TransSystem%TotCompPowerLP             = 0.0
-    TransSystem%TotCompCoolingEnergy       = 0.0
+    TransSystem%TotalCoolingLoadMT         = 0.0d0
+    TransSystem%TotalCoolingLoadLT         = 0.0d0
+    TransSystem%TotalCondDefrostCredit     = 0.0d0
+    TransSystem%NetHeatRejectLoad          = 0.0d0
+    TransSystem%NetHeatRejectEnergy        = 0.0d0
+    TransSystem%AverageCompressorCOP       = 0.0d0
+    TransSystem%TotCompCapacityHP          = 0.0d0
+    TransSystem%TotCompCapacityLP          = 0.0d0
+    TransSystem%TotCompElecConsump         = 0.0d0
+    TransSystem%TotCompPowerHP             = 0.0d0
+    TransSystem%TotCompPowerLP             = 0.0d0
+    TransSystem%TotCompCoolingEnergy       = 0.0d0
   ENDIF
 
   IF (NumSimulationSecondarySystems > 0) THEN
@@ -9205,25 +9246,25 @@ SUBROUTINE InitRefrigeration
   !Accumulative and carry-over variables are not zeroed at start of each time step, only at begining of environment
   IF(BeginEnvrnFlag .AND. MyBeginEnvrnFlag)THEN
         IF (NumSimulationCases > 0) THEN
-          RefrigCase%DefrostEnergy  = 0.0
-          RefrigCase%StockingEnergy = 0.0
-          RefrigCase%WarmEnvEnergy  = 0.0
-          RefrigCase%KgFrost        = 0.0
-          RefrigCase%StoredEnergy   = 0.0
+          RefrigCase%DefrostEnergy  = 0.0d0
+          RefrigCase%StockingEnergy = 0.0d0
+          RefrigCase%WarmEnvEnergy  = 0.0d0
+          RefrigCase%KgFrost        = 0.0d0
+          RefrigCase%StoredEnergy   = 0.0d0
         ENDIF
         IF (NumRefrigSystems > 0) THEN
-          System%UnmetEnergy    = 0.0
+          System%UnmetEnergy    = 0.0d0
         ENDIF
         IF (NumSimulationWalkIns > 0) THEN
-          WalkIn%KgFrost         = 0.0
-          WalkIn%StoredEnergy    =0.0
+          WalkIn%KgFrost         = 0.0d0
+          WalkIn%StoredEnergy    =0.0d0
           DO WalkInID = 1, NumsimulationWalkIns
             WalkIn(WalkInID)%IceTemp = WalkIn(WalkInID)%TEvapDesign
           END DO
         ENDIF
         IF (NumSimulationRefrigAirChillers > 0) THEN
-          WarehouseCoil%KgFrost         = 0.0
-          WarehouseCoil%KgFrostSaved    = 0.0
+          WarehouseCoil%KgFrost         = 0.0d0
+          WarehouseCoil%KgFrostSaved    = 0.0d0
           DO CoilID = 1, NumSimulationRefrigAirChillers
             WarehouseCoil(CoilID)%IceTemp      = WarehouseCoil(CoilID)%TEvapDesign
             WarehouseCoil(CoilID)%IceTempSaved = WarehouseCoil(CoilID)%TEvapDesign
@@ -9233,24 +9274,24 @@ SUBROUTINE InitRefrigeration
             Secondary%UnMetEnergy        = 0.0d0
         END IF
         IF (NumRefrigeratedRacks > 0) THEN
-          HeatReclaimRefrigeratedRack%UsedHVACCoil    = 0.0
-          HeatReclaimRefrigeratedRack%UsedWaterHeater = 0.0
+          HeatReclaimRefrigeratedRack%UsedHVACCoil    = 0.0d0
+          HeatReclaimRefrigeratedRack%UsedWaterHeater = 0.0d0
           RefrigRack%LaggedUsedWaterHeater            = 0.d0
           RefrigRack%LaggedUsedHVACCoil               = 0.d0
         ENDIF
         IF (NumRefrigCondensers > 0) THEN
-          HeatReclaimRefrigCondenser%UsedHVACCoil     = 0.0
-          HeatReclaimRefrigCondenser%UsedWaterHeater  = 0.0
+          HeatReclaimRefrigCondenser%UsedHVACCoil     = 0.0d0
+          HeatReclaimRefrigCondenser%UsedWaterHeater  = 0.0d0
           Condenser%LaggedUsedWaterHeater             = 0.d0
           Condenser%LaggedUsedHVACCoil                = 0.d0
         ENDIF
         DO SystemID=1,NumRefrigSystems
-          IF (ALLOCATED(System(SystemID)%MechSCLoad))System(SystemID)%MechSCLoad = 0.0
-          System(SystemID)%LSHXTrans  = 0.0
-          System(SystemID)%LSHXTransEnergy  = 0.0
+          IF (ALLOCATED(System(SystemID)%MechSCLoad))System(SystemID)%MechSCLoad = 0.0d0
+          System(SystemID)%LSHXTrans  = 0.0d0
+          System(SystemID)%LSHXTransEnergy  = 0.0d0
         END DO
 
-        IF (NumOfTimeStepInHour > 0.0d0) TimeStepFraction=1./REAL(NumOfTimeStepInHour,r64)
+        IF (NumOfTimeStepInHour > 0.0d0) TimeStepFraction=1.0d0/REAL(NumOfTimeStepInHour,r64)
         MyBeginEnvrnFlag = .FALSE.
 
   END IF !(BeginEnvrnFlag .AND. MyBeginEnvrnFlag)
@@ -9599,6 +9640,7 @@ SUBROUTINE CalcRackSystem(RackNum)
   USE CurveManager,      ONLY : CurveValue
   USE Psychrometrics,    ONLY: PsyRhoAirFnPbTdbW,RhoH2O,PsyWFnTdbTwbPb,PsyTwbFnTdbWPb
   USE DataEnvironment,   ONLY: OutBaroPress,OutHumRat,OutDryBulbTemp
+  USE DataHVACGlobals,   ONLY: TimeStepSys
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -9634,24 +9676,58 @@ SUBROUTINE CalcRackSystem(RackNum)
   REAL(r64)   :: HumRatOut                   ! Humidity ratio of outlet air from condenser (assumed saturated) [kg/kg]
   REAL(r64)   :: BPress                      ! Barometric pressure at condenser air inlet node [Pa]
   LOGICAL     :: EvapAvail                   ! Control for evap condenser availability
+  REAL(r64)   :: LocalTimeStep = 0.0d0       !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  INTEGER     :: CoilSetIndex  = 0           ! Index to set of coils in a single zone
+  INTEGER     :: CoilSetID     = 0           ! Index to set of coils in a single zone (shared inlet and outlet nodes)
+  INTEGER     :: CoilIndex     = 0           ! Index to a single air chiller/coil
+  INTEGER     :: CoilID        = 0           ! Index to a single air chiller/coil
 
   NumCases               = RefrigRack(RackNum)%NumCases
-  TotalRackDeliveredCapacity   = 0.0
-  CompressorCOPactual          = 0.0
-  TotalCompressorPower         = 0.0
-  TotalCondenserFanPower       = 0.0
-  TotalCondenserPumpPower      = 0.0
-  TotalBasinHeatPower          = 0.0
-  TotalCondenserHeat           = 0.0
-  TotalHeatRejectedToZone      = 0.0
-  TotalEvapWaterUseRate        = 0.0
-  RackSenCreditToZone          = 0.0
-  RackSenCreditToHVAC          = 0.0
-  CondenserFrac                = 0.0
+  TotalRackDeliveredCapacity   = 0.0d0
+  CompressorCOPactual          = 0.0d0
+  TotalCompressorPower         = 0.0d0
+  TotalCondenserFanPower       = 0.0d0
+  TotalCondenserPumpPower      = 0.0d0
+  TotalBasinHeatPower          = 0.0d0
+  TotalCondenserHeat           = 0.0d0
+  TotalHeatRejectedToZone      = 0.0d0
+  TotalEvapWaterUseRate        = 0.0d0
+  RackSenCreditToZone          = 0.0d0
+  RackSenCreditToHVAC          = 0.0d0
+  CondenserFrac                = 0.0d0
   EvapAvail                    = .TRUE.
   HeatRejectZoneNum            = 0
   HeatRejectZoneNodeNum        = 0
 
+LocalTimeStep = TimeStepZone
+IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
+
+!Loads for chiller sets are set in call to zone equipment element "SimAirChillerSet"
+! (all chiller coils within a set are located in the same zone)
+! (note non-zone, such as refrigeration, and zone equip, such as airchillersets, called at diff times)
+! Loads are then defined for each chiller coil within the set in "CalculateAirChillerSet"
+! In that subroutine, dispatch coils within each set in order specified for each zone
+!  Below will assign loads to refrigeration system or secondary loop
+!Note that this routine will go through all refrigeration systems, but loads for multiple systems
+! with interactions will not be known for the intitial calls with first HVAC time step. They will,
+! however, be repeated when the last chiller set is called from ZoneEquipmentManager
+! that's why important where init goes, don't want to zero out data should keep
+  IF(UseSysTimeStep) THEN
+    DO CoilSetIndex=1,NumRefrigChillerSets
+     CoilSetID = CoilSetIndex
+     CALL CalculateAirChillerSets(CoilSetID)
+    END DO
+  END IF
+
+  IF(RefrigRack(RackNum)%NumCoils > 0) THEN
+  DO CoilIndex=1,RefrigRack(RackNum)%NumCoils
+     CoilID=RefrigRack(RackNum)%CoilNum(CoilIndex)
+     ! already CALLed CalculateCoil(CoilID) in CoilSet specified order
+     ! increment TotalCoolingLoad for Compressors/condenser on each system
+     TotalRackDeliveredCapacity = TotalRackDeliveredCapacity + WarehouseCoil(CoilID)%TotalCoolingLoad
+!     System(SysNum)%TotalCondDefrostCredit=System(SysNum)%TotalCondDefrostCredit + WarehouseCoil(CoilID)%HotDefrostCondCredit
+  END DO !NumCoils systems
+  END IF !System(SysNum)%NumCoils > 0
 
   IF (NumCases > 0) THEN
   DO CaseNum = 1, NumCases
@@ -9758,7 +9834,7 @@ SUBROUTINE CalcRackSystem(RackNum)
 
   CompressorCOPactual        = RefrigRack(RackNum)%RatedCOP * COPFTempOutput
 
-  IF(CompressorCOPactual > 0.0) THEN
+  IF(CompressorCOPactual > 0.0d0) THEN
     TotalCompressorPower               = TotalRackDeliveredCapacity / CompressorCOPactual
     TotalCondenserHeat                 = TotalCompressorPower + TotalRackDeliveredCapacity
   ELSE
@@ -9772,7 +9848,7 @@ SUBROUTINE CalcRackSystem(RackNum)
 
   !calculate condenser fan usage here if not water-cooled; if water-cooled, fan is in separate tower object
   ! fan loads > 0 only if the connected cases are operating
-  IF(TotalRackDeliveredCapacity > 0.0 .AND. RefrigRack(RackNum)%CondenserType /= RefrigCondenserTypeWater) THEN
+  IF(TotalRackDeliveredCapacity > 0.0d0 .AND. RefrigRack(RackNum)%CondenserType /= RefrigCondenserTypeWater) THEN
     IF(RefrigRack(RackNum)%TotCondFTempPtr /= 0) THEN
       IF(RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
         CondenserFrac            = MAX(0.0d0,MIN(1.0d0,CurveValue(RefrigRack(RackNum)%TotCondFTempPtr, &
@@ -9801,13 +9877,13 @@ SUBROUTINE CalcRackSystem(RackNum)
     END IF   !evapAvail
   ! calculate basin water heater load
   IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap) THEN
-    IF ((TotalRackDeliveredCapacity == 0.0) .AND. &
+    IF ((TotalRackDeliveredCapacity == 0.0d0) .AND. &
        (EvapAvail)                          .AND. &
        (OutDbTemp < RefrigRack(RackNum)%BasinHeaterSetPointTemp)) THEN
           TotalBasinHeatPower = MAX(0.0d0,RefrigRack(RackNum)%BasinHeaterPowerFTempDiff * &
                (RefrigRack(RackNum)%BasinHeaterSetPointTemp - OutDbTemp))
           ! provide warning if no heater power exists
-          IF (TotalBasinHeatPower == 0.0) THEN
+          IF (TotalBasinHeatPower == 0.0d0) THEN
             !RefrigRack(RackNum)%EvapFreezeWarn = RefrigRack(RackNum)%EvapFreezeWarn + 1
             IF (RefrigRack(RackNum)%EvapFreezeWarnIndex == 0) THEN
               CALL ShowWarningMessage('Refrigeration Compressor Rack '// TRIM(RefrigRack(RackNum)%Name) // &
@@ -9828,7 +9904,7 @@ SUBROUTINE CalcRackSystem(RackNum)
 !   rejection goes to that zone - that is, no condenser heat rejection goes to the HVAC return air
   IF (RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
     TotalCondenserHeat = TotalRackDeliveredCapacity + TotalCompressorPower + TotalCondenserFanPower
-    IF(HeatRejectZoneNum > 0 .AND. TotalRackDeliveredCapacity > 0.0) THEN
+    IF(HeatRejectZoneNum > 0 .AND. TotalRackDeliveredCapacity > 0.0d0) THEN
       IF (RefrigRack(RackNum)%NumWalkIns == 0)THEN
 !       rack report variables for condenser heat to Zone and/or HVAC
 !       The difference between TotalHeatRejectedToZone and TotalRackDeliveredCapacity is the heat sent to return air
@@ -9889,7 +9965,7 @@ SUBROUTINE ReportRackSystem(RackNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)   :: LocalTimeStep = 0.0    !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  REAL(r64)   :: LocalTimeStep = 0.0d0    !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
   INTEGER      :: DemandARRID   = 0     ! Index to water tank Demand used for evap condenser on rack
   INTEGER      :: RackTankID   = 0      ! Index to water tank used for evap condenser on rack
 
@@ -9917,7 +9993,7 @@ SUBROUTINE ReportRackSystem(RackNum)
   RefrigRack(RackNum)%CondEnergy               = TotalCondenserHeat * LocalTimeStep * SecInHour
 ! Set total rack heat rejection used for heat reclaim. Do not allow heat reclaim on stand alone (indoor) display cases.
   IF(RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
-    HeatReclaimRefrigeratedRack(RackNum)%AvailCapacity = 0.0
+    HeatReclaimRefrigeratedRack(RackNum)%AvailCapacity = 0.0d0
   ELSE
     HeatReclaimRefrigeratedRack(RackNum)%AvailCapacity = TotalRackDeliveredCapacity * (1.0d0 + 1.0d0/CompressorCOPactual)
   END IF
@@ -9998,63 +10074,63 @@ INTEGER      :: DefCapCurvePtr = 0
 INTEGER      :: DefrostEnergyCurveType = 0
 INTEGER      :: DefrostType = 0
 INTEGER      :: ZoneNodeNum  = 0             ! Zone node number
-REAL(r64)    :: CapAvail                =0.0 ! capacity available to meet current and stored load (W)
-REAL(r64)    :: CaseRAFraction          =0.0 ! Fraction of case credits applied to return air
-REAL(r64)    :: CaseCreditFraction      =0.0 ! Reduction in case credits due to e.g., reduced door openings at night
-REAL(r64)    :: CaseSenCreditToZone     =0.0 ! Amount of sensible case credit applied to zone load (W)
-REAL(r64)    :: CaseLatCreditToZone     =0.0 ! Amount of latent case credit applied to zone load (W)
-REAL(r64)    :: CaseSenCreditToHVAC     =0.0 ! Amount of sensible case credit applied to HVAC RA duct (W)
-REAL(r64)    :: CaseLatCreditToHVAC     =0.0 ! Amount of latent case credit applied to HVAC RA duct (W)
-REAL(r64)    :: CaseSchedule            =0.0 ! Current value of case operating (availability) schedule
-REAL(r64)    :: DefrostEnergy           =0.0 ! Energy form of defrost capacity (J)
-REAL(r64)    :: DefrostSchedule         =0.0 ! Display case defrost schedule
-REAL(r64)    :: DefrostDripDownSchedule =0.0 ! Display case drip-down schedule (allows coil to drain after defrost)
-REAL(r64)    :: DefCapModFrac           =0.0 ! Defrost capacity modifier curve based on case operating temperature
-REAL(r64)    :: DefrostRatio            =0.0 !ratio of defrost energy at current zone temp/humrat to defrost
+REAL(r64)    :: CapAvail                =0.0d0 ! capacity available to meet current and stored load (W)
+REAL(r64)    :: CaseRAFraction          =0.0d0 ! Fraction of case credits applied to return air
+REAL(r64)    :: CaseCreditFraction      =0.0d0 ! Reduction in case credits due to e.g., reduced door openings at night
+REAL(r64)    :: CaseSenCreditToZone     =0.0d0 ! Amount of sensible case credit applied to zone load (W)
+REAL(r64)    :: CaseLatCreditToZone     =0.0d0 ! Amount of latent case credit applied to zone load (W)
+REAL(r64)    :: CaseSenCreditToHVAC     =0.0d0 ! Amount of sensible case credit applied to HVAC RA duct (W)
+REAL(r64)    :: CaseLatCreditToHVAC     =0.0d0 ! Amount of latent case credit applied to HVAC RA duct (W)
+REAL(r64)    :: CaseSchedule            =0.0d0 ! Current value of case operating (availability) schedule
+REAL(r64)    :: DefrostEnergy           =0.0d0 ! Energy form of defrost capacity (J)
+REAL(r64)    :: DefrostSchedule         =0.0d0 ! Display case defrost schedule
+REAL(r64)    :: DefrostDripDownSchedule =0.0d0 ! Display case drip-down schedule (allows coil to drain after defrost)
+REAL(r64)    :: DefCapModFrac           =0.0d0 ! Defrost capacity modifier curve based on case operating temperature
+REAL(r64)    :: DefrostRatio            =0.0d0 !ratio of defrost energy at current zone temp/humrat to defrost
                                              !    capacity at design condition
-REAL(r64)    :: DefrostLoad_Actual      =0.0 ! heat load on case due to defrost (W)
-REAL(r64)    :: DefrostCap_Actual       =0.0 ! power used to defrost (W)
-REAL(r64)    :: DeltaFreezeKgFrost      =0.0 ! change in frost on coils (kg)
-REAL(r64)    :: DeltaStockingEnergy     =0.0 ! Used to keep track of problems if sizing not consistent (J)
-REAL(r64)    :: DeltaWarmEnvEnergy      =0.0 ! Used to keep track of problems if sizing not consistent (J)
-REAL(r64)    :: DesignRatedCap          =0.0 ! Design rated capacity of display case (W)
-REAL(r64)    :: DesignDefrostCap        =0.0 ! Design defrost capacity of display case (W)
-REAL(r64)    :: DesignLatentCap         =0.0 ! Design latent capacity of display case (W)
-REAL(r64)    :: DesignLighting          =0.0 ! Total design display case lighting power (W)
-REAL(r64)    :: FrostMeltedKg           =0.0 ! Frost melted by defrost during a time step (kg)
-REAL(r64)    :: LatentLoad              =0.0 ! Latent load placed on case at actual zone conditions (W)
-REAL(r64)    :: LatentRatio             =0.0 !ratio of latent capacity at current zone temp/humrat to
+REAL(r64)    :: DefrostLoad_Actual      =0.0d0 ! heat load on case due to defrost (W)
+REAL(r64)    :: DefrostCap_Actual       =0.0d0 ! power used to defrost (W)
+REAL(r64)    :: DeltaFreezeKgFrost      =0.0d0 ! change in frost on coils (kg)
+REAL(r64)    :: DeltaStockingEnergy     =0.0d0 ! Used to keep track of problems if sizing not consistent (J)
+REAL(r64)    :: DeltaWarmEnvEnergy      =0.0d0 ! Used to keep track of problems if sizing not consistent (J)
+REAL(r64)    :: DesignRatedCap          =0.0d0 ! Design rated capacity of display case (W)
+REAL(r64)    :: DesignDefrostCap        =0.0d0 ! Design defrost capacity of display case (W)
+REAL(r64)    :: DesignLatentCap         =0.0d0 ! Design latent capacity of display case (W)
+REAL(r64)    :: DesignLighting          =0.0d0 ! Total design display case lighting power (W)
+REAL(r64)    :: FrostMeltedKg           =0.0d0 ! Frost melted by defrost during a time step (kg)
+REAL(r64)    :: LatentLoad              =0.0d0 ! Latent load placed on case at actual zone conditions (W)
+REAL(r64)    :: LatentRatio             =0.0d0 !ratio of latent capacity at current zone temp/humrat to
                                              !    latent capacity at design condition
-REAL(r64)    :: LatentCap_Actual        =0.0 ! Refrigerated case latent capacity at specific operating conditions
-REAL(r64)    :: LatentCaseCredit        =0.0 ! Latent case credit delivered to zone (W)
-REAL(r64)    :: LatCapModFrac           =0.0 ! Latent capacity modifier curve based on case operating temperature
-REAL(r64)    :: LightingSchedule        =0.0 ! Display case lighting schedule
-REAL(r64)    :: Length                  =0.0 ! Length of display case (m)
-REAL(r64)    :: LoadRequested           =0.0 ! TotalLoad_Actual  + StoredEnergyRate
-REAL(r64)    :: RatedAmbientRH          =0.0 ! Local variable for the RH corresponding to case rating conditions
-REAL(r64)    :: SensibleCaseCredit      =0.0 ! Sensible case credit delivered to zone (W)
-REAL(r64)    :: SensibleCap_Actual      =0.0 ! Refrigerated case sensible capacity at specific operating conditions
-!REAL(r64)    :: SensibleFraction        =0.0 ! Portion of total load due to sensible load
-REAL(r64)    :: SensibleLoadPrime       =0.0 ! Sensible load due to cond, conv, rad, infil (W)
-REAL(r64)    :: SensibleLoadAux         =0.0 ! Sensible load due to heaters, lighting (W)
-REAL(r64)    :: SensibleLoadTotal       =0.0 ! Total sensible load on case, may not = capacity applied (W)
-REAL(r64)    :: StockingSchedule        =0.0 ! Current value of product stocking schedule (W/m)
-REAL(r64)    :: StockingLoad            =0.0 ! Total load due to stocking case product (W)
-REAL(r64)    :: StoredEnergyRate        =0.0 ! Rate needed to serve all stored energy during single time step (W)
-REAL(r64)    :: TotalLoad_Actual        =0.0 ! total load on case at zone conditions (W)
-REAL(r64)    :: StartFrostKg            =0.0 ! frost load at start of time step (kg of ice)
-REAL(r64)    :: TotalCap_Actual         =0.0 ! Refrigerated case total capacity at specific operating conditions
-REAL(r64)    :: TotalLightingLoad       =0.0 ! Total lighting energy rate (W)
-REAL(r64)    :: TotalFan                =0.0 ! Total fan energy rate (W)
-REAL(r64)    :: TotalAntiSweat          =0.0 ! Total anti-sweat heater energy rate (W)
-REAL(r64)    :: TotalLightToCase        =0.0 ! Lighting energy to case
-REAL(r64)    :: TotalASHeaterToCase     =0.0 ! Anti-sweat heater energy to case
-REAL(r64)    :: TotalLightToZone        =0.0 ! Lighting energy to zone
-REAL(r64)    :: TotalASHeaterToZone     =0.0 ! Anti-sweat heater energy to zone
-REAL(r64)    :: TCase                   =0.0 ! Display case operating temperature
-REAL(r64)    :: ZoneRHPercent           =0.0 ! Zone relative humidity (%)
-REAL(r64)    :: ZoneDewPoint            =0.0 ! Zone dew point (C)
-REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible load due to excursions in zone T
+REAL(r64)    :: LatentCap_Actual        =0.0d0 ! Refrigerated case latent capacity at specific operating conditions
+REAL(r64)    :: LatentCaseCredit        =0.0d0 ! Latent case credit delivered to zone (W)
+REAL(r64)    :: LatCapModFrac           =0.0d0 ! Latent capacity modifier curve based on case operating temperature
+REAL(r64)    :: LightingSchedule        =0.0d0 ! Display case lighting schedule
+REAL(r64)    :: Length                  =0.0d0 ! Length of display case (m)
+REAL(r64)    :: LoadRequested           =0.0d0 ! TotalLoad_Actual  + StoredEnergyRate
+REAL(r64)    :: RatedAmbientRH          =0.0d0 ! Local variable for the RH corresponding to case rating conditions
+REAL(r64)    :: SensibleCaseCredit      =0.0d0 ! Sensible case credit delivered to zone (W)
+REAL(r64)    :: SensibleCap_Actual      =0.0d0 ! Refrigerated case sensible capacity at specific operating conditions
+!REAL(r64)    :: SensibleFraction        =0.0d0 ! Portion of total load due to sensible load
+REAL(r64)    :: SensibleLoadPrime       =0.0d0 ! Sensible load due to cond, conv, rad, infil (W)
+REAL(r64)    :: SensibleLoadAux         =0.0d0 ! Sensible load due to heaters, lighting (W)
+REAL(r64)    :: SensibleLoadTotal       =0.0d0 ! Total sensible load on case, may not = capacity applied (W)
+REAL(r64)    :: StockingSchedule        =0.0d0 ! Current value of product stocking schedule (W/m)
+REAL(r64)    :: StockingLoad            =0.0d0 ! Total load due to stocking case product (W)
+REAL(r64)    :: StoredEnergyRate        =0.0d0 ! Rate needed to serve all stored energy during single time step (W)
+REAL(r64)    :: TotalLoad_Actual        =0.0d0 ! total load on case at zone conditions (W)
+REAL(r64)    :: StartFrostKg            =0.0d0 ! frost load at start of time step (kg of ice)
+REAL(r64)    :: TotalCap_Actual         =0.0d0 ! Refrigerated case total capacity at specific operating conditions
+REAL(r64)    :: TotalLightingLoad       =0.0d0 ! Total lighting energy rate (W)
+REAL(r64)    :: TotalFan                =0.0d0 ! Total fan energy rate (W)
+REAL(r64)    :: TotalAntiSweat          =0.0d0 ! Total anti-sweat heater energy rate (W)
+REAL(r64)    :: TotalLightToCase        =0.0d0 ! Lighting energy to case
+REAL(r64)    :: TotalASHeaterToCase     =0.0d0 ! Anti-sweat heater energy to case
+REAL(r64)    :: TotalLightToZone        =0.0d0 ! Lighting energy to zone
+REAL(r64)    :: TotalASHeaterToZone     =0.0d0 ! Anti-sweat heater energy to zone
+REAL(r64)    :: TCase                   =0.0d0 ! Display case operating temperature
+REAL(r64)    :: ZoneRHPercent           =0.0d0 ! Zone relative humidity (%)
+REAL(r64)    :: ZoneDewPoint            =0.0d0 ! Zone dew point (C)
+REAL(r64)    :: ZoneTempFactor          =0.0d0 ! used to look at extra sensible load due to excursions in zone T
 
 ! Refrigerated display case defrost type (parameters)
 ! DefNone             = 0
@@ -10068,31 +10144,31 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
 
   !Initialize this case for this time step (
   !     All report variables prev set to zero for case when schedule for case is 'off')
-  TotalCap_Actual     = 0.0
-  LatentCap_Actual    = 0.0
-  SensibleCap_Actual  = 0.0
-  SensibleLoadTotal  = 0.0
-  SensibleLoadPrime   = 0.0
-  SensibleLoadAux     = 0.0
-  DefrostLoad_Actual  = 0.0
-  DefrostCap_Actual   = 0.0
+  TotalCap_Actual     = 0.0d0
+  LatentCap_Actual    = 0.0d0
+  SensibleCap_Actual  = 0.0d0
+  SensibleLoadTotal  = 0.0d0
+  SensibleLoadPrime   = 0.0d0
+  SensibleLoadAux     = 0.0d0
+  DefrostLoad_Actual  = 0.0d0
+  DefrostCap_Actual   = 0.0d0
 
-  DefrostRatio        = 0.0
-  LatentRatio         = 0.0
-  StartFrostKg        = 0.0
+  DefrostRatio        = 0.0d0
+  LatentRatio         = 0.0d0
+  StartFrostKg        = 0.0d0
 
-  SensibleCaseCredit  = 0.0
-  LatentCaseCredit    = 0.0
+  SensibleCaseCredit  = 0.0d0
+  LatentCaseCredit    = 0.0d0
 
-  CaseSenCreditToZone = 0.0
-  CaseLatCreditToZone = 0.0
-  CaseSenCreditToHVAC = 0.0
-  CaseLatCreditToHVAC = 0.0
-  CaseRAFactor        = 0.0
+  CaseSenCreditToZone = 0.0d0
+  CaseLatCreditToZone = 0.0d0
+  CaseSenCreditToHVAC = 0.0d0
+  CaseLatCreditToHVAC = 0.0d0
+  CaseRAFactor        = 0.0d0
 
-  TotalLightingLoad   = 0.0
-  TotalAntiSweat      = 0.0
-  TotalFan            = 0.0
+  TotalLightingLoad   = 0.0d0
+  TotalAntiSweat      = 0.0d0
+  TotalFan            = 0.0d0
 
   !Set local subroutine variables for convenience
   ActualZoneNum             = RefrigCase(CaseID)%ActualZoneNum
@@ -10121,14 +10197,14 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
     !next statement In case user doesn't understand concept of drip down schedule
     DefrostDripDownSchedule = MAX(DefrostDripDownSchedule,DefrostSchedule)
   ELSE
-    DefrostSchedule         = 0.0
-    DefrostDripDownSchedule = 0.0
+    DefrostSchedule         = 0.0d0
+    DefrostDripDownSchedule = 0.0d0
   END IF
 ! get product stocking schedule and load due to product stocking, if no schedule exists load is 0
   IF (RefrigCase(CaseID)%StockingSchedPtr > 0) THEN
     StockingSchedule        = GetCurrentScheduleValue(RefrigCase(CaseID)%StockingSchedPtr)
   ELSE
-    StockingSchedule        = 0.0
+    StockingSchedule        = 0.0d0
   END IF
   ! get lighting schedule and total load due to lighting
   LightingSchedule          = GetCurrentScheduleValue(RefrigCase(CaseID)%LightingSchedPtr)
@@ -10164,7 +10240,7 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
   ! Anti-sweat heater capacity
   SELECT CASE (RefrigCase(CaseID)%AntiSweatControlType)
    CASE (ASNone)
-     TotalAntiSweat         = 0.0
+     TotalAntiSweat         = 0.0d0
    CASE (ASConstant)
      TotalAntiSweat         = RefrigCase(CaseID)%AntiSweatPower
    CASE (ASLinear)
@@ -10177,7 +10253,7 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
              MIN(1.0d0, MAX(0.0d0,(ZoneDewPoint-TCase)/(RefrigCase(CaseID)%RatedAmbientDewPoint-TCase)))
      TotalAntiSweat         = MAX(RefrigCase(CaseID)%MinimumASPower, TotalAntiSweat)
    CASE (ASHeatBalance)
-     IF(RefrigCase(CaseID)%Rcase > 0.0) THEN
+     IF(RefrigCase(CaseID)%Rcase > 0.0d0) THEN
        TotalAntiSweat = (((ZoneDewPoint-Node(ZoneNodeNum)%Temp)*RefrigCase(CaseID)%Height &
                           /Rair) + &
                          ((ZoneDewPoint-Tcase)*RefrigCase(CaseID)%Height &
@@ -10185,11 +10261,11 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
        TotalAntiSweat = MIN(RefrigCase(CaseID)%AntiSweatPower,MAX(RefrigCase(CaseID)%MinimumASPower, &
                                                                TotalAntiSweat))
      ELSE
-       TotalAntiSweat = 0.0
+       TotalAntiSweat = 0.0d0
      END IF
    CASE DEFAULT
    ! should never execute this CASE statement
-     TotalAntiSweat   = 0.0
+     TotalAntiSweat   = 0.0d0
   END SELECT
   TotalAntiSweat      = TotalAntiSweat * Length
   TotalASHeaterToCase = RefrigCase(CaseID)%ASHeaterFractionToCase * TotalAntiSweat
@@ -10229,11 +10305,11 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
     RefrigCase(CaseID)%KgFrost = RefrigCase(CaseID)%KgFrost + DeltaFreezeKgFrost
   END IF
 
-  IF(Tcase > TempTooHotToFrost) RefrigCase(CaseID)%KgFrost = 0.0
+  IF(Tcase > TempTooHotToFrost) RefrigCase(CaseID)%KgFrost = 0.0d0
 
 
 !DEFROST CALCULATIONS
-  IF(DefrostSchedule > 0.0) THEN
+  IF(DefrostSchedule > 0.0d0) THEN
     IF(DefrostType /= DefNone .AND. DefrostType /= DefOffCycle) THEN
        DefrostCap_Actual = DesignDefrostCap * DefrostSchedule
        IF(DefrostType == DefElectricTerm .OR. DefrostType == DefHotFluidTerm )THEN
@@ -10307,7 +10383,7 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
 
 ! Reset DefrostLoad_Actual to zero for non-electric defrost types, for reporting purposes
   IF (DefrostType /= DefElectric .AND. DefrostType /= DefElectricOnDemand .AND. &
-              DefrostType /= DefElectricTerm ) DefrostCap_Actual = 0.0
+              DefrostType /= DefElectricTerm ) DefrostCap_Actual = 0.0d0
 
   CaseRAFraction            = MIN(0.8d0, RefrigCase(CaseID)%RAFrac)
   CaseRAFactor              = (1.0d0 - ((0.8d0 - CaseRAFraction) / 0.8d0)) * 0.5d0
@@ -10342,16 +10418,16 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
 
   RefrigCase(CaseID)%SensZoneCreditRate       = CaseSenCreditToZone ! both positive or negative
 ! This rate can be positive or negative, split into separate output variables and always report positive value
-  IF(CaseSenCreditToZone <= 0.0) THEN
+  IF(CaseSenCreditToZone <= 0.0d0) THEN
     RefrigCase(CaseID)%SensZoneCreditCoolRate = -CaseSenCreditToZone
     RefrigCase(CaseID)%SensZoneCreditCool     = -CaseSenCreditToZone * TimeStepZone * SecInHour
-    RefrigCase(CaseID)%SensZoneCreditHeatRate = 0.0
-    RefrigCase(CaseID)%SensZoneCreditHeat     = 0.0
+    RefrigCase(CaseID)%SensZoneCreditHeatRate = 0.0d0
+    RefrigCase(CaseID)%SensZoneCreditHeat     = 0.0d0
   ELSE
     RefrigCase(CaseID)%SensZoneCreditHeatRate = CaseSenCreditToZone
     RefrigCase(CaseID)%SensZoneCreditHeat     = CaseSenCreditToZone * TimeStepZone * SecInHour
-    RefrigCase(CaseID)%SensZoneCreditCoolRate = 0.0
-    RefrigCase(CaseID)%SensZoneCreditCool     = 0.0
+    RefrigCase(CaseID)%SensZoneCreditCoolRate = 0.0d0
+    RefrigCase(CaseID)%SensZoneCreditCool     = 0.0d0
   END IF
 
 ! This rate should always be negative
@@ -10360,16 +10436,16 @@ REAL(r64)    :: ZoneTempFactor          =0.0 ! used to look at extra sensible lo
 
   RefrigCase(CaseID)%SensHVACCreditRate       = CaseSenCreditToHVAC
 ! This rate can be positive or negative, split into separate output variables and always report positive value
-  IF(CaseSenCreditToHVAC <= 0.0) THEN
+  IF(CaseSenCreditToHVAC <= 0.0d0) THEN
     RefrigCase(CaseID)%SensHVACCreditCoolRate = -CaseSenCreditToHVAC
     RefrigCase(CaseID)%SensHVACCreditCool     = -CaseSenCreditToHVAC * TimeStepZone * SecInHour
-    RefrigCase(CaseID)%SensHVACCreditHeatRate = 0.0
-    RefrigCase(CaseID)%SensHVACCreditHeat     = 0.0
+    RefrigCase(CaseID)%SensHVACCreditHeatRate = 0.0d0
+    RefrigCase(CaseID)%SensHVACCreditHeat     = 0.0d0
   ELSE
     RefrigCase(CaseID)%SensHVACCreditHeatRate = CaseSenCreditToHVAC
     RefrigCase(CaseID)%SensHVACCreditHeat     = CaseSenCreditToHVAC * TimeStepZone * SecInHour
-    RefrigCase(CaseID)%SensHVACCreditCoolRate = 0.0
-    RefrigCase(CaseID)%SensHVACCreditCool     = 0.0
+    RefrigCase(CaseID)%SensHVACCreditCoolRate = 0.0d0
+    RefrigCase(CaseID)%SensHVACCreditCool     = 0.0d0
   END IF
 
 ! This rate should always be negative
@@ -10496,14 +10572,14 @@ SUBROUTINE SimRefrigCondenser(SysType, CompName, CompIndex, FirstHVACIteration, 
 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) :: DeltaT = 0.0
-  REAL(r64) :: InletTemp = 0.0
-  REAL(r64) :: DesVolFlowRate = 0.0
-  REAL(r64) :: MassFlowRate = 0.0
-  REAL(r64) :: MassFlowRateMax = 0.0
-  REAL(r64) :: OutletTempMax = 0.0
-  REAL(r64) :: VolFlowRate = 0.0
-  REAL(r64) :: OutletTemp = 0.0
+  REAL(r64) :: DeltaT = 0.0d0
+  REAL(r64) :: InletTemp = 0.0d0
+  REAL(r64) :: DesVolFlowRate = 0.0d0
+  REAL(r64) :: MassFlowRate = 0.0d0
+  REAL(r64) :: MassFlowRateMax = 0.0d0
+  REAL(r64) :: OutletTempMax = 0.0d0
+  REAL(r64) :: VolFlowRate = 0.0d0
+  REAL(r64) :: OutletTemp = 0.0d0
   INTEGER   :: FlowType = 0
   ! INTEGER   :: HighFlowWarn = 0
   ! INTEGER   :: HighTempWarn = 0
@@ -10729,7 +10805,7 @@ SUBROUTINE SimRefrigCondenser(SysType, CompName, CompIndex, FirstHVACIteration, 
         + Node(PlantInletNode)%Temp
   ELSE
     OutletTemp = InletTemp
-    IF ((TotalCondenserHeat > 0.) .AND. (.NOT. FirstHVACIteration)) THEN
+    IF ((TotalCondenserHeat > 0.0d0) .AND. (.NOT. FirstHVACIteration)) THEN
 
       CALL ShowRecurringWarningErrorAtEnd(TypeName//TRIM(Name)//&
             'Water-cooled condenser has no cooling water flow. '// &
@@ -11177,7 +11253,7 @@ IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
        !With air chiller coils, don't use unmet energy, instead reduce capacity on coils to match avail compressor/cond capacity
        CurrentLoads = System(SysNum)%TotalSystemLoad + &
                    System(SysNum)%LSHXTrans  !because compressor capacity rated from txv to comp inlet
-       IF((System(SysNum)%CoilFlag).AND.(CurrentLoads > (System(SysNum)%TotCompCapacity*1.001))) THEN
+       IF((System(SysNum)%CoilFlag).AND.(CurrentLoads > (System(SysNum)%TotCompCapacity*1.001d0))) THEN
          DeRate = .TRUE.
          CALL FinalRateCoils(Derate,DetailedSystem,SysNum,CurrentLoads, &
                              System(SysNum)%TotCompCapacity)
@@ -11671,8 +11747,8 @@ DO WHILE (NotBalanced)
   System(SysNum)%RefMassFlowtoLoads=System(SysNum)%TotalSystemLoad/(System(SysNum)%HCaseOut-System(SysNum)%HCaseIn)
   IF(NumIter < 2)CYCLE
   !Previously did error check on calculated Tcondense, but not sensitive enough
-  IF((System(SysNum)%RefMassFlowtoLoads ==0.0)  .OR. & !.OR. (MassFlowCasesStart == 0.0)
-      (MassFlowCompsStart == 0.0)) THEN
+  IF((System(SysNum)%RefMassFlowtoLoads ==0.0d0)  .OR. & !.OR. (MassFlowCasesStart == 0.0)
+      (MassFlowCompsStart == 0.0d0)) THEN
       CALL ShowWarningError('Refrigeration:System: '//TRIM(System(SysNum)%Name)//&
                              ' showing zero refrigeration flow.')
   ELSE
@@ -11892,14 +11968,14 @@ LocalTimeStep = TimeStepZone
 IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
 
 !Initialize this condenser for this time step
-  TotalCondenserPumpPower      = 0.0
-  TotalBasinHeatPower          = 0.0
-  TotalCondenserHeat           = 0.0
-  TotalEvapWaterUseRate        = 0.0
+  TotalCondenserPumpPower      = 0.0d0
+  TotalBasinHeatPower          = 0.0d0
+  TotalCondenserHeat           = 0.0d0
+  TotalEvapWaterUseRate        = 0.0d0
   AirVolRatio                  = 1.0d0
-  ActualFanPower               = 0.0
-  TotalCondDefrostCredit       = 0.0
-  TotalLoadFromSystems         = 0.0
+  ActualFanPower               = 0.0d0
+  TotalCondDefrostCredit       = 0.0d0
+  TotalLoadFromSystems         = 0.0d0
   EvapAvail                    = .TRUE.
   CondID                       = System(SysNum)%CondenserNum(1)
   RatedFanPower                = Condenser(CondID)%RatedFanPower
@@ -11928,7 +12004,7 @@ IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
  END DO ! Sysloop over every system connected to this condenser
 
  ! for cascade condensers, condenser defrost credit gets passed on to the primary system condenser
- IF(Condenser(CondID)%CondenserType == RefrigCondenserTypeCascade) TotalCondDefrostCredit       = 0.0
+ IF(Condenser(CondID)%CondenserType == RefrigCondenserTypeCascade) TotalCondDefrostCredit       = 0.0d0
 
   ! Calculate Total Heat rejection needed.  Assume hermetic compressors - conservative assumption
   ! Note that heat rejection load carried by desuperheater hvac coils or water heaters is the
@@ -11942,7 +12018,7 @@ Condenser(CondID)%TotalHeatRecoveredLoad    =  Condenser(CondID)%ExternalHeatRec
 
 TotalCondenserHeat   =   TotalLoadFromSystems - TotalCondDefrostCredit - &
                          Condenser(CondID)%ExternalHeatRecoveredLoad
-IF (TotalCondenserHeat < 0.) THEN
+IF (TotalCondenserHeat < 0.0d0) THEN
 
   TotalCondenserHeat = 0.d0
   IF( .not. warmupflag) THEN
@@ -12033,7 +12109,7 @@ ELSEIF ((Condenser(CondID)%CondenserType == RefrigCondenserTypeAir) .OR. &
       ! (Tcondense-Twb)=A1 + A2*hrcf + A3/hrcf + A4*Twb
       ! HRCF defined as rated capacity divided by load
       ! Apply ARI490 elevation correction factor here for evap condenser, then apply hrcf limits
-      IF(CapFac > 0.0) THEN
+      IF(CapFac > 0.0d0) THEN
          HRCF   =  Condenser(CondID)%EvapElevFact/CapFac
          !Condenser(CondNum)%EvapElevFact=1.d0-3.074D-5*Elevation
       ELSE
@@ -12140,11 +12216,11 @@ ELSEIF ((Condenser(CondID)%CondenserType == RefrigCondenserTypeAir) .OR. &
       ! assumes evap water pump runs whenever evap cooling is available to minimize scaling
       TotalCondenserPumpPower  = Condenser(CondID)%EvapPumpPower
       ! calculate basin water heater load
-      IF(TotalCondenserHeat == 0.0 .AND.OutDbTemp < Condenser(CondID)%BasinHeaterSetPointTemp) THEN
+      IF(TotalCondenserHeat == 0.0d0 .AND.OutDbTemp < Condenser(CondID)%BasinHeaterSetPointTemp) THEN
         TotalBasinHeatPower = MAX(0.0d0,Condenser(CondID)%BasinHeaterPowerFTempDiff * &
                (Condenser(CondID)%BasinHeaterSetPointTemp - OutDbTemp))
         ! provide warning if no heater power exists
-        IF (TotalBasinHeatPower == 0.0) THEN
+        IF (TotalBasinHeatPower == 0.0d0) THEN
           !Condenser(CondID)%EvapFreezeWarn = Condenser(CondID)%EvapFreezeWarn + 1
           IF (Condenser(CondID)%EvapFreezeWarnIndex == 0) THEN
             CALL ShowWarningMessage('Refrigeration Condenser '// TRIM(Condenser(CondID)%Name) // &
@@ -12295,11 +12371,11 @@ LocalTimeStep = TimeStepZone
 IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
 
 !!Initialize this gas cooler for this time step
-TotalGasCoolerHeat           = 0.0
+TotalGasCoolerHeat           = 0.0d0
 AirVolRatio                  = 1.0d0
-ActualFanPower               = 0.0
-TotalCondDefrostCredit       = 0.0
-TotalLoadFromSystems         = 0.0
+ActualFanPower               = 0.0d0
+TotalCondDefrostCredit       = 0.0d0
+TotalLoadFromSystems         = 0.0d0
 GasCoolerID                  = TransSystem(SysNum)%GasCoolerNum(1)
 RatedFanPower                = GasCooler(GasCoolerID)%RatedFanPower
 FanMinAirFlowRatio           = GasCooler(GasCoolerID)%FanMinAirFlowRatio
@@ -12321,7 +12397,7 @@ GasCooler(GasCoolerID)%InternalHeatRecoveredLoad = TotalCondDefrostCredit
 GasCooler(GasCoolerID)%TotalHeatRecoveredLoad    = TotalCondDefrostCredit
 TotalGasCoolerHeat = TotalLoadFromSystems - TotalCondDefrostCredit
 
-IF (TotalGasCoolerHeat < 0.) THEN
+IF (TotalGasCoolerHeat < 0.0d0) THEN
   TotalGasCoolerHeat = 0.0d0
   IF( .not. warmupflag) &
     CALL ShowRecurringWarningErrorAtEnd('Refrigeration:TranscriticalSystem: '//TRIM(TransSystem(SysNum)%Name)//&
@@ -12359,7 +12435,7 @@ IF (OutDbTemp > GasCooler(GasCoolerID)%TransitionTemperature) THEN  ! Gas cooler
    GasCooler(GasCoolerID)%TransOpFlag = .TRUE.
 ELSE  ! Gas cooler in subcritical operation
    GasCooler(GasCoolerID)%TGasCoolerOut = OutDbTemp + GasCooler(GasCoolerID)%SubcriticalTempDiff
-   IF (GasCooler(GasCoolerID)%TGasCoolerOut > 30.978) THEN    !  Gas temperature should be less than critical temperature
+   IF (GasCooler(GasCoolerID)%TGasCoolerOut > 30.978d0) THEN    !  Gas temperature should be less than critical temperature
       GasCooler(GasCoolerID)%PGasCoolerOut = 7.2d6            !  Fix the pressure to be subcritical
       GasCooler(GasCoolerID)%TGasCoolerOut = GetSatTemperatureRefrig(TransSystem(SysNum)%RefrigerantName, &
                                              GasCooler(GasCoolerID)%PGasCoolerOut,TransSystem(SysNum)%RefIndex, &
@@ -12380,7 +12456,7 @@ ELSE  ! Gas cooler in subcritical operation
    GasCooler(GasCoolerID)%TransOpFlag = .FALSE.
 END IF    ! (OutDbTemp > TransitionTemperature)
 
-IF (GasCooler(GasCoolerID)%TGasCoolerOut < 30.978) THEN
+IF (GasCooler(GasCoolerID)%TGasCoolerOut < 30.978d0) THEN
   GasCooler(GasCoolerID)%CpGasCoolerOut = GetSatSpecificHeatRefrig(TransSystem(SysNum)%RefrigerantName, &
                                           GasCooler(GasCoolerID)%TGasCoolerOut,0.0d0,TransSystem(SysNum)%RefIndex, &
                                           'RefrigeratedCase:CalcGasCooler')
@@ -12484,7 +12560,7 @@ REAL(r64), PARAMETER ::DelTDischPipes = 0.5d0 ! Tsat drop corresponding to P dro
   REAL(r64)   :: HSatVapCondense     ! Enthalpy of saturated vapor at T condense, J/kg
   REAL(r64)   :: HsatVaporforTevapneeded ! Enthalpy saturated vapor at temperature needed at evaporator
   REAL(r64)   :: LFLastComp          ! Load factor for last compressor dispatched
-  REAL(r64)   :: LocalTimeStep = 0.0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  REAL(r64)   :: LocalTimeStep = 0.0d0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
   REAL(r64)   :: MassCorrection      ! Mass flow at existing subcool/superheat over cap at rated conditions
   REAL(r64)   :: NeededCapacity      ! Sum of case loads and mech subcooler loads on suction group
   REAL(r64)   :: Psuction            ! Suction Pressure
@@ -12874,8 +12950,8 @@ REAL(r64), PARAMETER ::ErrorTol       = 0.001d0     ! Iterative solution toleran
   INTEGER     :: CompID                       ! Compressor index within all compressors
   INTEGER     :: GasCoolerID                  ! Gas cooler index for this refrigeration system
   INTEGER     :: Iter                         ! Iteration counter
-  REAL(r64)   :: AccumLoadMT = 0.0            ! Load due to previously unmet medium temperature compressor loads (transcritical system)
-  REAL(r64)   :: AccumLoadLT = 0.0            ! Load due to previously unmet low temperature compressor loads (transcritical system)
+  REAL(r64)   :: AccumLoadMT = 0.0d0            ! Load due to previously unmet medium temperature compressor loads (transcritical system)
+  REAL(r64)   :: AccumLoadLT = 0.0d0            ! Load due to previously unmet low temperature compressor loads (transcritical system)
   REAL(r64)   :: CapacityCorrectionLT         ! Capacity at existing subcool/superheat over cap at rated conditions for LT loads
   REAL(r64)   :: CapacityCorrectionMT         ! Capacity at existing subcool/superheat over cap at rated conditions for MT loads
   REAL(r64)   :: CaseEnthalpyChangeRatedMT    ! Enthalpy change in medium temperature cases at compressor rated cond, J/kg
@@ -12886,18 +12962,18 @@ REAL(r64), PARAMETER ::ErrorTol       = 0.001d0     ! Iterative solution toleran
   REAL(r64)   :: DensityRatedLP               ! Density of low pressure compressor inlet gas at rated superheat, m3/kg
   REAL(r64)   :: HCaseInRatedLT               ! Enthalpy entering low temperature cases at rated subcooling, J/kg
   REAL(r64)   :: HCaseInRatedMT               ! Enthalpy entering medium temperature cases at rated subcooling, J/kg
-  REAL(r64)   :: HCaseOutLTMT = 0.0           ! Combined enthalpy from the outlets of the LP compressor and MT loads, J/kg
+  REAL(r64)   :: HCaseOutLTMT = 0.0d0           ! Combined enthalpy from the outlets of the LP compressor and MT loads, J/kg
   REAL(r64)   :: HCompInRatedHP               ! Enthalpy entering high pressure compressor at rated superheat, J/kg
   REAL(r64)   :: HCompInRatedLP               ! Enthalpy entering low pressure compressor at rated superheat, J/kg
   REAL(r64)   :: HGCOutlet                    ! Enthalpy at gas cooler outlet, J/kg
   REAL(R64)   :: HIdeal                       ! Ideal enthalpy at subcooler (for 100% effectiveness)
   REAL(r64)   :: Hnew                         ! Calucalted enthalpy, J/kg
-  REAL(r64)   :: HReceiverBypass = 0.0        ! Enthalpy at the receiver bypass, J/kg
+  REAL(r64)   :: HReceiverBypass = 0.0d0        ! Enthalpy at the receiver bypass, J/kg
   REAL(r64)   :: HsatLiqforTevapNeededMT      ! Enthalpy of saturated liquid at MT evaporator, J/kg
   REAL(r64)   :: HsatVaporforTevapneededMT    ! Enthlapy of saturated vapor at MT evaporator (transcritical cycle), J/kg
   REAL(r64)   :: HsatVaporforTevapneededLT    ! Enthlapy of saturated vapor at LT evaporator (transcritical cycle), J/kg
   REAL(r64)   :: LFLastComp                   ! Load factor for last compressor dispatched
-  REAL(r64)   :: LocalTimeStep = 0.0          ! TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  REAL(r64)   :: LocalTimeStep = 0.0d0          ! TimeStepZone for case/walkin systems, TimeStepSys for coil systems
   REAL(r64)   :: MassCorrectionLT             ! Mass flow at existing subcool/superheat over cap at rated conditions for LT loads
   REAL(r64)   :: MassCorrectionMT             ! Mass flow at existing subcool/superheat over cap at rated conditions for MT loads
   REAL(r64)   :: NeededCapacityLT             ! Sum of LT case loads and mech subcooler loads (transcritical cycle), W
@@ -12909,7 +12985,7 @@ REAL(r64), PARAMETER ::ErrorTol       = 0.001d0     ! Iterative solution toleran
   REAL(r64)   :: SubCoolEffect                ! Heat exchanger effectiveness of the subcooler
   REAL(r64)   :: TempInRatedHP                ! Temperature entering high pressure compressor at rated superheat, C
   REAL(r64)   :: TempInRatedLP                ! Temperature entering low pressure compressor at rated superheat, C
-  REAL(r64)   :: TsatforPdisLT                ! Low temeprature saturated discharge temperature (transcritical cycle), C
+  REAL(r64)   :: TsatforPdisLT                ! Low temperature saturated discharge temperature (transcritical cycle), C
   REAL(r64)   :: TsatforPdisMT                ! Medium temperature saturated discharge temperature (transcritical cycle), C
   REAL(r64)   :: TsatforPsucLT                ! Low temperature saturated suction temperature (transcritical cycle), C
   REAL(r64)   :: TsatforPsucMT                ! Medium temperature saturated suction temperature (transcritical cycle), C
@@ -13083,7 +13159,7 @@ REAL(r64), PARAMETER ::ErrorTol       = 0.001d0     ! Iterative solution toleran
                        (1.0d0-QualityReceiver)
     TransSystem(SysNum)%RefMassFlowReceiverByPass = QualityReceiver*TotalRefMassFlow
   ELSE
-    TransSystem(SysNum)%RefMassFlowReceiverBypass = 0
+    TransSystem(SysNum)%RefMassFlowReceiverBypass = 0.0d0
     TotalRefMassFlow = (TransSystem(SysNum)%RefMassFlowtoLTLoads + TransSystem(SysNum)%RefMassFlowtoMTLoads)
   END IF  ! %HGasCoolerOut > TransSystem(SysNum)%HSatLiqReceiver)
 
@@ -13306,7 +13382,7 @@ SUBROUTINE CalculateSubcoolers(SysNum)
   REAL(r64)   :: ControlTliqOut      ! Controlled temperature of liquid leaving Mechanical subcooler
   REAL(r64)   :: DelTempActual       ! Actual subcooling, T liquid in - T liquid out
   REAL(r64)   :: DelTLiqDes          ! Design Temperature Change on liquid side of LSHX
-  REAL(r64)   :: LocalTimeStep = 0.0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  REAL(r64)   :: LocalTimeStep = 0.0d0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
   REAL(r64)   :: LSHXeffectiveness   ! EFfectiveness of liquid suction heat exchanger (LSHX)
   REAL(r64)   :: MechSCLoad          ! Mechanical subcooler load
   REAL(r64)   :: SubcoolLoad       ! energy transferred from warmer liquid to cool vapor
@@ -14275,74 +14351,74 @@ SUBROUTINE CalculateWalkIn(WalkInID)
 INTEGER      :: ZoneNodeNum             =0   ! Zone node number
 INTEGER      :: ZoneNum                 =0   ! Index to zone
 INTEGER      :: ZoneID                  =0   ! Index to zone
-REAL(r64)    :: CapApplied              =0.0 !  Walk In total capacity at specific operating conditions
-REAL(r64)    :: CircFanSchedule         =0.0
-REAL(r64)    :: Conv                    =0.0 ! conversion factor in gravity equation
-REAL(r64)    :: DefrostCap              =0.0 ! Design defrost capacity of WalkIn (W)
-REAL(r64)    :: DefrostEnergy           =0.0 ! (J)
-REAL(r64)    :: DefEnergyFraction = 0.0 !dimensionless
-REAL(r64)    :: AvailDefrostEnergy = 0.0 !available to melt ice with temp term control (J)
-REAL(r64)    :: DefrostLoad             =0.0 ! (W)
-REAL(r64)    :: DefrostSchedule         =0.0 ! WalkIn defrost schedule, between 0 and 1
-REAL(r64)    :: DefrostDripDownSchedule =0.0 ! WalkIn drip-down schedule (allows coil to drain after defrost)
-REAL(r64)    :: DefrostEnergyNeeded     =0.0 ! Energy needed to melt all ice, used with temperature termination (J)
-REAL(r64)    :: DensityAirWalkIn        =0.0 ! Density at Walk in temperature and 90% assumed RH
-REAL(r64)    :: DensityZoneAir          =0.0 ! Density of the air in a particular zone (kg/m3)
-REAL(r64)    :: DensityFactorFm         =0.0 ! called Fm in ASHRAE 2010 eq 13 page 24.5 for door infiltration
-REAL(r64)    :: DensitySqRtFactor       =0.0 ! from ASHRAE 2010 eq 12 page 24.4 for door infiltration
-REAL(r64)    :: DelTemp                 =0.0 ! Difference between zone and walk in temperatures (C)
-REAL(r64)    :: DesignLighting          =0.0 ! Total design display WalkIn lighting power (W)
-REAL(r64)    :: DesignRatedCap          =0.0 ! Rated capacity of walk in cooler coil (W)
-REAL(r64)    :: DoorFlowFactor          =0.0 ! Derate compared to fully developed flow through 100% open door
-REAL(r64)    :: DoorOpenFactor          =0.0 ! Derate based upon fraction time door opened
-REAL(r64)    :: DoorProtectEff          =0.0 ! Door protection effectiveness
-REAL(r64)    :: DrHeight                =0.0 ! Door height (m)
-REAL(r64)    :: DrArea                  =0.0 ! Door area (m2)
-REAL(r64)    :: EnthalpyAirWalkIn       =0.0 ! Enthalpy of air corresponding to walk in temperatuer and 90% assumed RH (J/kg)
-REAL(r64)    :: EnthalpyZoneAir         =0.0 ! Enthalpy of the air in a particular zone (J/kg)
-REAL(r64)    :: FanLoad                 =0.0 ! Total fan energy rate (W)
-REAL(r64)    :: FloorLoad               =0.0 ! Total floor energy rate (W)
-REAL(r64)    :: FrostChangekg           =0.0 ! Amount of frost added or melted  (kg)
-REAL(r64)    :: FullFlowInfLoad         =0.0 ! Total load (lat + sens) due to 100% open doors w/ fully developed flow (W)
-REAL(r64)    :: GlassDoorInfLoad        =0.0 ! infiltration through glass reach-in doors in a particular zone (W)
-REAL(r64)    :: GlassDoorSensHeat       =0.0 ! sensible heat gain through glass reach-in doors (UA*delta T) (W)
-REAL(r64)    :: GlassDoorArea           =0.0 ! facing a particular zone (m2)
-REAL(r64)    :: Gravity                 =0.0 !
-REAL(r64)    :: HeaterSchedule          =0.0 ! zero to one
-REAL(r64)    :: HeaterLoad              =0.0 ! Total heater (except defrost) energy rate (W)
-REAL(r64)    :: HumRatioAirWalkIn       =0.0 ! corresponds to walk in temp and 90% assumed RH(kg water/kg dry air)
-REAL(r64)    :: HumRatioZoneAir         =0.0 ! Humidity Ratio of the air in a particular zone (kg water/kg dry air)
-REAL(r64)    :: IceSensHeatNeeded       =0.0 ! Energy to raise frost temperature to 0C, used w/ temp termination (J)
-REAL(r64)    :: LatentCapApplied        =0.0 ! Walk In latent capacity at specific operating conditions
-REAL(r64)    :: LatentLoadTotal         =0.0 ! total latent load on WalkIn over all zones (W)
-REAL(r64)    :: LightLoad               =0.0 ! Total lighting energy rate (W)
-REAL(r64)    :: LightingSchedule        =0.0 ! WalkIn lighting schedule
-REAL(r64)    :: LoadRequested           =0.0 ! Load necessary to meet current and all stored energy needs (W)
-REAL(r64)    :: LoadTotal               =0.0 ! total load in time step (W)
-REAL(r64)    :: MassDryAirRate          =0.0 ! Mass dry air infiltrating into/out-of walkin through doors (kg/s)
-REAL(r64)    :: MaxCap                  =0.0 ! Design chilling capacity reduced according to drip-down schedule (W)
-REAL(r64)    :: SensibleCapApplied      =0.0 ! Walk In sensible capacity at specific operating conditions
-REAL(r64)    :: SensibleLoadTotal       =0.0 ! Total sensible load on WalkIn over all zones (W)
-REAL(r64)    :: StoredEnergyRate        =0.0 ! Rate needed to serve all stored energy during single time step (W)
-REAL(r64)    :: StartIceTemp            =0.0 ! Frost temperature at start of time step [C]
-REAL(r64)    :: StartFrostkg            =0.0 ! frost load at start of time step (kg of ice)
-REAL(r64)    :: StockDoorInfLoad        =0.0 ! infiltration through stock doors in a particular zone (W)
-REAL(r64)    :: StockDoorSensHeat       =0.0 ! sensible heat gain through stock doors (UA*delta T) (W)
-REAL(r64)    :: StockDoorArea           =0.0 ! (m2)
-REAL(r64)    :: StockingLoad            =0.0 ! Total load due to stocking WalkIn product (W)
-REAL(r64)    :: TWalkIn                 =0.0 ! WalkIn operating temperature (C)
-REAL(r64)    :: UAOtherSurfaces         =0.0 ! UA for non-door surfaces facing a certain zone (W/C)
-REAL(r64)    :: WalkInSchedule          =0.0 ! Current value of WalkIn operating (availability) schedule
-REAL(r64)    :: WalkInSensLoad          =0.0 ! Walk in cooler sensible load facing particular zone (W)
-REAL(r64)    :: WalkInLatLoad           =0.0 ! Walk in cooler latent load facing particular zone (W)
-REAL(r64)    :: WaterRemovRate          =0.0 ! Walk in cooler removes water at this rate in this zone (kg/s)
-REAL(r64)    :: ZoneDryBulb             =0.0 ! Dry Bulb Temperature of adjacent zone
-REAL(r64)    :: ZoneSensLoad            =0.0 ! Sensible WalkIn credit delivered to a particular zone (W)
-REAL(r64)    :: ZoneLatentLoad          =0.0 ! Latent WalkIn credit delivered to zone (W)
-REAL(r64)    :: ZoneRHFrac              =0.0 ! Zone relative humidity fraction (decimal)
-REAL(r64)    :: ZoneInfilLoad           =0.0 ! Walk in cooler infiltration load (sens + latent) in certain zone (W)
-REAL(r64)    :: ZinfilSensLoad          =0.0 ! Sensible load due to infiltration in one zone
-REAL(r64)    :: ZdoorSensLoad           =0.0 ! Sensible load due to UA delta T through closed door in one zone
+REAL(r64)    :: CapApplied              =0.0d0 !  Walk In total capacity at specific operating conditions
+REAL(r64)    :: CircFanSchedule         =0.0d0
+REAL(r64)    :: Conv                    =0.0d0 ! conversion factor in gravity equation
+REAL(r64)    :: DefrostCap              =0.0d0 ! Design defrost capacity of WalkIn (W)
+REAL(r64)    :: DefrostEnergy           =0.0d0 ! (J)
+REAL(r64)    :: DefEnergyFraction = 0.0d0 !dimensionless
+REAL(r64)    :: AvailDefrostEnergy = 0.0d0 !available to melt ice with temp term control (J)
+REAL(r64)    :: DefrostLoad             =0.0d0 ! (W)
+REAL(r64)    :: DefrostSchedule         =0.0d0 ! WalkIn defrost schedule, between 0 and 1
+REAL(r64)    :: DefrostDripDownSchedule =0.0d0 ! WalkIn drip-down schedule (allows coil to drain after defrost)
+REAL(r64)    :: DefrostEnergyNeeded     =0.0d0 ! Energy needed to melt all ice, used with temperature termination (J)
+REAL(r64)    :: DensityAirWalkIn        =0.0d0 ! Density at Walk in temperature and 90% assumed RH
+REAL(r64)    :: DensityZoneAir          =0.0d0 ! Density of the air in a particular zone (kg/m3)
+REAL(r64)    :: DensityFactorFm         =0.0d0 ! called Fm in ASHRAE 2010 eq 13 page 24.5 for door infiltration
+REAL(r64)    :: DensitySqRtFactor       =0.0d0 ! from ASHRAE 2010 eq 12 page 24.4 for door infiltration
+REAL(r64)    :: DelTemp                 =0.0d0 ! Difference between zone and walk in temperatures (C)
+REAL(r64)    :: DesignLighting          =0.0d0 ! Total design display WalkIn lighting power (W)
+REAL(r64)    :: DesignRatedCap          =0.0d0 ! Rated capacity of walk in cooler coil (W)
+REAL(r64)    :: DoorFlowFactor          =0.0d0 ! Derate compared to fully developed flow through 100% open door
+REAL(r64)    :: DoorOpenFactor          =0.0d0 ! Derate based upon fraction time door opened
+REAL(r64)    :: DoorProtectEff          =0.0d0 ! Door protection effectiveness
+REAL(r64)    :: DrHeight                =0.0d0 ! Door height (m)
+REAL(r64)    :: DrArea                  =0.0d0 ! Door area (m2)
+REAL(r64)    :: EnthalpyAirWalkIn       =0.0d0 ! Enthalpy of air corresponding to walk in temperatuer and 90% assumed RH (J/kg)
+REAL(r64)    :: EnthalpyZoneAir         =0.0d0 ! Enthalpy of the air in a particular zone (J/kg)
+REAL(r64)    :: FanLoad                 =0.0d0 ! Total fan energy rate (W)
+REAL(r64)    :: FloorLoad               =0.0d0 ! Total floor energy rate (W)
+REAL(r64)    :: FrostChangekg           =0.0d0 ! Amount of frost added or melted  (kg)
+REAL(r64)    :: FullFlowInfLoad         =0.0d0 ! Total load (lat + sens) due to 100% open doors w/ fully developed flow (W)
+REAL(r64)    :: GlassDoorInfLoad        =0.0d0 ! infiltration through glass reach-in doors in a particular zone (W)
+REAL(r64)    :: GlassDoorSensHeat       =0.0d0 ! sensible heat gain through glass reach-in doors (UA*delta T) (W)
+REAL(r64)    :: GlassDoorArea           =0.0d0 ! facing a particular zone (m2)
+REAL(r64)    :: Gravity                 =0.0d0 !
+REAL(r64)    :: HeaterSchedule          =0.0d0 ! zero to one
+REAL(r64)    :: HeaterLoad              =0.0d0 ! Total heater (except defrost) energy rate (W)
+REAL(r64)    :: HumRatioAirWalkIn       =0.0d0 ! corresponds to walk in temp and 90% assumed RH(kg water/kg dry air)
+REAL(r64)    :: HumRatioZoneAir         =0.0d0 ! Humidity Ratio of the air in a particular zone (kg water/kg dry air)
+REAL(r64)    :: IceSensHeatNeeded       =0.0d0 ! Energy to raise frost temperature to 0C, used w/ temp termination (J)
+REAL(r64)    :: LatentCapApplied        =0.0d0 ! Walk In latent capacity at specific operating conditions
+REAL(r64)    :: LatentLoadTotal         =0.0d0 ! total latent load on WalkIn over all zones (W)
+REAL(r64)    :: LightLoad               =0.0d0 ! Total lighting energy rate (W)
+REAL(r64)    :: LightingSchedule        =0.0d0 ! WalkIn lighting schedule
+REAL(r64)    :: LoadRequested           =0.0d0 ! Load necessary to meet current and all stored energy needs (W)
+REAL(r64)    :: LoadTotal               =0.0d0 ! total load in time step (W)
+REAL(r64)    :: MassDryAirRate          =0.0d0 ! Mass dry air infiltrating into/out-of walkin through doors (kg/s)
+REAL(r64)    :: MaxCap                  =0.0d0 ! Design chilling capacity reduced according to drip-down schedule (W)
+REAL(r64)    :: SensibleCapApplied      =0.0d0 ! Walk In sensible capacity at specific operating conditions
+REAL(r64)    :: SensibleLoadTotal       =0.0d0 ! Total sensible load on WalkIn over all zones (W)
+REAL(r64)    :: StoredEnergyRate        =0.0d0 ! Rate needed to serve all stored energy during single time step (W)
+REAL(r64)    :: StartIceTemp            =0.0d0 ! Frost temperature at start of time step [C]
+REAL(r64)    :: StartFrostkg            =0.0d0 ! frost load at start of time step (kg of ice)
+REAL(r64)    :: StockDoorInfLoad        =0.0d0 ! infiltration through stock doors in a particular zone (W)
+REAL(r64)    :: StockDoorSensHeat       =0.0d0 ! sensible heat gain through stock doors (UA*delta T) (W)
+REAL(r64)    :: StockDoorArea           =0.0d0 ! (m2)
+REAL(r64)    :: StockingLoad            =0.0d0 ! Total load due to stocking WalkIn product (W)
+REAL(r64)    :: TWalkIn                 =0.0d0 ! WalkIn operating temperature (C)
+REAL(r64)    :: UAOtherSurfaces         =0.0d0 ! UA for non-door surfaces facing a certain zone (W/C)
+REAL(r64)    :: WalkInSchedule          =0.0d0 ! Current value of WalkIn operating (availability) schedule
+REAL(r64)    :: WalkInSensLoad          =0.0d0 ! Walk in cooler sensible load facing particular zone (W)
+REAL(r64)    :: WalkInLatLoad           =0.0d0 ! Walk in cooler latent load facing particular zone (W)
+REAL(r64)    :: WaterRemovRate          =0.0d0 ! Walk in cooler removes water at this rate in this zone (kg/s)
+REAL(r64)    :: ZoneDryBulb             =0.0d0 ! Dry Bulb Temperature of adjacent zone
+REAL(r64)    :: ZoneSensLoad            =0.0d0 ! Sensible WalkIn credit delivered to a particular zone (W)
+REAL(r64)    :: ZoneLatentLoad          =0.0d0 ! Latent WalkIn credit delivered to zone (W)
+REAL(r64)    :: ZoneRHFrac              =0.0d0 ! Zone relative humidity fraction (decimal)
+REAL(r64)    :: ZoneInfilLoad           =0.0d0 ! Walk in cooler infiltration load (sens + latent) in certain zone (W)
+REAL(r64)    :: ZinfilSensLoad          =0.0d0 ! Sensible load due to infiltration in one zone
+REAL(r64)    :: ZdoorSensLoad           =0.0d0 ! Sensible load due to UA delta T through closed door in one zone
 
   WalkInSchedule = GetCurrentScheduleValue( WalkIn( WalkInID)%SchedPtr)
   IF ( WalkInSchedule <= 0) RETURN
@@ -14378,12 +14454,12 @@ REAL(r64)    :: ZdoorSensLoad           =0.0 ! Sensible load due to UA delta T t
   !set to zero before summing over zones
   SensibleLoadTotal = 0.d0
   LatentLoadTotal = 0.d0
-  WalkIn(WalkInID)%SensZoneCreditRate   = 0.0
-  WalkIn(WalkInID)%SensZoneCreditCoolRate   = 0.0
-  WalkIn(WalkInID)%SensZoneCreditCool       = 0.0
-  WalkIn(WalkInID)%SensZoneCreditHeatRate   = 0.0
-  WalkIn(WalkInID)%SensZoneCreditHeat       = 0.0
-  WalkIn(WalkInID)%LatZoneCreditRate        = 0.0
+  WalkIn(WalkInID)%SensZoneCreditRate   = 0.0d0
+  WalkIn(WalkInID)%SensZoneCreditCoolRate   = 0.0d0
+  WalkIn(WalkInID)%SensZoneCreditCool       = 0.0d0
+  WalkIn(WalkInID)%SensZoneCreditHeatRate   = 0.0d0
+  WalkIn(WalkInID)%SensZoneCreditHeat       = 0.0d0
+  WalkIn(WalkInID)%LatZoneCreditRate        = 0.0d0
 
  !Start zone loop:
  DO ZoneID = 1,WalkIn(WalkInID)%NumZones
@@ -14402,10 +14478,10 @@ REAL(r64)    :: ZdoorSensLoad           =0.0 ! Sensible load due to UA delta T t
 
   !Get infiltration loads if either type of door is present in this zone
   IF(StockDoorArea > 0.d0 .OR. GlassDoorArea > 0.d0) THEN
-    ZoneRHFrac      =  PsyRhFnTdbWPb(Node(ZoneNodeNum)%Temp,Node(ZoneNodeNum)%Humrat,OutBaroPress)
-    EnthalpyZoneAir =  PsyHFnTdbRhPb(ZoneDryBulb,ZoneRHFrac,OutBaroPress)
-    HumRatioZoneAir =  PsyWFnTdbH(ZoneDryBulb,EnthalpyZoneAir)
-    DensityZoneAir  =  PsyRhoAirFnPbTdbW(OutBaroPress,ZoneDryBulb,HumRatioZoneAir)
+    ZoneRHFrac      =  PsyRhFnTdbWPb(Node(ZoneNodeNum)%Temp,Node(ZoneNodeNum)%Humrat,OutBaroPress,'CalculateWalkIn')
+    EnthalpyZoneAir =  PsyHFnTdbRhPb(ZoneDryBulb,ZoneRHFrac,OutBaroPress,'CalculateWalkIn')
+    HumRatioZoneAir =  PsyWFnTdbH(ZoneDryBulb,EnthalpyZoneAir,'CalculateWalkIn')
+    DensityZoneAir  =  PsyRhoAirFnPbTdbW(OutBaroPress,ZoneDryBulb,HumRatioZoneAir,'CalculateWalkIn')
     IF (DensityZoneAir < DensityAirWalkIn)THEN !usual case when walk in is colder than zone
       DensitySqRtFactor = (1.d0 - DensityZoneAir/DensityAirWalkIn)**0.5d0
       DensityFactorFm = (2.d0/(1.d0 + (DensityAirWalkIn/DensityZoneAir)**0.333d0))**1.5d0
@@ -14500,16 +14576,16 @@ REAL(r64)    :: ZdoorSensLoad           =0.0 ! Sensible load due to UA delta T t
  ! Set up report variables for each zone for this walk-in
  ! Sensible heat exchange can be positive or negative, split into separate output variables and always report positive value
   WalkIn(WalkInID)%SensZoneCreditRate(ZoneID) = ZoneSensLoad
-  IF(ZoneSensLoad <= 0.0) THEN
+  IF(ZoneSensLoad <= 0.0d0) THEN
      WalkIn(WalkInID)%SensZoneCreditCoolRate(ZoneID) = -ZoneSensLoad
      WalkIn(WalkInID)%SensZoneCreditCool(ZoneID)     = -ZoneSensLoad * TimeStepZone * SecInHour
-     WalkIn(WalkInID)%SensZoneCreditHeatRate(ZoneID) = 0.0
-     WalkIn(WalkInID)%SensZoneCreditHeat(ZoneID)     = 0.0
+     WalkIn(WalkInID)%SensZoneCreditHeatRate(ZoneID) = 0.0d0
+     WalkIn(WalkInID)%SensZoneCreditHeat(ZoneID)     = 0.0d0
   ELSE
      WalkIn(WalkInID)%SensZoneCreditHeatRate(ZoneID) = ZoneSensLoad
      WalkIn(WalkInID)%SensZoneCreditHeat(ZoneID)     = ZoneSensLoad * TimeStepZone * SecInHour
-     WalkIn(WalkInID)%SensZoneCreditCoolRate(ZoneID) = 0.0
-     WalkIn(WalkInID)%SensZoneCreditCool(ZoneID)     = 0.0
+     WalkIn(WalkInID)%SensZoneCreditCoolRate(ZoneID) = 0.0d0
+     WalkIn(WalkInID)%SensZoneCreditCool(ZoneID)     = 0.0d0
   END IF
   ! This rate should always be negative
   WalkIn(WalkInID)%LatZoneCreditRate(ZoneID)        = ZoneLatentLoad
@@ -14535,7 +14611,7 @@ END DO !Do loop over zones for zone-condition-related sensible and latent loads
 
 
 !DEFROST CALCULATIONS
-  IF((DefrostSchedule > 0.0).AND. &
+  IF((DefrostSchedule > 0.0d0).AND. &
       (WalkIn(WalkInID)%DefrostType /= WalkInDefrostNone) .AND. &
       (WalkIn(WalkInID)%DefrostType /=  WalkInDefrostOffCycle)) THEN
       DefrostLoad = DefrostCap*DefrostSchedule  !W
@@ -14771,8 +14847,8 @@ SUBROUTINE CalculateSecondary(SecondaryNum)
   REAL(r64)   :: Error             ! Used in iterative soln for pumps needed to meet load (that has to include pump energy)
   REAL(r64)   :: Eta               ! Secondary loop heat exchanger eta, dimensionless
   REAL(r64)   :: FlowVolNeeded     ! Flow rate needed to meet load (m3/s)
-  REAL(r64)   :: LoadRequested           =0.0 ! Load necessary to meet current and all stored energy needs (W)
-  REAL(r64)   :: LocalTimeStep = 0.0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
+  REAL(r64)   :: LoadRequested           =0.0d0 ! Load necessary to meet current and all stored energy needs (W)
+  REAL(r64)   :: LocalTimeStep = 0.0d0 !TimeStepZone for case/walkin systems, TimeStepSys for coil systems
   REAL(r64)   :: MaxLoad           ! Secondary loop capacity can be limited by heat exchanger or pumps (W)
   REAL(r64)   :: MaxVolFlow        ! Flow can be limited by either total pump capacity or heat exchanger design (m3/s)
   REAL(r64)   :: PartLdFrac        ! Used to ratio pump power
@@ -15073,7 +15149,7 @@ SUBROUTINE SumZoneImpacts
              - CoilSysCredit(ZoneNum)%LatCreditToZoneEnergy
        ! Sensible rate can be positive or negative, split into separate output variables and
        !   always report positive value
-       IF(CoilSysCredit(ZoneNum)%SenCreditToZoneRate <= 0.0) THEN
+       IF(CoilSysCredit(ZoneNum)%SenCreditToZoneRate <= 0.0d0) THEN
          CoilSysCredit(ZoneNum)%ReportSenCoolingToZoneRate = &
               - CoilSysCredit(ZoneNum)%SenCreditToZoneRate
          CoilSysCredit(ZoneNum)%ReportSenCoolingToZoneEnergy = &
@@ -15111,7 +15187,7 @@ SUBROUTINE SumZoneImpacts
                   TimeStepZone * SecInHour
        ! Sensible rate can be positive or negative, split into separate output variables and
        !   always report positive value
-       IF(RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone <= 0.0) THEN
+       IF(RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone <= 0.0d0) THEN
          CaseWIZoneReport(ZoneNum)%SenCoolingToZoneRate = &
                   - RefrigCaseCredit(ZoneNum)%SenCaseCreditToZone
          CaseWIZoneReport(ZoneNum)%SenCoolingToZoneEnergy  = &
@@ -15336,9 +15412,9 @@ SUBROUTINE CalculateAirChillerSets(AirChillerSetID)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER      :: CoilID              =0   ! Index to coil
 INTEGER      :: CoilIndex           =0   ! rank of coils within system
-REAL(r64)    :: AirChillerSetSchedule     =0.0   ! Schedule value for air chiller SET
-REAL(r64)    :: QZNReqSens          =0.0   ! Amount of sensible heat needed by the zone, NEGATIVE when cooling needed [W]
-REAL(r64)    :: RemainQZNReqSens    =0.0   ! Remaiing amount of sensible heat needed by the zone [W]
+REAL(r64)    :: AirChillerSetSchedule     =0.0d0   ! Schedule value for air chiller SET
+REAL(r64)    :: QZNReqSens          =0.0d0   ! Amount of sensible heat needed by the zone, NEGATIVE when cooling needed [W]
+REAL(r64)    :: RemainQZNReqSens    =0.0d0   ! Remaiing amount of sensible heat needed by the zone [W]
 
 
   !Note, all coils in a coil set are in the same zone
@@ -15413,10 +15489,10 @@ SUBROUTINE FinalRateCoils(Derate,SystemSourceType,SystemID,InitialTotalLoad,Avai
 INTEGER      :: NumCoils             =0   ! Number of coils on this system or secondary loop
 INTEGER      :: CoilID               =0   ! Index to coil
 INTEGER      :: CoilIndex            =0   ! rank of coils within system
-REAL(r64)    :: DeRateFactor         =0.0 ! Ratio of energy available from system or secondary loop
-REAL(r64)    :: InitLatCreditEnergy  =0.0 ! Latent credit energy before derate [W]
-REAL(r64)    :: InitKgFrost          =0.0 ! Initial amount of frost on coils based on latent load before derate [kg]
-REAL(r64)    :: FrostReduction       =0.0 ! Change in frost on coils based on derated latent load [kg]
+REAL(r64)    :: DeRateFactor         =0.0d0 ! Ratio of energy available from system or secondary loop
+REAL(r64)    :: InitLatCreditEnergy  =0.0d0 ! Latent credit energy before derate [W]
+REAL(r64)    :: InitKgFrost          =0.0d0 ! Initial amount of frost on coils based on latent load before derate [kg]
+REAL(r64)    :: FrostReduction       =0.0d0 ! Change in frost on coils based on derated latent load [kg]
 
 SELECT CASE (SystemSourceType)
 CASE (DetailedSystem)
@@ -15549,75 +15625,75 @@ INTEGER      :: FanSpeedControlType     =0   ! from input
 INTEGER      :: ShrCorrectionCurvePtr   =0   ! Points to curve entered by user to specify total/sensible capacity as a function of SHR
 INTEGER      :: SHRCorrectionType       =0   ! SHR60, QUADRATICSHR, EUROPEAN, or TABULARRH_DT1_TRoom
 INTEGER      :: ZoneNodeNum             =0   ! Zone node number
-REAL(r64)    :: AirVolRatio             =0.0 ! used when operating at part load
-REAL(r64)    :: AirVolumeFlowMax        =0.0 ! Coil air flow limited by drip down schedule (m3/s)
-REAL(r64)    :: AirVolumeFlowRated      =0.0 ! Coil rated air flow (m3/s)
-REAL(r64)    :: AvailDefrostEnergy      =0.0 ! available to melt ice with temp term control (J)
-REAL(r64)    :: CapFac                  =0.0 ! used to reduce fan power when don't need full coil capacity
-REAL(r64)    :: CoilCapTotal            =0.0 ! Sensible plus latent load (W)
-REAL(r64)    :: CoilCapTotEstimate      =0.0 ! Part of loop to solve for total coil capacity as a function of inlet air conditions (W)
-REAL(r64)    :: CoilInletCp             =0.0 ! Coil air inlet specific heat (J/kg-deltaC)
-REAL(r64)    :: CoilInletDensity        =0.0 ! Coil air inlet density (kg/m3)
-REAL(r64)    :: CoilInletDryAirCp       =0.0 ! Dry air specific heat at coil inlet temperature (J/kg-C)
-REAL(r64)    :: CoilInletDryAirDensity  =0.0 ! Dry Air density at coil inlet temperature (kg/m3)
-REAL(r64)    :: CoilInletHumRatio       =0.0 ! Coil air inlet humidity ratio (kg water/kg air)
-REAL(r64)    :: CoilInletTemp           =0.0 ! Inlet temperature of air to coil, not mixed zone temperature unless "middle" location selected (C)
-REAL(r64)    :: CoilInletEnthalpy       =0.0 ! Coil inlet air enthalpy (J/kg)
-REAL(r64)    :: CoilInletRHFrac         =0.0 ! Coil inlet air relative humidity expressed as a fraction (0 to 1)
-REAL(r64)    :: CoilSchedule            =0.0 ! Current value of Coil operating (availability) schedule
-REAL(r64)    :: CoolingLoadNet          =0.0 ! Cooling capacity of the coil minus fan, heater, and defrost loads (W)
-REAL(r64)    :: DefrostCap              =0.0 ! Design defrost capacity of Coil (W)
-REAL(r64)    :: DefrostEnergy           =0.0 ! (J)
-REAL(r64)    :: DefEnergyFraction       =0.0 ! dimensionless
-REAL(r64)    :: DefrostLoad             =0.0 ! Part of the defrost that is a heat load on the zone (W)
-REAL(r64)    :: DefrostSchedule         =0.0 ! Coil defrost schedule, between 0 and 1
-REAL(r64)    :: DefrostDripDownSchedule =0.0 ! Coil drip-down schedule (allows coil to drain after defrost)
-REAL(r64)    :: DefrostEnergyNeeded     =0.0 ! Energy needed to melt all ice, used with temperature termination (J)
-REAL(r64)    :: DefrostRateNeeded       =0.0 ! Defrost load that actually goes to melting ice (W)
-REAL(r64)    :: DryAirMassFlowMax       =0.0 ! Rated volume flow rate times dry air density adjusted for schedules (kg/s)
-REAL(r64)    :: DryAirMassFlowRated     =0.0 ! Rated volume flow rate times dry air density
-!REAL(r64)    :: Error                   =0.0 ! Used in iterative solution for sensible heat ratio
-REAL(r64)    :: ExitHumRatio            =0.0 ! kg water/kg air
-REAL(r64)    :: ExitTemperature         =0.0 ! Air temperature leaving the coil (C)
-REAL(r64)    :: ExitTemperatureEstimate =0.0 ! Estimated Air temperature leaving the coil (C)
-REAL(r64)    :: ExitEnthalpy            =0.0 ! Air enthalpy leaving the coil (J/kg)
-REAL(r64)    :: ExitEnthalpyEstimate    =0.0 ! Estimated Air enthalpy leaving the coil (J/kg)
-REAL(r64)    :: FanMinAirFlowRatio      =0.0 ! From input
-REAL(r64)    :: FanPowerActual          =0.0 ! (W)
-REAL(r64)    :: FanPowerRated           =0.0 ! (W)
-REAL(r64)    :: FanPowerMax             =0.0 ! Total fan energy rate, limited by dripdown period (W)
-REAL(r64)    :: FanPowerRatio           =0.0 ! Used for variable speed fans, dimensionless
-REAL(r64)    :: FrostChangekg           =0.0 ! Amount of frost added or melted  (kg)
-REAL(r64)    :: HeaterSchedule          =0.0 ! zero to one
-REAL(r64)    :: HeaterLoad              =0.0 ! Total heater (except defrost) energy rate (W)
-REAL(r64)    :: IceSensHeatNeeded       =0.0 ! Energy to raise frost temperature to 0C, used w/ temp termination (J)
-REAL(r64)    :: LatLoadServed           =0.0 ! Energy rate used to remove water from zone air (W)
-REAL(r64)    :: MaxTemperatureDif       =0.0 ! Used to limit capacity during initial pulldown (deltaC)
-REAL(r64)    :: SensibleCapacityMax     =0.0 ! Sensible capacity adjusted for any time in dripdown state (W)
-!REAL(r64)    :: SensibleLoad            =0.0 ! Sensible load provided by coil (W)
-REAL(r64)    :: SensLoadRequested       =0.0 ! Sensible load requested by zone balance (W)
-REAL(r64)    :: SensLoadFromZone        =0.0 ! Net sensible load removed from zone after accounting for heaters, fans, defrost [W]
-REAL(r64)    :: SensLoadRequestedGross  =0.0 ! Gross sensible load removed by coil
-REAL(r64)    :: SensLoadGross           =0.0 ! Sensible load met by coil (W)
-REAL(r64)    :: SHR                     =0.0 ! Sensible heat ratio, sensible load/total load
-REAL(r64)    :: SHRCorrection           =0.0 ! Actual total/sensible load, NOT = Inverse SHR (unless coil efficiency = 1.0),
+REAL(r64)    :: AirVolRatio             =0.0d0 ! used when operating at part load
+REAL(r64)    :: AirVolumeFlowMax        =0.0d0 ! Coil air flow limited by drip down schedule (m3/s)
+REAL(r64)    :: AirVolumeFlowRated      =0.0d0 ! Coil rated air flow (m3/s)
+REAL(r64)    :: AvailDefrostEnergy      =0.0d0 ! available to melt ice with temp term control (J)
+REAL(r64)    :: CapFac                  =0.0d0 ! used to reduce fan power when don't need full coil capacity
+REAL(r64)    :: CoilCapTotal            =0.0d0 ! Sensible plus latent load (W)
+REAL(r64)    :: CoilCapTotEstimate      =0.0d0 ! Part of loop to solve for total coil capacity as a function of inlet air conditions (W)
+REAL(r64)    :: CoilInletCp             =0.0d0 ! Coil air inlet specific heat (J/kg-deltaC)
+REAL(r64)    :: CoilInletDensity        =0.0d0 ! Coil air inlet density (kg/m3)
+REAL(r64)    :: CoilInletDryAirCp       =0.0d0 ! Dry air specific heat at coil inlet temperature (J/kg-C)
+REAL(r64)    :: CoilInletDryAirDensity  =0.0d0 ! Dry Air density at coil inlet temperature (kg/m3)
+REAL(r64)    :: CoilInletHumRatio       =0.0d0 ! Coil air inlet humidity ratio (kg water/kg air)
+REAL(r64)    :: CoilInletTemp           =0.0d0 ! Inlet temperature of air to coil, not mixed zone temperature unless "middle" location selected (C)
+REAL(r64)    :: CoilInletEnthalpy       =0.0d0 ! Coil inlet air enthalpy (J/kg)
+REAL(r64)    :: CoilInletRHFrac         =0.0d0 ! Coil inlet air relative humidity expressed as a fraction (0 to 1)
+REAL(r64)    :: CoilSchedule            =0.0d0 ! Current value of Coil operating (availability) schedule
+REAL(r64)    :: CoolingLoadNet          =0.0d0 ! Cooling capacity of the coil minus fan, heater, and defrost loads (W)
+REAL(r64)    :: DefrostCap              =0.0d0 ! Design defrost capacity of Coil (W)
+REAL(r64)    :: DefrostEnergy           =0.0d0 ! (J)
+REAL(r64)    :: DefEnergyFraction       =0.0d0 ! dimensionless
+REAL(r64)    :: DefrostLoad             =0.0d0 ! Part of the defrost that is a heat load on the zone (W)
+REAL(r64)    :: DefrostSchedule         =0.0d0 ! Coil defrost schedule, between 0 and 1
+REAL(r64)    :: DefrostDripDownSchedule =0.0d0 ! Coil drip-down schedule (allows coil to drain after defrost)
+REAL(r64)    :: DefrostEnergyNeeded     =0.0d0 ! Energy needed to melt all ice, used with temperature termination (J)
+REAL(r64)    :: DefrostRateNeeded       =0.0d0 ! Defrost load that actually goes to melting ice (W)
+REAL(r64)    :: DryAirMassFlowMax       =0.0d0 ! Rated volume flow rate times dry air density adjusted for schedules (kg/s)
+REAL(r64)    :: DryAirMassFlowRated     =0.0d0 ! Rated volume flow rate times dry air density
+!REAL(r64)    :: Error                   =0.0d0 ! Used in iterative solution for sensible heat ratio
+REAL(r64)    :: ExitHumRatio            =0.0d0 ! kg water/kg air
+REAL(r64)    :: ExitTemperature         =0.0d0 ! Air temperature leaving the coil (C)
+REAL(r64)    :: ExitTemperatureEstimate =0.0d0 ! Estimated Air temperature leaving the coil (C)
+REAL(r64)    :: ExitEnthalpy            =0.0d0 ! Air enthalpy leaving the coil (J/kg)
+REAL(r64)    :: ExitEnthalpyEstimate    =0.0d0 ! Estimated Air enthalpy leaving the coil (J/kg)
+REAL(r64)    :: FanMinAirFlowRatio      =0.0d0 ! From input
+REAL(r64)    :: FanPowerActual          =0.0d0 ! (W)
+REAL(r64)    :: FanPowerRated           =0.0d0 ! (W)
+REAL(r64)    :: FanPowerMax             =0.0d0 ! Total fan energy rate, limited by dripdown period (W)
+REAL(r64)    :: FanPowerRatio           =0.0d0 ! Used for variable speed fans, dimensionless
+REAL(r64)    :: FrostChangekg           =0.0d0 ! Amount of frost added or melted  (kg)
+REAL(r64)    :: HeaterSchedule          =0.0d0 ! zero to one
+REAL(r64)    :: HeaterLoad              =0.0d0 ! Total heater (except defrost) energy rate (W)
+REAL(r64)    :: IceSensHeatNeeded       =0.0d0 ! Energy to raise frost temperature to 0C, used w/ temp termination (J)
+REAL(r64)    :: LatLoadServed           =0.0d0 ! Energy rate used to remove water from zone air (W)
+REAL(r64)    :: MaxTemperatureDif       =0.0d0 ! Used to limit capacity during initial pulldown (deltaC)
+REAL(r64)    :: SensibleCapacityMax     =0.0d0 ! Sensible capacity adjusted for any time in dripdown state (W)
+!REAL(r64)    :: SensibleLoad            =0.0d0 ! Sensible load provided by coil (W)
+REAL(r64)    :: SensLoadRequested       =0.0d0 ! Sensible load requested by zone balance (W)
+REAL(r64)    :: SensLoadFromZone        =0.0d0 ! Net sensible load removed from zone after accounting for heaters, fans, defrost [W]
+REAL(r64)    :: SensLoadRequestedGross  =0.0d0 ! Gross sensible load removed by coil
+REAL(r64)    :: SensLoadGross           =0.0d0 ! Sensible load met by coil (W)
+REAL(r64)    :: SHR                     =0.0d0 ! Sensible heat ratio, sensible load/total load
+REAL(r64)    :: SHRCorrection           =0.0d0 ! Actual total/sensible load, NOT = Inverse SHR (unless coil efficiency = 1.0),
                                              ! but function of SHR, which is why iteration needed
-REAL(r64)    :: ShrCorrection60         =0.0 ! Total capacity as a fraction of sensible capacity at a SHR of 0.6, entered by user
-REAL(r64)    :: Slope                   =0.0 ! Part of linear SHR60 correction factor, dimensionless
-REAL(r64)    :: StartIceTemp            =0.0 ! Frost temperature at start of time step [C]
-REAL(r64)    :: StartFrostkg            =0.0 ! frost load at start of time step (kg of ice)
-REAL(r64)    :: TemperatureDif          =0.0 ! difference between inlet air and evaporating temperature (deltaC)
-REAL(r64)    :: TEvap                   =0.0 ! Evaporating temperature in the coil (C)
-REAL(r64)    :: UnitLoadFactorSens      =0.0 ! Rated capacity divided by rated DT1 (T air in - Tevap) (W/delta C)
-REAL(r64)    :: WaterRemovRate          =0.0 ! Walk in cooler removes water at this rate in this zone (kg/s)
-REAL(r64)    :: Yint                    =0.0 !Part of linear SHR60 correction factor, dimensionless
-REAL(r64)    :: ZoneDryAirDensity       =0.0 ! Dry air density at mixed zone conditions
-REAL(r64)    :: ZoneMixedAirCp          =0.0 ! J/kg-deltaC
-REAL(r64)    :: ZoneMixedAirDensity     =0.0 ! kg/m3
-REAL(r64)    :: ZoneMixedAirDrybulb     =0.0 ! (C)
-REAL(r64)    :: ZoneMixedAirRHfrac      =0.0 ! relative humidity of mixed air in the zone expressed as a fraction from 0 to 1
-REAL(r64)    :: ZoneMixedAirEnthalpy    =0.0 ! J/kg
-REAL(r64)    :: ZoneMixedAirHumRatio    =0.0 ! kg water/kg air in the zone mixed air
+REAL(r64)    :: ShrCorrection60         =0.0d0 ! Total capacity as a fraction of sensible capacity at a SHR of 0.6, entered by user
+REAL(r64)    :: Slope                   =0.0d0 ! Part of linear SHR60 correction factor, dimensionless
+REAL(r64)    :: StartIceTemp            =0.0d0 ! Frost temperature at start of time step [C]
+REAL(r64)    :: StartFrostkg            =0.0d0 ! frost load at start of time step (kg of ice)
+REAL(r64)    :: TemperatureDif          =0.0d0 ! difference between inlet air and evaporating temperature (deltaC)
+REAL(r64)    :: TEvap                   =0.0d0 ! Evaporating temperature in the coil (C)
+REAL(r64)    :: UnitLoadFactorSens      =0.0d0 ! Rated capacity divided by rated DT1 (T air in - Tevap) (W/delta C)
+REAL(r64)    :: WaterRemovRate          =0.0d0 ! Walk in cooler removes water at this rate in this zone (kg/s)
+REAL(r64)    :: Yint                    =0.0d0 !Part of linear SHR60 correction factor, dimensionless
+REAL(r64)    :: ZoneDryAirDensity       =0.0d0 ! Dry air density at mixed zone conditions
+REAL(r64)    :: ZoneMixedAirCp          =0.0d0 ! J/kg-deltaC
+REAL(r64)    :: ZoneMixedAirDensity     =0.0d0 ! kg/m3
+REAL(r64)    :: ZoneMixedAirDrybulb     =0.0d0 ! (C)
+REAL(r64)    :: ZoneMixedAirRHfrac      =0.0d0 ! relative humidity of mixed air in the zone expressed as a fraction from 0 to 1
+REAL(r64)    :: ZoneMixedAirEnthalpy    =0.0d0 ! J/kg
+REAL(r64)    :: ZoneMixedAirHumRatio    =0.0d0 ! kg water/kg air in the zone mixed air
 
   ! GET SCHEDULES
   CoilSchedule            = GetCurrentScheduleValue(WarehouseCoil(CoilID)%SchedPtr)
@@ -15776,7 +15852,7 @@ IF(AirVolumeFlowMax > 0.d0) THEN
           !PARAMETER ::EuropeanEvapTemp      = (/ 0.0D0, -8.0D0, -25.0D0, -31.0D0, -40.0D0/)
           !PARAMETER ::EuropeanDT1           = (/10.0D0,  8.0D0,   7.0D0,   7.0D0,   6.0D0/)
           IF (CoilInletTemp <= -25.d0) THEN
-            SHRCorrection = 1.0
+            SHRCorrection = 1.0d0
           ELSE IF(CoilInletTemp > -25.d0 .and. CoilInletTemp <=0.0d0) THEN
             SHRCorrection = (EuropeanWetCoilFactor(2)-EuropeanWetCoilFactor(4))/ &
                             (EuropeanAirInletTemp(2) - EuropeanAirInletTemp(4)) * &
@@ -15797,7 +15873,7 @@ IF(AirVolumeFlowMax > 0.d0) THEN
     END IF !  (SensibleCapacityMax > 0.d0)
   END IF ! Rating type : CapacityTotalSpecificConditions or Sensible Unit Load Factor
 
-  IF (CoilCapTotEstimate > 0.) THEN
+  IF (CoilCapTotEstimate > 0.0d0) THEN
       ExitEnthalpy    = CoilInletEnthalpy - (CoilCapTotEstimate/(AirVolumeFlowMax*CoilInletDensity))
       ExitTemperature = PsyTsatFnHPb(ExitEnthalpy,OutBaroPress,TrackMessage) !RH =1.0 at Tsat
       ExitHumRatio    = PsyWFnTdbH(ExitTemperature,ExitEnthalpy,TrackMessage)
@@ -15884,7 +15960,7 @@ END IF !(AirVolumeFlowMax > 0.d0)
 !                     in starting IF are there to mimic temperature override
 !                     on the coils that stops defrost if the coils get above
 !                     a certain temperature (such as when there's no load and no ice)
-  IF((DefrostSchedule > 0.0).AND. &
+  IF((DefrostSchedule > 0.0d0).AND. &
       (WarehouseCoil(CoilID)%DefrostType /= DefrostNone) .AND. &
       (WarehouseCoil(CoilID)%DefrostType /=  DefrostOffCycle))THEN
       DefrostLoad   = DefrostCap * DefrostSchedule  !W
@@ -16167,7 +16243,7 @@ SUBROUTINE ZeroHVACValues
   INTEGER      :: PlantLoopSideIndex = 0  ! Used to zero request for cooling water for condenser
   INTEGER      :: PlantBranchIndex = 0  ! Used to zero request for cooling water for condenser
   INTEGER      :: PlantCompIndex   = 0  ! Used to zero request for cooling water for condenser
-  REAL(r64)    :: MassFlowRate     =0.0 ! Used to zero request for cooling water for condenser
+  REAL(r64)    :: MassFlowRate     =0.0d0 ! Used to zero request for cooling water for condenser
 
 
   IF(HaveRefrigRacks) THEN

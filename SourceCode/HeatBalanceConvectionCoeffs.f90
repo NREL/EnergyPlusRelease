@@ -507,11 +507,11 @@ SUBROUTINE InitInteriorConvectionCoeffs(SurfaceTemperatures,ZoneToResimulate)
         Node%TempSetPointLo            = DefaultNodeValues%TempSetPointLo
         IF (ALLOCATED(MoreNodeInfo)) THEN
           MoreNodeInfo%WetbulbTemp       = DefaultNodeValues%Temp
-          MoreNodeInfo%RelHumidity       = 0.0
+          MoreNodeInfo%RelHumidity       = 0.0d0
           MoreNodeInfo%ReportEnthalpy    = DefaultNodeValues%Enthalpy
-          MoreNodeInfo%VolFlowRateStdRho = 0.0
-          MoreNodeInfo%VolFlowRateCrntRho= 0.0
-          MoreNodeInfo%AirDensity        = 0.0
+          MoreNodeInfo%VolFlowRateStdRho = 0.0d0
+          MoreNodeInfo%VolFlowRateCrntRho= 0.0d0
+          MoreNodeInfo%Density           = 0.0d0
         ENDIF
       ENDIF
     ENDIF
@@ -695,9 +695,9 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
   BaseSurf = Surface(SurfNum)%BaseSurf ! If this is a base surface, BaseSurf = SurfNum
 
   IF (.NOT. Surface(SurfNum)%ExtWind) THEN
-    SurfWindSpeed = 0.0  ! No wind exposure
+    SurfWindSpeed = 0.0d0  ! No wind exposure
   ELSE IF (Surface(SurfNum)%Class == SurfaceClass_Window .AND. SurfaceWindow(SurfNum)%ShadingFlag == ExtShadeOn) THEN
-    SurfWindSpeed = 0.0  ! Assume zero wind speed at outside glass surface of window with exterior shade
+    SurfWindSpeed = 0.0d0  ! Assume zero wind speed at outside glass surface of window with exterior shade
   ELSE
     SurfWindSpeed = Surface(SurfNum)%WindSpeed
   ENDIF
@@ -735,15 +735,15 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           ! due to outlying calculations when perimeter is very small compared to area, use Perimeter
           ! approximation calculation
 
-          IF (Surface(BaseSurf)%GrossArea /= 0.0 .and. Surface(BaseSurf)%Height /= 0.0) THEN
+          IF (Surface(BaseSurf)%GrossArea /= 0.0d0 .and. Surface(BaseSurf)%Height /= 0.0d0) THEN
             rCalcPerimeter = 2.0d0  * (Surface(BaseSurf)%GrossArea / Surface(BaseSurf)%Height + Surface(BaseSurf)%Height)
             Hf = CalcHfExteriorSparrow(SurfWindSpeed, Surface(BaseSurf)%GrossArea, rCalcPerimeter, &
               Surface(SurfNum)%CosTilt, Surface(SurfNum)%Azimuth, Roughness, WindDir)
           ELSE
-            Hf = 0.0
+            Hf = 0.0d0
           ENDIF
 
-          IF (HMovInsul > 0.0) TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
+          IF (HMovInsul > 0.0d0) TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
           Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
           HExt = Hn + Hf
 
@@ -787,7 +787,7 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
           HcGlass = SQRT(Hn**2 + (ConstantA * SurfWindSpeed ** ConstantB)**2)
           Hf = RoughnessMultiplier(Roughness) * (HcGlass - Hn)
-          IF (HMovInsul > 0.0) THEN
+          IF (HMovInsul > 0.0d0) THEN
             TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
             Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
             ! Better if there was iteration for movable insulation?
@@ -808,7 +808,7 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
        IF (Surface(SurfNum)%EMSOverrideExtConvCoef) HExt = Surface(SurfNum)%EMSValueForExtConvCoef
 
        IF (TSurf == SkyTempKelvin .OR. ABS(Surface(SurfNum)%ExtConvCoeff) == ASHRAESimple) THEN
-         HSky = 0.0
+         HSky = 0.0d0
        ELSE
          ! Compute sky radiation coefficient
          HSky = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorSkyIR &
@@ -816,8 +816,8 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
        END IF
 
        IF (TSurf == TAir .OR. ABS(Surface(SurfNum)%ExtConvCoeff) == ASHRAESimple) THEN
-         HGround = 0.0
-         HAir = 0.0
+         HGround = 0.0d0
+         HAir = 0.0d0
        ELSE
          ! Compute ground radiation coefficient
          HGround = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorGroundIR &
@@ -858,15 +858,15 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           ! due to outlying calculations when perimeter is very small compared to area, use Perimeter
           ! approximation calculation
 
-          IF (Surface(BaseSurf)%GrossArea /= 0.0 .and. Surface(BaseSurf)%Height /= 0.0) THEN
+          IF (Surface(BaseSurf)%GrossArea /= 0.0d0 .and. Surface(BaseSurf)%Height /= 0.0d0) THEN
             rCalcPerimeter = 2.0d0  * (Surface(BaseSurf)%GrossArea / Surface(BaseSurf)%Height + Surface(BaseSurf)%Height)
             Hf = CalcHfExteriorSparrow(SurfWindSpeed, Surface(BaseSurf)%GrossArea, rCalcPerimeter, &
               Surface(SurfNum)%CosTilt, Surface(SurfNum)%Azimuth, Roughness, WindDir)
           ELSE
-            Hf = 0.0
+            Hf = 0.0d0
           ENDIF
 
-          IF (HMovInsul > 0.0) TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
+          IF (HMovInsul > 0.0d0) TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
           Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
           HExt = Hn + Hf
 
@@ -909,7 +909,7 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
           HcGlass = SQRT(Hn**2 + (ConstantA * SurfWindSpeed ** ConstantB)**2)
           Hf = RoughnessMultiplier(Roughness) * (HcGlass - Hn)
-          IF (HMovInsul > 0.0) THEN
+          IF (HMovInsul > 0.0d0) THEN
             TSurf = (HMovInsul * TSurf + Hf * TAir) / (HMovInsul + Hf)
             Hn = CalcHnASHRAETARPExterior(TSurf,TAir,Surface(SurfNum)%CosTilt)
             ! Better if there was iteration for movable insulation?
@@ -930,7 +930,7 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
        IF (Surface(SurfNum)%EMSOverrideExtConvCoef) HExt = Surface(SurfNum)%EMSValueForExtConvCoef
 
        IF (TSurf == SkyTempKelvin .OR. Zone(Surface(SurfNum)%Zone)%OutsideConvectionAlgo == ASHRAESimple) THEN
-         HSky = 0.0
+         HSky = 0.0d0
        ELSE
          ! Compute sky radiation coefficient
          HSky = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorSkyIR &
@@ -938,8 +938,8 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
        END IF
 
        IF (TSurf == TAir .OR. Zone(Surface(SurfNum)%Zone)%OutsideConvectionAlgo == ASHRAESimple) THEN
-         HGround = 0.0
-         HAir = 0.0
+         HGround = 0.0d0
+         HAir = 0.0d0
        ELSE
          ! Compute ground radiation coefficient
          HGround = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorGroundIR &
@@ -957,7 +957,7 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
       IF (Surface(SurfNum)%EMSOverrideExtConvCoef) HExt = Surface(SurfNum)%EMSValueForExtConvCoef
 
       IF (TSurf == SkyTempKelvin .OR. Zone(Surface(SurfNum)%Zone)%OutsideConvectionAlgo == ASHRAESimple) THEN
-        HSky = 0.0
+        HSky = 0.0d0
       ELSE
         ! Compute sky radiation coefficient
         HSky = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorSkyIR &
@@ -965,8 +965,8 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
       END IF
 
       IF (TSurf == TAir .OR. Zone(Surface(SurfNum)%Zone)%OutsideConvectionAlgo == ASHRAESimple) THEN
-        HGround = 0.0
-        HAir = 0.0
+        HGround = 0.0d0
+        HAir = 0.0d0
       ELSE
         ! Compute ground radiation coefficient
         HGround = StefanBoltzmann*AbsExt*Surface(SurfNum)%ViewFactorGroundIR &
@@ -1107,19 +1107,19 @@ FUNCTION CalcHnASHRAETARPExterior(TOutSurf, TAir, CosTilt) RESULT(Hn)
   ! Notes: CosTilt > 0 = faces up (roof), CosTilt < 0 = faces down (floor),
   ! CosTilt=0 = vertical surface (wall)
 
-  Hn=0.0
+  Hn=0.0d0
 
-  IF (CosTilt == 0.0) THEN ! Vertical Surface
+  IF (CosTilt == 0.0d0) THEN ! Vertical Surface
 
     Hn = 1.31d0*(ABS((TOutSurf-TAir))**OneThird)
 
-  ELSE IF ( ((CosTilt < 0.0) .AND. (TOutSurf < TAir)) .OR. &
-           ((CosTilt > 0.0) .AND. (TOutSurf > TAir)) ) THEN   ! Enhanced convection
+  ELSE IF ( ((CosTilt < 0.0d0) .AND. (TOutSurf < TAir)) .OR. &
+           ((CosTilt > 0.0d0) .AND. (TOutSurf > TAir)) ) THEN   ! Enhanced convection
 
     Hn = 9.482d0*(ABS((TOutSurf-TAir))**OneThird)/(7.238d0-ABS(CosTilt))
 
-  ELSE IF ( ((CosTilt < 0.0) .AND. (TOutSurf > TAir)) .OR. &
-           ((CosTilt > 0.0) .AND. (TOutSurf < TAir)) ) THEN   ! Reduced convection
+  ELSE IF ( ((CosTilt < 0.0d0) .AND. (TOutSurf > TAir)) .OR. &
+           ((CosTilt > 0.0d0) .AND. (TOutSurf < TAir)) ) THEN   ! Reduced convection
 
     Hn = 1.810d0*(ABS((TOutSurf-TAir))**OneThird)/(1.382d0+ABS(CosTilt))
 
@@ -4144,15 +4144,15 @@ SUBROUTINE CalcASHRAESimpleIntConvCoeff(SurfNum,SurfaceTemperature,ZoneMeanAirTe
     ! Set HConvIn using the proper correlation based on DeltaTemp and Cosine of the Tilt of the Surface
     IF (ABS(Surface(SurfNum)%CosTilt) >= 0.9239d0) THEN  ! Horizontal Surface
 
-      IF (DeltaTemp*Surface(SurfNum)%CosTilt < 0.0) THEN ! Horizontal, Reduced Convection
+      IF (DeltaTemp*Surface(SurfNum)%CosTilt < 0.0d0) THEN ! Horizontal, Reduced Convection
 
         HConvIn(SurfNum) = 0.948d0
 
-      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt == 0.0) THEN ! Vertical Surface
+      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt == 0.0d0) THEN ! Vertical Surface
 
         HConvIn(SurfNum) = 3.076d0
 
-      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt > 0.0) THEN ! Horizontal, Enhanced Convection
+      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt > 0.0d0) THEN ! Horizontal, Enhanced Convection
 
         HConvIn(SurfNum) = 4.040d0
 
@@ -4160,15 +4160,15 @@ SUBROUTINE CalcASHRAESimpleIntConvCoeff(SurfNum,SurfaceTemperature,ZoneMeanAirTe
 
     ELSE  ! Tilted Surface
 
-      IF (DeltaTemp*Surface(SurfNum)%CosTilt < 0.0) THEN ! Tilted, Reduced Convection
+      IF (DeltaTemp*Surface(SurfNum)%CosTilt < 0.0d0) THEN ! Tilted, Reduced Convection
 
         HConvIn(SurfNum) = 2.281d0
 
-      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt == 0.0) THEN ! Vertical Surface
+      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt == 0.0d0) THEN ! Vertical Surface
 
         HConvIn(SurfNum) = 3.076d0
 
-      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt > 0.0) THEN ! Tilted, Enhanced Convection
+      ELSEIF (DeltaTemp*Surface(SurfNum)%CosTilt > 0.0d0) THEN ! Tilted, Enhanced Convection
 
         HConvIn(SurfNum) = 3.870d0
 
@@ -4241,17 +4241,17 @@ SUBROUTINE CalcASHRAEDetailedIntConvCoeff(SurfNum,SurfaceTemperature,ZoneMeanAir
 
     ! Set HConvIn using the proper correlation based on DeltaTemp and Surface (Cosine Tilt)
 
-  IF ((DeltaTemp == 0.0) .OR. (Surface(SurfNum)%CosTilt == 0.0)) THEN   ! Vertical Surface
+  IF ((DeltaTemp == 0.0d0) .OR. (Surface(SurfNum)%CosTilt == 0.0d0)) THEN   ! Vertical Surface
 
     HConvIn(SurfNum) = CalcASHRAEVerticalWall(DeltaTemp)
 
-  ELSEIF ( ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-           ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Enhanced Convection
+  ELSEIF ( ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+           ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Enhanced Convection
 
     HConvIn(SurfNum) = CalcWaltonUnstableHorizontalOrTilt(DeltaTemp, Surface(SurfNum)%CosTilt)
 
-  ELSEIF ( ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-           ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Reduced Convection
+  ELSEIF ( ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+           ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Reduced Convection
 
     HConvIn(SurfNum) = CalcWaltonStableHorizontalOrTilt(DeltaTemp, Surface(SurfNum)%CosTilt)
 
@@ -4333,18 +4333,18 @@ SUBROUTINE CalcDetailedHcInForDVModel(SurfNum,SurfaceTemperatures,HcIn,Vhc)
 
         HcIn(SurfNum)=SetIntConvectionCoeff(SurfNum)
 
-      ELSEIF ((DeltaTemp == 0.0) .OR. (Surface(surfnum)%CosTilt == 0.0)) THEN   ! Vertical Surface
+      ELSEIF ((DeltaTemp == 0.0d0) .OR. (Surface(surfnum)%CosTilt == 0.0d0)) THEN   ! Vertical Surface
 
         HcIn(SurfNum) = 1.31d0*((ABS(DeltaTemp))**OneThird)
 
-      ELSEIF ( ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-             ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Enhanced Convection
+      ELSEIF ( ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+             ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Enhanced Convection
 
         HcIn(SurfNum) = 9.482d0*((ABS(DeltaTemp))**OneThird) &
                                 /(7.283d0 - ABS(Surface(SurfNum)%CosTilt))
 
-      ELSEIF ( ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-             ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Reduced Convection
+      ELSEIF ( ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+             ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Reduced Convection
 
         HcIn(SurfNum) = 1.810d0*((ABS(DeltaTemp))**OneThird) &
                                 /(1.382d0 + ABS(Surface(SurfNum)%CosTilt))
@@ -4361,23 +4361,23 @@ SUBROUTINE CalcDetailedHcInForDVModel(SurfNum,SurfaceTemperatures,HcIn,Vhc)
         HcIn(SurfNum)=SetIntConvectionCoeff(SurfNum)
 
 
-      ELSEIF ((DeltaTemp == 0.0) .OR. (Surface(SurfNum)%CosTilt == 0.0)) THEN   ! Vertical Surface
+      ELSEIF ((DeltaTemp == 0.0d0) .OR. (Surface(SurfNum)%CosTilt == 0.0d0)) THEN   ! Vertical Surface
 
         HcIn(SurfNum) = 1.31d0*((ABS(DeltaTemp))**OneThird)
 
         HcIn(SurfNum)= (HcIn(SurfNum)**3.2d0+Hf**3.2d0)**(1.d0/3.2d0)
 
 
-      ELSEIF ( ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-             ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Enhanced Convection
+      ELSEIF ( ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+             ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Enhanced Convection
 
         HcIn(SurfNum) = 9.482d0*((ABS(DeltaTemp))**(1.d0/3.d0)) &
                                 /(7.283 - ABS(Surface(SurfNum)%CosTilt))
         HcIn(SurfNum)= (HcIn(SurfNum)**3.2d0+Hf**3.2d0)**(1.d0/3.2d0)
 
 
-      ELSEIF ( ((DeltaTemp > 0.0) .AND. (Surface(SurfNum)%CosTilt > 0.0)) .OR. &
-             ((DeltaTemp < 0.0) .AND. (Surface(SurfNum)%CosTilt < 0.0)) ) THEN  ! Reduced Convection
+      ELSEIF ( ((DeltaTemp > 0.0d0) .AND. (Surface(SurfNum)%CosTilt > 0.0d0)) .OR. &
+             ((DeltaTemp < 0.0d0) .AND. (Surface(SurfNum)%CosTilt < 0.0d0)) ) THEN  ! Reduced Convection
 
         HcIn(SurfNum) = 1.810d0*((ABS(DeltaTemp))**OneThird) &
                                 /(1.382d0 + ABS(Surface(SurfNum)%CosTilt))
@@ -4444,7 +4444,7 @@ SUBROUTINE CalcCeilingDiffuserIntConvCoeff(ZoneNum)
 
           ! FLOW:
   IF (SysSizingCalc .OR. ZoneSizingCalc .OR. .NOT. ALLOCATED(Node)) THEN
-    ACH = 0.0
+    ACH = 0.0d0
   ELSE
     ! Set local variables
     ZoneVolume = Zone(ZoneNum)%Volume
@@ -4455,11 +4455,11 @@ SUBROUTINE CalcCeilingDiffuserIntConvCoeff(ZoneNum)
       ZoneMassFlowRate = Node(ZoneNode)%MassFlowRate / ZoneMult
     ELSE  ! because these are not updated yet for new environment
       AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,0.0d0,PsyWFnTdpPb(0.0d0,OutBaroPress))
-      ZoneMassFlowRate = 0.0
+      ZoneMassFlowRate = 0.0d0
     ENDIF
 
     IF (ZoneMassFlowRate < MinFlow) THEN
-      ACH = 0.0
+      ACH = 0.0d0
     ELSE
       ! Calculate ACH
       ACH = ZoneMassFlowRate/AirDensity/ZoneVolume*SecInHour
@@ -4480,7 +4480,7 @@ SUBROUTINE CalcCeilingDiffuserIntConvCoeff(ZoneNum)
     ! Set HConvIn using the proper correlation based on Surface Tilt
     IF (Surface(SurfNum)%Tilt > 135.0d0) THEN
       HConvIn(SurfNum) = CalcFisherPedersenCeilDiffuserFloor(ACH) ! Floor correlation
-    ELSEIF (Surface(SurfNum)%Tilt < 45.) THEN
+    ELSEIF (Surface(SurfNum)%Tilt < 45.0d0 ) THEN
       HConvIn(SurfNum) =CalcFisherPedersenCeilDiffuserCeiling(ACH) ! Ceiling correlation
     ELSE
       HConvIn(SurfNum) = CalcFisherPedersenCeilDiffuserWalls(ACH) ! Wall correlation
@@ -4541,7 +4541,7 @@ SUBROUTINE CalcCeilingDiffuserInletCorr(ZoneNum, SurfaceTemperatures)
 
           ! FLOW:
   IF (SysSizingCalc .OR. ZoneSizingCalc .OR. .NOT. ALLOCATED(Node)) THEN
-    ACH = 0.0
+    ACH = 0.0d0
   ELSE
     ! Set local variables
     ZoneVolume = Zone(ZoneNum)%Volume
@@ -4551,7 +4551,7 @@ SUBROUTINE CalcCeilingDiffuserInletCorr(ZoneNum, SurfaceTemperatures)
     ZoneMassFlowRate = Node(ZoneNode)%MassFlowRate/ZoneMult
 
     IF (ZoneMassFlowRate < MinFlow) THEN
-      ACH = 0.0
+      ACH = 0.0d0
     ELSE
       ! Calculate ACH
       ACH = ZoneMassFlowRate / AirDensity / ZoneVolume * SecInHour
@@ -4591,7 +4591,7 @@ SUBROUTINE CalcCeilingDiffuserInletCorr(ZoneNum, SurfaceTemperatures)
 
     END DO ! SurfNum
 
-    IF (ACH > 100.0) CALL ShowWarningError('CeilingDiffuser convection correlation is out of range: ACH > 100')
+    IF (ACH > 100.0d0) CALL ShowWarningError('CeilingDiffuser convection correlation is out of range: ACH > 100')
 
   RETURN
 
@@ -4667,13 +4667,13 @@ SUBROUTINE CalcTrombeWallIntConvCoeff(ZoneNum,SurfaceTemperatures)
   Surf2 = 0
 
   H = Zone(ZoneNum)%CeilingHeight
-  minorW = 100000.0 ! An impossibly big width
-  majorW = 0.0
-  gapW = 0.0
+  minorW = 100000.0d0 ! An impossibly big width
+  majorW = 0.0d0
+  gapW = 0.0d0
 
-  Tso = 0.0
-  Tsi = 0.0
-  HConvNet = 0.0
+  Tso = 0.0d0
+  Tsi = 0.0d0
+  HConvNet = 0.0d0
 
   ! determine major width and minor width
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
@@ -4807,11 +4807,12 @@ SUBROUTINE CalcNusselt(SurfNum, asp, tso, tsi, gr, pr, gnu)
   ra = gr*pr
                          !!fw if (ra > 2.0e6): error that outside range of Rayleigh number?
 
-  IF (ra <= 1.0d4)                  gnu901 = 1. + 1.7596678d-10 * ra**2.2984755d0   ! eq. 51
+  IF (ra <= 1.0d4)                  gnu901 = 1.d0 + 1.7596678d-10 * ra**2.2984755d0   ! eq. 51
   IF (ra > 1.0d4 .and. ra <= 5.0d4) gnu901 =      0.028154d0      * ra**0.4134d0      ! eq. 50
   IF (ra > 5.0d4)                   gnu901 =      0.0673838d0     * ra**(1.0d0/3.0d0)   ! eq. 49
-                                   gnu902 = 0.242d0 * (ra/asp)**.272d0               ! eq. 52
-                                   gnu90 = MAX(gnu901,gnu902)
+
+  gnu902 = 0.242d0 * (ra/asp)**.272d0               ! eq. 52
+  gnu90 = MAX(gnu901,gnu902)
 
   IF (tso > tsi) THEN ! window heated from above
     gnu = 1.0d0 + (gnu90-1.0d0)*sintilt                     ! eq. 53
@@ -5077,9 +5078,9 @@ SUBROUTINE CalcISO15099WindowIntConvCoeff(SurfNum,SurfaceTemperature,AirTemperat
   sineTilt=Surface(SurfNum)%SinTilt
 
   ! four cases depending on tilt and DeltaTemp (heat flow direction )
-  If (DeltaTemp > 0.0 ) TiltDeg = 180.0D0 - TiltDeg ! complement angle if cooling situation
+  If (DeltaTemp > 0.0d0 ) TiltDeg = 180.0D0 - TiltDeg ! complement angle if cooling situation
 
-  RaH = ( rho**2.0D0 * Height**3.0D0 * g * Cp *(ABS(SurfTempKelvin-AirTempKelvin) ) ) &
+  RaH = ( rho**2 * Height**3 * g * Cp *(ABS(SurfTempKelvin-AirTempKelvin) ) ) &
            / (TmeanFilmKelvin * mu * lambda) ! eq 132 in ISO 15099
 
   ! case a)
@@ -5727,12 +5728,12 @@ SUBROUTINE SetupAdaptiveConvectionStaticMetaData
         Surface(SurfLoop)%OutConvFaceHeight    = MAX(NorthWestFacade%Height , &
                                                    (MAXVAL(Surface(SurfLoop)%Vertex%Z) - MINVAL(Surface(SurfLoop)%Vertex%Z) ) )
       ENDIF
-    ELSEIF (Surface(SurfLoop)%Tilt < 45.0) THEN ! assume part of roof
+    ELSEIF (Surface(SurfLoop)%Tilt < 45.0d0) THEN ! assume part of roof
       Surface(SurfLoop)%OutConvFaceArea      = MAX(RoofGeo%Area ,Surface(SurfLoop)%GrossArea)
       Surface(SurfLoop)%OutConvFacePerimeter = MAX(RoofGeo%Perimeter ,Surface(SurfLoop)%Perimeter)
       Surface(SurfLoop)%OutConvFaceHeight    = MAX(RoofGeo%Height, &
                                                    (MAXVAL(Surface(SurfLoop)%Vertex%Z) - MINVAL(Surface(SurfLoop)%Vertex%Z) ) )
-    ELSEIF (Surface(SurfLoop)%Tilt >= 135.0) THEN !assume floor over exterior, just use surface's geometry
+    ELSEIF (Surface(SurfLoop)%Tilt >= 135.0d0) THEN !assume floor over exterior, just use surface's geometry
       Surface(SurfLoop)%OutConvFaceArea      = Surface(SurfLoop)%GrossArea
       Surface(SurfLoop)%OutConvFacePerimeter = Surface(SurfLoop)%Perimeter
       Surface(SurfLoop)%OutConvFaceHeight    = (MAXVAL(Surface(SurfLoop)%Vertex%Z) - MINVAL(Surface(SurfLoop)%Vertex%Z) )
@@ -5894,9 +5895,9 @@ SUBROUTINE SetupAdaptiveConvectionStaticMetaData
 
   ENDIF
 
-  900 format('! <Surface Convection Parameters>, Surface Name, Outside Model Assignment, Outside Area [m2], ' &
-             'Outside Perimeter [m], Outside Height [m], Inside Model Assignment, ' &
-             'Inside Height [cm], Inside Perimeter Envelope [m], Inside Hydraulic Diameter [m], Window Wall Ratio [ ], ' &
+  900 format('! <Surface Convection Parameters>, Surface Name, Outside Model Assignment, Outside Area [m2], ', &
+             'Outside Perimeter [m], Outside Height [m], Inside Model Assignment, ', &
+             'Inside Height [cm], Inside Perimeter Envelope [m], Inside Hydraulic Diameter [m], Window Wall Ratio [ ], ', &
              'Window Location [ ], Near Radiant [Yes/No], Has Active HVAC [Yes/No]')
 
   901 format('Surface Convection Parameters,',A,',',A,',',A,',',A,',',A,',',A,',',A,',' &
@@ -5922,10 +5923,10 @@ SUBROUTINE SetupAdaptiveConvectionStaticMetaData
   8700 format('! <Building Convection Parameters:Northwest Facade>, Perimeter, Height, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax ')
   8701 format('Building Convection Parameters:NorthwWest Facade, ',A, ',' , A,',', A,',',A,',', A,',', A,',', A ,',',A)
 
-  8800 format('! <Building Convection Parameters:Roof>, Area [m2], Perimeter [m], Height [m], ' &
+  8800 format('! <Building Convection Parameters:Roof>, Area [m2], Perimeter [m], Height [m], ', &
                                'XdYdZd:X, XdYdZd:Y, XdYdZd:Z' , & ! 1 low x, low y, low z
-                               ',XdYdZu:X, XdYdZu:Y, XdYdZu:Z' , & ! 2 low x, low y, hi z
-                               ',XdYuZd:X, XdYuZd:Y, XdYuZd:Z',  & ! 3 low x, hi y, low z
+                               ',XdYdZu:X, XdYdZu:Y, XdYdZu:Z', & ! 2 low x, low y, hi z
+                               ',XdYuZd:X, XdYuZd:Y, XdYuZd:Z', & ! 3 low x, hi y, low z
                                ',XdYuZu:X, XdYuZu:Y, XdYuZu:Z', & ! 4 low x, hi y, hi z
                                ',XuYdZd:X, XuYdZd:Y, XuYdZd:Z', & ! 5 hi x, low y, low z
                                ',XuYuZd:X, XuYuZd:Y, XuYuZd:Z', & ! 6 hi x, hi y, low z
@@ -6210,33 +6211,51 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_FisherPedersenCeilDiffuserFloor)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    AirChangeRate = MIN(AirChangeRate, MaxACH)
-    AirChangeRate = MAX(AirChangeRate, 0.0d0)
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      AirChangeRate = MIN(AirChangeRate, MaxACH)
+      AirChangeRate = MAX(AirChangeRate, 0.0d0)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirChangeRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcFisherPedersenCeilDiffuserFloor(AirChangeRate)
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    
   CASE(HcInt_FisherPedersenCeilDiffuserCeiling)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    AirChangeRate = MIN(AirChangeRate, MaxACH)
-    AirChangeRate = MAX(AirChangeRate, 0.0d0)
+    IF (ZoneNode > 0 ) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      AirChangeRate = MIN(AirChangeRate, MaxACH)
+      AirChangeRate = MAX(AirChangeRate, 0.0d0)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirChangeRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcFisherPedersenCeilDiffuserCeiling(AirChangeRate)
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+
   CASE(HcInt_FisherPedersenCeilDiffuserWalls)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    AirChangeRate = MIN(AirChangeRate, MaxACH)
-    AirChangeRate = MAX(AirChangeRate, 0.0d0)
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      AirChangeRate = MIN(AirChangeRate, MaxACH)
+      AirChangeRate = MAX(AirChangeRate, 0.0d0)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirChangeRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcFisherPedersenCeilDiffuserWalls(AirChangeRate)
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+
   CASE(HcInt_AlamdariHammondStableHorizontal)
     ZoneNum =  Surface(SurfNum)%Zone
     tmpHc = CalcAlamdariHammondStableHorizontal((TH(SurfNum,1,2) - MAT(ZoneNum)), &
@@ -6285,28 +6304,33 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedAssistingWall)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0 ) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
     tmpHc = CalcBeausoleilMorrisonMixedAssistedWall((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
                                                                Surface(SurfNum)%IntConvZoneWallHeight, &
@@ -6317,28 +6341,33 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedOppossingWall)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume* ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume* ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
 
     tmpHc = CalcBeausoleilMorrisonMixedOpposingWall((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
@@ -6351,30 +6380,34 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedStableCeiling)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
-
     tmpHc = CalcBeausoleilMorrisonMixedStableCeiling((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
@@ -6384,30 +6417,34 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedUnstableCeiling)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
-
     tmpHc = CalcBeausoleilMorrisonMixedUnstableCeiling((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
@@ -6417,30 +6454,34 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedStableFloor)
     ZoneNum  = Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume * ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
-
     tmpHc = CalcBeausoleilMorrisonMixedStableFloor((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
@@ -6450,30 +6491,34 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_BeausoleilMorrisonMixedUnstableFloor)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume  * ZoneMult)
-    SumMdotTemp = 0.d0
-    SumMdot     = 0.d0
-    DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
-      IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
-        thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
-        IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
-          SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
-          SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+    IF (ZoneNode > 0.d0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirChangeRate = (Node(ZoneNode)%MassFlowRate * SecInHour)/ (AirDensity * Zone(ZoneNum)%Volume  * ZoneMult)
+      SumMdotTemp = 0.d0
+      SumMdot     = 0.d0
+      DO EquipNum = 1, ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%NumOfEquipTypes
+        IF (ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%NumOutlets > 0) THEN
+          thisZoneInletNode = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums(1)
+          IF ((thisZoneInletNode > 0) .AND. (Node(thisZoneInletNode)%MassFlowRate > 0.d0)) THEN
+            SumMdotTemp = SumMdotTemp + Node(thisZoneInletNode)%MassFlowRate * Node(thisZoneInletNode)%Temp
+            SumMdot     = SumMdot     + Node(thisZoneInletNode)%MassFlowRate
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (SumMdot > 0.d0) THEN
+        SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
+      ELSE
+        IF (thisZoneInletNode > 0) THEN
+          SupplyAirTemp = Node(thisZoneInletNode)%Temp
+        ELSE
+          SupplyAirTemp = Node(ZoneNode)%Temp
         ENDIF
       ENDIF
-    ENDDO
-    IF (SumMdot > 0.d0) THEN
-      SupplyAirTemp = SumMdotTemp / SumMdot      ! mass flow weighted inlet temperature
     ELSE
-      IF (thisZoneInletNode > 0) THEN
-        SupplyAirTemp = Node(thisZoneInletNode)%Temp
-      ELSE
-        SupplyAirTemp = Node(ZoneNode)%Temp
-      ENDIF
+      AirChangeRate = 0.d0
+      SupplyAirTemp = Node(ZoneNode)%Temp
     ENDIF
-
     tmpHc = CalcBeausoleilMorrisonMixedUnstableFloor((TH(SurfNum,1,2) - MAT(ZoneNum)),       &
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
@@ -6499,33 +6544,51 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_GoldsteinNovoselacCeilingDiffuserWindow)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate /(AirDensity * ZoneMult)
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate /(AirDensity * ZoneMult)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirSystemVolFlowRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserWindow(AirSystemVolFlowRate, &
                              Surface(SurfNum)%IntConvZonePerimLength, &
                              Surface(SurfNum)%IntConvWindowWallRatio,  &
                              Surface(SurfNum)%IntConvWindowLocation, ZoneNum)
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+
   CASE(HcInt_GoldsteinNovoselacCeilingDiffuserWalls)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate /(AirDensity * ZoneMult)
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate /(AirDensity * ZoneMult)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirSystemVolFlowRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserWall(AirSystemVolFlowRate, &
                             Surface(SurfNum)%IntConvZonePerimLength, &
                             Surface(SurfNum)%IntConvWindowLocation, ZoneNum )
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+
   CASE(HcInt_GoldsteinNovoselacCeilingDiffuserFloor)
     ZoneNum =  Surface(SurfNum)%Zone
     ZoneNode = Zone(ZoneNum)%SystemZoneNodeNumber
-    ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-    AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
-    AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate / (AirDensity * ZoneMult)
+    IF (ZoneNode > 0) THEN
+      ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+      AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
+      AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate / (AirDensity * ZoneMult)
+      Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+    ELSE
+      AirSystemVolFlowRate = 0.d0
+      Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
+    ENDIF
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemVolFlowRate, &
                             Surface(SurfNum)%IntConvZonePerimLength, ZoneNum )
-    Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
+
   END SELECT
 
   IF (tmpHc < AdaptiveHcInsideLowLimit) tmpHc = AdaptiveHcInsideLowLimit
@@ -7361,7 +7424,7 @@ SUBROUTINE DynamicIntConvSurfaceClassification(SurfNum)
       ENDIF
 
     ELSEIF (Surface(SurfNum)%Class == SurfaceClass_Roof) THEN
-      IF (Surface(SurfNum)%Tilt < 5.0) THEN
+      IF (Surface(SurfNum)%Tilt < 5.0d0) THEN
         IF (DeltaTemp <0.d0) THEN
           Surface(SurfNum)%IntConvClassification = InConvClass_A3_UnstableHoriz
         Else
@@ -7441,7 +7504,7 @@ SUBROUTINE DynamicIntConvSurfaceClassification(SurfNum)
       ENDIF
 
     ELSEIF (Surface(SurfNum)%Class == SurfaceClass_Roof) THEN
-      IF (Surface(SurfNum)%Tilt < 5.0) THEN
+      IF (Surface(SurfNum)%Tilt < 5.0d0) THEN
         IF (DeltaTemp <0.d0) THEN
           Surface(SurfNum)%IntConvClassification = InConvClass_B_UnstableHoriz
         Else
@@ -10332,7 +10395,7 @@ FUNCTION CalcBlockenWindward(WindAt10m, WindDir, SurfAzimuth) RESULT (Hf)
   REAL(r64) :: Theta ! angle between wind and surface azimuth
 
   Theta = WindDir - SurfAzimuth - 90.d0 !TODO double check theta
-  IF (Theta > 180 ) Theta = Theta - 360.00
+  IF (Theta > 180.0d0) Theta = Theta - 360.00
 
   IF (Theta <= 11.25d0) THEN
     Hf = 4.6d0 * (WindAt10m**0.89d0)
@@ -10396,7 +10459,7 @@ FUNCTION CalcEmmelVertical(WindAt10m, WindDir, SurfAzimuth, SurfNum) RESULT (Hf)
   INTEGER, SAVE :: ErrorIndex = 0
 
   Theta = WindDir - SurfAzimuth - 90.d0 !TODO double check theta
-  IF (Theta > 180 ) Theta = Theta - 360.00
+  IF (Theta > 180 ) Theta = Theta - 360.0d0
 
   IF (Theta <= 22.5d0) THEN
     Hf = 5.15d0 * (WindAt10m**0.81d0)
@@ -10471,7 +10534,7 @@ FUNCTION CalcEmmelRoof(WindAt10m, WindDir, LongAxisOutwardAzimuth, SurfNum) RESU
   INTEGER, SAVE :: ErrorIndex = 0
 
   Theta = WindDir - LongAxisOutwardAzimuth - 90.d0 !TODO double check theta
-  IF (Theta > 180 ) Theta = Theta - 360.00
+  IF (Theta > 180.0d0) Theta = Theta - 360.0d0
 
   IF (Theta <= 22.5d0) THEN
     Hf = 5.15d0 * (WindAt10m**0.81d0)
@@ -10581,7 +10644,7 @@ FUNCTION CalcClearRoof(SurfNum, SurfTemp, AirTemp, WindAtZ, WindDirect, RoofArea
   Rex = WindAtZ * AirDensity * x / v
 
   IF (Rex > 0.1d0) THEN !avoid zero and crazy small denominators
-    eta = (log(1+GrLn/Rex**2))/(1 + Log(1 + GrLn/(Rex**2)))
+    eta = (log(1.0d0+GrLn/Rex**2))/(1.0d0 + Log(1.0d0 + GrLn/(Rex**2)))
   ELSE
     eta = 1.d0 ! forced convection gone because no wind
   ENDIF

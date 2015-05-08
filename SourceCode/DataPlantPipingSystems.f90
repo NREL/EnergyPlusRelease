@@ -226,8 +226,8 @@ MODULE DataPlantPipingSystems
     END TYPE
 
     TYPE SimulationControl
-        REAL(r64) :: MinimumTemperatureLimit = -1000
-        REAL(r64) :: MaximumTemperatureLimit = 1000
+        REAL(r64) :: MinimumTemperatureLimit = -1000.0d0
+        REAL(r64) :: MaximumTemperatureLimit = 1000.0d0
         REAL(r64) :: Convergence_CurrentToPrevIteration  = 0.0d0
         INTEGER :: MaxIterationsPerTS=0
     END TYPE
@@ -279,8 +279,8 @@ MODULE DataPlantPipingSystems
     END TYPE
 
     TYPE MoistureInfo
-        REAL(r64) :: Theta_liq = 0.3 !volumetric moisture content of the soil
-        REAL(r64) :: Theta_sat = 0.5 !volumetric moisture content of soil at saturation
+        REAL(r64) :: Theta_liq = 0.3d0 !volumetric moisture content of the soil
+        REAL(r64) :: Theta_sat = 0.5d0 !volumetric moisture content of soil at saturation
         REAL(r64) :: GroundCoverCoefficient = 0.408d0
     END TYPE
 
@@ -382,7 +382,7 @@ MODULE DataPlantPipingSystems
 
         ! Variables used to pass information from INIT-type routines to CALC-type routines
         REAL(r64) :: CurCircuitInletTemp = 23.0d0
-        REAL(r64) :: CurCircuitFlowRate = 0.1321
+        REAL(r64) :: CurCircuitFlowRate = 0.1321d0
         REAL(r64) :: CurCircuitConvectionCoefficient =0.0d0
 
         ! Reporting variables

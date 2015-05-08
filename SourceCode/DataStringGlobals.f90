@@ -66,8 +66,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=PathLimit)    :: CurrentWorkingFolder=' '  ! Current working directory for run
           CHARACTER(len=PathLimit+15) :: FullName=' '              ! Full name of file to open, including path
           CHARACTER(len=120) :: IDDVerString=' '                   ! Version information from the IDD (line 1)
-          CHARACTER(len=120) :: VerString='EnergyPlus, Version 8.0'      ! String that represents version information
-          CHARACTER(len=5)   :: MatchVersion='8.0.0' ! String to be matched by Version object
+          CHARACTER(len=120) :: VerString='EnergyPlus, Version 8.1'      ! String that represents version information
+          CHARACTER(len=5)   :: MatchVersion='8.1.0' ! String to be matched by Version object
           CHARACTER(len=40)  :: CurrentDateTime=' '       ! For printing current date and time at start of run
 
 

@@ -218,7 +218,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   USE HeatBalanceIntRadExchange,    ONLY : CalcInteriorRadExchange
   USE HeatBalFiniteDiffManager,  ONLY : InitHeatBalFiniteDiff
   USE DataSystemVariables, ONLY: GoodIOStatValue
-
+  USE DataGlobals  , ONLY: AnyEnergyManagementSystemInModel
   ! RJH DElight Modification Begin
   USE DElightManagerF
   ! RJH DElight Modification End
@@ -275,24 +275,40 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
 
   if (firsttime) CALL DisplayString('Initializing Outdoor environment for Surfaces')
   ! Initialize zone outdoor environmental variables
-  ! Bulk Initialization for Temperatures
+  ! Bulk Initialization for Temperatures & WindSpeed
   ! using the zone, modify the zone  Dry/Wet BulbTemps
   CALL SetOutBulbTempAt(NumOfZones, Zone(1:NumOfZones)%Centroid%Z,           &
-       Zone(1:NumOfZones)%OutDryBulbTemp, Zone(1:NumOfZones)%OutWetBulbTemp)
+       Zone(1:NumOfZones)%OutDryBulbTemp, Zone(1:NumOfZones)%OutWetBulbTemp, 'Zone')
 
-  DO ZoneNum = 1, NumOfZones
-    Zone(ZoneNum)%WindSpeed = WindSpeedAt(Zone(ZoneNum)%Centroid%Z)
-  END DO
+  CALL SetWindSpeedAt(NumOfZones, Zone(1:NumOfZones)%Centroid%Z, Zone(1:NumOfZones)%WindSpeed, 'Zone')
+!  DO ZoneNum = 1, NumOfZones
+!    Zone(ZoneNum)%WindSpeed = WindSpeedAt(Zone(ZoneNum)%Centroid%Z)
+!  END DO
 
   ! Initialize surface outdoor environmental variables
-  ! Bulk Initialization for Temperatures
+  ! Bulk Initialization for Temperatures & WindSpeed
   ! using the surface centroids, modify the surface Dry/Wet BulbTemps
   CALL SetOutBulbTempAt(TotSurfaces, Surface(1:TotSurfaces)%Centroid%Z, &
-       Surface(1:TotSurfaces)%OutDryBulbTemp, Surface(1:TotSurfaces)%OutWetBulbTemp)
+       Surface(1:TotSurfaces)%OutDryBulbTemp, Surface(1:TotSurfaces)%OutWetBulbTemp, 'Surface')
 
-  DO SurfNum = 1, TotSurfaces
-    IF (Surface(SurfNum)%ExtWind) Surface(SurfNum)%WindSpeed = WindSpeedAt(Surface(SurfNum)%Centroid%Z)
-  END DO
+  CALL SetWindSpeedAt(TotSurfaces, Surface(1:TotSurfaces)%Centroid%Z, Surface(1:TotSurfaces)%WindSpeed, 'Surface')
+!  DO SurfNum = 1, TotSurfaces
+!    IF (Surface(SurfNum)%ExtWind) Surface(SurfNum)%WindSpeed = WindSpeedAt(Surface(SurfNum)%Centroid%Z)
+!  END DO
+
+  IF (AnyEnergyManagementSystemInModel) THEN
+    DO SurfNum = 1, TotSurfaces
+      IF (Surface(SurfNum)%OutDryBulbTempEMSOverrideOn) THEN
+        Surface(SurfNum)%OutDryBulbTemp = Surface(SurfNum)%OutDryBulbTempEMSOverrideValue
+      ENDIF
+      IF (Surface(SurfNum)%OutWetBulbTempEMSOverrideOn) THEN
+        Surface(SurfNum)%OutWetBulbTemp = Surface(SurfNum)%OutWetBulbTempEMSOverrideValue
+      ENDIF
+      IF (Surface(SurfNum)%WindSpeedEMSOverrideOn) THEN
+        Surface(SurfNum)%WindSpeed = Surface(SurfNum)%WindSpeedEMSOverrideValue
+      ENDIF
+    ENDDO
+  ENDIF
 
           ! Do the Begin Simulation initializations
   IF (BeginSimFlag) THEN
@@ -321,10 +337,13 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
 
   ENDIF
 
+  ! Need to be called each timestep in order to check if surface points to new construction (EMS) and if does then
+  ! complex fenestration needs to be initialized for additional states
+  CALL TimestepInitComplexFenestration
 
   ! Calculate exterior-surface multipliers that account for anisotropy of
   ! sky radiance
-  IF (SunIsUp .AND. DifSolarRad > 0.0) THEN
+  IF (SunIsUp .AND. DifSolarRad > 0.0d0) THEN
     CALL AnisoSkyViewFactors
   ELSE
     AnisoSkyMult = 0.0d0
@@ -354,10 +373,10 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
 
   DO SurfNum = 1,TotSurfaces
     IF(Surface(SurfNum)%Class == SurfaceClass_Window .AND. Surface(SurfNum)%ExtSolar) THEN
-      SurfaceWindow(SurfNum)%IllumFromWinAtRefPt1Rep   = 0.0
-      SurfaceWindow(SurfNum)%IllumFromWinAtRefPt2Rep   = 0.0
-      SurfaceWindow(SurfNum)%LumWinFromRefPt1Rep       = 0.0
-      SurfaceWindow(SurfNum)%LumWinFromRefPt2Rep       = 0.0
+      SurfaceWindow(SurfNum)%IllumFromWinAtRefPt1Rep   = 0.0d0
+      SurfaceWindow(SurfNum)%IllumFromWinAtRefPt2Rep   = 0.0d0
+      SurfaceWindow(SurfNum)%LumWinFromRefPt1Rep       = 0.0d0
+      SurfaceWindow(SurfNum)%LumWinFromRefPt2Rep       = 0.0d0
     END IF
   END DO
 
@@ -365,9 +384,9 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
     ! RJH DElight Modification Begin - Change Daylighting test to continue for Detailed AND DElight
     IF (ZoneDaylight(NZ)%DaylightType == NoDaylighting) CYCLE
     ! RJH DElight Modification End - Change Daylighting test to continue for Detailed AND DElight
-    ZoneDaylight(NZ)%DaylIllumAtRefPt = 0.0
-    ZoneDaylight(NZ)%GlareIndexAtRefPt = 0.0
-    ZoneDaylight(NZ)%ZonePowerReductionFactor = 1.0
+    ZoneDaylight(NZ)%DaylIllumAtRefPt = 0.0d0
+    ZoneDaylight(NZ)%GlareIndexAtRefPt = 0.0d0
+    ZoneDaylight(NZ)%ZonePowerReductionFactor = 1.0d0
     ZoneDaylight(NZ)%InterReflIllFrIntWins = 0.0d0             ! inter-reflected illuminance from interior windows
     IF (ZoneDaylight(NZ)%TotalDaylRefPoints /= 0) THEN
       ZoneDaylight(NZ)%TimeExceedingGlareIndexSPAtRefPt = 0.0d0
@@ -390,7 +409,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
     ! Check if the sun is up and the current Thermal Zone hosts a Daylighting:DElight object
     IF(SunIsUp .AND. ZoneDaylight(NZ)%TotalDElightRefPts /= 0) THEN
         ! Call DElight interior illuminance and electric lighting control subroutine
-        dPowerReducFac = 1.0
+        dPowerReducFac = 1.0d0
         dHISKFFC = HISKF*LUX2FC
         dHISUNFFC = HISUNF*LUX2FC
         dSOLCOS1 = SOLCOS(1)
@@ -499,11 +518,11 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   errFlag=.false.
   DO SurfNum = 1, TotSurfaces
     IF(Surface(SurfNum)%Class /= SurfaceClass_Window) CYCLE
-    SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 0.0
+    SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 0.0d0
     IF(SurfaceWindow(SurfNum)%ShadingFlag > 0) THEN
-      SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 1.0
+      SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 1.0d0
     ELSE
-      SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 0.0
+      SurfaceWindow(SurfNum)%FracTimeShadingDeviceOn = 0.0d0
     END IF
   END DO
 
@@ -515,7 +534,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   !  take the appropriate parts of these inits to the other heat balance managers
   if (firsttime) CALL DisplayString('Initializing Solar Heat Gains')
   CALL InitSolarHeatGains
-  IF(SunIsUp .AND. (BeamSolarRad+GndSolarRad+DifSolarRad > 0.0)) THEN
+  IF(SunIsUp .AND. (BeamSolarRad+GndSolarRad+DifSolarRad > 0.0d0)) THEN
     DO NZ = 1,NumOfZones
       IF(ZoneDaylight(NZ)%TotalDaylRefPoints > 0) THEN
         IF(Zone(NZ)%HasInterZoneWindow) THEN
@@ -551,9 +570,9 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
     CALL InitHeatBalFiniteDiff
   ENDIF
 
-  CTFConstOutPart  = 0.0
-  CTFConstInPart   = 0.0
-  CTFTsrcConstPart = 0.0
+  CTFConstOutPart  = 0.0d0
+  CTFConstInPart   = 0.0d0
+  CTFTsrcConstPart = 0.0d0
   DO SurfNum = 1, TotSurfaces   ! Loop through all surfaces...
 
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE  ! Skip non-heat transfer surfaces
@@ -608,24 +627,24 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
 
     ELSE    ! Number of CTF Terms = 1-->Resistance only constructions have no history terms.
 
-      CTFConstOutPart(SurfNum)  = 0.0
-      CTFConstInPart(SurfNum)   = 0.0
-      CTFTsrcConstPart(SurfNum) = 0.0
+      CTFConstOutPart(SurfNum)  = 0.0d0
+      CTFConstInPart(SurfNum)   = 0.0d0
+      CTFTsrcConstPart(SurfNum) = 0.0d0
 
     END IF
 
   END DO    ! ...end of surfaces DO loop for initializing temperature history terms for the surface heat balances
 
           ! Zero out all of the radiant system heat balance coefficient arrays
-  RadSysTiHBConstCoef = 0.0
-  RadSysTiHBToutCoef  = 0.0
-  RadSysTiHBQsrcCoef  = 0.0
-  RadSysToHBConstCoef = 0.0
-  RadSysToHBTinCoef   = 0.0
-  RadSysToHBQsrcCoef  = 0.0
+  RadSysTiHBConstCoef = 0.0d0
+  RadSysTiHBToutCoef  = 0.0d0
+  RadSysTiHBQsrcCoef  = 0.0d0
+  RadSysToHBConstCoef = 0.0d0
+  RadSysToHBTinCoef   = 0.0d0
+  RadSysToHBQsrcCoef  = 0.0d0
 
   QRadSysSource = 0.0D0
-
+  QPVSysSource  = 0.0d0
   QHTRadSysSurf = 0.0D0
   QHWBaseboardSurf = 0.0D0
   QSteamBaseboardSurf = 0.0D0
@@ -702,23 +721,23 @@ SUBROUTINE GatherForPredefinedReport
   INTEGER :: ErrFlag
   INTEGER :: curWSC
   !following variables are totals for fenestration table
-  REAL(r64) :: windowAreaWMult = 0.0
-  REAL(r64) :: fenTotArea = 0.0
-  REAL(r64) :: fenTotAreaNorth = 0.0
-  REAL(r64) :: fenTotAreaNonNorth = 0.0
-  REAL(r64) :: ufactArea = 0.0
-  REAL(r64) :: ufactAreaNorth = 0.0
-  REAL(r64) :: ufactAreaNonNorth = 0.0
-  REAL(r64) :: shgcArea = 0.0
-  REAL(r64) :: shgcAreaNorth = 0.0
-  REAL(r64) :: shgcAreaNonNorth   = 0.0
-  REAL(r64) :: vistranArea = 0.0
-  REAL(r64) :: vistranAreaNorth = 0.0
-  REAL(r64) :: vistranAreaNonNorth   = 0.0
-  REAL(r64) :: intFenTotArea = 0.0
-  REAL(r64) :: intUfactArea = 0.0
-  REAL(r64) :: intShgcArea = 0.0
-  REAL(r64) :: intVistranArea = 0.0
+  REAL(r64) :: windowAreaWMult = 0.0d0
+  REAL(r64) :: fenTotArea = 0.0d0
+  REAL(r64) :: fenTotAreaNorth = 0.0d0
+  REAL(r64) :: fenTotAreaNonNorth = 0.0d0
+  REAL(r64) :: ufactArea = 0.0d0
+  REAL(r64) :: ufactAreaNorth = 0.0d0
+  REAL(r64) :: ufactAreaNonNorth = 0.0d0
+  REAL(r64) :: shgcArea = 0.0d0
+  REAL(r64) :: shgcAreaNorth = 0.0d0
+  REAL(r64) :: shgcAreaNonNorth   = 0.0d0
+  REAL(r64) :: vistranArea = 0.0d0
+  REAL(r64) :: vistranAreaNorth = 0.0d0
+  REAL(r64) :: vistranAreaNonNorth   = 0.0d0
+  REAL(r64) :: intFenTotArea = 0.0d0
+  REAL(r64) :: intUfactArea = 0.0d0
+  REAL(r64) :: intShgcArea = 0.0d0
+  REAL(r64) :: intVistranArea = 0.0d0
   LOGICAL   :: isNorth
 
   numSurfaces=0
@@ -762,8 +781,8 @@ SUBROUTINE GatherForPredefinedReport
           mult = Zone(zonePt)%Multiplier * Zone(zonePt)%ListMultiplier * Surface(iSurf)%Multiplier
           !include the frame area if present
           windowArea = Surface(iSurf)%GrossArea
-          frameArea = 0
-          dividerArea = 0
+          frameArea = 0.0d0
+          dividerArea = 0.0d0
           frameDivNum = Surface(iSurf)%FrameDivider
           IF  (frameDivNum /= 0) THEN
             frameWidth = FrameDivider(frameDivNum)%FrameWidth
@@ -792,7 +811,9 @@ SUBROUTINE GatherForPredefinedReport
             TransVisNorm = Construct(curCons)%VisTransNorm
           ELSE
             !must calculate Summer SHGC
-            CALL CalcNominalWindowCond(curCons,2,nomCond,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            IF (.NOT. Construct(curCons)%WindowTypeEQL) THEN
+              CALL CalcNominalWindowCond(curCons,2,nomCond,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            ENDIF
           END IF
           CALL PreDefTableEntry(pdchFenSHGC,surfName,SHGCSummer,3)
           CALL PreDefTableEntry(pdchFenVisTr,surfName,TransVisNorm,3)
@@ -950,7 +971,9 @@ SUBROUTINE GatherForPredefinedReport
             TransVisNorm = Construct(curCons)%VisTransNorm
           ELSE
             !must calculate Summer SHGC
-            CALL CalcNominalWindowCond(curCons,2,nomCond,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            IF (.NOT. Construct(curCons)%WindowTypeEQL) THEN
+                CALL CalcNominalWindowCond(curCons,2,nomCond,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            ENDIF
           END IF
           CALL PreDefTableEntry(pdchIntFenSHGC,surfName,SHGCSummer,3)
           CALL PreDefTableEntry(pdchIntFenVisTr,surfName,TransVisNorm,3)
@@ -973,7 +996,7 @@ SUBROUTINE GatherForPredefinedReport
   END DO
   ! total
   CALL PreDefTableEntry(pdchFenArea,"Total or Average",fenTotArea)
-  IF (fenTotArea > 0.0) THEN
+  IF (fenTotArea > 0.0d0) THEN
     CALL PreDefTableEntry(pdchFenUfact,"Total or Average",ufactArea / fenTotArea,3)
     CALL PreDefTableEntry(pdchFenSHGC,"Total or Average",shgcArea / fenTotArea,3)
     CALL PreDefTableEntry(pdchFenVisTr,"Total or Average",vistranArea / fenTotArea,3)
@@ -984,7 +1007,7 @@ SUBROUTINE GatherForPredefinedReport
   ENDIF
   ! north
   CALL PreDefTableEntry(pdchFenArea,"North Total or Average",fenTotAreaNorth)
-  IF (fenTotAreaNorth > 0.0) THEN
+  IF (fenTotAreaNorth > 0.0d0) THEN
     CALL PreDefTableEntry(pdchFenUfact,"North Total or Average",ufactAreaNorth / fenTotAreaNorth,3)
     CALL PreDefTableEntry(pdchFenSHGC,"North Total or Average",shgcAreaNorth / fenTotAreaNorth,3)
     CALL PreDefTableEntry(pdchFenVisTr,"North Total or Average",vistranAreaNorth / fenTotAreaNorth,3)
@@ -995,7 +1018,7 @@ SUBROUTINE GatherForPredefinedReport
   ENDIF
   ! non-north
   CALL PreDefTableEntry(pdchFenArea,"Non-North Total or Average",fenTotAreaNonNorth)
-  IF (fenTotAreaNonNorth > 0.0) THEN
+  IF (fenTotAreaNonNorth > 0.0d0) THEN
     CALL PreDefTableEntry(pdchFenUfact,"Non-North Total or Average",ufactAreaNonNorth / fenTotAreaNonNorth,3)
     CALL PreDefTableEntry(pdchFenSHGC,"Non-North Total or Average",shgcAreaNonNorth / fenTotAreaNonNorth,3)
     CALL PreDefTableEntry(pdchFenVisTr,"Non-North Total or Average",vistranAreaNonNorth / fenTotAreaNonNorth,3)
@@ -1006,7 +1029,7 @@ SUBROUTINE GatherForPredefinedReport
   ENDIF
   !interior fenestration totals
   CALL PreDefTableEntry(pdchIntFenArea,"Total or Average",intFenTotArea)
-  IF (intFenTotArea > 0.0) THEN
+  IF (intFenTotArea > 0.0d0) THEN
     CALL PreDefTableEntry(pdchIntFenUfact,"Total or Average",intUfactArea / intFenTotArea,3)
     CALL PreDefTableEntry(pdchIntFenSHGC,"Total or Average",intShgcArea / intFenTotArea,3)
     CALL PreDefTableEntry(pdchIntFenVisTr,"Total or Average",intVistranArea / intFenTotArea,3)
@@ -1092,11 +1115,11 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ALLOCATE (CTFTsrcConstPart(TotSurfaces))
   CTFTsrcConstPart=0.0d0
   ALLOCATE (TempEffBulkAir(TotSurfaces))
-  TempEffBulkAir=23.0
+  TempEffBulkAir=23.0d0
   ALLOCATE (HConvIn(TotSurfaces))
-  HConvIn=0.0
+  HConvIn=0.0d0
   ALLOCATE (HcExtSurf(TotSurfaces))
-  HcExtSurf=0.0
+  HcExtSurf=0.0d0
   ALLOCATE (HAirExtSurf(TotSurfaces))
   HAirExtSurf=0.0d0
   ALLOCATE (HSkyExtSurf(TotSurfaces))
@@ -1108,21 +1131,21 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ALLOCATE (TempSurfInTmp(TotSurfaces))
   TempSurfInTmp=0.0d0
   ALLOCATE (QRadSWOutAbs(TotSurfaces))
-  QRadSWOutAbs=0.0
+  QRadSWOutAbs=0.0d0
   ALLOCATE (QRadSWInAbs(TotSurfaces))
-  QRadSWInAbs=0.0
+  QRadSWInAbs=0.0d0
   ALLOCATE (InitialDifSolInAbs(TotSurfaces))
-  InitialDifSolInAbs=0.0
+  InitialDifSolInAbs=0.0d0
   ALLOCATE (InitialDifSolInTrans(TotSurfaces))
-  InitialDifSolInTrans=0.0
-  ALLOCATE (QRadSWwinAbs(TotSurfaces,MaxSolidWinLayers))
-  QRadSWwinAbs=0.0
-  ALLOCATE (InitialDifSolwinAbs(TotSurfaces,MaxSolidWinLayers))
-  InitialDifSolwinAbs = 0.0
+  InitialDifSolInTrans=0.0d0
+  ALLOCATE (QRadSWwinAbs(TotSurfaces,CFSMAXNL+1))
+  QRadSWwinAbs=0.0d0
+  ALLOCATE (InitialDifSolwinAbs(TotSurfaces,CFSMAXNL))
+  InitialDifSolwinAbs=0.0d0
   ALLOCATE (QRadSWOutMvIns(TotSurfaces))
-  QRadSWOutMvIns=0.0
+  QRadSWOutMvIns=0.0d0
   ALLOCATE (QRadThermInAbs(TotSurfaces))
-  QRadThermInAbs=0.0
+  QRadThermInAbs=0.0d0
   ALLOCATE (SUMH(TotSurfaces))
   SUMH=0
 
@@ -1239,41 +1262,41 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   OpaqSurfStorageConductionEnergy = 0.d0
 
   ALLOCATE (OpaqSurfInsFaceBeamSolAbsorbed(TotSurfaces))
-  OpaqSurfInsFaceBeamSolAbsorbed=0.0
+  OpaqSurfInsFaceBeamSolAbsorbed=0.0d0
   ALLOCATE (TempSource(TotSurfaces))
-  TempSource = 0.0
+  TempSource = 0.0d0
   ALLOCATE (QH(TotSurfaces,MaxCTFTerms,2))
-  QH=0.0
+  QH=0.0d0
   ALLOCATE (THM(TotSurfaces,MaxCTFTerms,2))
-  THM=0.0
+  THM=0.0d0
   ALLOCATE (QHM(TotSurfaces,MaxCTFTerms,2))
-  QHM=0.0
+  QHM=0.0d0
   ALLOCATE (TsrcHist(TotSurfaces,MaxCTFTerms))
-  TsrcHist = 0.0
+  TsrcHist = 0.0d0
   ALLOCATE (QsrcHist(TotSurfaces,MaxCTFTerms))
-  QsrcHist = 0.0
+  QsrcHist = 0.0d0
   ALLOCATE (TsrcHistM(TotSurfaces,MaxCTFTerms))
-  TsrcHistM = 0.0
+  TsrcHistM = 0.0d0
   ALLOCATE (QsrcHistM(TotSurfaces,MaxCTFTerms))
-  QsrcHistM = 0.0
+  QsrcHistM = 0.0d0
 
   ALLOCATE (NetLWRadToSurf(TotSurfaces))
-  NetLWRadToSurf = 0.0
+  NetLWRadToSurf = 0.0d0
   ALLOCATE (QRadSWLightsInAbs(TotSurfaces))
   QRadSWLightsInAbs = 0.d0
 
   ALLOCATE (RadSysTiHBConstCoef(TotSurfaces))
-  RadSysTiHBConstCoef = 0.0
+  RadSysTiHBConstCoef = 0.0d0
   ALLOCATE (RadSysTiHBToutCoef(TotSurfaces))
-  RadSysTiHBToutCoef = 0.0
+  RadSysTiHBToutCoef = 0.0d0
   ALLOCATE (RadSysTiHBQsrcCoef(TotSurfaces))
-  RadSysTiHBQsrcCoef = 0.0
+  RadSysTiHBQsrcCoef = 0.0d0
   ALLOCATE (RadSysToHBConstCoef(TotSurfaces))
-  RadSysToHBConstCoef = 0.0
+  RadSysToHBConstCoef = 0.0d0
   ALLOCATE (RadSysToHBTinCoef(TotSurfaces))
-  RadSysToHBTinCoef = 0.0
+  RadSysToHBTinCoef = 0.0d0
   ALLOCATE (RadSysToHBQsrcCoef(TotSurfaces))
-  RadSysToHBQsrcCoef = 0.0
+  RadSysToHBQsrcCoef = 0.0d0
   ALLOCATE(QRadSysSource(TotSurfaces))
   QRadSysSource = 0.0D0
   ALLOCATE (TCondFDSourceNode(TotSurfaces))
@@ -1295,25 +1318,25 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ALLOCATE(TempOutsideAirFD(TotSurfaces))
   TempOutsideAirFD=0.0D0
   ALLOCATE(RhoVaporAirOut(TotSurfaces))
-  RhoVaporAirOut=0.0
+  RhoVaporAirOut=0.0d0
   ALLOCATE(RhoVaporSurfIn(TotSurfaces))
-  RhoVaporSurfIn=0.0
+  RhoVaporSurfIn=0.0d0
   ALLOCATE(RhoVaporAirIn(TotSurfaces))
-  RhoVaporAirIn=0.0
+  RhoVaporAirIn=0.0d0
   ALLOCATE(HConvExtFD(TotSurfaces))
-  HConvExtFD=0.0
+  HConvExtFD=0.0d0
   ALLOCATE(HMassConvExtFD(TotSurfaces))
-  HMassConvExtFD=0.0
+  HMassConvExtFD=0.0d0
   ALLOCATE(HConvInFD(TotSurfaces))
-  HConvInFD=0.0
+  HConvInFD=0.0d0
   ALLOCATE(HMassConvInFD(TotSurfaces))
-  HMassConvInFD=0.0
+  HMassConvInFD=0.0d0
   ALLOCATE(HSkyFD(TotSurfaces))
-  HSkyFD=0.0
+  HSkyFD=0.0d0
   ALLOCATE(HGrndFD(TotSurfaces))
-  HGrndFD=0.0
+  HGrndFD=0.0d0
   ALLOCATE(HAirFD(TotSurfaces))
-  HAirFD=0.0
+  HAirFD=0.0d0
 
   CALL DisplayString('Setting up Surface Reporting Variables')
 
@@ -1510,23 +1533,23 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
 !unused  ALLOCATE (QBV(NumOfZones))
 !unused  QBV=0.0
   ALLOCATE (QC(NumOfZones))
-  QC=0.0
+  QC=0.0d0
   ALLOCATE (QD(NumOfZones))
-  QD=0.0
+  QD=0.0d0
   ALLOCATE (QDforDaylight(NumOfZones))
-  QDforDaylight=0.0
+  QDforDaylight=0.0d0
   ALLOCATE (QDV(NumOfZones))
-  QDV=0.0
+  QDV=0.0d0
   ALLOCATE(QL(NumOfZones))
-  QL=0.0
+  QL=0.0d0
 
 !UCSD
   ALLOCATE(MRT(NumOfZones))
-  MRT=0.0
+  MRT=0.0d0
 
   ! Allocate Reporting Variables and set up tracking
   ALLOCATE(ZoneMRT(NumOfZones))
-  ZoneMRT=0.0
+  ZoneMRT=0.0d0
 
   DO Loop=1,NumOfZones
       !CurrentModuleObject='Zone'
@@ -1638,7 +1661,7 @@ SUBROUTINE InitThermalAndFluxHistories
   QdotConvOutRepPerArea = 0.d0
   QRadOutReport = 0.d0
   QdotRadOutRep = 0.d0
-  QdotRadOutRepPerArea = 0.0
+  QdotRadOutRepPerArea = 0.0d0
   OpaqSurfInsFaceConduction = 0.d0
   OpaqSurfInsFaceConductionFlux = 0.d0
   OpaqSurfInsFaceConductionEnergy = 0.d0
@@ -1692,8 +1715,8 @@ SUBROUTINE InitThermalAndFluxHistories
     END IF
 
     IF (Surface(SurfNum)%ExtCavityPresent) THEN
-      ExtVentedCavity(Surface(SurfNum)%ExtCavNum)%TbaffleLast = 20.0
-      ExtVentedCavity(Surface(SurfNum)%ExtCavNum)%TairLast    = 20.0
+      ExtVentedCavity(Surface(SurfNum)%ExtCavNum)%TbaffleLast = 20.0d0
+      ExtVentedCavity(Surface(SurfNum)%ExtCavNum)%TairLast    = 20.0d0
     ENDIF
 
           ! Initialize the flux histories
@@ -1707,10 +1730,10 @@ SUBROUTINE InitThermalAndFluxHistories
 
   IF (TotOSCM > 1) THEN
     DO OSCMnum =1,TotOSCM
-      OSCM(OSCMnum)%TConv     = 20.0
-      OSCM(OSCMnum)%Hconv     = 4.0 !
-      OSCM(OSCMnum)%TRad      = 20.0 !
-      OSCM(OSCMnum)%Hrad      = 4.0 !
+      OSCM(OSCMnum)%TConv     = 20.0d0
+      OSCM(OSCMnum)%Hconv     = 4.0d0 !
+      OSCM(OSCMnum)%TRad      = 20.0d0 !
+      OSCM(OSCMnum)%Hrad      = 4.0d0 !
     ENDDO
   ENDIF
 
@@ -1751,6 +1774,8 @@ SUBROUTINE InitSolarHeatGains
   USE General, ONLY: POLYF, InterpSw, InterpBlind, InterpProfAng, InterpSlatAng, InterpProfSlatAng, BlindBeamBeamTrans
   USE DataDaylightingDevices
   USE DaylightingDevices, ONLY: FindTDDPipe, TransTDD
+  USE DataWindowEquivalentLayer
+  USE SolarShading, ONLY: SurfaceScheduledSolarInc, WindowScheduledSolarAbs
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1786,9 +1811,9 @@ SUBROUTINE InitSolarHeatGains
   INTEGER   :: TotGlassLay        ! Number of glass layers
   INTEGER   :: TotSolidLay        ! Number of solid layers in fenestration system (glass + shading)
   INTEGER   :: CurrentState       ! Current state for Complex Fenestration
-  REAL(r64) :: AbsDiffWin(MaxSolidWinLayers) ! Diffuse solar absorptance of glass layers
-  REAL(r64) :: AbsDiffWinGnd(MaxSolidWinLayers) ! Ground diffuse solar absorptance of glass layers
-  REAL(r64) :: AbsDiffWinSky(MaxSolidWinLayers) ! Sky diffuse solar absorptance of glass layers
+  REAL(r64) :: AbsDiffWin(CFSMAXNL) ! Diffuse solar absorptance of glass layers
+  REAL(r64) :: AbsDiffWinGnd(CFSMAXNL) ! Ground diffuse solar absorptance of glass layers
+  REAL(r64) :: AbsDiffWinSky(CFSMAXNL) ! Sky diffuse solar absorptance of glass layers
   INTEGER   :: Lay                ! Layer number
   REAL(r64) :: DividerAbs         ! Window divider solar absorptance
   REAL(r64) :: DividerRefl        ! Window divider solar reflectance
@@ -1843,98 +1868,101 @@ SUBROUTINE InitSolarHeatGains
   REAL(r64) :: AbsDiffGlassLayGnd ! System glass layer ground diffuse solar absorptance with blind on
   REAL(r64) :: AbsDiffGlassLaySky ! System glass layer sky diffuse solar absorptance with blind on
   INTEGER   :: OtherZoneNum       ! Adjacent zone number
+  INTEGER   :: SurfSolAbs         ! Pointer to scheduled surface gains object for fenestration systems
+  INTEGER   :: SurfSolIncPtr      ! Pointer to schedule surface gain object for interior side of the surface
 
           ! Always initialize the shortwave quantities
 
-  QRadSWOutAbs = 0.0
-  QRadSWInAbs  = 0.0
+  QRadSWOutAbs = 0.0d0
+  QRadSWInAbs  = 0.0d0
   QRadSWLightsInAbs = 0.d0
-  QRadSWwinAbs = 0.0
-  InitialDifSolInAbs = 0.0
-  InitialDifSolInTrans = 0.0
-  InitialDifSolwinAbs = 0.0
-  InitialZoneDifSolReflW = 0.0
-  QRadSWwinAbsTot = 0.0
-  SWwinAbsTotalReport = 0.0
-  InitialDifSolInAbsReport = 0.0
-  InitialDifSolInTransReport = 0.0
-  SWInAbsTotalReport = 0.0
+  QRadSWwinAbs = 0.0d0
+  InitialDifSolInAbs = 0.0d0
+  InitialDifSolInTrans = 0.0d0
+  InitialDifSolwinAbs = 0.0d0
+  InitialZoneDifSolReflW = 0.0d0
+  QRadSWwinAbsTot = 0.0d0
+  QRadSWwinAbsLayer = 0.0d0
+  SWwinAbsTotalReport = 0.0d0
+  InitialDifSolInAbsReport = 0.0d0
+  InitialDifSolInTransReport = 0.0d0
+  SWInAbsTotalReport = 0.0d0
   SWOutAbsTotalReport = 0.d0
   SWOutAbsEnergyReport = 0.d0
-  QRadSWOutIncident = 0.0
-  QRadSWOutIncidentBeam = 0.0
-  BmIncInsSurfIntensRep = 0.0
-  BmIncInsSurfAmountRep = 0.0
-  IntBmIncInsSurfIntensRep = 0.0
-  IntBmIncInsSurfAmountRep = 0.0
-  QRadSWOutIncidentSkyDiffuse = 0.0
-  QRadSWOutIncidentGndDiffuse = 0.0
-  QRadSWOutIncBmToDiffReflGnd = 0.0
-  QRadSWOutIncSkyDiffReflGnd = 0.0
-  QRadSWOutIncBmToBmReflObs = 0.0
-  QRadSWOutIncBmToDiffReflObs = 0.0
-  QRadSWOutIncSkyDiffReflObs = 0.0
-  CosIncidenceAngle = 0.0
+  QRadSWOutIncident = 0.0d0
+  QRadSWOutIncidentBeam = 0.0d0
+  BmIncInsSurfIntensRep = 0.0d0
+  BmIncInsSurfAmountRep = 0.0d0
+  IntBmIncInsSurfIntensRep = 0.0d0
+  IntBmIncInsSurfAmountRep = 0.0d0
+  QRadSWOutIncidentSkyDiffuse = 0.0d0
+  QRadSWOutIncidentGndDiffuse = 0.0d0
+  QRadSWOutIncBmToDiffReflGnd = 0.0d0
+  QRadSWOutIncSkyDiffReflGnd = 0.0d0
+  QRadSWOutIncBmToBmReflObs = 0.0d0
+  QRadSWOutIncBmToDiffReflObs = 0.0d0
+  QRadSWOutIncSkyDiffReflObs = 0.0d0
+  CosIncidenceAngle = 0.0d0
   BSDFBeamDirectionRep = 0
-  BSDFBeamThetaRep = 0.0
-  BSDFBeamPhiRep = 0.0
-  OpaqSurfInsFaceBeamSolAbsorbed = 0.0
+  BSDFBeamThetaRep = 0.0d0
+  BSDFBeamPhiRep = 0.0d0
+  OpaqSurfInsFaceBeamSolAbsorbed = 0.0d0
 
   DO SurfNum = 1, TotSurfaces
-     SurfaceWindow(SurfNum)%FrameQRadOutAbs = 0.0
-     SurfaceWindow(SurfNum)%FrameQRadInAbs = 0.0
-     SurfaceWindow(SurfNum)%DividerQRadOutAbs = 0.0
-     SurfaceWindow(SurfNum)%DividerQRadInAbs = 0.0
-     SurfaceWindow(SurfNum)%ExtBeamAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%ExtDiffAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%IntBeamAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%IntSWAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%InitialDifSolAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%IntLWAbsByShade = 0.0
-     SurfaceWindow(SurfNum)%ConvHeatFlowNatural = 0.0
-     SurfaceWindow(SurfNum)%ConvHeatGainToZoneAir = 0.0
-     SurfaceWindow(SurfNum)%RetHeatGainToZoneAir = 0.0
-     SurfaceWindow(SurfNum)%DividerConduction = 0.0
-     SurfaceWindow(SurfNum)%BlTsolBmBm = 0.0
-     SurfaceWindow(SurfNum)%BlTsolBmDif = 0.0
-     SurfaceWindow(SurfNum)%BlTsolDifDif = 0.0
-     SurfaceWindow(SurfNum)%BlGlSysTsolBmBm = 0.0
-     SurfaceWindow(SurfNum)%BlGlSysTsolDifDif = 0.0
-     SurfaceWindow(SurfNum)%ScTsolBmBm = 0.0
-     SurfaceWindow(SurfNum)%ScTsolBmDif = 0.0
-     SurfaceWindow(SurfNum)%ScTsolDifDif = 0.0
-     SurfaceWindow(SurfNum)%ScGlSysTsolBmBm = 0.0
-     SurfaceWindow(SurfNum)%ScGlSysTsolDifDif = 0.0
-     SurfaceWindow(SurfNum)%GlTsolBmBm = 0.0
-     SurfaceWindow(SurfNum)%GlTsolBmDif = 0.0
-     SurfaceWindow(SurfNum)%GlTsolDifDif = 0.0
-     SurfaceWindow(SurfNum)%BmSolTransThruIntWinRep = 0.0
-     SurfaceWindow(SurfNum)%BmSolAbsdOutsReveal = 0.0
-     SurfaceWindow(SurfNum)%BmSolRefldOutsRevealReport = 0.0
-     SurfaceWindow(SurfNum)%BmSolAbsdInsReveal = 0.0
-     SurfaceWindow(SurfNum)%BmSolRefldInsReveal = 0.0
-     SurfaceWindow(SurfNum)%BmSolRefldInsRevealReport = 0.0
-     SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffIntoZone = 0.0
-     SurfaceWindow(SurfNum)%OutsRevealDiffOntoFrame = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffOntoFrame = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazingReport = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffIntoZoneReport = 0.0
-     SurfaceWindow(SurfNum)%InsRevealDiffOntoFrameReport = 0.0
-     SurfaceWindow(SurfNum)%BmSolAbsdInsRevealReport = 0.0
-     SurfaceWindow(SurfNum)%BmSolTransThruIntWinRepEnergy = 0.0
-     SurfaceWindow(SurfNum)%BmSolRefldOutsRevealRepEnergy = 0.0
-     SurfaceWindow(SurfNum)%BmSolRefldInsRevealRepEnergy = 0.0
-     SurfaceWindow(SurfNum)%ProfileAngHor = 0.0
-     SurfaceWindow(SurfNum)%ProfileAngVert = 0.0
-     SurfaceWindow(SurfNum)%SkySolarInc = 0.0
-     SurfaceWindow(SurfNum)%GndSolarInc = 0.0
+     SurfaceWindow(SurfNum)%FrameQRadOutAbs = 0.0d0
+     SurfaceWindow(SurfNum)%FrameQRadInAbs = 0.0d0
+     SurfaceWindow(SurfNum)%DividerQRadOutAbs = 0.0d0
+     SurfaceWindow(SurfNum)%DividerQRadInAbs = 0.0d0
+     SurfaceWindow(SurfNum)%ExtBeamAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%ExtDiffAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%IntBeamAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%IntSWAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%InitialDifSolAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%IntLWAbsByShade = 0.0d0
+     SurfaceWindow(SurfNum)%ConvHeatFlowNatural = 0.0d0
+     SurfaceWindow(SurfNum)%ConvHeatGainToZoneAir = 0.0d0
+     SurfaceWindow(SurfNum)%RetHeatGainToZoneAir = 0.0d0
+     SurfaceWindow(SurfNum)%DividerConduction = 0.0d0
+     SurfaceWindow(SurfNum)%BlTsolBmBm = 0.0d0
+     SurfaceWindow(SurfNum)%BlTsolBmDif = 0.0d0
+     SurfaceWindow(SurfNum)%BlTsolDifDif = 0.0d0
+     SurfaceWindow(SurfNum)%BlGlSysTsolBmBm = 0.0d0
+     SurfaceWindow(SurfNum)%BlGlSysTsolDifDif = 0.0d0
+     SurfaceWindow(SurfNum)%ScTsolBmBm = 0.0d0
+     SurfaceWindow(SurfNum)%ScTsolBmDif = 0.0d0
+     SurfaceWindow(SurfNum)%ScTsolDifDif = 0.0d0
+     SurfaceWindow(SurfNum)%ScGlSysTsolBmBm = 0.0d0
+     SurfaceWindow(SurfNum)%ScGlSysTsolDifDif = 0.0d0
+     SurfaceWindow(SurfNum)%GlTsolBmBm = 0.0d0
+     SurfaceWindow(SurfNum)%GlTsolBmDif = 0.0d0
+     SurfaceWindow(SurfNum)%GlTsolDifDif = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolTransThruIntWinRep = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolAbsdOutsReveal = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolRefldOutsRevealReport = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolAbsdInsReveal = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolRefldInsReveal = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolRefldInsRevealReport = 0.0d0
+     SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffIntoZone = 0.0d0
+     SurfaceWindow(SurfNum)%OutsRevealDiffOntoFrame = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffOntoFrame = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazingReport = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffIntoZoneReport = 0.0d0
+     SurfaceWindow(SurfNum)%InsRevealDiffOntoFrameReport = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolAbsdInsRevealReport = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolTransThruIntWinRepEnergy = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolRefldOutsRevealRepEnergy = 0.0d0
+     SurfaceWindow(SurfNum)%BmSolRefldInsRevealRepEnergy = 0.0d0
+     SurfaceWindow(SurfNum)%ProfileAngHor = 0.0d0
+     SurfaceWindow(SurfNum)%ProfileAngVert = 0.0d0
+     SurfaceWindow(SurfNum)%SkySolarInc = 0.0d0
+     SurfaceWindow(SurfNum)%GndSolarInc = 0.0d0
   end DO
 
-  WinHeatGain = 0.0
-  WinHeatGainRep = 0.0
-  WinHeatLossRep = 0.0
+  WinHeatGain = 0.0d0
+  WinHeatGainRep = 0.0d0
+  WinHeatLossRep = 0.0d0
   WinGainConvGlazToZoneRep        = 0.0D0
   WinGainIRGlazToZoneRep          = 0.0D0
   WinLossSWZoneToOutWinRep        = 0.0D0
@@ -1942,91 +1970,92 @@ SUBROUTINE InitSolarHeatGains
   WinGainConvGlazShadGapToZoneRep = 0.0D0
   WinGainConvShadeToZoneRep       = 0.0D0
   WinGainIRShadeToZoneRep         = 0.0D0
-  WinGapConvHtFlowRep = 0.0
-  OpaqSurfInsFaceCondGainRep = 0.0
-  OpaqSurfInsFaceCondLossRep = 0.0
-  ZoneWinHeatGain = 0.0
-  ZoneWinHeatGainRep = 0.0
-  ZoneWinHeatLossRep = 0.0
-  ZoneOpaqSurfInsFaceCond = 0.0
-  ZoneOpaqSurfInsFaceCondGainRep = 0.0
-  ZoneOpaqSurfInsFaceCondLossRep = 0.0
+  OtherConvGainInsideFaceToZoneRep= 0.0d0
+  WinGapConvHtFlowRep = 0.0d0
+  OpaqSurfInsFaceCondGainRep = 0.0d0
+  OpaqSurfInsFaceCondLossRep = 0.0d0
+  ZoneWinHeatGain = 0.0d0
+  ZoneWinHeatGainRep = 0.0d0
+  ZoneWinHeatLossRep = 0.0d0
+  ZoneOpaqSurfInsFaceCond = 0.0d0
+  ZoneOpaqSurfInsFaceCondGainRep = 0.0d0
+  ZoneOpaqSurfInsFaceCondLossRep = 0.0d0
   ZoneOpaqSurfExtFaceCond        = 0.d0
   ZoneOpaqSurfExtFaceCondGainRep = 0.d0
   ZoneOpaqSurfExtFaceCondLossRep = 0.d0
-  WinShadingAbsorbedSolar = 0.0
-  WinSysSolTransmittance = 0.0
-  WinSysSolReflectance = 0.0
-  WinSysSolAbsorptance = 0.0
+  WinShadingAbsorbedSolar = 0.0d0
+  WinSysSolTransmittance = 0.0d0
+  WinSysSolReflectance = 0.0d0
+  WinSysSolAbsorptance = 0.0d0
   IF (NumOfTDDPipes > 0) THEN
-    TDDPipe%HeatGain = 0.0
-    TDDPipe%HeatLoss = 0.0
+    TDDPipe%HeatGain = 0.0d0
+    TDDPipe%HeatLoss = 0.0d0
   ENDIF
-  BmIncInsSurfIntensRep = 0.0
-  BmIncInsSurfAmountRep = 0.0
-  IntBmIncInsSurfIntensRep = 0.0
-  IntBmIncInsSurfAmountRep = 0.0
+  BmIncInsSurfIntensRep = 0.0d0
+  BmIncInsSurfAmountRep = 0.0d0
+  IntBmIncInsSurfIntensRep = 0.0d0
+  IntBmIncInsSurfAmountRep = 0.0d0
   !energy
-  QRadSWwinAbsTotEnergy = 0.0
-  BmIncInsSurfAmountRepEnergy = 0.0
-  IntBmIncInsSurfAmountRepEnergy = 0.0
-  WinHeatGainRepEnergy = 0.0
-  WinHeatLossRepEnergy = 0.0
-  WinGapConvHtFlowRepEnergy = 0.0
-  ZoneWinHeatGainRepEnergy = 0.0
-  ZoneWinHeatLossRepEnergy = 0.0
-  ZnOpqSurfInsFaceCondGnRepEnrg = 0.0
-  ZnOpqSurfInsFaceCondLsRepEnrg = 0.0
+  QRadSWwinAbsTotEnergy = 0.0d0
+  BmIncInsSurfAmountRepEnergy = 0.0d0
+  IntBmIncInsSurfAmountRepEnergy = 0.0d0
+  WinHeatGainRepEnergy = 0.0d0
+  WinHeatLossRepEnergy = 0.0d0
+  WinGapConvHtFlowRepEnergy = 0.0d0
+  ZoneWinHeatGainRepEnergy = 0.0d0
+  ZoneWinHeatLossRepEnergy = 0.0d0
+  ZnOpqSurfInsFaceCondGnRepEnrg = 0.0d0
+  ZnOpqSurfInsFaceCondLsRepEnrg = 0.0d0
   ZnOpqSurfExtFaceCondGnRepEnrg = 0.d0
   ZnOpqSurfExtFaceCondLsRepEnrg = 0.d0
-  WinShadingAbsorbedSolarEnergy = 0.0
-  BmIncInsSurfAmountRepEnergy = 0.0
-  IntBmIncInsSurfAmountRepEnergy = 0.0
+  WinShadingAbsorbedSolarEnergy = 0.0d0
+  BmIncInsSurfAmountRepEnergy = 0.0d0
+  IntBmIncInsSurfAmountRepEnergy = 0.0d0
 
-  IF (.not. SunIsUp .or. (BeamSolarRad+GndSolarRad+DifSolarRad <= 0.0)) THEN  ! Sun is down
+  IF (.not. SunIsUp .or. (BeamSolarRad+GndSolarRad+DifSolarRad <= 0.0d0)) THEN  ! Sun is down
 
-    QD  = 0.0
-    QDforDaylight  = 0.0
-    QC  = 0.0
-    QDV = 0.0
+    QD  = 0.0d0
+    QDforDaylight  = 0.0d0
+    QC  = 0.0d0
+    QDV = 0.0d0
 !unused    QBV = 0.0
-    ZoneTransSolar = 0.0
-    ZoneBmSolFrExtWinsRep = 0.0
-    ZoneBmSolFrIntWinsRep = 0.0
-    ZoneDifSolFrExtWinsRep = 0.0
-    ZoneDifSolFrIntWinsRep = 0.0
-    WinTransSolar = 0.0
-    WinBmSolar = 0.0
-    WinBmBmSolar = 0.
-    WinBmDifSolar = 0.
+    ZoneTransSolar = 0.0d0
+    ZoneBmSolFrExtWinsRep = 0.0d0
+    ZoneBmSolFrIntWinsRep = 0.0d0
+    ZoneDifSolFrExtWinsRep = 0.0d0
+    ZoneDifSolFrIntWinsRep = 0.0d0
+    WinTransSolar = 0.0d0
+    WinBmSolar = 0.0d0
+    WinBmBmSolar = 0.0d0
+    WinBmDifSolar = 0.0d0
 
-    WinDifSolar = 0.0
-    WinDirSolTransAtIncAngle = 0.0
+    WinDifSolar = 0.0d0
+    WinDirSolTransAtIncAngle = 0.0d0
     !energy
-    ZoneTransSolarEnergy = 0.0
-    ZoneBmSolFrExtWinsRepEnergy = 0.0
-    ZoneBmSolFrIntWinsRepEnergy = 0.0
-    ZoneDifSolFrExtWinsRepEnergy = 0.0
-    ZoneDifSolFrIntWinsRepEnergy = 0.0
-    WinTransSolarEnergy = 0.0
-    WinBmSolarEnergy = 0.0
-    WinBmBmSolarEnergy = 0.0
-    WinBmDifSolarEnergy = 0.0
+    ZoneTransSolarEnergy = 0.0d0
+    ZoneBmSolFrExtWinsRepEnergy = 0.0d0
+    ZoneBmSolFrIntWinsRepEnergy = 0.0d0
+    ZoneDifSolFrExtWinsRepEnergy = 0.0d0
+    ZoneDifSolFrIntWinsRepEnergy = 0.0d0
+    WinTransSolarEnergy = 0.0d0
+    WinBmSolarEnergy = 0.0d0
+    WinBmBmSolarEnergy = 0.0d0
+    WinBmDifSolarEnergy = 0.0d0
 
-    WinDifSolarEnergy = 0.0
+    WinDifSolarEnergy = 0.0d0
 
     IF (NumOfTDDPipes > 0) THEN
-      TDDPipe%TransSolBeam = 0.0
-      TDDPipe%TransSolDiff = 0.0
-      TDDPipe%TransVisBeam = 0.0
-      TDDPipe%TransVisDiff = 0.0
-      TDDPipe%TransmittedSolar = 0.0
+      TDDPipe%TransSolBeam = 0.0d0
+      TDDPipe%TransSolDiff = 0.0d0
+      TDDPipe%TransVisBeam = 0.0d0
+      TDDPipe%TransVisDiff = 0.0d0
+      TDDPipe%TransmittedSolar = 0.0d0
     ENDIF
 
     IF(CalcSolRefl) THEN
-      BmToBmReflFacObs = 0.0
-      BmToDiffReflFacObs = 0.0
-      BmToDiffReflFacGnd = 0.0
+      BmToBmReflFacObs = 0.0d0
+      BmToDiffReflFacObs = 0.0d0
+      BmToDiffReflFacGnd = 0.0d0
     END IF
 
   ELSE  ! Sun is up, calculate solar quantities
@@ -2036,7 +2065,7 @@ SUBROUTINE InitSolarHeatGains
       SurfaceWindow(SurfNum)%GndSolarInc = GndSolarRad * Surface(SurfNum)%ViewFactorGround
       !For Complex Fenestrations:
       SurfaceWindow(SurfNum)%SkyGndSolarInc = SurfaceWindow(SurfNum)%GndSolarInc
-      SurfaceWindow(SurfNum)%BmGndSolarInc =0.
+      SurfaceWindow(SurfNum)%BmGndSolarInc =0.0d0
       !
       IF(CalcSolRefl) THEN
 
@@ -2086,7 +2115,7 @@ SUBROUTINE InitSolarHeatGains
       !  DBZone needs to subtract this part since it is already counted in DBZone.
       !  Use InitialZoneDifSolReflW (Rob's previous work) as it better counts initial distribution of
       !   diffuse solar rather than using weighted area*absorptance
-        QDforDaylight(ZoneNum) = (DBZone(ZoneNum) - DBZoneIntWin(ZoneNum)) * BeamSolarRad &
+        QDforDaylight(ZoneNum) = (DBZone(ZoneNum) - DBZoneIntWin(ZoneNum)) * BeamSolarRad + DBZoneSSG(ZoneNum) &
                                  + InitialZoneDifSolReflW(ZoneNum)
 
       ! RJH 08/30/07 - Substitute InitialZoneDifSolReflW(ZoneNum) for DSZone and DGZone here
@@ -2097,13 +2126,13 @@ SUBROUTINE InitSolarHeatGains
       !QD(ZoneNum)  = DBZone(ZoneNum)*BeamSolarRad  &
       !                +DSZone(ZoneNum)*DifSolarRad  &
       !                +DGZone(ZoneNum)*GndSolarRad
-      QD(ZoneNum)  = DBZone(ZoneNum)*BeamSolarRad  &
+      QD(ZoneNum)  = DBZone(ZoneNum)*BeamSolarRad + DBZoneSSG(ZoneNum)  &
                       + InitialZoneDifSolReflW(ZoneNum)
     END DO
 
           ! Flux of diffuse solar in each zone
 
-    QSDifSol = 0.0
+    QSDifSol = 0.0d0
     DO ZoneNum = 1, NumOfZones
       QSDifSol(ZoneNum) = QDforDaylight(ZoneNum)
     END DO
@@ -2256,13 +2285,14 @@ SUBROUTINE InitSolarHeatGains
 
           IF (RoughIndexMovInsul <= 0) THEN   ! No movable insulation present
 
-            IF (Construct(ConstrNum)%TransDiff <= 0.0) THEN ! Opaque surface
+            IF (Construct(ConstrNum)%TransDiff <= 0.0d0) THEN ! Opaque surface
 
               AbsExt = Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpSolar
 
             ELSE ! Exterior window
 
-              IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
+              IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel .AND. &
+                  SurfaceWindow(SurfNum)%WindowModelType /= WindowEQLModel) THEN
                 TotGlassLay = Construct(ConstrNum)%TotGlassLayers
                 DO Lay = 1,TotGlassLay
                   AbsDiffWin(Lay) = Construct(ConstrNum)%AbsDiff(Lay)
@@ -2303,15 +2333,15 @@ SUBROUTINE InitSolarHeatGains
                       AbsDiffBlindSky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
                         SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlindSky)
                       SurfaceWindow(SurfNum)%ExtDiffAbsByShade = &
-                        SkySolarInc*(0.5*ACosTlt*AbsDiffBlindGnd + (1.-0.5*ACosTlt)*AbsDiffBlindSky) +  &
-                        GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffBlindGnd + 0.5*ACosTlt*AbsDiffBlindSky)
+                        SkySolarInc*(0.5d0*ACosTlt*AbsDiffBlindGnd + (1.0d0-0.5d0*ACosTlt)*AbsDiffBlindSky) +  &
+                        GndSolarInc*((1.0d0-0.5d0*ACosTlt)*AbsDiffBlindGnd + 0.5d0*ACosTlt*AbsDiffBlindSky)
                     END IF
                   END IF
 
                   ! Correct for shadowing of divider onto interior shading device (note that dividers are
                   ! not allowed in windows with between-glass shade/blind)
 
-                  IF((ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) .AND. SurfaceWindow(SurfNum)%DividerArea > 0.0) &
+                  IF((ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) .AND. SurfaceWindow(SurfNum)%DividerArea > 0.0d0) &
                       SurfaceWindow(SurfNum)%ExtDiffAbsByShade = SurfaceWindow(SurfNum)%ExtDiffAbsByShade * &
                         SurfaceWindow(SurfNum)%GlazedFrac
 
@@ -2324,7 +2354,7 @@ SUBROUTINE InitSolarHeatGains
 
                 END IF ! End of check if window has shading device on
 
-                QRadSWwinAbsTot(SurfNum) = 0.
+                QRadSWwinAbsTot(SurfNum) = 0.0d0
                 DO Lay = 1,TotGlassLay
                   QRadSWwinAbs(SurfNum,Lay) = AbsDiffWin(Lay) * (SkySolarInc + GndSolarInc) &
                     + AWinSurf(SurfNum,Lay) * BeamSolar  ! AWinSurf is from InteriorSolarDistribution
@@ -2335,32 +2365,70 @@ SUBROUTINE InitSolarHeatGains
                        AbsDiffGlassLaySky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
                          SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffSky(Lay,1:19))
                        QRadSWwinAbs(SurfNum,Lay) = &
-                        SkySolarInc*(0.5*ACosTlt*AbsDiffGlassLayGnd + (1.-0.5*ACosTlt)*AbsDiffGlassLaySky) +  &
-                        GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffGlassLayGnd + 0.5*ACosTlt*AbsDiffGlassLaySky) +  &
+                        SkySolarInc*(0.5d0*ACosTlt*AbsDiffGlassLayGnd + (1.0d0-0.5d0*ACosTlt)*AbsDiffGlassLaySky) +  &
+                        GndSolarInc*((1.0d0-0.5d0*ACosTlt)*AbsDiffGlassLayGnd + 0.5d0*ACosTlt*AbsDiffGlassLaySky) +  &
                         AWinSurf(SurfNum,Lay) * BeamSolar
                      END IF
                   END IF
 
+                  ! Total solar absorbed in solid layer (W), for reporting
+                  QRadSWwinAbsLayer(SurfNum,Lay) = QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+
                   ! Total solar absorbed in all glass layers (W), for reporting
-                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbsLayer(SurfNum,Lay)
                 END DO
                 QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
 
               ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
                 TotSolidLay = Construct(ConstrNum)%TotSolidLayers
                 CurrentState = SurfaceWindow(SurfNum)%ComplexFen%CurrentState
+                ! Examine for schedule surface gain
+                SurfSolAbs = WindowScheduledSolarAbs(SurfNum, ConstrNum)
+
                 DO Lay = 1, TotSolidLay
-                  ! Several notes about this equation.  First part is accounting for duffuse solar radiation for the ground and
-                  ! from the sky.  Second item (AWinSurf(SurfNum,Lay) * BeamSolar) is accounting for absorbed solar radiation
-                  ! originating from beam on exterior side.  Third item (AWinCFOverlap(SurfNum,Lay)) is accounting for
-                  ! absorptances from beam hitting back of the window which passes through rest of exterior windows
-                  QRadSWwinAbs(SurfNum,Lay) = SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyFtAbs(Lay) * SkySolarInc &
-                    & + SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyGndAbs(Lay) * GndSolarInc &
-                    & + AWinSurf(SurfNum,Lay) * BeamSolar &
-                    & + AWinCFOverlap(SurfNum,Lay) * BeamSolar
+                  IF (SurfSolAbs /= 0) THEN
+                    AWinSurf(SurfNum,Lay) = GetCurrentScheduleValue(FenLayAbsSSG(SurfSolAbs)%SchedPtrs(Lay))
+                    !ABWin(Lay) = AWinSurf(SurfNum,Lay)
+                    QRadSWwinAbs(SurfNum,Lay) = AWinSurf(SurfNum,Lay)
+                  ELSE
+                    ! Several notes about this equation.  First part is accounting for duffuse solar radiation for the ground and
+                    ! from the sky.  Second item (AWinSurf(SurfNum,Lay) * BeamSolar) is accounting for absorbed solar radiation
+                    ! originating from beam on exterior side.  Third item (AWinCFOverlap(SurfNum,Lay)) is accounting for
+                    ! absorptances from beam hitting back of the window which passes through rest of exterior windows
+                    QRadSWwinAbs(SurfNum,Lay) = SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyFtAbs(Lay) * &
+                      & SkySolarInc + SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyGndAbs(Lay) * GndSolarInc &
+                      & + AWinSurf(SurfNum,Lay) * BeamSolar &
+                      & + AWinCFOverlap(SurfNum,Lay) * BeamSolar
+                  END IF
+                  ! Total solar absorbed in solid layer (W), for reporting
+                  QRadSWwinAbsLayer(SurfNum,Lay) = QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
 
                   ! Total solar absorbed in all glass layers (W), for reporting
-                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbsLayer(SurfNum,Lay)
+                END DO
+                QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
+
+         ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+
+              ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowEQLModel) THEN
+                QRadSWwinAbsTot(SurfNum) = 0.0d0
+                !EQLNum = Construct(Surface(SurfNum)%Construction)%EQLConsPtr
+                TotSolidLay = CFS(Construct(Surface(SurfNum)%Construction)%EQLConsPtr)%NL
+                DO Lay = 1, TotSolidLay
+                  ! Absorbed window components include:
+                  ! (1) beam solar radiation absorbed by all layers in the fenestration
+                  ! (2) sky and ground reflected duffuse solar radiation absorbed by all layers
+                  ! (3) diffuse short wave incident on the inside face of the fenestration.  The short wave internal sources
+                  !     include light, ...
+                  AbsDiffWin(Lay) = Construct(ConstrNum)%AbsDiffFrontEQL(Lay)
+                  QRadSWwinAbs(SurfNum,Lay) = AWinSurf(SurfNum,Lay) * BeamSolar &
+                                            + AbsDiffWin(Lay) * (SkySolarInc + GndSolarInc)
+
+                  ! Total solar absorbed in solid layer (W), for reporting
+                  QRadSWwinAbsLayer(SurfNum,Lay) = QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+
+                  ! Total solar absorbed in all glass layers (W), for reporting
+                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbsLayer(SurfNum,Lay)
                 END DO
                 QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
               END IF ! IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
@@ -2377,26 +2445,26 @@ SUBROUTINE InitSolarHeatGains
                 DivProjOut = FrameDivider(FrDivNum)%DividerProjectionOut
                 DivProjIn = FrameDivider(FrDivNum)%DividerProjectionIn
               ELSE
-                FrWidth=0.0
-                FrProjOut=0.0
-                FrProjIn=0.0
-                DivArea=0.0
-                DivWidth=0.0
-                DivProjOut=0.0
-                DivProjIn=0.0
+                FrWidth=0.0d0
+                FrProjOut=0.0d0
+                FrProjIn=0.0d0
+                DivArea=0.0d0
+                DivWidth=0.0d0
+                DivProjOut=0.0d0
+                DivProjIn=0.0d0
               ENDIF
-              CosIncAngHorProj = 0.
-              CosIncAngVertProj = 0.
-              IF(FrArea > 0.0 .OR. DivArea > 0.0) THEN
+              CosIncAngHorProj = 0.0d0
+              CosIncAngVertProj = 0.0d0
+              IF(FrArea > 0.0d0 .OR. DivArea > 0.0d0) THEN
                 FracSunLit = SunLitFrac(SurfNum,HourOfDay,TimeStep)
                 BeamFaceInc = BeamSolarRad * SunLitFrac(SurfNum,HourOfDay,TimeStep)*CosInc
                 DifSolarFaceInc = SkySolarInc + GndSolarInc
               ELSE
-                FracSunLit=0.0
+                FracSunLit=0.0d0
               END IF
-              IF(FracSunLit > 0.0) THEN
-                IF((FrArea > 0.0 .AND. (FrProjOut > 0.0 .OR. FrProjIn > 0.0)) &
-                  .OR. (DivArea > 0.0 .AND. (DivProjOut > 0.0 .OR. DivProjIn > 0.0))) THEN
+              IF(FracSunLit > 0.0d0) THEN
+                IF((FrArea > 0.0d0 .AND. (FrProjOut > 0.0d0 .OR. FrProjIn > 0.0d0)) &
+                  .OR. (DivArea > 0.0d0 .AND. (DivProjOut > 0.0d0 .OR. DivProjIn > 0.0d0))) THEN
                   ! Dot products used to calculate beam solar incident on faces of
                   ! frame and divider perpendicular to the glass surface.
                   ! Note that SOLCOS is the current timestep's solar direction cosines.
@@ -2414,18 +2482,18 @@ SUBROUTINE InitSolarHeatGains
 
               ! (A window shade or blind, if present, is assumed to not shade the frame, so no special
               ! treatment of frame solar needed if window has an exterior shade or blind.)
-              IF(FrArea > 0.0) THEN
+              IF(FrArea > 0.0d0) THEN
                 FrIncSolarOut = BeamFaceInc
-                FrIncSolarIn  = 0.0
-                TransDiffGl   = 0.0
-                IF(FrProjOut > 0.0 .OR. FrProjIn > 0.0) THEN
+                FrIncSolarIn  = 0.0d0
+                TransDiffGl   = 0.0d0
+                IF(FrProjOut > 0.0d0 .OR. FrProjIn > 0.0d0) THEN
                   BeamFrHorFaceInc = BeamSolarRad * CosIncAngHorProj * &
                     (Surface(SurfNum)%Width - FrameDivider(FrDivNum)%VertDividers*DivWidth)*FracSunLit/FrArea
                   BeamFrVertFaceInc = BeamSolarRad * CosIncAngVertProj * &
                     (Surface(SurfNum)%Height - FrameDivider(FrDivNum)%HorDividers*DivWidth)*FracSunLit/FrArea
                   ! Beam solar on outside of frame
                   FrIncSolarOut = FrIncSolarOut + (BeamFrHorFaceInc + BeamFrVertFaceInc)*FrProjOut
-                  IF(FrProjIn > 0.0) THEN
+                  IF(FrProjIn > 0.0d0) THEN
                     TransGl = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
                     TransDiffGl = Construct(ConstrNum)%TransDiff
                     IF(ShadeFlag == SwitchableGlazing) THEN   ! Switchable glazing
@@ -2439,7 +2507,7 @@ SUBROUTINE InitSolarHeatGains
                   END IF
                 END IF
                 ! Beam plus diffuse solar on outside of frame
-                FrIncSolarOut = FrIncSolarOut + DifSolarFaceInc*(1.+0.5*SurfaceWindow(SurfNum)%ProjCorrFrOut)
+                FrIncSolarOut = FrIncSolarOut + DifSolarFaceInc*(1.0d0+0.5d0*SurfaceWindow(SurfNum)%ProjCorrFrOut)
                 SurfaceWindow(SurfNum)%FrameQRadOutAbs = FrIncSolarOut*SurfaceWindow(SurfNum)%FrameSolAbsorp
                 ! Add diffuse from beam reflected from window outside reveal surfaces
                 SurfaceWindow(SurfNum)%FrameQRadOutAbs = SurfaceWindow(SurfNum)%FrameQRadOutAbs + BeamSolarRad * &
@@ -2447,7 +2515,7 @@ SUBROUTINE InitSolarHeatGains
 
                 ! Beam plus diffuse solar on inside of frame
                 FrIncSolarIn = FrIncSolarIn + DifSolarFaceInc * TransDiffGl * &
-                  0.5 * SurfaceWindow(SurfNum)%ProjCorrFrIn
+                  0.5d0 * SurfaceWindow(SurfNum)%ProjCorrFrIn
                 SurfaceWindow(SurfNum)%FrameQRadInAbs = FrIncSolarIn*SurfaceWindow(SurfNum)%FrameSolAbsorp
                 ! Add diffuse from beam reflected from window inside reveal surfaces
                 SurfaceWindow(SurfNum)%FrameQRadInAbs = SurfaceWindow(SurfNum)%FrameQRadInAbs + BeamSolarRad * &
@@ -2461,7 +2529,7 @@ SUBROUTINE InitSolarHeatGains
               ! Dividers are not allowed on windows with between-glass shade/blind so DivProjOut and
               ! DivProjIn will be zero in this case.)
 
-              IF(DivArea > 0.0) THEN  ! Solar absorbed by window divider
+              IF(DivArea > 0.0d0) THEN  ! Solar absorbed by window divider
                 DividerAbs = SurfaceWindow(SurfNum)%DividerSolAbsorp
                 IF(SurfaceWindow(SurfNum)%DividerType == Suspended) THEN
                   ! Suspended (between-glass) divider; account for effect glass on outside of divider
@@ -2469,24 +2537,25 @@ SUBROUTINE InitSolarHeatGains
                   MatNumGL = Construct(ConstrNum)%LayerPoint(1)
                   TransGl = Material(MatNumGl)%Trans
                   ReflGl = Material(MatNumGl)%ReflectSolBeamFront
-                  AbsGl = 1.-TransGl-ReflGl
+                  AbsGl = 1.0d0-TransGl-ReflGl
                   IF(ShadeFlag == SwitchableGlazing) THEN   ! Switchable glazing
                     MatNumGlSh = Construct(ConstrNumSh)%LayerPoint(1)
                     TransGlSh = Material(MatNumGlSh)%Trans
                     ReflGlSh = Material(MatNumGlSh)%ReflectSolBeamFront
-                    AbsGlSh = 1.-TransGlSh-ReflGlSh
+                    AbsGlSh = 1.0d0-TransGlSh-ReflGlSh
                     TransGl = InterpSw(SwitchFac,TransGl,TransGlSh)
                     ReflGl = InterpSw(SwitchFac,ReflGl,ReflGlSh)
                     AbsGl = InterpSw(SwitchFac,AbsGl,AbsGlSh)
                   END IF
-                  DividerRefl = 1.-DividerAbs
-                  DividerAbs = AbsGl + TransGl*(DividerAbs + DividerRefl*AbsGl)/(1.-DividerRefl*ReflGl)
+                  DividerRefl = 1.0d0-DividerAbs
+                  DividerAbs = AbsGl + TransGl*(DividerAbs + DividerRefl*AbsGl)/(1.0d0-DividerRefl*ReflGl)
                 END IF
 
-                BeamDivHorFaceInc = 0.
-                BeamDivVertFaceInc = 0.
+                BeamDivHorFaceInc = 0.0d0
+                BeamDivVertFaceInc = 0.0d0
                 ! Beam incident on horizontal and vertical projection faces of divider if no exterior shading
-                IF(DivProjOut > 0.0 .and. ShadeFlag /= ExtShadeOn .and. ShadeFlag /= ExtBlindOn .and. ShadeFlag /= ExtScreenOn)THEN
+                IF(DivProjOut > 0.0d0 .and. ShadeFlag /= ExtShadeOn .and.   &
+                   ShadeFlag /= ExtBlindOn .and. ShadeFlag /= ExtScreenOn)THEN
                   BeamDivHorFaceInc = BeamSolarRad * CosIncAngHorProj * FrameDivider(FrDivNum)%HorDividers * &
                     DivProjOut * (Surface(SurfNum)%Width - FrameDivider(FrDivNum)%VertDividers*DivWidth) * &
                     FracSunLit / DivArea
@@ -2494,15 +2563,15 @@ SUBROUTINE InitSolarHeatGains
                     DivProjOut * (Surface(SurfNum)%Height - FrameDivider(FrDivNum)%HorDividers*DivWidth) * &
                     FracSunLit / DivArea
                 END IF
-                DivIncSolarOutBm  = 0.0
-                DivIncSolarOutDif = 0.0
-                DivIncSolarInBm   = 0.0
-                DivIncSolarInDif  = 0.0
+                DivIncSolarOutBm  = 0.0d0
+                DivIncSolarOutDif = 0.0d0
+                DivIncSolarInBm   = 0.0d0
+                DivIncSolarInDif  = 0.0d0
                 IF(ShadeFlag /= ExtShadeOn .and. ShadeFlag /= ExtBlindOn .AND. ShadeFlag /= BGShadeOn &
                        .AND. ShadeFlag /= BGBlindOn .and. ShadeFlag /= ExtScreenOn) THEN  ! No exterior or between-glass shading
                   DivIncSolarOutBm =  BeamFaceInc + BeamDivHorFaceInc + BeamDivVertFaceInc
-                  DivIncSolarOutDif = DifSolarFaceInc*(1.+SurfaceWindow(SurfNum)%ProjCorrDivOut)
-                  IF(DivProjIn > 0.0) THEN
+                  DivIncSolarOutDif = DifSolarFaceInc*(1.0d0+SurfaceWindow(SurfNum)%ProjCorrDivOut)
+                  IF(DivProjIn > 0.0d0) THEN
                     TransGl = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
                     TransDiffGl = Construct(ConstrNum)%TransDiff
                     IF(ShadeFlag == SwitchableGlazing) THEN   ! Switchable glazing
@@ -2522,8 +2591,8 @@ SUBROUTINE InitSolarHeatGains
                     DivIncSolarInDif = TransDiffGl * DifSolarFaceInc * SurfaceWindow(SurfNum)%ProjCorrDivIn
                   END IF
                 ELSE  ! Exterior shade, screen or blind present
-                  DivIncSolarOutBm  = BeamFaceInc * (1.+SurfaceWindow(SurfNum)%ProjCorrDivOut)
-                  DivIncSolarOutDif = DifSolarFaceInc * (1.+SurfaceWindow(SurfNum)%ProjCorrDivOut)
+                  DivIncSolarOutBm  = BeamFaceInc * (1.0d0+SurfaceWindow(SurfNum)%ProjCorrDivOut)
+                  DivIncSolarOutDif = DifSolarFaceInc * (1.0d0+SurfaceWindow(SurfNum)%ProjCorrDivOut)
                   DivIncSolarInBm   = BeamFaceInc * SurfaceWindow(SurfNum)%ProjCorrDivIn * &
                                           Construct(ConstrNum)%TransDiff
                   DivIncSolarInDif  = DifSolarFaceInc * SurfaceWindow(SurfNum)%ProjCorrDivIn * &
@@ -2577,7 +2646,7 @@ SUBROUTINE InitSolarHeatGains
 
           END IF ! RoughIndexMovInsul <= 0, no movable insulation
 
-          IF (Surface(SurfNum)%HeatTransSurf .AND. Construct(ConstrNum)%TransDiff <= 0.0) THEN ! Opaque heat transfer surface
+          IF (Surface(SurfNum)%HeatTransSurf .AND. Construct(ConstrNum)%TransDiff <= 0.0d0) THEN ! Opaque heat transfer surface
             QRadSWOutAbs(SurfNum) = AOSurf(SurfNum) * BeamSolarRad + AbsExt * (SkySolarInc + GndSolarInc)
             SWOutAbsTotalReport(SurfNum) = QRadSWOutAbs(SurfNum) * Surface(SurfNum)%Area
             SWOutAbsEnergyReport(SurfNum) = SWOutAbsTotalReport(SurfNum) * SecInHour * TimeStepZone
@@ -2587,15 +2656,20 @@ SUBROUTINE InitSolarHeatGains
       END IF ! Surface(SurfNum)%ExtSolar
 
       IF (Surface(SurfNum)%HeatTransSurf .and. ConstrNum > 0) THEN
-        IF (Construct(ConstrNum)%TransDiff <= 0.0) THEN ! Opaque surface
-          QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + AISurf(SurfNum)*BeamSolarRad
-          IF (InShelfSurf > 0) THEN ! Inside daylighting shelf
-            ! Shelf surface area is divided by 2 because only one side sees beam (Area was multiplied by 2 during init)
-            OpaqSurfInsFaceBeamSolAbsorbed(SurfNum) = AISurf(SurfNum)*BeamSolarRad*(0.5*Surface(SurfNum)%Area)
-          ELSE ! Regular surface
-            OpaqSurfInsFaceBeamSolAbsorbed(SurfNum) = AISurf(SurfNum)*BeamSolarRad*Surface(SurfNum)%Area
-          END IF
-        ENDIF
+        SurfSolIncPtr = SurfaceScheduledSolarInc(SurfNum, ConstrNum)
+        IF (SurfSolIncPtr == 0) THEN
+          IF (Construct(ConstrNum)%TransDiff <= 0.0d0) THEN ! Opaque surface
+            QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + AISurf(SurfNum)*BeamSolarRad
+            IF (InShelfSurf > 0) THEN ! Inside daylighting shelf
+              ! Shelf surface area is divided by 2 because only one side sees beam (Area was multiplied by 2 during init)
+              OpaqSurfInsFaceBeamSolAbsorbed(SurfNum) = AISurf(SurfNum)*BeamSolarRad*(0.5*Surface(SurfNum)%Area)
+            ELSE ! Regular surface
+              OpaqSurfInsFaceBeamSolAbsorbed(SurfNum) = AISurf(SurfNum)*BeamSolarRad*Surface(SurfNum)%Area
+            END IF
+          ENDIF
+        ELSE
+          QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + AISurf(SurfNum)
+        END IF
       END IF
 
     END DO  !End of surface loop
@@ -2634,6 +2708,7 @@ SUBROUTINE InitIntSolarDistribution
   USE General, ONLY: InterpSw, InterpSlatAng
   USE HeatBalanceMovableInsulation
   USE DaylightingDevices, ONLY: DistributeTDDAbsorbedSolar
+  USE DataWindowEquivalentLayer
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2673,8 +2748,10 @@ SUBROUTINE InitIntSolarDistribution
   REAL(r64)    :: AbsDiffBkBl        ! Blind diffuse back solar absorptance as part of glazing system
   REAL(r64)    :: EffBlEmiss         ! Blind emissivity (thermal absorptance) as part of glazing system
   REAL(r64) :: pulseMultipler     ! use to create a pulse for the load component report computations
-  REAL(r64) :: curQL = 0.0        ! radiant value prior to adjustment for pulse for load component report
-  REAL(r64) :: adjQL = 0.0        ! radiant value including adjustment for pulse for load component report
+  REAL(r64) :: curQL = 0.0d0        ! radiant value prior to adjustment for pulse for load component report
+  REAL(r64) :: adjQL = 0.0d0        ! radiant value including adjustment for pulse for load component report
+  INTEGER   :: EQLNum             ! equivalent layer fenestration index
+  INTEGER   :: Lay                ! equivalent layer fenestration layer index
 
           ! FLOW:
 
@@ -2747,146 +2824,191 @@ SUBROUTINE InitIntSolarDistribution
 
     ConstrNum = Surface(SurfNum)%Construction
 
-    IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
+    IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque surface
       AbsIntSurf = Construct(ConstrNum)%InsideAbsorpSolar
       AbsIntSurfVis = Construct(ConstrNum)%InsideAbsorpSolar !to fix CR 8695 change to this = Construct(ConstrNum)%InsideAbsorpVis
-      HMovInsul = 0.0
+      HMovInsul = 0.0d0
       IF (Surface(SurfNum)%MaterialMovInsulInt.GT.0) &
         CALL EvalInsideMovableInsulation(SurfNum,HMovInsul,AbsInt)
-      IF (HMovInsul > 0.0) AbsIntSurf = AbsInt
+      IF (HMovInsul > 0.0d0) AbsIntSurf = AbsInt
       QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + QS(ZoneNum)*AbsIntSurf
       QRadSWLightsInAbs(SurfNum) = QRadSWLightsInAbs(SurfNum) + QSLights(ZoneNum)*AbsIntSurfVis
     ELSE  ! Window
-      ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-      IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
-        ConstrNum   = Surface(SurfNum)%StormWinConstruction
-        ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
-      END IF
-      TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
-      ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
 
-      ! These calculations are repeated from InitInternalHeatGains for the Zone Component Loads Report
-      pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
-      IF (.NOT. doLoadComponentPulseNow) THEN
-        QRadThermInAbs(SurfNum) = QL(ZoneNum) * TMULT(ZoneNum) * ITABSF(SurfNum)
-      ELSE
-        curQL = QL(ZoneNum)
-        ! for the loads component report during the special sizing run increase the radiant portion
-        ! a small amount to create a "pulse" of heat that is used for the
-        adjQL = curQL + Zone(ZoneNum)%FloorArea * pulseMultipler
-        ! ITABSF is the Inside Thermal Absorptance
-        ! TMULT is a mulipliter for each zone
-        ! QRadThermInAbs is the thermal radiation absorbed on inside surfaces
-        QRadThermInAbs(SurfNum) = adjQL * TMULT(ZoneNum) * ITABSF(SurfNum)
-      END IF
-
-      IF(ShadeFlag <= 0) THEN  ! No window shading
-        DO IGlass = 1,TotGlassLayers
-          QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
-            QS(ZoneNum)*Construct(ConstrNum)%AbsDiffBack(IGlass)
-        END DO
-      ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
-            ! Interior, exterior or between-glass shade, screen or blind in place
-        DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
-          IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
-            QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
-              QS(ZoneNum)*Construct(ConstrNumSh)%AbsDiffBack(IGlass)
-          IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn) THEN
-            BlAbsDiffBk = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                                 Construct(ConstrNumSh)%BlAbsDiffBack(IGlass,1:MaxSlatAngs))
-            QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) + QS(ZoneNum)*BlAbsDiffBk
+      IF ( SurfaceWindow(SurfNum)%WindowModelType /= WindowEQLModel) THEN
+          ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+          IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
+            ConstrNum   = Surface(SurfNum)%StormWinConstruction
+            ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
           END IF
+          TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
+          ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+
+          ! These calculations are repeated from InitInternalHeatGains for the Zone Component Loads Report
+          pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
+          IF (.NOT. doLoadComponentPulseNow) THEN
+            QRadThermInAbs(SurfNum) = QL(ZoneNum) * TMULT(ZoneNum) * ITABSF(SurfNum)
+          ELSE
+            curQL = QL(ZoneNum)
+            ! for the loads component report during the special sizing run increase the radiant portion
+            ! a small amount to create a "pulse" of heat that is used for the
+            adjQL = curQL + Zone(ZoneNum)%FloorArea * pulseMultipler
+            ! ITABSF is the Inside Thermal Absorptance
+            ! TMULT is a mulipliter for each zone
+            ! QRadThermInAbs is the thermal radiation absorbed on inside surfaces
+            QRadThermInAbs(SurfNum) = adjQL * TMULT(ZoneNum) * ITABSF(SurfNum)
+          END IF
+
+          IF(ShadeFlag <= 0) THEN  ! No window shading
+            DO IGlass = 1,TotGlassLayers
+              QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+                QS(ZoneNum)*Construct(ConstrNum)%AbsDiffBack(IGlass)
+            END DO
+          ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
+                ! Interior, exterior or between-glass shade, screen or blind in place
+            DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
+              IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
+                QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+                  QS(ZoneNum)*Construct(ConstrNumSh)%AbsDiffBack(IGlass)
+              IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn) THEN
+                BlAbsDiffBk = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+                                     Construct(ConstrNumSh)%BlAbsDiffBack(IGlass,1:MaxSlatAngs))
+                QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) + QS(ZoneNum)*BlAbsDiffBk
+              END IF
+            END DO
+            BlNum = SurfaceWindow(SurfNum)%BlindNumber
+            IF(ShadeFlag == IntShadeOn) &
+              SurfaceWindow(SurfNum)%IntLWAbsByShade = &
+                QL(ZoneNum) * Construct(ConstrNumSh)%ShadeAbsorpThermal * TMULT(ZoneNum)
+            IF(ShadeFlag == IntBlindOn) THEN
+              EffBlEmiss = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+                                     SurfaceWindow(SurfNum)%EffShBlindEmiss)
+              SurfaceWindow(SurfNum)%IntLWAbsByShade = QL(ZoneNum) * EffBlEmiss * TMULT(ZoneNum)
+            END IF
+            IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
+              SurfaceWindow(SurfNum)%IntSWAbsByShade = QS(ZoneNum)*Construct(ConstrNumSh)%AbsDiffBackShade
+            IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN
+              AbsDiffBkBl = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+                                     Construct(ConstrNumSh)%AbsDiffBackBlind)
+              SurfaceWindow(SurfNum)%IntSWAbsByShade = QS(ZoneNum)*AbsDiffBkBl
+            END IF
+            ! Correct for divider shadowing
+            IF(ShadeFlag == ExtShadeOn.OR.ShadeFlag == ExtBlindOn.OR.ShadeFlag == ExtScreenOn) &
+              SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade * SurfaceWindow(SurfNum)%GlazedFrac
+
+          ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
+            DO IGlass = 1,TotGlassLayers
+             QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+               QS(ZoneNum) * InterpSw(SurfaceWindow(SurfNum)%SwitchingFactor,  &
+                                      Construct(ConstrNum)%AbsDiffBack(IGlass),  &
+                                      Construct(ConstrNumSh)%AbsDiffBack(IGlass))
+            END DO
+
+          END IF  ! End of shading flag check
+
+          IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0) &  ! Window has a frame
+            ! Note that FrameQRadInAbs is initially calculated in InitSolarHeatGains
+            SurfaceWindow(SurfNum)%FrameQRadInAbs = SurfaceWindow(SurfNum)%FrameQRadInAbs + &
+              ( QS(ZoneNum) * SurfaceWindow(SurfNum)%FrameSolAbsorp + &
+              (QL(ZoneNum)*TMULT(ZoneNum) + QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) + &
+              QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum)) * &
+              SurfaceWindow(SurfNum)%FrameEmis ) * (1.0d0+0.5d0*SurfaceWindow(SurfNum)%ProjCorrFrIn)
+          IF(SurfaceWindow(SurfNum)%DividerArea > 0.0d0) THEN  ! Window has dividers
+            DividerThermAbs = SurfaceWindow(SurfNum)%DividerEmis
+            DividerSolAbs = SurfaceWindow(SurfNum)%DividerSolAbsorp
+            IF(SurfaceWindow(SurfNum)%DividerType == Suspended) THEN ! Suspended divider; account for inside glass
+              MatNumGl = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
+              TransGl = Material(MatNumGl)%Trans
+              ReflGl = Material(MatNumGl)%ReflectSolBeamBack
+              AbsGl = 1.0d0-TransGl-ReflGl
+              DividerSolRefl = 1.0d0-DividerSolAbs
+              DividerSolAbs = AbsGl + TransGl*(DividerSolAbs + DividerSolRefl*AbsGl)/(1.0d0-DividerSolRefl*ReflGl)
+              DividerThermAbs = Material(MatNumGl)%AbsorpThermalBack
+            END IF
+            ! Correct for interior shade transmittance
+            IF(ShadeFlag == IntShadeOn) THEN
+              MatNumSh = Construct(ConstrNumSh)%LayerPoint(Construct(ConstrNumSh)%TotLayers)
+              DividerSolAbs = DividerSolAbs * Material(MatNumSh)%Trans
+              DividerThermAbs = DividerThermAbs * Material(MatNumSh)%TransThermal
+            ELSE IF(ShadeFlag == IntBlindOn) THEN
+              DividerSolAbs = DividerSolAbs * InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
+                  SurfaceWindow(SurfNum)%MovableSlats,Blind(BlNum)%SolBackDiffDiffTrans)
+              DividerThermAbs = DividerThermAbs * InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
+                  SurfaceWindow(SurfNum)%MovableSlats, Blind(BlNum)%IRBackTrans)
+            END IF
+            ! Note that DividerQRadInAbs is initially calculated in InitSolarHeatGains
+            SurfaceWindow(SurfNum)%DividerQRadInAbs = SurfaceWindow(SurfNum)%DividerQRadInAbs + &
+               ( QS(ZoneNum)*DividerSolAbs + &
+               (QL(ZoneNum)*TMULT(ZoneNum) + QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) + &
+               QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum))*DividerThermAbs) * &
+               (1.0d0+SurfaceWindow(SurfNum)%ProjCorrDivIn)
+          END IF
+
+      ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowEQLModel) THEN
+
+        !ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+        ConstrNum   = Surface(SurfNum)%Construction
+        !TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
+
+        ! These calculations are repeated from InitInternalHeatGains for the Zone Component Loads Report
+        pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
+        IF (.NOT. doLoadComponentPulseNow) THEN
+            QRadThermInAbs(SurfNum) = QL(ZoneNum) * TMULT(ZoneNum) * ITABSF(SurfNum)
+        ELSE
+            curQL = QL(ZoneNum)
+            ! for the loads component report during the special sizing run increase the radiant portion
+            ! a small amount to create a "pulse" of heat that is used for the
+            adjQL = curQL + Zone(ZoneNum)%FloorArea * pulseMultipler
+            ! ITABSF is the Inside Thermal Absorptance
+            ! TMULT is a mulipliter for each zone
+            ! QRadThermInAbs is the thermal radiation absorbed on inside surfaces
+            QRadThermInAbs(SurfNum) = adjQL * TMULT(ZoneNum) * ITABSF(SurfNum)
+        END IF
+        ! Radiations absorbed by the window layers coming from zone side
+        EQLNum = Construct(ConstrNum)%EQLConsPtr
+        DO Lay = 1, CFS(EQLNum)%NL
+            QRadSWwinAbs(SurfNum,Lay) = QRadSWwinAbs(SurfNum,Lay) &
+                                      + QS(ZoneNum) * Construct(ConstrNum)%AbsDiffBackEQL(Lay)
         END DO
-        BlNum = SurfaceWindow(SurfNum)%BlindNumber
-        IF(ShadeFlag == IntShadeOn) &
-          SurfaceWindow(SurfNum)%IntLWAbsByShade = &
-            QL(ZoneNum) * Construct(ConstrNumSh)%ShadeAbsorpThermal * TMULT(ZoneNum)
-        IF(ShadeFlag == IntBlindOn) THEN
-          EffBlEmiss = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                                 SurfaceWindow(SurfNum)%EffShBlindEmiss)
-          SurfaceWindow(SurfNum)%IntLWAbsByShade = QL(ZoneNum) * EffBlEmiss * TMULT(ZoneNum)
-        END IF
-        IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
-          SurfaceWindow(SurfNum)%IntSWAbsByShade = QS(ZoneNum)*Construct(ConstrNumSh)%AbsDiffBackShade
-        IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN
-          AbsDiffBkBl = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                                 Construct(ConstrNumSh)%AbsDiffBackBlind)
-          SurfaceWindow(SurfNum)%IntSWAbsByShade = QS(ZoneNum)*AbsDiffBkBl
-        END IF
-        ! Correct for divider shadowing
-        IF(ShadeFlag == ExtShadeOn.OR.ShadeFlag == ExtBlindOn.OR.ShadeFlag == ExtScreenOn) &
-          SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade * SurfaceWindow(SurfNum)%GlazedFrac
+        ! Window frame has not been included for equivalent layer model yet
 
-      ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
-        DO IGlass = 1,TotGlassLayers
-         QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
-           QS(ZoneNum) * InterpSw(SurfaceWindow(SurfNum)%SwitchingFactor,  &
-                                  Construct(ConstrNum)%AbsDiffBack(IGlass),  &
-                                  Construct(ConstrNumSh)%AbsDiffBack(IGlass))
-        END DO
 
-      END IF  ! End of shading flag check
-
-      IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) &  ! Window has a frame
-        ! Note that FrameQRadInAbs is initially calculated in InitSolarHeatGains
-        SurfaceWindow(SurfNum)%FrameQRadInAbs = SurfaceWindow(SurfNum)%FrameQRadInAbs + &
-          ( QS(ZoneNum) * SurfaceWindow(SurfNum)%FrameSolAbsorp + &
-          (QL(ZoneNum)*TMULT(ZoneNum) + QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) + &
-          QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum)) * &
-          SurfaceWindow(SurfNum)%FrameEmis ) * (1.+0.5*SurfaceWindow(SurfNum)%ProjCorrFrIn)
-      IF(SurfaceWindow(SurfNum)%DividerArea > 0.0) THEN  ! Window has dividers
-        DividerThermAbs = SurfaceWindow(SurfNum)%DividerEmis
-        DividerSolAbs = SurfaceWindow(SurfNum)%DividerSolAbsorp
-        IF(SurfaceWindow(SurfNum)%DividerType == Suspended) THEN ! Suspended divider; account for inside glass
-          MatNumGl = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
-          TransGl = Material(MatNumGl)%Trans
-          ReflGl = Material(MatNumGl)%ReflectSolBeamBack
-          AbsGl = 1.-TransGl-ReflGl
-          DividerSolRefl = 1.-DividerSolAbs
-          DividerSolAbs = AbsGl + TransGl*(DividerSolAbs + DividerSolRefl*AbsGl)/(1.-DividerSolRefl*ReflGl)
-          DividerThermAbs = Material(MatNumGl)%AbsorpThermalBack
-        END IF
-        ! Correct for interior shade transmittance
-        IF(ShadeFlag == IntShadeOn) THEN
-          MatNumSh = Construct(ConstrNumSh)%LayerPoint(Construct(ConstrNumSh)%TotLayers)
-          DividerSolAbs = DividerSolAbs * Material(MatNumSh)%Trans
-          DividerThermAbs = DividerThermAbs * Material(MatNumSh)%TransThermal
-        ELSE IF(ShadeFlag == IntBlindOn) THEN
-          DividerSolAbs = DividerSolAbs * InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
-              SurfaceWindow(SurfNum)%MovableSlats,Blind(BlNum)%SolBackDiffDiffTrans)
-          DividerThermAbs = DividerThermAbs * InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
-              SurfaceWindow(SurfNum)%MovableSlats, Blind(BlNum)%IRBackTrans)
-        END IF
-        ! Note that DividerQRadInAbs is initially calculated in InitSolarHeatGains
-        SurfaceWindow(SurfNum)%DividerQRadInAbs = SurfaceWindow(SurfNum)%DividerQRadInAbs + &
-           ( QS(ZoneNum)*DividerSolAbs + &
-           (QL(ZoneNum)*TMULT(ZoneNum) + QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) + &
-           QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum))*DividerThermAbs) * &
-           (1.+SurfaceWindow(SurfNum)%ProjCorrDivIn)
-      END IF
+      END IF ! end if for IF ( SurfaceWindow(SurfNum)%WindowModelType /= WindowEQLModel) THEN
 
     END IF  ! End of opaque surface vs. window check
 
           ! OUTSIDE OF SURFACE CASES
     IF (Surface(SurfNum)%ExtBoundCond > 0) THEN  ! Interzone surface
 
-      IF (Construct(ConstrNum)%TransDiff > 0.0) THEN  ! Interzone window
+      IF (Construct(ConstrNum)%TransDiff > 0.0d0) THEN  ! Interzone window
 
         ! Short-wave radiation absorbed in panes of corresponding window in adjacent zone
         SurfNumAdjZone = Surface(SurfNum)%ExtBoundCond
-        DO IGlass =1,TotGlassLayers
-          QRadSWwinAbs(SurfNumAdjZone,IGlass) =  QRadSWwinAbs(SurfNumAdjZone,IGlass) +  &
-            QS(ZoneNum) * Construct(Surface(SurfNumAdjZone)%Construction)%AbsDiff(IGlass)
-            ! Note that AbsDiff rather than AbsDiffBack is used in the above since the
-            ! radiation from the current zone is incident on the outside of the adjacent
-            ! zone's window.
-        END DO
 
+        IF (SurfaceWindow(SurfNumAdjZone)%WindowModelType /= WindowEQLModel) THEN
+            DO IGlass =1,TotGlassLayers
+              QRadSWwinAbs(SurfNumAdjZone,IGlass) =  QRadSWwinAbs(SurfNumAdjZone,IGlass) +  &
+                QS(ZoneNum) * Construct(Surface(SurfNumAdjZone)%Construction)%AbsDiff(IGlass)
+                ! Note that AbsDiff rather than AbsDiffBack is used in the above since the
+                ! radiation from the current zone is incident on the outside of the adjacent
+                ! zone's window.
+            END DO
+        ELSE  ! IF (SurfaceWindow(SurfNumAdjZone)%WindowModelType == WindowEQLModel) THEN
+            ConstrNum   = Surface(SurfNumAdjZone)%Construction
+            EQLNum = Construct(ConstrNum)%EQLConsPtr
+            DO Lay = 1, CFS(EQLNum)%NL
+                QRadSWwinAbs(SurfNumAdjZone,Lay) = QRadSWwinAbs(SurfNumAdjZone,Lay) &
+                               + QS(ZoneNum) * Construct(ConstrNum)%AbsDiffFrontEQL(Lay)
+                ! Note that AbsDiffFrontEQL rather than AbsDiffBackEQL is used in the above
+                ! since the radiation from the current zone is incident on the outside of the
+                ! adjacent zone's window.
+            END DO
+        ENDIF
       END IF
 
-    ELSE  IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque exterior surface
+    ELSE  IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque exterior surface
       ! Calculate absorbed solar on outside if movable exterior insulation in place
-      HMovInsul = 0.0
+      HMovInsul = 0.0d0
       IF (Surface(SurfNum)%MaterialMovInsulExt.GT.0) &
         CALL EvalOutsideMovableInsulation(SurfNum,HMovInsul,RoughIndexMovInsul,AbsExt)
       IF (HMovInsul > 0) THEN    ! Movable outside insulation in place
@@ -2915,53 +3037,72 @@ SUBROUTINE InitIntSolarDistribution
     IF (.NOT. Surface(SurfNum)%HeatTransSurf .OR. ZoneNum == 0) CYCLE  ! Skip non-heat transfer surfaces
     IF (Surface(SurfNum)%Class == SurfaceClass_TDD_Dome) CYCLE  ! Skip tubular daylighting device domes
     ConstrNum = Surface(SurfNum)%Construction
-    IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
+    IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque surface
       QRadSWInAbs(SurfNum) = QRadSWInAbs(SurfNum) + InitialDifSolInAbs(SurfNum)
     ELSE  ! Window
-      ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-      IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
-        ConstrNum   = Surface(SurfNum)%StormWinConstruction
-        ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
-      END IF
-      TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
-      ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
-      IF(ShadeFlag <= 0) THEN  ! No window shading
-        DO IGlass = 1,TotGlassLayers
-          QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
-            InitialDifSolwinAbs(SurfNum,IGlass)
-        END DO
-      ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
-            ! Interior, exterior or between-glass shade, screen or blind in place
-        DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
-          QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) + InitialDifSolwinAbs(SurfNum,IGlass)
-        END DO
-        IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
-          SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade  &
-                                                    + SurfaceWindow(SurfNum)%InitialDifSolAbsByShade
-        IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN
-          SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade  &
-                                                    + SurfaceWindow(SurfNum)%InitialDifSolAbsByShade
-        END IF
-      ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
-        DO IGlass = 1,TotGlassLayers
-         QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
-           InitialDifSolwinAbs(SurfNum,IGlass)
-        END DO
-      END IF  ! End of shading flag check
+       IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel .AND. &
+             SurfaceWindow(SurfNum)%WindowModelType /= WindowEQLModel) THEN
+          ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+          IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
+            ConstrNum   = Surface(SurfNum)%StormWinConstruction
+            ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
+          END IF
+          TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
+          ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+          IF(ShadeFlag <= 0) THEN  ! No window shading
+            DO IGlass = 1,TotGlassLayers
+              QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+                InitialDifSolwinAbs(SurfNum,IGlass)
+            END DO
+          ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
+                ! Interior, exterior or between-glass shade, screen or blind in place
+            DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
+              QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) + InitialDifSolwinAbs(SurfNum,IGlass)
+            END DO
+            IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) &
+              SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade  &
+                                                        + SurfaceWindow(SurfNum)%InitialDifSolAbsByShade
+            IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN
+              SurfaceWindow(SurfNum)%IntSWAbsByShade = SurfaceWindow(SurfNum)%IntSWAbsByShade  &
+                                                        + SurfaceWindow(SurfNum)%InitialDifSolAbsByShade
+            END IF
+          ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
+            DO IGlass = 1,TotGlassLayers
+             QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+               InitialDifSolwinAbs(SurfNum,IGlass)
+            END DO
+          END IF  ! End of shading flag check
+       ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+          TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
+          DO IGlass = 1,TotGlassLayers
+            QRadSWwinAbs(SurfNum,IGlass) = QRadSWwinAbs(SurfNum,IGlass) +  &
+                InitialDifSolwinAbs(SurfNum,IGlass)
+          END DO
+       ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowEQLModel) THEN
+
+          !ConstrNum   = Surface(SurfNum)%Construction
+          EQLNum = Construct(ConstrNum)%EQLConsPtr
+
+          DO Lay = 1, CFS(EQLNum)%NL
+             QRadSWwinAbs(SurfNum,Lay) = QRadSWwinAbs(SurfNum,Lay) &
+                                       + InitialDifSolwinAbs(SurfNum,Lay)
+          END DO
+
+       ENDIF
     END IF  ! End of Opaque surface vs. Window check
   END DO  ! End of SurfNum loop to initialize SW Absorbed values with CalcWinTransDifSolInitialDistribution results
 
   ! RJH 09/07/07 - report variables for surface absorbed short wave radiation
   DO SurfNum = 1, TotSurfaces
-    SWwinAbsTotalReport(SurfNum) = 0.0
-    SWInAbsTotalReport(SurfNum) = 0.0
-    InitialDifSolInAbsReport(SurfNum) = 0.0
-    InitialDifSolInTransReport(SurfNum) = 0.0
+    SWwinAbsTotalReport(SurfNum) = 0.0d0
+    SWInAbsTotalReport(SurfNum) = 0.0d0
+    InitialDifSolInAbsReport(SurfNum) = 0.0d0
+    InitialDifSolInTransReport(SurfNum) = 0.0d0
     ZoneNum = Surface(SurfNum)%Zone
     IF (.NOT. Surface(SurfNum)%HeatTransSurf .OR. ZoneNum == 0) CYCLE  ! Skip non-heat transfer surfaces
     IF (Surface(SurfNum)%Class == SurfaceClass_TDD_Dome) CYCLE  ! Skip tubular daylighting device domes
     ConstrNum = Surface(SurfNum)%Construction
-    IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
+    IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque surface
       ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
       InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbs(SurfNum) * Surface(SurfNum)%Area
       ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
@@ -2970,51 +3111,73 @@ SUBROUTINE InitIntSolarDistribution
       ! Initial Transmitted Diffuse Solar Transmitted Through Inside of Surface[W]
       InitialDifSolInTransReport(SurfNum) = InitialDifSolInTransReport(SurfNum) &
                                               + InitialDifSolInTrans(SurfNum) * Surface(SurfNum)%Area
-      ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-      IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
-        ConstrNum   = Surface(SurfNum)%StormWinConstruction
-        ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
-      END IF
-      TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
-      ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
-      IF(ShadeFlag <= 0) THEN  ! No window shading
-        DO IGlass = 1,TotGlassLayers
+      IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowEQLModel) THEN
+          ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+          IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
+            ConstrNum   = Surface(SurfNum)%StormWinConstruction
+            ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
+          END IF
+          IF (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+            TotGlassLayers = Construct(ConstrNum)%TotSolidLayers
+          ELSE
+            TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
+          END IF
+          ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+          IF(ShadeFlag <= 0) THEN  ! No window shading
+            DO IGlass = 1,TotGlassLayers
+              ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
+              InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
+                                                    + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
+              SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
+                                              + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Absorbed:All Glass Layers[W]
+              SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
+                                                    + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+            END DO
+          ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
+                ! Interior, exterior or between-glass shade, screen or blind in place
+            DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
+              ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
+              InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
+                                                    + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
+              SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
+                                              + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Absorbed:All Glass Layers[W]
+              SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
+                                              + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+            END DO
+          ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
+            DO IGlass = 1,TotGlassLayers
+              ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
+              InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
+                                                    + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
+              SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
+                                              + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+              ! Total Shortwave Absorbed:All Glass Layers[W]
+              SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
+                                              + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+            END DO
+          END IF  ! End of shading flag check
+      ELSE !IF (SurfaceWindow(SurfNum)%WindowModelType == WindowEQLModel) THEN
+        ConstrNum   = Surface(SurfNum)%Construction
+        EQLNum = Construct(ConstrNum)%EQLConsPtr
+        DO Lay = 1, CFS(EQLNum)%NL
+
           ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
           InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
-                                                + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+                                            + InitialDifSolwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
           ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
           SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
-                                          + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-          ! Total Shortwave Absorbed:All Glass Layers[W]
+                                      + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+          ! Total Shortwave Absorbed:All solid Layers[W]
           SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
-                                                + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
+                                       + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+
         END DO
-      ELSE IF(ShadeFlag == IntShadeOn .OR. ShadeFlag >= 3) THEN
-            ! Interior, exterior or between-glass shade, screen or blind in place
-        DO IGlass = 1,Construct(ConstrNumSh)%TotGlassLayers
-          ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
-          InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
-                                                + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-          ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
-          SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
-                                          + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-          ! Total Shortwave Absorbed:All Glass Layers[W]
-          SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
-                                          + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-        END DO
-      ELSE IF(ShadeFlag == SwitchableGlazing) THEN  ! Switchable glazing
-        DO IGlass = 1,TotGlassLayers
-          ! Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]
-          InitialDifSolInAbsReport(SurfNum) = InitialDifSolInAbsReport(SurfNum) &
-                                                + InitialDifSolwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-          ! Total Shortwave Radiation Absorbed on Inside of Surface[W]
-          SWInAbsTotalReport(SurfNum) = SWInAbsTotalReport(SurfNum) &
-                                          + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-          ! Total Shortwave Absorbed:All Glass Layers[W]
-          SWwinAbsTotalReport(SurfNum) = SWwinAbsTotalReport(SurfNum) &
-                                          + QRadSWwinAbs(SurfNum,IGlass) * Surface(SurfNum)%Area
-        END DO
-      END IF  ! End of shading flag check
+      ENDIF
     END IF  ! End of Opaque surface vs. Window check
   END DO  ! End of SurfNum loop to report variables for surface total absorbed short wave radiation
 
@@ -3085,11 +3248,11 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
 
   IF (.NOT. ALLOCATED(ITABSF)) THEN
     ALLOCATE(ITABSF(TotSurfaces))
-    ITABSF=0.0
+    ITABSF=0.0d0
     ALLOCATE(TMULT(NumOfZones))
-    TMULT=0.0
+    TMULT=0.0d0
     ALLOCATE(TCONV(NumOfZones))
-    TCONV=0.0
+    TCONV=0.0d0
   ENDIF
 
   DO SurfNum = 1,TotSurfaces
@@ -3097,7 +3260,7 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
     ConstrNum = Surface(SurfNum)%Construction
     ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
     ITABSF(SurfNum) = Construct(ConstrNum)%InsideAbsorpThermal
-    IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
+    IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque surface
       RoughIndexMovInsul = 0
       IF(Surface(SurfNum)%MaterialMovInsulExt > 0) &
         CALL EvalOutsideMovableInsulation(SurfNum,HMovInsul,RoughIndexMovInsul,AbsExt)
@@ -3136,9 +3299,9 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
       END IF
 
                          ! Window frame and divider effects
-      IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) SUM1 = SUM1 + SurfaceWindow(SurfNum)%FrameArea * &
+      IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0) SUM1 = SUM1 + SurfaceWindow(SurfNum)%FrameArea * &
           (1.d0+0.5d0*SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameEmis
-      IF(SurfaceWindow(SurfNum)%DividerArea > 0.0) THEN
+      IF(SurfaceWindow(SurfNum)%DividerArea > 0.0d0) THEN
         DividerThermAbs = SurfaceWindow(SurfNum)%DividerEmis
         IF(SurfaceWindow(SurfNum)%DividerType == Suspended) &
           ! Suspended (between-glass) divider; relevant emissivity is inner glass emissivity
@@ -3209,6 +3372,7 @@ SUBROUTINE ComputeIntSWAbsorpFactors
           ! USE STATEMENTS:
   USE HeatBalanceMovableInsulation
   USE General, ONLY: InterpSw, InterpSlatAng
+  USE DataWindowEquivalentLayer
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -3255,9 +3419,9 @@ SUBROUTINE ComputeIntSWAbsorpFactors
 
   IF (.NOT. ALLOCATED(VMULT)) THEN
     ALLOCATE(VMULT(NumOfZones))
-    VMULT=0.0
+    VMULT=0.0d0
     ALLOCATE(VCONV(NumOfZones))
-    VCONV=0.0
+    VCONV=0.0d0
   ENDIF
   IF (FirstTime) THEN
     ALLOCATE(FirstCalcZone(NumOfZones))
@@ -3278,101 +3442,113 @@ SUBROUTINE ComputeIntSWAbsorpFactors
 
       ConstrNum=Surface(SurfNum)%Construction
 
-      IF (Construct(ConstrNum)%TransDiff <= 0.0) THEN
+      IF (Construct(ConstrNum)%TransDiff <= 0.0d0) THEN
 
         ! Opaque surface
 
 
         AbsIntSurf = Construct(ConstrNum)%InsideAbsorpSolar
-        HMovInsul = 0.0
+        HMovInsul = 0.0d0
         IF (Surface(SurfNum)%MaterialMovInsulInt > 0) &
           CALL EvalInsideMovableInsulation(SurfNum,HMovInsul,AbsInt)
-        IF (HMovInsul > 0.0) AbsIntSurf = AbsInt
+        IF (HMovInsul > 0.0d0) AbsIntSurf = AbsInt
         SUM1 = SUM1 + Surface(SurfNum)%Area*AbsIntSurf
 
       ELSE
 
         ! Window
+         IF ( .NOT. Construct(Surface(SurfNum)%Construction)%WindowTypeEQL) THEN
+            ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+            AbsDiffTotWin = 0.0d0
+            ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+            IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
+              ConstrNum   = Surface(SurfNum)%StormWinConstruction
+              ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
+            END IF
+            SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
 
-        ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
-        AbsDiffTotWin = 0.
-        ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-        IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
-          ConstrNum   = Surface(SurfNum)%StormWinConstruction
-          ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
-        END IF
-        SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
+            ! Sum of absorptances of glass layers
+            DO Lay = 1,Construct(ConstrNum)%TotGlassLayers
+              AbsDiffLayWin = Construct(ConstrNum)%AbsDiffBack(Lay)
 
-        ! Sum of absorptances of glass layers
-        DO Lay = 1,Construct(ConstrNum)%TotGlassLayers
-          AbsDiffLayWin = Construct(ConstrNum)%AbsDiffBack(Lay)
+              ! Window with shade, screen or blind
+              IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn .OR. ShadeFlag == BGShadeOn   &
+                 .OR. ShadeFlag == ExtScreenOn) THEN
+                AbsDiffLayWin = Construct(ConstrNumSh)%AbsDiffBack(Lay)
+              ELSE IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == BGBlindOn) THEN
+                AbsDiffLayWin = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
+                  SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffBack(Lay,1:MaxSlatAngs))
+              END IF
 
-          ! Window with shade, screen or blind
-          IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn .OR. ShadeFlag == BGShadeOn .OR. ShadeFlag == ExtScreenOn) THEN
-            AbsDiffLayWin = Construct(ConstrNumSh)%AbsDiffBack(Lay)
-          ELSE IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == BGBlindOn) THEN
-            AbsDiffLayWin = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
-              SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffBack(Lay,1:MaxSlatAngs))
-          END IF
+              ! Switchable glazing
+              IF(ShadeFlag == SwitchableGlazing) AbsDiffLayWin =  &
+                InterpSw(SwitchFac, AbsDiffLayWin, Construct(ConstrNumSh)%AbsDiffBack(Lay))
 
-          ! Switchable glazing
-          IF(ShadeFlag == SwitchableGlazing) AbsDiffLayWin =  &
-            InterpSw(SwitchFac, AbsDiffLayWin, Construct(ConstrNumSh)%AbsDiffBack(Lay))
+              AbsDiffTotWin = AbsDiffTotWin + AbsDiffLayWin
+            END DO
 
-          AbsDiffTotWin = AbsDiffTotWin + AbsDiffLayWin
-        END DO
+            TransDiffWin = Construct(ConstrNum)%TransDiff
+            DiffAbsShade = 0.0d0
 
-        TransDiffWin = Construct(ConstrNum)%TransDiff
-        DiffAbsShade = 0.0
+            ! Window with shade, screen or blind
 
-        ! Window with shade, screen or blind
+            IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn .OR. ShadeFlag == BGShadeOn .OR. ShadeFlag == ExtScreenOn) THEN
+              TransDiffWin = Construct(ConstrNumSh)%TransDiff
+              DiffAbsShade = Construct(ConstrNumSh)%AbsDiffBackShade
+            ELSE IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == BGBlindOn) THEN
+              TransDiffWin = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
+                  SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlTransDiff)
+              DiffAbsShade = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
+                  SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBackBlind)
+            END IF
 
-        IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn .OR. ShadeFlag == BGShadeOn .OR. ShadeFlag == ExtScreenOn) THEN
-          TransDiffWin = Construct(ConstrNumSh)%TransDiff
-          DiffAbsShade = Construct(ConstrNumSh)%AbsDiffBackShade
-        ELSE IF(ShadeFlag == IntBlindOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == BGBlindOn) THEN
-          TransDiffWin = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
-              SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlTransDiff)
-          DiffAbsShade = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS, &
-              SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBackBlind)
-        END IF
+            ! Switchable glazing
 
-        ! Switchable glazing
+            IF(ShadeFlag == SwitchableGlazing) TransDiffWin =  &
+               InterpSw(SwitchFac, TransDiffWin, Construct(ConstrNumSh)%TransDiff)
 
-        IF(ShadeFlag == SwitchableGlazing) TransDiffWin =  &
-           InterpSw(SwitchFac, TransDiffWin, Construct(ConstrNumSh)%TransDiff)
+            SUM1 = SUM1 + Surface(SurfNum)%Area*(TransDiffWin + AbsDiffTotWin + DiffAbsShade)
 
-        SUM1 = SUM1 + Surface(SurfNum)%Area*(TransDiffWin + AbsDiffTotWin + DiffAbsShade)
-
-        ! Window frame and divider effects (shade area is glazed area plus divider area)
+            ! Window frame and divider effects (shade area is glazed area plus divider area)
 
 
-        IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) SUM1 = SUM1 + SurfaceWindow(SurfNum)%FrameArea *  &
-          SurfaceWindow(SurfNum)%FrameSolAbsorp * (1.+0.5*SurfaceWindow(SurfNum)%ProjCorrFrIn)
-        IF(SurfaceWindow(SurfNum)%DividerArea > 0.0) THEN
-          DividerAbs = SurfaceWindow(SurfNum)%DividerSolAbsorp
-          IF(SurfaceWindow(SurfNum)%DividerType == Suspended) THEN
-            !Suspended (between-glass) divider: account for glass on inside of divider
-            MatNumGl = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
-            TransGl = Material(MatNumGl)%Trans
-            ReflGl = Material(MatNumGl)%ReflectSolBeamBack
-            AbsGl = 1.-TransGl-ReflGl
-            DividerRefl = 1. - DividerAbs
-            DividerAbs = AbsGl + TransGl*(DividerAbs + DividerRefl*AbsGl)/(1.-DividerRefl*ReflGl)
-          END IF
-          IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==IntBlindOn) THEN
-            SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * (DividerAbs + DiffAbsShade)
-          ELSE
-            SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * &
-              (1.+SurfaceWindow(SurfNum)%ProjCorrDivIn) * DividerAbs
-          END IF
-        END IF
-
+            IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0) SUM1 = SUM1 + SurfaceWindow(SurfNum)%FrameArea *  &
+              SurfaceWindow(SurfNum)%FrameSolAbsorp * (1.0d0+0.5d0*SurfaceWindow(SurfNum)%ProjCorrFrIn)
+            IF(SurfaceWindow(SurfNum)%DividerArea > 0.0d0) THEN
+              DividerAbs = SurfaceWindow(SurfNum)%DividerSolAbsorp
+              IF(SurfaceWindow(SurfNum)%DividerType == Suspended) THEN
+                !Suspended (between-glass) divider: account for glass on inside of divider
+                MatNumGl = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
+                TransGl = Material(MatNumGl)%Trans
+                ReflGl = Material(MatNumGl)%ReflectSolBeamBack
+                AbsGl = 1.0d0-TransGl-ReflGl
+                DividerRefl = 1.0d0 - DividerAbs
+                DividerAbs = AbsGl + TransGl*(DividerAbs + DividerRefl*AbsGl)/(1.0d0-DividerRefl*ReflGl)
+              END IF
+              IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==IntBlindOn) THEN
+                SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * (DividerAbs + DiffAbsShade)
+              ELSE
+                SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * &
+                  (1.0d0+SurfaceWindow(SurfNum)%ProjCorrDivIn) * DividerAbs
+              END IF
+            END IF
+         ELSE       ! equivalent layer window
+            ! In equivalent layer window solid layers (Glazing and shades) are treated equally
+            ! frames and dividers are not supported
+            AbsDiffTotWin = 0.0d0
+            AbsDiffLayWin = 0.0d0
+            TransDiffWin = Construct(ConstrNum)%TransDiff
+            DO Lay = 1, CFS(Construct(ConstrNum)%EQLConsPtr)%NL
+              AbsDiffLayWin = Construct(ConstrNum)%AbsDiffBackEQL(Lay)
+              AbsDiffTotWin = AbsDiffTotWin + AbsDiffLayWin
+            END DO
+            SUM1 = SUM1 + Surface(SurfNum)%Area*(TransDiffWin + AbsDiffTotWin)
+         ENDIF
       END IF  ! End of check if opaque surface or window
     END DO  ! End of loop over surfaces in zone
 
     IF (SUM1 > SmallestAreaAbsProductAllowed) THEN  ! Everything is okay, proceed with the regular calculation
-      VMULT(ZoneNum) = 1.0/SUM1
+      VMULT(ZoneNum) = 1.0d0/SUM1
 
     ELSE    ! the sum of area*solar absorptance for all surfaces in the zone is zero--either the user screwed up
             ! or they really want to disallow any solar from being absorbed on the inside surfaces.  Fire off a
@@ -3385,7 +3561,7 @@ SUBROUTINE ComputeIntSWAbsorpFactors
                               'for all surfaces is zero in Zone: '//TRIM(Zone(ZoneNum)%Name))
         FirstCalcZone(ZoneNum) = .FALSE.
       END IF
-      VMULT(ZoneNum) = 0.0
+      VMULT(ZoneNum) = 0.0d0
 
     END IF
   END DO  ! End of zone loop
@@ -3440,10 +3616,10 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
       ENDIF
 
       RecDifShortFromZ=.FALSE.
-      FractDifShortZtoZ = 0.0
-      D = 0.0
+      FractDifShortZtoZ = 0.0d0
+      D = 0.0d0
       DO NZ=1,NumberOfZones
-        D(NZ,NZ)=1.0
+        D(NZ,NZ)=1.0d0
       ENDDO
 
 !      IF (.not. ANY(Zone%HasInterZoneWindow)) RETURN  ! this caused massive diffs
@@ -3454,21 +3630,21 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
         IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
         IF (Surface(SurfNum)%ExtBoundCond <= 0) CYCLE
         IF (Surface(SurfNum)%ExtBoundCond  ==  SurfNum) CYCLE
-        IF (Construct(Surface(SurfNum)%Construction)%TransDiff <= 0.0) CYCLE
+        IF (Construct(Surface(SurfNum)%Construction)%TransDiff <= 0.0d0) CYCLE
 
         NZ=Surface(SurfNum)%Zone
         if (.not. Zone(NZ)%HasInterZoneWindow) CYCLE
         MZ=Surface(Surface(SurfNum)%ExtBoundCond)%Zone
         FractDifShortZtoZ(MZ,NZ)=FractDifShortZtoZ(MZ,NZ)+ &
                        Construct(Surface(SurfNum)%Construction)%TransDiff*VMULT(NZ)*Surface(SurfNum)%Area
-        IF (VMULT(NZ) /= 0.0) RecDifShortFromZ(NZ)=.TRUE.
+        IF (VMULT(NZ) /= 0.0d0) RecDifShortFromZ(NZ)=.TRUE.
       END DO
  !          Compute fractions for multiple passes.
 
       DO NZ=1,NumberOfZones
         DO MZ=1,NumberOfZones
           IF (MZ == NZ) CYCLE
-          D(MZ,NZ)=FractDifShortZtoZ(MZ,NZ)/(1.0-FractDifShortZtoZ(MZ,NZ)*FractDifShortZtoZ(NZ,MZ))
+          D(MZ,NZ)=FractDifShortZtoZ(MZ,NZ)/(1.0d0-FractDifShortZtoZ(MZ,NZ)*FractDifShortZtoZ(NZ,MZ))
           D(NZ,NZ)=D(NZ,NZ)+FractDifShortZtoZ(NZ,MZ)*D(MZ,NZ)
         ENDDO
       ENDDO
@@ -3493,13 +3669,13 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
         DO JZ=1,NumberOfZones
           IF(.NOT. RecDifShortFromZ(JZ)) CYCLE
           IF(IZ == JZ) CYCLE
-          IF(D(JZ,IZ) == 0.0) CYCLE
+          IF(D(JZ,IZ) == 0.0d0) CYCLE
 
           DO KZ=1,NumberOfZones
             IF(.NOT. RecDifShortFromZ(KZ)) CYCLE
             IF(IZ == KZ) CYCLE
             IF(JZ == KZ) CYCLE
-            IF(D(KZ,JZ) == 0.0) CYCLE
+            IF(D(KZ,JZ) == 0.0d0) CYCLE
             FractDifShortZtoZ(KZ,IZ)=FractDifShortZtoZ(KZ,IZ)+D(KZ,JZ)*D(JZ,IZ)
 
             DO LZ=1,NumberOfZones
@@ -3507,7 +3683,7 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
               IF(IZ == LZ) CYCLE
               IF(JZ == LZ) CYCLE
               IF(KZ == LZ) CYCLE
-              IF(D(LZ,KZ) == 0.0) CYCLE
+              IF(D(LZ,KZ) == 0.0d0) CYCLE
               FractDifShortZtoZ(LZ,IZ)=FractDifShortZtoZ(LZ,IZ)+D(LZ,KZ)*D(KZ,JZ)*D(JZ,IZ)
 
               DO MZ=1,NumberOfZones
@@ -3516,7 +3692,7 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
                 IF(JZ == MZ) CYCLE
                 IF(KZ == MZ) CYCLE
                 IF(LZ == MZ) CYCLE
-                IF(D(MZ,LZ) == 0.0) CYCLE
+                IF(D(MZ,LZ) == 0.0d0) CYCLE
                 FractDifShortZtoZ(MZ,IZ)=FractDifShortZtoZ(MZ,IZ)+D(MZ,LZ)*D(LZ,KZ)*D(KZ,JZ)*D(JZ,IZ)
               ENDDO  ! MZ Loop
 
@@ -3673,7 +3849,7 @@ SUBROUTINE InitEMSControlledConstructions
 
   DO SurfNum = 1, TotSurfaces
 
-    IF (Surface(SurfNum)%EMSConstructionOverrideON) THEN
+    IF (Surface(SurfNum)%EMSConstructionOverrideON .AND. (Surface(SurfNum)%EMSConstructionOverrideValue > 0) ) THEN
 
       IF( (EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) .AND. &
           (EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue)) )  THEN
@@ -4005,9 +4181,9 @@ SUBROUTINE UpdateThermalHistories
 !      IF (Surface(SurfNum)%Class/=SurfaceClass_IntMass)  &
 !      ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
 !              OpaqSurfInsFaceConduction(SurfNum)
-      OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0
-      OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0
-      IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0) THEN
+      OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0d0
+      OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0d0
+      IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0d0) THEN
         OpaqSurfInsFaceCondGainRep(SurfNum) = OpaqSurfInsFaceConduction(SurfNum)
       ELSE
         OpaqSurfInsFaceCondLossRep(SurfNum) = -OpaqSurfInsFaceConduction(SurfNum)
@@ -4216,8 +4392,8 @@ SUBROUTINE CalculateZoneMRT(ZoneToResimulate)
   IF (FirstTime) THEN
     ALLOCATE(SurfaceAE(TotSurfaces))
     ALLOCATE(ZoneAESum(NumOfZones))
-    SurfaceAE = 0.0
-    ZoneAESum = 0.0
+    SurfaceAE = 0.0d0
+    ZoneAESum = 0.0d0
     DO SurfNum = 1, TotSurfaces
       IF (Surface(SurfNum)%HeatTransSurf) THEN
         SurfaceAE(SurfNum) = Surface(SurfNum)%Area*Construct(Surface(SurfNum)%Construction)%InsideAbsorpThermal
@@ -4229,7 +4405,7 @@ SUBROUTINE CalculateZoneMRT(ZoneToResimulate)
 
   DO ZoneNum = 1, NumOfZones
     IF ( PRESENT(ZoneToResimulate)  .AND. (ZoneNum /= ZoneToResimulate)) CYCLE
-    SumAET = 0.0
+    SumAET = 0.0d0
     DO SurfNum = Zone(ZoneNum)%SurfaceFirst, Zone(ZoneNum)%SurfaceLast
       IF (Surface(SurfNum)%HeatTransSurf) THEN
         SumAET = SumAET + SurfaceAE(SurfNum)*TempSurfIn(SurfNum)
@@ -4349,9 +4525,9 @@ SUBROUTINE ReportSurfaceHeatBalance
       OpaqSurfInsFaceConductionEnergy(SurfNum) = OpaqSurfInsFaceConduction(SurfNum) * SecInHour * TimeStepZone
       ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
               OpaqSurfInsFaceConduction(SurfNum)
-      OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0
-      OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0
-      IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0) THEN
+      OpaqSurfInsFaceCondGainRep(SurfNum) = 0.0d0
+      OpaqSurfInsFaceCondLossRep(SurfNum) = 0.0d0
+      IF(OpaqSurfInsFaceConduction(SurfNum) >= 0.0d0) THEN
         OpaqSurfInsFaceCondGainRep(SurfNum) = OpaqSurfInsFaceConduction(SurfNum)
       ELSE
         OpaqSurfInsFaceCondLossRep(SurfNum) = -OpaqSurfInsFaceConduction(SurfNum)
@@ -4402,7 +4578,7 @@ SUBROUTINE ReportSurfaceHeatBalance
 
 
   DO ZoneNum = 1,NumOfZones
-    IF(ZoneOpaqSurfInsFaceCond(ZoneNum) >= 0.0) THEN
+    IF(ZoneOpaqSurfInsFaceCond(ZoneNum) >= 0.0d0) THEN
       ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) = ZoneOpaqSurfInsFaceCond(ZoneNum)
       ZnOpqSurfInsFaceCondGnRepEnrg(ZoneNum)  = ZoneOpaqSurfInsFaceCondGainRep(ZoneNum) * TimeStepZone * SecInHour
     ELSE
@@ -4410,7 +4586,7 @@ SUBROUTINE ReportSurfaceHeatBalance
       ZnOpqSurfInsFaceCondLsRepEnrg(ZoneNum)  = ZoneOpaqSurfInsFaceCondLossRep(ZoneNum) * TimeStepZone * SecInHour
     END IF
 
-    IF(ZoneOpaqSurfExtFaceCond(ZoneNum) >= 0.0) THEN
+    IF(ZoneOpaqSurfExtFaceCond(ZoneNum) >= 0.0d0) THEN
       ZoneOpaqSurfExtFaceCondGainRep(ZoneNum) = ZoneOpaqSurfExtFaceCond(ZoneNum)
       ZnOpqSurfExtFaceCondGnRepEnrg(ZoneNum)  = ZoneOpaqSurfExtFaceCondGainRep(ZoneNum) * TimeStepZone * SecInHour
     ELSE
@@ -4523,11 +4699,11 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ! Need to transfer any source/sink for a surface to the local array.  Note that
           ! the local array is flux (W/m2) while the QRadSysSource is heat transfer (W).
           ! This must be done at this location so that this is always updated correctly.
-    IF (Surface(SurfNum)%Area > 0.0) &  ! Make sure we don't divide by zero...
+    IF (Surface(SurfNum)%Area > 0.0d0) &  ! Make sure we don't divide by zero...
       QsrcHist(SurfNum,1) = QRadSysSource(SurfNum)/Surface(SurfNum)%Area
 
           ! next we add source (actually a sink) from any integrated PV
-    IF (Surface(SurfNum)%Area > 0.0) & ! Make sure we don't divide by zero...
+    IF (Surface(SurfNum)%Area > 0.0d0) & ! Make sure we don't divide by zero...
       QsrcHist(SurfNum,1) = QsrcHist(SurfNum,1) + QPVSysSource(SurfNum)/Surface(SurfNum)%Area
   END DO
 
@@ -4556,14 +4732,14 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
           ! Initializations for this surface
     ConstrNum       = Surface(SurfNum)%Construction
-    HMovInsul       = 0.0
-    HSky            = 0.0
-    HGround         = 0.0
-    HAir            = 0.0
-    HcExtSurf(SurfNum)   = 0.0
-    HAirExtSurf(SurfNum) = 0.0
-    HSkyExtSurf(SurfNum) = 0.0
-    HGrdExtSurf(SurfNum) = 0.0
+    HMovInsul       = 0.0d0
+    HSky            = 0.0d0
+    HGround         = 0.0d0
+    HAir            = 0.0d0
+    HcExtSurf(SurfNum)   = 0.0d0
+    HAirExtSurf(SurfNum) = 0.0d0
+    HSkyExtSurf(SurfNum) = 0.0d0
+    HGrdExtSurf(SurfNum) = 0.0d0
 
           ! Calculate the current outside surface temperature TH(SurfNum,1,1) for the
           ! various different boundary conditions
@@ -4829,7 +5005,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
         IF (IsRain) THEN ! Raining: since wind exposed, outside surface gets wet
 
           IF (Surface(SurfNum)%ExtConvCoeff <= 0) THEN ! Reset HcExtSurf because of wetness
-            HcExtSurf(SurfNum) = 1000.
+            HcExtSurf(SurfNum) = 1000.d0
           ELSE  ! User set
             HcExtSurf(SurfNum) = SetExtConvectionCoeff(SurfNum)
           ENDIF
@@ -4932,9 +5108,9 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           HMassConvExtFD(SurfNum)=HConvExtFD(SurfNum)/((PsyRhoAirFnPbTdbW(OutBaroPress,TempOutsideAirFD(SurfNum),  &
               PsyWFnTdbRhPb(TempOutsideAirFD(SurfNum),1.0d0,OutBaroPress,'CalcHeatBalanceOutsideSurf:interior/other'))+  &
               RhoVaporAirOut(SurfNum))*PsyCpAirFnWTdb(OutHumRat,TempOutsideAirFD(SurfNum)))
-          HSkyFD(SurfNum) = 0.0
-          HGrndFD(SurfNum) = 0.0
-          HAirFD(SurfNum) = 0.0
+          HSkyFD(SurfNum) = 0.0d0
+          HGrndFD(SurfNum) = 0.0d0
+          HAirFD(SurfNum) = 0.0d0
         ENDIF
 
       ELSE  ! Interzone partition
@@ -4952,9 +5128,9 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           HMassConvExtFD(SurfNum)=HConvExtFD(SurfNum)/((PsyRhoAirFnPbTdbW(OutBaroPress,TempOutsideAirFD(SurfNum),  &
               PsyWFnTdbRhPb(TempOutsideAirFD(SurfNum),1.0d0,OutBaroPress,'CalcHeatBalanceOutsideSurf:IZPart'))+  &
               RhoVaporAirOut(SurfNum))*PsyCpAirFnWTdb(OutHumRat,TempOutsideAirFD(SurfNum)))
-          HSkyFD(SurfNum) = 0.0
-          HGrndFD(SurfNum) = 0.0
-          HAirFD(SurfNum) = 0.0
+          HSkyFD(SurfNum) = 0.0d0
+          HGrndFD(SurfNum) = 0.0d0
+          HAirFD(SurfNum) = 0.0d0
         ENDIF
 
       END IF
@@ -5048,6 +5224,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   USE OutputReportTabular, ONLY: loadConvectedNormal,loadConvectedWithPulse,netSurfRadSeq
   USE DataSizing, ONLY: CurOverallSimDay
   USE DataTimings
+  USE WindowEquivalentLayer,        ONLY : EQLWindowOutsideEffectiveEmiss
 
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -5168,6 +5345,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
          WinGainFrameDividertoZoneRep(Surfnum)    = 0.0D0
          WinGainConvGlazShadGapToZoneRep(Surfnum) = 0.0D0
          WinGainConvShadeToZoneRep(Surfnum)       = 0.0D0
+         OtherConvGainInsideFaceToZoneRep(Surfnum)= 0.0D0
          WinGainIRShadeToZoneRep(Surfnum)         = 0.0D0
          SurfaceWindow(Surfnum)%FrameQRadOutAbs   = 0.0d0
          SurfaceWindow(Surfnum)%FrameQRadInAbs    = 0.0d0
@@ -5191,8 +5369,8 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                 RETURN
             END IF
             ! determine supply air conditions
-            SumSysMCp = 0.0
-            SumSysMCpT = 0.0
+            SumSysMCp = 0.0d0
+            SumSysMCpT = 0.0d0
             DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
                 NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
                 MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
@@ -5228,6 +5406,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
     WinGainFrameDividertoZoneRep    = 0.0D0
     WinGainConvGlazShadGapToZoneRep = 0.0D0
     WinGainConvShadeToZoneRep       = 0.0D0
+    OtherConvGainInsideFaceToZoneRep= 0.0D0
     WinGainIRShadeToZoneRep         = 0.0D0
     SurfaceWindow%FrameQRadOutAbs   = 0.0d0
     SurfaceWindow%FrameQRadInAbs    = 0.0d0
@@ -5360,7 +5539,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                           /( Construct(ConstrNum)%CTFInside(0) & ! Cond term (both partition sides same temp)
                                             -Construct(ConstrNum)%CTFCross(0)  & ! Cond term (both partition sides same temp)
                                             +HConvIn(SurfNum) )              ! Convection and damping term
-            RadSysTiHBToutCoef(SurfNum)  = 0.0  ! The outside temp is assumed to be equal to the inside temp for a partition
+            RadSysTiHBToutCoef(SurfNum)  = 0.0d0  ! The outside temp is assumed to be equal to the inside temp for a partition
             RadSysTiHBQsrcCoef(SurfNum)  = Construct(ConstrNum)%CTFSourceIn(0) & ! QTF term for the source
                                           /( Construct(ConstrNum)%CTFInside(0) & ! Cond term (both partition sides same temp)
                                             -Construct(ConstrNum)%CTFCross(0)  & ! Cond term (both partition sides same temp)
@@ -5391,11 +5570,11 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
 
         IF (Surface(SurfNum)%Class /= SurfaceClass_Window) THEN ! Opaque surface
 
-          HMovInsul = 0.0
+          HMovInsul = 0.0d0
           IF (Surface(SurfNum)%MaterialMovInsulInt > 0) &
             CALL EvalInsideMovableInsulation(SurfNum,HMovInsul,AbsInt)
 
-          IF (HMovInsul <= 0.0) THEN  ! No movable insulation present, normal heat balance equation
+          IF (HMovInsul <= 0.0d0) THEN  ! No movable insulation present, normal heat balance equation
 
             IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
                 Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN ! Regular CTF Surface and/or EMPD surface
@@ -5550,7 +5729,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
             ! Lookup up the TDD:DOME object
             PipeNum = FindTDDPipe(SurfNum)
             SurfNum2 = TDDPipe(PipeNum)%Dome
-            Ueff = 1.0 / TDDPipe(PipeNum)%Reff
+            Ueff = 1.0d0 / TDDPipe(PipeNum)%Reff
 
             ! Similar to opaque surface but outside surface temp of TDD:DOME is used, and no embedded sources/sinks.
             ! Absorbed shortwave radiation is treated similar to a regular window, but only 1 glass layer is allowed.
@@ -5585,7 +5764,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                       QHWBaseboardSurf(SurfNum) + QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum)))
             WinLossSWZoneToOutWinRep(SurfNum) = QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area &
                                                  * Construct(Surface(SurfNum)%Construction)%TransDiff
-            IF(WinHeatGain(SurfNum) >= 0.0) THEN
+            IF(WinHeatGain(SurfNum) >= 0.0d0) THEN
               WinHeatGainRep(SurfNum) = WinHeatGain(SurfNum)
               WinHeatGainRepEnergy(SurfNum) = WinHeatGainRep(SurfNum) * TimeStepZone * SecInHour
             ELSE
@@ -5613,6 +5792,11 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                   RoughSurf = Material(Construct(ConstrNumSh)%LayerPoint(1))%Roughness
                   EmisOut = Material(Construct(ConstrNumSh)%LayerPoint(1))%AbsorpThermal
                 END IF
+
+                ! Get the outside effective emissivity for Equivalent layer model
+                IF ( Construct(ConstrNum)%WindowTypeEQL ) THEN
+                   EmisOut = EQLWindowOutsideEffectiveEmiss(ConstrNum)
+                ENDIF
                 ! Set Exterior Convection Coefficient...
                 IF (Surface(SurfNum)%ExtConvCoeff > 0) THEN
 
@@ -5625,7 +5809,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                     HcExtSurf(SurfNum),HSkyExtSurf(SurfNum),HGrdExtSurf(SurfNum),HAirExtSurf(SurfNum))
 
                   IF (IsRain) THEN  ! Raining: since wind exposed, outside window surface gets wet
-                    HcExtSurf(SurfNum)=1000. ! Reset HcExtSurf because of wetness
+                    HcExtSurf(SurfNum)=1000.0d0 ! Reset HcExtSurf because of wetness
                   ENDIF
 
                 ELSE  ! Not Wind exposed
@@ -5649,7 +5833,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
               ! Following call determines inside surface temperature of glazing, and of
               ! frame and/or divider, if present
               CALL CalcWindowHeatBalance(SurfNum,HcExtSurf(SurfNum),TempSurfInTmp(SurfNum),TH(SurfNum,1,1))
-              IF(WinHeatGain(SurfNum) >= 0.0) THEN
+              IF(WinHeatGain(SurfNum) >= 0.0d0) THEN
                 WinHeatGainRep(SurfNum) = WinHeatGain(SurfNum)
                 WinHeatGainRepEnergy(SurfNum) = WinHeatGainRep(SurfNum) * TimeStepZone * SecInHour
               ELSE
@@ -5719,7 +5903,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
               CALL ShowContinueErrorTimeStamp(' ')
               IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
                 CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-                IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+                IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
                   CALL ShowContinueError('...Internal Heat Gain ['//  &
                        trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
                 ELSE
@@ -5758,7 +5942,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
               CALL ShowContinueErrorTimeStamp(' ')
               IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
                 CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-                IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+                IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
                   CALL ShowContinueError('...Internal Heat Gain ['//  &
                        trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
                 ELSE
@@ -5812,7 +5996,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
             CALL ShowContinueErrorTimeStamp(' ')
             IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
               CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-              IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+              IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
                 CALL ShowContinueError('...Internal Heat Gain ['//  &
                      trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
               ELSE
@@ -5841,7 +6025,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
             CALL ShowContinueErrorTimeStamp(' ')
             IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
               CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-              IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+              IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
                 CALL ShowContinueError('...Internal Heat Gain ['//  &
                      trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
               ELSE
@@ -5896,7 +6080,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
     InsideSurfIterations = InsideSurfIterations + 1
 
           ! Convergence check
-    MaxDelTemp      = 0.0
+    MaxDelTemp      = 0.0d0
     DO SurfNum = 1, TotSurfaces   ! Loop through all surfaces to check for convergence...
 
       IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE  ! Skip non-heat transfer surfaces
@@ -5908,7 +6092,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       ENDIF
 
       ConstrNum = Surface(SurfNum)%Construction
-      IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
+      IF(Construct(ConstrNum)%TransDiff <= 0.0d0) THEN  ! Opaque surface
         MaxDelTemp = MAX(ABS(TempSurfIn(SurfNum)-TempInsOld(SurfNum)),MaxDelTemp)
         IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD) THEN
           ! also check all internal nodes as well as surface faces
@@ -6065,7 +6249,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   ENDDO
   DO ZoneNum = 1,NumOfZones
     IF ( PRESENT(ZoneToResimulate)  .AND. (ZoneNum /= ZoneToResimulate)) CYCLE
-    IF(ZoneWinHeatGain(ZoneNum) >= 0.0) THEN
+    IF(ZoneWinHeatGain(ZoneNum) >= 0.0d0) THEN
       ZoneWinHeatGainRep(ZoneNum) = ZoneWinHeatGain(ZoneNum)
       ZoneWinHeatGainRepEnergy(ZoneNum) = ZoneWinHeatGainRep(ZoneNum) * TimeStepZone * SecInHour
     ELSE
@@ -6167,7 +6351,7 @@ SUBROUTINE CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
 
 
           ! Determine whether or not movable insulation is present
-      IF (HMovInsul > 0.0) THEN
+      IF (HMovInsul > 0.0d0) THEN
         MovInsulPresent = .TRUE.
       ELSE
         MovInsulPresent = .FALSE.
@@ -6198,7 +6382,7 @@ SUBROUTINE CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
           PipeNum = FindTDDPipe(SurfNum)
           SurfNum2 = TDDPipe(PipeNum)%Diffuser
           ZoneNum2 = Surface(SurfNum2)%Zone
-          Ueff = 1.0 / TDDPipe(PipeNum)%Reff
+          Ueff = 1.0d0 / TDDPipe(PipeNum)%Reff
           F1 = Ueff / (Ueff + HConvIn(SurfNum2))
 
           ! Similar to opaque surface but inside conditions of TDD:DIFFUSER are used, and no embedded sources/sinks.

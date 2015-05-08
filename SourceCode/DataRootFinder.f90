@@ -88,16 +88,16 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER           :: SlopeType  = iSlopeNone   ! Set to any of the iSlope<...> codes
     INTEGER           :: MethodType = iMethodNone  ! Desired solution method.
                                 ! Set to any of the iMethod<...> codes except for iMethodNone and iMethodBracket
-    REAL(r64)         :: TolX   = 1.0e-3           ! Relative tolerance for variable X
-    REAL(r64)         :: ATolX  = 1.0e-3           ! Absolute tolerance for variable X
-    REAL(r64)         :: ATolY  = 1.0e-3           ! Absolute tolerance for variable Y
+    REAL(r64)         :: TolX   = 1.0d-3           ! Relative tolerance for variable X
+    REAL(r64)         :: ATolX  = 1.0d-3           ! Absolute tolerance for variable X
+    REAL(r64)         :: ATolY  = 1.0d-3           ! Absolute tolerance for variable Y
   END TYPE ControlsType
 
   ! Type declaration for iterate tracking.
   TYPE PointType
     LOGICAL           :: DefinedFlag = .FALSE.     ! Set to true if point has been set; false otherwise
-    REAL(r64)         :: X = 0.0                   ! X value
-    REAL(r64)         :: Y = 0.0                   ! Y value = F(X)
+    REAL(r64)         :: X = 0.0d0                   ! X value
+    REAL(r64)         :: Y = 0.0d0                   ! Y value = F(X)
   END TYPE PointType
 
   ! Type declaration for the root finder solution technique.
@@ -106,8 +106,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER                   :: StatusFlag = iStatusNone     ! Current status of root finder
                                                 ! Valid values are any of the STATUS_<code> constants
     INTEGER                   :: CurrentMethodType = iMethodNone ! Solution method used to perform current step
-    REAL(r64)                 :: XCandidate = 0.0       ! Candidate X value to use next when evaluating F(X)
-    REAL(r64)                 :: ConvergenceRate = 0.0  ! Convergence rate achieved over the last 2 successive iterations
+    REAL(r64)                 :: XCandidate = 0.0d0       ! Candidate X value to use next when evaluating F(X)
+    REAL(r64)                 :: ConvergenceRate = 0.0d0  ! Convergence rate achieved over the last 2 successive iterations
     TYPE (PointType)          :: Increment              ! Increment between last 2 iterations
     TYPE (PointType)          :: MinPoint               ! Point { XMin, F(XMin) }
     TYPE (PointType)          :: MaxPoint               ! Point { XMax, F(XMax) }

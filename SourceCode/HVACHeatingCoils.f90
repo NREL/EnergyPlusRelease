@@ -63,37 +63,37 @@ TYPE, PUBLIC                   :: HeatingCoilEquipConditions
   CHARACTER(len=MaxNameLength) :: Schedule         = ' ' ! HeatingCoil Operation Schedule
   Integer      :: SchedPtr                         = 0   ! Pointer to the correct schedule
   Integer      :: InsuffTemperatureWarn            = 0   ! Used for recurring error message
-  REAL(r64)    :: InletAirMassFlowRate             = 0.0 ! MassFlow through the HeatingCoil being Simulated [kg/Sec]
-  REAL(r64)    :: OutletAirMassFlowRate            = 0.0 !
-  REAL(r64)    :: InletAirTemp                     = 0.0 !
-  REAL(r64)    :: OutletAirTemp                    = 0.0 !
-  REAL(r64)    :: InletAirHumRat                   = 0.0 !
-  REAL(r64)    :: OutletAirHumRat                  = 0.0 !
-  REAL(r64)    :: InletAirEnthalpy                 = 0.0 !
-  REAL(r64)    :: OutletAirEnthalpy                = 0.0 !
-  REAL(r64)    :: HeatingCoilLoad                  = 0.0 ! Total Load on the Coil [J]
-  REAL(r64)    :: HeatingCoilRate                  = 0.0 ! Total Coil Rate on the Coil [W]
-  REAL(r64)    :: GasUseLoad                       = 0.0 ! Gas Usage of Coil [J]
-  REAL(r64)    :: ElecUseLoad                      = 0.0 ! Electric Usage of Coil [J]
-  REAL(r64)    :: GasUseRate                       = 0.0 ! Gas Usage of Coil [W]
-  REAL(r64)    :: ElecUseRate                      = 0.0 ! Electric Usage of Coil [W]
-  REAL(r64)    :: Efficiency                       = 0.0 ! HeatingCoil Efficiency Value
-  REAL(r64)    :: NominalCapacity                  = 0.0 ! Nominal Capacity of Coil [W]
-  REAL(r64)    :: DesiredOutletTemp                = 0.0 !
-  REAL(r64)    :: DesiredOutletHumRat              = 0.0 !
-  REAL(r64)    :: AvailTemperature                 = 0.0 ! Used in heat recovery test [C]
+  REAL(r64)    :: InletAirMassFlowRate             = 0.0d0 ! MassFlow through the HeatingCoil being Simulated [kg/Sec]
+  REAL(r64)    :: OutletAirMassFlowRate            = 0.0d0 !
+  REAL(r64)    :: InletAirTemp                     = 0.0d0 !
+  REAL(r64)    :: OutletAirTemp                    = 0.0d0 !
+  REAL(r64)    :: InletAirHumRat                   = 0.0d0 !
+  REAL(r64)    :: OutletAirHumRat                  = 0.0d0 !
+  REAL(r64)    :: InletAirEnthalpy                 = 0.0d0 !
+  REAL(r64)    :: OutletAirEnthalpy                = 0.0d0 !
+  REAL(r64)    :: HeatingCoilLoad                  = 0.0d0 ! Total Load on the Coil [J]
+  REAL(r64)    :: HeatingCoilRate                  = 0.0d0 ! Total Coil Rate on the Coil [W]
+  REAL(r64)    :: GasUseLoad                       = 0.0d0 ! Gas Usage of Coil [J]
+  REAL(r64)    :: ElecUseLoad                      = 0.0d0 ! Electric Usage of Coil [J]
+  REAL(r64)    :: GasUseRate                       = 0.0d0 ! Gas Usage of Coil [W]
+  REAL(r64)    :: ElecUseRate                      = 0.0d0 ! Electric Usage of Coil [W]
+  REAL(r64)    :: Efficiency                       = 0.0d0 ! HeatingCoil Efficiency Value
+  REAL(r64)    :: NominalCapacity                  = 0.0d0 ! Nominal Capacity of Coil [W]
+  REAL(r64)    :: DesiredOutletTemp                = 0.0d0 !
+  REAL(r64)    :: DesiredOutletHumRat              = 0.0d0 !
+  REAL(r64)    :: AvailTemperature                 = 0.0d0 ! Used in heat recovery test [C]
   INTEGER      :: AirInletNodeNum                  = 0   !
   INTEGER      :: AirOutletNodeNum                 = 0   !
   INTEGER      :: TempSetPointNodeNum              = 0   ! If applicable this is the node number that the temp setpoint exists.
   INTEGER      :: Control                          = 0   !
   INTEGER      :: PLFCurveIndex                    = 0   ! Index for part-load factor curve index for gas heating coil
-  REAL(r64)    :: ParasiticElecLoad                = 0.0 ! parasitic electric load associated with the gas heating coil
-  REAL(r64)    :: ParasiticGasLoad                 = 0.0 ! parasitic gas load associated with the gas heating coil
+  REAL(r64)    :: ParasiticElecLoad                = 0.0d0 ! parasitic electric load associated with the gas heating coil
+  REAL(r64)    :: ParasiticGasLoad                 = 0.0d0 ! parasitic gas load associated with the gas heating coil
                                                          ! (standing pilot light) [J]
-  REAL(r64)    :: ParasiticGasRate                 = 0.0 ! avg. parasitic gas consumption rate with the gas heating coil
+  REAL(r64)    :: ParasiticGasRate                 = 0.0d0 ! avg. parasitic gas consumption rate with the gas heating coil
                                                          ! (standing pilot light) [J]
-  REAL(r64)    :: ParasiticGasCapacity             = 0.0 ! capacity of parasitic gas consumption rate, input by user [W]
-  REAL(r64)    :: RTF                              = 0.0 ! Heater runtime fraction, including PLF curve impacts
+  REAL(r64)    :: ParasiticGasCapacity             = 0.0d0 ! capacity of parasitic gas consumption rate, input by user [W]
+  REAL(r64)    :: RTF                              = 0.0d0 ! Heater runtime fraction, including PLF curve impacts
   INTEGER      :: RTFErrorIndex                    = 0   ! used in recurring error warnings
   INTEGER      :: RTFErrorCount                    = 0   ! used in recurring error warnings
   INTEGER      :: PLFErrorIndex                    = 0   ! used in recurring error warnings
@@ -136,9 +136,9 @@ PRIVATE SizeHeatingCoil
           ! Algorithms for the module
 Private CalcElectricHeatingCoil
 Private CalcGasHeatingCoil
-Private CalcMultiStageElectricHeatingCoil
-Private CalcMultiStageGasHeatingCoil
 Private CalcDesuperheaterHeatingCoil
+Public  CalcMultiStageElectricHeatingCoil
+Public  CalcMultiStageGasHeatingCoil
 
           ! Update routine to check convergence and update nodes
 Private UpdateHeatingCoil
@@ -158,6 +158,7 @@ Public  GetHeatingCoilTypeNum
 Public  GetHeatingCoilIndex
 Public  GetHeatingCoilPLFCurveIndex
 Public  GetHeatingCoilNumberOfStages
+Public  GetCoilAvailScheduleIndex
 
 CONTAINS
 
@@ -270,7 +271,7 @@ SUBROUTINE SimulateHeatingCoilComponents(CompName,FirstHVACIteration,QCoilReq,Co
   IF(PRESENT(PartLoadRatio))THEN
     PartLoadFrac = PartLoadRatio
   ELSE
-    PartLoadFrac = 1.0
+    PartLoadFrac = 1.0d0
   END IF
 
   IF(PRESENT(QCoilReq))THEN
@@ -286,15 +287,15 @@ SUBROUTINE SimulateHeatingCoilComponents(CompName,FirstHVACIteration,QCoilReq,Co
   If(HeatingCoil(CoilNum)%HCoilType_Num == Coil_HeatingElectric) Then
        Call CalcElectricHeatingCoil(CoilNum,QCoilRequired,QCoilActual2,OpMode,PartLoadFrac)
   ElseIf(HeatingCoil(CoilNum)%HCoilType_Num == Coil_HeatingElectric_MultiStage) Then
-       Call CalcMultiStageElectricHeatingCoil(CoilNum,SpeedRatio, PartLoadRatio, StageNum, OpMode)
+       Call CalcMultiStageElectricHeatingCoil(CoilNum,SpeedRatio, PartLoadRatio, StageNum, OpMode) !Objexx:OPTIONAL SpeedRatio, PartLoadRatio, StageNum used without PRESENT check
   ElseIf(HeatingCoil(CoilNum)%HCoilType_Num == Coil_HeatingGas) Then
        Call CalcGasHeatingCoil(CoilNum,QCoilRequired,QCoilActual2,OpMode,PartLoadFrac)
   ElseIf(HeatingCoil(CoilNum)%HCoilType_Num == Coil_HeatingGas_MultiStage) Then
-       Call CalcMultiStageGasHeatingCoil(CoilNum,SpeedRatio, PartLoadRatio, StageNum, OpMode)
+       Call CalcMultiStageGasHeatingCoil(CoilNum,SpeedRatio, PartLoadRatio, StageNum, OpMode) !Objexx:OPTIONAL SpeedRatio, PartLoadRatio, StageNum used without PRESENT check
   ElseIf(HeatingCoil(CoilNum)%HCoilType_Num == Coil_HeatingDesuperheater) Then
        Call CalcDesuperheaterHeatingCoil(CoilNum,QCoilRequired,QCoilActual2)
   Else
-       QCoilActual2 = 0.0
+       QCoilActual2 = 0.0d0
   End If
 
   ! Update the current HeatingCoil to the outlet nodes
@@ -425,7 +426,7 @@ SUBROUTINE GetHeatingCoilInput
     ALLOCATE(cNumericFields(MaxNums))
     cNumericFields=' '
     ALLOCATE(Numbers(MaxNums))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(lAlphaBlanks(MaxAlphas))
     lAlphaBlanks=.true.
     ALLOCATE(lNumericBlanks(MaxNums))
@@ -808,7 +809,7 @@ SUBROUTINE GetHeatingCoilInput
 
 !       check availability schedule for values between 0 and 1
         IF (HeatingCoil(CoilNum)%SchedPtr .GT. 0)THEN
-          IF (.NOT. CheckScheduleValueMinMax(HeatingCoil(CoilNum)%SchedPtr,'>=',0.,'<=',1.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax(HeatingCoil(CoilNum)%SchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
             CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(HeatingCoil(CoilNum)%Name)//'"')
             CALL ShowContinueError('Error found in '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
             CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
@@ -1076,14 +1077,14 @@ SUBROUTINE InitHeatingCoil(CoilNum, FirstHVACIteration, QCoilRequired)
   HeatingCoil(CoilNum)%InletAirEnthalpy     = Node(AirInletNode)%Enthalpy
 
   ! Set the reporting variables to zero at each timestep.
-  HeatingCoil(CoilNum)%HeatingCoilLoad = 0.0
-  HeatingCoil(CoilNum)%GasUseLoad=0.0
-  HeatingCoil(CoilNum)%ElecUseLoad=0.0
-  HeatingCoil(CoilNum)%RTF = 0.0
+  HeatingCoil(CoilNum)%HeatingCoilLoad = 0.0d0
+  HeatingCoil(CoilNum)%GasUseLoad=0.0d0
+  HeatingCoil(CoilNum)%ElecUseLoad=0.0d0
+  HeatingCoil(CoilNum)%RTF = 0.0d0
 
   ! If a temperature setpoint controlled coil must set the desired outlet temp everytime
   IF (ControlNode.EQ.0) THEN
-    HeatingCoil(CoilNum)%DesiredOutletTemp = 0.0
+    HeatingCoil(CoilNum)%DesiredOutletTemp = 0.0d0
   ELSE IF (ControlNode.EQ.AirOutletNode) THEN
     HeatingCoil(CoilNum)%DesiredOutletTemp = Node(ControlNode)%TempSetPoint
   ELSE
@@ -1214,7 +1215,7 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   January 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1259,31 +1260,80 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
   REAL(r64)           :: DesMassFlow
   REAL(r64)           :: CpAir
   REAL(r64)           :: OutAirFrac
+  REAL(r64)           :: MinPriFlowFrac
   REAL(r64)           :: RhoAirStd
   REAL(r64)           :: CpAirStd
   INTEGER             :: StageNum
   INTEGER             :: NumOfStages
+  LOGICAL             :: IsAutosize            ! Indicator to autosize for reporting
+  LOGICAL             :: ThisStageAutosize     ! Indicator to autosize at each stage for reporting
+  LOGICAL             :: HardSizeNoDesRun      ! Indicator to hardsize with no sizing runs for reporting
+  REAL(r64)           :: NominalCapacityDes    ! Autosized nominal capacity for reporting 
+  REAL(r64)           :: NominalCapacityUser   ! Hardsized nominal capacity for reporting 
+!  REAL(r64)           :: MSNominalCapacityDes  ! Autosized multi stage nominal capacity for reporting
+!  REAL(r64)           :: MSNominalCapacityUser ! Hardsized multi stage nominal capacity for reporting 
+  LOGICAL :: SizingDesRunThisAirSys            ! true if a particular air system had a Sizing:System object and system sizing done
+  LOGICAL :: SizingDesRunThisZone              ! true if a particular zone had a Sizing:Zone object and zone sizing was done
 
-  CoilInTemp = 0.0
-  CoilOutTemp = 0.0
-  CoilOutHumRat = 0.0
-  DesPriVolFlow = 0.0
-  DesCoilLoad = 0.0
-  DesVolFlow = 0.0
-  DesMassFlow = 0.0
-  CpAir = 0.0
-  OutAirFrac = 0.0
+  CoilInTemp = 0.0d0
+  CoilOutTemp = 0.0d0
+  CoilOutHumRat = 0.0d0
+  DesPriVolFlow = 0.0d0
+  DesCoilLoad = 0.0d0
+  DesVolFlow = 0.0d0
+  DesMassFlow = 0.0d0
+  CpAir = 0.0d0
+  OutAirFrac = 0.0d0
+  MinPriFlowFrac = 0.0d0
   CpAirStd = PsyCpAirFnWTdb(0.0d0,20.0d0)
   RhoAirStd = StdRhoAir
+  NominalCapacityDes = 0.0d0
+  NominalCapacityUser = 0.0d0
+!  MSNominalCapacityDes = 0.0d0
+!  MSNominalCapacityUser = 0.0d0
+  IsAutosize = .FALSE.
+  ThisStageAutosize = .FALSE.
+  IF (SysSizingRunDone .OR. ZoneSizingRunDone) THEN
+    HardSizeNoDesRun = .FALSE.
+  ELSE
+    HardSizeNoDesRun = .TRUE.
+  ENDIF
+  IF (CurSysNum > 0) THEN
+    CALL CheckThisAirSystemForSizing(CurSysNum, SizingDesRunThisAirSys )
+  ELSE
+    SizingDesRunThisAirSys =  .FALSE.
+  ENDIF
+  IF (CurZoneEqNum > 0) THEN
+    CALL CheckThisZoneForSizing(CurZoneEqNum, SizingDesRunThisZone)
+  ELSE
+    SizingDesRunThisZone =  .FALSE.
+  ENDIF
 
   IF (HeatingCoil(CoilNum)%NominalCapacity == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF  
 
-    IF (CurSysNum > 0) THEN
-
+  IF (CurSysNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisAirSys) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.    
+      IF (HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) THEN
+        CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+                            //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
+                            HeatingCoil(CoilNum)%Name, 'User-Specified Nominal Capacity [W]', &
+                            HeatingCoil(CoilNum)%NominalCapacity)  
+      END IF
+    ELSE ! Autosize or hardsize with sizing data  
       CALL CheckSysSizing('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':'//TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
                             HeatingCoil(CoilNum)%Name)
-        IF (CurOASysNum > 0) THEN
+      IF (CurOASysNum > 0) THEN
+        IF(OASysEqSizing(CurOASysNum)%AirFlow)THEN
+          DesVolFlow = OASysEqSizing(CurOASysNum)%AirVolFlow
+        ELSE
           DesVolFlow = FinalSysSizing(CurSysNum)%DesOutAirVolFlow
+        END IF
+      ELSE
+        IF(UnitarySysEqSizing(CurSysNum)%AirFlow)THEN
+          DesVolFlow = UnitarySysEqSizing(CurSysNum)%AirVolFlow
         ELSE
           SELECT CASE(CurDuctType)
             CASE(Main)
@@ -1298,60 +1348,96 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
               DesVolFlow = FinalSysSizing(CurSysNum)%DesMainVolFlow
           END SELECT
         END IF
-        DesMassFlow = RhoAirStd*DesVolFlow
-        ! get the outside air fraction
-        IF (CurOASysNum > 0) THEN
-          OutAirFrac = 1.0
-        ELSE IF (FinalSysSizing(CurSysNum)%HeatOAOption == MinOA) THEN
-          IF (DesVolFlow > 0.0) THEN
-            OutAirFrac = FinalSysSizing(CurSysNum)%DesOutAirVolFlow / DesVolFlow
-          ELSE
-            OutAirFrac = 1.0
-          END IF
-          OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
+      END IF
+      DesMassFlow = RhoAirStd*DesVolFlow
+      ! get the outside air fraction
+      IF (CurOASysNum > 0) THEN
+        OutAirFrac = 1.0d0
+      ELSE IF (FinalSysSizing(CurSysNum)%HeatOAOption == MinOA) THEN
+        IF (DesVolFlow > 0.0d0) THEN
+          OutAirFrac = FinalSysSizing(CurSysNum)%DesOutAirVolFlow / DesVolFlow
         ELSE
-          OutAirFrac = 1.0
+          OutAirFrac = 1.0d0
         END IF
-        ! coil inlet temperature
-        IF (CurOASysNum == 0 .AND. PrimaryAirSystem(CurSysNum)%NumOAHeatCoils > 0) THEN
-          CoilInTemp = OutAirFrac*FinalSysSizing(CurSysNum)%PreheatTemp + &
+        OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
+      ELSE
+        OutAirFrac = 1.0d0
+      END IF
+      ! coil inlet temperature
+      IF (CurOASysNum == 0 .AND. PrimaryAirSystem(CurSysNum)%NumOAHeatCoils > 0) THEN
+        CoilInTemp = OutAirFrac*FinalSysSizing(CurSysNum)%PreheatTemp + &
                          (1.0d0-OutAirFrac)*FinalSysSizing(CurSysNum)%HeatRetTemp
+      ELSE
+        CoilInTemp = OutAirFrac*FinalSysSizing(CurSysNum)%HeatOutTemp + &
+                         (1.0d0-OutAirFrac)*FinalSysSizing(CurSysNum)%HeatRetTemp
+      END IF
+
+      ! coil load
+      IF (CurOASysNum > 0) THEN
+        IF(OASysEqSizing(CurOASysNum)%Capacity)THEN
+          DesCoilLoad = OASysEqSizing(CurOASysNum)%DesHeatingLoad
         ELSE
-          CoilInTemp = OutAirFrac*FinalSysSizing(CurSysNum)%HeatOutTemp + &
-                         (1.0d0-OutAirFrac)*FinalSysSizing(CurSysNum)%HeatRetTemp
-        END IF
-        ! coil load
-        IF (CurOASysNum > 0) THEN
           DesCoilLoad = CpAirStd*DesMassFlow*(FinalSysSizing(CurSysNum)%PreheatTemp - CoilInTemp)
+        END IF
+      ELSE
+        IF(UnitarySysEqSizing(CurSysNum)%Capacity)THEN
+          DesCoilLoad = UnitarySysEqSizing(CurSysNum)%DesHeatingLoad
         ELSE
           DesCoilLoad = CpAirStd*DesMassFlow*(FinalSysSizing(CurSysNum)%HeatSupTemp - CoilInTemp)
         END IF
+      END IF
 
       IF (AirLoopControlInfo(CurSysNum)%UnitarySys) THEN
         IF (CoilIsSuppHeater) THEN
-          HeatingCoil(CoilNum)%NominalCapacity = SuppHeatCap
+          NominalCapacityDes = SuppHeatCap
         ELSE
-          HeatingCoil(CoilNum)%NominalCapacity = UnitaryHeatCap
+         ! TRUE for all air loop parent equipment except UnitarySystem where flag is reset to FALSE after simulating
+         ! This method allows downstream heating coils to size individually. Probably should do this for all air loop equipment
+         ! ChangoverBypass model always sets AirLoopControlInfo%UnitarySys to FALSE so heating coil can individually size
+          IF(AirLoopControlInfo(CurSysNum)%UnitarySysSimulating)THEN
+            NominalCapacityDes = UnitaryHeatCap
+          ELSE
+            IF (DesCoilLoad >= SmallLoad) THEN
+              NominalCapacityDes = DesCoilLoad
+            ELSE
+              NominalCapacityDes = 0.0d0
+            END IF
+          END IF
         END IF
       ELSE
         IF (DesCoilLoad >= SmallLoad) THEN
-          HeatingCoil(CoilNum)%NominalCapacity = DesCoilLoad
+          NominalCapacityDes = DesCoilLoad
         ELSE
-          HeatingCoil(CoilNum)%NominalCapacity = 0.0
+          NominalCapacityDes = 0.0d0
         END IF
       END IF
+    END IF  
 
-
-    ELSE IF (CurZoneEqNum > 0) THEN
+  ELSE IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisZone) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.    
+      IF (HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) THEN
+        CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+                            //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
+                            HeatingCoil(CoilNum)%Name, 'User-Specified Nominal Capacity [W]', &
+                            HeatingCoil(CoilNum)%NominalCapacity) 
+      END IF
+    ELSE ! Autosize or hardsize with sizing data  
 
       CALL CheckZoneSizing('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':'//TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
                             HeatingCoil(CoilNum)%Name)
-      IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallMassFlow) THEN
+      IF(ZoneEqSizing(CurZoneEqNum)%Capacity)THEN
+        NominalCapacityDes = ZoneEqSizing(CurZoneEqNum)%DesHeatingLoad
+      ELSE IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallMassFlow) THEN
         IF (TermUnitPIU) THEN
-          ! MinFlowFrac set at bottom of SUBROUTINE SizePIU (here OutAirFrac = min primary air flow frac)
-          OutAirFrac = TermUnitSizing(CurZoneEqNum)%MinFlowFrac
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * OutAirFrac + &
-                          FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1. - OutAirFrac)
+          MinPriFlowFrac = TermUnitSizing(CurZoneEqNum)%MinFlowFrac
+          IF (TermUnitSizing(CurZoneEqNum)%InducesPlenumAir) THEN
+            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * MinPriFlowFrac + &
+                           FinalZoneSizing(CurZoneEqNum)%ZoneRetTempAtHeatPeak * (1.0d0 - MinPriFlowFrac)
+          ELSE
+            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * MinPriFlowFrac + &
+                           FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1.0d0 - MinPriFlowFrac)
+          END IF
         ELSE IF (TermUnitIU) THEN
           CoilInTemp = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
         ELSE IF (TermUnitSingDuct) THEN
@@ -1373,7 +1459,7 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
             DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesHeatLoad - CpAir*RhoAirStd*DesPriVolFlow* &
               (FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU - FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak)
           ELSE
-            DesCoilLoad = 0.0
+            DesCoilLoad = 0.0d0
           END IF
         ELSE
           CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
@@ -1381,64 +1467,153 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
           CpAir = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp))
           DesCoilLoad = CpAir * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow * (CoilOutTemp-CoilInTemp)
         END IF
-        HeatingCoil(CoilNum)%NominalCapacity = DesCoilLoad
+        NominalCapacityDes = MAX(0.0d0,DesCoilLoad)
       ELSE
-        HeatingCoil(CoilNum)%NominalCapacity = 0.0
+        NominalCapacityDes = 0.0d0
       END IF
-
-    END IF
-    CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+    END IF 
+  END IF  
+  IF (.NOT. HardSizeNoDesRun) THEN
+    IF (IsAutosize) THEN
+      HeatingCoil(CoilNum)%NominalCapacity = NominalCapacityDes
+      CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
                             //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
-                            HeatingCoil(CoilNum)%Name, 'Nominal Capacity [W]', &
-                            HeatingCoil(CoilNum)%NominalCapacity)
-  ENDIF
+                            HeatingCoil(CoilNum)%Name, 'Design Size Nominal Capacity [W]', NominalCapacityDes)                                    
+    ELSE  
+      IF (HeatingCoil(CoilNum)%NominalCapacity > 0.0d0 .AND. NominalCapacityDes > 0.0d0) THEN            
+        NominalCapacityUser = HeatingCoil(CoilNum)%NominalCapacity
+        CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+                          //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), &
+                          HeatingCoil(CoilNum)%Name, 'Design Size Nominal Capacity [W]', NominalCapacityDes, &
+                          'User-Specified Nominal Capacity [W]', NominalCapacityUser) 
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(NominalCapacityDes - NominalCapacityUser)/NominalCapacityUser ) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeHeatingCoil: Potential issue with equipment sizing for ' &
+                                       //TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//' '//  &
+                                   TRIM(HeatingCoil(CoilNum)%HeatingCoilModel)//', '//TRIM(HeatingCoil(CoilNum)%Name))
+            CALL ShowContinueError('User-Specified Nominal Capacity of '// &
+                                  TRIM(RoundSigDigits(NominalCapacityUser,2))// ' [W]')
+            CALL ShowContinueError('differs from Design Size Nominal Capacity of ' // &
+                                  TRIM(RoundSigDigits(NominalCapacityDes,2))// ' [W]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF
+    END IF
+  END IF
 
   IF (HeatingCoil(CoilNum)%HCoilType_Num .EQ. Coil_HeatingElectric_MultiStage .OR. &
       HeatingCoil(CoilNum)%HCoilType_Num .EQ. Coil_HeatingGas_MultiStage ) THEN
+    IsAutosize = .FALSE.  
     IF (ANY(HeatingCoil(CoilNum)%MSNominalCapacity == AutoSize)) THEN
+      IsAutosize = .TRUE.
+    END IF  
+    IF (IsAutosize) THEN
       NumOfStages = HeatingCoil(CoilNum)%NumOfStages
       DO StageNum=NumOfStages, 1, -1
         IF (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) == AutoSize) THEN
-          IF (StageNum .EQ. NumOfStages) THEN
-            HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) = SuppHeatCap
+          ThisStageAutosize = .TRUE.
+        END IF  
+        IF (StageNum .EQ. NumOfStages) THEN
+          IF (CoilIsSuppHeater) THEN
+            NominalCapacityDes = SuppHeatCap
           ELSE
-            HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) = HeatingCoil(CoilNum)%MSNominalCapacity(NumOfStages) * &
-                                                              StageNum / NumOfStages
+            IF(AirLoopControlInfo(CurSysNum)%UnitarySysSimulating)THEN
+              NominalCapacityDes = UnitaryHeatCap
+            ELSE
+              IF (DesCoilLoad >= SmallLoad) THEN
+                NominalCapacityDes = DesCoilLoad
+              ELSE
+                NominalCapacityDes = 0.0d0
+              END IF
+            END IF
+          END IF
+        ELSE
+          NominalCapacityDes = HeatingCoil(CoilNum)%MSNominalCapacity(NumOfStages) * &
+                                 StageNum / NumOfStages
         ENDIF
-        CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+        IF (ThisStageAutosize) THEN
+          HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) = NominalCapacityDes   
+          CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
                   //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), HeatingCoil(CoilNum)%Name, 'Stage ' &
-                  //TRIM(TrimSigDigits(StageNum))//' Nominal Capacity [W]', HeatingCoil(CoilNum)%MSNominalCapacity(StageNum))
+                  //TRIM(TrimSigDigits(StageNum))//' Design Size Nominal Capacity [W]', NominalCapacityDes)
+        ELSE 
+          IF (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) > 0.0d0 .AND. NominalCapacityDes > 0.0d0) THEN
+            NominalCapacityUser = HeatingCoil(CoilNum)%MSNominalCapacity(StageNum)
+            CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+                  //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), HeatingCoil(CoilNum)%Name, 'Stage ' &
+                  //TRIM(TrimSigDigits(StageNum))//' Design Size Nominal Capacity [W]', NominalCapacityDes, &
+                 ' User-Specified Nominal Capacity [W]', NominalCapacityUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(NominalCapacityDes - NominalCapacityUser)/NominalCapacityUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeHeatingCoil: Potential issue with equipment sizing for ' &
+                                     //TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//' '//  &
+                       TRIM(HeatingCoil(CoilNum)%HeatingCoilModel)//', '//TRIM(HeatingCoil(CoilNum)%Name))
+                CALL ShowContinueError('User-Specified Nominal Capacity of '// &
+                                    TRIM(RoundSigDigits(NominalCapacityUser,2))// ' [W]')
+                CALL ShowContinueError('differs from Design Size Nominal Capacity of ' // &
+                                    TRIM(RoundSigDigits(NominalCapacityDes,2))// ' [W]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.') 
+              END IF
+            ENDIF
+          END IF  
         ENDIF
       END DO
+    ELSE ! No autosize
+      NumOfStages = HeatingCoil(CoilNum)%NumOfStages  
+      DO StageNum=NumOfStages, 1, -1        
+        IF (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) > 0.0d0) THEN
+          CALL ReportSizingOutput('Coil:'//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//':' &
+                  //TRIM(HeatingCoil(CoilNum)%HeatingCoilModel), HeatingCoil(CoilNum)%Name, 'Stage ' &
+                  //TRIM(TrimSigDigits(StageNum))//' User-Specified Nominal Capacity [W]', &
+                  HeatingCoil(CoilNum)%MSNominalCapacity(StageNum))  
+        END IF
+      END DO  
     ENDIF
    ! Ensure capacity at lower Stage must be lower or equal to the capacity at higher Stage.
-    Do StageNum = 1,HeatingCoil(CoilNum)%NumOfStages-1
-      If (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) .GT. HeatingCoil(CoilNum)%MSNominalCapacity(StageNum+1)) Then
-        CALL ShowSevereError('SizeHeatingCoil: '//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//' '// &
-          TRIM(HeatingCoil(CoilNum)%Name)//', '// 'Stage '//Trim(TrimSigDigits(StageNum)) &
-          //' Nominal Capacity ('//TRIM(RoundSigDigits(HeatingCoil(CoilNum)%MSNominalCapacity(StageNum),2)) &
-          //' W) must be less than or equal to '//'Stage '//Trim(TrimSigDigits(StageNum+1)) &
-          //' Nominal Capacity ('//TRIM(RoundSigDigits(HeatingCoil(CoilNum)%MSNominalCapacity(StageNum+1),2))//' W).')
-        CALL ShowFatalError('Preceding conditions cause termination.')
-      End If
-    End Do
-  ENDIF
+    !IF (IsAutosize) THEN
+      Do StageNum = 1,HeatingCoil(CoilNum)%NumOfStages-1
+        If (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) .GT. HeatingCoil(CoilNum)%MSNominalCapacity(StageNum+1)) Then
+          CALL ShowSevereError('SizeHeatingCoil: '//TRIM(HeatingCoil(CoilNum)%HeatingCoilType)//' '// &
+            TRIM(HeatingCoil(CoilNum)%Name)//', '// 'Stage '//TRIM(TrimSigDigits(StageNum)) &
+            //' Nominal Capacity ('//TRIM(RoundSigDigits(HeatingCoil(CoilNum)%MSNominalCapacity(StageNum),2)) &
+            //' W) must be less than or equal to '//'Stage '//TRIM(TrimSigDigits(StageNum+1)) &
+            //' Nominal Capacity ('//TRIM(RoundSigDigits(HeatingCoil(CoilNum)%MSNominalCapacity(StageNum+1),2))//' W).')
+          CALL ShowFatalError('Preceding conditions cause termination.')
+        End If
+      End Do
+    !ENDIF
+  END IF  
 
   !create predefined report entries
   SELECT CASE (HeatingCoil(CoilNum)%HCoilType_Num)
     CASE (Coil_HeatingElectric)
       CALL PreDefTableEntry(pdchHeatCoilType,HeatingCoil(CoilNum)%Name,'Coil:Heating:Electric')
+      CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%NominalCapacity)
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%Efficiency)
     CASE (Coil_HeatingElectric_MultiStage)
       CALL PreDefTableEntry(pdchHeatCoilType,HeatingCoil(CoilNum)%Name,'Coil:Heating:Electric:MultiStage')
+      CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name, &
+                            HeatingCoil(CoilNum)%MSNominalCapacity(HeatingCoil(CoilNum)%NumOfStages))
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name, &
+                            HeatingCoil(CoilNum)%MSEfficiency(HeatingCoil(CoilNum)%NumOfStages))
     CASE (Coil_HeatingGas)
       CALL PreDefTableEntry(pdchHeatCoilType,HeatingCoil(CoilNum)%Name,'Coil:Heating:Gas')
+      CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%NominalCapacity)
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%Efficiency)
     CASE (Coil_HeatingGas_MultiStage)
       CALL PreDefTableEntry(pdchHeatCoilType,HeatingCoil(CoilNum)%Name,'Coil:Heating:Gas:MultiStage')
+      CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name, &
+                            HeatingCoil(CoilNum)%MSNominalCapacity(HeatingCoil(CoilNum)%NumOfStages))
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name, &
+                            HeatingCoil(CoilNum)%MSEfficiency(HeatingCoil(CoilNum)%NumOfStages))
     CASE (Coil_HeatingDesuperheater)
       CALL PreDefTableEntry(pdchHeatCoilType,HeatingCoil(CoilNum)%Name,'Coil:Heating:Desuperheater')
+      CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%NominalCapacity)
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%Efficiency)
   END SELECT
-  CALL PreDefTableEntry(pdchHeatCoilNomCap,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%NominalCapacity)
-  CALL PreDefTableEntry(pdchHeatCoilNomEff,HeatingCoil(CoilNum)%Name,HeatingCoil(CoilNum)%Efficiency)
 
   RETURN
 
@@ -1506,11 +1681,11 @@ Subroutine CalcElectricHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLo
 
 !  adjust mass flow rates for cycling fan cycling coil operation
    IF(FanOpMode .EQ. CycFanCycCoil)THEN
-     IF(PartLoadRatio .GT. 0.0)THEN
+     IF(PartLoadRatio .GT. 0.0d0)THEN
        AirMassFlow = HeatingCoil(CoilNum)%InletAirMassFlowRate / PartLoadRatio
        QCoilReq    = QCoilReq / PartLoadRatio
      ELSE
-       AirMassFlow = 0.0
+       AirMassFlow = 0.0d0
      END IF
    ELSE
      AirMassFlow   = HeatingCoil(CoilNum)%InletAirMassFlowRate
@@ -1523,9 +1698,9 @@ Subroutine CalcElectricHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLo
   !  Also the coil has to be scheduled to be available.
 
   ! Control output to meet load QCoilReq (QCoilReq is passed in if load controlled, otherwise QCoilReq=-999)
-  IF((AirMassFlow .GT. 0.0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
-     (QCoilReq .gt. 0.0)) THEN
+  IF((AirMassFlow .GT. 0.0d0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
+     (QCoilReq .gt. 0.0d0)) THEN
 
       !check to see if the Required heating capacity is greater than the user specified capacity.
       IF(QCoilReq > HeatingCoil(CoilNum)%NominalCapacity) Then
@@ -1541,16 +1716,16 @@ Subroutine CalcElectricHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLo
       HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoilLoad/Effic
 
    ! Control coil output to meet a setpoint temperature.
-   Else IF((AirMassFlow .GT. 0.0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
+   Else IF((AirMassFlow .GT. 0.0d0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
      (QCoilReq == SensedLoadFlagValue) .and. &
      (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap = CapacitanceAir*(TempSetPoint - TempAirIn)
       ! check to see if setpoint above enetering temperature. If not, set
       ! output to zero.
-      IF(QCoilCap .LE. 0.0) THEN
-        QCoilCap = 0.0
+      IF(QCoilCap .LE. 0.0d0) THEN
+        QCoilCap = 0.0d0
         TempAirOut = TempAirIn
       !check to see if the Required heating capacity is greater than the user
       ! specified capacity.
@@ -1570,8 +1745,8 @@ Subroutine CalcElectricHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLo
   Else ! If not running Conditions do not change across coil from inlet to outlet
 
       TempAirOut=TempAirIn
-      HeatingCoilLoad=0.0
-      HeatingCoil(CoilNum)%ElecUseLoad = 0.0
+      HeatingCoilLoad=0.0d0
+      HeatingCoil(CoilNum)%ElecUseLoad = 0.0d0
   END IF
 
    IF(FanOpMode .EQ. CycFanCycCoil)THEN
@@ -1668,6 +1843,7 @@ REAL(r64) :: LSFullLoadOutAirEnth ! Outlet full load enthalpy at low stage
 REAL(r64) :: HSFullLoadOutAirEnth ! Outlet full load enthalpy at high stage
 REAL(r64) :: LSElecHeatingPower   ! Full load power at low stage
 REAL(r64) :: HSElecHeatingPower   ! Full load power at high stage
+REAL(r64) :: PartLoadRat          ! part load ratio
 
 ! FLOW
 If (StageNum > 1) Then
@@ -1689,9 +1865,9 @@ InletAirHumRat      = HeatingCoil(CoilNum)%InletAirHumRat
 
 OutdoorPressure = OutBaroPress
 
-IF((AirMassFlow .GT. 0.0) .AND. &
-   (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .GT. 0.0) .AND. &
-   ((CycRatio .GT. 0.0) .OR. (SpeedRatio .GT. 0.0))) THEN
+IF((AirMassFlow .GT. 0.0d0) .AND. &
+   (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .GT. 0.0d0) .AND. &
+   ((CycRatio .GT. 0.0d0) .OR. (SpeedRatio .GT. 0.0d0))) THEN
 
   If (StageNum > 1) Then
 
@@ -1723,8 +1899,8 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     FullLoadOutAirRH = PsyRhFnTdbWPb(OutletAirTemp,OutletAirHumRat,OutdoorPressure,RoutineName//':Averageload')
 
     IF (FullLoadOutAirRH .gt. 1.d0) THEN  ! Limit to saturated conditions at FullLoadOutAirEnth
-      OutletAirTemp = PsyTsatFnHPb(FullLoadOutAirEnth,OutdoorPressure,RoutineName)
-      OutletAirHumRat = PsyWFnTdbH(OutletAirTemp,FullLoadOutAirEnth,RoutineName)
+      OutletAirTemp = PsyTsatFnHPb(OutletAirEnthalpy,OutdoorPressure,RoutineName)
+      OutletAirHumRat = PsyWFnTdbH(OutletAirTemp,OutletAirEnthalpy,RoutineName)
     END IF
 
     HeatingCoil(CoilNum)%OutletAirTemp     = OutletAirTemp
@@ -1733,10 +1909,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
 
   ! Stage 1
-  Else If (CycRatio > 0.0) Then
+  Else If (CycRatio > 0.0d0) Then
+
+    PartLoadRat = MIN(1.0d0,CycRatio)
 
     ! for cycling fan, reset mass flow to full on rate
-    IF (FanOpMode .EQ. CycFanCycCoil) AirMassFlow = AirMassFlow / CycRatio
+    IF (FanOpMode .EQ. CycFanCycCoil) AirMassFlow = AirMassFlow / PartLoadRat
     IF (FanOpMode .EQ. ContFanCycCoil) AirMassFlow = MSHPMassFlowRateLow
 
     TotCap = HeatingCoil(CoilNum)%MSNominalCapacity(StageNumLS)
@@ -1755,14 +1933,23 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     END IF
 
     ! Set outlet conditions from the full load calculation
-    OutletAirEnthalpy = FullLoadOutAirEnth
-    OutletAirHumRat   = FullLoadOutAirHumRat
-    OutletAirTemp     = FullLoadOutAirTemp
+    IF (FanOpMode .EQ. CycFanCycCoil) THEN
+      OutletAirEnthalpy = FullLoadOutAirEnth
+      OutletAirHumRat   = FullLoadOutAirHumRat
+      OutletAirTemp     = FullLoadOutAirTemp
+    ELSE
+      OutletAirEnthalpy = PartLoadRat * FullLoadOutAirEnth + (1.0d0-PartLoadRat) * InletAirEnthalpy
+      OutletAirHumRat   = PartLoadRat * FullLoadOutAirHumRat + (1.0d0-PartLoadRat) * InletAirHumRat
+      OutletAirTemp     = PartLoadRat * FullLoadOutAirTemp + (1.0d0-PartLoadRat) * InletAirDryBulbTemp
+    END IF
 
     EffLS = HeatingCoil(CoilNum)%MSEfficiency(StageNumLS)
 
-    HeatingCoil(CoilNum)%ElecUseLoad = TotCap/ EffLS
-    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap
+!    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap
+!   This would require a CR to change
+    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap * PartLoadRat
+
+    HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%HeatingCoilLoad/ EffLS
 
     ElecHeatingCoilPower = HeatingCoil(CoilNum)%ElecUseLoad
 
@@ -1770,6 +1957,17 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     HeatingCoil(CoilNum)%OutletAirHumRat   = OutletAirHumRat
     HeatingCoil(CoilNum)%OutletAirEnthalpy = OutletAirEnthalpy
     HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
+! this would require a CR to correct (i.e., calculate outputs when coil is off)
+!  ELSE
+!    ! electric coil is off; just pass through conditions
+!    HeatingCoil(CoilNum)%OutletAirEnthalpy = HeatingCoil(CoilNum)%InletAirEnthalpy
+!    HeatingCoil(CoilNum)%OutletAirHumRat   = HeatingCoil(CoilNum)%InletAirHumRat
+!    HeatingCoil(CoilNum)%OutletAirTemp     = HeatingCoil(CoilNum)%InletAirTemp
+!    HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
+!
+!    HeatingCoil(CoilNum)%ElecUseLoad      = 0.0
+!    HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0
+!    ElecHeatingCoilPower                  = 0.0
   End If
 
 ELSE
@@ -1780,9 +1978,10 @@ ELSE
   HeatingCoil(CoilNum)%OutletAirTemp     = HeatingCoil(CoilNum)%InletAirTemp
   HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
 
-  HeatingCoil(CoilNum)%ElecUseLoad      = 0.0
-  HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0
-  ElecHeatingCoilPower                  = 0.0
+  ! some of these are reset in Init, can be removed to speed up code
+  HeatingCoil(CoilNum)%ElecUseLoad      = 0.0d0
+  HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0d0
+  ElecHeatingCoilPower                  = 0.0d0
 
 END IF ! end of on/off if - else
 
@@ -1855,9 +2054,9 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
   !  Also the coil has to be scheduled to be available.
 
   ! Control output to meet load QCoilReq (QCoilReq is passed in if load controlled, otherwise QCoilReq=-999)
-  IF((AirMassFlow > 0.0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
-     (QCoilReq .gt. 0.0)) THEN
+  IF((AirMassFlow > 0.0d0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
+     (QCoilReq .gt. 0.0d0)) THEN
 
       !check to see if the Required heating capacity is greater than the user specified capacity.
       IF(QCoilReq > HeatingCoil(CoilNum)%NominalCapacity) Then
@@ -1874,19 +2073,19 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
      !The HeatingCoilLoad is the change in the enthalpy of the Heating
       HeatingCoil(CoilNum)%GasUseLoad = HeatingCoilLoad/Effic
       HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%ParasiticElecLoad*PartLoadRat
-      HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity * (1.0 - PartLoadRat)
+      HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity * (1.0d0 - PartLoadRat)
 
    ! Control coil output to meet a setpoint temperature.
-   Else IF((AirMassFlow > 0.0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
+   Else IF((AirMassFlow > 0.0d0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
      (QCoilReq == SensedLoadFlagValue) .and. &
      (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap = CapacitanceAir*(TempSetPoint - TempAirIn)
       ! check to see if setpoint above entering temperature. If not, set
       ! output to zero.
-      IF(QCoilCap .LE. 0.0) THEN
-        QCoilCap = 0.0
+      IF(QCoilCap .LE. 0.0d0) THEN
+        QCoilCap = 0.0d0
         TempAirOut = TempAirIn
       !check to see if the Required heating capacity is greater than the user
       ! specified capacity.
@@ -1909,10 +2108,10 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
   Else ! If not running Conditions do not change across coil from inlet to outlet
 
       TempAirOut=TempAirIn
-      HeatingCoilLoad=0.0
-      PartLoadRat = 0.0
-      HeatingCoil(CoilNum)%GasUseLoad = 0.0
-      HeatingCoil(CoilNum)%ElecUseLoad = 0.0
+      HeatingCoilLoad=0.0d0
+      PartLoadRat = 0.0d0
+      HeatingCoil(CoilNum)%GasUseLoad = 0.0d0
+      HeatingCoil(CoilNum)%ElecUseLoad = 0.0d0
       HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity
   END IF
 
@@ -1921,7 +2120,7 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
   ! If the PLF curve is defined the gas usage needs to be modified
    If(HeatingCoil(CoilNum)%PLFCurveIndex > 0)Then
       IF (PartLoadRat == 0)THEN
-        HeatingCoil(CoilNum)%GasUseLoad = 0.0
+        HeatingCoil(CoilNum)%GasUseLoad = 0.0d0
       ELSE
         PLF = CurveValue(HeatingCoil(CoilNum)%PLFCurveIndex, PartLoadRat)
         IF (PLF < 0.7d0) THEN
@@ -1955,9 +2154,9 @@ Subroutine CalcGasHeatingCoil(CoilNum,QCoilReq,QCoilActual,FanOpMode,PartLoadRat
                         ', Heating coil runtime fraction > 1.0 warning continues... ',  &
                         HeatingCoil(CoilNum)%RTFErrorIndex,HeatingCoil(CoilNum)%RTF,HeatingCoil(CoilNum)%RTF)
           END IF
-          HeatingCoil(CoilNum)%RTF = 1.0 ! Reset coil runtime fraction to 1.0
-        ELSEIF (HeatingCoil(CoilNum)%RTF > 1.0) THEN
-          HeatingCoil(CoilNum)%RTF = 1.0 ! Reset coil runtime fraction to 1.0
+          HeatingCoil(CoilNum)%RTF = 1.0d0 ! Reset coil runtime fraction to 1.0
+        ELSEIF (HeatingCoil(CoilNum)%RTF > 1.0d0) THEN
+          HeatingCoil(CoilNum)%RTF = 1.0d0 ! Reset coil runtime fraction to 1.0
         END IF
         HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%ParasiticElecLoad * HeatingCoil(CoilNum)%RTF
         HeatingCoil(CoilNum)%GasUseLoad  = HeatingCoil(CoilNum)%NominalCapacity / Effic * HeatingCoil(CoilNum)%RTF
@@ -1997,7 +2196,7 @@ SUBROUTINE CalcMultiStageGasHeatingCoil(CoilNum,SpeedRatio, CycRatio, StageNum, 
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Calculates the air-side performance and Gasal energy use of a multi stage gas heating coil.
+          ! Calculates the air-side performance and energy use of a multi stage gas heating coil.
 
           ! METHODOLOGY EMPLOYED:
           ! Uses the same methodology as the single speed Gas heating unit model (SUBROUTINE CalcGasHeatingCoil).
@@ -2040,8 +2239,9 @@ REAL(r64) :: OutletAirHumRat     ! outlet air humidity ratio [kg/kg]
 REAL(r64) :: TotCapHS            ! total capacity at high stage [W]
 REAL(r64) :: TotCapLS            ! total capacity at low stage [W]
 REAL(r64) :: TotCap              ! total capacity at current stage [W]
-REAL(r64) :: EffHS               ! total capacity at high stage [W]
-REAL(r64) :: EffLS               ! total capacity at low stage [W]
+REAL(r64) :: EffHS               ! efficiency at high stage
+REAL(r64) :: EffLS               ! efficiency at low stage
+REAL(r64) :: EffAvg              ! average efficiency
 REAL(r64) :: OutdoorPressure      ! Outdoor barometric pressure at condenser (Pa)
 INTEGER   :: StageNumHS           ! High stage number
 INTEGER   :: StageNumLS           ! Low stage number
@@ -2052,10 +2252,10 @@ REAL(r64) :: FullLoadOutAirRH     ! Outler relative humidity at full load
 REAL(r64) :: OutletAirTemp        ! Supply ari temperature
 REAL(r64) :: LSFullLoadOutAirEnth ! Outlet full load enthalpy at low stage
 REAL(r64) :: HSFullLoadOutAirEnth ! Outlet full load enthalpy at high stage
-REAL(r64) :: LSGasHeatingPower   ! Full load power at low stage
-REAL(r64) :: HSGasHeatingPower   ! Full load power at high stage
-REAL(r64) :: PartLoadRat
-REAL(r64) :: PLF
+REAL(r64) :: LSGasHeatingPower    ! Full load power at low stage
+REAL(r64) :: HSGasHeatingPower    ! Full load power at high stage
+REAL(r64) :: PartLoadRat          ! part load ratio
+REAL(r64) :: PLF                  ! part load factor used to calculate RTF
 
 ! FLOW
 If (StageNum > 1) Then
@@ -2077,9 +2277,9 @@ InletAirHumRat      = HeatingCoil(CoilNum)%InletAirHumRat
 
 OutdoorPressure = OutBaroPress
 
-IF((AirMassFlow .GT. 0.0) .AND. &
-   (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .GT. 0.0) .AND. &
-   ((CycRatio .GT. 0.0) .OR. (SpeedRatio .GT. 0.0))) THEN
+IF((AirMassFlow .GT. 0.0d0) .AND. &
+   (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .GT. 0.0d0) .AND. &
+   ((CycRatio .GT. 0.0d0) .OR. (SpeedRatio .GT. 0.0d0))) THEN
 
   If (StageNum > 1) Then
 
@@ -2100,20 +2300,24 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     ! if cycling fan, send coil part-load fraction to on/off fan via HVACDataGlobals
     ! IF (FanOpMode .EQ. CycFanCycCoil) OnOffFanPartLoadFraction = 1.0d0
 
-    ! Power calculation
-    HeatingCoil(CoilNum)%ElecUseLoad = SpeedRatio*HSGasHeatingPower+(1.0d0-SpeedRatio)*LSGasHeatingPower
+    ! Power calculation. If PartLoadRat (SpeedRatio) = 0, operate at LS the whole time step
+    HeatingCoil(CoilNum)%ElecUseLoad = PartLoadRat*HeatingCoil(CoilNum)%MSParasiticElecLoad(StageNumHS) + &
+                                       (1.0d0-PartLoadRat)*HeatingCoil(CoilNum)%MSParasiticElecLoad(StageNumLS)
 
     ElecHeatingCoilPower = HeatingCoil(CoilNum)%ElecUseLoad
-    HeatingCoil(CoilNum)%HeatingCoilLoad = MSHPMassFlowRateHigh*(HSFullLoadOutAirEnth-InletAirEnthalpy)*SpeedRatio + &
-                                               MSHPMassFlowRateLow*(LSFullLoadOutAirEnth-InletAirEnthalpy)*(1.0d0-SpeedRatio)
+    HeatingCoil(CoilNum)%HeatingCoilLoad = MSHPMassFlowRateHigh*(HSFullLoadOutAirEnth-InletAirEnthalpy)*PartLoadRat + &
+                                               MSHPMassFlowRateLow*(LSFullLoadOutAirEnth-InletAirEnthalpy)*(1.0d0-PartLoadRat)
+    EffAvg = (EffHS * PartLoadRat) + (EffLS * (1.0d0 - PartLoadRat))
+    HeatingCoil(CoilNum)%GasUseLoad      = HeatingCoil(CoilNum)%HeatingCoilLoad / EffAvg
+    HeatingCoil(CoilNum)%ParasiticGasRate = 0.0d0
 
     OutletAirEnthalpy = InletAirEnthalpy + HeatingCoil(CoilNum)%HeatingCoilLoad/HeatingCoil(CoilNum)%InletAirMassFlowRate
     OutletAirTemp = PsyTdbFnHW(OutletAirEnthalpy,OutletAirHumRat,RoutineName)
     FullLoadOutAirRH = PsyRhFnTdbWPb(OutletAirTemp,OutletAirHumRat,OutdoorPressure,RoutineName//':Averageload')
 
     IF (FullLoadOutAirRH .gt. 1.d0) THEN  ! Limit to saturated conditions at FullLoadOutAirEnth
-      OutletAirTemp = PsyTsatFnHPb(FullLoadOutAirEnth,OutdoorPressure,RoutineName)
-      OutletAirHumRat = PsyWFnTdbH(OutletAirTemp,FullLoadOutAirEnth,RoutineName)
+      OutletAirTemp = PsyTsatFnHPb(OutletAirEnthalpy,OutdoorPressure,RoutineName)
+      OutletAirHumRat = PsyWFnTdbH(OutletAirTemp,OutletAirEnthalpy,RoutineName)
     END IF
 
     HeatingCoil(CoilNum)%OutletAirTemp     = OutletAirTemp
@@ -2122,7 +2326,7 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
 
   ! Stage 1
-  Else If (CycRatio > 0.0) Then
+  Else If (CycRatio > 0.0d0) Then
 
     ! for cycling fan, reset mass flow to full on rate
     IF (FanOpMode .EQ. CycFanCycCoil) AirMassFlow = AirMassFlow / CycRatio
@@ -2146,23 +2350,46 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     END IF
 
     ! Set outlet conditions from the full load calculation
-    OutletAirEnthalpy = FullLoadOutAirEnth
-    OutletAirHumRat   = FullLoadOutAirHumRat
-    OutletAirTemp     = FullLoadOutAirTemp
+    IF (FanOpMode .EQ. CycFanCycCoil) THEN
+      OutletAirEnthalpy = FullLoadOutAirEnth
+      OutletAirHumRat   = FullLoadOutAirHumRat
+      OutletAirTemp     = FullLoadOutAirTemp
+    ELSE
+      OutletAirEnthalpy = PartLoadRat * FullLoadOutAirEnth + (1.0d0-PartLoadRat) * InletAirEnthalpy
+      OutletAirHumRat   = PartLoadRat * FullLoadOutAirHumRat + (1.0d0-PartLoadRat) * InletAirHumRat
+      OutletAirTemp     = PartLoadRat * FullLoadOutAirTemp + (1.0d0-PartLoadRat) * InletAirDryBulbTemp
+    END IF
 
     EffLS = HeatingCoil(CoilNum)%MSEfficiency(StageNumLS)
 
-    HeatingCoil(CoilNum)%ElecUseLoad = TotCap/ EffLS
-    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap
+!    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap
+!   This would require a CR to change
+    HeatingCoil(CoilNum)%HeatingCoilLoad = TotCap * PartLoadRat
 
+    HeatingCoil(CoilNum)%GasUseLoad  = HeatingCoil(CoilNum)%HeatingCoilLoad / EffLS
+!   parasitics are calculated when the coil is off (1-PLR)
+    HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%MSParasiticElecLoad(StageNumLS) * (1.0d0 - PartLoadRat)
+    HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity * (1.0d0 - PartLoadRat)
     ElecHeatingCoilPower = HeatingCoil(CoilNum)%ElecUseLoad
 
     HeatingCoil(CoilNum)%OutletAirTemp     = OutletAirTemp
     HeatingCoil(CoilNum)%OutletAirHumRat   = OutletAirHumRat
     HeatingCoil(CoilNum)%OutletAirEnthalpy = OutletAirEnthalpy
     HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
+! This seems unecessary (i.e., cycratio or speedratio is > 0) , and would require a CR to change
+!  ELSE
+!    ! Gas coil is off; just pass through conditions
+!    HeatingCoil(CoilNum)%OutletAirEnthalpy = HeatingCoil(CoilNum)%InletAirEnthalpy
+!    HeatingCoil(CoilNum)%OutletAirHumRat   = HeatingCoil(CoilNum)%InletAirHumRat
+!    HeatingCoil(CoilNum)%OutletAirTemp     = HeatingCoil(CoilNum)%InletAirTemp
+!    HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
+!
+!    HeatingCoil(CoilNum)%ElecUseLoad      = 0.0
+!    HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0
+!    ElecHeatingCoilPower                  = 0.0
   End If
 
+! This requires a CR to correct (i.e., calculate outputs when coil is off)
 ELSE
 
   ! Gas coil is off; just pass through conditions
@@ -2171,17 +2398,20 @@ ELSE
   HeatingCoil(CoilNum)%OutletAirTemp     = HeatingCoil(CoilNum)%InletAirTemp
   HeatingCoil(CoilNum)%OutletAirMassFlowRate = HeatingCoil(CoilNum)%InletAirMassFlowRate
 
-  HeatingCoil(CoilNum)%ElecUseLoad      = 0.0
-  HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0
-  ElecHeatingCoilPower                  = 0.0
+  ! some of these are reset in Init, can be removed to speed up code
+  HeatingCoil(CoilNum)%ElecUseLoad      = 0.0d0
+  HeatingCoil(CoilNum)%HeatingCoilLoad  = 0.0d0
+  HeatingCoil(CoilNum)%GasUseLoad       = 0.0d0
+  HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity
+  ElecHeatingCoilPower                  = 0.0d0
+  PartLoadRat                           = 0.0d0
 
 END IF ! end of on/off if - else
 
-  ! If the PLF curve is defined the gas usage needs to be modified
+   ! If the PLF curve is defined the gas usage needs to be modified.
+   ! The PLF curve is only used when the coil cycles.
    If(HeatingCoil(CoilNum)%PLFCurveIndex > 0)Then
-      IF (PartLoadRat == 0)THEN
-        HeatingCoil(CoilNum)%GasUseLoad = 0.0
-      ELSE
+      IF (PartLoadRat > 0 .AND. StageNum < 2)THEN
         PLF = CurveValue(HeatingCoil(CoilNum)%PLFCurveIndex, PartLoadRat)
         IF (PLF < 0.7d0) THEN
           IF (HeatingCoil(CoilNum)%PLFErrorCount < 1) THEN
@@ -2214,12 +2444,12 @@ END IF ! end of on/off if - else
                         ', Heating coil runtime fraction > 1.0 warning continues... ',  &
                         HeatingCoil(CoilNum)%RTFErrorIndex,HeatingCoil(CoilNum)%RTF,HeatingCoil(CoilNum)%RTF)
           END IF
-          HeatingCoil(CoilNum)%RTF = 1.0 ! Reset coil runtime fraction to 1.0
-        ELSEIF (HeatingCoil(CoilNum)%RTF > 1.0) THEN
-          HeatingCoil(CoilNum)%RTF = 1.0 ! Reset coil runtime fraction to 1.0
+          HeatingCoil(CoilNum)%RTF = 1.0d0 ! Reset coil runtime fraction to 1.0
+        ELSEIF (HeatingCoil(CoilNum)%RTF > 1.0d0) THEN
+          HeatingCoil(CoilNum)%RTF = 1.0d0 ! Reset coil runtime fraction to 1.0
         END IF
         HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%MSParasiticElecLoad(StageNum) * HeatingCoil(CoilNum)%RTF
-        HeatingCoil(CoilNum)%GasUseLoad  = HeatingCoil(CoilNum)%NominalCapacity / EffLS * HeatingCoil(CoilNum)%RTF
+        HeatingCoil(CoilNum)%GasUseLoad  = (HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) / EffLS) * HeatingCoil(CoilNum)%RTF
         HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity * (1.0d0 - HeatingCoil(CoilNum)%RTF)
         ! Fan power will also be modified by the heating coil's part load fraction
         ! OnOffFanPartLoadFraction passed to fan via DataHVACGlobals (cycling fan only)
@@ -2227,6 +2457,13 @@ END IF ! end of on/off if - else
           OnOffFanPartLoadFraction = PLF
         END IF
       END IF
+! This requires a CR to correct (i.e., if PLFCurveIndex = 0 do this)
+!   ELSE
+!     IF(CycRatio > 0.0d0 .AND. StageNum < 2)THEN
+!       HeatingCoil(CoilNum)%ElecUseLoad = HeatingCoil(CoilNum)%MSParasiticElecLoad(StageNum) * CycRatio
+!       HeatingCoil(CoilNum)%GasUseLoad  = HeatingCoil(CoilNum)%MSNominalCapacity(StageNum) / EffLS * CycRatio
+!       HeatingCoil(CoilNum)%ParasiticGasRate = HeatingCoil(CoilNum)%ParasiticGasCapacity * (1.0d0 - CycRatio)
+!     END IF
    END IF
 
 RETURN
@@ -2302,12 +2539,12 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
       IF(HeatingCoil(CoilNum)%ReclaimHeatingSource .EQ. COMPRESSORRACK_REFRIGERATEDCASE)THEN
       !Added last term to available energy equations to avoid double counting reclaimed energy
       ! because refrigeration systems are solved outside the hvac time step iterations
-        HeatingCoil(CoilNum)%RTF = 1.0
+        HeatingCoil(CoilNum)%RTF = 1.0d0
           HeatingCoil(CoilNum)%NominalCapacity = HeatReclaimRefrigeratedRack(SourceID)%AvailCapacity * Effic - &
                   HeatReclaimRefrigeratedRack(SourceID)%UsedWaterHeater
       ELSEIF(HeatingCoil(CoilNum)%ReclaimHeatingSource .EQ. CONDENSER_REFRIGERATION)THEN
          AvailTemp = HeatReclaimRefrigCondenser(SourceID)%AvailTemperature
-         HeatingCoil(CoilNum)%RTF = 1.0
+         HeatingCoil(CoilNum)%RTF = 1.0d0
         IF(AvailTemp .LE. TempAirIn)THEN
           HeatingCoil(CoilNum)%NominalCapacity = 0.d0
           CALL ShowRecurringWarningErrorAtEnd('Coil:Heating:Desuperheater '// &
@@ -2325,13 +2562,13 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
         HeatingCoil(CoilNum)%NominalCapacity = HeatReclaimDXCoil(SourceID)%AvailCapacity * Effic
       END IF
    ELSE
-      HeatingCoil(CoilNum)%NominalCapacity = 0.0
+      HeatingCoil(CoilNum)%NominalCapacity = 0.0d0
    END IF
 
   ! Control output to meet load (QCoilReq)
-  IF((AirMassFlow .GT. 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
-     (QCoilReq .gt. 0.0)) THEN
+  IF((AirMassFlow .GT. 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
+     (QCoilReq .gt. 0.0d0)) THEN
 
       !check to see if the Required heating capacity is greater than the available heating capacity.
       IF(QCoilReq > HeatingCoil(CoilNum)%NominalCapacity) Then
@@ -2341,25 +2578,25 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
       End IF
 
       ! report the runtime fraction of the desuperheater heating coil
-      IF(HeatingCoil(CoilNum)%NominalCapacity .GT. 0.0)THEN
+      IF(HeatingCoil(CoilNum)%NominalCapacity .GT. 0.0d0)THEN
         HeatingCoil(CoilNum)%RTF = HeatingCoil(CoilNum)%RTF * (QCoilCap / HeatingCoil(CoilNum)%NominalCapacity)
         TempAirOut               = TempAirIn + QCoilCap/CapacitanceAir
         HeatingCoilLoad          = QCoilCap
       ELSE
-        HeatingCoil(CoilNum)%RTF = 0.0
+        HeatingCoil(CoilNum)%RTF = 0.0d0
         TempAirOut               = TempAirIn
-        HeatingCoilLoad          = 0.0
+        HeatingCoilLoad          = 0.0d0
       END IF
 
    ! Control coil output to meet a setpoint temperature.
-   Else IF((AirMassFlow .GT. 0.0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0) .and. &
-     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0) .and. &
+   Else IF((AirMassFlow .GT. 0.0d0 .AND. HeatingCoil(CoilNum)%NominalCapacity > 0.0d0) .and. &
+     (GetCurrentScheduleValue(HeatingCoil(CoilNum)%SchedPtr) .gt. 0.0d0) .and. &
      (QCoilReq == SensedLoadFlagValue) .and. (ABS(TempSetPoint-TempAirIn) .gt. TempControlTol) ) THEN
 
       QCoilCap     = CapacitanceAir*(TempSetPoint - TempAirIn)
       ! check to see if setpoint is above entering air temperature. If not, set output to zero.
-      IF(QCoilCap .LE. 0.0) THEN
-        QCoilCap   = 0.0
+      IF(QCoilCap .LE. 0.0d0) THEN
+        QCoilCap   = 0.0d0
         TempAirOut = TempAirIn
       !check to see if the required heating capacity is greater than the available capacity.
       Else IF(QCoilCap > HeatingCoil(CoilNum)%NominalCapacity) Then
@@ -2376,9 +2613,9 @@ Subroutine CalcDesuperheaterHeatingCoil(CoilNum,QCoilReq,QCoilActual)
   Else ! If not running, conditions do not change across heating coil from inlet to outlet
 
       TempAirOut                       = TempAirIn
-      HeatingCoilLoad                  = 0.0
-      HeatingCoil(CoilNum)%ElecUseLoad = 0.0
-      HeatingCoil(CoilNum)%RTF         = 0.0
+      HeatingCoilLoad                  = 0.0d0
+      HeatingCoil(CoilNum)%ElecUseLoad = 0.0d0
+      HeatingCoil(CoilNum)%RTF         = 0.0d0
 
   END IF
 
@@ -2740,36 +2977,112 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
   End If
 
   FoundType = FindItem(CoilType,cAllCoilTypes,NumAllCoilTypes)
-  IF (FoundType == Coil_HeatingElectric .OR. FoundType == Coil_HeatingElectric_MultiStage .OR. &
-      FoundType == Coil_HeatingGas .OR. FoundType == Coil_HeatingGas_MultiStage .OR. &
-      FoundType == Coil_HeatingDesuperheater) THEN
+  IF (FoundType == Coil_HeatingElectric .OR. FoundType == Coil_HeatingGas .OR. FoundType == Coil_HeatingDesuperheater) THEN
     WhichCoil=FindItem(CoilName,HeatingCoil%Name,NumHeatingCoils)
     IF (WhichCoil /= 0) THEN
       CoilCapacity=HeatingCoil(WhichCoil)%NominalCapacity
+    ENDIF
+  ELSE IF (FoundType == Coil_HeatingElectric_MultiStage .OR. FoundType == Coil_HeatingGas_MultiStage) THEN
+    WhichCoil=FindItem(CoilName,HeatingCoil%Name,NumHeatingCoils)
+    IF (WhichCoil /= 0) THEN
+      CoilCapacity=HeatingCoil(WhichCoil)%MSNominalCapacity(HeatingCoil(WhichCoil)%NumOfStages)
     ENDIF
   ELSE
     WhichCoil=0
   ENDIF
 
-  IF (WhichCoil == 0 .and. FoundType == 0) THEN
-    CALL ShowSevereError('GetCoilCapacity: Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+  IF (WhichCoil == 0) THEN !Objexx:Return Reworked block to assure CoilCapacity is set before return
+    IF (FoundType == 0) THEN
+      CALL ShowSevereError('GetCoilCapacity: Could not find Coil, Type="'//TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+    ELSEIF (FoundType > 0) THEN
+      CALL ShowSevereError('GetCoilCapacity: Invalid coil type for capacity, Type="'//TRIM(CoilType)//  &
+         '" Name="'//TRIM(CoilName)//'"')
+      CALL ShowContinueError('...only '//trim(cAllCoilTypes(Coil_HeatingElectric))//', '//  &
+         trim(cAllCoilTypes(Coil_HeatingGas))//' or '//trim(cAllCoilTypes(Coil_HeatingDesuperheater))//  &
+         ' are valid in this context.')
+    ENDIF
     CALL ShowContinueError('... returning Coil Capacity as -1000.')
     ErrorsFound=.true.
-    CoilCapacity=-1000.
-  ELSEIF (WhichCoil == 0 .and. FoundType > 0) THEN
-    CALL ShowSevereError('GetCoilCapacity: Invalid coil type for capacity, Type="'//TRIM(CoilType)//  &
-       '" Name="'//TRIM(CoilName)//'"')
-    CALL ShowContinueError('...only '//trim(cAllCoilTypes(Coil_HeatingElectric))//', '//  &
-       trim(cAllCoilTypes(Coil_HeatingGas))//' or '//trim(cAllCoilTypes(Coil_HeatingDesuperheater))//  &
-       ' are valid in this context.')
-    CALL ShowContinueError('... returning Coil Capacity as -1000.')
-    ErrorsFound=.true.
-    CoilCapacity=-1000.
+    CoilCapacity=-1000.0d0
   ENDIF
 
   RETURN
 
 END FUNCTION GetCoilCapacity
+
+FUNCTION GetCoilAvailScheduleIndex(CoilType,CoilName,ErrorsFound) RESULT(AvailSchIndex)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   February 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given coil and returns the availability schedule index.  If
+          ! incorrect coil type or name is given, errorsfound is returned as true and index is returned
+          ! as zero.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItem
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilType     ! must match coil types in this module
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  INTEGER                      :: AvailSchIndex   ! returned availability schedule of matched coil
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+  INTEGER :: FoundType ! Integer equivalent of coil type
+
+  ! Obtains and Allocates HeatingCoil related parameters from input file
+  IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
+    CALL GetHeatingCoilInput
+    GetCoilsInputFlag=.false.
+  End If
+
+  WhichCoil=0
+  AvailSchIndex=0
+  FoundType = FindItem(CoilType,cAllCoilTypes,NumAllCoilTypes)
+  IF (FoundType == Coil_HeatingElectric .OR. FoundType == Coil_HeatingElectric_MultiStage .OR. &
+      FoundType == Coil_HeatingGas .OR. FoundType == Coil_HeatingGas_MultiStage .OR. &
+      FoundType == Coil_HeatingDesuperheater) THEN
+    WhichCoil=FindItem(CoilName,HeatingCoil%Name,NumHeatingCoils)
+    IF (WhichCoil /= 0) THEN
+      AvailSchIndex=HeatingCoil(WhichCoil)%SchedPtr
+    ENDIF
+  ELSE
+    WhichCoil=0
+  ENDIF
+
+  IF (WhichCoil == 0) THEN
+    CALL ShowSevereError('GetCoilAvailScheduleIndex: Could not find Coil, Type="'// &
+                          TRIM(CoilType)//'" Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    AvailSchIndex=0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetCoilAvailScheduleIndex
 
 FUNCTION GetCoilInletNode(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
 

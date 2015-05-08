@@ -57,6 +57,7 @@ PRIVATE SetupZoneInfoAsInternalDataAvail
 PRIVATE SetupWindowShadingControlActuators
 PRIVATE SetupThermostatActuators
 PRIVATE SetupSurfaceConvectionActuators
+PRIVATE SetupSurfaceOutdoorBoundaryConditionActuators
 PRIVATE GetVariableTypeAndIndex
 PRIVATE EchoOutActuatorKeyChoices
 PRIVATE EchoOutInternalVariableChoices
@@ -394,6 +395,7 @@ SUBROUTINE InitEMS (iCalledFrom)
     CALL SetupThermostatActuators
     CALL SetupSurfaceConvectionActuators
     CALL SetupSurfaceConstructionActuators
+    CALL SetupSurfaceOutdoorBoundaryConditionActuators
     CALL GetEMSInput
     GetEMSUserInput = .FALSE.
   ENDIF
@@ -2027,6 +2029,69 @@ SUBROUTINE SetupSurfaceConstructionActuators
   RETURN
 
 END SUBROUTINE SetupSurfaceConstructionActuators
+
+SUBROUTINE SetupSurfaceOutdoorBoundaryConditionActuators
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   May 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! setup EMS actuators for outside boundary conditions by surface
+
+          ! METHODOLOGY EMPLOYED:
+          ! loop through all surfaces, cycle if not heat transfer or outdoors BC
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataInterfaces,  ONLY: SetupEMSActuator
+  USE DataSurfaces,    ONLY: Surface, TotSurfaces, ExternalEnvironment
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: SurfNum ! local loop index.
+
+  DO SurfNum = 1, TotSurfaces
+
+    IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE
+    IF (.NOT. Surface(SurfNum)%ExtBoundCond == ExternalEnvironment) CYCLE
+
+    CALL SetupEMSActuator('Surface',  Surface(SurfNum)%Name, &
+                           'Outdoor Air Dryblub Temperature', '[C]', &
+                           Surface(SurfNum)%OutDryBulbTempEMSOverrideOn, &
+                           Surface(SurfNum)%OutDryBulbTempEMSOverrideValue)
+
+    CALL SetupEMSActuator('Surface',  Surface(SurfNum)%Name, &
+                           'Outdoor Air Wetblub Temperature', '[C]', &
+                           Surface(SurfNum)%OutWetBulbTempEMSOverrideOn, &
+                           Surface(SurfNum)%OutWetBulbTempEMSOverrideValue)
+    IF (Surface(SurfNum)%ExtWind) THEN
+      CALL SetupEMSActuator('Surface',  Surface(SurfNum)%Name, &
+                             'Outdoor Air Wind Speed', '[m/s]', &
+                             Surface(SurfNum)%WindSpeedEMSOverrideOn, &
+                             Surface(SurfNum)%WindSpeedEMSOverrideValue)
+    ENDIF
+  ENDDO
+  RETURN
+
+END SUBROUTINE SetupSurfaceOutdoorBoundaryConditionActuators
 
 
 SUBROUTINE SetupZoneInfoAsInternalDataAvail

@@ -41,7 +41,7 @@ module TARCOGGassesParams
   !real(r64), parameter :: UniversalGasConst = 8314.462175d0 !(J/mol*K)
   real(r64), parameter :: alpha1 = 0.5d0 !accomodation coefficient for low pressure gas calculations
   real(r64), parameter :: alpha2 = 0.5d0 !accomodation coefficient for low pressure gas calculations
-  real(r64), parameter :: InputDataTolerance = 1d-7 !coefficient used for input data tolerance in case for displaying error message
+  real(r64), parameter :: InputDataTolerance = 1.0d-7 !coefficient used for input data tolerance in case for displaying error message
 
   !real(r64) :: gcon(maxgas,3), gvis(maxgas,3), gcp(maxgas,3), grho(maxgas,3), wght(maxgas)
 
@@ -181,6 +181,10 @@ module TARCOGGasses90
     !real(r64) gaslaw
     !DATA gaslaw /8314.51/   ! Molar gas constant in Joules/(kmol*K)
 
+    ! SUBROUTINE PARAMETER DEFINITIONS:
+    real(r64), parameter          :: ENpressure = 1.0d5    ! Gap gas pressure (Pa)
+    real(r64), parameter          :: gaslaw = 8314.51d0    ! Molar gas constant (J/kMol-K)
+
     !!! Body of GASSES90
 
     con=0.0d0
@@ -189,19 +193,21 @@ module TARCOGGasses90
     cp=0.0d0
 
     !Simon: remove this when assigned properly
+!EPTeam???    xgrho = 0.0d0 !Objexx:Uninit Line added to protect against use uninitialized: Assuming this is incomplete/unused functionality
     grho = 0.0d0
 
-    fcon(1)  = xgcon(iprop(1),1) + xgcon(iprop(1),2)*tmean + xgcon(iprop(1),3)*tmean**2.0d0
-    fvis(1)  = xgvis(iprop(1),1) + xgvis(iprop(1),2)*tmean + xgvis(iprop(1),3)*tmean**2.0d0
-    fcp(1)   = xgcp(iprop(1),1)  + xgcp(iprop(1),2)*tmean  + xgcp(iprop(1),3)*tmean**2.0d0
+    fcon(1)  = xgcon(iprop(1),1) + xgcon(iprop(1),2)*tmean + xgcon(iprop(1),3)*tmean**2
+    fvis(1)  = xgvis(iprop(1),1) + xgvis(iprop(1),2)*tmean + xgvis(iprop(1),3)*tmean**2
+    fcp(1)   = xgcp(iprop(1),1)  + xgcp(iprop(1),2)*tmean  + xgcp(iprop(1),3)*tmean**2
     ! Density using ideal gas law: rho=(presure*mol. weight)/(gas const*Tmean)
     fdens(1) = pres * xwght(iprop(1)) / (UniversalGasConst * tmean)
                 ! Mollecular weights in kg/kmol
     if ((standard.eq.EN673).or.(standard.eq.EN673Design)) then
-       fdens(1) = xgrho(iprop(1),1) + xgrho(iprop(1),2)*tmean + xgrho(iprop(1),3)*tmean**2.0d0
+       !fdens(1) = xgrho(iprop(1),1) + xgrho(iprop(1),2)*tmean + xgrho(iprop(1),3)*tmean**2 !Objexx:Uninit xgrho is uninitialized
+      fdens(i) = ENpressure*xwght(iprop(i))/(gaslaw*tmean)
     end if
 
-    if (frct(1).eq.1) then   ! Single gas properties
+    if (frct(1).eq.1.0d0) then   ! Single gas properties
       visc=fvis(1)      ! viscosity in kg/(m*s)
       con=fcon(1)       ! conductivity in W/(m*K)
       cp=fcp(1)         ! SpecIFic heat in J/(kg*K)
@@ -230,7 +236,8 @@ module TARCOGGasses90
         fcp(i)   = xgcp(iprop(i),1)  + xgcp(iprop(i),2)*tmean  + xgcp(iprop(i),3)*tmean**2.0d0
         fdens(i) = pres * xwght(iprop(i)) / (UniversalGasConst * tmean)
         if ((standard.eq.EN673).or.(standard.eq.EN673Design)) then
-          fdens(i) = grho(iprop(i),1) + grho(iprop(i),2)*tmean + grho(iprop(i),3)*tmean**2.0d0
+          !fdens(i) = grho(iprop(i),1) + grho(iprop(i),2)*tmean + grho(iprop(i),3)*tmean**2.0d0
+          fdens(1) = ENpressure*xwght(iprop(1))/(gaslaw*tmean)  ! Density using ideal gas law: rho=(presure*mol. weight)/(gas const*Tmean)
         end if
         molmix = molmix+frct(i)*xwght(iprop(i))      ! equation 56
         cpmixm = cpmixm+frct(i)*fcp(i)*xwght(iprop(i))   ! equation 58-59
@@ -280,7 +287,7 @@ module TARCOGGasses90
 
           ! final mixture properties:
           visc=mumix
-          con=kmix;
+          con=kmix
           dens=rhomix
           cp=cpmixm/molmix
         case (EN673, EN673Design)
@@ -529,7 +536,7 @@ module TARCOGParams
   real(r64), parameter :: AirflowConvergenceTolerance = 1d-2
   real(r64), parameter :: AirflowRelaxationParameter = 0.9d0
 
-  real(r64), parameter :: TemperatureQuessDiff = 1 ! in case outside and inside temperatures are identical
+  real(r64), parameter :: TemperatureQuessDiff = 1.0d0 ! in case outside and inside temperatures are identical
 
 !     NOTICE
 !
@@ -625,7 +632,7 @@ module TARCOGCommon
     real(r64), intent(in) :: Height
     integer :: i, j
 
-    LDSumMax = 0
+    LDSumMax = 0.0d0
     do i = 1, mmax, 2
       do j = 1, nmax, 2
         LDSumMax = LDSumMax + (Sin(i*Pi/2) * Sin(j*Pi/2)) / (i*j*((i/Width)**2 + (j/Height)**2)**2)
@@ -648,7 +655,7 @@ module TARCOGCommon
     real(r64), intent(in) :: Height
     integer :: i, j
 
-    LDSumMean = 0
+    LDSumMean = 0.0d0
     do i = 1, mmax, 2
       do j = 1, nmax, 2
         LDSumMean = LDSumMean + 4 / (i**2 * j**2 * Pi**2 * ((i / Width)**2 + (j / Height)**2)**2)
@@ -702,30 +709,30 @@ module TARCOGCommon
       if (nlayer.ne.1) then
         if (i.ne.1) then
           a(k, k-3)   = -hcgas(i)
-          a(k, k-1)   = -1
+          a(k, k-1)   = -1.0d0
           a(k+1, k-3) = -hcgas(i)
-          a(k+1, k-1) = -1
+          a(k+1, k-1) = -1.0d0
           a(k+2, k-1) = rir(front)
           a(k+3, k-1) = tir(front)
         end if
         if (i.ne.nlayer) then
           a(k, k+4)   = -hcgas(i+1)
-          a(k, k+6)   = -1
+          a(k, k+6)   = -1.0d0
           a(k+2, k+6) = tir(back)
           a(k+3, k+6) = rir(back)
         end if
       end if
       a(k, k)     = hcgas(i)
       a(k, k+1)   = hcgas(i+1)
-      a(k, k+2)   = 1
-      a(k, k+3)   = 1
+      a(k, k+2)   = 1.0d0
+      a(k, k+3)   = 1.0d0
       a(k+1, k)   = scon(i)/thick(i) + hcgas(i)
       a(k+1, k+1) = -scon(i)/thick(i)
-      a(k+1, k+2) = 1
+      a(k+1, k+2) = 1.0d0
       a(k+2, k)   = emis(front) * StefanBoltzmann * theta(front)**3.0d0
-      a(k+2, k+2) = -1
+      a(k+2, k+2) = -1.0d0
       a(k+3, k+1) = emis(back) * StefanBoltzmann * theta(back)**3.0d0
-      a(k+3, k+3) = -1
+      a(k+3, k+3) = -1.0d0
     end do
 
     !build matrix b
@@ -792,24 +799,24 @@ module TARCOGCommon
     character(len=*), intent(inout) :: ErrorMessage
 
     integer, parameter :: NMAX = 500
-    real(r64), parameter :: TINY = 1.0e-20
+    real(r64), parameter :: TINY = 1.0d-20
 
     integer :: i,imax,j,k
     real(r64) :: aamax, dum, sum
     real(r64),dimension(NMAX) :: vv
 
-    d=1.
+    d=1.0d0
     do i = 1, n
-      aamax = 0.
+      aamax = 0.0d0
       do j = 1, n
         if (ABS(a(i,j)).gt.aamax) aamax=ABS(a(i,j))
       end do  ! j
-      if (aamax.eq.0.) then
+      if (aamax.eq.0.0d0) then
         nperr = 13
         ErrorMessage = 'Singular matrix in ludcmp.'
         return
       end if
-      vv(i) = 1./aamax
+      vv(i) = 1.0d0/aamax
     end do  ! i
 
     do j = 1, n
@@ -820,7 +827,7 @@ module TARCOGCommon
         end do  ! k
         a(i,j) = sum
       end do  ! i
-      aamax = 0.
+      aamax = 0.0d0
       do i = j, n
         sum = a(i,j)
         do k = 1, j-1
@@ -843,9 +850,9 @@ module TARCOGCommon
         vv(imax) = vv(j)
       end if
       indx(j) = imax
-      if (a(j,j).eq.0.) a(j,j) = TINY
+      if (a(j,j).eq.0.0d0) a(j,j) = TINY
       if (j.ne.n) then
-        dum=1./a(j,j)
+        dum=1.0d0/a(j,j)
         do i = j+1, n
           a(i,j) = a(i,j)*dum
         end do  ! i
@@ -1363,7 +1370,7 @@ module TARCOGOutput
     1120  format('    vvent      = ', F12.5,  ' - Forced ventilation speed [m/s]')
     1121  format('    tvent      = ', F12.5,  ' - Temperature in connected gap [K]')
 
-    1130  format('      Gas mix coefficients - gas ', i1, ', ' F6.2,' %')
+    1130  format('      Gas mix coefficients - gas ', i1, ', ', F6.2,' %')
     1131  format('        gcon   = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Conductivity')
     1132  format('        gvis   = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Dynamic viscosity')
     1133  format('        gcp    = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Spec.heat @ const.P')
@@ -1460,7 +1467,7 @@ module TARCOGOutput
     1090  format('    thick   = ', F10.6,  '   - Thickness [m]')
     1091  format('    scon    = ', F10.6,  '   - Thermal conductivity [W/m-K]')
 
-    1130  format('      Gas mix coefficients - gas ', i1, ', ' F6.2,' %')
+    1130  format('      Gas mix coefficients - gas ', i1, ', ', F6.2,' %')
     1131  format('        gcon   = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Conductivity')
     1132  format('        gvis   = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Dynamic viscosity')
     1133  format('        gcp    = ', F11.6, ', ', F11.6, ', ', F11.6,  ' - Spec.heat @ const.P')
@@ -1567,7 +1574,9 @@ module TARCOGOutput
         if (vvent(i+1).eq.0) then
           write(OutArgumentsFile, 2321) i, vfreevent(i+1), i, Keff(i)
         else
-          write(OutArgumentsFile, 2321) i, vvent(i+1), i, Keff(i-1)
+          if (i > 1) then
+            write(OutArgumentsFile, 2321) i, vvent(i+1), i, Keff(i-1) !Objexx:BoundsViolation Keff(i-1) @ i=1
+          end if
         end if
         write(OutArgumentsFile, 2322) i, qcgas(i+1), i, qrgas(i+1)
   !      write(OutArgumentsFile, 2323) i, Keff(i)
@@ -1762,7 +1771,7 @@ module TARCOGOutput
 
     integer, intent(inout) :: OutArgumentsFile
     integer, intent(in) :: nlayer
-    character*1000, intent(in) :: DBGD
+    character(len=*), intent(in) :: DBGD
     real(r64), intent(in) :: ufactor, hout, hin
     real(r64), dimension(maxlay), intent(in) :: Ra, Nu
     real(r64), dimension(maxlay), intent(in) :: hg, hr, hs
@@ -2470,14 +2479,14 @@ module TARCOGArgs
       return
     end if
 
-    if ((fclr.lt.0).or.(fclr.gt.1)) then
+    if ((fclr.lt.0.0d0).or.(fclr.gt.1.0d0)) then
       ArgCheck = 19
       ErrorMessage = 'Fraction of sky that is clear can be in range between 0 and 1.'
       return
     end if
 
     do i=1, nlayer - 1
-      if (gap(i).le.0) then
+      if (gap(i).le.0.0d0) then
         ArgCheck = 20
         write(a,'(i3)') i
         ErrorMessage = 'Gap width is less than (or equal to) zero. Gap #'//trim(a)
@@ -2486,7 +2495,7 @@ module TARCOGArgs
     end do
 
     do i=1, nlayer
-      if (thick(i).le.0) then
+      if (thick(i).le.0.0d0) then
         ArgCheck = 21
         write(a,'(i3)') i
         ErrorMessage = 'Layer width is less than (or equal to) zero. Layer #'//trim(a)
@@ -2514,32 +2523,32 @@ module TARCOGArgs
       end if
       !Deflection cannot be calculated with IGU containing shading layer. This error check is to be
       !removed once that extension is programmed
-      if ((CalcDeflection.gt.0).and.(LayerType(i).ne.SPECULAR)) then
+      if ((CalcDeflection.gt.0.0d0).and.(LayerType(i).ne.SPECULAR)) then
         ArgCheck = 42
         ErrorMessage = 'Cannot calculate deflection with IGU containing shading devices.'
         return
       end if
     end do
 
-    if (height.le.0) then
+    if (height.le.0.0d0) then
       ArgCheck = 23
       ErrorMessage = 'IGU cavity height must be greater than zero.'
       return
     end if
 
-    if (heightt.le.0) then
+    if (heightt.le.0.0d0) then
       ArgCheck = 24
       ErrorMessage = 'Total window height must be greater than zero.'
       return
     end if
 
-    if (width.le.0) then
+    if (width.le.0.0d0) then
       ArgCheck = 25
       ErrorMessage = 'Window width must be greater than zero.'
       return
     end if
 
-    if ((SDScalar.lt.0.0).or.(SDScalar.gt.1.0)) then
+    if ((SDScalar.lt.0.0d0).or.(SDScalar.gt.1.0d0)) then
       ArgCheck = 30
       ErrorMessage = 'SDscalar is out of range (<0.0 or >1.0).'
       return
@@ -2547,7 +2556,7 @@ module TARCOGArgs
 
   !bi...Check layers and update Venetian blinds properties:
     do i=1, nlayer
-      if (scon(i).le.0) then
+      if (scon(i).le.0.0d0) then
         ArgCheck = 26
         write(a,'(i3)') i
         ErrorMessage = 'Layer '//trim(a)//' has conductivity whcih is less or equal to zero.'
@@ -2582,31 +2591,31 @@ module TARCOGArgs
           ErrorMessage = 'Invalid slat thickness (must be >0). Layer #'//trim(a)
           return
         end if
-        if (SlatWidth(i).le.0) then
+        if (SlatWidth(i).le.0.0d0) then
           ArgCheck = 32
           write(a,'(i3)') i
           ErrorMessage = 'Invalid slat width (must be >0). Layer #'//trim(a)
           return
         end if
-        if ((SlatAngle(i).lt.-90).or.(SlatAngle(i).gt.90)) then
+        if ((SlatAngle(i).lt.-90.0d0).or.(SlatAngle(i).gt.90.0d0)) then
           ArgCheck = 33
           write(a,'(i3)') i
           ErrorMessage = 'Invalid slat angle (must be between -90 and 90). Layer #'//trim(a)
           return
         end if
-        if (SlatCond(i).le.0) then
+        if (SlatCond(i).le.0.0d0) then
           ArgCheck = 34
           write(a,'(i3)') i
           ErrorMessage = 'Invalid conductivity of slat material (must be >0). Layer #'//trim(a)
           return
         end if
-        if (SlatSpacing(i).le.0) then
+        if (SlatSpacing(i).le.0.0d0) then
           ArgCheck = 35
           write(a,'(i3)') i
           ErrorMessage = 'Invalid slat spacing (must be >0). Layer #'//trim(a)
           return
         end if
-        if ( (SlatCurve(i).ne.0).and.(abs(SlatCurve(i)).le.(SlatWidth(i) / 2.0)) ) then
+        if ( (SlatCurve(i).ne.0.0d0).and.(abs(SlatCurve(i)).le.(SlatWidth(i) / 2.0d0)) ) then
           ArgCheck = 36
           write(a,'(i3)') i
           ErrorMessage = 'Invalid curvature radius (absolute value must be >SlatWidth/2, or 0 for flat slats). Layer #'//trim(a)
@@ -2618,7 +2627,7 @@ module TARCOGArgs
     end do  ! Layers...
 
     do i=1, nlayer + 1
-      if (presure(i).lt.0) then
+      if (presure(i).lt.0.0d0) then
         ArgCheck = 27
         write(a,'(i3)') i
         if ((i.eq.1).or.(i.eq.(nlayer + 1))) then
@@ -2719,9 +2728,10 @@ module TARCOGArgs
         if (ThermalMod.eq.THERM_MOD_SCW) then
           !bi...the idea here is to have glass-to-glass width the same as before scaling
           !bi...TODO: check for outdoor and indoor blinds! SCW model is only applicable to in-between SDs!!!
-          thick(i) = SlatWidth(i) * cos(SlatAngle(i) * Pi / 180)
-          gap(i-1)=gap(i-1) + (1-SDScalar)/2 * thick(i)
-          gap(i)=gap(i) + (1-SDScalar)/2 * thick(i)
+          thick(i) = SlatWidth(i) * cos(SlatAngle(i) * Pi / 180.0d0)
+          if ( i > 1 ) gap(i-1)=gap(i-1) + (1.0d0-SDScalar)/2.0d0 * thick(i) !Objexx:BoundsViolation gap(i-1) @ i=1: Added if condition
+!EPTeam - see above line          gap(i-1)=gap(i-1) + (1.0d0-SDScalar)/2.0d0 * thick(i)
+          gap(i)=gap(i) + (1.0d0-SDScalar)/2.0d0 * thick(i)
           thick(i) = SDScalar*thick(i)
           if (thick(i).lt.SlatThick(i))  thick(i) = SlatThick(i)
         else if ((ThermalMod.eq.THERM_MOD_ISO15099).or.(ThermalMod.eq.THERM_MOD_CSM)) then
@@ -2733,7 +2743,7 @@ module TARCOGArgs
 
     hint = hin
     houtt = hout
-    tiltr = tilt*2*pi/360         ! convert tilt in degrees to radians
+    tiltr = tilt*2.0d0*pi/360.0d0         ! convert tilt in degrees to radians
 
     ! external radiation term
     select case (isky)
@@ -2741,12 +2751,12 @@ module TARCOGArgs
         Gout = outir
         Trmout = (Gout/StefanBoltzmann)**(0.25d0)
       case (2)                            ! effective clear sky emittance from swinbank (SPC142/ISO15099 equations 131, 132, ...)
-        Rsky = 5.31E-13*Tout**6.0d0
-        esky = Rsky/(StefanBoltzmann*Tout**4.0d0)        ! check esky const, also check what esky to use when tsky input...
+        Rsky = 5.31d-13*Tout**6
+        esky = Rsky/(StefanBoltzmann*Tout**4)        ! check esky const, also check what esky to use when tsky input...
       case (1)
-        esky = tsky**4.0d0/tout**4.0d0
+        esky = tsky**4/tout**4
       case (0)                              ! for isky=0 it is assumed that actual values for esky and Tsky are specified
-        esky = esky*tsky**4.0d0/tout**4.0d0
+        esky = esky*tsky**4/tout**4
       case DEFAULT
         nperr = 1                        ! error 2010: isky can be: 0(esky,Tsky input), 1(Tsky input), or 2(Swinbank model)
         return
@@ -2754,9 +2764,9 @@ module TARCOGArgs
 
     !Simon: In this case we do not need to recalculate Gout and Trmout again
     if (isky.ne.3) then
-      Fsky = (1.+cos(tiltr))/2.
-      Fground = 1 - Fsky
-      e0 = Fground + (1-fclr)*Fsky + Fsky*fclr*esky
+      Fsky = (1.0d0+cos(tiltr))/2.0d0
+      Fground = 1.0d0 - Fsky
+      e0 = Fground + (1.0d0-fclr)*Fsky + Fsky*fclr*esky
       !  Trmout = Tout * e0**0.25
 
       !bi   Set mean radiant temps for fixed combined film coef. case:
@@ -2767,7 +2777,7 @@ module TARCOGArgs
         Trmout = Tout * e0**0.25d0
       end if
 
-      Gout = StefanBoltzmann * Trmout**4.0d0
+      Gout = StefanBoltzmann * Trmout**4
     end if !if (isky.ne.3) then
 
     Ebsky = Gout
@@ -2795,19 +2805,19 @@ module TARCOGArgs
       k1 = 2*k - 1
       rir(k1)   = 1 - tir(k1) - emis(k1)
       rir(k1+1) = 1 - tir(k1) - emis(k1+1)
-      if ((tir(k1).lt.0).or.(tir(k1).gt.1).or.(tir(k1+1).lt.0).or.(tir(k1+1).gt.1)) then
+      if ((tir(k1).lt.0.0d0).or.(tir(k1).gt.1.0d0).or.(tir(k1+1).lt.0.0d0).or.(tir(k1+1).gt.1.0d0)) then
         nperr = 4
         write(a, '(i3)') k
         ErrorMessage = 'Layer transmissivity is our of range (<0 or >1). Layer #'//trim(a)
         return
       end if
-      if ((emis(k1).lt.0).or.(emis(k1).gt.1).or.(emis(k1+1).lt.0).or.(emis(k1+1).gt.1)) then
+      if ((emis(k1).lt.0.0d0).or.(emis(k1).gt.1.0d0).or.(emis(k1+1).lt.0.0d0).or.(emis(k1+1).gt.1.0d0)) then
         nperr = 14
         write(a, '(i3)') k
         ErrorMessage = 'Layer emissivity is our of range (<0 or >1). Layer #'//trim(a)
         return
       end if
-      if ((rir(k1).lt.0).or.(rir(k1).gt.1).or.(rir(k1+1).lt.0).or.(rir(k1+1).gt.1)) then
+      if ((rir(k1).lt.0.0d0).or.(rir(k1).gt.1.0d0).or.(rir(k1+1).lt.0.0d0).or.(rir(k1+1).gt.1.0d0)) then
         nperr = 3
         write(a, '(i3)') k
         ErrorMessage = 'Layer reflectivity is our of range (<0 or >1). Layer #'//trim(a)
@@ -2914,7 +2924,7 @@ module TARCOGDeflection
     real(r64), intent(in) :: Pa, Pini, Tini
 
     !OUTPUT
-    real(r64), dimension(maxlay), intent(out) :: LayerDeflection
+    real(r64), dimension(maxlay), intent(inout) :: LayerDeflection !Objexx:ArgIN Changed IN to INOUT: Arg used and modified
     real(r64), dimension(MaxGap), intent(inout) :: DeflectedGapWidthMax
     real(r64), dimension(MaxGap), intent(out) :: DeflectedGapWidthMean
     integer, intent(inout) :: nperr
@@ -2962,7 +2972,7 @@ module TARCOGDeflection
     real(r64), intent(in) :: Pa, Pini, Tini
 
     !OUTPUT
-    real(r64), dimension(maxlay), intent(out) :: LayerDeflection
+    real(r64), dimension(maxlay), intent(inout) :: LayerDeflection !Objexx:ArgIN Changed IN to INOUT: Arg used and modified
     real(r64), dimension(MaxGap), intent(out) :: DeflectedGapWidthMax
     real(r64), dimension(MaxGap), intent(out) :: DeflectedGapWidthMean
     integer, intent(inout) :: nperr
@@ -3062,9 +3072,9 @@ module TARCOGDeflection
     MeanLDSum = 0.0d0
     MaxLDSum = 0.0d0
 
-    nominator = 0
+    nominator = 0.0d0
     do i = 1, nlayer - 1
-      SumL = 0
+      SumL = 0.0d0
       do j = i, nlayer - 1
         SumL = SumL + NonDeflectedGapWidth(j) - DeflectedGapWidthMax(j)
       end do
@@ -3294,10 +3304,16 @@ module TarcogShading
 
         !dr.......shading on indoor side
         if (i.eq.nlayer) then
-          s = gap(nlayer - 1)
+          if (nlayer > 1) then
+            s = gap(nlayer - 1) !Objexx:BoundsViolation gap(nlayer - 1) @ nlayer=1
+            Tav = (theta(2 * nlayer - 1) + theta(2 * nlayer - 2)) / 2.0d0 !Objexx:BoundsViolation theta(2 * nlayer - 2) @ nlayer=1
+          else
+            s = 0.0d0
+            Tav = 273.15d0
+          end if
           hc = hcgas(nlayer)
           !Tenv = tvent(nlayer + 1)
-          Tav = (theta(2 * nlayer - 1) + theta(2 * nlayer - 2)) / 2.0d0
+
           Tgap = Tgaps(nlayer)
 
           !bi.........use Tin as temp of the air at inlet
@@ -3466,7 +3482,8 @@ module TarcogShading
     real(r64), intent(inout) :: Atop, Abot
     real(r64), intent(in) :: hc1, hc2, Tav1, Tav2
 
-    real(r64), intent(out) :: Tgap1, Tgap2, hcv1, hcv2, qv1, qv2, speed1, speed2
+    real(r64), intent(inout) :: Tgap1, Tgap2 !Objexx:ArgIN Changed IN to INOUT: These are used and modified
+    real(r64), intent(out) :: hcv1, hcv2, qv1, qv2, speed1, speed2
     integer, intent(inout) :: nperr
     character(len=*), intent(inout) :: ErrorMessage
 
@@ -3560,18 +3577,18 @@ module TarcogShading
         A2eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
       end if
 
-      Zin1 = ((s1 * L / (0.6d0 * A1eqin)) - 1) ** 2
-      Zin2 = ((s2 * L / (0.6d0 * A2eqin)) - 1) ** 2
-      Zout1 = ((s1 * L / (0.6d0 * A1eqout)) - 1) ** 2
-      Zout2 = ((s2 * L / (0.6d0 * A2eqout)) - 1) ** 2
+      Zin1 = ((s1 * L / (0.6d0 * A1eqin)) - 1.0d0) ** 2
+      Zin2 = ((s2 * L / (0.6d0 * A2eqin)) - 1.0d0) ** 2
+      Zout1 = ((s1 * L / (0.6d0 * A1eqout)) - 1.0d0) ** 2
+      Zout2 = ((s2 * L / (0.6d0 * A2eqout)) - 1.0d0) ** 2
 
       D1 = (dens1 / 2.0d0) * (Zin1 + Zout1)
-      D2 = (dens2 / 2.0d0) * ((s1 / s2) ** 2.0d0) * (Zin2 + Zout2)
+      D2 = (dens2 / 2.0d0) * ((s1 / s2) ** 2) * (Zin2 + Zout2)
 
       A1 = B1 + D1 + B2 + D2
       A2 = C1 + C2
 
-      speed1 = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
+      speed1 = (SQRT((A2 ** 2) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
       speed2 = speed1 * s1 / s2
 
       H01 = (dens1 * cp1 * s1 * speed1) / (4.0d0 * hc1 + 8.0d0 * speed1)
@@ -3585,14 +3602,14 @@ module TarcogShading
       beta1 = e ** P1
       beta2 = e ** P2
 
-      alpha1 = 1 - beta1
-      alpha2 = 1 - beta2
+      alpha1 = 1.0d0 - beta1
+      alpha2 = 1.0d0 - beta2
 
       if (Tgap1 > Tgap2) then
-        Tup = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
+        Tup = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1.0d0 - beta1 * beta2)
         Tdown = alpha2 * Tav2 + beta2 * Tup
       else if (Tgap2 >= Tgap1) then
-        Tdown = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
+        Tdown = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1.0d0 - beta1 * beta2)
         Tup = alpha2 * Tav2 + beta2 * Tdown
       end if
 
@@ -3607,8 +3624,8 @@ module TarcogShading
         Temp2 = Tav2 - (H02 / H) * (Tup - Tdown)
       end if
 
-      Tgap1 = AirflowRelaxationParameter * Temp1 + (1 - AirflowRelaxationParameter) * TGapOld1
-      Tgap2 = AirflowRelaxationParameter * Temp2 + (1 - AirflowRelaxationParameter) * TGapOld2
+      Tgap1 = AirflowRelaxationParameter * Temp1 + (1.0d0 - AirflowRelaxationParameter) * TGapOld1
+      Tgap2 = AirflowRelaxationParameter * Temp2 + (1.0d0 - AirflowRelaxationParameter) * TGapOld2
 
       converged = .false.
       if ((abs(Tgap1 - TGapOld1) < AirflowConvergenceTolerance) .or. (iter >= NumOfIterations)) then
@@ -3699,7 +3716,8 @@ module TarcogShading
     real(r64), intent(in) :: press1, press2, Al, Ar, s, H, L, angle, hc, Tenv, Tav
     real(r64), intent(inout) :: Atop, Abot, Ah
 
-    real(r64), intent(out) :: Tgap, hcv, qv, speed
+    real(r64), intent(inout) :: Tgap !Objexx:ArgIN Changed IN to INOUT: Arg used and modified
+    real(r64), intent(out) :: hcv, qv, speed
     integer, intent(inout) :: nperr
     character(len=*), intent(inout) :: ErrorMessage
 
@@ -3718,7 +3736,7 @@ module TarcogShading
     real(r64) :: TGapOld
     logical :: converged
 
-    tilt = pi/180 * (angle - 90)
+    tilt = pi/180.0d0 * (angle - 90.0d0)
     T0 = 0.0d0 + KelvinConv
 
     call gasses90(T0, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con0, visc0, dens0, cp0, pr0, 1, &
@@ -3783,10 +3801,10 @@ module TarcogShading
     !dr...recalculate speed if forced speed exist
     !bi...skip forced vent for now
     !  if (forcedspeed.ne.0) then
-      if ((forcedspeed.ne.0.0d0).and.(CalcForcedVentilation.ne.0.0d0)) then
+      if ((forcedspeed.ne.0.0d0).and.(CalcForcedVentilation.ne.0)) then
         speed = forcedspeed
       else
-        speed = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
+        speed = (SQRT((A2 ** 2) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
     !  speed = abs((sqrt((A2 ** 2) + (4 * A * A1)) - A2) / (2 * A1))
       end if
 
@@ -3991,10 +4009,11 @@ module ThermalEN673Calc
     real(r64), intent(in) :: hout
 
     real(r64), dimension(maxlay2), intent(out) :: theta
-    real(r64), intent(out) :: hin, hcin, ufactor
+    real(r64), intent(inout) :: hin !Objexx:ArgIN Changed IN to INOUT: Arg used and modified
+    real(r64), intent(out) :: hcin, ufactor
     real(r64), dimension(maxlay), intent(out) :: hr, hs, hg
     integer, intent(out) :: nperr
-    character, intent(inout) :: ErrorMessage
+    character(len=*), intent(inout) :: ErrorMessage
 
     !dr...internal variables
     real(r64) :: Tm, diff, Rg
@@ -4004,10 +4023,13 @@ module ThermalEN673Calc
     real(r64), dimension(maxlay) :: Gr, Nu, Ra
     real(r64) :: A, n, hrin, sumRs, sumRsold
 
-    real(r64), parameter :: eps = 1e-4  ! set iteration accuracy
+    real(r64), parameter :: eps = 1.0d-4  ! set iteration accuracy
 
     real(r64), dimension(maxgas) :: frctg
     integer, dimension(maxgas) :: ipropg
+
+!EPTeam    ! Initialization
+!EPTeam - comment out until proven    con = 0.0d0 !Objexx:Uninit Line added to eliminate chance of use uninitialized
 
   !jel..hrin is 4.4 for standard clear glass:
     if ((emis(2*nlayer).lt.0.85d0).and.(emis(2*nlayer).gt.0.83d0)) then
@@ -4047,6 +4069,7 @@ module ThermalEN673Calc
     Gr = 0.0d0
     Nu = 0.0d0
     Ra = 0.0d0
+    con = 0.0d0
 
     do i = 1, nlayer
       rs(2*i) = thick(i)/scon(i) ! thermal resistance of each glazing layer
@@ -4102,12 +4125,12 @@ module ThermalEN673Calc
         end do  ! gaps
       else
         do  i = 1, nlayer - 1
-          Nu(i)   = 1.0
-          hg(i) = Nu(i) * con / gap(i)
+          Nu(i)   = 1.0d0
+          hg(i) = Nu(i) * con / gap(i) !Objexx:Uninit con is uninitialized: Initialization added above: With con=0 this line is pointless
         end do
       end if
       do i = 1, nlayer - 1
-        hr(i) = 4.0d0 * StefanBoltzmann * (1.0d0 / emis(2*i) + 1.0d0 / emis(2*i+1) - 1.0d0)**(-1.0d0) * Tm**3.0d0
+        hr(i) = 4.0d0 * StefanBoltzmann * (1.0d0 / emis(2*i) + 1.0d0 / emis(2*i+1) - 1.0d0)**(-1.0d0) * Tm**3
         hs(i) = hg(i) + hr(i)
         rs(2*i+1) = 1.0d0/hs(i) ! Thermal resistance of each gap
         sumRs = sumRs + rs(2*i+1)
@@ -4156,7 +4179,7 @@ module ThermalEN673Calc
           else
             do i = 1, nlayer-1
               Nu(i)   = 1.0d0
-              hg(i) = Nu(i) * con / gap(i)
+              hg(i) = Nu(i) * con / gap(i) !Objexx:Uninit con may be uninitialized: Initialization added above: With con=0 this line is pointless
             end do
           end if   ! tind > tout
         end if
@@ -4191,7 +4214,7 @@ module ThermalEN673Calc
     real(r64), intent(in) :: x1, x2, y1, y2, x
     real(r64), intent(out) :: y
 
-    y = (y2 - y1) / (x2 - x1) * (x - x1) + y1
+    y = (y2 - y1) / (x2 - x1) * (x - x1) + y1 !Objexx:DivZero Should protect against divide by zero
 
     return
 
@@ -4369,10 +4392,10 @@ module ThermalISO15099Calc
     ! calculation of convection component of exterior film coefficient using the :
     select case (ibc)
       case (0)    !ISO 15099
-        hcout = 4 + 4 * ws
+        hcout = 4.0d0 + 4.0d0 * ws
       case (-1)   ! old ASHRAE SPC142 correlation
         if (iwd .eq. 0) then    ! windward
-          if (ws.gt.2.0) then
+          if (ws.gt.2.0d0) then
             vc = 0.25d0 * ws
           else
             vc = 0.5d0
@@ -4647,7 +4670,7 @@ module ThermalISO15099Calc
       if ((SHGCCalc.gt.0).and.(dir.gt.0.0d0)) then
         call solarISO15099(totsol, rtot, rs, nlayer, asol, sft)
         shgct = sft
-        shgct_NOSD = 0.0
+        shgct_NOSD = 0.0d0
         hcins=hcin
         hrins=hrin
         hins=hin
@@ -4893,7 +4916,7 @@ module ThermalISO15099Calc
                   tgg = gap(i-1) + gap(i) + thick(i)
                   qc1 = qcgas(i-1)
                   qc2 = qcgas(i)
-                  qcgg = (qc1 + qc2) / 2.0
+                  qcgg = (qc1 + qc2) / 2.0d0
                   ShadeGapKeffConv(i) = tgg * qcgg / (theta(2*i+1) - theta(2*i-2))
                 end if
               end if
@@ -6047,7 +6070,7 @@ module ThermalISO15099Calc
     integer, dimension(maxlay1), intent(in) :: nmix
     real(r64), intent(out) :: hcin
     integer, intent(inout) :: nperr
-    character, intent(inout) :: ErrorMessage
+    character(len=*), intent(inout) :: ErrorMessage
 
     real(r64), dimension(maxgas) :: frcti
     integer :: j
@@ -6057,13 +6080,13 @@ module ThermalISO15099Calc
     if (wsi .gt. 0.0d0) then  ! main IF
       select case (ibc)
         case (0)
-          hcin = 4 + 4 * wsi
+          hcin = 4.0d0 + 4.0d0 * wsi
         case (-1)
           hcin = 5.6d0 + 3.8d0 * wsi   ! SPC142 correlation
           return
       end select
     else       ! main IF - else
-      tiltr = tilt*2*pi/360     ! convert tilt in degrees to radians
+      tiltr = tilt*2.0d0*pi/360.0d0     ! convert tilt in degrees to radians
       tmean = tair + 0.25d0 * (t - tair)
       delt = ABS(tair-t)
 
@@ -6077,23 +6100,23 @@ module ThermalISO15099Calc
 
       !   Calculate grashoff number:
       !   The grashoff number is the Rayleigh Number (equation 5.29) in SPC142 divided by the Prandtl Number (prand):
-      gr = GravityConstant * height**3 * delt*dens**2. / (tmean*visc**2.)
+      gr = GravityConstant * height**3 * delt*dens**2 / (tmean*visc**2)
 
       RaL = gr*pr
       !   write(*,*)' RaCrit,RaL,gr,pr '
       !   write(*,*) RaCrit,RaL,gr,pr
 
       if ((0.0d0.le.tilt).and.(tilt.lt.15.0d0)) then      ! IF no. 1
-        Gnui = 0.13d0 * RaL**(1/3.0d0)
+        Gnui = 0.13d0 * RaL**(1.0d0/3.0d0)
       else if ((15.0d0.le.tilt).and.(tilt.le.90.0d0)) then
         !   if the room air is still THEN use equations 5.43 - 5.48:
-        RaCrit = 2.5e5 * (EXP(0.72d0 * tilt) / SIN(tiltr))**0.2d0
+        RaCrit = 2.5d5 * (EXP(0.72d0 * tilt) / SIN(tiltr))**0.2d0
         if (RaL.le.RaCrit)  THEN           ! IF no. 2
           Gnui = 0.56d0 * (RaL * SIN(tiltr))**0.25d0
           ! write(*,*) ' Nu ', Gnui
         else
           !Gnui = 0.13*(RaL**0.3333 - RaCrit**0.3333) + 0.56*(RaCrit*sin(tiltr))**0.25
-          Gnui = 0.13d0 * (RaL**(1/3.0d0) - RaCrit**(1/3.0d0)) + 0.56d0 * (RaCrit*sin(tiltr))**0.25d0
+          Gnui = 0.13d0 * (RaL**(1.0d0/3.0d0) - RaCrit**(1.0d0/3.0d0)) + 0.56d0 * (RaCrit*sin(tiltr))**0.25d0
         end if              ! end if no. 2
       else if ((90.0d0.lt.tilt).and.(tilt.le.179.0d0)) then
         Gnui = 0.56d0 * (RaL*SIN(tiltr))**0.25d0
@@ -6168,7 +6191,7 @@ module ThermalISO15099Calc
       tmean = Tgap(i+1) ! Tgap(1) is exterior environment
       delt = ABS(theta(j)-theta(k))
       ! Temperatures should not be equal. This can happen in initial temperature guess before iterations started
-      if (delt == 0.0d0) delt = 1d-6
+      if (delt == 0.0d0) delt = 1.0d-6
       do l=1, nmix(i+1)
         ipropg(l) = iprop(i+1,l)
         frctg(l) = frct(i+1,l)
@@ -6180,7 +6203,7 @@ module ThermalISO15099Calc
 
         ! Calculate grashoff number:
         ! The grashoff number is the Rayleigh Number (equation 5.29) in SPC142 divided by the Prandtl Number (prand):
-        ra = GravityConstant * gap(i)**3. * delt* cp * dens**2 / (tmean*visc*con)
+        ra = GravityConstant * gap(i)**3 * delt* cp * dens**2 / (tmean*visc*con)
         Rayleigh(i) = ra
         ! write(*,*) 'height,gap(i),asp',height,gap(i),asp
         !asp = 1
@@ -6245,8 +6268,8 @@ module ThermalISO15099Calc
         !Average glass conductivity is taken as average from both glass surrounding gap
         aveGlassConductivity = (scon(i) + scon(i+1)) / 2;
 
-        cpa = 2 * aveGlassConductivity * PillarRadius(i) / ((PillarSpacing(i) ** 2) * &
-          (1 + 2 * gap(i) / (pi * PillarRadius(i))))
+        cpa = 2.0d0 * aveGlassConductivity * PillarRadius(i) / ((PillarSpacing(i) ** 2) * &
+          (1.0d0 + 2.0d0 * gap(i) / (pi * PillarRadius(i))))
 
         !It is important to add on prevoius values caluculated for gas
         hcgas(i+1) = hcgas(i+1) + cpa
@@ -6284,53 +6307,54 @@ module ThermalISO15099Calc
     Nu90 = 0.0d0
     Nu60 = 0.0d0
     G = 0.0d0
-    tiltr = tilt*2*pi/360     ! convert tilt in degrees to radians
-    if ((tilt.ge.0).and.(tilt.lt.60)) then                 !ISO/DIS 15099 - chapter 5.3.3.1
-      subNu1 = 1 - 1708 / (ra * cos(tiltr))
+    tiltr = tilt*2.0d0*pi/360.0d0     ! convert tilt in degrees to radians
+    if ((tilt.ge.0.0d0).and.(tilt.lt.60.0d0)) then                 !ISO/DIS 15099 - chapter 5.3.3.1
+      subNu1 = 1.0d0 - 1708.0d0 / (ra * cos(tiltr))
       subNu1 = pos(subNu1)
-      subNu2 = 1 - (1708 * (sin(1.8d0 * tiltr)) ** 1.6d0) / (ra * cos(tiltr))
-      subNu3 = ((ra * cos(tiltr) / 5830) ** (1.0d0/3.0d0)) - 1
+      subNu2 = 1.0d0 - (1708.0d0 * (sin(1.8d0 * tiltr)) ** 1.6d0) / (ra * cos(tiltr))
+      subNu3 = ((ra * cos(tiltr) / 5830.0d0) ** (1.0d0/3.0d0)) - 1.0d0
       subNu3 = pos(subNu3)
-      gnu = 1 + 1.44d0 * subNu1 * subNu2 + subNu3                         !equation 42
-      if (ra.ge.1e5) then
+      gnu = 1.0d0 + 1.44d0 * subNu1 * subNu2 + subNu3                         !equation 42
+      if (ra.ge.1.0d5) then
         nperr = 1001    ! Rayleigh number is out of range
         ErrorMessage = 'Rayleigh number out of range in Nusselt num. calc. for gaps (angle between 0 and 60 deg).'
       end if
-      if (asp.le.20) then
+      if (asp.le.20.0d0) then
         nperr = 1002    ! Aspect Ratio is out of range
         ErrorMessage = 'Aspect Ratio out of range in Nusselt num. calc. for gaps (angle between 0 and 60 deg).'
       end if
-    else if (tilt.eq.60) then                               !ISO/DIS 15099 - chapter 5.3.3.2
-      G = 0.5d0 / ((1 + (ra / 3160) ** 20.6d0) ** 0.1d0)                      !equation 47
-      Nu1 = (1 + ((0.0936d0 * ra ** 0.314d0)/(1 + G)) ** 7) ** (0.1428571d0)  !equation 45
+    else if (tilt.eq.60.0d0) then                               !ISO/DIS 15099 - chapter 5.3.3.2
+      G = 0.5d0 / ((1.0d0 + (ra / 3160.0d0) ** 20.6d0) ** 0.1d0)                      !equation 47
+      Nu1 = (1.0d0 + ((0.0936d0 * ra ** 0.314d0)/(1.0d0 + G)) ** 7) ** (0.1428571d0)  !equation 45
       Nu2 = (0.104d0 + 0.175d0 / asp) * (ra ** 0.283d0)                       !equation 46
       gnu = Max(Nu1, Nu2)                                               !equation 44
-    else if ((tilt.gt.60).and.(tilt.lt.90)) then            !ISO/DIS 15099 - chapter 5.3.3.3
-      if ((ra.gt.100).and.(ra.lt.2d7).and.(asp.gt.5).and.(asp.lt.100)) then
-        G = 0.5d0 / ((1 + (ra / 3160) ** 20.6d0) ** 0.1d0)                     !equation 47
-        Nu1 = (1 + ((0.0936d0 * ra ** 0.314d0)/(1 + G)) ** 7) ** (0.1428571d0) !equation 45
+    else if ((tilt.gt.60.0d0).and.(tilt.lt.90.0d0)) then            !ISO/DIS 15099 - chapter 5.3.3.3
+      if ((ra.gt.100.0d0).and.(ra.lt.2.0d7).and.(asp.gt.5.0d0).and.(asp.lt.100.0d0)) then
+        G = 0.5d0 / ((1.0d0 + (ra / 3160.0d0) ** 20.6d0) ** 0.1d0)                     !equation 47
+        Nu1 = (1.0d0 + ((0.0936d0 * ra ** 0.314d0)/(1.0d0 + G)) ** 7) ** (0.1428571d0) !equation 45
         Nu2 = (0.104d0 + 0.175d0 / asp) * (ra ** 0.283d0)                      !equation 46
         Nu60 = Max(Nu1, Nu2)                                             !equation 44
         Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                                !equation 52
-        if (ra.gt.5e4) then
+        if (ra.gt.5.0d4) then
           Nu1 = 0.0673838d0 * ra ** (1.0d0/3.0d0)                                !equation 49
-        else if ((ra.gt.1d4).and.(ra.le.5d4)) then
+        else if ((ra.gt.1.0d4).and.(ra.le.5.0d4)) then
           Nu1 = 0.028154d0 * ra ** 0.4134d0                                  !equation 50
-        else if (ra.le.1d4) then
-          Nu1 = 1 + 1.7596678d-10 * ra ** 2.2984755d0                      !equation 51
+        else if (ra.le.1.0d4) then
+          Nu1 = 1.0d0 + 1.7596678d-10 * ra ** 2.2984755d0                      !equation 51
         end if
-      else if (ra.le.100) then
-        G = 0.5d0 / ((1 + (ra / 3160) ** 20.6d0) ** 0.1d0)                      !equation 47
-        Nu1 = (1 + ((0.0936d0 * ra ** 0.314d0)/(1 + G)) ** 7) ** (0.1428571d0)  !equation 45
+      else if (ra.le.100.0d0) then
+        G = 0.5d0 / ((1.0d0 + (ra / 3160.0d0) ** 20.6d0) ** 0.1d0)                      !equation 47
+        Nu1 = (1.0d0 + ((0.0936d0 * ra ** 0.314d0)/(1.0d0 + G)) ** 7) ** (0.1428571d0)  !equation 45
         Nu2 = (0.104d0 + 0.175d0 / asp) * (ra ** 0.283d0)                       !equation 46
         Nu60 = Max(Nu1, Nu2)                                              !equation 44
         Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                                 !equation 52
-        Nu1 = 1 + 1.7596678d-10 * ra ** 2.2984755d0                         !equation 51
+        Nu1 = 1.0d0 + 1.7596678d-10 * ra ** 2.2984755d0                         !equation 51
         nperr = 1003   ! Rayleigh number is less than 100
-        ErrorMessage = 'Rayleigh number is less than 100 in Nusselt number calculations for gaps (angle between 60 and 90 degrees).'
-      else if (ra.gt.2e7) then
-        G = 0.5d0 / ((1 + (ra / 3160) ** 20.6d0) ** 0.1d0)                      !equation 47
-        Nu1 = (1 + ((0.0936d0 * ra ** 0.314d0)/(1 + G)) ** 7) ** (0.1428571d0)  !equation 45
+        ErrorMessage = 'Rayleigh number is less than 100 in Nusselt number calculations for gaps '//  &
+           '(angle between 60 and 90 degrees).'
+      else if (ra.gt.2.0d7) then
+        G = 0.5d0 / ((1.0d0 + (ra / 3160.0d0) ** 20.6d0) ** 0.1d0)                      !equation 47
+        Nu1 = (1.0d0 + ((0.0936d0 * ra ** 0.314d0)/(1.0d0 + G)) ** 7) ** (0.1428571d0)  !equation 45
         Nu2 = (0.104d0 + 0.175d0 / asp) * (ra ** 0.283d0)                       !equation 46
         Nu60 = Max(Nu1, Nu2)                                              !equation 44
         Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                                 !equation 52
@@ -6338,46 +6362,46 @@ module ThermalISO15099Calc
         nperr = 1004   ! Rayleigh number is great from 2e7
         ErrorMessage = 'Rayleigh number is greater than 2e7 in Nusselt number calculations for gaps'// &
                           ' (angle between 60 and 90 degrees).'
-      else if ((asp.le.5).or.(asp.ge.100)) then
-        G = 0.5d0 / ((1 + (ra / 3160) ** 20.6d0) ** 0.1d0)                      !equation 47
-        Nu1 = (1 + ((0.0936d0 * ra ** 0.314d0)/(1 + G)) ** 7) ** (0.1428571d0)  !equation 45
+      else if ((asp.le.5.0d0).or.(asp.ge.100.0d0)) then
+        G = 0.5d0 / ((1.0d0 + (ra / 3160.0d0) ** 20.6d0) ** 0.1d0)                      !equation 47
+        Nu1 = (1.0d0 + ((0.0936d0 * ra ** 0.314d0)/(1.0d0 + G)) ** 7) ** (0.1428571d0)  !equation 45
         Nu2 = (0.104d0 + 0.175d0 / asp) * (ra ** 0.283d0)                       !equation 46
         Nu60 = Max(Nu1, Nu2)                                              !equation 44
         Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                                 !equation 52
-        if (ra.gt.5e4) then
+        if (ra.gt.5.0d4) then
           Nu1 = 0.0673838d0 * ra ** (1.0d0/3.0d0)                                 !equation 49
-        else if ((ra.gt.1e4).and.(ra.le.5e4)) then
+        else if ((ra.gt.1.0d4).and.(ra.le.5.0d4)) then
           Nu1 = 0.028154d0 * ra ** 0.4134d0                                   !equation 50
-        else if (ra.le.1e4) then
-          Nu1 = 1 + 1.7596678e-10 * ra ** 2.2984755d0                       !equation 51
+        else if (ra.le.1.0d4) then
+          Nu1 = 1.0d0 + 1.7596678d-10 * ra ** 2.2984755d0                       !equation 51
         end if
         nperr = 1005 ! Aspect Ratio is out of range
         ErrorMessage = 'Aspect Ratio is out of range in Nusselt number calculations for gaps (angle between 60 and 90 degrees).'
       end if
       Nu90 = Max(Nu1, Nu2)                                  !equation 48
-      gnu = ((Nu90 - Nu60) / (90 - 60)) * (tilt - 60) + Nu60  !linear interpolation between 60 and 90 degrees
-    else if (tilt.eq.90) then                                !ISO/DIS 15099 - chapter 5.3.3.4
-      Nu2 = 0.242 * (ra / asp) ** 0.272d0                     !equation 52
-      if (ra.gt.5e4) then
+      gnu = ((Nu90 - Nu60) / (90.0d0 - 60.0d0)) * (tilt - 60.0d0) + Nu60  !linear interpolation between 60 and 90 degrees
+    else if (tilt.eq.90.0d0) then                                !ISO/DIS 15099 - chapter 5.3.3.4
+      Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                     !equation 52
+      if (ra.gt.5.0d4) then
         Nu1 = 0.0673838d0 * (ra ** (1.0d0/3.0d0))             !equation 49
-      else if ((ra.gt.1d4).and.(ra.le.5d4)) then
+      else if ((ra.gt.1.0d4).and.(ra.le.5.0d4)) then
         Nu1 = 0.028154d0 * ra ** 0.4134d0                       !equation 50
         !Nu1 = 0.028154 * ra ** 0.414d0                       !equation 50 - DISCONTINUITY CORRECTED
-      else if (ra.le.1d4) then
-        Nu1 = 1 + 1.7596678e-10 * ra ** 2.2984755d0           !equation 51
+      else if (ra.le.1.0d4) then
+        Nu1 = 1.0d0 + 1.7596678d-10 * ra ** 2.2984755d0           !equation 51
       end if
       gnu = Max(Nu1, Nu2)                                   !equation 48
-    else if ((tilt.gt.90).and.(tilt.le.180)) then
+    else if ((tilt.gt.90.0d0).and.(tilt.le.180.0d0)) then
       Nu2 = 0.242d0 * (ra / asp) ** 0.272d0                     !equation 52
-      if (ra.gt.5e4) then
+      if (ra.gt.5.0d4) then
         Nu1 = 0.0673838d0 * ra ** (1.0d0/3.0d0)               !equation 49
-      else if ((ra.gt.1d4).and.(ra.le.5d4)) then
+      else if ((ra.gt.1.0d4).and.(ra.le.5.0d4)) then
         Nu1 = 0.028154d0 * ra ** 0.4134d0                       !equation 50
-      else if (ra.le.1e4) then
-        Nu1 = 1 + 1.7596678d-10 * ra ** 2.2984755d0           !equation 51
+      else if (ra.le.1.0d4) then
+        Nu1 = 1.0d0 + 1.7596678d-10 * ra ** 2.2984755d0           !equation 51
       end if
       gnu = Max(Nu1, Nu2)                                   !equation 48
-      gnu = 1 + (gnu - 1) * SIN(tiltr)                      !equation 53
+      gnu = 1.0d0 + (gnu - 1.0d0) * SIN(tiltr)                      !equation 53
     else
       nperr = 10    !error flag: angle is out of range
       ErrorMessage = 'Window tilt angle is out of range.'
@@ -6495,7 +6519,7 @@ module ThermalISO15099Calc
       j = 2*SDLayerIndex-2
       k = j+3
       ! determine the gas properties for this "gap":
-      tmean = (theta(j)+theta(k))/2.
+      tmean = (theta(j)+theta(k))/2.0d0
       delt = abs(theta(j)-theta(k))
       i = SDLayerIndex
       do l=1, nmix(i+1)
@@ -6734,9 +6758,9 @@ module ThermalISO15099Calc
     !calculate balance equations by using temperature solution and estimates stores error in FRes
     !real(r64), intent(in) :: theta(maxlay2)
     !real(r64), intent(in) :: R(maxlay2)  ! Radiation on layer surfaces
+    integer, intent(in) :: nlayer
     real(r64), dimension(4*nlayer, 4*nlayer), intent(in) :: a
     real(r64), dimension(4*nlayer), intent(in) :: b, x
-    integer, intent(in) :: nlayer
 
     !integer, intent(out) :: nperr
     !character*(*), intent(out) :: ErrorMessage
@@ -7412,20 +7436,20 @@ module TARCOGMain
 
     !!! Body of TARCOG90
 
-    he = 0
-    hi = 0
+    he = 0.0d0
+    hi = 0.0d0
     hcin = 0.0d0
     hrin = 0.0d0
     hcout = 0.0d0
     hrout = 0.0d0
-    LayerDef = 0.0
-    dtmax = 0
+    LayerDef = 0.0d0
+    dtmax = 0.0d0
     i = 0
     counter = 0
-    eskyTemp = 0
-    trminTemp = 0
-    hinTemp = 0
-    houtTemp = 0
+    eskyTemp = 0.0d0
+    trminTemp = 0.0d0
+    hinTemp = 0.0d0
+    houtTemp = 0.0d0
     ErrorMessage = 'Normal Termination'
 
     !sol = 0.0d0

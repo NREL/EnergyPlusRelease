@@ -44,6 +44,7 @@ USE DataHVACGlobals
 USE ScheduleManager
 USE DataSizing
 USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2, ZoneCO2GainFromPeople, ZoneAirCO2, OutdoorGC
+USE FaultsManager
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
 
@@ -87,6 +88,7 @@ INTEGER, PARAMETER :: PVT_AirBased = 17
 INTEGER, PARAMETER :: Fan_ComponentModel = 18 !cpw22Aug2010 (new)
 INTEGER, PARAMETER :: DXHeatPumpSystem = 19
 INTEGER, PARAMETER :: Coil_UserDefined = 20
+INTEGER, PARAMETER :: UnitarySystem    = 21
 
 INTEGER, PARAMETER :: ControllerSimple = 1
 INTEGER, PARAMETER :: ControllerOutsideAir = 2
@@ -144,24 +146,6 @@ TYPE ControllerListProps
   CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerName
 END TYPE ControllerListProps
 
-TYPE OutsideAirSysProps
-  CHARACTER(len=MaxNameLength) :: Name  = ' '
-  CHARACTER(len=MaxNameLength) :: ControllerListName  = ' '
-  CHARACTER(len=MaxNameLength) :: ComponentListName  = ' '
-  INTEGER      :: ControllerListNum     = 0                ! index of the Controller List
-  INTEGER      :: NumComponents         = 0
-  INTEGER      :: NumControllers        = 0
-  INTEGER      :: NumSimpleControllers  = 0                ! number of CONTROLLER:SIMPLE objects in OA Sys controller list
-  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ComponentName
-  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ComponentType
-  INTEGER, DIMENSION(:), ALLOCATABLE :: ComponentType_Num  ! Parameterized (see above) Component Types this
-                                                           ! module can address
-  INTEGER, DIMENSION(:), ALLOCATABLE :: ComponentIndex     ! Which one in list -- updated by routines called from here
-  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerName
-  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerType
-  INTEGER, DIMENSION(:), ALLOCATABLE :: ControllerIndex    ! Which one in list -- updated by routines called from here
-END TYPE OutsideAirSysProps
-
 TYPE OAControllerProps                     ! Derived type for Outside Air Controller data
   CHARACTER(len=MaxNameLength) :: Name = ' '
   CHARACTER(len=MaxNameLength) :: ControllerType = ' '
@@ -170,13 +154,13 @@ TYPE OAControllerProps                     ! Derived type for Outside Air Contro
   INTEGER      :: Lockout              = 0          ! 0=NoLockoutPossible; 1=LockoutWithHeatingPossible;
                                                     ! 2=LockoutWithCompressorPossible;
   LOGICAL      :: FixedMin             = .true.     ! Fixed Minimum or Proportional Minimum
-  REAL(r64)    :: TempLim              = 0.0        ! Temperature Limit
-  REAL(r64)    :: TempLowLim           = 0.0        ! Temperature Lower Limit
-  REAL(r64)    :: EnthLim              = 0.0        ! Enthalpy Limit
-  REAL(r64)    :: DPTempLim            = 0.0        ! Dew Point Temperature Limit
+  REAL(r64)    :: TempLim              = 0.0d0        ! Temperature Limit
+  REAL(r64)    :: TempLowLim           = 0.0d0        ! Temperature Lower Limit
+  REAL(r64)    :: EnthLim              = 0.0d0        ! Enthalpy Limit
+  REAL(r64)    :: DPTempLim            = 0.0d0        ! Dew Point Temperature Limit
   INTEGER      :: EnthalpyCurvePtr     = 0          ! Electronic Enthalpy Curve Index (max HumRat = f[OAT])
-  REAL(r64)    :: MinOA                = 0.0        ! Minimum outside air flow (m3/sec)
-  REAL(r64)    :: MaxOA                = 0.0        ! Maximum outside air flow (m3/sec)
+  REAL(r64)    :: MinOA                = 0.0d0        ! Minimum outside air flow (m3/sec)
+  REAL(r64)    :: MaxOA                = 0.0d0        ! Maximum outside air flow (m3/sec)
   INTEGER      :: Econo                = 0          ! 0 = NoEconomizer, 1 = FixedDryBulb, 2 = FixedEnthalpy, 3=DifferentialDryBulb,
                                                     ! 4=DifferentialEnthalpy, 5=FixedDewPointAndDryBulb, 6 = ElectronicEnthalpy,
                                                     ! 7 =DifferentialDryBulbAndEnthalpy
@@ -188,29 +172,29 @@ TYPE OAControllerProps                     ! Derived type for Outside Air Contro
   INTEGER      :: RetNode              = 0          ! Return Air Node Number
   CHARACTER(len=MaxNameLength) :: MinOASch = ' '    ! Name of the minimum outside air schedule
   INTEGER      :: MinOASchPtr          = 0          ! Index to the minimum outside air schedule
-  REAL(r64)    :: RelMassFlow          = 0.0
-  REAL(r64)    :: OAMassFlow           = 0.0
-  REAL(r64)    :: ExhMassFlow          = 0.0
-  REAL(r64)    :: MixMassFlow          = 0.0
-  REAL(r64)    :: InletTemp            = 0.0
-  REAL(r64)    :: InletEnth            = 0.0
-  REAL(r64)    :: InletPress           = 0.0
-  REAL(r64)    :: InletHumRat          = 0.0
-  REAL(r64)    :: OATemp               = 0.0
-  REAL(r64)    :: OAEnth               = 0.0
-  REAL(r64)    :: OAPress              = 0.0
-  REAL(r64)    :: OAHumRat             = 0.0
-  REAL(r64)    :: RetTemp              = 0.0
-  REAL(r64)    :: RetEnth              = 0.0
-  REAL(r64)    :: MixSetTemp           = 0.0
-  REAL(r64)    :: MinOAMassFlowRate    = 0.0        ! Minimum outside air flow (kg/s)
-  REAL(r64)    :: MaxOAMassFlowRate    = 0.0        ! Maximum outside air flow (kg/s)
+  REAL(r64)    :: RelMassFlow          = 0.0d0
+  REAL(r64)    :: OAMassFlow           = 0.0d0
+  REAL(r64)    :: ExhMassFlow          = 0.0d0
+  REAL(r64)    :: MixMassFlow          = 0.0d0
+  REAL(r64)    :: InletTemp            = 0.0d0
+  REAL(r64)    :: InletEnth            = 0.0d0
+  REAL(r64)    :: InletPress           = 0.0d0
+  REAL(r64)    :: InletHumRat          = 0.0d0
+  REAL(r64)    :: OATemp               = 0.0d0
+  REAL(r64)    :: OAEnth               = 0.0d0
+  REAL(r64)    :: OAPress              = 0.0d0
+  REAL(r64)    :: OAHumRat             = 0.0d0
+  REAL(r64)    :: RetTemp              = 0.0d0
+  REAL(r64)    :: RetEnth              = 0.0d0
+  REAL(r64)    :: MixSetTemp           = 0.0d0
+  REAL(r64)    :: MinOAMassFlowRate    = 0.0d0        ! Minimum outside air flow (kg/s)
+  REAL(r64)    :: MaxOAMassFlowRate    = 0.0d0        ! Maximum outside air flow (kg/s)
   INTEGER      :: ZoneEquipZoneNum     = 0
   CHARACTER(len=MaxNameLength) :: VentilationMechanicalName = ' ' ! Name of ventilation:mechanical object used for DCV
   INTEGER      :: VentMechObjectNum = 0                ! Index to VENTILATION:MECHANICAL object for this controller
   INTEGER      :: HumidistatZoneNum = 0                ! zone number where humidistat is located
   INTEGER      :: NodeNumofHumidistatZone = 0          ! node number of zone where humidistat is located
-  REAL(r64)    :: HighRHOAFlowRatio = 1.0              ! Modify ratio with respect to maximum outdoor air flow rate (high RH)
+  REAL(r64)    :: HighRHOAFlowRatio = 1.0d0              ! Modify ratio with respect to maximum outdoor air flow rate (high RH)
   LOGICAL      :: ModifyDuringHighOAMoisture = .FALSE. ! flag to Modify outdoor air flow, TRUE when modify any time
                                                        ! FALSE when modify only when indoor air humrat is less than outdoor HR
   INTEGER      :: EconomizerOASchedPtr = 0             ! schedule to modify outdoor air flow
@@ -230,11 +214,11 @@ TYPE OAControllerProps                     ! Derived type for Outside Air Contro
   INTEGER      :: HRHeatingCoilActive      = 0    ! OA Sys Heat Recovery Heating Coil Was Active status (1 = on, 0 = off)
   REAL(r64)    :: MixedAirTempAtMinOAFlow  = 0.d0 ! calculated mixed air temp when using special HX bypass control
   INTEGER      :: HighHumCtrlStatus        = 0    ! High Humidity Control status (1 = on, 0 = off or high hum ctrl not used)
-  REAL(r64)    :: OAFractionRpt            = 0.0  ! Actual outdoor air fraction for reporting (based on mixed air flow rate),
-                                                  ! 0 to 1 (normally)
-  REAL(r64)    :: MinOAFracLimit           = 0.0  ! Minimum OA fraction limit
+  REAL(r64)    :: OAFractionRpt            = 0.0d0   ! Actual outdoor air fraction for reporting (based on mixed air flow rate),
+                                                     ! 0 to 1 (normally)
+  REAL(r64)    :: MinOAFracLimit           = 0.0d0   ! Minimum OA fraction limit
   LOGICAL      :: EMSOverrideOARate        = .FALSE. ! if true, EMS is calling to override OA rate
-  REAL(r64)    :: EMSOARateValue           = 0.0D0 ! Value EMS is directing to use. [kg/s]
+  REAL(r64)    :: EMSOARateValue           = 0.0D0   ! Value EMS is directing to use. [kg/s]
   INTEGER      :: HeatRecoveryBypassControlType = BypassWhenWithinEconomizerLimits    ! User input selects type of heat recovery optimization
 END TYPE OAControllerProps
 
@@ -244,12 +228,12 @@ TYPE VentilationMechanicalProps   ! Derived type for Ventilation:Mechanical data
   INTEGER                       :: SchPtr    = 0  ! Index to the mechanical ventilation schedule
   LOGICAL                       :: DCVFlag           = .FALSE. ! if true, implement OA based on demand controlled ventilation
   INTEGER                       :: NumofVentMechZones= 0  ! Number of zones with mechanical ventilation
-  REAL(r64)                     :: TotAreaOAFlow     =0.0 ! Total outdoor air flow rate for all zones per area (m3/s/m2)
-  REAL(r64)                     :: TotPeopleOAFlow   =0.0 ! Total outdoor air flow rate for all PEOPLE objects in zones (m3/s)
-  REAL(r64)                     :: TotZoneOAFlow     =0.0 ! Total outdoor air flow rate for all zones (m3/s)
-  REAL(r64)                     :: TotZoneOAACH      =0.0 ! Total outdoor air flow rate for all zones Air Changes per hour (m3/s/m3)
+  REAL(r64)                     :: TotAreaOAFlow     =0.0d0 ! Total outdoor air flow rate for all zones per area (m3/s/m2)
+  REAL(r64)                     :: TotPeopleOAFlow   =0.0d0 ! Total outdoor air flow rate for all PEOPLE objects in zones (m3/s)
+  REAL(r64)                     :: TotZoneOAFlow     =0.0d0 ! Total outdoor air flow rate for all zones (m3/s)
+  REAL(r64)                     :: TotZoneOAACH      =0.0d0 ! Total outdoor air flow rate for all zones Air Changes per hour (m3/s/m3)
   INTEGER                       :: SystemOAMethod = 0         ! System Outdoor Air Method - SOAM_ZoneSum, SOAM_VRP
-  REAL(r64)                     :: ZoneMaxOAFraction =1.0 ! Zone maximum outdoor air fraction
+  REAL(r64)                     :: ZoneMaxOAFraction =1.0d0 ! Zone maximum outdoor air fraction
 
   REAL(r64), DIMENSION(:),ALLOCATABLE:: ZoneOAAreaRate          ! Mechanical ventilation rate (m3/s/m2) for each zone
   REAL(r64), DIMENSION(:),ALLOCATABLE:: ZoneOAPeopleRate        ! Mechanical ventilation rate (m3/s/person) for each zone
@@ -291,26 +275,26 @@ TYPE OAMixerProps ! Derived type for Outside Air Mixing Component
   INTEGER      :: InletNode            = 0  ! Inlet node for outside air stream (Nov. 2004 BTG was OANode )
   INTEGER      :: RelNode              = 0  ! Outlet node - relief air
   INTEGER      :: RetNode              = 0  ! Inlet node - return air
-  REAL(r64)    :: MixTemp              = 0.0
-  REAL(r64)    :: MixHumRat            = 0.0
-  REAL(r64)    :: MixEnthalpy          = 0.0
-  REAL(r64)    :: MixPressure          = 0.0
-  REAL(r64)    :: MixMassFlowRate      = 0.0
-  REAL(r64)    :: OATemp               = 0.0
-  REAL(r64)    :: OAHumRat             = 0.0
-  REAL(r64)    :: OAEnthalpy           = 0.0
-  REAL(r64)    :: OAPressure           = 0.0
-  REAL(r64)    :: OAMassFlowRate       = 0.0
-  REAL(r64)    :: RelTemp              = 0.0
-  REAL(r64)    :: RelHumRat            = 0.0
-  REAL(r64)    :: RelEnthalpy          = 0.0
-  REAL(r64)    :: RelPressure          = 0.0
-  REAL(r64)    :: RelMassFlowRate      = 0.0
-  REAL(r64)    :: RetTemp              = 0.0
-  REAL(r64)    :: RetHumRat            = 0.0
-  REAL(r64)    :: RetEnthalpy          = 0.0
-  REAL(r64)    :: RetPressure          = 0.0
-  REAL(r64)    :: RetMassFlowRate      = 0.0
+  REAL(r64)    :: MixTemp              = 0.0d0
+  REAL(r64)    :: MixHumRat            = 0.0d0
+  REAL(r64)    :: MixEnthalpy          = 0.0d0
+  REAL(r64)    :: MixPressure          = 0.0d0
+  REAL(r64)    :: MixMassFlowRate      = 0.0d0
+  REAL(r64)    :: OATemp               = 0.0d0
+  REAL(r64)    :: OAHumRat             = 0.0d0
+  REAL(r64)    :: OAEnthalpy           = 0.0d0
+  REAL(r64)    :: OAPressure           = 0.0d0
+  REAL(r64)    :: OAMassFlowRate       = 0.0d0
+  REAL(r64)    :: RelTemp              = 0.0d0
+  REAL(r64)    :: RelHumRat            = 0.0d0
+  REAL(r64)    :: RelEnthalpy          = 0.0d0
+  REAL(r64)    :: RelPressure          = 0.0d0
+  REAL(r64)    :: RelMassFlowRate      = 0.0d0
+  REAL(r64)    :: RetTemp              = 0.0d0
+  REAL(r64)    :: RetHumRat            = 0.0d0
+  REAL(r64)    :: RetEnthalpy          = 0.0d0
+  REAL(r64)    :: RetPressure          = 0.0d0
+  REAL(r64)    :: RetMassFlowRate      = 0.0d0
 END TYPE OAMixerProps
 
 !MODULE VARIABLE DECLARATIONS:
@@ -318,15 +302,14 @@ TYPE (ControllerListProps), ALLOCATABLE, DIMENSION(:) :: ControllerLists
 TYPE (OAControllerProps), ALLOCATABLE, DIMENSION(:) :: OAController
 TYPE (OAMixerProps), ALLOCATABLE, DIMENSION(:)      :: OAMixer
 TYPE (VentilationMechanicalProps), ALLOCATABLE, DIMENSION(:)  :: VentilationMechanical
-TYPE (OutsideAirSysProps), ALLOCATABLE, DIMENSION(:) :: OutsideAirSys
 INTEGER :: NumControllerLists = 0   ! Number of Controller Lists
 INTEGER :: NumOAControllers=0       ! Number of OA Controllers (includes ERV controllers)
 INTEGER :: NumERVControllers=0      ! Number of ERV Controllers
 INTEGER :: NumOAMixers=0            ! Number of Outdoor Air Mixers
-INTEGER :: NumOASystems=0           ! Number of Outdoor Air Systems
 INTEGER :: NumVentMechControllers=0 ! Number of Controller:MechanicalVentilation objects in input deck
 
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: MyOneTimeErrorFlag
+LOGICAL, ALLOCATABLE, DIMENSION(:) :: MyOneTimeCheckUnitarySysFlag
 LOGICAL :: GetOASysInputFlag        = .True.  ! Flag set to make sure you get input once
 LOGICAL :: GetOAMixerInputFlag      = .True.  ! Flag set to make sure you get input once
 LOGICAL :: GetOAControllerInputFlag = .True.  ! Flag set to make sure you get input once
@@ -443,7 +426,7 @@ RETURN
 
 END SUBROUTINE ManageOutsideAirSystem
 
-SUBROUTINE  SimOutsideAirSys(OASysNum,FirstHVACIteration,AirLoopNum)
+SUBROUTINE SimOutsideAirSys(OASysNum,FirstHVACIteration,AirLoopNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -510,7 +493,7 @@ DO CompNum=1,OutsideAirSys(OASysNum)%NumComponents
   CompType = OutsideAirSys(OASysNum)%ComponentType(CompNum)
   CompName = OutsideAirSys(OASysNum)%ComponentName(CompNum)
   CALL SimOAComponent(CompType,CompName,OutsideAirSys(OASysNum)%ComponentType_Num(CompNum),  &
-                  FirstHVACIteration,OutsideAirSys(OASysNum)%ComponentIndex(CompNum),AirLoopNum,Sim, &
+                  FirstHVACIteration,OutsideAirSys(OASysNum)%ComponentIndex(CompNum),AirLoopNum,Sim,OASysNum, &
                   OAHeatCoil,OACoolCoil,OAHX)
   IF (OAHX) ReSim = .TRUE.
 END DO
@@ -522,7 +505,7 @@ IF (ReSim) THEN
     CompType = OutsideAirSys(OASysNum)%ComponentType(CompNum)
     CompName = OutsideAirSys(OASysNum)%ComponentName(CompNum)
     CALL SimOAComponent(CompType,CompName,OutsideAirSys(OASysNum)%ComponentType_Num(CompNum),  &
-                    FirstHVACIteration,OutsideAirSys(OASysNum)%ComponentIndex(CompNum),AirLoopNum,Sim, &
+                    FirstHVACIteration,OutsideAirSys(OASysNum)%ComponentIndex(CompNum),AirLoopNum,Sim,OASysNum, &
                     OAHeatCoil,OACoolCoil,OAHX)
   END DO
 END IF
@@ -574,7 +557,7 @@ AirLoopControlInfo(AirLoopNum)%OASysComponentsSimulated = .TRUE.
 RETURN
 END SUBROUTINE SimOutsideAirSys
 
-SUBROUTINE SimOAComponent(CompType,CompName,CompTypeNum,FirstHVACIteration,CompIndex,AirLoopNum,Sim, &
+SUBROUTINE SimOAComponent(CompType,CompName,CompTypeNum,FirstHVACIteration,CompIndex,AirLoopNum,Sim,OASysNum, &
                           OAHeatingCoil,OACoolingCoil,OAHX)
 
           ! SUBROUTINE INFORMATION
@@ -595,6 +578,7 @@ SUBROUTINE SimOAComponent(CompType,CompName,CompTypeNum,FirstHVACIteration,CompI
 
           ! USE Statements
   Use Fans, Only:SimulateFanComponents
+  USE DataAirLoop, ONLY: AirLoopInputsFilled
   Use WaterCoils, Only:SimulateWaterCoilComponents
   Use HeatingCoils, Only:SimulateHeatingCoilComponents
   Use HeatRecovery, Only: SimHeatRecovery
@@ -607,6 +591,7 @@ SUBROUTINE SimOAComponent(CompType,CompName,CompTypeNum,FirstHVACIteration,CompI
   Use EvaporativeCoolers, Only:SimEvapCooler
   USE PhotovoltaicThermalCollectors, ONLY:SimPVTcollectors, CalledFromOutsideAirSystem
   USE UserDefinedComponents, ONLY: SimCoilUserDefined
+  USE HVACUnitarySystem,     ONLY: SimUnitarySystem, GetUnitarySystemOAHeatCoolCoil, CheckUnitarySysCoilInOASysExists
 
 IMPLICIT NONE
 
@@ -619,6 +604,7 @@ INTEGER, INTENT(IN)           :: CompTypeNum ! Component Type -- Integerized for
 INTEGER, INTENT(INOUT)        :: CompIndex
 INTEGER, INTENT(IN)           :: AirLoopNum ! air loop index for economizer lockout coordination
 LOGICAL, INTENT(IN)            :: Sim        ! if TRUE, simulate component; if FALSE, just set the coil exisitence flags
+INTEGER, INTENT(IN)            :: OASysNum   ! index to outside air system
 LOGICAL, INTENT(OUT), OPTIONAL :: OAHeatingCoil  ! TRUE indicates a heating coil has been found
 LOGICAL, INTENT(OUT), OPTIONAL :: OACoolingCoil  ! TRUE indicates a cooling coil has been found
 LOGICAL, INTENT(OUT), OPTIONAL :: OAHX           ! TRUE indicates a heat exchanger has been found
@@ -700,6 +686,17 @@ SELECT CASE(CompTypeNum)
       CALL SimDXCoolingSystem(CompName,FirstHVACIteration,AirLoopNum, CompIndex)
     END IF
     OACoolingCoil = .TRUE.
+  CASE(UnitarySystem)  ! AirLoopHVAC:UnitarySystem
+    IF (Sim) Then
+      CALL SimUnitarySystem(CompName,FirstHVACIteration,AirLoopNum, CompIndex)
+    END IF
+    IF(AirLoopInputsFilled)CALL GetUnitarySystemOAHeatCoolCoil(CompName, OACoolingCoil, OAHeatingCoil)
+    IF(MyOneTimeCheckUnitarySysFlag(OASysNum))THEN
+      IF(AirLoopInputsFilled)THEN
+        CALL CheckUnitarySysCoilInOASysExists(CompName)
+        MyOneTimeCheckUnitarySysFlag(OASysNum) = .FALSE.
+      END IF
+    END IF
   CASE (DXHeatPumpSystem)
     IF (sim) Then
       CALL SimDXHeatPumpSystem(CompName,FirstHVACIteration,AirLoopNum, CompIndex)
@@ -1029,8 +1026,11 @@ CurrentModuleObject = CurrentModuleObjects(CMO_OASystem)
 NumOASystems = GetNumObjectsFound(CurrentModuleObject)
 
   ALLOCATE(OutsideAirSys(NumOASystems))
+  ALLOCATE(OASysEqSizing(NumOASystems))
   ALLOCATE(MyOneTimeErrorFlag(NumOASystems))
+  ALLOCATE(MyOneTimeCheckUnitarySysFlag(NumOASystems))
   MyOneTimeErrorFlag = .TRUE.
+  MyOneTimeCheckUnitarySysFlag = .TRUE.
 
   DO OASysNum=1,NumOASystems
 
@@ -1175,6 +1175,8 @@ NumOASystems = GetNumObjectsFound(CurrentModuleObject)
           CALL CheckDXCoolingCoilInOASysExists(OutsideAirSys(OASysNum)%ComponentName(CompNum))
         CASE('COILSYSTEM:HEATING:DX')
           OutsideAirSys(OASysNum)%ComponentType_Num(CompNum)= DXHeatPumpSystem
+        CASE('AIRLOOPHVAC:UNITARYSYSTEM')
+            OutsideAirSys(OASysNum)%ComponentType_Num(CompNum)= UnitarySystem
         CASE('COIL:USERDEFINED')
           OutsideAirSys(OASysNum)%ComponentType_Num(CompNum)= Coil_UserDefined
   ! Heat recovery
@@ -1348,7 +1350,7 @@ INTEGER :: ControllerListNum = 0  ! Index used to loop through controller list
 INTEGER :: ControllerNum = 0      ! Index to controllers in each controller list
 INTEGER :: Num = 0                ! Index used to loop through controllers in list
 INTEGER :: SysNum = 0             ! Index used to loop through OA systems
-REAL(r64) :: DesSupplyVolFlowRate = 0.0  ! Temporary variable for design supply volumetric flow rate for air loop (m3/s)
+REAL(r64) :: DesSupplyVolFlowRate = 0.0d0  ! Temporary variable for design supply volumetric flow rate for air loop (m3/s)
 CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE:: DesignSpecOAObjName ! name of the design specification outdoor air object
 INTEGER,DIMENSION(:),ALLOCATABLE:: DesignSpecOAObjIndex ! index of the design specification outdoor air object
 CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE:: VentMechZoneName ! Zone or Zone List to apply mechanical ventilation rate
@@ -1378,6 +1380,7 @@ INTEGER :: EquipNum = 0
 INTEGER :: EquipListNum = 0
 INTEGER :: ADUNum = 0
 INTEGER :: jZone
+INTEGER :: i
 
 !First, call other get input routines in this module to make sure data is filled during this routine.
 IF (GetOASysInputFlag) THEN  ! Gets input for object  first time Sim routine is called
@@ -1803,6 +1806,15 @@ OALp: DO AirLoopNumber = 1, NumPrimaryAirSys
       END DO OALp
     ENDIF
 
+    ! add applicable faults identifier to avoid string comparison at each time step
+    !  loop through each fault for each OA controller
+    DO i = 1, NumFaults
+      IF (Faults(i)%ControllerTypeEnum /= iController_AirEconomizer) CYCLE
+      IF (SameString(OAController(OutAirNum)%Name, Faults(i)%ControllerName)) THEN
+        Faults(i)%ControllerID = OutAirNum
+      ENDIF
+    ENDDO
+
   END DO  ! LOOP FOR OutAirNum
 
   IF (ErrorsFound) THEN
@@ -1998,15 +2010,15 @@ IF(NumVentMechControllers .GT. 0) THEN
     VentMechZoneName = ' '
     DesignSpecOAObjName = ' '
     DesignSpecOAObjIndex = 0
-    VentMechZoneOAAreaRate = 0.0
-    VentMechZoneOAPeopleRate = 0.0
+    VentMechZoneOAAreaRate = 0.0d0
+    VentMechZoneOAPeopleRate = 0.0d0
 
     ! use defaults for Cooling and Heating Effectiveness
-    VentMechZoneADEffCooling = 1.0
-    VentMechZoneADEffHeating = 1.0
+    VentMechZoneADEffCooling = 1.0d0
+    VentMechZoneADEffHeating = 1.0d0
     VentMechZoneADEffSchPtr = 0
     VentMechZoneADEffSchName = ' '
-    VentMechZoneSecondaryRecirculation = 0.0
+    VentMechZoneSecondaryRecirculation = 0.0d0
     DesignSpecZoneADObjName = ' '
     DesignSpecZoneADObjIndex = 0
 
@@ -2201,17 +2213,10 @@ IF(NumVentMechControllers .GT. 0) THEN
     VentilationMechanical(VentMechNum)%Zone = 0
     VentilationMechanical(VentMechNum)%ZoneDesignSpecOAObjName = ' '
     VentilationMechanical(VentMechNum)%ZoneDesignSpecOAObjIndex = 0
-    VentilationMechanical(VentMechNum)%ZoneOAAreaRate = 0.0
-    VentilationMechanical(VentMechNum)%ZoneOAPeopleRate = 0.0
-    VentilationMechanical(VentMechNum)%ZoneOAFlow = 0.0
-    VentilationMechanical(VentMechNum)%ZoneOAACH = 0.0
-!!   Also allocate temp arrays to use in Init subroutine for disregarding zones not on the correct air loop
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZone(MechVentZoneCount))
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneOAAreaRate(MechVentZoneCount))
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneOAPeopleRate(MechVentZoneCount))
-!    VentilationMechanical(VentMechNum)%TempZone = 0
-!    VentilationMechanical(VentMechNum)%TempZoneOAAreaRate = 0.0
-!    VentilationMechanical(VentMechNum)%TempZoneOAPeopleRate = 0.0
+    VentilationMechanical(VentMechNum)%ZoneOAAreaRate = 0.0d0
+    VentilationMechanical(VentMechNum)%ZoneOAPeopleRate = 0.0d0
+    VentilationMechanical(VentMechNum)%ZoneOAFlow = 0.0d0
+    VentilationMechanical(VentMechNum)%ZoneOAACH = 0.0d0
 
     ! added for new DCV, 2/12/2009
     ALLOCATE(VentilationMechanical(VentMechNum)%ZoneADEffCooling(MechVentZoneCount))
@@ -2226,24 +2231,13 @@ IF(NumVentMechControllers .GT. 0) THEN
     ALLOCATE(VentilationMechanical(VentMechNum)%ZoneDesignSpecADObjName(MechVentZoneCount))
     ALLOCATE(VentilationMechanical(VentMechNum)%ZoneDesignSpecADObjIndex(MechVentZoneCount))
 
-    VentilationMechanical(VentMechNum)%ZoneADEffCooling = 1.0
-    VentilationMechanical(VentMechNum)%ZoneADEffHeating = 1.0
+    VentilationMechanical(VentMechNum)%ZoneADEffCooling = 1.0d0
+    VentilationMechanical(VentMechNum)%ZoneADEffHeating = 1.0d0
     VentilationMechanical(VentMechNum)%ZoneADEffSchPtr = 0
     VentilationMechanical(VentMechNum)%ZoneADEffSchName = ' '
-    VentilationMechanical(VentMechNum)%ZoneSecondaryRecirculation = 0.0
+    VentilationMechanical(VentMechNum)%ZoneSecondaryRecirculation = 0.0d0
     VentilationMechanical(VentMechNum)%ZoneDesignSpecADObjName = ' '
     VentilationMechanical(VentMechNum)%ZoneDesignSpecADObjIndex = 0
-
-!    ! Also allocate temp arrays to use in Init subroutine for disregarding zones not on the correct air loop
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneADEffCooling(MechVentZoneCount))
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneADEffHeating(MechVentZoneCount))
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneADEffSchPtr(MechVentZoneCount))
-!    ALLOCATE(VentilationMechanical(VentMechNum)%TempZoneADEffSchName(MechVentZoneCount))
-!    VentilationMechanical(VentMechNum)%TempZoneADEffCooling = 1.0
-!    VentilationMechanical(VentMechNum)%TempZoneADEffHeating = 1.0
-!    VentilationMechanical(VentMechNum)%TempZoneADEffSchPtr = 0
-!    VentilationMechanical(VentMechNum)%TempZoneADEffSchName = ' '
-
 
     MechVentZoneCount = 0
 
@@ -2285,14 +2279,21 @@ IF(NumVentMechControllers .GT. 0) THEN
                  VentilationMechanical(VentMechNum)%ZoneDesignSpecOAObjIndex(MechVentZoneCount) = &
                                 ZoneSizingInput(ObjIndex)%ZoneDesignSpecOAIndex
                  ObjIndex = VentilationMechanical(VentMechNum)%ZoneDesignSpecOAObjIndex(MechVentZoneCount)
-                 VentilationMechanical(VentMechNum)%ZoneOAAreaRate(MechVentZoneCount) =  &
-                    OARequirements(ObjIndex)%OAFlowPerArea
-                 VentilationMechanical(VentMechNum)%ZoneOAPeopleRate(MechVentZoneCount) = &
-                    OARequirements(ObjIndex)%OAFlowPerPerson
-                 VentilationMechanical(VentMechNum)%ZoneOAFlow(MechVentZoneCount) =  &
-                    OARequirements(ObjIndex)%OAFlowPerZone
-                 VentilationMechanical(VentMechNum)%ZoneOAACH = &
-                    OARequirements(ObjIndex)%OAFlowACH
+                 IF (ObjIndex > 0) THEN
+                   VentilationMechanical(VentMechNum)%ZoneOAAreaRate(MechVentZoneCount) =  &
+                      OARequirements(ObjIndex)%OAFlowPerArea
+                   VentilationMechanical(VentMechNum)%ZoneOAPeopleRate(MechVentZoneCount) = &
+                      OARequirements(ObjIndex)%OAFlowPerPerson
+                   VentilationMechanical(VentMechNum)%ZoneOAFlow(MechVentZoneCount) =  &
+                      OARequirements(ObjIndex)%OAFlowPerZone
+                   VentilationMechanical(VentMechNum)%ZoneOAACH = &
+                      OARequirements(ObjIndex)%OAFlowACH
+                 ELSE  ! use defaults
+                   VentilationMechanical(VentMechNum)%ZoneOAAreaRate(MechVentZoneCount) = 0.0d0
+                   VentilationMechanical(VentMechNum)%ZoneOAPeopleRate(MechVentZoneCount) = 0.00944d0
+                   VentilationMechanical(VentMechNum)%ZoneOAFlow(MechVentZoneCount) = 0.0d0
+                   VentilationMechanical(VentMechNum)%ZoneOAACH = 0.0d0
+                 ENDIF
                ELSE
                  CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//  &
                              trim(VentilationMechanical(VentMechNum)%Name)//'", missing')
@@ -2555,7 +2556,8 @@ IF(NumVentMechControllers .GT. 0) THEN
            '", Design Specification Outdoor Air Object Name blank')
         CALL ShowContinueError('For Zone="'//trim(Zone(VentilationMechanical(VentMechNum)%Zone(jZone))%Name)//'".')
         CALL ShowContinueError('This field either needs to be filled in in this object or Sizing:Zone object.')
-        ErrorsFound=.true.
+        CALL ShowContinueError('For this run, default values for these fields will be used.')
+!        ErrorsFound=.true.
       ENDIF
 !      IF (VentilationMechanical(VentMechNum)%ZoneDesignSpecADObjName(jZone) == blank) THEN
 !        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(VentilationMechanical(VentMechNum)%Name)//  &
@@ -2612,7 +2614,7 @@ IF(NumVentMechControllers .GT. 0) THEN
 
 ! write to .eio file
   Write(OutputFileInits,700)
- 700 Format('!<Controller:MechanicalVentilation>,Name,Availability Schedule Name,Demand Controlled Ventilation {Yes/No},' &
+ 700 Format('!<Controller:MechanicalVentilation>,Name,Availability Schedule Name,Demand Controlled Ventilation {Yes/No},', &
       'System Outdoor Air Method,Zone Maximum Outdoor Air Fraction,Number of Zones,Zone Name,DSOA Name,DSZAD Name')
   DO VentMechNum=1,NumVentMechControllers
     Write(OutputFileInits,'(A)',ADVANCE='NO') ' Controller:MechanicalVentilation,'//  &
@@ -2893,6 +2895,7 @@ SUBROUTINE InitOAController(OAControllerNum,FirstHVACIteration,AirLoopNum)
           !       DATE WRITTEN   Oct 1998
           !       MODIFIED       Shirey/Raustad FSEC, June/Aug 2003, Feb 2004
           !                      Tianzhen Hong, Feb 2009 for DCV
+          !                      Tianzhen Hong, Aug 2013 for economizer faults
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE
@@ -2984,6 +2987,11 @@ CHARACTER(len=MaxNameLength) :: airloopName ! Temporary equipment name
                                                                ! effectiveness schedule name for each zone
 CHARACTER(len=MaxNameLength) :: zoneName
 INTEGER :: jZone
+
+REAL(r64) :: rSchVal
+REAL(r64) :: rOffset
+INTEGER   :: i
+INTEGER   :: iEco
 
 
 ErrorsFound = .FALSE.
@@ -3367,7 +3375,7 @@ IF(MechVentCheckFlag(OAControllerNum))THEN
           ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(NumMechVentZone)
           IF(ZoneNum .EQ. NumZone)THEN
             FoundAreaZone = .TRUE.
-            IF(VentilationMechanical(VentMechObjectNum)%ZoneOAPeopleRate(NumMechVentZone) .GT. 0.0)THEN
+            IF(VentilationMechanical(VentMechObjectNum)%ZoneOAPeopleRate(NumMechVentZone) .GT. 0.0d0)THEN
               FoundPeopleZone = .TRUE.
             END IF
           EXIT
@@ -3549,13 +3557,13 @@ END IF
 IF (FirstHVACIteration) THEN
 ! Mixed air setpoint. Set by a setpoint manager.
   IF(OAController(OAControllerNum)%ControllerType_Num == ControllerOutsideAir)THEN
-    IF (Node(OAController(OAControllerNum)%MixNode)%TempSetPoint > 0.0) THEN
+    IF (Node(OAController(OAControllerNum)%MixNode)%TempSetPoint > 0.0d0) THEN
       OAController(OAControllerNum)%MixSetTemp = Node(OAController(OAControllerNum)%MixNode)%TempSetPoint
     ELSE
       OAController(OAControllerNum)%MixSetTemp = OAController(OAControllerNum)%TempLowLim
     END IF
 
-    TotalPeopleOAFlow = 0.0
+    TotalPeopleOAFlow = 0.0d0
     IF(VentMechObjectNum /= 0)THEN
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
@@ -3591,11 +3599,11 @@ IF(OAController(OAControllerNum)%ControllerType_Num == ControllerOutsideAir)THEN
                                                     OAController(OAControllerNum)%ExhMassFlow
     END IF
   ELSE
-    OAController(OAControllerNum)%ExhMassFlow = 0.0
+    OAController(OAControllerNum)%ExhMassFlow = 0.0d0
     OAController(OAControllerNum)%MixMassFlow = Node(OAController(OAControllerNum)%RetNode)%MassFlowRate
   END IF
-  IF (Node(OAController(OAControllerNum)%MixNode)%MassFlowRateMaxAvail <= 0.0) THEN
-    OAController(OAControllerNum)%MixMassFlow = 0.0
+  IF (Node(OAController(OAControllerNum)%MixNode)%MassFlowRateMaxAvail <= 0.0d0) THEN
+    OAController(OAControllerNum)%MixMassFlow = 0.0d0
   END IF
 ELSE
   ! Mixed and exhaust flow rates are passed through to model CONTROLLER:STAND ALONE ERV in SimOAController
@@ -3604,19 +3612,102 @@ ELSE
   OAController(OAControllerNum)%ExhMassFlow = Node(OAController(OAControllerNum)%RetNode)%MassFlowRate
 END IF
 OAController(OAControllerNum)%ExhMassFlow = MAX(OAController(OAControllerNum)%ExhMassFlow,0.0d0)
+
 ! Outside air values
 OAController(OAControllerNum)%OATemp = Node(OAController(OAControllerNum)%OANode)%Temp
 OAController(OAControllerNum)%OAEnth = Node(OAController(OAControllerNum)%OANode)%Enthalpy
 OAController(OAControllerNum)%OAPress = Node(OAController(OAControllerNum)%OANode)%Press
 OAController(OAControllerNum)%OAHumRat = Node(OAController(OAControllerNum)%OANode)%HumRat
+
 ! Inlet air values (on OA input side)
 OAController(OAControllerNum)%InletTemp = Node(OAController(OAControllerNum)%InletNode)%Temp
 OAController(OAControllerNum)%InletEnth = Node(OAController(OAControllerNum)%InletNode)%Enthalpy
 OAController(OAControllerNum)%InletPress = Node(OAController(OAControllerNum)%InletNode)%Press
 OAController(OAControllerNum)%InletHumRat = Node(OAController(OAControllerNum)%InletNode)%HumRat
+
 ! Return air values
 OAController(OAControllerNum)%RetTemp = Node(OAController(OAControllerNum)%RetNode)%Temp
 OAController(OAControllerNum)%RetEnth = Node(OAController(OAControllerNum)%RetNode)%Enthalpy
+
+
+!
+! Check sensors faults for the air economizer
+!
+iEco = OAController(OAControllerNum)%Econo
+IF (AnyFaultsInModel .AND. (iEco > NoEconomizer)) THEN
+  DO i = 1, NumFaults
+    IF ((Faults(i)%ControllerTypeEnum == iController_AirEconomizer) .AND. &
+        (Faults(i)%ControllerID == OAControllerNum)) THEN
+
+      IF (GetCurrentScheduleValue(Faults(i)%AvaiSchedPtr) > 0.0d0) THEN
+        rSchVal = 1.0d0
+        IF (Faults(i)%SeveritySchedPtr > 0) THEN
+          rSchVal = GetCurrentScheduleValue(Faults(i)%SeveritySchedPtr)
+        ENDIF
+      ELSE
+        ! no fault
+        CYCLE
+      ENDIF
+
+      rOffset = rSchVal * Faults(i)%Offset
+
+      IF(ABS(rOffset) < 0.000000001d0) CYCLE
+
+      ! ECONOMIZER - outdoor air dry-bulb temperature sensor offset
+      SELECT CASE(iEco)
+        CASE(FixedDryBulb, DifferentialDryBulb, FixedDewpointAndDryBulb, ElectronicEnthalpy, DifferentialDryBulbAndEnthalpy)
+          IF(Faults(i)%FaultTypeEnum == iFault_TemperatureSensorOffset_OutdoorAir) THEN
+            ! FaultModel:TemperatureSensorOffset:OutdoorAir
+            OAController(OAControllerNum)%OATemp = OAController(OAControllerNum)%OATemp + rOffset
+            OAController(OAControllerNum)%InletTemp = OAController(OAControllerNum)%InletTemp + rOffset
+          ENDIF
+        CASE DEFAULT
+        END SELECT
+
+      ! ECONOMIZER - outdoor air humidity ratio sensor offset. really needed ???
+      SELECT CASE(iEco)
+        CASE(FixedDewpointAndDryBulb, ElectronicEnthalpy)
+          IF(Faults(i)%FaultTypeEnum == iFault_HumiditySensorOffset_OutdoorAir) THEN
+            ! FaultModel:HumiditySensorOffset:OutdoorAir
+            OAController(OAControllerNum)%OAHumRat = OAController(OAControllerNum)%OAHumRat + rOffset
+            OAController(OAControllerNum)%InletHumRat = OAController(OAControllerNum)%InletHumRat + rOffset
+          ENDIF
+        CASE DEFAULT
+        END SELECT
+
+      ! ECONOMIZER - outdoor air enthalpy sensor offset
+      SELECT CASE(iEco)
+        CASE(FixedEnthalpy, ElectronicEnthalpy, DifferentialDryBulbAndEnthalpy)
+          IF(Faults(i)%FaultTypeEnum == iFault_EnthalpySensorOffset_OutdoorAir) THEN
+            ! FaultModel:EnthalpySensorOffset:OutdoorAir
+            OAController(OAControllerNum)%OAEnth = OAController(OAControllerNum)%OAEnth + rOffset
+            OAController(OAControllerNum)%InletEnth = OAController(OAControllerNum)%InletEnth + rOffset
+          ENDIF
+        CASE DEFAULT
+       END SELECT
+
+      ! ECONOMIZER - return air dry-bulb temperature sensor offset
+      SELECT CASE(iEco)
+        CASE(DifferentialDryBulb, DifferentialDryBulbAndEnthalpy)
+          IF(Faults(i)%FaultTypeEnum == iFault_TemperatureSensorOffset_ReturnAir) THEN
+            ! FaultModel:TemperatureSensorOffset:ReturnAir
+            OAController(OAControllerNum)%RetTemp = OAController(OAControllerNum)%RetTemp + rOffset
+          ENDIF
+        CASE DEFAULT
+      END SELECT
+
+      ! ECONOMIZER - return air enthalpy sensor offset
+      SELECT CASE(iEco)
+        CASE(ElectronicEnthalpy, DifferentialDryBulbAndEnthalpy)
+          IF(Faults(i)%FaultTypeEnum == iFault_EnthalpySensorOffset_ReturnAir) THEN
+            ! FaultModel:EnthalpySensorOffset:ReturnAir
+            OAController(OAControllerNum)%RetEnth = OAController(OAControllerNum)%RetEnth + rOffset
+          ENDIF
+        CASE DEFAULT
+      END SELECT
+    ENDIF
+  ENDDO
+ENDIF
 
 IF (ErrorsFound) THEN
   CALL ShowFatalError('Error in '//trim(CurrentModuleObjects(CMO_OAController))//'; program terminated')
@@ -3819,18 +3910,18 @@ REAL(r64) :: ZoneMinCO2                   ! Minimum CO2 concentration in zone
 REAL(r64) :: ZoneContamControllerSched    ! Schedule value for ZoneControl:ContaminantController
 
 LOGICAL   :: MultiPath = .FALSE.     ! TRUE if multi-path ventilation system such as dual fan dual duct, VAV with fan-powered box
-REAL(r64) :: Ep = 1.0                ! zone primary air fraction
-REAL(r64) :: Er = 0.0                ! zone secondary recirculation fraction
-REAL(r64) :: Fa = 1.0                ! temporary variable used in multi-path VRP calc
-REAL(r64) :: Fb = 1.0
-REAL(r64) :: Fc = 1.0
-REAL(r64) :: Xs = 1.0                ! uncorrected system outdoor air fraction
-REAL(r64) :: Evz = 1.0               ! zone ventilation efficiency
+REAL(r64) :: Ep = 1.0d0                ! zone primary air fraction
+REAL(r64) :: Er = 0.0d0                ! zone secondary recirculation fraction
+REAL(r64) :: Fa = 1.0d0                ! temporary variable used in multi-path VRP calc
+REAL(r64) :: Fb = 1.0d0
+REAL(r64) :: Fc = 1.0d0
+REAL(r64) :: Xs = 1.0d0                ! uncorrected system outdoor air fraction
+REAL(r64) :: Evz = 1.0d0               ! zone ventilation efficiency
 
 INTEGER   :: PriNode                 ! primary node of zone terminal unit
 INTEGER   :: InletNode               ! outlet node of zone terminal unit
 
-MinOASchedVal = 1.0
+MinOASchedVal = 1.0d0
 ZoneMaxCO2 = 0.d0
 ZoneMinCO2 = 0.d0
 ZoneOAMin = 0.d0
@@ -3850,17 +3941,17 @@ END IF
 ! Check for no flow
 IF (OAController(OAControllerNum)%MixMassFlow .LE. SmallMassFlow) THEN
 
-  OAController(OAControllerNum)%OAMassFlow = 0.        ! outside air mass flow rate
-  OAController(OAControllerNum)%RelMassFlow = 0.       ! relief air mass flow rate
-  OAController(OAControllerNum)%MixMassFlow = 0.       ! mixed air mass flow rate
-  OAController(OAControllerNum)%MinOAFracLimit = 0.    ! minimum OA fraction limit
+  OAController(OAControllerNum)%OAMassFlow = 0.0d0        ! outside air mass flow rate
+  OAController(OAControllerNum)%RelMassFlow = 0.0d0       ! relief air mass flow rate
+  OAController(OAControllerNum)%MixMassFlow = 0.0d0       ! mixed air mass flow rate
+  OAController(OAControllerNum)%MinOAFracLimit = 0.0d0    ! minimum OA fraction limit
 
   OAController(OAControllerNum)%EconomizerStatus = 0   ! economizer status for reporting
   OAController(OAControllerNum)%HeatRecoveryBypassStatus = 0   ! HR bypass status for reporting
   OAController(OAControllerNum)%HRHeatingCoilActive = 0 ! resets report variable
   OAController(OAControllerNum)%MixedAirTempAtMinOAFlow = Node(OAController(OAControllerNum)%RetNode)%Temp ! track return T
   OAController(OAControllerNum)%HighHumCtrlStatus = 0  ! high humdity control status for reporting
-  OAController(OAControllerNum)%OAFractionRpt = 0.     ! actual OA fraction for reporting
+  OAController(OAControllerNum)%OAFractionRpt = 0.0d0     ! actual OA fraction for reporting
 
   OAControllerInfo(OAControllerNum)%EconoActive       = .FALSE. ! DataAirLoop variable (OA Controllers)
   OAControllerInfo(OAControllerNum)%HighHumCtrlActive = .FALSE. ! DataAirLoop variable (OA Controllers)
@@ -3883,13 +3974,13 @@ IF (AirLoopNum > 0) THEN
   IF (AirLoopFlow(AirLoopNum)%DesSupply >= SmallAirVolFlow) THEN
     OutAirMinFrac = OAController(OAControllerNum)%MinOAMassFlowRate / AirLoopFlow(AirLoopNum)%DesSupply
   ELSE
-    OutAirMinFrac = 0.0
+    OutAirMinFrac = 0.0d0
   END IF
 ELSE
   IF (OAController(OAControllerNum)%MaxOA >= SmallAirVolFlow) THEN
     OutAirMinFrac = OAController(OAControllerNum)%MinOA / OAController(OAControllerNum)%MaxOA
   ELSE
-    OutAirMinFrac = 0.0
+    OutAirMinFrac = 0.0d0
   END IF
 END IF
 IF (OAController(OAControllerNum)%MinOASchPtr .GT.0) THEN
@@ -3913,7 +4004,7 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
     !ELSE IF (VentilationMechanical(VentMechObjectNum)%SystemOAMethod == SOAM_IAQP) THEN
     IF (VentilationMechanical(VentMechObjectNum)%SystemOAMethod == SOAM_IAQP) THEN
       ! IAQP for CO2 control
-      SysOA = 0.0
+      SysOA = 0.0d0
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
         SysOA = SysOA + ZoneSysContDemand(ZoneNum)%OutputRequiredToCO2SP
@@ -3921,7 +4012,7 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
       MechVentOutsideAirFlow = SysOA
     ELSE IF (VentilationMechanical(VentMechObjectNum)%SystemOAMethod == SOAM_IAQPGC) THEN
       ! IAQP for generic contaminant control
-      SysOA = 0.0
+      SysOA = 0.0d0
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
         SysOA = SysOA + ZoneSysContDemand(ZoneNum)%OutputRequiredToGCSP
@@ -3929,13 +4020,13 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
       MechVentOutsideAirFlow = SysOA
     ELSE IF (VentilationMechanical(VentMechObjectNum)%SystemOAMethod == SOAM_IAQPCOM) THEN
       ! IAQP for both CO2 and generic contaminant control
-      SysOA = 0.0
+      SysOA = 0.0d0
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
         SysOA = SysOA + ZoneSysContDemand(ZoneNum)%OutputRequiredToCO2SP
       END DO
       MechVentOutsideAirFlow = SysOA
-      SysOA = 0.0
+      SysOA = 0.0d0
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
         SysOA = SysOA + ZoneSysContDemand(ZoneNum)%OutputRequiredToGCSP
@@ -3946,8 +4037,8 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
       ! new code for DCV method complying with the VRP defined in ASHRAE Standard 62.1-2010
 
       ! Loop through each zone first to calc uncorrected system OA flow rate
-      SysOAuc = 0.0
-      SysOA = 0.0
+      SysOAuc = 0.0d0
+      SysOA = 0.0d0
       DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
         ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
 
@@ -4019,22 +4110,22 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
         ENDIF
 
         ! System supply air flow rate is always greater than or equal the system outdoor air flow rate
-        IF ((SysSA > 0.0) .AND. (SysSA < (SysOAuc*StdRhoAir))) SysSA = SysOAuc*StdRhoAir
+        IF ((SysSA > 0.0d0) .AND. (SysSA < (SysOAuc*StdRhoAir))) SysSA = SysOAuc*StdRhoAir
 
         ! calc Xs - average outdoor air fraction
-        IF (SysSA > 0.0) THEN
+        IF (SysSA > 0.0d0) THEN
           Xs = (SysOAuc*StdRhoAir) / SysSA
         ELSE
-          Xs = 0.0
+          Xs = 0.0d0
         ENDIF
 
         ! Loop through each zone again
-        SysEv = 2.0 ! starting with a big fraction
+        SysEv = 2.0d0 ! starting with a big fraction
         DO ZoneIndex = 1, VentilationMechanical(VentMechObjectNum)%NumofVentMechZones
           ZoneNum = VentilationMechanical(VentMechObjectNum)%Zone(ZoneIndex)
           ZoneName = Zone(ZoneNum)%Name
           ZoneEquipConfigNum = ZoneNum  ! correspondence - 1:1 of ZoneEquipConfig to Zone index
-          ZoneEz = 0.0
+          ZoneEz = 0.0d0
 
           ! Calc the zone OA flow rate based on the people component
           ! ZoneIntGain(ZoneNum)%NOFOCC is the number of occupants of a zone at each time step, already counting the occupant schedule
@@ -4092,14 +4183,14 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
             ZoneLoad = ZoneSysEnergyDemand(ZoneEquipConfig(ZoneEquipConfigNum)%ActualZoneNum)%TotalOutputRequired
 
             ! Zone in cooling mode
-            IF (ZoneLoad < 0.0) ZoneEz = VentilationMechanical(VentMechObjectNum)%ZoneADEffCooling(ZoneIndex)
+            IF (ZoneLoad < 0.0d0) ZoneEz = VentilationMechanical(VentMechObjectNum)%ZoneADEffCooling(ZoneIndex)
 
             ! Zone in heating mode
-            IF (ZoneLoad > 0.0) ZoneEz = VentilationMechanical(VentMechObjectNum)%ZoneADEffHeating(ZoneIndex)
+            IF (ZoneLoad > 0.0d0) ZoneEz = VentilationMechanical(VentMechObjectNum)%ZoneADEffHeating(ZoneIndex)
           ENDIF
-          IF (ZoneEz <= 0.0) THEN
+          IF (ZoneEz <= 0.0d0) THEN
             !Enforce defaults
-            ZoneEz = 1.0
+            ZoneEz = 1.0d0
           ENDIF
 
           ! Calc zone supply OA flow rate
@@ -4128,7 +4219,7 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
 
                     ! Calculate zone maximum target CO2 concentration in PPM
                     ZoneMaxCO2 = OutdoorCO2 + &
-                                (ZoneCO2GainFromPeople(ZoneNum) * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier *1.0E6) &
+                                (ZoneCO2GainFromPeople(ZoneNum) * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier *1.0d6) &
                                 / ZoneOAMax
 
                     IF (ZoneMaxCO2 .LE. ZoneMinCO2) THEN
@@ -4211,9 +4302,9 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
           ENDIF
 
           ! Get the zone supply air flow rate
-          ZoneSA = 0.0
-          ZonePA = 0.0
-          Ep = 1.0
+          ZoneSA = 0.0d0
+          ZonePA = 0.0d0
+          Ep = 1.0d0
           IF (ZoneEquipConfigNum > 0) THEN
             DO InNodeIndex = 1,ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
               ! Assume primary air is always stored at the AirDistUnitCool (cooling deck if dual duct)
@@ -4223,10 +4314,10 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
                 NodeHumRat = Node(PriNode)%HumRat
                 MassFlowRate = Node(PriNode)%MassFlowRate
               ELSE
-                MassFlowRate = 0.0
+                MassFlowRate = 0.0d0
               END IF
               ! total primary air to terminal units of the zone
-              IF (MassFlowRate > 0.0) ZonePA = ZonePA + MassFlowRate / PsyRhoAirFnPbTdbW(OutBaroPress,NodeTemp,NodeHumRat)
+              IF (MassFlowRate > 0.0d0) ZonePA = ZonePA + MassFlowRate / PsyRhoAirFnPbTdbW(OutBaroPress,NodeTemp,NodeHumRat)
 
               ! or InletNode = ZoneEquipConfig(ZoneEquipConfigNum)%AirDistUnitCool(InNodeIndex)%OutNode
               InletNode = ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(InNodeIndex)
@@ -4235,24 +4326,24 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
                 NodeHumRat = Node(InletNode)%HumRat  ! ZoneAirHumRat(ZoneNum)
                 MassFlowRate = Node(InletNode)%MassFlowRate
               ELSE
-                MassFlowRate = 0.0
+                MassFlowRate = 0.0d0
               END IF
               ! total supply air to the zone
-              IF (MassFlowRate > 0.0) ZoneSA = ZoneSA + MassFlowRate / PsyRhoAirFnPbTdbW(OutBaroPress,NodeTemp,NodeHumRat)
+              IF (MassFlowRate > 0.0d0) ZoneSA = ZoneSA + MassFlowRate / PsyRhoAirFnPbTdbW(OutBaroPress,NodeTemp,NodeHumRat)
             END DO
 
             ! calc zone primary air fraction
-            IF (ZoneSA > 0.0) Ep = ZonePA / ZoneSA
-            IF (Ep > 1.0) Ep = 1.0
+            IF (ZoneSA > 0.0d0) Ep = ZonePA / ZoneSA
+            IF (Ep > 1.0d0) Ep = 1.0d0
           END IF
 
           ! Calc the zone OA fraction = Zone OA flow rate / Zone supply air flow rate
-          IF (ZoneSA > 0.0) THEN
+          IF (ZoneSA > 0.0d0) THEN
             ZoneOAFrac = ZoneOA / ZoneSA
             ! Zone OA fraction cannot be more than 1
-            IF (ZoneOAFrac > 1.0) ZoneOAFrac = 1.0
+            IF (ZoneOAFrac > 1.0d0) ZoneOAFrac = 1.0d0
           ELSE
-            ZoneOAFrac = 0.0
+            ZoneOAFrac = 0.0d0
           ENDIF
 
           ! added for TRACE - zone maximum OA fraction - calculate the adjustment factor for the TU/zone supply air flow
@@ -4261,7 +4352,7 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
 
           IF (VentilationMechanical(VentMechObjectNum)%SystemOAMethod == SOAM_VRP) THEN
             IF (ZoneOAFrac > VentilationMechanical(VentMechObjectNum)%ZoneMaxOAFraction) THEN
-              IF (VentilationMechanical(VentMechObjectNum)%ZoneMaxOAFraction > 0.0) THEN
+              IF (VentilationMechanical(VentMechObjectNum)%ZoneMaxOAFraction > 0.0d0) THEN
                 ZoneSysEnergyDemand(ZoneEquipConfigNum)%SupplyAirAdjustFactor =  &
                  ZoneOAFrac / VentilationMechanical(VentMechObjectNum)%ZoneMaxOAFraction
               ELSE
@@ -4275,31 +4366,31 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
 
           ! Zone air secondary recirculation fraction
           Er = VentilationMechanical(VentMechObjectNum)%ZoneSecondaryRecirculation(ZoneIndex)
-          IF (Er > 0.0) THEN
+          IF (Er > 0.0d0) THEN
             ! multi-path ventilation system using VRP
-            Fa = Ep + (1.0 - Ep) * Er
+            Fa = Ep + (1.0d0 - Ep) * Er
             Fb = Ep
-            Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+            Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
 
             ! Calc zone ventilation efficiency
-            IF (Fa > 0.0) THEN
-              Evz = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+            IF (Fa > 0.0d0) THEN
+              Evz = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
             ELSE
-              Evz = 1.0
+              Evz = 1.0d0
             ENDIF
           ELSE
             ! single-path ventilation system
-            Evz = 1.0 + Xs - ZoneOAFrac
+            Evz = 1.0d0 + Xs - ZoneOAFrac
           ENDIF
 
           ! calc system ventilation efficiency = Minimum of zone ventilation efficiency
-          IF (Evz < 0.0) Evz = 0.0
+          IF (Evz < 0.0d0) Evz = 0.0d0
           IF (Evz < SysEv) SysEv = Evz
 
         ENDDO  ! zone loop
 
         ! Calc the system supply OA flow rate counting the system ventilation efficiency
-        IF (SysEv <= 0.0) SysEv = 1.0
+        IF (SysEv <= 0.0d0) SysEv = 1.0d0
 
         ! Calc system outdoor air requirement
         SysOA = SysOAuc / SysEv
@@ -4311,8 +4402,8 @@ IF(AirLoopNum > 0 .AND. VentMechObjectNum /= 0)THEN
 
     MechVentOutsideAirMinFrac = MechVentOutsideAirFlow / AirLoopFlow(AirLoopNum)%DesSupply
   ELSE
-    MechVentOutsideAirMinFrac = 0.0
-    MechVentOutsideAirFlow    = 0.0
+    MechVentOutsideAirMinFrac = 0.0d0
+    MechVentOutsideAirFlow    = 0.0d0
   END IF
 
   IF(AirLoopflow(AirLoopNum)%FanPLR .GT. 0.0D0)THEN
@@ -4333,17 +4424,17 @@ IF (ABS(OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%In
   OutAirSignal = (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%MixSetTemp) &
                    / (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%InletTemp)
 ELSE
-  IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%MixSetTemp .LT. 0.) THEN
-    IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%InletTemp .GE. 0.) THEN
-      OutAirSignal = -1.
+  IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%MixSetTemp .LT. 0.0d0) THEN
+    IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%InletTemp .GE. 0.0d0) THEN
+      OutAirSignal = -1.d0
     ELSE
-      OutAirSignal = 1.
+      OutAirSignal = 1.d0
     ENDIF
   ELSE
-    IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%InletTemp .GE. 0.) THEN
-      OutAirSignal = 1.
+    IF (OAController(OAControllerNum)%RetTemp - OAController(OAControllerNum)%InletTemp .GE. 0.0d0) THEN
+      OutAirSignal = 1.d0
     ELSE
-      OutAirSignal = -1.
+      OutAirSignal = -1.d0
     ENDIF
   ENDIF
 ENDIF
@@ -4353,17 +4444,17 @@ OutAirSignal = MIN(MAX(OutAirSignal,OutAirMinFrac),1.0d0)
 IF (OAController(OAControllerNum)%Econo .EQ. NoEconomizer) THEN
   OutAirSignal = OutAirMinFrac
   EconomizerOperationFlag = .FALSE.
-  EconomizerAirFlowScheduleValue = 0.0
+  EconomizerAirFlowScheduleValue = 0.0d0
   HighHumidityOperationFlag = .FALSE.
 ELSE IF (OAController(OAControllerNum)%MaxOA < SmallAirVolFlow) THEN
   OutAirSignal = OutAirMinFrac
   EconomizerOperationFlag = .FALSE.
-  EconomizerAirFlowScheduleValue = 0.0
+  EconomizerAirFlowScheduleValue = 0.0d0
   HighHumidityOperationFlag = .FALSE.
 ELSE IF (AirLoopEconoLockout) THEN
   OutAirSignal = OutAirMinFrac
   EconomizerOperationFlag = .FALSE.
-  EconomizerAirFlowScheduleValue = 0.0
+  EconomizerAirFlowScheduleValue = 0.0d0
   HighHumidityOperationFlag = .FALSE.
 ELSE
 !Changed by Amit for new implementation
@@ -4371,7 +4462,7 @@ ELSE
   EconomizerOperationFlag = .TRUE.
   ! Outside air temp greater than mix air setpoint
   IF (OAController(OAControllerNum)%InletTemp.GT.OAController(OAControllerNum)%MixSetTemp) THEN
-    OutAirSignal = 1.0
+    OutAirSignal = 1.0d0
   ENDIF
   ! Return air temp limit
   IF (OAController(OAControllerNum)%Econo .EQ. DifferentialDryBulb) THEN
@@ -4427,7 +4518,7 @@ ELSE
   ! (HumidistatZoneNum is greater than 0 IF High Humidity Control Flag = YES, checked in GetInput)
   IF(OAController(OAControllerNum)%HumidistatZoneNum .GT. 0)THEN
 !   IF humidistat senses a moisture load check to see if modifying air flow is appropriate, otherwise disable modified air flow
-    IF(ZoneSysMoistureDemand(OAController(OAControllerNum)%HumidistatZoneNum)%TotalOutputRequired .LT. 0.0)THEN
+    IF(ZoneSysMoistureDemand(OAController(OAControllerNum)%HumidistatZoneNum)%TotalOutputRequired .LT. 0.0d0)THEN
 !     IF OAController is not allowed to modify air flow during high outdoor humrat condition, then disable modified air flow
 !     if indoor humrat is less than or equal to outdoor humrat
       IF(.NOT. OAController(OAControllerNum)%ModifyDuringHighOAMoisture .AND. &
@@ -4444,12 +4535,12 @@ ELSE
   END IF
 
 ! Check time of day economizer schedule, enable economizer if schedule value > 0
-  EconomizerAirFlowScheduleValue = 0.0
+  EconomizerAirFlowScheduleValue = 0.0d0
   IF(OAController(OAControllerNum)%EconomizerOASchedPtr .GT. 0)THEN
     EconomizerAirFlowScheduleValue = GetCurrentScheduleValue(OAController(OAControllerNum)%EconomizerOASchedPtr)
-    IF(EconomizerAirFlowScheduleValue .GT. 0.0) THEN
+    IF(EconomizerAirFlowScheduleValue .GT. 0.0d0) THEN
       EconomizerOperationFlag = .TRUE.
-      OutAirSignal = 1.0
+      OutAirSignal = 1.0d0
     END IF
   END IF
 
@@ -4458,7 +4549,7 @@ END IF
 ! OutAirSignal will not give exactly the correct mixed air temperature (equal to the setpoint) since
 ! it was calculated using the approximate method of sensible energy balance. Now we have to get the
 ! accurate result using a full mass, enthalpy and moisture balance and iteration.
-IF ( OutAirSignal > OutAirMinFrac .AND. OutAirSignal < 1.0 .AND. &
+IF ( OutAirSignal > OutAirMinFrac .AND. OutAirSignal < 1.0d0 .AND. &
      OAController(OAControllerNum)%MixMassFlow > VerySmallMassFlow .AND. &
      OAController(OAControllerNum)%ControllerType_Num == ControllerOutsideAir .AND. &
      .NOT. AirLoopNightVent) THEN
@@ -4476,13 +4567,13 @@ END IF
 
 ! Economizer choice "Bypass" forces minimum OA except when high humidity air flow is active based on indoor RH
 IF (OAController(OAControllerNum)%EconBypass .AND. &
-    EconomizerAirFlowScheduleValue .EQ. 0.0)THEN
+    EconomizerAirFlowScheduleValue .EQ. 0.0d0)THEN
  OASignal = OutAirMinFrac
 END IF
 
 ! Set outdoor air signal based on OA flow ratio if high humidity air flow is enabled
 IF(HighHumidityOperationFlag) THEN
-  IF(OAController(OAControllerNum)%MixMassFlow .GT. 0.0)THEN
+  IF(OAController(OAControllerNum)%MixMassFlow .GT. 0.0d0)THEN
 !   calculate the actual ratio of outside air to mixed air so the magnitude of OA during high humidity control is correct
     OASignal = MAX(OutAirMinFrac, &
                   (OAController(OAControllerNum)%HighRHOAFlowRatio*OAController(OAControllerNum)%MaxOAMassFlowRate/ &
@@ -4491,7 +4582,7 @@ IF(HighHumidityOperationFlag) THEN
 END IF
 
 ! Night ventilation control overrides economizer and high humidity control.
-IF (AirLoopNightVent)OASignal = 1.0
+IF (AirLoopNightVent)OASignal = 1.0d0
 
 ! Changed by Amit for new feature
 IF (OAController(OAControllerNum)%MinOAflowSchPtr .GT.0) THEN
@@ -4580,13 +4671,13 @@ ENDIF
 ! save the min outside air flow fraction and max outside air mass flow rate
 IF (AirLoopNum > 0) THEN
   AirLoopFlow(AirLoopNum)%OAMinFrac = OutAirMinFrac
-  IF(OAController(OAControllerNum)%MixMassFlow .GT. 0.0)THEN
+  IF(OAController(OAControllerNum)%MixMassFlow .GT. 0.0d0)THEN
     AirLoopFlow(AirLoopNum)%OAFrac = OAController(OAControllerNum)%OAMassflow / OAController(OAControllerNum)%MixMassFlow
   ELSE
     AirLoopFlow(AirLoopNum)%OAFrac = 0.0D0
   END IF
   OAController(OAControllerNum)%MinOAFracLimit = OutAirMinFrac
-  IF(HighHumidityOperationFlag .AND. OASignal .GT. 1.0)THEN
+  IF(HighHumidityOperationFlag .AND. OASignal .GT. 1.0d0)THEN
     AirLoopFlow(AirLoopNum)%MaxOutAir = OAController(OAControllerNum)%MaxOAMassFlowRate * OASignal
   ELSE
     AirLoopFlow(AirLoopNum)%MaxOutAir = OAController(OAControllerNum)%MaxOAMassFlowRate
@@ -4724,7 +4815,7 @@ ELSE
   IF (OAController(OAControllerNum)%OAMassflow > 0) THEN
     OAController(OAControllerNum)%OAFractionRpt = OASignal
   ELSE
-    OAController(OAControllerNum)%OAFractionRpt = 0
+    OAController(OAControllerNum)%OAFractionRpt = 0.0d0
   ENDIF
 ENDIF
 
@@ -4776,8 +4867,8 @@ REAL(r64) :: RecircHumRat
 RecircMassFlowRate = OAMixer(OAMixerNum)%RetMassFlowRate - OAMixer(OAMixerNum)%RelMassFlowRate
 !In certain low flow conditions the return air mass flow rate can be below the outside air value established
 !  by the user.  This check will ensure that this condition does not result in unphysical air properties.
-If(RecircMassFlowRate < 0.0)THEN
-  RecircMassFlowRate = 0.0
+If(RecircMassFlowRate < 0.0d0)THEN
+  RecircMassFlowRate = 0.0d0
   OAMixer(OAMixerNum)%RelMassFlowRate = OAMixer(OAMixerNum)%RetMassFlowRate
 END IF
 
@@ -4920,7 +5011,7 @@ SUBROUTINE SizeOAController(OAControllerNum)
     END IF
 
     IF (OAController(OAControllerNum)%MaxOA < SmallAirVolFlow) THEN
-      OAController(OAControllerNum)%MaxOA = 0.0
+      OAController(OAControllerNum)%MaxOA = 0.0d0
     END IF
 
     CALL ReportSizingOutput(CurrentModuleObject,OAController(OAControllerNum)%Name,&
@@ -4936,7 +5027,7 @@ SUBROUTINE SizeOAController(OAControllerNum)
       IF (FinalSysSizing(CurSysNum)%DesOutAirVolFlow >= SmallAirVolFlow) THEN
         OAController(OAControllerNum)%MinOA = MIN(FinalSysSizing(CurSysNum)%DesOutAirVolFlow,OAController(OAControllerNum)%MaxOA)
       ELSE
-        OAController(OAControllerNum)%MinOA = 0.0
+        OAController(OAControllerNum)%MinOA = 0.0d0
       END IF
 
     END IF
@@ -4945,7 +5036,7 @@ SUBROUTINE SizeOAController(OAControllerNum)
                             'Minimum Outdoor Air Flow Rate [m3/s]',OAController(OAControllerNum)%MinOA)
 
     IF(OAController(OAControllerNum)%HumidistatZoneNum .GT. 0 .AND. OAController(OAControllerNum)%FixedMin)THEN
-      IF(OAController(OAControllerNum)%MaxOA .GT. 0.0)THEN
+      IF(OAController(OAControllerNum)%MaxOA .GT. 0.0d0)THEN
         OAFlowRatio = OAController(OAControllerNum)%MinOA/OAController(OAControllerNum)%MaxOA
         IF(OAController(OAControllerNum)%HighRHOAFlowRatio .LT. OAFlowRatio)THEN
           CALL ShowWarningError(CurrentModuleObject//' "'//TRIM(OAController(OAControllerNum)%Name)//'"')
@@ -5626,7 +5717,7 @@ FUNCTION GetOASysNumHeatingCoils(OASysNumber) RESULT(NumHeatingCoils)
     CompType = OutsideAirSys(OASysNumber)%ComponentType(CompNum)
     CompName = OutsideAirSys(OASysNumber)%ComponentName(CompNum)
     CALL SimOAComponent(CompType,CompName,OutsideAirSys(OASysNumber)%ComponentType_Num(CompNum),  &
-                        FirstHVACIteration,OutsideAirSys(OASysNumber)%ComponentIndex(CompNum),AirLoopNum,Sim, &
+                        FirstHVACIteration,OutsideAirSys(OASysNumber)%ComponentIndex(CompNum),AirLoopNum,Sim,OASysNumber, &
                         OAHeatingCoil,OACoolingCoil,OAHX)
     IF (OAHeatingCoil) THEN
       NumHeatingCoils = NumHeatingCoils + 1
@@ -5696,7 +5787,7 @@ FUNCTION GetOASysNumCoolingCoils(OASysNumber) RESULT(NumCoolingCoils)
     CompType = OutsideAirSys(OASysNumber)%ComponentType(CompNum)
     CompName = OutsideAirSys(OASysNumber)%ComponentName(CompNum)
     CALL SimOAComponent(CompType,CompName,OutsideAirSys(OASysNumber)%ComponentType_Num(CompNum),  &
-                        FirstHVACIteration,OutsideAirSys(OASysNumber)%ComponentIndex(CompNum),AirLoopNum,Sim, &
+                        FirstHVACIteration,OutsideAirSys(OASysNumber)%ComponentIndex(CompNum),AirLoopNum,Sim,OASysNumber, &
                         OAHeatingCoil,OACoolingCoil,OAHX)
     IF (OACoolingCoil) THEN
       NumCoolingCoils = NumCoolingCoils + 1

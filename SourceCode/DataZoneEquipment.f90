@@ -34,6 +34,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
   INTEGER, PARAMETER :: ZoneReturnPlenum_Type = 4
 
 ! Start zone equip objects
+! list units that are valid for zone system availability managers first
   INTEGER, PARAMETER :: FanCoil4Pipe_Num         = 1
   INTEGER, PARAMETER :: PkgTermHPAirToAir_Num    = 2
   INTEGER, PARAMETER :: PkgTermACAirToAir_Num    = 3
@@ -46,29 +47,31 @@ PUBLIC          ! By definition, all variables which are placed in this data
   INTEGER, PARAMETER :: OutdoorAirUnit_Num       = 10
   INTEGER, PARAMETER :: VRFTerminalUnit_Num      = 11
   INTEGER, PARAMETER :: PurchasedAir_Num         = 12
-  INTEGER, PARAMETER :: AirDistUnit_Num          = 13
-  INTEGER, PARAMETER :: DirectAir_Num            = 14
-  INTEGER, PARAMETER :: BBWaterConvective_Num    = 15
-  INTEGER, PARAMETER :: BBElectricConvective_Num = 16
-  INTEGER, PARAMETER :: HiTempRadiant_Num        = 17
-  INTEGER, PARAMETER :: LoTempRadiant_Num        = 18
-  INTEGER, PARAMETER :: ZoneExhaustFan_Num       = 19
-  INTEGER, PARAMETER :: HeatXchngr_Num           = 20
-  INTEGER, PARAMETER :: HPWaterHeater_Num        = 21
-  INTEGER, PARAMETER :: BBWater_Num              = 22
-  INTEGER, PARAMETER :: ZoneDXDehumidifier_Num   = 23
-  INTEGER, PARAMETER :: BBSteam_Num              = 24
-  INTEGER, PARAMETER :: BBElectric_Num           = 25
-  INTEGER, PARAMETER :: RefrigerationAirChillerSet_Num   = 26
-  INTEGER, PARAMETER :: UserDefinedZoneHVACForcedAir_Num = 27
+  INTEGER, PARAMETER :: ZoneEvaporativeCoolerUnit_Num = 13
+  INTEGER, PARAMETER :: AirDistUnit_Num          = 14
+  INTEGER, PARAMETER :: DirectAir_Num            = 15
+  INTEGER, PARAMETER :: BBWaterConvective_Num    = 16
+  INTEGER, PARAMETER :: BBElectricConvective_Num = 17
+  INTEGER, PARAMETER :: HiTempRadiant_Num        = 18
+  INTEGER, PARAMETER :: LoTempRadiant_Num        = 19
+  INTEGER, PARAMETER :: ZoneExhaustFan_Num       = 20
+  INTEGER, PARAMETER :: HeatXchngr_Num           = 21
+  INTEGER, PARAMETER :: HPWaterHeater_Num        = 22
+  INTEGER, PARAMETER :: BBWater_Num              = 23
+  INTEGER, PARAMETER :: ZoneDXDehumidifier_Num   = 24
+  INTEGER, PARAMETER :: BBSteam_Num              = 25
+  INTEGER, PARAMETER :: BBElectric_Num           = 26
+  INTEGER, PARAMETER :: RefrigerationAirChillerSet_Num   = 27
+  INTEGER, PARAMETER :: UserDefinedZoneHVACForcedAir_Num = 28
+  INTEGER, PARAMETER :: ZoneUnitarySystem_Num = 29 ! AirloopHVAC:UnitarySystem configured as zone equipment
 !
-  INTEGER, PARAMETER :: TotalNumZoneEquipType = 27
+  INTEGER, PARAMETER :: TotalNumZoneEquipType = 29
   ! **NOTE**... if you add another zone equipment object, then increment
   ! TotalNumZoneEquipType above to match the total number of zone equipment types
 ! End zone equip objects
 
 
-  INTEGER, PARAMETER :: NumValidSysAvailZoneComponents = 12
+  INTEGER, PARAMETER :: NumValidSysAvailZoneComponents = 13
   CHARACTER(len=*), PARAMETER, DIMENSION(NumValidSysAvailZoneComponents) :: cValidSysAvailManagerCompTypes=    &
                  (/'ZoneHVAC:FourPipeFanCoil                        ',     &
                    'ZoneHVAC:PackagedTerminalHeatPump               ',     &
@@ -81,7 +84,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                    'ZoneHVAC:VentilatedSlab                         ',     &
                    'ZoneHVAC:OutdoorAirUnit                         ',     &
                    'ZoneHVAC:TerminalUnit:VariableRefrigerantFlow   ',     &
-                   'ZoneHVAC:IdealLoadsAirSystem                    '/)
+                   'ZoneHVAC:IdealLoadsAirSystem                    ',     &
+                   'ZoneHVAC:EvaporativeCoolerUnit                  ' /)
 
           ! DERIVED TYPE DEFINITIONS:
   TYPE EquipMeterData
@@ -94,7 +98,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER                               :: ReportVarIndex     =0
     INTEGER                               :: ReportVarIndexType =0
     INTEGER                               :: ReportVarType      =0
-    REAL(r64)                             :: CurMeterReading    =0
+    REAL(r64)                             :: CurMeterReading    =0.0d0
   END TYPE EquipMeterData
 
   TYPE SubSubEquipmentData  !data for an individual component
@@ -109,20 +113,20 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER                        :: EnergyTransComp  =0 !1=EnergyTransfer, 0=No EnergyTransfer  Flag needed for reporting
     INTEGER                        :: ZoneEqToPlantPtr =0 !0=No plant loop connection, >=0 index to ZoneEqToPlant array
     INTEGER                        :: OpMode = 0
-    REAL(r64)                      :: Capacity=0.0
-    REAL(r64)                      :: Efficiency=0.0
-    REAL(r64)                      :: TotPlantSupplyElec    =0.0
-    REAL(r64)                      :: PlantSupplyElecEff    =0.0
-    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0
-    REAL(r64)                      :: TotPlantSupplyGas     =0.0
-    REAL(r64)                      :: PlantSupplyGasEff     =0.0
-    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0
-    REAL(r64)                      :: TotPlantSupplyPurch   =0.0
-    REAL(r64)                      :: PlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: TotPlantSupplyOther   =0.0
-    REAL(r64)                      :: PlantSupplyOtherEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0
+    REAL(r64)                      :: Capacity=0.0d0
+    REAL(r64)                      :: Efficiency=0.0d0
+    REAL(r64)                      :: TotPlantSupplyElec    =0.0d0
+    REAL(r64)                      :: PlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: TotPlantSupplyGas     =0.0d0
+    REAL(r64)                      :: PlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: TotPlantSupplyPurch   =0.0d0
+    REAL(r64)                      :: PlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: TotPlantSupplyOther   =0.0d0
+    REAL(r64)                      :: PlantSupplyOtherEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0d0
   END TYPE SubSubEquipmentData
 
   TYPE SubEquipmentData  !data for an individual component
@@ -140,20 +144,20 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER                        :: EnergyTransComp  =0 !1=EnergyTransfer, 0=No EnergyTransfer  Flag needed for reporting
     INTEGER                        :: ZoneEqToPlantPtr =0 !0=No plant loop connection, >0 index to ZoneEqToPlant array
     INTEGER                        :: OpMode = 0
-    REAL(r64)                      :: Capacity=0.0
-    REAL(r64)                      :: Efficiency=0.0
-    REAL(r64)                      :: TotPlantSupplyElec    =0.0
-    REAL(r64)                      :: PlantSupplyElecEff    =0.0
-    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0
-    REAL(r64)                      :: TotPlantSupplyGas     =0.0
-    REAL(r64)                      :: PlantSupplyGasEff     =0.0
-    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0
-    REAL(r64)                      :: TotPlantSupplyPurch   =0.0
-    REAL(r64)                      :: PlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: TotPlantSupplyOther   =0.0
-    REAL(r64)                      :: PlantSupplyOtherEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0
+    REAL(r64)                      :: Capacity=0.0d0
+    REAL(r64)                      :: Efficiency=0.0d0
+    REAL(r64)                      :: TotPlantSupplyElec    =0.0d0
+    REAL(r64)                      :: PlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: TotPlantSupplyGas     =0.0d0
+    REAL(r64)                      :: PlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: TotPlantSupplyPurch   =0.0d0
+    REAL(r64)                      :: PlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: TotPlantSupplyOther   =0.0d0
+    REAL(r64)                      :: PlantSupplyOtherEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0d0
   END TYPE SubEquipmentData
 
   TYPE AirIn
@@ -164,7 +168,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
     INTEGER   :: SupplyBranchIndex   =0
     INTEGER   :: AirDistUnitIndex    =0    ! equipment number in EquipList
     INTEGER   :: SupplyAirPathIndex  =0
-    REAL(r64) :: NetBranchCoilDemand =0.0
+    REAL(r64) :: NetBranchCoilDemand =0.0d0
     TYPE (SubSubEquipmentData), ALLOCATABLE, DIMENSION(:) :: Coil
   END TYPE AirIn
 
@@ -223,19 +227,19 @@ PUBLIC          ! By definition, all variables which are placed in this data
     TYPE(SubEquipmentData), ALLOCATABLE, DIMENSION(:)   :: SubEquipData             ! Component list
     INTEGER                        :: EnergyTransComp  =0 !1=EnergyTransfer, 0=No EnergyTransfer  Flag needed for reporting
     INTEGER                        :: ZoneEqToPlantPtr =0 !0=No plant loop connection, >0 index to ZoneEqToPlant array
-    REAL(r64)                      :: TotPlantSupplyElec    =0.0
-    REAL(r64)                      :: PlantSupplyElecEff    =0.0
-    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0
-    REAL(r64)                      :: TotPlantSupplyGas     =0.0
-    REAL(r64)                      :: PlantSupplyGasEff     =0.0
-    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0
-    REAL(r64)                      :: TotPlantSupplyPurch   =0.0
-    REAL(r64)                      :: PlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0
-    REAL(r64)                      :: TotPlantSupplyOther   =0.0
-    REAL(r64)                      :: PlantSupplyOtherEff   =0.0
-    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0
-    REAL(r64)                      :: Capacity=0.0
+    REAL(r64)                      :: TotPlantSupplyElec    =0.0d0
+    REAL(r64)                      :: PlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyElecEff    =0.0d0
+    REAL(r64)                      :: TotPlantSupplyGas     =0.0d0
+    REAL(r64)                      :: PlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyGasEff     =0.0d0
+    REAL(r64)                      :: TotPlantSupplyPurch   =0.0d0
+    REAL(r64)                      :: PlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyPurchEff   =0.0d0
+    REAL(r64)                      :: TotPlantSupplyOther   =0.0d0
+    REAL(r64)                      :: PlantSupplyOtherEff   =0.0d0
+    REAL(r64)                      :: PeakPlantSupplyOtherEff   =0.0d0
+    REAL(r64)                      :: Capacity=0.0d0
     INTEGER                        :: OpMode = 0
   END TYPE EquipmentData
 
@@ -292,7 +296,6 @@ PUBLIC          ! By definition, all variables which are placed in this data
   LOGICAL :: ZoneEquipSimulatedOnce = .FALSE.
   INTEGER :: NumofZoneEquipLists  = 0 ! The Number of Zone Equipment List objects
   INTEGER, ALLOCATABLE :: ZoneEquipAvail(:)
-  LOGICAL, ALLOCATABLE :: DeltaTempWarning(:)
 
   TYPE (EquipConfiguration), ALLOCATABLE, DIMENSION(:) :: ZoneEquipConfig
   TYPE (EquipList), ALLOCATABLE, DIMENSION(:)          :: ZoneEquipList
@@ -309,6 +312,7 @@ PUBLIC  GetControlledZoneIndex
 PUBLIC  GetSystemNodeNumberForZone
 PUBLIC  GetReturnAirNodeForZone
 PUBLIC  CalcDesignSpecificationOutdoorAir
+PUBLIC FindControlledZoneIndexFromSystemNodeNumberForZone
 
 CONTAINS
 
@@ -398,7 +402,11 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneEquipmentData1: ' ! include t
           ! na
 
           ! DERIVED TYPE DEFINITIONS
-          ! na
+TYPE EquipListAudit
+  CHARACTER(len=MaxNameLength) :: ObjectType=' '
+  CHARACTER(len=MaxNameLength) :: ObjectName=' '
+  INTEGER :: OnListNum=0
+END TYPE
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER :: NumAlphas
@@ -436,6 +444,10 @@ LOGICAL :: IdealLoadsOnEquipmentList
 INTEGER :: found = 0
 INTEGER :: maxEquipCount
 INTEGER :: numEquipCount
+TYPE (EquipListAudit), ALLOCATABLE, DIMENSION(:) :: ZoneEquipListAcct
+INTEGER :: overallEquipCount
+INTEGER :: Loop1
+INTEGER :: Loop2
 
 
 ExhaustNodeListName = ' '
@@ -464,7 +476,7 @@ MaxNums=MAX(MaxNums,NumNums)
 ALLOCATE(AlphArray(MaxAlphas))
 AlphArray=' '
 ALLOCATE(NumArray(MaxNums))
-NumArray=0.0
+NumArray=0.0d0
 ALLOCATE(cAlphaFields(MaxAlphas))
 cAlphaFields=' '
 ALLOCATE(cNumericFields(MaxNums))
@@ -494,8 +506,6 @@ ALLOCATE (ZoneEquipConfig(NumOfZones)) ! Allocate the array containing the confi
                                                  ! be the same as the number of zones in the building
 ALLOCATE (ZoneEquipList(NumOfZones))
 ALLOCATE (ZoneEquipAvail(NumOfZones))
-ALLOCATE (DeltaTempWarning(NumOfZones))
-DeltaTempWarning = .TRUE.
 ZoneEquipAvail = NoAction
 
 IF (NumOfZoneEquipLists /= NumOfControlledZones) THEN
@@ -514,6 +524,8 @@ ENDIF
 
 
 CALL InitUniqueNodeCheck('ZoneHVAC:EquipmentConnections')
+
+  overallEquipCount=0
 
 DO ControlledZoneLoop = 1,NumOfControlledZones
 
@@ -568,9 +580,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     ErrorsFound=.true.
   ELSE
     UniqueNodeError=.false.
-    CALL CheckUniqueNodes('Zone Air Node','NodeName',UniqueNodeError,CheckName=AlphArray(5))
+    CALL CheckUniqueNodes(cAlphaFields(5),'NodeName',UniqueNodeError,CheckName=AlphArray(5),ObjectName=AlphArray(1))
     IF (UniqueNodeError) THEN
-      CALL ShowContinueError('Occurs for '//TRIM(cAlphaFields(1))//' = '//TRIM(AlphArray(1)))
+!      CALL ShowContinueError('Occurs for '//TRIM(cAlphaFields(1))//' = '//TRIM(AlphArray(1)))
       ErrorsFound=.true.
     ENDIF
   ENDIF
@@ -585,9 +597,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
                                                                     ! assigned to this node
   IF (ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode /= 0) THEN
     UniqueNodeError=.false.
-    CALL CheckUniqueNodes('Zone Return Air Node','NodeName',UniqueNodeError,CheckName=AlphArray(6))
+    CALL CheckUniqueNodes(cAlphaFields(6),'NodeName',UniqueNodeError,CheckName=AlphArray(6),ObjectName=AlphArray(1))
     IF (UniqueNodeError) THEN
-      CALL ShowContinueError('Occurs for '//TRIM(cAlphaFields(1))//' = '//TRIM(AlphArray(1)))
+!      CALL ShowContinueError('Occurs for '//TRIM(cAlphaFields(1))//' = '//TRIM(AlphArray(1)))
       ErrorsFound=.true.
     ENDIF
   ENDIF
@@ -629,6 +641,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
       EXIT
     ENDDO
 
+    overallEquipCount=overallEquipCount+maxEquipCount
     ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes = maxEquipCount
     ALLOCATE(ZoneEquipList(ControlledZoneNum)%EquipType(ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes))
     ALLOCATE(ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes))
@@ -703,6 +716,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
         CASE ('ZONEHVAC:PACKAGEDTERMINALAIRCONDITIONER') ! Packaged Terminal Air Conditioner
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=PkgTermACAirToAir_Num
 
+        CASE ('AIRLOOPHVAC:UNITARYSYSTEM') ! Unitary System
+          ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=ZoneUnitarySystem_Num
+
         CASE ('ZONEHVAC:DEHUMIDIFIER:DX') ! Zone dehumidifier
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=ZoneDXDehumidifier_Num
 
@@ -775,6 +791,8 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
         CASE('ZONEHVAC:FORCEDAIR:USERDEFINED')
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=UserDefinedZoneHVACForcedAir_Num
 
+        CASE('ZONEHVAC:EVAPORATIVECOOLERUNIT')
+          ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=ZoneEvaporativeCoolerUnit_Num
         CASE DEFAULT
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
           CALL ShowContinueError('..Invalid Equipment Type = '//TRIM(ZoneEquipList(ControlledZoneNum)%EquipType(ZoneEquipTypeNum)))
@@ -815,6 +833,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     ErrorsFound=.true.
   END IF
 
+  ! End ZoneHVAC:EquipmentList
+
+
   NodeListError=.false.
   CALL GetNodeNums(InletNodeListName,NumNodes,NodeNums,NodeListError,NodeType_Air,'ZoneHVAC:EquipmentConnections', &
                    ZoneEquipConfig(ControlledZoneNum)%ZoneName,NodeConnectionType_ZoneInlet,1,ObjectIsNotParent)
@@ -829,9 +850,10 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     DO NodeNum = 1, NumNodes
       ZoneEquipConfig(ControlledZoneNum)%InletNode(NodeNum) = NodeNums(NodeNum)
       UniqueNodeError=.false.
-      CALL CheckUniqueNodes('Zone Air Inlet Nodes','NodeNumber',UniqueNodeError,CheckNumber=NodeNums(NodeNum))
+      CALL CheckUniqueNodes('Zone Air Inlet Nodes','NodeNumber',UniqueNodeError,CheckNumber=NodeNums(NodeNum),   &
+          ObjectName=ZoneEquipConfig(ControlledZoneNum)%ZoneName)
       IF (UniqueNodeError) THEN
-        CALL ShowContinueError('Occurs for Zone = '//TRIM(AlphArray(1)))
+!        CALL ShowContinueError('Occurs for Zone = '//TRIM(AlphArray(1)))
         ErrorsFound=.true.
       ENDIF
       ZoneEquipConfig(ControlledZoneNum)%AirDistUnitCool(NodeNum)%InNode = 0
@@ -857,9 +879,10 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     DO NodeNum = 1, NumNodes
       ZoneEquipConfig(ControlledZoneNum)%ExhaustNode(NodeNum) = NodeNums(NodeNum)
       UniqueNodeError=.false.
-      CALL CheckUniqueNodes('Zone Air Exhaust Nodes','NodeNumber',UniqueNodeError,CheckNumber=NodeNums(NodeNum))
+      CALL CheckUniqueNodes('Zone Air Exhaust Nodes','NodeNumber',UniqueNodeError,CheckNumber=NodeNums(NodeNum),   &
+          ObjectName=ZoneEquipConfig(ControlledZoneNum)%ZoneName)
       IF (UniqueNodeError) THEN
-        CALL ShowContinueError('Occurs for Zone = '//TRIM(AlphArray(1)))
+!        CALL ShowContinueError('Occurs for Zone = '//TRIM(AlphArray(1)))
         ErrorsFound=.true.
       ENDIF
     END DO
@@ -869,6 +892,40 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     ErrorsFound=.true.
   ENDIF
 END DO ! end loop over controlled zones
+
+    IF (ErrorsFound) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//', duplicate items NOT CHECKED due to previous errors.')
+      overallEquipCount=0
+    ENDIF
+    IF (overallEquipCount > 0) THEN
+      ALLOCATE(ZoneEquipListAcct(overallEquipCount))
+      overallEquipCount=0
+      DO Loop1 = 1,NumOfControlledZones
+        DO Loop2=1,ZoneEquipList(Loop1)%NumOfEquipTypes
+          overallEquipCount=overallEquipCount+1
+          ZoneEquipListAcct(overallEquipCount)%ObjectType=ZoneEquipList(Loop1)%EquipType(Loop2)
+          ZoneEquipListAcct(overallEquipCount)%ObjectName=ZoneEquipList(Loop1)%EquipName(Loop2)
+          ZoneEquipListAcct(overallEquipCount)%OnListNum=Loop1
+        ENDDO
+      ENDDO
+      ! Now check for uniqueness
+      DO Loop1=1,overallEquipCount
+        DO Loop2=Loop1+1,overallEquipCount
+          IF (ZoneEquipListAcct(Loop1)%ObjectType /= ZoneEquipListAcct(Loop2)%ObjectType  .or.  &
+              ZoneEquipListAcct(Loop1)%ObjectName /= ZoneEquipListAcct(Loop2)%ObjectName) CYCLE
+          ! Duplicated -- not allowed
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//', duplicate items in ZoneHVAC:EquipmentList.')
+          CALL ShowContinueError('Equipment: Type='//trim(ZoneEquipListAcct(Loop1)%ObjectType)//', Name='//  &
+                              trim(ZoneEquipListAcct(Loop1)%ObjectName))
+          CALL ShowContinueError('Found on List="'//trim(ZoneEquipList(ZoneEquipListAcct(Loop1)%OnListNum)%Name)//'".')
+          CALL ShowContinueError('Equipment Duplicated on List="'//  &
+             trim(ZoneEquipList(ZoneEquipListAcct(Loop2)%OnListNum)%Name)//'".')
+          ErrorsFound=.true.
+        ENDDO
+      ENDDO
+      DEALLOCATE(ZoneEquipListAcct)
+    ENDIF
+
 
 !map ZoneEquipConfig%EquipListIndex to ZoneEquipList%Name
 
@@ -893,7 +950,7 @@ DO PathNum = 1,  NumSupplyAirPaths
     IF (IsBlank) AlphArray(1)='xxxxx'
   ENDIF
   SupplyAirPath(PathNum)%Name   = AlphArray(1)
-  SupplyAirPath(PathNum)%NumOfComponents = NINT((NumAlphas - 2.) / 2.)
+  SupplyAirPath(PathNum)%NumOfComponents = NINT((REAL(NumAlphas,r64) - 2.0d0) / 2.0d0)
 
   SupplyAirPath(PathNum)%InletNodeNum   = &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
@@ -956,7 +1013,7 @@ DO PathNum = 1,  NumReturnAirPaths
     IF (IsBlank) AlphArray(1)='xxxxx'
   ENDIF
   ReturnAirPath(PathNum)%Name   = AlphArray(1)
-  ReturnAirPath(PathNum)%NumOfComponents = NINT((NumAlphas - 2.) / 2.)
+  ReturnAirPath(PathNum)%NumOfComponents = NINT((REAL(NumAlphas,r64) - 2.0d0) / 2.0d0)
 
   ReturnAirPath(PathNum)%OutletNodeNum  = &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
@@ -1172,6 +1229,67 @@ FUNCTION GetControlledZoneIndex(ZoneName) RESULT (ControlledZoneIndex)
   RETURN
 
 END FUNCTION GetControlledZoneIndex
+
+FUNCTION FindControlledZoneIndexFromSystemNodeNumberForZone(TrialZoneNodeNum) RESULT (ControlledZoneIndex)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Brent Griffith
+          !       DATE WRITTEN   August 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns the zone number for the indicated
+          ! zone node num.  Returns 0 if did not find zone node in any Zone
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: TrialZoneNodeNum ! Node number to match into Controlled Zone structure
+  INTEGER             :: ControlledZoneIndex ! Index into Controlled Zone structure
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  LOGICAL :: FoundIt
+  INTEGER :: ZoneNum
+
+  FoundIt = .FALSE.
+
+  IF (.not. ZoneEquipInputsFilled) THEN
+    CALL GetZoneEquipmentData1
+    ZoneEquipInputsFilled=.true.
+  END IF
+  ControlledZoneIndex = 0
+  DO ZoneNum = 1 , NumOfZones
+    IF (ZoneEquipConfig(ZoneNum)%ActualZoneNum > 0)  THEN
+      IF ( TrialZoneNodeNum == ZoneEquipConfig(ZoneNum)%ZoneNode) THEN
+        ! found it.
+        FoundIt = .TRUE.
+        ControlledZoneIndex = ZoneEquipConfig(ZoneNum)%ActualZoneNum
+      ENDIF
+    ENDIF
+  ENDDO
+
+  RETURN
+
+END FUNCTION FindControlledZoneIndexFromSystemNodeNumberForZone
 
 FUNCTION GetSystemNodeNumberForZone(ZoneName) RESULT (SystemZoneNodeNumber)
 

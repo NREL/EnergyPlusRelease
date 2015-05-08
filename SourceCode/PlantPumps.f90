@@ -74,9 +74,9 @@ MODULE Pumps
     CHARACTER(len=MaxNameLength) :: MaxRPMSchedName  = '  '
     INTEGER                      :: MaxRPMSchedIndex= 0
     INTEGER           :: VFDControlType               = 0    !Integer equivalent of VFDControlType
-    REAL(r64)         :: MaxRPM                       = 0.0  !Maximum RPM range value - schedule limit
-    REAL(r64)         :: MinRPM                       = 0.0  !Minimum RPM range value - schedule limit
-    REAL(r64)         :: PumpActualRPM                = 0.0  !RPM recalculated from final flow through the loop
+    REAL(r64)         :: MaxRPM                       = 0.0d0  !Maximum RPM range value - schedule limit
+    REAL(r64)         :: MinRPM                       = 0.0d0  !Minimum RPM range value - schedule limit
+    REAL(r64)         :: PumpActualRPM                = 0.0d0  !RPM recalculated from final flow through the loop
   END TYPE PumpVFDControlData
 
 
@@ -100,22 +100,22 @@ MODULE Pumps
     INTEGER           :: NumPumpsInBank         = 0    ! Node number on the inlet side of the plant
     INTEGER           :: PowerErrIndex1         = 0    ! for recurring errors
     INTEGER           :: PowerErrIndex2         = 0    ! for recurring errors
-    REAL(r64)         :: MinVolFlowRateFrac     = 0.0  ! minimum schedule value fraction modifier
-    REAL(r64)         :: NomVolFlowRate         = 0.0  ! design nominal capacity of Pump
-    REAL(r64)         :: MassFlowRateMax        = 0.0  ! design nominal capacity of Pump
+    REAL(r64)         :: MinVolFlowRateFrac     = 0.0d0  ! minimum schedule value fraction modifier
+    REAL(r64)         :: NomVolFlowRate         = 0.0d0  ! design nominal capacity of Pump
+    REAL(r64)         :: MassFlowRateMax        = 0.0d0  ! design nominal capacity of Pump
     LOGICAL           :: EMSMassFlowOverrideOn  = .FALSE. ! if true, then EMS is calling to override flow requests.
     REAL(r64)         :: EMSMassFlowValue       = 0.0D0 ! EMS value to use for mass flow rate [kg/s]
-    REAL(r64)         :: NomSteamVolFlowRate    = 0.0   ! For Steam Pump
-    REAL(r64)         :: MinVolFlowRate         = 0.0   ! For a Variable Flow Pump this is the minimum capacity during operation.
-    REAL(r64)         :: MassFlowRateMin        = 0.0   ! For a Variable Flow Pump this is the minimum capacity during operation.
-    REAL(r64)         :: NomPumpHead            = 0.0   ! design nominal head pressure of Pump, [Pa]
-    REAL(r64)         :: NomPowerUse            = 0.0   ! design nominal capacity of Pump
-    REAL(r64)         :: MotorEffic             = 0.0   ! efficiency of the motor
-    REAL(r64)         :: PumpEffic              = 0.0   ! efficiency of the pump
-    REAL(r64)         :: FracMotorLossToFluid   = 0.0   ! ?????
-    REAL(r64)         :: Energy                 = 0.0   ! Energy consumed
-    REAL(r64)         :: Power                  = 0.0   ! Power used
-    REAL(r64), DIMENSION(4):: PartLoadCoef      = 0.0   ! Pump Curve Coefficients
+    REAL(r64)         :: NomSteamVolFlowRate    = 0.0d0   ! For Steam Pump
+    REAL(r64)         :: MinVolFlowRate         = 0.0d0   ! For a Variable Flow Pump this is the minimum capacity during operation.
+    REAL(r64)         :: MassFlowRateMin        = 0.0d0   ! For a Variable Flow Pump this is the minimum capacity during operation.
+    REAL(r64)         :: NomPumpHead            = 0.0d0   ! design nominal head pressure of Pump, [Pa]
+    REAL(r64)         :: NomPowerUse            = 0.0d0   ! design nominal capacity of Pump
+    REAL(r64)         :: MotorEffic             = 0.0d0   ! efficiency of the motor
+    REAL(r64)         :: PumpEffic              = 0.0d0   ! efficiency of the pump
+    REAL(r64)         :: FracMotorLossToFluid   = 0.0d0   ! ?????
+    REAL(r64)         :: Energy                 = 0.0d0   ! Energy consumed
+    REAL(r64)         :: Power                  = 0.0d0   ! Power used
+    REAL(r64), DIMENSION(4):: PartLoadCoef      = 0.0d0   ! Pump Curve Coefficients
     INTEGER           :: PressureCurve_Index    = 0     ! Pointer to a pump coefficient curve
     REAL(r64)         :: PumpMassFlowRateMaxRPM = 0.0d0 ! Mass flow rate calculated from maximum rpm
     REAL(r64)         :: PumpMassFlowRateMinRPM = 0.0d0 ! Mass flow rate calculated from minimum rpm
@@ -137,11 +137,11 @@ MODULE Pumps
 
   TYPE ReportVars
     INTEGER           :: NumPumpsOperating            = 0    !Used in pump bank. reports how many pumps are ON
-    REAL(r64)         :: PumpMassFlowRate             = 0.0  !Mass flow rate of the pump
-    REAL(r64)         :: PumpHeattoFluid              = 0.0  !Heat transfer from pump to fluid (W)
-    REAL(r64)         :: PumpHeattoFluidEnergy        = 0.0  !Pump Energy dissipated into fluid stream
-    REAL(r64)         :: OutletTemp                   = 0.0  !Pump outlet temperature
-    REAL(r64)         :: ShaftPower                   = 0.0  !Power input at the shaft
+    REAL(r64)         :: PumpMassFlowRate             = 0.0d0  !Mass flow rate of the pump
+    REAL(r64)         :: PumpHeattoFluid              = 0.0d0  !Heat transfer from pump to fluid (W)
+    REAL(r64)         :: PumpHeattoFluidEnergy        = 0.0d0  !Pump Energy dissipated into fluid stream
+    REAL(r64)         :: OutletTemp                   = 0.0d0  !Pump outlet temperature
+    REAL(r64)         :: ShaftPower                   = 0.0d0  !Power input at the shaft
     REAL(r64)         :: ZoneTotalGainRate            = 0.d0 ! total pump skin losses to zone (W)
     REAL(r64)         :: ZoneTotalGainEnergy          = 0.d0 ! total pump skin losses to zone energy (J)
     REAL(r64)         :: ZoneConvGainRate             = 0.d0 ! pump skin losses convecting to zone air (W)
@@ -155,13 +155,13 @@ MODULE Pumps
 !  INTEGER       :: NumPumpsPartLoad                   = 0    !Num pumps running at part load (used in pump bank)
 
        !simulation and reporting variables
-!  REAL(r64)           :: OutletTemp                   = 0.0  ! pump outlet temperature
-  REAL(r64)           :: PumpMassFlowRate             = 0.0  ! mass flow rate at pump inlet node
-!  REAL(r64)           :: PumpPress                    = 0.0  ! For Passing around the steam loops
-!  REAL(r64)           :: PumpQuality                  = 0.0  ! For Passing around the steam loops=0.0 here
-  REAL(r64)           :: PumpHeattoFluid              = 0.0  ! Pump Power dissipated in fluid stream
-  REAL(r64)           :: Power                        = 0.0  ! Pump Electric power
-  REAL(r64)           :: ShaftPower                   = 0.0  ! Power passing through pump shaft
+!  REAL(r64)           :: OutletTemp                   = 0.0d0  ! pump outlet temperature
+  REAL(r64)           :: PumpMassFlowRate             = 0.0d0  ! mass flow rate at pump inlet node
+!  REAL(r64)           :: PumpPress                    = 0.0d0  ! For Passing around the steam loops
+!  REAL(r64)           :: PumpQuality                  = 0.0d0  ! For Passing around the steam loops=0.0 here
+  REAL(r64)           :: PumpHeattoFluid              = 0.0d0  ! Pump Power dissipated in fluid stream
+  REAL(r64)           :: Power                        = 0.0d0  ! Pump Electric power
+  REAL(r64)           :: ShaftPower                   = 0.0d0  ! Power passing through pump shaft
 
   TYPE(PumpSpecs),  PUBLIC, ALLOCATABLE, DIMENSION(:) :: PumpEquip
   TYPE(ReportVars), ALLOCATABLE, DIMENSION(:) :: PumpEquipReport
@@ -219,7 +219,7 @@ SUBROUTINE SimPumps(PumpName, LoopNum, FlowRequest, PumpRunning, PumpIndex, Pump
 
   ! Exit early if no pumps found
   IF (NumPumps == 0) THEN
-    PumpHeat=0.0
+    PumpHeat=0.0d0
     RETURN
   ENDIF
 
@@ -515,8 +515,8 @@ SUBROUTINE GetPumpInput()
     ENDIF
 
     ! Is this really necessary for each pump GetInput loop?
-    PumpEquip(PumpNum)%Energy = 0.0
-    PumpEquip(PumpNum)%Power = 0.0
+    PumpEquip(PumpNum)%Energy = 0.0d0
+    PumpEquip(PumpNum)%Power = 0.0d0
   END DO
 
   cCurrentModuleObject = TRIM(cPump_ConSpeed)
@@ -553,16 +553,16 @@ SUBROUTINE GetPumpInput()
     PumpEquip(PumpNum)%NomPowerUse         = rNumericArgs(3)
     PumpEquip(PumpNum)%MotorEffic          = rNumericArgs(4)
     PumpEquip(PumpNum)%FracMotorLossToFluid= rNumericArgs(5)
-    PumpEquip(PumpNum)%PartLoadCoef(1)     = 1.0
-    PumpEquip(PumpNum)%PartLoadCoef(2)     = 0.0
-    PumpEquip(PumpNum)%PartLoadCoef(3)     = 0.0
-    PumpEquip(PumpNum)%PartLoadCoef(4)     = 0.0
+    PumpEquip(PumpNum)%PartLoadCoef(1)     = 1.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(2)     = 0.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(3)     = 0.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(4)     = 0.0d0
     !DSU In a constant volume pump we previously set the minimum to the nominal capacity
     !DSU Now we model the pump as constant speed and set flow by riding the pump curve.
     !DSU PumpEquip(PumpNum)%MinVolFlowRate      = rNumericArgs(1)
-    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0
-    PumpEquip(PumpNum)%Energy = 0.0
-    PumpEquip(PumpNum)%Power = 0.0
+    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0d0
+    PumpEquip(PumpNum)%Energy = 0.0d0
+    PumpEquip(PumpNum)%Power = 0.0d0
 
 !    PumpEquip(PumpNum)%PumpControlType = cAlphaArgs(4)
     IF (SameString(cAlphaArgs(4),'Continuous')) THEN
@@ -695,9 +695,9 @@ SUBROUTINE GetPumpInput()
       ENDIF
     ENDIF
 
-    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0
-    PumpEquip(PumpNum)%Energy = 0.0
-    PumpEquip(PumpNum)%Power = 0.0
+    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0d0
+    PumpEquip(PumpNum)%Energy = 0.0d0
+    PumpEquip(PumpNum)%Power = 0.0d0
 
     IF (PumpEquip(PumpNum)%NomSteamVolFlowRate == Autosize)THEN
        PumpEquip(PumpNum)%NomVolFlowRate=Autosize
@@ -803,8 +803,8 @@ SUBROUTINE GetPumpInput()
       ENDIF
     ENDIF
 
-    PumpEquip(PumpNum)%Energy = 0.0
-    PumpEquip(PumpNum)%Power = 0.0
+    PumpEquip(PumpNum)%Energy = 0.0d0
+    PumpEquip(PumpNum)%Power = 0.0d0
   END DO
 
   cCurrentModuleObject = TRIM(cPumpBank_ConSpeed)
@@ -878,10 +878,10 @@ SUBROUTINE GetPumpInput()
     PumpEquip(PumpNum)%NomPowerUse         = rNumericArgs(4)
     PumpEquip(PumpNum)%MotorEffic          = rNumericArgs(5)
     PumpEquip(PumpNum)%FracMotorLossToFluid= rNumericArgs(6)
-    PumpEquip(PumpNum)%PartLoadCoef(1)     = 1.0
-    PumpEquip(PumpNum)%PartLoadCoef(2)     = 0.0
-    PumpEquip(PumpNum)%PartLoadCoef(3)     = 0.0
-    PumpEquip(PumpNum)%PartLoadCoef(4)     = 0.0
+    PumpEquip(PumpNum)%PartLoadCoef(1)     = 1.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(2)     = 0.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(3)     = 0.0d0
+    PumpEquip(PumpNum)%PartLoadCoef(4)     = 0.0d0
 !    PumpEquip(PumpNum)%MinVolFlowRateFrac  = rNumericArgs(11)
 !    PumpEquip(PumpNum)%MinVolFlowRate      = PumpEquip(PumpNum)%NomVolFlowRate * PumpEquip(PumpNum)%MinVolFlowRateFrac
    !DSU?  need a value set for %MinVolFlowRate ?? zero? NomVolFlowRate?
@@ -900,9 +900,9 @@ SUBROUTINE GetPumpInput()
       ENDIF
     ENDIF
 
-    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0
-    PumpEquip(PumpNum)%Energy = 0.0
-    PumpEquip(PumpNum)%Power = 0.0
+    PumpEquip(PumpNum)%MinVolFlowRate      = 0.0d0
+    PumpEquip(PumpNum)%Energy = 0.0d0
+    PumpEquip(PumpNum)%Power = 0.0d0
   END DO
 
   IF (ErrorsFound) THEN
@@ -1089,19 +1089,25 @@ SUBROUTINE InitializePumps(PumpNum)
     lsnum=PumpEquip(PumpNum)%LoopSideNum
     brnum=PumpEquip(PumpNum)%BranchNum
     cpnum=PumpEquip(PumpNum)%CompNum
-    IF (PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn /= InletNode .or.  &
-        PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut /= OutletNode) THEN
+    IF (plloopnum > 0 .and. lsnum > 0 .and. brnum > 0 .and. cpnum > 0) THEN
+      IF (PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn /= InletNode .or.  &
+          PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut /= OutletNode) THEN
+        CALL ShowSevereError('InitializePumps: '//trim(cPumpTypes(PumpEquip(PumpNum)%PumpType))//'="'//  &
+          trim(PumpEquip(PumpNum)%Name)//'", non-matching nodes.')
+        CALL ShowContinueError('...in Branch="'//trim(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Name)//  &
+           '", Component referenced with:')
+        CALL ShowContinueError('...Inlet Node="'//  &
+           trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn)))
+        CALL ShowContinueError('...Outlet Node="'//  &
+           trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut)))
+        CALL ShowContinueError('...Pump Inlet Node="'//trim(NodeID(InletNode)))
+        CALL ShowContinueError('...Pump Outlet Node="'//trim(NodeID(OutletNode)))
+        errflag=.true.
+      ENDIF
+    ELSE ! CR9292
       CALL ShowSevereError('InitializePumps: '//trim(cPumpTypes(PumpEquip(PumpNum)%PumpType))//'="'//  &
-        trim(PumpEquip(PumpNum)%Name)//'", non-matching nodes.')
-      CALL ShowContinueError('...in Branch="'//trim(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Name)//  &
-         '", Component referenced with:')
-      CALL ShowContinueError('...Inlet Node="'//  &
-         trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn)))
-      CALL ShowContinueError('...Outlet Node="'//  &
-         trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut)))
-      CALL ShowContinueError('...Pump Inlet Node="'//trim(NodeID(InletNode)))
-      CALL ShowContinueError('...Pump Outlet Node="'//trim(NodeID(OutletNode)))
-      errflag=.true.
+          trim(PumpEquip(PumpNum)%Name)//'", component missing.')
+      errflag=.true.  ! should have received warning/severe earlier, will reiterate
     ENDIF
 
     IF (errFlag) THEN
@@ -1123,7 +1129,7 @@ SUBROUTINE InitializePumps(PumpNum)
       PumpEquip(PumpNum)%PumpEffic =  TotalEffic / PumpEquip(PumpNum)%MotorEffic
       IF (PumpEquip(PumpNum)%PumpEffic < .50d0)THEN
         CALL ShowWarningError('Check input. Calculated Pump Efficiency='//  &
-                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.,2))// &
+                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.0d0 ,2))// &
                               '% which is less than 50%, for pump='//TRIM(PumpEquip(PumpNum)%Name))
         CALL ShowContinueError('Calculated Pump_Efficiency % =Total_Efficiency % ['//TRIM(RoundSigDigits(TotalEffic*100.,1))//  &
                                '] / Motor_Efficiency % ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%MotorEffic*100.,1))//']')
@@ -1131,9 +1137,9 @@ SUBROUTINE InitializePumps(PumpNum)
                                TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomVolFlowRate,1))//  &
                                '] * Rated_Pump_Head ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomPumpHead,1))//  &
                                '] / Rated_Power_Use ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomPowerUse,1))//']) * 100.')
-      Else IF ((PumpEquip(PumpNum)%PumpEffic > 0.95) .and. (PumpEquip(PumpNum)%PumpEffic <= 1.0))THEN
+      Else IF ((PumpEquip(PumpNum)%PumpEffic > 0.95d0) .and. (PumpEquip(PumpNum)%PumpEffic <= 1.0d0))THEN
         CALL ShowWarningError('Check input.  Calculated Pump Efficiency='// &
-                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.,2))//  &
+                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.0d0 ,2))//  &
                               '% is approaching 100%, for pump='//TRIM(PumpEquip(PumpNum)%Name))
         CALL ShowContinueError('Calculated Pump_Efficiency % =Total_Efficiency % ['//TRIM(RoundSigDigits(TotalEffic*100.,1))//  &
                                '] / Motor_Efficiency % ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%MotorEffic*100.,1))//']')
@@ -1141,9 +1147,9 @@ SUBROUTINE InitializePumps(PumpNum)
                                TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomVolFlowRate,1))//  &
                                '] * Rated_Pump_Head ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomPumpHead,1))//  &
                                '] / Rated_Power_Use ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%NomPowerUse,1))//']) * 100.')
-      Else IF (PumpEquip(PumpNum)%PumpEffic > 1.0)THEN
+      Else IF (PumpEquip(PumpNum)%PumpEffic > 1.0d0)THEN
         CALL ShowSevereError('Check input.  Calculated Pump Efficiency='//  &
-                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.,3))//  &
+                              TRIM(RoundSigDigits(PumpEquip(PumpNum)%PumpEffic*100.0d0 ,3))//  &
                               '% which is bigger than 100%, for pump='//TRIM(PumpEquip(PumpNum)%Name))
         CALL ShowContinueError('Calculated Pump_Efficiency % =Total_Efficiency % ['//TRIM(RoundSigDigits(TotalEffic*100.,1))//  &
                                '] / Motor_Efficiency % ['//TRIM(RoundSigDigits(PumpEquip(PumpNum)%MotorEffic*100.,1))//']')
@@ -1191,7 +1197,7 @@ SUBROUTINE InitializePumps(PumpNum)
       !flow rate under normal operating conditions.  For cases when 'MaxAvail' on the pump
       !inlet node actually less than the 'minimum flow rate' specified by the user, than a
       !loop shutdown must  be triggered.
-      mdotMin = 0.0
+      mdotMin = 0.0d0
       CALL InitComponentNodes(mdotMin, mdotMax, InletNode, OutletNode, &
                                 PumpEquip(PumpNum)%LoopNum           , &
                                 PumpEquip(PumpNum)%LoopSideNum, &
@@ -1208,7 +1214,7 @@ SUBROUTINE InitializePumps(PumpNum)
       mdotMax = PumpEquip(PumpNum)%NomVolFlowRate * TempWaterDensity
       !mdotMin = PumpEquip(PumpNum)%MinVolFlowRate * TempWaterDensity
       !see note above
-      mdotMin = 0.0
+      mdotMin = 0.0d0
       CALL InitComponentNodes(mdotMin, mdotMax, InletNode, OutletNode, &
                                 PumpEquip(PumpNum)%LoopNum           , &
                                 PumpEquip(PumpNum)%LoopSideNum, &
@@ -1334,8 +1340,8 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
     !Check for conflicts (MaxAvail < MinAvail)
   IF(PumpMassFlowRateMin > PumpMassFlowRateMax)THEN !the demand side wants to operate outside of the pump range
         !shut the pump (and the loop) down
-    PumpMassFlowRateMin = 0.0
-    PumpMassFlowRateMax = 0.0
+    PumpMassFlowRateMin = 0.0d0
+    PumpMassFlowRateMax = 0.0d0
         !Let the user know that his input file is overconstrained
     !DSU? Call one-time warning...with a counter
   ENDIF
@@ -1421,8 +1427,8 @@ SUBROUTINE SetupPumpMinMaxFlows(LoopNum, PumpNum)
   ! Override pump operation based on System Availability Managers, should be done elsewhere?  I suppose this should be OK though
   IF(ALLOCATED(PlantAvailMgr))THEN
     IF (PlantAvailMgr(LoopNum)%AvailStatus == ForceOff) THEN
-      PumpMassFlowRateMax = 0.0
-      PumpMassFlowRateMin = 0.0
+      PumpMassFlowRateMax = 0.0d0
+      PumpMassFlowRateMin = 0.0d0
     END IF
   END IF
 
@@ -1803,7 +1809,7 @@ SUBROUTINE SizePump(PumpNum)
                 PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(Side)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn .AND. &
               PumpEquip(PumpNum)%OutletNodeNum ==   &
                  PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(Side)%Branch(BranchNum)%Comp(CompNum)%NodeNumOut) THEN
-            IF (PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(Side)%Branch(BranchNum)%PumpSizFac > 0.0) THEN
+            IF (PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(Side)%Branch(BranchNum)%PumpSizFac > 0.0d0) THEN
               PumpSizFac = PlantLoop(PumpEquip(PumpNum)%LoopNum)%LoopSide(Side)%Branch(BranchNum)%PumpSizFac
             ELSE
               PumpSizFac = 1.0d0
@@ -1844,7 +1850,7 @@ SUBROUTINE SizePump(PumpNum)
         ENDIF
 
       ELSE
-        PumpEquip(PumpNum)%NomVolFlowRate = 0.0
+        PumpEquip(PumpNum)%NomVolFlowRate = 0.0d0
         CALL ShowWarningError('SizePump: Calculated Pump Nominal Volume Flow Rate=['//  &
              TRIM(RoundSigDigits(PlantSizData(PlantSizNum)%DesVolFlowRate, 2))//'] is too small. Set to 0.0')
         CALL ShowContinueError('..occurs for Pump='//TRIM(PumpEquip(PumpNum)%Name))
@@ -1859,23 +1865,17 @@ SUBROUTINE SizePump(PumpNum)
 
   END IF
 
+  ! Note that autocalculation of power is based on nominal volume flow, regardless of whether the flow was
+  !  auto sized or manually sized.  Thus, this must go after the flow sizing block above.
   IF (PumpEquip(PumpNum)%NomPowerUse == AutoSize) THEN
-
-    IF (PlantSizNum > 0) THEN
-      IF (PlantSizData(PlantSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
+      IF (PumpEquip(PumpNum)%NomVolFlowRate >= SmallWaterVolFlow) THEN
         PumpEquip(PumpNum)%NomPowerUse = (PumpEquip(PumpNum)%NomPumpHead * PumpEquip(PumpNum)%NomVolFlowRate) / &
                                          TotalEffic
       ELSE
-        PumpEquip(PumpNum)%NomPowerUse = 0.0
+        PumpEquip(PumpNum)%NomPowerUse = 0.0d0
       END IF
       CALL ReportSizingOutput(cPumpTypes(PumpEquip(PumpNum)%PumpType), PumpEquip(PumpNum)%Name, &
                               'Rated Power Consumption [W]', PumpEquip(PumpNum)%NomPowerUse)
-    ELSE
-      CALL ShowSevereError('Autosizing of plant loop pump nominal power requires a loop Sizing:Plant object')
-      CALL ShowContinueError('Occurs in plant pump object='//TRIM(PumpEquip(PumpNum)%Name))
-      ErrorsFound = .TRUE.
-    END IF
-
   END IF
 
   IF (ErrorsFound) THEN
@@ -1933,17 +1933,18 @@ SUBROUTINE ReportPumps(PumpNum)
   OutletNode = PumpEquip(PumpNum)%OutletNodeNum
 
   IF (PumpMassFlowRate <= MassFlowTolerance) THEN
-   PumpEquipReport(PumpNum)%PumpMassFlowRate = 0.0
-   PumpEquipReport(PumpNum)%PumpHeattoFluid  = 0.0
+   PumpEquipReport(PumpNum)%PumpMassFlowRate = 0.0d0
+   PumpEquipReport(PumpNum)%PumpHeattoFluid  = 0.0d0
    PumpEquipReport(PumpNum)%OutletTemp       = Node(OutletNode)%Temp
-   PumpEquip(PumpNum)%Power                  = 0.0
-   PumpEquip(PumpNum)%Energy                 = 0.0
-   PumpEquipReport(PumpNum)%ShaftPower       = 0.0
-   PumpEquipReport(PumpNum)%PumpHeattoFluidEnergy = 0.0
+   PumpEquip(PumpNum)%Power                  = 0.0d0
+   PumpEquip(PumpNum)%Energy                 = 0.0d0
+   PumpEquipReport(PumpNum)%ShaftPower       = 0.0d0
+   PumpEquipReport(PumpNum)%PumpHeattoFluidEnergy = 0.0d0
    PumpEquipReport(PumpNum)%ZoneTotalGainRate     = 0.d0
    PumpEquipReport(PumpNum)%ZoneTotalGainEnergy   = 0.d0
    PumpEquipReport(PumpNum)%ZoneConvGainRate      = 0.d0
    PumpEquipReport(PumpNum)%ZoneRadGainRate       = 0.d0
+   PumpEquipReport(PumpNum)%NumPumpsOperating = 0
   ELSE
    PumpEquipReport(PumpNum)%PumpMassFlowRate = PumpMassFlowRate
    PumpEquipReport(PumpNum)%PumpHeattoFluid  = PumpHeattoFluid
@@ -2118,8 +2119,8 @@ Subroutine GetRequiredMassFlowRate(LoopNum, PumpNum, InletNodeMassFlowRate, Actu
     !Calculate maximum and minimum mass flow rate associated with operating pressure range
     IF (PumpEquip(PumpNum)%LoopNum .GT. 0) THEN
       If(PlantLoop(LoopNum)%PressureEffectiveK .GT. 0.0d0) Then
-        PumpMassFlowRateMaxPress = ((MaxPress) / (PlantLoop(LoopNum)%PressureEffectiveK))**0.5
-        PumpMassFlowRateMinPress = ((MinPress) / (PlantLoop(LoopNum)%PressureEffectiveK))**0.5
+        PumpMassFlowRateMaxPress = ((MaxPress) / (PlantLoop(LoopNum)%PressureEffectiveK))**0.5d0
+        PumpMassFlowRateMinPress = ((MinPress) / (PlantLoop(LoopNum)%PressureEffectiveK))**0.5d0
       End If
     End If
 

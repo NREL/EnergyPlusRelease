@@ -439,9 +439,9 @@ SUBROUTINE GetPipingSystemsInput
                          UBOUND(PipingSystemCircuits(CircuitIndex)%PipeSegmentIndeces, 1)
                 ThisSegmentIndex = PipingSystemCircuits(CircuitCtr)%PipeSegmentIndeces(PipeCtr)
                 IF ((PipingSystemSegments(ThisSegmentIndex)%PipeLocation%X > PipingSystemDomains(DomainNum)%Extents%Xmax) .OR. &
-                    (PipingSystemSegments(ThisSegmentIndex)%PipeLocation%X < 0.0) .OR. &
+                    (PipingSystemSegments(ThisSegmentIndex)%PipeLocation%X < 0.0d0) .OR. &
                     (PipingSystemSegments(ThisSegmentIndex)%PipeLocation%Y > PipingSystemDomains(DomainNum)%Extents%Ymax) .OR. &
-                    (PipingSystemSegments(ThisSegmentIndex)%PipeLocation%Y < 0.0)) THEN
+                    (PipingSystemSegments(ThisSegmentIndex)%PipeLocation%Y < 0.0d0)) THEN
                     CALL ShowSevereError('PipingSystems::'//RoutineName//':A pipe was found to be outside of the domain extents'//&
                                                                  ' after performing any corrections for basement or burial depth.')
                     CALL ShowContinueError('Pipe segment name:'//TRIM(PipingSystemSegments(ThisSegmentIndex)%Name))
@@ -1082,27 +1082,27 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
         CHARACTER(len=MaxNameLength) :: ObjName                   = ''
         CHARACTER(len=MaxNameLength) :: InletNodeName             = ''
         CHARACTER(len=MaxNameLength) :: OutletNodeName            = ''
-        REAL(r64)                    :: AxialLength               = 0.0
-        REAL(r64)                    :: PipeID                    = 0.0
-        REAL(r64)                    :: PipeOD                    = 0.0
+        REAL(r64)                    :: AxialLength               = 0.0d0
+        REAL(r64)                    :: PipeID                    = 0.0d0
+        REAL(r64)                    :: PipeOD                    = 0.0d0
         INTEGER                      :: NumPipes                  = 0
-        REAL(r64)                    :: BurialDepth               = 0.0
-        REAL(r64)                    :: DesignFlowRate            = 0.0
-        REAL(r64)                    :: SoilConductivity          = 0.0
-        REAL(r64)                    :: SoilDensity               = 0.0
-        REAL(r64)                    :: SoilSpecificHeat          = 0.0
-        REAL(r64)                    :: PipeConductivity          = 0.0
-        REAL(r64)                    :: PipeDensity               = 0.0
-        REAL(r64)                    :: PipeSpecificHeat          = 0.0
-        REAL(r64)                    :: InterPipeSpacing          = 0.0
-        REAL(r64)                    :: MoistureContent           = 0.0
-        REAL(r64)                    :: SaturationMoistureContent = 0.0
-        REAL(r64)                    :: KusudaAvgSurfTemp         = 0.0
-        REAL(r64)                    :: KusudaAvgAmplitude        = 0.0
-        REAL(r64)                    :: KusudaPhaseShift          = 0.0
-        REAL(r64)                    :: EvapotranspirationCoeff   = 0.0
+        REAL(r64)                    :: BurialDepth               = 0.0d0
+        REAL(r64)                    :: DesignFlowRate            = 0.0d0
+        REAL(r64)                    :: SoilConductivity          = 0.0d0
+        REAL(r64)                    :: SoilDensity               = 0.0d0
+        REAL(r64)                    :: SoilSpecificHeat          = 0.0d0
+        REAL(r64)                    :: PipeConductivity          = 0.0d0
+        REAL(r64)                    :: PipeDensity               = 0.0d0
+        REAL(r64)                    :: PipeSpecificHeat          = 0.0d0
+        REAL(r64)                    :: InterPipeSpacing          = 0.0d0
+        REAL(r64)                    :: MoistureContent           = 0.0d0
+        REAL(r64)                    :: SaturationMoistureContent = 0.0d0
+        REAL(r64)                    :: KusudaAvgSurfTemp         = 0.0d0
+        REAL(r64)                    :: KusudaAvgAmplitude        = 0.0d0
+        REAL(r64)                    :: KusudaPhaseShift          = 0.0d0
+        REAL(r64)                    :: EvapotranspirationCoeff   = 0.0d0
         LOGICAL                      :: UseGroundTempDataForKusuda= .FALSE.
-        REAL(r64)                    :: MinSurfTemp               = 0.0
+        REAL(r64)                    :: MinSurfTemp               = 0.0d0
         INTEGER                      :: MonthOfMinSurfTemp        = 0
     END TYPE
 
@@ -1187,7 +1187,7 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
         !the extents will be: Zmax = axial length; Ymax = burial depth*2; Xmax = (NumPipes+1)*HorizontalPipeSpacing
         PipingSystemDomains(DomainCtr)%IsActuallyPartOfAHorizontalTrench = .TRUE.
         WRITE(PipingSystemDomains(DomainCtr)%Name, '("HorizontalTrenchDomain",I4)') HorizontalGHXCtr
-        PipingSystemDomains(DomainCtr)%Extents%Xmax = (REAL(HGHX(HorizontalGHXCtr)%NumPipes) + 1.0d0) * &
+        PipingSystemDomains(DomainCtr)%Extents%Xmax = (REAL(HGHX(HorizontalGHXCtr)%NumPipes,r64) + 1.0d0) * &
                                                                             HGHX(HorizontalGHXCtr)%InterPipeSpacing
         PipingSystemDomains(DomainCtr)%Extents%Ymax = 2.0d0 * HGHX(HorizontalGHXCtr)%BurialDepth
         PipingSystemDomains(DomainCtr)%Extents%Zmax = HGHX(HorizontalGHXCtr)%AxialLength
@@ -1227,7 +1227,7 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
             END IF
 
             !Calculate Average Ground Temperature for all 12 months of the year:
-            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = 0.0
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = 0.0d0
             DO MonthIndex = 1, MonthsInYear
                 PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = &
                                  PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature + PubGroundTempSurface(MonthIndex)
@@ -1236,7 +1236,7 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
                                  PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature / MonthsInYear
 
             !Calculate Average Amplitude from Average:
-            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = 0.0
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = 0.0d0
             DO MonthIndex = 1, MonthsInYear
                 PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = &
                             PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude + &
@@ -1263,7 +1263,7 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
                     PipingSystemDomains(DomainCtr)%Farfield%PhaseShiftOfMinGroundTempDays * SecsInDay
 
         !Other parameters
-        PipingSystemDomains(DomainCtr)%SimControls%Convergence_CurrentToPrevIteration = 0.001
+        PipingSystemDomains(DomainCtr)%SimControls%Convergence_CurrentToPrevIteration = 0.001d0
         PipingSystemDomains(DomainCtr)%SimControls%MaxIterationsPerTS = 250
 
         !additional evapotranspiration parameter, min/max validated by IP
@@ -1324,7 +1324,7 @@ SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCi
                         'Piping System Circuit Nodes')
 
         !Convergence tolerance values, validated by IP
-        PipingSystemCircuits(CircuitCtr)%Convergence_CurrentToPrevIteration = 0.001
+        PipingSystemCircuits(CircuitCtr)%Convergence_CurrentToPrevIteration = 0.001d0
         PipingSystemCircuits(CircuitCtr)%MaxIterationsPerTS = 100
 
         !Radial mesh inputs, validated by IP
@@ -1610,7 +1610,7 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
     IF (.NOT. BeginEnvrnFlag) PipingSystemDomains(DomainNum)%BeginSimEnvrn = .TRUE.
 
     !Shift history arrays only if necessary
-    IF(ABS(PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds-PipingSystemDomains(DomainNum)%Cur%PrevSimTimeSeconds)>1.0E-6)THEN
+    IF(ABS(PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds-PipingSystemDomains(DomainNum)%Cur%PrevSimTimeSeconds)>1.0d-6)THEN
         PipingSystemDomains(DomainNum)%Cur%PrevSimTimeSeconds = PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds
         CALL ShiftTemperaturesForNewTimeStep(DomainNum)
         PipingSystemDomains(DomainNum)%DomainNeedsSimulation = .TRUE.
@@ -2928,6 +2928,7 @@ REAL(r64) FUNCTION NormalArea(c, Direction) RESULT (RetVal)
     CASE (Direction_PositiveZ, Direction_NegativeZ)
         RetVal = ZNormalArea(c)
     END SELECT
+    !Objexx:Return Check/enforce that one of these CASEs holds to assure return value is set
 
     RETURN
 
@@ -2964,6 +2965,7 @@ TYPE(NeighborInformation) FUNCTION NeighborInformationArray_Value(dict, directio
             EXIT
         END IF
     END DO
+    !Objexx:Return Check/enforce that return value is set
 
     RETURN
 
@@ -3657,7 +3659,7 @@ FUNCTION CreateRegionList(DomainNum, ThesePartitionRegions, DirExtentMax, &
             ThisRegion = ThesePartitionRegions(Index)
 
             IF (Index == 0) THEN
-                LeftRegionExtent = 0.0
+                LeftRegionExtent = 0.0d0
             ELSE
                 LeftRegionExtent = ThesePartitionRegions(Index - 1)%Max
             END IF
@@ -3703,7 +3705,7 @@ FUNCTION CreateRegionList(DomainNum, ThesePartitionRegions, DirExtentMax, &
         END DO
     ELSE !Input partitions were not allocate
         !'if we don't have a region, we still need to make a single mesh region
-        TempRegions(0) = TempGridRegionData(0.0, DirExtentMax, DirDirection)
+        TempRegions(0) = TempGridRegionData(0.0d0, DirExtentMax, DirDirection)
     END IF
 
     !'finally repackage the grid regions into the final class form with cell counts included
@@ -4286,6 +4288,7 @@ SUBROUTINE AddNeighborInformation(DomainNum, X, Y, Z, Direction, ThisCentroidToN
         DEALLOCATE(PipingSystemDomains(DomainNum)%Cells(X,Y,Z)%NeighborInformation)
         ALLOCATE(PipingSystemDomains(DomainNum)%Cells(X,Y,Z)%NeighborInformation(0:PrevUbound+1))
         PipingSystemDomains(DomainNum)%Cells(X,Y,Z)%NeighborInformation(0:PrevUbound) = PrevValues
+        DEALLOCATE(PrevValues)
     END IF
 
     PipingSystemDomains(DomainNum)%Cells(X,Y,Z)%NeighborInformation(PrevUbound+1)%Direction = Direction
@@ -4437,6 +4440,7 @@ INTEGER FUNCTION GetCellWidthsCount(DomainNum, dir) RESULT(RetVal)
     CASE (RegionType_ZDirection)
         RetVal = PipingSystemDomains(DomainNum)%Mesh%Z%RegionMeshCount
     END SELECT
+    !Objexx:Return Check/enforce that one of these CASEs holds to assure return value is set
 
     RETURN
 
@@ -4712,8 +4716,8 @@ REAL(r64) FUNCTION EvaluateFieldCellTemperature(DomainNum, ThisCell) RESULT(RetV
     INTEGER :: CurDirection !From Enum: Direction
 
     !Set up once-per-cell items
-    Numerator = 0.0
-    Denominator = 0.0
+    Numerator = 0.0d0
+    Denominator = 0.0d0
     Beta = ThisCell%MyBase%Beta
 
     !add effect from cell history
@@ -4854,9 +4858,9 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     GroundCoverCoefficient = PipingSystemDomains(DomainNum)%Moisture%GroundCoverCoefficient
 
     !initialize values
-    Numerator = 0.0
-    Denominator = 0.0
-    Resistance = 0.0
+    Numerator = 0.0d0
+    Denominator = 0.0d0
+    Resistance = 0.0d0
     Beta = cell%MyBase%Beta
     ThisNormalArea = NormalArea(cell, Direction_PositiveY)
 
@@ -4873,11 +4877,11 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
 
         !We have adiabatic z-faces, check if we are adjacent to one in the opposite direction
         IF ( (CurDirection==Direction_NegativeZ) .AND. (cell%Z_index==UBOUND(PipingSystemDomains(DomainNum)%Cells,3)) ) THEN
-            AdiabaticMultiplier = 2.0
+            AdiabaticMultiplier = 2.0d0
         ELSE IF ( (CurDirection==Direction_PositiveZ) .AND. (cell%Z_index==0) ) THEN
-            AdiabaticMultiplier = 2.0
+            AdiabaticMultiplier = 2.0d0
         ELSE
-            AdiabaticMultiplier = 1.0
+            AdiabaticMultiplier = 1.0d0
         END IF
 
         !Use the multiplier (either 1 or 2) to calculate the neighbor cell effects
@@ -4905,7 +4909,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
                 ! debug error, can't get here
             CASE (Direction_PositiveY)
                 ! convection at the surface
-                IF (WindSpeed .GT. 0.1) THEN
+                IF (WindSpeed .GT. 0.1d0) THEN
                     Resistance = 208.0d0 / (AirDensity * AirSpecificHeat * WindSpeed * ThisNormalArea)
                     Numerator = Numerator + (Beta / Resistance) * PipingSystemDomains(DomainNum)%Cur%CurAirTemp
                     Denominator = Denominator + (Beta / Resistance)
@@ -4945,7 +4949,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     Hour_Angle = Pi / 12.0d0 * ( ( (HourOfDay - 0.5d0) + 0.06667d0 * (StMeridian_Degrees - Longitude_Degrees) + Sc) - 12.0d0)
 
     ! Calculate sunset something, and constrain to a minimum of 0.000001
-    X_sunset = 1.0d0 - TAN(Latitude_Radians)**2.0d0 * TAN(Declination)**2.0d0
+    X_sunset = 1.0d0 - TAN(Latitude_Radians)**2 * TAN(Declination)**2
     X_sunset = MAX(X_sunset, 0.000001d0)
 
     ! Find sunset angle
@@ -5005,7 +5009,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     VaporPressureActual_kPa = VaporPressureSaturated_kPa * PipingSystemDomains(DomainNum)%Cur%CurRelativeHumidity / 100.0d0
 
     ! Calculate another Q term, [MJ/m2-hr]
-    QRAD_NL = 2.042D-10 * CurAirTempK**4.0d0 * (0.34d0 - 0.14d0 * SQRT(VaporPressureActual_kPa)) * (1.35d0 * Ratio_SO - 0.35d0)
+    QRAD_NL = 2.042D-10 * CurAirTempK**4 * (0.34d0 - 0.14d0 * SQRT(VaporPressureActual_kPa)) * (1.35d0 * Ratio_SO - 0.35d0)
 
     ! Calculate another Q term, [MJ/hr]
     NetIncidentRadiation_MJhr = AbsorbedIncidentSolar_MJhrmin - QRAD_NL
@@ -5014,7 +5018,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     Cn = 37.0d0
 
     ! Check whether there was sun
-    IF (NetIncidentRadiation_MJhr .LT. 0.0)THEN
+    IF (NetIncidentRadiation_MJhr .LT. 0.0d0)THEN
         G_hr = 0.5d0 * NetIncidentRadiation_MJhr
         Cd = 0.96d0
     ELSE
@@ -5029,7 +5033,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
                                 (PipingSystemDomains(DomainNum)%Cur%CurAirTemp + 237.3d0)   &
                             )  / (PipingSystemDomains(DomainNum)%Cur%CurAirTemp+237.3d0)**2
     Pressure = 98.0d0
-    PsychrometricConstant = 0.665E-3 * Pressure
+    PsychrometricConstant = 0.665d-3 * Pressure
 
     ! Evapotranspiration constant, [mm/hr]
     EvapotransFluidLoss_mmhr = (GroundCoverCoefficient * Slope_s * (NetIncidentRadiation_MJhr - G_hr) &
@@ -5108,9 +5112,9 @@ REAL(r64) FUNCTION EvaluateAdiabaticSurfaceTemperature(DomainNum, cell) RESULT(R
     INTEGER :: CurDirection
     REAL(r64) :: AdiabaticMultiplier
 
-    Numerator = 0.0
-    Denominator = 0.0
-    Resistance = 0.0
+    Numerator = 0.0d0
+    Denominator = 0.0d0
+    Resistance = 0.0d0
     Beta = cell%MyBase%Beta
 
     !'add effect from previous time step
@@ -5122,7 +5126,7 @@ REAL(r64) FUNCTION EvaluateAdiabaticSurfaceTemperature(DomainNum, cell) RESULT(R
 
     DO DirectionCounter = LBOUND(NeighborFieldCells,1), UBOUND(NeighborFieldCells,1)
         CurDirection = NeighborFieldCells(DirectionCounter)
-        AdiabaticMultiplier = 1.0
+        AdiabaticMultiplier = 1.0d0
 
         ! There are only a few cases for adiabatic cells to be handled here
         ! These cases must be validated during mesh development as they aren't here
@@ -5132,14 +5136,14 @@ REAL(r64) FUNCTION EvaluateAdiabaticSurfaceTemperature(DomainNum, cell) RESULT(R
         !   specified as adiabatic.
         SELECT CASE (CurDirection)
             CASE (Direction_PositiveZ) ! Case: front face looking in +z direction
-                IF (cell%Z_index == 0) AdiabaticMultiplier = 2.0
+                IF (cell%Z_index == 0) AdiabaticMultiplier = 2.0d0
             CASE (Direction_NegativeZ) ! Case: back face looking in -z direction
-                IF (cell%Z_index == UBOUND(PipingSystemDomains(DomainNum)%Cells,3)) AdiabaticMultiplier = 2.0
+                IF (cell%Z_index == UBOUND(PipingSystemDomains(DomainNum)%Cells,3)) AdiabaticMultiplier = 2.0d0
             CASE (Direction_PositiveX) ! Case: Under basement floor, far left cell
-                IF (cell%X_index == 0) AdiabaticMultiplier = 2.0
+                IF (cell%X_index == 0) AdiabaticMultiplier = 2.0d0
             CASE (Direction_NegativeY) ! Case: basement wall ground surface boundary
                 !Not sure if this is ever hit (it should be a basement wall celltype)
-                IF (cell%Y_index == UBOUND(PipingSystemDomains(DomainNum)%Cells,2)) AdiabaticMultiplier = 2.0
+                IF (cell%Y_index == UBOUND(PipingSystemDomains(DomainNum)%Cells,2)) AdiabaticMultiplier = 2.0d0
         END SELECT
 
         !Use the multiplier (either 1 or 2) to calculate the neighbor cell effects
@@ -5192,9 +5196,9 @@ REAL(r64) FUNCTION EvaluateBasementCellTemperature(DomainNum, cell) RESULT(RetVa
     REAL(r64) :: HeatFlux
 
     !Initialize
-    Numerator = 0.0
-    Denominator = 0.0
-    Resistance = 0.0
+    Numerator = 0.0d0
+    Denominator = 0.0d0
+    Resistance = 0.0d0
     SELECT CASE (cell%CellType)
     CASE (CellType_BasementWall, CellType_BasementFloor)
         !This is actually only a half-cell since the basement wall slices right through the middle in one direction
@@ -5315,7 +5319,7 @@ REAL(r64) FUNCTION GetBasementFloorHeatFlux(DomainNum) RESULT (RetVal)
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS FUNCTION:
-          ! <description>-on another note, looking forward to seeing grampy and gg tomorrow!
+          ! <description>
 
           ! METHODOLOGY EMPLOYED:
           ! <description>
@@ -5445,7 +5449,7 @@ REAL(r64) FUNCTION GetAverageTempByType(DomainNum, CellType) RESULT (RetVal)
     INTEGER :: X, Y, Z
 
     RunningSummation = 0.0d0
-    RunningCounter = 0.0d0
+    RunningCounter = 0
 
     DO Z = LBOUND(PipingSystemDomains(DomainNum)%Cells,3), UBOUND(PipingSystemDomains(DomainNum)%Cells,3)
         DO Y = LBOUND(PipingSystemDomains(DomainNum)%Cells,2), UBOUND(PipingSystemDomains(DomainNum)%Cells,2)
@@ -5459,9 +5463,10 @@ REAL(r64) FUNCTION GetAverageTempByType(DomainNum, CellType) RESULT (RetVal)
     END DO
 
     IF (RunningCounter > 0) THEN
-        RetVal = RunningSummation / REAL(RunningCounter)
+        RetVal = RunningSummation / REAL(RunningCounter,r64)
     ELSE
         !ERROR!!!
+        RetVal = 0.0d0 !Objexx:Return Line added to assure return value is set: Proper error handling needed here!
     END IF
 
   RETURN
@@ -5505,9 +5510,9 @@ REAL(r64) FUNCTION EvaluateFarfieldBoundaryTemperature(DomainNum, cell) RESULT(R
     INTEGER :: CurDirection
     REAL(r64) :: NeighborTemp
 
-    Numerator = 0.0
-    Denominator = 0.0
-    Resistance = 0.0
+    Numerator = 0.0d0
+    Denominator = 0.0d0
+    Resistance = 0.0d0
     Beta = cell%MyBase%Beta
 
     !add effect from previous time step
@@ -5577,14 +5582,14 @@ SUBROUTINE EvaluateFarfieldCharacteristics(DomainNum, cell, direction, neighbort
 
     SELECT CASE (direction)
     CASE(Direction_NegativeX, Direction_PositiveX)
-        distance = (width(cell) / 2.0)
+        distance = (width(cell) / 2.0d0)
     CASE(Direction_NegativeY, Direction_PositiveY)
-        distance = (height(cell) / 2.0)
+        distance = (height(cell) / 2.0d0)
     CASE(Direction_NegativeZ, Direction_PositiveZ)
-        distance = (depth(cell) / 2.0)
+        distance = (depth(cell) / 2.0d0)
     END SELECT
 
-    resistance = (distance / 2.0) / (cell%mybase%properties%conductivity * NormalArea(cell, direction))
+    resistance = (distance / 2.0d0) / (cell%mybase%properties%conductivity * NormalArea(cell, direction))
     neighbortemp = GetFarfieldTemp(DomainNum, cell)
 
     RETURN
@@ -5707,7 +5712,7 @@ SUBROUTINE PreparePipeCircuitSimulation(DomainNum, CircuitNum)
     SpecificHeat = PipingSystemCircuits(CircuitNum)%CurFluidPropertySet%MyBase%SpecificHeat
 
     !Flow calculations
-    Area_c = (Pi/4.0) * PipingSystemCircuits(CircuitNum)%PipeSize%InnerDia**2
+    Area_c = (Pi/4.0d0) * PipingSystemCircuits(CircuitNum)%PipeSize%InnerDia**2
     Velocity = PipingSystemCircuits(CircuitNum)%CurCircuitFlowRate / (Density * Area_c)
 
     !Determine convection coefficient based on flow conditions
@@ -5715,11 +5720,11 @@ SUBROUTINE PreparePipeCircuitSimulation(DomainNum, CircuitNum)
         Reynolds = Density * PipingSystemCircuits(CircuitNum)%PipeSize%InnerDia * Velocity / Viscosity
         IF ( PipingSystemDomains(DomainNum)%Cells(CellX, CellY, CellZ)%PipeCellData%Fluid%MyBase%Temperature > &
                PipingSystemDomains(DomainNum)%Cells(CellX, CellY, CellZ)%PipeCellData%Pipe%MyBase%Temperature ) THEN
-            ExponentTerm = 0.3
+            ExponentTerm = 0.3d0
         ELSE
-            ExponentTerm = 0.4
+            ExponentTerm = 0.4d0
         END IF
-        Nusselt = 0.023 * Reynolds**(4./5.) * Prandtl**ExponentTerm
+        Nusselt = 0.023d0 * Reynolds**(4.0d0/5.0d0) * Prandtl**ExponentTerm
         ConvCoefficient = Nusselt * Conductivity / PipingSystemCircuits(DomainNum)%PipeSize%InnerDia
     ELSE
         ConvCoefficient = StagnantFluidConvCoeff
@@ -6553,7 +6558,7 @@ SUBROUTINE SimulateRadialPipeCell(DomainNum, CircuitNum, ThisCell, ConvectionCoe
     !'add effects from water cell
     PipeConductionResistance = LOG(ThisPipeCellRadialCentroid / ThisPipeCellInnerRadius) / &
                                (2 * PI * Depth(ThisCell) * ThisPipeCellConductivity)
-    ConvectiveResistance = 1 / (ConvectionCoefficient * 2 * PI * ThisPipeCellInnerRadius * Depth(ThisCell))
+    ConvectiveResistance = 1.0d0 / (ConvectionCoefficient * 2 * PI * ThisPipeCellInnerRadius * Depth(ThisCell))
     Resistance = PipeConductionResistance + ConvectiveResistance
     Numerator = Numerator + (Beta / Resistance) * FluidCellTemperature
     Denominator = Denominator + (Beta / Resistance)
@@ -6633,7 +6638,7 @@ SUBROUTINE SimulateFluidCell(ThisCell, FlowRate, ConvectionCoefficient, Entering
     !'add effects from outer pipe cell
     PipeConductionResistance = LOG(PipeCellRadialCentroid / PipeCellInnerRadius) / &
                     (2 * PI * Depth(ThisCell) * PipeCellConductivity)
-    ConvectiveResistance = 1 / (ConvectionCoefficient * 2 * PI * PipeCellInnerRadius * Depth(ThisCell))
+    ConvectiveResistance = 1.0d0 / (ConvectionCoefficient * 2 * PI * PipeCellInnerRadius * Depth(ThisCell))
     TotalPipeResistance = PipeConductionResistance + ConvectiveResistance
     Numerator = Numerator + (Beta / TotalPipeResistance) * PipeCellTemperature
     Denominator = Denominator + (Beta / TotalPipeResistance)
@@ -7136,7 +7141,7 @@ SUBROUTINE EvaluateSoilRhoCp(DomainNum, CellTemp, rhoCp, InitOnly)
         !'Cp (freezing) calculations
         rho_ice = 917.d0 !'Kg / m3
         rho_liq = 1000.d0 !'kg / m3
-        rhoCp_soil_liq_1 = 1225000.0 / (1 - Theta_sat) !'J/m3K
+        rhoCp_soil_liq_1 = 1225000.0d0 / (1 - Theta_sat) !'J/m3K
         !'from(" An improved model for predicting soil thermal conductivity from water content at room temperature, Fig 4")
         CP_liq = 4180.0d0 !'J / KgK
         CP_ice = 2066.0d0 !'J / KgK
@@ -7314,12 +7319,12 @@ SUBROUTINE EvaluateNeighborCharacteristics(DomainNum, ThisCell, CurDirection, &
             ThisCellLength = TempNeighborInfo%ThisCentroidToNeighborWall
             NeighborCellLength = TempNeighborInfo%ThisWallToNeighborCentroid
         ELSE
-            ThisCellLength = 0
+            ThisCellLength = 0.0d0
             NeighborCellLength = TempNeighborInfo%ThisWallToNeighborCentroid
         END IF
     ELSE IF (PipingSystemDomains(DomainNum)%Cells(NX, NY, NZ)%CellType == CellType_Pipe) THEN
         ThisCellLength = TempNeighborInfo%ThisCentroidToNeighborWall
-        NeighborCellLength = 0
+        NeighborCellLength = 0.0d0
     ELSE
         ThisCellLength = TempNeighborInfo%ThisCentroidToNeighborWall
         NeighborCellLength = TempNeighborInfo%ThisWallToNeighborCentroid

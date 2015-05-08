@@ -135,7 +135,7 @@ MODULE ReturnAirPathManager
           IF (IsBlank) cAlphaArgs(1)='xxxxx'
         ENDIF
         ReturnAirPath(PathNum)%Name   = cAlphaArgs(1)
-        ReturnAirPath(PathNum)%NumOfComponents = NINT((NumAlphas - 2.) / 2.)
+        ReturnAirPath(PathNum)%NumOfComponents = NINT((NumAlphas - 2.0d0) / 2.0d0)
 
         ReturnAirPath(PathNum)%OutletNodeNum  = &
                GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &

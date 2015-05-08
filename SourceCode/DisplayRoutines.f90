@@ -134,7 +134,7 @@
 
   if (KickOffSimulation .and. .not. DeveloperFlag) return
   if (TotalSimdays > 0) then
-    percent=NINT((CurrentSimDay/TotalSimdays)*100.)
+    percent=NINT((CurrentSimDay/TotalSimdays)*100.0d0)
     percent=MIN(percent,100)
   else
     percent=0

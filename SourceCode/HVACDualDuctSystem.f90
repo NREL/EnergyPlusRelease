@@ -60,15 +60,15 @@ TYPE DamperDesignParams
   INTEGER      :: DamperType  = 0 ! Type of Damper ie. VAV, Mixing, Inducing, etc.
   CHARACTER(len=MaxNameLength) :: Schedule    = ' ' ! Damper Operation Schedule
   INTEGER      :: SchedPtr                    = 0 ! Pointer to the correct schedule
-  REAL(r64)    :: MaxAirVolFlowRate           = 0 ! Max Specified Volume Flow Rate of Damper [m3/sec]
-  REAL(r64)    :: MaxAirMassFlowRate           = 0 ! Max Specified MAss Flow Rate of Damper [kg/s]
+  REAL(r64)    :: MaxAirVolFlowRate           = 0.0d0 ! Max Specified Volume Flow Rate of Damper [m3/sec]
+  REAL(r64)    :: MaxAirMassFlowRate           = 0.0d0 ! Max Specified MAss Flow Rate of Damper [kg/s]
   INTEGER      :: InletNodeNum                = 0
   INTEGER      :: HotAirInletNodeNum          = 0
   INTEGER      :: ColdAirInletNodeNum         = 0
   INTEGER      :: OutletNodeNum               = 0
-  REAL(r64)    :: ZoneMinAirFrac              = 0.0
-  REAL(r64)    :: ColdAirDamperPosition       = 0.0
-  REAL(r64)    :: HotAirDamperPosition        = 0.0
+  REAL(r64)    :: ZoneMinAirFrac              = 0.0d0
+  REAL(r64)    :: ColdAirDamperPosition       = 0.0d0
+  REAL(r64)    :: HotAirDamperPosition        = 0.0d0
 
   INTEGER      :: OAInletNodeNum              = 0    ! Alternate Node for VAV:OutdoorAir for Outdoor Air
   INTEGER      :: RecircAirInletNodeNum       = 0    ! Alternate Node for VAV:OutdoorAir for Recirc Air
@@ -97,13 +97,13 @@ TYPE DamperDesignParams
 END TYPE DamperDesignParams
 
 TYPE DamperFlowConditions
-  REAL(r64) :: AirMassFlowRate          = 0.0 ! MassFlow through the Damper being Simulated [kg/Sec]
-  REAL(r64) :: AirMassFlowRateMaxAvail  = 0.0 ! MassFlow through the Damper being Simulated [kg/Sec]
-  REAL(r64) :: AirMassFlowRateMinAvail  = 0.0 ! MassFlow through the Damper being Simulated [kg/Sec]
-  REAL(r64) :: AirmassFlowRateMax       = 0.0 ! Max Mass Flow Rate or the Design Mass Flow Rate
-  REAL(r64) :: AirTemp                  = 0.0
-  REAL(r64) :: AirHumRat                = 0.0
-  REAL(r64) :: AirEnthalpy              = 0.0
+  REAL(r64) :: AirMassFlowRate          = 0.0d0 ! MassFlow through the Damper being Simulated [kg/Sec]
+  REAL(r64) :: AirMassFlowRateMaxAvail  = 0.0d0 ! MassFlow through the Damper being Simulated [kg/Sec]
+  REAL(r64) :: AirMassFlowRateMinAvail  = 0.0d0 ! MassFlow through the Damper being Simulated [kg/Sec]
+  REAL(r64) :: AirmassFlowRateMax       = 0.0d0 ! Max Mass Flow Rate or the Design Mass Flow Rate
+  REAL(r64) :: AirTemp                  = 0.0d0
+  REAL(r64) :: AirHumRat                = 0.0d0
+  REAL(r64) :: AirEnthalpy              = 0.0d0
   REAL(r64) :: AirMassFlowRateHist1     = 0.d0 ! flow history back 1 iteration kg/s
   REAL(r64) :: AirMassFlowRateHist2     = 0.d0 ! flow history back 2 iteration kg/s
   REAL(r64) :: AirMassFlowRateHist3     = 0.d0 ! flow history back 3 iteration kg/s
@@ -334,7 +334,7 @@ SUBROUTINE GetDualDuctInput
     INTEGER :: CtrlZone   ! controlled zone do loop index
     INTEGER :: SupAirIn   ! controlled zone supply air inlet index
     INTEGER :: ADUNum     ! loop control to search Air Distribution Units
-    REAL(r64) :: DummyOAFlow = 0
+    REAL(r64) :: DummyOAFlow = 0.0d0
 
           ! Flow
     NumDualDuctConstVolDampers = GetNumObjectsFound(cCMO_DDConstantVolume)
@@ -395,7 +395,7 @@ SUBROUTINE GetDualDuctInput
                             NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(5))
 
         Damper(DamperNum)%MaxAirVolFlowRate = NumArray(1)
-        Damper(DamperNum)%ZoneMinAirFrac = 0.0
+        Damper(DamperNum)%ZoneMinAirFrac = 0.0d0
 
         ! Register component set data - one for heat and one for cool
         CALL TestCompSet(TRIM(CurrentModuleObject)//':HEAT',Damper(DamperNum)%DamperName, &
@@ -824,18 +824,18 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
       ColdInNode  = Damper(DamperNum)%ColdAirInletNodeNum
       Node(OutNode)%MassFlowRateMax = Damper(DamperNum)%MaxAirVolFlowRate * StdRhoAir
       IF (Damper(DamperNum)%DamperType == DualDuct_ConstantVolume) THEN
-        Node(OutNode)%MassFlowRateMin = 0.0
+        Node(OutNode)%MassFlowRateMin = 0.0d0
       ELSE IF (Damper(DamperNum)%DamperType == DualDuct_VariableVolume) THEN
         Node(OutNode)%MassFlowRateMin = Node(OutNode)%MassFlowRateMax * Damper(DamperNum)%ZoneMinAirFrac
       ELSE
-        Node(OutNode)%MassFlowRateMin = 0.0
+        Node(OutNode)%MassFlowRateMin = 0.0d0
       END IF
       DamperHotAirInlet(DamperNum)%AirMassFlowRateMax = Node(OutNode)%MassFlowRateMax
       DamperColdAirInlet(DamperNum)%AirMassFlowRateMax = Node(OutNode)%MassFlowRateMax
       Node(HotInNode)%MassFlowRateMax = Node(OutNode)%MassFlowRateMax
       Node(ColdInNode)%MassFlowRateMax = Node(OutNode)%MassFlowRateMax
-      Node(HotInNode)%MassFlowRateMin = 0.0
-      Node(ColdInNode)%MassFlowRateMin = 0.0
+      Node(HotInNode)%MassFlowRateMin = 0.0d0
+      Node(ColdInNode)%MassFlowRateMin = 0.0d0
       MyEnvrnFlag(DamperNum) = .FALSE.
 
     ELSEIF (Damper(DamperNum)%DamperType == DualDuct_OutdoorAir) THEN
@@ -844,17 +844,17 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
       OAInNode  = Damper(DamperNum)%OAInletNodeNum
       IF (Damper(DamperNum)%RecircIsUsed) RAInNode  = Damper(DamperNum)%RecircAirInletNodeNum
       Node(OutNode)%MassFlowRateMax = Damper(DamperNum)%MaxAirMassFlowRate
-      Node(OutNode)%MassFlowRateMin = 0.0
+      Node(OutNode)%MassFlowRateMin = 0.0d0
       DamperOAInlet(DamperNum)%AirMassFlowRateMax = Damper(DamperNum)%DesignOAFlowRate * StdRhoAir
       IF (Damper(DamperNum)%RecircIsUsed) THEN
         DamperRecircAirInlet(DamperNum)%AirMassFlowRateMax = Damper(DamperNum)%MaxAirMassFlowRate &
                                           - DamperOAInlet(DamperNum)%AirMassFlowRateMax
         Node(RAInNode)%MassFlowRateMax = DamperRecircAirInlet(DamperNum)%AirMassFlowRateMax
-        Node(RAInNode)%MassFlowRateMin = 0.0
+        Node(RAInNode)%MassFlowRateMin = 0.0d0
         DamperRecircAirInlet(DamperNum)%AirMassFlowDiffMag = 1.0d-10 * DamperRecircAirInlet(DamperNum)%AirMassFlowRateMax
       ENDIF
       Node(OAInNode)%MassFlowRateMax = DamperOAInlet(DamperNum)%AirMassFlowRateMax
-      Node(OAInNode)%MassFlowRateMin = 0.0
+      Node(OAInNode)%MassFlowRateMin = 0.0d0
       !figure per person by design level for the OA duct.
       PeopleFlow = 0.d0
       DO Loop = 1, TotPeople
@@ -907,61 +907,61 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
      !Take care of the flow rates first. For Const Vol and VAV.
     IF (Damper(DamperNum)%DamperType == DualDuct_ConstantVolume .OR. &
     Damper(DamperNum)%DamperType == DualDuct_VariableVolume) THEN
-      IF((Node(HotInNode)%MassFlowRate > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      IF((Node(HotInNode)%MassFlowRate > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(HotInNode)%MassFlowRate = DamperHotAirInlet(DamperNum)%AirMassFlowRateMax
       ELSE
-        Node(HotInNode)%MassFlowRate = 0.0
+        Node(HotInNode)%MassFlowRate = 0.0d0
       END IF
-      IF((Node(ColdInNode)%MassFlowRate > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      IF((Node(ColdInNode)%MassFlowRate > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(ColdInNode)%MassFlowRate = DamperColdAirInlet(DamperNum)%AirMassFlowRateMax
       ELSE
-        Node(ColdInNode)%MassFlowRate = 0.0
+        Node(ColdInNode)%MassFlowRate = 0.0d0
       END IF
      !Next take care of the Max Avail Flow Rates
-      If((Node(HotInNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      If((Node(HotInNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(HotInNode)%MassFlowRateMaxAvail = DamperHotAirInlet(DamperNum)%AirMassFlowRateMax
       Else
-        Node(HotInNode)%MassFlowRateMaxAvail = 0.0
+        Node(HotInNode)%MassFlowRateMaxAvail = 0.0d0
       END IF
-      IF((Node(ColdInNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      IF((Node(ColdInNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(ColdInNode)%MassFlowRateMaxAvail = DamperColdAirInlet(DamperNum)%AirMassFlowRateMax
       ELSE
-        Node(ColdInNode)%MassFlowRateMaxAvail = 0.0
+        Node(ColdInNode)%MassFlowRateMaxAvail = 0.0d0
       END IF
      !The last item is to take care of the Min Avail Flow Rates
-      IF((Node(HotInNode)%MassFlowRate > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      IF((Node(HotInNode)%MassFlowRate > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(HotInNode)%MassFlowRateMinAvail = DamperHotAirInlet(DamperNum)%AirMassFlowRateMax *  &
                                                 Damper(DamperNum)%ZoneMinAirFrac
       ELSE
-        Node(HotInNode)%MassFlowRateMinAvail = 0.0
+        Node(HotInNode)%MassFlowRateMinAvail = 0.0d0
       END IF
-      IF((Node(ColdInNode)%MassFlowRate > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) Then
+      IF((Node(ColdInNode)%MassFlowRate > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) Then
         Node(ColdInNode)%MassFlowRateMinAvail = DamperColdAirInlet(DamperNum)%AirMassFlowRateMax *  &
                                                 Damper(DamperNum)%ZoneMinAirFrac
       ELSE
-        Node(ColdInNode)%MassFlowRateMinAvail = 0.0
+        Node(ColdInNode)%MassFlowRateMinAvail = 0.0d0
       END IF
 
     ELSEIF (Damper(DamperNum)%DamperType == DualDuct_OutdoorAir) THEN
     !The first time through set the mass flow rate to the Max for VAV:OutdoorAir
-      IF((Node(OAInNode)%MassFlowRate > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) THEN
+      IF((Node(OAInNode)%MassFlowRate > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) THEN
         Node(OAInNode)%MassFlowRate = DamperOAInlet(DamperNum)%AirMassFlowRateMax
       ELSE
-        Node(OAInNode)%MassFlowRate = 0.0
+        Node(OAInNode)%MassFlowRate = 0.0d0
       END IF
       IF (Damper(DamperNum)%RecircIsUsed) THEN
-        IF((Node(RAInNode)%MassFlowRate > 0.0) .AND.  &
-           (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) THEN
+        IF((Node(RAInNode)%MassFlowRate > 0.0d0) .AND.  &
+           (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) THEN
           Node(RAInNode)%MassFlowRate = DamperRecircAirInlet(DamperNum)%AirMassFlowRateMax
         ELSE
-          Node(RAInNode)%MassFlowRate = 0.0
+          Node(RAInNode)%MassFlowRate = 0.0d0
         END IF
         ! clear flow history
         DamperRecircAirInlet(DamperNum)%AirMassFlowRateHist1 = 0.d0
@@ -969,23 +969,23 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
         DamperRecircAirInlet(DamperNum)%AirMassFlowRateHist3 = 0.d0
       ENDIF
      !Next take care of the Max Avail Flow Rates
-      IF((Node(OAInNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) THEN
+      IF((Node(OAInNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+         (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) THEN
         Node(OAInNode)%MassFlowRateMaxAvail = DamperOAInlet(DamperNum)%AirMassFlowRateMax
       ELSE
-        Node(OAInNode)%MassFlowRateMaxAvail = 0.0
+        Node(OAInNode)%MassFlowRateMaxAvail = 0.0d0
       END IF
       IF (Damper(DamperNum)%RecircIsUsed) THEN
-        IF((Node(RAInNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-           (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0)) THEN
+        IF((Node(RAInNode)%MassFlowRateMaxAvail > 0.0d0) .AND.  &
+           (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0)) THEN
           Node(RAInNode)%MassFlowRateMaxAvail = DamperRecircAirInlet(DamperNum)%AirMassFlowRateMax
         ELSE
-          Node(RAInNode)%MassFlowRateMaxAvail = 0.0
+          Node(RAInNode)%MassFlowRateMaxAvail = 0.0d0
         END IF
       ENDIF
      !The last item is to take care of the Min Avail Flow Rates. VAV:OutdoorAir
-      Node(OAInNode)%MassFlowRateMinAvail = 0.0
-      IF (Damper(DamperNum)%RecircIsUsed)  Node(RAInNode)%MassFlowRateMinAvail = 0.0
+      Node(OAInNode)%MassFlowRateMinAvail = 0.0d0
+      IF (Damper(DamperNum)%RecircIsUsed)  Node(RAInNode)%MassFlowRateMinAvail = 0.0d0
     END IF
   END IF
 
@@ -1163,6 +1163,7 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
    USE DataZoneEnergyDemands
 !unused0909   USE DataHeatBalFanSys, ONLY: Mat
    USE Psychrometrics , ONLY:PsyCpAirFnWTdb, PsyTdbFnHW
+   USE DataHVACGlobals, ONLY:SmallTempDiff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1194,9 +1195,12 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
       ! Get the calculated load from the Heat Balance from ZoneSysEnergyDemand
    QTotLoad=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired
       ! Need the design massflowrate for calculations
-   MassFlow = DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail/2.0 + &
-              DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail/2.0
-
+   IF (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0) THEN
+     MassFlow = DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail/2.0d0 + &
+                DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail/2.0d0
+   ELSE
+     MassFlow = 0.d0
+   ENDIF
       ! If there is massflow then need to provide the correct amount of total
       !  required zone energy
    If(MassFlow .GT. SmallMassFlow) Then
@@ -1205,7 +1209,7 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
       ! If the enthalpy is the same for the hot and cold duct then there would be a
       !  divide by zero so for heating or cooling set the damper to one max flow
       !  or the other.
-     If(DamperColdAirInlet(DamperNum)%AirTemp .ne. DamperHotAirInlet(DamperNum)%AirTemp) Then
+     If(ABS(DamperColdAirInlet(DamperNum)%AirTemp - DamperHotAirInlet(DamperNum)%AirTemp) > SmallTempDiff) Then
        ! CpAirSysHot = PsyCpAirFnWTdb(DamperHotAirInlet(DamperNum)%AirHumRat,DamperHotAirInlet(DamperNum)%AirTemp)
        ! CpAirSysCold= PsyCpAirFnWTdb(DamperColdAirInlet(DamperNum)%AirHumRat,DamperColdAirInlet(DamperNum)%AirTemp)
        CpAirSysHot = CpAirZn
@@ -1213,8 +1217,8 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
        !Determine the Cold Air Mass Flow Rate
        DamperColdAirInlet(DamperNum)%AirMassFlowRate = (QZnReq - MassFlow*CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp)/ &
             (CpAirSysCold*DamperColdAirInlet(DamperNum)%AirTemp - CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp)
-     Else If((QTotLoad > 0.0) .And. (DamperHotAirInlet(DamperNum)%AirMassFlowRate > 0.0)) Then
-       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
+     Else If((QTotLoad > 0.0d0) .And. (DamperHotAirInlet(DamperNum)%AirMassFlowRate > 0.0d0)) Then
+       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
      Else
        DamperColdAirInlet(DamperNum)%AirMassFlowRate = MassFlow
      End If
@@ -1232,6 +1236,11 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
           DamperHotAirInlet(DamperNum)%AirMassFlowRate = DamperHotAirInlet(DamperNum)%AirMassFlowRateMinAvail
      End If
      MassFlow = DamperColdAirInlet(DamperNum)%AirMassFlowRate + DamperHotAirInlet(DamperNum)%AirMassFlowRate
+   Else
+   ! System is Off set massflow to 0.0
+     MassFlow = 0.0d0
+   End If
+   If(MassFlow .GT. SmallMassFlow) Then
       ! After flows are calculated then calculate the mixed air flow properties.
      HumRat = (DamperHotAirInlet(DamperNum)%AirHumRat * &
              DamperHotAirInlet(DamperNum)%AirMassFlowRate + &
@@ -1244,10 +1253,10 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
 
       ! If there is no air flow than calculate the No Flow conditions
    Else
-     DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
-     DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0
-     HumRat =(DamperHotAirInlet(DamperNum)%AirHumRat + DamperColdAirInlet(DamperNum)%AirHumRat)/2.0
-     Enthalpy = (DamperHotAirInlet(DamperNum)%AirEnthalpy + DamperColdAirInlet(DamperNum)%AirEnthalpy)/2.0
+     DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
+     DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
+     HumRat =(DamperHotAirInlet(DamperNum)%AirHumRat + DamperColdAirInlet(DamperNum)%AirHumRat)/2.0d0
+     Enthalpy = (DamperHotAirInlet(DamperNum)%AirEnthalpy + DamperColdAirInlet(DamperNum)%AirEnthalpy)/2.0d0
    End IF
      Temperature = PsyTdbFnHW(Enthalpy,HumRat)
 
@@ -1261,10 +1270,10 @@ SUBROUTINE SimDualDuctConstVol(DamperNum, ZoneNum, ZoneNodeNum)
    DamperOutlet(DamperNum)%AirEnthalpy            = Enthalpy
 
    !Calculate the hot and cold damper position in %
-   If((DamperHotAirInlet(DamperNum)%AirmassFlowRateMax == 0.0) .or. &
-      (DamperColdAirInlet(DamperNum)%AirmassFlowRateMax == 0.0)) Then
-     Damper(DamperNum)%ColdAirDamperPosition = 0.0
-     Damper(DamperNum)%HotAirDamperPosition  = 0.0
+   If((DamperHotAirInlet(DamperNum)%AirmassFlowRateMax == 0.0d0) .or. &
+      (DamperColdAirInlet(DamperNum)%AirmassFlowRateMax == 0.0d0)) Then
+     Damper(DamperNum)%ColdAirDamperPosition = 0.0d0
+     Damper(DamperNum)%HotAirDamperPosition  = 0.0d0
    Else
      Damper(DamperNum)%ColdAirDamperPosition = DamperColdAirInlet(DamperNum)%AirMassFlowRate/ &
                                              DamperColdAirInlet(DamperNum)%AirmassFlowRateMax
@@ -1298,6 +1307,7 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
    USE DataZoneEnergyDemands
 !unused0909   USE DataHeatBalFanSys, ONLY: Mat
    USE Psychrometrics, ONLY:PsyCpAirFnWTdb, PsyTdbFnHW
+   USE DataHVACGlobals, ONLY:SmallTempDiff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1344,10 +1354,14 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
    ! the massflow rate of either heating or cooling is determined to meet the entire load.  Then
    ! if the massflow is below the minimum or greater than the Max it is set to either the Min
    ! or the Max as specified for the VAV model.
-   If((QTotLoad > 0.0) .AND. (DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0)) Then
+   IF (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) == 0.0d0) THEN
+     ! System is Off set massflow to 0.0
+     MassFlow = 0.0d0
+
+   ELSEIf((QTotLoad > 0.0d0) .AND. (DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0d0)) Then
    ! Then heating is needed
    ! Next check for the denominator equal to zero
-     If((CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp) .ne. (CpAirZn*Node(ZoneNodeNum)%Temp)) Then
+     If(ABS((CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp) - (CpAirZn*Node(ZoneNodeNum)%Temp))/CpAirZn > SmallTempDiff) Then
        MassFlow= QTotLoad/(CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp - CpAirZn*Node(ZoneNodeNum)%Temp)
      Else
        ! If denominator tends to zero then mass flow would go to infinity thus set to the max for this iteration
@@ -1362,17 +1376,17 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      End If
 
      ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
-     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0d0) THEN
        MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
      ENDIF
 
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail)
 
-   Else If((QTotLoad < 0.0) .AND. (DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0)) Then
+   Else If((QTotLoad < 0.0d0) .AND. (DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0d0)) Then
    ! Then cooling is required
    ! Next check for the denominator equal to zero
-     If((CpAirSysCold*DamperColdAirInlet(DamperNum)%AirTemp) .ne. (CpAirZn*Node(ZoneNodeNum)%Temp)) Then
+     If(ABS((CpAirSysCold*DamperColdAirInlet(DamperNum)%AirTemp) - (CpAirZn*Node(ZoneNodeNum)%Temp))/CpAirZn > SmallTempDiff) Then
        MassFlow= QTotLoad/(CpAirSysCold*DamperColdAirInlet(DamperNum)%AirTemp - CpAirZn*Node(ZoneNodeNum)%Temp)
      Else
        ! If denominator tends to zero then mass flow would go to infinity thus set to the max for this iteration
@@ -1381,31 +1395,31 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
 
      !Check to see if the flow is < the Min or > the Max air Fraction to the zone; then set to min or max
      IF((MassFlow <= (DamperColdAirInlet(DamperNum)%AirMassFlowRateMax*Damper(DamperNum)%ZoneMinAirFrac)) .and. &
-         (MassFlow >= 0.0)) Then
+         (MassFlow >= 0.0d0)) Then
        MassFlow = DamperColdAirInlet(DamperNum)%AirMassFlowRateMax*Damper(DamperNum)%ZoneMinAirFrac
        MassFlow = MAX(MassFlow,DamperColdAirInlet(DamperNum)%AirMassFlowRateMinAvail)
-     Else If(MassFlow < 0.0) Then
+     Else If(MassFlow < 0.0d0) Then
        MassFlow = DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail
      Else If(MassFlow >= DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail) Then
        MassFlow = DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail
      End If
 
      ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
-     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0d0) THEN
        MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
      ENDIF
 
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail)
 
-   Else If((DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0) .or.  &
-           (DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0)) Then
+   Else If((DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0d0) .or.  &
+           (DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail > 0.0d0)) Then
    ! No Load on Zone set to mixed condition
-     MassFlow = (DamperHotAirInlet(DamperNum)%AirMassFlowRateMax/2.0) * Damper(DamperNum)%ZoneMinAirFrac + &
-                DamperColdAirInlet(DamperNum)%AirMassFlowRateMax/2.0 * Damper(DamperNum)%ZoneMinAirFrac
+     MassFlow = (DamperHotAirInlet(DamperNum)%AirMassFlowRateMax/2.0d0) * Damper(DamperNum)%ZoneMinAirFrac + &
+                DamperColdAirInlet(DamperNum)%AirMassFlowRateMax/2.0d0 * Damper(DamperNum)%ZoneMinAirFrac
 
      ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
-     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0d0) THEN
        MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
      ENDIF
 
@@ -1415,7 +1429,7 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
 
    Else
    ! System is Off set massflow to 0.0
-     MassFlow = 0.0
+     MassFlow = 0.0d0
    End If
 
    !Now the massflow for heating or cooling has been determined and if the massflow was reset to the
@@ -1427,12 +1441,12 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      QZnReq = QTotLoad + Massflow * CpAirZn * Node(ZoneNodeNum)%Temp
      !Using the known enthalpies the cold air inlet mass flow is determined.  If the enthalpy of the hot and cold
      ! air streams are equal the IF-Then block handles that condition.
-     If(DamperColdAirInlet(DamperNum)%AirTemp .ne. DamperHotAirInlet(DamperNum)%AirTemp) Then
+     If(ABS(DamperColdAirInlet(DamperNum)%AirTemp - DamperHotAirInlet(DamperNum)%AirTemp) > SmallTempDiff) Then
        !Calculate the Cold air mass flow rate
        DamperColdAirInlet(DamperNum)%AirMassFlowRate = (QZnReq - MassFlow*CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp)/ &
             (CpAirSysCold*DamperColdAirInlet(DamperNum)%AirTemp - CpAirSysHot*DamperHotAirInlet(DamperNum)%AirTemp)
-     Else If((QTotLoad > 0.0) .And. (DamperHotAirInlet(DamperNum)%AirMassFlowRate > 0.0)) Then
-       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
+     Else If((QTotLoad > 0.0d0) .And. (DamperHotAirInlet(DamperNum)%AirMassFlowRate > 0.0d0)) Then
+       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
      Else
        DamperColdAirInlet(DamperNum)%AirMassFlowRate = MassFlow
      End If
@@ -1442,8 +1456,8 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
           DamperColdAirInlet(DamperNum)%AirMassFlowRate = DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail
 
      !These are shutoff boxes for either the hot or the cold, therfore one side or other can = 0.0
-     Else If(DamperColdAirInlet(DamperNum)%AirMassFlowRate .lt. 0.0)Then
-          DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
+     Else If(DamperColdAirInlet(DamperNum)%AirMassFlowRate .lt. 0.0d0)Then
+          DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
      Else If(DamperColdAirInlet(DamperNum)%AirMassFlowRate .gt. MassFlow)Then
           DamperColdAirInlet(DamperNum)%AirMassFlowRate = MassFlow
      End If
@@ -1451,10 +1465,10 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      DamperHotAirInlet(DamperNum)%AirMassFlowRate = MassFlow - DamperColdAirInlet(DamperNum)%AirMassFlowRate
 
      IF (DamperHotAirInlet(DamperNum)%AirMassFlowRate < MassFlowSetToler) THEN
-       DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0
+       DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
        DamperColdAirInlet(DamperNum)%AirMassFlowRate = MassFlow
      ELSE IF (DamperColdAirInlet(DamperNum)%AirMassFlowRate < MassFlowSetToler) THEN
-       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
+       DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
        DamperHotAirInlet(DamperNum)%AirMassFlowRate = MassFlow
      END IF
 
@@ -1470,10 +1484,10 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
 
      !IF the system is OFF the properties are calculated for this special case.
    Else
-     DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0
-     DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0
-     HumRat =(DamperHotAirInlet(DamperNum)%AirHumRat + DamperColdAirInlet(DamperNum)%AirHumRat)/2.0
-     Enthalpy = (DamperHotAirInlet(DamperNum)%AirEnthalpy + DamperColdAirInlet(DamperNum)%AirEnthalpy)/2.0
+     DamperColdAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
+     DamperHotAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
+     HumRat =(DamperHotAirInlet(DamperNum)%AirHumRat + DamperColdAirInlet(DamperNum)%AirHumRat)/2.0d0
+     Enthalpy = (DamperHotAirInlet(DamperNum)%AirEnthalpy + DamperColdAirInlet(DamperNum)%AirEnthalpy)/2.0d0
    End IF
      Temperature = PsyTdbFnHW(Enthalpy,HumRat)
 
@@ -1488,10 +1502,10 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
    Damper(DamperNum)%OutdoorAirFlowRate    = MassFlow * AirLoopOAFrac
 
    !Calculate the hot and cold damper position in %
-   If((DamperHotAirInlet(DamperNum)%AirmassFlowRateMax == 0.0) .or. &
-      (DamperColdAirInlet(DamperNum)%AirmassFlowRateMax == 0.0)) Then
-     Damper(DamperNum)%ColdAirDamperPosition = 0.0
-     Damper(DamperNum)%HotAirDamperPosition  = 0.0
+   If((DamperHotAirInlet(DamperNum)%AirmassFlowRateMax == 0.0d0) .or. &
+      (DamperColdAirInlet(DamperNum)%AirmassFlowRateMax == 0.0d0)) Then
+     Damper(DamperNum)%ColdAirDamperPosition = 0.0d0
+     Damper(DamperNum)%HotAirDamperPosition  = 0.0d0
    Else
      Damper(DamperNum)%ColdAirDamperPosition = DamperColdAirInlet(DamperNum)%AirMassFlowRate/ &
                                              DamperColdAirInlet(DamperNum)%AirmassFlowRateMax
@@ -1531,6 +1545,7 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
   USE DataGlobals
   USE General,             ONLY: TrimSigDigits
   USE DataHeatBalFanSys, ONLY: ZoneThermostatSetPointLo, ZoneThermostatSetPointHi
+  USE DataHVACGlobals, ONLY:SmallTempDiff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1594,12 +1609,12 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
   IF(DamperOAInlet(DamperNum)%AirMassFlowRate .gt. DamperOAInlet(DamperNum)%AirMassFlowRateMaxAvail) THEN
     DamperOAInlet(DamperNum)%AirMassFlowRate = DamperOAInlet(DamperNum)%AirMassFlowRateMaxAvail
 
-  ELSE IF(DamperOAInlet(DamperNum)%AirMassFlowRate .lt. 0.0)THEN
-    DamperOAInlet(DamperNum)%AirMassFlowRate = 0.0
+  ELSE IF(DamperOAInlet(DamperNum)%AirMassFlowRate .lt. 0.0d0)THEN
+    DamperOAInlet(DamperNum)%AirMassFlowRate = 0.0d0
   END IF
 
    !..Find the amount of load that the OAMassFlow accounted for
-  IF((CpAirSysOA*DamperOAInlet(DamperNum)%AirTemp) /= (CpAirZn*Node(ZoneNodeNum)%Temp)) THEN
+  IF(ABS((CpAirSysOA*DamperOAInlet(DamperNum)%AirTemp) - (CpAirZn*Node(ZoneNodeNum)%Temp))/CpAirZn > SmallTempDiff) THEN
     QOALoad = DamperOAInlet(DamperNum)%AirMassFlowRate *  &
                  (CpAirSysOA * DamperOAInlet(DamperNum)%AirTemp - CpAirZn * Node(ZoneNodeNum)%Temp)
 
@@ -1609,9 +1624,9 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
                  (CpAirSysOA * DamperOAInlet(DamperNum)%AirTemp - CpAirZn * ZoneThermostatSetPointHi(ZoneNum))
 
   ELSE
-    QOALoad = 0.0
-    QOALoadToHeatSP = 0.0
-    QOALoadToCoolSP = 0.0
+    QOALoad = 0.0d0
+    QOALoadToHeatSP = 0.0d0
+    QOALoadToCoolSP = 0.0d0
   END IF
 
   IF ( Damper(DamperNum)%RecircIsUsed ) THEN
@@ -1626,7 +1641,7 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
     ELSEIF (QtoHeatSPRemainAdjust > 0.d0) THEN
       QRALoad = QtoHeatSPRemainAdjust
     ELSE
-      QRALoad = 0.0
+      QRALoad = 0.0d0
     ENDIF
 
 
@@ -1647,8 +1662,7 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
     IF (QRALoad < 0.d0) THEN ! cooling
       IF ((DamperRecircAirInlet(DamperNum)%AirTemp - Node(ZoneNodeNum)%Temp) < -0.5d0)  THEN ! can cool
            !  Find the Mass Flow Rate of the RA Stream needed to meet the zone cooling load
-        IF((CpAirSysRA*DamperRecircAirInlet(DamperNum)%AirTemp) /= (CpAirZn*Node(ZoneNodeNum)%Temp)) THEN
-
+        IF(ABS((CpAirSysRA*DamperRecircAirInlet(DamperNum)%AirTemp)-(CpAirZn*Node(ZoneNodeNum)%Temp))/CpAirZn > SmallTempDiff) THEN
           DamperRecircAirInlet(DamperNum)%AirMassFlowRate = QRALoad / &
                            (CpAirSysRA*DamperRecircAirInlet(DamperNum)%AirTemp - CpAirZn*Node(ZoneNodeNum)%Temp)
         ENDIF
@@ -1695,14 +1709,18 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
           (ABS(DamperRecircAirInlet(DamperNum)%AirMassFlowRate  &
                  -DamperRecircAirInlet(DamperNum)%AirMassFlowRateHist1) &
                     >= DamperRecircAirInlet(DamperNum)%AirMassFlowDiffMag) ) THEN
-     IF (DamperRecircAirInlet(DamperNum)%AirMassFlowRate > 0.0) THEN
+     IF (DamperRecircAirInlet(DamperNum)%AirMassFlowRate > 0.0d0) THEN
        DamperRecircAirInlet(DamperNum)%AirMassFlowRate = DamperRecircAirInlet(DamperNum)%AirMassFlowRateHist1
      ENDIF
    END IF
 
    ! Find the Max Box Flow Rate.
   MassFlowMax = DamperOAInlet(DamperNum)%AirMassFlowRateMaxAvail + DamperRecircAirInlet(DamperNum)%AirMassFlowRateMaxAvail
-  TotMassFlow = DamperOAInlet(DamperNum)%AirMassFlowRate + DamperRecircAirInlet(DamperNum)%AirMassFlowRate
+  IF  (GetCurrentScheduleValue(Damper(DamperNum)%SchedPtr) .gt. 0.0d0) THEN
+    TotMassFlow = DamperOAInlet(DamperNum)%AirMassFlowRate + DamperRecircAirInlet(DamperNum)%AirMassFlowRate
+  ELSE
+    TotMassFlow = 0.d0
+  ENDIF
 
   IF (TotMassFlow .GT. SmallMassFlow) THEN
 
@@ -1722,16 +1740,16 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
                   DamperRecircAirInlet(DamperNum)%AirEnthalpy * &
                   DamperRecircAirInlet(DamperNum)%AirMassFlowRate) / TotMassFlow
     ELSE
-      HumRat =(DamperRecircAirInlet(DamperNum)%AirHumRat + DamperOAInlet(DamperNum)%AirHumRat)/2.0
-      Enthalpy = (DamperRecircAirInlet(DamperNum)%AirEnthalpy + DamperOAInlet(DamperNum)%AirEnthalpy)/2.0
+      HumRat =(DamperRecircAirInlet(DamperNum)%AirHumRat + DamperOAInlet(DamperNum)%AirHumRat)/2.0d0
+      Enthalpy = (DamperRecircAirInlet(DamperNum)%AirEnthalpy + DamperOAInlet(DamperNum)%AirEnthalpy)/2.0d0
     ENDIF
   ELSE
 
     ! The Max Box Flow Rate is zero and the box is off.
-    DamperRecircAirInlet(DamperNum)%AirMassFlowRate = 0.0
-    DamperOAInlet(DamperNum)%AirMassFlowRate = 0.0
-    HumRat =(DamperRecircAirInlet(DamperNum)%AirHumRat + DamperOAInlet(DamperNum)%AirHumRat)/2.0
-    Enthalpy = (DamperRecircAirInlet(DamperNum)%AirEnthalpy + DamperOAInlet(DamperNum)%AirEnthalpy)/2.0
+    DamperRecircAirInlet(DamperNum)%AirMassFlowRate = 0.0d0
+    DamperOAInlet(DamperNum)%AirMassFlowRate = 0.0d0
+    HumRat =(DamperRecircAirInlet(DamperNum)%AirHumRat + DamperOAInlet(DamperNum)%AirHumRat)/2.0d0
+    Enthalpy = (DamperRecircAirInlet(DamperNum)%AirEnthalpy + DamperOAInlet(DamperNum)%AirEnthalpy)/2.0d0
   END IF
 
   Temperature = PsyTdbFnHW(Enthalpy,HumRat)
@@ -1745,15 +1763,15 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
    !Calculate the OA and RA damper position in %
   IF ( Damper(DamperNum)%RecircIsUsed ) THEN
     IF (DamperRecircAirInlet(DamperNum)%AirmassFlowRateMax == 0.d0) THEN !protect div by zero
-      Damper(DamperNum)%RecircAirDamperPosition = 0.0
+      Damper(DamperNum)%RecircAirDamperPosition = 0.0d0
     ELSE
       Damper(DamperNum)%RecircAirDamperPosition = DamperRecircAirInlet(DamperNum)%AirMassFlowRate/ &
                                                DamperRecircAirInlet(DamperNum)%AirmassFlowRateMax
     ENDIF
   ENDIF
 
-  IF (DamperOAInlet(DamperNum)%AirmassFlowRateMax == 0.0) THEN !protect div by zero
-    Damper(DamperNum)%OADamperPosition  = 0.0
+  IF (DamperOAInlet(DamperNum)%AirmassFlowRateMax == 0.0d0) THEN !protect div by zero
+    Damper(DamperNum)%OADamperPosition  = 0.0d0
   ELSE
     Damper(DamperNum)%OADamperPosition  = DamperOAInlet(DamperNum)%AirMassFlowRate/ &
                                              DamperOAInlet(DamperNum)%AirmassFlowRateMax
@@ -1762,18 +1780,18 @@ SUBROUTINE SimDualDuctVAVOutdoorAir(DamperNum, ZoneNum, ZoneNodeNum)
    !Calculate OAFraction of mixed air after the box
   IF (TotMassFlow > 0) THEN
     IF (Damper(DamperNum)%RecircIsUsed) THEN
-      If(DamperOAInlet(DamperNum)%AirmassFlowRate == 0.0) THEN
-        Damper(DamperNum)%OAFraction = 0.0
-      ELSEIF( DamperRecircAirInlet(DamperNum)%AirmassFlowRate == 0.0) THEN
-        Damper(DamperNum)%OAFraction = 1.0
+      If(DamperOAInlet(DamperNum)%AirmassFlowRate == 0.0d0) THEN
+        Damper(DamperNum)%OAFraction = 0.0d0
+      ELSEIF( DamperRecircAirInlet(DamperNum)%AirmassFlowRate == 0.0d0) THEN
+        Damper(DamperNum)%OAFraction = 1.0d0
       ELSE
         Damper(DamperNum)%OAFraction = DamperOAInlet(DamperNum)%AirmassFlowRate / TotMassFlow
       END IF
     ELSE
-      Damper(DamperNum)%OAFraction = 1.0
+      Damper(DamperNum)%OAFraction = 1.0d0
     ENDIF
   ELSE
-    Damper(DamperNum)%OAFraction = 0.0
+    Damper(DamperNum)%OAFraction = 0.0d0
   ENDIF
 
 

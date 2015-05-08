@@ -31,8 +31,9 @@ MODULE UnitHeater
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, SetupOutputVariable
+USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc, ScheduleAlwaysOn, &
+                           DisplayExtraWarnings
+USE DataInterfaces
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallAirVolFlow, cFanTypes
 
   ! Use statements for access to subroutines in other modules
@@ -70,8 +71,8 @@ TYPE UnitHeaterData
   INTEGER                      :: FanAvailSchedPtr   =0   ! index to fan availability schedule
   INTEGER                      :: ControlCompTypeNum =0
   INTEGER                      :: CompErrIndex       =0
-  REAL(r64)                    :: MaxAirVolFlow      =0.0 ! m3/s
-  REAL(r64)                    :: MaxAirMassFlow     =0.0 ! kg/s
+  REAL(r64)                    :: MaxAirVolFlow      =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxAirMassFlow     =0.0d0 ! kg/s
   CHARACTER(len=MaxNameLength) :: FanControlType     =' ' ! type of control; options are VARIABLE PERCENT and FIXED TEMPERATURE
   INTEGER                      :: FanOutletNode      =0   ! outlet node number for fan exit
                                                           ! (assumes fan is upstream of heating coil)
@@ -81,16 +82,16 @@ TYPE UnitHeaterData
   INTEGER                      :: HCoil_Index        =0   !
   INTEGER                      :: HCoil_PlantTypeNum =0  !
   INTEGER                      :: HCoil_FluidIndex   =0
-  REAL(r64)                    :: MaxVolHotWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MaxVolHotSteamFlow =0.0 ! m3/s
-  REAL(r64)                    :: MaxHotWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MaxHotSteamFlow    =0.0 ! m3/s
-  REAL(r64)                    :: MinVolHotWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinVolHotSteamFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MinHotSteamFlow    =0.0 ! kg/s
+  REAL(r64)                    :: MaxVolHotWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxVolHotSteamFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxHotWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MaxHotSteamFlow    =0.0d0 ! m3/s
+  REAL(r64)                    :: MinVolHotWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinVolHotSteamFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MinHotSteamFlow    =0.0d0 ! kg/s
   INTEGER                      :: HotControlNode     =0   ! hot water control node, inlet of coil
-  REAL(r64)                    :: HotControlOffset   =0.0 ! control tolerance
+  REAL(r64)                    :: HotControlOffset   =0.0d0 ! control tolerance
   INTEGER                      :: HotCoilOutNodeNum  =0   ! outlet of coil
   INTEGER                      :: HWLoopNum          =0   ! index for plant loop with hot plant coil
   INTEGER                      :: HWLoopSide         =0   ! index for plant loop side for hot plant coil
@@ -98,10 +99,10 @@ TYPE UnitHeaterData
   INTEGER                      :: HWCompNum          =0   ! index for plant component for hot plant coil
 
   ! Report data
-  REAL(r64)                    :: HeatPower          =0.0 ! unit heating output in watts
-  REAL(r64)                    :: HeatEnergy         =0.0 ! unit heating output in J
-  REAL(r64)                    :: ElecPower          =0.0 !
-  REAL(r64)                    :: ElecEnergy         =0.0 !
+  REAL(r64)                    :: HeatPower          =0.0d0 ! unit heating output in watts
+  REAL(r64)                    :: HeatEnergy         =0.0d0 ! unit heating output in J
+  REAL(r64)                    :: ElecPower          =0.0d0 !
+  REAL(r64)                    :: ElecEnergy         =0.0d0 !
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
   INTEGER                      :: AvailStatus          = 0
   LOGICAL                      :: FanControlTypeOnOff = .FALSE.   ! True when FanControlType is OnOffCtrl
@@ -305,7 +306,7 @@ SUBROUTINE GetUnitHeaterInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -484,7 +485,7 @@ SUBROUTINE GetUnitHeaterInput
 
     UnitHeat(UnitHeatNum)%HotControlOffset = Numbers(4)
     ! Set default convergence tolerance
-    IF (UnitHeat(UnitHeatNum)%HotControlOffset .LE. 0.0) THEN
+    IF (UnitHeat(UnitHeatNum)%HotControlOffset .LE. 0.0d0) THEN
       UnitHeat(UnitHeatNum)%HotControlOffset = 0.001d0
     END IF
 
@@ -702,10 +703,10 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
 
     ! set the node max and min mass flow rates
     Node(OutNode)%MassFlowRateMax = UnitHeat(UnitHeatNum)%MaxAirMassFlow
-    Node(OutNode)%MassFlowRateMin = 0.0
+    Node(OutNode)%MassFlowRateMin = 0.0d0
 
     Node(InNode)%MassFlowRateMax = UnitHeat(UnitHeatNum)%MaxAirMassFlow
-    Node(InNode)%MassFlowRateMin = 0.0
+    Node(InNode)%MassFlowRateMin = 0.0d0
 
     IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
       rho = GetDensityGlycol( PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidName, &
@@ -725,7 +726,7 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
                                 UnitHeat(UnitHeatNum)%HWCompNum )
     END IF
     IF (UnitHeat(UnitHeatNum)%HCoilType == SteamCoil) THEN
-      TempSteamIn= 100.00
+      TempSteamIn= 100.00d0
       SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,UnitHeat(UnitHeatNum)%HCoil_FluidIndex,'InitUnitHeater')
       UnitHeat(UnitHeatNum)%MaxHotSteamFlow = SteamDensity*UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow
       UnitHeat(UnitHeatNum)%MinHotSteamFlow = SteamDensity*UnitHeat(UnitHeatNum)%MinVolHotSteamFlow
@@ -766,12 +767,12 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
   ENDIF
 
   IF (SetMassFlowRateToZero) THEN
-    Node(InNode)%MassFlowRate          = 0.0
-    Node(InNode)%MassFlowRateMaxAvail  = 0.0
-    Node(InNode)%MassFlowRateMinAvail  = 0.0
-    Node(OutNode)%MassFlowRate         = 0.0
-    Node(OutNode)%MassFlowRateMaxAvail = 0.0
-    Node(OutNode)%MassFlowRateMinAvail = 0.0
+    Node(InNode)%MassFlowRate          = 0.0d0
+    Node(InNode)%MassFlowRateMaxAvail  = 0.0d0
+    Node(InNode)%MassFlowRateMinAvail  = 0.0d0
+    Node(OutNode)%MassFlowRate         = 0.0d0
+    Node(OutNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(OutNode)%MassFlowRateMinAvail = 0.0d0
   ELSE
     Node(InNode)%MassFlowRate          = UnitHeat(UnitHeatNum)%MaxAirMassFlow
     Node(InNode)%MassFlowRateMaxAvail  = UnitHeat(UnitHeatNum)%MaxAirMassFlow
@@ -798,7 +799,7 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -820,6 +821,7 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
   USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE Psychrometrics,     ONLY: CpHW
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -851,108 +853,213 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
   INTEGER             :: CoilSteamOutletNode=0
   REAL(r64)           :: Cp ! local temporary for fluid specific heat
   REAL(r64)           :: rho ! local temporary for fluid density
-
-
+  LOGICAL             :: IsAutosize             ! Indicator to autosize
+  REAL(r64)           :: MaxAirVolFlowDes       ! Autosized maximum air flow for reporting
+  REAL(r64)           :: MaxAirVolFlowUser      ! Hardsized maximum air flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowDes  ! Autosized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowUser ! Hardsized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowDes  ! Autosized maximum hot steam flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowUser ! Hardsized maximum hot steam flow for reporting
 
   PltSizHeatNum = 0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxAirVolFlowDes = 0.0d0
+  MaxAirVolFlowUser = 0.0d0
+  MaxVolHotWaterFlowDes = 0.0d0
+  MaxVolHotWaterFlowUser = 0.0d0
+  MaxVolHotSteamFlowDes = 0.0d0
+  MaxVolHotSteamFlowUser = 0.0d0
 
   IF (UnitHeat(UnitHeatNum)%MaxAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (UnitHeat(UnitHeatNum)%MaxAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                        'User-Specified Maximum Supply Air Flow Rate [m3/s]', UnitHeat(UnitHeatNum)%MaxAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name)
       IF (FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow >= SmallAirVolFlow) THEN
-        UnitHeat(UnitHeatNum)%MaxAirVolFlow = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+        MaxAirVolFlowDes = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
       ELSE
-        UnitHeat(UnitHeatNum)%MaxAirVolFlow = 0.0
+        MaxAirVolFlowDes = 0.0d0
       END IF
-      CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
-                              'Maximum Supply Air Flow Rate [m3/s]', UnitHeat(UnitHeatNum)%MaxAirVolFlow)
+      IF (IsAutosize) THEN
+        UnitHeat(UnitHeatNum)%MaxAirVolFlow = MaxAirVolFlowDes
+        CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                        'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes)
+      ELSE
+        IF (UnitHeat(UnitHeatNum)%MaxAirVolFlow > 0.0d0 .AND. MaxAirVolFlowDes > 0.0d0) THEN
+          MaxAirVolFlowUser = UnitHeat(UnitHeatNum)%MaxAirVolFlow
+          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                        'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes, &
+                        'User-Specified Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowDes - MaxAirVolFlowUser)/MaxAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeUnitHeater: Potential issue with equipment sizing for ZoneHVAC:UnitHeater ' &
+                               //TRIM(UnitHeat(UnitHeatNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Hot Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('.differs from Design Size Maximum Hot Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
-  IF((UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow==AutoSize).or.(UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow==AutoSize))THEN
 
-    IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
+  IsAutosize = .FALSE.
+  IF(UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-      IF (CurZoneEqNum > 0) THEN
+  IF (UnitHeat(UnitHeatNum)%HCoilType == WaterCoil) THEN
 
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+        IF (UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow > 0.0d0) THEN
+          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                       'User-Specified Maximum Hot Water Flow [m3/s]', UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow)
+        END IF
+      ELSE
         CALL CheckZoneSizing('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name)
 
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',UnitHeat(UnitHeatNum)%HCoilName,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',UnitHeat(UnitHeatNum)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', UnitHeat(UnitHeatNum)%HCoilName, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', UnitHeat(UnitHeatNum)%HCoilName, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
+          IF (PltSizHeatNum > 0) THEN
+            DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesHeatLoad
+            IF (DesCoilLoad >= SmallLOad) THEN
 
-        IF (PltSizHeatNum > 0) THEN
-          DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesHeatLoad
-          IF (DesCoilLoad >= SmallLOad) THEN
-
-            rho = GetDensityGlycol(PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidName, &
+              rho = GetDensityGlycol(PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidIndex, &
                                      'SizeUnitHeater')
-            Cp = GetSpecificHeatGlycol(PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidName, &
+              Cp = GetSpecificHeatGlycol(PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(UnitHeat(UnitHeatNum)%HWLoopNum)%FluidIndex, &
                                      'SizeUnitHeater')
 
-            UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow = DesCoilLoad / &
-                                                       ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                       Cp  * rho )
+              MaxVolHotWaterFlowDes = DesCoilLoad / &
+                                    ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                    Cp  * rho )
+            ELSE
+              MaxVolHotWaterFlowDes = 0.0d0
+            END IF
           ELSE
-            UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow = 0.0
-          END IF
-          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
-                                  'Maximum Hot Water Flow [m3/s]', UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:UnitHeater' // ' Object=' &
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:UnitHeater' // ' Object=' &
                                  //TRIM(UnitHeat(UnitHeatNum)%Name))
-          ErrorsFound = .TRUE.
+            ErrorsFound = .TRUE.
+          END IF
         END IF
-
+        IF (IsAutosize) THEN
+          UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow = MaxVolHotWaterFlowDes
+          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                       'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes)
+        ELSE
+          IF (UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow > 0.0d0 .AND. MaxVolHotWaterFlowDes > 0.0d0) THEN
+            MaxVolHotWaterFlowUser = UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow
+            CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                       'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes, &
+                       'User-Specified Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotWaterFlowDes - MaxVolHotWaterFlowUser)/MaxVolHotWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeUnitHeater: Potential issue with equipment sizing for ZoneHVAC:UnitHeater ' &
+                               //TRIM(UnitHeat(UnitHeatNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Hot Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Hot Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-    ELSEIF (UnitHeat(UnitHeatNum)%HCoilType == SteamCoil) THEN
+    END IF
+  ELSE
+    UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow = 0.0d0
+  END IF
 
-      IF (CurZoneEqNum > 0) THEN
+  IsAutosize = .FALSE.
+  IF (UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
+  IF (UnitHeat(UnitHeatNum)%HCoilType == SteamCoil) THEN
+
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+        IF (UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow > 0.0d0) THEN
+          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                                'User-Specified Maximum Steam Flow [m3/s]', UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow)
+        END IF
+      ELSE
         CALL CheckZoneSizing('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name)
 
         CoilSteamInletNode = GetCoilSteamInletNode('Coil:Heating:Steam',UnitHeat(UnitHeatNum)%HCoilName,ErrorsFound)
         CoilSteamOutletNode = GetCoilSteamInletNode('Coil:Heating:Steam',UnitHeat(UnitHeatNum)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', UnitHeat(UnitHeatNum)%HCoilName, CoilSteamInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', UnitHeat(UnitHeatNum)%HCoilName, CoilSteamInletNode, &
                                        CoilSteamOutletNode, ErrorsFound)
-
-        IF (PltSizHeatNum > 0) THEN
-          DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesHeatLoad
-          IF (DesCoilLoad >= SmallLOad) THEN
-            TempSteamIn= 100.00
-            EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitHeater')
-            EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,RefrigIndex,'SizeUnitHeater')
-            LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
-            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitHeater')
-            UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow = DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
-              PlantSizData(PltSizHeatNum)%DeltaT*CPHW(PlantSizData(PltSizHeatNum)%ExitTemp)))
+          IF (PltSizHeatNum > 0) THEN
+            DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesHeatLoad
+            IF (DesCoilLoad >= SmallLOad) THEN
+              TempSteamIn= 100.00d0
+              EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitHeater')
+              EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,RefrigIndex,'SizeUnitHeater')
+              LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
+              SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitHeater')
+              MaxVolHotSteamFlowDes = DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
+                                    PlantSizData(PltSizHeatNum)%DeltaT*CPHW(PlantSizData(PltSizHeatNum)%ExitTemp)))
+            ELSE
+              MaxVolHotSteamFlowDes = 0.0d0
+            END IF
           ELSE
-            UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow = 0.0
-          END IF
-          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
-                                  'Maximum Steam Flow [m3/s]', UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:UnitHeater' // ' Object=' &
+            CALL ShowSevereError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:UnitHeater' // ' Object=' &
                                  //TRIM(UnitHeat(UnitHeatNum)%Name))
-          ErrorsFound = .TRUE.
+            ErrorsFound = .TRUE.
+          END IF
         END IF
-
+        IF (IsAutosize) THEN
+          UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow = MaxVolHotSteamFlowDes
+          CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                       'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes)
+        ELSE
+          IF (UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow > 0.0d0 .AND. MaxVolHotSteamFlowDes > 0.0d0) THEN
+            MaxVolHotSteamFlowUser = UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow
+            CALL ReportSizingOutput('ZoneHVAC:UnitHeater', UnitHeat(UnitHeatNum)%Name, &
+                       'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes, &
+                       'User-Specified Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotSteamFlowDes - MaxVolHotSteamFlowUser)/MaxVolHotSteamFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeUnitHeater: Potential issue with equipment sizing for ZoneHVAC:UnitHeater ' &
+                                  //TRIM(UnitHeat(UnitHeatNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Steam Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Steam Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-    ELSE
-      UnitHeat(UnitHeatNum)%MaxVolHotWaterFlow = 0.0
-      UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow = 0.0
-
     END IF
-
+  ELSE
+    UnitHeat(UnitHeatNum)%MaxVolHotSteamFlow = 0.0d0
   END IF
 
   ! set the design air flow rate for the heating coil
@@ -1043,8 +1150,8 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
           ! initialize local variables
   QUnitOut      = 0.0d0
   LatentOutput  = 0.0d0
-  MaxWaterFlow  = 0.0
-  MinWaterFlow  = 0.0
+  MaxWaterFlow  = 0.0d0
+  MinWaterFlow  = 0.0d0
   InletNode     = UnitHeat(UnitHeatNum)%AirInNode
   OutletNode    = UnitHeat(UnitHeatNum)%AirOutNode
   ControlNode   = UnitHeat(UnitHeatNum)%HotControlNode
@@ -1272,14 +1379,14 @@ SUBROUTINE CalcUnitHeaterComponents(UnitHeatNum,FirstHVACIteration,LoadMet)
     CASE (SteamCoil)
 
       IF (.NOT.HCoilOn) THEN
-        QCoilReq = 0.0
+        QCoilReq = 0.0d0
       ELSE
         HCoilInAirNode = UnitHeat(UnitHeatNum)%FanOutletNode
         CpAirZn        = PsyCpAirFnWTdb(Node(UnitHeat(UnitHeatNum)%AirInNode)%HumRat,Node(UnitHeat(UnitHeatNum)%AirInNode)%Temp)
         QCoilReq       = QZnReq - Node(HCoilInAirNode)%MassFlowRate * CpAirZn &
                                   *(Node(HCoilInAirNode)%Temp-Node(UnitHeat(UnitHeatNum)%AirInNode)%Temp)
       END IF
-      IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+      IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
       CALL SimulateSteamCoilComponents(CompName=UnitHeat(UnitHeatNum)%HCoilName, &
                                          FirstHVACIteration=FirstHVACIteration,    &
                                          QCoilReq=QCoilReq,                        &
@@ -1288,14 +1395,14 @@ SUBROUTINE CalcUnitHeaterComponents(UnitHeatNum,FirstHVACIteration,LoadMet)
     CASE (ElectricCoil,GasCoil)
 
       IF (.NOT.HCoilOn) THEN
-        QCoilReq = 0.0
+        QCoilReq = 0.0d0
       ELSE
         HCoilInAirNode = UnitHeat(UnitHeatNum)%FanOutletNode
         CpAirZn        = PsyCpAirFnWTdb(Node(UnitHeat(UnitHeatNum)%AirInNode)%HumRat,Node(UnitHeat(UnitHeatNum)%AirInNode)%Temp)
         QCoilReq       = QZnReq - Node(HCoilInAirNode)%MassFlowRate * CpAirZn &
                                   *(Node(HCoilInAirNode)%Temp-Node(UnitHeat(UnitHeatNum)%AirInNode)%Temp)
       END IF
-      IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+      IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
       CALL SimulateHeatingCoilComponents(CompName=UnitHeat(UnitHeatNum)%HCoilName, &
                                          FirstHVACIteration=FirstHVACIteration,    &
                                          QCoilReq=QCoilReq,                        &

@@ -50,24 +50,24 @@ TYPE GlheSpecs
   CHARACTER(len=MaxNameLength)  :: Name               =' ' ! user identifier
   LOGICAL                       :: Available          =.false. ! need an array of logicals--load identifiers of available equipment
   LOGICAL                       :: ON                 =.false. ! simulate the machine at it's operating part load ratio
-  REAL(r64)                     :: MaxGlheFlowRate    =0.0 ! design nominal capacity of Pump
+  REAL(r64)                     :: MaxGlheFlowRate    =0.0d0 ! design nominal capacity of Pump
   INTEGER                       :: MaxSimYears        =0   ! maximum length of simulation (years)
   INTEGER                       :: GlheInletNodeNum   =0   ! Node number on the inlet side of the plant
   INTEGER                       :: GlheOutletNodeNum  =0   ! Node number on the outlet side of the plant
   INTEGER                       :: NumBoreholes       =0
-  REAL(r64)                     :: BoreholeLength     =0.0
-  REAL(r64)                     :: BoreholeRadius     =0.0
-  REAL(r64)                     :: KGround            =0.0 ! Thermal conductivity of the ground        [W/(mK)]
-  REAL(r64)                     :: CpRhoGround        =0.0 ! Specific heat capacity of ground      [J/Kg/K]
-  REAL(r64)                     :: TempGround         =0.0 ! The far feild temperature of the ground   [°C]
-  REAL(r64)                     :: DesignFlow         =0.0 ! Design volumetric flow rate               [m3/S]
-  REAL(r64)                     :: DesignMassFlow     =0.0 ! Design mass flow rate                    [kg/S]
-  REAL(r64)                     :: KGrout             =0.0 ! Grout thermal conductivity                [W/(mK)]
-  REAL(r64)                     :: KPipe              =0.0 ! Thermal Conductivity of the U tube        [W/(mK)]
-  REAL(r64)                     :: PipeOutDia         =0.0 ! Outer diameter of the Pipe                [m]
-  REAL(r64)                     :: UtubeDist          =0.0 ! Distance between the legs of the Utube    [m]
-  REAL(r64)                     :: PipeThick          =0.0 ! Thickness of the pipe wall
-  REAL(r64)                     :: gReferenceRatio    =0.0 ! Reference ratio for developing g-functions [-]
+  REAL(r64)                     :: BoreholeLength     =0.0d0
+  REAL(r64)                     :: BoreholeRadius     =0.0d0
+  REAL(r64)                     :: KGround            =0.0d0 ! Thermal conductivity of the ground        [W/(mK)]
+  REAL(r64)                     :: CpRhoGround        =0.0d0 ! Specific heat capacity of ground      [J/Kg/K]
+  REAL(r64)                     :: TempGround         =0.0d0 ! The far feild temperature of the ground   [°C]
+  REAL(r64)                     :: DesignFlow         =0.0d0 ! Design volumetric flow rate               [m3/S]
+  REAL(r64)                     :: DesignMassFlow     =0.0d0 ! Design mass flow rate                    [kg/S]
+  REAL(r64)                     :: KGrout             =0.0d0 ! Grout thermal conductivity                [W/(mK)]
+  REAL(r64)                     :: KPipe              =0.0d0 ! Thermal Conductivity of the U tube        [W/(mK)]
+  REAL(r64)                     :: PipeOutDia         =0.0d0 ! Outer diameter of the Pipe                [m]
+  REAL(r64)                     :: UtubeDist          =0.0d0 ! Distance between the legs of the Utube    [m]
+  REAL(r64)                     :: PipeThick          =0.0d0 ! Thickness of the pipe wall
+  REAL(r64)                     :: gReferenceRatio    =0.0d0 ! Reference ratio for developing g-functions [-]
   INTEGER                       :: NPairs             =0   ! Number of pairs of Lntts and Gfunc
   REAL(r64),ALLOCATABLE,DIMENSION(:) :: QnMonthlyAgg       ! Monthly aggregated normalised heat extraction/rejection rate [W/m]
   REAL(r64),ALLOCATABLE,DIMENSION(:) :: QnHr               ! Hourly aggregated normalised heat extraction/rejection rate [W/m]
@@ -88,12 +88,12 @@ END TYPE GlheSpecs
 
 
 TYPE ReportVars
-  REAL(r64)                     :: GlheBoreholeTemp   =0.0 ! [°C]
-  REAL(r64)                     :: GlheMassFlowRate   =0.0 ! [kg/s]
-  REAL(r64)                     :: GlheOutletTemp     =0.0 ! [°C]
-  REAL(r64)                     :: GlheInletTemp      =0.0 ! [°C]
-  REAL(r64)                     :: GlheAveFluidTemp   =0.0 ! [°C]
-  REAL(r64)                     :: QGlhe              =0.0 ! [W] heat transfer rate
+  REAL(r64)                     :: GlheBoreholeTemp   =0.0d0 ! [°C]
+  REAL(r64)                     :: GlheMassFlowRate   =0.0d0 ! [kg/s]
+  REAL(r64)                     :: GlheOutletTemp     =0.0d0 ! [°C]
+  REAL(r64)                     :: GlheInletTemp      =0.0d0 ! [°C]
+  REAL(r64)                     :: GlheAveFluidTemp   =0.0d0 ! [°C]
+  REAL(r64)                     :: QGlhe              =0.0d0 ! [W] heat transfer rate
 END TYPE ReportVars
 
   ! MODULE PARAMETER DEFINITIONS
@@ -104,14 +104,14 @@ INTEGER, PARAMETER       :: MaxTSinHr   = 60   ! Max number of time step in a ho
   ! MODULE VARIABLE DECLARATIONS:
 INTEGER                         :: NumVerticalGlhes=0
 INTEGER                         :: N               =1    ! COUNTER OF TIME STEP
-REAL(r64)                       :: CurrentSimTime  =0.0  ! Current simulation time in hours
-REAL(r64)                       :: GlheOutletTemp  =0.0  ! Outlet temperature of the fluid  [°C]
-REAL(r64)                       :: GlheInletTemp   =0.0  ! Inlet temperature of the fluid   [°C]
-REAL(r64)                       :: GlheMassFlowRate=0.0  ! Mass flowrate of the fluid       [Kg/s]
-REAL(r64)                       :: QGlhe           =0.0  ! The normalised heat transfer rate[W/m]
-REAL(r64)                       :: GlheRB          =0.0  ! [K per W/m] Just for Analyis will be removed later
-REAL(r64)                       :: GlheAveFluidTemp=0.0  ! The average fluid temperature    [°C]
-REAL(r64)                       :: GlheBoreholeTemp=0.0  ! The average borehole tempreature [°C]
+REAL(r64)                       :: CurrentSimTime  =0.0d0  ! Current simulation time in hours
+REAL(r64)                       :: GlheOutletTemp  =0.0d0  ! Outlet temperature of the fluid  [°C]
+REAL(r64)                       :: GlheInletTemp   =0.0d0  ! Inlet temperature of the fluid   [°C]
+REAL(r64)                       :: GlheMassFlowRate=0.0d0  ! Mass flowrate of the fluid       [Kg/s]
+REAL(r64)                       :: QGlhe           =0.0d0  ! The normalised heat transfer rate[W/m]
+REAL(r64)                       :: GlheRB          =0.0d0  ! [K per W/m] Just for Analyis will be removed later
+REAL(r64)                       :: GlheAveFluidTemp=0.0d0  ! The average fluid temperature    [°C]
+REAL(r64)                       :: GlheBoreholeTemp=0.0d0  ! The average borehole tempreature [°C]
 INTEGER                         :: LocHourofDay    =0
 INTEGER                         :: LocDayofSim     =0
 REAL(r64),SAVE, ALLOCATABLE,DIMENSION(:):: LastQnSubHr   ! Previous time step Qn subhourly value
@@ -289,7 +289,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     REAL(r64)              :: Tground
     REAL(r64)              :: ResistanceBhole           ! The thermal resistance of the borehole, (K per W/m]
     REAL(r64)              :: Gfuncval                  ! Interpolated G function value at a sub-hour
-    REAL(r64)              :: ToutNew = 19.375
+    REAL(r64)              :: ToutNew = 19.375d0
     REAL(r64)              :: FluidAveTemp
     REAL(r64)              :: GroundDiffusivity
     REAL(r64)              :: TimeSS                    !Steady state time
@@ -361,12 +361,12 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
 
   IF(TriggerDesignDayReset.AND. Warmupflag)UpdateCurSimTime=.TRUE.
   IF(DayofSim .EQ. 1 .AND. UpdateCurSimTime)THEN
-    CurrentSimTime = 0.0
-    PrevTimeSteps = 0.0
+    CurrentSimTime = 0.0d0
+    PrevTimeSteps = 0.0d0
     DO I = 1,NumVerticalGlhes
-      VerticalGlhe(I)%QnHr           = 0.0
-      VerticalGlhe(I)%QnMonthlyAgg   = 0.0
-      VerticalGlhe(I)%QnSubHr   = 0.0
+      VerticalGlhe(I)%QnHr           = 0.0d0
+      VerticalGlhe(I)%QnMonthlyAgg   = 0.0d0
+      VerticalGlhe(I)%QnSubHr   = 0.0d0
       VerticalGlhe(I)%LastHourN = 1
     END DO
     N = 1
@@ -386,8 +386,8 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     TriggerDesignDayReset = .TRUE.
   ENDIF
 
-  IF (CurrentSimTime .LE. 0.0)THEN
-    PrevTimeSteps = 0.0 ! this resets history when rounding 24:00 hours during warmup avoids hard crash later
+  IF (CurrentSimTime .LE. 0.0d0)THEN
+    PrevTimeSteps = 0.0d0 ! this resets history when rounding 24:00 hours during warmup avoids hard crash later
     GlheOutletTemp = GlheInletTemp
     GlheMassFlowRate = MDotActual
     CALL CalcAggregateLoad(GlheNum)     !Just allocates and initializes PrevHour array
@@ -412,9 +412,10 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
   ! Update the borehole resistance each time
   CALL BoreholeResistance(GlheNum, ResistanceBhole)
 
+  SumTotal = 0.0d0 !Objexx:Uninit Line added to assure SumTotal initialized when used in: GlheBoreholeTemp = TGround - SumTotal
   IF(N .EQ. 1) THEN
-    IF(MDotActual .LE. 0.0) THEN
-      tmpQnSubHourly = 0
+    IF(MDotActual .LE. 0.0d0) THEN
+      tmpQnSubHourly = 0.0d0
       FluidAveTemp = Tground
       ToutNew = GlheInletTemp
     ELSE
@@ -433,7 +434,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     IF(CurrentSimTime .LT.(HrsPerMonth + AGG + SubAGG)) THEN
 
       ! Calculate the Sub Hourly Superposition
-      SumQnSubHourly = 0.0
+      SumQnSubHourly = 0.0d0
       IF(INT(CurrentSimTime).LT.SubAGG)THEN
         IndexN = INT(CurrentSimTime)+1
       ELSE
@@ -469,7 +470,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
           ! Calculate the Hourly Superposition
 
       HourlyLimit =  INT(CurrentSimTime)
-      SumQnHourly = 0.0
+      SumQnHourly = 0.0d0
       HOURLY_LOOP:DO I = SubAGG+1, HourlyLimit
         IF(I.EQ.HourlyLimit) THEN
           XI = LOG( CurrentSimTime / (TimeSS_Factor) )
@@ -495,8 +496,8 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
       CALL INTERP(GlheNum,XI,GfuncVal)
       RQSubHr = GfuncVal / (K_Ground_Factor )
 
-      IF(MDotActual .LE. 0.0)THEN
-        tmpQnsubHourly = 0
+      IF(MDotActual .LE. 0.0d0)THEN
+        tmpQnsubHourly = 0.0d0
         FluidAveTemp = Tground - SumTotal ! Q(N)*RB = 0
         ToutNew = GlheInletTemp
       ELSE
@@ -521,7 +522,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
       END IF
 
          !monthly superposition
-      SumQnMonthly = 0.0
+      SumQnMonthly = 0.0d0
       SUMMONTHLY :DO I = 1,CurrentMonth
         IF(I.EQ.1) THEN
           XI = LOG(CurrentSimTime/ (TimeSS_Factor))
@@ -540,7 +541,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
 
        ! Hourly Supr position
       HourlyLimit = INT( CurrentSimTime - CurrentMonth* HrsPerMonth)
-      SumQnHourly = 0.0
+      SumQnHourly = 0.0d0
       HOURLYLOOP: DO I = 1 + SubAGG, HourlyLimit
         IF(I.EQ.HourlyLimit) THEN
           XI = LOG( (CurrentSimTime - INT(CurrentSimTime) + I) / (TimeSS_Factor) )
@@ -560,7 +561,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
 
           ! Subhourly Superposition
       SubHourlyLimit = N - VerticalGlhe(GlheNum)%LastHourN(SubAGG+1)
-      SumQnSubHourly = 0.0
+      SumQnSubHourly = 0.0d0
       SUBHRLOOP:  DO I = 1 ,SubHourlyLimit
         IF(I.EQ.SubHourlyLimit) THEN
           XI = LOG( (CurrentSimTime - PrevTimeSteps(I+1)) / (TimeSS_Factor) )
@@ -586,8 +587,8 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
       CALL INTERP(GlheNum,XI,GfuncVal)
       RQSubHr = GfuncVal / (K_Ground_Factor )
 
-      IF(MDotActual .LE. 0.0)THEN
-        tmpQnsubHourly = 0
+      IF(MDotActual .LE. 0.0d0)THEN
+        tmpQnsubHourly = 0.0d0
         FluidAveTemp = Tground - SumTotal ! Q(N)*RB = 0
         ToutNew = GlheInletTemp
       ELSE
@@ -663,7 +664,7 @@ SUBROUTINE CalcAggregateLoad(GlheNum)
       MyEnvrnFlag = .FALSE.
       PrevHour = 1
     END IF
-    IF (CurrentSimTime .LE. 0.0) RETURN
+    IF (CurrentSimTime .LE. 0.0d0) RETURN
 
     IF(.NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
@@ -673,7 +674,7 @@ SUBROUTINE CalcAggregateLoad(GlheNum)
 
     !SUBHOURLY Qn IS NOT AGGREGATED . IT IS THE BASIC LOAD
     IF(PrevHour(GlheNum) /= LocHourOfDay )THEN
-        SumQnHr=0.0
+        SumQnHr=0.0d0
         DO J = 1, (N - VerticalGlhe(GlheNum)%LastHourN(1)) ! Check during debugging if we need a +1
             SumQnHr = SumQnHr + VerticalGlhe(GlheNum)%QnSubHr(J)*ABS((PrevTimeSteps(J)-PrevTimeSteps(J+1)))
         END DO
@@ -685,7 +686,7 @@ SUBROUTINE CalcAggregateLoad(GlheNum)
     !CHECK IF A MONTH PASSES...
     IF(MOD(((LocDayOfSim-1)*HrsPerDay+(LocHourOfDay)),HrsPerMonth).EQ.0 .AND. PrevHour(GlheNum) /= LocHourOfDay)THEN
         MonthNum = (LocDayOfSim*HrsPerDay+LocHourOfDay)/HrsPerMonth
-        SumQnMonth=0.0
+        SumQnMonth=0.0d0
         DO J = 1, Int(HrsPerMonth)
             SumQnMonth = SumQnMonth+VerticalGlhe(GlheNum)%QnHr(J)
         END DO
@@ -848,22 +849,22 @@ SUBROUTINE GetGroundheatExchangerInput
 
     ! Allocation of all the dynamic arrays
     ALLOCATE (VerticalGlhe(GlheNum)%LNTTS(VerticalGlhe(GlheNum)%NPairs))
-    VerticalGlhe(GlheNum)%LNTTS=0.0
+    VerticalGlhe(GlheNum)%LNTTS=0.0d0
     ALLOCATE (VerticalGlhe(GlheNum)%GFNC(VerticalGlhe(GlheNum)%NPairs))
-    VerticalGlhe(GlheNum)%GFNC=0.0
+    VerticalGlhe(GlheNum)%GFNC=0.0d0
     ALLOCATE (VerticalGlhe(GlheNum)%QnMonthlyAgg(VerticalGlhe(GlheNum)%MaxSimYears*12))
-    VerticalGlhe(GlheNum)%QnMonthlyAgg=0.0
+    VerticalGlhe(GlheNum)%QnMonthlyAgg=0.0d0
     ALLOCATE (VerticalGlhe(GlheNum)%QnHr(730+ VerticalGlhe(GlheNum)%AGG+ &
                                             VerticalGlhe(GlheNum)%SubAGG))
-    VerticalGlhe(GlheNum)%QnHr=0.0
+    VerticalGlhe(GlheNum)%QnHr=0.0d0
     ALLOCATE (VerticalGlhe(GlheNum)%QnSubHr((VerticalGlhe(GlheNum)%SubAGG+1)*MaxTSinHr+1))
-    VerticalGlhe(GlheNum)%QnSubHr=0.0
+    VerticalGlhe(GlheNum)%QnSubHr=0.0d0
     ALLOCATE (VerticalGlhe(GlheNum)%LastHourN(VerticalGlhe(GlheNum)%SubAGG+1))
     VerticalGlhe(GlheNum)%LastHourN=0
 
     IF(.NOT.Allocated)THEN
       ALLOCATE (PrevTimeSteps((VerticalGlhe(GlheNum)%SubAGG+1)*MaxTSinHr+1))
-      PrevTimeSteps=0.0
+      PrevTimeSteps=0.0d0
       Allocated = .TRUE.
     END IF
 
@@ -1016,8 +1017,8 @@ END SUBROUTINE GetGroundheatExchangerInput
 !   Convection Resistance
     NusseltNum = 0.023d0 * (ReynoldsNum**0.8d0) * (PrandlNum**0.35d0)
     hci = NusseltNum * K_Fluid / PipeInnerDia
-    IF(BholeMdot == 0.)THEN
-        RCONV=0.
+    IF(BholeMdot == 0.0d0)THEN
+        RCONV=0.0d0
     ELSE
         RCONV = 1.0d0 / (2.0d0*PI*PipeInnerDia*hci)
     ENDIF
@@ -1030,7 +1031,7 @@ END SUBROUTINE GetGroundheatExchangerInput
     DistanceRatio=DistUtube/MaxDistance
 
 
-    IF(DistanceRatio >= 0. .AND. DistanceRatio <= 0.25d0) THEN
+    IF(DistanceRatio >= 0.0d0 .AND. DistanceRatio <= 0.25d0) THEN
         B0=14.450872d0
         B1=-0.8176d0
     ELSE IF(DistanceRatio > 0.25d0 .AND. DistanceRatio < 0.5d0) THEN
@@ -1287,18 +1288,18 @@ SUBROUTINE InitBoreholeHXSimVars(GlheNum,Runflag)
                                  VerticalGlhe(GlheNum)%BranchNum, &
                                  VerticalGlhe(GlheNum)%CompNum)
 
-      LastQnSubHr = 0.0
+      LastQnSubHr = 0.0d0
       Node(VerticalGlhe(GlheNum)%GlheInletNodeNum)%Temp                  = VerticalGlhe(GlheNum)%TempGround
       Node(VerticalGlhe(GlheNum)%GlheOutletNodeNum)%Temp                 = VerticalGlhe(GlheNum)%TempGround
 
       ! zero out all history arrays
 
-      VerticalGlhe(GlheNum)%QnHr           = 0.0
-      VerticalGlhe(GlheNum)%QnMonthlyAgg   = 0.0
-      VerticalGlhe(GlheNum)%QnSubHr        = 0.0
+      VerticalGlhe(GlheNum)%QnHr           = 0.0d0
+      VerticalGlhe(GlheNum)%QnMonthlyAgg   = 0.0d0
+      VerticalGlhe(GlheNum)%QnSubHr        = 0.0d0
       VerticalGlhe(GlheNum)%LastHourN      = 0
-      PrevTimeSteps  = 0.0
-      CurrentSimtime = 0.0
+      PrevTimeSteps  = 0.0d0
+      CurrentSimtime = 0.0d0
     END IF
 
   MDotActual = RegulateCondenserCompFlowReqOp(VerticalGlhe(GlheNum)%LoopNum,     &

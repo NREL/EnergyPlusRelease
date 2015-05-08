@@ -283,7 +283,7 @@ SUBROUTINE InitConductionTransferFunctions
     Construct(ConstrNum)%CTFTUserSource = 0.0D0
     Construct(ConstrNum)%NumHistories   = 0
     Construct(ConstrNum)%NumCTFTerms    = 0
-    Construct(ConstrNum)%UValue         = 0.0
+    Construct(ConstrNum)%UValue         = 0.0d0
 
     AdjacentResLayerNum = 0 ! Zero this out for each construct
 
@@ -315,7 +315,7 @@ SUBROUTINE InitConductionTransferFunctions
         cp(Layer)  = Material(CurrentLayer)%SpecHeat ! Must convert
                                         ! from kJ/kg-K to J/kg-k due to rk units
 
-        IF (Construct(ConstrNum)%SourceSinkPresent .AND. .Not. Material(CurrentLayer)%WarnedForHighDiffusivity) THEN 
+        IF (Construct(ConstrNum)%SourceSinkPresent .AND. .Not. Material(CurrentLayer)%WarnedForHighDiffusivity) THEN
           ! check for materials that are too conductive or thin
           IF ((rho(Layer) *  cp(Layer)) > 0.d0) THEN
             Alpha = rk(Layer) / (rho(Layer) *  cp(Layer))
@@ -329,13 +329,15 @@ SUBROUTINE InitConductionTransferFunctions
                                         //'constructions, material conductivity = ' &
                                         //TRIM(RoundSigDigits(Material(CurrentLayer)%Conductivity, 3)) //' [W/m-K]')
                 CALL ShowContinueError('Material thermal diffusivity = ' //TRIM(RoundSigDigits(Alpha, 3)) //' [m2/s]')
+                CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
+                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
                 IF (Material(CurrentLayer)%Thickness < ThinMaterialLayerThreshold) THEN
                   CALL ShowContinueError('Material may be too thin to be modeled well, thickness = ' &
                                           // TRIM(RoundSigDigits(Material(currentLayer)%Thickness, 5 ))//' [m]')
                   CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
-                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
+                                      //  TRIM(RoundSigDigits(ThinMaterialLayerThreshold , 5)) // ' [m]')
                 ENDIF
-                Material(CurrentLayer)%WarnedForHighDiffusivity = .TRUE. 
+                Material(CurrentLayer)%WarnedForHighDiffusivity = .TRUE.
               ENDIF
             ENDIF
           ENDIF
@@ -1332,7 +1334,7 @@ SUBROUTINE CalculateExponentialMatrix(delt)
           ! Step 2, page 128:  Find smallest integer k such that
           ! AMatRowNormMax< = 2^k
 
-  k = INT(LOG(AMatRowNormMax)/LOG(2.0D0))+1
+  k = INT(LOG(AMatRowNormMax)/LOG(2.0D0))+1 !Objexx:Num Handle AMatRowNormMax=0
 
           ! Step 3, page 128:  Divide (AMat*delt) by 2^k.  This section of code
           ! takes advantage of the fact that AMat is tridiagonal.  Thus, it

@@ -41,9 +41,9 @@ TYPE,PUBLIC :: SolReflRecSurfData
   CHARACTER(len=MaxNameLength)      :: SurfName     =' ' ! Name of heat transfer surface
   INTEGER                           :: NumRecPts    =0   ! Number of receiving points
   REAL(r64),ALLOCATABLE,DIMENSION(:,:)   :: RecPt        ! Coordinates of receiving point on receiving surface in global CS (m)
-  REAL(r64),DIMENSION(3)                 :: NormVec      =0.0 ! Unit outward normal to receiving surface
-  REAL(r64)                         :: ThetaNormVec =0.0 ! Azimuth of surface normal (radians)
-  REAL(r64)                         :: PhiNormVec   =0.0 ! Altitude of surface normal (radians)
+  REAL(r64),DIMENSION(3)                 :: NormVec      =0.0d0 ! Unit outward normal to receiving surface
+  REAL(r64)                         :: ThetaNormVec =0.0d0 ! Azimuth of surface normal (radians)
+  REAL(r64)                         :: PhiNormVec   =0.0d0 ! Altitude of surface normal (radians)
   INTEGER                           :: NumReflRays  =0   ! Number of rays from this receiving surface
   REAL(r64),ALLOCATABLE,DIMENSION(:,:)   :: RayVec       ! Unit vector in direction of ray from receiving surface
   REAL(r64),ALLOCATABLE,DIMENSION(:)     :: CosIncAngRay ! Cosine of angle between ray and receiving surface outward normal
@@ -226,17 +226,17 @@ ENDIF
 ALLOCATE(SolReflRecSurf(TotSolReflRecSurf))
 
 ALLOCATE(ReflFacBmToDiffSolObs(TotSurfaces,24))
-ReflFacBmToDiffSolObs = 0.0
+ReflFacBmToDiffSolObs = 0.0d0
 ALLOCATE(ReflFacBmToDiffSolGnd(TotSurfaces,24))
-ReflFacBmToDiffSolGnd = 0.0
+ReflFacBmToDiffSolGnd = 0.0d0
 ALLOCATE(ReflFacBmToBmSolObs(TotSurfaces,24))
-ReflFacBmToBmSolObs = 0.0
+ReflFacBmToBmSolObs = 0.0d0
 ALLOCATE(ReflFacSkySolObs(TotSurfaces))
-ReflFacSkySolObs = 0.0
+ReflFacSkySolObs = 0.0d0
 ALLOCATE(ReflFacSkySolGnd(TotSurfaces))
-ReflFacSkySolGnd = 0.0
+ReflFacSkySolGnd = 0.0d0
 ALLOCATE(CosIncAveBmToBmSolObs(TotSurfaces,24))
-CosIncAveBmToBmSolObs = 0.0
+CosIncAveBmToBmSolObs = 0.0d0
 
 ! Only surfaces with sun exposure can receive solar reflection from ground or onstructions
 !  Shading surfaces are always not exposed to solar (ExtSolar = False)
@@ -270,25 +270,25 @@ END DO
 
 MaxReflRays = AltAngStepsForSolReflCalc * AzimAngStepsForSolReflCalc
 DO RecSurfNum = 1,TotSolReflRecSurf
-  SolReflRecSurf(RecSurfNum)%NormVec = 0.0
+  SolReflRecSurf(RecSurfNum)%NormVec = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%RecPt(3,MaxRecPts))
-  SolReflRecSurf(RecSurfNum)%RecPt = 0.0
+  SolReflRecSurf(RecSurfNum)%RecPt = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%RayVec(3,MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%RayVec = 0.0
+  SolReflRecSurf(RecSurfNum)%RayVec = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%CosIncAngRay(MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%CosIncAngRay = 0.0
+  SolReflRecSurf(RecSurfNum)%CosIncAngRay = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%dOmegaRay(MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%dOmegaRay = 0.0
+  SolReflRecSurf(RecSurfNum)%dOmegaRay = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%HitPt(3,MaxRecPts,MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%HitPt = 0.0
+  SolReflRecSurf(RecSurfNum)%HitPt = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%HitPtSurfNum(MaxRecPts,MaxReflRays))
   SolReflRecSurf(RecSurfNum)%HitPtSurfNum = 0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%HitPtSolRefl(MaxRecPts,MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%HitPtSolRefl = 0.0
+  SolReflRecSurf(RecSurfNum)%HitPtSolRefl = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%RecPtHitPtDis(MaxRecPts,MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%RecPtHitPtDis = 0.0
+  SolReflRecSurf(RecSurfNum)%RecPtHitPtDis = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%HitPtNormVec(3,MaxRecPts,MaxReflRays))
-  SolReflRecSurf(RecSurfNum)%HitPtNormVec = 0.0
+  SolReflRecSurf(RecSurfNum)%HitPtNormVec = 0.0d0
   ALLOCATE(SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(TotSurfaces))
   SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums = 0
 END DO
@@ -334,8 +334,8 @@ DO RecSurfNum = 1,TotSolReflRecSurf
       DO loopA = 1,Surface(SurfNum)%Sides
         DO loopB = 1,Surface(ObsSurfNum)%Sides
           VecAB = Surface(ObsSurfNum)%Vertex(loopB) - Surface(SurfNum)%Vertex(loopA)
-          IF(DOT_PRODUCT(VecAB,SolReflRecSurf(RecSurfNum)%NormVec) > 0.0 .AND.  &
-             DOT_PRODUCT(VecAB,Surface(ObsSurfNum)%OutNormVec) < 0.0) THEN
+          IF(DOT_PRODUCT(VecAB,SolReflRecSurf(RecSurfNum)%NormVec) > 0.0d0 .AND.  &
+             DOT_PRODUCT(VecAB,Surface(ObsSurfNum)%OutNormVec) < 0.0d0) THEN
                ObsHasView = .TRUE.
                EXIT
           END IF
@@ -403,7 +403,7 @@ DO RecSurfNum = 1,TotSolReflRecSurf
     ! Third component of ray unit vector in (Theta,Phi) direction
     URay(3) = SPhi
 
-    IF(PhiSurf >= 0.0) THEN
+    IF(PhiSurf >= 0.0d0) THEN
       IF(Phi >= PiOvr2 - PhiSurf) THEN
         ThetaMin = -Pi
         ThetaMax = Pi
@@ -514,7 +514,7 @@ DO RecSurfNum = 1, TotSolReflRecSurf
         Vec2 = Surface(NearestHitSurfNum)%Vertex(2) -  Surface(NearestHitSurfNum)%Vertex(3)
         CALL CrossProduct(Vec1,Vec2,VNorm)
         VNorm = VNorm/SQRT(DOT_PRODUCT(VNorm,VNorm))
-        IF(DOT_PRODUCT(VNorm,-RayVec) < 0.0) VNorm = -VNorm
+        IF(DOT_PRODUCT(VNorm,-RayVec) < 0.0d0) VNorm = -VNorm
         SolReflRecSurf(RecSurfNum)%HitPtNormVec(1:3,RecPtNum,RayNum) = VNorm
         ! Get solar and visible beam-to-diffuse reflectance at nearest hit point
         ObsConstrNum = Surface(NearestHitSurfNum)%Construction
@@ -523,11 +523,11 @@ DO RecSurfNum = 1, TotSolReflRecSurf
           IF(.NOT.Construct(ObsConstrNum)%TypeIsWindow) THEN
             ! Obstruction is not a window, i.e., is an opaque surface
             SolReflRecSurf(RecSurfNum)%HitPtSolRefl(RecPtNum,RayNum) = &
-              1.0 - Construct(ObsConstrNum)%OutsideAbsorpSolar
+              1.0d0 - Construct(ObsConstrNum)%OutsideAbsorpSolar
           ELSE
             ! Obstruction is a window. Assume it is bare so that there is no beam-to-diffuse reflection
             ! (beam-to-beam reflection is calculated in subroutine CalcBeamSolSpecularReflFactors).
-            SolReflRecSurf(RecSurfNum)%HitPtSolRefl(RecPtNum,RayNum) = 0.0
+            SolReflRecSurf(RecSurfNum)%HitPtSolRefl(RecPtNum,RayNum) = 0.0d0
           END IF
         ELSE
           ! Shading surface is nearest hit
@@ -538,7 +538,7 @@ DO RecSurfNum = 1, TotSolReflRecSurf
         SolReflRecSurf(RecSurfNum)%HitPtSurfNum(RecPtNum,RayNum) = 0
         ! If ray is going downward find the hit point on the ground plane if the receiving point
         ! is above ground level; note that GroundLevelZ is <= 0.0
-        IF(RayVec(3) < 0.0 .AND. SolReflRecSurf(RecSurfNum)%RecPt(3,RecPtNum) > GroundLevelZ) THEN
+        IF(RayVec(3) < 0.0d0 .AND. SolReflRecSurf(RecSurfNum)%RecPt(3,RecPtNum) > GroundLevelZ) THEN
           ! Ray hits ground
           Alfa = ACOS(-RayVec(3))
           Beta = ATAN2(RayVec(2),RayVec(1))
@@ -651,7 +651,7 @@ SUBROUTINE FigureBeamSolDiffuseReflFactors(iHour)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) :: SunVec(3)            =0.0 ! Unit vector to sun
+  REAL(r64) :: SunVec(3)            =0.0d0 ! Unit vector to sun
   INTEGER   :: RecSurfNum           =0   ! Receiving surface number
   INTEGER   :: SurfNum              =0   ! Heat transfer surface number corresponding to RecSurfNum
   INTEGER   :: RecPtNum             =0   ! Receiving point number
@@ -667,17 +667,17 @@ SUBROUTINE FigureBeamSolDiffuseReflFactors(iHour)
                                             ! beam normal irradiance
   INTEGER   :: RayNum               =0   ! Ray number
   INTEGER   :: IHit                 =0   ! > 0 if obstruction is hit; otherwise = 0
-  REAL(r64) :: OriginThisRay(3)     =0.0 ! Origin point of a ray (m)
-  REAL(r64) :: ObsHitPt(3)          =0.0 ! Hit point on obstruction (m)
+  REAL(r64) :: OriginThisRay(3)     =0.0d0 ! Origin point of a ray (m)
+  REAL(r64) :: ObsHitPt(3)          =0.0d0 ! Hit point on obstruction (m)
   INTEGER   :: ObsSurfNum           =0   ! Obstruction surface number
-  REAL(r64) :: CosIncBmAtHitPt      =0.0 ! Cosine of incidence angle of beam solar at hit point
-  REAL(r64) :: CosIncBmAtHitPt2     =0.0 ! Cosine of incidence angle of beam solar at hit point,
+  REAL(r64) :: CosIncBmAtHitPt      =0.0d0 ! Cosine of incidence angle of beam solar at hit point
+  REAL(r64) :: CosIncBmAtHitPt2     =0.0d0 ! Cosine of incidence angle of beam solar at hit point,
                                          !  the mirrored shading surface
-  REAL(r64) :: BmReflSolRadiance    =0.0 ! Solar radiance at hit point due to incident beam, divided
+  REAL(r64) :: BmReflSolRadiance    =0.0d0 ! Solar radiance at hit point due to incident beam, divided
                                          !  by beam normal irradiance
-  REAL(r64) :: dReflBeamToDiffSol   =0.0 ! Contribution to reflection factor at a receiving point
+  REAL(r64) :: dReflBeamToDiffSol   =0.0d0 ! Contribution to reflection factor at a receiving point
                                          !  from beam solar reflected from a hit point
-  REAL(r64) :: SunLitFract          =0.0 ! Sunlit fraction
+  REAL(r64) :: SunLitFract          =0.0d0 ! Sunlit fraction
 
   ReflBmToDiffSolObs    = 0.d0
   ReflBmToDiffSolGnd    = 0.d0
@@ -828,8 +828,8 @@ SUBROUTINE FigureBeamSolDiffuseReflFactors(iHour)
     END DO  ! End of loop over receiving points
 
     ! Average over receiving points
-    ReflFacBmToDiffSolObs(SurfNum,iHour) = 0.0
-    ReflFacBmToDiffSolGnd(SurfNum,iHour) = 0.0
+    ReflFacBmToDiffSolObs(SurfNum,iHour) = 0.0d0
+    ReflFacBmToDiffSolGnd(SurfNum,iHour) = 0.0d0
     NumRecPts = SolReflRecSurf(RecSurfNum)%NumRecPts
     DO RecPtNum = 1, NumRecPts
       ReflFacBmToDiffSolObs(SurfNum,iHour) = ReflFacBmToDiffSolObs(SurfNum,iHour) + ReflBmToDiffSolObs(RecPtNum)
@@ -947,38 +947,38 @@ SUBROUTINE FigureBeamSolSpecularReflFactors(iHour)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER           :: loop                 =0   ! DO loop indices
   INTEGER           :: loop2                =0   ! DO loop indices
-  REAL(r64)         :: SunVec(3)            =0.0 ! Unit vector to sun
-  REAL(r64)         :: SunVecMir(3)         =0.0 ! Unit vector to sun mirrored by a reflecting surface
+  REAL(r64)         :: SunVec(3)            =0.0d0 ! Unit vector to sun
+  REAL(r64)         :: SunVecMir(3)         =0.0d0 ! Unit vector to sun mirrored by a reflecting surface
   INTEGER           :: RecSurfNum           =0   ! Receiving surface number
   INTEGER           :: SurfNum              =0   ! Heat transfer surface number corresponding to RecSurfNum
   INTEGER           :: NumRecPts            =0   ! Number of receiving points on a receiving surface
   INTEGER           :: RecPtNum             =0   ! Receiving point number
-  REAL(r64)         :: RecPt(3)             =0.0 ! Receiving point (m)
-  REAL(r64)         :: HitPtRefl(3)         =0.0 ! Hit point on a reflecting surface (m)
+  REAL(r64)         :: RecPt(3)             =0.0d0 ! Receiving point (m)
+  REAL(r64)         :: HitPtRefl(3)         =0.0d0 ! Hit point on a reflecting surface (m)
   REAL(r64)         :: ReflBmToDiffSolObs(MaxRecPts) ! Irradiance at a receiving point for
                                             ! beam solar diffusely reflected from obstructions, divided by
                                             ! beam normal irradiance
 !unused  INTEGER           :: RayNum               =0   ! Ray number
   INTEGER           :: IHitRefl             =0   ! > 0 if reflecting surface is hit; otherwise = 0
   INTEGER           :: IHitObs              =0   ! > 0 if obstruction is hit
-  REAL(r64)         :: HitPtObs(3)          =0.0 ! Hit point on obstruction (m)
+  REAL(r64)         :: HitPtObs(3)          =0.0d0 ! Hit point on obstruction (m)
   INTEGER           :: IHitObsRefl          =0   ! > 0 if obstruction hit between rec. pt. and reflection point
   INTEGER           :: ObsSurfNum           =0   ! Obstruction surface number
   INTEGER           :: ReflSurfNum          =0   ! Reflecting surface number
   INTEGER           :: ReflSurfRecNum       =0   ! Receiving surface number corresponding to a reflecting surface number
-  REAL(r64)         :: ReflNorm(3)          =0.0 ! Unit normal to reflecting surface
+  REAL(r64)         :: ReflNorm(3)          =0.0d0 ! Unit normal to reflecting surface
   REAL(r64)         :: ReflBmToBmSolObs(MaxRecPts) ! Irradiance at a receiving point for
                                             ! beam solar specularly reflected from obstructions, divided by
                                             ! beam normal irradiance
-  REAL(r64)         :: ReflDistance         =0.0 ! Distance from receiving point to hit point on a reflecting surface (m)
-  REAL(r64)         :: ObsDistance          =0.0 ! Distance from receiving point to hit point on an obstruction (m)
-  REAL(r64)         :: SpecReflectance      =0.0 ! Specular reflectance of a reflecting surface
+  REAL(r64)         :: ReflDistance         =0.0d0 ! Distance from receiving point to hit point on a reflecting surface (m)
+  REAL(r64)         :: ObsDistance          =0.0d0 ! Distance from receiving point to hit point on an obstruction (m)
+  REAL(r64)         :: SpecReflectance      =0.0d0 ! Specular reflectance of a reflecting surface
   INTEGER           :: ConstrNumRefl        =0   ! Construction number of a reflecting surface
-  REAL(r64)         :: CosIncAngRefl        =0.0 ! Cosine of incidence angle of beam on reflecting surface
-  REAL(r64)         :: CosIncAngRec         =0.0 ! Angle of incidence of reflected beam on receiving surface
-  REAL(r64)         :: ReflFac              =0.0 ! Contribution to specular reflection factor
+  REAL(r64)         :: CosIncAngRefl        =0.0d0 ! Cosine of incidence angle of beam on reflecting surface
+  REAL(r64)         :: CosIncAngRec         =0.0d0 ! Angle of incidence of reflected beam on receiving surface
+  REAL(r64)         :: ReflFac              =0.0d0 ! Contribution to specular reflection factor
   REAL(r64)         :: ReflFacTimesCosIncSum(MaxRecPts) ! Sum of ReflFac times CosIncAngRefl
-  REAL(r64)         :: CosIncWeighted       =0.0 ! Cosine of incidence angle on receiving surf weighted by reflection factor
+  REAL(r64)         :: CosIncWeighted       =0.0d0 ! Cosine of incidence angle on receiving surf weighted by reflection factor
 
 
   ReflBmToDiffSolObs    = 0.0d0
@@ -1006,7 +1006,7 @@ SUBROUTINE FigureBeamSolSpecularReflFactors(iHour)
           ! Check if sun is in front of this reflecting surface.
           ReflNorm = Surface(ReflSurfNum)%OutNormVec(1:3)
           CosIncAngRefl = DOT_PRODUCT(SunVec,ReflNorm)
-          IF(CosIncAngRefl < 0.0) CYCLE
+          IF(CosIncAngRefl < 0.0d0) CYCLE
 
           ! Get sun position unit vector for mirror image of sun in reflecting surface
           SunVecMir = SunVec - 2.0d0*DOT_PRODUCT(SunVec,ReflNorm)*ReflNorm
@@ -1158,29 +1158,29 @@ SUBROUTINE CalcSkySolDiffuseReflFactors
                                     ! reflected from ground, divided by unobstructed
                                     ! sky diffuse horizontal irradiance
   INTEGER   :: RayNum               =0 ! Ray number
-  REAL(r64) :: HitPtRefl(3)         =0.0 ! Coordinates of hit point on obstruction or ground (m)
+  REAL(r64) :: HitPtRefl(3)         =0.0d0 ! Coordinates of hit point on obstruction or ground (m)
   INTEGER   :: IHitObs              =0 ! > 0 if obstruction is hit; otherwise = 0
-  REAL(r64) :: HitPtObs(3)          =0.0 ! Hit point on an obstruction (m)
+  REAL(r64) :: HitPtObs(3)          =0.0d0 ! Hit point on an obstruction (m)
 !unused  REAL(r64)         :: ObsHitPt(3)          =0.0 ! Hit point on obstruction (m)
-  REAL(r64) :: dOmega               =0.0 ! Solid angle increment (steradians)
-  REAL(r64) :: CosIncAngRayToSky            =0.0 ! Cosine of incidence angle on ground of ray to sky
-  REAL(r64) :: SkyReflSolRadiance   =0.0 ! Reflected radiance at hit point divided by unobstructed
+  REAL(r64) :: dOmega               =0.0d0 ! Solid angle increment (steradians)
+  REAL(r64) :: CosIncAngRayToSky            =0.0d0 ! Cosine of incidence angle on ground of ray to sky
+  REAL(r64) :: SkyReflSolRadiance   =0.0d0 ! Reflected radiance at hit point divided by unobstructed
                                     !  sky diffuse horizontal irradiance
-  REAL(r64) :: dReflSkySol          =0.0 ! Contribution to reflection factor at a receiving point
+  REAL(r64) :: dReflSkySol          =0.0d0 ! Contribution to reflection factor at a receiving point
                                     !  from sky solar reflected from a hit point
-  REAL(r64) :: Phi                  =0.0 ! Altitude angle and increment (radians)
-  REAL(r64) :: DPhi                 =0.0 ! Altitude angle and increment (radians)
-  REAL(r64) :: SPhi                 =0.0 ! Sine of Phi
-  REAL(r64) :: CPhi                 =0.0 ! Cosine of Phi
-  REAL(r64) :: Theta                =0.0 ! Azimuth angle (radians)
-  REAL(r64) :: DTheta               =0.0 ! Azimuth increment (radians)
+  REAL(r64) :: Phi                  =0.0d0 ! Altitude angle and increment (radians)
+  REAL(r64) :: DPhi                 =0.0d0 ! Altitude angle and increment (radians)
+  REAL(r64) :: SPhi                 =0.0d0 ! Sine of Phi
+  REAL(r64) :: CPhi                 =0.0d0 ! Cosine of Phi
+  REAL(r64) :: Theta                =0.0d0 ! Azimuth angle (radians)
+  REAL(r64) :: DTheta               =0.0d0 ! Azimuth increment (radians)
   INTEGER   :: IPhi                 =0 ! Altitude angle index
   INTEGER   :: ITheta               =0 ! Azimuth angle index
-  REAL(r64) :: URay(3)              =0.0 ! Unit vector along ray from ground hit point
-  REAL(r64) :: SurfVertToGndPt(3)   =0.0 ! Vector from a vertex of possible obstructing surface to ground
+  REAL(r64) :: URay(3)              =0.0d0 ! Unit vector along ray from ground hit point
+  REAL(r64) :: SurfVertToGndPt(3)   =0.0d0 ! Vector from a vertex of possible obstructing surface to ground
                                     !  hit point (m)
-  REAL(r64) :: SurfVert(3)          =0.0 ! Surface vertex (m)
-  REAL(r64) :: dReflSkyGnd          =0.0 ! Factor for ground radiance due to direct sky diffuse reflection
+  REAL(r64) :: SurfVert(3)          =0.0d0 ! Surface vertex (m)
+  REAL(r64) :: dReflSkyGnd          =0.0d0 ! Factor for ground radiance due to direct sky diffuse reflection
           ! FLOW:
 
 CALL DisplayString('Calculating Sky Diffuse Exterior Solar Reflection Factors')
@@ -1214,7 +1214,7 @@ DO RecSurfNum = 1,TotSolReflRecSurf
         ! The following gets the correct side of a shading surface in order to get the right value
         ! of DifShdgRatioIsoSky (the two sides can have different sky shadowing).
         IF(Surface(HitPtSurfNum)%ShadowingSurf) THEN
-          IF(DOT_PRODUCT(SolReflRecSurf(RecSurfNum)%RayVec(1:3,RayNum),Surface(HitPtSurfNum)%OutNormVec)>0.0)THEN
+          IF(DOT_PRODUCT(SolReflRecSurf(RecSurfNum)%RayVec(1:3,RayNum),Surface(HitPtSurfNum)%OutNormVec)>0.0d0)THEN
             IF (HitPtSurfNum + 1 < TotSurfaces) HitPtSurfNumX = HitPtSurfNum + 1
             IF(Surface(HitPtSurfNumX)%Shelf > 0) CYCLE
           ENDIF
@@ -1299,7 +1299,7 @@ DO RecSurfNum = 1,TotSolReflRecSurf
   ReflFacSkySolObs(SurfNum) = ReflFacSkySolObs(SurfNum)/NumRecPts
   ReflFacSkySolGnd(SurfNum) = ReflFacSkySolGnd(SurfNum)/NumRecPts
   ! Do not allow ReflFacBmToDiffSolGnd to exceed the surface's unobstructed ground view factor
-  ReflFacSkySolGnd(SurfNum) = MIN(0.5d0*(1.-Surface(SurfNum)%CosTilt),  &
+  ReflFacSkySolGnd(SurfNum) = MIN(0.5d0*(1.0d0-Surface(SurfNum)%CosTilt),  &
                                            ReflFacSkySolGnd(SurfNum))
   ! Note: the above factors are dimensionless; they are equal to
   ! (W/m2 reflected solar incident on SurfNum)/(W/m2 unobstructed horizontal sky diffuse irradiance)
@@ -1446,7 +1446,7 @@ SUBROUTINE PierceSurface(ISurf, R1, RN, IPIERC, CPhit)
   F1 = SN(1)*(V(2,1)-R1(1)) + SN(2)*(V(2,2)-R1(2)) + SN(3)*(V(2,3)-R1(3))
   !F1 = DOT_PRODUCT(SN, V2 - R1)
   SCALE = F1 / F2
-  IF (SCALE <= 0.0) RETURN  ! Skip surfaces that RN points away from
+  IF (SCALE <= 0.0d0) RETURN  ! Skip surfaces that RN points away from
   CPhit = R1 + RN * SCALE  ! Point that RN intersects plane of surface
 
 
@@ -1484,7 +1484,7 @@ SUBROUTINE PierceSurface(ISurf, R1, RN, IPIERC, CPhit)
 
 
     DOTCB = DOT_PRODUCT(CCC, BBB)
-    IF (DOTCB < 0.) RETURN
+    IF (DOTCB < 0.0d0) RETURN
     IF (DOTCB > DOT_PRODUCT(BBB,BBB)) RETURN
 
 
@@ -1495,7 +1495,7 @@ SUBROUTINE PierceSurface(ISurf, R1, RN, IPIERC, CPhit)
 
 
     DOTCA = DOT_PRODUCT(CCC, AAA)
-    IF (DOTCA < 0.) RETURN
+    IF (DOTCA < 0.0d0) RETURN
     IF (DOTCA > DOT_PRODUCT(AAA,AAA)) RETURN
     ! Surface is intersected
     IPIERC = 1

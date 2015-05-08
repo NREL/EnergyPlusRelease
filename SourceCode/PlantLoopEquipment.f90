@@ -171,8 +171,8 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   REAL(r64)    :: MinLoad
   REAL(r64)    :: OptLoad
   REAL(r64)    :: SizingFac    ! the component sizing fraction
-  REAL(r64)    :: BranchFlowRequest = 0.0
-  REAL(r64)    :: InitialBranchFlow = 0.0
+  REAL(r64)    :: BranchFlowRequest = 0.0d0
+  REAL(r64)    :: InitialBranchFlow = 0.0d0
   INTEGER      :: GeneralEquipType !Basic Equipment type from EquipType Used to help organize this routine
   LOGICAL      :: PumpPowerToLoop = .False.
   LOGICAL,SAVE :: RunLoopPumps = .False.
@@ -183,7 +183,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   GeneralEquipType = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%GeneralEquipType
   IF ( GetCompSizFac .AND. (GeneralEquipType .NE. GenEquipTypes_Chiller .AND. GeneralEquipType .NE. GenEquipTypes_Boiler) .AND. &
                             GeneralEquipType .NE. GenEquipTypes_CoolingTower) THEN
-    PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac = 0.0
+    PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac = 0.0d0
     RETURN
   END IF
 
@@ -470,7 +470,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
                   !TOWERS
         CASE (TypeOf_CoolingTower_SingleSpd)
 
-          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip, &    !DSU
+          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip,CurLoad, &    !DSU
                          MaxLoad,MinLoad,OptLoad,GetCompSizFac,SizingFac)
            IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
@@ -484,7 +484,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_CoolingTower_TwoSpd)
 
-          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip, &    !DSU
+          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip,CurLoad, &    !DSU
                          MaxLoad,MinLoad,OptLoad,GetCompSizFac,SizingFac)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
@@ -498,7 +498,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_CoolingTower_VarSpd) ! 'CoolingTower:VariableSpeed'
 
-          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip, &    !DSU
+          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip,CurLoad , &    !DSU
                          MaxLoad,MinLoad,OptLoad,GetCompSizFac,SizingFac)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
@@ -510,6 +510,19 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
             END IF
 
+        CASE (TypeOf_CoolingTower_VarSpdMerkel ) 
+
+          CALL SimTowers(EquipType,EquipName,EquipNum,RunFlag,InitLoopEquip, CurLoad,&
+                         MaxLoad,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+            IF(InitLoopEquip)THEN
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+            END IF
+            IF (GetCompSizFac) THEN
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
+            END IF
         CASE DEFAULT
           CALL ShowSevereError('SimPlantEquip: Invalid Tower Type='//TRIM(EquipType))
           CALL ShowContinueError('Occurs in Plant Loop='//TRIM(PlantLoop(LoopNum)%Name))
@@ -796,9 +809,9 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
                              InitLoopEquip,CurLoad)   !,EquipFlowCtrl
 
             IF(InitLoopEquip)THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  0.0
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  0.0
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  0.0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  0.0d0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  0.0d0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  0.0d0
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
             END IF
 
@@ -809,9 +822,9 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
               ! Not sure what this really needs to do here...
             IF (InitLoopEquip) THEN
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  0.0
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  0.0
-              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  0.0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  0.0d0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  0.0d0
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  0.0d0
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
             END IF
 
@@ -1002,7 +1015,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE ( TypeOf_CoilWAHPCoolingParamEst )
 
-
+        CASE ( TypeOf_PackagedTESCoolingCoil )
 
         CASE DEFAULT
           CALL ShowSevereError('SimPlantEquip: Invalid Load Coil Type='//TRIM(EquipType))
@@ -1076,6 +1089,8 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
       CASE (TypeOf_CooledBeamAirTerminal)
 
       CASE (TypeOf_MultiSpeedHeatPumpRecovery)
+
+      CASE (TypeOf_UnitarySystemRecovery)
 
       CASE DEFAULT
 

@@ -371,12 +371,14 @@ SUBROUTINE SetupNodeVarsForReporting
           CALL SetupOutputVariable('System Node Standard Density Volume Flow Rate [m3/s]', &
                                     MoreNodeInfo(NumNode)%VolFlowRateStdRho, 'System',     &
                                    'Average', NodeID(NumNode))
-          IF (Node(NumNode)%FluidType == NodeType_Air) THEN ! setup volume flow rate report for actual/current density
+          IF (Node(NumNode)%FluidType == NodeType_Air .OR. Node(NumNode)%FluidType == NodeType_Water) THEN
+           ! setup volume flow rate report for actual/current density
             CALL SetupOutputVariable('System Node Current Density Volume Flow Rate [m3/s]', &
                                     MoreNodeInfo(NumNode)%VolFlowRateCrntRho, 'System',     &
                                    'Average', NodeID(NumNode))
+
             CALL SetupOutputVariable('System Node Current Density [kg/m3]', &
-                                    MoreNodeInfo(NumNode)%AirDensity, 'System',     &
+                                    MoreNodeInfo(NumNode)%Density, 'System',     &
                                    'Average', NodeID(NumNode))
           ENDIF
 
@@ -570,7 +572,23 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
     !  Put all in, then determine unique
     DO Loop1=1,NumAlphas-1
       NodeLists(NCount)%NodeNames(Loop1)=cAlphas(Loop1+1)
+      IF (cAlphas(Loop1+1) == blank) THEN
+        CALL ShowWarningError(RoutineName//CurrentModuleObject//'="'//trim(cAlphas(1))//'", blank node name in list.')
+        NodeLists(NCount)%NumOfNodesInList=NodeLists(NCount)%NumOfNodesInList-1
+        IF (NodeLists(NCount)%NumOfNodesInList <= 0) THEN
+          CALL ShowSevereError(RoutineName//CurrentModuleObject//'="'//trim(cAlphas(1))//'" does not have any nodes.')
+          ErrorsFound=.true.
+          EXIT
+        ENDIF
+        CYCLE
+      ENDIF
       NodeLists(NCount)%NodeNumbers(Loop1)=AssignNodeNumber(NodeLists(NCount)%NodeNames(Loop1),NodeType_Unknown,ErrorsFound)
+      IF (SameString(NodeLists(NCount)%NodeNames(Loop1),NodeLists(NCount)%Name)) THEN
+        CALL ShowSevereError(RoutineName//CurrentModuleObject//'="'//trim(cAlphas(1))//'", invalid node name in list.')
+        CALL ShowContinueError('... Node '//trim(TrimSigDigits(Loop1))//' Name="'//trim(cAlphas(Loop1+1))//  &
+           '", duplicates NodeList Name.')
+        ErrorsFound=.true.
+      ENDIF
     ENDDO
     ! Error on any duplicates
     flagError=.true.
@@ -584,6 +602,21 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
         CALL ShowContinueError('...list item='//  &
            trim(TrimSigDigits(Loop1))//', "'//trim(NodeID(NodeLists(NCount)%NodeNumbers(Loop1)))//'", duplicate list item='//  &
            trim(TrimSigDigits(Loop2))//', "'//trim(NodeID(NodeLists(NCount)%NodeNumbers(Loop2)))//'".')
+        ErrorsFound=.true.
+      ENDDO
+    ENDDO
+  ENDDO
+
+  DO Loop=1,NumOfNodeLists
+    DO Loop2=1,NodeLists(Loop)%NumOfNodesInList
+      DO Loop1=1,NumOfNodeLists
+        IF (Loop == Loop1) CYCLE   ! within a nodelist have already checked to see if node name duplicates nodelist name
+        IF (.not. SameString(NodeLists(Loop)%NodeNames(Loop2),NodeLists(Loop1)%Name)) CYCLE
+        CALL ShowSevereError(RoutineName//CurrentModuleObject//'="'//trim(NodeLists(Loop1)%Name)//'", invalid node name in list.')
+        CALL ShowContinueError('... Node '//trim(TrimSigDigits(Loop2))//' Name="'//  &
+           trim(NodeLists(Loop)%NodeNames(Loop2))//'", duplicates NodeList Name.')
+        CALL ShowContinueError('... NodeList="'//trim(NodeLists(Loop1)%Name)//'", is duplicated.')
+        CALL ShowContinueError('... Items in NodeLists must not be the name of another NodeList.')
         ErrorsFound=.true.
       ENDDO
     ENDDO
@@ -886,7 +919,7 @@ SUBROUTINE InitUniqueNodeCheck(ContextName)
 
 END SUBROUTINE InitUniqueNodeCheck
 
-SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumber)
+SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumber,ObjectName)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -903,6 +936,7 @@ SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumbe
           ! CheckName - NodeName entered
           ! CheckNumber - Node Number entered
           ! only 1 of CheckName or CheckNumber need be entered.
+          ! ObjectName - "Name" field of object (i.e., CurCheckContextName)
 
           ! METHODOLOGY EMPLOYED:
           ! checks the current list of items for this (again)
@@ -921,6 +955,7 @@ SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumbe
   LOGICAL, INTENT(INOUT)       :: ErrorsFound
   CHARACTER(len=*), INTENT(IN), OPTIONAL :: CheckName
   INTEGER, INTENT(IN), OPTIONAL :: CheckNumber
+  CHARACTER(len=*), INTENT(IN), OPTIONAL :: ObjectName
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -944,8 +979,11 @@ SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumbe
       IF (CheckName /= Blank) THEN
         Found=FindItemInList(CheckName,UniqueNodeNames,NumCheckNodes)
         IF (Found /= 0) THEN
-          CALL ShowSevereError('Node Types='//TRIM(NodeTypes)//', Non Unique Name found='//TRIM(CheckName))
-          CALL ShowContinueError('Context='//TRIM(CurCheckContextName))
+          CALL ShowSevereError(trim(CurCheckContextName)//'="'//trim(ObjectName)//'", duplicate node names found.')
+          CALL ShowContinueError('...for Node Type(s)='//trim(NodeTypes)//', duplicate node name="'//trim(CheckName)//'".')
+          CALL ShowContinueError('...Nodes must be unique across instances of this object.')
+!          CALL ShowSevereError('Node Types='//TRIM(NodeTypes)//', Non Unique Name found='//TRIM(CheckName))
+!          CALL ShowContinueError('Context='//TRIM(CurCheckContextName))
           ErrorsFound=.true.
         ELSE
           NumCheckNodes=NumCheckNodes+1
@@ -971,8 +1009,11 @@ SUBROUTINE CheckUniqueNodes(NodeTypes,CheckType,ErrorsFound,CheckName,CheckNumbe
       IF (CheckNumber /= 0) THEN
         Found=FindItemInList(NodeID(CheckNumber),UniqueNodeNames,NumCheckNodes)
         IF (Found /= 0) THEN
-          CALL ShowSevereError('Node Types='//TRIM(NodeTypes)//', Non Unique Name found='//TRIM(NodeID(CheckNumber)))
-          CALL ShowContinueError('Context='//TRIM(CurCheckContextName))
+          CALL ShowSevereError(trim(CurCheckContextName)//'="'//trim(ObjectName)//'", duplicate node names found.')
+          CALL ShowContinueError('...for Node Type(s)='//trim(NodeTypes)//', duplicate node name="'//trim(CheckName)//'".')
+          CALL ShowContinueError('...Nodes must be unique across instances of this object.')
+!          CALL ShowSevereError('Node Types='//TRIM(NodeTypes)//', Non Unique Name found='//TRIM(NodeID(CheckNumber)))
+!          CALL ShowContinueError('Context='//TRIM(CurCheckContextName))
           ErrorsFound=.true.
         ELSE
           NumCheckNodes=NumCheckNodes+1
@@ -1079,7 +1120,8 @@ SUBROUTINE CalcMoreNodeInfo
   USE DataInterfaces,  ONLY: ShowWarningError,ShowContinueErrorTimeStamp
   USE OutputProcessor, ONLY: ReqReportVariables,ReqRepVars,NumOfReqVariables
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
-  USE FluidProperties, ONLY: GetSatDensityRefrig, GetSatEnthalpyRefrig
+  USE FluidProperties, ONLY: GetSatDensityRefrig, GetSatEnthalpyRefrig, GetSpecificHeatGlycol, &
+                             GetDensityGlycol, GetGlycolNameByIndex, NumOfGlycols
   USE General,         ONLY: RoundSigDigits
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -1115,6 +1157,10 @@ SUBROUTINE CalcMoreNodeInfo
 !  REAL(r64)     :: rRhoVapor
 !  INTEGER,save :: Count=0
   CHARACTER(len=MaxNameLength+18) :: NodeReportingString
+  CHARACTER(len=MaxNameLength+18) :: FluidName
+  REAL(r64) :: rho
+  REAL(r64) :: Cp
+  REAL(r64) :: rhoStd
 
   IF (MyOneTimeFlag) THEN
     RhoAirStdInit = StdRhoAir
@@ -1170,19 +1216,19 @@ SUBROUTINE CalcMoreNodeInfo
     ReportRelHumidity = .FALSE.
     ReportDewpoint = .false.
     IF ( NodeWetbulbRepReq(iNode) .AND. NodeWetbulbSchedPtr(iNode) > 0) THEN
-      ReportWetbulb = (GetCurrentScheduleValue(NodeWetbulbSchedPtr(iNode)) > 0.0)
+      ReportWetbulb = (GetCurrentScheduleValue(NodeWetbulbSchedPtr(iNode)) > 0.0d0)
     ELSE IF ( NodeWetbulbRepReq(iNode) .AND. NodeWetbulbSchedPtr(iNode) == 0) THEN
       ReportWetbulb = .TRUE.
     ELSE IF ( Node(iNode)%SPMNodeWetbulbRepReq) THEN
-      ReportWetbulb = .TRUE.      
+      ReportWetbulb = .TRUE.
     END IF
     IF ( NodeRelHumidityRepReq(iNode) .AND. NodeRelHumiditySchedPtr(iNode) > 0) THEN
-      ReportRelHumidity = (GetCurrentScheduleValue(NodeRelHumiditySchedPtr(iNode)) > 0.0)
+      ReportRelHumidity = (GetCurrentScheduleValue(NodeRelHumiditySchedPtr(iNode)) > 0.0d0)
     ELSE IF ( NodeRelHumidityRepReq(iNode) .AND. NodeRelHumiditySchedPtr(iNode) == 0) THEN
       ReportRelHumidity = .TRUE.
     END IF
     IF ( NodeDewpointRepReq(iNode) .AND. NodeDewpointSchedPtr(iNode) > 0) THEN
-      ReportDewpoint = (GetCurrentScheduleValue(NodeDewpointSchedPtr(iNode)) > 0.0)
+      ReportDewpoint = (GetCurrentScheduleValue(NodeDewpointSchedPtr(iNode)) > 0.0d0)
     ELSE IF ( NodeDewpointRepReq(iNode) .AND. NodeDewpointSchedPtr(iNode) == 0) THEN
       ReportDewpoint = .TRUE.
     END IF
@@ -1191,7 +1237,7 @@ SUBROUTINE CalcMoreNodeInfo
       MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / RhoAirStdInit
        ! if Node%Press was reliable could be used here.
       RhoAirCurrent = PsyRhoAirFnPbTdbW(OutBaroPress, Node(iNode)%Temp, Node(iNode)%HumRat)
-      MoreNodeInfo(iNode)%AirDensity=RhoAirCurrent
+      MoreNodeInfo(iNode)%Density=RhoAirCurrent
       IF (RhoAirCurrent /= 0.0D0) MoreNodeInfo(iNode)%VolFlowRateCrntRho = Node(iNode)%MassFlowRate / RhoAirCurrent
       MoreNodeInfo(iNode)%ReportEnthalpy = PsyHFnTdbW(Node(iNode)%Temp,Node(iNode)%HumRat)
       IF (ReportWetBulb) THEN
@@ -1199,12 +1245,12 @@ SUBROUTINE CalcMoreNodeInfo
         MoreNodeInfo(iNode)%WetbulbTemp = PsyTwbFnTdbWPb(Node(iNode)%Temp,Node(iNode)%HumRat,OutBaroPress,  &
            NodeReportingString)
       ELSE
-        MoreNodeInfo(iNode)%WetbulbTemp = 0.0
+        MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
       END IF
       IF (ReportDewpoint) THEN
         MoreNodeInfo(iNode)%AirDewpointTemp=PsyTdpFnWPb(Node(iNode)%HumRat,OutBaroPress)
       ELSE
-        MoreNodeInfo(iNode)%AirDewpointTemp=0.0
+        MoreNodeInfo(iNode)%AirDewpointTemp=0.0d0
       ENDIF
       IF (ReportRelHumidity) THEN
         ! if Node%Press was reliable could be used here.
@@ -1216,46 +1262,70 @@ SUBROUTINE CalcMoreNodeInfo
 !              'NodeReportingCalc:'//TRIM(NodeID(iNode)))
 
       ELSE
-        MoreNodeInfo(iNode)%RelHumidity = 0.0
+        MoreNodeInfo(iNode)%RelHumidity = 0.0d0
       ENDIF
     ELSE IF (Node(iNode)%FluidType == NodeType_Water) THEN
-      MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / RhoWaterStdInit
-      MoreNodeInfo(iNode)%ReportEnthalpy = CpCw(Node(iNode)%Temp)*Node(iNode)%Temp
-      MoreNodeInfo(iNode)%WetbulbTemp = 0.0
+
+
+      IF (.NOT. ((Node(iNode)%FluidIndex > 0) .AND. (Node(iNode)%FluidIndex <= NumOfGlycols))) THEN
+        rho = RhoWaterStdInit
+        rhoStd = RhoWaterStdInit
+        Cp  = CpCw(Node(iNode)%Temp)
+      ELSE
+        FluidName = GetGlycolNameByIndex(Node(iNode)%FluidIndex)
+        Cp    =  GetSpecificHeatGlycol(FluidName,            &
+                                     Node(iNode)%Temp,       &
+                                     Node(iNode)%FluidIndex, &
+                                     NodeReportingString)
+        rhoStd = GetDensityGlycol(    FluidName,  &
+                                      InitConvTemp, &
+                                      Node(iNode)%FluidIndex, &
+                                      NodeReportingString)
+        rho    = GetDensityGlycol(    FluidName,  &
+                                      Node(iNode)%Temp, &
+                                      Node(iNode)%FluidIndex, &
+                                      NodeReportingString)
+      ENDIF
+
+      MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / rhoStd
+      MoreNodeInfo(iNode)%VolFlowRateCrntRho = Node(iNode)%MassFlowRate / rho
+      MoreNodeInfo(iNode)%Density     = rho
+      MoreNodeInfo(iNode)%ReportEnthalpy = Cp*Node(iNode)%Temp
+      MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
       MoreNodeInfo(iNode)%RelHumidity = 100.0d0
     ELSE IF (Node(iNode)%FluidType == NodeType_Steam) THEN
-        IF(Node(iNode)%Quality==1.0)Then
+        IF(Node(iNode)%Quality==1.0d0)Then
             SteamDensity=GetSatDensityRefrig("STEAM",Node(iNode)%Temp,Node(iNode)%Quality,  &
                            Node(iNode)%FluidIndex,'CalcMoreNodeInfo')
             EnthSteamInDry=GetSatEnthalpyRefrig("STEAM",Node(iNode)%Temp,Node(iNode)%Quality,  &
                            Node(iNode)%FluidIndex,'CalcMoreNodeInfo')
             MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / SteamDensity
             MoreNodeInfo(iNode)%ReportEnthalpy = EnthSteamInDry
-            MoreNodeInfo(iNode)%WetbulbTemp = 0.0
-            MoreNodeInfo(iNode)%RelHumidity = 0.0
-        ElseIf(Node(iNode)%Quality==0.0)Then    !The node has condensate water through it
+            MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
+            MoreNodeInfo(iNode)%RelHumidity = 0.0d0
+        ElseIf(Node(iNode)%Quality==0.0d0)Then    !The node has condensate water through it
             MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / RhoWaterStdInit
             MoreNodeInfo(iNode)%ReportEnthalpy = CpCw(Node(iNode)%Temp)*Node(iNode)%Temp
-            MoreNodeInfo(iNode)%WetbulbTemp = 0.0
-            MoreNodeInfo(iNode)%RelHumidity = 0.0
+            MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
+            MoreNodeInfo(iNode)%RelHumidity = 0.0d0
         EndIf
     ELSE IF (Node(iNode)%FluidType == NodeType_Electric) THEN
-      MoreNodeInfo(iNode)%VolFlowRateStdRho = 0.0
-      MoreNodeInfo(iNode)%ReportEnthalpy = 0.0
-      MoreNodeInfo(iNode)%WetbulbTemp = 0.0
-      MoreNodeInfo(iNode)%RelHumidity = 0.0
+      MoreNodeInfo(iNode)%VolFlowRateStdRho = 0.0d0
+      MoreNodeInfo(iNode)%ReportEnthalpy = 0.0d0
+      MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
+      MoreNodeInfo(iNode)%RelHumidity = 0.0d0
     ELSE
       MoreNodeInfo(iNode)%VolFlowRateStdRho = Node(iNode)%MassFlowRate / RhoAirStdInit
-      IF (Node(iNode)%HumRat > 0.0) THEN
+      IF (Node(iNode)%HumRat > 0.0d0) THEN
         MoreNodeInfo(iNode)%ReportEnthalpy = PsyHFnTdbW(Node(iNode)%Temp,Node(iNode)%HumRat)
         IF (ReportWetBulb) THEN
           MoreNodeInfo(iNode)%WetbulbTemp = PsyTwbFnTdbWPb(Node(iNode)%Temp,Node(iNode)%HumRat,StdBaroPress)
         ELSE
-          MoreNodeInfo(iNode)%WetbulbTemp = 0.0
+          MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
         END IF
       ELSE
         MoreNodeInfo(iNode)%ReportEnthalpy = CpCw(Node(iNode)%Temp)*Node(iNode)%Temp
-        MoreNodeInfo(iNode)%WetbulbTemp = 0.0
+        MoreNodeInfo(iNode)%WetbulbTemp = 0.0d0
       END IF
     END IF
   END DO

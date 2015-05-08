@@ -64,14 +64,15 @@ INTEGER, PARAMETER :: HeatXchngr = 15
 INTEGER, PARAMETER :: Desiccant = 16
 INTEGER, PARAMETER :: Unglazed_SolarCollector = 17
 INTEGER, PARAMETER :: EvapCooler = 18
-INTEGER, PARAMETER :: Furnace_UnitarySys = 19
-INTEGER, PARAMETER :: Humidifier = 20
-INTEGER, PARAMETER :: Duct = 21
-INTEGER, PARAMETER :: UnitarySystem_BypassVAVSys = 22
-INTEGER, PARAMETER :: UnitarySystem_MSHeatPump = 23
-INTEGER, PARAMETER :: Fan_ComponentModel = 24 !cpw22Aug2010 (new)
-INTEGER, PARAMETER :: DXHeatPumpSystem = 25
-INTEGER, PARAMETER :: CoilUserDefined  = 26
+INTEGER, PARAMETER :: UnitarySystem = 19
+INTEGER, PARAMETER :: Furnace_UnitarySys = 20
+INTEGER, PARAMETER :: Humidifier = 21
+INTEGER, PARAMETER :: Duct = 22
+INTEGER, PARAMETER :: UnitarySystem_BypassVAVSys = 23
+INTEGER, PARAMETER :: UnitarySystem_MSHeatPump = 24
+INTEGER, PARAMETER :: Fan_ComponentModel = 25 !cpw22Aug2010 (new)
+INTEGER, PARAMETER :: DXHeatPumpSystem = 26
+INTEGER, PARAMETER :: CoilUserDefined  = 27
 
           ! DERIVED TYPE DEFINITIONS:
           ! na
@@ -245,7 +246,7 @@ USE SystemAvailabilityManager, ONLY: GetAirLoopAvailabilityManager
 USE MixedAir, ONLY: GetOASystemNumber, FindOAMixerMatchForOASystem, GetOAMixerInletNodeNumber, GetOASysControllerListIndex, &
                     GetOASysNumSimpControllers, GetOASysNumCoolingCoils, GetOASysNumHeatingCoils, &
                     GetOACompListNumber, GetOACompName, GetOACompType, GetOACompTypeNum, GetNumOASystems
-USE HVACControllers, ONLY: CheckCoilWaterInletNode
+USE HVACControllers, ONLY: CheckCoilWaterInletNode, GetControllerActuatorNodeNum
 USE WaterCoils, ONLY: GetCoilWaterInletNode
 USE General, ONLY: RoundSigDigits
 USE DataConvergParams, ONLY: AirLoopConvergence
@@ -335,12 +336,9 @@ INTEGER :: OASysContListNum               ! index of the controller list of the 
 INTEGER :: OASysControllerNum             ! index of OA Sys simple controller in the air primary system controller lists
 LOGICAL :: NodeNotFound                   ! true if matching actuator node not found
 INTEGER :: CompType_Num                   ! numeric equivalent for component type
-!INTEGER :: ActuatedNodeNum                ! numeric equivalent for actuated node number for each controller
+CHARACTER(len=MaxNameLength)  :: CompType ! component type
 INTEGER :: WaterCoilNodeNum               ! numeric equivalent for water coil node number
-!INTEGER :: AirLoopControlNum              ! Number of times that the maximum iterations was exceeded
-!CHARACTER(len=MaxNameLength) :: ComponentName
-!CHARACTER(len=MaxNameLength) :: ComponentType
-!INTEGER :: ComponentType_Num
+INTEGER :: ActuatorNodeNum                ! numeric equivalent for controller actuator node number
 CHARACTER(len=MaxNameLength), DIMENSION(3) :: MatchNodeName
 
 
@@ -384,6 +382,7 @@ ALLOCATE(PackagedUnit(NumPrimaryAirSys))
 ALLOCATE(AirLoopControlInfo(NumPrimaryAirSys))
 ALLOCATE(AirLoopFlow(NumPrimaryAirSys))
 ALLOCATE(AirLoopConvergence(NumPrimaryAirSys))
+ALLOCATE(UnitarySysEqSizing(NumPrimaryAirSys))
 
 IF (NumPrimaryAirSys <= 0) THEN
   DEALLOCATE(TestUniqueNodes)
@@ -689,6 +688,8 @@ DO AirSysNum=1,NumPrimaryAirSys
             PackagedUnit(AirSysNum) = .TRUE.
           CASE('COILSYSTEM:HEATING:DX')
             PackagedUnit(AirSysNum) = .TRUE.
+          CASE('AIRLOOPHVAC:UNITARYSYSTEM')
+            PackagedUnit(AirSysNum) = .TRUE.
           CASE('AIRLOOPHVAC:UNITARY:FURNACE:HEATONLY')
             PackagedUnit(AirSysNum) = .TRUE.
           CASE('AIRLOOPHVAC:UNITARY:FURNACE:HEATCOOL')
@@ -710,11 +711,11 @@ DO AirSysNum=1,NumPrimaryAirSys
       END DO ! end of component loop
 
       PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%ControlType = ' '
-      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MinVolFlowRate = 0.0
+      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MinVolFlowRate = 0.0d0
       PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%NodeNumIn = InletNodeNumbers(1)
       PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%NodeNumOut = OutletNodeNumbers(NumCompsOnBranch)
-      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MaxMassFlowRate = 0.0
-      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MinMassFlowRate = 0.0
+      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MaxMassFlowRate = 0.0d0
+      PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MinMassFlowRate = 0.0d0
 
       DEALLOCATE(CompTypes)
       DEALLOCATE(CompNames)
@@ -973,6 +974,8 @@ DO AirSysNum=1,NumPrimaryAirSys
         PrimaryAirSystem(AirSysNum)%ControllerIndex=0
         Allocate(PrimaryAirSystem(AirSysNum)%ControlConverged(NumOASysSimpControllers))
         Allocate(PrimaryAirSystem(AirSysNum)%CanBeLockedOutByEcono(NumOASysSimpControllers))
+        PrimaryAirSystem(AirSysNum)%ControlConverged=.FALSE.
+        PrimaryAirSystem(AirSysNum)%CanBeLockedOutByEcono=.FALSE.
       END IF
       ! loop over the OA Sys controllers and move them up to the primary air system controller lists
       OASysControllerNum = 0
@@ -985,7 +988,31 @@ DO AirSysNum=1,NumPrimaryAirSys
           PrimaryAirSystem(AirSysNum)%ControllerName(OASysControllerNum) = ControllerName
           PrimaryAirSystem(AirSysNum)%ControllerType(OASysControllerNum) = ControllerType
           PrimaryAirSystem(AirSysNum)%ControlConverged(OASysControllerNum) = .False.
-          PrimaryAirSystem(AirSysNum)%CanBeLockedOutByEcono(OASysControllerNum) = .True.
+          PrimaryAirSystem(AirSysNum)%CanBeLockedOutByEcono(OASysControllerNum) = .TRUE.
+!         Coil controllers can be entered either in the air loop controller list or the
+!         OA system controller list. The CanBeLockedOutByEcono should only be set for OA coils
+!         First get the OA controller actuator node and then compare to the air loop coil water inlet node
+!         If these node numbers match, the coil is in the main air loop and the lockout flag should be reset to FALSE
+          CALL GetControllerActuatorNodeNum(ControllerName,ActuatorNodeNum,ErrFlag)
+          DO BranchNum = 1, PrimaryAirSystem(AirSysNum)%NumBranches
+            DO CompNum = 1, PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%TotalComponents
+              IF(SameString(PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
+                            'AirloopHVAC:OutdoorAirSystem'))CYCLE
+              CompType = PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
+              WaterCoilNodeNum = -1
+              IF (SameString(CompType,'Coil:Cooling:Water:DetailedGeometry') .OR. &
+                  SameString(CompType,'Coil:Heating:Water') .OR. &
+                  SameString(CompType,'Coil:Cooling:Water')) THEN
+                WaterCoilNodeNum = GetCoilWaterInletNode(  &
+                   PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf,  &
+                   PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%Name,  &
+                   ErrorsFound)
+              END IF
+              IF(WaterCoilNodeNum == ActuatorNodeNum) THEN
+                PrimaryAirSystem(AirSysNum)%CanBeLockedOutByEcono(OASysControllerNum) = .FALSE.
+              END IF
+            END DO
+          END DO
         END IF
       END DO
     END IF
@@ -1068,6 +1095,8 @@ DO AirSysNum=1,NumPrimaryAirSys
           PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompType_Num=DXHeatPumpSystem
         CASE('COIL:USERDEFINED')
           PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompType_Num=CoilUserDefined
+        CASE('AIRLOOPHVAC:UNITARYSYSTEM')
+          PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompType_Num=UnitarySystem
         CASE('AIRLOOPHVAC:UNITARY:FURNACE:HEATONLY')
           PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompType_Num=Furnace_UnitarySys
         CASE('AIRLOOPHVAC:UNITARY:FURNACE:HEATCOOL')
@@ -1295,7 +1324,7 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
   INTEGER :: PlenumOutNum     ! DO loop index of supply plenum outlets
   REAL(r64)    :: MassFlowSaved    ! mass flow rate for a node saved from previous call
   REAL(r64)    :: MassFlowSet      ! desired mass flow rate for a node
-  REAL(r64)    :: SumZoneDesFlow=0.0 ! sum of the zone design air mass flow rates for zones served by a system
+  REAL(r64)    :: SumZoneDesFlow=0.0d0 ! sum of the zone design air mass flow rates for zones served by a system
   INTEGER :: SupAirPath       ! supply air path do loop index
   INTEGER :: SupAirPathNum    ! specific supply air path index
   INTEGER :: SplitterNum      ! Zone equip splitter index
@@ -1770,7 +1799,7 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
 
     ! calculate the ratio of air loop design flow to the sum of the zone design flows
     DO AirLoopNum = 1, NumPrimaryAirSys
-      SumZoneDesFlow = 0.0
+      SumZoneDesFlow = 0.0d0
       DO ZoneInSysIndex=1,AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
         TUInNode = AirToZoneNodeInfo(AirLoopNum)%TermUnitCoolInletNodes(ZoneInSysIndex)
         SumZoneDesFlow = SumZoneDesFlow + Node(TUInNode)%MassFlowRateMax
@@ -1806,18 +1835,18 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
 
           ! Initialize the nodes to a standard set of initial conditions that will
           !  change after the first iteration to a system value
-          Node(NodeNum)%Temp         = 20.0
+          Node(NodeNum)%Temp         = 20.0d0
           Node(NodeNum)%HumRat       = OutHumRat
           Node(NodeNum)%Enthalpy     = PsyHFnTdbW(Node(NodeNum)%Temp,Node(NodeNum)%HumRat)
           ! set the node mass flow rates to the branch mass flow rate
           Node(NodeNum)%MassFlowRate = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%MaxMassFlowRate
           Node(NodeNum)%MassFlowRateMax = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%MaxMassFlowRate
           Node(NodeNum)%MassFlowRateMaxAvail = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%MaxMassFlowRate
-          Node(NodeNum)%MassFlowRateMin = 0.0
-          Node(NodeNum)%MassFlowRateSetPoint = 0.0
-          Node(NodeNum)%MassFlowRateMinAvail = 0.0
+          Node(NodeNum)%MassFlowRateMin = 0.0d0
+          Node(NodeNum)%MassFlowRateSetPoint = 0.0d0
+          Node(NodeNum)%MassFlowRateMinAvail = 0.0d0
           Node(NodeNum)%Press        = StdBaroPress
-          Node(NodeNum)%Quality      = 0.0
+          Node(NodeNum)%Quality      = 0.0d0
           IF (Contaminant%CO2Simulation) Then
             Node(NodeNum)%CO2 = OutdoorCO2
           End If
@@ -1853,7 +1882,7 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
       IF (PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%DuctType == RAB) CYCLE
       DO NodeIndex = 1,PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%TotalNodes ! loop over alll nodes on branch
         NodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%NodeNum(NodeIndex)
-        Node(NodeNum)%MassFlowRateSetPoint = 0.
+        Node(NodeNum)%MassFlowRateSetPoint = 0.0d0
         ! Reset MassFlowRateMaxAvail at start of each HVAC simulation
         IF (FirstHVACIteration) THEN
           Node(NodeNum)%MassFlowRateMaxAvail = Node(NodeNum)%MassFlowRateMax
@@ -1874,14 +1903,14 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
         MassFlowSet = PrimaryAirSystem(AirLoopNum)%Branch(OutBranchNum)%MaxMassFlowRate
       END IF
       ! Need to make sure that flows are greater than zero
-      IF (MassFlowSet .GE. 0.0) THEN
+      IF (MassFlowSet .GE. 0.0d0) THEN
          Node(NodeNumOut)%MassFlowRateSetPoint = MassFlowSet
-      ELSE IF (MassFlowSet .LT. 0.0) THEN
-         Node(NodeNumOut)%MassFlowRateSetPoint = 0.0
+      ELSE IF (MassFlowSet .LT. 0.0d0) THEN
+         Node(NodeNumOut)%MassFlowRateSetPoint = 0.0d0
       END IF
 
       IF (Node(NodeNumOut)%MassFlowRateSetPoint < MassFlowSetToler) THEN
-        Node(NodeNumOut)%MassFlowRateSetPoint = 0.0
+        Node(NodeNumOut)%MassFlowRateSetPoint = 0.0d0
       END IF
 
       ! Pass the required mass flow upstream to the start of each outlet branch
@@ -1904,7 +1933,7 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
     END DO  ! end loop over outlet branches
 
     ! sum and save the total loop return air mass flow rate
-    AirLoopFlow(AirLoopNum)%TotReturn = 0.0
+    AirLoopFlow(AirLoopNum)%TotReturn = 0.0d0
     DO InBranchNum=1,AirToZoneNodeInfo(AirLoopNum)%NumReturnNodes
       AirLoopFlow(AirLoopNum)%TotReturn = AirLoopFlow(AirLoopNum)%TotReturn + &
         Node(AirToZoneNodeInfo(AirLoopNum)%AirLoopReturnNodeNum(InBranchNum))%MassFlowRate
@@ -2013,7 +2042,7 @@ SUBROUTINE SimAirLoops(FirstHVACIteration,SimZoneEquipment)
        ! SUBROUTINE LOCAL VARIABLE DEFINITIONS
   ! Last saved HVAC time stamp at beginning of step in seconds.
   ! Used to control when to reset the statistic counters for each new HVAC step.
-  REAL(r64), SAVE :: SavedPreviousHVACTime = 0.0
+  REAL(r64), SAVE :: SavedPreviousHVACTime = 0.0d0
   REAL(r64) :: rxTime
   ! Maximum of iteration counters across all air loops
   INTEGER, SAVE          :: IterMax = 0
@@ -2768,6 +2797,7 @@ SUBROUTINE SimAirLoopComponent(CompName,CompType_Num,FirstHVACIteration,AirLoopN
   USE HeatingCoils,              ONLY:SimulateHeatingCoilComponents
   USE HeatRecovery,              ONLY:SimHeatRecovery
   USE HVACDXSystem,              ONLY:SimDXCoolingSystem
+  USE HVACUnitarySystem,         ONLY:SimUnitarySystem
   USE HVACDXHeatPumpSystem,      ONLY:SimDXHeatPumpSystem
   USE EvaporativeCoolers,        ONLY:SimEvapCooler
   USE HVACUnitaryBypassVAV,      ONLY:SimUnitaryBypassVAV
@@ -2875,6 +2905,10 @@ SELECT CASE(CompType_Num)
   CASE(CoilUserDefined) ! Coil:UserDefined
     CALL SimCoilUserDefined(CompName, CompIndex, AirLoopNum, HeatingActive, CoolingActive  )
 
+  CASE(UnitarySystem)  ! 'AirLoopHVAC:UnitarySystem'
+    CALL SimUnitarySystem(CompName, FirstHVACIteration, AirLoopNum, CompIndex, &
+                          HeatActive=HeatingActive, CoolActive=CoolingActive)
+
   CASE(Furnace_UnitarySys)  ! 'AirLoopHVAC:Unitary:Furnace:HeatOnly', 'AirLoopHVAC:Unitary:Furnace:HeatCool',
                             ! 'AirLoopHVAC:UnitaryHeatOnly', 'AirLoopHVAC:UnitaryHeatCool'
                             ! 'AirLoopHVAC:UnitaryHeatPump:AirToAir', 'AirLoopHVAC:UnitaryHeatPump:WaterToAir'
@@ -2980,16 +3014,16 @@ REAL(r64)    :: OutletCO2          ! outlet CO2 of mixer
 REAL(r64)    :: OutletGC           ! outlet generic contaminant of mixer
 
           ! FLOW
-MassFlowRateSetSum = 0.0
-MassFlowRateOut = 0.0
-MassFlowRateMinAvailOut = 0.0
-OutletHumRat = 0.0
-OutletEnthalpy = 0.0
-OutletPress = 0.0
+MassFlowRateSetSum = 0.0d0
+MassFlowRateOut = 0.0d0
+MassFlowRateMinAvailOut = 0.0d0
+OutletHumRat = 0.0d0
+OutletEnthalpy = 0.0d0
+OutletPress = 0.0d0
 RABNodeNum = 0
 NonRABNodeNum = 0
-OutletCO2 = 0.0
-OutletGC = 0.0
+OutletCO2 = 0.0d0
+OutletGC = 0.0d0
 
 IF (PrimaryAirSystem(AirLoopNum)%Splitter%Exists .AND. Update == AfterBranchSim) THEN
   ! if we are at an inlet branch, pass data through the splitter
@@ -3017,7 +3051,7 @@ IF (PrimaryAirSystem(AirLoopNum)%Splitter%Exists .AND. Update == AfterBranchSim)
       DO OutletNum=1,PrimaryAirSystem(AirLoopNum)%Splitter%TotalOutletNodes
         OutletNodeNum = PrimaryAirSystem(AirLoopNum)%Splitter%NodeNumOut(OutletNum)
         IF (MassFlowRateSetSum.LT.SmallMassFlow .OR. Node(InletNodeNum)%MassFlowRate.LT.SmallMassFlow) THEN
-          Node(OutletNodeNum)%MassFlowRate = 0.0
+          Node(OutletNodeNum)%MassFlowRate = 0.0d0
         ELSE
           Node(OutletNodeNum)%MassFlowRate = Node(InletNodeNum)%MassFlowRate * &
                                              (MIN(Node(OutletNodeNum)%MassFlowRateSetPoint, &
@@ -3025,13 +3059,13 @@ IF (PrimaryAirSystem(AirLoopNum)%Splitter%Exists .AND. Update == AfterBranchSim)
                                              / MassFlowRateSetSum)
         END IF
         Node(OutletNodeNum)%MassFlowRateMaxAvail = Node(InletNodeNum)%MassFlowRateMaxAvail
-        Node(OutletNodeNum)%MassFlowRateMinAvail = 0.0
+        Node(OutletNodeNum)%MassFlowRateMinAvail = 0.0d0
       END DO
     ELSE ! set the RAB flow rates
       RABNodeNum = PrimaryAirSystem(AirLoopNum)%RABSplitOutNode
       NonRABNodeNum = PrimaryAirSystem(AirLoopNum)%OtherSplitOutNode
       IF (AirLoopControlInfo(AirLoopNum)%EconoActive) THEN
-        Node(RABNodeNum)%MassFlowRate = 0.0
+        Node(RABNodeNum)%MassFlowRate = 0.0d0
         Node(NonRABNodeNum)%MassFlowRate = Node(InletNodeNum)%MassFlowRate
       ELSE
         Node(RABNodeNum)%MassFlowRate = Node(RABNodeNum)%MassFlowRateSetPoint
@@ -3060,7 +3094,7 @@ IF (PrimaryAirSystem(AirLoopNum)%Mixer%Exists .AND. Update == BeforeBranchSim) T
     Node(OutletNodeNum)%MassFlowRateMinAvail = MassFlowRateMinAvailOut
     Node(OutletNodeNum)%MassFlowRateMaxAvail = Node(OutletNodeNum)%MassFlowRateMax
     ! calculate the outlet humidity ratio and enthalpy and pressure
-    IF (MassFlowRateOut > 0.0) THEN
+    IF (MassFlowRateOut > 0.0d0) THEN
       DO InletNum=1,PrimaryAirSystem(AirLoopNum)%Mixer%TotalInletNodes
         InletNodeNum = PrimaryAirSystem(AirLoopNum)%Mixer%NodeNumIn(InletNum)
         OutletHumRat = OutletHumRat + (Node(InletNodeNum)%MassFlowRate * Node(InletNodeNum)%HumRat) / MassFlowRateOut
@@ -3182,7 +3216,7 @@ END IF
 
 ! If mass flow conserved on each branch, check for mass balance across splitter
 IF (.NOT.SysReSim .AND. PrimaryAirSystem(SysNum)%Splitter%Exists) THEN
-  MassFlowRateOutSum = 0.0
+  MassFlowRateOutSum = 0.0d0
   InletNodeNum = PrimaryAirSystem(SysNum)%Splitter%NodeNumIn
   ! Get sum of splitter outlet mass flows
   DO OutletNum=1,PrimaryAirSystem(SysNum)%Splitter%TotalOutletNodes
@@ -3206,7 +3240,7 @@ IF (SysReSim) THEN
   ! Impose mass balance at splitter
   IF (PrimaryAirSystem(SysNum)%Splitter%Exists) THEN
     InBranchNum = PrimaryAirSystem(SysNum)%Splitter%BranchNumIn
-    MassFlowRateOutSum = 0.0
+    MassFlowRateOutSum = 0.0d0
     InletNodeNum = PrimaryAirSystem(SysNum)%Splitter%NodeNumIn
     DO OutletNum=1,PrimaryAirSystem(SysNum)%Splitter%TotalOutletNodes
       OutletNodeNum = PrimaryAirSystem(SysNum)%Splitter%NodeNumOut(OutletNum)
@@ -3465,8 +3499,8 @@ SUBROUTINE SetUpSysSizingArrays
   LOGICAL :: ErrorsFound=.false.  ! Set to true if errors in input, fatal at end of routine
   REAL(r64)     :: ZoneOAFracCooling ! zone OA fraction for cooling design air flow
   REAL(r64)     :: ZoneOAFracHeating ! zone OA fraction for heating design air flow
-  REAL(r64) :: Ep = 1.0                ! zone primary air fraction
-  REAL(r64) :: Er = 0.0                ! zone secondary recirculation fraction
+  REAL(r64) :: Ep = 1.0d0                ! zone primary air fraction
+  REAL(r64) :: Er = 0.0d0                ! zone secondary recirculation fraction
   REAL(r64) :: ZoneSA                 ! Zone supply air flow rate
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: VdzClgByZone  !saved value of cooling based ZoneSA which is Vdz used in 62.1 tabular report (also used for zone level Vps)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: VdzHtgByZone  !saved value of heating based ZoneSA which is Vdz used in 62.1 tabular report (also used for zone level Vps)
@@ -3511,35 +3545,35 @@ SUBROUTINE SetUpSysSizingArrays
   ! allocate arrays used to store values for standard 62.1 tabular report
   IF (.NOT. ALLOCATED(VpzClgByZone)) THEN
     ALLOCATE (VdzClgByZone(NumOfZones))
-    VdzClgByZone = 0.0
+    VdzClgByZone = 0.0d0
     ALLOCATE (VdzHtgByZone(NumOfZones))
-    VdzHtgByZone = 0.0
+    VdzHtgByZone = 0.0d0
     ALLOCATE (VpzClgByZone(NumOfZones))
-    VpzClgByZone = 0.0
+    VpzClgByZone = 0.0d0
     ALLOCATE (VpzMinClgByZone(NumOfZones))
-    VpzMinClgByZone = 0.0
+    VpzMinClgByZone = 0.0d0
      ALLOCATE (VpzHtgByZone(NumOfZones))
-    VpzHtgByZone = 0.0
+    VpzHtgByZone = 0.0d0
     ALLOCATE (VpzMinHtgByZone(NumOfZones))
-    VpzMinHtgByZone = 0.0
+    VpzMinHtgByZone = 0.0d0
     ALLOCATE (VpzClgSumBySys(NumPrimaryAirSys))
-    VpzClgSumBySys = 0.0
+    VpzClgSumBySys = 0.0d0
     ALLOCATE (VpzHtgSumBySys(NumPrimaryAirSys))
-    VpzHtgSumBySys = 0.0
+    VpzHtgSumBySys = 0.0d0
     ALLOCATE (VbzByZone(NumOfZones))
-    VbzByZone = 0.0
+    VbzByZone = 0.0d0
     ALLOCATE (PzSumBySysCool(NumPrimaryAirSys))
-    PzSumBySysCool = 0.0
+    PzSumBySysCool = 0.0d0
     ALLOCATE (PzSumBySysHeat(NumPrimaryAirSys))
-    PzSumBySysHeat = 0.0
+    PzSumBySysHeat = 0.0d0
     ALLOCATE (PsBySysCool(NumPrimaryAirSys))
-    PsBySysCool = 0.0
+    PsBySysCool = 0.0d0
     ALLOCATE (PsBySysHeat(NumPrimaryAirSys))
-    PsBySysHeat = 0.0
+    PsBySysHeat = 0.0d0
     ALLOCATE (DBySysCool(NumPrimaryAirSys))
-    DBySysCool = 0.0
+    DBySysCool = 0.0d0
     ALLOCATE (DBySysHeat(NumPrimaryAirSys))
-    DBySysHeat = 0.0
+    DBySysHeat = 0.0d0
   END IF
 
   DO SysSizIndex=1,NumSysSizInput
@@ -3548,6 +3582,8 @@ SUBROUTINE SetUpSysSizingArrays
       CALL ShowSevereError ('Sizing:System: '//TRIM(SysSizInput(SysSizIndex)%AirPriLoopName)// &
                            ' references unknown AirLoopHVAC')
       ErrorsFound = .TRUE.
+    ELSE
+      SysSizInput(SysSizIndex)%AirLoopNum = PrimAirIndex
     END IF
   END DO
   IF (ErrorsFound) THEN
@@ -3620,19 +3656,19 @@ SUBROUTINE SetUpSysSizingArrays
       ALLOCATE(SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolOutHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutTempSeq(NumOfTimeStepInDay))
       ALLOCATE(SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutHumRatSeq(NumOfTimeStepInDay))
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%HeatFlowSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%CoolFlowSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SensCoolCapSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%HeatCapSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%PreHeatCapSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolRetTempSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolRetHumRatSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatRetTempSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatRetHumRatSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolOutTempSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolOutHumRatSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutTempSeq = 0.0
-      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutHumRatSeq = 0.0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%HeatFlowSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%CoolFlowSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SensCoolCapSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%HeatCapSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%PreHeatCapSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolRetTempSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolRetHumRatSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatRetTempSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatRetHumRatSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolOutTempSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysCoolOutHumRatSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutTempSeq = 0.0d0
+      SysSizing(AirLoopNum,DesDayEnvrnNum)%SysHeatOutHumRatSeq = 0.0d0
     END DO ! end the primary air system loop
   END DO
 
@@ -3744,19 +3780,19 @@ SUBROUTINE SetUpSysSizingArrays
     ALLOCATE(FinalSysSizing(AirLoopNum)%SysCoolOutHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalSysSizing(AirLoopNum)%SysHeatOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalSysSizing(AirLoopNum)%SysHeatOutHumRatSeq(NumOfTimeStepInDay))
-    FinalSysSizing(AirLoopNum)%HeatFlowSeq = 0.0
-    FinalSysSizing(AirLoopNum)%CoolFlowSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SensCoolCapSeq = 0.0
-    FinalSysSizing(AirLoopNum)%HeatCapSeq = 0.0
-    FinalSysSizing(AirLoopNum)%PreHeatCapSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysCoolRetTempSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysCoolRetHumRatSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysHeatRetTempSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysHeatRetHumRatSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysCoolOutTempSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysCoolOutHumRatSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysHeatOutTempSeq = 0.0
-    FinalSysSizing(AirLoopNum)%SysHeatOutHumRatSeq = 0.0
+    FinalSysSizing(AirLoopNum)%HeatFlowSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%CoolFlowSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SensCoolCapSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%HeatCapSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%PreHeatCapSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysCoolRetTempSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysCoolRetHumRatSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysHeatRetTempSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysHeatRetHumRatSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysCoolOutTempSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysCoolOutHumRatSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysHeatOutTempSeq = 0.0d0
+    FinalSysSizing(AirLoopNum)%SysHeatOutHumRatSeq = 0.0d0
     ALLOCATE(CalcSysSizing(AirLoopNum)%HeatFlowSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcSysSizing(AirLoopNum)%CoolFlowSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcSysSizing(AirLoopNum)%SensCoolCapSeq(NumOfTimeStepInDay))
@@ -3770,19 +3806,19 @@ SUBROUTINE SetUpSysSizingArrays
     ALLOCATE(CalcSysSizing(AirLoopNum)%SysCoolOutHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcSysSizing(AirLoopNum)%SysHeatOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcSysSizing(AirLoopNum)%SysHeatOutHumRatSeq(NumOfTimeStepInDay))
-    CalcSysSizing(AirLoopNum)%HeatFlowSeq = 0.0
-    CalcSysSizing(AirLoopNum)%CoolFlowSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SensCoolCapSeq = 0.0
-    CalcSysSizing(AirLoopNum)%HeatCapSeq = 0.0
-    CalcSysSizing(AirLoopNum)%PreHeatCapSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysCoolRetTempSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysCoolRetHumRatSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysHeatRetTempSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysHeatRetHumRatSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysCoolOutTempSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysCoolOutHumRatSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysHeatOutTempSeq = 0.0
-    CalcSysSizing(AirLoopNum)%SysHeatOutHumRatSeq = 0.0
+    CalcSysSizing(AirLoopNum)%HeatFlowSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%CoolFlowSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SensCoolCapSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%HeatCapSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%PreHeatCapSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysCoolRetTempSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysCoolRetHumRatSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysHeatRetTempSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysHeatRetHumRatSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysCoolOutTempSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysCoolOutHumRatSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysHeatOutTempSeq = 0.0d0
+    CalcSysSizing(AirLoopNum)%SysHeatOutHumRatSeq = 0.0d0
 
     IF (AnyEnergyManagementSystemInModel) THEN
 
@@ -3897,13 +3933,13 @@ SUBROUTINE SetUpSysSizingArrays
 
   ! If the system design minimum outside air flow rate is autosized, calculate it from the zone data
   DO AirLoopNum=1,NumPrimaryAirSys
-    MinOAFlow = 0.0
-    SysOAUnc = 0.0
-    PopulationDiversity = 1.0
-    TotalPeople = 0.0
-    PeakPeople = 0.0
-    ClgSupplyAirAdjustFactor = 1.0
-    HtgSupplyAirAdjustFactor = 1.0
+    MinOAFlow = 0.0d0
+    SysOAUnc = 0.0d0
+    PopulationDiversity = 1.0d0
+    TotalPeople = 0.0d0
+    PeakPeople = 0.0d0
+    ClgSupplyAirAdjustFactor = 1.0d0
+    HtgSupplyAirAdjustFactor = 1.0d0
     SysSizNum = FindItemInList(FinalSysSizing(AirLoopNum)%AirPriLoopName,SysSizInput%AirPriLoopName,NumSysSizInput)
     IF (SysSizNum == 0) SysSizNum=1  ! use first when none applicable
     IF (FinalSysSizing(AirLoopNum)%OAAutosized) THEN
@@ -3916,7 +3952,7 @@ SUBROUTINE SetUpSysSizingArrays
       IF (TotalPeople > 0.0d0) THEN
         PopulationDiversity = PeakPeople / TotalPeople
       ELSE
-        PopulationDiversity = 1.0
+        PopulationDiversity = 1.0d0
       END IF
       !save population for standard 62.1 report
       PzSumBySysCool(AirLoopNum) = TotalPeople
@@ -3932,7 +3968,7 @@ SUBROUTINE SetUpSysSizingArrays
         IF (SysSizNum > 0) THEN
           IF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_ZoneSum) THEN ! ZoneSum Method
             MinOAFlow = MinOAFlow +  FinalZoneSizing(CtrlZoneNum)%MinOA
-            ZoneOAFracCooling = 0.0
+            ZoneOAFracCooling = 0.0d0
           ELSEIF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
             ZoneOAUnc = PopulationDiversity*FinalZoneSizing(CtrlZoneNum)%TotalOAFromPeople +   &
                FinalZoneSizing(CtrlZoneNum)%TotalOAFromArea
@@ -3955,7 +3991,7 @@ SUBROUTINE SetUpSysSizingArrays
             FinalZoneSizing(CtrlZoneNum)%VozClgByZone = ZoneOAUnc / FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling
             MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%VozClgByZone
 
-            IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0) THEN
+            IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0d0) THEN
               IF (FinalZoneSizing(CtrlZoneNum)%ZoneSecondaryRecirculation > 0.0d0 .OR.   &
                  FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlowMin <= 0) THEN
                 ! multi-path system or VAV Minimum not defined
@@ -3965,13 +4001,13 @@ SUBROUTINE SetUpSysSizingArrays
                 ZoneOAFracCooling = FinalZoneSizing(CtrlZoneNum)%VozClgByZone / FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlowMin
               ENDIF
             ELSE
-              ZoneOAFracCooling = 0.0
+              ZoneOAFracCooling = 0.0d0
             ENDIF
           ELSE  ! error
           ENDIF
         ELSE ! ZoneSum Method
           MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%MinOA
-          ZoneOAFracCooling = 0.0
+          ZoneOAFracCooling = 0.0d0
         ENDIF
 
         ! Calc maximum zone OA fraction and supply air adjustment factor based on
@@ -4003,9 +4039,9 @@ SUBROUTINE SetUpSysSizingArrays
            ClgSupplyAirAdjustFactor = 1.0D0
         ENDIF
 
-        ZoneSA = 0.0
-        ZonePA = 0.0
-        Ep = 1.0
+        ZoneSA = 0.0d0
+        ZonePA = 0.0d0
+        Ep = 1.0d0
         IF (FinalZoneSizing(CtrlZoneNum)%ZoneSecondaryRecirculation > 0.0d0) THEN ! multi-path system
              !Vpz: "Primary" supply air from main air handler served by an oa mixer
           ZonePA = FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow
@@ -4040,15 +4076,15 @@ SUBROUTINE SetUpSysSizingArrays
         VpzClgSumBySys(AirLoopNum) = VpzClgSumBySys(AirLoopNum) + ZonePA
 
         ! Fraction of required zone ventilation to minimum primary airflow expected at condition analyzed
-        FinalZoneSizing(CtrlZoneNum)%ZpzClgByZone = 0
+        FinalZoneSizing(CtrlZoneNum)%ZpzClgByZone = 0.0d0
         IF (VpzMinClgByZone(CtrlZoneNum) > 0) THEN
           FinalZoneSizing(CtrlZoneNum)%ZpzClgByZone =   &
              MIN(1.0D0, FinalZoneSizing(CtrlZoneNum)%VozClgByZone / VpzMinClgByZone(CtrlZoneNum))
         ENDIF
 
         ! calc zone primary air fraction
-        IF (ZoneSA > 0.0) Ep = ZonePA / ZoneSA
-        IF (Ep > 1.0) Ep = 1.0
+        IF (ZoneSA > 0.0d0) Ep = ZonePA / ZoneSA
+        IF (Ep > 1.0d0) Ep = 1.0d0
         FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFraction = Ep
         FinalZoneSizing(CtrlZoneNum)%ZoneOAFracCooling = ZoneOAFracCooling
       END DO
@@ -4063,7 +4099,7 @@ SUBROUTINE SetUpSysSizingArrays
             IF (SysSizNum > 0) THEN
               IF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_ZoneSum) THEN ! ZoneSum Method
                 MinOAFlow = MinOAFlow +  FinalZoneSizing(CtrlZoneNum)%MinOA
-                ZoneOAFracHeating = 0.0
+                ZoneOAFracHeating = 0.0d0
               ELSEIF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
                 ZoneOAUnc = PopulationDiversity * FinalZoneSizing(CtrlZoneNum)%TotalOAFromPeople +   &
                    FinalZoneSizing(CtrlZoneNum)%TotalOAFromArea
@@ -4076,7 +4112,7 @@ SUBROUTINE SetUpSysSizingArrays
                 FinalZoneSizing(CtrlZoneNum)%VozHtgByZone = ZoneOAUnc / FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
                 MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%VozHtgByZone
 
-                IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+                IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
                   IF (FinalZoneSizing(CtrlZoneNum)%ZoneSecondaryRecirculation > 0.0d0) THEN ! multi-path system
                     ! multi-path system
                     ZoneOAFracHeating = FinalZoneSizing(CtrlZoneNum)%VozHtgByZone / TermUnitSizing(CtrlZoneNum)%AirVolFlow
@@ -4085,16 +4121,16 @@ SUBROUTINE SetUpSysSizingArrays
                     ZoneOAFracHeating = FinalZoneSizing(CtrlZoneNum)%VozHtgByZone / FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow
                   ENDIF
                 ELSE
-                  ZoneOAFracHeating = 0.0
+                  ZoneOAFracHeating = 0.0d0
                 ENDIF
               ELSE  ! would be error
               ENDIF
             ELSE ! ZoneSum Method
               MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%MinOA
-              ZoneOAFracHeating = 0.0
+              ZoneOAFracHeating = 0.0d0
             END IF
           ELSE
-            ZoneOAFracHeating = 0.0
+            ZoneOAFracHeating = 0.0d0
           END IF
 
           ! Calc maximum zone OA fraction and supply air adjustment factor based
@@ -4123,9 +4159,9 @@ SUBROUTINE SetUpSysSizingArrays
             HtgSupplyAirAdjustFactor = 1.0D0
           ENDIF
 
-          ZoneSA = 0.0
-          ZonePA = 0.0
-          Ep = 1.0
+          ZoneSA = 0.0d0
+          ZonePA = 0.0d0
+          Ep = 1.0d0
           IF (FinalZoneSizing(CtrlZoneNum)%ZoneSecondaryRecirculation > 0.0d0) THEN ! multi-path system
                 !Vpz: "Primary" supply air from main air handler served by an oa mixer
             ZonePA = FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow
@@ -4154,28 +4190,28 @@ SUBROUTINE SetUpSysSizingArrays
           VpzHtgSumBySys(AirLoopNum) = VpzHtgSumBySys(AirLoopNum) + ZonePA
 
           ! Fraction of required zone ventilation to minimum primary airflow expected at condition analyzed
-          FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone = 0
+          FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone = 0.0d0
           IF (VpzMinHtgByZone(CtrlZoneNum) > 0) THEN
             FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone =   &
                MIN(1.0D0, FinalZoneSizing(CtrlZoneNum)%VozHtgByZone / VpzMinHtgByZone(CtrlZoneNum))
           ENDIF
 
           ! calc zone primary air fraction
-          IF (ZoneSA > 0.0) Ep = ZonePA / ZoneSA
-          IF (Ep > 1.0) Ep = 1.0
+          IF (ZoneSA > 0.0d0) Ep = ZonePA / ZoneSA
+          IF (Ep > 1.0d0) Ep = 1.0d0
           FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg = Ep
           FinalZoneSizing(CtrlZoneNum)%ZoneOAFracHeating = ZoneOAFracHeating
         END DO
 
       ELSE ! getting heating flow based values for Std 62.1 report for single path systems
-        ZoneOAFracHeating = 0.0
+        ZoneOAFracHeating = 0.0d0
         DO ZonesHeatedNum=1,NumZonesCooled
           CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesHeatedNum)
 
           ! Voz ventilation airflow required during heating mode
           FinalZoneSizing(CtrlZoneNum)%VozHtgByZone = VbzByZone(CtrlZoneNum) / FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
 
-          IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+          IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
             ! ZoneOAFracHeating = FinalZoneSizing(CtrlZoneNum)%MinOA / FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow
             IF (FinalZoneSizing(CtrlZoneNum)%ZoneSecondaryRecirculation > 0.0d0) THEN ! multi-path system
               ! multi-path system
@@ -4187,7 +4223,7 @@ SUBROUTINE SetUpSysSizingArrays
               ZoneOAFracHeating = FinalZoneSizing(CtrlZoneNum)%VozHtgByZone / FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow
             ENDIF
           ELSE
-            ZoneOAFracHeating = 0.0
+            ZoneOAFracHeating = 0.0d0
           ENDIF
 
           ! Calc maximum zone OA fraction and supply air adjustment factor based
@@ -4226,15 +4262,15 @@ SUBROUTINE SetUpSysSizingArrays
           FinalZoneSizing(CtrlZoneNum)%VozHtgByZone = VbzByZone(CtrlZoneNum) / FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
 
           ! Fraction of required zone ventilation to minimum primary airflow expected at condition analyzed
-          FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone = 0
+          FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone = 0.0d0
           IF (VpzMinHtgByZone(CtrlZoneNum) > 0) THEN
             FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone = FinalZoneSizing(CtrlZoneNum)%VozHtgByZone/ VpzMinHtgByZone(CtrlZoneNum)
           ENDIF
 
           ! calc zone primary air fraction
-          Ep = 1.0
-          IF (ZoneSA > 0.0) Ep = ZonePA / ZoneSA
-          IF (Ep > 1.0) Ep = 1.0
+          Ep = 1.0d0
+          IF (ZoneSA > 0.0d0) Ep = ZonePA / ZoneSA
+          IF (Ep > 1.0d0) Ep = 1.0d0
           FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg = Ep
           FinalZoneSizing(CtrlZoneNum)%ZoneOAFracHeating = ZoneOAFracHeating
         END DO
@@ -4273,15 +4309,15 @@ SUBROUTINE SetUpSysSizingArrays
       CALL PreDefTableEntry(pdchS62svrHtVou,FinalSysSizing(AirLoopNum)%AirPriLoopName,FinalSysSizing(AirLoopNum)%SysUncOA,4)  !Vou
 
       ! clear temporary values for system ventilation parameters report
-      RpPzSum = 0.0
-      RaAzSum = 0.0
-      AzSum = 0.0
-      VbzSum = 0.0
-      VozClgSum = 0.0
-      VozHtgSum = 0.0
-      VdzSum = 0.0
-      VdzHtgSum = 0.0
-      VpzMin = 0
+      RpPzSum = 0.0d0
+      RaAzSum = 0.0d0
+      AzSum = 0.0d0
+      VbzSum = 0.0d0
+      VozClgSum = 0.0d0
+      VozHtgSum = 0.0d0
+      VdzSum = 0.0d0
+      VdzHtgSum = 0.0d0
+      VpzMin = 0.0d0
       DO ZonesCooledNum=1,NumZonesCooled ! loop over cooled zones
         CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
         !Zone Ventilation Parameters
@@ -4300,7 +4336,7 @@ SUBROUTINE SetUpSysSizingArrays
            VbzByZone(CtrlZoneNum),4)       !Vbz
         CALL PreDefTableEntry(pdchS62zvpClEz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
            FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling,3)  !Ez-clg
-        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling .NE. 0.0) THEN
+        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling .NE. 0.0d0) THEN
           CALL PreDefTableEntry(pdchS62zvpClVoz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
              VbzByZone(CtrlZoneNum)/FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling,4)  !Voz-clg
           CALL PreDefTableEntry(pdchS62zcdVozclg,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
@@ -4335,7 +4371,7 @@ SUBROUTINE SetUpSysSizingArrays
       NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
       CALL PreDefTableEntry(pdchS62scdVpzmin,FinalSysSizing(AirLoopNum)%AirPriLoopName,VpzMin,4)           !Vpz-min
 
-      VpzMin = 0
+      VpzMin = 0.0d0
       IF (NumZonesHeated > 0) THEN
         DO ZonesHeatedNum=1,NumZonesHeated ! loop over the heated zones
         CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%HeatCtrlZoneNums(ZonesHeatedNum)
@@ -4361,7 +4397,7 @@ SUBROUTINE SetUpSysSizingArrays
         !Zone Ventilation Parameters
         CALL PreDefTableEntry(pdchS62zvpHtEz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
            FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating,3)  !Ez-htg
-        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating .NE. 0.0) THEN
+        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating .NE. 0.0d0) THEN
           CALL PreDefTableEntry(pdchS62zvpHtVoz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
              VbzByZone(CtrlZoneNum)/FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating,4)  !Voz-htg
           CALL PreDefTableEntry(pdchS62zhdVozhtg,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
@@ -4391,12 +4427,12 @@ SUBROUTINE SetUpSysSizingArrays
         !Zone Ventilation Parameters
         CALL PreDefTableEntry(pdchS62zvpHtEz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &
            FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating,3)  !Ez-htg
-        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating .NE. 0.0) THEN
+        IF (FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating .NE. 0.0d0) THEN
           CALL PreDefTableEntry(pdchS62zvpHtVoz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &    !Voz-htg
                          VbzByZone(CtrlZoneNum)/FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating,4)
           CALL PreDefTableEntry(pdchS62zhdVozhtg,FinalZoneSizing(CtrlZoneNum)%ZoneName,  &     !Voz-htg
                          VbzByZone(CtrlZoneNum)/FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating,4)
-          IF (VpzHtgByZone(CtrlZoneNum) .NE. 0.0) THEN
+          IF (VpzHtgByZone(CtrlZoneNum) .NE. 0.0d0) THEN
             CALL PreDefTableEntry(pdchS62zhdZpz,FinalZoneSizing(CtrlZoneNum)%ZoneName,  & !Zpz = Voz/Vpz (see eq 6-5 in 62.1-2010)
                         (VbzByZone(CtrlZoneNum)/FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating)/VpzHtgByZone(CtrlZoneNum),3)
           END IF
@@ -4407,11 +4443,11 @@ SUBROUTINE SetUpSysSizingArrays
 
       CALL PreDefTableEntry(pdchS62shdVpzmin,FinalSysSizing(AirLoopNum)%AirPriLoopName,VpzMin)           !Vpz-min
       !System Ventilation Parameters
-      IF (PzSumBySysCool(AirLoopNum) .NE. 0.0) THEN
+      IF (PzSumBySysCool(AirLoopNum) .NE. 0.0d0) THEN
         CALL PreDefTableEntry(pdchS62svpRp,FinalSysSizing(AirLoopNum)%AirPriLoopName,RpPzSum/PzSumBySysCool(AirLoopNum),6)
       END IF
       CALL PreDefTableEntry(pdchS62svpPz,FinalSysSizing(AirLoopNum)%AirPriLoopName,PzSumBySysCool(AirLoopNum))
-      IF (AzSum .NE. 0.0) THEN
+      IF (AzSum .NE. 0.0d0) THEN
         CALL PreDefTableEntry(pdchS62svpRa,FinalSysSizing(AirLoopNum)%AirPriLoopName,RaAzSum/AzSum,6)
       END IF
       CALL PreDefTableEntry(pdchS62svpAz,FinalSysSizing(AirLoopNum)%AirPriLoopName,AzSum)
@@ -4530,18 +4566,18 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: EvBySysCool !saved value of SysCoolingEv used in 62.1 tabular report
   REAL(r64)    :: SysHeatingEv       ! System level ventilation effectiveness for heating mode
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: EvBySysHeat !saved value of SysHeatingEv used in 62.1 tabular report
-  REAL(r64) :: Ep = 1.0                ! zone primary air fraction
-  REAL(r64) :: Er = 0.0                ! zone secondary recirculation fraction
-  REAL(r64) :: Fa = 1.0                ! temporary variable used in multi-path VRP calc
+  REAL(r64) :: Ep = 1.0d0                ! zone primary air fraction
+  REAL(r64) :: Er = 0.0d0                ! zone secondary recirculation fraction
+  REAL(r64) :: Fa = 1.0d0                ! temporary variable used in multi-path VRP calc
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FaByZoneCool  !saved value of Fa used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FaByZoneHeat  !saved value of Fa used in 62.1 tabular report
-  REAL(r64) :: Fb = 1.0                ! temporary variable used in multi-path VRP calc
+  REAL(r64) :: Fb = 1.0d0                ! temporary variable used in multi-path VRP calc
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FbByZoneCool  !saved value of Fb used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FbByZoneHeat  !saved value of Fb used in 62.1 tabular report
-  REAL(r64) :: Fc = 1.0                ! temporary variable used in multi-path VRP calc
+  REAL(r64) :: Fc = 1.0d0                ! temporary variable used in multi-path VRP calc
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FcByZoneCool  !saved value of Fc used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: FcByZoneHeat  !saved value of Fc used in 62.1 tabular report
-  REAL(r64) :: Xs = 1.0                ! uncorrected system outdoor air fraction
+  REAL(r64) :: Xs = 1.0d0                ! uncorrected system outdoor air fraction
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: XsBySysCool !saved value of Xs used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: XsBySysHeat !saved value of Xs used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: EvzByZoneCool !saved value of Evz (zone vent effy) used in 62.1 tabular report
@@ -4552,21 +4588,25 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE  :: VotHtgBySys  !saved value of heating ventilation required at primary AHU, used in 62.1 tabular report
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE  :: VozSumClgBySys  !saved value of cooling ventilation required at clg zones
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE  :: VozSumHtgBySys  !saved value of cooling ventilation required at htg zones
-  REAL(r64) :: Evz = 1.0               ! zone ventilation efficiency
-  REAL(r64) :: MinHeatingEvz = 1.0     ! minimum zone ventilation efficiency for heating (to be used as system efficiency)
+  REAL(r64) :: Evz = 1.0d0               ! zone ventilation efficiency
+  REAL(r64) :: MinHeatingEvz = 1.0d0     ! minimum zone ventilation efficiency for heating (to be used as system efficiency)
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: EvzMinBySysHeat !saved value of EvzMin used in 62.1 tabular report
-  REAL(r64) :: MinCoolingEvz = 1.0     ! minimum zone ventilation efficiency for cooling (to be used as system efficiency)
+  REAL(r64) :: MinCoolingEvz = 1.0d0     ! minimum zone ventilation efficiency for cooling (to be used as system efficiency)
   REAL(r64), ALLOCATABLE, DIMENSION(:),SAVE :: EvzMinBySysCool !saved value of EvzMin used in 62.1 tabular report
-  REAL(r64) :: ZoneOAFrac = 0.0        ! zone OA fraction
-  REAL(r64) :: ZoneEz = 1.0            ! zone air distribution effectiveness
+  REAL(r64) :: ZoneOAFrac = 0.0d0        ! zone OA fraction
+  REAL(r64) :: ZoneEz = 1.0d0            ! zone air distribution effectiveness
   REAL(r64) :: Vou = 0.0D0             ! Uncorrected outdoor air intake for all zones per ASHRAE std 62.1
   REAL(r64) :: Vot = 0.0D0             ! Required outdoor air intake at primary AHU per ASHRAE std 62.1
   REAL(r64) :: VotMax = 0.0D0          ! Max of required cooling/heating outdoor air intake at primary AHU per ASHRAE std 62.1
   REAL(r64) :: VozBySys = 0.0D0        ! Sum of zone required outdoor air intake per ASHRAE std 62.1
   REAL(r64) :: Ratio   = 1D0           ! Ratio of VozBySys / VotMax
+! not changing this for the unitary system check in
+!  REAL(r64) :: Ratio   = 1.0d0           ! Ratio of VozBySys / VotMax
   REAL(r64) :: SysHtgPeakAirflow       ! Peak heating airflow
   INTEGER   :: NumZonesForHtg          ! Number of heating zones for given primary system
   INTEGER   :: MatchingCooledZoneNum   ! temporary variable
+  real(r64) :: termunitsizingtempfrac  ! 1.0/(1.0+termunitsizing(ctrlzone)%inducrat)
+  real(r64) :: termunitsizingtemp      ! (1.0+termunitsizing(ctrlzone)%inducrat)
 
   NumOfTimeStepInDay = NumOfTimeStepInHour * 24
 !  NumZonesCooled=0
@@ -4575,45 +4615,45 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
   ! allocate arrays used to store values for standard 62.1 tabular report
   IF (.NOT. ALLOCATED(FaByZoneCool)) THEN
     ALLOCATE (FaByZoneCool(NumOfZones))
-    FaByZoneCool = 0.0
+    FaByZoneCool = 0.0d0
     ALLOCATE (FaByZoneHeat(NumOfZones))
-    FaByZoneHeat = 0.0
+    FaByZoneHeat = 0.0d0
     ALLOCATE (FbByZoneCool(NumOfZones))
-    FbByZoneCool = 0.0
+    FbByZoneCool = 0.0d0
     ALLOCATE (FbByZoneHeat(NumOfZones))
-    FbByZoneHeat = 0.0
+    FbByZoneHeat = 0.0d0
     ALLOCATE (FcByZoneCool(NumOfZones))
-    FcByZoneCool = 0.0
+    FcByZoneCool = 0.0d0
     ALLOCATE (FcByZoneHeat(NumOfZones))
-    FcByZoneHeat = 0.0
+    FcByZoneHeat = 0.0d0
     ALLOCATE (EvBySysCool(NumPrimaryAirSys))
-    EvBySysCool = 1.0
+    EvBySysCool = 1.0d0
     ALLOCATE (EvBySysHeat(NumPrimaryAirSys))
-    EvBySysHeat = 1.0
+    EvBySysHeat = 1.0d0
     ALLOCATE (XsBySysCool(NumPrimaryAirSys))
-    XsBySysCool = 1.0
+    XsBySysCool = 1.0d0
     ALLOCATE (XsBySysHeat(NumPrimaryAirSys))
-    XsBySysHeat = 1.0
+    XsBySysHeat = 1.0d0
     ALLOCATE (EvzByZoneCool(NumOfZones))
-    EvzByZoneCool = 1.0
+    EvzByZoneCool = 1.0d0
     ALLOCATE (EvzByZoneCoolPrev(NumOfZones))
-    EvzByZoneCoolPrev = 1.0
+    EvzByZoneCoolPrev = 1.0d0
     ALLOCATE (EvzByZoneHeat(NumOfZones))
-    EvzByZoneHeat = 1.0
+    EvzByZoneHeat = 1.0d0
     ALLOCATE (EvzByZoneHeatPrev(NumOfZones))
-    EvzByZoneHeatPrev = 1.0
+    EvzByZoneHeatPrev = 1.0d0
     ALLOCATE (EvzMinBySysCool(NumPrimaryAirSys))
-    EvzMinBySysCool = 1.0
+    EvzMinBySysCool = 1.0d0
     ALLOCATE (EvzMinBySysHeat(NumPrimaryAirSys))
-    EvzMinBySysHeat = 1.0
+    EvzMinBySysHeat = 1.0d0
     ALLOCATE (VotClgBySys(NumPrimaryAirSys))
-    VotClgBySys = 0.0
+    VotClgBySys = 0.0d0
     ALLOCATE (VotHtgBySys(NumPrimaryAirSys))
-    VotHtgBySys = 0.0
+    VotHtgBySys = 0.0d0
     ALLOCATE (VozSumClgBySys(NumPrimaryAirSys))
-    VozSumClgBySys = 0.0
+    VozSumClgBySys = 0.0d0
     ALLOCATE (VozSumHtgBySys(NumPrimaryAirSys))
-    VozSumHtgBySys = 0.0
+    VozSumHtgBySys = 0.0d0
   END IF
 
   SELECT CASE (CallIndicator)
@@ -4624,19 +4664,29 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
       ! ZoneEquipmentManager assumes all the air entering the zone goes into the return node.
       DO CtrlZoneNum=1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
+        termunitsizingtemp=(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat)
+        termunitsizingtempfrac=(1.0d0/termunitsizingtemp)
         RetTempRise = ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtCoolPeak - &
                         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtCoolPeak
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtCoolPeak = &
+!            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtCoolPeak + RetTempRise * &
+!           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
           ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtCoolPeak = &
-            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtCoolPeak + RetTempRise * &
-           (1./(1.+TermUnitSizing(CtrlZoneNum)%InducRat))
+            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtCoolPeak +   &
+            RetTempRise * termunitsizingtempfrac
         END IF
         RetTempRise = ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtHeatPeak - &
                         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtHeatPeak
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtHeatPeak = &
+!            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtHeatPeak + RetTempRise * &
+!            (1./(1.+TermUnitSizing(CtrlZoneNum)%InducRat))
           ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtHeatPeak = &
-            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtHeatPeak + RetTempRise * &
-            (1./(1.+TermUnitSizing(CtrlZoneNum)%InducRat))
+            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtHeatPeak +   &
+            RetTempRise * termunitsizingtempfrac
         END IF
       END DO
 
@@ -4680,19 +4730,29 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
       ! ZoneEquipmentManager assumes all the air entering the zone goes into the return node.
       DO CtrlZoneNum=1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
+        termunitsizingtemp=(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat)
+        termunitsizingtempfrac=(1.0d0/termunitsizingtemp)
         RetTempRise = ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepInDay) - &
                         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneTempSeq(TimeStepInDay)
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepInDay) = &
+!            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneTempSeq(TimeStepInDay) + RetTempRise * &
+!           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
           ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepInDay) = &
-            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneTempSeq(TimeStepInDay) + RetTempRise * &
-           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneTempSeq(TimeStepInDay) +   &
+            RetTempRise * termunitsizingtempfrac
         END IF
         RetTempRise = ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepInDay) - &
                         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneTempSeq(TimeStepInDay)
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepInDay) = &
+!            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneTempSeq(TimeStepInDay) + RetTempRise * &
+!           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
           ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepInDay) = &
-            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneTempSeq(TimeStepInDay) + RetTempRise * &
-           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+            ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneTempSeq(TimeStepInDay) +   &
+            RetTempRise * termunitsizingtempfrac
         END IF
       END DO
 
@@ -4701,12 +4761,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
         NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
         NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
 
-        SysCoolRetTemp = 0.0
-        OutAirFrac = 0.0
-        SysCoolMixTemp = 0.0
-        SysSensCoolCap = 0.0
-        SysCoolRetHumRat = 0.0
-        SysCoolMixHumRat = 0.0
+        SysCoolRetTemp = 0.0d0
+        OutAirFrac = 0.0d0
+        SysCoolMixTemp = 0.0d0
+        SysSensCoolCap = 0.0d0
+        SysCoolRetHumRat = 0.0d0
+        SysCoolMixHumRat = 0.0d0
 
         DO ZonesCooledNum=1,NumZonesCooled ! loop over zones cooled by central system
           CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
@@ -4723,7 +4783,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                        / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
         END DO ! end of loop over zones cooled by central system
         ! check that there is system mass flow
-        IF (SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay) > 0.0) THEN
+        IF (SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay) > 0.0d0) THEN
           ! complete return air temp calc
           SysCoolRetTemp = SysCoolRetTemp / SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay)
           SysCoolRetHumRat = SysCoolRetHumRat / SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay)
@@ -4736,11 +4796,11 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                          SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay)
             OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
           ELSE
-            OutAirFrac = 1.0
+            OutAirFrac = 1.0d0
           END IF
           ! now calculate the mixed air temperature
-          SysCoolMixTemp = OutDryBulbTemp*OutAirFrac + SysCoolRetTemp*(1.-OutAirFrac)
-          SysCoolMixHumRat = OutHumRat*OutAirFrac + SysCoolRetHumRat*(1.-OutAirFrac)
+          SysCoolMixTemp = OutDryBulbTemp*OutAirFrac + SysCoolRetTemp*(1.0d0-OutAirFrac)
+          SysCoolMixHumRat = OutHumRat*OutAirFrac + SysCoolRetHumRat*(1.0d0-OutAirFrac)
           SysSizing(AirLoopNum,CurOverallSimDay)%SysCoolOutTempSeq(TimeStepInDay) = OutDryBulbTemp
           SysSizing(AirLoopNum,CurOverallSimDay)%SysCoolOutHumRatSeq(TimeStepInDay) = OutHumRat
           ! From the mixed air temp, system design supply air temp, and the mass flow rate
@@ -4767,12 +4827,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
         SysSizing(AirLoopNum,CurOverallSimDay)%CoinCoolMassFlow = MAX(SysSizing(AirLoopNum,CurOverallSimDay)%CoinCoolMassFlow, &
                                                    SysSizing(AirLoopNum,CurOverallSimDay)%CoolFlowSeq(TimeStepInDay))
 
-        SysHeatRetTemp = 0.0
-        OutAirFrac = 0.0
-        SysHeatMixTemp = 0.0
-        SysHeatCap = 0.0
-        SysHeatRetHumRat = 0.0
-        SysHeatMixHumRat = 0.0
+        SysHeatRetTemp = 0.0d0
+        OutAirFrac = 0.0d0
+        SysHeatMixTemp = 0.0d0
+        SysHeatCap = 0.0d0
+        SysHeatRetHumRat = 0.0d0
+        SysHeatMixHumRat = 0.0d0
 
         IF (NumZonesHeated.GT.0) THEN ! IF there are centrally heated zones
 
@@ -4791,7 +4851,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                            / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
           END DO ! end heated zones loop
           ! check that the system flow rate is nonzero
-          IF (SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) > 0.0) THEN
+          IF (SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) > 0.0d0) THEN
             ! complete return air temp calc
             SysHeatRetTemp = SysHeatRetTemp / SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
             SysHeatRetHumRat = SysHeatRetHumRat / SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
@@ -4804,11 +4864,11 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                              SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
             ! calculate the mixed air temperature
-            SysHeatMixTemp = OutDryBulbTemp*OutAirFrac + SysHeatRetTemp*(1.-OutAirFrac)
-            SysHeatMixHumRat = OutHumRat*OutAirFrac + SysHeatRetHumRat*(1.-OutAirFrac)
+            SysHeatMixTemp = OutDryBulbTemp*OutAirFrac + SysHeatRetTemp*(1.0d0-OutAirFrac)
+            SysHeatMixHumRat = OutHumRat*OutAirFrac + SysHeatRetHumRat*(1.0d0-OutAirFrac)
             SysSizing(AirLoopNum,CurOverallSimDay)%SysHeatOutTempSeq(TimeStepInDay) = OutDryBulbTemp
             SysSizing(AirLoopNum,CurOverallSimDay)%SysHeatOutHumRatSeq(TimeStepInDay) = OutHumRat
             ! From the mixed air temp, heating supply air temp, and mass flow rate calculate the system heating capacity
@@ -4852,7 +4912,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                            / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
           END DO ! end of cooled zones loop
 
-          IF (SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) > 0.0) THEN
+          IF (SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) > 0.0d0) THEN
             ! complete return air temp calc
             SysHeatRetTemp = SysHeatRetTemp / SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
             SysHeatRetHumRat = SysHeatRetHumRat / SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
@@ -4865,11 +4925,11 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                              SysSizing(AirLoopNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay)
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
             ! calculate the mixed air temperature
-            SysHeatMixTemp = OutDryBulbTemp*OutAirFrac + SysHeatRetTemp*(1.-OutAirFrac)
-            SysHeatMixHumRat = OutHumRat*OutAirFrac + SysHeatRetHumRat*(1.-OutAirFrac)
+            SysHeatMixTemp = OutDryBulbTemp*OutAirFrac + SysHeatRetTemp*(1.0d0-OutAirFrac)
+            SysHeatMixHumRat = OutHumRat*OutAirFrac + SysHeatRetHumRat*(1.0d0-OutAirFrac)
             SysSizing(AirLoopNum,CurOverallSimDay)%SysHeatOutTempSeq(TimeStepInDay) = OutDryBulbTemp
             SysSizing(AirLoopNum,CurOverallSimDay)%SysHeatOutHumRatSeq(TimeStepInDay) = OutHumRat
             ! From the mixed air temp, heating supply air temp, and mass flow rate calculate the system heating capacity
@@ -4901,9 +4961,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
     CASE (EndDay)
 
       ! Get design flows
-      SysCoolingEv = 1.0
-      SysHeatingEv = 1.0
+      SysCoolingEv = 1.0d0
+      SysHeatingEv = 1.0d0
       DO AirLoopNum=1,NumPrimaryAirSys
+
+        NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
+        NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
 
         SELECT CASE(SysSizing(AirLoopNum,CurOverallSimDay)%SizingOption)
           CASE(Coincident)
@@ -4926,12 +4989,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               IF (SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow > 0) THEN
                 Xs = MIN(1.0d0,FinalSysSizing(AirLoopNum)%SysUncOA / SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow)
               ELSE
-                Xs = 0.0
+                Xs = 0.0d0
               ENDIF
               IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow > 0) THEN
                 NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
-                MinCoolingEvz = 1.0
-                VozSumClgBySys(AirLoopNum) = 0
+                MinCoolingEvz = 1.0d0
+                VozSumClgBySys(AirLoopNum) = 0.0d0
                 DO ZonesCooledNum=1,NumZonesCooled
                   CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
 
@@ -4940,26 +5003,26 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                   Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFraction
                   ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzClgByZone
                   ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling
-                  IF (Er > 0.0) THEN
+                  IF (Er > 0.0d0) THEN
                     ! multi-path ventilation system using VRP
-                    Fa = Ep + (1.0 - Ep) * Er
+                    Fa = Ep + (1.0d0 - Ep) * Er
                     Fb = Ep
-                    Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                    Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
                     !save Fa Fb and Fc for standard 62.1 report
                     FaByZoneCool(CtrlZoneNum) = Fa
                     FbByZoneCool(CtrlZoneNum) = Fb
                     FcByZoneCool(CtrlZoneNum) = Fc
 
                     ! Calc zone ventilation efficiency
-                    IF (Fa > 0.0) THEN
-                      SysCoolingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                    IF (Fa > 0.0d0) THEN
+                      SysCoolingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                     ELSE
-                      SysCoolingEv = 1.0
+                      SysCoolingEv = 1.0d0
                     ENDIF
 
                   ELSE
                     ! single-path ventilation system
-                    SysCoolingEv = 1.0 + Xs - ZoneOAFrac
+                    SysCoolingEv = 1.0d0 + Xs - ZoneOAFrac
                   ENDIF
                   IF (SysCoolingEv < MinCoolingEvz) MinCoolingEvz = SysCoolingEv
                   EvzByZoneCoolPrev(CtrlZoneNum) = EvzByZoneCool(CtrlZoneNum)    ! Save previous EvzByZoneCool
@@ -5003,7 +5066,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               ! variable will be out of sync with the
               IF (FinalSysSizing(AirLoopNum)%MaxZoneOAFraction > 0 .AND. &
                   FinalSysSizing(AirLoopNum)%HeatAirDesMethod == FromDDCalc) THEN
-                SysHtgPeakAirflow = 0
+                SysHtgPeakAirflow = 0.0d0
                 IF (NumZonesHeated > 0) THEN
                   DO ZonesHeatedNum=1,NumZonesHeated
                     CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%HeatCtrlZoneNums(ZonesHeatedNum)
@@ -5024,13 +5087,13 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                 Xs = MIN(1.0d0,FinalSysSizing(AirLoopNum)%SysUncOA / &
                     MAX(SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow, SysHtgPeakAirflow))
               ELSE
-                Xs = 0.0
+                Xs = 0.0d0
               END IF
 
               IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow > 0) THEN
                 NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
-                MinHeatingEvz = 1.0
-                VozSumHtgBySys(AirLoopNum) = 0
+                MinHeatingEvz = 1.0d0
+                VozSumHtgBySys(AirLoopNum) = 0.0d0
                 IF (NumZonesHeated > 0) THEN
                   DO ZonesHeatedNum=1,NumZonesHeated
                     CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%HeatCtrlZoneNums(ZonesHeatedNum)
@@ -5042,25 +5105,25 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                       Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg
                       ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone
                       ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
-                      IF (Er > 0.0) THEN
+                      IF (Er > 0.0d0) THEN
                         ! multi-path ventilation system using VRP
-                        Fa = Ep + (1.0 - Ep) * Er
+                        Fa = Ep + (1.0d0 - Ep) * Er
                         Fb = Ep
-                        Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                        Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
                         !save Fa Fb and Fc for standard 62.1 report
                         FaByZoneHeat(CtrlZoneNum) = Fa
                         FbByZoneHeat(CtrlZoneNum) = Fb
                         FcByZoneHeat(CtrlZoneNum) = Fc
 
                         ! Calc zone ventilation efficiency
-                        IF (Fa > 0.0) THEN
-                          SysHeatingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                        IF (Fa > 0.0d0) THEN
+                          SysHeatingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                         ELSE
-                          SysHeatingEv = 1.0
+                          SysHeatingEv = 1.0d0
                         ENDIF
                       ELSE
                         ! single-path ventilation system
-                        SysHeatingEv = 1.0 + Xs - ZoneOAFrac
+                        SysHeatingEv = 1.0d0 + Xs - ZoneOAFrac
                       ENDIF
                       IF (SysHeatingEv < MinHeatingEvz) MinHeatingEvz = SysHeatingEv
                       EvzByZoneHeatPrev(CtrlZoneNum) = EvzByZoneHeat(CtrlZoneNum)  ! Save previous EvzByZoneHeat
@@ -5076,25 +5139,25 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                     Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg
                     ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone
                     ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
-                    IF (Er > 0.0) THEN
+                    IF (Er > 0.0d0) THEN
                       ! multi-path ventilation system using VRP
-                      Fa = Ep + (1.0 - Ep) * Er
+                      Fa = Ep + (1.0d0 - Ep) * Er
                       Fb = Ep
-                      Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                      Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
                       !save Fa Fb and Fc for standard 62.1 report
                       FaByZoneHeat(CtrlZoneNum) = Fa
                       FbByZoneHeat(CtrlZoneNum) = Fb
                       FcByZoneHeat(CtrlZoneNum) = Fc
 
                       ! Calc zone ventilation efficiency
-                      IF (Fa > 0.0) THEN
-                        SysHeatingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                      IF (Fa > 0.0d0) THEN
+                        SysHeatingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                       ELSE
-                        SysHeatingEv = 1.0
+                        SysHeatingEv = 1.0d0
                       ENDIF
                     ELSE
                       ! single-path ventilation system
-                      SysHeatingEv = 1.0 + Xs - ZoneOAFrac
+                      SysHeatingEv = 1.0d0 + Xs - ZoneOAFrac
                     ENDIF
                     IF (SysHeatingEv < MinHeatingEvz) MinHeatingEvz = SysHeatingEv
                     EvzByZoneHeatPrev(CtrlZoneNum) = EvzByZoneHeat(CtrlZoneNum)   ! Save previous EvzByZoneHeat
@@ -5155,12 +5218,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               IF (SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow > 0) THEN
                 Xs = MIN(1.0d0,FinalSysSizing(AirLoopNum)%SysUncOA / SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow)
               ELSE
-                Xs = 0.0
+                Xs = 0.0d0
               ENDIF
               IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow > 0) THEN
                 NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
-                MinCoolingEvz = 1.0
-                VozSumClgBySys(AirLoopNum) = 0
+                MinCoolingEvz = 1.0d0
+                VozSumClgBySys(AirLoopNum) = 0.0d0
                 DO ZonesCooledNum=1,NumZonesCooled
                   CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
 
@@ -5169,25 +5232,25 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                   Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFraction
                   ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzClgByZone
                   ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling
-                  IF (Er > 0.0) THEN
+                  IF (Er > 0.0d0) THEN
                     ! multi-path ventilation system using VRP
-                    Fa = Ep + (1.0 - Ep) * Er
+                    Fa = Ep + (1.0d0 - Ep) * Er
                     Fb = Ep
-                    Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                    Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
                     !save Fa Fb and Fc for standard 62.1 report
                     FaByZoneCool(CtrlZoneNum) = Fa
                     FbByZoneCool(CtrlZoneNum) = Fb
                     FcByZoneCool(CtrlZoneNum) = Fc
 
                     ! Calc zone ventilation efficiency
-                    IF (Fa > 0.0) THEN
-                      SysCoolingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                    IF (Fa > 0.0d0) THEN
+                      SysCoolingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                     ELSE
-                      SysCoolingEv = 1.0
+                      SysCoolingEv = 1.0d0
                     ENDIF
                   ELSE
                     ! single-path ventilation system
-                    SysCoolingEv = 1.0 + Xs - ZoneOAFrac
+                    SysCoolingEv = 1.0d0 + Xs - ZoneOAFrac
                   END IF
                   IF (SysCoolingEv < MinCoolingEvz) MinCoolingEvz = SysCoolingEv
                   EvzByZoneCoolPrev(CtrlZoneNum) = EvzByZoneCool(CtrlZoneNum)
@@ -5230,12 +5293,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               IF (SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow > 0) THEN
                 Xs = MIN(1.0d0,FinalSysSizing(AirLoopNum)%SysUncOA / SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow)
               ELSE
-                Xs = 0.0
+                Xs = 0.0d0
               END IF
               IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow > 0) THEN
                 NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
-                MinHeatingEvz = 1.0
-                VozSumHtgBySys(AirLoopNum) = 0
+                MinHeatingEvz = 1.0d0
+                VozSumHtgBySys(AirLoopNum) = 0.0d0
                 IF (NumZonesHeated > 0) THEN
                   DO ZonesHeatedNum=1,NumZonesHeated
                     CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%HeatCtrlZoneNums(ZonesHeatedNum)
@@ -5247,21 +5310,21 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                       Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg
                       ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone
                       ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
-                      IF (Er > 0.0) THEN
+                      IF (Er > 0.0d0) THEN
                         ! multi-path ventilation system using VRP
-                        Fa = Ep + (1.0 - Ep) * Er
+                        Fa = Ep + (1.0d0 - Ep) * Er
                         Fb = Ep
-                        Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                        Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
 
                         ! Calc zone ventilation efficiency
-                        IF (Fa > 0.0) THEN
-                          SysHeatingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                        IF (Fa > 0.0d0) THEN
+                          SysHeatingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                         ELSE
-                          SysHeatingEv = 1.0
+                          SysHeatingEv = 1.0d0
                         END IF
                       ELSE
                         ! single-path ventilation system
-                        SysHeatingEv = 1.0 + Xs - ZoneOAFrac
+                        SysHeatingEv = 1.0d0 + Xs - ZoneOAFrac
                       END IF
                     END IF
                     IF (SysHeatingEv < MinHeatingEvz) MinHeatingEvz = SysHeatingEv
@@ -5278,21 +5341,21 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                     Ep = FinalZoneSizing(CtrlZoneNum)%ZonePrimaryAirFractionHtg
                     ZoneOAFrac = FinalZoneSizing(CtrlZoneNum)%ZpzHtgByZone
                     ZoneEz = FinalZoneSizing(CtrlZoneNum)%ZoneADEffHeating
-                    IF (Er > 0.0) THEN
+                    IF (Er > 0.0d0) THEN
                       ! multi-path ventilation system using VRP
-                      Fa = Ep + (1.0 - Ep) * Er
+                      Fa = Ep + (1.0d0 - Ep) * Er
                       Fb = Ep
-                      Fc = 1.0 - (1.0 - ZoneEz)*(1.0 - Er)*(1.0 - Ep)
+                      Fc = 1.0d0 - (1.0d0 - ZoneEz)*(1.0d0 - Er)*(1.0d0 - Ep)
 
                       ! Calc zone ventilation efficiency
-                      IF (Fa > 0.0) THEN
-                        SysHeatingEv = 1.0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
+                      IF (Fa > 0.0d0) THEN
+                        SysHeatingEv = 1.0d0 + Xs * Fb / Fa - ZoneOAFrac * Ep * Fc / Fa
                       ELSE
-                        SysHeatingEv = 1.0
+                        SysHeatingEv = 1.0d0
                       END IF
                     ELSE
                       ! single-path ventilation system
-                      SysHeatingEv = 1.0 + Xs - ZoneOAFrac
+                      SysHeatingEv = 1.0d0 + Xs - ZoneOAFrac
                     END IF
                     IF (SysHeatingEv < MinHeatingEvz) MinHeatingEvz = SysHeatingEv
                     EvzByZoneHeatPrev(CtrlZoneNum) = EvzByZoneHeat(CtrlZoneNum)     ! Save previous EvzByZoneHeat
@@ -5348,7 +5411,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
              !**Reset zone min ventilation based on max cooling Vot
                 !The system-level Vot will always be larger than the sum of the zone Voz
                 ! and so the zone-level Voz must be prorated so their sum equals the system level Vot
-                Ratio = 1
+                Ratio = 1.0d0
                 IF (VozSumClgBySys(AirLoopNum) > 0) Ratio = VotClgBySys(AirLoopNum)/ VozSumClgBySys(AirLoopNum)
                 DO ZonesCooledNum=1,NumZonesCooled
                    CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
@@ -5363,7 +5426,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
 
                 !The system-level Vot will always be larger than the sum of the zone Voz
                 ! and so the zone-level Voz must be prorated so their sum equals the system level Vot
-                Ratio = 1
+                Ratio = 1.0d0
                 IF (VozSumHtgBySys(AirLoopNum) > 0) Ratio = VotHtgBySys(AirLoopNum)/VozSumHtgBySys(AirLoopNum)
                 DO ZonesHeatedNum=1,NumZonesForHtg
                   IF (NumZonesHeated == 0) THEN
@@ -5385,34 +5448,52 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
       ! ZoneEquipmentManager assumes all the air entering the zone goes into the return node.
       DO CtrlZoneNum=1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
+        termunitsizingtemp=(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat)
+        termunitsizingtempfrac=(1.0d0/termunitsizingtemp)
         RetTempRise = FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtCoolPeak - &
                         FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtCoolPeak = &
+!            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak + RetTempRise * &
+!           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
           FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtCoolPeak = &
-            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak + RetTempRise * &
-           (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak +   &
+            RetTempRise * termunitsizingtempfrac
         END IF
         RetTempRise = FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtHeatPeak - &
                         FinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak
         IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!          FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtHeatPeak = &
+!            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak + RetTempRise * &
+!            (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
           FinalZoneSizing(CtrlZoneNum)%ZoneRetTempAtHeatPeak = &
-            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak + RetTempRise * &
-            (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+            FinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak +  &
+            RetTempRise * termunitsizingtempfrac
         END IF
         DO TimeStepIndex=1,NumOfTimeStepInDay
           RetTempRise = FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) - &
                           FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex)
           IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!            FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = &
+!              FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) + RetTempRise * &
+!             (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
             FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = &
-              FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) + RetTempRise * &
-             (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+              FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) +   &
+              RetTempRise * termunitsizingtempfrac
           END IF
           RetTempRise = FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) - &
                           FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex)
           IF (RetTempRise > 0.01d0) THEN
+!avoid possible compiler bug
+!            FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = &
+!              FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) + RetTempRise * &
+!             (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
             FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = &
-              FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) + RetTempRise * &
-             (1.d0/(1.d0+TermUnitSizing(CtrlZoneNum)%InducRat))
+              FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) +   &
+              RetTempRise * termunitsizingtempfrac
           END IF
         END DO
       END DO
@@ -5475,18 +5556,18 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
 
         NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
         NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
-        SysCoolRetTemp = 0.0
-        OutAirFrac = 0.0
-        SysCoolMixTemp = 0.0
-        SysSensCoolCap = 0.0
+        SysCoolRetTemp = 0.0d0
+        OutAirFrac = 0.0d0
+        SysCoolMixTemp = 0.0d0
+        SysSensCoolCap = 0.0d0
         CoolTimeStepNum = 0
         CoolDDNum = 0
-        OutAirTemp = 0.0
-        OutAirHumRat = 0.0
-        SysCoolMixHumRat = 0.0
-        SysCoolRetHumRat = 0.0
-        SysCoolOutTemp = 0.0
-        SysCoolOutHumRat = 0.0
+        OutAirTemp = 0.0d0
+        OutAirHumRat = 0.0d0
+        SysCoolMixHumRat = 0.0d0
+        SysCoolRetHumRat = 0.0d0
+        SysCoolOutTemp = 0.0d0
+        SysCoolOutHumRat = 0.0d0
 
         DO ZonesCooledNum=1,NumZonesCooled ! loop over cooled zones
           CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
@@ -5494,7 +5575,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           FinalZoneSizing(CtrlZoneNum)%DesCoolCoilInTempTU = CalcSysSizing(AirLoopNum)%CoolSupTemp
           ! save the system cooling supply air hum rat
           FinalZoneSizing(CtrlZoneNum)%DesCoolCoilInHumRatTU = CalcSysSizing(AirLoopNum)%CoolSupHumRat
-          IF (FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow <= 0.0) CYCLE
+          IF (FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow <= 0.0d0) CYCLE
           CalcSysSizing(AirLoopNum)%NonCoinCoolMassFlow = &
             CalcSysSizing(AirLoopNum)%NonCoinCoolMassFlow + &
             FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
@@ -5524,7 +5605,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                          CalcSysSizing(AirLoopNum)%NonCoinCoolMassFlow
             OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
           ELSE
-            OutAirFrac = 1.0
+            OutAirFrac = 1.0d0
           END IF
           SysCoolMixTemp = OutAirTemp*OutAirFrac + SysCoolRetTemp*(1.d0-OutAirFrac)
           SysCoolMixHumRat = OutAirHumRat*OutAirFrac + SysCoolRetHumRat*(1.d0-OutAirFrac)
@@ -5533,18 +5614,18 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           SysSensCoolCap = MAX(0.0d0,SysSensCoolCap)
         END IF
 
-        SysHeatRetTemp = 0.0
-        OutAirFrac = 0.0
-        SysHeatMixTemp = 0.0
-        SysHeatCap = 0.0
+        SysHeatRetTemp = 0.0d0
+        OutAirFrac = 0.0d0
+        SysHeatMixTemp = 0.0d0
+        SysHeatCap = 0.0d0
         HeatTimeStepNum = 0
         HeatDDNum = 0
-        OutAirTemp = 0.0
-        OutAirHumRat = 0.0
-        SysHeatMixHumRat = 0.0
-        SysHeatRetHumRat = 0.0
-        SysHeatOutTemp = 0.0
-        SysHeatOutHumRat = 0.0
+        OutAirTemp = 0.0d0
+        OutAirHumRat = 0.0d0
+        SysHeatMixHumRat = 0.0d0
+        SysHeatRetHumRat = 0.0d0
+        SysHeatOutTemp = 0.0d0
+        SysHeatOutHumRat = 0.0d0
 
         IF (NumZonesHeated.GT.0) THEN ! IF there are centrally heated zones
 
@@ -5554,7 +5635,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
             FinalZoneSizing(CtrlZoneNum)%DesHeatCoilInTempTU = CalcSysSizing(AirLoopNum)%HeatSupTemp
             ! save the system heating supply air hum rat
             FinalZoneSizing(CtrlZoneNum)%DesHeatCoilInHumRatTU= CalcSysSizing(AirLoopNum)%HeatSupHumRat
-            IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow <= 0.0) CYCLE
+            IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow <= 0.0d0) CYCLE
             CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow = &
               CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow + &
               FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
@@ -5571,7 +5652,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
             OutAirHumRat = OutAirHumRat + DesDayWeath(HeatDDNum)%HumRat(HeatTimeStepNum) * &
                              FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
           END DO
-          IF ( CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow > 0.0 ) THEN
+          IF ( CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow > 0.0d0 ) THEN
             SysHeatRetTemp = SysHeatRetTemp / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
             SysHeatRetHumRat = SysHeatRetHumRat / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
             OutAirTemp = OutAirTemp / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
@@ -5584,10 +5665,10 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                            CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
-            SysHeatMixTemp = OutAirTemp*OutAirFrac + SysHeatRetTemp*(1.-OutAirFrac)
-            SysHeatMixHumRat = OutAirHumRat*OutAirFrac + SysHeatRetHumRat*(1.-OutAirFrac)
+            SysHeatMixTemp = OutAirTemp*OutAirFrac + SysHeatRetTemp*(1.0d0-OutAirFrac)
+            SysHeatMixHumRat = OutAirHumRat*OutAirFrac + SysHeatRetHumRat*(1.0d0-OutAirFrac)
             SysHeatCap = PsyCpAirFnWTdb(constant_zero,constant_twenty) * CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow * &
                               (CalcSysSizing(AirLoopNum)%HeatSupTemp - SysHeatMixTemp)
             SysHeatCap = MAX(0.0d0,SysHeatCap)
@@ -5601,7 +5682,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
             FinalZoneSizing(CtrlZoneNum)%DesHeatCoilInTempTU = CalcSysSizing(AirLoopNum)%HeatSupTemp
             ! save the system heating supply air hum rat
             FinalZoneSizing(CtrlZoneNum)%DesHeatCoilInHumRatTU = CalcSysSizing(AirLoopNum)%HeatSupHumRat
-            IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow <= 0.0) CYCLE
+            IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow <= 0.0d0) CYCLE
             CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow = &
               CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow + &
               FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
@@ -5618,7 +5699,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
             OutAirHumRat = OutAirHumRat + DesDayWeath(HeatDDNum)%HumRat(HeatTimeStepNum) * &
                              FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow / (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
           END DO
-          IF ( CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow > 0.0 ) THEN
+          IF ( CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow > 0.0d0 ) THEN
             SysHeatRetTemp = SysHeatRetTemp / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
             SysHeatRetHumRat = SysHeatRetHumRat / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
             OutAirTemp = OutAirTemp / CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
@@ -5631,7 +5712,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                            CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
             SysHeatMixTemp = OutAirTemp*OutAirFrac + SysHeatRetTemp*(1.d0-OutAirFrac)
             SysHeatMixHumRat = OutAirHumRat*OutAirFrac + SysHeatRetHumRat*(1.d0-OutAirFrac)
@@ -5645,7 +5726,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
         ! move the noncoincident results into the system sizing array
         IF (CalcSysSizing(AirLoopNum)%SizingOption == NonCoincident) THEN
           ! But first check to see if the noncoincident result is actually bigger than the coincident (for 100% outside air)
-          IF ( .not. (FinalSysSizing(AirLoopNum)%CoolOAOption == 1 .and. SysSensCoolCap <= 0.0)) THEN
+          IF ( .not. (FinalSysSizing(AirLoopNum)%CoolOAOption == 1 .and. SysSensCoolCap <= 0.0d0)) THEN
             CalcSysSizing(AirLoopNum)%SensCoolCap = SysSensCoolCap
             CalcSysSizing(AirLoopNum)%CoolMixTemp = SysCoolMixTemp
             CalcSysSizing(AirLoopNum)%CoolRetTemp = SysCoolRetTemp
@@ -5655,7 +5736,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
             CalcSysSizing(AirLoopNum)%CoolOutHumRat = SysCoolOutHumRat
           END IF
           ! check to see is the noncoincident result is actually bigger than the coincident (for 100% outside air)
-          IF ( .not. (FinalSysSizing(AirLoopNum)%HeatOAOption == 1 .and. SysHeatCap < 0.0)) THEN
+          IF ( .not. (FinalSysSizing(AirLoopNum)%HeatOAOption == 1 .and. SysHeatCap < 0.0d0)) THEN
             CalcSysSizing(AirLoopNum)%HeatCap = SysHeatCap
             CalcSysSizing(AirLoopNum)%HeatMixTemp = SysHeatMixTemp
             CalcSysSizing(AirLoopNum)%HeatRetTemp = SysHeatRetTemp
@@ -5737,34 +5818,34 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
         NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
         NumZonesHeated = AirToZoneNodeInfo(AirLoopNum)%NumZonesHeated
         RhoAir = StdRhoAir
-        SysCoolSizingRat = 0.0
+        SysCoolSizingRat = 0.0d0
         IF (CalcSysSizing(AirLoopNum)%InpDesCoolAirFlow > 0.0 .AND. &
             CalcSysSizing(AirLoopNum)%DesCoolVolFlow > 0.0 .AND. &
             CalcSysSizing(AirLoopNum)%CoolAirDesMethod == InpDesAirFlow) THEN
           SysCoolSizingRat = CalcSysSizing(AirLoopNum)%InpDesCoolAirFlow / &
             CalcSysSizing(AirLoopNum)%DesCoolVolFlow
         ELSE
-          SysCoolSizingRat = 1.0
+          SysCoolSizingRat = 1.0d0
         END IF
 
-        SysHeatSizingRat = 0.0
+        SysHeatSizingRat = 0.0d0
         IF (CalcSysSizing(AirLoopNum)%InpDesHeatAirFlow > 0.0 .AND. &
             CalcSysSizing(AirLoopNum)%DesHeatVolFlow > 0.0 .AND. &
             CalcSysSizing(AirLoopNum)%HeatAirDesMethod == InpDesAirFlow) THEN
           SysHeatSizingRat = CalcSysSizing(AirLoopNum)%InpDesHeatAirFlow / &
             CalcSysSizing(AirLoopNum)%DesHeatVolFlow
         ELSE
-          SysHeatSizingRat = 1.0
+          SysHeatSizingRat = 1.0d0
         END IF
 
-        IF (CalcSysSizing(AirLoopNum)%LoadSizeType == Ventilation .AND. SysCoolSizingRat == 1.0) THEN
+        IF (CalcSysSizing(AirLoopNum)%LoadSizeType == Ventilation .AND. SysCoolSizingRat == 1.0d0) THEN
           IF (CalcSysSizing(AirLoopNum)%DesCoolVolFlow > 0.d0) THEN
             SysCoolSizingRat = CalcSysSizing(AirLoopNum)%DesOutAirVolFlow / CalcSysSizing(AirLoopNum)%DesCoolVolFlow
           ELSE
             SysCoolSizingRat = 1.d0
           ENDIF
         END IF
-        IF (CalcSysSizing(AirLoopNum)%LoadSizeType == Ventilation .AND. SysHeatSizingRat == 1.0) THEN
+        IF (CalcSysSizing(AirLoopNum)%LoadSizeType == Ventilation .AND. SysHeatSizingRat == 1.0d0) THEN
           IF ( CalcSysSizing(AirLoopNum)%DesHeatVolFlow > 0.d0 ) THEN
             SysHeatSizingRat = CalcSysSizing(AirLoopNum)%DesOutAirVolFlow / CalcSysSizing(AirLoopNum)%DesHeatVolFlow
           ELSE
@@ -5773,17 +5854,17 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
         END IF
 
         ! Calculate the new user modified system design quantities
-        IF (ABS(SysCoolSizingRat-1.0) > .00001d0) THEN
+        IF (ABS(SysCoolSizingRat-1.0d0) > .00001d0) THEN
 
           FinalSysSizing(AirLoopNum)%CoinCoolMassFlow = SysCoolSizingRat*CalcSysSizing(AirLoopNum)%CoinCoolMassFlow
           FinalSysSizing(AirLoopNum)%NonCoinCoolMassFlow = SysCoolSizingRat*CalcSysSizing(AirLoopNum)%NonCoinCoolMassFlow
           FinalSysSizing(AirLoopNum)%DesCoolVolFlow = SysCoolSizingRat*CalcSysSizing(AirLoopNum)%DesCoolVolFlow
 
-          IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlow > 0.0) THEN
+          IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlow > 0.0d0) THEN
 
             DO TimeStepIndex=1,NumOfTimeStepInDay
 
-              IF (CalcSysSizing(AirLoopNum)%CoolFlowSeq(TimeStepIndex) > 0.0) THEN
+              IF (CalcSysSizing(AirLoopNum)%CoolFlowSeq(TimeStepIndex) > 0.0d0) THEN
 
                 FinalSysSizing(AirLoopNum)%CoolFlowSeq(TimeStepIndex) = &
                   SysCoolSizingRat*CalcSysSizing(AirLoopNum)%CoolFlowSeq(TimeStepIndex)
@@ -5792,7 +5873,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                  FinalSysSizing(AirLoopNum)%CoolFlowSeq(TimeStepIndex)
                   OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
                 ELSE
-                  OutAirFrac = 1.0
+                  OutAirFrac = 1.0d0
                 END IF
                 SysCoolMixTemp = FinalSysSizing(AirLoopNum)%SysCoolOutTempSeq(TimeStepIndex)*OutAirFrac + &
                                    FinalSysSizing(AirLoopNum)%SysCoolRetTempSeq(TimeStepIndex)*(1.d0-OutAirFrac)
@@ -5812,7 +5893,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               OutAirFrac = FinalSysSizing(AirLoopNum)%DesOutAirVolFlow / FinalSysSizing(AirLoopNum)%DesCoolVolFlow
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
             FinalSysSizing(AirLoopNum)%CoolMixTemp = FinalSysSizing(AirLoopNum)%CoolOutTemp*OutAirFrac + &
                                                       FinalSysSizing(AirLoopNum)%CoolRetTemp*(1.d0-OutAirFrac)
@@ -5828,8 +5909,8 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           ! take account of the user input system flow rates and alter the zone flow rates to match
           DO ZonesCooledNum=1,NumZonesCooled
             CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
-            IF ((SysCoolSizingRat .NE. 1.0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
-                (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0)) THEN
+            IF ((SysCoolSizingRat .NE. 1.0d0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
+                (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0d0)) THEN
               ! size on ventilation load
               ZoneOARatio = FinalZoneSizing(CtrlZoneNum)%MinOA /   &
                                MAX(FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow,FinalZoneSizing(CtrlZoneNum)%MinOA)
@@ -5843,8 +5924,8 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                                                    * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
               TermUnitFinalZoneSizing(CtrlZoneNum)%CoolLoadSeq = FinalZoneSizing(CtrlZoneNum)%CoolLoadSeq * ZoneOARatio &
                                                                    * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
-            ELSE IF ( (SysCoolSizingRat > 1.0) .OR. &
-                      (SysCoolSizingRat < 1.0 .AND. FinalSysSizing(AirLoopNum)%SizingOption == NonCoincident) ) THEN
+            ELSE IF ( (SysCoolSizingRat > 1.0d0) .OR. &
+                      (SysCoolSizingRat < 1.0d0 .AND. FinalSysSizing(AirLoopNum)%SizingOption == NonCoincident) ) THEN
               ! size on user input system design flows
               TermUnitFinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow =   &
                                      FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow * SysCoolSizingRat
@@ -5864,11 +5945,11 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           FinalSysSizing(AirLoopNum)%NonCoinHeatMassFlow = SysHeatSizingRat*CalcSysSizing(AirLoopNum)%NonCoinHeatMassFlow
           FinalSysSizing(AirLoopNum)%DesHeatVolFlow = SysHeatSizingRat*CalcSysSizing(AirLoopNum)%DesHeatVolFlow
 
-          IF (FinalSysSizing(AirLoopNum)%DesHeatVolFlow > 0.0) THEN
+          IF (FinalSysSizing(AirLoopNum)%DesHeatVolFlow > 0.0d0) THEN
 
             DO TimeStepIndex=1,NumOfTimeStepInDay
 
-              IF (CalcSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex) > 0.0) THEN
+              IF (CalcSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex) > 0.0d0) THEN
 
                 FinalSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex) = &
                   SysHeatSizingRat*CalcSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex)
@@ -5877,12 +5958,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                  FinalSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex)
                   OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
                 ELSE
-                  OutAirFrac = 1.0
+                  OutAirFrac = 1.0d0
                 END IF
                 SysHeatMixTemp = FinalSysSizing(AirLoopNum)%SysHeatOutTempSeq(TimeStepIndex)*OutAirFrac + &
-                                   FinalSysSizing(AirLoopNum)%SysHeatRetTempSeq(TimeStepIndex)*(1.-OutAirFrac)
+                                   FinalSysSizing(AirLoopNum)%SysHeatRetTempSeq(TimeStepIndex)*(1.0d0-OutAirFrac)
                 SysHeatMixHumRat = FinalSysSizing(AirLoopNum)%SysHeatOutHumRatSeq(TimeStepIndex)*OutAirFrac + &
-                                     FinalSysSizing(AirLoopNum)%SysHeatRetHumRatSeq(TimeStepIndex)*(1.-OutAirFrac)
+                                     FinalSysSizing(AirLoopNum)%SysHeatRetHumRatSeq(TimeStepIndex)*(1.0d0-OutAirFrac)
                 SysHeatCap = PsyCpAirFnWTdb(constant_zero,constant_twenty) *   &
                                 FinalSysSizing(AirLoopNum)%HeatFlowSeq(TimeStepIndex) * &
                                (FinalSysSizing(AirLoopNum)%HeatSupTemp - SysHeatMixTemp)
@@ -5897,7 +5978,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
               OutAirFrac = FinalSysSizing(AirLoopNum)%DesOutAirVolFlow / FinalSysSizing(AirLoopNum)%DesHeatVolFlow
               OutAirFrac = MIN(1.0d0,MAX(0.0d0,OutAirFrac))
             ELSE
-              OutAirFrac = 1.0
+              OutAirFrac = 1.0d0
             END IF
             FinalSysSizing(AirLoopNum)%HeatMixTemp = FinalSysSizing(AirLoopNum)%HeatOutTemp*OutAirFrac + &
                                                   FinalSysSizing(AirLoopNum)%HeatRetTemp*(1.d0-OutAirFrac)
@@ -5913,8 +5994,8 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           IF (NumZonesHeated.GT.0) THEN ! IF there are centrally heated zones
             DO ZonesHeatedNum=1,NumZonesHeated ! loop over the heated zones
               CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%HeatCtrlZoneNums(ZonesHeatedNum)
-              IF ((SysHeatSizingRat .NE. 1.0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
-                  (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0)) THEN
+              IF ((SysHeatSizingRat .NE. 1.0d0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
+                  (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0d0)) THEN
                 ZoneOARatio = FinalZoneSizing(CtrlZoneNum)%MinOA /   &
                                      MAX(FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow,FinalZoneSizing(CtrlZoneNum)%MinOA)
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow = FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow &
@@ -5927,8 +6008,8 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                                        * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
                 TermUnitFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq = FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq * ZoneOARatio &
                                                        * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
-              ELSE IF ( (SysHeatSizingRat > 1.0) .OR. &
-                        (SysHeatSizingRat < 1.0 .AND. FinalSysSizing(AirLoopNum)%SizingOption == NonCoincident) ) THEN
+              ELSE IF ( (SysHeatSizingRat > 1.0d0) .OR. &
+                        (SysHeatSizingRat < 1.0d0 .AND. FinalSysSizing(AirLoopNum)%SizingOption == NonCoincident) ) THEN
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow =   &
                                         FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow * SysHeatSizingRat
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow =   &
@@ -5941,15 +6022,15 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           ELSE ! No centrally heated zones: use cooled zones
             DO ZonesCooledNum=1,NumZonesCooled ! loop over the cooled zones
               CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
-              IF ((SysHeatSizingRat .NE. 1.0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
-                  (FinalZoneSizing(CtrlZoneNum)%MinOA <= 0.0)) THEN
+              IF ((SysHeatSizingRat .NE. 1.0d0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
+                  (FinalZoneSizing(CtrlZoneNum)%MinOA <= 0.0d0)) THEN
                 CALL ShowWarningError('FinalSystemSizing: AirLoop="'//trim(AirToZoneNodeInfo(AirLoopNum)%AirLoopName)//  &
                    '", Requested sizing on Ventilation,')
                 CALL ShowContinueError('but Zone has no design OA Flow. Zone="'//  &
                    trim(ZoneEquipConfig(CtrlZoneNum)%ZoneName)//'".')
               ENDIF
-              IF ((SysHeatSizingRat .NE. 1.0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
-                  (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0)) THEN
+              IF ((SysHeatSizingRat .NE. 1.0d0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
+                  (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0d0)) THEN
                 ZoneOARatio = FinalZoneSizing(CtrlZoneNum)%MinOA /   &
                                         MAX(FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow,FinalZoneSizing(CtrlZoneNum)%MinOA)
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow = FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow * ZoneOARatio &
@@ -5962,8 +6043,8 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                                                                      * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
                 TermUnitFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq = FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq * ZoneOARatio &
                                                                      * (1.d0 + TermUnitSizing(CtrlZoneNum)%InducRat)
-              ELSE  IF ((SysHeatSizingRat .NE. 1.0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
-                        (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0)) THEN
+              ELSE  IF ((SysHeatSizingRat .NE. 1.0d0) .AND. (FinalSysSizing(AirLoopNum)%LoadSizeType == Ventilation) .AND. &
+                        (FinalZoneSizing(CtrlZoneNum)%MinOA > 0.0d0)) THEN
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow =   &
                                         FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow * SysHeatSizingRat
                 TermUnitFinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow =   &
@@ -5987,7 +6068,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
           FinalSysSizing(AirLoopNum)%DesCoolVolFlowMin = FinalSysSizing(AirLoopNum)%DesCoolVolFlowMin +   &
              FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlowMin
         END DO
-        IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlowMin <= 0.0) THEN
+        IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlowMin <= 0.0d0) THEN
           FinalSysSizing(AirLoopNum)%DesCoolVolFlowMin = FinalSysSizing(AirLoopNum)%DesOutAirVolFlow
         END IF
       END DO
@@ -6091,7 +6172,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
              EvzMinBySysHeat(AirLoopNum),3)   !Ev
           CALL PreDefTableEntry(pdchS62svrHtVot,FinalSysSizing(AirLoopNum)%AirPriLoopName,  &
              VotHtgBySys(AirLoopNum),4)    !Vot
-          IF (FinalSysSizing(AirLoopNum)%DesHeatVolFlow .NE. 0.) THEN     ! Move here from other routine
+          IF (FinalSysSizing(AirLoopNum)%DesHeatVolFlow .NE. 0.0d0) THEN     ! Move here from other routine
             CALL PreDefTableEntry(pdchS62svrHtPercOA,FinalSysSizing(AirLoopNum)%AirPriLoopName, &
                   VotHtgBySys(AirLoopNum) / FinalSysSizing(AirLoopNum)%DesHeatVolFlow)  !%OA
           END IF
@@ -6102,7 +6183,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
              EvzMinBySysCool(AirLoopNum),3)   !Evz-min
           CALL PreDefTableEntry(pdchS62svrClVot,FinalSysSizing(AirLoopNum)%AirPriLoopName,  &
              VotClgBySys(AirLoopNum),4)              !Vot
-          IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlow .NE. 0.) THEN    ! Move here
+          IF (FinalSysSizing(AirLoopNum)%DesCoolVolFlow .NE. 0.0d0) THEN    ! Move here
             CALL PreDefTableEntry(pdchS62svrClPercOA,FinalSysSizing(AirLoopNum)%AirPriLoopName, &
                 VotClgBySys(AirLoopNum) / FinalSysSizing(AirLoopNum)%DesCoolVolFlow)  !%OA
           END IF

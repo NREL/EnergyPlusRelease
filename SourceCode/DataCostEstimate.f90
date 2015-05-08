@@ -31,25 +31,25 @@ TYPE                   :: CostLineItemStruct
   CHARACTER(len=MaxNameLength) :: ParentObjName = '' ! parent instance in IDF
   CHARACTER(len=MaxNameLength) :: ParentObjKey  = '' ! end use key for parent object
   INTEGER :: ParentObjIDinList  = 1  !
-  REAL(r64)    :: PerSquareMeter     = 0.0 ! cost per square meter
-  REAL(r64)    :: PerEach            = 0.0 ! cost per each
-  REAL(r64)    :: PerKiloWattCap     = 0.0 ! cost per kW of nominal capacity
-  REAL(r64)    :: PerKWCapPerCOP     = 0.0 ! cost per kW of nominal capacity per COP
-  REAL(r64)    :: PerCubicMeter      = 0.0 ! cost per cubic meter
-  REAL(r64)    :: PerCubMeterPerSec  = 0.0 ! cost per cubic meter per second
-  REAL(r64)    :: PerUAinWattperDelK = 0.0 ! cost per (UA) in Watt/deltaK
-!  REAL(r64)    :: AnnualMaintFract   = 0.0 ! cost for annual service and non energy consumables
-!  REAL(r64)    :: MinorOverhallFract = 0.0 ! cost for minor overhalls
+  REAL(r64)    :: PerSquareMeter     = 0.0d0 ! cost per square meter
+  REAL(r64)    :: PerEach            = 0.0d0 ! cost per each
+  REAL(r64)    :: PerKiloWattCap     = 0.0d0 ! cost per kW of nominal capacity
+  REAL(r64)    :: PerKWCapPerCOP     = 0.0d0 ! cost per kW of nominal capacity per COP
+  REAL(r64)    :: PerCubicMeter      = 0.0d0 ! cost per cubic meter
+  REAL(r64)    :: PerCubMeterPerSec  = 0.0d0 ! cost per cubic meter per second
+  REAL(r64)    :: PerUAinWattperDelK = 0.0d0 ! cost per (UA) in Watt/deltaK
+!  REAL(r64)    :: AnnualMaintFract   = 0.0d0 ! cost for annual service and non energy consumables
+!  REAL(r64)    :: MinorOverhallFract = 0.0d0 ! cost for minor overhalls
 !  INTEGER :: MinorOverhallYears = 0   ! year interval for minor overhalls
-!  REAL(r64)    :: MajorOverhallFract = 0.0 ! cost for major overhall
+!  REAL(r64)    :: MajorOverhallFract = 0.0d0 ! cost for major overhall
 !  INTEGER :: MajorOverhallYears = 0   ! year interval for major overhalls
 !  INTEGER :: LifeYears          = 0.0 ! expected life in years
-!  REAL(r64)    :: ValueAtReplacement = 0.0 ! residual value at end of life
+!  REAL(r64)    :: ValueAtReplacement = 0.0d0 ! residual value at end of life
   INTEGER :: LineNumber         = -1  ! number of line item in detail list
-  REAL(r64)    :: Qty                = 0.0 ! quantity in calculations (can be input)
+  REAL(r64)    :: Qty                = 0.0d0 ! quantity in calculations (can be input)
   Character(len=MaxNameLength)  :: Units = ''! Reported units
-  REAL(r64)    :: ValuePer           = 0.0 ! Cost used in final calculation
-  REAL(r64)    :: LineSubTotal       = 0.0 ! line item total  Qty * ValuePer
+  REAL(r64)    :: ValuePer           = 0.0d0 ! Cost used in final calculation
+  REAL(r64)    :: LineSubTotal       = 0.0d0 ! line item total  Qty * ValuePer
 END TYPE CostLineItemStruct
 
 TYPE  :: CostAdjustmentStruct
@@ -71,9 +71,27 @@ END TYPE CostAdjustmentStruct
 TYPE (CostLineItemStruct), ALLOCATABLE, DIMENSION(:) :: CostLineItem
 
  ! CurntBldg holds results for current bldg. cost estimate
-TYPE (CostAdjustmentStruct) :: CurntBldg  =CostAdjustmentStruct(0.,0.,0.,0.,0.,0.,0.,1.,0.)
+TYPE (CostAdjustmentStruct),SAVE :: CurntBldg  =CostAdjustmentStruct  &
+   (0.0d0,  &   ! holds total from line item cost calculations
+    0.0d0,  &   ! holds user-defined constant cost model
+    0.0d0,  &   ! holds user-defined fraction for design fees
+    0.0d0,  &   ! holds user-defined fraction for contractor fees
+    0.0d0,  &   ! holds user-defined fraction for contingencies
+    0.0d0,  &   ! holds user-defined fraction for bonding costs
+    0.0d0,  &   ! holds user-defined fraction for commissioning costs
+    1.0d0,  &   ! holds user-defined multiplier to account for regional diffs
+    0.0d0)      ! the Grand Total of all line items plus all other costs
  ! RefrnceBldg holds user input for comparison.
-TYPE (CostAdjustmentStruct) :: RefrncBldg =CostAdjustmentStruct(0.,0.,0.,0.,0.,0.,0.,1.,0.)
+TYPE (CostAdjustmentStruct),SAVE :: RefrncBldg =CostAdjustmentStruct  &
+   (0.0d0,  &   ! holds total from line item cost calculations
+    0.0d0,  &   ! holds user-defined constant cost model
+    0.0d0,  &   ! holds user-defined fraction for design fees
+    0.0d0,  &   ! holds user-defined fraction for contractor fees
+    0.0d0,  &   ! holds user-defined fraction for contingencies
+    0.0d0,  &   ! holds user-defined fraction for bonding costs
+    0.0d0,  &   ! holds user-defined fraction for commissioning costs
+    1.0d0,  &   ! holds user-defined multiplier to account for regional diffs
+    0.0d0)      ! the Grand Total of all line items plus all other costs
 
 INTEGER  :: NumLineItems=0  ! number of cost estimate line items
 LOGICAL  :: DoCostEstimate   = .FALSE. !set to true if any cost estimating needed

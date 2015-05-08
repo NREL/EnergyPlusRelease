@@ -80,10 +80,10 @@ TYPE GenData
   CHARACTER(len=MaxNameLength) :: TypeOf             = ' ' ! equipment type
   INTEGER                      :: CompType_Num       = 0  ! Numeric designator for CompType (TypeOf)
   INTEGER                      :: GeneratorIndex     = 0
-  REAL(r64)                    :: MaxPowerOut        = 0.0 ! Maximum Power Output (W)
+  REAL(r64)                    :: MaxPowerOut        = 0.0d0 ! Maximum Power Output (W)
   CHARACTER(len=MaxNameLength) :: AvailSched         = ' ' ! Operation Schedule.
   INTEGER                      :: AvailSchedPtr      = 0   ! pointer to operation schedule
-  REAL(r64)                    :: PowerRequestThisTimestep   = 0.0 ! Current Demand on Equipment (W)
+  REAL(r64)                    :: PowerRequestThisTimestep   = 0.0d0 ! Current Demand on Equipment (W)
   LOGICAL                      :: ONThisTimestep     =.false. !Indicator whether Generator on
   REAL(r64)                    :: EMSPowerRequest    = 0.0D0 ! EMS actuator for current demand on equipment (W)
   LOGICAL                      :: EMSRequestOn       = .FALSE. ! EMS actuating On if true.
@@ -93,14 +93,14 @@ TYPE GenData
   INTEGER                      :: LoopSideNum        = 0 ! Cogen: pointer to plant loop data structure
   INTEGER                      :: BranchNum          = 0 ! Cogen: pointer to plant loop data structure
   INTEGER                      :: CompNum            = 0 ! Cogen: pointer to plant loop data structure
-  REAL(r64)                    :: NominalThermElectRatio  = 0.0 ! Cogen: nominal ratio of thermal to elect production
+  REAL(r64)                    :: NominalThermElectRatio  = 0.0d0 ! Cogen: nominal ratio of thermal to elect production
   !results of component models for load center reporting
-  REAL(r64)                    :: DCElectricityProd    = 0.0 ! Current DC Electric Produced from Equipment (J)
-  REAL(r64)                    :: DCElectProdRate      = 0.0 ! Current DC Electric Production Rate from Equipment (W)
-  REAL(r64)                    :: ElectricityProd      = 0.0 ! Current AC Electric Produced from Equipment (J)
-  REAL(r64)                    :: ElectProdRate        = 0.0 ! Current AC Electric Production Rate from Equipment (W)
-  REAL(r64)                    :: ThermalProd          = 0.0 ! Current Thermal energy Produced from Equipment (J)
-  REAL(r64)                    :: ThermalProdRate      = 0.0 ! Current Thermal energy Production Rate from Equipment (W)
+  REAL(r64)                    :: DCElectricityProd    = 0.0d0 ! Current DC Electric Produced from Equipment (J)
+  REAL(r64)                    :: DCElectProdRate      = 0.0d0 ! Current DC Electric Production Rate from Equipment (W)
+  REAL(r64)                    :: ElectricityProd      = 0.0d0 ! Current AC Electric Produced from Equipment (J)
+  REAL(r64)                    :: ElectProdRate        = 0.0d0 ! Current AC Electric Production Rate from Equipment (W)
+  REAL(r64)                    :: ThermalProd          = 0.0d0 ! Current Thermal energy Produced from Equipment (J)
+  REAL(r64)                    :: ThermalProdRate      = 0.0d0 ! Current Thermal energy Production Rate from Equipment (W)
 
 END TYPE GenData
 
@@ -114,7 +114,7 @@ TYPE ElectricPowerLoadCenter
   CHARACTER(len=MaxNameLength) :: GenerationMeterName= ' ' ! Name of Generated Energy Meter for "on demand" operation
   INTEGER                      :: NumGenerators      = 0   ! Number of Generators
   TYPE(GenData), ALLOCATABLE, DIMENSION(:) :: ElecGen          ! pointer to generator
-  REAL(r64)                    :: DemandLimit        = 0.0 ! Demand Limit in Watts(W) which the generator will operate above
+  REAL(r64)                    :: DemandLimit        = 0.0d0 ! Demand Limit in Watts(W) which the generator will operate above
   INTEGER                      :: TrackSchedPtr      = 0   ! "pointer" to schedule for electrical demand to meet.
 
   INTEGER                      :: BussType           = 0   ! is this load center powered by AC or DC generators
@@ -133,13 +133,13 @@ TYPE ElectricPowerLoadCenter
   CHARACTER(len=MaxNameLength) :: TransformerName    = ' ' ! hold name for verificaton and error messages
   INTEGER                      :: TransformerModelNum= 0   ! simulation model parameter type
 
-  REAL(r64)                    :: ElectricityProd    = 0.0 ! Current AC Electric Produced from Equipment (J)
-  REAL(r64)                    :: ElectProdRate      = 0.0 ! Current Electric Production Rate from Equipment (W)
-  REAL(r64)                    :: ThermalProd        = 0.0 ! Current Thermal energy Produced from Equipment (J)
-  REAL(r64)                    :: ThermalProdRate    = 0.0 ! Current Thermal energy Production Rate from Equipment (W)
-  REAL(r64)                    :: TotalPowerRequest  = 0.0 ! Total electric power request from the load center (W)
-  REAL(r64)                    :: TotalThermalPowerRequest  = 0.0 ! Total thermal power request from the load center (W)
-  REAL(r64)                    :: ElectDemand        = 0.0 ! Current electric power demand on the load center (W)
+  REAL(r64)                    :: ElectricityProd    = 0.0d0 ! Current AC Electric Produced from Equipment (J)
+  REAL(r64)                    :: ElectProdRate      = 0.0d0 ! Current Electric Production Rate from Equipment (W)
+  REAL(r64)                    :: ThermalProd        = 0.0d0 ! Current Thermal energy Produced from Equipment (J)
+  REAL(r64)                    :: ThermalProdRate    = 0.0d0 ! Current Thermal energy Production Rate from Equipment (W)
+  REAL(r64)                    :: TotalPowerRequest  = 0.0d0 ! Total electric power request from the load center (W)
+  REAL(r64)                    :: TotalThermalPowerRequest  = 0.0d0 ! Total thermal power request from the load center (W)
+  REAL(r64)                    :: ElectDemand        = 0.0d0 ! Current electric power demand on the load center (W)
 END TYPE ElectricPowerLoadCenter
 
 TYPE CECInverterLookUpTableData
@@ -333,6 +333,8 @@ INTEGER :: ElecProducedCoGenIndex =0
 INTEGER :: ElecProducedPVIndex    =0
 INTEGER :: ElecProducedWTIndex    =0
 
+INTEGER :: MAXRainflowArrayBounds =100
+INTEGER :: MAXRainFlowArrayInc    =100
 TYPE (ElecStorageDataStruct), ALLOCATABLE, PUBLIC, DIMENSION(:)    :: ElecStorage
 TYPE (DCtoACInverterStruct), ALLOCATABLE, DIMENSION(:)     :: Inverter
 TYPE (ElectricPowerLoadCenter), ALLOCATABLE, DIMENSION(:)  :: ElecLoadCenter  !dimension to number of machines
@@ -1233,8 +1235,8 @@ SUBROUTINE GetPowerManagerInput
   INTEGER  :: NumWiredMeters      !Number of electric meters wired to a transformer
   INTEGER  :: LCofTransformer     !Index of load center served by a transformer
   INTEGER  :: LoopCount           !loop counter
-  REAL(r64) :: pvTotalCapacity = 0    ! for LEED report
-  REAL(r64) :: windTotalCapacity = 0   ! for LEED report
+  REAL(r64) :: pvTotalCapacity = 0.0d0    ! for LEED report
+  REAL(r64) :: windTotalCapacity = 0.0d0   ! for LEED report
 
   NumAlphaBeforeMeter   = 7       !Hard coded. Changes might be needed if the transformer input structure gets changed
   LCofTransformer       = 0
@@ -1635,15 +1637,14 @@ SUBROUTINE GetPowerManagerInput
                  trim(GetCurveType(ElecStorage(StorNum)%LifeCurveNum)))
               ErrorsFound=.true.
             ENDIF
+            
+            ElecStorage(StorNum)%CycleBinNum= rNumericArgs(14)
+            
             IF (.not. ErrorsFound) THEN  ! life cycle calculation for this battery, allocate arrays for degradation calculation
-!              ALLOCATE(ElecStorage(StorNum)%B10(0:NumOfTimeStepInHour+1))
-!              ALLOCATE(ElecStorage(StorNum)%X0(0:NumOfTimeStepInHour+1))
-!              ALLOCATE(ElecStorage(StorNum)%Nmb0(0:NumOfTimeStepInHour+1))
-!              ALLOCATE(ElecStorage(StorNum)%OneNmb0(0:NumOfTimeStepInHour+1))
-              ALLOCATE(ElecStorage(StorNum)%B10(0:101))
-              ALLOCATE(ElecStorage(StorNum)%X0(0:101))
-              ALLOCATE(ElecStorage(StorNum)%Nmb0(0:101))
-              ALLOCATE(ElecStorage(StorNum)%OneNmb0(0:101))
+              ALLOCATE(ElecStorage(StorNum)%B10(1:MAXRainflowArrayBounds+1))
+              ALLOCATE(ElecStorage(StorNum)%X0(1:MAXRainflowArrayBounds+1))
+              ALLOCATE(ElecStorage(StorNum)%Nmb0(1:ElecStorage(StorNum)%CycleBinNum))
+              ALLOCATE(ElecStorage(StorNum)%OneNmb0(1:ElecStorage(StorNum)%CycleBinNum))
               ElecStorage(StorNum)%B10=0.0d0
               ElecStorage(StorNum)%X0=0.0d0
               ElecStorage(StorNum)%Nmb0=0.0d0
@@ -1667,9 +1668,6 @@ SUBROUTINE GetPowerManagerInput
         ElecStorage(StorNum)%CutoffV                     = rNumericArgs(12)
         ElecStorage(StorNum)%MaxChargeRate               = rNumericArgs(13)
 
-        IF(ElecStorage(StorNum)%LifeCalculation == Battery_LifeCalculation_Yes) THEN
-           ElecStorage(StorNum)%CycleBinNum              = rNumericArgs(14)
-        ENDIF
 
 
         CALL SetupOutputVariable('Electric Storage Operating Mode Index []', &
@@ -2176,8 +2174,8 @@ SUBROUTINE GetPowerManagerInput
   !Allocate the pointer array
       ALLOCATE(ElecLoadCenter(Count)%ElecGen(NumGenerators))
       ElecLoadCenter(Count)%NumGenerators = NumGenerators
-      pvTotalCapacity = 0    ! for LEED report
-      windTotalCapacity = 0   ! for LEED report
+      pvTotalCapacity = 0.0d0    ! for LEED report
+      windTotalCapacity = 0.0d0   ! for LEED report
       DO GenCount = 1, ElecLoadCenter(Count)%NumGenerators
   !Load the Power Center Generator List Name
         ElecLoadCenter(Count)%ElecGen(GenCount)%Name            = cAlphaArgs(alphacount)
@@ -2264,8 +2262,8 @@ SUBROUTINE GetPowerManagerInput
   ENDDO  ! loop over number of load centers
 
   ! LEED report
-  pvTotalCapacity = 0
-  windTotalCapacity = 0
+  pvTotalCapacity = 0.0d0
+  windTotalCapacity = 0.0d0
   DO Count = 1, NumLoadCenters
     IF(Trim(ElecLoadCenter(Count)%GeneratorList) .NE. '')Then
       DO GenCount = 1, ElecLoadCenter(Count)%NumGenerators
@@ -2570,7 +2568,7 @@ SUBROUTINE CalcLoadCenterThermalLoad(FirstHVACIteration, LoadCenterNum, ThermalL
  IF (MyOneTimeSetupFlag) THEN
    ALLOCATE(MyCoGenSetupFlag(NumLoadCenters))
    MyCoGenSetupFlag = .true.
-   ThermalLoad = 0.0
+   ThermalLoad = 0.0d0
    MyOneTimeSetupFlag = .false.
    return
  ENDIF
@@ -2610,7 +2608,7 @@ SUBROUTINE CalcLoadCenterThermalLoad(FirstHVACIteration, LoadCenterNum, ThermalL
  ENDIF
 
  ! sum up "MyLoad" for all generators on this load center from plant structure
- ThermalLoad = 0.0
+ ThermalLoad = 0.0d0
  Do i = 1, ElecLoadCenter(LoadCenterNum)%NumGenerators
    If (ElecLoadCenter(LoadCenterNum)%ElecGen(i)%PlantInfoFound) then
      LoopID   = ElecLoadCenter(LoadCenterNum)%ElecGen(i)%PlantLoopNum
@@ -2750,7 +2748,7 @@ SUBROUTINE ManageInverter(LoadCenterNum)
   END SELECT
 
   ! check availability schedule
-  IF (GetCurrentScheduleValue(Inverter(InvertNum)%AvailSchedPtr) > 0.0) THEN
+  IF (GetCurrentScheduleValue(Inverter(InvertNum)%AvailSchedPtr) > 0.0d0) THEN
 
     ! now calculate Inverter based on model type
     SELECT CASE (Inverter(InvertNum)%ModelType)
@@ -2970,11 +2968,11 @@ IMPLICIT NONE
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64), external    :: GetInstantMeterValue
 
-  REAL(r64) :: ElecProducedCoGen = 0.0
-  REAL(r64) :: ElecProducedFacility = 0.0
-  REAL(r64) :: TotalPurchased = 0.0
-  REAL(r64) :: TotalSurplus = 0.0
-  REAL(r64) :: NetPurchased = 0.0
+  REAL(r64) :: ElecProducedCoGen = 0.0d0
+  REAL(r64) :: ElecProducedFacility = 0.0d0
+  REAL(r64) :: TotalPurchased = 0.0d0
+  REAL(r64) :: TotalSurplus = 0.0d0
+  REAL(r64) :: NetPurchased = 0.0d0
 
         ! Flow
 
@@ -2991,16 +2989,16 @@ IMPLICIT NONE
   !Report the Total Electric Power Purchased [W], If negative then there is extra power to be sold or stored.
   TotalPurchased = WholeBldgElectSummary%TotalElectricDemand - WholeBldgElectSummary%ElectProdRate
   !Check this value against a tolerance to aid in reporting.
-  If(ABS(TotalPurchased) .lt. 0.0001d0) TotalPurchased = 0.0
-  If (TotalPurchased < 0.0) totalPurchased = 0.0  ! don't want negative purchased...
+  If(ABS(TotalPurchased) .lt. 0.0001d0) TotalPurchased = 0.0d0
+  If (TotalPurchased < 0.0d0) totalPurchased = 0.0d0  ! don't want negative purchased...
   WholeBldgElectSummary%ElectPurchRate = TotalPurchased
   !Report the Total Electric Energy Purchased [J]
   WholeBldgElectSummary%ElectricityPurch = WholeBldgElectSummary%ElectPurchRate*TimeStepSys*SecInHour
 
   !report the total electric surplus....
   TotalSurplus =WholeBldgElectSummary%ElectProdRate -  WholeBldgElectSummary%TotalElectricDemand
-  If(ABS(TotalSurplus) .lt. 0.0001d0) TotalSurplus = 0.0
-  If (TotalSurplus < 0.0) TotalSurplus = 0.0  ! don't want negative surplus
+  If(ABS(TotalSurplus) .lt. 0.0001d0) TotalSurplus = 0.0d0
+  If (TotalSurplus < 0.0d0) TotalSurplus = 0.0d0  ! don't want negative surplus
 
   WholeBldgElectSummary%ElectSurplusRate = TotalSurplus
   WholeBldgElectSummary%ElectricitySurplus =TotalSurplus*TimeStepSys*SecInHour
@@ -3093,6 +3091,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
           ! na
 
           ! USE STATEMENTS:
+  USE General, ONLY: ReallocateRealArray
   USE CurveManager, ONLY: CurveValue
   USE DataHVACGlobals, ONLY: TimeStepSys,SysTimeElapsed
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
@@ -3162,6 +3161,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
   REAL(r64)    ::I=0.0D0       ! current
   REAL(r64)    ::DeltaSOC1     ! difference of fractional SOC between this time step and last time step
   REAL(r64)    ::DeltaSOC2     ! difference of fractional SOC between last time step and last two time step
+  Integer      ::SaveArrayBounds !Maximum size for the arrays used for rainflow counting
 
   If ( .NOT. (ElecLoadCenter(LoadCenterNum)%StoragePresent)) RETURN
 
@@ -3208,8 +3208,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
        Elecstorage(ElecStorNum)%ThisTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%ThisTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. Battery_LifeCalculation_Yes) THEN
-          ElecStorage(ElecStorNum)%count0  = 1
-          ElecStorage(ElecStorNum)%B10(0)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
+          ElecStorage(ElecStorNum)%count0  = 2                                     ! Index 1 is for initial SOC, so new input starts from index 2.
+          ElecStorage(ElecStorNum)%B10(1)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
           ElecStorage(ElecStorNum)%X0      = 0.0D0
           ElecStorage(ElecStorNum)%OneNmb0 = 0.0D0
           ElecStorage(ElecStorNum)%Nmb0    = 0.0D0
@@ -3235,8 +3235,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
        Elecstorage(ElecStorNum)%ThisTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%ThisTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. Battery_LifeCalculation_Yes) THEN
-          ElecStorage(ElecStorNum)%count0  = 1
-          ElecStorage(ElecStorNum)%B10(0)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
+          ElecStorage(ElecStorNum)%count0  = 2                                     ! Index 1 is for initial SOC, so new input starts from index 2.
+          ElecStorage(ElecStorNum)%B10(1)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
           ElecStorage(ElecStorNum)%X0      = 0.0D0
           ElecStorage(ElecStorNum)%OneNmb0 = 0.0D0
           ElecStorage(ElecStorNum)%Nmb0    = 0.0D0
@@ -3277,14 +3277,22 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
                   Elecstorage(ElecStorNum)%MaxAhCapacity
          ElecStorage(ElecStorNum)%B10(ElecStorage(ElecStorNum)%count0)   = input0
 
-!         Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
-!            ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
-!            ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,NumOfTimeStepInHour+1)
+!        The arrary size needs to be increased when count = MAXRainflowArrayBounds. Please note that (MAXRainflowArrayBounds +1)
+!        is the index used in the subroutine RainFlow. So we cannot reallocate array size until count = MAXRainflowArrayBounds +1.
+         IF (ElecStorage(ElecStorNum)%count0 == MAXRainflowArrayBounds) THEN
+            SaveArrayBounds=MAXRainflowArrayBounds+1
+            CALL ReallocateRealArray(ElecStorage(ElecStorNum)%B10,SaveArrayBounds,MAXRainFlowArrayInc)
+            SaveArrayBounds=MAXRainflowArrayBounds+1
+            CALL ReallocateRealArray(ElecStorage(ElecStorNum)%X0,SaveArrayBounds,MAXRainFlowArrayInc)
+!           Decrement by 1 is needed because the last input parameter of RainFlow is MAXRainflowArrayBounds+1
+            MAXRainflowArrayBounds=SaveArrayBounds-1  
+         ENDIF
+           
          Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
             ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
-            ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,101)
+            ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,MAXRainflowArrayBounds+1)
 
-         ElecStorage(ElecStorNum)%BatteryDamage=0
+         ElecStorage(ElecStorNum)%BatteryDamage=0.0d0
 
          DO BinNum = 1, ElecStorage(ElecStorNum)%CycleBinNum
 !       Battery damage is calculated by accumulating the impact from each cycle.
@@ -3475,7 +3483,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
       Volt  = Ef-I0*InternalR
       Inew  = Pw/Volt
       Tnew  = qmaxf/abs(Inew)
-      error = 1.0
+      error = 1.0d0
 
       DO WHILE (error.gt.0.0001d0)    !Iteration process to get converged current(I)
         I0    = Inew
@@ -3501,8 +3509,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
          Pactual = I0*Volt
       ELSE
          I0    = Imax
-         qmaxf = 80 !Initial assumption to solve the equation using iterative method
-         error = 10 !Initial assumption ...
+         qmaxf = 80.0d0 !Initial assumption to solve the equation using iterative method
+         error = 10.0d0 !Initial assumption ...
          DO WHILE (error.gt.0.001d0)
             ! *** I0(current) should be positive for this calculation
             RHS=(qmax*k*c*qmaxf/abs(I0))/(1.0d0-exp(-k*qmaxf/abs(I0))+c*(k*qmaxf/abs(I0)-1.0d0+exp(-k*qmaxf/abs(I0))))
@@ -3520,7 +3528,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
 
       IF (ElecStorage(ElecStorNum)%LastTimeStepStateOfCharge <= 0.d0) THEN
           ! storage empty  no more allowed!
-          tmpPdraw = 0.0
+          tmpPdraw = 0.0d0
           drawing = .FALSE.
       ENDIF
       IF (tmpPdraw > ElecStorage(ElecStorNum)%MaxPowerDraw) THEN
@@ -3529,7 +3537,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
 
       !now take energy from storage by drawing  (amplified by energetic effic)
       IF ((ElecStorage(ElecStorNum)%LastTimeStepStateOfCharge  &
-          - tmpPdraw *TimeStepSys*SecInHour/ElecStorage(ElecStorNum)%EnergeticEfficDischarge) > 0.0 ) Then
+          - tmpPdraw *TimeStepSys*SecInHour/ElecStorage(ElecStorNum)%EnergeticEfficDischarge) > 0.0d0 ) Then
 
         ElecStorage(ElecStorNum)%ThisTimeStepStateOfCharge =  ElecStorage(ElecStorNum)%LastTimeStepStateOfCharge &
                                 - tmpPdraw *TimeStepSys*SecInHour/ElecStorage(ElecStorNum)%EnergeticEfficDischarge
@@ -3585,8 +3593,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
          Pactual = I0*Volt
       ELSE
          I0    = Imax
-         qmaxf = 10     !Initial assumption to solve the equation using iterative method
-         error = 10     !Initial assumption ...
+         qmaxf = 10.0d0     !Initial assumption to solve the equation using iterative method
+         error = 10.0d0     !Initial assumption ...
          DO WHILE (error.gt.0.001d0)
             RHS = (qmax*k*c*qmaxf/I0)/(1.0d0-exp(-k*qmaxf/I0)+c*(k*qmaxf/I0-1+exp(-k*qmaxf/I0)))
             error = abs(qmaxf-RHS)
@@ -3625,7 +3633,7 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
   IF (Pstorage >= 0.d0) THEN
 
     ElecStorage(ElecStorNum)%PelIntoStorage = Pstorage
-    ElecStorage(ElecStorNum)%PelFromStorage = 0.0
+    ElecStorage(ElecStorNum)%PelFromStorage = 0.0d0
   ENDIF
 
   IF (Pstorage < 0.d0) THEN
@@ -3682,24 +3690,24 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
        ElecStorage(ElecStorNum)%StoredPower  = Volt*I0*Numbattery
        ElecStorage(ElecStorNum)%StoredEnergy = Volt*I0*Numbattery*TimeStepSys*SecInHour
        ElecStorage(ElecStorNum)%DecrementedEnergyStored = -1.0D0 * ElecStorage(ElecStorNum)%StoredEnergy
-       ElecStorage(ElecStorNum)%DrawnPower  = 0.0
-       ElecStorage(ElecStorNum)%DrawnEnergy = 0.0
+       ElecStorage(ElecStorNum)%DrawnPower  = 0.0d0
+       ElecStorage(ElecStorNum)%DrawnEnergy = 0.0d0
 
     ELSEIF (TotalSOC.lt.q0) THEN
        ElecStorage(ElecStorNum)%StorageMode  = 1
-       ElecStorage(ElecStorNum)%StoredPower  = 0
-       ElecStorage(ElecStorNum)%StoredEnergy = 0
-       ElecStorage(ElecStorNum)%DecrementedEnergyStored = 0
+       ElecStorage(ElecStorNum)%StoredPower  = 0.0d0
+       ElecStorage(ElecStorNum)%StoredEnergy = 0.0d0
+       ElecStorage(ElecStorNum)%DecrementedEnergyStored = 0.0d0
        ElecStorage(ElecStorNum)%Drawnpower   = Volt*I0*Numbattery
        ElecStorage(ElecStorNum)%Drawnenergy  = Volt*I0*Numbattery*TimeStepSys*SecInHour
 
     ELSE
        ElecStorage(ElecStorNum)%StorageMode  = 0
-       ElecStorage(ElecStorNum)%StoredPower  = 0
-       ElecStorage(ElecStorNum)%StoredEnergy = 0
-       ElecStorage(ElecStorNum)%DecrementedEnergyStored = 0
-       ElecStorage(ElecStorNum)%DrawnPower   = 0
-       ElecStorage(ElecStorNum)%DrawnEnergy  = 0
+       ElecStorage(ElecStorNum)%StoredPower  = 0.0d0
+       ElecStorage(ElecStorNum)%StoredEnergy = 0.0d0
+       ElecStorage(ElecStorNum)%DecrementedEnergyStored = 0.0d0
+       ElecStorage(ElecStorNum)%DrawnPower   = 0.0d0
+       ElecStorage(ElecStorNum)%DrawnEnergy  = 0.0d0
     ENDIF
 
     ElecStorage(ElecStorNum)%AbsoluteSOC          = TotalSOC*Numbattery
@@ -3708,30 +3716,6 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
     ElecStorage(ElecStorNum)%BatteryVoltage       = Volt*Numser
     ElecStorage(ElecStorNum)%ThermLossRate        = InternalR*I0**2*Numbattery
     ElecStorage(ElecStorNum)%ThermLossEnergy      = InternalR*I0**2*TimeStepSys*SecInHour*Numbattery
-
-    IF (ElecStorage(ElecStorNum)%LifeCalculation.eq.Battery_LifeCalculation_Yes) then
-  !First time step starting point should be notified in input subroutine
-!      numbin0       = ElecStorage(ElecStorNum)%CycleBinNum
-      Input0        = TotalSOC/qmax
-      ElecStorage(ElecStorNum)%B10(ElecStorage(ElecStorNum)%count0)   = input0
-
-!      Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
-!         ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
-!         ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,NumOfTimeStepInHour+1)
-      Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
-         ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
-         ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,101)
-
-      ElecStorage(ElecStorNum)%BatteryDamage=0
-
-      DO BinNum = 1, ElecStorage(ElecStorNum)%CycleBinNum
-
-        ElecStorage(ElecStorNum)%BatteryDamage = ElecStorage(ElecStorNum)%OneNmb0(BinNum)/  &
-           Curvevalue(ElecStorage(ElecStorNum)%LifeCurveNum, (Real(BinNum,r64)/Real(ElecStorage(ElecStorNum)%CycleBinNum,r64))) &
-           + ElecStorage(ElecStorNum)%BatteryDamage
-      ENDDO
-
-    ENDIF
 
   IF (ElecStorage(ElecStorNum)%ZoneNum > 0) THEN ! set values for zone heat gains
     ElecStorage(ElecStorNum)%QdotconvZone = ( (1.0D0 - ElecStorage(ElecStorNum)%ZoneRadFract) *  &
@@ -3933,7 +3917,7 @@ SUBROUTINE ManageTransformers()
         IF(Transformer(TransfNum)%SpecialMeter(MeterNum) ) THEN
           ElecLoad = ElecLoad - Transformer(TransfNum)%LoadLossRate - Transformer(TransfNum)%NoLoadLossRate
 
-          IF (ElecLoad < 0) ElecLoad = 0      !Essential check.
+          IF (ElecLoad < 0) ElecLoad = 0.0d0      !Essential check.
         END IF
 
       END DO
@@ -3943,7 +3927,7 @@ SUBROUTINE ManageTransformers()
       DO LCNum = 1, Transformer(TransfNum)%LoadCenterNum
         SurplusPower = ElecLoadCenter(LCNum)%ElectProdRate - ElecLoadCenter(LCNum)%ElectDemand
 
-        IF(SurplusPower < 0) SurplusPower = 0
+        IF(SurplusPower < 0) SurplusPower = 0.0d0
 
         ElecLoad = ElecLoad + SurplusPower
         PastElecLoad = ElecLoad
@@ -3954,15 +3938,19 @@ SUBROUTINE ManageTransformers()
 
 
     ! check availability schedule
-    IF (GetCurrentScheduleValue(Transformer(TransfNum)%AvailSchedPtr) > 0.0) THEN
+    IF (GetCurrentScheduleValue(Transformer(TransfNum)%AvailSchedPtr) > 0.0d0) THEN
       Capacity = Transformer(TransfNum)%RatedCapacity
       PUL = ElecLoad / Capacity
 
+      IF (PUL > 1.0D0) THEN
+          PUL = 1.0D0
+      END IF
+     
       !Originally, PUL was used to check whether a transformer is overloaded (PUL > 1.0 or not). However, it was
       !found that ElecLoad obtained from GetInstantMeterVlaue() might refer to intermideiate values before
       !convergence. The intermediate values may issue false warning. This the reason why PastElecLoad obtained
       !by GetCurrentMeterValue() is used here to check overload issue.
-      IF( (PastElecLoad/Capacity) > 1.0) THEN
+      IF( (PastElecLoad/Capacity) > 1.0d0) THEN
         IF(Transformer(TransfNum)%OverloadErrorIndex == 0) THEN
           CALL ShowSevereError('Transformer Overloaded' )
           CALL ShowContinueError('Entered in ElectricLoadCenter:Transformer ='//TRIM(Transformer(TransfNum)%Name) )
@@ -4134,11 +4122,11 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb,dim)
   REAL(r64) :: input  ! input = input value from other object (battery model)
  !Array B1 stores the value of points
  !Array X stores the value of two data points' difference.
-  REAL(r64), DIMENSION(0:dim) :: B1  ! stores values of points, calculated here - stored for next timestep
-  REAL(r64), DIMENSION(0:dim) :: X   ! stores values of two data point difference, calculated here - stored for next timestep
+  REAL(r64), DIMENSION(1:dim) :: B1  ! stores values of points, calculated here - stored for next timestep
+  REAL(r64), DIMENSION(1:dim) :: X   ! stores values of two data point difference, calculated here - stored for next timestep
   INTEGER :: count   ! calculated here - stored for next timestep in main loop
-  REAL(r64), DIMENSION(0:dim) :: Nmb  ! calculated here - stored for next timestep in main loop
-  REAL(r64), DIMENSION(0:dim) :: OneNmb  ! calculated here - stored for next timestep in main loop
+  REAL(r64), DIMENSION(1:numbin) :: Nmb  ! calculated here - stored for next timestep in main loop
+  REAL(r64), DIMENSION(1:numbin) :: OneNmb  ! calculated here - stored for next timestep in main loop
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -4159,22 +4147,20 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb,dim)
 ! Get rid of the data if it is not peak nor valley
 ! The value of count means the number of peak or valley points added to the arrary B10/B1, not including the
 ! first point B10(0)/B1(0). Therefore, even if count =2, B1(count-2) is still valid.
- IF(count .ge. 2) THEN
+ IF(count .ge. 3) THEN
 !  The following check on peak or valley may be not necessary in most times because the same check is made in the
 !  upper-level subroutine. However, it does not hurt to leave it here.
    IF (X(count)*X(count-1) .ge. 0) THEN
      X(count-1) = B1(count)-B1(count-2)
-!     CALL shift(B1,count-1,count,B1,NumOfTimeStepInHour+1)  ! Get rid of (count-1) row in B1
-!     CALL shift(X,count,count,X,NumOfTimeStepInHour+1)
-     CALL shift(B1,count-1,count,B1,101)  ! Get rid of (count-1) row in B1
-     CALL shift(X,count,count,X,101)
+     CALL shift(B1,count-1,count,B1,MAXRainflowArrayBounds+1)  ! Get rid of (count-1) row in B1
+     CALL shift(X,count,count,X,MAXRainflowArrayBounds+1)
      count=count-1  ! If the value keep increasing or decreasing, get rid of the middle point.
    ENDIF            ! Only valley and peak will be stored in the matrix, B1
 
-   IF ((count == 2) .AND. (abs(X(1)).le.abs(X(2))) ) THEN
+   IF ((count == 3) .AND. (abs(X(2)).le.abs(X(3))) ) THEN
 !  This means the starting point is included in X(2), a half cycle is counted according to the rain flow
 !  algorithm specified in the reference (Ariduru S. 2004)
-     num = NINT((abs(X(1))*numbin*10+5)/10) ! Count half cycle
+     num = NINT((abs(X(2))*numbin*10+5)/10) ! Count half cycle
      Nmb(num) = Nmb(num)+0.5d0
      B1 = EOSHIft(B1,shift=1)              ! Once counting a half cycle, get rid of the value.
      X = EOSHIft(X,shift=1)
@@ -4183,7 +4169,7 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb,dim)
  ENDIF ! Counting cyle end
  !*** Note: The value of "count" changes in the upper "IF LOOP"
 
- IF (count .ge. 3) THEN !count 1 cycle
+ IF (count .ge. 4) THEN !count 1 cycle
    DO WHILE (abs(X(count)) .gt. abs(X(count-1)))
 !  This means that the starting point is not included in X(count-1). a cycle is counted according to the rain flow
 !  algorithm specified in the reference (Ariduru S. 2004)
@@ -4193,18 +4179,14 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb,dim)
 !     X(count-2) = abs(X(count))-abs(X(count-1))+abs(X(count-2))
      X(count-2) = B1(count)-B1(count-3) ! Updating X needs to be done before shift operation below
 
-!     CALL shift(B1,count-1,count,B1,NumOfTimeStepInHour+1)   ! Get rid of two data points one by one
-!     CALL shift(B1,count-2,count,B1,NumOfTimeStepInHour+1)   ! Delete one point
-     CALL shift(B1,count-1,count,B1,101)   ! Get rid of two data points one by one
-     CALL shift(B1,count-2,count,B1,101)   ! Delete one point
+     CALL shift(B1,count-1,count,B1,MAXRainflowArrayBounds+1)   ! Get rid of two data points one by one
+     CALL shift(B1,count-2,count,B1,MAXRainflowArrayBounds+1)   ! Delete one point
 
-!     CALL shift(X,count,count,X,NumOfTimeStepInHour+1)       ! Get rid of two data points one by one
-!     CALL shift(X,count-1,count,X,NumOfTimeStepInHour+1)     ! Delete one point
-     CALL shift(X,count,count,X,101)       ! Get rid of two data points one by one
-     CALL shift(X,count-1,count,X,101)     ! Delete one point
+     CALL shift(X,count,count,X,MAXRainflowArrayBounds)       ! Get rid of two data points one by one
+     CALL shift(X,count-1,count,X,MAXRainflowArrayBounds)     ! Delete one point
 
      count = count-2       ! If one cycle is counted, two data points are deleted.
-     IF (count .lt. 3) Exit  ! When only three data points exists, one cycle cannot be counted.
+     IF (count .lt. 4) Exit  ! When only three data points exists, one cycle cannot be counted.
    ENDDO
  ENDIF
 

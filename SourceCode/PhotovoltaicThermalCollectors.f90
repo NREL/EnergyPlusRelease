@@ -51,7 +51,7 @@ INTEGER, PARAMETER :: AirWorkingFluid     = 2
 INTEGER, PARAMETER , PUBLIC :: CalledFromPlantLoopEquipMgr  = 101
 INTEGER, PARAMETER , PUBLIC :: CalledFromOutsideAirSystem = 102
 
-REAL(r64), PARAMETER :: SimplePVTWaterSizeFactor = 1.905E-5  ! [ m3/s/m2 ] average of collectors in SolarCollectors.idf
+REAL(r64), PARAMETER :: SimplePVTWaterSizeFactor = 1.905d-5  ! [ m3/s/m2 ] average of collectors in SolarCollectors.idf
 
 
           ! DERIVED TYPE DEFINITIONS:

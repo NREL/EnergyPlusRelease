@@ -29,8 +29,8 @@ MODULE UnitVentilator
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, SetupOutputVariable
+USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc, DisplayExtraWarnings
+USE DataInterfaces
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallAirVolFlow, ContFanCycCoil
 
   ! Use statements for access to subroutines in other modules
@@ -84,8 +84,8 @@ TYPE UnitVentilatorData
   INTEGER                      :: FanAvailSchedPtr    =0   ! index to fan availability schedule
   INTEGER                      :: ControlCompTypeNum =0
   INTEGER                      :: CompErrIndex       =0
-  REAL(r64)                    :: MaxAirVolFlow       =0.0 ! m3/s
-  REAL(r64)                    :: MaxAirMassFlow      =0.0 ! kg/s
+  REAL(r64)                    :: MaxAirVolFlow       =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxAirMassFlow      =0.0d0 ! kg/s
   INTEGER                      :: OAControlType       =0   ! type of control; options are VARIABLE PERCENT and FIXED TEMPERATURE
   CHARACTER(len=MaxNameLength) :: MinOASchedName      =' ' ! schedule of fraction for minimum outside air (all controls)
   INTEGER                      :: MinOASchedPtr       =0   ! index to schedule
@@ -97,10 +97,10 @@ TYPE UnitVentilatorData
   INTEGER                      :: OutsideAirNode      =0   ! outside air node number
   INTEGER                      :: AirReliefNode       =0   ! relief air node number
   INTEGER                      :: OAMixerOutNode      =0   ! outlet node after the outside air mixer (inlet to coils if present)
-  REAL(r64)                    :: OutAirVolFlow       =0.0 ! m3/s
-  REAL(r64)                    :: OutAirMassFlow      =0.0 ! kg/s
-  REAL(r64)                    :: MinOutAirVolFlow    =0.0 ! m3/s
-  REAL(r64)                    :: MinOutAirMassFlow   =0.0 ! kg/s
+  REAL(r64)                    :: OutAirVolFlow       =0.0d0 ! m3/s
+  REAL(r64)                    :: OutAirMassFlow      =0.0d0 ! kg/s
+  REAL(r64)                    :: MinOutAirVolFlow    =0.0d0 ! m3/s
+  REAL(r64)                    :: MinOutAirMassFlow   =0.0d0 ! kg/s
   INTEGER                      :: CoilOption          =0 ! type of coil option; options are BOTH, HEATING, COOLING, AND NONE
   LOGICAL                      :: HCoilPresent        =.FALSE. ! .TRUE. if unit ventilator has a heating coil
   INTEGER                      :: HCoilType           =0   ! type of heating coil (water, gas, electric, etc.)
@@ -111,18 +111,18 @@ TYPE UnitVentilatorData
   INTEGER                      :: HCoil_FluidIndex    =0
   CHARACTER(len=MaxNameLength) :: HCoilSchedName      =' ' ! availability schedule for the heating coil
   INTEGER                      :: HCoilSchedPtr       =0   ! index to schedule
-  REAL(r64)                    :: HCoilSchedValue     =0.0
-  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxVolHotSteamFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: MaxHotSteamFlow=0.0
-  REAL(r64)                    :: MinHotSteamFlow =0.0
-  REAL(r64)                    :: MinVolHotWaterFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinVolHotSteamFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow     =0.0 ! kg/s
+  REAL(r64)                    :: HCoilSchedValue     =0.0d0
+  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxVolHotSteamFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: MaxHotSteamFlow=0.0d0
+  REAL(r64)                    :: MinHotSteamFlow =0.0d0
+  REAL(r64)                    :: MinVolHotWaterFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinVolHotSteamFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow     =0.0d0 ! kg/s
   INTEGER                      :: HotControlNode      =0   ! hot water control node
   INTEGER                      :: HotCoilOutNodeNum   =0   ! outlet of coil
-  REAL(r64)                    :: HotControlOffset    =0.0 ! control tolerance
+  REAL(r64)                    :: HotControlOffset    =0.0d0 ! control tolerance
   INTEGER                      :: HWLoopNum           =0   ! index for plant loop with hot water coil
   INTEGER                      :: HWLoopSide          =0   ! index for plant loop side for hot water coil
   INTEGER                      :: HWBranchNum         =0   ! index for plant branch for hot water coil
@@ -140,14 +140,14 @@ TYPE UnitVentilatorData
                                                            ! 'CoilSystem:Cooling:Water:HeatExchangerAssisted'
   CHARACTER(len=MaxNameLength) :: CCoilSchedName      =' ' ! availability schedule for the cooling coil
   INTEGER                      :: CCoilSchedPtr       =0   ! index to schedule
-  REAL(r64)                    :: CCoilSchedValue     =0.0
-  REAL(r64)                    :: MaxVolColdWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MaxColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MinVolColdWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinColdWaterFlow    =0.0 ! kg/s
+  REAL(r64)                    :: CCoilSchedValue     =0.0d0
+  REAL(r64)                    :: MaxVolColdWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MinVolColdWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinColdWaterFlow    =0.0d0 ! kg/s
   INTEGER                      :: ColdControlNode     =0   ! chilled water control node
   INTEGER                      :: ColdCoilOutNodeNum  =0   ! chilled water coil out node
-  REAL(r64)                    :: ColdControlOffset   =0.0 ! control tolerance
+  REAL(r64)                    :: ColdControlOffset   =0.0d0 ! control tolerance
   INTEGER                      :: CWLoopNum           =0   ! index for plant loop with chilled water coil
   INTEGER                      :: CWLoopSide          =0   ! index for plant loop side for chilled water coil
   INTEGER                      :: CWBranchNum         =0   ! index for plant branch for chilled water coil
@@ -155,14 +155,14 @@ TYPE UnitVentilatorData
 
 
   ! Report data
-  REAL(r64)                    :: HeatPower           =0.0 ! unit heating output in watts
-  REAL(r64)                    :: HeatEnergy          =0.0 ! unit heating output in J
-  REAL(r64)                    :: TotCoolPower        =0.0
-  REAL(r64)                    :: TotCoolEnergy       =0.0
-  REAL(r64)                    :: SensCoolPower       =0.0
-  REAL(r64)                    :: SensCoolEnergy      =0.0
-  REAL(r64)                    :: ElecPower           =0.0
-  REAL(r64)                    :: ElecEnergy          =0.0
+  REAL(r64)                    :: HeatPower           =0.0d0 ! unit heating output in watts
+  REAL(r64)                    :: HeatEnergy          =0.0d0 ! unit heating output in J
+  REAL(r64)                    :: TotCoolPower        =0.0d0
+  REAL(r64)                    :: TotCoolEnergy       =0.0d0
+  REAL(r64)                    :: SensCoolPower       =0.0d0
+  REAL(r64)                    :: SensCoolEnergy      =0.0d0
+  REAL(r64)                    :: ElecPower           =0.0d0
+  REAL(r64)                    :: ElecEnergy          =0.0d0
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
   INTEGER                      :: AvailStatus          = 0
                                                                   ! for unit ventilator object
@@ -173,8 +173,8 @@ TYPE (UnitVentilatorData), ALLOCATABLE, DIMENSION(:) :: UnitVent
   ! MODULE VARIABLE DECLARATIONS:
 LOGICAL :: HCoilOn         =.FALSE. ! TRUE if the heating coil (gas or electric especially) should be running
 INTEGER :: NumOfUnitVents  =0       ! Number of unit ventilators in the input file
-REAL(r64)    :: OAMassFlowRate  =0.0     ! Outside air mass flow rate for the unit ventilator
-REAL(r64)    :: QZnReq          =0.0     ! heating or cooling needed by zone [watts]
+REAL(r64)    :: OAMassFlowRate  =0.0d0     ! Outside air mass flow rate for the unit ventilator
+REAL(r64)    :: QZnReq          =0.0d0     ! heating or cooling needed by zone [watts]
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
 LOGICAL,SAVE :: GetUnitVentilatorInputFlag = .TRUE.  ! First time, input is "gotten"
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
@@ -377,7 +377,7 @@ SUBROUTINE GetUnitVentilatorInput
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(NumAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(NumNumbers))
@@ -447,7 +447,7 @@ SUBROUTINE GetUnitVentilatorInput
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'// TRIM(UnitVent(UnitVentNum)%Name)//'", invalid')
           CALL ShowContinueError('not found:'//TRIM(cAlphaFields(5))//'="'//TRIM(UnitVent(UnitVentNum)%MaxOASchedName)//'".')
           ErrorsFound=.TRUE.
-        ELSEIF (.not. CheckScheduleValueMinMax(UnitVent(UnitVentNum)%MaxOASchedPtr,'>=0',0.0,'<=',1.0)) THEN
+        ELSEIF (.not. CheckScheduleValueMinMax(UnitVent(UnitVentNum)%MaxOASchedPtr,'>=0',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'// TRIM(UnitVent(UnitVentNum)%Name)//'", invalid')
           CALL ShowContinueError('out of range [0,1]: '//TRIM(cAlphaFields(5))//'="'//  &
              TRIM(UnitVent(UnitVentNum)%MaxOASchedName)//'".')
@@ -461,7 +461,7 @@ SUBROUTINE GetUnitVentilatorInput
           CALL ShowSevereError(TRIM(cAlphaFields(5))//' not found = '//TRIM(UnitVent(UnitVentNum)%MaxOASchedName))
           CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(UnitVent(UnitVentNum)%Name))
           ErrorsFound=.TRUE.
-        ELSEIF (.not. CheckScheduleValueMinMax(UnitVent(UnitVentNum)%MaxOASchedPtr,'>=0',0.0)) THEN
+        ELSEIF (.not. CheckScheduleValueMinMax(UnitVent(UnitVentNum)%MaxOASchedPtr,'>=0',0.0d0)) THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'// TRIM(UnitVent(UnitVentNum)%Name)//'", invalid')
           CALL ShowContinueError('out of range [0,1]: '//TRIM(cAlphaFields(5))//'="'//  &
              TRIM(UnitVent(UnitVentNum)%MaxOASchedName)//'".')
@@ -705,12 +705,12 @@ SUBROUTINE GetUnitVentilatorInput
         ENDIF
 
 
-        UnitVent(UnitVentNum)%MinVolHotWaterFlow = 0.0
-        UnitVent(UnitVentNum)%MinVolHotSteamFlow = 0.0
+        UnitVent(UnitVentNum)%MinVolHotWaterFlow = 0.0d0
+        UnitVent(UnitVentNum)%MinVolHotSteamFlow = 0.0d0
 
         UnitVent(UnitVentNum)%HotControlOffset = Numbers(4)
         ! Set default convergence tolerance
-        IF (UnitVent(UnitVentNum)%HotControlOffset .LE. 0.0) THEN
+        IF (UnitVent(UnitVentNum)%HotControlOffset .LE. 0.0d0) THEN
           UnitVent(UnitVentNum)%HotControlOffset = 0.001d0
         END IF
         SELECT CASE(UnitVent(UnitVentNum)%HCoilType)
@@ -810,10 +810,10 @@ SUBROUTINE GetUnitVentilatorInput
           ENDIF
         ENDIF
 
-        UnitVent(UnitVentNum)%MinVolColdWaterFlow = 0.0
+        UnitVent(UnitVentNum)%MinVolColdWaterFlow = 0.0d0
         UnitVent(UnitVentNum)%ColdControlOffset = Numbers(5)
         ! Set default convergence tolerance
-        IF (UnitVent(UnitVentNum)%ColdControlOffset .LE. 0.0) THEN
+        IF (UnitVent(UnitVentNum)%ColdControlOffset .LE. 0.0d0) THEN
           UnitVent(UnitVentNum)%ColdControlOffset = 0.001d0
         END IF
         SELECT CASE(UnitVent(UnitVentNum)%CCoilType)
@@ -1128,13 +1128,13 @@ END IF
 
     ! set the node max and min mass flow rates
     Node(OutsideAirNode)%MassFlowRateMax = UnitVent(UnitVentNum)%OutAirMassFlow
-    Node(OutsideAirNode)%MassFlowRateMin = 0.0
+    Node(OutsideAirNode)%MassFlowRateMin = 0.0d0
 
     Node(OutNode)%MassFlowRateMax = UnitVent(UnitVentNum)%MaxAirMassFlow
-    Node(OutNode)%MassFlowRateMin = 0.0
+    Node(OutNode)%MassFlowRateMin = 0.0d0
 
     Node(InNode)%MassFlowRateMax = UnitVent(UnitVentNum)%MaxAirMassFlow
-    Node(InNode)%MassFlowRateMin = 0.0
+    Node(InNode)%MassFlowRateMin = 0.0d0
 
    IF (UnitVent(UnitVentNum)%HCoilPresent) THEN ! Only initialize these if a heating coil is actually present
 
@@ -1159,7 +1159,7 @@ END IF
 
     END IF
     IF (UnitVent(UnitVentNum)%HCoilType == Heating_SteamCoilType) THEN
-      TempSteamIn= 100.00
+      TempSteamIn= 100.00d0
       SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,UnitVent(UnitVentNum)%HCoil_FluidIndex,'InitUnitVentilator')
       UnitVent(UnitVentNum)%MaxHotSteamFlow = SteamDensity*UnitVent(UnitVentNum)%MaxVolHotSteamFlow
       UnitVent(UnitVentNum)%MinHotSteamFlow = SteamDensity*UnitVent(UnitVentNum)%MinVolHotSteamFlow
@@ -1219,18 +1219,18 @@ END IF
   ENDIF
 
   IF (SetMassFlowRateToZero) THEN
-    Node(InNode)%MassFlowRate                 = 0.0
-    Node(InNode)%MassFlowRateMaxAvail         = 0.0
-    Node(InNode)%MassFlowRateMinAvail         = 0.0
-    Node(OutNode)%MassFlowRate                = 0.0
-    Node(OutNode)%MassFlowRateMaxAvail        = 0.0
-    Node(OutNode)%MassFlowRateMinAvail        = 0.0
-    Node(OutsideAirNode)%MassFlowRate         = 0.0
-    Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0
-    Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
-    Node(AirRelNode)%MassFlowRate             = 0.0
-    Node(AirRelNode)%MassFlowRateMaxAvail     = 0.0
-    Node(AirRelNode)%MassFlowRateMinAvail     = 0.0
+    Node(InNode)%MassFlowRate                 = 0.0d0
+    Node(InNode)%MassFlowRateMaxAvail         = 0.0d0
+    Node(InNode)%MassFlowRateMinAvail         = 0.0d0
+    Node(OutNode)%MassFlowRate                = 0.0d0
+    Node(OutNode)%MassFlowRateMaxAvail        = 0.0d0
+    Node(OutNode)%MassFlowRateMinAvail        = 0.0d0
+    Node(OutsideAirNode)%MassFlowRate         = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
+    Node(AirRelNode)%MassFlowRate             = 0.0d0
+    Node(AirRelNode)%MassFlowRateMaxAvail     = 0.0d0
+    Node(AirRelNode)%MassFlowRateMinAvail     = 0.0d0
   ELSE
     Node(InNode)%MassFlowRate                 = UnitVent(UnitVentNum)%MaxAirMassFlow
     Node(InNode)%MassFlowRateMaxAvail         = UnitVent(UnitVentNum)%MaxAirMassFlow
@@ -1249,7 +1249,7 @@ END IF
   ! Initialize the relief air (same as inlet conditions to the unit ventilator...
   ! Note that mass flow rates will be taken care of later.
   Node(AirRelNode) = Node(InNode)
-  OAMassFlowRate                = 0.0
+  OAMassFlowRate                = 0.0d0
 
   ! Just in case the unit is off and conditions do not get sent through
   ! the unit for some reason, set the outlet conditions equal to the inlet
@@ -1277,7 +1277,7 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1293,7 +1293,7 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
           ! USE STATEMENTS:
   USE DataSizing
   USE InputProcessor
-  USE General,        ONLY: TrimSigDigits
+  USE General,        ONLY: TrimSigDigits, RoundSigDigits
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE SteamCoils,     ONLY: GetCoilSteamInletNode, GetCoilSteamOutletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXDXCoilName, GetHXCoilType
@@ -1342,239 +1342,439 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
   REAL(r64)           :: rho
   REAL(r64)           :: Cp
   INTEGER             :: DummyWaterIndex = 1
-
+  LOGICAL :: IsAutosize                          ! Index to autosize
+  REAL(r64)           :: MaxAirVolFlowDes        ! Autosized maximum air flow for reporting
+  REAL(r64)           :: MaxAirVolFlowUser       ! Hardsized maximum air flow for reporting
+  REAL(r64)           :: OutAirVolFlowDes        ! Autosized outdoor air flow for reporting
+  REAL(r64)           :: OutAirVolFlowUser       ! Hardsized outdoor air flow for reporting
+  REAL(r64)           :: MinOutAirVolFlowDes     ! Autosized minimum outdoor air flow for reporting
+  REAL(r64)           :: MinOutAirVolFlowUser    ! Hardsized minimum outdoor air flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowDes   ! Autosized maximum water flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowUser  ! Hardsized maximum water flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowDes   ! Autosized maximum steam flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowUser  ! Hardsized maximum steam flow for reporting
+  REAL(r64)           :: MaxVolColdWaterFlowDes  ! Autosized maximum chilled water flow for reporting
+  REAL(r64)           :: MaxVolColdWaterFlowUser ! Hardsized maximum chilled water flow for reporting
 
   PltSizHeatNum = 0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxAirVolFlowDes = 0.0d0
+  MaxAirVolFlowUser = 0.0d0
+  OutAirVolFlowDes = 0.0d0
+  OutAirVolFlowUser = 0.0d0
+  MinOutAirVolFlowDes = 0.0d0
+  MinOutAirVolFlowUser = 0.0d0
+  MaxVolHotWaterFlowDes = 0.0d0
+  MaxVolHotWaterFlowUser = 0.0d0
+  MaxVolHotSteamFlowDes = 0.0d0
+  MaxVolHotSteamFlowUser = 0.0d0
+  MaxVolColdWaterFlowDes = 0.0d0
+  MaxVolColdWaterFlowUser = 0.0d0
 
   IF (UnitVent(UnitVentNum)%MaxAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (UnitVent(UnitVentNum)%MaxAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Maximum Supply Air Flow Rate [m3/s]', UnitVent(UnitVentNum)%MaxAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
 
       IF (UnitVent(UnitVentNum)%CoilOption == BothOption) THEN
-        UnitVent(UnitVentNum)%MaxAirVolFlow = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+        MaxAirVolFlowDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                               FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
       ELSEIF (UnitVent(UnitVentNum)%CoilOption == HeatingOption) THEN
-        UnitVent(UnitVentNum)%MaxAirVolFlow = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+        MaxAirVolFlowDes = FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
       ELSEIF (UnitVent(UnitVentNum)%CoilOption == CoolingOption) THEN
-        UnitVent(UnitVentNum)%MaxAirVolFlow = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
+        MaxAirVolFlowDes = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
       ELSEIF (UnitVent(UnitVentNum)%CoilOption == NoneOption) THEN
-        UnitVent(UnitVentNum)%MaxAirVolFlow = FinalZoneSizing(CurZoneEqNum)%MinOA
+        MaxAirVolFlowDes = FinalZoneSizing(CurZoneEqNum)%MinOA
       END IF
-
-      IF (UnitVent(UnitVentNum)%MaxAirVolFlow < SmallAirVolFlow) THEN
-        UnitVent(UnitVentNum)%MaxAirVolFlow = 0.0
+      IF (MaxAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxAirVolFlowDes = 0.0d0
       END IF
-      CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                              'Maximum Supply Air Flow Rate [m3/s]', UnitVent(UnitVentNum)%MaxAirVolFlow)
+      IF (IsAutosize) THEN
+        UnitVent(UnitVentNum)%MaxAirVolFlow = MaxAirVolFlowDes
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes)
+      ELSE
+        IF (UnitVent(UnitVentNum)%MaxAirVolFlow > 0.0d0 .AND. MaxAirVolFlowDes > 0.0d0 ) THEN
+          MaxAirVolFlowUser = UnitVent(UnitVentNum)%MaxAirVolFlow
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes, &
+                     'User-Specified Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowDes - MaxAirVolFlowUser)/MaxAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                    //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (UnitVent(UnitVentNum)%OutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
-      UnitVent(UnitVentNum)%OutAirVolFlow = UnitVent(UnitVentNum)%MaxAirVolFlow
-      CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                              'Maximum Outdoor Air Flow Rate [m3/s]', UnitVent(UnitVentNum)%OutAirVolFlow)
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
-
-  IF (UnitVent(UnitVentNum)%MinOutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
-      UnitVent(UnitVentNum)%MinOutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
-                                                   UnitVent(UnitVentNum)%MaxAirVolFlow)
-      IF (UnitVent(UnitVentNum)%MinOutAirVolFlow < SmallAirVolFlow) THEN
-        UnitVent(UnitVentNum)%MinOutAirVolFlow = 0.0
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (UnitVent(UnitVentNum)%OutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Maximum Outdoor Air Flow Rate [m3/s]', UnitVent(UnitVentNum)%OutAirVolFlow)
       END IF
-      CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                              'Minimum Outdoor Air Flow Rate [m3/s]',UnitVent(UnitVentNum)%MinOutAirVolFlow)
-
+    ELSE
+      CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
+      OutAirVolFlowDes = UnitVent(UnitVentNum)%MaxAirVolFlow
+      IF (IsAutosize) THEN
+        UnitVent(UnitVentNum)%OutAirVolFlow = OutAirVolFlowDes
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowDes)
+      ELSE
+        IF (UnitVent(UnitVentNum)%OutAirVolFlow > 0.0d0 .AND. OutAirVolFlowDes > 0.0d0) THEN
+          OutAirVolFlowUser = UnitVent(UnitVentNum)%OutAirVolFlow
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowDes, &
+                     'User-Specified Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(OutAirVolFlowDes - OutAirVolFlowUser)/OutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                  //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Outdoor Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(OutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Outdoor Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(OutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
-  IF ((UnitVent(UnitVentNum)%MaxVolHotWaterFlow==AutoSize).or.(UnitVent(UnitVentNum)%MaxVolHotSteamFlow==AutoSize))THEN
-    IF (UnitVent(UnitVentNum)%HCoilType == Heating_WaterCoilType) THEN
 
-      IF (CurZoneEqNum > 0) THEN
+  IsAutosize = .FALSE.
+  IF (UnitVent(UnitVentNum)%MinOutAirVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (UnitVent(UnitVentNum)%MinOutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Minimum Outdoor Air Flow Rate [m3/s]', UnitVent(UnitVentNum)%MinOutAirVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
+      MinOutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
+                            UnitVent(UnitVentNum)%MaxAirVolFlow)
+      IF (MinOutAirVolFlowDes < SmallAirVolFlow) THEN
+        MinOutAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        UnitVent(UnitVentNum)%MinOutAirVolFlow = MinOutAirVolFlowDes
+        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Minimum Outdoor Air Flow Rate [m3/s]', MinOutAirVolFlowDes)
+      ELSE
+        IF (UnitVent(UnitVentNum)%MinOutAirVolFlow > 0.0d0 .AND. MinOutAirVolFlowDes > 0.0d0) THEN
+          MinOutAirVolFlowUser = UnitVent(UnitVentNum)%MinOutAirVolFlow
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Minimum Outdoor Air Flow Rate [m3/s]', MinOutAirVolFlowDes, &
+                     'User-Specified Minimum Outdoor Air Flow Rate [m3/s]', MinOutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MinOutAirVolFlowDes - MinOutAirVolFlowUser)/MinOutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                     //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+              CALL ShowContinueError('User-Specified Minimum Outdoor Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MinOutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Minimum Outdoor Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MinOutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
+  END IF
 
+  IsAutosize = .FALSE.
+  IF (UnitVent(UnitVentNum)%MaxVolHotWaterFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (UnitVent(UnitVentNum)%HCoilType == Heating_WaterCoilType) THEN
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+        IF (UnitVent(UnitVentNum)%MaxVolHotWaterFlow > 0.0d0) THEN
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Maximum Hot Water Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolHotWaterFlow)
+        END IF
+      ELSE
         CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
 
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',UnitVent(UnitVentNum)%HCoilName,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',UnitVent(UnitVentNum)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', UnitVent(UnitVentNum)%HCoilName, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', UnitVent(UnitVentNum)%HCoilName, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
-
-        IF (PltSizHeatNum > 0) THEN
-          IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
-            CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+          IF (PltSizHeatNum > 0) THEN
+            IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
+              CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                               * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                               * (CoilOutTemp-CoilInTemp)
 
-            rho = GetDensityGlycol(PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidName, &
+              rho = GetDensityGlycol(PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidIndex, &
                                      'SizeUnitVentilator')
-            Cp = GetSpecificHeatGlycol(PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidName, &
+              Cp = GetSpecificHeatGlycol(PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidName, &
                                     60.d0, &
                                      PlantLoop(UnitVent(UnitVentNum)%HWLoopNum)%FluidIndex, &
                                      'SizeUnitVentilator')
 
-            UnitVent(UnitVentNum)%MaxVolHotWaterFlow = DesCoilLoad / &
-                                                       ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                       Cp * rho )
+              MaxVolHotWaterFlowDes = DesCoilLoad / &
+                                     ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                     Cp * rho )
+            ELSE
+              MaxVolHotWaterFlowDes = 0.0d0
+            END IF
           ELSE
-            UnitVent(UnitVentNum)%MaxVolHotWaterFlow = 0.0
-          END IF
-          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                                  'Maximum Hot Water Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolHotWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
                                //TRIM(UnitVent(UnitVentNum)%Name))
-          ErrorsFound = .TRUE.
+            ErrorsFound = .TRUE.
+          END IF
         END IF
-
+        IF (IsAutosize) THEN
+            UnitVent(UnitVentNum)%MaxVolHotWaterFlow = MaxVolHotWaterFlowDes
+            CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes)
+        ELSE
+          IF (UnitVent(UnitVentNum)%MaxVolHotWaterFlow > 0.0d0 .AND. MaxVolHotWaterFlowDes > 0.0d0) THEN
+            MaxVolHotWaterFlowUser = UnitVent(UnitVentNum)%MaxVolHotWaterFlow
+            CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes, &
+                     'User-Specified Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotWaterFlowDes - MaxVolHotWaterFlowUser)/MaxVolHotWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                    //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Hot Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Hot Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-    ELSEIF(UnitVent(UnitVentNum)%HCoilType == Heating_SteamCoilType) THEN
+    END IF
+  ELSE
+    UnitVent(UnitVentNum)%MaxVolHotWaterFlow = 0.0d0
+  END IF
 
-      IF (CurZoneEqNum > 0) THEN
-
+  IsAutosize = .FALSE.
+  IF (UnitVent(UnitVentNum)%MaxVolHotSteamFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF(UnitVent(UnitVentNum)%HCoilType == Heating_SteamCoilType) THEN
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+        IF (UnitVent(UnitVentNum)%MaxVolHotSteamFlow > 0.0d0) THEN
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Maximum Steam Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolHotSteamFlow)
+        END IF
+      ELSE
         CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
 
         CoilSteamInletNode = GetCoilSteamInletNode('Coil:Heating:Steam',UnitVent(UnitVentNum)%HCoilName,ErrorsFound)
         CoilSteamOutletNode = GetCoilSteamInletNode('Coil:Heating:Steam',UnitVent(UnitVentNum)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', UnitVent(UnitVentNum)%HCoilName, CoilSteamInletNode, &
+        IF (IsAutosize) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', UnitVent(UnitVentNum)%HCoilName, CoilSteamInletNode, &
                                        CoilSteamOutletNode, ErrorsFound)
-
-        IF (PltSizHeatNum > 0) THEN
-          IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
-            CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+          IF (PltSizHeatNum > 0) THEN
+            IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
+              CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                               * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                               * (CoilOutTemp-CoilInTemp)
 
-            TempSteamIn= 100.00
-            EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitVentilator')
-            EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,RefrigIndex,'SizeUnitVentilator')
-            LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
-            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitVentilator')
-            Cp = GetSpecificHeatGlycol('WATER', PlantSizData(PltSizHeatNum)%ExitTemp, DummyWaterIndex, 'SizeUnitVentilator')
+              TempSteamIn= 100.00d0
+              EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitVentilator')
+              EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,RefrigIndex,'SizeUnitVentilator')
+              LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
+              SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,RefrigIndex,'SizeUnitVentilator')
+              Cp = GetSpecificHeatGlycol('WATER', PlantSizData(PltSizHeatNum)%ExitTemp, DummyWaterIndex, 'SizeUnitVentilator')
 
-            UnitVent(UnitVentNum)%MaxVolHotSteamFlow = DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
-              PlantSizData(PltSizHeatNum)%DeltaT * Cp ))
+              MaxVolHotSteamFlowDes = DesCoilLoad/(SteamDensity*(LatentHeatSteam + &
+                                    PlantSizData(PltSizHeatNum)%DeltaT * Cp ))
+            ELSE
+              MaxVolHotSteamFlowDes = 0.0d0
+            END IF
           ELSE
-            UnitVent(UnitVentNum)%MaxVolHotSteamFlow = 0.0
-          END IF
-          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                                  'Maximum Steam Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolHotSteamFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
-                               //TRIM(UnitVent(UnitVentNum)%Name))
-          ErrorsFound = .TRUE.
-        END IF
-
-      END IF
-    ELSE
-
-      UnitVent(UnitVentNum)%MaxVolHotWaterFlow = 0.0
-      UnitVent(UnitVentNum)%MaxVolHotSteamFlow = 0.0
-
-    END IF
-
-  END IF
-
-  IF (UnitVent(UnitVentNum)%MaxVolColdWaterFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
-
-      IF (UnitVent(UnitVentNum)%CCoilType == Cooling_CoilHXAssisted) THEN
-        CoolingCoilName = GetHXDXCoilName(UnitVent(UnitVentNum)%CCoilTypeCh,UnitVent(UnitVentNum)%CCoilName,ErrorsFound)
-        CoolingCoilType = GetHXCoilType(UnitVent(UnitVentNum)%CCoilTypeCh,UnitVent(UnitVentNum)%CCoilName,ErrorsFound)
-      ELSE
-        CoolingCoilName = UnitVent(UnitVentNum)%CCoilName
-        CoolingCoilType = UnitVent(UnitVentNum)%CCoilTypeCh
-      END IF
-      CoilWaterInletNode = GetCoilWaterInletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
-      CoilWaterOutletNode = GetCoilWaterOutletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
-      PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType,CoolingCoilName, CoilWaterInletNode, &
-                                         CoilWaterOutletNode, ErrorsFound)
-
-      IF (PltSizCoolNum > 0) THEN
-        IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
-          CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
-          CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
-          CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
-          DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
-                          * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
-          rho = GetDensityGlycol(PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidName, &
-                                    5.d0, &
-                                     PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidIndex, &
-                                     'SizeUnitVentilator')
-          Cp = GetSpecificHeatGlycol(PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidName, &
-                                    5.d0, &
-                                     PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidIndex, &
-                                     'SizeUnitVentilator')
-
-          UnitVent(UnitVentNum)%MaxVolColdWaterFlow = DesCoilLoad / &
-                                                     ( PlantSizData(PltSizCoolNum)%DeltaT * &
-                                                     Cp * rho )
-          IF(UnitVent(UnitVentNum)%MaxVolColdWaterFlow .LT. 0.d0)THEN
-            CALL ShowContinueError('Autosizing of water flow resulted in negative value.')
+            CALL ShowSevereError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
             CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
                                //TRIM(UnitVent(UnitVentNum)%Name))
-            CALL ShowContinueError('...Sizing information found during sizing simulation:')
-            CALL ShowContinueError('...Coil inlet temperature      = '//TRIM(TrimSigDigits(CoilInTemp,3))//' C')
-            CALL ShowContinueError('...Coil inlet humidity ratio   = '//TRIM(TrimSigDigits(CoilInHumRat,6))//' kg/kg')
-            CoilInEnthalpy = PsyHFnTdbW(CoilInTemp, CoilInHumRat)
-            CALL ShowContinueError('...Coil inlet enthalpy         = '//TRIM(TrimSigDigits(CoilInEnthalpy,3))//' J/kg')
-            CALL ShowContinueError('...Sizing information from sizing object:')
-            CALL ShowContinueError('...Coil outlet temperature     = '//TRIM(TrimSigDigits(CoilOutTemp,3))//' C')
-            CALL ShowContinueError('...Coil outlet humidity ratio  = '//TRIM(TrimSigDigits(CoilOutHumRat,6))//' kg/kg')
-            CoilOutEnthalpy = PsyHFnTdbW(CoilOutTemp, CoilOutHumRat)
-            CALL ShowContinueError('...Coil outlet enthalpy         = '//TRIM(TrimSigDigits(CoilOutEnthalpy,3))//' J/kg')
-            IF(CoilOutEnthalpy .GT. CoilInEnthalpy)THEN
-              CALL ShowContinueError('...Coil outlet air enthalpy is greater than coil inlet air enthalpy.')
-            END IF
-            CALL ShowContinueError('...Calculated coil design load = '//TRIM(TrimSigDigits(DesCoilLoad,3))//' W')
-            CALL ShowContinueError('...Calculated water flow rate  = '// &
-                                   TRIM(TrimSigDigits(UnitVent(UnitVentNum)%MaxVolColdWaterFlow,3))//' m3/s')
-            CALL ShowContinueError('...Water flow rate will be set to 0. Check sizing inputs for zone and plant,'// &
-                                   ' inputs for water cooling coil object, and design day specifications.')
-            CALL ShowContinueError('...Consider autosizing all inputs if not already doing so.')
-            UnitVent(UnitVentNum)%MaxVolColdWaterFlow = 0.0
+            ErrorsFound = .TRUE.
           END IF
-        ELSE
-          UnitVent(UnitVentNum)%MaxVolColdWaterFlow = 0.0
         END IF
-        CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
-                                'Maximum Cold Water Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolColdWaterFlow)
-      ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
-        CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
-                               //TRIM(UnitVent(UnitVentNum)%Name))
-        Errorsfound = .TRUE.
+        IF (IsAutosize) THEN
+          UnitVent(UnitVentNum)%MaxVolHotSteamFlow = MaxVolHotSteamFlowDes
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes)
+        ELSE
+          IF (UnitVent(UnitVentNum)%MaxVolHotSteamFlow > 0.0d0 .AND. MaxVolHotSteamFlowDes > 0.0d0) THEN
+            MaxVolHotSteamFlowUser = UnitVent(UnitVentNum)%MaxVolHotSteamFlow
+            CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes, &
+                     'User-Specified Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotSteamFlowDes - MaxVolHotSteamFlowUser)/MaxVolHotSteamFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                      //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Steam Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Steam Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-
     END IF
+  ELSE
+    UnitVent(UnitVentNum)%MaxVolHotSteamFlow = 0.0d0
+  END IF
 
+  IsAutosize = .FALSE.
+  IF (UnitVent(UnitVentNum)%MaxVolColdWaterFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (UnitVent(UnitVentNum)%CCoilType == Cooling_CoilWaterCooling .OR. &
+      UnitVent(UnitVentNum)%CCoilType == Cooling_CoilDetailedCooling .OR. &
+      UnitVent(UnitVentNum)%CCoilType == Cooling_CoilHXAssisted) THEN
+
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+        IF (UnitVent(UnitVentNum)%MaxVolColdWaterFlow > 0.0d0) THEN
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'User-Specified Maximum Cold Water Flow [m3/s]', UnitVent(UnitVentNum)%MaxVolColdWaterFlow)
+        END IF
+      ELSE
+        CALL CheckZoneSizing(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name)
+
+        IF (UnitVent(UnitVentNum)%CCoilType == Cooling_CoilHXAssisted) THEN
+          CoolingCoilName = GetHXDXCoilName(UnitVent(UnitVentNum)%CCoilTypeCh,UnitVent(UnitVentNum)%CCoilName,ErrorsFound)
+          CoolingCoilType = GetHXCoilType(UnitVent(UnitVentNum)%CCoilTypeCh,UnitVent(UnitVentNum)%CCoilName,ErrorsFound)
+        ELSE
+          CoolingCoilName = UnitVent(UnitVentNum)%CCoilName
+          CoolingCoilType = UnitVent(UnitVentNum)%CCoilTypeCh
+        END IF
+        CoilWaterInletNode = GetCoilWaterInletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
+        CoilWaterOutletNode = GetCoilWaterOutletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
+        IF (IsAutosize) THEN
+          PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType,CoolingCoilName, CoilWaterInletNode, &
+                                         CoilWaterOutletNode, ErrorsFound)
+          IF (PltSizCoolNum > 0) THEN
+            IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+              CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
+              CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
+              CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+              DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
+                          * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
+              rho = GetDensityGlycol(PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidName, &
+                                    5.d0, &
+                                     PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidIndex, &
+                                     'SizeUnitVentilator')
+              Cp = GetSpecificHeatGlycol(PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidName, &
+                                     5.d0, &
+                                     PlantLoop(UnitVent(UnitVentNum)%CWLoopNum)%FluidIndex, &
+                                     'SizeUnitVentilator')
+
+              MaxVolColdWaterFlowDes = DesCoilLoad / &
+                                   ( PlantSizData(PltSizCoolNum)%DeltaT * &
+                                   Cp * rho )
+              IF(MaxVolColdWaterFlowDes .LT. 0.d0)THEN
+                CALL ShowWarningError('Autosizing of water flow resulted in negative value.')
+                CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
+                               //TRIM(UnitVent(UnitVentNum)%Name))
+                CALL ShowContinueError('...Sizing information found during sizing simulation:')
+                CALL ShowContinueError('...Coil inlet temperature      = '//TRIM(TrimSigDigits(CoilInTemp,3))//' C')
+                CALL ShowContinueError('...Coil inlet humidity ratio   = '//TRIM(TrimSigDigits(CoilInHumRat,6))//' kg/kg')
+                CoilInEnthalpy = PsyHFnTdbW(CoilInTemp, CoilInHumRat)
+                CALL ShowContinueError('...Coil inlet enthalpy         = '//TRIM(TrimSigDigits(CoilInEnthalpy,3))//' J/kg')
+                CALL ShowContinueError('...Sizing information from sizing object:')
+                CALL ShowContinueError('...Coil outlet temperature     = '//TRIM(TrimSigDigits(CoilOutTemp,3))//' C')
+                CALL ShowContinueError('...Coil outlet humidity ratio  = '//TRIM(TrimSigDigits(CoilOutHumRat,6))//' kg/kg')
+                CoilOutEnthalpy = PsyHFnTdbW(CoilOutTemp, CoilOutHumRat)
+                CALL ShowContinueError('...Coil outlet enthalpy         = '//TRIM(TrimSigDigits(CoilOutEnthalpy,3))//' J/kg')
+                IF(CoilOutEnthalpy .GT. CoilInEnthalpy)THEN
+                  CALL ShowContinueError('...Coil outlet air enthalpy is greater than coil inlet air enthalpy.')
+                END IF
+                CALL ShowContinueError('...Calculated coil design load = '//TRIM(TrimSigDigits(DesCoilLoad,3))//' W')
+                CALL ShowContinueError('...Calculated water flow rate  = '// &
+                                   TRIM(TrimSigDigits(MaxVolColdWaterFlowDes,3))//' m3/s')
+                CALL ShowContinueError('...Water flow rate will be set to 0. Check sizing inputs for zone and plant,'// &
+                                   ' inputs for water cooling coil object, and design day specifications.')
+                CALL ShowContinueError('...Consider autosizing all inputs if not already doing so.')
+                MaxVolColdWaterFlowDes = 0.0d0
+              END IF
+            ELSE
+              MaxVolColdWaterFlowDes = 0.0d0
+            END IF
+          ELSE
+            CALL ShowSevereError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // cMO_UnitVentilator // ' Object=' &
+                               //TRIM(UnitVent(UnitVentNum)%Name))
+            Errorsfound = .TRUE.
+          END IF
+        END IF
+        IF (IsAutosize) THEN
+          UnitVent(UnitVentNum)%MaxVolColdWaterFlow = MaxVolColdWaterFlowDes
+          CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowDes)
+        ELSE
+          IF (UnitVent(UnitVentNum)%MaxVolColdWaterFlow > 0.0d0 .AND. MaxVolColdWaterFlowDes > 0.0d0) THEN
+            MaxVolColdWaterFlowUser = UnitVent(UnitVentNum)%MaxVolColdWaterFlow
+            CALL ReportSizingOutput(cMO_UnitVentilator, UnitVent(UnitVentNum)%Name, &
+                     'Design Size Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowDes, &
+                     'User-Specified Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolColdWaterFlowDes - MaxVolColdWaterFlowUser)/MaxVolColdWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeUnitVentilator: Potential issue with equipment sizing for ' &
+                                    //TRIM(cMO_UnitVentilator)//' '//TRIM(UnitVent(UnitVentNum)%Name))
+                CALL ShowContinueError('User-Specified Maximum Cold Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolColdWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Cold Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolColdWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
+      END IF
+    END IF
   END IF
 
   ! set the design air flow rates for the heating and cooling coils
@@ -1786,9 +1986,9 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
   ControlNode    = 0
   QUnitOut       = 0.0d0
   LatentOutput   = 0.0d0
-  ControlOffset  = 0.0
-  MaxWaterFlow   = 0.0
-  MinWaterFlow   = 0.0
+  ControlOffset  = 0.0d0
+  MaxWaterFlow   = 0.0d0
+  MinWaterFlow   = 0.0d0
   InletNode      = UnitVent(UnitVentNum)%AirInNode
   OutletNode     = UnitVent(UnitVentNum)%AirOutNode
   OutsideAirNode = UnitVent(UnitVentNum)%OutsideAirNode
@@ -1852,11 +2052,11 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
       End If
       HCoilOn       = .TRUE.
 
-      If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+      If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
          MinOAFrac = GetCurrentScheduleValue(UnitVent(UnitVentNum)%MinOASchedPtr) * &
                     (UnitVent(UnitVentNum)%MinOutAirMassFlow / Node(OutsideAirNode)%MassFlowRate)
       Else
-         MinOAFrac = 0.0
+         MinOAFrac = 0.0d0
       End If
       MinOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
 
@@ -1864,7 +2064,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
 
 
       IF ( (.NOT.UnitVent(UnitVentNum)%HCoilPresent) .OR. &
-           (UnitVent(UnitVentNum)%HCoilSchedValue <= 0.0) ) THEN
+           (UnitVent(UnitVentNum)%HCoilSchedValue <= 0.0d0) ) THEN
           ! In heating mode, but there is no coil to provide heating.  This is handled
           ! differently than if there was a heating coil present.  Fixed temperature
           ! will still try to vary the amount of outside air to meet the desired
@@ -1910,7 +2110,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
         Tdesired  = GetCurrentScheduleValue(UnitVent(UnitVentNum)%TempSchedPtr)
         Tinlet    = Node(InletNode)%Temp
         Toutdoor  = Node(OutsideAirNode)%Temp
-        MaxOAFrac = 1.0
+        MaxOAFrac = 1.0d0
 
         IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
           OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -1983,7 +2183,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
         Tdesired  = GetCurrentScheduleValue(UnitVent(UnitVentNum)%TempSchedPtr)
         Tinlet    = Node(InletNode)%Temp
         Toutdoor  = Node(OutsideAirNode)%Temp
-        MaxOAFrac = 1.0
+        MaxOAFrac = 1.0d0
 
         IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
           OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2063,17 +2263,17 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
       Toutdoor  = Node(OutsideAirNode)%Temp
 
 
-      If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+      If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
          MinOAFrac = GetCurrentScheduleValue(UnitVent(UnitVentNum)%MinOASchedPtr) * &
                     (UnitVent(UnitVentNum)%MinOutAirMassFlow / Node(OutsideAirNode)%MassFlowRate)
       Else
-         MinOAFrac = 0.0
+         MinOAFrac = 0.0d0
       End If
       MinOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
 
 
       IF ( (.NOT.UnitVent(UnitVentNum)%CCoilPresent) .OR. &
-           (UnitVent(UnitVentNum)%CCoilSchedValue <= 0.0) ) THEN
+           (UnitVent(UnitVentNum)%CCoilSchedValue <= 0.0d0) ) THEN
           ! In cooling mode, but there is no coil to provide cooling.  This is handled
           ! differently than if there was a cooling coil present.  Fixed temperature
           ! will still try to vary the amount of outside air to meet the desired
@@ -2107,7 +2307,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
         CASE (FixedTemperature)
           ! This is basically the same algorithm as for the heating case...
           Tdesired  = GetCurrentScheduleValue(UnitVent(UnitVentNum)%TempSchedPtr)
-          MaxOAFrac = 1.0
+          MaxOAFrac = 1.0d0
 
           IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
             OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2169,7 +2369,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
           ! This is basically the same algorithm as for the heating case...
           Tdesired  = GetCurrentScheduleValue(UnitVent(UnitVentNum)%TempSchedPtr)
 
-          MaxOAFrac = 1.0
+          MaxOAFrac = 1.0d0
 
           IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
             OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2231,7 +2431,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
   END IF    ! ...end of unit ON/OFF IF-THEN block
 
 ! CR9155 Remove specific humidity calculations
-  SpecHumOut = Node(OutletNode)%HumRat 
+  SpecHumOut = Node(OutletNode)%HumRat
   SpecHumIn  = Node(InletNode)%HumRat
   LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
@@ -2334,7 +2534,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
       CASE (Heating_SteamCoilType)
 
         IF (.NOT.HCoilOn) THEN
-          QCoilReq = 0.0
+          QCoilReq = 0.0d0
         ELSE
           HCoilInAirNode = UnitVent(UnitVentNum)%FanOutletNode
           CpAirZn        = PsyCpAirFnWTdb(Node(UnitVent(UnitVentNum)%AirInNode)%HumRat,Node(UnitVent(UnitVentNum)%AirInNode)%Temp)
@@ -2342,7 +2542,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
                                     *(Node(HCoilInAirNode)%Temp-Node(UnitVent(UnitVentNum)%AirInNode)%Temp)
         END IF
 
-        IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+        IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
 
         CALL SimulateSteamCoilComponents(CompName=UnitVent(UnitVentNum)%HCoilName, &
                                            FirstHVACIteration=FirstHVACIteration,    &
@@ -2353,7 +2553,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
       CASE (Heating_ElectricCoilType,Heating_GasCoilType)
 
         IF (.NOT.HCoilOn) THEN
-          QCoilReq = 0.0
+          QCoilReq = 0.0d0
         ELSE
           HCoilInAirNode = UnitVent(UnitVentNum)%FanOutletNode
           CpAirZn        = PsyCpAirFnWTdb(Node(UnitVent(UnitVentNum)%AirInNode)%HumRat,Node(UnitVent(UnitVentNum)%AirInNode)%Temp)
@@ -2361,7 +2561,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
                                     *(Node(HCoilInAirNode)%Temp-Node(UnitVent(UnitVentNum)%AirInNode)%Temp)
         END IF
 
-        IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+        IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
 
         CALL SimulateHeatingCoilComponents(CompName=UnitVent(UnitVentNum)%HCoilName, &
                                            FirstHVACIteration=FirstHVACIteration,    &
@@ -2461,17 +2661,17 @@ SUBROUTINE SimUnitVentOAMixer(UnitVentNum)
   Node(AirRelNode)%HumRat   = Node(InletNode)%HumRat
   Node(AirRelNode)%Enthalpy = Node(InletNode)%Enthalpy
 
-  IF (Node(InletNode)%MassFlowRate > 0.0) THEN
+  IF (Node(InletNode)%MassFlowRate > 0.0d0) THEN
     OAFraction = Node(OutsideAirNode)%MassFlowRate/Node(InletNode)%MassFlowRate
   ELSE
-    OAFraction = 0.0
+    OAFraction = 0.0d0
   END IF
 
           ! Perform an energy and moisture mass balance on the mixing portion of the unit ventilator
   Node(OAMixOutNode)%Enthalpy = OAFraction*Node(OutsideAirNode)%Enthalpy &
-                               +(1.0-OAFraction)*Node(InletNode)%Enthalpy
+                               +(1.0d0-OAFraction)*Node(InletNode)%Enthalpy
   Node(OAMixOutNode)%HumRat   = OAFraction*Node(OutsideAirNode)%HumRat &
-                               +(1.0-OAFraction)*Node(InletNode)%HumRat
+                               +(1.0d0-OAFraction)*Node(InletNode)%HumRat
 
           ! Find the other key state points based on calculated conditions
   Node(OAMixOutNode)%Temp  = PsyTdbFnHW(Node(OAMixOutNode)%Enthalpy,Node(OAMixOutNode)%HumRat)
@@ -2479,11 +2679,11 @@ SUBROUTINE SimUnitVentOAMixer(UnitVentNum)
 
   IF (Contaminant%CO2Simulation) Then
     Node(AirRelNode)%CO2 = Node(InletNode)%CO2
-    Node(OAMixOutNode)%CO2 = OAFraction*Node(OutsideAirNode)%CO2+(1.0-OAFraction)*Node(InletNode)%CO2
+    Node(OAMixOutNode)%CO2 = OAFraction*Node(OutsideAirNode)%CO2+(1.0d0-OAFraction)*Node(InletNode)%CO2
   END IF
   IF (Contaminant%GenericContamSimulation) Then
     Node(AirRelNode)%GenContam = Node(InletNode)%GenContam
-    Node(OAMixOutNode)%GenContam = OAFraction*Node(OutsideAirNode)%GenContam+(1.0-OAFraction)*Node(InletNode)%GenContam
+    Node(OAMixOutNode)%GenContam = OAFraction*Node(OutsideAirNode)%GenContam+(1.0d0-OAFraction)*Node(InletNode)%GenContam
   END IF
 
   RETURN

@@ -339,17 +339,17 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
       WildcardObjNames =  .FALSE.
       thisCoil  = 0
       ! test if too many pricing methods are set in user input
-      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0) .and. (CostLineItem(Item)%perEach > 0.0)) then
+      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0d0) .and. (CostLineItem(Item)%perEach > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
             '", Coil:DX, too many pricing methods specified')
          ErrorsFound = .TRUE.
       ENDIF
-      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
+      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0d0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
             '", Coil:DX, too many pricing methods specified')
          ErrorsFound = .TRUE.
       ENDIF
-      IF ((CostLineItem(Item)%perEach > 0.0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
+      IF ((CostLineItem(Item)%perEach > 0.0d0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
             '", Coil:DX, too many pricing methods specified')
          ErrorsFound = .TRUE.
@@ -378,17 +378,17 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
       WildcardObjNames =  .FALSE.
       thisCoil  = 0
       ! test if too many pricing methods are set in user input
-      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0) .and. (CostLineItem(Item)%perEach > 0.0)) then
+      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0d0) .and. (CostLineItem(Item)%perEach > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
              '", Coil:Heating:Gas, too many pricing methods specified')
          ErrorsFound = .TRUE.
       ENDIF
-      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
+      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0d0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
              '", Coil:Heating:Gas, too many pricing methods specified')
          ErrorsFound = .TRUE.
       ENDIF
-      IF ((CostLineItem(Item)%perEach > 0.0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
+      IF ((CostLineItem(Item)%perEach > 0.0d0) .and. (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
              '", Coil:Heating:Gas, too many pricing methods specified')
          ErrorsFound = .TRUE.
@@ -474,13 +474,13 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
 
     CASE ('LIGHTS')
 
-      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0) .and. (CostLineItem(Item)%perEach > 0.0)) then
+      IF ((CostLineItem(Item)%PerKiloWattCap > 0.0d0) .and. (CostLineItem(Item)%perEach > 0.0d0)) then
          CALL ShowSevereError('ComponentCost:LineItem: "'//trim(CostLineItem(Item)%LineName)//  &
              '", Lights, too many pricing methods specified')
          ErrorsFound = .TRUE.
       ENDIF
 
-      IF (CostLineItem(item)%PerKiloWattCap /= 0.0) THEN
+      IF (CostLineItem(item)%PerKiloWattCap /= 0.0d0) THEN
         IF (CostLineItem(Item)%ParentObjName /= '') THEN
           ThisZoneID = FindItem(CostLineItem(item)%ParentObjName, Zone%Name, NumOfZones)
           IF (ThisZoneID == 0) THEN
@@ -498,13 +498,13 @@ SUBROUTINE CheckCostEstimateInput(ErrorsFound)
 
     CASE ('GENERATOR:PHOTOVOLTAIC')
 
-      IF (CostLineItem(item)%PerKiloWattCap /= 0.0) THEN
+      IF (CostLineItem(item)%PerKiloWattCap /= 0.0d0) THEN
         IF (CostLineItem(Item)%ParentObjName /= '') THEN
           ThisPV    = FindItem(CostLineItem(Item)%ParentObjName, PVArray%Name, NumPVs)
           IF (ThisPV > 0) THEN
             ThisZoneID = FindItem(Surface(PVArray(thisPV)%SurfacePtr)%ZoneName,Zone%name,NumOfZones)
             IF (ThisZoneID == 0) THEN
-              Multipliers=1.0
+              Multipliers=1.0d0
             ELSE
               Multipliers=Zone(ThisZoneID)%Multiplier * Zone(ThisZoneID)%ListMultiplier
             ENDIF
@@ -623,7 +623,7 @@ SUBROUTINE CalcCostEstimate
       ALLOCATE(uniqueSurfMask(TotSurfaces))
       uniqueSurfMask = .true.  !init to true and change duplicates to false
       AllOCATE(SurfMultipleARR(TotSurfaces))
-      SurfMultipleARR = 1.0
+      SurfMultipleARR = 1.0d0
       DO surf=1, TotSurfaces
         IF (surface(surf)%ExtBoundCond >= 1) THEN
           IF (surface(surf)%ExtBoundCond < surf) THEN !already cycled through
@@ -659,38 +659,38 @@ SUBROUTINE CalcCostEstimate
         thisCoil = FindItem(CostLineItem(Item)%ParentObjName, DXCoil%Name, NumDXCoils)
       ENDIF
 
-      If (CostLineItem(Item)%PerKiloWattCap > 0.0) then !
+      If (CostLineItem(Item)%PerKiloWattCap > 0.0d0) then !
         If (WildCardObjNames) then
-          CostLineItem(item)%Qty = sum(DXCoil%RatedTotCap(1))/1000.0
+          CostLineItem(item)%Qty = sum(DXCoil%RatedTotCap(1))/1000.0d0
           CostLineItem(item)%units = 'kW (tot cool cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         endif
         If (thisCoil > 0) then
-          CostLineItem(item)%Qty = DXCoil(thisCoil)%RatedTotCap(1)/1000.0
+          CostLineItem(item)%Qty = DXCoil(thisCoil)%RatedTotCap(1)/1000.0d0
           CostLineItem(item)%units = 'kW (tot cool cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         endif
       endif
 
-      If (CostLineItem(Item)%perEach > 0.0) then
-          If (WildCardObjNames) CostLineItem(item)%Qty = NumDXCoils
-          If (thisCoil > 0) CostLineItem(item)%Qty = 1
+      If (CostLineItem(Item)%perEach > 0.0d0) then
+          If (WildCardObjNames) CostLineItem(item)%Qty = REAL(NumDXCoils,r64)
+          If (thisCoil > 0) CostLineItem(item)%Qty = 1.0d0
           CostLineItem(item)%ValuePer = CostLineItem(Item)%perEach
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
           CostLineItem(item)%units = 'Ea.'
       endif
 
-      IF (CostLineItem(Item)%PerKWCapPerCOP > 0.0) then
+      IF (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0) then
          If (WildCardObjNames) then
-          CostLineItem(item)%Qty = sum(DXCoil%RatedCOP(1)*DXCoil%RatedTotCap(1))/1000.0
+          CostLineItem(item)%Qty = sum(DXCoil%RatedCOP(1)*DXCoil%RatedTotCap(1))/1000.0d0
           CostLineItem(item)%units = 'kW*COP (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         ENDIF
         If (thisCoil > 0) then
-          CostLineItem(item)%Qty = DXCoil(thisCoil)%RatedCOP(1) * DXCoil(thisCoil)%RatedTotCap(1)/1000.0
+          CostLineItem(item)%Qty = DXCoil(thisCoil)%RatedCOP(1) * DXCoil(thisCoil)%RatedTotCap(1)/1000.0d0
           CostLineItem(item)%units = 'kW*COP (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
@@ -707,41 +707,41 @@ SUBROUTINE CalcCostEstimate
         thisCoil = FindItem(CostLineItem(Item)%ParentObjName, HeatingCoil%Name, NumHeatingCoils)
       ENDIF
 
-      If (CostLineItem(Item)%PerKiloWattCap > 0.0) then !
+      If (CostLineItem(Item)%PerKiloWattCap > 0.0d0) then !
         If (WildCardObjNames) then
 
           CostLineItem(item)%Qty = sum(HeatingCoil%NominalCapacity, &
-              mask=(HeatingCoil%HCoilType_Num == 1) )/1000.0
+              mask=(HeatingCoil%HCoilType_Num == 1) )/1000.0d0
           CostLineItem(item)%units = 'kW (tot heat cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         endif
         If (thisCoil > 0) then
-          CostLineItem(item)%Qty = HeatingCoil(thisCoil)%NominalCapacity/1000.0
+          CostLineItem(item)%Qty = HeatingCoil(thisCoil)%NominalCapacity/1000.0d0
           CostLineItem(item)%units = 'kW (tot heat cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         endif
       endif
 
-      If (CostLineItem(Item)%perEach > 0.0) then
+      If (CostLineItem(Item)%perEach > 0.0d0) then
           If (WildCardObjNames) CostLineItem(item)%Qty = NumHeatingCoils
-          If (thisCoil > 0) CostLineItem(item)%Qty = 1
+          If (thisCoil > 0) CostLineItem(item)%Qty = 1.0d0
           CostLineItem(item)%ValuePer = CostLineItem(Item)%perEach
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
           CostLineItem(item)%units = 'Ea.'
       endif
 
-      IF (CostLineItem(Item)%PerKWCapPerCOP > 0.0) then
+      IF (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0) then
          If (WildCardObjNames) then
           CostLineItem(item)%Qty = sum(HeatingCoil%Efficiency*HeatingCoil%NominalCapacity ,&
-              mask=(HeatingCoil%HCoilType_Num == 1) )/1000.0
+              mask=(HeatingCoil%HCoilType_Num == 1) )/1000.0d0
           CostLineItem(item)%units = 'kW*Eff (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
         ENDIF
         If (thisCoil > 0) then
-          CostLineItem(item)%Qty = HeatingCoil(thisCoil)%Efficiency*HeatingCoil(thisCoil)%NominalCapacity/1000.0
+          CostLineItem(item)%Qty = HeatingCoil(thisCoil)%Efficiency*HeatingCoil(thisCoil)%NominalCapacity/1000.0d0
           CostLineItem(item)%units = 'kW*Eff (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
@@ -751,20 +751,20 @@ SUBROUTINE CalcCostEstimate
     CASE ('CHILLER:ELECTRIC')
       !
       thisChil = FindItem(CostLineItem(Item)%ParentObjName, ElectricChiller%Base%Name, NumElectricChillers )
-      If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKiloWattCap > 0.0)) then
-          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%NomCap/1000.0
+      If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKiloWattCap > 0.0d0)) then
+          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%NomCap/1000.0d0
           CostLineItem(item)%units = 'kW (tot cool cap.)'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKiloWattCap
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
       ENDIF
-      If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKWCapPerCOP > 0.0)) then
-          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%COP * ElectricChiller(thisChil)%Base%NomCap/1000.0
+      If ((thisChil > 0) .AND. (CostLineItem(Item)%PerKWCapPerCOP > 0.0d0)) then
+          CostLineItem(item)%Qty = ElectricChiller(thisChil)%Base%COP * ElectricChiller(thisChil)%Base%NomCap/1000.0d0
           CostLineItem(item)%units = 'kW*COP (total, rated) '
           CostLineItem(item)%ValuePer = CostLineItem(Item)%PerKWCapPerCOP
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
       ENDIF
-      IF ((thisChil > 0) .AND. (CostLineItem(Item)%PerEach > 0.0)) then
-          CostLineItem(item)%Qty = 1.0
+      IF ((thisChil > 0) .AND. (CostLineItem(Item)%PerEach > 0.0d0)) then
+          CostLineItem(item)%Qty = 1.0d0
           CostLineItem(item)%units = 'Ea.'
           CostLineItem(item)%ValuePer = CostLineItem(Item)%perEach
           CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
@@ -806,14 +806,14 @@ SUBROUTINE CalcCostEstimate
 
     CASE ('LIGHTS')
 
-      IF (CostLineItem(item)%PerEach /= 0.0) THEN
-        CostLineItem(item)%Qty = 1
+      IF (CostLineItem(item)%PerEach /= 0.0d0) THEN
+        CostLineItem(item)%Qty = 1.0d0
         CostLineItem(item)%units = 'Ea.'
         CostLineItem(item)%ValuePer = CostLineItem(item)%PerEach
         CostLineItem(item)%LineSubTotal = CostLineItem(item)%Qty * CostLineItem(item)%ValuePer
       ENDIF
 
-      IF (CostLineItem(item)%PerKiloWattCap /= 0.0) THEN
+      IF (CostLineItem(item)%PerKiloWattCap /= 0.0d0) THEN
         IF (CostLineItem(Item)%ParentObjName /= '') THEN
           ThisZoneID = FindItem(CostLineItem(item)%ParentObjName, Zone%Name, NumOfZones)
           IF (ThisZoneID > 0) THEN
@@ -830,20 +830,20 @@ SUBROUTINE CalcCostEstimate
 
     CASE ('GENERATOR:PHOTOVOLTAIC')
 
-      IF (CostLineItem(item)%PerKiloWattCap /= 0.0) THEN
+      IF (CostLineItem(item)%PerKiloWattCap /= 0.0d0) THEN
         IF (CostLineItem(Item)%ParentObjName /= '') THEN
           ThisPV    = FindItem(CostLineItem(Item)%ParentObjName, PVArray%Name, NumPVs)
           IF (ThisPV > 0) THEN
             ThisZoneID = FindItem(Surface(PVArray(thisPV)%SurfacePtr)%ZoneName,Zone%name,NumOfZones)
             IF (ThisZoneID == 0) THEN
-              Multipliers=1.0
+              Multipliers=1.0d0
             ELSE
               Multipliers=Zone(ThisZoneID)%Multiplier * Zone(ThisZoneID)%ListMultiplier
             ENDIF
             IF (PVArray(thisPV)%PVModelType == iSimplePVModel) THen
-              CostLineItem(item)%Qty = 1000.0 * PVArray(thisPV)%SimplePVModule%AreaCol &
+              CostLineItem(item)%Qty = 1000.0d0 * PVArray(thisPV)%SimplePVModule%AreaCol &
                                               * PVArray(thisPV)%SimplePVModule%PVEfficiency &
-                                              * Multipliers  / 1000.0
+                                              * Multipliers  / 1000.0d0
 
             ENDIF
             CostLineItem(item)%units = 'kW (rated)'

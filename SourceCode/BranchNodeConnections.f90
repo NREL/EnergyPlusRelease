@@ -22,7 +22,7 @@ MODULE BranchNodeConnections
           ! na
 
           ! USE STATEMENTS:
-USE DataGlobals, ONLY: MaxNameLength
+USE DataGlobals, ONLY: MaxNameLength,outputfiledebug
 USE DataInterfaces, ONLY: ShowFatalError, ShowWarningError, ShowSevereError, ShowMessage, ShowContinueError
 USE DataLoopNode
 USE DataBranchNodeConnections
@@ -300,7 +300,8 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
           ! na
 
           ! USE STATEMENTS:
-          ! na
+  USE InputProcessor, ONLY: SameString
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -324,6 +325,15 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
   LOGICAL IsOutlet
   LOGICAL MatchedAtLeastOne
   INTEGER :: ErrorCounter
+  INTEGER :: Object
+  INTEGER :: StartConnect
+  INTEGER :: EndConnect
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: FluidStreamInletCount
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: FluidStreamOutletCount
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: NodeObjects
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: FluidStreamCounts
+  INTEGER :: NumObjects
+  INTEGER :: MaxFluidStream
 
   ErrorCounter=0
   !  Check 1 -- check sensor and actuator nodes
@@ -605,6 +615,78 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
 !      ErrorsFound=.true.
     ENDIF
   ENDDO
+
+  ! Check 10 -- fluid streams cannot have multiple inlet/outlet nodes on same component
+  !  can have multiple inlets with one outlet or vice versa but cannot have multiple both inlet and outlet
+  IF (NumOfNodeConnections > 0) THEN
+    MaxFluidStream=MAXVAL(NodeConnections%FluidStream)
+    ALLOCATE(FluidStreamInletCount(MaxFluidStream))
+    ALLOCATE(FluidStreamOutletCount(MaxFluidStream))
+    ALLOCATE(FluidStreamCounts(MaxFluidStream))
+    ALLOCATE(NodeObjects(NumOfNodeConnections))
+    FluidStreamInletCount=0
+    FluidStreamOutletCount=0
+    NodeObjects=0
+    FluidStreamCounts=.false.
+    ! Following code relies on node connections for single object type/name being grouped together
+    Object=1
+    StartConnect=1
+    EndConnect=0
+    NumObjects=2
+    NodeObjects(1)=1
+    DO WHILE (Object < NumOfNodeConnections)
+      IF (NodeConnections(Object)%ObjectType /= NodeConnections(Object+1)%ObjectType .or.   &
+          NodeConnections(Object)%ObjectName /= NodeConnections(Object+1)%ObjectName) THEN
+        EndConnect=Object+1
+        NodeObjects(NumObjects)=EndConnect
+        IF (Object+1 < NumOfNodeConnections) NumObjects=NumObjects+1
+      ENDIF
+      Object=Object+1
+    ENDDO
+    ! NodeObjects now contains each consecutive object...
+    DO Object=1,NumObjects-1
+      IsValid=.true.
+      FluidStreamInletCount=0
+      FluidStreamOutletCount=0
+      FluidStreamCounts=.false.
+      Loop1=NodeObjects(Object)
+      IF (NodeConnections(Loop1)%ObjectIsParent) CYCLE
+      IF (NodeConnections(Loop1)%ConnectionType == ValidConnectionTypes(NodeConnectionType_Inlet))   &
+         FluidStreamInletCount(NodeConnections(Loop1)%FluidStream)=FluidStreamInletCount(NodeConnections(Loop1)%FluidStream)+1
+      IF (NodeConnections(Loop1)%ConnectionType == ValidConnectionTypes(NodeConnectionType_Outlet))   &
+         FluidStreamOutletCount(NodeConnections(Loop1)%FluidStream)=FluidStreamOutletCount(NodeConnections(Loop1)%FluidStream)+1
+      DO Loop2=Loop1+1,NodeObjects(Object+1)-1
+        IF (NodeConnections(Loop2)%ObjectIsParent) CYCLE
+        IF (NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_Inlet))   &
+           FluidStreamInletCount(NodeConnections(Loop2)%FluidStream)=FluidStreamInletCount(NodeConnections(Loop2)%FluidStream)+1
+        IF (NodeConnections(Loop2)%ConnectionType == ValidConnectionTypes(NodeConnectionType_Outlet))   &
+           FluidStreamOutletCount(NodeConnections(Loop2)%FluidStream)=FluidStreamOutletCount(NodeConnections(Loop2)%FluidStream)+1
+      ENDDO
+      DO Loop2=1,MaxFluidStream
+        IF (FluidStreamInletCount(Loop2) > 1 .and. FluidStreamOutletCount(Loop2) > 1) THEN
+          IsValid=.false.
+          FluidStreamCounts(Loop2)=.true.
+        ENDIF
+      ENDDO
+      IF (.not. IsValid) THEN
+        CALL ShowSevereError('(Developer) Node Connection Error, Object='//trim(NodeConnections(Loop1)%ObjectType)//':'//  &
+           trim(NodeConnections(Loop1)%ObjectName))
+        CALL ShowContinueError('Object has multiple connections on both inlet and outlet fluid streams.')
+        DO Loop2=1,MaxFluidStream
+          IF (FluidStreamCounts(Loop2))   &
+             CALL ShowContinueError('...occurs in Fluid Stream ['//trim(RoundSigDigits(Loop2))//'].')
+        ENDDO
+        ErrorCounter=ErrorCounter+1
+        ErrorsFound=.true.
+      ENDIF
+    ENDDO
+    DEALLOCATE(FluidStreamInletCount)
+    DEALLOCATE(FluidStreamOutletCount)
+    DEALLOCATE(FluidStreamCounts)
+    DEALLOCATE(NodeObjects)
+  ENDIF
+
+
 
   NumNodeConnectionErrors=NumNodeConnectionErrors+ErrorCounter
   RETURN
@@ -1618,7 +1700,7 @@ SUBROUTINE TestInletOutletNodes(ErrorsFound)
         CALL ShowContinueError ('  as inlet for: '//TRIM(CompSets(Count)%CType)//', name='//TRIM(CompSets(Count)%CName))
         CALL ShowContinueError ('  and  by     : '//TRIM(CompSets(Other)%ParentCType)//', name='//TRIM(CompSets(Other)%ParentCName))
         CALL ShowContinueError ('  as inlet for: '//TRIM(CompSets(Other)%CType)//', name='//TRIM(CompSets(Other)%CName))
-        ErrorsFound=.true.
+!        ErrorsFound=.true.
       ENDIF
     ENDDO
   ENDDO
@@ -1641,7 +1723,7 @@ SUBROUTINE TestInletOutletNodes(ErrorsFound)
         CALL ShowContinueError ('  and  by      : '//TRIM(CompSets(Other)%ParentCType)//  &
                                 ', name='//TRIM(CompSets(Other)%ParentCName))
         CALL ShowContinueError ('  as outlet for: '//TRIM(CompSets(Other)%CType)//', name='//TRIM(CompSets(Other)%CName))
-        ErrorsFound=.true.
+!        ErrorsFound=.true.
       ENDIF
     ENDDO
   ENDDO

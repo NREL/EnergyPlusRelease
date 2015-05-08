@@ -419,7 +419,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   ALLOCATE(cNumericFieldNames(maxNumber))
   cNumericFieldNames=' '
   ALLOCATE(rNumericArgs(maxNumber))
-  rNumericArgs=0.0
+  rNumericArgs=0.0d0
   ALLOCATE(lAlphaFieldBlanks(maxAlpha))
   lAlphaFieldBlanks=.true.
   ALLOCATE(lNumericFieldBlanks(maxNumber))
@@ -470,7 +470,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     END SELECT
 
     ZoneAirBalance(Loop)%InducedAirRate = rNumericArgs(1)
-    If (rNumericArgs(1) < 0.0) Then
+    If (rNumericArgs(1) < 0.0d0) Then
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
         '", invalid Induced Outdoor Air Due to Duct Leakage Unbalance specification [<0.0]='//   &
         TRIM(RoundSigDigits(rNumericArgs(1),3)))
@@ -488,7 +488,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
       END IF
       ErrorsFound=.TRUE.
     ENDIF
-    IF (.NOT. CheckScheduleValueMinMax(ZoneAirBalance(Loop)%InducedAirSchedPtr,'>=',0.,'<=',1.)) THEN
+    IF (.NOT. CheckScheduleValueMinMax(ZoneAirBalance(Loop)%InducedAirSchedPtr,'>=',0.0d0,'<=',1.0d0)) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(ZoneAirBalance(Loop)%Name)//&
            ':  Error found in '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)))
       CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
@@ -673,10 +673,10 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
           CASE('FLOW/AREA')
             IF (Infiltration(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(2) >= 0.0) THEN
+              IF (rNumericArgs(2) >= 0.0d0) THEN
                 Infiltration(Loop)%DesignLevel=rNumericArgs(2)*Zone(Infiltration(Loop)%ZonePtr)%FloorArea
                 IF (Infiltration(Loop)%ZonePtr > 0) THEN
-                  IF (Zone(Infiltration(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                  IF (Zone(Infiltration(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                     CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Infiltration(Loop)%Name)//  &
                       '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(2))//  &
                       ', but Zone Floor Area = 0.  0 Infiltration will result.')
@@ -697,9 +697,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
           CASE('FLOW/EXTERIORAREA')
             IF (Infiltration(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(3) >= 0.0) THEN
+              IF (rNumericArgs(3) >= 0.0d0) THEN
                 Infiltration(Loop)%DesignLevel=rNumericArgs(3)*Zone(Infiltration(Loop)%ZonePtr)%ExteriorTotalSurfArea
-                IF (Zone(Infiltration(Loop)%ZonePtr)%ExteriorTotalSurfArea <= 0.0) THEN
+                IF (Zone(Infiltration(Loop)%ZonePtr)%ExteriorTotalSurfArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Infiltration(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(3))//  &
                     ', but Exterior Surface Area = 0.  0 Infiltration will result.')
@@ -718,9 +718,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
             ENDIF
           CASE('FLOW/EXTERIORWALLAREA')
             IF (Infiltration(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(3) >= 0.0) THEN
+              IF (rNumericArgs(3) >= 0.0d0) THEN
                 Infiltration(Loop)%DesignLevel=rNumericArgs(3)*Zone(Infiltration(Loop)%ZonePtr)%ExtGrossWallArea
-                IF (Zone(Infiltration(Loop)%ZonePtr)%ExtGrossWallArea <= 0.0) THEN
+                IF (Zone(Infiltration(Loop)%ZonePtr)%ExtGrossWallArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Infiltration(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(3))//  &
                     ', but Exterior Wall Area = 0.  0 Infiltration will result.')
@@ -739,9 +739,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
             ENDIF
           CASE('AIRCHANGES/HOUR')
             IF (Infiltration(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(4) >= 0.0) THEN
+              IF (rNumericArgs(4) >= 0.0d0) THEN
                 Infiltration(Loop)%DesignLevel=rNumericArgs(4)*Zone(Infiltration(Loop)%ZonePtr)%Volume/SecInHour
-                IF (Zone(Infiltration(Loop)%ZonePtr)%Volume <= 0.0) THEN
+                IF (Zone(Infiltration(Loop)%ZonePtr)%Volume <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Infiltration(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(4))//  &
                     ', but Zone Volume = 0.  0 Infiltration will result.')
@@ -771,26 +771,26 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         IF (.not. lNumericFieldBlanks(5)) THEN
           Infiltration(Loop)%ConstantTermCoef=rNumericArgs(5)
         ELSE
-          Infiltration(Loop)%ConstantTermCoef=1.0
+          Infiltration(Loop)%ConstantTermCoef=1.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(6)) THEN
           Infiltration(Loop)%TemperatureTermCoef=rNumericArgs(6)
         ELSE
-          Infiltration(Loop)%TemperatureTermCoef=0.0
+          Infiltration(Loop)%TemperatureTermCoef=0.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(7)) THEN
           Infiltration(Loop)%VelocityTermCoef=rNumericArgs(7)
         ELSE
-          Infiltration(Loop)%VelocityTermCoef=0.0
+          Infiltration(Loop)%VelocityTermCoef=0.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(8)) THEN
           Infiltration(Loop)%VelocitySQTermCoef=rNumericArgs(8)
         ELSE
-          Infiltration(Loop)%VelocitySQTermCoef=0.0
+          Infiltration(Loop)%VelocitySQTermCoef=0.0d0
         ENDIF
 
-        IF (Infiltration(Loop)%ConstantTermCoef == 0.0 .and. Infiltration(Loop)%TemperatureTermCoef == 0.0 .and.  &
-            Infiltration(Loop)%VelocityTermCoef == 0.0 .and. Infiltration(Loop)%VelocitySQTermCoef == 0.0)  THEN
+        IF (Infiltration(Loop)%ConstantTermCoef == 0.0d0 .and. Infiltration(Loop)%TemperatureTermCoef == 0.0d0 .and.  &
+            Infiltration(Loop)%VelocityTermCoef == 0.0d0 .and. Infiltration(Loop)%VelocitySQTermCoef == 0.0d0)  THEN
             IF (Item1 == 1) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", in '// &
                                       TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
@@ -855,7 +855,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
     !check if zone has exterior surfaces
     IF (Infiltration(InfiltCount)%ZonePtr > 0) THEN
-      IF (Zone(Infiltration(InfiltCount)%ZonePtr)%ExteriorTotalSurfArea <= 0.0) THEN
+      IF (Zone(Infiltration(InfiltCount)%ZonePtr)%ExteriorTotalSurfArea <= 0.0d0) THEN
         CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//   &
            '", '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'" does not have surfaces exposed to outdoors.')
         CALL ShowContinueError('Infiltration model is appropriate for exterior zones not interior zones, simulation continues.')
@@ -917,7 +917,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
         !check if zone has exterior surfaces
     IF (Infiltration(InfiltCount)%ZonePtr > 0) THEN
-      IF (Zone(Infiltration(InfiltCount)%ZonePtr)%ExteriorTotalSurfArea <= 0.0) THEN
+      IF (Zone(Infiltration(InfiltCount)%ZonePtr)%ExteriorTotalSurfArea <= 0.0d0) THEN
         CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//   &
            '", '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'" does not have surfaces exposed to outdoors.')
         CALL ShowContinueError('Infiltration model is appropriate for exterior zones not interior zones, simulation continues.')
@@ -1105,9 +1105,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
           CASE('FLOW/AREA')
             IF (Ventilation(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(2) >= 0.0) THEN
+              IF (rNumericArgs(2) >= 0.0d0) THEN
                 Ventilation(Loop)%DesignLevel=rNumericArgs(2)*Zone(Ventilation(Loop)%ZonePtr)%FloorArea
-                IF (Zone(Ventilation(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+                IF (Zone(Ventilation(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Ventilation(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(2))//  &
                     ', but Zone Floor Area = 0.  0 Ventilation will result.')
@@ -1127,9 +1127,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
           CASE('FLOW/PERSON')
             IF (Ventilation(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(3) >= 0.0) THEN
+              IF (rNumericArgs(3) >= 0.0d0) THEN
                 Ventilation(Loop)%DesignLevel=rNumericArgs(3)*Zone(Ventilation(Loop)%ZonePtr)%TotOccupants
-                IF (Zone(Ventilation(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+                IF (Zone(Ventilation(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Ventilation(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(3))//  &
                     ', but Zone Total Occupants = 0.  0 Ventilation will result.')
@@ -1149,9 +1149,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
           CASE('AIRCHANGES/HOUR')
             IF (Ventilation(Loop)%ZonePtr /= 0) THEN
-              IF (rNumericArgs(4) >= 0.0) THEN
+              IF (rNumericArgs(4) >= 0.0d0) THEN
                 Ventilation(Loop)%DesignLevel=rNumericArgs(4)*Zone(Ventilation(Loop)%ZonePtr)%Volume/SecInHour
-                IF (Zone(Ventilation(Loop)%ZonePtr)%Volume <= 0.0) THEN
+                IF (Zone(Ventilation(Loop)%ZonePtr)%Volume <= 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Ventilation(Loop)%Name)//  &
                     '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(4))//  &
                     ', but Zone Volume = 0.  0 Ventilation will result.')
@@ -1196,7 +1196,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         END SELECT
 
         Ventilation(Loop)%FanPressure   = rNumericArgs(5)
-        IF (Ventilation(Loop)%FanPressure < 0.0) THEN
+        IF (Ventilation(Loop)%FanPressure < 0.0d0) THEN
           IF (Item1 == 1) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Ventilation(Loop)%Name)//  &
             '", '//trim(cNumericFieldNames(5))//' must be >=0')
@@ -1205,8 +1205,8 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         END IF
 
         Ventilation(Loop)%FanEfficiency = rNumericArgs(6)
-        IF ((Ventilation(Loop)%FanEfficiency <= 0.0) .OR. &
-            (Ventilation(Loop)%FanEfficiency >  1.0)) THEN
+        IF ((Ventilation(Loop)%FanEfficiency <= 0.0d0) .OR. &
+            (Ventilation(Loop)%FanEfficiency >  1.0d0)) THEN
           IF (Item1 == 1) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(Ventilation(Loop)%Name)//  &
                '",'//trim(cNumericFieldNames(6))//' must be in range >0 and <= 1')
@@ -1216,33 +1216,33 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
               ! Override any user input for cases where natural ventilation is being used
         IF (Ventilation(Loop)%FanType == NaturalVentilation) THEN
-          Ventilation(Loop)%FanPressure   = 0.0
-          Ventilation(Loop)%FanEfficiency = 1.0
+          Ventilation(Loop)%FanPressure   = 0.0d0
+          Ventilation(Loop)%FanEfficiency = 1.0d0
         END IF
 
         IF (.not. lNumericFieldBlanks(7)) THEN
           Ventilation(Loop)%ConstantTermCoef    = rNumericArgs(7)
         ELSE
-          Ventilation(Loop)%ConstantTermCoef    = 1.0
+          Ventilation(Loop)%ConstantTermCoef    = 1.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(8)) THEN
           Ventilation(Loop)%TemperatureTermCoef = rNumericArgs(8)
         ELSE
-          Ventilation(Loop)%TemperatureTermCoef = 0.0
+          Ventilation(Loop)%TemperatureTermCoef = 0.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(9)) THEN
           Ventilation(Loop)%VelocityTermCoef    = rNumericArgs(9)
         ELSE
-          Ventilation(Loop)%VelocityTermCoef    = 0.0
+          Ventilation(Loop)%VelocityTermCoef    = 0.0d0
         ENDIF
         IF (.not. lNumericFieldBlanks(10)) THEN
           Ventilation(Loop)%VelocitySQTermCoef  = rNumericArgs(10)
         ELSE
-          Ventilation(Loop)%VelocitySQTermCoef  = 0.0
+          Ventilation(Loop)%VelocitySQTermCoef  = 0.0d0
         ENDIF
 
-        IF (Ventilation(Loop)%ConstantTermCoef == 0.0 .and. Ventilation(Loop)%TemperatureTermCoef == 0.0 .and.  &
-            Ventilation(Loop)%VelocityTermCoef == 0.0 .and. Ventilation(Loop)%VelocitySQTermCoef == 0.0)  THEN
+        IF (Ventilation(Loop)%ConstantTermCoef == 0.0d0 .and. Ventilation(Loop)%TemperatureTermCoef == 0.0d0 .and.  &
+            Ventilation(Loop)%VelocityTermCoef == 0.0d0 .and. Ventilation(Loop)%VelocitySQTermCoef == 0.0d0)  THEN
             IF (Item1 == 1) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", in '// &
                                       TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
@@ -1604,7 +1604,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     End If
 
     Ventilation(VentiCount)%OpenArea   = rNumericArgs(1)
-    IF (Ventilation(VentiCount)%OpenArea < 0.0) THEN
+    IF (Ventilation(VentiCount)%OpenArea < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", '//   &
                    trim(cNumericFieldNames(1))//' must be positive.')
       ErrorsFound = .TRUE.
@@ -1624,21 +1624,21 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
     Ventilation(VentiCount)%OpenEff   = rNumericArgs(2)
     IF (Ventilation(VentiCount)%OpenEff /= AutoCalculate .and. &
-       (Ventilation(VentiCount)%OpenEff < 0.0 .OR. Ventilation(VentiCount)%OpenEff > 1)) THEN
+       (Ventilation(VentiCount)%OpenEff < 0.0d0 .OR. Ventilation(VentiCount)%OpenEff > 1)) THEN
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", '//   &
                        trim(cNumericFieldNames(2))//' must be between 0 and 1.')
       ErrorsFound = .TRUE.
     END IF
 
     Ventilation(VentiCount)%EffAngle   = rNumericArgs(3)
-    IF (Ventilation(VentiCount)%EffAngle < 0.0 .OR. Ventilation(VentiCount)%EffAngle >= 360) THEN
+    IF (Ventilation(VentiCount)%EffAngle < 0.0d0 .OR. Ventilation(VentiCount)%EffAngle >= 360) THEN
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", '//   &
                        trim(cNumericFieldNames(3))//' must be between 0 and 360.')
       ErrorsFound = .TRUE.
     END IF
 
     Ventilation(VentiCount)%DH   = rNumericArgs(4)
-    IF (Ventilation(VentiCount)%DH < 0.0) THEN
+    IF (Ventilation(VentiCount)%DH < 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", '//   &
                        trim(cNumericFieldNames(4))//' must be positive.')
       ErrorsFound = .TRUE.
@@ -1646,7 +1646,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
     Ventilation(VentiCount)%DiscCoef   = rNumericArgs(5)
     IF (Ventilation(VentiCount)%DiscCoef /= AutoCalculate .and. &
-       (Ventilation(VentiCount)%DiscCoef < 0.0 .OR. Ventilation(VentiCount)%DiscCoef > 1)) THEN
+       (Ventilation(VentiCount)%DiscCoef < 0.0d0 .OR. Ventilation(VentiCount)%DiscCoef > 1)) THEN
       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", '//   &
                        trim(cNumericFieldNames(5))//' must be between 0 and 1.')
       ErrorsFound = .TRUE.
@@ -1963,9 +1963,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('FLOW/AREA')
         IF (Mixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(2) >= 0.0) THEN
+          IF (rNumericArgs(2) >= 0.0d0) THEN
             Mixing(Loop)%DesignLevel=rNumericArgs(2)*Zone(Mixing(Loop)%ZonePtr)%FloorArea
-            IF (Zone(Mixing(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+            IF (Zone(Mixing(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(2))//  &
                 ', but Zone Floor Area = 0.  0 Mixing will result.')
@@ -1985,9 +1985,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('FLOW/PERSON')
         IF (Mixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(3) >= 0.0) THEN
+          IF (rNumericArgs(3) >= 0.0d0) THEN
             Mixing(Loop)%DesignLevel=rNumericArgs(3)*Zone(Mixing(Loop)%ZonePtr)%TotOccupants
-            IF (Zone(Mixing(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+            IF (Zone(Mixing(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(3))//  &
                 ', but Zone Total Occupants = 0.  0 Mixing will result.')
@@ -2007,9 +2007,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('AIRCHANGES/HOUR')
         IF (Mixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(4) >= 0.0) THEN
+          IF (rNumericArgs(4) >= 0.0d0) THEN
             Mixing(Loop)%DesignLevel=rNumericArgs(4)*Zone(Mixing(Loop)%ZonePtr)%Volume/SecInHour
-            IF (Zone(Mixing(Loop)%ZonePtr)%Volume <= 0.0) THEN
+            IF (Zone(Mixing(Loop)%ZonePtr)%Volume <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(4))//  &
                 ', but Zone Volume = 0.  0 Mixing will result.')
@@ -2261,9 +2261,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('FLOW/AREA')
         IF (CrossMixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(2) >= 0.0) THEN
+          IF (rNumericArgs(2) >= 0.0d0) THEN
             CrossMixing(Loop)%DesignLevel=rNumericArgs(2)*Zone(CrossMixing(Loop)%ZonePtr)%FloorArea
-            IF (Zone(CrossMixing(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
+            IF (Zone(CrossMixing(Loop)%ZonePtr)%FloorArea <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(2))//  &
                 ', but Zone Floor Area = 0.  0 Cross Mixing will result.')
@@ -2283,9 +2283,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('FLOW/PERSON')
         IF (CrossMixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(3) >= 0.0) THEN
+          IF (rNumericArgs(3) >= 0.0d0) THEN
             CrossMixing(Loop)%DesignLevel=rNumericArgs(3)*Zone(CrossMixing(Loop)%ZonePtr)%TotOccupants
-            IF (Zone(CrossMixing(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
+            IF (Zone(CrossMixing(Loop)%ZonePtr)%TotOccupants <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(3))//  &
                 ', but Zone Total Occupants = 0.  0 Cross Mixing will result.')
@@ -2305,9 +2305,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       CASE('AIRCHANGES/HOUR')
         IF (CrossMixing(Loop)%ZonePtr /= 0) THEN
-          IF (rNumericArgs(4) >= 0.0) THEN
+          IF (rNumericArgs(4) >= 0.0d0) THEN
             CrossMixing(Loop)%DesignLevel=rNumericArgs(4)*Zone(CrossMixing(Loop)%ZonePtr)%Volume/SecInHour
-            IF (Zone(CrossMixing(Loop)%ZonePtr)%Volume <= 0.0) THEN
+            IF (Zone(CrossMixing(Loop)%ZonePtr)%Volume <= 0.0d0) THEN
               CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
                 '", '//trim(cAlphaFieldNames(4))//' specifies '//TRIM(cNumericFieldNames(4))//  &
                 ', but Zone Volume = 0.  0 Cross Mixing will result.')
@@ -2346,7 +2346,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         IF (.NOT. lNumericFieldBlanks(5)) &
         CALL ShowWarningError(RoutineName//'The Delta Temperature value and schedule are provided. The scheduled temperature ' &
                               //'will be used in the '//TRIM(cCurrentModuleObject)//' object = '//TRIM(cAlphaArgs(1)))
-        IF (GetScheduleMinValue(CrossMixing(Loop)%DeltaTempSchedPtr) < 0.0) THEN
+        IF (GetScheduleMinValue(CrossMixing(Loop)%DeltaTempSchedPtr) < 0.0d0) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) // &
          ' must have a delta temperature equal to or above 0 C defined in the schedule = '//TRIM(cAlphaArgs(6)))
           ErrorsFound = .TRUE.
@@ -2510,9 +2510,9 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   ! Detect invalid Crossmixings
   IF (TotCrossMixing > 1 .and. .not. ErrorsFound) THEN
     ALLOCATE(SVals1(24,NumOfTimeStepInHour))
-    SVals1=0.0
+    SVals1=0.0d0
     ALLOCATE(SVals2(24,NumOfTimeStepInHour))
-    SVals2=0.0
+    SVals2=0.0d0
     ALLOCATE(OverLap(TotCrossMixing))
     OverLap = .FALSE.
     DO Loop=1,TotCrossMixing
@@ -2530,13 +2530,13 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
         DO JDay=1,366
           CALL GetScheduleValuesForDay(CrossMixing(Loop)%SchedPtr,SVals1,JDay)
-          IF (.not. ANY(SVals1>0.0)) CYCLE
+          IF (.not. ANY(SVals1>0.0d0)) CYCLE
           CALL GetScheduleValuesForDay(CrossMixing(Loop1)%SchedPtr,SVals2,JDay)
-          IF (.not. ANY(SVals2>0.0)) CYCLE
+          IF (.not. ANY(SVals2>0.0d0)) CYCLE
           IF (OverLap(Loop) .AND. OverLap(Loop1)) CYCLE   ! Already problem for these Cross Mixings
   HrLoop: DO Hr=1,24
   TSLoop:   DO TS=1,NumOfTimeStepInHour
-              IF (SVals1(Hr,TS) == 0.0 .or. SVals2(Hr,TS) == 0.0) CYCLE
+              IF (SVals1(Hr,TS) == 0.0d0 .or. SVals2(Hr,TS) == 0.0d0) CYCLE
               CALL ShowSevereError(RoutineName//'Overlapping Cross Mixings found')
               CALL ShowContinueError('Cross Mixing with receiving zone '// &
                                       TRIM(Zone(CrossMixing(Loop)%ZonePtr)%Name) // &
@@ -2620,8 +2620,8 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         ALLOCATE(RefDoorMixing(ZoneNumA)%DoorProtTypeName(NumofZones))
         RefDoorMixing(ZoneNumA)%DoorMixingObjectName = " "
         RefDoorMixing(ZoneNumA)%OpenSchedPtr = 0
-        RefDoorMixing(ZoneNumA)%DoorHeight = 0.0
-        RefDoorMixing(ZoneNumA)%DoorArea = 0.0
+        RefDoorMixing(ZoneNumA)%DoorHeight = 0.0d0
+        RefDoorMixing(ZoneNumA)%DoorArea = 0.0d0
         RefDoorMixing(ZoneNumA)%Protection = RefDoorNone
         RefDoorMixing(ZoneNumA)%MateZonePtr = 0
         RefDoorMixing(ZoneNumA)%EMSRefDoorMixingOn = .FALSE.
@@ -2643,8 +2643,8 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         ALLOCATE(RefDoorMixing(ZoneNumB)%DoorProtTypeName(NumofZones))
         RefDoorMixing(ZoneNumB)%DoorMixingObjectName = " "
         RefDoorMixing(ZoneNumB)%OpenSchedPtr = 0
-        RefDoorMixing(ZoneNumB)%DoorHeight = 0.0
-        RefDoorMixing(ZoneNumB)%DoorArea = 0.0
+        RefDoorMixing(ZoneNumB)%DoorHeight = 0.0d0
+        RefDoorMixing(ZoneNumB)%DoorArea = 0.0d0
         RefDoorMixing(ZoneNumB)%Protection = RefDoorNone
         RefDoorMixing(ZoneNumB)%MateZonePtr = 0
         RefDoorMixing(ZoneNumB)%EMSRefDoorMixingOn = .FALSE.
@@ -2689,7 +2689,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
              ' invalid (not found) '//TRIM(cAlphaFieldNames(AlphaNum))//'="'//trim(cAlphaArgs(AlphaNum))//'".')
           ErrorsFound=.TRUE.
         ELSE !OpenSchedPtr(ConnectionNumber) ne 0)
-          IF (.NOT. CheckScheduleValueMinMax(RefDoorMixing(ZoneNumA)%OpenSchedPtr(ConnectionNumber),'>=',0.,'<=',1.)) THEN
+          IF (.NOT. CheckScheduleValueMinMax(RefDoorMixing(ZoneNumA)%OpenSchedPtr(ConnectionNumber),'>=',0.0d0,'<=',1.0d0)) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",'//   &
                TRIM(cAlphaFieldNames(AlphaNum))//'="'//trim(cAlphaArgs(AlphaNum))//'" has schedule values < 0 or > 1.')
             ErrorsFound=.TRUE.
@@ -2706,7 +2706,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
       ELSE
         RefDoorMixing(ZoneNumA)%DoorHeight(ConnectionNumber)=rNumericArgs(NumbNum)
         IF ((RefDoorMixing(ZoneNumA)%DoorHeight(ConnectionNumber) < 0) .OR. &
-          (RefDoorMixing(ZoneNumA)%DoorHeight(ConnectionNumber) > 50.)) THEN
+          (RefDoorMixing(ZoneNumA)%DoorHeight(ConnectionNumber) > 50.0d0 )) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) // &
            ' must have a door height between 0 and 50 meters. ')
           ErrorsFound = .TRUE.
@@ -2715,14 +2715,14 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
       NumbNum = NumbNum + 1  !2
       IF (lNumericFieldBlanks(NumbNum)) THEN
-        RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber)=9.0 ! default area of 9 m2
+        RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber)=9.0d0 ! default area of 9 m2
         CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
             TRIM(cNumericFieldNames(NumbNum))//  &
             ' is blank and the default value of 9 m2 will be used.')
       ELSE
         RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber)=rNumericArgs(NumbNum)
         IF ((RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber) < 0) .OR. &
-          (RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber) > 400.)) THEN
+          (RefDoorMixing(ZoneNumA)%DoorArea(ConnectionNumber) > 400.0d0 )) THEN
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) // &
            ' must have a door height between 0 and 400 square meters. ')
           ErrorsFound = .TRUE.
@@ -2822,7 +2822,7 @@ END IF !TotRefDoorMixing > 0)
 
 
   ALLOCATE(TotInfilVentFlow(NumOfZones))
-  TotInfilVentFlow=0.0
+  TotInfilVentFlow=0.0d0
 
   DO Loop=1,TotInfiltration
     IF (Loop == 1) WRITE(OutputFileInits,721) 'Infiltration','Design Volume Flow Rate {m3/s},'//  &
@@ -2842,19 +2842,19 @@ END IF !TotRefDoorMixing > 0)
        TRIM(Zone(ZoneNum)%Name),TRIM(RoundSigDigits(Zone(ZoneNum)%FloorArea,2)),TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
     StringOut=RoundSigDigits(Infiltration(Loop)%DesignLevel,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(Infiltration(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%ExteriorTotalSurfArea > 0.0) THEN
+    IF (Zone(ZoneNum)%ExteriorTotalSurfArea > 0.0d0) THEN
       StringOut=RoundSigDigits(Infiltration(Loop)%DesignLevel/Zone(ZoneNum)%ExteriorTotalSurfArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%Volume > 0.0) THEN
+    IF (Zone(ZoneNum)%Volume > 0.0d0) THEN
       StringOut=RoundSigDigits(Infiltration(Loop)%DesignLevel*SecInHour/Zone(ZoneNum)%Volume,3)
     ELSE
       StringOut='N/A'
@@ -2891,19 +2891,19 @@ END IF !TotRefDoorMixing > 0)
        TRIM(Zone(ZoneNum)%Name),TRIM(RoundSigDigits(Zone(ZoneNum)%FloorArea,2)),TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
     StringOut=RoundSigDigits(Ventilation(Loop)%DesignLevel,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(Ventilation(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(Ventilation(Loop)%DesignLevel/(Zone(ZoneNum)%TotOccupants),3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%Volume > 0.0) THEN
+    IF (Zone(ZoneNum)%Volume > 0.0d0) THEN
       StringOut=RoundSigDigits(Ventilation(Loop)%DesignLevel*SecInHour/Zone(ZoneNum)%Volume,3)
     ELSE
       StringOut='N/A'
@@ -2966,7 +2966,7 @@ END IF !TotRefDoorMixing > 0)
   ENDDO
 
   ALLOCATE(TotMixingFlow(NumOfZones))
-  TotMixingFlow=0.0
+  TotMixingFlow=0.0d0
   DO Loop=1,TotMixing
     IF (Loop == 1) WRITE(OutputFileInits,721) 'Mixing','Design Volume Flow Rate {m3/s},'//  &
        'Volume Flow Rate/Floor Area {m3/s/m2},Volume Flow Rate/person Area {m3/s/person},'//  &
@@ -2983,19 +2983,19 @@ END IF !TotRefDoorMixing > 0)
        TRIM(Zone(ZoneNum)%Name),TRIM(RoundSigDigits(Zone(ZoneNum)%FloorArea,2)),TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
     StringOut=RoundSigDigits(Mixing(Loop)%DesignLevel,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(Mixing(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(Mixing(Loop)%DesignLevel/(Zone(ZoneNum)%TotOccupants),3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%Volume > 0.0) THEN
+    IF (Zone(ZoneNum)%Volume > 0.0d0) THEN
       StringOut=RoundSigDigits(Mixing(Loop)%DesignLevel*SecInHour/Zone(ZoneNum)%Volume,3)
     ELSE
       StringOut='N/A'
@@ -3022,19 +3022,19 @@ END IF !TotRefDoorMixing > 0)
        TRIM(Zone(ZoneNum)%Name),TRIM(RoundSigDigits(Zone(ZoneNum)%FloorArea,2)),TRIM(RoundSigDigits(Zone(ZoneNum)%TotOccupants,1))
     StringOut=RoundSigDigits(CrossMixing(Loop)%DesignLevel,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+    IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
       StringOut=RoundSigDigits(CrossMixing(Loop)%DesignLevel/Zone(ZoneNum)%FloorArea,3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%TotOccupants > 0.0) THEN
+    IF (Zone(ZoneNum)%TotOccupants > 0.0d0) THEN
       StringOut=RoundSigDigits(CrossMixing(Loop)%DesignLevel/(Zone(ZoneNum)%TotOccupants),3)
     ELSE
       StringOut='N/A'
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    IF (Zone(ZoneNum)%Volume > 0.0) THEN
+    IF (Zone(ZoneNum)%Volume > 0.0d0) THEN
       StringOut=RoundSigDigits(CrossMixing(Loop)%DesignLevel*SecInHour/Zone(ZoneNum)%Volume,3)
     ELSE
       StringOut='N/A'
@@ -3361,8 +3361,8 @@ SUBROUTINE InitAirHeatBalance  ! Surface Heat Balance Initialization Manager
 
   ! Do the Begin Environment initializations
   IF (BeginEnvrnFlag) THEN
-    MVFC=0.0
-    MTC=0.0
+    MVFC=0.0d0
+    MTC=0.0d0
   END IF
 
 
@@ -3419,9 +3419,9 @@ SUBROUTINE AllocateAirHeatBalArrays  ! Heat Balance Array Allocation
 
 ! Use the total number of zones to allocate variables to avoid a zone number limit
     ALLOCATE(MVFC(NumOfZones))
-    MVFC=0.0
+    MVFC=0.0d0
     ALLOCATE(MTC(NumOfZones))
-    MTC=0.0
+    MTC=0.0d0
 
 
   RETURN
@@ -3471,8 +3471,8 @@ SUBROUTINE InitSimpleMixingConvectiveHeatGains
    INTEGER J    ! local index for second zone in refrig door pair
 
                 !  Zero out time step variables
-   MTC = 0.0
-   MVFC = 0.0
+   MTC = 0.0d0
+   MVFC = 0.0d0
 
    ! Select type of airflow calculation
 

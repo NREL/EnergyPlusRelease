@@ -21,28 +21,30 @@ PUBLIC          ! By definition, all variables which are placed in this data
           ! MODULE VARIABLE DECLARATIONS:
 
 TYPE ZoneSystemDemandData ! Sensible cooling/heating loads to be met (watts)
-  REAL(r64) :: RemainingOutputRequired            =0.0 !
-  REAL(r64) :: TotalOutputRequired                =0.0 !
-  REAL(r64) :: OutputRequiredToHeatingSP          =0.0 ! Load required to meet heating setpoint (>0 is a heating load)
-  REAL(r64) :: OutputRequiredToCoolingSP          =0.0 ! Load required to meet cooling setpoint (<0 is a cooling load)
-  REAL(r64) :: RemainingOutputReqToHeatSP         =0.0 ! Remaining load required to meet heating setpoint (>0 is a heating load)
-  REAL(r64) :: RemainingOutputReqToCoolSP         =0.0 ! Remaining load required to meet cooling setpoint (<0 is a cooling load)
+  REAL(r64) :: RemainingOutputRequired            =0.0d0 !
+  REAL(r64) :: TotalOutputRequired                =0.0d0 !
+  REAL(r64) :: OutputRequiredToHeatingSP          =0.0d0 ! Load required to meet heating setpoint (>0 is a heating load)
+  REAL(r64) :: OutputRequiredToCoolingSP          =0.0d0 ! Load required to meet cooling setpoint (<0 is a cooling load)
+  REAL(r64) :: RemainingOutputReqToHeatSP         =0.0d0 ! Remaining load required to meet heating setpoint (>0 is a heating load)
+  REAL(r64) :: RemainingOutputReqToCoolSP         =0.0d0 ! Remaining load required to meet cooling setpoint (<0 is a cooling load)
   INTEGER   :: NumZoneEquipment                   = 0  ! count of zone equipment for this zone, from ZoneHVAC:EquipmentList
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequired
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequiredToHeatingSP !load required to meet heating setpoint by sequence
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequiredToCoolingSP !load required to meet cooling setpoint by sequence
   REAL(r64) :: SupplyAirAdjustFactor              = 1.0D0 ! supply air adjustment factor due to the cap of
                                                           ! zone maximum outdoor air fraction
+  INTEGER   :: StageNum                           = 0  ! The stage number when staged thermostate is used: 
+                                                       ! 0 no load, >0 Heating stage, <0 Cooling stage
 END TYPE ZoneSystemDemandData
 
 TYPE ZoneSystemMoistureDemand  ! Humidification/dehumidification loads to be met (kg water per second)
-  REAL(r64) :: RemainingOutputRequired            =0.0 !
-  REAL(r64) :: TotalOutputRequired                =0.0 !
-  REAL(r64) :: OutputRequiredToHumidifyingSP      =0.0 ! Load required to meet humidifying setpoint (>0 = a humidify load)
-  REAL(r64) :: OutputRequiredToDehumidifyingSP    =0.0 ! Load required to meet dehumidifying setpoint (<0 = a dehumidify load)
-  REAL(r64) :: RemainingOutputReqToHumidSP        =0.0 ! Remaining load required to meet humidifying setpoint
+  REAL(r64) :: RemainingOutputRequired            =0.0d0 !
+  REAL(r64) :: TotalOutputRequired                =0.0d0 !
+  REAL(r64) :: OutputRequiredToHumidifyingSP      =0.0d0 ! Load required to meet humidifying setpoint (>0 = a humidify load)
+  REAL(r64) :: OutputRequiredToDehumidifyingSP    =0.0d0 ! Load required to meet dehumidifying setpoint (<0 = a dehumidify load)
+  REAL(r64) :: RemainingOutputReqToHumidSP        =0.0d0 ! Remaining load required to meet humidifying setpoint
                                                        ! (>0 is a humidify load)
-  REAL(r64) :: RemainingOutputReqToDehumidSP      =0.0 ! Remaining load required to meet dehumidifying setpoint
+  REAL(r64) :: RemainingOutputReqToDehumidSP      =0.0d0 ! Remaining load required to meet dehumidifying setpoint
                                                        ! (<0 is a dehumidify load)
   INTEGER   :: NumZoneEquipment                   = 0  ! count of zone equipment for this zone, from ZoneHVAC:EquipmentList
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: SequencedOutputRequired

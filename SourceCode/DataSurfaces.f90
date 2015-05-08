@@ -269,6 +269,7 @@ INTEGER, PARAMETER :: AirFlowWindow_ControlType_Schedule  = 3
 ! Parameters for window model selection
 INTEGER, PARAMETER :: Window5DetailedModel   = 100 ! indicates original winkelmann window 5 implementation
 INTEGER, PARAMETER :: WindowBSDFModel = 101 ! indicates complex fenestration window 6 implementation
+INTEGER, PARAMETER :: WindowEQLModel = 102  ! indicates equivalent layer winodw model implementation
 
 
           ! DERIVED TYPE DEFINITIONS:
@@ -287,20 +288,20 @@ TYPE SurfaceData
                                                      !                Rectangular Left Fin=6,Rectangular Right Fin=7,
                                                      !                Triangular Window=8)
   INTEGER :: Sides                             = 0   ! Number of side/vertices for this surface (based on Shape)
-  REAL(r64) :: Area                            = 0.0 ! Surface area of the surface (less any subsurfaces) {m2}
-  REAL(r64) :: GrossArea                       = 0.0 ! Surface area of the surface (including subsurfaces) {m2}
-  REAL(r64) :: NetAreaShadowCalc               = 0.0 ! Area of a wall/floor/ceiling less subsurfaces assuming
+  REAL(r64) :: Area                            = 0.0d0 ! Surface area of the surface (less any subsurfaces) {m2}
+  REAL(r64) :: GrossArea                       = 0.0d0 ! Surface area of the surface (including subsurfaces) {m2}
+  REAL(r64) :: NetAreaShadowCalc               = 0.0d0 ! Area of a wall/floor/ceiling less subsurfaces assuming
                                                      !  all windows, if present, have unity multiplier.
                                                      ! Wall/floor/ceiling/roof areas that include windows include
                                                      !  frame (unity) areas.
                                                      ! Areas of Windows including divider (unity) area.
                                                      ! These areas are used in shadowing / sunlit area calculations.
-  REAL(r64) :: Perimeter                       = 0.0 ! Perimeter length of the surface {m}
-  REAL(r64) :: Azimuth                         = 0.0 ! Direction the surface outward normal faces (degrees) or FACING
-  REAL(r64) :: Height                          = 0.0 ! Height of the surface (m)
-  REAL(r64) :: Reveal                          = 0.0 ! Depth of the window reveal (m) if this surface is a window
-  REAL(r64) :: Tilt                            = 0.0 ! Angle (deg) between the ground outward normal and the surface outward normal
-  REAL(r64) :: Width                           = 0.0 ! Width of the surface (m)
+  REAL(r64) :: Perimeter                       = 0.0d0 ! Perimeter length of the surface {m}
+  REAL(r64) :: Azimuth                         = 0.0d0 ! Direction the surface outward normal faces (degrees) or FACING
+  REAL(r64) :: Height                          = 0.0d0 ! Height of the surface (m)
+  REAL(r64) :: Reveal                          = 0.0d0 ! Depth of the window reveal (m) if this surface is a window
+  REAL(r64) :: Tilt                            = 0.0d0 ! Angle (deg) between the ground outward normal and the surface outward normal
+  REAL(r64) :: Width                           = 0.0d0 ! Width of the surface (m)
 
           ! Boundary conditions and interconnections
   LOGICAL :: HeatTransSurf                 = .false. ! True if surface is a heat transfer surface,
@@ -340,13 +341,13 @@ TYPE SurfaceData
                                                      ! when being overridden
   LOGICAL :: EMSOverrideExtConvCoef            = .FALSE. ! if true, EMS is calling to override exterior convection coefficeint
   REAL(r64) :: EMSValueForExtConvCoef          = 0.0D0 ! Value EMS is calling to use for exterior convection coefficient [W/m2-K]
-  REAL(r64) :: ViewFactorGround                = 0.0 ! View factor to the ground from the exterior of the surface
+  REAL(r64) :: ViewFactorGround                = 0.0d0 ! View factor to the ground from the exterior of the surface
                                                      !   for diffuse solar radiation
-  REAL(r64) :: ViewFactorSky                   = 0.0 ! View factor to the sky from the exterior of the surface
+  REAL(r64) :: ViewFactorSky                   = 0.0d0 ! View factor to the sky from the exterior of the surface
                                                      !   for diffuse solar radiation
-  REAL(r64) :: ViewFactorGroundIR              = 0.0 ! View factor to the ground and shadowing surfaces from the
+  REAL(r64) :: ViewFactorGroundIR              = 0.0d0 ! View factor to the ground and shadowing surfaces from the
                                                      !    exterior of the surface for IR radiation
-  REAL(r64) :: ViewFactorSkyIR                 = 0.0 ! View factor to the sky from the exterior of the surface for IR radiation
+  REAL(r64) :: ViewFactorSkyIR                 = 0.0d0 ! View factor to the sky from the exterior of the surface for IR radiation
 
           ! Special/optional other side coefficients (OSC)
   INTEGER :: OSCPtr                            = 0   ! Pointer to OSC data structure
@@ -360,9 +361,9 @@ TYPE SurfaceData
   REAL(r64) :: SchedMinValue                   = 0.0d0   ! Schedule minimum value.
 
           ! Optional parameters specific to solar reflection from surfaces
-  REAL(r64)    :: ShadowSurfDiffuseSolRefl     = 0.0 ! Diffuse solar reflectance of opaque portion
-  REAL(r64)    :: ShadowSurfDiffuseVisRefl     = 0.0 ! Diffuse visible reflectance of opaque portion
-  REAL(r64)    :: ShadowSurfGlazingFrac        = 0.0 ! Glazing fraction
+  REAL(r64)    :: ShadowSurfDiffuseSolRefl     = 0.0d0 ! Diffuse solar reflectance of opaque portion
+  REAL(r64)    :: ShadowSurfDiffuseVisRefl     = 0.0d0 ! Diffuse visible reflectance of opaque portion
+  REAL(r64)    :: ShadowSurfGlazingFrac        = 0.0d0 ! Glazing fraction
   INTEGER :: ShadowSurfGlazingConstruct        = 0   ! Glazing construction number
   LOGICAL :: ShadowSurfPossibleObstruction     = .TRUE. ! True if a surface can be an exterior obstruction
   LOGICAL :: ShadowSurfPossibleReflector       = .FALSE. ! True if a surface can be an exterior reflector, not used!
@@ -376,18 +377,18 @@ TYPE SurfaceData
 
           ! Vertices
   TYPE (vector), ALLOCATABLE, DIMENSION(:) :: Vertex     ! Surface Vertices are represented by Number of Sides and Vector (type)
-  TYPE (vector) :: Centroid          =vector(0.,0.,0.)   ! computed centroid (also known as center of mass or surface balance point)
-  type (vector) :: lcsx              =vector(0.,0.,0.)
-  type (vector) :: lcsy              =vector(0.,0.,0.)
-  type (vector) :: lcsz              =vector(0.,0.,0.)
-  type (vector) :: NewellAreaVector  =vector(0.,0.,0.)
-  type (vector) :: NewellSurfaceNormalVector  =vector(0.,0.,0.)  ! same as OutNormVec in vector notation
-  REAL(r64), DIMENSION(3) :: OutNormVec        =0.0  ! Direction cosines (outward normal vector) for surface
+  TYPE (vector) :: Centroid          =vector(0.0d0,0.0d0,0.0d0)   ! computed centroid (also known as center of mass or surface balance point)
+  type (vector) :: lcsx              =vector(0.0d0,0.0d0,0.0d0)
+  type (vector) :: lcsy              =vector(0.0d0,0.0d0,0.0d0)
+  type (vector) :: lcsz              =vector(0.0d0,0.0d0,0.0d0)
+  type (vector) :: NewellAreaVector  =vector(0.0d0,0.0d0,0.0d0)
+  type (vector) :: NewellSurfaceNormalVector  =vector(0.0d0,0.0d0,0.0d0)  ! same as OutNormVec in vector notation
+  REAL(r64), DIMENSION(3) :: OutNormVec        = 0.0d0  ! Direction cosines (outward normal vector) for surface
 
-  REAL(r64) :: SinAzim                         = 0.0 ! Sine of surface azimuth angle
-  REAL(r64) :: CosAzim                         = 0.0 ! Cosine of surface azimuth angle
-  REAL(r64) :: SinTilt                         = 0.0 ! Sine of surface tilt angle
-  REAL(r64) :: CosTilt                         = 0.0 ! Cosine of surface tilt angle
+  REAL(r64) :: SinAzim                         = 0.0d0 ! Sine of surface azimuth angle
+  REAL(r64) :: CosAzim                         = 0.0d0 ! Cosine of surface azimuth angle
+  REAL(r64) :: SinTilt                         = 0.0d0 ! Sine of surface tilt angle
+  REAL(r64) :: CosTilt                         = 0.0d0 ! Cosine of surface tilt angle
   LOGICAL   :: IsConvex                        = .true. ! true if the surface is convex.
   LOGICAL   :: IsDegenerate                    = .false. ! true if the surface is degenerate.
 
@@ -397,7 +398,7 @@ TYPE SurfaceData
   INTEGER :: StormWinConstruction              = 0   ! Construction with storm window (windows only)
   INTEGER :: StormWinShadedConstruction        = 0   ! Shaded construction with storm window (windows only)
   INTEGER :: FrameDivider                      = 0   ! Pointer to frame and divider information (windows only)
-  REAL(r64)    :: Multiplier                   = 1.0 ! Multiplies glazed area, frame area and divider area (windows only)
+  REAL(r64)    :: Multiplier                   = 1.0d0 ! Multiplies glazed area, frame area and divider area (windows only)
           ! Daylighting pointers
   INTEGER :: Shelf                             = 0   ! Pointer to daylighting shelf
   INTEGER :: TAirRef                           = ZoneMeanAirTemp  ! Flag for reference air temperature
@@ -408,9 +409,15 @@ TYPE SurfaceData
         ! ZoneSupplyAirTemp = 3 = supply air temperature => for mixing air model with inlet-dependent algo
         ! Default value is 'ZoneMeanAirTemp' and value for each particular surface will be changed only if
                                 ! the inlet-dependent convection algorithm and/or nodal and zonal air models are used.
-  REAL(r64) :: OutDryBulbTemp                  = 0.0 ! Surface outside dry bulb air temperature, for surface heat balance (C)
-  REAL(r64) :: OutWetBulbTemp                  = 0.0 ! Surface outside wet bulb air temperature, for surface heat balance (C)
-  REAL(r64) :: WindSpeed                       = 0.0 ! Surface outside wind speed, for surface heat balance (m/s)
+  REAL(r64) :: OutDryBulbTemp                  = 0.0d0 ! Surface outside dry bulb air temperature, for surface heat balance (C)
+  LOGICAL   :: OutDryBulbTempEMSOverrideOn     = .FALSE. ! if true, EMS is calling to override the surface's outdoor air temp
+  REAL(r64) :: OutDryBulbTempEMSOverrideValue  = 0.d0 ! value to use for EMS override of outdoor air dryblub temp (C)
+  REAL(r64) :: OutWetBulbTemp                  = 0.0d0 ! Surface outside wet bulb air temperature, for surface heat balance (C)
+  LOGICAL   :: OutWetBulbTempEMSOverrideOn     = .FALSE. ! if true, EMS is calling to override the surface's outdoor wetbulb
+  REAL(r64) :: OutWetBulbTempEMSOverrideValue  = 0.d0 ! value to use for EMS override of outdoor air wetblub temp (C)
+  REAL(r64) :: WindSpeed                       = 0.0d0 ! Surface outside wind speed, for surface heat balance (m/s)
+  LOGICAL   :: WindSpeedEMSOverrideOn          = .FALSE. !
+  REAL(r64) :: WindSpeedEMSOverrideValue       = 0.d0 !
   CHARACTER(len=15) :: UNomWOFilm              = '-' ! Nominal U Value without films stored as string
   CHARACTER(len=15) :: UNomFilm                = '-' ! Nominal U Value with films stored as string
 
@@ -434,13 +441,13 @@ TYPE SurfaceData
   INTEGER   :: OutConvHnModelEq          = 0 ! current Convection model for natural convection at outside face
   INTEGER   :: OutConvHnUserCurveIndex   = 0 ! current index to user natural convection model if used
 
-  REAL(r64) :: OutConvFaceArea           = 0.d0 ! area of larger building envelope facade that surface is a part of
-  REAL(r64) :: OutConvFacePerimeter      = 0.d0 ! perimeter of larger building envelope facade that surface is a part of
-  REAL(r64) :: OutConvFaceHeight         = 0.d0 ! height of larger building envelope facade that surface is a part of
-  REAL(r64) :: IntConvZoneWallHeight     = 0.d0 ! [m] height of larger inside building wall element that surface is a part of
-  REAL(r64) :: IntConvZonePerimLength    = 0.d0 ! [m] length of perimeter zone's exterior wall
-  REAL(r64) :: IntConvZoneHorizHydrDiam  = 0.d0 ! [m] hydraulic diameter, usually 4 times the zone floor area div by perimeter
-  REAL(r64) :: IntConvWindowWallRatio    = 0.d0 ! [-] area of windows over area of exterior wall for zone
+  REAL(r64) :: OutConvFaceArea           = 0.0d0 ! area of larger building envelope facade that surface is a part of
+  REAL(r64) :: OutConvFacePerimeter      = 0.0d0 ! perimeter of larger building envelope facade that surface is a part of
+  REAL(r64) :: OutConvFaceHeight         = 0.0d0 ! height of larger building envelope facade that surface is a part of
+  REAL(r64) :: IntConvZoneWallHeight     = 0.0d0 ! [m] height of larger inside building wall element that surface is a part of
+  REAL(r64) :: IntConvZonePerimLength    = 0.0d0 ! [m] length of perimeter zone's exterior wall
+  REAL(r64) :: IntConvZoneHorizHydrDiam  = 0.0d0 ! [m] hydraulic diameter, usually 4 times the zone floor area div by perimeter
+  REAL(r64) :: IntConvWindowWallRatio    = 0.0d0 ! [-] area of windows over area of exterior wall for zone
   INTEGER   :: IntConvWindowLocation     = InConvWinLoc_NotSet ! relative location of window in zone for interior Hc models
   LOGICAL   :: IntConvSurfGetsRadiantHeat= .FALSE.
   LOGICAL   :: IntConvSurfHasActiveInIt  = .FALSE.
@@ -483,7 +490,7 @@ TYPE SurfaceWindowCalc          ! Calculated window-related values
                                             !   1: Window has storm window and it is on
   INTEGER :: StormWinFlagPrevDay      = -1  !  Previous time step value of StormWinFlag
 
-  REAL(r64) :: FracTimeShadingDeviceOn = 0.0 ! For a single time step, = 0.0 if no shading device or shading device is off,
+  REAL(r64) :: FracTimeShadingDeviceOn = 0.0d0 ! For a single time step, = 0.0 if no shading device or shading device is off,
                                             !                         = 1.0 if shading device is on;
                                             ! For time intervals longer than a time step, = fraction of time that shading
                                             ! device is on.
@@ -501,210 +508,211 @@ TYPE SurfaceWindowCalc          ! Calculated window-related values
   REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: SourceLumFromWinAtRefPt ! Window luminance at ref pts for window
                                                                ! with and w/o shade (cd/m2)
   INTEGER :: DaylFacPoint             = 0   ! Pointer to daylight factors for the window
-  REAL(r64) :: VisTransSelected        = 0.0 ! Window vis trans at normal incidence selected for use in dayltg calculation
-  REAL(r64) :: SwitchingFactor         = 0.0 ! Window switching factor (0.0 = unswitched; 1.0 = fully switched)
-  REAL(r64), DIMENSION(3) :: WinCenter = 0.0 ! X,Y,Z coordinates of window center point in building coord system
-  REAL(r64) :: Theta                   = 0.0 ! Azimuth of window normal (rad)
-  REAL(r64) :: Phi                     = 0.0 ! Altitude of window normal (rad)
-  REAL(r64) :: RhoCeilingWall          = 0.0 ! Average interior reflectance seen by light moving up across horizontal
+  REAL(r64) :: VisTransSelected        = 0.0d0 ! Window vis trans at normal incidence selected for use in dayltg calculation
+  REAL(r64) :: SwitchingFactor         = 0.0d0 ! Window switching factor (0.0 = unswitched; 1.0 = fully switched)
+  REAL(r64), DIMENSION(3) :: WinCenter = 0.0d0 ! X,Y,Z coordinates of window center point in building coord system
+  REAL(r64) :: Theta                   = 0.0d0 ! Azimuth of window normal (rad)
+  REAL(r64) :: Phi                     = 0.0d0 ! Altitude of window normal (rad)
+  REAL(r64) :: RhoCeilingWall          = 0.0d0 ! Average interior reflectance seen by light moving up across horizontal
                                             !  plane thru center of window
-  REAL(r64) :: RhoFloorWall            = 0.0 ! Same as above, but for light moving down
-  REAL(r64) :: FractionUpgoing         = 0.0 ! Fraction light entering window that goes upward
-  REAL(r64) :: VisTransRatio           = 0.0 ! For windows with switchable glazing, ratio of normal transmittance
+  REAL(r64) :: RhoFloorWall            = 0.0d0 ! Same as above, but for light moving down
+  REAL(r64) :: FractionUpgoing         = 0.0d0 ! Fraction light entering window that goes upward
+  REAL(r64) :: VisTransRatio           = 0.0d0 ! For windows with switchable glazing, ratio of normal transmittance
                                             !  in switched state to that in unswitched state
-  REAL(r64), DIMENSION(10) :: ThetaFace    = 296.15 ! Face temperatures of window layers (K)
-  REAL(r64) :: IRfromParentZone        = 0.0 ! Incident IR from parent zone (W/m2)
+  REAL(r64), DIMENSION(10) :: ThetaFace    = 296.15d0 ! Face temperatures of window layers (K)
+  REAL(r64) :: IRfromParentZone        = 0.0d0 ! Incident IR from parent zone (W/m2)
   INTEGER :: IRErrCount               = 0   ! For recurring error counts
   INTEGER :: IRErrCountC              = 0   ! For recurring error counts (continuation)
-  REAL(r64) :: FrameArea               = 0.0 ! Frame projected area (m2)
-  REAL(r64) :: FrameConductance        = 0.0 ! Frame conductance [no air films] (W/m2-K)
-  REAL(r64) :: FrameSolAbsorp          = 0.0 ! Frame solar absorptance (assumed same inside and outside)
-  REAL(r64) :: FrameVisAbsorp          = 0.0 ! Frame visible absorptance (assumed same inside and outside)
-  REAL(r64) :: FrameEmis               = 0.0 ! Frame thermal emissivity (thermal absorptance) (assumed same
+  REAL(r64) :: FrameArea               = 0.0d0 ! Frame projected area (m2)
+  REAL(r64) :: FrameConductance        = 0.0d0 ! Frame conductance [no air films] (W/m2-K)
+  REAL(r64) :: FrameSolAbsorp          = 0.0d0 ! Frame solar absorptance (assumed same inside and outside)
+  REAL(r64) :: FrameVisAbsorp          = 0.0d0 ! Frame visible absorptance (assumed same inside and outside)
+  REAL(r64) :: FrameEmis               = 0.0d0 ! Frame thermal emissivity (thermal absorptance) (assumed same
                                             !   inside and outside)
-  REAL(r64) :: FrameAreaXEmiss         = 0.0 ! Frame area times thermal emissivity (m2)
-  REAL(r64) :: FrameRadExchangeFactor  = 0.0 ! Frame IR radiant exchange factor
-  REAL(r64) :: FrameHRadLinIn          = 0.0 ! Frame linearized inside IR radiation conductance (W/m2-K)
-  REAL(r64) :: FrameRadThermalFluxRec  = 0.0 ! Frame inside IR flux received (W/m2)
-  REAL(r64) :: FrameRadThermalFluxRecOld  = 0.0 ! Previous value of frame inside IR flux received (W/m2)
-  REAL(r64) :: FrEdgeToCenterGlCondRatio  = 1.0 ! Ratio of frame edge of glass conductance (without air films) to
+  REAL(r64) :: FrameAreaXEmiss         = 0.0d0 ! Frame area times thermal emissivity (m2)
+  REAL(r64) :: FrameRadExchangeFactor  = 0.0d0 ! Frame IR radiant exchange factor
+  REAL(r64) :: FrameHRadLinIn          = 0.0d0 ! Frame linearized inside IR radiation conductance (W/m2-K)
+  REAL(r64) :: FrameRadThermalFluxRec  = 0.0d0 ! Frame inside IR flux received (W/m2)
+  REAL(r64) :: FrameRadThermalFluxRecOld  = 0.0d0 ! Previous value of frame inside IR flux received (W/m2)
+  REAL(r64) :: FrEdgeToCenterGlCondRatio  = 1.0d0 ! Ratio of frame edge of glass conductance (without air films) to
                                             ! center of glass conductance (without air films)
-  REAL(r64) :: FrameEdgeArea           = 0.0 ! Area of glass near frame (m2)
+  REAL(r64) :: FrameEdgeArea           = 0.0d0 ! Area of glass near frame (m2)
   REAL(r64) :: FrameTempSurfIn         = 23.0d0 ! Frame inside surface temperature (C)
   REAL(r64) :: FrameTempSurfInOld      = 23.0d0 ! Previous value of frame inside surface temperature (C)
   REAL(r64) :: FrameTempSurfOut        = 23.0d0 ! Frame outside surface temperature (C)
-  REAL(r64) :: FrameQRadInAbs          = 0.0 ! Radiation absorbed by inside of frame (short-wave from solar
+  REAL(r64) :: FrameQRadInAbs          = 0.0d0 ! Radiation absorbed by inside of frame (short-wave from solar
                                             !   and lights; long-wave from internal gains) (W/m2)
-  REAL(r64) :: FrameQRadOutAbs         = 0.0 ! Radiation absorbed by outside of frame (solar) (W/m2)
-  REAL(r64) :: ProjCorrFrOut           = 0.0 ! Correction factor to absorbed radiation due to frame outside projection
-  REAL(r64) :: ProjCorrFrIn            = 0.0 ! Correction factor to absorbed radiation due to frame inside projection
+  REAL(r64) :: FrameQRadOutAbs         = 0.0d0 ! Radiation absorbed by outside of frame (solar) (W/m2)
+  REAL(r64) :: ProjCorrFrOut           = 0.0d0 ! Correction factor to absorbed radiation due to frame outside projection
+  REAL(r64) :: ProjCorrFrIn            = 0.0d0 ! Correction factor to absorbed radiation due to frame inside projection
   INTEGER :: DividerType              = 0   ! Divider type (1=DividedLite, 2=Suspended (between-pane))
-  REAL(r64) :: DividerArea             = 0.0 ! Divider projected area (m2)
-  REAL(r64) :: DividerConductance      = 0.0 ! Divider conductance [no air films] (W/m2-K)
-  REAL(r64) :: DividerSolAbsorp        = 0.0 ! Divider solar absorptance (assumed same inside and outside)
-  REAL(r64) :: DividerVisAbsorp        = 0.0 ! Divider visible absorptance (assumed same inside and outside)
-  REAL(r64) :: DividerEmis             = 0.0 ! Divider thermal emissivity (thermal absorptance) (assumed same
+  REAL(r64) :: DividerArea             = 0.0d0 ! Divider projected area (m2)
+  REAL(r64) :: DividerConductance      = 0.0d0 ! Divider conductance [no air films] (W/m2-K)
+  REAL(r64) :: DividerSolAbsorp        = 0.0d0 ! Divider solar absorptance (assumed same inside and outside)
+  REAL(r64) :: DividerVisAbsorp        = 0.0d0 ! Divider visible absorptance (assumed same inside and outside)
+  REAL(r64) :: DividerEmis             = 0.0d0 ! Divider thermal emissivity (thermal absorptance) (assumed same
                                             !   inside and outside)
-  REAL(r64) :: DividerAreaXEmiss       = 0.0 ! Divider area times thermal emissivity (m2)
-  REAL(r64) :: DividerRadExchangeFactor= 0.0 ! Divider IR radiant exchange factor
-  REAL(r64) :: DividerHRadLinIn        = 0.0 ! Divider linearized inside IR radiation conductance (W/m2-K)
-  REAL(r64) :: DividerRadThermalFluxRec    = 0.0 ! Divider inside IR flux received (W/m2)
-  REAL(r64) :: DividerRadThermalFluxRecOld = 0.0 ! Previous value of divider inside IR flux received (W/m2)
+  REAL(r64) :: DividerAreaXEmiss       = 0.0d0 ! Divider area times thermal emissivity (m2)
+  REAL(r64) :: DividerRadExchangeFactor= 0.0d0 ! Divider IR radiant exchange factor
+  REAL(r64) :: DividerHRadLinIn        = 0.0d0 ! Divider linearized inside IR radiation conductance (W/m2-K)
+  REAL(r64) :: DividerRadThermalFluxRec    = 0.0d0 ! Divider inside IR flux received (W/m2)
+  REAL(r64) :: DividerRadThermalFluxRecOld = 0.0d0 ! Previous value of divider inside IR flux received (W/m2)
 
-  REAL(r64) :: DivEdgeToCenterGlCondRatio  = 1.0 ! Ratio of divider edge of glass conductance (without air films) to
+  REAL(r64) :: DivEdgeToCenterGlCondRatio  = 1.0d0 ! Ratio of divider edge of glass conductance (without air films) to
                                             ! center of glass conductance (without air films)
-  REAL(r64) :: DividerEdgeArea         = 0.0 ! Area of glass near dividers (m2)
+  REAL(r64) :: DividerEdgeArea         = 0.0d0 ! Area of glass near dividers (m2)
   REAL(r64) :: DividerTempSurfIn       = 23.0d0 ! Divider inside surface temperature (C)
   REAL(r64) :: DividerTempSurfInOld    = 23.0d0 ! Previous value of divider inside surface temperature (C)
   REAL(r64) :: DividerTempSurfOut      = 23.0d0 ! Divider outside surface temperature (C)
-  REAL(r64) :: DividerQRadInAbs        = 0.0 ! Radiation absorbed by inside of divider (short-wave from solar
+  REAL(r64) :: DividerQRadInAbs        = 0.0d0 ! Radiation absorbed by inside of divider (short-wave from solar
                                             !   and lights; long-wave from internal gains) (W/m2)
-  REAL(r64) :: DividerQRadOutAbs       = 0.0 ! Radiation absorbed by outside of divider (solar) (W/m2)
-  REAL(r64) :: ProjCorrDivOut          = 0.0 ! Correction factor to absorbed radiation due to divider outside projection
-  REAL(r64) :: ProjCorrDivIn           = 0.0 ! Correction factor to absorbed radiation due to divider inside projection
-  REAL(r64) :: GlazedFrac              = 1.0 ! (Glazed area)/(Glazed area + divider area)
-  REAL(r64), DIMENSION(24) :: OutProjSLFracMult  = 1.0 ! Multiplier on sunlit fraction due to shadowing of glass by frame
+  REAL(r64) :: DividerQRadOutAbs       = 0.0d0 ! Radiation absorbed by outside of divider (solar) (W/m2)
+  REAL(r64) :: ProjCorrDivOut          = 0.0d0 ! Correction factor to absorbed radiation due to divider outside projection
+  REAL(r64) :: ProjCorrDivIn           = 0.0d0 ! Correction factor to absorbed radiation due to divider inside projection
+  REAL(r64) :: GlazedFrac              = 1.0d0 ! (Glazed area)/(Glazed area + divider area)
+  REAL(r64), DIMENSION(24) :: OutProjSLFracMult  = 1.0d0 ! Multiplier on sunlit fraction due to shadowing of glass by frame
                                             ! and divider outside projections
-  REAL(r64), DIMENSION(24) :: InOutProjSLFracMult= 1.0 ! Multiplier on sunlit fraction due to shadowing of glass by frame
+  REAL(r64), DIMENSION(24) :: InOutProjSLFracMult= 1.0d0 ! Multiplier on sunlit fraction due to shadowing of glass by frame
                                             ! and divider inside and outside projections
-  REAL(r64) :: CenterGlArea            = 0.0 ! Center of glass area (m2); area of glass where 1-D conduction dominates
-  REAL(r64) :: EdgeGlCorrFac           = 1.0 ! Correction factor to center-of-glass conductance to account for
+  REAL(r64) :: CenterGlArea            = 0.0d0 ! Center of glass area (m2); area of glass where 1-D conduction dominates
+  REAL(r64) :: EdgeGlCorrFac           = 1.0d0 ! Correction factor to center-of-glass conductance to account for
                                              !  2-D glass conduction thermal bridging effects near frame and divider
   INTEGER :: OriginalClass             = 0   ! 0 or if entered originally as:
                                              ! Window - SurfaceClass_Window
                                              ! Glass Door - SurfaceClass_GlassDoor
                                              ! tubular daylighting device dome - SurfaceClass_TDD_Dome
                                              ! tubular daylighting device diffuser - SurfaceClass_TDD_Diffuser
-  REAL(r64) :: ExtBeamAbsByShade       = 0.0 ! Exterior beam solar absorbed by window shade (W/m2)
-  REAL(r64) :: ExtDiffAbsByShade       = 0.0 ! Exterior diffuse solar absorbed by window shade (W/m2)
-  REAL(r64) :: IntBeamAbsByShade       = 0.0 ! Interior beam solar absorbed by window shade (W/m2)
-  REAL(r64) :: IntSWAbsByShade         = 0.0 ! Interior diffuse solar plus short-wave from lights absorbed by window shade (W/m2)
-  REAL(r64) :: InitialDifSolAbsByShade = 0.0 ! Initial diffuse solar from ext and int windows absorbed by window shade (W/m2)
-  REAL(r64) :: IntLWAbsByShade         = 0.0 ! Interior long-wave from zone lights and equipment absorbed by window shade (W/m2)
+  REAL(r64) :: ExtBeamAbsByShade       = 0.0d0 ! Exterior beam solar absorbed by window shade (W/m2)
+  REAL(r64) :: ExtDiffAbsByShade       = 0.0d0 ! Exterior diffuse solar absorbed by window shade (W/m2)
+  REAL(r64) :: IntBeamAbsByShade       = 0.0d0 ! Interior beam solar absorbed by window shade (W/m2)
+  REAL(r64) :: IntSWAbsByShade         = 0.0d0 ! Interior diffuse solar plus short-wave from lights absorbed by window shade (W/m2)
+  REAL(r64) :: InitialDifSolAbsByShade = 0.0d0 ! Initial diffuse solar from ext and int windows absorbed by window shade (W/m2)
+  REAL(r64) :: IntLWAbsByShade         = 0.0d0 ! Interior long-wave from zone lights and equipment absorbed by window shade (W/m2)
   REAL(r64), DIMENSION(2) :: ShadeAbsFacFace=0.5d0 ! Fraction of short-wave radiation incident on face 1 that is
                                             !  absorbed by face 1 and by the other face (face 2) when total absorbed
                                             !  radiation is apportioned to the two faces
-  REAL(r64) :: ConvCoeffWithShade      = 0.0 ! Convection coefficient from glass or shade to gap air when
+  REAL(r64) :: ConvCoeffWithShade      = 0.0d0 ! Convection coefficient from glass or shade to gap air when
                                             !  interior or exterior shade is present (W/m2-K)
-  REAL(r64) :: ConvHeatFlowNatural     = 0.0 ! Convective heat flow from gap between glass and interior shade or blind (W)
-  REAL(r64) :: ConvHeatGainToZoneAir   = 0.0 ! Convective heat gain to zone air from window gap airflow (W)
-  REAL(r64) :: RetHeatGainToZoneAir    = 0.0 ! Convective heat gain to return air sent to zone [W]
-  REAL(r64) :: DividerConduction       = 0.0 ! Conduction through divider from outside to inside face (W)
+  REAL(r64) :: ConvHeatFlowNatural     = 0.0d0 ! Convective heat flow from gap between glass and interior shade or blind (W)
+  REAL(r64) :: ConvHeatGainToZoneAir   = 0.0d0 ! Convective heat gain to zone air from window gap airflow (W)
+  REAL(r64) :: RetHeatGainToZoneAir    = 0.0d0 ! Convective heat gain to return air sent to zone [W]
+  REAL(r64) :: DividerConduction       = 0.0d0 ! Conduction through divider from outside to inside face (W)
+  REAL(r64) :: OtherConvHeatGain       = 0.0d0 ! other convective = total conv - standard model prediction for EQL window model (W)
   INTEGER :: BlindNumber              = 0   ! Blind number for a window with a blind
-  REAL(r64), DIMENSION(MaxSlatAngs) :: EffShBlindEmiss= 0.0 ! Effective emissivity of interior blind or shade
-  REAL(r64), DIMENSION(MaxSlatAngs) :: EffGlassEmiss  = 0.0 ! Effective emissivity of glass adjacent to interior blind or shade
+  REAL(r64), DIMENSION(MaxSlatAngs) :: EffShBlindEmiss= 0.0d0 ! Effective emissivity of interior blind or shade
+  REAL(r64), DIMENSION(MaxSlatAngs) :: EffGlassEmiss  = 0.0d0 ! Effective emissivity of glass adjacent to interior blind or shade
   REAL(r64) :: EffInsSurfTemp              = 23.0d0 ! Effective inside surface temperature for window with interior blind or
                                             !  shade; combination of shade/blind and glass temperatures (C)
   LOGICAL :: MovableSlats         = .false. ! True if window has a blind with movable slats
-  REAL(r64) :: SlatAngThisTS           = 0.0 ! Slat angle this time step for window with blind on (radians)
-  REAL(r64) :: SlatAngThisTSDeg        = 0.0 ! Slat angle this time step for window with blind on (deg)
+  REAL(r64) :: SlatAngThisTS           = 0.0d0 ! Slat angle this time step for window with blind on (radians)
+  REAL(r64) :: SlatAngThisTSDeg        = 0.0d0 ! Slat angle this time step for window with blind on (deg)
   Logical   :: SlatAngThisTSDegEMSon = .FALSE.  ! flag that indicate EMS system is actuating SlatAngThisTSDeg
   REAL(r64) :: SlatAngThisTSDegEMSValue = 0.0D0 ! value that EMS sets for slat angle in degrees
   LOGICAL :: SlatsBlockBeam       = .false. ! True if blind slats block incident beam solar
-  REAL(r64) :: BlindAirFlowPermeability    = 0.0 ! Blind air-flow permeability for calculation of convective flow
+  REAL(r64) :: BlindAirFlowPermeability    = 0.0d0 ! Blind air-flow permeability for calculation of convective flow
                                             !  in gap between blind and glass
-  REAL(r64) :: TotGlazingThickness     = 0.0 ! Total glazing thickness from outside of outer glass to inside of inner glass (m)
-  REAL(r64) :: ProfileAngHor           = 0.0 ! Horizontal beam solar profile angle (degrees)
-  REAL(r64) :: ProfileAngVert          = 0.0 ! Vertical beam solar profile angle (degrees)
-  REAL(r64) :: TanProfileAngHor        = 0.0 ! Tangent of horizontal profile angle
-  REAL(r64) :: TanProfileAngVert       = 0.0 ! Tangent of vertical profile angle
-  REAL(r64) :: InsideSillDepth         = 0.0 ! Depth of inside sill (m)
-  REAL(r64) :: InsideReveal            = 0.0 ! Depth of inside reveal (m)
-  REAL(r64) :: InsideSillSolAbs        = 0.0 ! Solar absorptance of inside sill
-  REAL(r64) :: InsideRevealSolAbs      = 0.0 ! Solar absorptance of inside reveal
-  REAL(r64) :: OutsideRevealSolAbs     = 0.0 ! Solar absorptance of outside reveal
-  REAL(r64) :: BmSolAbsdInsReveal      = 0.0 ! Multiplied by BeamSolarRad, gives beam solar absorbed
+  REAL(r64) :: TotGlazingThickness     = 0.0d0 ! Total glazing thickness from outside of outer glass to inside of inner glass (m)
+  REAL(r64) :: ProfileAngHor           = 0.0d0 ! Horizontal beam solar profile angle (degrees)
+  REAL(r64) :: ProfileAngVert          = 0.0d0 ! Vertical beam solar profile angle (degrees)
+  REAL(r64) :: TanProfileAngHor        = 0.0d0 ! Tangent of horizontal profile angle
+  REAL(r64) :: TanProfileAngVert       = 0.0d0 ! Tangent of vertical profile angle
+  REAL(r64) :: InsideSillDepth         = 0.0d0 ! Depth of inside sill (m)
+  REAL(r64) :: InsideReveal            = 0.0d0 ! Depth of inside reveal (m)
+  REAL(r64) :: InsideSillSolAbs        = 0.0d0 ! Solar absorptance of inside sill
+  REAL(r64) :: InsideRevealSolAbs      = 0.0d0 ! Solar absorptance of inside reveal
+  REAL(r64) :: OutsideRevealSolAbs     = 0.0d0 ! Solar absorptance of outside reveal
+  REAL(r64) :: BmSolAbsdInsReveal      = 0.0d0 ! Multiplied by BeamSolarRad, gives beam solar absorbed
                                              ! by inside reveal surfaces (m2)
-  REAL(r64) :: BmSolRefldInsReveal     = 0.0 ! Multiplied by BeamSolarRad, gives beam solar reflected
+  REAL(r64) :: BmSolRefldInsReveal     = 0.0d0 ! Multiplied by BeamSolarRad, gives beam solar reflected
                                              ! by inside reveal surfaces (m2)
-  REAL(r64) :: BmSolRefldInsRevealReport   = 0.0 ! Beam solar reflected by inside reveal surfaces, for reporting (W)
-  REAL(r64) :: BmSolRefldOutsRevealReport  = 0.0 ! Beam solar reflected by outside reveal surfaces, for reporting (m2)
-  REAL(r64) :: BmSolAbsdOutsReveal     = 0.0     ! Multiplied by BeamSolarRad, gives beam solar absorbed by
+  REAL(r64) :: BmSolRefldInsRevealReport   = 0.0d0 ! Beam solar reflected by inside reveal surfaces, for reporting (W)
+  REAL(r64) :: BmSolRefldOutsRevealReport  = 0.0d0 ! Beam solar reflected by outside reveal surfaces, for reporting (m2)
+  REAL(r64) :: BmSolAbsdOutsReveal     = 0.0d0     ! Multiplied by BeamSolarRad, gives beam solar absorbed by
                                                  ! outside reveal surfaces (m2)
-  REAL(r64) :: OutsRevealDiffOntoGlazing   = 0.0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from
+  REAL(r64) :: OutsRevealDiffOntoGlazing   = 0.0d0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from
                                                  !    outside reveal that is incident on the glazing per m2 of glazing (-)
-  REAL(r64) :: InsRevealDiffOntoGlazing    = 0.0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection
+  REAL(r64) :: InsRevealDiffOntoGlazing    = 0.0d0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection
                                             !  from inside reveal that is incident on the glazing per m2 of glazing (-)
-  REAL(r64) :: InsRevealDiffIntoZone   = 0.0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection
+  REAL(r64) :: InsRevealDiffIntoZone   = 0.0d0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection
                                             !  from inside reveal that goes into zone directly or reflected from glazing (m2)
-  REAL(r64) :: OutsRevealDiffOntoFrame = 0.0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from outside reveal
+  REAL(r64) :: OutsRevealDiffOntoFrame = 0.0d0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from outside reveal
                                             !   that is incident on the outside of the frame per m2 of frame (-)
-  REAL(r64) :: InsRevealDiffOntoFrame  = 0.0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from inside reveal
+  REAL(r64) :: InsRevealDiffOntoFrame  = 0.0d0 ! Multiplied by BeamSolarRad, gives diffuse from beam reflection from inside reveal
                                             !   that is incident on the outside of the frame per m2 of frame (-)
 
   ! added for debugging CR 7596. TH 5/26/2009
-  REAL(r64) :: InsRevealDiffOntoGlazingReport = 0.0 ! Diffuse solar from beam reflection
+  REAL(r64) :: InsRevealDiffOntoGlazingReport = 0.0d0 ! Diffuse solar from beam reflection
                                                     !  from inside reveal that is incident on the glazing (W)
-  REAL(r64) :: InsRevealDiffIntoZoneReport    = 0.0 ! Diffuse from beam reflection
+  REAL(r64) :: InsRevealDiffIntoZoneReport    = 0.0d0 ! Diffuse from beam reflection
                                                     !  from inside reveal that goes into zone directly or reflected from glazing (W)
-  REAL(r64) :: InsRevealDiffOntoFrameReport   = 0.0 ! Diffuse from beam reflection from inside reveal
+  REAL(r64) :: InsRevealDiffOntoFrameReport   = 0.0d0 ! Diffuse from beam reflection from inside reveal
                                                     !  that is incident on the frame (W)
-  REAL(r64) :: BmSolAbsdInsRevealReport       = 0.0 ! Beam solar absorbed by inside reveal (W)
+  REAL(r64) :: BmSolAbsdInsRevealReport       = 0.0d0 ! Beam solar absorbed by inside reveal (W)
 
 
-  REAL(r64) :: BlTsolBmBm              = 0.0 ! Time-step value of blind beam-beam solar transmittance (-)
-  REAL(r64) :: BlTsolBmDif             = 0.0 ! Time-step value of blind beam-diffuse solar transmittance (-)
-  REAL(r64) :: BlTsolDifDif            = 0.0 ! Time-step value of blind diffuse-diffuse solar transmittance (-)
-  REAL(r64) :: BlGlSysTsolBmBm         = 0.0 ! Time-step value of blind/glass system beam-beam solar transmittance (-)
-  REAL(r64) :: BlGlSysTsolDifDif       = 0.0 ! Time-step value of blind/glass system diffuse-diffuse solar transmittance (-)
+  REAL(r64) :: BlTsolBmBm              = 0.0d0 ! Time-step value of blind beam-beam solar transmittance (-)
+  REAL(r64) :: BlTsolBmDif             = 0.0d0 ! Time-step value of blind beam-diffuse solar transmittance (-)
+  REAL(r64) :: BlTsolDifDif            = 0.0d0 ! Time-step value of blind diffuse-diffuse solar transmittance (-)
+  REAL(r64) :: BlGlSysTsolBmBm         = 0.0d0 ! Time-step value of blind/glass system beam-beam solar transmittance (-)
+  REAL(r64) :: BlGlSysTsolDifDif       = 0.0d0 ! Time-step value of blind/glass system diffuse-diffuse solar transmittance (-)
   INTEGER :: ScreenNumber             = 0   ! Screen number for a window with a screen (do not confuse with material number)
-  REAL(r64) :: ScTsolBmBm              = 0.0 ! Time-step value of screen beam-beam solar transmittance (-)
-  REAL(r64) :: ScTsolBmDif             = 0.0 ! Time-step value of screen beam-diffuse solar transmittance (-)
-  REAL(r64) :: ScTsolDifDif            = 0.0 ! Time-step value of screen diffuse-diffuse solar transmittance (-)
-  REAL(r64) :: ScGlSysTsolBmBm         = 0.0 ! Time-step value of screen/glass system beam-beam solar transmittance (-)
-  REAL(r64) :: ScGlSysTsolDifDif       = 0.0 ! Time-step value of screen/glass system diffuse-diffuse solar transmittance (-)
-  REAL(r64) :: GlTsolBmBm              = 0.0 ! Time-step value of glass beam-beam solar transmittance (-)
-  REAL(r64) :: GlTsolBmDif             = 0.0 ! Time-step value of glass beam-diffuse solar transmittance (-)
-  REAL(r64) :: GlTsolDifDif            = 0.0 ! Time-step value of glass diffuse-diffuse solar transmittance (-)
+  REAL(r64) :: ScTsolBmBm              = 0.0d0 ! Time-step value of screen beam-beam solar transmittance (-)
+  REAL(r64) :: ScTsolBmDif             = 0.0d0 ! Time-step value of screen beam-diffuse solar transmittance (-)
+  REAL(r64) :: ScTsolDifDif            = 0.0d0 ! Time-step value of screen diffuse-diffuse solar transmittance (-)
+  REAL(r64) :: ScGlSysTsolBmBm         = 0.0d0 ! Time-step value of screen/glass system beam-beam solar transmittance (-)
+  REAL(r64) :: ScGlSysTsolDifDif       = 0.0d0 ! Time-step value of screen/glass system diffuse-diffuse solar transmittance (-)
+  REAL(r64) :: GlTsolBmBm              = 0.0d0 ! Time-step value of glass beam-beam solar transmittance (-)
+  REAL(r64) :: GlTsolBmDif             = 0.0d0 ! Time-step value of glass beam-diffuse solar transmittance (-)
+  REAL(r64) :: GlTsolDifDif            = 0.0d0 ! Time-step value of glass diffuse-diffuse solar transmittance (-)
   INTEGER :: AirflowSource             = 0   ! Source of gap airflow (INSIDEAIR, OUTSIDEAIR, etc.)
   INTEGER :: AirflowDestination        = 0   ! Destination of gap airflow (INSIDEAIR, OUTSIDEAIR, etc.)
-  REAL(r64) :: MaxAirflow              = 0.0 ! Maximum gap airflow (m3/s per m of glazing width)
+  REAL(r64) :: MaxAirflow              = 0.0d0 ! Maximum gap airflow (m3/s per m of glazing width)
   INTEGER :: AirflowControlType        = 0   ! Gap airflow control type (ALWAYSONATMAXFLOW, etc.)
   LOGICAL :: AirflowHasSchedule       = .FALSE. ! True if gap airflow is scheduled
   INTEGER :: AirflowSchedulePtr       = 0   ! Gap airflow schedule pointer
-  REAL(r64) :: AirflowThisTS           = 0.0 ! Gap airflow this timestep (m3/s per m of glazing width)
-  REAL(r64)    :: TAirflowGapOutlet    = 0.0 ! Temperature of air leaving airflow gap between glass panes (C)
+  REAL(r64) :: AirflowThisTS           = 0.0d0 ! Gap airflow this timestep (m3/s per m of glazing width)
+  REAL(r64)    :: TAirflowGapOutlet    = 0.0d0 ! Temperature of air leaving airflow gap between glass panes (C)
   INTEGER :: WindowCalcIterationsRep  = 0   ! Number of iterations in window heat balance calculation
-  REAL(r64)    :: BmSolTransThruIntWinRep  = 0.0 ! Beam solar transmitted through interior window [W]
-  REAL(r64)    :: VentingOpenFactorRep = 0.0 ! Window/door venting open factor, for reporting
-  REAL(r64)    :: VentingOpenFactorMultRep = 0.0 ! Window/door opening modulation multiplier on venting open factor, for reporting
-  REAL(r64)    :: InsideTempForVentingRep = 0.0 ! Inside air temp used to control window/door venting, for reporting (C)
-  REAL(r64)    :: VentingAvailabilityRep   = 0.0 ! Venting availability schedule value (0.0/1.0 = no venting allowed/not allowed)
-  REAL(r64)    :: IllumFromWinAtRefPt1Rep   = 0.0 ! Illuminance from window at reference point #1 [lux]
-  REAL(r64)    :: IllumFromWinAtRefPt2Rep   = 0.0 ! Illuminance from window at reference point #2 [lux]
-  REAL(r64)    :: LumWinFromRefPt1Rep   = 0.0 ! Window luminance as viewed from reference point #1 [cd/m2]
-  REAL(r64)    :: LumWinFromRefPt2Rep   = 0.0 ! Window luminance as viewed from reference point #2 [cd/m2]
-  REAL(r64)    :: SkySolarInc           = 0.0 ! Incident diffuse solar from sky; if CalcSolRefl is true, includes
+  REAL(r64)    :: BmSolTransThruIntWinRep  = 0.0d0 ! Beam solar transmitted through interior window [W]
+  REAL(r64)    :: VentingOpenFactorRep = 0.0d0 ! Window/door venting open factor, for reporting
+  REAL(r64)    :: VentingOpenFactorMultRep = 0.0d0 ! Window/door opening modulation multiplier on venting open factor, for reporting
+  REAL(r64)    :: InsideTempForVentingRep = 0.0d0 ! Inside air temp used to control window/door venting, for reporting (C)
+  REAL(r64)    :: VentingAvailabilityRep   = 0.0d0 ! Venting availability schedule value (0.0/1.0 = no venting allowed/not allowed)
+  REAL(r64)    :: IllumFromWinAtRefPt1Rep   = 0.0d0 ! Illuminance from window at reference point #1 [lux]
+  REAL(r64)    :: IllumFromWinAtRefPt2Rep   = 0.0d0 ! Illuminance from window at reference point #2 [lux]
+  REAL(r64)    :: LumWinFromRefPt1Rep   = 0.0d0 ! Window luminance as viewed from reference point #1 [cd/m2]
+  REAL(r64)    :: LumWinFromRefPt2Rep   = 0.0d0 ! Window luminance as viewed from reference point #2 [cd/m2]
+  REAL(r64)    :: SkySolarInc           = 0.0d0 ! Incident diffuse solar from sky; if CalcSolRefl is true, includes
                                              ! reflection of sky diffuse and beam solar from exterior obstructions [W/m2]
-  REAL(r64)    :: GndSolarInc           = 0.0 ! Incident diffuse solar from ground; if CalcSolRefl is true, accounts
+  REAL(r64)    :: GndSolarInc           = 0.0d0 ! Incident diffuse solar from ground; if CalcSolRefl is true, accounts
                                              ! for shadowing of ground by building and obstructions [W/m2]
-  REAL(r64)    :: SkyGndSolarInc           = 0.0 ! Incident diffuse solar from ground-reflected sky radiation; used for
+  REAL(r64)    :: SkyGndSolarInc           = 0.0d0 ! Incident diffuse solar from ground-reflected sky radiation; used for
             !Complex Fen; if CalcSolRefl is true, accounts for shadowing of ground by building and obstructions [W/m2]
-  REAL(r64)    :: BmGndSolarInc           = 0.0 ! Incident diffuse solar from ground-reflected beam radiation; used for
+  REAL(r64)    :: BmGndSolarInc           = 0.0d0 ! Incident diffuse solar from ground-reflected beam radiation; used for
             !Complex Fen; if CalcSolRefl is true, accounts for shadowing of ground by building and obstructions [W/m2]
-  REAL(r64),DIMENSION(3) :: ZoneAreaMinusThisSurf = 0.0 ! Zone inside surface area minus this surface and its subsurfaces
+  REAL(r64),DIMENSION(3) :: ZoneAreaMinusThisSurf = 0.0d0 ! Zone inside surface area minus this surface and its subsurfaces
                                              ! for floor/wall/ceiling (m2)
-  REAL(r64),DIMENSION(3) :: ZoneAreaReflProdMinusThisSurf   = 0.0 ! Zone product of inside surface area times vis reflectance
+  REAL(r64),DIMENSION(3) :: ZoneAreaReflProdMinusThisSurf   = 0.0d0 ! Zone product of inside surface area times vis reflectance
                                                                   ! minus this surface and its subsurfaces,
                                                                   ! for floor/wall/ceiling (m2)
-  REAL(r64)    :: LightWellEff              = 1.0 ! Light well efficiency (multiplier on exterior window vis trans
+  REAL(r64)    :: LightWellEff              = 1.0d0 ! Light well efficiency (multiplier on exterior window vis trans
                                                   !  due to light well losses)
   LOGICAL :: SolarDiffusing            = .false. ! True if exterior window with a construction that contains a
                                                  !  diffusing glass layer
   !energy
-  REAL(r64) :: BmSolRefldInsRevealRepEnergy   = 0.0 ! energy of BmSolRefldInsRevealReport [J]
-  REAL(r64) :: BmSolRefldOutsRevealRepEnergy  = 0.0 ! energy of BmSolRefldOutsRevealReport [J]
-  REAL(r64) :: BmSolTransThruIntWinRepEnergy  = 0.0 ! energy of BmSolTransThruIntWinRep [J]
+  REAL(r64) :: BmSolRefldInsRevealRepEnergy   = 0.0d0 ! energy of BmSolRefldInsRevealReport [J]
+  REAL(r64) :: BmSolRefldOutsRevealRepEnergy  = 0.0d0 ! energy of BmSolRefldOutsRevealReport [J]
+  REAL(r64) :: BmSolTransThruIntWinRepEnergy  = 0.0d0 ! energy of BmSolTransThruIntWinRep [J]
 
   ! Reporting
-  REAL(r64) :: FrameHeatGain  =0.0
-  REAL(r64) :: DividerHeatGain=0.0
-  REAL(r64) :: FrameHeatLoss  =0.0
-  REAL(r64) :: DividerHeatLoss=0.0
+  REAL(r64) :: FrameHeatGain  =0.0d0
+  REAL(r64) :: DividerHeatGain=0.0d0
+  REAL(r64) :: FrameHeatLoss  =0.0d0
+  REAL(r64) :: DividerHeatLoss=0.0d0
 
   ! Added TH for thermochromic windows. 12/22/2008
-  REAL(r64) :: TCLayerTemp = 0.0      ! The temperature of the thermochromic layer of the window
-  REAL(r64) :: SpecTemp = 0.0         ! The specification temperature of the TC layer glass
+  REAL(r64) :: TCLayerTemp = 0.0d0      ! The temperature of the thermochromic layer of the window
+  REAL(r64) :: SpecTemp = 0.0d0         ! The specification temperature of the TC layer glass
 
   ! Added for W6 integration June 2010
   INTEGER   :: WindowModelType   = Window5DetailedModel ! if set to WindowBSDFModel, then uses BSDF methods
@@ -715,47 +723,47 @@ END TYPE SurfaceWindowCalc
 TYPE FrameDividerProperties
 
   CHARACTER(len=MaxNameLength) :: Name = ' ' ! Name of frame/divider
-  REAL(r64) :: FrameWidth              = 0.0 ! Average width of frame in plane of window {m}
-  REAL(r64) :: FrameProjectionOut      = 0.0 ! Distance normal to window between outside face of outer pane
+  REAL(r64) :: FrameWidth              = 0.0d0 ! Average width of frame in plane of window {m}
+  REAL(r64) :: FrameProjectionOut      = 0.0d0 ! Distance normal to window between outside face of outer pane
                                              !  and outside of frame {m}
-  REAL(r64) :: FrameProjectionIn       = 0.0 ! Distance normal to window between inside face of inner pane
+  REAL(r64) :: FrameProjectionIn       = 0.0d0 ! Distance normal to window between inside face of inner pane
                                              !  and inside of frame {m}
-  REAL(r64) :: FrameConductance        = 0.0 ! Effective conductance of frame (no air films) {W/m2-K}
+  REAL(r64) :: FrameConductance        = 0.0d0 ! Effective conductance of frame (no air films) {W/m2-K}
   REAL(r64) :: FrameEdgeWidth          = 0.06355d0 ! default 2.5 in ! Width of glass edge region near frame {m}
-  REAL(r64) :: FrEdgeToCenterGlCondRatio   = 1.0 ! Ratio of frame edge of glass conductance (without air films) to
+  REAL(r64) :: FrEdgeToCenterGlCondRatio   = 1.0d0 ! Ratio of frame edge of glass conductance (without air films) to
                                                  ! center of glass conductance (without air films)
-  REAL(r64) :: FrameSolAbsorp          = 0.0 ! Solar absorptance of frame corrected for self-shading
-  REAL(r64) :: FrameVisAbsorp          = 0.0 ! Visible absorptance of frame corrected for self-shading
+  REAL(r64) :: FrameSolAbsorp          = 0.0d0 ! Solar absorptance of frame corrected for self-shading
+  REAL(r64) :: FrameVisAbsorp          = 0.0d0 ! Visible absorptance of frame corrected for self-shading
   REAL(r64) :: FrameEmis               = 0.9d0 ! Thermal emissivity of frame
   INTEGER   :: DividerType             = 0   ! Type of divider {DividedLite or Suspended (between-glass}
-  REAL(r64) :: DividerWidth            = 0.0 ! Average width of divider in plane of window {m}
+  REAL(r64) :: DividerWidth            = 0.0d0 ! Average width of divider in plane of window {m}
   INTEGER :: HorDividers               = 0   ! Number of horizontal dividers
   INTEGER :: VertDividers              = 0   ! Number of vertical dividers
-  REAL(r64) :: DividerProjectionOut    = 0.0 ! Distance normal to window between outside face of outer pane
+  REAL(r64) :: DividerProjectionOut    = 0.0d0 ! Distance normal to window between outside face of outer pane
                                              !  and outside of divider {m}
-  REAL(r64) :: DividerProjectionIn     = 0.0 ! Distance normal to window between inside face of inner pane
+  REAL(r64) :: DividerProjectionIn     = 0.0d0 ! Distance normal to window between inside face of inner pane
                                              !  and inside of divider {m}
   REAL(r64) :: DividerEdgeWidth        = 0.06355d0 ! default 2.5 in ! Width of glass edge region near divider
-  REAL(r64) :: DividerConductance      = 0.0 ! Effective conductance of divider (no air films) {W/m2-K}
-  REAL(r64) :: DivEdgeToCenterGlCondRatio  = 1.0 ! Ratio of divider edge of glass conductance (without air films) to
+  REAL(r64) :: DividerConductance      = 0.0d0 ! Effective conductance of divider (no air films) {W/m2-K}
+  REAL(r64) :: DivEdgeToCenterGlCondRatio  = 1.0d0 ! Ratio of divider edge of glass conductance (without air films) to
                                                  ! center of glass conductance (without air films)
-  REAL(r64) :: DividerSolAbsorp        = 0.0 ! Solar absorptance of divider corrected for self-shading
-  REAL(r64) :: DividerVisAbsorp        = 0.0 ! Visible absorptance of divider corrected for self-shading
+  REAL(r64) :: DividerSolAbsorp        = 0.0d0 ! Solar absorptance of divider corrected for self-shading
+  REAL(r64) :: DividerVisAbsorp        = 0.0d0 ! Visible absorptance of divider corrected for self-shading
   REAL(r64) :: DividerEmis             = 0.9d0 ! Thermal emissivity of divider
   INTEGER   :: MullionOrientation      = 0     ! Horizontal or Vertical; used only for windows with two glazing systems
                                                   !  divided by a mullion; obtained from Window5 data file.
-  REAL(r64) :: OutsideRevealSolAbs     = 0.0 ! Solar absorptance of outside reveal
-  REAL(r64) :: InsideSillDepth         = 0.0 ! Inside sill depth (m)
-  REAL(r64) :: InsideReveal            = 0.0 ! Inside reveal (m)
-  REAL(r64) :: InsideSillSolAbs        = 0.0 ! Solar absorptance of inside sill
-  REAL(r64) :: InsideRevealSolAbs      = 0.0 ! Solar absorptance of inside reveal
+  REAL(r64) :: OutsideRevealSolAbs     = 0.0d0 ! Solar absorptance of outside reveal
+  REAL(r64) :: InsideSillDepth         = 0.0d0 ! Inside sill depth (m)
+  REAL(r64) :: InsideReveal            = 0.0d0 ! Inside reveal (m)
+  REAL(r64) :: InsideSillSolAbs        = 0.0d0 ! Solar absorptance of inside sill
+  REAL(r64) :: InsideRevealSolAbs      = 0.0d0 ! Solar absorptance of inside reveal
 
 END TYPE FrameDividerProperties
 
 TYPE StormWindowData
   INTEGER :: BaseWindowNum              = 0   ! Surface number of associated exterior window
   INTEGER :: StormWinMaterialNum        = 0   ! Material number of storm window glass
-  REAL(r64)    :: StormWinDistance       = 0.0 ! Distance between storm window glass and adjacent glass (m)
+  REAL(r64)    :: StormWinDistance       = 0.0d0 ! Distance between storm window glass and adjacent glass (m)
   INTEGER :: DateOn                     = 0   ! Date (julian) storm window is put on
   INTEGER :: MonthOn                    = 0   ! Month storm window is put on
   INTEGER :: DayOfMonthOn               = 0   ! Day of month storm window is put on
@@ -820,13 +828,13 @@ TYPE WindowShadingControlData
   INTEGER  :: Schedule                = 0   ! Pointer to schedule of 0 and 1 values: 0 => window is not shaded;
                                             !  1 => window is shaded if Type=Schedule or Type = ScheduleAnd...
                                             ! and setpoint is exceeded.
-  REAL(r64)     :: SetPoint            = 0.0 ! Control setpoint (dimension depends on Trigger:
+  REAL(r64)     :: SetPoint            = 0.0d0 ! Control setpoint (dimension depends on Trigger:
                                             !  W/m2 of window area for solar on window,
                                             !  W/m2 of ground area for horizontal solar,
                                             !  deg C for air temp, W for zone heating and
                                             !  cooling rate). Not used for Shading Control Type =
                                             !  MeetDaylightIlluminanceSetpoint or OnIfHighGlare.
-  REAL(r64)     :: SetPoint2           = 0.0 ! Second control setpoint for control types that take two setpoints.
+  REAL(r64)     :: SetPoint2           = 0.0d0 ! Second control setpoint for control types that take two setpoints.
                                             !   Dimension is deg C or W/m2.
   LOGICAL  :: ShadingControlIsScheduled = .false. ! True if shading control has a schedule
   LOGICAL  :: GlareControlIsActive  = .false. ! True if shading control to reduce daylight glare is active
@@ -846,13 +854,13 @@ END TYPE
 
 TYPE OSCData
   CHARACTER(len=MaxNameLength) :: Name = ' ' ! Name of OSC
-  REAL(r64) :: ConstTemp        = 0.0 ! User selected constant temperature (degrees C)
-  REAL(r64) :: ConstTempCoef    = 0.0 ! Coefficient modifying the user selected constant temperature
-  REAL(r64) :: ExtDryBulbCoef   = 0.0 ! Coefficient modifying the external dry bulb temperature
-  REAL(r64) :: GroundTempCoef   = 0.0 ! Coefficient modifying the ground temperature
-  REAL(r64) :: SurfFilmCoef     = 0.0 ! Combined convective/radiative film coefficient if >0, else use other coefficients
-  REAL(r64) :: WindSpeedCoef    = 0.0 ! Coefficient modifying the wind speed term (s/m)
-  REAL(r64) :: ZoneAirTempCoef  = 0.0 ! Coefficient modifying the zone air temperature part of the equation
+  REAL(r64) :: ConstTemp        = 0.0d0 ! User selected constant temperature (degrees C)
+  REAL(r64) :: ConstTempCoef    = 0.0d0 ! Coefficient modifying the user selected constant temperature
+  REAL(r64) :: ExtDryBulbCoef   = 0.0d0 ! Coefficient modifying the external dry bulb temperature
+  REAL(r64) :: GroundTempCoef   = 0.0d0 ! Coefficient modifying the ground temperature
+  REAL(r64) :: SurfFilmCoef     = 0.0d0 ! Combined convective/radiative film coefficient if >0, else use other coefficients
+  REAL(r64) :: WindSpeedCoef    = 0.0d0 ! Coefficient modifying the wind speed term (s/m)
+  REAL(r64) :: ZoneAirTempCoef  = 0.0d0 ! Coefficient modifying the zone air temperature part of the equation
   CHARACTER(len=MaxNameLength) :: ConstTempScheduleName = ' ' ! Schedule name for scheduled outside temp
   INTEGER   :: ConstTempScheduleIndex = 0  ! Index for scheduled outside temp.
   LOGICAL   :: SinusoidalConstTempCoef = .FALSE. ! If true then ConstTempCoef varies by sine wave
@@ -887,7 +895,7 @@ TYPE ConvectionCoefficient
   INTEGER :: WhichSurface  = 0   ! Which surface number this is applied to
   CHARACTER(len=MaxNameLength) :: SurfaceName = ' ' ! Which surface (name)
   INTEGER :: OverrideType  = 0   ! Override type, 1=value, 2=schedule, 3=model, 4=user curve
-  REAL(r64) :: OverrideValue    = 0.0 ! User specified value
+  REAL(r64) :: OverrideValue    = 0.0d0 ! User specified value
   CHARACTER(len=MaxNameLength) :: ScheduleName = ' ' ! Which surface (name)
   INTEGER :: ScheduleIndex = 0  ! if type="schedule" is used
   INTEGER :: UserCurveIndex =0  ! if type=UserCurve is used
@@ -906,38 +914,55 @@ TYPE ExtVentedCavityStruct
   CHARACTER(len=MaxNameLength) :: Name             = ' ' !
   CHARACTER(len=MaxNameLength) :: OSCMName         = ' ' !OtherSideConditionsModel
   INTEGER                      :: OSCMPtr          = 0  ! OtherSideConditionsModel index
-  REAL(r64)                    :: Porosity         = 0. ! fraction of absorber plate [--]
-  REAL(r64)                    :: LWEmitt          = 0. ! Thermal Emissivity of Baffle Surface [dimensionless]
-  REAL(r64)                    :: SolAbsorp        = 0. ! Solar Absorbtivity of Baffle Surface [dimensionless]
+  REAL(r64)                    :: Porosity         = 0.0d0 ! fraction of absorber plate [--]
+  REAL(r64)                    :: LWEmitt          = 0.0d0 ! Thermal Emissivity of Baffle Surface [dimensionless]
+  REAL(r64)                    :: SolAbsorp        = 0.0d0 ! Solar Absorbtivity of Baffle Surface [dimensionless]
   INTEGER                      :: BaffleRoughness    = 1  ! surface roughness for exterior convection calcs.
-  REAL(r64)                    :: PlenGapThick     = 0. ! Depth of Plenum Behind Baffle [m]
+  REAL(r64)                    :: PlenGapThick     = 0.0d0 ! Depth of Plenum Behind Baffle [m]
   INTEGER                      :: NumSurfs         = 0  ! a single baffle can have multiple surfaces underneath it
   INTEGER, ALLOCATABLE, DIMENSION(:) ::SurfPtrs    != 0  ! array of pointers for participating underlying surfaces
-  REAL(r64)                    :: HdeltaNPL        = 0. ! Height scale for Cavity bouyancy  [m]
-  REAL(r64)                    :: AreaRatio        = 0. ! Ratio of actual surface are to projected surface area [dimensionless]
-  REAL(r64)                    :: Cv               = 0. ! volume-based effectiveness of openings for wind-driven vent when Passive
-  REAL(r64)                    :: Cd               = 0. ! discharge coefficient of openings for bouyancy-driven vent when Passive
+  REAL(r64)                    :: HdeltaNPL        = 0.0d0 ! Height scale for Cavity bouyancy  [m]
+  REAL(r64)                    :: AreaRatio        = 0.0d0 ! Ratio of actual surface are to projected surface area [dimensionless]
+  REAL(r64)                    :: Cv               = 0.0d0 ! volume-based effectiveness of openings for wind-driven vent when Passive
+  REAL(r64)                    :: Cd               = 0.0d0 ! discharge coefficient of openings for bouyancy-driven vent when Passive
  ! data from elswhere and calculated
-  REAL(r64)                    :: ActualArea       = 0. ! Overall Area of Collect with surface corrugations.
-  REAL(r64)                    :: ProjArea         = 0. ! Overall Area of Collector projected, as if flat [m2]
-  TYPE (vector)                :: Centroid         = vector(0.,0.,0.)  ! computed centroid
-  REAL(r64)                    :: TAirCav          = 0. ! modeled drybulb temperature for air between baffle and wall [C]
-  REAL(r64)                    :: Tbaffle          = 0. ! modeled surface temperature for baffle[C]
+  REAL(r64)                    :: ActualArea       = 0.0d0 ! Overall Area of Collect with surface corrugations.
+  REAL(r64)                    :: ProjArea         = 0.0d0 ! Overall Area of Collector projected, as if flat [m2]
+  TYPE (vector)                :: Centroid         = vector(0.0d0,0.0d0,0.0d0)  ! computed centroid
+  REAL(r64)                    :: TAirCav          = 0.0d0 ! modeled drybulb temperature for air between baffle and wall [C]
+  REAL(r64)                    :: Tbaffle          = 0.0d0 ! modeled surface temperature for baffle[C]
   REAL(r64)                    :: TairLast         = 20.0d0 ! Old Value for modeled drybulb temp of air between baffle and wall [C]
   REAL(r64)                    :: TbaffleLast      = 20.0d0 ! Old value for modeled surface temperature for baffle [C]
-  REAL(r64)                    :: HrPlen           = 0  ! Modeled radiation coef for OSCM [W/m2-C]
-  REAL(r64)                    :: HcPlen           = 0. ! Modeled Convection coef for OSCM [W/m2-C]
-  REAL(r64)                    :: MdotVent         = 0. ! air mass flow exchanging with ambient when passive.
-  REAL(r64)                    :: Tilt             = 0. ! Tilt from area weighted average of underlying surfaces
-  REAL(r64)                    :: Azimuth          = 0. ! Azimuth from area weighted average of underlying surfaces
-  REAL(r64)                    :: QdotSource       = 0. ! Source/sink term
+  REAL(r64)                    :: HrPlen           = 0.0d0  ! Modeled radiation coef for OSCM [W/m2-C]
+  REAL(r64)                    :: HcPlen           = 0.0d0 ! Modeled Convection coef for OSCM [W/m2-C]
+  REAL(r64)                    :: MdotVent         = 0.0d0 ! air mass flow exchanging with ambient when passive.
+  REAL(r64)                    :: Tilt             = 0.0d0 ! Tilt from area weighted average of underlying surfaces
+  REAL(r64)                    :: Azimuth          = 0.0d0 ! Azimuth from area weighted average of underlying surfaces
+  REAL(r64)                    :: QdotSource       = 0.0d0 ! Source/sink term
   ! reporting data
-  REAL(r64)                    :: Isc              = 0. ! total incident solar on baffle [W]
-  REAL(r64)                    :: PassiveACH       = 0. ! air changes per hour when passive [1/hr]
-  REAL(r64)                    :: PassiveMdotVent  = 0. ! Total Nat Vent air change rate  [kg/s]
-  REAL(r64)                    :: PassiveMdotWind  = 0. ! Nat Vent air change rate from Wind-driven [kg/s]
-  REAL(r64)                    :: PassiveMdotTherm = 0. ! Nat. Vent air change rate from bouyancy-driven flow [kg/s]
+  REAL(r64)                    :: Isc              = 0.0d0 ! total incident solar on baffle [W]
+  REAL(r64)                    :: PassiveACH       = 0.0d0 ! air changes per hour when passive [1/hr]
+  REAL(r64)                    :: PassiveMdotVent  = 0.0d0 ! Total Nat Vent air change rate  [kg/s]
+  REAL(r64)                    :: PassiveMdotWind  = 0.0d0 ! Nat Vent air change rate from Wind-driven [kg/s]
+  REAL(r64)                    :: PassiveMdotTherm = 0.0d0 ! Nat. Vent air change rate from bouyancy-driven flow [kg/s]
 END TYPE ExtVentedCavityStruct
+
+! Definitions used for scheduled surface gains
+
+TYPE SurfaceSolarIncident
+  CHARACTER(len=MaxNameLength) :: Name             = ' ' !
+  INTEGER                      :: SurfPtr          = 0 ! surface pointer
+  INTEGER                      :: ConstrPtr        = 0 ! construction pointer
+  INTEGER                      :: SchedPtr         = 0 ! schedule pointer
+END TYPE SurfaceSolarIncident
+
+TYPE FenestrationSolarAbsorbed
+  CHARACTER(len=MaxNameLength) :: Name             = ' ' !
+  INTEGER                      :: SurfPtr          = 0 ! surface pointer
+  INTEGER                      :: ConstrPtr        = 0 ! construction pointer
+  INTEGER                      :: NumOfSched       = 0 ! number of scheduled layers
+  INTEGER, ALLOCATABLE, DIMENSION(:) ::SchedPtrs       ! pointer to schedules for each layer in construction
+END TYPE FenestrationSolarAbsorbed
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -954,6 +979,8 @@ TYPE (ConvectionCoefficient), ALLOCATABLE, DIMENSION(:) :: UserIntConvectionCoef
 TYPE (ConvectionCoefficient), ALLOCATABLE, DIMENSION(:) :: UserExtConvectionCoeffs
 TYPE (ShadingVertexData), ALLOCATABLE, DIMENSION(:) :: ShadeV
 TYPE (ExtVentedCavityStruct), ALLOCATABLE, DIMENSION(:) :: ExtVentedCavity
+TYPE (SurfaceSolarIncident), ALLOCATABLE, DIMENSION(:) :: SurfIncSolSSG
+TYPE (FenestrationSolarAbsorbed), ALLOCATABLE, DIMENSION(:) :: FenLayAbsSSG
 
 INTEGER :: TotSurfaces          =0 ! Total number of surfaces (walls, floors, roofs, windows, shading surfaces, etc.--everything)
 INTEGER :: TotWindows           =0 ! Total number of windows
@@ -965,6 +992,8 @@ INTEGER :: TotExtConvCoeff      =0 ! Total number of exterior convection coeffic
 INTEGER :: TotOSC               =0 ! Total number of Other Side Coefficient Blocks
 INTEGER :: TotOSCM              =0 ! Total number of Other Side Conditions Model Blocks.
 INTEGER :: TotExtVentCav        = 0
+INTEGER :: TotSurfIncSolSSG     =0 ! Total number of scheduled surface gains for incident solar radiation on surface
+INTEGER :: TotFenLayAbsSSG      =0 ! Total number of scheduled surface gains for absorbed solar radiation in window layers
 INTEGER :: Corner               =0 ! Which corner is specified as the first vertice
 INTEGER :: MaxVerticesPerSurface = 4 ! Maximum number of vertices allowed for a single surface (default -- can go higher)
 
@@ -981,7 +1010,7 @@ LOGICAL :: DaylRefWorldCoordSystem     =.false. ! True if Daylight Reference Poi
                                                 ! False means relative coordinates
 INTEGER :: MaxRecPts=0                  ! Max number of receiving points on a surface for solar reflection calc
 INTEGER :: MaxReflRays=0                ! Max number of rays from a receiving surface for solar reflection calc
-REAL(r64) :: GroundLevelZ=0.0           ! Z value of ground level for solar refl calc (m)
+REAL(r64) :: GroundLevelZ= 0.0d0           ! Z value of ground level for solar refl calc (m)
 LOGICAL :: AirflowWindows = .FALSE. ! TRUE if one or more airflow windows
 
 LOGICAL :: ShadingTransmittanceVaries=.false.       ! overall, shading transmittance varies for the building
@@ -1001,6 +1030,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: DSZone ! Factor for sky diffuse solar ra
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: DGZone ! Factor for ground diffuse solar radiation into a zone
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: DBZone ! Factor for diffuse radiation in a zone from
                                                ! beam reflecting from inside surfaces
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: DBZoneSSG ! Factor for diffuse radiation in a zone from beam reflecting from inside
+                                               ! surfaces. Used only for scheduled surface gains
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: CBZone ! Factor for beam solar absorbed by interior shades
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: AISurf ! Time step value of factor for beam
                                                ! absorbed on inside of opaque surface
@@ -1054,6 +1085,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGainConvGlazShadGapToZoneRep ! compon
                                                                      ! the gap between the inner most glazing and the shade   (W)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGainConvShadeToZoneRep ! component of WinHeatGain convect to zone from front shade (W)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGainIRShadeToZoneRep   ! component of WinHeatGain net IR to zone from front shade (W)
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: OtherConvGainInsideFaceToZoneRep ! net imbalance of convection heat gain from equivalent Layer window
+                                                                      ! inside face to zone air
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: WinGapConvHtFlowRep !Convective heat flow from gap in airflow window (W)
 !REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondGainRep !Equals Opaq Surf Ins Face Cond

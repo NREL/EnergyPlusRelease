@@ -332,6 +332,7 @@ SUBROUTINE GetPVInput
   LOGICAL :: IsNotOK               ! Flag to verify name
   LOGICAL :: IsBlank               ! Flag for blank name
   INTEGER :: ThisParamObj !
+  INTEGER :: dupPtr
 
   TYPE(SimplePVParamsStruct),        ALLOCATABLE, DIMENSION(:) :: tmpSimpleModuleParams ! temporary, for processing input data
   TYPE(TRNSYSPVModuleParamsStruct),  ALLOCATABLE, DIMENSION(:) :: tmpTNRSYSModuleParams ! temporary, for processing input data
@@ -452,6 +453,38 @@ SUBROUTINE GetPVInput
     PVArray(PVNum)%NumModNSeries    = rNumericArgs(2)
 
   ENDDO ! main PV array objects
+
+  ! search for duplicate PV arrays on integrated heat transfer surfaces, accumulating source terms across arrays is not supported
+  DO PVnum = 1, NumPVs
+    IsNotOK = .FALSE.
+    SELECT CASE (PVArray(PVNum)%CellIntegrationMode)
+
+    CASE (iSurfaceOutsideFaceCellIntegration, iTranspiredCollectorCellIntegration, iExteriorVentedCavityCellIntegration )
+      dupPtr = FindItemInList(PVarray(PVNum)%SurfaceName, PVarray(PVNum+1:NumPVs)%SurfaceName, (NumPVs - PVnum) )
+      IF (dupPtr /= 0) dupPtr = dupPtr + PVNum ! to correct for shortened array in find item
+      IF (dupPtr /= 0) THEN
+        IF (PVArray(dupPtr)%CellIntegrationMode == iSurfaceOutsideFaceCellIntegration) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': problem detected with multiple PV arrays.')
+          CALL ShowContinueError('When using IntegratedSurfaceOutsideFace heat transfer mode, only one PV array can be coupled')
+          CALL ShowContinueError('Both '//TRIM(PVarray(PVNum)%Name)//' and '//TRIM(PVarray(dupPtr)%Name)//' are using surface ' &
+                                    //TRIM(PVarray(PVNum)%SurfaceName) )
+           ErrorsFound=.TRUE.
+        ELSEIF (PVArray(dupPtr)%CellIntegrationMode == iTranspiredCollectorCellIntegration) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': problem detected with multiple PV arrays.')
+          CALL ShowContinueError('When using IntegratedTranspiredCollector heat transfer mode, only one PV array can be coupled')
+          CALL ShowContinueError('Both '//TRIM(PVarray(PVNum)%Name)//' and '//TRIM(PVarray(dupPtr)%Name)//' are using UTSC ' &
+                                   //'surface = ' //TRIM(PVarray(PVNum)%SurfaceName) )
+           ErrorsFound=.TRUE.
+        ELSEIF (PVArray(dupPtr)%CellIntegrationMode ==iExteriorVentedCavityCellIntegration) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': problem detected with multiple PV arrays.')
+          CALL ShowContinueError('When using IntegratedExteriorVentedCavity heat transfer mode, only one PV array can be coupled')
+          CALL ShowContinueError('Both '//TRIM(PVarray(PVNum)%Name)//' and '//TRIM(PVarray(dupPtr)%Name)//' are using exterior ' &
+                                   //'vented surface = '   //TRIM(PVarray(PVNum)%SurfaceName) )
+           ErrorsFound=.TRUE.
+        ENDIF
+      ENDIF
+    END select
+  ENDDO
 
   IF (NumSimplePVModuleTypes > 0) THEN
     ALLOCATE(tmpSimpleModuleParams(NumSimplePVModuleTypes))
@@ -801,10 +834,10 @@ SUBROUTINE CalcSimplePV(thisPV, RunFlag)
       PVArray(thisPV)%Report%ArrayEfficiency = Eff
     ELSE  !not enough incident solar, zero things out
 
-      PVArray(thisPV)%SurfaceSink    = 0.0
-      PVArray(thisPV)%Report%DCEnergy = 0.0
-      PVArray(thisPV)%Report%DCPower  = 0.0
-      PVArray(thisPV)%Report%ArrayEfficiency = 0.0
+      PVArray(thisPV)%SurfaceSink    = 0.0d0
+      PVArray(thisPV)%Report%DCEnergy = 0.0d0
+      PVArray(thisPV)%Report%DCPower  = 0.0d0
+      PVArray(thisPV)%Report%ArrayEfficiency = 0.0d0
 
     ENDIF
 
@@ -1081,22 +1114,22 @@ SUBROUTINE CalcSandiaPV(PVNum, runFlag)
       PVarray(PVNum)%SNLPVCalc%SurfaceSink = PVarray(PVNum)%SNLPVCalc%Pmp
     ELSE ! Ibeam+Idiff < MaxIrradiance or not RunFlag
       ! so zero things.
-      PVarray(PVNum)%SNLPVCalc%Vmp=0.0
-      PVarray(PVNum)%SNLPVCalc%Imp=0.0
-      PVarray(PVNum)%SNLPVCalc%Pmp=0.0
-      PVarray(PVNum)%SNLPVCalc%EffMax=0.0
-      PVarray(PVNum)%SNLPVCalc%Isc=0.0
-      PVarray(PVNum)%SNLPVCalc%Voc=0.0
+      PVarray(PVNum)%SNLPVCalc%Vmp=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Imp=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Pmp=0.0d0
+      PVarray(PVNum)%SNLPVCalc%EffMax=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Isc=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Voc=0.0d0
       PVarray(PVNum)%SNLPVCalc%Tcell=PVArray(PVNum)%SNLPVinto%Tamb
       PVarray(PVNum)%SNLPVCalc%Tback=PVArray(PVNum)%SNLPVinto%Tamb
       PVarray(PVNum)%SNLPVCalc%AMa=999.0d0
-      PVarray(PVNum)%SNLPVCalc%F1=0.0
-      PVarray(PVNum)%SNLPVCalc%F2=0.0
-      PVarray(PVNum)%SNLPVCalc%Ix=0.0
-      PVarray(PVNum)%SNLPVCalc%Vx=0.0
-      PVarray(PVNum)%SNLPVCalc%Ixx=0.0
-      PVarray(PVNum)%SNLPVCalc%Vxx=0.0
-      PVarray(PVNum)%SNLPVCalc%SurfaceSink = 0.0
+      PVarray(PVNum)%SNLPVCalc%F1=0.0d0
+      PVarray(PVNum)%SNLPVCalc%F2=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Ix=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Vx=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Ixx=0.0d0
+      PVarray(PVNum)%SNLPVCalc%Vxx=0.0d0
+      PVarray(PVNum)%SNLPVCalc%SurfaceSink = 0.0d0
     ENDIF !Ibeam+Idiff > MinIrradiance and runflag
 
     ! update calculations to report variables
@@ -1105,6 +1138,7 @@ SUBROUTINE CalcSandiaPV(PVNum, runFlag)
     PVarray(PVNum)%Report%ArrayVoc = PVarray(PVNum)%SNLPVCalc%Voc
     PVarray(PVNum)%Report%CellTemp = PVarray(PVNum)%SNLPVCalc%Tcell
     PVarray(PVNum)%Report%ArrayEfficiency = PVarray(PVNum)%SNLPVCalc%EffMax
+    PVarray(PVNum)%SurfaceSink  = PVarray(PVNum)%SNLPVCalc%SurfaceSink
 
     RETURN
 
@@ -1261,7 +1295,7 @@ SUBROUTINE CalcTRNSYSPV(PVNum,RunFlag)
 
 ! if the cell temperature mode is 2, convert the timestep to seconds
   IF(FirstTime .and. PVarray(PVNum)%CellIntegrationMode == iDecoupledUllebergDynamicCellIntegration) THEN
-    PVTimeStep = REAL(MinutesPerTimeStep,r64)*60.  !Seconds per time step
+    PVTimeStep = REAL(MinutesPerTimeStep,r64)*60.0d0   !Seconds per time step
   ENDIF
   FirstTime=.false.
 
@@ -1279,7 +1313,7 @@ SUBROUTINE CalcTRNSYSPV(PVNum,RunFlag)
     EtaOld = EtaIni
 
 ! Begin DO WHILE loop - until the error tolerance is reached.
-    ETA = 0.0
+    ETA = 0.0d0
     DO WHILE (DummyErr .GT. ERR)
 
       SELECT CASE (PVarray(PVNum)%CellIntegrationMode)
@@ -1346,7 +1380,7 @@ SUBROUTINE CalcTRNSYSPV(PVNum,RunFlag)
 !  maximum power point tracking
 
 !   SEARCH --> VM AT MAXIMUM POWER POINT
-      VLEFT  = 0.0
+      VLEFT  = 0.0d0
       VRIGHT = VOC
       CALL SEARCH(VLEFT,VRIGHT,VM,K,IO,IL,SeriesResistance,AA,EPS,KMAX)
 
@@ -1383,13 +1417,13 @@ SUBROUTINE CalcTRNSYSPV(PVNum,RunFlag)
         ! get PVT model result for cell temp..
     END SELECT
 
-    PVarray(PVNum)%TRNSYSPVcalc%Insolation = 0.0
-    IM = 0.0   !module current
-    VM = 0.0   !module voltage
-    PM = 0.0   !module power
-    ETA = 0.0  !module efficiency
-    ISC = 0.0
-    VOC = 0.0
+    PVarray(PVNum)%TRNSYSPVcalc%Insolation = 0.0d0
+    IM = 0.0d0   !module current
+    VM = 0.0d0   !module voltage
+    PM = 0.0d0   !module power
+    ETA = 0.0d0  !module efficiency
+    ISC = 0.0d0
+    VOC = 0.0d0
 
   END IF
 
@@ -1525,7 +1559,7 @@ SUBROUTINE NEWTON(XX,FXX,DER,II,VV,IO,IL,RSER,AA,XS,EPS)
 
   COUNT = 0
   XX  = XS
-  ERR = 1.0
+  ERR = 1.0d0
   DO WHILE ((ERR .GT. EPS) .AND. (COUNT .LE. 10))
     X0  = XX
     XX  = XX-FXX(II,VV,IL,IO,RSER,AA)/DER(II,VV,IO,RSER,AA)
@@ -2124,10 +2158,10 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
 
     F1 = a0 + a1*AMa + a2*AMa**2 + a3*AMa**3 + a4*AMa**4
 
-    IF (F1.GT.0.0) THEN
+    IF (F1.GT.0.0d0) THEN
         SandiaF1 = F1
     ELSE
-        SandiaF1 = 0.0
+        SandiaF1 = 0.0d0
     ENDIF
 
   END FUNCTION SandiaF1
@@ -2180,10 +2214,10 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
     F2 = b0+b1*IncAng+b2*IncAng**2+b3*IncAng**3+b4*IncAng**4 &
              + b5*IncAng**5
 
-    IF (F2.GT.0.0) THEN
+    IF (F2.GT.0.0d0) THEN
           SandiaF2 = F2
     ELSE
-          SandiaF2 = 0.0
+          SandiaF2 = 0.0d0
     ENDIF
 
   END FUNCTION SandiaF2
@@ -2431,7 +2465,7 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
     REAL(r64) :: dTc
     REAL(r64) :: BVmpEe
 
-    IF (Ee.GT.0.0) THEN
+    IF (Ee.GT.0.0d0) THEN
       ! following is equation 8 in King et al. nov. 2003
       dTc = DiodeFactor*((1.38066d-23*(Tc+KelvinConv))/1.60218d-19)
 
@@ -2440,7 +2474,7 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
       SandiaVmp = Vmp0+C2*NcellSer*dTc*Log(Ee)+ &
                     C3*NcellSer*(dTc*Log(Ee))**2+BVmpEe*(Tc-25.0d0)
     ELSE
-      SandiaVmp = 0
+      SandiaVmp = 0.0d0
     ENDIF
 
   END FUNCTION SandiaVmp
@@ -2492,13 +2526,13 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
      REAL(r64) :: dTc !working variable
      REAL(r64) :: BVocEe !working variable
 
-     IF (Ee.GT.0.0) THEN
+     IF (Ee.GT.0.0d0) THEN
         dTc=DiodeFactor*((1.38066d-23*(Tc + KelvinConv))/1.60218d-19)
         BVocEe = BVoc0 + mBVoc * (1.0d0 - Ee)
 
         SandiaVoc=Voc0+NcellSer*dTc*Log(Ee)+BVocEe*(Tc-25.0d0)
      ELSE
-        SandiaVoc = 0.0
+        SandiaVoc = 0.0d0
      ENDIF
 
   END FUNCTION SandiaVoc

@@ -2,8 +2,8 @@
 
 ! HBIRE_USE_OMP defined, then openMP instructions are used.  Compiler may have to have switch for openmp
 ! HBIRE_NO_OMP defined, then old code is used without any openmp instructions
-! HBIRE - loop in HeatBalanceIntRadExchange.f90
 
+! HBIRE - loop in HeatBalanceIntRadExchange.f90
 #ifdef HBIRE_USE_OMP
 #undef HBIRE_NO_OMP
 #else
@@ -104,7 +104,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   USE ExteriorEnergyUse,   ONLY: ManageExteriorEnergyUse
   USE OutputReportTabular, ONLY: WriteTabularReports,OpenOutputTabularFile,CloseOutputTabularFile
   USE DataErrorTracking,   ONLY: AskForConnectionsReport,ExitDuringSimulations
-  USE OutputProcessor,     ONLY: SetupTimePointers
+  USE OutputProcessor,     ONLY: SetupTimePointers, ReportForTabularReports
   USE CostEstimateManager, ONLY: SimCostEstimate
   USE EconomicTariff,      ONLY: ComputeTariff,WriteTabularTariffReports  !added for computing annual utility costs
   USE General,             ONLY: TrimSigDigits
@@ -114,13 +114,13 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   USE BranchNodeConnections, ONLY: CheckNodeConnections,TestCompSetInletOutletNodes
   Use PollutionModule,     ONLY: SetupPollutionMeterReporting, SetupPollutionCalculations, CheckPollutionMeterReporting
   USE SystemReports,       ONLY: ReportAirLoopConnections, CreateEnergyReportStructure
-  USE BranchInputManager,  ONLY: ManageBranchInput,TestBranchIntegrity
+  USE BranchInputManager,  ONLY: ManageBranchInput,TestBranchIntegrity,InvalidBranchDefinitions
   USE ManageElectricPower, ONLY: VerifyCustomMetersElecPowerMgr
   USE MixedAir,            ONLY: CheckControllerLists
   USE EMSManager ,         ONLY: CheckIFAnyEMS, ManageEMS
   USE EconomicLifeCycleCost, ONLY: GetInputForLifeCycleCost, ComputeLifeCycleCostAndReport
-  USE SQLiteProcedures,    ONLY: WriteOutputToSQLite, CreateSQLiteSimulationsRecord, &
-                                 CreateSQLiteEnvironmentPeriodRecord,CreateZoneExtendedOutput
+  USE SQLiteProcedures,    ONLY: WriteOutputToSQLite, CreateSQLiteSimulationsRecord, InitializeIndexes, &
+                                 CreateSQLiteEnvironmentPeriodRecord,CreateZoneExtendedOutput, SQLiteBegin, SQLiteCommit
   USE DemandManager,       ONLY: InitDemandManagers
   USE PlantManager,        ONLY: CheckIfAnyPlant
   USE CurveManager,        ONLY: InitCurveReporting
@@ -128,6 +128,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   USE DataSystemVariables, ONLY: DeveloperFlag, TimingFlag, FullAnnualRun
   USE SetPointManager,     ONLY: CheckIFAnyIdealCondEntSetPoint
   USE Psychrometrics,      ONLY: InitializePsychRoutines
+  USE FaultsManager
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -181,7 +182,10 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
 
   CALL CheckIFAnyIdealCondEntSetPoint
 
+  CALL CheckAndReadFaults
+
   CALL ManageBranchInput  ! just gets input and returns.
+
   DoingSizing = .TRUE.
   CALL ManageSizing
 
@@ -198,6 +202,10 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
        '(in SimulationControl object). Succeeding warnings/errors may be confusing.')
   ENDIF
   Available=.true.
+
+  IF (InvalidBranchDefinitions) THEN
+    CALL ShowFatalError('Preceding error(s) in Branch Input cause termination.')
+  ENDIF
 
   CALL DisplayString('Initializing Simulation')
   KickOffSimulation=.true.
@@ -260,13 +268,16 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     END IF
   END IF
 
-  IF (WriteOutputToSQLite) CALL CreateSQLiteSimulationsRecord(1)
+  IF (WriteOutputToSQLite) THEN
+    CALL SQLiteBegin
+    CALL CreateSQLiteSimulationsRecord(1)
+    CALL SQLiteCommit
+  END IF
 
   CALL GetInputForLifeCycleCost !must be prior to WriteTabularReports -- do here before big simulation stuff.
 
   CALL ShowMessage('Beginning Simulation')
   CALL ResetEnvironmentCounter
-
 
   EnvCount=0
   WarmupFlag=.true.
@@ -281,7 +292,12 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     IF ( (.NOT. DoWeathSim) .AND. (KindOfSim == ksRunPeriodWeather)) CYCLE
 
     EnvCount=EnvCount+1
-    IF (WriteOutputToSQLite) CALL CreateSQLiteEnvironmentPeriodRecord()
+
+    IF (WriteOutputToSQLite) THEN
+      CALL SQLiteBegin
+      CALL CreateSQLiteEnvironmentPeriodRecord()
+      CALL SQLiteCommit
+    END IF
 
     ExitDuringSimulations=.true.
     SimsDone=.true.
@@ -298,6 +314,8 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     CALL ManageEMS(emsCallFromBeginNewEvironment) ! calling point
 
     DO WHILE ((DayOfSim.LT.NumOfDayInEnvrn).OR.(WarmupFlag))  ! Begin day loop ...
+
+      IF (WriteOutputToSQLite) CALL SQLiteBegin ! setup for one transaction per day
 
       DayOfSim     = DayOfSim + 1
       WRITE(DayOfSimChr,*) DayOfSim
@@ -377,6 +395,8 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
 
       END DO                    ! ... End hour loop.
 
+      IF (WriteOutputToSQLite) CALL SQLiteCommit  ! one transaction per day
+
     END DO                      ! ... End day loop.
 
     ! Need one last call to send latest states to middleware
@@ -399,12 +419,16 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
     ENDIF
   ENDIF
 
+  IF (WriteOutputToSQLite) CALL SQLiteBegin  ! for final data to write
+
 #ifdef EP_Detailed_Timings
                              CALL epStartTime('Closeout Reporting=')
 #endif
   CALL SimCostEstimate
 
   CALL ComputeTariff          !     Compute the utility bills
+
+  CALL ReportForTabularReports  ! For Energy Meters (could have other things that need to be pushed to after simulation)
 
   CALL OpenOutputTabularFile
 
@@ -424,6 +448,12 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   CALL CloseOutputFiles
 
   CALL CreateZoneExtendedOutput
+
+  IF (WriteOutputToSQLite) THEN
+    CALL DisplayString('Writing final SQL reports')
+    CALL SQLiteCommit ! final transactions
+    CALL InitializeIndexes  ! do not create indexes (SQL) until all is done.
+  ENDIF
 
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Error condition occurred.  Previous Severe Errors cause termination.')
@@ -1223,7 +1253,6 @@ SUBROUTINE CloseOutputFiles
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  CHARACTER(len=20) DebugPosition
   INTEGER EchoInputFile  ! found unit number for 'eplusout.audit'
   INTEGER, EXTERNAL :: FindUnitNumber
   CHARACTER(len=10) :: cEnvSetThreads
@@ -1369,20 +1398,6 @@ SUBROUTINE CloseOutputFiles
   ELSE
     CLOSE (OutputFileMeters,STATUS='DELETE')
   ENDIF
-
-  !  In case some debug output was produced, it appears that the
-  !  position on the INQUIRE will not be 'ASIS' (3 compilers tested)
-  !  So, will want to keep....
-
-  INQUIRE(OutputFileDebug,POSITION=DebugPosition)
-  IF (TRIM(DebugPosition) /= 'ASIS') THEN
-    DebugOutput=.True.
-  ENDIF
-  IF (DebugOutput) THEN
-    CLOSE (OutputFileDebug)
-  ELSE
-    CLOSE (OutputFileDebug,STATUS='DELETE')
-  END IF
 
   RETURN
 

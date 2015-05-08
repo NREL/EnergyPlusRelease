@@ -45,6 +45,7 @@ PRIVATE ! Everything private unless explicitly made public
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE WaterManager:
 PUBLIC  ManageWater
+PUBLIC  ManageWaterInits
 PRIVATE GetWaterManagerInput
 PRIVATE UpdatePrecipitation
 PRIVATE UpdateIrrigation
@@ -94,7 +95,7 @@ SUBROUTINE ManageWater
           ! na
 
           ! USE STATEMENTS:
-USE DataGlobals,  only: BeginTimeStepFlag
+
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -123,16 +124,6 @@ USE DataGlobals,  only: BeginTimeStepFlag
 
   If ( .NOT. (AnyWaterSystemsInModel) ) RETURN
 
-  IF (BeginTimeStepFlag) Then
-  ! calls do updating that would be needed at end of final iteration
-  ! and at the beginning of the timestep.
-
-    call UpdateWaterManager
-
-    Call UpdatePrecipitation
-    Call UpdateIrrigation
-
-  ENDIF
 
   ! this is the main water manager
   ! first call all the water storage tanks
@@ -149,11 +140,70 @@ USE DataGlobals,  only: BeginTimeStepFlag
      CALL CalcGroundwaterWell(WellNum)
   ENDDO
 
+  !call the tanks again to get updated rain and well activity
+  Do TankNum=1, NumWaterStorageTanks
+     CALL  CalcWaterStorageTank(TankNum)
+  ENDDO !tank loop
+
   CALL ReportWaterManager
 
   RETURN
 
 END SUBROUTINE ManageWater
+
+SUBROUTINE ManageWaterInits
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,  only: BeginTimeStepFlag
+  USE DataHVACGlobals, ONLY: FirstTimeStepSysFlag
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+  If ( .NOT. (AnyWaterSystemsInModel) ) RETURN
+
+!  IF (BeginTimeStepFlag .OR. FirstTimeStepSysFlag) Then
+  ! calls do updating that would be needed at end of final iteration
+  ! and at the beginning of the timestep.
+
+    call UpdateWaterManager
+
+    Call UpdatePrecipitation
+    Call UpdateIrrigation
+
+!  ENDIF
+  RETURN
+
+END SUBROUTINE ManageWaterInits
+
 
 SUBROUTINE GetWaterManagerInput
 
@@ -219,13 +269,14 @@ SUBROUTINE GetWaterManagerInput
   CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
   REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
   CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
-  REAL(r64)                      :: tmpMax = 0.0
-  REAL(r64)                      :: tmpMin = 0.0
-  REAL(r64)                      :: tmpNumerator = 0.0
-  REAL(r64)                      :: tmpArea = 0.0
-  REAL(r64)                      :: tmpDenominator = 0.0
+  REAL(r64)                      :: tmpMax = 0.0d0
+  REAL(r64)                      :: tmpMin = 0.0d0
+  REAL(r64)                      :: tmpNumerator = 0.0d0
+  REAL(r64)                      :: tmpArea = 0.0d0
+  REAL(r64)                      :: tmpDenominator = 0.0d0
   INTEGER                        :: thisSurf = 0
   INTEGER                        :: NumIrrigation
+  INTEGER                        :: Dummy
 
 
 If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block for entire subroutine
@@ -306,18 +357,18 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 !    ENDIF
 
       WaterStorage(Item)%MaxCapacity    = rNumericArgs(1)
-      IF (WaterStorage(Item)%MaxCapacity  == 0.0 ) Then !default
+      IF (WaterStorage(Item)%MaxCapacity  == 0.0d0 ) Then !default
         WaterStorage(Item)%MaxCapacity    = BigNumber
       endif
 
       WaterStorage(Item)%InitialVolume  = rNumericArgs(2)
       WaterStorage(Item)%MaxInFlowRate  = rNumericArgs(3)
-      IF (WaterStorage(Item)%MaxInFlowRate  == 0.0 ) Then !default
+      IF (WaterStorage(Item)%MaxInFlowRate  == 0.0d0 ) Then !default
         WaterStorage(Item)%MaxInFlowRate    = BigNumber
       endif
 
       WaterStorage(Item)%MaxOutFlowRate = rNumericArgs(4)
-      IF (WaterStorage(Item)%MaxOutFlowRate   == 0.0 ) Then !default
+      IF (WaterStorage(Item)%MaxOutFlowRate   == 0.0d0 ) Then !default
         WaterStorage(Item)%MaxOutFlowRate    = BigNumber
       endif
 
@@ -338,8 +389,21 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
       endif
       WaterStorage(Item)%ValveOnCapacity = rNumericArgs(5)
       WaterStorage(Item)%ValveOffCapacity = rNumericArgs(6)
+      IF (WaterStorage(Item)%ControlSupplyType /= NoControlLevel) THEN
+        IF (WaterStorage(Item)%ValveOffCapacity < WaterStorage(Item)%ValveOnCapacity) THEN 
+          CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(5))//' and/or '// TRIM(cNumericFieldNames(6)) )
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          CALL ShowContinueError( TRIM(cNumericFieldNames(6)) //' must be greater than '//TRIM(cNumericFieldNames(5)) )
+          CALL ShowContinueError('Check value for '//TRIM(cNumericFieldNames(5))//' = ' &
+                               //TRIM(RoundSIgDigits(WaterStorage(Item)%ValveOnCapacity, 5)) )
+          CALL ShowContinueError('which must be lower than '//TRIM(cNumericFieldNames(6))//' = ' &
+                               //TRIM(RoundSIgDigits(WaterStorage(Item)%ValveOffCapacity, 5)) )
+          ErrorsFound = .true.
+        ENDIF
+      ENDIF
+
       WaterStorage(Item)%BackupMainsCapacity = rNumericArgs(7)
-      If (WaterStorage(Item)%BackupMainsCapacity > 0.0) Then !add backup to well and other thank supply
+      If (WaterStorage(Item)%BackupMainsCapacity > 0.0d0) Then !add backup to well and other thank supply
         If (WaterStorage(Item)%ControlSupplyType == WellFloatValve) Then
           WaterStorage(Item)%ControlSupplyType = WellFloatMainsBackup
         endif
@@ -367,14 +431,14 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
           errorsfound = .true.
         ENDIF
         tmpMin = GetScheduleMinValue(WaterStorage(item)%TempSchedID)
-        IF (tmpMin < 0.0) Then
+        IF (tmpMin < 0.0d0) Then
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           Call ShowContinueError('Found storage tank temperature schedule value less than 0.0 in '//trim(objNameMsg))
           errorsfound = .true.
         ENDIF
         tmpMax = GetScheduleMaxValue(WaterStorage(item)%TempSchedID)
-        If (tmpMax > 100.0) Then
+        If (tmpMax > 100.0d0) Then
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           Call ShowContinueError('found storage tank temperature schedule value greater than 100.0 in '//trim(objNameMsg))
@@ -452,12 +516,12 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
         errorsfound = .true.
       ENDIF
       RainCollector(Item)%LossFactor = rNumericArgs(1)
-      If (RainCollector(Item)%LossFactor > 1.0) then
+      If (RainCollector(Item)%LossFactor > 1.0d0) then
         CALL ShowWarningError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
         Call ShowContinueError('found rain water collection loss factor greater than 1.0, simulation continues')
       endif
-      If (RainCollector(Item)%LossFactor < 0.0) then
+      If (RainCollector(Item)%LossFactor < 0.0d0) then
         CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
         Call ShowContinueError('found rain water collection loss factor less than 0.0')
@@ -471,13 +535,13 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           errorsfound = .true.
         ENDIF
-        IF (GetScheduleMinValue(RainCollector(Item)%LossFactorSchedID) < 0.0) Then
+        IF (GetScheduleMinValue(RainCollector(Item)%LossFactorSchedID) < 0.0d0) Then
           CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           Call ShowContinueError('found rain water collection loss factor schedule value less than 0.0 in '//trim(objNameMsg))
           errorsfound = .true.
         ENDIF
-        If (GetScheduleMaxValue(RainCollector(Item)%LossFactorSchedID) > 1.0) Then
+        If (GetScheduleMaxValue(RainCollector(Item)%LossFactorSchedID) > 1.0d0) Then
           CALL showWarningError('Potentially invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           Call ShowContinueError('found rain water collection loss factor schedule value greater than 1.0, '// &
@@ -486,7 +550,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
         ENDIF
       ENDIF
       RainCollector(Item)%MaxCollectRate = rNumericArgs(1)
-      If (RainCollector(Item)%MaxCollectRate == 0.0) RainCollector(Item)%MaxCollectRate = 100000000000.0
+      If (RainCollector(Item)%MaxCollectRate == 0.0d0) RainCollector(Item)%MaxCollectRate = 100000000000.0d0
 
       !number of surfaces is extensible and = NumAlphas - alphaOffset
       alphaOffset = 4 !update this if more alphas inserted ahead of extensible surface listing
@@ -504,9 +568,9 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
       ENDDO
 
       ! now setup horizontal surface area
-      tmpArea = 0.0
-      tmpNumerator = 0.0
-      tmpDenominator = 0.0
+      tmpArea = 0.0d0
+      tmpNumerator = 0.0d0
+      tmpDenominator = 0.0d0
       Do surfNum=1, RainCollector(Item)%NumCollectSurfs
         thisSurf = RainCollector(Item)%SurfID(surfNum)
         tmpArea = tmpArea + Surface(thisSurf)%GrossArea * Surface(thisSurf)%CosTilt
@@ -607,6 +671,10 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
         CALL InternalSetupTankDemandComponent(WaterStorage(Item)%Name, TRIM(cCurrentModuleObject), &
                    WaterStorage(Item)%SupplyTankName, ErrorsFound, WaterStorage(Item)%SupplyTankID, &
                    WaterStorage(Item)%SupplyTankDemandARRID)
+        !call to setup tank supply as well
+        Call InternalSetupTankSupplyComponent(WaterStorage(Item)%SupplyTankName, TRIM(cCurrentModuleObject),   &
+                                      WaterStorage(Item)%Name, &
+                                      errorsFound, dummy, dummy)
       ENDIF
       ! setup overflow inputs
       WaterStorage(Item)%OverflowTankID = &
@@ -656,7 +724,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
       Call ShowSevereError('Schedule not found for '//TRIM(cCurrentModuleObject)//' object')
       errorsFound = .true.
     ElseIf ((RainFall%RainSchedID == 0) .AND. (RainFall%ModeID == RainSchedDesign)) then
-      If (.not. CheckScheduleValueMinMax(RainFall%RainSchedID,'>=',0.0) ) then
+      If (.not. CheckScheduleValueMinMax(RainFall%RainSchedID,'>=',0.0d0) ) then
         CALL ShowSevereError('Schedule='//trim(cAlphaArgs(2))//' for '//TRIM(cCurrentModuleObject)//' object has values < 0.')
         errorsFound = .true.
       ENDIF
@@ -691,7 +759,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
       CALL ShowSevereError ('Schedule not found for '//TRIM(cCurrentModuleObject)//' object')
       errorsFound = .true.
     ELSEIF ((Irrigation%IrrSchedID == 0) .AND. (Irrigation%ModeID == IrrSchedDesign)) THEN
-      IF (.not. CheckScheduleValueMinMax(Irrigation%IrrSchedID,'>=',0.0) ) THEN
+      IF (.not. CheckScheduleValueMinMax(Irrigation%IrrSchedID,'>=',0.0d0) ) THEN
         CALL ShowSevereError('Schedule='//TRIM(cAlphaArgs(2))//' for '//TRIM(cCurrentModuleObject)//' object has values < 0.')
         errorsFound = .true.
       ENDIF
@@ -907,7 +975,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 REAL(r64)  :: schedRate
 !REAL(r64)  :: ScaleFactor
 
-Irrigation%ScheduledAmount =  0.0
+Irrigation%ScheduledAmount =  0.0d0
 
 If (Irrigation%ModeID == IrrSchedDesign) then
 schedRate = GetCurrentScheduleValue(Irrigation%IrrSchedID) ! m/hr
@@ -1003,35 +1071,35 @@ SUBROUTINE CalcWaterStorageTank(TankNum)
 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)    :: OrigVdotDemandRequest = 0.0
-  REAL(r64)    :: TotVdotDemandAvail = 0.0
-  REAL(r64)    :: OrigVolDemandRequest = 0.0
-  REAL(r64)    :: TotVolDemandAvail = 0.0
-  REAL(r64)    :: OrigVdotSupplyAvail = 0.0
-  REAL(r64)    :: TotVdotSupplyAvail = 0.0
-  REAL(r64)    :: TotVolSupplyAvail = 0.0
-!  REAL(r64)    :: TotVolSupplyAllow = 0.0
-  REAL(r64)    :: overflowVdot = 0.0
-  REAL(r64)    :: overflowVol = 0.0
-  REAL(r64)    :: overflowTwater = 0.0
-  REAL(r64)    :: NetVdotAdd = 0.0
-  REAL(r64)    :: NetVolAdd = 0.0
-  REAL(r64)    :: FillVolRequest = 0.0
-  REAL(r64)    :: TotVolAllowed = 0.0
-  REAL(r64)    :: AvailVolume = 0.0
-  REAL(r64)    :: underflowVdot = 0.0
-  REAL(r64)    :: VolumePredict = 0.0
-  REAL(r64)    :: OverFillVolume = 0.0
+  REAL(r64)    :: OrigVdotDemandRequest = 0.0d0
+  REAL(r64)    :: TotVdotDemandAvail = 0.0d0
+  REAL(r64)    :: OrigVolDemandRequest = 0.0d0
+  REAL(r64)    :: TotVolDemandAvail = 0.0d0
+  REAL(r64)    :: OrigVdotSupplyAvail = 0.0d0
+  REAL(r64)    :: TotVdotSupplyAvail = 0.0d0
+  REAL(r64)    :: TotVolSupplyAvail = 0.0d0
+!  REAL(r64)    :: TotVolSupplyAllow = 0.0d0
+  REAL(r64)    :: overflowVdot = 0.0d0
+  REAL(r64)    :: overflowVol = 0.0d0
+  REAL(r64)    :: overflowTwater = 0.0d0
+  REAL(r64)    :: NetVdotAdd = 0.0d0
+  REAL(r64)    :: NetVolAdd = 0.0d0
+  REAL(r64)    :: FillVolRequest = 0.0d0
+  REAL(r64)    :: TotVolAllowed = 0.0d0
+  REAL(r64)    :: AvailVolume = 0.0d0
+  REAL(r64)    :: underflowVdot = 0.0d0
+  REAL(r64)    :: VolumePredict = 0.0d0
+  REAL(r64)    :: OverFillVolume = 0.0d0
 
   If (BeginTimeStepFlag) then
     ! initializations are done in UpdateWaterManager
   endif
 
-  overflowVdot = 0.0
+  overflowVdot = 0.0d0
   IF (WaterStorage(TankNum)%NumWaterSupplies > 0) THEN
     OrigVdotSupplyAvail = Sum(WaterStorage(TankNum)%VdotAvailSupply)
   ELSE
-    OrigVdotSupplyAvail = 0.0
+    OrigVdotSupplyAvail = 0.0d0
   ENDIF
   TotVdotSupplyAvail = OrigVdotSupplyAvail ! Init
   If (TotVdotSupplyAvail > WaterStorage(TankNum)%MaxInFlowRate) THen
@@ -1044,11 +1112,11 @@ SUBROUTINE CalcWaterStorageTank(TankNum)
   TotVolSupplyAvail = TotVdotSupplyAvail *  TimeStepSys * SecInHour
   overflowVol = overflowVdot *  TimeStepSys * SecInHour
 
-  underflowVdot = 0.0
+  underflowVdot = 0.0d0
   IF (WaterStorage(TankNum)%NumWaterDemands > 0) THEN
     OrigVdotDemandRequest = Sum(WaterStorage(TankNum)%VdotRequestDemand)
   ELSE
-    OrigVdotDemandRequest = 0.0
+    OrigVdotDemandRequest = 0.0d0
   ENDIF
   OrigVolDemandRequest  = OrigVdotDemandRequest *  TimeStepSys * SecInHour
   TotVdotDemandAvail =  OrigVdotDemandRequest ! initialize to satisfied then modify if needed
@@ -1078,20 +1146,25 @@ SUBROUTINE CalcWaterStorageTank(TankNum)
   endif
 
   !Is tank too low to meet the request?
-  IF (VolumePredict < 0.0) THEN
+  IF (VolumePredict < 0.0d0) THEN
     AvailVolume = WaterStorage(TankNum)%LastTimeStepVolume + TotVolSupplyAvail
+    AvailVolume = MAX(0.d0, AvailVolume)
     TotVolDemandAvail = AvailVolume
     TotVdotDemandAvail = AvailVolume / (TimeStepSys * SecInHour)
     underflowVdot = OrigVdotDemandRequest - TotVdotDemandAvail
     NetVdotAdd = TotVdotSupplyAvail - TotVdotDemandAvail
     NetVolAdd  = NetVdotAdd * (TimeStepSys * SecInHour)
-    VolumePredict = 0.0
+    VolumePredict = 0.0d0
   ENDIF
 
   If (TotVdotDemandAvail < OrigVdotDemandRequest) Then ! starvation
   ! even distribution
-   WaterStorage(TankNum)%VdotAvailDemand = (TotVdotDemandAvail/OrigVdotDemandRequest) &
+    IF (OrigVdotDemandRequest > 0.d0) THEN
+      WaterStorage(TankNum)%VdotAvailDemand = (TotVdotDemandAvail/OrigVdotDemandRequest) &
                                            * WaterStorage(TankNum)%VdotRequestDemand
+    ELSE
+      WaterStorage(TankNum)%VdotAvailDemand = 0.d0
+    ENDIF
   ELSE ! requested demand can be served
     IF (WaterStorage(TankNum)%NumWaterDemands > 0) THEN
       WaterStorage(TankNum)%VdotAvailDemand = WaterStorage(TankNum)%VdotRequestDemand
@@ -1100,7 +1173,7 @@ SUBROUTINE CalcWaterStorageTank(TankNum)
 
 
   ! is tank lower than float valve on capacity and requesting fill from controlled supplier?
-  FillVolRequest = 0.0
+  FillVolRequest = 0.0d0
   If ((VolumePredict)< WaterStorage(TankNum)%ValveOnCapacity) THen !turn on supply to fill tank
     FillVolRequest = WaterStorage(TankNum)%ValveOffCapacity - VolumePredict
 
@@ -1302,18 +1375,18 @@ SUBROUTINE InternalSetupTankSupplyComponent(CompName, CompType, TankName, Errors
     ENDIF
     DEALLOCATE(WaterStorage(TankIndex)%VdotAvailSupply)
     ALLOCATE(WaterStorage(TankIndex)%VdotAvailSupply(oldNumSupply + 1))
-    WaterStorage(TankIndex)%VdotAvailSupply = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotAvailSupply = 0.0d0 !initialize
     DEALLOCATE(WaterStorage(TankIndex)%TwaterSupply)
     ALLOCATE(WaterStorage(TankIndex)%TwaterSupply(oldNumSupply + 1))
-    WaterStorage(TankIndex)%TwaterSupply = 0.0 !initialize
+    WaterStorage(TankIndex)%TwaterSupply = 0.0d0 !initialize
     WaterSupplyIndex = oldNumSupply + 1
     WaterStorage(TankIndex)%NumWaterSupplies = WaterStorage(TankIndex)%NumWaterSupplies + 1
   ELSE ! first time (no push)
 
     ALLOCATE(WaterStorage(TankIndex)%VdotAvailSupply(1))
-    WaterStorage(TankIndex)%VdotAvailSupply = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotAvailSupply = 0.0d0 !initialize
     ALLOCATE(WaterStorage(TankIndex)%TwaterSupply(1))
-    WaterStorage(TankIndex)%TwaterSupply = 0.0 !initialize
+    WaterStorage(TankIndex)%TwaterSupply = 0.0d0 !initialize
     ALLOCATE(WaterStorage(TankIndex)%SupplyCompNames(1))
     WaterStorage(TankIndex)%SupplyCompNames(1) = CompName
     ALLOCATE(WaterStorage(TankIndex)%SupplyCompTypes(1))
@@ -1458,20 +1531,20 @@ SUBROUTINE InternalSetupTankDemandComponent(CompName, CompType, TankName, Errors
 
     DEALLOCATE(WaterStorage(TankIndex)%VdotRequestDemand)
     ALLOCATE(WaterStorage(TankIndex)%VdotRequestDemand(oldNumDemand + 1))
-    WaterStorage(TankIndex)%VdotRequestDemand = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotRequestDemand = 0.0d0 !initialize
 
     DEALLOCATE(WaterStorage(TankIndex)%VdotAvailDemand)
     ALLOCATE(WaterStorage(TankIndex)%VdotAvailDemand(oldNumDemand + 1))
-    WaterStorage(TankIndex)%VdotAvailDemand = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotAvailDemand = 0.0d0 !initialize
 
     WaterDemandIndex = oldNumDemand + 1
     WaterStorage(TankIndex)%NumWaterDemands = WaterStorage(TankIndex)%NumWaterDemands + 1
   ELSE ! first time (no push)
 
     ALLOCATE(WaterStorage(TankIndex)%VdotRequestDemand(1))
-    WaterStorage(TankIndex)%VdotRequestDemand = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotRequestDemand = 0.0d0 !initialize
     ALLOCATE(WaterStorage(TankIndex)%VdotAvailDemand(1))
-    WaterStorage(TankIndex)%VdotAvailDemand = 0.0 !initialize
+    WaterStorage(TankIndex)%VdotAvailDemand = 0.0d0 !initialize
     ALLOCATE(WaterStorage(TankIndex)%DemandCompNames(1))
     WaterStorage(TankIndex)%DemandCompNames(1) = CompName
     ALLOCATE(WaterStorage(TankIndex)%DemandCompTypes(1))
@@ -1531,14 +1604,14 @@ SUBROUTINE CalcRainCollector(RainColNum)
 
 
  !If (.NOT.(IsRain)) Then ! is it raining now? No don't use this flag since precip schedule might differ from weather file
-  IF (RainFall%CurrentRate <= 0.0) Then
+  IF (RainFall%CurrentRate <= 0.0d0) Then
   ! set available supply rate in WaterStorage
-    WaterStorage(RainCollector(RainColNum)%StorageTankID)%VdotAvailSupply(RainCollector(RainColNum)%StorageTankSupplyARRID) = 0.0
+    WaterStorage(RainCollector(RainColNum)%StorageTankID)%VdotAvailSupply(RainCollector(RainColNum)%StorageTankSupplyARRID) = 0.0d0
     ! temperature of water supply is modeled as the same as outdoor drybulb.
-    WaterStorage(RainCollector(RainColNum)%StorageTankID)%TwaterSupply(RainCollector(RainColNum)%StorageTankSupplyARRID)    = 0.0
+    WaterStorage(RainCollector(RainColNum)%StorageTankID)%TwaterSupply(RainCollector(RainColNum)%StorageTankSupplyARRID)    = 0.0d0
 
-    RainCollector(RainColNum)%VdotAvail = 0.0
-    RainCollector(RainColNum)%VolCollected =  0.0
+    RainCollector(RainColNum)%VdotAvail = 0.0d0
+    RainCollector(RainColNum)%VolCollected =  0.0d0
   ELSE
 
     SELECT CASE (RainCollector(RainColNum)%LossFactorMode)
@@ -1549,7 +1622,7 @@ SUBROUTINE CalcRainCollector(RainColNum)
       LossFactor = GetCurrentScheduleValue(RainCollector(RainColNum)%LossFactorSchedID)
     END SELECT
 
-    VdotAvail =  RainFall%CurrentRate * RainCollector(RainColNum)%HorizArea *(1.0 - LossFactor )
+    VdotAvail =  RainFall%CurrentRate * RainCollector(RainColNum)%HorizArea *(1.0d0 - LossFactor )
 
     If (VdotAvail > RainCollector(RainColNum)%MaxCollectRate) Then
       VdotAvail =  RainCollector(RainColNum)%MaxCollectRate
@@ -1623,9 +1696,9 @@ SUBROUTINE CalcGroundwaterWell(WellNum)
 
   endif
 
-  VdotDelivered = 0.0
-  PumpPower = 0.0
-  If (GroundwaterWell(WellNum)%VdotRequest > 0.0) Then
+  VdotDelivered = 0.0d0
+  PumpPower = 0.0d0
+  If (GroundwaterWell(WellNum)%VdotRequest > 0.0d0) Then
 
     IF (GroundwaterWell(WellNum)%VdotRequest >= GroundwaterWell(WellNum)%PumpNomVolFlowRate) Then ! run flat out
       WaterStorage(GroundwaterWell(WellNum)%StorageTankID)%VdotAvailSupply(GroundwaterWell(WellNum)%StorageTankSupplyARRID) &
@@ -1683,7 +1756,7 @@ SUBROUTINE UpdateWaterManager
           ! na
 
           ! USE STATEMENTS:
-  USE DataGlobals, ONLY:BeginEnvrnFlag, InitConvTemp, WarmUpFlag
+  USE DataGlobals, ONLY:BeginEnvrnFlag, InitConvTemp, WarmUpFlag, KickOffSimulation, DoingSizing
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1705,6 +1778,7 @@ SUBROUTINE UpdateWaterManager
   INTEGER  :: WellNum
   LOGICAL,SAVE        :: MyEnvrnFlag = .TRUE. ! flag for init once at start of environment
   LOGICAL,SAVE        :: MyWarmupFlag = .False. ! flag for init after warmup complete
+  LOGICAL,SAVE        :: MyTankDemandCheckFlag = .TRUE.
 
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN !
     Do TankNum=1, NumWaterStorageTanks
@@ -1712,6 +1786,19 @@ SUBROUTINE UpdateWaterManager
      WaterStorage(TankNum)%LastTimeStepVolume = WaterStorage(TankNum)%InitialVolume
      WaterStorage(TankNum)%ThisTimeStepVolume = WaterStorage(TankNum)%InitialVolume
     ENDDO
+    IF ((.NOT. DoingSizing) .and. (.NOT. KickOffSimulation) .AND. MyTankDemandCheckFlag) THEN
+      IF (NumWaterStorageTanks > 0) THEN
+        DO TankNum=1,NumWaterStorageTanks
+          IF (WaterStorage(TankNum)%NumWaterDemands == 0) THEN
+            CALL ShowWarningError('Found WaterUse:Tank that has nothing connected to draw water from it.')
+            CALL ShowContinueError('Occurs for WaterUse:Tank = '//TRIM(WaterStorage(TankNum)%Name) )
+            Call ShowContinueError('Check that input for water consuming components specifies a water supply tank.')
+          ENDIF
+        ENDDO
+      ENDIF
+      MyTankDemandCheckFlag = .FALSE.
+    ENDIF
+
     MyEnvrnFlag = .FALSE.
     MyWarmupFlag = .TRUE.
   ENDIF ! end environmental inits
@@ -1730,39 +1817,39 @@ SUBROUTINE UpdateWaterManager
 
   Do TankNum=1, NumWaterStorageTanks
      ! main location for inits for new timestep.
-     WaterStorage(TankNum)%LastTimeStepVolume = WaterStorage(TankNum)%ThisTimeStepVolume
-     WaterStorage(TankNum)%MainsDrawVdot = 0.0
-     WaterStorage(TankNum)%MainsDrawVol  = 0.0
-     WaterStorage(TankNum)%NetVdot       = 0.0
-     WaterStorage(TankNum)%VdotFromTank  = 0.0
-     WaterStorage(TankNum)%VdotToTank    = 0.0
+     WaterStorage(TankNum)%LastTimeStepVolume = MAX(WaterStorage(TankNum)%ThisTimeStepVolume, 0.d0)
+     WaterStorage(TankNum)%MainsDrawVdot = 0.0d0
+     WaterStorage(TankNum)%MainsDrawVol  = 0.0d0
+     WaterStorage(TankNum)%NetVdot       = 0.0d0
+     WaterStorage(TankNum)%VdotFromTank  = 0.0d0
+     WaterStorage(TankNum)%VdotToTank    = 0.0d0
      IF (WaterStorage(TankNum)%NumWaterDemands > 0) THEN
-       WaterStorage(TankNum)%VdotRequestDemand = 0.0
-       WaterStorage(TankNum)%VdotAvailDemand   = 0.0
+       WaterStorage(TankNum)%VdotRequestDemand = 0.0d0
+       WaterStorage(TankNum)%VdotAvailDemand   = 0.0d0
      ENDIF
-     WaterStorage(TankNum)%VdotOverflow      = 0.0
+     WaterStorage(TankNum)%VdotOverflow      = 0.0d0
      IF (WaterStorage(TankNum)%NumWaterSupplies > 0) THEN
-       WaterStorage(TankNum)%VdotAvailSupply   = 0.0
+       WaterStorage(TankNum)%VdotAvailSupply   = 0.0d0
      ENDIF
      IF ((WaterStorage(TankNum)%ControlSupplyType == WellFloatValve) &
           .OR. (WaterStorage(TankNum)%ControlSupplyType == WellFloatMainsBackup)) THEN
-       If (allocated(GroundWaterWell))  GroundwaterWell(WaterStorage(TankNum)%GroundWellID)%VdotRequest = 0.0
+       If (allocated(GroundWaterWell))  GroundwaterWell(WaterStorage(TankNum)%GroundWellID)%VdotRequest = 0.0d0
      ENDIF
   ENDDO !tank loop
 
   Do RainColNum=1, NumRainCollectors
 
-    RainCollector(RainColNum)%VdotAvail    = 0.0
-    RainCollector(RainColNum)%VolCollected = 0.0
+    RainCollector(RainColNum)%VdotAvail    = 0.0d0
+    RainCollector(RainColNum)%VolCollected = 0.0d0
   ENDDO
 
   Do WellNum=1, NumGroundWaterWells
     ! re init calculated vars
-    GroundwaterWell(WellNum)%VdotRequest   = 0.0
-    GroundwaterWell(WellNum)%VdotDelivered = 0.0
-    GroundwaterWell(WellNum)%VolDelivered  = 0.0
-    GroundwaterWell(WellNum)%PumpPower     = 0.0
-    GroundwaterWell(WellNum)%PumpEnergy    = 0.0
+    GroundwaterWell(WellNum)%VdotRequest   = 0.0d0
+    GroundwaterWell(WellNum)%VdotDelivered = 0.0d0
+    GroundwaterWell(WellNum)%VolDelivered  = 0.0d0
+    GroundwaterWell(WellNum)%PumpPower     = 0.0d0
+    GroundwaterWell(WellNum)%PumpEnergy    = 0.0d0
   ENDDO
 
 

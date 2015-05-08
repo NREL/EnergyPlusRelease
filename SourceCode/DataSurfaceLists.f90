@@ -105,6 +105,7 @@ SUBROUTINE GetSurfaceListsInputs
   CHARACTER(len=*), PARAMETER :: CurrentModuleObject1 = 'ZoneHVAC:LowTemperatureRadiant:SurfaceGroup'
   CHARACTER(len=*), PARAMETER :: CurrentModuleObject2 = 'ZoneHVAC:VentilatedSlab:SlabGroup'
   REAL(r64),        PARAMETER :: FlowFractionTolerance = 0.0001d0 ! Smallest deviation from unity for the sum of all fractions
+  REAL(r64),        PARAMETER :: SurfListMinFlowFrac   = 0.001d0  ! Minimum allowed flow fraction (to avoid divide by zero)
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -157,7 +158,7 @@ SUBROUTINE GetSurfaceListsInputs
     ALLOCATE(cAlphaFields(MaxAlphas))
     cAlphaFields=' '
     ALLOCATE(Numbers(MaxNumbers))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(cNumericFields(MaxNumbers))
     cNumericFields=' '
     ALLOCATE(lNumericBlanks(MaxNumbers))
@@ -199,7 +200,7 @@ SUBROUTINE GetSurfaceListsInputs
         ALLOCATE(SurfList(Item)%SurfFlowFrac(SurfList(Item)%NumOfSurfaces))
       END IF
 
-      SumOfAllFractions = 0.0
+      SumOfAllFractions = 0.0d0
       DO SurfNum = 1, SurfList(Item)%NumOfSurfaces
         SurfList(Item)%SurfName(SurfNum)     = Alphas(SurfNum+1)
         SurfList(Item)%SurfPtr(SurfNum)      = FindIteminList(Alphas(SurfNum+1),Surface%Name,TotSurfaces)
@@ -221,6 +222,12 @@ SUBROUTINE GetSurfaceListsInputs
           END IF
         END IF
         SurfList(Item)%SurfFlowFrac(SurfNum) = Numbers(SurfNum)
+        IF (SurfList(Item)%SurfFlowFrac(SurfNum) < SurfListMinFlowFrac) THEN
+              CALL ShowSevereError('The Flow Fraction for Surface '//TRIM(SurfList(Item)%SurfName(SurfNum))// &
+                                   ' in Surface Group '//TRIM(SurfList(Item)%Name)//' is zero')
+              CALL ShowContinueError('...Zero flow fractions are not allowed. Remove this surface from the surface group.')
+              ErrorsFound = .TRUE.
+        END IF
         SumOfAllFractions = SumOfAllFractions + SurfList(Item)%SurfFlowFrac(SurfNum)
       END DO
 
@@ -251,7 +258,7 @@ SUBROUTINE GetSurfaceListsInputs
     ALLOCATE(cAlphaFields(MaxAlphas))
     cAlphaFields=' '
     ALLOCATE(Numbers(MaxNumbers))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(cNumericFields(MaxNumbers))
     cNumericFields=' '
     ALLOCATE(lNumericBlanks(MaxNumbers))

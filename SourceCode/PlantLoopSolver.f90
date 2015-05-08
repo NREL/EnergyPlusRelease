@@ -48,6 +48,7 @@ MODULE PlantLoopSolver
   REAL(r64) :: CurrentAlterationsToDemand
   REAL(r64) :: UpdatedDemandToLoopSetPoint
   REAL(r64) :: LoadToLoopSetPointThatWasntMet ! Unmet Demand
+  REAL(r64) :: InitialDemandToLoopSetPointSAVED
   INTEGER   :: RefrigIndex = 0 ! Index denoting refrigerant used (possibly steam)
 
           ! SUBROUTINE SPECIFICATIONS:
@@ -138,7 +139,7 @@ SUBROUTINE PlantHalfLoopSolver(FirstHVACIteration, LoopSideNum, LoopNum, ReSimOt
   REAL(r64)                                 :: ThisLoopSideFlow
   REAL(r64)                                 :: TotalPumpMaxAvailFlow
   REAL(r64)                                 :: TotalPumpMinAvailFlow
-  REAL(r64)                                 :: InitialDemandToLoopSetPointSAVED
+
 
   ! Initialize variables
   InitialDemandToLoopSetPoint = 0.0d0
@@ -673,11 +674,17 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
            CompIndex = PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%CompNum
            SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%TypeOf_Num)
             ! remove var speed pumps from this case statement if can set MassFlowRateRequest
-           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed,TypeOf_PumpBankConstantSpeed)
+           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed)
 
              IF (CompIndex > 0) THEN
                !
                ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+             ENDIF
+           CASE (TypeOf_PumpBankConstantSpeed )
+             IF (CompIndex > 0) THEN
+               !
+               ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  &
+                                                PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank)
              ENDIF
            CASE DEFAULT
              ThisBranchFlowRequestNeedIfOn    = MAX(ThisBranchFlowRequestNeedIfOn,     &
@@ -689,10 +696,16 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
            CompIndex = PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%CompNum
            SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%TypeOf_Num)
             ! remove var speed pumps from this case statement if can set MassFlowRateRequest
-           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed,TypeOf_PumpBankConstantSpeed)
+           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpVariableSpeed,TypeOf_PumpBankVariableSpeed)
              IF (CompIndex > 0) THEN
                !
                ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+             ENDIF
+           CASE (TypeOf_PumpBankConstantSpeed )
+             IF (CompIndex > 0) THEN
+               !
+               ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  &
+                                                        PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank)
              ENDIF
            CASE DEFAULT
              ThisBranchFlowRequestNeedIfOn    = MAX(ThisBranchFlowRequestNeedIfOn,     &
@@ -702,7 +715,7 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
            CompIndex = PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%CompNum
            SELECT CASE (PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp(CompCounter)%TypeOf_Num)
 
-           CASE (TypeOf_PumpConstantSpeed,TypeOf_PumpBankConstantSpeed)
+           CASE (TypeOf_PumpConstantSpeed)
              IF (CompIndex > 0) THEN
                IF (ParallelBranchIndex >= 1) THEN ! branch pump
                  IF (ANY(ABS(PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp%MyLoad) > SmallLoad )) THEN
@@ -716,6 +729,25 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
                             =  PumpEquip(CompIndex)%MassFlowRateMax
                ELSE ! inlet pump
                  ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  PumpEquip(CompIndex)%MassFlowRateMax)
+               ENDIF
+             ENDIF
+           CASE (TypeOf_PumpBankConstantSpeed )
+             IF (CompIndex > 0) THEN
+               IF (ParallelBranchIndex >= 1) THEN ! branch pump
+                 IF (ANY(ABS(PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%Comp%MyLoad) > SmallLoad )) THEN
+                   ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  &
+                                         PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank)
+                 ELSEIF (PlantLoop(LoopNum)%CommonPipeType  /= CommonPipe_No) THEN ! common pipe and constant branch pumps
+                   ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  &
+                                         PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank)
+                 ENDIF
+                 ThisLoopHasConstantSpeedBranchPumps(LoopSideCounter) = .TRUE.
+                 PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%HasConstantSpeedBranchPump = .TRUE.
+                 PlantLoop(LoopNum)%LoopSide(LoopSideCounter)%Branch(BranchCounter)%ConstantSpeedBranchMassFlow &
+                            =  PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank
+               ELSE ! inlet pump
+                 ThisBranchFlowRequestNeedIfOn  = MAX(ThisBranchFlowRequestNeedIfOn,  &
+                                       PumpEquip(CompIndex)%MassFlowRateMax/ PumpEquip(CompIndex)%NumPumpsInBank)
                ENDIF
              ENDIF
            END SELECT
@@ -1037,7 +1069,7 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
           ! USE STATEMENTS:
  USE DataPlant,              ONLY: PlantLoop, DemandOpSchemeType, PumpOpSchemeType, LoadRangeBasedMin, LoadRangeBasedMax, &
                                    FlowLocked, NoControlOpSchemeType, CompSetPtBasedSchemeType, FreeRejectionOpSchemeType, &
-                                   WSEconOpSchemeType, UnknownStatusOpSchemeType, PressureCall_Calc
+                                   WSEconOpSchemeType, UnknownStatusOpSchemeType, PressureCall_Calc, EMSOpSchemeType, SupplySide
  USE DataLoopNode,           ONLY: Node
  USE PlantCondLoopOperation, ONLY: ManagePlantLoadDistribution
  USE PlantLoopEquip,         ONLY: SimPlantEquip
@@ -1087,7 +1119,8 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
   REAL(r64)                                        :: LoadToLoopSetPoint
   TYPE(Location)                                   :: PumpLocation
 
-
+  INTEGER :: curCompOpSchemePtr
+  INTEGER :: OpSchemePtr
   !~ Debug variables
 
   ! We only need to reallocate the accessible array and reset the LastComponentSimulated if
@@ -1177,6 +1210,17 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
 
         CASE (CompSetPtBasedSchemeType)
           CALL ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchCounter, CompCounter, LoadToLoopSetPoint, &
+                                             LoadToLoopSetPointThatWasntMet, FirstHVACIteration, LoopShutDownFlag, &
+                                             LoadDistributionWasPerformed)
+          CALL SimPlantEquip(LoopNum,LoopSideNum,BranchCounter,CompCounter,FirstHVACIteration,DummyInit,DoNotGetCompSizFac)
+        CASE ( EMSOpSchemeType )
+          IF (LoopSideNum == SupplySide) THEN
+            curCompOpSchemePtr = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchCounter)%Comp(CompCounter)%CurCompLevelOpNum
+            OpSchemePtr = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchCounter)%&
+                                     Comp(CompCounter)%OpScheme(curCompOpSchemePtr)%OpSchemePtr
+            PlantLoop(LoopNum)%OpScheme(OpSchemePtr)%EMSIntVarLoopDemandRate = InitialDemandToLoopSetPoint
+          ENDIF
+          CALL ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchCounter, CompCounter, UpdatedDemandToLoopSetPoint, &
                                              LoadToLoopSetPointThatWasntMet, FirstHVACIteration, LoopShutDownFlag, &
                                              LoadDistributionWasPerformed)
           CALL SimPlantEquip(LoopNum,LoopSideNum,BranchCounter,CompCounter,FirstHVACIteration,DummyInit,DoNotGetCompSizFac)
@@ -1551,7 +1595,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
   REAL(r64)                 :: LatentHeatSteam        ! Latent heat of steam
 
   ! Initialize
-  LoadToLoopSetPoint = 0.0
+  LoadToLoopSetPoint = 0.0d0
 
   ! Sweep across flow paths in this group and calculate the deltaT and then the load
   BranchIndex = 0
@@ -1575,7 +1619,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
   END DO
 
   IF ( SumMdot .LT. MassFlowTolerance ) THEN
-    LoadToLoopSetPoint = 0.0
+    LoadToLoopSetPoint = 0.0d0
     RETURN
   END IF
 
@@ -1605,7 +1649,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
         LoopSetPointTemperatureLo = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetpointLo
 
         !Calculate the demand on the loop
-        IF (SumMdot > 0.0) THEN
+        IF (SumMdot > 0.0d0) THEN
           LoadtoHeatingSetPoint = SumMdot*Cp*(LoopSetPointTemperatureLo - WeightedInletTemp)
           LoadtoCoolingSetPoint = SumMdot*Cp*(LoopSetPointTemperatureHi - WeightedInletTemp)
           ! Possible combinations:
@@ -1627,12 +1671,12 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
 
             CALL ShowFatalError('Program terminates due to above conditions.')
           END IF
-          IF (LoadToHeatingSetPoint .GT. 0.0 .AND. LoadToCoolingSetPoint .GT. 0.0) THEN
+          IF (LoadToHeatingSetPoint .GT. 0.0d0 .AND. LoadToCoolingSetPoint .GT. 0.0d0) THEN
             LoadToLoopSetPoint = LoadToHeatingSetPoint
-          ELSE IF (LoadToHeatingSetPoint .LT. 0.0 .AND. LoadToCoolingSetPoint .LT. 0.0) THEN
+          ELSE IF (LoadToHeatingSetPoint .LT. 0.0d0 .AND. LoadToCoolingSetPoint .LT. 0.0d0) THEN
             LoadToLoopSetPoint = LoadToCoolingSetPoint
-          ELSE IF (LoadToHeatingSetPoint .LE. 0.0 .AND. LoadToCoolingSetPoint .GE. 0.0) THEN ! deadband includes zero loads
-            LoadToLoopSetPoint = 0.0
+          ELSE IF (LoadToHeatingSetPoint .LE. 0.0d0 .AND. LoadToCoolingSetPoint .GE. 0.0d0) THEN ! deadband includes zero loads
+            LoadToLoopSetPoint = 0.0d0
           ELSE
             CALL ShowSevereError('DualSetPointWithDeadBand: Unanticipated combination of heating and cooling loads - '// &
                                  'report to EnergyPlus Development Team')
@@ -1644,7 +1688,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
             CALL ShowFatalError('Program terminates due to above conditions.')
           END IF
         ELSE
-          LoadToLoopSetPoint = 0.0
+          LoadToLoopSetPoint = 0.0d0
         END IF
 
       END SELECT
@@ -1684,7 +1728,7 @@ FUNCTION EvaluateLoopSetPointLoad(LoopNum, LoopSideNum, FirstBranchNum, LastBran
     END IF
 
     ! Trim the demand to zero if it is very small
-    IF(ABS(LoadToLoopSetPoint) < LoopDemandTol) LoadToLoopSetPoint = 0.0
+    IF(ABS(LoadToLoopSetPoint) < LoopDemandTol) LoadToLoopSetPoint = 0.0d0
 
  RETURN
 
@@ -1970,7 +2014,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%MixerExists) THEN
 
         ! Zero out local variables
-    TotParallelBranchFlowReq = 0.0
+    TotParallelBranchFlowReq = 0.0d0
     NumSplitOutlets = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%TotalOutletNodes
     IF(NumSplitOutlets < 1)THEN
       CALL ShowSevereError('Plant topology problem for PlantLoop: '//PlantLoop(LoopNum)%Name//', '// &
@@ -1981,8 +2025,8 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
     ENDIF
 
     NumActiveBranches = 0
-    ParallelBranchMaxAvail = 0.0
-    ParallelBranchMinAvail = 0.0
+    ParallelBranchMaxAvail = 0.0d0
+    ParallelBranchMinAvail = 0.0d0
     DO iBranch = 1, NumSplitOutlets
       BranchNum        = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(iBranch)
       SplitterBranchOut = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(iBranch)
@@ -2067,7 +2111,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
       FirstNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(SplitterBranchOut)%NodeNumIn
       IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%ControlType /= ControlType_Active .AND. &
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%ControlType /= ControlType_SeriesActive) THEN
-        Node(FirstNodeOnBranch)%MassFlowRate = 0.0
+        Node(FirstNodeOnBranch)%MassFlowRate = 0.0d0
         CALL PushBranchFlowCharacteristics(LoopNum, LoopSideNum, SplitterBranchOut,   &
                                            Node(FirstNodeOnBranch)%MassFlowRate, FirstHVACIteration)
       ENDIF
@@ -2100,18 +2144,18 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%ControlType == ControlType_SeriesActive) THEN
                           ! branch flow is min of requested flow and remaining flow
           Node(FirstNodeOnBranch)%MassFlowRate = MIN(Node(FirstNodeOnBranch)%MassFlowRate,FlowRemaining)
-          IF(Node(FirstNodeOnBranch)%MassFlowRate < MassFlowTolerance) Node(FirstNodeOnBranch)%MassFlowRate = 0.0
+          IF(Node(FirstNodeOnBranch)%MassFlowRate < MassFlowTolerance) Node(FirstNodeOnBranch)%MassFlowRate = 0.0d0
           CALL PushBranchFlowCharacteristics(LoopNum, LoopSideNum, SplitterBranchOut,   &
                                              Node(FirstNodeOnBranch)%MassFlowRate, FirstHVACIteration)
           FlowRemaining = FlowRemaining - Node(FirstNodeOnBranch)%MassFlowRate
-          IF(FlowRemaining < MassFlowTolerance) FlowRemaining = 0.0
+          IF(FlowRemaining < MassFlowTolerance) FlowRemaining = 0.0d0
         ENDIF
       END DO
             !IF the active branches take the entire loop flow, return
-      IF(FlowRemaining == 0.0)RETURN
+      IF(FlowRemaining == 0.0d0)RETURN
 
   ! 2) Distribute remaining flow to PASSIVE branches
-      totalMax = 0.0
+      totalMax = 0.0d0
       DO OutletNum = 1, NumSplitOutlets
         SplitterBranchOut = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(OutletNum)
         FirstNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(SplitterBranchOut)%NodeNumIn
@@ -2127,7 +2171,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           FirstNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(SplitterBranchOut)%NodeNumIn
           IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%ControlType == ControlType_Passive) THEN
             FracFlow = FlowRemaining / totalMax
-            IF (FracFlow <= 1.0) THEN !the passive branches will take all the flow
+            IF (FracFlow <= 1.0d0) THEN !the passive branches will take all the flow
               PassiveFlowRate = FracFlow * Node(FirstNodeOnBranch)%MassFlowRateMaxAvail
                   !Check against FlowRemaining
               PassiveFlowRate = MIN(FlowRemaining,PassiveFlowRate)
@@ -2145,7 +2189,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
         ENDDO
       ENDIF !totalMax <=0 and flow should be assigned to active branches
             !IF the passive branches take the remaining loop flow, return
-      IF(FlowRemaining == 0.0)RETURN
+      IF(FlowRemaining == 0.0d0)RETURN
 
   ! 3) Distribute remaining flow to the BYPASS
         DO OutletNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%TotalOutletNodes
@@ -2159,7 +2203,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           END IF
         END DO
             !IF the bypass take the remaining loop flow, return
-        IF(FlowRemaining == 0.0)RETURN
+        IF(FlowRemaining == 0.0d0)RETURN
 
   ! 4) If PASSIVE branches and BYPASS are at max and there's still flow, distribute remaining flow to ACTIVE branches
       IF(NumActiveBranches > 0)THEN
@@ -2183,7 +2227,7 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
           IF(FlowRemaining == 0)EXIT
         END DO
             !IF the active branches take the remaining loop flow, return
-        IF(FlowRemaining == 0.0)RETURN
+        IF(FlowRemaining == 0.0d0)RETURN
 
 
   ! 5)  Step 4) could have left ACTIVE branches < MaxAvail.  Check to makes sure all ACTIVE branches are at MaxAvail
@@ -2202,11 +2246,11 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
         END DO
       ENDIF
           !IF the active branches take the remaining loop flow, return
-      IF(FlowRemaining == 0.0)RETURN
+      IF(FlowRemaining == 0.0d0)RETURN
 
   ! 6) Adjust Inlet branch and outlet branch flow rates to match parallel branch rate
  !DSU? do we need this logic?   or should we fatal on a diagnostic error
-      TotParallelBranchFlowReq =0
+      TotParallelBranchFlowReq =0.0d0
       DO iBranch = 1, NumSplitOutlets
         BranchNum        = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(iBranch)
         FirstNodeOnBranch= PlantLoop(LoopNum)%LoopSide(LoopSideNum)%branch(branchNum)%NodeNumIn
@@ -2547,7 +2591,8 @@ SUBROUTINE PushBranchFlowCharacteristics(LoopNum, LoopSideNum, BranchNum, ValueT
              TypeOf_CoilWAHPCoolingParamEst,      &
              TypeOf_CoilUserDefined ,             &
              TypeOf_CoilVSWAHPCoolingEquationFit, &
-             TypeOf_CoilVSWAHPHeatingEquationFit)
+             TypeOf_CoilVSWAHPHeatingEquationFit, &
+             TypeOf_PackagedTESCoolingCoil)
 
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%SimAirLoopsNeeded = .TRUE.
         !sometimes these coils are children in ZoneHVAC equipment
@@ -2626,13 +2671,13 @@ SUBROUTINE UpdateLoopSideReportVars(LoopNum, LoopSide, OtherSideDemand, LocalRem
     PlantReport(LoopNum)%OutletNodeTemperature = Node(PlantLoop(LoopNum)%LoopSide(SupplySide)%NodeNumOut)%Temp
 
  ! In the baseline code, only reported supply side demand. so putting in "SupplySide" IF block for now but might expand later
-    IF (OtherSideDemand < 0.0 ) THEN
+    IF (OtherSideDemand < 0.0d0 ) THEN
       PlantReport(LoopNum)%CoolingDemand  = ABS(OtherSideDemand)
-      PlantReport(LoopNum)%HeatingDemand  = 0.0
+      PlantReport(LoopNum)%HeatingDemand  = 0.0d0
       PlantReport(LoopNum)%DemandNotDispatched    = -LocalRemLoopDemand  !  Setting sign based on old logic for now
     ELSE
       PlantReport(LoopNum)%HeatingDemand  = OtherSideDemand
-      PlantReport(LoopNum)%CoolingDemand  = 0.0
+      PlantReport(LoopNum)%CoolingDemand  = 0.0d0
       PlantReport(LoopNum)%DemandNotDispatched    = LocalRemLoopDemand  !  Setting sign based on old logic for now
     END IF
 
@@ -2709,7 +2754,7 @@ SUBROUTINE CalcUnmetPlantDemand(LoopNum, LoopSideNum)
   REAL(r64)                 :: LoadToLoopSetPoint
 
   ! Initialize
-  LoadToLoopSetPoint = 0.0
+  LoadToLoopSetPoint = 0.0d0
 
   ! Get temperature at loop setpoint node.
   TargetTemp   = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%Temp
@@ -2739,7 +2784,7 @@ SUBROUTINE CalcUnmetPlantDemand(LoopNum, LoopSideNum)
         LoopSetPointTemperatureLo = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetpointLo
 
         !Calculate the demand on the loop
-        IF (MassFlowRate > 0.0) THEN
+        IF (MassFlowRate > 0.0d0) THEN
           LoadtoHeatingSetPoint = MassFlowRate*Cp*(LoopSetPointTemperatureLo - TargetTemp)
           LoadtoCoolingSetPoint = MassFlowRate*Cp*(LoopSetPointTemperatureHi - TargetTemp)
           ! Possible combinations:
@@ -2747,15 +2792,15 @@ SUBROUTINE CalcUnmetPlantDemand(LoopNum, LoopSideNum)
           ! 2  LoadToHeatingSetPoint < 0 & LoadToCoolingSetPoint < 0 -->  Cooling Required
           ! 3  LoadToHeatingSetPoint <=0 & LoadToCoolingSetPoint >=0 -->  Dead Band Operation - includes zero load cases
           ! 4  LoadToHeatingSetPoint  >  LoadToCoolingSetPoint       -->  Not Feasible if LoopSetPointHi >= LoopSetPointLo
-          IF (LoadToHeatingSetPoint .GT. 0.0 .AND. LoadToCoolingSetPoint .GT. 0.0) THEN
+          IF (LoadToHeatingSetPoint .GT. 0.0d0 .AND. LoadToCoolingSetPoint .GT. 0.0d0) THEN
             LoadToLoopSetPoint = LoadToHeatingSetPoint
-          ELSE IF (LoadToHeatingSetPoint .LT. 0.0 .AND. LoadToCoolingSetPoint .LT. 0.0) THEN
+          ELSE IF (LoadToHeatingSetPoint .LT. 0.0d0 .AND. LoadToCoolingSetPoint .LT. 0.0d0) THEN
             LoadToLoopSetPoint = LoadToCoolingSetPoint
-          ELSE IF (LoadToHeatingSetPoint .LE. 0.0 .AND. LoadToCoolingSetPoint .GE. 0.0) THEN ! deadband includes zero loads
-            LoadToLoopSetPoint = 0.0
+          ELSE IF (LoadToHeatingSetPoint .LE. 0.0d0 .AND. LoadToCoolingSetPoint .GE. 0.0d0) THEN ! deadband includes zero loads
+            LoadToLoopSetPoint = 0.0d0
           END IF
         ELSE
-          LoadToLoopSetPoint = 0.0
+          LoadToLoopSetPoint = 0.0d0
         END IF
 
       END SELECT
@@ -2795,7 +2840,7 @@ SUBROUTINE CalcUnmetPlantDemand(LoopNum, LoopSideNum)
     END IF
 
     ! Trim the demand to zero if it is very small
-    IF(ABS(LoadToLoopSetPoint) < LoopDemandTol) LoadToLoopSetPoint = 0.0
+    IF(ABS(LoadToLoopSetPoint) < LoopDemandTol) LoadToLoopSetPoint = 0.0d0
 
     PlantReport(LoopNum)%UnmetDemand = LoadToLoopSetPoint
 

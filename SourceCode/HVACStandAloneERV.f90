@@ -27,9 +27,8 @@ MODULE HVACStandAloneERV
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, SecInHour, &
-                           SysSizingCalc, WarmupFlag, ScheduleAlwaysOn
-USE DataInterfaces,  ONLY: SetupOutputVariable, ShowContinueErrorTimeStamp,  &
-                           ShowFatalError, ShowSevereError, ShowContinueError, ShowWarningError
+                           SysSizingCalc, WarmupFlag, ScheduleAlwaysOn, DisplayExtraWarnings
+USE DataInterfaces
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
 USE DataHVACGlobals
 
@@ -69,41 +68,41 @@ TYPE StandAloneERVData
   INTEGER                      :: ExhaustAirFanIndex    =0   ! index to exhaust air fan
   INTEGER                      :: ExhaustAirFanSchPtr   =0   ! index to exhaust air fan schedule
   INTEGER                      :: ExhaustAirFanType_Num =0   ! paramter equivalent of fan type
-  REAL(r64)                    :: SupplyAirVolFlow      =0.0 ! volumetric flow rate through the supply side of the ERV
-  REAL(r64)                    :: ExhaustAirVolFlow     =0.0 ! volumetric flow rate through the exhaust side of the ERV
+  REAL(r64)                    :: SupplyAirVolFlow      =0.0d0 ! volumetric flow rate through the supply side of the ERV
+  REAL(r64)                    :: ExhaustAirVolFlow     =0.0d0 ! volumetric flow rate through the exhaust side of the ERV
   CHARACTER(len=MaxNameLength) :: ControllerName        =' ' ! name of the controller for the stand alone ERV
   LOGICAL                      :: ControllerNameDefined = .TRUE. ! controller for the stand alone ERV is defined
   INTEGER                      :: ControlledZoneNum     = 0  ! index to controlled zone for stand alone ERV
   INTEGER                      :: ControllerIndex       = 0  ! Pointer for updates by routines this module calls.
-  REAL(r64)                    :: MaxSupAirMassFlow     =0.0 ! air mass flow rate through the supply side of the ERV
-  REAL(r64)                    :: MaxExhAirMassFlow     =0.0 ! air mass flow rate through the exhaust side of the ERV
-  REAL(r64)                    :: HighRHOAFlowRatio      =1.0 ! ratio of outside air flow to max outside air flow
-  REAL(r64)                    :: DesignSAFanVolFlowRate = 0.0 ! SA fan volumetric flow rate
-  REAL(r64)                    :: DesignEAFanVolFlowRate = 0.0 ! EA fan volumetric flow rate
-  REAL(r64)                    :: DesignSAFanMassFlowRate = 0.0 ! SA fan mass flow rate
-  REAL(r64)                    :: DesignEAFanMassFlowRate = 0.0 ! EA fan mass flow rate
-  REAL(r64)                    :: AirVolFlowPerFloorArea = 0.0  ! Air flow rate per unit floor area, used for autosizing
-  REAL(r64)                    :: AirVolFlowPerOccupant  = 0.0  ! Air flow rate per occupant, used for autosizing
+  REAL(r64)                    :: MaxSupAirMassFlow     =0.0d0 ! air mass flow rate through the supply side of the ERV
+  REAL(r64)                    :: MaxExhAirMassFlow     =0.0d0 ! air mass flow rate through the exhaust side of the ERV
+  REAL(r64)                    :: HighRHOAFlowRatio      =1.0d0 ! ratio of outside air flow to max outside air flow
+  REAL(r64)                    :: DesignSAFanVolFlowRate = 0.0d0 ! SA fan volumetric flow rate
+  REAL(r64)                    :: DesignEAFanVolFlowRate = 0.0d0 ! EA fan volumetric flow rate
+  REAL(r64)                    :: DesignSAFanMassFlowRate = 0.0d0 ! SA fan mass flow rate
+  REAL(r64)                    :: DesignEAFanMassFlowRate = 0.0d0 ! EA fan mass flow rate
+  REAL(r64)                    :: AirVolFlowPerFloorArea = 0.0d0  ! Air flow rate per unit floor area, used for autosizing
+  REAL(r64)                    :: AirVolFlowPerOccupant  = 0.0d0  ! Air flow rate per occupant, used for autosizing
   INTEGER                      :: EconomizerOASchedPtr        = 0    ! schedule to modify outdoor air
   LOGICAL                      :: FlowError              = .TRUE. ! used for one-time warning message for flow imbalance (Init)
   INTEGER                      :: AvailStatus         =0
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
 
   ! report variables
-  REAL(r64)        :: ElecUseRate       =0.0 ! total electric use rate (power) for supply/exhaust fans & generic HX parasitics [W]
-  REAL(r64)        :: ElecUseEnergy     =0.0 ! electric energy use for supply fan, exhaust fan, and generic HX parasitics [J]
-  REAL(r64)        :: SensCoolingEnergy =0.0 ! sensible cooling energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: SensCoolingRate   =0.0 ! rate of sensible cooling delivered to the zone [W]
-  REAL(r64)        :: LatCoolingEnergy  =0.0 ! latent cooling energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: LatCoolingRate    =0.0 ! rate of latent cooling delivered to the zone [W]
-  REAL(r64)        :: TotCoolingEnergy  =0.0 ! total cooling energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: TotCoolingRate    =0.0 ! rate of total cooling delivered to the zone [W]
-  REAL(r64)        :: SensHeatingEnergy =0.0 ! sensible heating energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: SensHeatingRate   =0.0 ! rate of sensible heating delivered to the zone [W]
-  REAL(r64)        :: LatHeatingEnergy  =0.0 ! latent heating energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: LatHeatingRate    =0.0 ! rate of latent heating delivered to the zone [W]
-  REAL(r64)        :: TotHeatingEnergy  =0.0 ! total heating energy delivered by the ERV supply air to the zone [J]
-  REAL(r64)        :: TotHeatingRate    =0.0 ! rate of total heating delivered to the zone [W]
+  REAL(r64)        :: ElecUseRate       =0.0d0 ! total electric use rate (power) for supply/exhaust fans & generic HX parasitics [W]
+  REAL(r64)        :: ElecUseEnergy     =0.0d0 ! electric energy use for supply fan, exhaust fan, and generic HX parasitics [J]
+  REAL(r64)        :: SensCoolingEnergy =0.0d0 ! sensible cooling energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: SensCoolingRate   =0.0d0 ! rate of sensible cooling delivered to the zone [W]
+  REAL(r64)        :: LatCoolingEnergy  =0.0d0 ! latent cooling energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: LatCoolingRate    =0.0d0 ! rate of latent cooling delivered to the zone [W]
+  REAL(r64)        :: TotCoolingEnergy  =0.0d0 ! total cooling energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: TotCoolingRate    =0.0d0 ! rate of total cooling delivered to the zone [W]
+  REAL(r64)        :: SensHeatingEnergy =0.0d0 ! sensible heating energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: SensHeatingRate   =0.0d0 ! rate of sensible heating delivered to the zone [W]
+  REAL(r64)        :: LatHeatingEnergy  =0.0d0 ! latent heating energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: LatHeatingRate    =0.0d0 ! rate of latent heating delivered to the zone [W]
+  REAL(r64)        :: TotHeatingEnergy  =0.0d0 ! total heating energy delivered by the ERV supply air to the zone [J]
+  REAL(r64)        :: TotHeatingRate    =0.0d0 ! rate of total heating delivered to the zone [W]
 
 END TYPE StandAloneERVData
 
@@ -339,7 +338,7 @@ SUBROUTINE GetStandAloneERV
   ALLOCATE(Alphas(MaxAlphas))
   Alphas=' '
   ALLOCATE(Numbers(MaxNumbers))
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(cAlphaFields(MaxAlphas))
   cAlphaFields=' '
   ALLOCATE(cNumericFields(MaxNumbers))
@@ -684,15 +683,15 @@ SUBROUTINE GetStandAloneERV
       ENDIF
     ENDIF
     IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow /= AutoSize) THEN
-      IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow <= 0.0) THEN
+      IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow <= 0.0d0) THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(StandAloneERV(StandAloneERVNum)%Name)//  &
             ' has an '//TRIM(cNumericFields(2))//' <= 0.0, it must be >0.0')
         CALL ShowContinueError('... Entered value='//TRIM(RoundSigDigits(StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow,2)))
         ErrorsFound=.TRUE.
       ENDIF
     ELSE
-      IF(StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea .EQ. 0.0 .AND. &
-         StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant .EQ. 0.0)THEN
+      IF(StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea .EQ. 0.0d0 .AND. &
+         StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant .EQ. 0.0d0)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(StandAloneERV(StandAloneERVNum)%Name)//'"')
         CALL ShowContinueError('... Autosizing '//TRIM(cNumericFields(2))//' requires at least one input for '// &
                                TRIM(cNumericFields(3))//' or '//TRIM(cNumericFields(4))//'.')
@@ -778,7 +777,7 @@ SUBROUTINE GetStandAloneERV
       CALL ShowSevereError('GetERVController: Could not find ZoneHVAC:EnergyRecoveryVentilator with '// &
                             TRIM(cAlphaFields(1))//' = "'//TRIM(Alphas(1))//'"')
       ErrorsFound=.TRUE.
-      AirFlowRate=-1000.
+      AirFlowRate=-1000.d0
     ENDIF
     CALL SetOAControllerData(OutAirNum,ErrorsFound,MinOA=AirFlowRate)
     CALL SetOAControllerData(OutAirNum,ErrorsFound,MaxOA=AirFlowRate)
@@ -1197,9 +1196,9 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,ZoneNum, FirstHVACIteration)
     StandAloneERV(StandAloneERVNum)%DesignEAFanMassFlowRate = StdRhoAir*StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate
     ! set the node max and min mass flow rates
     Node(SupInNode)%MassFlowRateMax = StandAloneERV(StandAloneERVNum)%MaxSupAirMassFlow
-    Node(SupInNode)%MassFlowRateMin = 0.0
+    Node(SupInNode)%MassFlowRateMin = 0.0d0
     Node(ExhInNode)%MassFlowRateMax = StandAloneERV(StandAloneERVNum)%MaxExhAirMassFlow
-    Node(ExhInNode)%MassFlowRateMin = 0.0
+    Node(ExhInNode)%MassFlowRateMin = 0.0d0
     MyEnvrnFlag(StandAloneERVNum) = .FALSE.
 !   Initialize OA Controller on BeginEnvrnFlag
     IF(StandAloneERV(StandAloneERVNum)%ControllerNameDefined)THEN
@@ -1213,18 +1212,18 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,ZoneNum, FirstHVACIteration)
   ENDIF
 
 ! These initializations are done every iteration
-  StandAloneERV(StandAloneERVNum)%ElecUseRate = 0.0
-  StandAloneERV(StandAloneERVNum)%SensCoolingRate = 0.0
-  StandAloneERV(StandAloneERVNum)%LatCoolingRate = 0.0
-  StandAloneERV(StandAloneERVNum)%TotCoolingRate = 0.0
-  StandAloneERV(StandAloneERVNum)%SensHeatingRate = 0.0
-  StandAloneERV(StandAloneERVNum)%LatHeatingRate = 0.0
-  StandAloneERV(StandAloneERVNum)%TotHeatingRate = 0.0
+  StandAloneERV(StandAloneERVNum)%ElecUseRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%SensCoolingRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%LatCoolingRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%TotCoolingRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%SensHeatingRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%LatHeatingRate = 0.0d0
+  StandAloneERV(StandAloneERVNum)%TotHeatingRate = 0.0d0
   SupInletNode = StandAloneERV(StandAloneERVNum)%SupplyAirInletNode
   ExhInNode = StandAloneERV(StandAloneERVNum)%ExhaustAirInletNode
 
 ! Set the inlet node mass flow rate
-  IF (GetCurrentScheduleValue(StandAloneERV(StandAloneERVNum)%SchedPtr) .GT. 0.0) THEN
+  IF (GetCurrentScheduleValue(StandAloneERV(StandAloneERVNum)%SchedPtr) .GT. 0.0d0) THEN
 
 !   IF optional ControllerName is defined SimOAController ONLY to set economizer and Modifyairflow flags
     IF(StandAloneERV(StandAloneERVNum)%ControllerNameDefined)THEN
@@ -1250,7 +1249,7 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,ZoneNum, FirstHVACIteration)
                                               StandAloneERV(StandAloneERVNum)%MaxSupAirMassFlow)
       END IF
     ELSE
-      Node(SupInletNode)%MassFlowRate = 0.0
+      Node(SupInletNode)%MassFlowRate = 0.0d0
     END IF
     Node(SupInletNode)%MassFlowRateMaxAvail = Node(SupInletNode)%MassFlowRate
     Node(SupInletNode)%MassFlowRateMinAvail = Node(SupInletNode)%MassFlowRate
@@ -1270,17 +1269,17 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,ZoneNum, FirstHVACIteration)
                                            StandAloneERV(StandAloneERVNum)%MaxExhAirMassFlow)
       END IF
     ELSE
-      Node(ExhInNode)%MassFlowRate = 0.0
+      Node(ExhInNode)%MassFlowRate = 0.0d0
     END IF
     Node(ExhInNode)%MassFlowRateMaxAvail = Node(ExhInNode)%MassFlowRate
     Node(ExhInNode)%MassFlowRateMinAvail = Node(ExhInNode)%MassFlowRate
   ELSE
-    Node(SupInletNode)%MassFlowRate = 0.0
-    Node(SupInletNode)%MassFlowRateMaxAvail = 0.0
-    Node(SupInletNode)%MassFlowRateMinAvail = 0.0
-    Node(ExhInNode)%MassFlowRate = 0.0
-    Node(ExhInNode)%MassFlowRateMaxAvail = 0.0
-    Node(ExhInNode)%MassFlowRateMinAvail = 0.0
+    Node(SupInletNode)%MassFlowRate = 0.0d0
+    Node(SupInletNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(SupInletNode)%MassFlowRateMinAvail = 0.0d0
+    Node(ExhInNode)%MassFlowRate = 0.0d0
+    Node(ExhInNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(ExhInNode)%MassFlowRateMinAvail = 0.0d0
   ENDIF
 
   RETURN
@@ -1291,7 +1290,7 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   October 2007
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1305,7 +1304,7 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataSizing,        ONLY: AutoSize, CurZoneEqNum, FinalZoneSizing
+  USE DataSizing,        ONLY: AutoSize, CurZoneEqNum, FinalZoneSizing, AutoVsHardSizingThreshold
   USE DataHeatBalance,   ONLY: Zone, People, TotPeople
   USE DataZoneEquipment, ONLY: ZoneEquipConfig
   USE InputProcessor,    ONLY: SameString
@@ -1314,6 +1313,7 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
   USE Fans,              ONLY: SetFanData
   USE MixedAir,          ONLY: SetOAControllerData
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1339,52 +1339,75 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
   REAL(r64)                    :: MaxPeopleSch      ! maximum people schedule value
   REAL(r64)                    :: FloorArea         ! Floor area of zone (m2)
   LOGICAL                      :: ErrorsFound       ! Used for warning messages
+  LOGICAL                      :: IsAutosize        ! Indicator to autosize
+  REAL(r64)                    :: SupplyAirVolFlowDes        ! Autosized supply air flow for reporting
+  REAL(r64)                    :: SupplyAirVolFlowUser       ! Hardsized supply air flow for reporting
+  REAL(r64)                    :: DesignSAFanVolFlowRateDes  ! Autosized supply air fan flow for reporting
+  REAL(r64)                    :: DesignSAFanVolFlowRateUser ! Hardsized supply air fan flow for reporting
+  REAL(r64)                    :: ExhaustAirVolFlowDes       ! Autosized exhaust air flow for reporting
+  REAL(r64)                    :: ExhaustAirVolFlowUser      ! Hardsized exhaust air flow for reporting
+  REAL(r64)                    :: DesignEAFanVolFlowRateDes  ! Autosized exhaust fan flow for reporting
+  REAL(r64)                    :: DesignEAFanVolFlowRateUser ! Hardsized exhaust fan flow for reporting
+
+  IsAutosize = .FALSE.
+  SupplyAirVolFlowDes = 0.0d0
+  SupplyAirVolFlowUser = 0.0d0
+  DesignSAFanVolFlowRateDes = 0.0d0
+  DesignSAFanVolFlowRateUser = 0.0d0
+  ExhaustAirVolFlowDes = 0.0d0
+  ExhaustAirVolFlowUser = 0.0d0
+  DesignEAFanVolFlowRateDes = 0.0d0
+  DesignEAFanVolFlowRateUser = 0.0d0
 
   IF (StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
+  IF (CurZoneEqNum > 0) THEN
 
 !      Sizing objects are not required for stand alone ERV
 !      CALL CheckZoneSizing('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name)
-      ZoneName = ZoneEquipConfig(CurZoneEqNum)%ZoneName
-      ActualZoneNum = ZoneEquipConfig(CurZoneEqNum)%ActualZoneNum
-      FloorArea = 0.0
-      IF(SameString(ZoneName,Zone(CurZoneEqNum)%Name))THEN
-        FloorArea = Zone(CurZoneEqNum)%FloorArea
-      ELSE
-        DO ZoneNum = 1, NumOfZones
-          IF(.NOT. SameString(ZoneName,Zone(CurZoneEqNum)%Name))CYCLE
+    ZoneName = ZoneEquipConfig(CurZoneEqNum)%ZoneName
+    ActualZoneNum = ZoneEquipConfig(CurZoneEqNum)%ActualZoneNum
+    FloorArea = 0.0d0
+    IF(SameString(ZoneName,Zone(CurZoneEqNum)%Name))THEN
+      FloorArea = Zone(CurZoneEqNum)%FloorArea
+    ELSE
+      DO ZoneNum = 1, NumOfZones
+        IF(.NOT. SameString(ZoneName,Zone(CurZoneEqNum)%Name))CYCLE
           FloorArea = Zone(ZoneNum)%FloorArea
-          EXIT
-        END DO
-      END IF
-      NumberOfPeople = 0.0
-      MaxPeopleSch = 0.0
-      DO PeopleNum = 1, TotPeople
-        IF(ActualZoneNum .NE. People(PeopleNum)%ZonePtr)CYCLE
+        EXIT
+      END DO
+    END IF
+    NumberOfPeople = 0.0d0
+    MaxPeopleSch = 0.0d0
+    DO PeopleNum = 1, TotPeople
+      IF(ActualZoneNum .NE. People(PeopleNum)%ZonePtr)CYCLE
         NumberOfPeople = People(PeopleNum)%NumberOfPeople
         PeopleSchPtr = People(PeopleNum)%NumberOfPeoplePtr
         MaxPeopleSch = GetScheduleMaxValue(PeopleSchPtr)
-        EXIT
-      END DO
-      StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow = &
-                               FloorArea * StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea + &
-                               MaxPeopleSch * NumberOfPeople * StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant
+      EXIT
+    END DO
+    SupplyAirVolFlowDes = &
+                         FloorArea * StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea + &
+                         MaxPeopleSch * NumberOfPeople * StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant
 
-      IF (StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow < SmallAirVolFlow) THEN
-        StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow = 0.0
-      END IF
+    IF (SupplyAirVolFlowDes < SmallAirVolFlow) THEN
+      SupplyAirVolFlowDes = 0.0d0
+    END IF
 
-      CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name,&
-                              'Supply Air Flow Rate [m3/s]',StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
+    IF (IsAutosize) THEN
+      StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow = SupplyAirVolFlowDes
+      CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name, &
+                              'Design Size Supply Air Flow Rate [m3/s]',SupplyAirVolFlowDes)
 
       CALL SetHeatExchangerData(StandAloneERV(StandAloneERVNum)%HeatExchangerIndex,ErrorsFound, &
                                 StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
-                                SupplyAirVolFlow=StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
+                                SupplyAirVolFlowDes)
 
       CALL ReportSizingOutput(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum), &
-                              StandAloneERV(StandAloneERVNum)%HeatExchangerName,&
-                             'Supply Air Flow Rate [m3/s]',StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
+                              StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
+                             'Design Size Supply Air Flow Rate [m3/s]',SupplyAirVolFlowDes)
 
       CALL SetFanData(StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex, ErrorsFound, &
                       StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
@@ -1392,12 +1415,12 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
                       StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
                       0.0d0)
 
-      StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow * &
+      StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate = SupplyAirVolFlowDes * &
                                                                StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
 
       CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num)), &
                               StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
-                             'Maximum Supply Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow* &
+                             'Design Size Maximum Supply Air Flow Rate [m3/s]', SupplyAirVolFlowDes * &
                               StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
 
 !      ERV fan type must be Fan:OnOff, min flow rate is assumed 0. Do not report min flow sizing.
@@ -1407,91 +1430,176 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
 
       IF(StandAloneERV(StandAloneERVNum)%ControllerNameDefined)THEN
         CALL SetOAControllerData(StandAloneERV(StandAloneERVNum)%ControllerIndex,ErrorsFound, &
-                               MaxOA=StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow * &
-                                     StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
+                               MaxOA=SupplyAirVolFlowDes * StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
 
 !        MaxOA is not an input for CONTROLLER:STAND ALONE ERV, do not report sizing
 !        CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator:Controller',StandAloneERV(StandAloneERVNum)%ControllerName,&
 !                                'maximum outside air flow rate [m3/s]',StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
 
-        CALL SetOAControllerData(StandAloneERV(StandAloneERVNum)%ControllerIndex,ErrorsFound, &
-                               MinOA=StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
+        CALL SetOAControllerData(StandAloneERV(StandAloneERVNum)%ControllerIndex,ErrorsFound, MinOA=SupplyAirVolFlowDes)
 
 !        MinOA is not an input for CONTROLLER:STAND ALONE ERV, do not report sizing
 !        CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator:Controller',StandAloneERV(StandAloneERVNum)%ControllerName,&
 !                                'minimum outside air flow rate [m3/s]',StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
-
       END IF
+    ELSE
+      IF (StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow > 0.0d0 .AND. SupplyAirVolFlowDes > 0.0d0) THEN
+        SupplyAirVolFlowUser = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow
+        IF (StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow > 0.0d0) THEN
+          CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name, &
+                              'Design Size Supply Air Flow Rate [m3/s]',SupplyAirVolFlowDes, &
+                              'User-Specified Supply Air Flow Rate [m3/s]',SupplyAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(SupplyAirVolFlowDes - SupplyAirVolFlowUser)/SupplyAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator =' &
+                           //TRIM(StandAloneERV(StandAloneERVNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
 
+          CALL ReportSizingOutput(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum), &
+                              StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
+                             'Design Size Supply Air Flow Rate [m3/s]',SupplyAirVolFlowDes, &
+                             'User-Specified Supply Air Flow Rate [m3/s]',SupplyAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(SupplyAirVolFlowDes - SupplyAirVolFlowUser)/SupplyAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator ' &
+                                 //   TRIM(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum))//' '//  &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%HeatExchangerName))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+
+          CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num)), &
+                              StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
+                             'Design Size Maximum Supply Air Flow Rate [m3/s]', SupplyAirVolFlowDes * &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
+                             'User-Specified Maximum Supply Air Flow Rate [m3/s]', SupplyAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(SupplyAirVolFlowDes - SupplyAirVolFlowUser)/SupplyAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator ' &
+                                  // TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num))//' '// &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%SupplyAirFanName))
+              CALL ShowContinueError('User-Specified Maximum Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(SupplyAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
+  END IF
 
-  ELSE IF (StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate == AutoSize) THEN
-    CALL SetFanData(StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex, ErrorsFound, &
+  IsAutosize = .FALSE.
+  IF (StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  CALL SetFanData(StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex, ErrorsFound, &
                     StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
                     StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow* &
                     StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
                     0.0d0)
-    StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow * &
-                                                             StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
-    CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num)), &
+  DesignSAFanVolFlowRateDes = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow * &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
+  IF (IsAutosize) THEN
+    StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate = DesignSAFanVolFlowRateDes
+    CALL ReportSizingOutput(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num), &
                               StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
-                             'Maximum Supply Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow* &
-                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
-
+                             'Design Size Maximum Supply Air Flow Rate [m3/s]', DesignSAFanVolFlowRateDes)
+  ELSE
+    IF (StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate > 0.0d0 .AND. DesignSAFanVolFlowRateDes > 0.0d0) THEN
+      DesignSAFanVolFlowRateUser = StandAloneERV(StandAloneERVNum)%DesignSAFanVolFlowRate
+      CALL ReportSizingOutput(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num), &
+                              StandAloneERV(StandAloneERVNum)%SupplyAirFanName, &
+                             'Design Size Maximum Supply Air Flow Rate [m3/s]', DesignSAFanVolFlowRateDes, &
+                             'User-Specified Maximum Supply Air Flow Rate [m3/s]', DesignSAFanVolFlowRateUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(DesignSAFanVolFlowRateDes - DesignSAFanVolFlowRateUser)/DesignSAFanVolFlowRateUser) &
+                                 > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator '//  &
+                                  TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num))//' '// &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%SupplyAirFanName))
+          CALL ShowContinueError('User-Specified Maximum Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(DesignSAFanVolFlowRateUser,5))//' [m3/s]')
+          CALL ShowContinueError('differs from Design Size Maximum Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(DesignSAFanVolFlowRateDes,5))//' [m3/s]')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
   END IF
 
+  IsAutosize = .FALSE.
   IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
 
-    IF (CurZoneEqNum > 0) THEN
+  IF (CurZoneEqNum > 0) THEN
 
 !      Sizing objects are not required for stand alone ERV
 !      CALL CheckZoneSizing('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name)
-      ZoneName = ZoneEquipConfig(CurZoneEqNum)%ZoneName
-      ActualZoneNum = ZoneEquipConfig(CurZoneEqNum)%ActualZoneNum
-      FloorArea = 0.0
-      IF(SameString(ZoneName,Zone(CurZoneEqNum)%Name))THEN
-        FloorArea = Zone(CurZoneEqNum)%FloorArea
-      ELSE
-        DO ZoneNum = 1, NumOfZones
-          IF(.NOT. SameString(ZoneName,Zone(CurZoneEqNum)%Name))CYCLE
+    ZoneName = ZoneEquipConfig(CurZoneEqNum)%ZoneName
+    ActualZoneNum = ZoneEquipConfig(CurZoneEqNum)%ActualZoneNum
+    FloorArea = 0.0d0
+    IF(SameString(ZoneName,Zone(CurZoneEqNum)%Name))THEN
+      FloorArea = Zone(CurZoneEqNum)%FloorArea
+    ELSE
+      DO ZoneNum = 1, NumOfZones
+        IF(.NOT. SameString(ZoneName,Zone(CurZoneEqNum)%Name))CYCLE
           FloorArea = Zone(ZoneNum)%FloorArea
-          EXIT
-        END DO
-      END IF
-      NumberOfPeople = 0.0
-      MaxPeopleSch = 0.0
-      DO PeopleNum = 1, TotPeople
-        IF(ActualZoneNum .NE. People(PeopleNum)%ZonePtr)CYCLE
+        EXIT
+      END DO
+    END IF
+    NumberOfPeople = 0.0d0
+    MaxPeopleSch = 0.0d0
+    DO PeopleNum = 1, TotPeople
+      IF(ActualZoneNum .NE. People(PeopleNum)%ZonePtr)CYCLE
         NumberOfPeople = People(PeopleNum)%NumberOfPeople
         PeopleSchPtr = People(PeopleNum)%NumberOfPeoplePtr
         MaxPeopleSch = GetScheduleMaxValue(PeopleSchPtr)
-        EXIT
-      END DO
-      StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow = &
-                               FloorArea * StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea + &
-                               MaxPeopleSch * NumberOfPeople * StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant
+      EXIT
+    END DO
+    ExhaustAirVolFlowDes = &
+                      FloorArea * StandAloneERV(StandAloneERVNum)%AirVolFlowPerFloorArea + &
+                      MaxPeopleSch * NumberOfPeople * StandAloneERV(StandAloneERVNum)%AirVolFlowPerOccupant
 
-      IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow < SmallAirVolFlow) THEN
-        StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow = 0.0
-      END IF
+    IF (ExhaustAirVolFlowDes < SmallAirVolFlow) THEN
+      ExhaustAirVolFlowDes = 0.0d0
+    END IF
 
-      IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow > StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow) THEN
-        StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow
-      END IF
+    IF (ExhaustAirVolFlowDes > StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow) THEN
+      ExhaustAirVolFlowDes = StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow
+    END IF
 
-      StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow * &
+    IF (IsAutosize) THEN
+      StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow = ExhaustAirVolFlowDes
+      StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate = ExhaustAirVolFlowDes * &
                                                                StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
 
-      CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name,&
-                              'Exhaust Air Flow Rate [m3/s]',StandAloneERV(StandAloneERVNum)%SupplyAirVolFlow)
+      CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name, &
+                            'Design Size Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowDes)
 
       CALL SetHeatExchangerData(StandAloneERV(StandAloneERVNum)%HeatExchangerIndex,ErrorsFound, &
                                 StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
-                                SecondaryAirVolFlow=StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow)
+                                SecondaryAirVolFlow=ExhaustAirVolFlowDes)
 
       CALL ReportSizingOutput(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum), &
-                              StandAloneERV(StandAloneERVNum)%HeatExchangerName,&
-                             'Exhaust Air Flow Rate [m3/s]',StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow)
+                              StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
+                             'Design Size Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowDes)
 
       CALL SetFanData(StandAloneERV(StandAloneERVNum)%ExhaustAirFanIndex, ErrorsFound, &
                       StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
@@ -1501,31 +1609,111 @@ SUBROUTINE SizeStandAloneERV(StandAloneERVNum)
 
       CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num)), &
                               StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
-                             'Maximum Exhaust Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
+                             'Design Size Maximum Exhaust Air Flow Rate [m3/s]', ExhaustAirVolFlowDes* &
                               StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
 
 !      ERV fan type must be Fan:OnOff, min flow rate is assumed 0. Do not report min flow sizing.
 !      CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num)), &
 !                              StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
 !                               'Min Flow Rate [m3/s]', 0.0)
+    ELSE
+      IF (StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow > 0.0d0 .AND. ExhaustAirVolFlowDes > 0.0d0) THEN
+        ExhaustAirVolFlowUser = StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow
 
+        CALL ReportSizingOutput('ZoneHVAC:EnergyRecoveryVentilator',StandAloneERV(StandAloneERVNum)%Name, &
+                            'Design Size Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowDes, &
+                            'User-Specified Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(ExhaustAirVolFlowDes - ExhaustAirVolFlowUser)/ExhaustAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator ' &
+                                       //TRIM(StandAloneERV(StandAloneERVNum)%Name))
+            CALL ShowContinueError('User-Specified Exhaust Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(ExhaustAirVolFlowUser,5))// ' [m3/s]')
+            CALL ShowContinueError('differs from Design Size Exhaust Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(ExhaustAirVolFlowDes,5))// ' [m3/s]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
 
+        CALL ReportSizingOutput(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum), &
+                              StandAloneERV(StandAloneERVNum)%HeatExchangerName, &
+                             'Design Size Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowDes, &
+                             'User-Specified Exhaust Air Flow Rate [m3/s]',ExhaustAirVolFlowUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(ExhaustAirVolFlowDes - ExhaustAirVolFlowUser)/ExhaustAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator '//  &
+                                  TRIM(cHXTypes(StandAloneERV(StandAloneERVNum)%HeatExchangerTypeNum))//' '//  &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%HeatExchangerName))
+            CALL ShowContinueError('User-Specified Exhaust Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(ExhaustAirVolFlowUser,5))// ' [m3/s]')
+            CALL ShowContinueError('differs from Design Size Exhaust Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(ExhaustAirVolFlowDes,5))// ' [m3/s]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+
+        CALL ReportSizingOutput(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num), &
+                              StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
+                             'Design Size Maximum Exhaust Air Flow Rate [m3/s]', ExhaustAirVolFlowDes* &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
+                             'User-Specified Maximum Exhaust Air Flow Rate [m3/s]', ExhaustAirVolFlowUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(ExhaustAirVolFlowDes - ExhaustAirVolFlowUser)/ExhaustAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator '//  &
+                                  TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num))//' '// &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%ExhaustAirFanName))
+            CALL ShowContinueError('User-Specified Maximum Exhaust Air Flow Rate of '// &
+                                        TRIM(RoundSigDigits(ExhaustAirVolFlowUser,5))// ' [m3/s]')
+            CALL ShowContinueError('differs from Design Size Maximum Exhaust Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(ExhaustAirVolFlowDes,5))// ' [m3/s]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF
     END IF
+  END IF
 
-  ELSE IF (StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate == AutoSize) THEN
-      CALL SetFanData(StandAloneERV(StandAloneERVNum)%ExhaustAirFanIndex, ErrorsFound, &
+  IsAutosize = .FALSE.
+  IF (StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  CALL SetFanData(StandAloneERV(StandAloneERVNum)%ExhaustAirFanIndex, ErrorsFound, &
                       StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
                       StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
                       StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio, &
                       0.0d0)
-      StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate = StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
-                                                               StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
-
+  DesignEAFanVolFlowRateDes = StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
+                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio
+  IF (IsAutosize) THEN
+    StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate =  DesignEAFanVolFlowRateDes
+    CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num)), &
+                              StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
+                             'Design Size Maximum Exhaust Air Flow Rate [m3/s]', DesignEAFanVolFlowRateDes)
+  ELSE
+    IF (StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate > 0.0d0 .AND. DesignEAFanVolFlowRateDes > 0.0d0) THEN
+      DesignEAFanVolFlowRateUser = StandAloneERV(StandAloneERVNum)%DesignEAFanVolFlowRate
       CALL ReportSizingOutput(TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%ExhaustAirFanType_Num)), &
                               StandAloneERV(StandAloneERVNum)%ExhaustAirFanName, &
-                             'Maximum Exhaust Air Flow Rate [m3/s]', StandAloneERV(StandAloneERVNum)%ExhaustAirVolFlow* &
-                              StandAloneERV(StandAloneERVNum)%HighRHOAFlowRatio)
-
+                             'Design Size Maximum Exhaust Air Flow Rate [m3/s]', DesignEAFanVolFlowRateDes, &
+                             'User-Specified Maximum Exhaust Air Flow Rate [m3/s]', DesignEAFanVolFlowRateUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(DesignEAFanVolFlowRateDes - DesignEAFanVolFlowRateUser)/DesignEAFanVolFlowRateUser) &
+                                   > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeStandAloneERV: Potential issue with equipment sizing for ZoneHVAC:EnergyRecoveryVentilator '//  &
+                                  TRIM(cFanTypes(StandAloneERV(StandAloneERVNum)%SupplyAirFanType_Num))//' '// &
+                                  TRIM(StandAloneERV(StandAloneERVNum)%SupplyAirFanName))
+          CALL ShowContinueError('User-Specified Maximum Exhaust Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(DesignEAFanVolFlowRateUser,5))// ' [m3/s]')
+          CALL ShowContinueError('differs from Design Size Maximum Exhaust Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(DesignEAFanVolFlowRateDes,5))// ' [m3/s]')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
   END IF
 
   RETURN
@@ -1637,25 +1825,25 @@ SUBROUTINE CalcStandAloneERV(StandAloneERVNum,FirstHVACIteration,SensLoadMet,Lat
   LatentMassLoadMet = AirMassFlow * (Node(SupOutletNode)%HumRat - Node(ExhaustInletNode)%HumRat) ! kg/s, dehumidification = negative
 
 
-  IF(SensLoadMet .LT. 0.0) THEN
+  IF(SensLoadMet .LT. 0.0d0) THEN
     StandAloneERV(StandAloneERVNum)%SensCoolingRate = ABS(SensLoadMet)
-    StandAloneERV(StandAloneERVNum)%SensHeatingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%SensHeatingRate = 0.0d0
   ELSE
-    StandAloneERV(StandAloneERVNum)%SensCoolingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%SensCoolingRate = 0.0d0
     StandAloneERV(StandAloneERVNum)%SensHeatingRate = SensLoadMet
   END IF
-  IF(TotLoadMet .LT. 0.0) THEN
+  IF(TotLoadMet .LT. 0.0d0) THEN
     StandAloneERV(StandAloneERVNum)%TotCoolingRate = ABS(TotLoadMet)
-    StandAloneERV(StandAloneERVNum)%TotHeatingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%TotHeatingRate = 0.0d0
   ELSE
-    StandAloneERV(StandAloneERVNum)%TotCoolingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%TotCoolingRate = 0.0d0
     StandAloneERV(StandAloneERVNum)%TotHeatingRate = TotLoadMet
   END IF
-  IF(LatLoadMet .LT. 0.0) THEN
+  IF(LatLoadMet .LT. 0.0d0) THEN
     StandAloneERV(StandAloneERVNum)%LatCoolingRate = ABS(LatLoadMet)
-    StandAloneERV(StandAloneERVNum)%LatHeatingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%LatHeatingRate = 0.0d0
   ELSE
-    StandAloneERV(StandAloneERVNum)%LatCoolingRate = 0.0
+    StandAloneERV(StandAloneERVNum)%LatCoolingRate = 0.0d0
     StandAloneERV(StandAloneERVNum)%LatHeatingRate = LatLoadMet
   END IF
 
@@ -1833,7 +2021,7 @@ FUNCTION GetSupplyAirFlowRate(ERVType,ERVCtrlName,ErrorsFound) RESULT(AirFlowRat
   IF (WhichERV == 0) THEN
     CALL ShowSevereError('Could not find ZoneHVAC:EnergyRecoveryVentilator with Controller Name="'//TRIM(ERVCtrlName)//'"')
     ErrorsFound=.TRUE.
-    AirFlowRate=-1000.
+    AirFlowRate=-1000.d0
   ENDIF
 
   RETURN

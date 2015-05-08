@@ -110,6 +110,7 @@ INTEGER, PARAMETER :: SOAM_IAQPCOM = 6  ! Take the maximum outdoor air rate from
 TYPE ZoneSizingInputData
   CHARACTER &
     (len=MaxNameLength) :: ZoneName                 = ' '     ! name of a zone
+  INTEGER               :: ZoneNum                  = 0       ! index of the zone
   INTEGER               :: ZnCoolDgnSAMethod        = 0       ! choice of how to get zone cooling design air temperature;
                                                               !  1 = specify supply air temperature,
                                                               !  2 = calculate from the temperature difference
@@ -149,8 +150,8 @@ TYPE ZoneSizingInputData
                                                               !  (of the cooling design air flow rate)
   REAL(r64)             :: HeatSizingFactor             = 0.0d0   ! the zone heating sizing ratio
   REAL(r64)             :: CoolSizingFactor             = 0.0d0   ! the zone cooling sizing ratio
-  REAL(r64)             :: ZoneADEffCooling         = 1.0
-  REAL(r64)             :: ZoneADEffHeating         = 1.0
+  REAL(r64)             :: ZoneADEffCooling         = 1.0d0
+  REAL(r64)             :: ZoneADEffHeating         = 1.0d0
   CHARACTER &
     (len=MaxNameLength) :: ZoneAirDistEffObjName      = ' '     ! name of the zone air distribution effectiveness object name
   INTEGER               :: ZoneAirDistributionIndex     = 0   ! index to the zone air distribution object
@@ -252,9 +253,11 @@ TYPE ZoneSizingData
   REAL(r64)             :: HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
   REAL(r64)             :: HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
   REAL(r64)             :: HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
+  REAL(r64)             :: HeatTstatTemp            = 0.0d0   ! current zone thermostat temperature (heating, time step)
   REAL(r64)             :: CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
   REAL(r64)             :: CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
   REAL(r64)             :: CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
+  REAL(r64)             :: CoolTstatTemp            = 0.0d0   ! current zone thermostat temperature (cooling, time step)
   REAL(r64)             :: HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
   REAL(r64)             :: CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
   REAL(r64)             :: HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
@@ -290,10 +293,14 @@ TYPE ZoneSizingData
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatOutTempSeq     ! daily sequence of outdoor temperatures (heating, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatZoneRetTempSeq ! daily sequence of zone return temperatures (heating,
                                                               !  zone time step)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: HeatTstatTempSeq   ! daily sequence of zone thermostat temperatures (heating,
+                                                              !  zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: DesHeatSetPtSeq    ! daily sequence of indoor set point temperatures (zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolZoneTempSeq    ! daily sequence of zone temperatures (cooling, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolOutTempSeq     ! daily sequence of outdoor temperatures (cooling, zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolZoneRetTempSeq ! daily sequence of zone return temperatures (cooling,
+                                                              !  zone time step)
+  REAL(r64), ALLOCATABLE, DIMENSION(:)  :: CoolTstatTempSeq   ! daily sequence of zone thermostat temperatures (cooling,
                                                               !  zone time step)
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: DesCoolSetPtSeq    ! daily sequence of indoor set point temperatures (zone time step)
 
@@ -328,7 +335,9 @@ TYPE TermUnitSizingData
   REAL(r64)             :: MaxCWVolFlow             = 0.0d0 ! design Cold Water vol flow for single duct terminal unit [m3/s]
   REAL(r64)             :: MinFlowFrac              = 0.0d0 ! design minimum flow fraction for a terminal unit
   REAL(r64)             :: InducRat                 = 0.0d0 ! design induction ratio for a terminal unit
-  REAL(r64)             :: ReheatMult               = 1.0d0 ! multiplier for reheat coil UA calculation
+  LOGICAL               :: InducesPlenumAir         =.FALSE.! True if secondary air comes from the plenum
+  REAL(r64)             :: ReheatAirFlowMult        = 1.0d0 ! multiplier for air flow in reheat coil UA calculation
+  REAL(r64)             :: ReheatLoadMult           = 1.0d0 ! multiplier for load in reheat coil UA calculation
   REAL(r64)             :: DesCoolingLoad           = 0.0d0 ! design cooling load used for zone equipment [W]
   REAL(r64)             :: DesHeatingLoad           = 0.0d0 ! design heating load used for zone equipment [W]
 END TYPE TermUnitSizingData
@@ -340,11 +349,14 @@ TYPE ZoneEqSizingData                                       ! data saved from zo
   REAL(r64)             :: OAVolFlow                = 0.0d0 ! design outside air flow for zone equipment unit [m3/s]
   REAL(r64)             :: DesCoolingLoad           = 0.0d0 ! design cooling load used for zone equipment [W]
   REAL(r64)             :: DesHeatingLoad           = 0.0d0 ! design heating load used for zone equipment [W]
+  LOGICAL               :: AirFlow  = .FALSE.   ! TRUE if AirloopHVAC system air flow rate is calcualted
+  LOGICAL               :: Capacity = .FALSE.  ! TRUE if AirloopHVAC system capacity is calculated
 END TYPE ZoneEqSizingData
 
 TYPE SystemSizingInputData
   CHARACTER &
     (len=MaxNameLength) :: AirPriLoopName           = ' '     ! name of an AirLoopHVAC object
+  INTEGER               :: AirLoopNum               = 0       ! index number of air loop
   INTEGER               :: LoadSizeType             = 0       ! type of load to size on;
                                                               ! 0=sensible, 1=latent, 2=total, 3=ventilation
   INTEGER               :: SizingOption             = 0       ! 1 = noncoincident, 2 = coincident
@@ -548,6 +560,8 @@ TYPE (SystemSizingData),      ALLOCATABLE, DIMENSION(:)   :: CalcSysSizing      
                                                                                   !  before applying user input sys flow rates.
 TYPE (TermUnitSizingData),    ALLOCATABLE, DIMENSION(:)   :: TermUnitSizing       ! Data added in sizing routines
 TYPE (ZoneEqSizingData),      ALLOCATABLE, DIMENSION(:)   :: ZoneEqSizing         ! Data added in zone eq component sizing routines
+TYPE (ZoneEqSizingData),      ALLOCATABLE, DIMENSION(:)   :: UnitarySysEqSizing   ! Data added in unitary system sizing routines
+TYPE (ZoneEqSizingData),      ALLOCATABLE, DIMENSION(:)   :: OASysEqSizing        ! Data added in unitary system sizing routines
 TYPE (PlantSizingData),       ALLOCATABLE, DIMENSION(:)   :: PlantSizData         ! Input data array for plant sizing
 TYPE (DesDayWeathData),       ALLOCATABLE, DIMENSION(:)   :: DesDayWeath          ! design day weather saved at major time step
 TYPE (CompDesWaterFlowData),  ALLOCATABLE, DIMENSION(:)   :: CompDesWaterFlow     ! array to store components' design water flow
@@ -573,9 +587,12 @@ LOGICAL   :: TermUnitPIU        = .FALSE. ! TRUE if a powered induction terminal
 LOGICAL   :: TermUnitIU         = .FALSE. ! TRUE if an unpowered induction terminal unit
 LOGICAL   :: ZoneEqFanCoil      = .FALSE. ! TRUE if a 4 pipe fan coil unit is being simulated
 LOGICAL   :: ZoneEqDXCoil       = .FALSE. ! TRUE if a ZoneHVAC DX coil is being simulated
+LOGICAL   :: ZoneCoolingOnlyFan = .FALSE. ! TRUE if a ZoneHVAC DX cooling coil is only coil in parent
 LOGICAL   :: ZoneHeatingOnlyFan = .FALSE. ! TRUE if zone unit only does heating and contains a fam (such as Unit Heater)
 LOGICAL   :: SysSizingRunDone   = .FALSE. ! True if a system sizing run is successfully completed.
 LOGICAL   :: ZoneSizingRunDone  = .FALSE. ! True if a zone sizing run has been successfully completed.
+REAL(r64) :: AutoVsHardSizingThreshold = 0.1d0 ! criteria threshold used to determine if user hard size and autosize disagree 10%
+REAL(r64) :: AutoVsHardSizingDeltaTempThreshold = 1.5d0 ! temperature criteria threshold for autosize versus hard size [C]
 REAL(r64) :: DXCoolCap          = 0.0d0   ! The ARI cooling capacity of a DX unit.
 REAL(r64) :: UnitaryHeatCap     = 0.0d0   ! the heating capacity of a unitary system
 REAL(r64) :: SuppHeatCap        = 0.0d0   ! the heating capacity of the supplemental heater in a unitary system

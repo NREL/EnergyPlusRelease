@@ -105,16 +105,16 @@ LOGICAL :: LCCparamPresent = .FALSE.                  ! If a LifeCycleCost:Param
 CHARACTER(len=MaxNameLength)   :: LCCname             ! Name
 INTEGER :: discountConvension = disConvEndOfYear      ! Discounting Convention
 INTEGER :: inflationApproach = inflAppConstantDollar  ! Inflation Approach
-REAL(r64) :: realDiscountRate = 0.0                   ! Real Discount Rate
-REAL(r64) :: nominalDiscountRate = 0.0                ! Nominal Discount Rate
-REAL(r64) :: inflation = 0.0                          ! Inflation
+REAL(r64) :: realDiscountRate = 0.0d0                   ! Real Discount Rate
+REAL(r64) :: nominalDiscountRate = 0.0d0                ! Nominal Discount Rate
+REAL(r64) :: inflation = 0.0d0                          ! Inflation
 INTEGER ::  baseDateMonth = 0                         ! Base Date Month (1=Jan, 12=Dec)
 INTEGER ::  baseDateYear = 0                          ! Base Date Year  1900-2100
 INTEGER ::  serviceDateMonth = 0                      ! Service Date Month (1=Jan, 12=Dec)
 INTEGER ::  serviceDateYear = 0                       ! Service Date Year 1900-2100
 INTEGER ::  lengthStudyYears = 0                      ! Length of Study Period in Years
 INTEGER ::  lengthStudyTotalMonths = 0                ! Length of Study expressed in months (years x 12)
-REAL(r64) :: taxRate = 0.0                            ! Tax rate
+REAL(r64) :: taxRate = 0.0d0                            ! Tax rate
 INTEGER :: depreciationMethod = depMethNone           ! Depreciation Method
 ! derived
 INTEGER ::  lastDateMonth = 0                         ! Last Date Month (the month before the base date month)
@@ -132,7 +132,7 @@ TYPE RecurringCostsType
   INTEGER :: repeatPeriodYears = 0                   ! Repeat Period Years 1 - 100
   INTEGER :: repeatPeriodMonths = 0                  ! Repeat Period Months 0 - 11
   INTEGER :: totalRepeatPeriodMonths = 0             ! Total months (12 x years) + months
-  REAL(r64) :: annualEscalationRate = 0.0            ! Annual escalation rate
+  REAL(r64) :: annualEscalationRate = 0.0d0            ! Annual escalation rate
 END TYPE
 TYPE (RecurringCostsType), ALLOCATABLE, DIMENSION(:) :: RecurringCosts
 INTEGER                                              :: numRecurringCosts = 0
@@ -152,7 +152,8 @@ INTEGER                                                :: numNonrecurringCost = 
 
 TYPE UsePriceEscalationType
   CHARACTER(len=MaxNameLength)   :: name  = ' '        ! Name
-  INTEGER :: resource                                  ! resource like electricity or natural gas (uses definitions from DataGlobalConstants)
+  INTEGER :: resource                                  ! resource like electricity or natural gas
+                                                       ! (uses definitions from DataGlobalConstants)
   INTEGER :: escalationStartYear = 0                   ! Escalation Start Year 1900-2100
   INTEGER :: escalationStartMonth = 0                  ! Escalation Start Month 1 to 12
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: Escalation   ! Escalation by year, first year is baseDateYear
@@ -163,7 +164,8 @@ INTEGER                                                   :: numUsePriceEscalati
 
 TYPE UseAdjustmentType
   CHARACTER(len=MaxNameLength)   :: name  = ' '        ! Name
-  INTEGER :: resource                                  ! resource like electricity or natural gas (uses definitions from DataGlobalConstants)
+  INTEGER :: resource                                  ! resource like electricity or natural gas
+                                                       ! (uses definitions from DataGlobalConstants)
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: Adjustment   ! Adjustment by year, first year is baseDateYear
                                                        ! last year is baseDateYear + lengthStudyYears - 1
 END TYPE
@@ -173,7 +175,8 @@ INTEGER                                              :: numUseAdjustment = 0
 TYPE CashFlowType
   CHARACTER(len=MaxNameLength)   :: name  = ' '        ! Name - just for labeling output - use Category for aggregation
   INTEGER :: SourceKind                                ! 1=recurring, 2=nonrecurring, 3=resource
-  INTEGER :: Resource                                  ! resource like electricity or natural gas (uses definitions from DataGlobalConstants)
+  INTEGER :: Resource                                  ! resource like electricity or natural gas
+                                                       ! (uses definitions from DataGlobalConstants)
   INTEGER :: Category                                  ! uses "costCat" constants above
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: mnAmount     ! cashflow dollar amount by month, first year is baseDateYear
                                                        ! last year is baseDateYear + lengthStudyYears - 1
@@ -321,6 +324,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
 IF (LCCparamPresent) THEN
+  CALL DisplayString('Computing Life Cycle Costs and Reporting')
   CALL ExpressAsCashFlows
   CALL ComputePresentValue
   CALL ComputeTaxAndDepreciation
@@ -545,7 +549,7 @@ ELSEIF (NumObj .EQ. 1) THEN
   !      \type real
   !      \minimum 0.0
   taxRate = NumArray(7)
-  IF (taxRate .LT. 0.0 .AND. (.NOT. lNumericFieldBlanks(7))) THEN
+  IF (taxRate .LT. 0.0d0 .AND. (.NOT. lNumericFieldBlanks(7))) THEN
     CALL ShowWarningError(TRIM(CurrentModuleObject)//': Invalid value in field '//TRIM(cNumericFieldNames(10))//    &
        '.  A value less than 0 is not reasonable for a tax rate. ')
   END IF
@@ -1067,7 +1071,7 @@ IF (numUsePriceEscalation .GT. 0) THEN
     ! The array is from the baseDateYear until baseDateYear + lengthStudyYears
     ! Set the array to default to 1.0
     DO jYear = 1,lengthStudyYears
-      UsePriceEscalation(iInObj)%Escalation(jYear) = 1.0
+      UsePriceEscalation(iInObj)%Escalation(jYear) = 1.0d0
     END DO
     ! Since the years in the UsePriceEscalation may not match up with the baseDateYear and
     ! the lenghtStudyYears, need to make adjustments when reading in the values to align
@@ -1184,7 +1188,7 @@ IF (numUseAdjustment .GT. 0) THEN
     !       \begin-extensible
     ! Set the array to default to 1.0
     DO jYear = 1,lengthStudyYears
-      UseAdjustment(iInObj)%Adjustment(jYear) = 1.0
+      UseAdjustment(iInObj)%Adjustment(jYear) = 1.0d0
     END DO
     numFldsToUse = MIN(NumNums,lengthStudyYears)
     DO jYear = 1,numFldsToUse
@@ -1336,7 +1340,7 @@ baseMonths1900 = (baseDateYear - 1900) * 12 + baseDateMonth
 serviceMonths1900 = (serviceDateYear - 1900) * 12 + serviceDateMonth
 monthsBaseToService = serviceMonths1900 - baseMonths1900
 ! if ComponentCost:LineItem exist, the grand total of all costs are another non-recurring cost
-IF (CurntBldg%GrandTotal .GT. 0.0) THEN !from DataCostEstimate and computed in WriteCompCostTable within OutputReportTabular
+IF (CurntBldg%GrandTotal .GT. 0.0d0) THEN !from DataCostEstimate and computed in WriteCompCostTable within OutputReportTabular
   numNonrecurringCost = numNonrecurringCost + 1
   NonrecurringCost(numNonrecurringCost)%Name = 'Total of ComponentCost:*'
   NonrecurringCost(numNonrecurringCost)%lineItem = ''
@@ -1354,12 +1358,12 @@ ALLOCATE(resourceCostAnnual(NumOfResourceTypes))
 numResourcesUsed = 0
 DO iResource = 1 , NumOfResourceTypes
   CALL GetMonthlyCostForResource(iResource + ResourceTypeInitialOffset,curResourceCosts)
-  annualCost = 0.0
+  annualCost = 0.0d0
   DO jMonth = 1, 12
     resourceCosts(iResource,jMonth) = curResourceCosts(jMonth)
     annualCost = annualCost + resourceCosts(iResource,jMonth)
   END DO
-  IF (annualCost .NE. 0.0) THEN
+  IF (annualCost .NE. 0.0d0) THEN
     numResourcesUsed = numResourcesUsed + 1
     resourceCostNotZero(iResource) = .TRUE.
   ELSE
@@ -1370,14 +1374,14 @@ END DO
 ! pre-compute the inflation factors for each year
 ALLOCATE(monthlyInflationFactor(lengthStudyTotalMonths))
 IF (inflationApproach .EQ. inflAppConstantDollar) THEN
-  monthlyInflationFactor = 1.0 !not really used but just in case
+  monthlyInflationFactor = 1.0d0 !not really used but just in case
 ELSEIF (inflationApproach .EQ. inflAppCurrentDollar) THEN
   ! to allocate an interest rate (in this case inflation) cannot just use 1/12
   ! for the monthly value since it will be slightly wrong. Instead use inverse of
   ! formula from Newnan (4-32) which is r = m x (ia + 1)^(1/m) - 1)
-  inflationPerMonth = ((inflation + 1.00) ** (1.0d0/12.0d0)) - 1
+  inflationPerMonth = ((inflation + 1.0d0) ** (1.0d0/12.0d0)) - 1
   DO jMonth = 1, lengthStudyTotalMonths
-    monthlyInflationFactor(jMonth) = (1 + inflationPerMonth) ** (jMonth - 1)
+    monthlyInflationFactor(jMonth) = (1.0d0 + inflationPerMonth) ** (jMonth - 1)
   END DO
 END IF
 
@@ -1392,9 +1396,9 @@ DO iCashFlow = 1 , numCashFlow
   ALLOCATE(CashFlow(iCashFlow)%mnAmount(lengthStudyTotalMonths))
   ALLOCATE(CashFlow(iCashFlow)%yrAmount(lengthStudyYears))
   ALLOCATE(CashFlow(iCashFlow)%yrPresVal(lengthStudyYears))
-  CashFlow(iCashFlow)%mnAmount = 0.0  !zero all cash flow values
-  CashFlow(iCashFlow)%yrAmount = 0.0  !zero all cash flow values
-  CashFlow(iCashFlow)%yrPresVal = 0.0  !zero all present values
+  CashFlow(iCashFlow)%mnAmount = 0.0d0  !zero all cash flow values
+  CashFlow(iCashFlow)%yrAmount = 0.0d0  !zero all cash flow values
+  CashFlow(iCashFlow)%yrPresVal = 0.0d0  !zero all present values
 END DO
 ! Put nonrecurring costs into cashflows
 offset = countOfCostCat + numRecurringCosts
@@ -1403,7 +1407,7 @@ DO jCost = 1, numNonrecurringCost
   CashFlow(offset + jCost)%SourceKind = skNonrecurring
   CashFlow(offset + jCost)%Category = NonrecurringCost(jCost)%category
   CashFlow(offset + jCost)%orginalCost = NonrecurringCost(jCost)%cost
-  CashFlow(offset + jCost)%mnAmount = 0.0
+  CashFlow(offset + jCost)%mnAmount = 0.0d0
   IF (NonrecurringCost(jCost)%startOfCosts .EQ. startServicePeriod) THEN
     month = NonrecurringCost(jCost)%totalMonthsFromStart + monthsBaseToService + 1
   ELSEIF (NonrecurringCost(jCost)%startOfCosts .EQ. startBasePeriod) THEN
@@ -1526,7 +1530,7 @@ END DO
 !convert all monthly cashflows into yearly cashflows
 DO jCost = 1,numCashFlow
   DO kYear = 1,lengthStudyYears
-    annualCost = 0.0
+    annualCost = 0.0d0
     DO jMonth = 1, 12
       month = (kYear - 1) * 12 + jMonth
       IF (month .LE. lengthStudyTotalMonths) THEN
@@ -1655,7 +1659,7 @@ END DO
 DO iCashFlow = 1, numCashFlow
   SELECT CASE (CashFlow(iCashFlow)%pvKind)
     CASE (pvkNonEnergy)
-      totalPV = 0.0
+      totalPV = 0.0d0
       DO jYear = 1,lengthStudyYears
         CashFlow(iCashFlow)%yrPresVal(jYear) = CashFlow(iCashFlow)%yrAmount(jYear) * SPV(jYear)
         totalPV = totalPV + CashFlow(iCashFlow)%yrPresVal(jYear)
@@ -1664,7 +1668,7 @@ DO iCashFlow = 1, numCashFlow
     CASE (pvkEnergy)
       curResource = CashFlow(iCashFlow)%Resource - ResourceTypeInitialOffset
       IF ((curResource .GE. 1) .AND. (curResource .LT. NumOfResourceTypes)) THEN
-        totalPV = 0.0
+        totalPV = 0.0d0
         DO jYear = 1,lengthStudyYears
           CashFlow(iCashFlow)%yrPresVal(jYear) = CashFlow(iCashFlow)%yrAmount(jYear) * energySPV(curResource,jYear)
           totalPV = totalPV + CashFlow(iCashFlow)%yrPresVal(jYear)
@@ -1775,228 +1779,228 @@ ALLOCATE(AfterTaxPresentValue(lengthStudyYears))
 ! Table A-7a for 39 years. Table A-13 for 40 years. These years are a classification of property
 ! and should not be confused with the length of the study. For 27 years, 31 years, 39 years and 40 years
 ! the June value was used.
-DepreciationPercent = 0.0 !default all values to zero
+DepreciationPercent = 0.0d0 !default all values to zero
 SELECT CASE (depreciationMethod)
   CASE(depMethMACRS3)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 33.33
-    DepreciationPercent(2) = 44.45
-    DepreciationPercent(3) = 14.81
-    DepreciationPercent(4) = 7.41
+    DepreciationPercent(1) = 33.33d0
+    DepreciationPercent(2) = 44.45d0
+    DepreciationPercent(3) = 14.81d0
+    DepreciationPercent(4) = 7.41d0
   CASE(depMethMACRS5)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 20
-    DepreciationPercent(2) = 32
-    DepreciationPercent(3) = 19.2
-    DepreciationPercent(4) = 11.52
-    DepreciationPercent(5) = 11.52
-    DepreciationPercent(6) = 5.76
+    DepreciationPercent(1) = 20.0d0
+    DepreciationPercent(2) = 32.0d0
+    DepreciationPercent(3) = 19.2d0
+    DepreciationPercent(4) = 11.52d0
+    DepreciationPercent(5) = 11.52d0
+    DepreciationPercent(6) = 5.76d0
   CASE(depMethMACRS7)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 14.29
-    DepreciationPercent(2) = 24.49
-    DepreciationPercent(3) = 17.49
-    DepreciationPercent(4) = 12.49
-    DepreciationPercent(5) = 8.93
-    DepreciationPercent(6) = 8.92
-    DepreciationPercent(7) = 8.93
-    DepreciationPercent(8) = 4.46
+    DepreciationPercent(1) = 14.29d0
+    DepreciationPercent(2) = 24.49d0
+    DepreciationPercent(3) = 17.49d0
+    DepreciationPercent(4) = 12.49d0
+    DepreciationPercent(5) = 8.93d0
+    DepreciationPercent(6) = 8.92d0
+    DepreciationPercent(7) = 8.93d0
+    DepreciationPercent(8) = 4.46d0
   CASE(depMethMACRS10)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 10
-    DepreciationPercent(2) = 18
-    DepreciationPercent(3) = 14.4
-    DepreciationPercent(4) = 11.52
-    DepreciationPercent(5) = 9.22
-    DepreciationPercent(6) = 7.37
-    DepreciationPercent(7) = 6.55
-    DepreciationPercent(8) = 6.55
-    DepreciationPercent(9) = 6.56
-    DepreciationPercent(10) = 6.55
-    DepreciationPercent(11) = 3.28
+    DepreciationPercent(1) = 10.0d0
+    DepreciationPercent(2) = 18.0d0
+    DepreciationPercent(3) = 14.4d0
+    DepreciationPercent(4) = 11.52d0
+    DepreciationPercent(5) = 9.22d0
+    DepreciationPercent(6) = 7.37d0
+    DepreciationPercent(7) = 6.55d0
+    DepreciationPercent(8) = 6.55d0
+    DepreciationPercent(9) = 6.56d0
+    DepreciationPercent(10) = 6.55d0
+    DepreciationPercent(11) = 3.28d0
   CASE(depMethMACRS15)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 5
-    DepreciationPercent(2) = 9.5
-    DepreciationPercent(3) = 8.55
-    DepreciationPercent(4) = 7.7
-    DepreciationPercent(5) = 6.93
-    DepreciationPercent(6) = 6.23
-    DepreciationPercent(7) = 5.9
-    DepreciationPercent(8) = 5.9
-    DepreciationPercent(9) = 5.91
-    DepreciationPercent(10) = 5.9
-    DepreciationPercent(11) = 5.91
-    DepreciationPercent(12) = 5.9
-    DepreciationPercent(13) = 5.91
-    DepreciationPercent(14) = 5.9
-    DepreciationPercent(15) = 5.91
-    DepreciationPercent(16) = 2.95
+    DepreciationPercent(1) = 5.0d0
+    DepreciationPercent(2) = 9.5d0
+    DepreciationPercent(3) = 8.55d0
+    DepreciationPercent(4) = 7.7d0
+    DepreciationPercent(5) = 6.93d0
+    DepreciationPercent(6) = 6.23d0
+    DepreciationPercent(7) = 5.9d0
+    DepreciationPercent(8) = 5.9d0
+    DepreciationPercent(9) = 5.91d0
+    DepreciationPercent(10) = 5.9d0
+    DepreciationPercent(11) = 5.91d0
+    DepreciationPercent(12) = 5.9d0
+    DepreciationPercent(13) = 5.91d0
+    DepreciationPercent(14) = 5.9d0
+    DepreciationPercent(15) = 5.91d0
+    DepreciationPercent(16) = 2.95d0
   CASE(depMethMACRS20)  ! IRS Publication 946 for 2009 Table A-1
-    DepreciationPercent(1) = 3.75
-    DepreciationPercent(2) = 7.219
-    DepreciationPercent(3) = 6.677
-    DepreciationPercent(4) = 6.177
-    DepreciationPercent(5) = 5.713
-    DepreciationPercent(6) = 5.285
-    DepreciationPercent(7) = 4.888
-    DepreciationPercent(8) = 4.522
-    DepreciationPercent(9) = 4.462
-    DepreciationPercent(10) = 4.461
-    DepreciationPercent(11) = 4.462
-    DepreciationPercent(12) = 4.461
-    DepreciationPercent(13) = 4.462
-    DepreciationPercent(14) = 4.461
-    DepreciationPercent(15) = 4.462
-    DepreciationPercent(16) = 4.461
-    DepreciationPercent(17) = 4.462
-    DepreciationPercent(18) = 4.461
-    DepreciationPercent(19) = 4.462
-    DepreciationPercent(20) = 4.461
-    DepreciationPercent(21) = 2.231
+    DepreciationPercent(1) = 3.75d0
+    DepreciationPercent(2) = 7.219d0
+    DepreciationPercent(3) = 6.677d0
+    DepreciationPercent(4) = 6.177d0
+    DepreciationPercent(5) = 5.713d0
+    DepreciationPercent(6) = 5.285d0
+    DepreciationPercent(7) = 4.888d0
+    DepreciationPercent(8) = 4.522d0
+    DepreciationPercent(9) = 4.462d0
+    DepreciationPercent(10) = 4.461d0
+    DepreciationPercent(11) = 4.462d0
+    DepreciationPercent(12) = 4.461d0
+    DepreciationPercent(13) = 4.462d0
+    DepreciationPercent(14) = 4.461d0
+    DepreciationPercent(15) = 4.462d0
+    DepreciationPercent(16) = 4.461d0
+    DepreciationPercent(17) = 4.462d0
+    DepreciationPercent(18) = 4.461d0
+    DepreciationPercent(19) = 4.462d0
+    DepreciationPercent(20) = 4.461d0
+    DepreciationPercent(21) = 2.231d0
   CASE(depMethStraight27)  ! IRS Publication 946 for 2009 Table A-6 (June)
-    DepreciationPercent(1) = 1.97
-    DepreciationPercent(2) = 3.636
-    DepreciationPercent(3) = 3.636
-    DepreciationPercent(4) = 3.636
-    DepreciationPercent(5) = 3.636
-    DepreciationPercent(6) = 3.636
-    DepreciationPercent(7) = 3.636
-    DepreciationPercent(8) = 3.636
-    DepreciationPercent(9) = 3.636
-    DepreciationPercent(10) = 3.637
-    DepreciationPercent(11) = 3.636
-    DepreciationPercent(12) = 3.637
-    DepreciationPercent(13) = 3.636
-    DepreciationPercent(14) = 3.637
-    DepreciationPercent(15) = 3.636
-    DepreciationPercent(16) = 3.637
-    DepreciationPercent(17) = 3.636
-    DepreciationPercent(18) = 3.637
-    DepreciationPercent(19) = 3.636
-    DepreciationPercent(20) = 3.637
-    DepreciationPercent(21) = 3.636
-    DepreciationPercent(22) = 3.637
-    DepreciationPercent(23) = 3.636
-    DepreciationPercent(24) = 3.637
-    DepreciationPercent(25) = 3.636
-    DepreciationPercent(26) = 3.637
-    DepreciationPercent(27) = 3.636
-    DepreciationPercent(28) = 3.485
+    DepreciationPercent(1) = 1.97d0
+    DepreciationPercent(2) = 3.636d0
+    DepreciationPercent(3) = 3.636d0
+    DepreciationPercent(4) = 3.636d0
+    DepreciationPercent(5) = 3.636d0
+    DepreciationPercent(6) = 3.636d0
+    DepreciationPercent(7) = 3.636d0
+    DepreciationPercent(8) = 3.636d0
+    DepreciationPercent(9) = 3.636d0
+    DepreciationPercent(10) = 3.637d0
+    DepreciationPercent(11) = 3.636d0
+    DepreciationPercent(12) = 3.637d0
+    DepreciationPercent(13) = 3.636d0
+    DepreciationPercent(14) = 3.637d0
+    DepreciationPercent(15) = 3.636d0
+    DepreciationPercent(16) = 3.637d0
+    DepreciationPercent(17) = 3.636d0
+    DepreciationPercent(18) = 3.637d0
+    DepreciationPercent(19) = 3.636d0
+    DepreciationPercent(20) = 3.637d0
+    DepreciationPercent(21) = 3.636d0
+    DepreciationPercent(22) = 3.637d0
+    DepreciationPercent(23) = 3.636d0
+    DepreciationPercent(24) = 3.637d0
+    DepreciationPercent(25) = 3.636d0
+    DepreciationPercent(26) = 3.637d0
+    DepreciationPercent(27) = 3.636d0
+    DepreciationPercent(28) = 3.485d0
   CASE(depMethStraight31)  ! IRS Publication 946 for 2009 Table A-7 (June)
-    DepreciationPercent(1) = 1.72
-    DepreciationPercent(2) = 3.175
-    DepreciationPercent(3) = 3.175
-    DepreciationPercent(4) = 3.175
-    DepreciationPercent(5) = 3.175
-    DepreciationPercent(6) = 3.175
-    DepreciationPercent(7) = 3.175
-    DepreciationPercent(8) = 3.174
-    DepreciationPercent(9) = 3.175
-    DepreciationPercent(10) = 3.174
-    DepreciationPercent(11) = 3.175
-    DepreciationPercent(12) = 3.174
-    DepreciationPercent(13) = 3.175
-    DepreciationPercent(14) = 3.174
-    DepreciationPercent(15) = 3.175
-    DepreciationPercent(16) = 3.174
-    DepreciationPercent(17) = 3.175
-    DepreciationPercent(18) = 3.174
-    DepreciationPercent(19) = 3.175
-    DepreciationPercent(20) = 3.174
-    DepreciationPercent(21) = 3.175
-    DepreciationPercent(22) = 3.174
-    DepreciationPercent(23) = 3.175
-    DepreciationPercent(24) = 3.174
-    DepreciationPercent(25) = 3.175
-    DepreciationPercent(26) = 3.174
-    DepreciationPercent(27) = 3.175
-    DepreciationPercent(28) = 3.174
-    DepreciationPercent(29) = 3.175
-    DepreciationPercent(30) = 3.174
-    DepreciationPercent(31) = 3.175
-    DepreciationPercent(32) = 3.042
+    DepreciationPercent(1) = 1.72d0
+    DepreciationPercent(2) = 3.175d0
+    DepreciationPercent(3) = 3.175d0
+    DepreciationPercent(4) = 3.175d0
+    DepreciationPercent(5) = 3.175d0
+    DepreciationPercent(6) = 3.175d0
+    DepreciationPercent(7) = 3.175d0
+    DepreciationPercent(8) = 3.174d0
+    DepreciationPercent(9) = 3.175d0
+    DepreciationPercent(10) = 3.174d0
+    DepreciationPercent(11) = 3.175d0
+    DepreciationPercent(12) = 3.174d0
+    DepreciationPercent(13) = 3.175d0
+    DepreciationPercent(14) = 3.174d0
+    DepreciationPercent(15) = 3.175d0
+    DepreciationPercent(16) = 3.174d0
+    DepreciationPercent(17) = 3.175d0
+    DepreciationPercent(18) = 3.174d0
+    DepreciationPercent(19) = 3.175d0
+    DepreciationPercent(20) = 3.174d0
+    DepreciationPercent(21) = 3.175d0
+    DepreciationPercent(22) = 3.174d0
+    DepreciationPercent(23) = 3.175d0
+    DepreciationPercent(24) = 3.174d0
+    DepreciationPercent(25) = 3.175d0
+    DepreciationPercent(26) = 3.174d0
+    DepreciationPercent(27) = 3.175d0
+    DepreciationPercent(28) = 3.174d0
+    DepreciationPercent(29) = 3.175d0
+    DepreciationPercent(30) = 3.174d0
+    DepreciationPercent(31) = 3.175d0
+    DepreciationPercent(32) = 3.042d0
   CASE(depMethStraight39)  ! IRS Publication 946 for 2009 Table A-7a (June)
-    DepreciationPercent(1) = 1.391
-    DepreciationPercent(2) = 2.564
-    DepreciationPercent(3) = 2.564
-    DepreciationPercent(4) = 2.564
-    DepreciationPercent(5) = 2.564
-    DepreciationPercent(6) = 2.564
-    DepreciationPercent(7) = 2.564
-    DepreciationPercent(8) = 2.564
-    DepreciationPercent(9) = 2.564
-    DepreciationPercent(10) = 2.564
-    DepreciationPercent(11) = 2.564
-    DepreciationPercent(12) = 2.564
-    DepreciationPercent(13) = 2.564
-    DepreciationPercent(14) = 2.564
-    DepreciationPercent(15) = 2.564
-    DepreciationPercent(16) = 2.564
-    DepreciationPercent(17) = 2.564
-    DepreciationPercent(18) = 2.564
-    DepreciationPercent(19) = 2.564
-    DepreciationPercent(20) = 2.564
-    DepreciationPercent(21) = 2.564
-    DepreciationPercent(22) = 2.564
-    DepreciationPercent(23) = 2.564
-    DepreciationPercent(24) = 2.564
-    DepreciationPercent(25) = 2.564
-    DepreciationPercent(26) = 2.564
-    DepreciationPercent(27) = 2.564
-    DepreciationPercent(28) = 2.564
-    DepreciationPercent(29) = 2.564
-    DepreciationPercent(30) = 2.564
-    DepreciationPercent(31) = 2.564
-    DepreciationPercent(32) = 2.564
-    DepreciationPercent(33) = 2.564
-    DepreciationPercent(34) = 2.564
-    DepreciationPercent(35) = 2.564
-    DepreciationPercent(36) = 2.564
-    DepreciationPercent(37) = 2.564
-    DepreciationPercent(38) = 2.564
-    DepreciationPercent(39) = 2.564
-    DepreciationPercent(40) = 1.177
+    DepreciationPercent(1) = 1.391d0
+    DepreciationPercent(2) = 2.564d0
+    DepreciationPercent(3) = 2.564d0
+    DepreciationPercent(4) = 2.564d0
+    DepreciationPercent(5) = 2.564d0
+    DepreciationPercent(6) = 2.564d0
+    DepreciationPercent(7) = 2.564d0
+    DepreciationPercent(8) = 2.564d0
+    DepreciationPercent(9) = 2.564d0
+    DepreciationPercent(10) = 2.564d0
+    DepreciationPercent(11) = 2.564d0
+    DepreciationPercent(12) = 2.564d0
+    DepreciationPercent(13) = 2.564d0
+    DepreciationPercent(14) = 2.564d0
+    DepreciationPercent(15) = 2.564d0
+    DepreciationPercent(16) = 2.564d0
+    DepreciationPercent(17) = 2.564d0
+    DepreciationPercent(18) = 2.564d0
+    DepreciationPercent(19) = 2.564d0
+    DepreciationPercent(20) = 2.564d0
+    DepreciationPercent(21) = 2.564d0
+    DepreciationPercent(22) = 2.564d0
+    DepreciationPercent(23) = 2.564d0
+    DepreciationPercent(24) = 2.564d0
+    DepreciationPercent(25) = 2.564d0
+    DepreciationPercent(26) = 2.564d0
+    DepreciationPercent(27) = 2.564d0
+    DepreciationPercent(28) = 2.564d0
+    DepreciationPercent(29) = 2.564d0
+    DepreciationPercent(30) = 2.564d0
+    DepreciationPercent(31) = 2.564d0
+    DepreciationPercent(32) = 2.564d0
+    DepreciationPercent(33) = 2.564d0
+    DepreciationPercent(34) = 2.564d0
+    DepreciationPercent(35) = 2.564d0
+    DepreciationPercent(36) = 2.564d0
+    DepreciationPercent(37) = 2.564d0
+    DepreciationPercent(38) = 2.564d0
+    DepreciationPercent(39) = 2.564d0
+    DepreciationPercent(40) = 1.177d0
   CASE(depMethStraight40)  ! IRS Publication 946 for 2009 Table A-13 (June)
-    DepreciationPercent(1) = 1.354
-    DepreciationPercent(2) = 2.5
-    DepreciationPercent(3) = 2.5
-    DepreciationPercent(4) = 2.5
-    DepreciationPercent(5) = 2.5
-    DepreciationPercent(6) = 2.5
-    DepreciationPercent(7) = 2.5
-    DepreciationPercent(8) = 2.5
-    DepreciationPercent(9) = 2.5
-    DepreciationPercent(10) = 2.5
-    DepreciationPercent(11) = 2.5
-    DepreciationPercent(12) = 2.5
-    DepreciationPercent(13) = 2.5
-    DepreciationPercent(14) = 2.5
-    DepreciationPercent(15) = 2.5
-    DepreciationPercent(16) = 2.5
-    DepreciationPercent(17) = 2.5
-    DepreciationPercent(18) = 2.5
-    DepreciationPercent(19) = 2.5
-    DepreciationPercent(20) = 2.5
-    DepreciationPercent(21) = 2.5
-    DepreciationPercent(22) = 2.5
-    DepreciationPercent(23) = 2.5
-    DepreciationPercent(24) = 2.5
-    DepreciationPercent(25) = 2.5
-    DepreciationPercent(26) = 2.5
-    DepreciationPercent(27) = 2.5
-    DepreciationPercent(28) = 2.5
-    DepreciationPercent(29) = 2.5
-    DepreciationPercent(30) = 2.5
-    DepreciationPercent(31) = 2.5
-    DepreciationPercent(32) = 2.5
-    DepreciationPercent(33) = 2.5
-    DepreciationPercent(34) = 2.5
-    DepreciationPercent(35) = 2.5
-    DepreciationPercent(36) = 2.5
-    DepreciationPercent(37) = 2.5
-    DepreciationPercent(38) = 2.5
-    DepreciationPercent(39) = 2.5
-    DepreciationPercent(40) = 2.5
-    DepreciationPercent(41) = 1.146
+    DepreciationPercent(1) = 1.354d0
+    DepreciationPercent(2) = 2.5d0
+    DepreciationPercent(3) = 2.5d0
+    DepreciationPercent(4) = 2.5d0
+    DepreciationPercent(5) = 2.5d0
+    DepreciationPercent(6) = 2.5d0
+    DepreciationPercent(7) = 2.5d0
+    DepreciationPercent(8) = 2.5d0
+    DepreciationPercent(9) = 2.5d0
+    DepreciationPercent(10) = 2.5d0
+    DepreciationPercent(11) = 2.5d0
+    DepreciationPercent(12) = 2.5d0
+    DepreciationPercent(13) = 2.5d0
+    DepreciationPercent(14) = 2.5d0
+    DepreciationPercent(15) = 2.5d0
+    DepreciationPercent(16) = 2.5d0
+    DepreciationPercent(17) = 2.5d0
+    DepreciationPercent(18) = 2.5d0
+    DepreciationPercent(19) = 2.5d0
+    DepreciationPercent(20) = 2.5d0
+    DepreciationPercent(21) = 2.5d0
+    DepreciationPercent(22) = 2.5d0
+    DepreciationPercent(23) = 2.5d0
+    DepreciationPercent(24) = 2.5d0
+    DepreciationPercent(25) = 2.5d0
+    DepreciationPercent(26) = 2.5d0
+    DepreciationPercent(27) = 2.5d0
+    DepreciationPercent(28) = 2.5d0
+    DepreciationPercent(29) = 2.5d0
+    DepreciationPercent(30) = 2.5d0
+    DepreciationPercent(31) = 2.5d0
+    DepreciationPercent(32) = 2.5d0
+    DepreciationPercent(33) = 2.5d0
+    DepreciationPercent(34) = 2.5d0
+    DepreciationPercent(35) = 2.5d0
+    DepreciationPercent(36) = 2.5d0
+    DepreciationPercent(37) = 2.5d0
+    DepreciationPercent(38) = 2.5d0
+    DepreciationPercent(39) = 2.5d0
+    DepreciationPercent(40) = 2.5d0
+    DepreciationPercent(41) = 1.146d0
 END SELECT
 ! convert construction costs (not salvage) into depreciation
-DepreciatedCapital = 0.0 ! set all years to zero
+DepreciatedCapital = 0.0d0 ! set all years to zero
 DO iYear = 1, lengthStudyYears
   curCapital = CashFlow(costCatConstruction)%yrAmount(iYear) + CashFlow(costCatOtherCapital)%yrAmount(iYear)
   DO jYear = 1, SizeDepr
@@ -2424,7 +2428,8 @@ IF (LCCparamPresent) THEN
 !    columnHead(jObj) = CashFlow(jObj)%name
 !  END DO
 !  DO kMonth = 1,lengthStudyTotalMonths
-!    rowHead(kMonth) = MonthNames(1 + MOD((kMonth + baseDateMonth - 2),12)) // ' ' // IntToStr(baseDateYear + INT((kMonth - 1) / 12))
+!    rowHead(kMonth) = MonthNames(1 + MOD((kMonth + baseDateMonth - 2),12)) &
+!                      // ' ' // IntToStr(baseDateYear + INT((kMonth - 1) / 12))
 !  END DO
 !  DO kMonth = 1,lengthStudyTotalMonths
 !    DO jObj = 1,numCashFlow
@@ -2487,9 +2492,9 @@ IF (LCCparamPresent) THEN
   columnHead(3) = 'Cost'
   columnHead(4) = 'Present Value'
   columnHead(5) = 'Present Value Factor'
-  totalPV = 0.0
+  totalPV = 0.0d0
   rowHead(numRows + 1) = 'TOTAL'
-  DO jObj = 1,numRows
+  DO jObj = 1,(numRecurringCosts + numNonrecurringCost + numResourcesUsed)
     offset = countOfCostCat
     rowHead(jObj) = CashFlow(offset + jObj)%name
     SELECT CASE (CashFlow(offset + jObj)%Category)
@@ -2533,7 +2538,7 @@ IF (LCCparamPresent) THEN
     tableBody(jObj,3) = TRIM(RealToStr(CashFlow(offset + jObj)%orginalCost,2))
     tableBody(jObj,4) = TRIM(RealToStr(CashFlow(offset + jObj)%presentValue,2))
     totalPV = totalPV + CashFlow(offset + jObj)%presentValue
-    IF (CashFlow(offset + jObj)%orginalCost .NE. 0.0) THEN
+    IF (CashFlow(offset + jObj)%orginalCost .NE. 0.0d0) THEN
       tableBody(jObj,5) = TRIM(RealToStr(CashFlow(offset + jObj)%presentValue / CashFlow(offset + jObj)%orginalCost,4))
     ELSE
       tableBody(jObj,5) = '-'
@@ -2616,7 +2621,7 @@ IF (LCCparamPresent) THEN
   columnHead(1) = 'Total Cost'
   columnHead(2) = 'Present Value of Costs'
 
-  totalPV = 0.0
+  totalPV = 0.0d0
   DO iYear = 1,lengthStudyYears
     rowHead(iYear) = MonthNames(baseDateMonth) // ' ' // IntToStr(baseDateYear + iYear - 1)
     tableBody(iYear,1) = TRIM(RealToStr(CashFlow(costCatTotGrand)%yrAmount(iYear),2))
@@ -2640,7 +2645,7 @@ IF (LCCparamPresent) THEN
   !
   !---- After Tax Estimate
   !
-  IF (taxRate .NE. 0.0) THEN
+  IF (taxRate .NE. 0.0d0) THEN
     ALLOCATE(rowHead(lengthStudyYears + 1))
     ALLOCATE(columnHead(5))
     ALLOCATE(columnWidth(5))
@@ -2653,7 +2658,7 @@ IF (LCCparamPresent) THEN
     columnHead(4) = 'After Tax Cash Flow'
     columnHead(5) = 'After Tax Present Value'
 
-    totalPV = 0.0
+    totalPV = 0.0d0
     DO iYear = 1,lengthStudyYears
       rowHead(iYear) = MonthNames(baseDateMonth) // ' ' // IntToStr(baseDateYear + iYear - 1)
       tableBody(iYear,1) = TRIM(RealToStr(DepreciatedCapital(iYear),2))

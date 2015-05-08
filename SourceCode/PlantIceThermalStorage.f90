@@ -55,9 +55,9 @@ MODULE IceThermalStorage  ! Ice Storage Module
   INTEGER, PARAMETER :: ITSType_IceOnCoilInternal = 1
   INTEGER, PARAMETER :: ITSType_IceOnCoilExternal = 2
        ! Conversion parameter
-  REAL(r64), PARAMETER :: EpsLimitForX         = 0.0 !0.02  ! See Dion's code as eps1
-  REAL(r64), PARAMETER :: EpsLimitForDisCharge = 0.0 !0.20  ! See Dion's code as eps2
-  REAL(r64), PARAMETER :: EpsLimitForCharge    = 0.0 !0.20  ! See Dion's code as eps3
+  REAL(r64), PARAMETER :: EpsLimitForX         = 0.0d0 !0.02  ! See Dion's code as eps1
+  REAL(r64), PARAMETER :: EpsLimitForDisCharge = 0.0d0 !0.20  ! See Dion's code as eps2
+  REAL(r64), PARAMETER :: EpsLimitForCharge    = 0.0d0 !0.20  ! See Dion's code as eps3
 
       !variable used by simple model
   REAL(r64), PARAMETER :: Delta = 0.005d0
@@ -100,7 +100,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
     INTEGER                      :: ITSType_Num = 0 ! Storage Type as number (IceOnCoilInternal,IceOnCoilExternal)
     INTEGER                      :: MapNum   = 0    ! Number to Map structure
     INTEGER :: UratePtr             =0    ! Charging/Discharging SchedulePtr: u value schedule
-    REAL(r64)    :: ITSNomCap            =0.0  ! Design nominal capacity of Ice Thermal Storage [J] (user input in GJ)
+    REAL(r64)    :: ITSNomCap            =0.0d0  ! Design nominal capacity of Ice Thermal Storage [J] (user input in GJ)
     INTEGER :: PltInletNodeNum      =0    ! Node number on the inlet side of the plant
     INTEGER :: PltOutletNodeNum     =0     ! Node number on the outlet side of the plant
     !loop topology variables
@@ -116,7 +116,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
     CHARACTER(len=MaxNameLength) :: Name = ' '                  ! User identifier
     CHARACTER(len=MaxNameLength) :: ScheduleName = ' '          ! User identifier
     INTEGER                      :: ScheduleIndex = 0           ! Plant inlet node number for ice storage unit
-    REAL(r64)                    :: NomCapacity = 0.0           ! Design storage capacity of Ice Thermal Storage system [W-hr]
+    REAL(r64)                    :: NomCapacity = 0.0d0           ! Design storage capacity of Ice Thermal Storage system [W-hr]
                                                                 ! (User input for this parameter in GJ--need to convert to W-hr)
     INTEGER                      :: PlantInNodeNum = 0          ! Plant inlet node number for ice storage unit
     INTEGER                      :: PlantOutNodeNum = 0         ! Plant outlet node number for ice storage unit
@@ -132,32 +132,32 @@ MODULE IceThermalStorage  ! Ice Storage Module
     CHARACTER(len=MaxNameLength) :: ChargeCurveType = ' '       ! Type of charging equation entered by user (QuadraticLinear)
     CHARACTER(len=MaxNameLength) :: ChargeCurveName = ' '       ! Curve name for charging (used to find the curve index)
     INTEGER                      :: ChargeCurveNum = 0          ! Curve index for charging
-    REAL(r64)                    :: CurveFitTimeStep = 1.0      ! Time step used to generate performance data [hours]
-    REAL(r64)                    :: DischargeParaElecLoad = 0.0 ! Parasitic electric load duing discharging [dimensionless]
+    REAL(r64)                    :: CurveFitTimeStep = 1.0d0      ! Time step used to generate performance data [hours]
+    REAL(r64)                    :: DischargeParaElecLoad = 0.0d0 ! Parasitic electric load duing discharging [dimensionless]
                                                                 ! (This is multiplied by the tank capacity to obtain elec consump)
-    REAL(r64)                    :: ChargeParaElecLoad = 0.0    ! Parasitic electric load duing charging [dimensionless]
+    REAL(r64)                    :: ChargeParaElecLoad = 0.0d0    ! Parasitic electric load duing charging [dimensionless]
                                                                 ! (This is multiplied by the tank capacity to obtain elec consump)
-    REAL(r64)                    :: TankLossCoeff = 0.0         ! Fraction of total storage capacity lost per hour [1/hours]
-    REAL(r64)                    :: FreezingTemp = 0.0          ! Freezing/melting temperature of ice storage unit [C]
+    REAL(r64)                    :: TankLossCoeff = 0.0d0         ! Fraction of total storage capacity lost per hour [1/hours]
+    REAL(r64)                    :: FreezingTemp = 0.0d0          ! Freezing/melting temperature of ice storage unit [C]
           ! Reporting data
-    REAL(r64)                    :: CompLoad = 0.0              ! load requested by plant [W]
-    REAL(r64)                    :: IceFracChange = 0.0         ! Change in fraction of ice stored during the time step [fraction]
-    REAL(r64)                    :: IceFracRemaining = 1.0      ! Fraction of ice remaining in storage [fraction]
+    REAL(r64)                    :: CompLoad = 0.0d0              ! load requested by plant [W]
+    REAL(r64)                    :: IceFracChange = 0.0d0         ! Change in fraction of ice stored during the time step [fraction]
+    REAL(r64)                    :: IceFracRemaining = 1.0d0      ! Fraction of ice remaining in storage [fraction]
     CHARACTER(len=MaxNameLength) :: ThawProcessIndicator = ' '  ! User input determining whether system is inside or outside melt
     INTEGER                      :: ThawProcessIndex = 0        ! Conversion of thaw process indicator to integer index
     REAL(r64)                    :: IceFracOnCoil = 1.0d0       ! Fraction of ice on the coil (affects charging) [fraction]
-    REAL(r64)                    :: DischargingRate = 0.0       ! Rate at which energy is being added (thawing) to ice unit [W]
-    REAL(r64)                    :: DischargingEnergy = 0.0     ! Total energy added to the ice storage unit [J]
-    REAL(r64)                    :: ChargingRate = 0.0          ! Rate at which energy is removed (freezing) to ice unit [W]
-    REAL(r64)                    :: ChargingEnergy = 0.0        ! Total energy removed from ice storage unit [J]
-    REAL(r64)                    :: MassFlowRate = 0.0          ! Total mass flow rate to component [kg/s]
-    REAL(r64)                    :: BypassMassFlowRate = 0.0    ! Mass flow rate that bypasses the ice unit locally [kg/s]
-    REAL(r64)                    :: TankMassFlowRate = 0.0      ! Mass flow rate through the ice storage unit [kg/s]
-    REAL(r64)                    :: InletTemp = 0.0             ! Component inlet temperature (same as bypass temperature) [C]
-    REAL(r64)                    :: OutletTemp = 0.0            ! Component outlet temperature (blended) [C]
-    REAL(r64)                    :: TankOutletTemp = 0.0        ! Ice storage unit outlet temperature [C]
-    REAL(r64)                    :: ParasiticElecRate = 0.0     ! Parasitic electrical energy rate consumed by ice storage [W]
-    REAL(r64)                    :: ParasiticElecEnergy = 0.0   ! Total parasitic electrical energy consumed by ice storage [J]
+    REAL(r64)                    :: DischargingRate = 0.0d0       ! Rate at which energy is being added (thawing) to ice unit [W]
+    REAL(r64)                    :: DischargingEnergy = 0.0d0     ! Total energy added to the ice storage unit [J]
+    REAL(r64)                    :: ChargingRate = 0.0d0          ! Rate at which energy is removed (freezing) to ice unit [W]
+    REAL(r64)                    :: ChargingEnergy = 0.0d0        ! Total energy removed from ice storage unit [J]
+    REAL(r64)                    :: MassFlowRate = 0.0d0          ! Total mass flow rate to component [kg/s]
+    REAL(r64)                    :: BypassMassFlowRate = 0.0d0    ! Mass flow rate that bypasses the ice unit locally [kg/s]
+    REAL(r64)                    :: TankMassFlowRate = 0.0d0      ! Mass flow rate through the ice storage unit [kg/s]
+    REAL(r64)                    :: InletTemp = 0.0d0             ! Component inlet temperature (same as bypass temperature) [C]
+    REAL(r64)                    :: OutletTemp = 0.0d0            ! Component outlet temperature (blended) [C]
+    REAL(r64)                    :: TankOutletTemp = 0.0d0        ! Ice storage unit outlet temperature [C]
+    REAL(r64)                    :: ParasiticElecRate = 0.0d0     ! Parasitic electrical energy rate consumed by ice storage [W]
+    REAL(r64)                    :: ParasiticElecEnergy = 0.0d0   ! Total parasitic electrical energy consumed by ice storage [J]
     INTEGER                      :: DischargeIterErrors = 0     ! Number of max iterations exceeded errors during discharging
     INTEGER                      :: DischargeErrorCount = 0     ! Index for error counting routine
     INTEGER                      :: ChargeIterErrors = 0        ! Number of max iterations exceeded errors during charging
@@ -165,17 +165,17 @@ MODULE IceThermalStorage  ! Ice Storage Module
   END TYPE DetailedIceStorageData
 
   TYPE ReportVars
-    REAL(r64)    :: MyLoad           =0.0 ! load requested by plant [W]
-    REAL(r64)    :: U                =0.0  ! [fraction]
-    REAL(r64)    :: Urate            =0.0  ! [fraction]
-    REAL(r64)    :: IceFracRemain    =0.0  ! Fraction of ice remaining in storage [fraction]
-    REAL(r64)    :: ITSCoolingRate   =0.0  ! [W]
-    REAL(r64)    :: ITSCoolingEnergy =0.0  ! [J]
-    REAL(r64)    :: ITSChargingRate  =0.0  ! [W]
-    REAL(r64)    :: ITSChargingEnergy=0.0  ! [J]
-    REAL(r64)    :: ITSmdot          =0.0  ! [kg/s]
-    REAL(r64)    :: ITSInletTemp     =0.0  ! [C]
-    REAL(r64)    :: ITSOutletTemp    =0.0  ! [C]
+    REAL(r64)    :: MyLoad           =0.0d0 ! load requested by plant [W]
+    REAL(r64)    :: U                =0.0d0  ! [fraction]
+    REAL(r64)    :: Urate            =0.0d0  ! [fraction]
+    REAL(r64)    :: IceFracRemain    =0.0d0  ! Fraction of ice remaining in storage [fraction]
+    REAL(r64)    :: ITSCoolingRate   =0.0d0  ! [W]
+    REAL(r64)    :: ITSCoolingEnergy =0.0d0  ! [J]
+    REAL(r64)    :: ITSChargingRate  =0.0d0  ! [W]
+    REAL(r64)    :: ITSChargingEnergy=0.0d0  ! [J]
+    REAL(r64)    :: ITSmdot          =0.0d0  ! [kg/s]
+    REAL(r64)    :: ITSInletTemp     =0.0d0  ! [C]
+    REAL(r64)    :: ITSOutletTemp    =0.0d0  ! [C]
   END TYPE ReportVars
 
  ! TYPE (ITSSetCapData), SAVE                   :: ITSSetCap=ITSSetCapData(.false.,0,0,0)
@@ -189,7 +189,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
   LOGICAL :: ResetXForITSFlag =.false.
 
        ! Input data
-  REAL(r64)    :: ITSNomCap        =0.0 ! Design nominal capacity of Ice Thermal Storage [J] (user input in GJ)
+  REAL(r64)    :: ITSNomCap        =0.0d0 ! Design nominal capacity of Ice Thermal Storage [J] (user input in GJ)
   INTEGER :: InletNodeNum     =0   ! Node number on the inlet side of the plant
   INTEGER :: OutletNodeNum    =0   ! Node number on the inlet side of the plant
 
@@ -200,21 +200,21 @@ MODULE IceThermalStorage  ! Ice Storage Module
   INTEGER :: NumDetIceStorages = 0
   INTEGER :: TotalIceStorages = 0
        ! ITS UAice and HLoss
-  REAL(r64)    :: UAIceCh       =0.0     ! Charging Ice Thermal Storage overall heat transfer coefficient [W/C]
-  REAL(r64)    :: UAIceDisCh    =0.0     ! Discharging Ice Thermal Storage overall heat transfer coefficient [W/C]
-  REAL(r64)    :: HLoss         =0.0     ! ITS Heat Loss
+  REAL(r64)    :: UAIceCh       =0.0d0     ! Charging Ice Thermal Storage overall heat transfer coefficient [W/C]
+  REAL(r64)    :: UAIceDisCh    =0.0d0     ! Discharging Ice Thermal Storage overall heat transfer coefficient [W/C]
+  REAL(r64)    :: HLoss         =0.0d0     ! ITS Heat Loss
        ! ITS State
-  REAL(r64)    :: XCurIceFrac   =0.0     ! Current Fraction of Ice Thermal Storage remaining [fraction]
-  REAL(r64)    :: U             =0.0     ! Adjusted input U after reading U Schedule [fraction]
-  REAL(r64)    :: Urate   =0.0 ! Final Urate adjusted Urate based on Error protection (I) [fraction] by HOUR
+  REAL(r64)    :: XCurIceFrac   =0.0d0     ! Current Fraction of Ice Thermal Storage remaining [fraction]
+  REAL(r64)    :: U             =0.0d0     ! Adjusted input U after reading U Schedule [fraction]
+  REAL(r64)    :: Urate   =0.0d0 ! Final Urate adjusted Urate based on Error protection (I) [fraction] by HOUR
        ! ITS status information
-  REAL(r64)    :: ITSMassFlowRate =0.0       ! ITS water mass flow rate [kg/s]
-  REAL(r64)    :: ITSInletTemp    =0.0       ! ITS inlet water temperature [C]
-  REAL(r64)    :: ITSOutletTemp   =0.0       ! ITS outlet water temperature [C]
-  REAL(r64)    :: ITSOutletSetPointTemp =0.0 ! ITS outlet water temperature setpoint [C]
-  REAL(r64)    :: ITSCoolingRate  =0.0       ! ITS Discharge(-)/Charge(+) rate [W]
-  REAL(r64)    :: ITSCoolingEnergy=0.0
-  REAL(r64)    :: ChillerOutletTemp=0.0     ! Chiller outlet brine temperature [C]
+  REAL(r64)    :: ITSMassFlowRate =0.0d0       ! ITS water mass flow rate [kg/s]
+  REAL(r64)    :: ITSInletTemp    =0.0d0       ! ITS inlet water temperature [C]
+  REAL(r64)    :: ITSOutletTemp   =0.0d0       ! ITS outlet water temperature [C]
+  REAL(r64)    :: ITSOutletSetPointTemp =0.0d0 ! ITS outlet water temperature setpoint [C]
+  REAL(r64)    :: ITSCoolingRate  =0.0d0       ! ITS Discharge(-)/Charge(+) rate [W]
+  REAL(r64)    :: ITSCoolingEnergy=0.0d0
+  REAL(r64)    :: ChillerOutletTemp=0.0d0     ! Chiller outlet brine temperature [C]
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE
@@ -410,13 +410,13 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
       !***** Dormant Process for ITS *****************************************
       !************************************************************************
 !        IF( U .EQ. 0.0 ) THEN
-      IF(( MyLoad2 .EQ. 0.0) .OR. (DemandMdot .EQ. 0.0)) THEN
+      IF(( MyLoad2 .EQ. 0.0d0) .OR. (DemandMdot .EQ. 0.0d0)) THEN
         CALL CalcIceStorageDormant(IceStorageType_Simple,IceNum)
 
       !***** Charging Process for ITS *****************************************
       !************************************************************************
 !        ELSE IF( U .GT. 0.0 ) THEN
-      ELSE IF( MyLoad2 .LT. 0.0 ) THEN
+      ELSE IF( MyLoad2 .LT. 0.0d0 ) THEN
 
 !             Call CalcIceStorageCapacity from here - MJW - 19 Sep 2005
         CALL CalcIceStorageCapacity(IceStorageType_Simple,MaxCap,MinCap,OptCap)
@@ -426,7 +426,7 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
       !***** Discharging Process for ITS *****************************************
       !************************************************************************
 !        ELSE IF( U .LT. 0.0 ) THEN
-      ELSE IF( MyLoad2 .GT. 0.0 ) THEN
+      ELSE IF( MyLoad2 .GT. 0.0d0 ) THEN
 !             Call CalcIceStorageCapacity from here - MJW - 19 Sep 2005
         CALL CalcIceStorageCapacity(IceStorageType_Simple,MaxCap,MinCap,OptCap)
 
@@ -585,7 +585,7 @@ SUBROUTINE SimDetailedIceStorage
     DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
     DetIceStor(IceNum)%MassFlowRate       = mdot
 
-  ELSEIF (LocalLoad < 0.0) THEN
+  ELSEIF (LocalLoad < 0.0d0) THEN
           ! The load is less than zero so we should be charging
           ! Before we do anything, we should check to make sure that we will actually be charging the unit
 
@@ -730,7 +730,7 @@ SUBROUTINE SimDetailedIceStorage
 
     END IF
 
-  ELSEIF (LocalLoad > 0.0) THEN
+  ELSEIF (LocalLoad > 0.0d0) THEN
           ! The load is greater than zero so we should be discharging
           ! Before we do anything, we should check to make sure that we will actually be discharging the unit
 
@@ -858,7 +858,7 @@ SUBROUTINE SimDetailedIceStorage
         IF (ToutNew >= TempSetPt) THEN
           DetIceStor(IceNum)%OutletTemp         = ToutNew
           DetIceStor(IceNum)%TankOutletTemp     = ToutNew
-          DetIceStor(IceNum)%BypassMassFlowRate = 0.0
+          DetIceStor(IceNum)%BypassMassFlowRate = 0.0d0
           DetIceStor(IceNum)%TankMassFlowRate   = DetIceStor(IceNum)%MassFlowRate
           DetIceStor(IceNum)%CompLoad           = DetIceStor(IceNum)%MassFlowRate * Cp * ABS(TempIn - ToutNew)
         ELSE
@@ -982,7 +982,7 @@ SUBROUTINE GetIceStorageInput
 
     ! Get and Verify ITS nominal Capacity (user input is in GJ, internal value in in J)
     IceStorage(IceNum)%ITSNomCap = rNumericArgs(1)*1.d+09
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       ErrorsFound=.true.
@@ -1002,17 +1002,17 @@ SUBROUTINE GetIceStorageInput
     CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(3),cAlphaArgs(4),'Chilled Water Nodes')
 
          ! Initialize Report Variables
-    IceStorageReport(IceNum)%MyLoad = 0.0
-    IceStorageReport(IceNum)%U = 0.0
-    IceStorageReport(IceNum)%Urate            = 0.0
-    IceStorageReport(IceNum)%IceFracRemain    = 1.0
-    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0
-    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSChargingRate   = 0.0
-    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSmdot          = 0.0
-    IceStorageReport(IceNum)%ITSInletTemp     = 0.0
-    IceStorageReport(IceNum)%ITSOutletTemp    = 0.0
+    IceStorageReport(IceNum)%MyLoad = 0.0d0
+    IceStorageReport(IceNum)%U = 0.0d0
+    IceStorageReport(IceNum)%Urate            = 0.0d0
+    IceStorageReport(IceNum)%IceFracRemain    = 1.0d0
+    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSmdot          = 0.0d0
+    IceStorageReport(IceNum)%ITSInletTemp     = 0.0d0
+    IceStorageReport(IceNum)%ITSOutletTemp    = 0.0d0
 
   END DO  ! IceNum
 
@@ -1097,7 +1097,7 @@ SUBROUTINE GetIceStorageInput
           ! Convert J to W-hr by dividing by number of seconds in an hour (3600)
     DetIceStor(IceNum)%NomCapacity = rNumericArgs(1)*(1.d+09)/(SecInHour)
 
-    IF (rNumericArgs(1) <= 0.0) THEN
+    IF (rNumericArgs(1) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
@@ -1150,7 +1150,7 @@ SUBROUTINE GetIceStorageInput
     END IF
 
     DetIceStor(IceNum)%CurveFitTimeStep = rNumericArgs(2)
-    IF ( (DetIceStor(IceNum)%CurveFitTimeStep <= 0.0) .OR. (DetIceStor(IceNum)%CurveFitTimeStep > 1.0) ) THEN
+    IF ( (DetIceStor(IceNum)%CurveFitTimeStep <= 0.0d0) .OR. (DetIceStor(IceNum)%CurveFitTimeStep > 1.0d0) ) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Curve fit time step invalid, less than zero or greater than 1 for ' &
@@ -1178,28 +1178,28 @@ SUBROUTINE GetIceStorageInput
     DetIceStor(IceNum)%TankLossCoeff         = rNumericArgs(5)
     DetIceStor(IceNum)%FreezingTemp          = rNumericArgs(6)
 
-    IF ( (DetIceStor(IceNum)%DischargeParaElecLoad < 0.0) .OR. (DetIceStor(IceNum)%DischargeParaElecLoad > 1.0) ) THEN
+    IF ( (DetIceStor(IceNum)%DischargeParaElecLoad < 0.0d0) .OR. (DetIceStor(IceNum)%DischargeParaElecLoad > 1.0d0) ) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(3))//'='//TRIM(RoundSigDigits(rNumericArgs(3),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value is either less than/equal to zero or greater than 1')
       ErrorsFound = .TRUE.
     END IF
 
-    IF ( (DetIceStor(IceNum)%ChargeParaElecLoad < 0.0) .OR. (DetIceStor(IceNum)%ChargeParaElecLoad > 1.0) ) THEN
+    IF ( (DetIceStor(IceNum)%ChargeParaElecLoad < 0.0d0) .OR. (DetIceStor(IceNum)%ChargeParaElecLoad > 1.0d0) ) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(4))//'='//TRIM(RoundSigDigits(rNumericArgs(4),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value is either less than/equal to zero or greater than 1')
       ErrorsFound = .TRUE.
     END IF
 
-    IF ( (DetIceStor(IceNum)%TankLossCoeff < 0.0) .OR. (DetIceStor(IceNum)%TankLossCoeff > 0.1) ) THEN
+    IF ( (DetIceStor(IceNum)%TankLossCoeff < 0.0d0) .OR. (DetIceStor(IceNum)%TankLossCoeff > 0.1d0) ) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(5))//'='//TRIM(RoundSigDigits(rNumericArgs(5),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value is either less than/equal to zero or greater than 0.1 (10%)')
       ErrorsFound = .TRUE.
     END IF
 
-    IF ( (DetIceStor(IceNum)%FreezingTemp < -10.0) .OR. (DetIceStor(IceNum)%FreezingTemp > 10.0) ) THEN
+    IF ( (DetIceStor(IceNum)%FreezingTemp < -10.0d0) .OR. (DetIceStor(IceNum)%FreezingTemp > 10.0d0) ) THEN
       CALL ShowWarningError('Potentially invalid '//TRIM(cNumericFieldNames(6))//'='//TRIM(RoundSigDigits(rNumericArgs(6),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value is either less than -10.0C or greater than 10.0C')
@@ -1207,22 +1207,22 @@ SUBROUTINE GetIceStorageInput
     END IF
 
           ! Initialize Report Variables
-    DetIceStor(IceNum)%CompLoad            = 0.0
+    DetIceStor(IceNum)%CompLoad            = 0.0d0
     DetIceStor(IceNum)%IceFracChange       = 0.0d0
     DetIceStor(IceNum)%IceFracRemaining    = 1.0d0
     DetIceStor(IceNum)%IceFracOnCoil       = 1.0d0
-    DetIceStor(IceNum)%DischargingRate     = 0.0
-    DetIceStor(IceNum)%DischargingEnergy   = 0.0
-    DetIceStor(IceNum)%ChargingRate        = 0.0
-    DetIceStor(IceNum)%ChargingEnergy      = 0.0
-    DetIceStor(IceNum)%MassFlowRate        = 0.0
-    DetIceStor(IceNum)%BypassMassFlowRate  = 0.0
-    DetIceStor(IceNum)%TankMassFlowRate    = 0.0
-    DetIceStor(IceNum)%InletTemp           = 0.0
-    DetIceStor(IceNum)%OutletTemp          = 0.0
-    DetIceStor(IceNum)%TankOutletTemp      = 0.0
-    DetIceStor(IceNum)%ParasiticElecRate   = 0.0
-    DetIceStor(IceNum)%ParasiticElecEnergy = 0.0
+    DetIceStor(IceNum)%DischargingRate     = 0.0d0
+    DetIceStor(IceNum)%DischargingEnergy   = 0.0d0
+    DetIceStor(IceNum)%ChargingRate        = 0.0d0
+    DetIceStor(IceNum)%ChargingEnergy      = 0.0d0
+    DetIceStor(IceNum)%MassFlowRate        = 0.0d0
+    DetIceStor(IceNum)%BypassMassFlowRate  = 0.0d0
+    DetIceStor(IceNum)%TankMassFlowRate    = 0.0d0
+    DetIceStor(IceNum)%InletTemp           = 0.0d0
+    DetIceStor(IceNum)%OutletTemp          = 0.0d0
+    DetIceStor(IceNum)%TankOutletTemp      = 0.0d0
+    DetIceStor(IceNum)%ParasiticElecRate   = 0.0d0
+    DetIceStor(IceNum)%ParasiticElecEnergy = 0.0d0
 
   END DO  ! ...over detailed ice storage units
 
@@ -1357,9 +1357,9 @@ SUBROUTINE InitDetailedIceStorage
     DetIceStor(IceNum)%IceFracChange       = 0.0d0
     DetIceStor(IceNum)%IceFracRemaining    = 1.0d0
     DetIceStor(IceNum)%IceFracOnCoil       = 1.0d0
-    DetIceStor(IceNum)%InletTemp           = 0.0
-    DetIceStor(IceNum)%OutletTemp          = 0.0
-    DetIceStor(IceNum)%TankOutletTemp      = 0.0
+    DetIceStor(IceNum)%InletTemp           = 0.0d0
+    DetIceStor(IceNum)%OutletTemp          = 0.0d0
+    DetIceStor(IceNum)%TankOutletTemp      = 0.0d0
     DetIceStor(IceNum)%DischargeIterErrors = 0
     DetIceStor(IceNum)%ChargeIterErrors    = 0
     DetIceStor(IceNum)%DesignMassFlowRate  = PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%MaxMassFlowRate
@@ -1389,17 +1389,17 @@ SUBROUTINE InitDetailedIceStorage
 
           ! Initializations that are done every iteration
           ! Make sure all of the reporting variables are always reset at the start of any iteration
-  DetIceStor(IceNum)%CompLoad            = 0.0
+  DetIceStor(IceNum)%CompLoad            = 0.0d0
   DetIceStor(IceNum)%IceFracChange       = 0.0d0
-  DetIceStor(IceNum)%DischargingRate     = 0.0
-  DetIceStor(IceNum)%DischargingEnergy   = 0.0
-  DetIceStor(IceNum)%ChargingRate        = 0.0
-  DetIceStor(IceNum)%ChargingEnergy      = 0.0
-  DetIceStor(IceNum)%MassFlowRate        = 0.0
-  DetIceStor(IceNum)%BypassMassFlowRate  = 0.0
-  DetIceStor(IceNum)%TankMassFlowRate    = 0.0
-  DetIceStor(IceNum)%ParasiticElecRate   = 0.0
-  DetIceStor(IceNum)%ParasiticElecEnergy = 0.0
+  DetIceStor(IceNum)%DischargingRate     = 0.0d0
+  DetIceStor(IceNum)%DischargingEnergy   = 0.0d0
+  DetIceStor(IceNum)%ChargingRate        = 0.0d0
+  DetIceStor(IceNum)%ChargingEnergy      = 0.0d0
+  DetIceStor(IceNum)%MassFlowRate        = 0.0d0
+  DetIceStor(IceNum)%BypassMassFlowRate  = 0.0d0
+  DetIceStor(IceNum)%TankMassFlowRate    = 0.0d0
+  DetIceStor(IceNum)%ParasiticElecRate   = 0.0d0
+  DetIceStor(IceNum)%ParasiticElecEnergy = 0.0d0
 
   RETURN
 
@@ -1495,17 +1495,17 @@ SUBROUTINE InitSimpleIceStorage
       ENDDO
 
     ENDIF
-    IceStorageReport(IceNum)%MyLoad = 0.0
-    IceStorageReport(IceNum)%U = 0.0
-    IceStorageReport(IceNum)%Urate            = 0.0
-    IceStorageReport(IceNum)%IceFracRemain    = 1.0
-    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0
-    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSChargingRate   = 0.0
-    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSmdot          = 0.0
-    IceStorageReport(IceNum)%ITSInletTemp     = 0.0
-    IceStorageReport(IceNum)%ITSOutletTemp    = 0.0
+    IceStorageReport(IceNum)%MyLoad = 0.0d0
+    IceStorageReport(IceNum)%U = 0.0d0
+    IceStorageReport(IceNum)%Urate            = 0.0d0
+    IceStorageReport(IceNum)%IceFracRemain    = 1.0d0
+    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSmdot          = 0.0d0
+    IceStorageReport(IceNum)%ITSInletTemp     = 0.0d0
+    IceStorageReport(IceNum)%ITSOutletTemp    = 0.0d0
 
     MyEnvrnFlag(IceNum) = .FALSE.
   ENDIF
@@ -1571,21 +1571,21 @@ CASE(IceStorageType_Simple)
   !------------------------------------------------------------------------
 
        ! Initialize Capacity
-  MaxCap = 0.0
-  MinCap = 0.0
-  OptCap = 0.0
+  MaxCap = 0.0d0
+  MinCap = 0.0d0
+  OptCap = 0.0d0
 
        ! Initialize processed Usys values
-  Umax = 0.0
-  Umin = 0.0
-  Uact = 0.0
+  Umax = 0.0d0
+  Umin = 0.0d0
+  Uact = 0.0d0
 
        ! XCurIceFrac is reset to 1.0 when first hour of day.
        ! Starting full is assumed, because most ice systems are fully charged overnight
   IF(ResetXForITSFlag) THEN
-    XCurIceFrac = 1.0
-    IceStorageReport(IceNum)%IceFracRemain = 1.0
-    Urate = 0.0
+    XCurIceFrac = 1.0d0
+    IceStorageReport(IceNum)%IceFracRemain = 1.0d0
+    Urate = 0.0d0
     ResetXForITSFlag = .FALSE.
   END IF
 
@@ -1598,7 +1598,7 @@ CASE(IceStorageType_Simple)
   CALL CalcQiceDischageMax(QiceMin)
 
          ! Check Umax and Umin to verify the input U value.
-  Umax = 0.0
+  Umax = 0.0d0
          ! At the first call of ITS model, MyLoad is 0. After that proper MyLoad will be provided by E+.
          ! Therefore, Umin is decided between input U and ITS REAL(r64) capacity.
   Umin = MIN( MAX( (-(1.0d0-EpsLimitForDisCharge)*QiceMin*TimeInterval/ITSNomCap), (-XCurIceFrac+EpsLimitForX) ), 0.0d0 )
@@ -1607,7 +1607,7 @@ CASE(IceStorageType_Simple)
   Uact = Umin
   ITSCoolingRateMax = ABS(Uact*ITSNomCap/TimeInterval)
   ITSCoolingRateOpt = ITSCoolingRateMax
-  ITSCoolingRateMin = 0.0
+  ITSCoolingRateMin = 0.0d0
 
        ! Define MaxCap, OptCap, and MinCap
   MaxCap = ITSCoolingRateMax
@@ -1661,9 +1661,9 @@ SELECT CASE (IceStorageType)   !by ZG
 CASE(IceStorageType_Simple)   !by ZG
 
        ! Initialize processed Usys values
-  Umax = 0.0
-  Umin = 0.0
-  Uact = 0.0
+  Umax = 0.0d0
+  Umin = 0.0d0
+  Uact = 0.0d0
 
        ! Provide output results for ITS.
   ITSMassFlowRate  = 0.d0                        ![kg/s]
@@ -1684,10 +1684,10 @@ CASE(IceStorageType_Simple)   !by ZG
   CASE (DualSetPointDeadBand)
     ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPointHi
   END SELECT
-  ITSCoolingRate   = 0.0                      ![W]
-  ITSCoolingEnergy = 0.0                      ![J]
+  ITSCoolingRate   = 0.0d0                      ![W]
+  ITSCoolingEnergy = 0.0d0                      ![J]
 
-  Urate = 0.0  ![n/a]
+  Urate = 0.0d0  ![n/a]
 
 CASE DEFAULT
 
@@ -1767,14 +1767,14 @@ CASE(IceStorageType_Simple)
   CASE (DualSetPointDeadBand)
     ITSOutletSetPointTemp  = Node(OutletNodeNum)%TempSetPointHi
   END SELECT
-  ITSCoolingRate   = 0.0                      ![W]
-  ITSCoolingEnergy = 0.0                      ![J]
+  ITSCoolingRate   = 0.0d0                      ![W]
+  ITSCoolingEnergy = 0.0d0                      ![J]
 
        ! Initialize processed U values
-  Umax = 0.0
-  Umin = 0.0
-  Uact = 0.0
-  Urate = 0.0
+  Umax = 0.0d0
+  Umin = 0.0d0
+  Uact = 0.0d0
+  Urate = 0.0d0
 
        ! Calculate QiceMax which is REAL(r64) ITS capacity.
        ! There are three possible to calculate QiceMax
@@ -1798,7 +1798,7 @@ CASE(IceStorageType_Simple)
   ! Calculate Umin,Umax,Uact
   !--------------------------------------------------------
        ! Set Umin
-  Umin = 0.0
+  Umin = 0.0d0
        ! Calculate Umax based on real ITS Max Capacity and remained XCurIceFrac.
        ! Umax should be equal or larger than 0.02 for realistic purpose by Dion.
   Umax = MAX( MIN( ((1.0d0-EpsLimitForCharge)*QiceMax*TimeInterval/ITSNomCap), (1.0d0-XCurIceFrac-EpsLimitForX) ), 0.0d0 )
@@ -1807,8 +1807,8 @@ CASE(IceStorageType_Simple)
   Umax = MIN(Umax,(1.d0-IceStorageReport(IceNum)%IceFracRemain)/TimeStepSys)
        ! First, check input U value.
        ! Based on Umax and Umin, if necessary to run E+, calculate proper Uact.
-  IF( Umax == 0.0 ) THEN  !(No Capacity of ITS), ITS is OFF.
-    Uact = 0.0
+  IF( Umax == 0.0d0 ) THEN  !(No Capacity of ITS), ITS is OFF.
+    Uact = 0.0d0
 
   ELSE  ! Umax non-zero
     Uact = Umax
@@ -1820,8 +1820,8 @@ CASE(IceStorageType_Simple)
        ! Calculate possible ITSChargingRate with Uact
   Qice = Uact*ITSNomCap/TimeInterval  ![W]
        ! If Qice is equal or less than 0.0, no need to calculate anymore.
-  IF( Qice <= 0.0 ) THEN
-    Urate               = 0.0                ![ratio]
+  IF( Qice <= 0.0d0 ) THEN
+    Urate               = 0.0d0                ![ratio]
   END IF
 
   !--------------------------------------------------------
@@ -1831,11 +1831,11 @@ CASE(IceStorageType_Simple)
   ChillerOutletTemp = Node(IceStorage(IceNum)%PltInletNodeNum)%Temp
 
         ! Calculate leaving water temperature
-  IF((Qice .LE. 0.0) .OR. (XCurIceFrac .GE. 1.0)) THEN
+  IF((Qice .LE. 0.0d0) .OR. (XCurIceFrac .GE. 1.0d0)) THEN
     ITSOutletTemp = ITSInletTemp
-    DeltaTemp     = 0.0
-    Qice          = 0.0
-    Uact          = 0.0
+    DeltaTemp     = 0.0d0
+    Qice          = 0.0d0
+    Uact          = 0.0d0
   ELSE
     DeltaTemp = Qice/CPCW(ITSInletTemp)/ITSMassFlowRate
     ITSOutletTemp = ITSInletTemp + DeltaTemp
@@ -1897,8 +1897,8 @@ SUBROUTINE CalcQiceChargeMaxByChiller(IceNum,QiceMaxByChiller)
   QiceMaxByChiller = UAiceCh*( FreezTemp-TchillerOut )  ![W] = [W/degC]*[degC]
 
        ! If it happened, it is occurred at the Discharing or Dormant process.
-  IF( QiceMaxByChiller <= 0.0 ) THEN
-    QiceMaxByChiller = 0.0
+  IF( QiceMaxByChiller <= 0.0d0 ) THEN
+    QiceMaxByChiller = 0.0d0
   END IF
 
 RETURN
@@ -1947,7 +1947,7 @@ SUBROUTINE CalcQiceChargeMaxByITS(IceNum,ChillerOutletTemp,QiceMaxByITS)
        ! Chiller outlet temp must be below freeze temp, or else no charge
   IF (ChOutletTemp .GE. Tfr) THEN
     ChillerInletTemp = ChOutletTemp
-    QiceMaxByITS     = 0.0
+    QiceMaxByITS     = 0.0d0
   ELSE
        ! Make ChillerInletTemp as almost same as ChillerOutletTemp(input data)
     ChillerInletTemp = ChOutletTemp + 0.01
@@ -1958,9 +1958,9 @@ SUBROUTINE CalcQiceChargeMaxByITS(IceNum,ChillerOutletTemp,QiceMaxByITS)
 
     LogTerm      = (Tfr - ChOutletTemp) / (Tfr - ChillerInletTemp)
        ! Need to protect this from LogTerm <= 0 - not sure what it should do then
-    IF (LogTerm <= 0.0) THEN
+    IF (LogTerm <= 0.0d0) THEN
       ChillerInletTemp = ChOutletTemp
-      QiceMaxByITS     = 0.0
+      QiceMaxByITS     = 0.0d0
     ENDIF
     QiceMaxByITS = UAiceCh * ( TempIPtoSI(ChillerInletTemp) - TempIPtoSI(ChOutletTemp) ) / LOG(LogTerm)
   ENDIF
@@ -2012,13 +2012,13 @@ SUBROUTINE CalcIceStorageDischarge(IceStorageType,IceNum,MyLoad,Runflag,FirstIte
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
        ! External function
        ! Local
-  REAL(r64)    :: Umax      =0.0     ! Max Urate adjusted Urate based on Error protection (I) [fraction]
-  REAL(r64)    :: Umin      =0.0     ! Min Urate adjusted Urate based on Error protection (I) [fraction]
-  REAL(r64)    :: Uact      =0.0     ! Acting between Usys and UsysLow Urate adjusted Urate based on Error protection (I) [fraction]
-  REAL(r64)    :: Umyload   =0.0
+  REAL(r64)    :: Umax      =0.0d0     ! Max Urate adjusted Urate based on Error protection (I) [fraction]
+  REAL(r64)    :: Umin      =0.0d0     ! Min Urate adjusted Urate based on Error protection (I) [fraction]
+  REAL(r64)    :: Uact      =0.0d0     ! Acting between Usys and UsysLow Urate adjusted Urate based on Error protection (I) [fraction]
+  REAL(r64)    :: Umyload   =0.0d0
 ! unused  REAL(r64)    :: QiceMin
-  REAL(r64)    :: Qice      =0.0
-  REAL(r64)    :: DeltaTemp =0.0
+  REAL(r64)    :: Qice      =0.0d0
+  REAL(r64)    :: DeltaTemp =0.0d0
 
 
   INTEGER :: LoopNum
@@ -2032,9 +2032,9 @@ SELECT CASE (IceStorageType)
 CASE(IceStorageType_Simple)
 
        ! Initialize processed Rate and Energy
-  ITSMassFlowRate  = 0.0
-  ITSCoolingRate   = 0.0
-  ITSCoolingEnergy = 0.0
+  ITSMassFlowRate  = 0.0d0
+  ITSCoolingRate   = 0.0d0
+  ITSCoolingEnergy = 0.0d0
 
   SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
   CASE (SingleSetPoint)
@@ -2044,19 +2044,19 @@ CASE(IceStorageType_Simple)
   END SELECT
 
        ! Initialize processed U values
-  Umax = 0.0
-  Umin = 0.0
-  Uact = 0.0
-  Umyload = 0.0
-  Urate   = 0.0
+  Umax = 0.0d0
+  Umin = 0.0d0
+  Uact = 0.0d0
+  Umyload = 0.0d0
+  Urate   = 0.0d0
 
        ! If no component demand or ITS OFF, then RETURN.
   IF( MyLoad == 0 .OR. .NOT.RunFlag ) THEN
-    ITSMassFlowRate  = 0.0
+    ITSMassFlowRate  = 0.0d0
     ITSInletTemp     = Node(InletNodeNum)%Temp
     ITSOutletTemp    = ITSInletTemp
-    ITSCoolingRate   = 0.0
-    ITSCoolingEnergy = 0.0
+    ITSCoolingRate   = 0.0d0
+    ITSCoolingEnergy = 0.0d0
     RETURN
   END IF
 
@@ -2104,11 +2104,11 @@ CASE(IceStorageType_Simple)
   Qice = MAX(Qice, -MaxCap)
 
         ! Calculate leaving water temperature
-  IF((Qice .GE. 0.0) .OR. (XCurIceFrac .LE. 0.0)) THEN
+  IF((Qice .GE. 0.0d0) .OR. (XCurIceFrac .LE. 0.0d0)) THEN
     ITSOutletTemp = ITSInletTemp
-    DeltaTemp     = 0.0
-    Qice          = 0.0
-    Uact          = 0.0
+    DeltaTemp     = 0.0d0
+    Qice          = 0.0d0
+    Uact          = 0.0d0
   ELSE
     DeltaTemp = Qice/CpFluid/ITSMassFlowRate
     ITSOutletTemp = ITSInletTemp + DeltaTemp
@@ -2181,7 +2181,7 @@ SUBROUTINE CalcQiceDischageMax(QiceMin)
     LogTerm       = (ITSInletTemp - FreezTemp) / (ITSOutletTemp - FreezTemp)
 
   IF(LogTerm <= 1) THEN
-    QiceMin = 0.0
+    QiceMin = 0.0d0
   ELSE
     QiceMin = UAiceDisCh * (ITSInletTemp-ITSOutletTemp) / LOG(LogTerm)
   ENDIF
@@ -2236,8 +2236,8 @@ SUBROUTINE CalcUAIce(IceNum,XCurIceFrac,UAIceCh,UAIceDisCh,HLoss)
                * IceStorage(IceNum)%ITSNomCap / TimeInterval / 10.0d0
       y=1.0d0-XCurIceFrac
       UAIceDisCh = ( 1.3879d0 - 7.6333d0*y + 26.3423d0*y**2 - 47.6084d0*y**3 + 41.8498d0*y**4 - 14.2948d0*y**5 )  &  ! [W/C]
-                  * IceStorage(IceNum)%ITSNomCap / TimeInterval / 10.0
-      HLoss = 0.0
+                  * IceStorage(IceNum)%ITSNomCap / TimeInterval / 10.0d0
+      HLoss = 0.0d0
     CASE(ITSType_IceOnCoilExternal)
       y = XCurIceFrac
       UAIceCh = ( 1.3879d0 - 7.6333d0*y + 26.3423d0*y**2 - 47.6084d0*y**3 + 41.8498d0*y**4 - 14.2948d0*y**5 )  &     ! [W/C]
@@ -2245,7 +2245,7 @@ SUBROUTINE CalcUAIce(IceNum,XCurIceFrac,UAIceCh,UAIceDisCh,HLoss)
       y = 1.0d0-XCurIceFrac
       UAIceDisCh = ( 1.1756d0 - 5.3689d0*y + 17.3602d0*y**2 - 30.1077d0*y**3 + 25.6387d0*y**4 - 8.5102d0*y**5 )  &   ! [W/C]
                   * IceStorage(IceNum)%ITSNomCap / TimeInterval / 10.0d0
-      HLoss = 0.0
+      HLoss = 0.0d0
 
   END SELECT
 
@@ -2437,11 +2437,11 @@ SUBROUTINE RecordOutput(IceNum,MyLoad,RunFlag)
     IceStorageReport(IceNum)%MyLoad = MyLoad
     IceStorageReport(IceNum)%U = U
     IceStorageReport(IceNum)%Urate = Urate
-    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0
-    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSChargingRate   = 0.0
-    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0
-    IceStorageReport(IceNum)%ITSmdot          = 0.0
+    IceStorageReport(IceNum)%ITSCoolingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingRate   = 0.0d0
+    IceStorageReport(IceNum)%ITSChargingEnergy = 0.0d0
+    IceStorageReport(IceNum)%ITSmdot          = 0.0d0
     IceStorageReport(IceNum)%ITSInletTemp     = ITSInletTemp
     IceStorageReport(IceNum)%ITSOutletTemp    = ITSOutletTemp
 
@@ -2449,14 +2449,14 @@ SUBROUTINE RecordOutput(IceNum,MyLoad,RunFlag)
     IceStorageReport(IceNum)%MyLoad = MyLoad
     IceStorageReport(IceNum)%U = U
     IceStorageReport(IceNum)%Urate = Urate
-    IF(ITSCoolingRate > 0.0) THEN
+    IF(ITSCoolingRate > 0.0d0) THEN
       IceStorageReport(IceNum)%ITSCoolingRate   = ITSCoolingRate
       IceStorageReport(IceNum)%ITSCoolingEnergy = ITSCoolingEnergy
-      IceStorageReport(IceNum)%ITSChargingRate   = 0.0
-      IceStorageReport(IceNum)%ITSChargingEnergy = 0.0
+      IceStorageReport(IceNum)%ITSChargingRate   = 0.0d0
+      IceStorageReport(IceNum)%ITSChargingEnergy = 0.0d0
     ELSE
-      IceStorageReport(IceNum)%ITSCoolingRate   = 0.0
-      IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0
+      IceStorageReport(IceNum)%ITSCoolingRate   = 0.0d0
+      IceStorageReport(IceNum)%ITSCoolingEnergy = 0.0d0
       IceStorageReport(IceNum)%ITSChargingRate   = -ITSCoolingRate
       IceStorageReport(IceNum)%ITSChargingEnergy = -ITSCoolingEnergy
     ENDIF
@@ -2515,23 +2515,23 @@ SUBROUTINE UpdateIceFractions
   DO IceNum2 = 1, NumIceStorages
     IceStorageReport(IceNum2)%IceFracRemain = IceStorageReport(IceNum2)%IceFracRemain + &
         IceStorageReport(IceNum2)%Urate*TimeStepSys
-    IF( IceStorageReport(IceNum2)%IceFracRemain .LE. 0.001d0) IceStorageReport(IceNum2)%IceFracRemain = 0.0
-    IF( IceStorageReport(IceNum2)%IceFracRemain .GT. 1.0  ) IceStorageReport(IceNum2)%IceFracRemain = 1.0
+    IF( IceStorageReport(IceNum2)%IceFracRemain .LE. 0.001d0) IceStorageReport(IceNum2)%IceFracRemain = 0.0d0
+    IF( IceStorageReport(IceNum2)%IceFracRemain .GT. 1.0d0  ) IceStorageReport(IceNum2)%IceFracRemain = 1.0d0
   END DO
 
   DO IceNum2 = 1, NumDetIceStorages
     DetIceStor(IceNum2)%IceFracRemaining = DetIceStor(IceNum2)%IceFracRemaining &
                                           +DetIceStor(IceNum2)%IceFracChange &
                                           -(DetIceStor(IceNum2)%TankLossCoeff*TimeStepSys)
-    IF( DetIceStor(IceNum2)%IceFracRemaining < 0.001d0) DetIceStor(IceNum2)%IceFracRemaining = 0.0
-    IF( DetIceStor(IceNum2)%IceFracRemaining > 1.000) DetIceStor(IceNum2)%IceFracRemaining = 1.0
+    IF( DetIceStor(IceNum2)%IceFracRemaining < 0.001d0) DetIceStor(IceNum2)%IceFracRemaining = 0.0d0
+    IF( DetIceStor(IceNum2)%IceFracRemaining > 1.000d0) DetIceStor(IceNum2)%IceFracRemaining = 1.0d0
          ! Reset the ice on the coil to zero for inside melt whenever discharging takes place.
          ! This assumes that any remaining ice floats away from the coil and resettles perfectly.
          ! While this is not exactly what happens and it is possible theoretically to have multiple
          ! freeze thaw cycles that are not complete, this is the best we can do.
     IF (DetIceStor(IceNum2)%ThawProcessIndex == DetIceInsideMelt) THEN
-      IF (DetIceStor(IceNum2)%IceFracChange < 0.0) THEN
-        DetIceStor(IceNum2)%IceFracOnCoil = 0.0
+      IF (DetIceStor(IceNum2)%IceFracChange < 0.0d0) THEN
+        DetIceStor(IceNum2)%IceFracOnCoil = 0.0d0
       ELSE
          ! Assume loss term does not impact ice on the coil but what is remaining
         DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracOnCoil &
@@ -2648,13 +2648,13 @@ SUBROUTINE ReportDetailedIceStorage
 
   IF (DetIceStor(IceNum)%CompLoad < LowLoadLimit) THEN  ! No load condition
 
-    DetIceStor(IceNum)%IceFracChange       = 0.0
-    DetIceStor(IceNum)%DischargingRate     = 0.0
-    DetIceStor(IceNum)%DischargingEnergy   = 0.0
-    DetIceStor(IceNum)%ChargingRate        = 0.0
-    DetIceStor(IceNum)%ChargingEnergy      = 0.0
-    DetIceStor(IceNum)%ParasiticElecRate   = 0.0
-    DetIceStor(IceNum)%ParasiticElecEnergy = 0.0
+    DetIceStor(IceNum)%IceFracChange       = 0.0d0
+    DetIceStor(IceNum)%DischargingRate     = 0.0d0
+    DetIceStor(IceNum)%DischargingEnergy   = 0.0d0
+    DetIceStor(IceNum)%ChargingRate        = 0.0d0
+    DetIceStor(IceNum)%ChargingEnergy      = 0.0d0
+    DetIceStor(IceNum)%ParasiticElecRate   = 0.0d0
+    DetIceStor(IceNum)%ParasiticElecEnergy = 0.0d0
 
   ELSE  ! There is a load, determine whether we are charging or discharging based on inlet and outlet temperature
 
@@ -2663,8 +2663,8 @@ SUBROUTINE ReportDetailedIceStorage
       DetIceStor(IceNum)%ChargingRate        = DetIceStor(IceNum)%CompLoad
       DetIceStor(IceNum)%ChargingEnergy      = DetIceStor(IceNum)%CompLoad * (TimeStepSys*SecInHour)
       DetIceStor(IceNum)%IceFracChange       = DetIceStor(IceNum)%CompLoad * TimeStepSys / DetIceStor(IceNum)%NomCapacity
-      DetIceStor(IceNum)%DischargingRate     = 0.0
-      DetIceStor(IceNum)%DischargingEnergy   = 0.0
+      DetIceStor(IceNum)%DischargingRate     = 0.0d0
+      DetIceStor(IceNum)%DischargingEnergy   = 0.0d0
       DetIceStor(IceNum)%ParasiticElecRate   = DetIceStor(IceNum)%ChargeParaElecLoad * DetIceStor(IceNum)%CompLoad
       DetIceStor(IceNum)%ParasiticElecEnergy = DetIceStor(IceNum)%ChargeParaElecLoad * DetIceStor(IceNum)%ChargingEnergy
 
@@ -2673,8 +2673,8 @@ SUBROUTINE ReportDetailedIceStorage
       DetIceStor(IceNum)%DischargingRate     = DetIceStor(IceNum)%CompLoad
       DetIceStor(IceNum)%DischargingEnergy   = DetIceStor(IceNum)%CompLoad * (TimeStepSys*SecInHour)
       DetIceStor(IceNum)%IceFracChange       =-DetIceStor(IceNum)%CompLoad * TimeStepSys / DetIceStor(IceNum)%NomCapacity
-      DetIceStor(IceNum)%ChargingRate        = 0.0
-      DetIceStor(IceNum)%ChargingEnergy      = 0.0
+      DetIceStor(IceNum)%ChargingRate        = 0.0d0
+      DetIceStor(IceNum)%ChargingEnergy      = 0.0d0
       DetIceStor(IceNum)%ParasiticElecRate   = DetIceStor(IceNum)%DischargeParaElecLoad * DetIceStor(IceNum)%CompLoad
       DetIceStor(IceNum)%ParasiticElecEnergy = DetIceStor(IceNum)%DischargeParaElecLoad * DetIceStor(IceNum)%ChargingEnergy
 

@@ -9,6 +9,7 @@ MODULE SystemAvailabilityManager
   !       MODIFIED       March 2007, LG: Added hybrid ventilation control.
   !                      August 2008, R. Raustad - FSEC: added 2 new scheduled sys avail managers
   !                      March 2011, Chandan Sharma - FSEC: Added zone sys avail managers
+  !                      August 2013, Xiufeng Pang (XP) - added algorithms for optimal start
   !       RE-ENGINEERED  na
 
   ! PURPOSE OF THIS MODULE
@@ -30,16 +31,28 @@ MODULE SystemAvailabilityManager
   ! Use statements for access to subroutines in other modules
   USE ScheduleManager
   USE DataAirSystems, ONLY : PrimaryAirSystem
+  USE DataHeatBalance, ONLY: ZoneList
 
   IMPLICIT NONE ! Enforce explicit typing of all variables
 
   PRIVATE ! Everything private unless explicitly made public
 
   ! MODULE PARAMETER DEFINITIONS
+  INTEGER, PARAMETER :: MaxDayTypes=12
   INTEGER, PARAMETER :: StayOff = 0
   INTEGER, PARAMETER :: CycleOnAny = 1
   INTEGER, PARAMETER :: CycleOnControlZone = 2
   INTEGER, PARAMETER :: ZoneFansOnly = 3
+
+  ! Optimum start parameter definations
+  INTEGER, PARAMETER :: ControlZone = 4
+  INTEGER, PARAMETER :: MaximumOfZoneList = 5
+
+  INTEGER, PARAMETER :: ConstantTemperatureGradient = 0
+  INTEGER, PARAMETER :: AdaptiveTemperatureGradient = 1
+  INTEGER, PARAMETER :: AdaptiveASHRAE = 2
+  INTEGER, PARAMETER :: ConstantStartTime = 3
+
   ! Hybrid Ventilation parameters
   INTEGER, PARAMETER :: HybridVentMode_No       = 0  ! No hybrid ventilation control
   INTEGER, PARAMETER :: HybridVentMode_Temp     = 1  ! Temperature control
@@ -51,7 +64,7 @@ MODULE SystemAvailabilityManager
   INTEGER, PARAMETER :: HybridVentCtrl_Open     = 1  ! Open windows or doors
   INTEGER, PARAMETER :: HybridVentCtrl_Close    = 2  ! Close windows or doors
 
-  INTEGER, PARAMETER :: NumValidSysAvailManagerTypes=11
+  INTEGER, PARAMETER :: NumValidSysAvailManagerTypes=12
   CHARACTER(len=*), PARAMETER, DIMENSION(NumValidSysAvailManagerTypes) :: cValidSysAvailManagerTypes=    &
                  (/'AvailabilityManager:Scheduled                ',  &
                    'AvailabilityManager:ScheduledOn              ',  &
@@ -63,8 +76,8 @@ MODULE SystemAvailabilityManager
                    'AvailabilityManager:LowTemperatureTurnOff    ',  &
                    'AvailabilityManager:LowTemperatureTurnOn     ',  &
                    'AvailabilityManager:NightVentilation         ',  &
-                   'AvailabilityManager:HybridVentilation        '/)
-
+                   'AvailabilityManager:HybridVentilation        ',  &
+                   'AvailabilityManager:OptimumStart             '/)
   INTEGER, PARAMETER :: SysAvailMgr_Scheduled    = 1
   INTEGER, PARAMETER :: SysAvailMgr_ScheduledOn  = 2
   INTEGER, PARAMETER :: SysAvailMgr_ScheduledOff = 3
@@ -77,6 +90,7 @@ MODULE SystemAvailabilityManager
   INTEGER, PARAMETER :: SysAvailMgr_NightVent    = 10
   INTEGER, PARAMETER :: SysAvailMgr_HybridVent   = 11
 
+  INTEGER, PARAMETER :: SysAvailMgr_OptimumStart = 12
   INTEGER, PARAMETER, DIMENSION(NumValidSysAvailManagerTypes) :: ValidSysAvailManagerTypes=  (/  &
            SysAvailMgr_Scheduled,    &
            SysAvailMgr_ScheduledOn,  &
@@ -88,9 +102,8 @@ MODULE SystemAvailabilityManager
            SysAvailMgr_LoTempTOff,   &
            SysAvailMgr_LoTempTOn,    &
            SysAvailMgr_NightVent,    &
-           SysAvailMgr_HybridVent/)
-
-
+           SysAvailMgr_HybridVent,   &
+           SysAvailMgr_OptimumStart/)
   ! DERIVED TYPE DEFINITIONS
   TYPE DefineSchedSysAvailManager                  ! Derived type for Scheduled Sys Avail Managers
     CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
@@ -121,21 +134,58 @@ MODULE SystemAvailabilityManager
     INTEGER                      :: FanSchedPtr       = 0    ! Fan schedule pointer
     INTEGER                      :: CtrlType          = 0    ! type of control: Stay Off, Cycle On Any,
                                                             !   Cycle On Control Zone, or Cycle On Any - Zone Fans Only
-    REAL(r64)                    :: TempTolRange      = 1.0  ! range in degrees C of thermostat tolerance
+    REAL(r64)                    :: TempTolRange      = 1.0d0  ! range in degrees C of thermostat tolerance
     INTEGER                      :: CyclingTimeSteps  = 1    ! period (in Loads time steps) system will cycle on.
     CHARACTER(len=MaxNameLength) :: CtrlZoneName      = ' '  ! Name of the control zone
-    INTEGER                      :: ZoneNum           = 0    ! zome number of control zone
+    INTEGER                      :: ZoneNum           = 0    ! zone number of control zone
     INTEGER                      :: ControlledZoneNum = 0    ! controlled zone number of control zone
     INTEGER                      :: AvailStatus       = 0    ! reports status of availability manager
   END TYPE DefineNightCycSysAvailManager
+
+  TYPE DefineOptStartSysAvailManager               ! Derived type for Optimal Start Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' '  ! Name of the manager object
+    INTEGER                      :: MgrType           = 0    ! Integer equivalent of availability manager type
+    INTEGER                      :: SchedPtr          = 0    ! Applicability schedule pointer
+    CHARACTER(len=MaxNameLength) :: FanSched          = ' '  ! Fan schedule name
+    INTEGER                      :: FanSchedPtr       = 0    ! Fan schedule pointer
+    INTEGER                      :: CtrlType          = 0    ! Type of control: Stay Off, ControlZone, MaximumofZoneList
+    CHARACTER(len=MaxNameLength) :: CtrlZoneName      = ' '  ! Name of the control zone
+    INTEGER                      :: ZoneNum           = 0    ! zone number of control zone
+    INTEGER                      :: ControlledZoneNum = 0    ! controlled zone number of control zone
+    CHARACTER(len=MaxNameLength) :: ZoneListName      = ' '  ! Zone List name
+    INTEGER                      :: NumOfZones    = 0        ! Number of zones in the list
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: ZonePtrs           ! Pointers to zones in the list
+    REAL(r64)                    :: MaxOptStartTime   = 6.0d0  ! Maximum value of start time in hours
+    INTEGER                      :: CtrlAlgType       = 0    ! Control algorithm: ConstantTemperatureGradient,
+                                                             ! AdaptiveTemperatureGradient, AdaptiveASHRAE, ConstantStartTime
+    REAL(r64)                    :: ConstTGradCool    = 1.0d0  ! Constant temperature gradient in cooling mode, unit: degC per hour
+    REAL(r64)                    :: ConstTGradHeat    = 1.0d0  ! Constant temperature gradient in heating mode, unit: degC per hour
+    REAL(r64)                    :: InitTGradCool     = 1.0d0  ! Initial value for temperature gradient in cooling mode, unit: degC per hour
+    REAL(r64)                    :: InitTGradHeat     = 1.0d0  ! Initial value for temperature gradient in heating mode, unit: degC per hour
+    REAL(r64)                    :: AdaptiveTGradCool = 1.0d0  ! Calculated adaptive temperature gradient in cooling mode, unit: degC per hour
+    REAL(r64)                    :: AdaptiveTGradHeat = 1.0d0  ! Calculated adaptive temperature gradient in heating mode, unit: degC per hour
+    REAL(r64)                    :: ConstStartTime    = 2.0d0  ! Constant start time in hours
+    INTEGER                      :: NumPreDays        = 1    ! Number of previous days for adaptive control
+    INTEGER                      :: AvailStatus       = 0    ! reports status of availability manager
+    REAL(r64)                    :: NumHoursBeforeOccupancy = 0.0d0
+  END TYPE DefineOptStartSysAvailManager
+
+!Not used yet
+  TYPE DefineASHRAEAdaptiveOptimumStartCoeffs               ! Derived type for Differential Thermostat Sys Avail Managers
+    CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the object
+    REAL(r64)                    :: Coeff1            = 0.0d0 ! 1st Coefficient of the equation
+    REAL(r64)                    :: Coeff2            = 0.0d0 ! 2nd Coefficient of the equation
+    REAL(r64)                    :: Coeff3            = 0.0d0 ! 3rd Coefficient of the equation
+    REAL(r64)                    :: Coeff4            = 0.0d0 ! 4th Coefficient of the equation
+  END TYPE DefineASHRAEAdaptiveOptimumStartCoeffs
 
   TYPE DefineDiffTSysAvailManager                  ! Derived type for Differential Thermostat Sys Avail Managers
     CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
     INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
     INTEGER                      :: HotNode           = 0   ! "Hot" sensor node
     INTEGER                      :: ColdNode          = 0   ! "Cold" sensor node
-    REAL(r64)                    :: TempDiffOn        = 0.0 ! Temperature difference for turn on (delta C)
-    REAL(r64)                    :: TempDiffOff       = 0.0 ! Temperature difference for turn off (delta C)
+    REAL(r64)                    :: TempDiffOn        = 0.0d0 ! Temperature difference for turn on (delta C)
+    REAL(r64)                    :: TempDiffOff       = 0.0d0 ! Temperature difference for turn off (delta C)
     INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
   END TYPE DefineDiffTSysAvailManager
 
@@ -143,7 +193,7 @@ MODULE SystemAvailabilityManager
     CHARACTER(len=MaxNameLength) :: Name              = ' ' ! Name of the manager object
     INTEGER                      :: MgrType           = 0   ! Integer equivalent of availability manager type
     INTEGER                      :: Node              = 0   ! Sensor node
-    REAL(r64)                    :: Temp              = 0.0 ! Temperature for on/off (C)
+    REAL(r64)                    :: Temp              = 0.0d0 ! Temperature for on/off (C)
     INTEGER                      :: SchedPtr          = 0   ! Applicability schedule pointer
     INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
   END TYPE DefineHiLoSysAvailManager
@@ -156,12 +206,12 @@ MODULE SystemAvailabilityManager
     INTEGER                      :: FanSchedPtr       = 0   ! Fan schedule pointer
     CHARACTER(len=MaxNameLength) :: VentTempSched     = ' ' ! Ventilation temperature schedule
     INTEGER                      :: VentTempSchedPtr  = 0   ! Ventilation temperature schedule pointer
-    REAL(r64)                    :: VentDelT          = 0.0 ! Ventilation delta T [deltaC]
-    REAL(r64)                    :: VentTempLowLim    = 0.0 ! ventilation temperature low limit
+    REAL(r64)                    :: VentDelT          = 0.0d0 ! Ventilation delta T [deltaC]
+    REAL(r64)                    :: VentTempLowLim    = 0.0d0 ! ventilation temperature low limit
     CHARACTER(len=MaxNameLength) :: CtrlZoneName      = ' ' ! Name of the control zone
     INTEGER                      :: ZoneNum           = 0   ! zome number of control zone
     INTEGER                      :: ControlledZoneNum = 0   ! controlled zone number of control zone
-    REAL(r64)                    :: VentFlowFrac      = 0.0 ! the night venting flow fraction
+    REAL(r64)                    :: VentFlowFrac      = 0.0d0 ! the night venting flow fraction
     INTEGER                      :: AvailStatus       = 0   ! reports status of availability manager
   END TYPE DefineNightVentSysAvailManager
 
@@ -177,13 +227,13 @@ MODULE SystemAvailabilityManager
     INTEGER                      :: ControlModeSchedPtr    = 0   ! Ventilation control mode schedule pointer
     INTEGER                      :: ControlMode            = 0   ! hybrid ventilation control mode
     INTEGER                      :: VentilationCtrl        = 0   ! Ventilation control type: Noaction, Close, Open
-    REAL(r64)                    :: MinOutdoorTemp    = -100.0   ! Minimum Outdoor Temperature [C]
-    REAL(r64)                    :: MaxOutdoorTemp     = 100.0   ! Maximum Outdoor Temperature [C]
-    REAL(r64)                    :: MinOutdoorEnth       = 0.1   ! Minimum Outdoor Enthalpy [J/kg]
-    REAL(r64)                    :: MaxOutdoorEnth  = 300000.0   ! Maximum Outdoor Enthalpy [J/kg]
-    REAL(r64)                    :: MinOutdoorDewPoint =-100.0   ! Minimum Outdoor Dew point temperature [C]
-    REAL(r64)                    :: MaxOutdoorDewPoint = 100.0   ! Maximum Outdoor Dew Point Temperature [C]
-    REAL(r64)                    :: MaxWindSpeed         = 0.0   ! Maximum Wind speed [m/s]
+    REAL(r64)                    :: MinOutdoorTemp    = -100.0d0   ! Minimum Outdoor Temperature [C]
+    REAL(r64)                    :: MaxOutdoorTemp     = 100.0d0   ! Maximum Outdoor Temperature [C]
+    REAL(r64)                    :: MinOutdoorEnth       = 0.1d0   ! Minimum Outdoor Enthalpy [J/kg]
+    REAL(r64)                    :: MaxOutdoorEnth  = 300000.0d0   ! Maximum Outdoor Enthalpy [J/kg]
+    REAL(r64)                    :: MinOutdoorDewPoint =-100.0d0   ! Minimum Outdoor Dew point temperature [C]
+    REAL(r64)                    :: MaxOutdoorDewPoint = 100.0d0   ! Maximum Outdoor Dew Point Temperature [C]
+    REAL(r64)                    :: MaxWindSpeed         = 0.0d0   ! Maximum Wind speed [m/s]
     LOGICAL                      :: UseRainIndicator  = .TRUE.   ! Use WeatherFile Rain Indicators
     CHARACTER(len=MaxNameLength) :: MinOASched             = ' ' ! Minimum Outdoor Ventilation Air Schedule Name
     INTEGER                      :: MinOASchedPtr          = 0   ! Minimum Outdoor Ventilation Air Schedule pointer
@@ -228,6 +278,9 @@ MODULE SystemAvailabilityManager
   TYPE (DefineNightVentSysAvailManager),  ALLOCATABLE, DIMENSION(:) :: NVentSysAvailMgrData
   TYPE (DefineHybridVentSysAvailManager), ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailMgrData
   TYPE (SysAvailManagerList),             ALLOCATABLE, DIMENSION(:) :: SysAvailMgrListData
+  TYPE (DefineOptStartSysAvailManager),   ALLOCATABLE, DIMENSION(:) :: OptStartSysAvailMgrData
+  TYPE (DefineASHRAEAdaptiveOptimumStartCoeffs),      ALLOCATABLE, DIMENSION(:) :: ASHRAEOptSCoeffCooling
+  TYPE (DefineASHRAEAdaptiveOptimumStartCoeffs),      ALLOCATABLE, DIMENSION(:) :: ASHRAEOptSCoeffHeating
 
   INTEGER :: NumSchedSysAvailMgrs     = 0
   INTEGER :: NumSchedOnSysAvailMgrs   = 0
@@ -243,7 +296,7 @@ MODULE SystemAvailabilityManager
   LOGICAL :: GetAvailListsInput       = .TRUE.
   LOGICAL :: GetAvailMgrInputFlag     = .TRUE.     ! First time, input is "gotten"
   LOGICAL :: GetHybridInputFlag = .True.  ! Flag set to make sure you get input once
-
+  INTEGER :: NumOptStartSysAvailMgrs  = 0
   ! SUBROUTINE SPECIFICATIONS FOR MODULE
 
   PUBLIC  ManageSystemAvailability
@@ -264,6 +317,7 @@ MODULE SystemAvailabilityManager
   PRIVATE CalcLoTurnOffSysAvailMgr
   PRIVATE CalcLoTurnOnSysAvailMgr
   PRIVATE CalcNVentSysAvailMgr
+  PRIVATE CalcOptStartSysAvailMgr
   PUBLIC  ValidateAndSetSysAvailabilityManagerType
   PUBLIC  ManageHybridVentilation
   PRIVATE GetHybridVentilationInputs
@@ -474,7 +528,7 @@ SUBROUTINE GetSysAvailManagerInputs
   USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindIteminList, SameString,   &
                               MakeUPPERCase, GetObjectDefMaxArgs
   USE NodeInputManager, ONLY: GetOnlySingleNode, MarkNode
-  USE DataHeatBalance,  ONLY: Zone
+  USE DataHeatBalance,  ONLY: Zone, ZoneList, NumOfZoneLists
   USE DataLoopNode
   USE DataZoneEquipment, ONLY: NumValidSysAvailZoneComponents, cValidSysAvailManagerCompTypes
 
@@ -513,6 +567,8 @@ SUBROUTINE GetSysAvailManagerInputs
   INTEGER       :: CyclingTimeSteps
   INTEGER       :: ZoneEquipType
   INTEGER       :: TotalNumComp
+  INTEGER       :: ZoneListNum
+  INTEGER       :: ZoneNumInList
 
   ! Get the number of occurences of each type of manager and read in data
   cCurrentModuleObject = 'AvailabilityManager:Scheduled'
@@ -552,6 +608,10 @@ SUBROUTINE GetSysAvailManagerInputs
   maxNumbers=MAX(maxNumbers,NumNumbers)
   maxAlphas=MAX(maxAlphas,NumAlphas)
   cCurrentModuleObject = 'AvailabilityManager:NightVentilation'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
+  maxNumbers=MAX(maxNumbers,NumNumbers)
+  maxAlphas=MAX(maxAlphas,NumAlphas)
+  cCurrentModuleObject = 'AvailabilityManager:OptimumStart'
   CALL GetObjectDefMaxArgs(cCurrentModuleObject,numArgs,NumAlphas,NumNumbers)
   maxNumbers=MAX(maxNumbers,NumNumbers)
   maxAlphas=MAX(maxAlphas,NumAlphas)
@@ -772,6 +832,142 @@ SUBROUTINE GetSysAvailManagerInputs
                                'System','Average',NCycSysAvailMgrData(SysAvailNum)%Name)
 
     END DO ! SysAvailNum
+ END IF
+
+  cCurrentModuleObject = 'AvailabilityManager:OptimumStart'
+  NumOptStartSysAvailMgrs  = GetNumObjectsFound(cCurrentModuleObject)
+  CyclingTimeSteps     = 0
+
+  IF(NumOptStartSysAvailMgrs > 0)THEN
+    ! Array size of variable type OptStartSysAvailMgrData is updated
+    ALLOCATE(OptStartSysAvailMgrData(NumOptStartSysAvailMgrs))
+
+    DO SysAvailNum = 1,NumOptStartSysAvailMgrs
+
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+                         AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                         AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+      CALL VerifyName(cAlphaArgs(1),OptStartSysAvailMgrData%Name,SysAvailNum-1,IsNotOK,IsBlank,&
+                      TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound=.TRUE.
+        IF (IsBlank) cAlphaArgs(1)='xxxxx'
+      ENDIF
+      OptStartSysAvailMgrData(SysAvailNum)%Name = cAlphaArgs(1)
+      OptStartSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_OptimumStart
+      OptStartSysAvailMgrData(SysAvailNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (OptStartSysAvailMgrData(SysAvailNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+      OptStartSysAvailMgrData(SysAvailNum)%FanSched = cAlphaArgs(3)
+      OptStartSysAvailMgrData(SysAvailNum)%FanSchedPtr = GetScheduleIndex(cAlphaArgs(3))
+      IF (OptStartSysAvailMgrData(SysAvailNum)%FanSchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//'", invalid')
+        CALL ShowContinueError('not found: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+
+      OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime = rNumericArgs(1)
+
+      SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+        CASE('STAYOFF')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlType = StayOff
+        CASE('CONTROLZONE')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlType = ControlZone
+        CASE('MAXIMUMOFZONELIST')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlType = MaximumOfZoneList
+        CASE DEFAULT
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlType = ControlZone
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError(RoutineName//'incorrect value: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+          ErrorsFound=.TRUE.
+      END SELECT
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType .EQ. ControlZone) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%CtrlZoneName = cAlphaArgs(5)
+        OptStartSysAvailMgrData(SysAvailNum)%ZoneNum = FindItemInList(cAlphaArgs(5),Zone%Name,NumOfZones)
+        IF (OptStartSysAvailMgrData(SysAvailNum)%ZoneNum .EQ. 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError('not found: '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+          ErrorsFound = .TRUE.
+        END IF
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType .EQ. MaximumOfZoneList) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%ZoneListName = cAlphaArgs(6)
+        Do ZoneListNum=1, NumOfZoneLists
+           IF (ZoneList(ZoneListNum)%Name == cAlphaArgs(6)) THEN
+             OptStartSysAvailMgrData(SysAvailNum)%NumOfZones=ZoneList(ZoneListNum)%NumOfZones
+             ALLOCATE(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneList(ZoneListNum)%NumOfZones))
+             DO ZoneNumInList=1, ZoneList(ZoneListNum)%NumOfZones
+                OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNumInList)= &
+                ZoneList(ZoneListNum)%Zone(ZoneNumInList)
+             END DO
+           END IF
+        END DO
+        OptStartSysAvailMgrData(SysAvailNum)%NumOfZones = FindItemInList(cAlphaArgs(6),ZoneList%Name,NumOfZoneLists)
+        IF (OptStartSysAvailMgrData(SysAvailNum)%NumOfZones .EQ. 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError('not found: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+          ErrorsFound = .TRUE.
+        END IF
+      END IF
+
+      SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(7))))
+        CASE('CONSTANTTEMPERATUREGRADIENT')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType = ConstantTemperatureGradient
+        CASE('ADAPTIVETEMPERATUREGRADIENT')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType = AdaptiveTemperatureGradient
+        CASE('ADAPTIVEASHRAE')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType = AdaptiveASHRAE
+        CASE('CONSTANTSTARTTIME')
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType = ConstantStartTime
+        CASE DEFAULT
+          OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType = AdaptiveASHRAE
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid')
+          CALL ShowSevereError(RoutineName//'incorrect value: '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+          ErrorsFound=.TRUE.
+      END SELECT
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. ConstantTemperatureGradient) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%ConstTGradCool = rNumericArgs(2)
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. ConstantTemperatureGradient) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%ConstTGradHeat = rNumericArgs(3)
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. AdaptiveTemperatureGradient) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%InitTGradCool = rNumericArgs(4)
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. AdaptiveTemperatureGradient) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat = rNumericArgs(5)
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. ConstantStartTime) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%ConstStartTime = rNumericArgs(6)
+      END IF
+
+      IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType .EQ. AdaptiveTemperatureGradient) THEN
+        OptStartSysAvailMgrData(SysAvailNum)%NumPreDays = rNumericArgs(7)
+       END IF
+
+      CALL SetupOutputVariable('Availability Manager Optimum Start Control Status []', &
+                                OptStartSysAvailMgrData(SysAvailNum)%AvailStatus, &
+                               'System','Average',OptStartSysAvailMgrData(SysAvailNum)%Name)
+
+      ! add
+      CALL SetupOutputVariable('Availability Manager Optimum Start Hours Before Occupancy []', &
+                                OptStartSysAvailMgrData(SysAvailNum)%NumHoursBeforeOccupancy, &
+                               'System','Average',OptStartSysAvailMgrData(SysAvailNum)%Name, 'Daily')
+
+    END DO
 
   END IF
 
@@ -1398,7 +1594,7 @@ SUBROUTINE GetAirLoopAvailabilityManager(AvailabilityListName,Loop,NumAirLoops,E
     PriAirSysAvailMgr(Loop)%AvailStatus = NoAction
     PriAirSysAvailMgr(Loop)%StartTime = 0
     PriAirSysAvailMgr(Loop)%StopTime = 0
-    PriAirSysAvailMgr(Loop)%ReqSupplyFrac = 1.0
+    PriAirSysAvailMgr(Loop)%ReqSupplyFrac = 1.0d0
     ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerName(PriAirSysAvailMgr(Loop)%NumAvailManagers))
     ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerType(PriAirSysAvailMgr(Loop)%NumAvailManagers))
     ALLOCATE(PriAirSysAvailMgr(Loop)%AvailManagerNum(PriAirSysAvailMgr(Loop)%NumAvailManagers))
@@ -1559,6 +1755,7 @@ SUBROUTINE InitSysAvailManagers
 
           ! USE STATEMENTS:
   USE DataZoneEquipment, ONLY: ZoneEquipConfig, NumValidSysAvailZoneComponents
+  USE InputProcessor, ONLY: FindItemInList
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1580,7 +1777,10 @@ SUBROUTINE InitSysAvailManagers
   INTEGER       :: SysAvailNum               ! DO loop indes for Sys Avail Manager objects
   INTEGER       :: ControlledZoneNum         ! Index into the ZoneEquipConfig array
   INTEGER       :: ZoneEquipType
-
+  INTEGER       :: ZoneListNum
+  INTEGER       :: ScanZoneListNum
+  INTEGER       :: ZoneNum
+  INTEGER       :: NumOfZoneLists=1
   ! One time initializations
   IF (MyOneTimeFlag) THEN
 
@@ -1597,6 +1797,35 @@ SUBROUTINE InitSysAvailManagers
         END DO
       END IF
     END DO
+
+
+    DO SysAvailNum = 1,NumOptStartSysAvailMgrs
+      SELECT CASE (OptStartSysAvailMgrData(SysAvailNum)%CtrlType)
+      CASE (ControlZone)
+        ! set the controlled zone numbers
+        DO ControlledZoneNum = 1,NumOfZones
+          IF (ALLOCATED(ZoneEquipConfig)) THEN
+            IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. OptStartSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
+              OptStartSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+              EXIT
+            END IF
+          ENDIF
+        END DO
+      CASE (MaximumofZoneList)
+        !a zone list
+        ZoneListNum = FindItemInList(OptStartSysAvailMgrData(SysAvailNum)%ZoneListName,ZoneList%Name,NumOfZoneLists)
+        IF(ZoneListNum .GT. 0)THEN
+          OptStartSysAvailMgrData(SysAvailNum)%NumOfZones = ZoneList(ZoneListNum)%NumofZones
+          IF (.NOT. ALLOCATED(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs)) THEN
+            ALLOCATE (OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(1:ZoneList(ZoneListNum)%NumofZones))
+          ENDIF
+          DO ScanZoneListNum = 1, ZoneList(ZoneListNum)%NumofZones
+            ZoneNum = ZoneList(ZoneListNum)%Zone(ScanZoneListNum)
+            OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ScanZoneListNum) = ZoneNum
+          END DO
+      END IF
+    END SELECT
+  END DO
 
     DO SysAvailNum = 1,NumNVentSysAvailMgrs
       ! set the controlled zone numbers
@@ -1625,6 +1854,7 @@ SUBROUTINE InitSysAvailManagers
   IF (ALLOCATED(HiTurnOnSysAvailMgrData))  HiTurnOnSysAvailMgrData%AvailStatus  = NoAction
   IF (ALLOCATED(LoTurnOffSysAvailMgrData)) LoTurnOffSysAvailMgrData%AvailStatus = NoAction
   IF (ALLOCATED(LoTurnOnSysAvailMgrData))  LoTurnOnSysAvailMgrData%AvailStatus  = NoAction
+  IF (ALLOCATED(OptStartSysAvailMgrData))  OptStartSysAvailMgrData%AvailStatus  = NoAction
 !  HybridVentSysAvailMgrData%AvailStatus= NoAction
   DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types
     IF(ALLOCATED(ZoneComp))THEN
@@ -1722,6 +1952,16 @@ SUBROUTINE SimSysAvailManager(SysAvailType,SysAvailName,SysAvailNum,PriAirSysNum
         CALL CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus, ZoneEquipType, CompNum)
       ELSE
         CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:NightCycle not found: '//TRIM(SysAvailName))
+      ENDIF
+
+    CASE(SysAvailMgr_OptimumStart) ! 'AvailabilityManager:OptimumStart'
+      IF (SysAvailNum == 0) THEN
+        SysAvailNum = FindItemInList(SysAvailName,OptStartSysAvailMgrData%Name,NumOptStartSysAvailMgrs)
+      ENDIF
+      IF (SysAvailNum > 0) THEN
+        CALL CalcOptStartSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus, ZoneEquipType, CompNum)
+      ELSE
+        CALL ShowFatalError('SimSysAvailManager: AvailabilityManager:OptimumStart not found: '//TRIM(SysAvailName))
       ENDIF
 
     CASE(SysAvailMgr_NightVent) ! 'AvailabilityManager:NightVentilation'
@@ -1832,7 +2072,7 @@ SUBROUTINE CalcSchedSysAvailMgr(SysAvailNum,AvailStatus)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
-  IF (GetCurrentScheduleValue(SchedSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0) THEN
+  IF (GetCurrentScheduleValue(SchedSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0d0) THEN
     AvailStatus = CycleOn
   ELSE
     AvailStatus = ForceOff
@@ -1881,7 +2121,7 @@ SUBROUTINE CalcSchedOnSysAvailMgr(SysAvailNum,AvailStatus)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
-  IF (GetCurrentScheduleValue(SchedOnSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0) THEN
+  IF (GetCurrentScheduleValue(SchedOnSysAvailMgrData(SysAvailNum)%SchedPtr) .GT. 0.0d0) THEN
     AvailStatus = CycleOn
   ELSE
     AvailStatus = NoAction
@@ -1930,7 +2170,7 @@ SUBROUTINE CalcSchedOffSysAvailMgr(SysAvailNum,AvailStatus)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
-  IF (GetCurrentScheduleValue(SchedOffSysAvailMgrData(SysAvailNum)%SchedPtr) .EQ. 0.0) THEN
+  IF (GetCurrentScheduleValue(SchedOffSysAvailMgrData(SysAvailNum)%SchedPtr) .EQ. 0.0d0) THEN
     AvailStatus = ForceOff
   ELSE
     AvailStatus = NoAction
@@ -1997,7 +2237,7 @@ SUBROUTINE CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipTyp
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: ZoneCompNCControlType
   LOGICAL, SAVE :: OneTimeFlag = .TRUE.
 
-  TempTol = 0.5*NCycSysAvailMgrData(SysAvailNum)%TempTolRange
+  TempTol = 0.5d0*NCycSysAvailMgrData(SysAvailNum)%TempTolRange
   IF (PRESENT(ZoneEquipType)) THEN
     StartTime = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime
     StopTime  = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime
@@ -2011,8 +2251,8 @@ SUBROUTINE CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipTyp
     StopTime = PriAirSysAvailMgr(PriAirSysNum)%StopTime
   ENDIF
 ! CR 7913 changed to allow during warmup
-  IF ( (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) .OR. &
-       (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0) )  THEN
+  IF ( (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0d0) .OR. &
+       (GetCurrentScheduleValue(NCycSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0d0) )  THEN
     AvailStatus = NoAction
     NCycSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus   ! CR 8358
     RETURN
@@ -2222,6 +2462,1204 @@ SUBROUTINE CalcNCycSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipTyp
 
 END SUBROUTINE CalcNCycSysAvailMgr
 
+SUBROUTINE CalcOptStartSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipType, CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR            Xiufeng Pang (XP)
+          !       DATE WRITTEN      August 2013
+          !       MODIFIED
+          !
+          !       RE-ENGINEERED
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Set AvailStatus indicator for a primary air loop, plant loop or ZoneHVAC component
+
+          ! METHODOLOGY EMPLOYED:
+          ! Sets the AvailStatus indicator according to the
+          ! optimum start algorithm
+
+          ! REFERENCES:
+          !
+
+          ! USE STATEMENTS:
+  USE DataAirLoop
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataHeatBalFanSys, ONLY: TempZoneThermostatSetpoint, ZoneThermostatSetPointHi, &
+                               ZoneThermostatSetPointLo, TempControlType, TempTstatAir
+  USE DataEnvironment, ONLY:   DSTIndicator, DayOfYear, DayOfWeekTomorrow, DayOfWeek
+  USE DataZoneControls, ONLY: OccRoomTSetPointHeat, OccRoomTSetPointCool
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
+  INTEGER, INTENT (IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
+  INTEGER, INTENT (OUT) :: AvailStatus         ! System status indicator
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: ZoneEquipType  ! Type of ZoneHVAC equipment component
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: CompNum    ! Index of ZoneHVAC equipment component
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  INTEGER :: ScheduleIndex
+  INTEGER :: DayScheduleIndex
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: DayValues
+  REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: DayValuesTmr
+  INTEGER :: JDay
+  INTEGER :: TmrJDay
+  INTEGER :: CurDayofWeek
+  INTEGER :: TmrDayOfWeek
+  INTEGER :: ZoneNum
+  REAL(r64)    :: FanStartTime
+  REAL(r64)    :: FanStartTimeTmr
+  REAL(r64)    :: PreStartTime
+  REAL(r64)    :: PreStartTimeTmr
+  REAL(r64)    :: DeltaTime
+  INTEGER      :: I
+  INTEGER      :: J
+  REAL(r64)    :: TempDiff
+  REAL(r64), SAVE    :: TempDiffHi = 0.0d0
+  REAL(r64), SAVE    :: TempDiffLo = 0.0d0
+!  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: ZoneCompOptStartControlType
+  LOGICAL       :: FirstTimeATGFlag = .TRUE.
+  LOGICAL       :: OverNightStartFlag = .False. ! Flag to indicate the optimum start starts before mid night.
+  LOGICAL       :: CycleOnFlag = .False.
+  LOGICAL       :: OSReportVarFlag = .True.
+  INTEGER       :: NumPreDays
+  INTEGER       :: NumOfZonesInList
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: AdaTempGradTrdHeat !Heating temp gradient for previous days
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: AdaTempGradTrdCool !Cooling temp gradient for previous days
+  REAL(r64), SAVE    :: AdaTempGradHeat
+  REAL(r64), SAVE    :: AdaTempGradCool
+  REAL(r64)    :: ATGUpdateTime1 = 0.0d0
+  REAL(r64)    :: ATGUpdateTime2 = 0.0d0
+  REAL(r64)    :: ATGUpdateTemp1 = 0.0d0
+  REAL(r64)    :: ATGUpdateTemp2 = 0.0d0
+  LOGICAL      :: ATGUpdateFlag1 = .False.
+  LOGICAL      :: ATGUpdateFlag2 = .False.
+  INTEGER       :: ATGCounter
+  INTEGER       :: ATGWCZoneNumHi
+  INTEGER       :: ATGWCZoneNumLo
+  REAL(r64)    :: NumHoursBeforeOccupancy = 0.0d0 !Variable to store the number of hours before occupancy in optimum start period
+
+! add or use a new variable OptStartSysAvailMgrData(SysAvailNum)%FanSchIndex
+  IF (KickOffSimulation) THEN
+      AvailStatus = NoAction
+  ELSE
+  ScheduleIndex=GetScheduleIndex(OptStartSysAvailMgrData(SysAvailNum)%FanSched)
+  JDay = DayOfYear
+  TmrJDay = JDay + 1
+  TmrDayOfWeek = DayOfWeekTomorrow
+
+  ALLOCATE (DayValues(24,NumOfTimeStepInHour))
+  ALLOCATE (DayValuesTmr(24,NumOfTimeStepInHour))
+  IF (.not.allocated(OptStartData%OptStartFlag)) THEN
+  ALLOCATE (OptStartData%OptStartFlag(NumOfZones))
+  ALLOCATE (OptStartData%OccStartTime(NumOfZones))
+  END IF
+  IF (.NOT.ALLOCATED(OptStartData%ActualZoneNum)) ALLOCATE(OptStartData%ActualZoneNum(NumOfZones))
+  OptStartData%OptStartFlag = .FALSE.
+  OptStartData%OccStartTime = 99.99d0   !initialize the zone occupancy start time
+  Call GetScheduleValuesForDay(ScheduleIndex,DayValues)
+  Call GetScheduleValuesForDay(ScheduleIndex,DayValuesTmr, TmrJDay, TmrDayOfWeek)
+
+  FanStartTime = 0.0d0
+  FanStartTimeTmr = 0.0d0
+Loop1:  DO I = 1, 24
+Loop2:    DO J = 1, NumOfTimeStepInHour
+        IF (DayValues(I,J)> 0.0d0) THEN
+          FanStartTime = I-1 + 1/NumOfTimeStepInHour * J
+          EXIT Loop1
+        ENDIF
+    END DO Loop2
+END DO Loop1
+
+Loop3:  DO I = 1, 24
+Loop4:    DO J = 1, NumOfTimeStepInHour
+        IF (DayValuesTmr(I,J)> 0.0d0) THEN
+          FanStartTimeTmr = I-1 + 1/NumOfTimeStepInHour * J
+          EXIT Loop3
+        ENDIF
+    END DO Loop4
+END DO Loop3
+
+IF (FanStartTimeTmr == 0.0d0) FanStartTimeTmr = 24.0d0
+
+! Pass the start time to ZoneTempPredictorCorrector
+DO I=1, NumOfZones
+  If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+    OptStartData%OccStartTime(ZoneEquipConfig(I)%ActualZoneNum)=FanStartTime
+    OptStartData%ActualZoneNum(ZoneEquipConfig(I)%ActualZoneNum)=ZoneEquipConfig(I)%ActualZoneNum
+  END IF
+END DO
+
+If (DSTIndicator>0) then
+  FanStartTime = FanStartTime - 1.d0
+  FanStartTimeTmr = FanStartTimeTmr - 1.d0
+End If
+
+IF (BeginDayFlag) THEN
+  NumHoursBeforeOccupancy = 0.0 !Initialize the hours of optimum start period. This variable is for reporting purpose.
+END IF
+
+SELECT CASE(OptStartSysAvailMgrData(SysAvailNum)%CtrlAlgType)
+CASE(ConstantStartTime)
+  IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType == StayOff) THEN
+    AvailStatus = NoAction
+  ELSE
+    DeltaTime = OptStartSysAvailMgrData(SysAvailNum)%ConstStartTime
+    IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+      DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+    END IF
+    PreStartTime = FanStartTime - DeltaTime
+    if (PreStartTime<0.0d0) PreStartTime = -.1d0
+    PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+    If (PreStartTimeTmr<0.0d0) then
+      PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+      OverNightStartFlag = .True.
+    else
+      OverNightStartFlag = .False.
+    end if
+    IF (.NOT. OverNightStartFlag) THEN
+      IF (FanStartTime == 0.0d0 .OR. PreviousHour .GT. FanStartTime) THEN
+        AvailStatus = NoAction
+        OSReportVarFlag = .True.
+      ELSE IF (PreStartTime .LT. CurrentTime) THEN
+        IF (OSReportVarFlag) THEN
+          NumHoursBeforeOccupancy=DeltaTime
+          OSReportVarFlag = .False.
+        END IF
+          AvailStatus = CycleOn
+          DO I=1, NumOfZones
+            If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+              OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+            END IF
+          END DO
+      ELSE
+        AvailStatus = NoAction
+        OSReportVarFlag = .True.
+      END IF
+    ELSE
+      IF (FanStartTime == 0.0d0 .OR. (HourOfDay .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+        AvailStatus = NoAction
+        OSReportVarFlag = .True.
+      ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+        IF (OSReportVarFlag) THEN
+          NumHoursBeforeOccupancy=DeltaTime
+          OSReportVarFlag = .False.
+        END IF
+        AvailStatus = CycleOn
+        DO I=1, NumOfZones
+          If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+            OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+          END IF
+        END DO
+      ELSE
+        AvailStatus = NoAction
+        OSReportVarFlag = .True.
+      END IF
+    END IF
+  END IF
+
+CASE(ConstantTemperatureGradient)
+  IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType == ControlZone) THEN
+    ZoneNum = OptStartSysAvailMgrData(SysAvailNum)%ZoneNum
+    IF ((.Not.allocated(TempTstatAir)) .OR. (.Not.allocated(ZoneThermostatSetPointLo)) .OR. &
+      (.Not.allocated(ZoneThermostatSetPointHi))) THEN
+      TempDiff = 0.0d0
+    ELSE
+      IF (.NOT. CycleOnFlag) THEN
+        IF (ALLOCATED(OccRoomTSetPointHeat) .AND. ALLOCATED(OccRoomTSetPointCool)) THEN
+          TempDiffHi = TempTstatAir(ZoneNum) - OccRoomTSetPointCool(ZoneNum)
+          TempDiffLo = TempTstatAir(ZoneNum) - OccRoomTSetPointHeat(ZoneNum)
+        ELSE
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+        END IF
+      END IF
+    END IF
+
+    IF (TempDiffHi<0.0d0) THEN
+      TempDiff = TempDiffLo
+      IF (TempDiff .LT. 0.0d0) THEN !Heating Mode
+        TempDiff = ABS(TempDiff)
+        DeltaTime = TempDiff/OptStartSysAvailMgrData(SysAvailNum)%ConstTGradHeat
+        IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+          DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+        END IF
+        PreStartTime = FanStartTime - DeltaTime
+        IF (PreStartTime<0) PreStartTime = -.1d0
+        PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+        IF (PreStartTimeTmr<0) THEN
+          PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+          OverNightStartFlag = .True.
+        ELSE
+          OverNightStartFlag = .False.
+        END IF
+        IF (.NOT. OverNightStartFlag) THEN
+          IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+              IF (CurrentTime .GT. FanStartTime) CycleOnFlag = .False.
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+            IF (CurrentTime .GT. FanStartTime .AND. CurrentTime .LT. PreStartTimeTmr) CycleOnFlag=.False.
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+              NumHoursBeforeOccupancy=DeltaTime
+              OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+          END IF
+        ELSE
+          AvailStatus = NoAction
+          CycleOnFlag = .False.
+        END IF
+      ELSE IF (OccRoomTSetPointCool(ZoneNum) .LT. 50.0d0) THEN ! Cooling Mode
+          TempDiff = TempDiffHi
+          DeltaTime = TempDiff/OptStartSysAvailMgrData(SysAvailNum)%ConstTGradCool
+          IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+            DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+          END IF
+          PreStartTime = FanStartTime - DeltaTime
+          IF (PreStartTime<0) PreStartTime = -.1d0
+          PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+          IF (PreStartTimeTmr<0) THEN
+            PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+            OverNightStartFlag = .True.
+          ELSE
+            OverNightStartFlag = .False.
+          END IF
+          IF (.NOT. OverNightStartFlag) THEN
+            IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+              NumHoursBeforeOccupancy=DeltaTime
+              OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+        END IF
+      ELSE
+        AvailStatus = NoAction
+        CycleOnFlag = .False.
+      END IF
+  ELSE IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType == MaximumOfZoneList) THEN
+    NumOfZonesInList = OptStartSysAvailMgrData(SysAvailNum)%NumOfZones
+    IF ((.Not.allocated(TempTstatAir)) .OR. (.Not.allocated(ZoneThermostatSetPointLo)) .OR. &
+      (.Not.allocated(ZoneThermostatSetPointHi))) THEN
+      TempDiff = 0.0d0
+    ELSE
+      IF (.NOT. CycleOnFlag) THEN
+        IF (ALLOCATED(OccRoomTSetPointHeat) .AND. ALLOCATED(OccRoomTSetPointCool)) THEN
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+          DO ZoneNum=1, NumOfZonesInList
+            TempDiff=TempTstatAir(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)) - &
+                     OccRoomTSetPointCool(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum))
+            TempDiffHi = Max(TempDiffHi, TempDiff)
+            TempDiff=TempTstatAir(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)) - &
+                     OccRoomTSetPointHeat(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum))
+            TempDiffLo = Min(TempDiffLo, TempDiff)
+          END DO
+        ELSE
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+        END IF
+      END IF
+    END IF
+      IF ((TempDiffHi<0.0d0 .AND. TempDiffLo<0.0d0) .OR. (abs(TempDiffLo)>abs(TempDiffHi) &
+        .AND. TempDiffLo<0)) THEN !Heating Mode
+        TempDiff = TempDiffLo
+        TempDiff = ABS(TempDiff)
+        DeltaTime = TempDiff/OptStartSysAvailMgrData(SysAvailNum)%ConstTGradHeat
+        IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+          DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+        END IF
+        PreStartTime = FanStartTime - DeltaTime
+        IF (PreStartTime<0) PreStartTime = -.1d0
+        PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+        IF (PreStartTimeTmr<0) THEN
+          PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+          OverNightStartFlag = .True.
+        ELSE
+          OverNightStartFlag = .False.
+        END IF
+        IF (.NOT. OverNightStartFlag) THEN
+          IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+              IF (CurrentTime .GT. FanStartTime) CycleOnFlag = .False.
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+            IF (CurrentTime .GT. FanStartTime .AND. CurrentTime .LT. PreStartTimeTmr) CycleOnFlag=.False.
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+              NumHoursBeforeOccupancy=DeltaTime
+              OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+        END IF
+      ELSE IF (TempDiffHi<=0.0d0 .AND. TempDiffLo>=0.0d0) THEN ! not heating and not cooling
+        AvailStatus = NoAction
+        CycleOnFlag = .False.
+        TempDiffHi = 0.0d0
+        TempDiffLo = 0.0d0
+      ELSE IF (TempDiffHi < 30.0d0) THEN ! Cooling Mode
+        TempDiff = TempDiffHi
+        DeltaTime = TempDiff/OptStartSysAvailMgrData(SysAvailNum)%ConstTGradCool
+        IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+          DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+        END IF
+        PreStartTime = FanStartTime - DeltaTime
+        IF (PreStartTime<0) PreStartTime = -.1d0
+        PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+        IF (PreStartTimeTmr<0) THEN
+          PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+          OverNightStartFlag = .True.
+        ELSE
+          OverNightStartFlag = .False.
+        END IF
+        IF (.NOT. OverNightStartFlag) THEN
+          IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+            AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+              NumHoursBeforeOccupancy=DeltaTime
+              OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            DO I=1, NumOfZones
+              If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+              END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+        END IF
+      ELSE
+        AvailStatus = NoAction
+        CycleOnFlag = .False.
+      END IF
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+CASE(AdaptiveTemperatureGradient)
+    NumPreDays = OptStartSysAvailMgrData(SysAvailNum)%NumPreDays
+  IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType == ControlZone) THEN
+    IF (.NOT.ALLOCATED(AdaTempGradTrdHeat)) THEN
+      ALLOCATE(AdaTempGradTrdHeat(NumPreDays))
+      ALLOCATE(AdaTempGradTrdCool(NumPreDays))
+    END IF
+    ZoneNum = OptStartSysAvailMgrData(SysAvailNum)%ZoneNum
+    IF ((.Not.allocated(TempTstatAir)) .OR. (.Not.allocated(ZoneThermostatSetPointLo)) .OR. &
+      (.Not.allocated(ZoneThermostatSetPointHi))) THEN
+      TempDiff = 0.0d0
+    ELSE
+      IF (.NOT. CycleOnFlag) THEN
+        IF (ALLOCATED(OccRoomTSetPointHeat) .AND. ALLOCATED(OccRoomTSetPointCool)) THEN
+          TempDiffHi = TempTstatAir(ZoneNum) - OccRoomTSetPointCool(ZoneNum)
+          TempDiffLo = TempTstatAir(ZoneNum) - OccRoomTSetPointHeat(ZoneNum)
+        ELSE
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+        END IF
+      END IF
+    END IF
+    !Store adaptive temperature gradients for previous days and calculate the adaptive temp gradients
+    !-----------------------------------------------------------------------------
+    IF (WarmupFlag) THEN
+        AdaTempGradHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradCool
+    ELSE IF (DayOfSim == BeginDay .AND. BeginDayFlag) THEN
+        AdaTempGradTrdHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradTrdCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+    ELSE
+        IF (BeginDayFlag .AND. FirstTimeATGFlag) THEN
+            FirstTimeATGFlag = .False.
+            AdaTempGradHeat = AdaTempGradHeat + AdaTempGradTrdHeat(NumPreDays)/NumPreDays - &
+                        AdaTempGradTrdHeat(1)/NumPreDays
+            AdaTempGradCool = AdaTempGradCool + AdaTempGradTrdCool(NumPreDays)/NumPreDays - &
+                        AdaTempGradTrdCool(1)/NumPreDays
+            IF (FanStartTime>0) THEN
+                DO ATGCounter=1, NumPreDays-1
+                AdaTempGradTrdHeat(ATGCounter) = AdaTempGradTrdHeat(ATGCounter+1)
+                AdaTempGradTrdCool(ATGCounter) = AdaTempGradTrdCool(ATGCounter+1)
+                END DO
+            END IF
+        END IF
+    END IF
+
+    IF (CurrentTime >= 1.0d0) FirstTimeATGFlag = .True.
+    !------------------------------------------------------------------------------
+
+    IF (TempDiffHi<0.0d0) THEN
+        TempDiff = TempDiffLo
+        IF (TempDiff .LT. 0.0d0) THEN !Heating Mode
+          TempDiff = ABS(TempDiff)
+          DeltaTime = TempDiff/AdaTempGradHeat
+          IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+            DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+          END IF
+          PreStartTime = FanStartTime - DeltaTime
+          IF (PreStartTime<0.0d0) PreStartTime = -.1d0
+          PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+          IF (PreStartTimeTmr<0.0d0) THEN
+            PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+            OverNightStartFlag = .True.
+          ELSE
+            OverNightStartFlag = .False.
+          END IF
+          IF (.NOT. OverNightStartFlag) THEN
+            IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+              IF (CurrentTime .GT. FanStartTime) CycleOnFlag = .False.
+              ! Calculate the current day actual temperature gradient --------------------------
+              IF (.NOT. WarmupFlag) THEN
+                  IF (ATGUpdateFlag1) THEN
+                    ATGUpdateTime1 = CurrentTime
+                    ATGUpdateTemp1 = TempTstatAir(ZoneNum)
+                    ATGUpdateFlag1 = .False.
+                  END IF
+                  IF (TempTstatAir(ZoneNum) .GE. OccRoomTSetPointHeat(ZoneNum) .AND. ATGUpdateFlag2) THEN
+                    ATGUpdateTime2 = CurrentTime
+                    ATGUpdateTemp2 = TempTstatAir(ZoneNum)
+                    ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1) > 1.d-10) THEN
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)/(ATGUpdateTime2-ATGUpdateTime1)
+                ELSE
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)*NumOfTimeStepInHour
+                END IF
+                  END IF
+              END IF
+              !---------------------------------------------------------------------------------
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              ATGUpdateFlag1 = .True.
+              ATGUpdateFlag2 = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+            IF (CurrentTime .GT. FanStartTime .AND. CurrentTime .LT. PreStartTimeTmr) CycleOnFlag=.False.
+            ! Calculate the current day actual temperature gradient --------------------------
+              IF (.NOT. WarmupFlag) THEN
+                IF (ATGUpdateFlag1) THEN
+                  ATGUpdateTime1 = CurrentTime
+                  ATGUpdateTemp1 = TempTstatAir(ZoneNum)
+                  ATGUpdateFlag1 = .False.
+                END IF
+                IF (TempTstatAir(ZoneNum) .GE. OccRoomTSetPointHeat(ZoneNum) .AND. ATGUpdateFlag2) THEN
+                  ATGUpdateTime2 = CurrentTime
+                  ATGUpdateTemp2 = TempTstatAir(ZoneNum)
+                  ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1+24.0d0) > 1.d-10) THEN
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)/(ATGUpdateTime2-ATGUpdateTime1+24.0d0)
+                ELSE
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)*NumOfTimeStepInHour
+                END IF
+                END IF
+              END IF
+              !---------------------------------------------------------------------------------
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            ATGUpdateFlag1 = .True.
+            ATGUpdateFlag2 = .True.
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+          END IF
+        ELSE
+          AvailStatus = NoAction
+          CycleOnFlag = .False.
+        END IF
+      ELSE IF (OccRoomTSetPointCool(ZoneNum) .LT. 50.0d0) THEN ! Cooling Mode
+          TempDiff = TempDiffHi
+          DeltaTime = TempDiff/AdaTempGradCool
+          IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+            DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+          END IF
+          PreStartTime = FanStartTime - DeltaTime
+          IF (PreStartTime<0.0d0) PreStartTime = -.1d0
+          PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+          IF (PreStartTimeTmr<0.0d0) THEN
+            PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+            OverNightStartFlag = .True.
+          ELSE
+            OverNightStartFlag = .False.
+          END IF
+          IF (.NOT. OverNightStartFlag) THEN
+            IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+              IF (.NOT. WarmupFlag) THEN
+                  IF (ATGUpdateFlag1) THEN
+                    ATGUpdateTime1 = CurrentTime
+                    ATGUpdateTemp1 = TempTstatAir(ZoneNum)
+                    ATGUpdateFlag1 = .False.
+                  END IF
+                  IF (TempTstatAir(ZoneNum) .LE. OccRoomTSetPointCool(ZoneNum) .AND. ATGUpdateFlag2) THEN
+                    ATGUpdateTime2 = CurrentTime
+                    ATGUpdateTemp2 = TempTstatAir(ZoneNum)
+                    ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1) > 1.d-10) THEN
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)/(ATGUpdateTime2-ATGUpdateTime1)
+                ELSE
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)*NumOfTimeStepInHour
+                END IF
+                  END IF
+              END IF
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              ATGUpdateFlag1 = .True.
+              ATGUpdateFlag2 = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            IF (.NOT. WarmupFlag) THEN
+              IF (ATGUpdateFlag1) THEN
+                ATGUpdateTime1 = CurrentTime
+                ATGUpdateTemp1 = TempTstatAir(ZoneNum)
+                ATGUpdateFlag1 = .False.
+              END IF
+              IF (TempTstatAir(ZoneNum) .LE. OccRoomTSetPointCool(ZoneNum) .AND. ATGUpdateFlag2) THEN
+                ATGUpdateTime2 = CurrentTime
+                ATGUpdateTemp2 = TempTstatAir(ZoneNum)
+                ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1+24.0d0) > 1.d-10) THEN
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)/(ATGUpdateTime2-ATGUpdateTime1+24.0d0)
+                ELSE
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)*NumOfTimeStepInHour
+                END IF
+              END IF
+            END IF
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            ATGUpdateFlag1 = .True.
+            ATGUpdateFlag2 = .True.
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+          END IF
+        ELSE !Not heating nor cooling mode
+          AvailStatus = NoAction
+          CycleOnFlag = .False.
+        END IF
+ELSE IF (OptStartSysAvailMgrData(SysAvailNum)%CtrlType == MaximumOfZoneList) THEN
+    IF (.NOT. ALLOCATED(AdaTempGradTrdHeat)) THEN
+      ALLOCATE(AdaTempGradTrdHeat(NumPreDays))
+      ALLOCATE(AdaTempGradTrdCool(NumPreDays))
+    END IF
+    NumOfZonesInList = OptStartSysAvailMgrData(SysAvailNum)%NumOfZones
+    ATGWCZoneNumHi = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(1)
+    ATGWCZoneNumLo = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(1)
+    IF ((.Not.allocated(TempTstatAir)) .OR. (.Not.allocated(ZoneThermostatSetPointLo)) .OR. &
+        (.Not.allocated(ZoneThermostatSetPointHi))) THEN
+      TempDiff = 0.0d0
+    ELSE
+      IF (.NOT. CycleOnFlag) THEN
+        IF (ALLOCATED(OccRoomTSetPointHeat) .AND. ALLOCATED(OccRoomTSetPointCool)) THEN
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+          DO ZoneNum=1, NumOfZonesInList
+            TempDiff=TempTstatAir(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)) - &
+                     OccRoomTSetPointCool(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum))
+            TempDiffHi = Max(TempDiffHi, TempDiff)
+            !Store the worse case zone number for actual temperature gradient calculation
+            IF (TempDiff == TempDiffHi) THEN
+              ATGWCZoneNumHi = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)
+            ELSE
+              ATGWCZoneNumHi = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(1)
+            END IF
+            TempDiff=TempTstatAir(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)) - &
+                     OccRoomTSetPointHeat(OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum))
+            TempDiffLo = Min(TempDiffLo, TempDiff)
+            IF (TempDiff == TempDiffLo) THEN
+              ATGWCZoneNumLo = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(ZoneNum)
+            ELSE
+              ATGWCZoneNumLo = OptStartSysAvailMgrData(SysAvailNum)%ZonePtrs(1)
+            END IF
+          END DO
+        ELSE
+          TempDiffHi = 0.0d0
+          TempDiffLo = 0.0d0
+        END IF
+      END IF
+    END IF
+    !Store adaptive temperature gradients for previous days and calculate the adaptive temp gradients
+    !-----------------------------------------------------------------------------
+    IF (WarmupFlag) THEN
+        AdaTempGradHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradCool
+    ELSE IF (DayOfSim == BeginDay .AND. BeginDayFlag) THEN
+        AdaTempGradTrdHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradHeat = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradTrdCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+        AdaTempGradCool = OptStartSysAvailMgrData(SysAvailNum)%InitTGradHeat
+    ELSE
+        IF (BeginDayFlag .AND. FirstTimeATGFlag) THEN
+            FirstTimeATGFlag = .False.
+            AdaTempGradHeat = AdaTempGradHeat + AdaTempGradTrdHeat(NumPreDays)/NumPreDays - &
+                        AdaTempGradTrdHeat(1)/NumPreDays
+            AdaTempGradCool = AdaTempGradCool + AdaTempGradTrdCool(NumPreDays)/NumPreDays - &
+                        AdaTempGradTrdCool(1)/NumPreDays
+            IF (FanStartTime>0) THEN
+                DO ATGCounter=1, NumPreDays-1
+                AdaTempGradTrdHeat(ATGCounter) = AdaTempGradTrdHeat(ATGCounter+1)
+                AdaTempGradTrdCool(ATGCounter) = AdaTempGradTrdCool(ATGCounter+1)
+                END DO
+            END IF
+        END IF
+    END IF
+
+    IF (CurrentTime >= 1.0d0) FirstTimeATGFlag = .True.
+    !------------------------------------------------------------------------------
+
+      IF ((TempDiffHi<0.0d0 .AND. TempDiffLo<0.0d0) .OR. (abs(TempDiffLo)>abs(TempDiffHi) &
+         .AND. TempDiffLo<0.0d0)) THEN !Heating Mode
+          TempDiff = TempDiffLo
+          TempDiff = ABS(TempDiff)
+          DeltaTime = TempDiff/AdaTempGradHeat
+          IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+            DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+          END IF
+          PreStartTime = FanStartTime - DeltaTime
+          IF (PreStartTime<0.0d0) PreStartTime = -.1d0
+          PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+          IF (PreStartTimeTmr<0.0d0) THEN
+            PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+            OverNightStartFlag = .True.
+          ELSE
+            OverNightStartFlag = .False.
+          END IF
+          IF (.NOT. OverNightStartFlag) THEN
+            IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              OSReportVarFlag = .True.
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+              IF (CurrentTime .GT. FanStartTime) CycleOnFlag = .False.
+              ! Calculate the current day actual temperature gradient --------------------------
+              IF (.NOT. WarmupFlag) THEN
+                  IF (ATGUpdateFlag1) THEN
+                    ATGUpdateTime1 = CurrentTime
+                    ATGUpdateTemp1 = TempTstatAir(ATGWCZoneNumLo)
+                    ATGUpdateFlag1 = .False.
+                  END IF
+                  IF (TempTstatAir(ATGWCZoneNumLo) .GE. OccRoomTSetPointHeat(ATGWCZoneNumLo) .AND. &
+                  ATGUpdateFlag2) THEN
+                    ATGUpdateTime2 = CurrentTime
+                    ATGUpdateTemp2 = TempTstatAir(ATGWCZoneNumLo)
+                    ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1) > 1.d-10) THEN
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)/(ATGUpdateTime2-ATGUpdateTime1)
+                ELSE
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)*NumOfTimeStepInHour
+                END IF
+                  END IF
+              END IF
+              !---------------------------------------------------------------------------------
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              ATGUpdateFlag1 = .True.
+              ATGUpdateFlag2 = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            ! Calculate the current day actual temperature gradient --------------------------
+            IF (.NOT. WarmupFlag) THEN
+                IF (ATGUpdateFlag1) THEN
+                ATGUpdateTime1 = CurrentTime
+                ATGUpdateTemp1 = TempTstatAir(ATGWCZoneNumLo)
+                ATGUpdateFlag1 = .False.
+                END IF
+                IF (TempTstatAir(ATGWCZoneNumLo) .GE. OccRoomTSetPointHeat(ATGWCZoneNumLo) .AND. &
+                ATGUpdateFlag2) THEN
+                ATGUpdateTime2 = CurrentTime
+                ATGUpdateTemp2 = TempTstatAir(ATGWCZoneNumLo)
+                ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1+24.0d0) > 1.d-10) THEN
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)/(ATGUpdateTime2-ATGUpdateTime1+24.0d0)
+                ELSE
+                  AdaTempGradTrdHeat(NumPreDays)=(ATGUpdateTemp2-ATGUpdateTemp1)*NumOfTimeStepInHour
+                END IF
+                END IF
+            END IF
+            !---------------------------------------------------------------------------------
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+            IF (CurrentTime .GT. FanStartTime .AND. CurrentTime .LT. PreStartTimeTmr) CycleOnFlag=.False.
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            ATGUpdateFlag1 = .True.
+            ATGUpdateFlag2 = .True.
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+          END IF
+      ELSE IF (TempDiffHi<=0.0d0 .AND. TempDiffLo>=0.0d0) THEN ! not heating and not cooling
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            TempDiffHi = 0.0d0
+            TempDiffLo = 0.0d0
+      ELSE IF (TempDiffHi < 30.0d0) THEN ! Cooling Mode
+          TempDiff = TempDiffHi
+          DeltaTime = TempDiff/AdaTempGradCool
+          IF (DeltaTime>OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime) THEN
+            DeltaTime=OptStartSysAvailMgrData(SysAvailNum)%MaxOptStartTime
+          END IF
+          PreStartTime = FanStartTime - DeltaTime
+          IF (PreStartTime<0) PreStartTime = -.1d0
+          PreStartTimeTmr = FanStartTimeTmr - DeltaTime
+          IF (PreStartTimeTmr<0) THEN
+            PreStartTimeTmr = PreStartTimeTmr + 24.0d0
+            OverNightStartFlag = .True.
+          ELSE
+            OverNightStartFlag = .False.
+          END IF
+          IF (.NOT. OverNightStartFlag) THEN
+            IF (FanStartTime == 0.0d0 .OR. CurrentTime .GT. FanStartTime) THEN
+              AvailStatus = NoAction
+              CycleOnFlag = .False.
+              OSReportVarFlag = .True.
+            ELSE IF (CyCleOnFlag) THEN
+              AvailStatus = CycleOn
+            ! Calculate the current day actual temperature gradient --------------------------
+            IF (.NOT. WarmupFlag) THEN
+                IF (ATGUpdateFlag1) THEN
+                ATGUpdateTime1 = CurrentTime
+                ATGUpdateTemp1 = TempTstatAir(ATGWCZoneNumHi)
+                ATGUpdateFlag1 = .False.
+                END IF
+                IF (TempTstatAir(ATGWCZoneNumHi) .LE. OccRoomTSetPointCool(ATGWCZoneNumHi) .AND. &
+                ATGUpdateFlag2) THEN
+                ATGUpdateTime2 = CurrentTime
+                ATGUpdateTemp2 = TempTstatAir(ATGWCZoneNumHi)
+                ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1) > 1.d-10) THEN
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)/(ATGUpdateTime2-ATGUpdateTime1)
+                ELSE
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)*NumOfTimeStepInHour
+                ENDIF
+
+                END IF
+            END IF
+            !---------------------------------------------------------------------------------
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE IF (PreStartTime .LT. CurrentTime) THEN
+              IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+              END IF
+              AvailStatus = CycleOn
+              CycleOnFlag = .True.
+              ATGUpdateFlag1 = .True.
+              ATGUpdateFlag2 = .True.
+              DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+              END DO
+            ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+            END IF
+          ELSE
+          IF (FanStartTime == 0.0d0 .OR. (CurrentTime .GT. FanStartTime .AND. CurrentTime .LE. PreStartTimeTmr)) THEN
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          ELSE IF (CycleOnFlag) THEN
+            AvailStatus = CycleOn
+            ! Calculate the current day actual temperature gradient --------------------------
+            IF (.NOT. WarmupFlag) THEN
+                IF (ATGUpdateFlag1) THEN
+                ATGUpdateTime1 = CurrentTime
+                ATGUpdateTemp1 = TempTstatAir(ATGWCZoneNumHi)
+                ATGUpdateFlag1 = .False.
+                END IF
+                IF (TempTstatAir(ATGWCZoneNumHi) .LE. OccRoomTSetPointCool(ATGWCZoneNumHi) .AND. &
+                ATGUpdateFlag2) THEN
+                ATGUpdateTime2 = CurrentTime
+                ATGUpdateTemp2 = TempTstatAir(ATGWCZoneNumHi)
+                ATGUpdateFlag2 = .False.
+                IF (ABS(ATGUpdateTime2-ATGUpdateTime1+24.0d0) > 1.d-10) THEN
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)/(ATGUpdateTime2-ATGUpdateTime1+24.0d0)
+                ELSE
+                  AdaTempGradTrdCool(NumPreDays)=(ATGUpdateTemp1-ATGUpdateTemp2)*NumOfTimeStepInHour
+                END IF
+                END IF
+            END IF
+            !---------------------------------------------------------------------------------
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE IF (PreStartTime .LT. CurrentTime .OR. PreStartTimeTmr .LT. CurrentTime) THEN
+            IF (OSReportVarFlag) THEN
+                NumHoursBeforeOccupancy=DeltaTime
+                OSReportVarFlag = .False.
+            END IF
+            AvailStatus = CycleOn
+            CycleOnFlag = .True.
+            ATGUpdateFlag2 = .True.
+            ATGUpdateFlag1 = .True.
+            DO I=1, NumOfZones
+                If (ZoneEquipConfig(I)%AirLoopNum==PriAirSysNum) THEN
+                    OptStartData%OptStartFlag(ZoneEquipConfig(I)%ActualZoneNum)=.TRUE.
+                END IF
+            END DO
+          ELSE
+            AvailStatus = NoAction
+            CycleOnFlag = .False.
+            OSReportVarFlag = .True.
+          END IF
+          END IF
+        ELSE
+          AvailStatus = NoAction
+          CycleOnFlag = .False.
+        END IF
+  ELSE
+    AvailStatus = NoAction
+  END IF
+
+CASE(AdaptiveASHRAE)
+    AvailStatus = NoAction
+END SELECT
+END IF
+
+  OptStartSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
+  OptStartSysAvailMgrData(SysAvailNum)%NumHoursBeforeOccupancy = NumHoursBeforeOccupancy
+
+  RETURN
+
+END SUBROUTINE CalcOptStartSysAvailMgr
+
 SUBROUTINE CalcNVentSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipType)
 
           ! SUBROUTINE INFORMATION:
@@ -2281,8 +3719,8 @@ SUBROUTINE CalcNVentSysAvailMgr(SysAvailNum,PriAirSysNum,AvailStatus,ZoneEquipTy
   LowLimCheck = .FALSE.
 ! check if night venting allowed: not allowed if avail sched is off or fan sched is on
 ! CR 7913 changed to allow during warmup
-  IF ( (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) .OR. &
-       (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0)  )  THEN
+  IF ( (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0d0) .OR. &
+       (GetCurrentScheduleValue(NVentSysAvailMgrData(SysAvailNum)%FanSchedPtr) > 0.0d0)  )  THEN
     AvailStatus = NoAction
   ELSE
 
@@ -2495,7 +3933,7 @@ SUBROUTINE CalcLoTurnOffSysAvailMgr(SysAvailNum,AvailStatus)
 
           ! If applicability schedule is off, then availability manager is inactive, return no action
   IF (LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr > 0) THEN
-    IF(GetCurrentScheduleValue(LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0) THEN
+    IF(GetCurrentScheduleValue(LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr) <= 0.0d0) THEN
       AvailStatus = NoAction
       LoTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus = AvailStatus
       RETURN
@@ -2911,7 +4349,7 @@ SUBROUTINE GetHybridVentilationInputs
     END IF
     IF (NumNumbers > 6) THEN
       HybridVentSysAvailMgrData(SysAvailNum)%MaxOutdoorDewPoint = rNumericArgs(7)
-      IF (rNumericArgs(7) > 100.0 .OR. rNumericArgs(7) < -100.0) THEN
+      IF (rNumericArgs(7) > 100.0d0 .OR. rNumericArgs(7) < -100.0d0) THEN
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
         CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' is beyond the range.')
         CALL ShowContinueError('The input value is '//TRIM(TrimSigDigits(rNumericArgs(7),0))// &
@@ -3316,7 +4754,7 @@ SUBROUTINE InitHybridVentSysAvailMgr
     ! -1 means that the value will be determined inside CalcHybridVentSysAvailMgr.
     ! IF the value is still -1, the program will stop.
     HybridVentSysAvailVentCtrl(SysAvailNum) = -1
-    HybridVentSysAvailWindModifier(SysAvailNum) = -1.0
+    HybridVentSysAvailWindModifier(SysAvailNum) = -1.0d0
   END DO
 
   IF (ALLOCATED(HybridVentSysAvailMgrData))  HybridVentSysAvailMgrData%AvailStatus  = NoAction
@@ -3443,7 +4881,7 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
 
       CASE(HybridVentMode_OA)
         OASetPoint = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr)
-        ACH=0.0
+        ACH=0.0d0
         HybridVentModeOA = .TRUE.
         IF(.NOT. HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
           IF (SimulateAirflowNetwork <= AirflowNetworkControlSimple) THEN
@@ -3518,7 +4956,7 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
 
     ! Dew point control mode
     IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlMode == HybridVentMode_Dewpoint) THEN
-      ZoneAirRH = PsyRhFnTdbWPb(MAT(ZoneNum),ZoneAirHumRat(ZoneNum),OutBaroPress)*100
+      ZoneAirRH = PsyRhFnTdbWPb(MAT(ZoneNum),ZoneAirHumRat(ZoneNum),OutBaroPress)*100.0d0
       ZoneAirDewpoint = PsyTdpFnWPb(ZoneAirHumRat(ZoneNum),OutBaroPress)
       IF (NumHumidityControlZones == 0) THEN
         HybridVentSysAvailMgrData(SysAvailNum)%DewPointNoRHErrCount = &
@@ -3546,11 +4984,11 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
           ZoneRHHumidifyingSetPoint = GetCurrentScheduleValue(HumidityControlZone(HstatZoneNum)%HumidifyingSchedIndex)
           ZoneRHDehumidifyingSetPoint = GetCurrentScheduleValue(HumidityControlZone(HstatZoneNum)%DehumidifyingSchedIndex)
           IF (ZoneAirRH > ZoneRHDehumidifyingSetPoint) THEN ! Need dehumidification
-            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHDehumidifyingSetPoint / 100.0),OutBaroPress)
+            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHDehumidifyingSetPoint / 100.0d0),OutBaroPress)
             IF (WSetPoint < OutHumRat) &
               HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
           ELSE IF (ZoneAirRH < ZoneRHHumidifyingSetPoint) THEN ! Need humidification
-            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHHumidifyingSetPoint / 100.0),OutBaroPress)
+            WSetPoint = PsyWFnTdbRhPb(MAT(ZoneNum),(ZoneRHHumidifyingSetPoint / 100.0d0),OutBaroPress)
             IF (WSetPoint > OutHumRat) &
               HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl = HybridVentCtrl_Close
           ELSE

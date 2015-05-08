@@ -55,31 +55,31 @@ CHARACTER(len=*), PARAMETER :: cCMO_BBRadiator_Steam='ZoneHVAC:Baseboard:Radiant
     INTEGER :: FluidIndex               = 0  ! Fluid index for FluidProperties (Steam)
     INTEGER :: ControlCompTypeNum       = 0
     INTEGER :: CompErrIndex             = 0
-    REAL(r64) :: DegofSubCooling        =0.0 ! Temperature differences due to subcooling of the condensate [C]
-    REAL(r64) :: Offset                 =0.0 ! Control accuracy
-    REAL(r64) :: SteamMassFlowRate      =0.0 ! Mass flow rate of steam passing through the heater [kg/s]
-    REAL(r64) :: SteamMassFlowRateMax   =0.0 ! Maximum mass flow rate of steam [kg/s]
-    REAL(r64) :: SteamVolFlowRateMax    =0.0 ! Maximum volumetric flow rate of steam [m3/s]
-    REAL(r64) :: SteamOutletTemp        =0.0 ! Outlet steam temperature from the heater [C]
-    REAL(r64) :: SteamInletTemp         =0.0 ! Inlet steam temperature [C]
-    REAL(r64) :: SteamInletEnthalpy     =0.0 ! Enthalpy of the steam delivered from the boiler [J/kg]
-    REAL(r64) :: SteamOutletEnthalpy    =0.0 ! Enthalpy of the steam leaving the heater [J/kg]
-    REAL(r64) :: SteamInletPress        =0.0 ! Pressure of steam at the inlet of the heater [Pa]
-    REAL(r64) :: SteamOutletPress       =0.0 ! Pressure of steam at the outlet of the heater [Pa]
-    REAL(r64) :: SteamInletQuality      =0.0 ! Quality of steam at the inlet of the heater [Pa]
-    REAL(r64) :: SteamOutletQuality     =0.0 ! Quality of steam at the outlet of the heater [Pa]
-    REAL(r64) :: FracRadiant            =0.0 ! User defined fraction for radiant heat addition
-    REAL(r64) :: FracConvect            =0.0 ! Fraction for convective heat addition
-    REAL(r64) :: FracDistribPerson      =0.0 ! Fraction for radiant heat incident on people
+    REAL(r64) :: DegofSubCooling        =0.0d0 ! Temperature differences due to subcooling of the condensate [C]
+    REAL(r64) :: Offset                 =0.0d0 ! Control accuracy
+    REAL(r64) :: SteamMassFlowRate      =0.0d0 ! Mass flow rate of steam passing through the heater [kg/s]
+    REAL(r64) :: SteamMassFlowRateMax   =0.0d0 ! Maximum mass flow rate of steam [kg/s]
+    REAL(r64) :: SteamVolFlowRateMax    =0.0d0 ! Maximum volumetric flow rate of steam [m3/s]
+    REAL(r64) :: SteamOutletTemp        =0.0d0 ! Outlet steam temperature from the heater [C]
+    REAL(r64) :: SteamInletTemp         =0.0d0 ! Inlet steam temperature [C]
+    REAL(r64) :: SteamInletEnthalpy     =0.0d0 ! Enthalpy of the steam delivered from the boiler [J/kg]
+    REAL(r64) :: SteamOutletEnthalpy    =0.0d0 ! Enthalpy of the steam leaving the heater [J/kg]
+    REAL(r64) :: SteamInletPress        =0.0d0 ! Pressure of steam at the inlet of the heater [Pa]
+    REAL(r64) :: SteamOutletPress       =0.0d0 ! Pressure of steam at the outlet of the heater [Pa]
+    REAL(r64) :: SteamInletQuality      =0.0d0 ! Quality of steam at the inlet of the heater [Pa]
+    REAL(r64) :: SteamOutletQuality     =0.0d0 ! Quality of steam at the outlet of the heater [Pa]
+    REAL(r64) :: FracRadiant            =0.0d0 ! User defined fraction for radiant heat addition
+    REAL(r64) :: FracConvect            =0.0d0 ! Fraction for convective heat addition
+    REAL(r64) :: FracDistribPerson      =0.0d0 ! Fraction for radiant heat incident on people
     REAL(r64),   ALLOCATABLE, DIMENSION(:) :: FracDistribToSurf
-    REAL(r64) :: TotPower               =0.0 ! Convective system impact rate that the heater actually meets [W]
-    REAL(r64) :: Power                  =0.0 ! Maximum heating rate [W]
-    REAL(r64) :: ConvPower              =0.0 ! Convective heating rate [W]
-    REAL(r64) :: RadPower               =0.0 ! Radiant heating rate [W]
-    REAL(r64) :: TotEnergy              =0.0 ! Convective system impact energy [J]
-    REAL(r64) :: Energy                 =0.0 ! Maximum heating energy [J]
-    REAL(r64) :: ConvEnergy             =0.0 ! Convective heating energy [J]
-    REAL(r64) :: RadEnergy              =0.0 ! Radiant heating energy [J]
+    REAL(r64) :: TotPower               =0.0d0 ! Convective system impact rate that the heater actually meets [W]
+    REAL(r64) :: Power                  =0.0d0 ! Maximum heating rate [W]
+    REAL(r64) :: ConvPower              =0.0d0 ! Convective heating rate [W]
+    REAL(r64) :: RadPower               =0.0d0 ! Radiant heating rate [W]
+    REAL(r64) :: TotEnergy              =0.0d0 ! Convective system impact energy [J]
+    REAL(r64) :: Energy                 =0.0d0 ! Maximum heating energy [J]
+    REAL(r64) :: ConvEnergy             =0.0d0 ! Convective heating energy [J]
+    REAL(r64) :: RadEnergy              =0.0d0 ! Radiant heating energy [J]
     INTEGER   :: LoopNum                =0   ! plant loop index
     INTEGER   :: LoopSideNum            =0   ! plant loop side index
     INTEGER   :: BranchNum              =0   ! plant loop branch index
@@ -216,13 +216,13 @@ CONTAINS
 
       IF (QZnReq > SmallLoad &
           .AND. .NOT. CurDeadbandOrSetback(ActualZoneNum) &
-          .AND. (GetCurrentScheduleValue(SteamBaseboard(BaseboardNum)%SchedPtr) > 0.0) ) THEN
+          .AND. (GetCurrentScheduleValue(SteamBaseboard(BaseboardNum)%SchedPtr) > 0.0d0) ) THEN
 
            ! On the first HVAC iteration the system values are given to the controller, but after that
            ! the demand limits are in place and there needs to be feedback to the Zone Equipment
         If(FirstHVACIteration)Then
            MaxSteamFlow = SteamBaseboard(BaseboardNum)%SteamMassFlowRateMax
-           MinSteamFlow = 0.0
+           MinSteamFlow = 0.0d0
         Else
            MaxSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMaxAvail
            MinSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMinAvail
@@ -709,8 +709,8 @@ SUBROUTINE InitSteamBaseboard(BaseboardNum, ControlledZoneNumSub, FirstHVACItera
                                    SteamBaseboard(BaseboardNum)%BranchNum,            &
                                    SteamBaseboard(BaseboardNum)%CompNum)
       Node(SteamInletNode)%Enthalpy                     = StartEnthSteam
-      Node(SteamInletNode)%Quality                      = 1.0
-      Node(SteamInletNode)%HumRat                       = 0.0
+      Node(SteamInletNode)%Quality                      = 1.0d0
+      Node(SteamInletNode)%HumRat                       = 0.0d0
 
           ! Initializes radiant sources
       ZeroSourceSumHATsurf      =0.0D0
@@ -763,7 +763,7 @@ SUBROUTINE SizeSteamBaseboard(BaseboardNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -782,6 +782,7 @@ SUBROUTINE SizeSteamBaseboard(BaseboardNum)
   USE FluidProperties,     ONLY: GetSatEnthalpyRefrig,GetSatDensityRefrig, GetSatSpecificHeatRefrig
 !  USE BranchInputManager,  ONLY: MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,         ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -807,14 +808,19 @@ SUBROUTINE SizeSteamBaseboard(BaseboardNum)
   REAL(r64) :: Cp                  ! local fluid specific heat
   REAL(r64) :: tmpSteamVolFlowRateMax ! local temporary design steam flow
   LOGICAL   :: ErrorsFound         ! If errors detected in input
+  LOGICAL   :: IsAutosize               ! Indicator to autosizing steam flow
+  REAL(r64) :: SteamVolFlowRateMaxDes   ! Design maximum steam volume flow for reporting
+  REAL(r64) :: SteamVolFlowRateMaxUser  ! User hard-sized maximum steam volume flow for reporting
 
 
   PltSizSteamNum = 0
-  DesCoilLoad    = 0.0
+  DesCoilLoad    = 0.0d0
   ErrorsFound    = .FALSE.
+  IsAutosize = .FALSE.
+  SteamVolFlowRateMaxDes = 0.0d0
+  SteamVolFlowRateMaxUser = 0.0d0
 
         ! Find the appropriate steam plant sizing object
-  IF (SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax == AutoSize) THEN
     PltSizSteamNum = PlantLoop(SteamBaseboard(BaseboardNum)%LoopNum)%PlantSizNum
 !    PltSizSteamNum = MyPlantSizingIndex('Coil:Heating:Steam', SteamBaseboard(BaseboardNum)%EquipID, &
 !                    SteamBaseboard(BaseboardNum)%SteamInletNode, &
@@ -824,36 +830,70 @@ SUBROUTINE SizeSteamBaseboard(BaseboardNum)
 
       IF (CurZoneEqNum > 0) THEN
 
-        IF (SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax == AutoSize) THEN
-          CALL CheckZoneSizing(cCMO_BBRadiator_Steam,SteamBaseboard(BaseboardNum)%EquipID)
-                 DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
-          IF (DesCoilLoad >= SmallLoad) THEN
-            SteamInletTemp  = 100.0d0
-            EnthSteamInDry  = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,1.0d0,  &
-                                SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
-            EnthSteamOutWet = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,0.0d0,  &
-                              SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
-            LatentHeatSteam = EnthSteamInDry - EnthSteamOutWet
-            SteamDensity    = GetSatDensityRefrig('STEAM',SteamInletTemp,1.0d0,  &
-                              SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
-            Cp = GetSatSpecificHeatRefrig('STEAM',SteamInletTemp,0.0d0,SteamBaseboard(BaseboardNum)%FluidIndex, &
-                                              'SizeSteamBaseboard')
-
-            SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax = DesCoilLoad / &
-                                            (SteamDensity*(LatentHeatSteam + SteamBaseboard(BaseboardNum)%DegOfSubCooling * Cp))
-          ELSE
-            SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax = SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax
-          END IF
-
+      IF (SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax == AutoSize) THEN
+        IsAutosize = .TRUE.
+      END IF
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+        IF (SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax > 0.0d0) THEN
           CALL ReportSizingOutput(cCMO_BBRadiator_Steam,SteamBaseboard(BaseboardNum)%EquipID,&
-                                'Maximum Steam Flow Rate [m3/s]',SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax)
+                               'User-Specified Maximum Water Flow Rate [m3/s]', &
+                                SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax)
+        END IF
+      ELSE
+        CALL CheckZoneSizing(cCMO_BBRadiator_Steam,SteamBaseboard(BaseboardNum)%EquipID)
+        DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
+        IF (DesCoilLoad >= SmallLoad) THEN
+          SteamInletTemp  = 100.0d0
+          EnthSteamInDry  = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,1.0d0,  &
+                            SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
+          EnthSteamOutWet = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,0.0d0,  &
+                            SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
+          LatentHeatSteam = EnthSteamInDry - EnthSteamOutWet
+          SteamDensity    = GetSatDensityRefrig('STEAM',SteamInletTemp,1.0d0,  &
+                            SteamBaseboard(BaseboardNum)%FluidIndex,'SizeSteamBaseboard')
+          Cp = GetSatSpecificHeatRefrig('STEAM',SteamInletTemp,0.0d0,SteamBaseboard(BaseboardNum)%FluidIndex, &
+                                            'SizeSteamBaseboard')
+
+          SteamVolFlowRateMaxDes = DesCoilLoad / &
+                                     (SteamDensity*(LatentHeatSteam + SteamBaseboard(BaseboardNum)%DegOfSubCooling * Cp))
+        ELSE
+          SteamVolFlowRateMaxDes = 0.0d0
+        END IF
+
+        IF (IsAutosize) THEN
+          SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax = SteamVolFlowRateMaxDes
+          CALL ReportSizingOutput(cCMO_BBRadiator_Steam,SteamBaseboard(BaseboardNum)%EquipID,&
+                              'Design Size Maximum Steam Flow Rate [m3/s]',SteamVolFlowRateMaxDes)
+        ELSE ! Hard size with sizing data
+          IF (SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax > 0.0d0 .AND. SteamVolFlowRateMaxDes > 0.0d0) THEN
+            SteamVolFlowRateMaxUser = SteamBaseboard(BaseboardNum)%SteamVolFlowRateMax
+            CALL ReportSizingOutput(cCMO_BBRadiator_Steam,SteamBaseboard(BaseboardNum)%EquipID,&
+                                'Design Size Maximum Steam Flow Rate [m3/s]',SteamVolFlowRateMaxDes, &
+                                'User-Speicified Maximum Steam Flow Rate [m3/s]',SteamVolFlowRateMaxUser)
+            IF (DisplayExtraWarnings) THEN
+                ! Report difference between design size and user-specified values
+              IF ((ABS(SteamVolFlowRateMaxDes - SteamVolFlowRateMaxUser)/SteamVolFlowRateMaxUser) &
+                          > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeSteamBaseboard: Potential issue with equipment sizing for ' &
+                                    // 'ZoneHVAC:Baseboard:RadiantConvective:Steam="'//  &
+                                    TRIM(SteamBaseboard(BaseboardNum)%EquipID)//'".')
+                CALL ShowContinueError('User-Specified Maximum Steam Flow Rate of '// &
+                                    TRIM(RoundSigDigits(SteamVolFlowRateMaxUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Steam Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(SteamVolFlowRateMaxDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
         END IF
       END IF
-
-    ELSE
+    END IF
+  ELSE
+    IF (IsAutosize) THEN
        ! if there is no heating Sizing:Plant object and autosizng was requested, issue an error message
        ! first error will be issued by MyPlantSizingIndex
-      CALL ShowContinueError('Autosizing of steam baseboard requires a heating loop Sizing:Plant object')
+      CALL ShowSevereError('Autosizing of steam baseboard requires a heating loop Sizing:Plant object')
       CALL ShowContinueError('Occurs in Baseboard Heater='//TRIM(SteamBaseboard(BaseboardNum)%EquipID))
       ErrorsFound = .TRUE.
     END IF
@@ -1313,7 +1353,7 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
   REAL(r64)           :: Area        ! Effective surface area
 
           ! FLOW:
-  SumHATsurf = 0.0
+  SumHATsurf = 0.0d0
 
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst, Zone(ZoneNum)%SurfaceLast
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
@@ -1326,17 +1366,17 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
         Area = Area + SurfaceWindow(SurfNum)%DividerArea
       END IF
 
-      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
+      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
         ! Window frame contribution
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%FrameArea &
-          * (1.0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
+          * (1.0d0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
       END IF
 
-      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
+      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0d0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
            .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntBlindOn) THEN
         ! Window divider contribution (only from shade or blind for window with divider and interior shade or blind)
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%DividerArea &
-          * (1.0 + 2.0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
+          * (1.0d0 + 2.0d0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
       END IF
     END IF
 

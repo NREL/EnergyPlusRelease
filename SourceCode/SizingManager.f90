@@ -89,10 +89,11 @@ SUBROUTINE  ManageSizing
   USE InputProcessor, ONLY: GetNumRangeCheckErrorsFound
   USE ZoneEquipmentManager, ONLY: UpdateZoneSizing, ManageZoneEquipment, RezeroZoneSizingArrays
   USE SimAirServingZones, ONLY: ManageAirLoops, UpdateSysSizing
-  USE DataEnvironment, ONLY : TotDesDays, OutDryBulbTemp, OutHumRat, OutBaroPress, CurEnvirNum, Month, DayOfMonth, EndMonthFlag
+  USE DataEnvironment, ONLY: TotDesDays, OutDryBulbTemp, OutHumRat, OutBaroPress, CurEnvirNum, Month, DayOfMonth, EndMonthFlag, &
+                              EnvironmentName
   USE OutputReportPredefined
   USE DataHeatBalance, ONLY: Zone
-  USE General, ONLY: TrimSigDigits
+  USE General, ONLY: TrimSigDigits, RoundSigDigits
   USE OutputReportTabular, ONLY: isCompLoadRepReq,AllocateLoadComponentArrays, DeallocateLoadComponentArrays,   &
      ComputeLoadComponentDecayCurve
 
@@ -119,8 +120,8 @@ SUBROUTINE  ManageSizing
   INTEGER          :: LastDayOfMonth=0
   INTEGER          :: CtrlZoneNum=0  ! controlled zone index
   INTEGER          :: ZoneNum=0      ! index into the Zone data array for the controlled zone
-  REAL(r64)        :: TempAtPeak=0.0       ! Outside temperature at peak cooling/heating for reporting
-  REAL(r64)        :: HumRatAtPeak=0.0     ! Outside humidity ratio at peak cooling/heating for reporting
+  REAL(r64)        :: TempAtPeak=0.0d0       ! Outside temperature at peak cooling/heating for reporting
+  REAL(r64)        :: HumRatAtPeak=0.0d0     ! Outside humidity ratio at peak cooling/heating for reporting
   INTEGER          :: TimeStepAtPeak=0     ! time step number at heat or cool peak
   INTEGER          :: DDNum=0              ! Design Day index
   INTEGER          :: AirLoopNum=0         ! air loop index
@@ -132,6 +133,7 @@ SUBROUTINE  ManageSizing
   INTEGER :: numZoneSizeIter !number of times to repeat zone sizing calcs. 1 normal, 2 load component reporting
   INTEGER :: iZoneCalcIter !index for repeating the zone sizing calcs
   LOGICAL :: runZeroingOnce = .TRUE.
+  LOGICAL :: isUserReqCompLoadReport
 
           ! FLOW:
 
@@ -160,8 +162,14 @@ SUBROUTINE  ManageSizing
 
   ! determine if the second set of zone sizing calculations should be performed
   ! that include a pulse for the load component reporting
+  isUserReqCompLoadReport = isCompLoadRepReq() !check getinput structure if load component report is requested
   IF (DoZoneSizing  .AND. (NumZoneSizingInput .GT. 0)) THEN
-    CompLoadReportIsReq = isCompLoadRepReq() !check getinput structure if load component report is requested
+    CompLoadReportIsReq = isUserReqCompLoadReport
+  ELSE ! produce a warning if the user asked for the report but it will not be generated because sizing is not done
+    IF (isUserReqCompLoadReport) THEN
+      CALL ShowWarningError(RoutineName//'The ZoneComponentLoadSummary report was requested ' //  &
+       'but no sizing objects were found so that report cannot be generated.')
+    ENDIF
   END IF
   IF (CompLoadReportIsReq) THEN  !if that report is created then zone sizing calculations are repeated
     numZoneSizeIter = 2
@@ -263,8 +271,12 @@ SUBROUTINE  ManageSizing
               IF (DayOfSim.EQ.1) THEN
                 IF (.NOT. isPulseZoneSizing) THEN
                   CALL DisplayString('Performing Zone Sizing Simulation')
+                  CALL DisplayString('...for Sizing Period: #'//trim(RoundSigDigits(NumSizingPeriodsPerformed))//   &
+                     ' '//trim(EnvironmentName))
                 ELSE
                   CALL DisplayString('Performing Zone Sizing Simulation for Load Component Report')
+                  CALL DisplayString('...for Sizing Period: #'//trim(RoundSigDigits(NumSizingPeriodsPerformed))//   &
+                     ' '//trim(EnvironmentName))
                 END IF
               END IF
             CALL UpdateZoneSizing(BeginDay)
@@ -463,7 +475,11 @@ SUBROUTINE  ManageSizing
         IF (WarmupFlag) THEN
           CALL DisplayString('Warming up')
         ELSE ! (.NOT.WarmupFlag)
-          IF (DayOfSim.EQ.1)   CALL DisplayString('Calculating System sizing')
+          IF (DayOfSim.EQ.1) THEN
+            CALL DisplayString('Calculating System sizing')
+            CALL DisplayString('...for Sizing Period: #'//trim(RoundSigDigits(NumSizingPeriodsPerformed))//   &
+                         ' '//trim(EnvironmentName))
+          ENDIF
           CALL UpdateSysSizing(BeginDay)
         END IF
 
@@ -533,15 +549,15 @@ SUBROUTINE  ManageSizing
     DO CtrlZoneNum = 1,NumOfZones
       IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
       ZoneNum = FinalZoneSizing(CtrlZoneNum)%ActualZoneNum
-      IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0) THEN
+      IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0d0) THEN
         TimeStepAtPeak = FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtCoolMax
         DDNum = FinalZoneSizing(CtrlZoneNum)%CoolDDNum
         IF (DDNum > 0 .AND. TimeStepAtPeak > 0) THEN
           TempAtPeak = DesDayWeath(DDNum)%Temp(TimeStepAtPeak)
           HumRatAtPeak = DesDayWeath(DDNum)%HumRat(TimeStepAtPeak)
         ELSE
-          TempAtPeak = 0.0
-          HumRatAtPeak = 0.0
+          TempAtPeak = 0.0d0
+          HumRatAtPeak = 0.0d0
         END IF
         CALL ReportZoneSizing(FinalZoneSizing(CtrlZoneNum)%ZoneName, &
                              'Cooling', &
@@ -559,22 +575,28 @@ SUBROUTINE  ManageSizing
         curName = FinalZoneSizing(CtrlZoneNum)%ZoneName
         CALL PreDefTableEntry(pdchZnClCalcDesLd,curName,CalcFinalZoneSizing(CtrlZoneNum)%DesCoolLoad)
         CALL PreDefTableEntry(pdchZnClUserDesLd,curName,FinalZoneSizing(CtrlZoneNum)%DesCoolLoad)
+        IF (Zone(ZoneNum)%FloorArea .NE. 0.0d0) THEN
+          CALL PreDefTableEntry(pdchZnClUserDesLdPerArea,curName,FinalZoneSizing(CtrlZoneNum)%DesCoolLoad / Zone(ZoneNum)%FloorArea)
+        ENDIF
         CALL PreDefTableEntry(pdchZnClCalcDesAirFlow,curName,CalcFinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow,3)
         CALL PreDefTableEntry(pdchZnClUserDesAirFlow,curName,FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow,3)
         CALL PreDefTableEntry(pdchZnClDesDay,curName,FinalZoneSizing(CtrlZoneNum)%CoolDesDay)
         CALL PreDefTableEntry(pdchZnClPkTime,curName,CoolPeakDateHrMin(CtrlZoneNum))
-        CALL PreDefTableEntry(pdchZnClPkTemp,curName,TempAtPeak)
-        CALL PreDefTableEntry(pdchZnClPkHum,curName,HumRatAtPeak,5)
+        CALL PreDefTableEntry(pdchZnClPkTstatTemp,curName,CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTemp)
+        CALL PreDefTableEntry(pdchZnClPkIndTemp,curName,CalcFinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak)
+        CALL PreDefTableEntry(pdchZnClPkIndHum,curName,CalcFinalZoneSizing(CtrlZoneNum)%ZoneHumRatAtCoolPeak,5)
+        CALL PreDefTableEntry(pdchZnClPkOATemp,curName,TempAtPeak)
+        CALL PreDefTableEntry(pdchZnClPkOAHum,curName,HumRatAtPeak,5)
       END IF
-      IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+      IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
         TimeStepAtPeak = FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtHeatMax
         DDNum = FinalZoneSizing(CtrlZoneNum)%HeatDDNum
         IF (DDNum > 0 .AND. TimeStepAtPeak > 0) THEN
           TempAtPeak = DesDayWeath(DDNum)%Temp(TimeStepAtPeak)
           HumRatAtPeak = DesDayWeath(DDNum)%HumRat(TimeStepAtPeak)
         ELSE
-          TempAtPeak = 0.0
-          HumRatAtPeak = 0.0
+          TempAtPeak = 0.0d0
+          HumRatAtPeak = 0.0d0
         END IF
         CALL ReportZoneSizing(FinalZoneSizing(CtrlZoneNum)%ZoneName, &
                               'Heating', &
@@ -592,12 +614,18 @@ SUBROUTINE  ManageSizing
         curName = FinalZoneSizing(CtrlZoneNum)%ZoneName
         CALL PreDefTableEntry(pdchZnHtCalcDesLd,curName,CalcFinalZoneSizing(CtrlZoneNum)%DesHeatLoad)
         CALL PreDefTableEntry(pdchZnHtUserDesLd,curName,FinalZoneSizing(CtrlZoneNum)%DesHeatLoad)
+        IF (Zone(ZoneNum)%FloorArea .NE. 0.0d0) THEN
+          CALL PreDefTableEntry(pdchZnHtUserDesLdPerArea,curName,FinalZoneSizing(CtrlZoneNum)%DesHeatLoad/Zone(ZoneNum)%FloorArea)
+        ENDIF
         CALL PreDefTableEntry(pdchZnHtCalcDesAirFlow,curName,CalcFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow,3)
         CALL PreDefTableEntry(pdchZnHtUserDesAirFlow,curName,FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow,3)
         CALL PreDefTableEntry(pdchZnHtDesDay,curName,FinalZoneSizing(CtrlZoneNum)%HeatDesDay)
         CALL PreDefTableEntry(pdchZnHtPkTime,curName,HeatPeakDateHrMin(CtrlZoneNum))
-        CALL PreDefTableEntry(pdchZnHtPkTemp,curName,TempAtPeak)
-        CALL PreDefTableEntry(pdchZnHtPkHum,curName,HumRatAtPeak,5)
+        CALL PreDefTableEntry(pdchZnHtPkTstatTemp,curName,CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTemp)
+        CALL PreDefTableEntry(pdchZnHtPkIndTemp,curName,CalcFinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak)
+        CALL PreDefTableEntry(pdchZnHtPkIndHum,curName,CalcFinalZoneSizing(CtrlZoneNum)%ZoneHumRatAtHeatPeak,5)
+        CALL PreDefTableEntry(pdchZnHtPkOATemp,curName,TempAtPeak)
+        CALL PreDefTableEntry(pdchZnHtPkOAHum,curName,HumRatAtPeak,5)
       END IF
     END DO
     ! Deallocate arrays no longer needed
@@ -728,7 +756,7 @@ SUBROUTINE GetOARequirements
     ALLOCATE(cNumericFields(NumNumbers))
     cNumericFields=' '
     ALLOCATE(Numbers(NumNumbers))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(lAlphaBlanks(NumAlphas))
     lAlphaBlanks=.true.
     ALLOCATE(lNumericBlanks(NumNumbers))
@@ -899,7 +927,7 @@ SUBROUTINE GetZoneAirDistribution
     ALLOCATE(cNumericFields(NumNumbers))
     cNumericFields=' '
     ALLOCATE(Numbers(NumNumbers))
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(lAlphaBlanks(NumAlphas))
     lAlphaBlanks=.true.
     ALLOCATE(lNumericBlanks(NumNumbers))
@@ -928,7 +956,7 @@ SUBROUTINE GetZoneAirDistribution
         ZoneAirDistribution(ZADIndex)%ZoneADEffCooling = Numbers(1)
       ELSE
         ! default value
-        ZoneAirDistribution(ZADIndex)%ZoneADEffCooling = 1.0
+        ZoneAirDistribution(ZADIndex)%ZoneADEffCooling = 1.0d0
       END IF
 
       ! Zone Air Distribution Effectiveness in Heating Mode
@@ -936,7 +964,7 @@ SUBROUTINE GetZoneAirDistribution
         ZoneAirDistribution(ZADIndex)%ZoneADEffHeating = Numbers(2)
       ELSE
         ! default value
-        ZoneAirDistribution(ZADIndex)%ZoneADEffHeating = 1.0
+        ZoneAirDistribution(ZADIndex)%ZoneADEffHeating = 1.0d0
       END IF
 
       ! Zone Secondary Recirculation Fraction
@@ -944,7 +972,7 @@ SUBROUTINE GetZoneAirDistribution
         ZoneAirDistribution(ZADIndex)%ZoneSecondaryRecirculation = Numbers(3)
       ELSE
         ! default value
-        ZoneAirDistribution(ZADIndex)%ZoneSecondaryRecirculation = 0.0
+        ZoneAirDistribution(ZADIndex)%ZoneSecondaryRecirculation = 0.0d0
       END IF
 
       IF(NumAlphas .GT. 1)THEN
@@ -1036,24 +1064,24 @@ SUBROUTINE GetSizingParams
     CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-    IF (lNumericFieldBlanks(1) .or. rNumericArgs(1) < 0.0) THEN
-      GlobalHeatSizingFactor = 1.0
+    IF (lNumericFieldBlanks(1) .or. rNumericArgs(1) < 0.0d0) THEN
+      GlobalHeatSizingFactor = 1.0d0
     ELSE
       GlobalHeatSizingFactor = rNumericArgs(1)
     ENDIF
-    IF (lNumericFieldBlanks(2) .or. rNumericArgs(2) < 0.0) THEN
-      GlobalCoolSizingFactor = 1.0
+    IF (lNumericFieldBlanks(2) .or. rNumericArgs(2) < 0.0d0) THEN
+      GlobalCoolSizingFactor = 1.0d0
     ELSE
       GlobalCoolSizingFactor = rNumericArgs(2)
     ENDIF
-    IF (lNumericFieldBlanks(3) .or. rNumericArgs(3) <= 0.0) THEN
+    IF (lNumericFieldBlanks(3) .or. rNumericArgs(3) <= 0.0d0) THEN
       NumTimeStepsInAvg=NumOfTimeStepInHour
     ELSE
       NumTimeStepsInAvg = INT(rNumericArgs(3))
     ENDIF
   ELSE IF (NumSizParams == 0) THEN
-    GlobalHeatSizingFactor = 1.0
-    GlobalCoolSizingFactor = 1.0
+    GlobalHeatSizingFactor = 1.0d0
+    GlobalCoolSizingFactor = 1.0d0
     NumTimeStepsInAvg = NumOfTimeStepInHour
   ELSE
     CALL ShowFatalError(TRIM(cCurrentModuleObject)//': More than 1 occurence of this object; only 1 allowed')
@@ -1290,7 +1318,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note Zone Cooling Design Supply Air Temperature is only used when Zone Cooling Design
 !      \note Supply Air Temperature Input Method = SupplyAirTemperature
         IF (lNumericFieldBlanks(1)) THEN
-          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0d0
         ELSEIF (rNumericArgs(1) < 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(1))//'=['//TRIM(RoundSigDigits(rNumericArgs(1),2))// &
@@ -1299,7 +1327,7 @@ SUBROUTINE GetZoneSizingInput
         ELSEIF (rNumericArgs(1) >= 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
           ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = rNumericArgs(1)
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0d0
         ENDIF
 !  N2, \field Zone Cooling Design Supply Air Temperature Difference
 !      \type real
@@ -1309,11 +1337,11 @@ SUBROUTINE GetZoneSizingInput
 !      \note The absolute of this value is value will be subtracted from room temperature
 !      \note at peak load to calculate Zone Cooling Design Supply Air Temperature.
         IF (lNumericFieldBlanks(2)) THEN
-          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0d0
         ELSEIF (ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == TemperatureDifference) THEN
           ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = rNumericArgs(2)
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0d0
         ENDIF
 !  A3, \field Zone Heating Design Supply Air Temperature Input Method
 !      \required-field
@@ -1338,7 +1366,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note Zone Heating Design Supply Air Temperature is only used when Zone Heating Design
 !      \note Supply Air Temperature Input Method = SupplyAirTemperature
         IF (lNumericFieldBlanks(3)) THEN
-          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0d0
         ELSEIF (rNumericArgs(3) < 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == SupplyAirTemperature) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(3))//'=['//TRIM(RoundSigDigits(rNumericArgs(3),2))// &
@@ -1347,7 +1375,7 @@ SUBROUTINE GetZoneSizingInput
         ELSEIF (rNumericArgs(3) >= 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == SupplyAirTemperature) THEN
           ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = rNumericArgs(3)
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0d0
         ENDIF
 !  N4, \field Zone Heating Design Supply Air Temperature Difference
 !      \type real
@@ -1357,11 +1385,11 @@ SUBROUTINE GetZoneSizingInput
 !      \note The absolute of this value is value will be added to room temperature
 !      \note at peak load to calculate Zone Heating Design Supply Air Temperature.
         IF (lNumericFieldBlanks(4)) THEN
-          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0d0
         ELSEIF (ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == TemperatureDifference) THEN
           ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = rNumericArgs(4)
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0d0
         ENDIF
 !  N5, \field Zone Cooling Design Supply Air Humidity Ratio
 !      \required-field
@@ -1369,7 +1397,7 @@ SUBROUTINE GetZoneSizingInput
 !      \type real
 !      \units kg-H2O/kg-air
         IF (lNumericFieldBlanks(5)) THEN
-          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = 0.0
+          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = 0.0d0
         ELSEIF (rNumericArgs(5) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(5))//': '//  &
              TRIM(RoundSigDigits(rNumericArgs(5),2)))
@@ -1384,7 +1412,7 @@ SUBROUTINE GetZoneSizingInput
 !      \type real
 !      \units kg-H2O/kg-air
         IF (lNumericFieldBlanks(6)) THEN
-          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = 0.0
+          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = 0.0d0
         ELSEIF (rNumericArgs(6) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(6))//': '//  &
              TRIM(RoundSigDigits(rNumericArgs(6),2)))
@@ -1415,9 +1443,9 @@ SUBROUTINE GetZoneSizingInput
            ENDIF
          ELSE ! If no design spec object specified, i.e. no OA, then set OA method to None as default but flows to 0
              ZoneSizingInput(ZoneSizIndex)%OADesMethod = 0
-             ZoneSizingInput(ZoneSizIndex)%DesOAFlowPPer = 0
-             ZoneSizingInput(ZoneSizIndex)%DesOAFlowPerArea = 0
-             ZoneSizingInput(ZoneSizIndex)%DesOAFlow = 0
+             ZoneSizingInput(ZoneSizIndex)%DesOAFlowPPer = 0.0d0
+             ZoneSizingInput(ZoneSizIndex)%DesOAFlowPerArea = 0.0d0
+             ZoneSizingInput(ZoneSizIndex)%DesOAFlow = 0.0d0
          ENDIF
 
 !  N7, \field Zone Heating Sizing Factor
@@ -1455,7 +1483,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note This value will be multiplied by the global or zone sizing factor and
 !      \note by zone multipliers.
         IF (lNumericFieldBlanks(9)) THEN
-          ZoneSizingInput(ZoneSizIndex)%DesCoolAirFlow =  0.0
+          ZoneSizingInput(ZoneSizIndex)%DesCoolAirFlow =  0.0d0
         ELSEIF (rNumericArgs(9) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(9))//'=['//TRIM(RoundSigDigits(rNumericArgs(9),2))//  &
@@ -1472,7 +1500,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note default is .15 cfm/ft2
 !      \note This input is used if Cooling Design Air Flow Method is design day with limit
         IF (lNumericFieldBlanks(10)) THEN
-          IF (rNumericArgs(10) <= 0.0) THEN  ! in case someone changes the default in the IDD
+          IF (rNumericArgs(10) <= 0.0d0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea =  .000762d0
           ELSE
             ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea = rNumericArgs(10)
@@ -1493,7 +1521,7 @@ SUBROUTINE GetZoneSizingInput
 !      \default 0
 !      \note This input is used if Cooling Design Air Flow Method is design day with limit
         IF (lNumericFieldBlanks(11)) THEN
-          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlow =  0.0
+          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlow =  0.0d0
         ELSEIF (rNumericArgs(11) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(11))//'=['//TRIM(RoundSigDigits(rNumericArgs(11),2))//  &
@@ -1510,7 +1538,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note This input is currently used in sizing the Fan minimum Flow Rate.
 !      \note It does not currently affect other component autosizing.
         IF (lNumericFieldBlanks(12)) THEN
-          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowFrac =   0.0
+          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowFrac =   0.0d0
         ELSEIF (rNumericArgs(12) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(12))//'=['//TRIM(RoundSigDigits(rNumericArgs(12),2))// &
@@ -1528,7 +1556,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note This value will be multiplied by the global or zone sizing factor and
 !      \note by zone multipliers.
         IF (lNumericFieldBlanks(13)) THEN
-          ZoneSizingInput(ZoneSizIndex)%DesHeatAirFlow = 0.0
+          ZoneSizingInput(ZoneSizIndex)%DesHeatAirFlow = 0.0d0
         ELSEIF (rNumericArgs(13) < 0.0d0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
           CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(13))//'=['//TRIM(RoundSigDigits(rNumericArgs(13),2))// &
@@ -1545,7 +1573,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note default is .40 cfm/ft2
 !      \note This input is not currently used for autosizing any of the components.
         IF (lNumericFieldBlanks(14)) THEN
-          IF (rNumericArgs(14) <= 0.0) THEN  ! in case someone changes the default in the IDD
+          IF (rNumericArgs(14) <= 0.0d0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = 0.002032d0
           ELSE
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = rNumericArgs(14)
@@ -1566,7 +1594,7 @@ SUBROUTINE GetZoneSizingInput
 !      \note default is 300 cfm
 !      \note This input is not currently used for autosizing any of the components.
         IF (lNumericFieldBlanks(15)) THEN
-          IF (rNumericArgs(15) <= 0.0) THEN  ! in case someone changes the default in the IDD
+          IF (rNumericArgs(15) <= 0.0d0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = 0.1415762d0
           ELSE
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = rNumericArgs(15)
@@ -1586,7 +1614,7 @@ SUBROUTINE GetZoneSizingInput
 !      \minimum 0
 !      \default 0.3
         IF (lNumericFieldBlanks(16)) THEN
-          IF (rNumericArgs(16) <= 0.0) THEN  ! in case someone changes the default in the IDD
+          IF (rNumericArgs(16) <= 0.0d0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = 0.3d0
           ELSE
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(16)
@@ -1618,9 +1646,9 @@ SUBROUTINE GetZoneSizingInput
           ENDIF
         ELSE
           ! assume defaults
-          ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = 1.0
-          ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = 1.0
-          ZoneSizingInput(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
+          ZoneSizingInput(ZoneSizIndex)%ZoneADEffCooling = 1.0d0
+          ZoneSizingInput(ZoneSizIndex)%ZoneADEffHeating = 1.0d0
+          ZoneSizingInput(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0d0
         ENDIF
 
         SELECT CASE(TRIM(cAlphaArgs(5)))
@@ -1904,8 +1932,8 @@ SUBROUTINE GetSystemSizingInput
 !      \minimum 0.0
 !      \maximum 1.0
     IF (lNumericFieldBlanks(2)) THEN
-      SysSizInput(SysSizIndex)%SysAirMinFlowRat = 0.0
-    ELSEIF (rNumericArgs(2) < 0.0) THEN
+      SysSizInput(SysSizIndex)%SysAirMinFlowRat = 0.0d0
+    ELSEIF (rNumericArgs(2) < 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
       CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(2))//'=['//TRIM(RoundSigDigits(rNumericArgs(2),2))//  &
                    '],  value should not be negative.')
@@ -1930,8 +1958,8 @@ SUBROUTINE GetSystemSizingInput
 !      \minimum 0
 !      \default 0
     IF (lNumericFieldBlanks(11)) THEN
-      SysSizInput(SysSizIndex)%DesCoolAirFlow = 0.0
-    ELSEIF (rNumericArgs(11) < 0.0) THEN
+      SysSizInput(SysSizIndex)%DesCoolAirFlow = 0.0d0
+    ELSEIF (rNumericArgs(11) < 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
       CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(11))//'=['//TRIM(RoundSigDigits(rNumericArgs(11),2))//  &
                    '],  value should not be negative.')
@@ -1948,8 +1976,8 @@ SUBROUTINE GetSystemSizingInput
 !      \minimum 0
 !      \default 0
     IF (lNumericFieldBlanks(12)) THEN
-      SysSizInput(SysSizIndex)%DesHeatAirFlow = 0.0
-    ELSEIF (rNumericArgs(12) < 0.0) THEN
+      SysSizInput(SysSizIndex)%DesHeatAirFlow = 0.0d0
+    ELSEIF (rNumericArgs(12) < 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
       CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(12))//'=['//TRIM(RoundSigDigits(rNumericArgs(12),2))//  &
                    '],  value should not be negative.')
@@ -1963,8 +1991,8 @@ SUBROUTINE GetSystemSizingInput
 !      \minimum> 0.0
 !      \units dimensionless
     IF (lNumericFieldBlanks(13)) THEN
-      SysSizInput(SysSizIndex)%MaxZoneOAFraction = 0.0
-    ELSEIF (rNumericArgs(13) < 0.0) THEN
+      SysSizInput(SysSizIndex)%MaxZoneOAFraction = 0.0d0
+    ELSEIF (rNumericArgs(13) < 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
       CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(13))//'=['//TRIM(RoundSigDigits(rNumericArgs(13),2))//  &
                    '],  value should not be negative.')
@@ -2078,10 +2106,10 @@ SUBROUTINE GetPlantSizingInput
     END IF
     ALLOCATE(PlantSizData(NumPltSizInput))
     PlantSizData%PlantLoopName = ' '
-    PlantSizData%ExitTemp = 0.0
-    PlantSizData%DeltaT = 0.0
+    PlantSizData%ExitTemp = 0.0d0
+    PlantSizData%DeltaT = 0.0d0
     PlantSizData%LoopType = 0
-    PlantSizData%DesVolFlowRate = 0.0
+    PlantSizData%DesVolFlowRate = 0.0d0
   END IF
 
   DO PltSizIndex=1,NumPltSizInput

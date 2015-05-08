@@ -80,7 +80,7 @@ TYPE BoilerSpecs
   REAL(r64)      :: VolFlowRate          = 0.0d0   ! m3/s - Boiler water design volumetric flow rate
   REAL(r64)      :: DesMassFlowRate      = 0.0d0   ! kg/s - Boiler water design mass flow rate
   REAL(r64)      :: MassFlowRate         = 0.0d0   ! kg/s - Boiler water mass flow rate
-  REAL(r64)      :: SizFac               = 0.0     ! sizing factor
+  REAL(r64)      :: SizFac               = 0.0d0     ! sizing factor
   INTEGER        :: BoilerInletNodeNum   = 0       ! Node number at the boiler inlet
   INTEGER        :: BoilerOutletNodeNum  = 0       ! Node number at the boiler outlet
   REAL(r64)      :: MinPartLoadRat       = 0.0d0   ! Minimum allowed operating part load ratio
@@ -257,7 +257,7 @@ SUBROUTINE GetBoilerInput
             ! REFERENCES: na
 
             ! USE STATEMENTS:
-    USE DataGlobals,           ONLY: MaxNameLength
+    USE DataGlobals,           ONLY: MaxNameLength, AnyEnergyManagementSystemInModel
     USE DataGlobalConstants
     USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString
     USE DataIPShortCuts  ! Data for field names, blank numerics
@@ -467,7 +467,7 @@ SUBROUTINE GetBoilerInput
 
       Boiler(BoilerNum)%ParasiticElecLoad    = rNumericArgs(9)
       Boiler(BoilerNum)%SizFac               = rNumericArgs(10)
-      IF (Boiler(BoilerNum)%SizFac == 0.0) Boiler(BoilerNum)%SizFac = 1.0d0
+      IF (Boiler(BoilerNum)%SizFac == 0.0d0) Boiler(BoilerNum)%SizFac = 1.0d0
 
       Boiler(BoilerNum)%BoilerInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
@@ -477,7 +477,7 @@ SUBROUTINE GetBoilerInput
                NodeConnectionType_Outlet, 1, ObjectIsNotParent)
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),'Hot Water Nodes')
 
-      SELECT CASE (TRIM(cAlphaArgs(7))) 
+      SELECT CASE (TRIM(cAlphaArgs(7)))
       CASE ('CONSTANTFLOW')
         Boiler(BoilerNum)%FlowMode  = ConstantFlow
       CASE ('VARIABLEFLOW') ! backward compatible, clean out eventually
@@ -535,6 +535,11 @@ SUBROUTINE GetBoilerInput
                     GroupKey='Plant')
      CALL SetupOutputVariable('Boiler Part Load Ratio []', &
           BoilerReport(BoilerNum)%BoilerPLR,'System','Average',Boiler(BoilerNum)%Name)
+     IF (AnyEnergyManagementSystemInModel) THEN
+       CALL SetupEMSInternalVariable('Boiler Nominal Capacity', Boiler(BoilerNum)%Name, '[W]', &
+                                     Boiler(BoilerNum)%NomCap  )
+     ENDIF
+
   END DO
 
   DEALLOCATE(BoilerFuelTypeForOutputVariable)

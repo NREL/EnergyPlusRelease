@@ -54,6 +54,8 @@ REAL(r64), PRIVATE, PARAMETER :: sigma=5.6697d-8    ! Stefan-Boltzmann constant
 REAL(r64),  PARAMETER :: TKelvin=KelvinConv  ! conversion from Kelvin to Celsius
 INTEGER, PRIVATE, PARAMETER :: nume=107           ! Number of wavelength values in solar spectrum
 INTEGER, PRIVATE, PARAMETER :: numt3=81           ! Number of wavelength values in the photopic response
+!INTEGER, PRIVATE :: nume=107           ! Number of wavelength values in solar spectrum
+!INTEGER, PRIVATE :: numt3=81           ! Number of wavelength values in the photopic response
 
 REAL(r64),    PRIVATE, PARAMETER, DIMENSION(8) :: AirProps=  &
 !               Dens  dDens/dT  Con    dCon/dT   Vis    dVis/dT Prandtl dPrandtl/dT
@@ -62,7 +64,8 @@ REAL(r64),    PRIVATE, PARAMETER, DIMENSION(8) :: AirProps=  &
 ! on a 37 degree tilted surface; corresponds
 ! to wavelengths (microns) in following data block (ISO 9845-1 and ASTM E 892;
 ! derived from Optics5 data file ISO-9845GlobalNorm.std, 10-14-99)
-REAL(r64), PRIVATE, PARAMETER, DIMENSION(nume) :: wle= &   ! Solar spectrum wavelength values (microns)
+!REAL(r64), PRIVATE, PARAMETER, DIMENSION(nume) :: wle= &   ! Solar spectrum wavelength values (microns)
+REAL(r64), PRIVATE, DIMENSION(nume) :: wle= &   ! Solar spectrum wavelength values (microns)
     (/0.3000d0,0.3050d0,0.3100d0,0.3150d0,0.3200d0,0.3250d0,0.3300d0,0.3350d0,0.3400d0,0.3450d0, &
       0.3500d0,0.3600d0,0.3700d0,0.3800d0,0.3900d0,0.4000d0,0.4100d0,0.4200d0,0.4300d0,0.4400d0, &
       0.4500d0,0.4600d0,0.4700d0,0.4800d0,0.4900d0,0.5000d0,0.5100d0,0.5200d0,0.5300d0,0.5400d0, &
@@ -75,7 +78,7 @@ REAL(r64), PRIVATE, PARAMETER, DIMENSION(nume) :: wle= &   ! Solar spectrum wave
       1.7400d0,1.8000d0,1.8600d0,1.9200d0,1.9600d0,1.9850d0,2.0050d0,2.0350d0,2.0650d0,2.1000d0, &
       2.1480d0,2.1980d0,2.2700d0,2.3600d0,2.4500d0,2.4940d0,2.5370d0 /)
 
-REAL(r64), PRIVATE, PARAMETER, DIMENSION(nume) :: e=  &  ! Solar spectrum values corresponding to wle
+REAL(r64), PRIVATE, DIMENSION(nume) :: e=  &  ! Solar spectrum values corresponding to wle
     (/   0.0d0,   9.5d0,  42.3d0, 107.8d0, 181.0d0, 246.0d0, 395.3d0, 390.1d0, 435.3d0, 438.9d0, &
        483.7d0, 520.3d0, 666.2d0, 712.5d0, 720.7d0,1013.1d0,1158.2d0,1184.0d0,1071.9d0,1302.0d0, &
       1526.0d0,1599.6d0,1581.0d0,1628.3d0,1539.2d0,1548.7d0,1586.5d0,1484.9d0,1572.4d0,1550.7d0, &
@@ -92,7 +95,7 @@ REAL(r64), PRIVATE, PARAMETER, DIMENSION(nume) :: e=  &  ! Solar spectrum values
 ! (CIE 1931 observer; ISO/CIE 10527, CIE Standard Calorimetric Observers;
 ! derived from Optics5 data file "CIE 1931 Color Match from E308.txt", which is
 ! the same as WINDOW4 file Cie31t.dat)
-REAL(r64), PRIVATE, PARAMETER, DIMENSION(numt3) :: wlt3=  &  ! Wavelength values for photopic response
+REAL(r64), PRIVATE, DIMENSION(numt3) :: wlt3=  &  ! Wavelength values for photopic response
     (/.380d0,.385d0,.390d0,.395d0,.400d0,.405d0,.410d0,.415d0,.420d0,.425d0, &
       .430d0,.435d0,.440d0,.445d0,.450d0,.455d0,.460d0,.465d0,.470d0,.475d0, &
       .480d0,.485d0,.490d0,.495d0,.500d0,.505d0,.510d0,.515d0,.520d0,.525d0, &
@@ -103,7 +106,7 @@ REAL(r64), PRIVATE, PARAMETER, DIMENSION(numt3) :: wlt3=  &  ! Wavelength values
       .730d0,.735d0,.740d0,.745d0,.750d0,.755d0,.760d0,.765d0,.770d0,.775d0, &
       .780d0 /)
 
-REAL(r64), PRIVATE, PARAMETER, DIMENSION(numt3) :: y30=  &   ! Photopic response corresponding to wavelengths in wlt3
+REAL(r64), PRIVATE, DIMENSION(numt3) :: y30=  &   ! Photopic response corresponding to wavelengths in wlt3
     (/0.0000d0,0.0001d0,0.0001d0,0.0002d0,0.0004d0,0.0006d0,0.0012d0,0.0022d0,0.0040d0,0.0073d0, &
       0.0116d0,0.0168d0,0.0230d0,0.0298d0,0.0380d0,0.0480d0,0.0600d0,0.0739d0,0.0910d0,0.1126d0, &
       0.1390d0,0.1693d0,0.2080d0,0.2586d0,0.3230d0,0.4073d0,0.5030d0,0.6082d0,0.7100d0,0.7932d0, &
@@ -130,81 +133,81 @@ REAL(r64) :: Ebout                        ! Sigma*(outside air temp)**4 (W/m2)
 REAL(r64) :: Outir                        ! IR radiance of window's exterior surround (W/m2)
 REAL(r64) :: Rmir                         ! IR radiance of window's interior surround (W/m2)
 REAL(r64) :: rtot                         ! Total thermal resistance of window (m2-K/W)
-REAL(r64) :: gcon(5,5,3) =0.0             ! Gas thermal conductivity coefficients for each gap
-REAL(r64) :: gvis(5,5,3) =0.0             ! Gas viscosity coefficients for each gap
-REAL(r64) :: gcp(5,5,3)  =0.0             ! Gas specific-heat coefficients for each gap
-REAL(r64) :: gwght(5,5)  =0.0             ! Gas molecular weights for each gap
-REAL(r64) :: gfract(5,5) =0.0             ! Gas fractions for each gap
+REAL(r64) :: gcon(5,5,3) =0.0d0             ! Gas thermal conductivity coefficients for each gap
+REAL(r64) :: gvis(5,5,3) =0.0d0             ! Gas viscosity coefficients for each gap
+REAL(r64) :: gcp(5,5,3)  =0.0d0             ! Gas specific-heat coefficients for each gap
+REAL(r64) :: gwght(5,5)  =0.0d0             ! Gas molecular weights for each gap
+REAL(r64) :: gfract(5,5) =0.0d0             ! Gas fractions for each gap
 INTEGER   :: gnmix(5)    =0               ! Number of gases in gap
-REAL(r64) :: gap(5)      =0.0             ! Gap width (m)
-REAL(r64) :: thick(5)    =0.0             ! Glass layer thickness (m)
-REAL(r64) :: scon(5)     =0.0             ! Glass layer conductance--conductivity/thickness (W/m2-K)
-REAL(r64) :: tir(10)     =0.0             ! Front and back IR transmittance for each glass layer
-REAL(r64) :: emis(10)    =0.0             ! Front and back IR emissivity for each glass layer
-REAL(r64) :: rir(10)     =0.0             ! Front and back IR reflectance for each glass layer
+REAL(r64) :: gap(5)      =0.0d0             ! Gap width (m)
+REAL(r64) :: thick(5)    =0.0d0             ! Glass layer thickness (m)
+REAL(r64) :: scon(5)     =0.0d0             ! Glass layer conductance--conductivity/thickness (W/m2-K)
+REAL(r64) :: tir(10)     =0.0d0             ! Front and back IR transmittance for each glass layer
+REAL(r64) :: emis(10)    =0.0d0             ! Front and back IR emissivity for each glass layer
+REAL(r64) :: rir(10)     =0.0d0             ! Front and back IR reflectance for each glass layer
                                           !  (program calculates from tir and emis)
-REAL(r64) :: AbsRadGlassFace(10) =0.0     ! Solar radiation and IR radiation from internal
+REAL(r64) :: AbsRadGlassFace(10) =0.0d0     ! Solar radiation and IR radiation from internal
                                                   !  gains absorbed by glass face
 REAL(r64) :: thetas(10)          =0.0D0   ! Glass surface temperatures (K)
 REAL(r64) :: thetasPrev(10)      =0.0D0   ! Previous-iteration glass surface temperatures (K)
 REAL(r64) :: fvec(10)            =0.0D0   ! Glass face heat balance function
 REAL(r64) :: fjac(10,10)         =0.0D0   ! Glass face heat balance Jacobian
-REAL(r64) :: dtheta(5)           =0.0     ! Glass layer temperature difference factor [K]
-REAL(r64) :: zir(10,10)          =0.0     ! IR transfer matrix
-REAL(r64) :: ziri(10,10)         =0.0     ! Inverse of IR transfer matrix
-REAL(r64) :: ddeldt(10,10)       =0.0     ! Matrix of derivatives of residuals wrt temperature
-REAL(r64) :: dtddel(10,10)       =0.0     ! Inverse of matrix of derivatives of
+REAL(r64) :: dtheta(5)           =0.0d0    ! Glass layer temperature difference factor [K]
+REAL(r64) :: zir(10,10)          =0.0d0    ! IR transfer matrix
+REAL(r64) :: ziri(10,10)         =0.0d0    ! Inverse of IR transfer matrix
+REAL(r64) :: ddeldt(10,10)       =0.0d0    ! Matrix of derivatives of residuals wrt temperature
+REAL(r64) :: dtddel(10,10)       =0.0d0    ! Inverse of matrix of derivatives of
                                           !   residuals wrt temperature
-REAL(r64) :: qf(10)              =0.0     ! IR heat flux at each face [W/m2]
-REAL(r64) :: hf(10)              =0.0     ! Component of convective flux at each face
-REAL(r64) :: der(10,5)           =0.0     ! Derivative of IR sources wrt surface temperature
-REAL(r64) :: dhf(10,5)           =0.0     ! Derivative of heat flux wrt surface temperature
-REAL(r64) :: sour(10)            =0.0     ! IR source term at each face [W/m2]
-REAL(r64) :: delta(5)            =0.0     ! Residual at each glass layer [W/m2]
-REAL(r64) :: hcgap(5)            =0.0     ! Convective gap conductance
-REAL(r64) :: hrgap(5)            =0.0     ! Radiative gap conductance
-REAL(r64) :: rgap(6)             =0.0     ! Convective plus radiative gap resistance
+REAL(r64) :: qf(10)              =0.0d0    ! IR heat flux at each face [W/m2]
+REAL(r64) :: hf(10)              =0.0d0    ! Component of convective flux at each face
+REAL(r64) :: der(10,5)           =0.0d0    ! Derivative of IR sources wrt surface temperature
+REAL(r64) :: dhf(10,5)           =0.0d0    ! Derivative of heat flux wrt surface temperature
+REAL(r64) :: sour(10)            =0.0d0    ! IR source term at each face [W/m2]
+REAL(r64) :: delta(5)            =0.0d0    ! Residual at each glass layer [W/m2]
+REAL(r64) :: hcgap(5)            =0.0d0    ! Convective gap conductance
+REAL(r64) :: hrgap(5)            =0.0d0    ! Radiative gap conductance
+REAL(r64) :: rgap(6)             =0.0d0    ! Convective plus radiative gap resistance
                                           !   (inverse of hcgap + hrgap)
-REAL(r64) :: rs(6)               =0.0     ! Outside film convective resistance, gap resistances,
+REAL(r64) :: rs(6)               =0.0d0    ! Outside film convective resistance, gap resistances,
                                           !   inside air film convective resistance
-REAL(r64) :: arhs(6)             =0.0
+REAL(r64) :: arhs(6)             =0.0d0
 REAL(r64) :: A23P,A32P,A45P,A54P,A67P,A76P ! Intermediate variables in glass face
 REAL(r64) :: A23,A45,A67                  ! heat balance equations
 
-REAL(r64) :: wlt(MaxSpectralDataElements,5)      =0.0     ! Spectral data wavelengths for each glass layer in a glazing system
+REAL(r64) :: wlt(MaxSpectralDataElements,5)      =0.0d0    ! Spectral data wavelengths for each glass layer in a glazing system
    ! Following data, Spectral data for each layer for each wavelength in wlt
-REAL(r64) :: t(MaxSpectralDataElements,5)        =0.0     ! normal transmittance
-REAL(r64) :: rff(MaxSpectralDataElements,5)      =0.0     ! normal front reflectance
-REAL(r64) :: rbb(MaxSpectralDataElements,5)      =0.0     ! normal back reflectance
-REAL(r64) :: tPhi(MaxSpectralDataElements,5)     =0.0     ! transmittance at angle of incidence
-REAL(r64) :: rfPhi(MaxSpectralDataElements,5)    =0.0     ! front reflectance at angle of incidence
-REAL(r64) :: rbPhi(MaxSpectralDataElements,5)    =0.0     ! back reflectance at angle of incidence
-REAL(r64) :: tadjPhi(MaxSpectralDataElements,5)  =0.0     ! transmittance at angle of incidence
-REAL(r64) :: rfadjPhi(MaxSpectralDataElements,5) =0.0     ! front reflectance at angle of incidence
-REAL(r64) :: rbadjPhi(MaxSpectralDataElements,5) =0.0     ! back reflectance at angle of incidence
+REAL(r64) :: t(MaxSpectralDataElements,5)        =0.0d0    ! normal transmittance
+REAL(r64) :: rff(MaxSpectralDataElements,5)      =0.0d0    ! normal front reflectance
+REAL(r64) :: rbb(MaxSpectralDataElements,5)      =0.0d0    ! normal back reflectance
+REAL(r64) :: tPhi(MaxSpectralDataElements,5)     =0.0d0    ! transmittance at angle of incidence
+REAL(r64) :: rfPhi(MaxSpectralDataElements,5)    =0.0d0    ! front reflectance at angle of incidence
+REAL(r64) :: rbPhi(MaxSpectralDataElements,5)    =0.0d0    ! back reflectance at angle of incidence
+REAL(r64) :: tadjPhi(MaxSpectralDataElements,5)  =0.0d0    ! transmittance at angle of incidence
+REAL(r64) :: rfadjPhi(MaxSpectralDataElements,5) =0.0d0    ! front reflectance at angle of incidence
+REAL(r64) :: rbadjPhi(MaxSpectralDataElements,5) =0.0d0    ! back reflectance at angle of incidence
 
 INTEGER   :: numpt(5)            =0       ! Number of spectral data wavelengths for each layer; =2 if no spectra data for a layer
-REAL(r64) :: stPhi(nume)         =0.0     ! Glazing system transmittance at angle of incidence for each wavelength in wle
-REAL(r64) :: srfPhi(nume)        =0.0     ! Glazing system front reflectance at angle of incidence for each wavelength in wle
-REAL(r64) :: srbPhi(nume)        =0.0     ! Glazing system back reflectance at angle of incidence for each wavelenth in wle
-REAL(r64) :: saPhi(nume,5)       =0.0     ! For each layer, glazing system absorptance at angle of incidence
+REAL(r64) :: stPhi(nume)         =0.0d0    ! Glazing system transmittance at angle of incidence for each wavelength in wle
+REAL(r64) :: srfPhi(nume)        =0.0d0    ! Glazing system front reflectance at angle of incidence for each wavelength in wle
+REAL(r64) :: srbPhi(nume)        =0.0d0    ! Glazing system back reflectance at angle of incidence for each wavelenth in wle
+REAL(r64) :: saPhi(nume,5)       =0.0d0    ! For each layer, glazing system absorptance at angle of incidence
                                           ! for each wavelenth in wle
-REAL(r64) :: top(5,5)            =0.0     ! Transmittance matrix for subr. op
-REAL(r64) :: rfop(5,5)           =0.0     ! Front reflectance matrix for subr. op
-REAL(r64) :: rbop(5,5)           =0.0     ! Back transmittance matrix for subr. op
-REAL(r64) :: IndepVarCurveFit(10)=0.0     ! Values of independent variable (cos of inc. angle) for curve fit
-REAL(r64) :: DepVarCurveFit(10)  =0.0     ! Values of dependent variable corresponding to IndepVarCurveFit values
-REAL(r64) :: CoeffsCurveFit(6)   =0.0     ! Polynomial coefficients from curve fit
-REAL(r64) :: tsolPhi(10)         =0.0     ! Glazing system solar transmittance for each angle of incidence
-REAL(r64) :: rfsolPhi(10)        =0.0     ! Glazing system solar front reflectance for each angle of incidence
-REAL(r64) :: rbsolPhi(10)        =0.0     ! Glazing system solar back reflectance for each angle of incidence
-REAL(r64) :: solabsPhi(10,5)     =0.0     ! Glazing system solar absorptance for each angle of incidence
-REAL(r64) :: solabsBackPhi(10,5) =0.0     ! Glazing system back solar absorptance for each angle of incidence
-REAL(r64) :: solabsShadePhi(10)  =0.0     ! Glazing system interior shade solar absorptance for each angle of incidence
-REAL(r64) :: tvisPhi(10)         =0.0     ! Glazing system visible transmittance for each angle of incidence
-REAL(r64) :: rfvisPhi(10)        =0.0     ! Glazing system visible front reflectance for each angle of incidence
-REAL(r64) :: rbvisPhi(10)        =0.0     ! Glazing system visible back reflectance for each angle of incidence
-REAL(r64) :: CosPhiIndepVar(10)  =0.0     ! Cos of incidence angles at 10-deg increments for curve fits
+REAL(r64) :: top(5,5)            =0.0d0    ! Transmittance matrix for subr. op
+REAL(r64) :: rfop(5,5)           =0.0d0    ! Front reflectance matrix for subr. op
+REAL(r64) :: rbop(5,5)           =0.0d0    ! Back transmittance matrix for subr. op
+REAL(r64) :: IndepVarCurveFit(10)=0.0d0    ! Values of independent variable (cos of inc. angle) for curve fit
+REAL(r64) :: DepVarCurveFit(10)  =0.0d0    ! Values of dependent variable corresponding to IndepVarCurveFit values
+REAL(r64) :: CoeffsCurveFit(6)   =0.0d0    ! Polynomial coefficients from curve fit
+REAL(r64) :: tsolPhi(10)         =0.0d0    ! Glazing system solar transmittance for each angle of incidence
+REAL(r64) :: rfsolPhi(10)        =0.0d0    ! Glazing system solar front reflectance for each angle of incidence
+REAL(r64) :: rbsolPhi(10)        =0.0d0    ! Glazing system solar back reflectance for each angle of incidence
+REAL(r64) :: solabsPhi(10,5)     =0.0d0    ! Glazing system solar absorptance for each angle of incidence
+REAL(r64) :: solabsBackPhi(10,5) =0.0d0    ! Glazing system back solar absorptance for each angle of incidence
+REAL(r64) :: solabsShadePhi(10)  =0.0d0    ! Glazing system interior shade solar absorptance for each angle of incidence
+REAL(r64) :: tvisPhi(10)         =0.0d0    ! Glazing system visible transmittance for each angle of incidence
+REAL(r64) :: rfvisPhi(10)        =0.0d0    ! Glazing system visible front reflectance for each angle of incidence
+REAL(r64) :: rbvisPhi(10)        =0.0d0    ! Glazing system visible back reflectance for each angle of incidence
+REAL(r64) :: CosPhiIndepVar(10)  =0.0d0    ! Cos of incidence angles at 10-deg increments for curve fits
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE WindowManager:
 PUBLIC  InitGlassOpticalCalculations
@@ -213,6 +216,7 @@ PRIVATE SystemSpectralPropertiesAtPhi
 PRIVATE SystemPropertiesAtLambdaAndPhi
 PRIVATE SolarSprectrumAverage
 PRIVATE VisibleSprectrumAverage
+PRIVATE CheckAndReadCustomSprectrumData
 PRIVATE Interpolate
 !   Heat Balance Routines
 PUBLIC  CalcWindowHeatBalance
@@ -262,6 +266,7 @@ SUBROUTINE InitGlassOpticalCalculations
           !                      Jan 2003 (FW): add between-glass shade/blind
           !                      May 2006 (RR): add exterior window screen
           !                      Aug 2010 (TH): allow spectral data for between-glass shade/blind
+          !                      Aug 2013 (TH): allow user defined solar and visible spectrum data
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -277,6 +282,7 @@ SUBROUTINE InitGlassOpticalCalculations
           ! USE STATEMENTS:
   USE Vectors
   USE General, ONLY: TrimSigDigits
+  USE WindowEquivalentLayer, ONLY: InitEquivalentLayerWindowCalculations
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -402,20 +408,24 @@ REAL(r64)         :: tmpReflectSolBeamFront = 0.0D0
 REAL(r64)         :: tmpReflectSolBeamBack =0.0D0
 REAL(r64)         :: tmpReflectVisBeamFront = 0.0D0
 REAL(r64)         :: tmpReflectVisBeamBack = 0.0D0
+
 !Debug
 INTEGER                        ::  Idb
-REAL(r64),DIMENSION(11)        ::  DbgTheta = (/ 0.,10.,20.,30.,40.,50.,60.,70.,80.,82.5,89.5 /)
-REAL(r64),DIMENSION(11)        ::  DbgTSol  =0.
-REAL(r64),DIMENSION(11)        ::  DbgRbSol  =0.
-REAL(r64),DIMENSION(11)        ::  DbgTVis  =0.
-REAL(r64),DIMENSION(11,5)      ::  DbgFtAbs  =0.
-REAL(r64),DIMENSION(11,5)      ::  DbgBkAbs  =0.
-REAL(r64)                     ::  DbgTSolDiff  =0.
-REAL(r64)                     ::  DbgRBSolDiff  =0.
-REAL(r64),DIMENSION(5)        ::  DbgFTAbsDiff  =0.
-REAL(r64),DIMENSION(5)        ::  DbgBkAbsDiff  =0.
+REAL(r64),DIMENSION(11)        ::  DbgTheta = (/ 0.d0,10.d0,20.d0,30.d0,40.d0,50.d0,60.d0,70.d0,80.d0,82.5d0,89.5d0 /)
+REAL(r64),DIMENSION(11)        ::  DbgTSol  =0.0d0
+REAL(r64),DIMENSION(11)        ::  DbgRbSol  =0.0d0
+REAL(r64),DIMENSION(11)        ::  DbgTVis  =0.0d0
+REAL(r64),DIMENSION(11,5)      ::  DbgFtAbs  =0.0d0
+REAL(r64),DIMENSION(11,5)      ::  DbgBkAbs  =0.0d0
+REAL(r64)                     ::  DbgTSolDiff  =0.0d0
+REAL(r64)                     ::  DbgRBSolDiff  =0.0d0
+REAL(r64),DIMENSION(5)        ::  DbgFTAbsDiff  =0.0d0
+REAL(r64),DIMENSION(5)        ::  DbgBkAbsDiff  =0.0d0
 
 !EndDebug
+
+! check and read custom solar and/or visible spectrum data if any
+CALL CheckAndReadCustomSprectrumData
 
 CALL W5InitGlassParameters
 
@@ -431,6 +441,7 @@ IF(NumSurfaceScreens > 0) CALL CalcWindowScreenProperties
 DO ConstrNum = 1,TotConstructs
   IF (.not. Construct(ConstrNum)%TypeIsWindow) CYCLE
   IF ( Construct(ConstrNum)%WindowTypeBSDF ) CYCLE  !Skip Complex Fenestrations, they have separate
+  IF ( Construct(ConstrNum)%WindowTypeEQL  ) CYCLE  !skip Equivalent Layer Fenestration
               !handling of optical properties
 
   TotLay = Construct(ConstrNum)%TotLayers
@@ -824,7 +835,7 @@ DO ConstrNum = 1,TotConstructs
   DO IPhi = 1,10
     Phi = REAL(IPhi-1,r64)*10.d0
     CosPhi = COS(Phi*DegToRadians)
-    if (abs(CosPhi) < .0001d0) CosPhi=0.0
+    if (abs(CosPhi) < .0001d0) CosPhi=0.0d0
 
     ! For each wavelength, get glass layer properties at this angle of incidence
     ! from properties at normal incidence
@@ -1369,7 +1380,7 @@ DO ConstrNum = 1,TotConstructs
       tvisPhiFit(IPhi) = 0.d0
       Phi = REAL(IPhi-1,r64)*10.d0
       CosPhi = COS(Phi*DegToRadians)
-      if (abs(CosPhi) < .0001d0) CosPhi=0.0
+      if (abs(CosPhi) < .0001d0) CosPhi=0.0d0
       DO CoefNum = 1,6
         tsolPhiFit(IPhi) = tsolPhiFit(IPhi) + Construct(ConstrNum)%TransSolBeamCoef(CoefNum)* &
                            CosPhi**CoefNum
@@ -1391,6 +1402,7 @@ DO SurfNum = 1,TotSurfaces
   IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
   IF(.NOT.Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
   IF( SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel ) CYCLE  !Irrelevant for Complex Fen
+  IF( Construct(Surface(SurfNum)%Construction)%WindowTypeEQL ) CYCLE       ! not required
   ConstrNumSh = SurfaceWindow(SurfNum)%ShadedConstruction
   IF(ConstrNumSh == 0) CYCLE
   TotLay = Construct(ConstrNumSh)%TotLayers
@@ -1439,7 +1451,7 @@ DO SurfNum = 1,TotSurfaces
   IF(.NOT.Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
     ConstrNum = Surface(SurfNum)%Construction
     ! Total thickness of glazing system (used in calculation of inside reveal reflection/absorption
-    SurfaceWindow(SurfNum)%TotGlazingThickness = 0.
+    SurfaceWindow(SurfNum)%TotGlazingThickness = 0.0d0
     DO LayNum = 1,Construct(ConstrNum)%TotLayers
       SurfaceWindow(SurfNum)%TotGlazingThickness = SurfaceWindow(SurfNum)%TotGlazingThickness + &
         Material(Construct(ConstrNum)%LayerPoint(LayNum))%Thickness
@@ -1475,9 +1487,9 @@ DO SurfNum = 1,TotSurfaces
     W21 = W1 - W2
     W23 = W3 - W2
     IF(Rectangle) THEN
-      SurfaceWindow(SurfNum)%WinCenter = W2 + (W23 + W21) / 2.
+      SurfaceWindow(SurfNum)%WinCenter = W2 + (W23 + W21) / 2.0d0
     ELSE IF(Triangle) THEN
-      SurfaceWindow(SurfNum)%WinCenter = W2 + (W23 + W21) / 3.
+      SurfaceWindow(SurfNum)%WinCenter = W2 + (W23 + W21) / 3.0d0
     END IF
 END DO  ! End of surface loop
 
@@ -1543,22 +1555,22 @@ INTEGER   :: DifOverrideCount        ! Count the number of SolarDiffusing materi
 DO ConstrNum = 1,TotConstructs
   IF(Construct(ConstrNum)%FromWindow5DataFile) CYCLE
   IF(Construct(ConstrNum)%WindowTypeBSDF) CYCLE
-  Construct(ConstrNum)%TransDiff            = 0.0
-  Construct(ConstrNum)%TransDiffVis         = 0.0
-  Construct(ConstrNum)%AbsDiffBackShade     = 0.0
-  Construct(ConstrNum)%ShadeAbsorpThermal   = 0.0
-  Construct(ConstrNum)%ReflectSolDiffBack   = 0.0
-  Construct(ConstrNum)%ReflectSolDiffFront  = 0.0
-  Construct(ConstrNum)%ReflectVisDiffFront  = 0.0
-  Construct(ConstrNum)%AbsBeamShadeCoef     = 0.0
-  Construct(ConstrNum)%TransSolBeamCoef     = 0.0
-  Construct(ConstrNum)%ReflSolBeamFrontCoef = 0.0
-  Construct(ConstrNum)%ReflSolBeamBackCoef  = 0.0
-  Construct(ConstrNum)%TransVisBeamCoef     = 0.0
-  Construct(ConstrNum)%AbsBeamCoef          = 0.0
-  Construct(ConstrNum)%AbsBeamBackCoef      = 0.0
-  Construct(ConstrNum)%AbsDiff              = 0.0
-  Construct(ConstrNum)%AbsDiffBack          = 0.0
+  Construct(ConstrNum)%TransDiff            = 0.0d0
+  Construct(ConstrNum)%TransDiffVis         = 0.0d0
+  Construct(ConstrNum)%AbsDiffBackShade     = 0.0d0
+  Construct(ConstrNum)%ShadeAbsorpThermal   = 0.0d0
+  Construct(ConstrNum)%ReflectSolDiffBack   = 0.0d0
+  Construct(ConstrNum)%ReflectSolDiffFront  = 0.0d0
+  Construct(ConstrNum)%ReflectVisDiffFront  = 0.0d0
+  Construct(ConstrNum)%AbsBeamShadeCoef     = 0.0d0
+  Construct(ConstrNum)%TransSolBeamCoef     = 0.0d0
+  Construct(ConstrNum)%ReflSolBeamFrontCoef = 0.0d0
+  Construct(ConstrNum)%ReflSolBeamBackCoef  = 0.0d0
+  Construct(ConstrNum)%TransVisBeamCoef     = 0.0d0
+  Construct(ConstrNum)%AbsBeamCoef          = 0.0d0
+  Construct(ConstrNum)%AbsBeamBackCoef      = 0.0d0
+  Construct(ConstrNum)%AbsDiff              = 0.0d0
+  Construct(ConstrNum)%AbsDiffBack          = 0.0d0
 END DO
 
 DO SurfNum = 1,TotSurfaces
@@ -1680,7 +1692,7 @@ IF (DifOverrideCount > 0) THEN
 ENDIF
 
 DO IPhi = 1, 10
-  CosPhiIndepVar(IPhi) = COS((IPhi-1)*10.*DegToRadians)
+  CosPhiIndepVar(IPhi) = COS((IPhi-1)*10.0d0*DegToRadians)
 END DO
 
 RETURN
@@ -1767,7 +1779,7 @@ INTEGER           :: iquasi                  ! When there is no spectral data, t
           stPhi(j) = top(1,1)
           srfPhi(j) = rfop(1,1)
           srbPhi(j) = rbop(1,1)
-          sabsPhi(1) = 1. - stPhi(j) - srfPhi(j)
+          sabsPhi(1) = 1.0d0 - stPhi(j) - srfPhi(j)
       else                     ! Multilayer system
           ! Get glazing system properties stPhi, etc., at this wavelength and incidence angle
           CALL SystemPropertiesAtLambdaAndPhi(ngllayer, stPhi(j), srfPhi(j), srbPhi(j), sabsPhi)
@@ -1822,11 +1834,11 @@ REAL(r64), INTENT(OUT)   :: aft(5)                  ! System absorptance of each
   ! Calculate perimeter elements of rt matrix
   do i=1,n-1
     do J=i+1,n
-      denom = 1. - rfop(j,j) * rbop(j-1,i)
+      denom = 1.0d0 - rfop(j,j) * rbop(j-1,i)
       if (denom .EQ. 0.0) then
-        top(i,j) = 0.0
-        rfop(i,j) = 1.0
-        rbop(j,i) = 1.0
+        top(i,j) = 0.0d0
+        rfop(i,j) = 1.0d0
+        rbop(j,i) = 1.0d0
       else
         top(i,j) = top(i,j-1) * top(j,j) / denom
         rfop(i,j) = rfop(i,j-1) + top(i,j-1)**2 * rfop(j,j) / denom
@@ -1842,26 +1854,26 @@ REAL(r64), INTENT(OUT)   :: aft(5)                  ! System absorptance of each
     ! Absorptance in each layer
     do j=1,n
       if (j.eq.1) then
-        t0 = 1.
-        rb0 = 0.
+        t0 = 1.0d0
+        rb0 = 0.0d0
       else
         t0 = top(1,j-1)
         rb0 = rbop(j-1,1)
       endif
 
       if (j.eq.n) then
-        rf0 = 0.
+        rf0 = 0.0d0
       else
         rf0 = rfop(j+1,n)
       endif
 
-      af = 1. - top(j,j) - rfop(j,j)
-      ab = 1. - top(j,j) - rbop(j,j)
-      denom1 = 1. - rfop(j,n)*rb0
-      denom2 = 1. - rbop(j,1)*rf0
+      af = 1.0d0 - top(j,j) - rfop(j,j)
+      ab = 1.0d0 - top(j,j) - rbop(j,j)
+      denom1 = 1.0d0 - rfop(j,n)*rb0
+      denom2 = 1.0d0 - rbop(j,1)*rf0
 
       if (denom1 .EQ. 0.0 .OR. denom2 .EQ. 0.0) then
-        aft(j) = 0.0
+        aft(j) = 0.0d0
       else
         aft(j) = (t0 * af) / denom1 + (top(1,j) * rf0 * ab) / denom2
       endif
@@ -1899,12 +1911,12 @@ REAL(r64)         :: psol                    ! Quantity p weighted by solar spec
 
           ! FLOW
 
-      up = 0.0
-      down = 0.0
+      up = 0.0d0
+      down = 0.0d0
 
       do i=1,nume-1
-        esol = (wle(i+1) - wle(i)) * 0.5 * (e(i) + e(i+1))
-        up = up + 0.5 * (p(i) + p(i+1)) * esol
+        esol = (wle(i+1) - wle(i)) * 0.5d0 * (e(i) + e(i+1))
+        up = up + 0.5d0 * (p(i) + p(i+1)) * esol
         down = down + esol
       END DO
 
@@ -1947,12 +1959,14 @@ REAL(r64)         :: evis                    ! Solar spectrum value times photop
                                              !   times delta wavelength
           ! FLOW
 
-      down = 0.
-      up = 0.
-      y30ils1 = 0.0
-      y30new = 0.0
+      down = 0.0d0
+      up = 0.0d0
+      y30ils1 = 0.0d0
+      y30new = 0.0d0
 
       do i=1,nume
+!EPTeam - Objexx suggested change
+!do i=2,nume !Objexx:BoundsViolation e|wle|p(i-1) @ i=1: Changed start index from 1 to 2: wle values prevented this violation from occurring in practice
         ! Restrict to visible range
         if (wle(i) >= 0.37d0 .and. wle(i) <= 0.78d0) then
           call Interpolate(wlt3, y30, numt3, wle(i), y30new)
@@ -2073,6 +2087,8 @@ SUBROUTINE CalcWindowHeatBalance (SurfNum,HextConvCoeff,SurfInsideTemp,SurfOutsi
 !unused0909  USE DataEnvironment, ONLY: CurMnDyHr
   USE InputProcessor, ONLY: SameString
   USE WindowComplexManager, ONLY: CalcComplexWindowThermal
+  USE WindowEquivalentLayer, ONLY: EQLWindowSurfaceHeatBalance
+
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2135,12 +2151,12 @@ REAL(r64) :: RefAirTemp ! reference air temperatures
 REAL(r64) :: locTCSpecTemp                ! The temperature corresponding to the specified optical properties of the TC layer
 REAL(r64) :: locTCLayerTemp               ! TC layer temperature at each time step. C
 LOGICAL   :: locTCFlag =.False.           ! True if this surface is a TC window
-REAL(r64) :: deltaTemp(100) = 0.0
+REAL(r64) :: deltaTemp(100) = 0.0d0
 INTEGER   :: i
 INTEGER   :: iMinDT(1) = 0
 INTEGER   :: IDConst(100) = 0
-REAL(r64) :: dT0 = 0.0
-REAL(r64) :: dT1 = 0.0
+REAL(r64) :: dT0 = 0.0d0
+REAL(r64) :: dT1 = 0.0d0
 REAL(r64) :: SurfOutsideEmiss ! temporary for result of outside surface emissivity
 REAL(r64) :: Tsout ! temporary for result of outside surface temp in Kelvin
 !integer :: CurrentThermalAlgorithm
@@ -2160,6 +2176,11 @@ IF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
 
   ConstrNum = Surface(SurfNum)%Construction
   TotGlassLay = Construct(ConstrNum)%TotGlassLayers
+  ngllayer = Construct(ConstrNum)%TotSolidLayers ! Simon: This is necessary to keep for frame calculations
+  ! Simon: need to transfer surface temperatures because of frames calculation
+  DO i = 1, 2*Construct(ConstrNum)%TotSolidLayers
+    thetas(i) = SurfaceWindow(SurfNum)%ThetaFace(i)
+  END DO
   hcout = HextConvCoeff
 
   ! This is code repeating and it is necessary to calculate report variables.  Do not know
@@ -2174,7 +2195,22 @@ IF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
     tout = Surface(SurfNum)%OutDryBulbTemp + TKelvin
   END IF
 
-ELSE ! regular window, not BSDF
+ELSEIF (SurfaceWindow(SurfNum)%WindowModelType  == WindowEQLModel) THEN
+
+   CALL EQLWindowSurfaceHeatBalance( SurfNum, HextConvCoeff,SurfInsideTemp,SurfOutsideTemp,SurfOutsideEmiss,noCondition)
+    hcout = HextConvCoeff
+  ! Required for report variables calculations.
+  IF(Surface(SurfNum)%ExtWind) THEN  ! Window is exposed to wind (and possibly rain)
+    IF(IsRain) THEN  ! Raining: since wind exposed, outside window surface gets wet
+      tout = Surface(SurfNum)%OutWetBulbTemp + TKelvin
+    ELSE             ! Dry
+      tout = Surface(SurfNum)%OutDryBulbTemp + TKelvin
+    END IF
+  ELSE                               ! Window not exposed to wind
+    tout = Surface(SurfNum)%OutDryBulbTemp + TKelvin
+  END IF
+
+ELSE ! regular window, not BSDF, not EQL Window
 
   ConstrNum = Surface(SurfNum)%Construction
   IF(SurfaceWindow(SurfNum)%StormWinFlag > 0) ConstrNum = Surface(SurfNum)%StormWinConstruction
@@ -2192,7 +2228,7 @@ ELSE ! regular window, not BSDF
     IF (dT0 >= 1) THEN
       ! Find the TC construction that is closed to the TCLayerTemp
       i = 0
-      deltaTemp = 0.0
+      deltaTemp = 0.0d0
       IDConst = 0
       DO k=1, TotConstructs
         IF (Construct(k)%TCMasterConst == Construct(ConstrNum)%TCMasterConst) THEN
@@ -2206,7 +2242,7 @@ ELSE ! regular window, not BSDF
       ENDDO
       IF (i >= 1) THEN
         ! Find the closest item
-        iMinDT = MINLOC(deltaTemp, MASK = deltaTemp.GT.0.0)
+        iMinDT = MINLOC(deltaTemp, MASK = deltaTemp.GT.0.0d0)
         ! Use the new TC window construction
         ConstrNum = IDConst(iMinDT(1))
         Surface(SurfNum)%Construction = ConstrNum
@@ -2251,8 +2287,8 @@ ELSE ! regular window, not BSDF
              RETURN
           END IF
           ! determine supply air conditions
-          SumSysMCp = 0.0
-          SumSysMCpT = 0.0
+          SumSysMCp = 0.0d0
+          SumSysMCpT = 0.0d0
           DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
               NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
               MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
@@ -2477,8 +2513,8 @@ ELSE ! regular window, not BSDF
             RETURN
           END IF
           ! determine supply air conditions
-          SumSysMCp = 0.0
-          SumSysMCpT = 0.0
+          SumSysMCp = 0.0d0
+          SumSysMCpT = 0.0d0
           DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
               NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
               MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
@@ -2531,28 +2567,28 @@ ELSE ! regular window, not BSDF
 
   ! Factors used in window layer temperature solution
   IF(ngllayer >= 2) THEN
-    A23P = -emis(3)/(1.-(1.-emis(2))*(1.-emis(3)))
-    A32P = emis(2)/(1.-(1.-emis(2))*(1.-emis(3)))
+    A23P = -emis(3)/(1.0d0-(1.0d0-emis(2))*(1.0d0-emis(3)))
+    A32P = emis(2)/(1.0d0-(1.0d0-emis(2))*(1.0d0-emis(3)))
     A23 = emis(2)*sigma*A23P
   END IF
 
   IF(ngllayer >= 3) THEN
-    A45P = -emis(5)/(1.-(1.-emis(4))*(1.-emis(5)))
-    A54P = emis(4)/(1.-(1.-emis(4))*(1.-emis(5)))
+    A45P = -emis(5)/(1.0d0-(1.0d0-emis(4))*(1.0d0-emis(5)))
+    A54P = emis(4)/(1.0d0-(1.0d0-emis(4))*(1.0d0-emis(5)))
     A45 = emis(4)*sigma*A45P
   END IF
 
   IF(ngllayer == 4) THEN
-    A67P = -emis(7)/(1.-(1.-emis(6))*(1.-emis(7)))
-    A76P = emis(6)/(1.-(1.-emis(6))*(1.-emis(7)))
+    A67P = -emis(7)/(1.0d0-(1.0d0-emis(6))*(1.0d0-emis(7)))
+    A76P = emis(6)/(1.0d0-(1.0d0-emis(6))*(1.0d0-emis(7)))
     A67 = emis(6)*sigma*A67P
 
   END IF
 
-  thetas = 0.
-  thetasPrev = 0.
-  fvec = 0.
-  fjac = 0.
+  thetas = 0.0d0
+  thetasPrev = 0.0d0
+  fvec = 0.0d0
+  fjac = 0.0d0
 
   ! Calculate window face temperatures
 
@@ -2597,17 +2633,18 @@ ELSE ! regular window, not BSDF
     SurfaceWindow(SurfNum)%TCLayerTemp = (thetas(2*Construct(ConstrNum)%TCGlassID-1)+ &
     thetas(2*Construct(ConstrNum)%TCGlassID))/2 - TKelvin   ! degree C
   ENDIF
+END IF !regular window, not BSDF, not EQL
 
   ! Set condensation flag to 1 if condensation expected to occur on the innermost glass face,
   ! or, for airflow windows, on either or the two glass faces in the airflow gap
-
+IF (.NOT. Construct(Surface(SurfNum)%Construction)%WindowTypeEQL) THEN
   InsideGlassTemp = thetas(2*ngllayer)-TKelvin
   RoomHumRat = ZoneAirHumRat(Surface(SurfNum)%Zone)
   RoomDewpoint = PsyTdpFnWPb(RoomHumRat,OutBaroPress)
   InsideGlassCondensationFlag(SurfNum) = 0
   IF(InsideGlassTemp < RoomDewPoint) InsideGlassCondensationFlag(SurfNum) = 1
       ! If airflow window, is there condensation on either glass face of the airflow gap?
-  IF(SurfaceWindow(SurfNum)%AirflowThisTS > 0.0) THEN
+  IF(SurfaceWindow(SurfNum)%AirflowThisTS > 0.0d0) THEN
     Tleft  = thetas(2*ngllayer-2)-TKelvin
     Tright = thetas(2*ngllayer-1)-TKelvin
     IF(SurfaceWindow(SurfNum)%AirflowSource == AirFlowWindow_Source_IndoorAir) THEN
@@ -2617,34 +2654,37 @@ ELSE ! regular window, not BSDF
     END IF
   END IF
 
-END IF !regular window, not BSDF
-
-! Do frame and divider calculation
-
-IF(SurfaceWindow(SurfNum)%FrameArea > 0.0 .OR. SurfaceWindow(SurfNum)%DividerArea > 0.0) &
-  CALL CalcWinFrameAndDividerTemps(SurfNum,tout,tin,hcout,hcin,outir,ConstrNum)
-IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
-  InsideFrameCondensationFlag(SurfNum) = 0
-  IF(SurfaceWindow(SurfNum)%FrameTempSurfIn < RoomDewPoint) InsideFrameCondensationFlag(SurfNum) = 1
-END IF
-IF(SurfaceWindow(SurfNum)%DividerArea > 0.0) THEN
-  InsideDividerCondensationFlag(SurfNum) = 0
-  IF(SurfaceWindow(SurfNum)%DividerTempSurfIn < RoomDewPoint) InsideDividerCondensationFlag(SurfNum) = 1
-END IF
-
+  ! Do frame and divider calculation
+  IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0 .OR. SurfaceWindow(SurfNum)%DividerArea > 0.0d0) &
+     CALL CalcWinFrameAndDividerTemps(SurfNum,tout,tin,hcout,hcin,outir,ConstrNum)
+  IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
+     InsideFrameCondensationFlag(SurfNum) = 0
+     IF(SurfaceWindow(SurfNum)%FrameTempSurfIn < RoomDewPoint) InsideFrameCondensationFlag(SurfNum) = 1
+  END IF
+  IF(SurfaceWindow(SurfNum)%DividerArea > 0.0d0) THEN
+     InsideDividerCondensationFlag(SurfNum) = 0
+     IF(SurfaceWindow(SurfNum)%DividerTempSurfIn < RoomDewPoint) InsideDividerCondensationFlag(SurfNum) = 1
+  END IF
+ENDIF
 !update exterior environment surface heat loss reporting
 Tsout                          = SurfOutsideTemp + TKelvin
 QdotConvOutRep(SurfNum)        = - Surface(SurfNum)%Area * hcout *(Tsout - Tout)
 QdotConvOutRepPerArea(SurfNum) = - hcout *(Tsout - Tout)
 QConvOutReport(SurfNum)        = QdotConvOutRep(SurfNum)* SecInHour * TimeStepZone
 
-QdotRadOutRep(SurfNum) = - Surface(SurfNum)%Area * SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + &
-                                 Surface(SurfNum)%ViewFactorGroundIR) * sigma * (Tsout**4 - tout**4) &
-                          -  Surface(SurfNum)%Area *SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  &
+QdotRadOutRep(SurfNum) = - Surface(SurfNum)%Area * SurfOutsideEmiss * &
+                             ((1.0d0-AirSkyRadSplit(SurfNum))* Surface(SurfNum)%ViewFactorSkyIR  +   &
+                                Surface(SurfNum)%ViewFactorGroundIR) &
+                                * sigma * (Tsout**4 - tout**4) &
+                          -  Surface(SurfNum)%Area *SurfOutsideEmiss *AirSkyRadSplit(SurfNum)*   &
+                             Surface(SurfNum)%ViewFactorSkyIR  &
                                 * sigma * (Tsout**4 - SkyTempKelvin**4)
-QdotRadOutRepPerArea(SurfNum) =- SurfOutsideEmiss *((1.0d0-AirSkyRadSplit(SurfNum)) + Surface(SurfNum)%ViewFactorGroundIR) &
-                          * sigma * (Tsout**4 - tout**4) &
-                          - SurfOutsideEmiss * Surface(SurfNum)%ViewFactorSkyIR  * sigma * (Tsout**4 - SkyTempKelvin**4)
+QdotRadOutRepPerArea(SurfNum) =- SurfOutsideEmiss * &
+                             ((1.0d0-AirSkyRadSplit(SurfNum))*Surface(SurfNum)%ViewFactorSkyIR +   &
+                                Surface(SurfNum)%ViewFactorGroundIR) &
+                                * sigma * (Tsout**4 - tout**4) &
+                          - SurfOutsideEmiss *AirSkyRadSplit(SurfNum) * Surface(SurfNum)%ViewFactorSkyIR &
+                               * sigma * (Tsout**4 - SkyTempKelvin**4)
 QRadOutReport(SurfNum) =  QdotRadOutRep(SurfNum) * SecInHour * TimeStepZone
 
 RETURN
@@ -2685,7 +2725,7 @@ REAL(r64)  :: nu                           ! Gap gas Nusselt number
 
 ! Have to zero fvec each time since LUdecompostion and LUsolution may
 ! add values to this array in unexpected places
-fvec = 0.0
+fvec = 0.0d0
 
 SELECT CASE(ngllayer)
 
@@ -2945,13 +2985,13 @@ REAL(r64)         :: ZoneTemp              ! Zone air temperature (C)
 Integer           :: InsideFaceIndex       ! intermediate variable for index of inside face in thetas
 
 iter = 0
-ConvHeatFlowNatural = 0.0
-ConvHeatFlowForced = 0.0
+ConvHeatFlowNatural = 0.0d0
+ConvHeatFlowForced = 0.0d0
 nglfacep = nglface
 ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
 ZoneNum = Surface(SurfNum)%Zone
-AbsRadShadeFace = 0.0
-TGapNew=0.0
+AbsRadShadeFace = 0.0d0
+TGapNew=0.0d0
 
 IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn.OR. &
    ShadeFlag==BGShadeOn.OR.ShadeFlag==BGBlindOn.OR.ShadeFlag==ExtScreenOn) THEN
@@ -2987,8 +3027,8 @@ END IF  ! End of check if shade or blind is on
 
 CALL StartingWindowTemps(SurfNum,AbsRadShadeFace)
 
-hcvPrev=0.0
-VGapPrev=0.0
+hcvPrev=0.0d0
+VGapPrev=0.0d0
 
 ! Calculate radiative conductances
 
@@ -3018,8 +3058,8 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
     hcin = HconvIn(SurfNum)
   ENDIF
 
-  Aface = 0.0
-  Bface = 0.0
+  Aface = 0.0d0
+  Bface = 0.0d0
 
 ! If interior or exterior shade or blind is present, get heat transfer
 ! coefficient from glass and shade/blind to gap between glass and shade/blind,
@@ -3036,13 +3076,13 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
     VGapPrev = VGap
   END IF
 
-  TAirFlowGapOutlet=0.0
+  TAirFlowGapOutlet=0.0d0
 ! If between-glass shade or blind is not present and this is an airflow window
 ! (i.e., with forced airflow in the gap for double glass or in the inner gap for triple glass)
 ! get glass-to-air forced convection heat transfer coefficient, average gap air temperature, and
 ! convective heat flow from gap.
 
-  IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0) THEN
+  IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0d0) THEN
     CALL BetweenGlassForcedFlow(SurfNum,iter,VAirflowGap,TAirFlowGapNew,TAirFlowGapOutlet,hcvAirflowGap,ConvHeatFlowForced)
   ENDIF
 
@@ -3052,7 +3092,7 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
 ! convective heat flows from the gaps.
 
   IF(ShadeFlag == BGShadeOn .OR. ShadeFlag == BGBlindOn) THEN
-    IF(SurfaceWindow(SurfNum)%AirflowThisTS == 0.0) THEN  ! Natural convection in gaps
+    IF(SurfaceWindow(SurfNum)%AirflowThisTS == 0.0d0) THEN  ! Natural convection in gaps
       CALL BetweenGlassShadeNaturalFlow(SurfNum,iter,VGap,TGapNewBG,hcvBG)
     ELSE                                            ! Forced convection in gaps
       CALL BetweenGlassShadeForcedFlow(SurfNum,iter,VGap,TGapNewBG,TAirFlowGapOutlet,hcvBG,ConvHeatFlowForced)
@@ -3106,10 +3146,10 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
       call WindowGasConductance(thetas(2),thetas(3),1,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(2),thetas(3),1,gr,pr,nu)
       hgap(1) = con/gap(1)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
-        hrgap(1) = 0.5*ABS(A23)*(thetas(2)+thetas(3))**3
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
+        hrgap(1) = 0.5d0*ABS(A23)*(thetas(2)+thetas(3))**3
         hgap(1) = hgap(1) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
 
       Bface(1) = outir*emis(1) + hcout*tout + AbsRadGlassFace(1)
@@ -3131,7 +3171,7 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
       Aface(4,3) = -scon(2)
       Aface(4,4) = hr(4) + scon(2) + hcin
 
-      IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0) THEN
+      IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0d0) THEN
         Bface(2) = AbsRadGlassFace(2) + hcvAirflowGap*TAirflowGapNew
         Bface(3) = AbsRadGlassFace(3) + hcvAirflowGap*TAirflowGapNew
         Aface(2,2) = scon(1) + hcvAirflowGap - A23P*hr(2)
@@ -3206,19 +3246,19 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
       call WindowGasConductance(thetas(2),thetas(3),1,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(2),thetas(3),1,gr,pr,nu)
       hgap(1) = con/gap(1)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
         hrgap(1) = 0.5d0*ABS(A23)*(thetas(2)+thetas(3))**3
         hgap(1) = hgap(1) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
 
       call WindowGasConductance(thetas(4),thetas(5),2,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(4),thetas(5),2,gr,pr,nu)
       hgap(2) = con/gap(2)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
         hrgap(2) = 0.5d0*ABS(A45)*(thetas(4)+thetas(5))**3
         hgap(2) = hgap(2) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(2) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(2) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
 
       Bface(1) = outir*emis(1) + hcout*tout + AbsRadGlassFace(1)
@@ -3250,7 +3290,7 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
       Aface(6,5) = -scon(3)
       Aface(6,6) = hr(6) + scon(3) + hcin
 
-      IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0) THEN
+      IF(ShadeFlag /= BGShadeOn .AND. ShadeFlag /= BGBlindOn .AND. SurfaceWindow(SurfNum)%AirflowThisTS > 0.0d0) THEN
         Bface(4) = AbsRadGlassFace(4) + hcvAirflowGap*TAirflowGapNew
         Bface(5) = AbsRadGlassFace(5) + hcvAirflowGap*TAirflowGapNew
         Aface(4,4) = scon(2) + hcvAirflowGap - A45P*hr(4)
@@ -3325,28 +3365,28 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
       call WindowGasConductance(thetas(2),thetas(3),1,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(2),thetas(3),1,gr,pr,nu)
       hgap(1) = con/gap(1)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
         hrgap(1) = 0.5d0*ABS(A23)*(thetas(2)+thetas(3))**3
         hgap(1) = hgap(1) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(1) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
 
       call WindowGasConductance(thetas(4),thetas(5),2,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(4),thetas(5),2,gr,pr,nu)
       hgap(2) = con/gap(2)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
         hrgap(2) = 0.5d0*ABS(A45)*(thetas(4)+thetas(5))**3
         hgap(2) = hgap(2) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(2) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(2) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
 
       call WindowGasConductance(thetas(6),thetas(7),3,con,pr,gr)
       call NusseltNumber(SurfNum,thetas(6),thetas(7),3,gr,pr,nu)
       hgap(3) = con/gap(3)*nu
-      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0) THEN ! Edge of glass correction
+      IF(SurfaceWindow(SurfNum)%EdgeGlCorrFac > 1.0d0) THEN ! Edge of glass correction
         hrgap(3) = 0.5d0*ABS(A67)*(thetas(6)+thetas(7))**3
         hgap(3) = hgap(3) * SurfaceWindow(SurfNum)%EdgeGlCorrFac + &
-                  hrgap(3) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.)
+                  hrgap(3) * (SurfaceWindow(SurfNum)%EdgeGlCorrFac - 1.0d0)
       END IF
       Bface(1) = outir*emis(1) + hcout*tout + AbsRadGlassFace(1)
       Bface(2) = AbsRadGlassFace(2)
@@ -3432,7 +3472,7 @@ DO WHILE (iter < MaxIterations .AND. errtemp > errtemptol)
     END IF
   END DO
 
-  errtemp = 0.0
+  errtemp = 0.0d0
   DO i = 1,nglfacep
     errtemp = errtemp + ABS(thetas(i)-thetasPrev(i))
   END DO
@@ -3490,12 +3530,12 @@ IF(errtemp < 10*errtemptol) THEN
       ! Note: effect of fan heat on gap outlet temperature is neglected since fan power (based
       ! on pressure drop through the gap) is extremely small
 
-  WinGapConvHtFlowRep(SurfNum) = 0.0
-  WinGapConvHtFlowRepEnergy(SurfNum) = 0.0
+  WinGapConvHtFlowRep(SurfNum) = 0.0d0
+  WinGapConvHtFlowRepEnergy(SurfNum) = 0.0d0
   TotAirflowGap = SurfaceWindow(SurfNum)%AirFlowThisTS * Surface(SurfNum)%Width
   TAirflowGapOutletC = TAirflowGapOutlet-TKelvin
   SurfaceWindow(SurfNum)%TAirflowGapOutlet = TAirflowGapOutletC
-  IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0) THEN
+  IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0d0) THEN
     WinGapConvHtFlowRep(SurfNum) = ConvHeatFlowForced
     WinGapConvHtFlowRepEnergy(SurfNum) = WinGapConvHtFlowRep(SurfNum) * TimeStepZone * SecInHour
     ! Add heat from gap airflow to zone air if destination is inside air; save the heat gain to return
@@ -3561,9 +3601,9 @@ IF(errtemp < 10*errtemptol) THEN
       (QRadSWOutIncident(SurfNum)*(Surface(SurfNum)%Area+SurfaceWindow(SurfNum)%DividerArea)+0.0001d0)
     WinSysSolReflectance(SurfNum)   = 1.0d0 - WinSysSolTransmittance(SurfNum) - WinSysSolAbsorptance(SurfNum)
   ELSE
-    WinSysSolTransmittance(SurfNum) = 0.0
-    WinSysSolAbsorptance(SurfNum)   = 0.0
-    WinSysSolReflectance(SurfNum)   = 0.0
+    WinSysSolTransmittance(SurfNum) = 0.0d0
+    WinSysSolAbsorptance(SurfNum)   = 0.0d0
+    WinSysSolReflectance(SurfNum)   = 0.0d0
   END IF
 
      ! Save hcv for use in divider calc with interior or exterior shade (see CalcWinFrameAndDividerTemps)
@@ -3717,9 +3757,9 @@ hGapStill = con/gap(TotGaps)*nu
 ! there is no air flow thru gap
 
 IF(ABS(Surface(SurfNum)%SinTilt) < 0.0872d0) THEN
-  VGap = 0.
+  VGap = 0.0d0
   hcv = 2.d0*hGapStill
-  QConvGap = 0.
+  QConvGap = 0.0d0
   TGapNew = TAve
   TGapOutlet = TAve
   RETURN
@@ -3782,7 +3822,7 @@ VGap = (SQRT(BVGap**2 + ABS(4.d0*AVGap*CVGap)) - BVGap)/(2.d0*AVGap)
 hcv = 2.d0*hGapStill + 4.d0*VGap
 GapHeightChar = RhoAir * 1008.d0 * GapDepth * VGap/(2.d0*hcv)
 ! The following avoids divide by zero and exponential underflow
-IF(GapHeightChar == 0.0) THEN
+IF(GapHeightChar == 0.0d0) THEN
   TGapOutlet = TAve
 ELSE IF((GapHeight/GapHeightChar) > 15.d0) THEN
   TGapOutlet = TAve
@@ -3929,7 +3969,7 @@ END DO
 ! there is no air flow thru gap
 
 IF(ABS(Surface(SurfNum)%SinTilt) < 0.0872d0) THEN
-  VGap = 0.
+  VGap = 0.0d0
   DO IGap = 1,2
     hcv(IGap) = 2.d0*hGapStill(IGap)
     TGapNew(IGap) = TAve(IGap)
@@ -3991,10 +4031,10 @@ DO IGap = 1,2
   hcv(IGap) = 2.d0*hGapStill(IGap) + 4.d0*VGap
   GapHeightChar(IGap) = RhoGas(IGap) * 1008.d0 * GapDepth * VGap/(2.d0*hcv(IGap))
      ! The following avoids divide by zero and exponential underflow
-  IF(GapHeightChar(IGap) == 0.0) THEN
-    EpsChar(IGap) = 0.0
+  IF(GapHeightChar(IGap) == 0.0d0) THEN
+    EpsChar(IGap) = 0.0d0
   ELSE IF((GapHeight/GapHeightChar(IGap)) > 15.d0) THEN
-    EpsChar(IGap) = 0.0
+    EpsChar(IGap) = 0.0d0
   ELSE
     EpsChar(IGap) = EXP(-GapHeight/GapHeightChar(IGap))
   END IF
@@ -4100,7 +4140,7 @@ ELSE
 END IF
 
 IF(iter == 0) THEN
-  TGapOld = 0.5*(TAve + TGapInlet)
+  TGapOld = 0.5d0*(TAve + TGapInlet)
 ELSE
   TGapOld = TGapNew
 END IF
@@ -4117,7 +4157,7 @@ hcv = 2.d0*hGapStill + 4.d0*VGap
 RhoAir  = AirProps(1) + AirProps(2)*(TGapOld-TKelvin)
 GapHeightChar = RhoAir * 1008.d0 * GapDepth * VGap/(2.d0*hcv)
     ! The following avoids divide by zero and exponential underflow
-IF(GapHeightChar == 0.0) THEN
+IF(GapHeightChar == 0.0d0) THEN
   TGapOutlet = TAve
 ELSE IF((GapHeight/GapHeightChar) > 15.d0) THEN
   TGapOutlet = TAve
@@ -4262,7 +4302,7 @@ DO IGap = 1,2
   hcv(IGap) = 2.d0*hGapStill(IGap) + 4.d0*VGap
   GapHeightChar(IGap) = RhoAir(IGap) * 1008.d0 * GapDepth * VGap/(2.d0*hcv(IGap))
           ! The following avoids divide by zero and exponential underflow
-  IF(GapHeightChar(IGap) == 0.0) THEN
+  IF(GapHeightChar(IGap) == 0.0d0) THEN
     TGapOutlet(IGap) = TAve(IGap)
   ELSE IF((GapHeight/GapHeightChar(IGap)) > 15.d0) THEN
     TGapOutlet(IGap) = TAve(IGap)
@@ -4330,14 +4370,14 @@ SUBROUTINE LUdecomposition(ajac,n,indx,d)
 
            ! FLOW
 
-      d=1.
+      d=1.0d0
       do i=1,n
-        aamax=0.
+        aamax=0.0d0
         do j=1,n
           if (abs(ajac(i,j)).gt.aamax) aamax=abs(ajac(i,j))
         end do
-          if (aamax.eq.0.) CALL ShowFatalError('Singular matrix in LUdecomposition, window calculations')
-          vv(i)=1./aamax
+          if (aamax.eq.0.0d0) CALL ShowFatalError('Singular matrix in LUdecomposition, window calculations')
+          vv(i)=1.0d0/aamax
       end do
       do j=1,n
         do i=1,j-1
@@ -4347,7 +4387,7 @@ SUBROUTINE LUdecomposition(ajac,n,indx,d)
           end do
           ajac(i,j)=sum
         end do
-        aamax=0.
+        aamax=0.0d0
         do i=j,n
 
           sum=ajac(i,j)
@@ -4371,9 +4411,9 @@ SUBROUTINE LUdecomposition(ajac,n,indx,d)
           vv(imax)=vv(j)
         endif
         indx(j)=imax
-        if(ajac(j,j).eq.0.) ajac(j,j)=rTinyValue
+        if(ajac(j,j).eq.0.0d0) ajac(j,j)=rTinyValue
         if(j.ne.n)then
-          dum=1./ajac(j,j)
+          dum=1.0d0/ajac(j,j)
 
           do i=j+1,n
             ajac(i,j)=ajac(i,j)*dum
@@ -4436,7 +4476,7 @@ SUBROUTINE LUsolution(a,n,indx,b)
           do j=ii,i-1
             sum=sum-a(i,j)*b(j)
           end do
-        else if (sum.ne.0.) then
+        else if (sum.ne.0.0d0) then
           ii=i
         endif
         b(i)=sum
@@ -4526,7 +4566,7 @@ SUBROUTINE WindowGasConductance(tleft,tright,IGap,con,pr,gr)
   REAL(r64)                :: fcp(10)           ! Specific heat of each gas in a mixture (J/m3-K)
 
 
-      NMix = gnmix(IGap)
+      NMix = gnmix(IGap) !Objexx:Logic Either assert NMix>0 or handle NMix<=0 in logic so that con and locals guar. initialized before use
 
       DO IMix = 1,NMix
         frct(IMix) = gfract(IGap,IMix)
@@ -4552,12 +4592,12 @@ SUBROUTINE WindowGasConductance(tleft,tright,IGap,con,pr,gr)
         kdblprm(1) = fcon(1)-kprime(1)                   ! eq. 67
 
         ! Initialize summations for eqns 60-66
-        mumix      = 0.0
-        kpmix      = 0.0
-        kdpmix     = 0.0
-        mukpdwn(1) = 1.0
-        kpdown(1)  = 1.0
-        kdpdown(1) = 1.0
+        mumix      = 0.0d0
+        kpmix      = 0.0d0
+        kdpmix     = 0.0d0
+        mukpdwn(1) = 1.0d0
+        kpdown(1)  = 1.0d0
+        kdpdown(1) = 1.0d0
 
         ! Calculate properties of mixture constituents
         do i = 2, NMix
@@ -4565,13 +4605,13 @@ SUBROUTINE WindowGasConductance(tleft,tright,IGap,con,pr,gr)
           fvis(i)  = gvis(IGap,i,1) + gvis(IGap,i,2)*tmean + gvis(IGap,i,3)*tmean**2
           fcp(i)   = gcp(IGap,i,1)  + gcp(IGap,i,2)*tmean +  gcp(IGap,i,3) *tmean**2
           fdens(i) = pres*gwght(IGap,i)/(gaslaw*tmean)
-          molmix   = molmix+frct(i)*gwght(IGap,i)         ! eq. 56
-          cpmixm   = cpmixm+frct(i)*fcp(i)*gwght(IGap,i)  ! eq. 58-59
-          kprime(i)  = 3.75d0*gaslaw/gwght(IGap,i)*fvis(i)  ! eq. 67
-          kdblprm(i) = fcon(i)-kprime(i)                  ! eq. 68
-          mukpdwn(i) = 1.0                                ! initialize denomonator of eq. 60
-          kpdown(i)  = 1.0                                ! initialize denomonator of eq. 63
-          kdpdown(i) = 1.0                                ! initialize denomonator of eq. 65
+          molmix   = molmix+frct(i)*gwght(IGap,i)          ! eq. 56
+          cpmixm   = cpmixm+frct(i)*fcp(i)*gwght(IGap,i)   ! eq. 58-59
+          kprime(i)  = 3.75d0*gaslaw/gwght(IGap,i)*fvis(i) ! eq. 67
+          kdblprm(i) = fcon(i)-kprime(i)                   ! eq. 68
+          mukpdwn(i) = 1.0d0                               ! initialize denomonator of eq. 60
+          kpdown(i)  = 1.0d0                               ! initialize denomonator of eq. 63
+          kdpdown(i) = 1.0d0                               ! initialize denomonator of eq. 65
         end do
 
         do i = 1,NMix
@@ -4688,15 +4728,15 @@ SUBROUTINE WindowGasPropertiesAtTemp(tmean,IGap,dens,visc)
         molmix = frct(1)*gwght(IGap,1)                   ! initialize eq. 56
 
         ! Initialize summations for eqns 60-66
-        mumix      = 0.0
-        mukpdwn(1) = 1.0
+        mumix      = 0.0d0
+        mukpdwn(1) = 1.0d0
 
         ! Calculate properties of mixture constituents
         do i = 2, NMix
           fvis(i)  = gvis(IGap,i,1) + gvis(IGap,i,2)*tmean + gvis(IGap,i,3)*tmean**2
           fdens(i) = pres*gwght(IGap,i)/(gaslaw*tmean)
           molmix   = molmix+frct(i)*gwght(IGap,i)         ! eq. 56
-          mukpdwn(i) = 1.0                                ! initialize denomonator of eq. 60
+          mukpdwn(i) = 1.0d0                              ! initialize denomonator of eq. 60
         end do
 
         do i = 1,NMix
@@ -4789,23 +4829,23 @@ INTEGER         :: nglfacePrevDay      ! Previous time step value (dya) of numbe
       ! Interaction with shade or blind, if one of these is present, is ignored. See below for
       ! separate calculation of shade/blind temperature.
 
-      rguess(1) = 1./(hcout+hrad)
-      rguess(nglface+1) = 1./(hcin+hrad)
+      rguess(1) = 1.0d0/(hcout+hrad)
+      rguess(nglface+1) = 1.0d0/(hcin+hrad)
 
       do i = 2,nglface,2
-        rguess(i) = 1./scon(i/2)
+        rguess(i) = 1.0d0/scon(i/2)
         if(i<nglface) rguess(i+1) = resgap
       end do
 
-      restot = 0.
+      restot = 0.0d0
       do i = 1,nglface+1
         restot = restot + rguess(i)
       enddo
 
       temdiff = tin - tout
-      if(abs(temdiff)<0.5d0) temdiff = 2.0
+      if(abs(temdiff)<0.5d0) temdiff = 2.0d0
 
-      ressum = 0.
+      ressum = 0.0d0
       do i = 1,nglface
         ressum = ressum + rguess(i)
         thetas(i) = (ressum/restot)*temdiff + tout
@@ -5083,7 +5123,7 @@ SUBROUTINE TransAndReflAtPhi(cs,tf0,rf0,rb0,tfp,rfp,rbp,SimpleGlazingSystem, Sim
     TransCurveF = 3.0254D0*cs**4   - 6.3664D0*cs**3   + 3.1371D0*cs**2 + 1.213D0*cs   - 1.3667D-03
     TransCurveG = 3.2292D0*cs**4   - 6.844D0*cs**3   + 3.5351D0*cs**2 + 1.0881D0*cs   - 2.8905D-03
     TransCurveH = 3.3341D0*cs**4   - 7.1306D0*cs**3   + 3.8287D0*cs**2 + 9.7663D-01*cs - 2.9521D-03
-    TransCurveI = 3.1464D0*cs**4   - 6.8549D0*cs**3   + 3.9311D0*cs**2 + 7.85950D-01*cs - 2.9344E-03
+    TransCurveI = 3.1464D0*cs**4   - 6.8549D0*cs**3   + 3.9311D0*cs**2 + 7.85950D-01*cs - 2.9344D-03
     TransCurveJ = 3.744D0*cs**4   - 8.8364D0*cs**3   + 6.0178D0*cs**2 + 8.4071D-02*cs + 4.825D-04
     TransCurveFGHI = (TransCurveF + TransCurveG + TransCurveH + TransCurveI) / 4.0D0
     TransCurveFH = (TransCurveF + TransCurveH) / 2.0D0
@@ -5352,133 +5392,133 @@ SUBROUTINE TransAndReflAtPhi(cs,tf0,rf0,rb0,tfp,rfp,rbp,SimpleGlazingSystem, Sim
   ENDIF
 
 
-  IF (tf0 .LE. 0.0) THEN
+  IF (tf0 .LE. 0.0d0) THEN
     ! This is an opaque window.  For all angles, set transmittance to 0; set reflectance to that at zero incidence angle.
-    tfp = 0.0
+    tfp = 0.0d0
     rfp = rf0
     rbp = rb0
   ELSE
 
-    betaf = tf0**2 - rf0**2 + 2*rf0 + 1.
-    betab = tf0**2 - rb0**2 + 2*rb0 + 1.
-    r0f = (betaf-sqrt(betaf**2-4.*(2.-rf0)*rf0))/(2.*(2.-rf0))
-    r0b = (betab-sqrt(betab**2-4.*(2.-rb0)*rb0))/(2.*(2.-rb0))
+    betaf = tf0**2 - rf0**2 + 2.0d0*rf0 + 1.0d0
+    betab = tf0**2 - rb0**2 + 2.0d0*rb0 + 1.0d0
+    r0f = (betaf-sqrt(betaf**2-4.0d0*(2.0d0-rf0)*rf0))/(2.0d0*(2.0d0-rf0))
+    r0b = (betab-sqrt(betab**2-4.0d0*(2.0d0-rb0)*rb0))/(2.0d0*(2.0d0-rb0))
 
     tmp1=abs(r0f-r0b)
-    if (tmp1 /= 0.0) then
+    if (tmp1 /= 0.0d0) then
       testval=abs(r0f-r0b)/(r0f+r0b)
     else
-      testval=0.0
+      testval=0.0d0
     endif
 
     IF (testval.LT.0.001d0) THEN  ! CR8830, CR8942, implications of relaxation of glazing properties CR8413
          ! UNCOATED GLASS
       tmp1=r0f*tf0
-      if (tmp1 /= 0.0) then
+      if (tmp1 /= 0.0d0) then
         abf=log(tmp1/(rf0-r0f))
       else
-        abf=0.0
+        abf=0.0d0
       endif
       tmp2=r0b*tf0
-      if (tmp2 /= 0.0) then
+      if (tmp2 /= 0.0d0) then
        abb=log(tmp2/(rb0-r0b))
       else
-        abb = 0.0
+        abb = 0.0d0
       endif
-      ngf  = (1.+sqrt(r0f))/(1.-sqrt(r0f))
-      ngb  = (1.+sqrt(r0b))/(1.-sqrt(r0b))
-      cgf  = sqrt(1.-(1.-cs*cs)/(ngf**2))
-      cgb  = sqrt(1.-(1.-cs*cs)/(ngb**2))
+      ngf  = (1.0d0+sqrt(r0f))/(1.0d0-sqrt(r0f))
+      ngb  = (1.0d0+sqrt(r0b))/(1.0d0-sqrt(r0b))
+      cgf  = sqrt(1.0d0-(1.0d0-cs*cs)/(ngf**2))
+      cgb  = sqrt(1.0d0-(1.0d0-cs*cs)/(ngb**2))
       tmp3=ngf*cs-cgf
-      if (tmp3 /= 0.0) then
+      if (tmp3 /= 0.0d0) then
         rpf1 = (tmp3/(ngf*cs+cgf))**2
       else
-        rpf1 = 0.0
+        rpf1 = 0.0d0
       endif
       tmp4=ngf*cgf-cs
-      if (tmp4 /= 0.0) then
+      if (tmp4 /= 0.0d0) then
         rpf2 = (tmp4/(ngf*cgf+cs))**2
       else
-        rpf2=0.0
+        rpf2=0.0d0
       endif
       tpf1 = 1 - rpf1
       tpf2 = 1 - rpf2
       tmp5=ngb*cs-cgb
-      if (tmp5 /= 0.0) then
+      if (tmp5 /= 0.0d0) then
         rpb1 = (tmp5/(ngb*cs+cgb))**2
       else
-        rpb1 = 0.0
+        rpb1 = 0.0d0
       endif
       tmp6=ngb*cgb-cs
-      if (tmp6 /= 0.0) then
+      if (tmp6 /= 0.0d0) then
         rpb2 = (tmp6/(ngb*cgb+cs))**2
       else
-        rpb2 = 0.0
+        rpb2 = 0.0d0
       endif
       tpb1 = 1 - rpf1
       tpb2 = 1 - rpf2
       tmp7=-abf
-      if (tmp7 /= 0.0) THEN
+      if (tmp7 /= 0.0d0) THEN
         expmabfdivcgf=exp(tmp7/cgf)
       else
-        expmabfdivcgf=0.0
+        expmabfdivcgf=0.0d0
       endif
       tmp8=-2.0d0*abf
-      if (tmp8 /= 0.0) then
+      if (tmp8 /= 0.0d0) then
         expm2abfdivcgf=exp(tmp8/cgf)
       else
-        expm2abfdivcgf=0.0
+        expm2abfdivcgf=0.0d0
       endif
-      if (tpf1 /= 0.0) then
-        tfp1 = tpf1**2*expmabfdivcgf/(1.-rpf1**2*expm2abfdivcgf)
+      if (tpf1 /= 0.0d0) then
+        tfp1 = tpf1**2*expmabfdivcgf/(1.0d0-rpf1**2*expm2abfdivcgf)
       else
-        tfp1 = 0.0
+        tfp1 = 0.0d0
       endif
-      rfp1 = rpf1*(1.+tfp1*expmabfdivcgf)
-      if (tpf2 /= 0.0) then
-        tfp2 = tpf2**2*expmabfdivcgf/(1.-rpf2**2*expm2abfdivcgf)
+      rfp1 = rpf1*(1.0d0+tfp1*expmabfdivcgf)
+      if (tpf2 /= 0.0d0) then
+        tfp2 = tpf2**2*expmabfdivcgf/(1.0d0-rpf2**2*expm2abfdivcgf)
       else
-        tfp2 = 0.0
+        tfp2 = 0.0d0
       endif
-      rfp2 = rpf2*(1.+tfp2*expmabfdivcgf)
-      tfp  = 0.5*(tfp1+tfp2)
-      rfp  = 0.5*(rfp1+rfp2)
+      rfp2 = rpf2*(1.0d0+tfp2*expmabfdivcgf)
+      tfp  = 0.5d0*(tfp1+tfp2)
+      rfp  = 0.5d0*(rfp1+rfp2)
       tmp9=-abb
-      if (tmp9 /= 0.0) then
+      if (tmp9 /= 0.0d0) then
         expmabbdivcgb=exp((tmp9/cgb))
       else
-        expmabbdivcgb=0.0
+        expmabbdivcgb=0.0d0
       endif
-      rbp1 = rpb1*(1.+tfp1*expmabbdivcgb)
-      rbp2 = rpb2*(1.+tfp2*expmabbdivcgb)
-      rbp  = 0.5*(rbp1+rbp2)
+      rbp1 = rpb1*(1.0d0+tfp1*expmabbdivcgb)
+      rbp2 = rpb2*(1.0d0+tfp2*expmabbdivcgb)
+      rbp  = 0.5d0*(rbp1+rbp2)
     ELSE
         ! COATED GLASS
       IF (tf0.GT.0.645d0) THEN
             ! Use clear glass angular distribution.
             ! Normalized clear glass transmittance and reflectance distribution
         IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
-          tcl = 1.0
-          rcl = 0.0
+          tcl = 1.0d0
+          rcl = 0.0d0
         ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
-          tcl = 0.0
-          rcl = 1.0
+          tcl = 0.0d0
+          rcl = 1.0d0
         ELSE
           tcl =  -0.0015d0 + ( 3.355d0+(-3.840d0+( 1.460d0  +0.0288d0*cs)*cs)*cs)*cs
           rcl =   0.999d0  + (-0.563d0+( 2.043d0+(-2.532d0  +1.054d0 *cs)*cs)*cs)*cs-tcl
         END IF
         tfp = tf0*tcl
-        rfp = rf0*(1.-rcl)+rcl
-        rbp = rb0*(1.-rcl)+rcl
+        rfp = rf0*(1.0d0-rcl)+rcl
+        rbp = rb0*(1.0d0-rcl)+rcl
       ELSE
            ! Use bronze glass angular distribution.
            ! Normalized bronze tinted glass transmittance and reflectance distribution
         IF(cs > 0.999d0) THEN        ! Angle of incidence = 0 deg
-          tbnz = 1.0
-          rbnz = 0.0
+          tbnz = 1.0d0
+          rbnz = 0.0d0
         ELSE IF(cs < 0.001d0) THEN   ! Angle of incidence = 90 deg
-          tbnz = 0.0
-          rbnz = 1.0
+          tbnz = 0.0d0
+          rbnz = 1.0d0
         ELSE
           tbnz = -0.002d0  + ( 2.813d0+(-2.341d0+(-0.05725d0+0.599d0 *cs)*cs)*cs)*cs
           rbnz =  0.997d0  + (-1.868d0+( 6.513d0+(-7.862d0  +3.225d0 *cs)*cs)*cs)*cs-tbnz
@@ -5659,13 +5699,13 @@ INTEGER           :: I, J, K, L, M, KP1, LP1, NM1 ! Loop parameters
       END DO
 
       DO I = 1,N
-        SUM = 0.0
+        SUM = 0.0d0
         DO M = N1,N2
           SUM = SUM+DepVar(M)*D(M,I)
         END DO
         B(I) = SUM
         DO J = 1,N
-          SUM = 0.0
+          SUM = 0.0d0
           DO M = N1,N2
             SUM = SUM+D(M,I)*D(M,J)
           END DO
@@ -5693,7 +5733,7 @@ INTEGER           :: I, J, K, L, M, KP1, LP1, NM1 ! Loop parameters
       L = N-1
 
       DO WHILE (L>0)
-        SUM = 0.0
+        SUM = 0.0d0
         DO J = LP1,N
           SUM = SUM+A(L,J)*CoeffsCurve(J)
         END DO
@@ -5766,13 +5806,13 @@ INTEGER          :: I, J, K, L, M, KP1, LP1, NM1 ! Loop parameters
       END DO
 
       DO I = 1,N
-        SUM = 0.0
+        SUM = 0.0d0
         DO M = N1,N2
           SUM = SUM+DepVar(M)*D(M,I)
         END DO
         B(I) = SUM
         DO J = 1,N
-          SUM = 0.0
+          SUM = 0.0d0
           DO M = N1,N2
             SUM = SUM+D(M,I)*D(M,J)
           END DO
@@ -5800,7 +5840,7 @@ INTEGER          :: I, J, K, L, M, KP1, LP1, NM1 ! Loop parameters
       L = N-1
 
       DO WHILE (L>0)
-        SUM = 0.0
+        SUM = 0.0d0
         DO J = LP1,N
           SUM = SUM+A(L,J)*CoeffsCurve(J)
         END DO
@@ -5900,8 +5940,8 @@ REAL(r64)         :: DPhi             ! Phi increment
 INTEGER           :: IPhi             ! Phi index
 REAL(r64)         :: Sum,SumDenom     ! Sums
 
-Sum = 0.
-SumDenom = 0.
+Sum = 0.0d0
+SumDenom = 0.0d0
 DPhi = 5.d0*DegToRadians
 
 ! Integrate from -90 to 0 deg
@@ -5955,8 +5995,8 @@ REAL(r64)         :: DPhi             ! Phi increment
 INTEGER           :: IPhi             ! Phi index
 REAL(r64)         :: Sum,SumDenom     ! Sums
 
-Sum = 0.
-SumDenom = 0.
+Sum = 0.0d0
+SumDenom = 0.0d0
 DPhi = 5.d0*DegToRadians
 
 ! Integrate from 0 to 90 deg
@@ -6066,14 +6106,14 @@ TotLayers = Construct(ConstrNum)%TotLayers
 TotGlassLayers = Construct(ConstrNum)%TotSolidLayers
 EmisGlassOut = Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpThermalFront
 EmisGlassIn  = Material(Construct(ConstrNum)%LayerPoint(TotLayers))%AbsorpThermalBack
-FrameHeatGain = 0.0
-DividerConduction = 0.0
-SurfaceWindow(SurfNum)%FrameHeatGain = 0.0
-SurfaceWindow(SurfNum)%FrameHeatLoss = 0.0
-SurfaceWindow(SurfNum)%DividerHeatGain = 0.0
-SurfaceWindow(SurfNum)%DividerHeatLoss = 0.0
+FrameHeatGain = 0.0d0
+DividerConduction = 0.0d0
+SurfaceWindow(SurfNum)%FrameHeatGain = 0.0d0
+SurfaceWindow(SurfNum)%FrameHeatLoss = 0.0d0
+SurfaceWindow(SurfNum)%DividerHeatGain = 0.0d0
+SurfaceWindow(SurfNum)%DividerHeatLoss = 0.0d0
 
-IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
+IF(SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
   ! Window has a frame. Note that if a shade, screen or blind is present it covers only the glazed part of the
   ! window and is assumed not to shadow long- or short-wave radiation incident on the frame elements.
   ProjCorrFrOut = SurfaceWindow(SurfNum)%ProjCorrFrOut
@@ -6083,11 +6123,11 @@ IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
   FrameCon = SurfaceWindow(SurfNum)%FrameConductance
   HInRad = 0.5d0 * SurfaceWindow(SurfNum)%FrameEmis * sigma * &
              (TInRadFr + SurfaceWindow(SurfNum)%FrameTempSurfIn + TKelvin)**3
-  HInConvFr = 0.0
+  HInConvFr = 0.0d0
   HOutRad = 0.5d0 * SurfaceWindow(SurfNum)%FrameEmis * sigma * &
               (TOutRadFr + SurfaceWindow(SurfNum)%FrameTempSurfOut + TKelvin)**3
   HOutConvFr = HOutConv
-  IF(FrameDivider(FrDivNum)%FrameProjectionOut > 0.0) THEN
+  IF(FrameDivider(FrDivNum)%FrameProjectionOut > 0.0d0) THEN
     HOutRad = HOutRad * (1.d0+ProjCorrFrOut)
     HOutConvFr = HOutConv * (1.d0+ProjCorrFrOut)
     ! Add long-wave from outside window surface absorbed by frame outside projection
@@ -6095,7 +6135,7 @@ IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
       0.5d0 * SurfaceWindow(SurfNum)%ProjCorrFrOut * FrameDivider(FrDivNum)%FrameEmis * &
       EmisGlassOut * sigma * SurfaceWindow(SurfNum)%ThetaFace(1)**4
   END IF
-  IF(FrameDivider(FrDivNum)%FrameProjectionIn > 0.0) THEN
+  IF(FrameDivider(FrDivNum)%FrameProjectionIn > 0.0d0) THEN
     HInRad = HInRad * (1.d0+ProjCorrFrIn)
     HInConvFr = HInConv * (1.d0+ProjCorrFrIn)
     ! Add long-wave from inside window surface absorbed by frame inside projection
@@ -6122,7 +6162,7 @@ IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
   ( hcin*(SurfaceWindow(SurfNum)%FrameTempSurfIn+TKelvin - tin) )
 
 
-  IF (FrameHeatGain > 0.0) THEN
+  IF (FrameHeatGain > 0.0d0) THEN
     SurfaceWindow(SurfNum)%FrameHeatGain = FrameHeatGain
   ELSE
     SurfaceWindow(SurfNum)%FrameHeatLoss = ABS(FrameHeatGain)
@@ -6132,7 +6172,7 @@ IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
   WinGainFrameDividerToZoneRep(SurfNum) = FrameHeatGain
 END IF  ! End of check if window has a frame
 
-IF(SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%StormWinFlag < 1) THEN
+IF(SurfaceWindow(SurfNum)%DividerArea > 0.0d0 .AND. SurfaceWindow(SurfNum)%StormWinFlag < 1) THEN
  ! Window has divider. Note that if the window has a storm window layer in place (StormWinFlag = 1)
  ! the divider heat transfer calculation is not done.
 
@@ -6158,7 +6198,7 @@ IF(SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%StormWi
               (TOutRadDiv + SurfaceWindow(SurfNum)%DividerTempSurfOut + TKelvin)**3
   HOutConvDiv = HOutConv
 
-  IF(FrameDivider(FrDivNum)%DividerProjectionOut > 0.0) THEN
+  IF(FrameDivider(FrDivNum)%DividerProjectionOut > 0.0d0) THEN
     HOutRad = HOutRad * (1.d0+2.d0*SurfaceWindow(SurfNum)%ProjCorrDivOut)
     IF(SurfaceWindow(SurfNum)%ShadingFlag == ExtShadeOn) HOutConvDiv =  &
       SurfaceWindow(SurfNum)%ConvCoeffWithShade
@@ -6171,7 +6211,7 @@ IF(SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%StormWi
 
   HInConvDiv = HInConv
 
-  IF(FrameDivider(FrDivNum)%DividerProjectionIn > 0.0) THEN
+  IF(FrameDivider(FrDivNum)%DividerProjectionIn > 0.0d0) THEN
     HInRad = HInRad *  (1.d0+2.d0*SurfaceWindow(SurfNum)%ProjCorrDivIn)
     IF(SurfaceWindow(SurfNum)%ShadingFlag == IntShadeOn) HInConvDiv =  &
       SurfaceWindow(SurfNum)%ConvCoeffWithShade
@@ -6194,7 +6234,7 @@ IF(SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%StormWi
   ProjCorrWinHeatGain = 1.d0 + 2.d0*SurfaceWindow(SurfNum)%ProjCorrDivIn
   DividerConduction = SurfaceWindow(SurfNum)%DividerArea * DivCon * &
     (SurfaceWindow(SurfNum)%DividerTempSurfOut - SurfaceWindow(SurfNum)%DividerTempSurfin)
-  IF (DividerConduction > 0.0) THEN
+  IF (DividerConduction > 0.0d0) THEN
     SurfaceWindow(SurfNum)%DividerHeatGain = DividerConduction
   ELSE
     SurfaceWindow(SurfNum)%DividerHeatLoss = ABS(DividerConduction)
@@ -6379,7 +6419,8 @@ REAL(r64)         :: AGlDiffBack                  ! Back diffuse solar absorptan
 ErrFlag = 0
 TotLay = Construct(ConstrNum)%TotLayers
 TotGlassLay = Construct(ConstrNum)%TotGlassLayers
-ngllayer = TotGlassLay
+ngllayer = TotGlassLay !Objexx:Uninit This routine needs to check/enforce 1<=ngllayer<=4
+!EPTeam - believe that is done on input.
 nglface  = 2*ngllayer
 tilt = 90.d0   ! Assume vertical window
 
@@ -6393,7 +6434,7 @@ IF(WinterSummerFlag == 1) THEN  ! Winter
 !  tout = 255.35  ! Outside air temperature (0F, -17.8C)
 !  hcout = 25.47  ! Outside convective film conductance for 6.71 m/s (15 mph) wind speed
 !                 ! (the value used in Window 4)
-  BeamSolarInc = 0.0
+  BeamSolarInc = 0.0d0
 ELSE  ! Summer
   ! LKL Oct 2007: According to Window5, Summer environmental conditions are:
   !tin = 297.05d0   ! Inside air temperature (75.2F, 24C)
@@ -6421,7 +6462,7 @@ outir = sigma * tout**4
 
 ! Determine whether construction has an exterior or interior shade or blind
 ShadeFlag = NoShade
-ShadeRes = 0.0
+ShadeRes = 0.0d0
 MatOutside = Construct(ConstrNum)%LayerPoint(1)
 MatInside = Construct(ConstrNum)%LayerPoint(TotLay)
 IF(Material(MatOutside)%Group == 2) THEN       ! Exterior shade present
@@ -6462,7 +6503,7 @@ END IF
 
 TSolNorm = POLYF(1.0d0,Construct(ConstrNum)%TransSolBeamCoef(1:6))
 TVisNorm = POLYF(1.0d0,Construct(ConstrNum)%TransVisBeamCoef(1:6))
-AbsBeamShadeNorm = 0.0
+AbsBeamShadeNorm = 0.0d0
 IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn) THEN  ! Exterior or interior shade on
   AbsBeamShadeNorm = POLYF(1.0d0,Construct(ConstrNum)%AbsBeamShadeCoef(1:6))
 ! Exterior blind or screen or interior blind on
@@ -6638,24 +6679,24 @@ END DO
 
 ! Factors used in glass temperature solution
 IF(ngllayer >= 2) THEN
-  A23P = -emis(3)/(1.-(1.-emis(2))*(1.-emis(3)))
-  A32P = emis(2)/(1.-(1.-emis(2))*(1.-emis(3)))
+  A23P = -emis(3)/(1.0d0-(1.0d0-emis(2))*(1.0d0-emis(3)))
+  A32P = emis(2)/(1.0d0-(1.0d0-emis(2))*(1.0d0-emis(3)))
   A23 = emis(2)*sigma*A23P
 END IF
 
 IF(ngllayer >= 3) THEN
-  A45P = -emis(5)/(1.-(1.-emis(4))*(1.-emis(5)))
-  A54P = emis(4)/(1.-(1.-emis(4))*(1.-emis(5)))
+  A45P = -emis(5)/(1.0d0-(1.0d0-emis(4))*(1.0d0-emis(5)))
+  A54P = emis(4)/(1.0d0-(1.0d0-emis(4))*(1.0d0-emis(5)))
   A45 = emis(4)*sigma*A45P
 END IF
 
 IF(ngllayer == 4) THEN
-  A67P = -emis(7)/(1.-(1.-emis(6))*(1.-emis(7)))
-  A76P = emis(6)/(1.-(1.-emis(6))*(1.-emis(7)))
+  A67P = -emis(7)/(1.0d0-(1.0d0-emis(6))*(1.0d0-emis(7)))
+  A76P = emis(6)/(1.0d0-(1.0d0-emis(6))*(1.0d0-emis(7)))
   A67 = emis(6)*sigma*A67P
 END IF
 
-thetas = 0.
+thetas = 0.0d0
 
 CALL WindowTempsForNominalCond(ConstrNum,hgap)
 
@@ -6667,14 +6708,14 @@ rOut = 1.0d0/(hOutRad + hcout)
 hInRad = emis(nglface)*sigma*0.5d0*(tin+thetas(nglface))**3
 rIn = 1.0d0/(hInRad + hcin)
 
-IF (.not. (ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn)) AbsBeamShadeNorm=0.0
+IF (.not. (ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn)) AbsBeamShadeNorm=0.0d0
 
 SELECT CASE(ngllayer)
 
   CASE(1)
     Rbare = 1.0D0/scon(1)
     Rtot = rOut + Rbare + rIn
-    SHGC = AbsBeamNorm(1) * (rOut + (0.5/scon(1)))/Rtot ! BG changed for CR7682 (solar absorbed in middle of layer)
+    SHGC = AbsBeamNorm(1) * (rOut + (0.5d0/scon(1)))/Rtot ! BG changed for CR7682 (solar absorbed in middle of layer)
     SHGC = SHGC + AbsBeamShadeNorm
     SHGC = SHGC + TSolNorm
 
@@ -6715,7 +6756,8 @@ SELECT CASE(ngllayer)
 
  END SELECT
 
-NominalConductance = 1.0D0/(rOut + Rbare + rIn)
+NominalConductance = 1.0D0/(rOut + Rbare + rIn) !Objexx:Uninit Rbare uninitialized if ngllayer>4
+!EPTeam - again -- believe that is enforced in input
 
 RETURN
 END SUBROUTINE CalcNominalWindowCond
@@ -6831,8 +6873,8 @@ DO WHILE (iter < MaxIterations .and. errtemp > errtemptol)
     hrprev(i) = hr(i)
   END DO
 
-  Aface = 0.0
-  Bface = 0.0
+  Aface = 0.0d0
+  Bface = 0.0d0
 
   ! Inside convective film conductance for vertical window
   if (iter >= 1) then
@@ -6996,7 +7038,7 @@ DO WHILE (iter < MaxIterations .and. errtemp > errtemptol)
   call LUdecomposition(Aface,nglface,indx,d)    ! Note that these routines change Aface;
   call LUsolution(Aface,nglface,indx,Bface)     ! face temperatures are returned in Bface
 
-  errtemp = 0.0
+  errtemp = 0.0d0
   DO i = 1,nglface
     errtemp = errtemp + ABS(thetas(i)-Bface(i))/nglface
   END DO
@@ -7064,14 +7106,14 @@ REAL(r64)         :: restot                      ! Total window resistance inclu
 REAL(r64)         :: temdiff                     ! Inside/outside air temperature difference (K)
 REAL(r64)         :: ressum                      ! Resistance sum (m2-K/W)
 
-      rguess(1) = 1./(hcout+hrad)
-      rguess(nglface+1) = 1./(hcinStartValue+hrad)
+      rguess(1) = 1.0d0/(hcout+hrad)
+      rguess(nglface+1) = 1.0d0/(hcinStartValue+hrad)
 
       do i = 2,nglface,2
-        rguess(i) = 1./scon(i/2)
+        rguess(i) = 1.0d0/scon(i/2)
         if(i<nglface) rguess(i+1) = resgap
       end do
-      restot = 0.
+      restot = 0.0d0
 
       do i = 1,nglface+1
         restot = restot + rguess(i)
@@ -7079,7 +7121,7 @@ REAL(r64)         :: ressum                      ! Resistance sum (m2-K/W)
 
       temdiff = tin - tout
       if(abs(temdiff)<0.5d0) temdiff = 2.0d0
-      ressum = 0.
+      ressum = 0.0d0
 
       do i = 1,nglface
         ressum = ressum + rguess(i)
@@ -7134,6 +7176,7 @@ SUBROUTINE ReportGlass
   LOGICAL :: DoReport=.false.
   LOGICAL :: HasWindows=.false.
   LOGICAL :: HasComplexWindows = .false.
+  LOGICAL :: HasEQLWindows = .false.               ! equivalent layer window defined
   INTEGER :: SurfConstr = 0
   REAL(r64) :: TempVar = 0.0d0 ! just temporary usage for complex fenestration
 
@@ -7161,6 +7204,8 @@ SUBROUTINE ReportGlass
   CHARACTER(len=3) SolarDiffusing    ! 'Yes' if glass is solar diffusing; otherwise 'No' (clear glass)
   CHARACTER(len=MaxNameLength) :: SpectralDataName
   CHARACTER(len=MaxNameLength) :: OpticalDataType
+  CHARACTER(len=MaxNameLength) :: SlateOrientation
+  CHARACTER(len=MaxNameLength) :: GapVentType
 
   CALL ScanForReports('Constructions',DoReport,'Constructions')
 
@@ -7172,6 +7217,7 @@ SUBROUTINE ReportGlass
 
   IF (ANY(Construct%TypeIsWindow)) HasWindows=.true.
   IF (ANY(Construct%WindowTypeBSDF)) HasComplexWindows=.true.  ! Yes, this is a bit different than actually using them.
+  IF (ANY(Construct%WindowTypeEQL)) HasEQLWindows=.true.       ! for reporting purpose only
 
 !  DO ThisNum=1,TotSurfaces
 !    SurfConstr = Surface(ThisNum)%Construction
@@ -7183,7 +7229,7 @@ SUBROUTINE ReportGlass
 !    END IF
 !  ENDDO
 
-  IF (DoReport .and. (HasWindows .or. HasComplexWindows)) THEN
+  IF (DoReport .and. (HasWindows .or. HasComplexWindows .OR. HasEQLWindows)) THEN
 !
 !
 !                                      Write Descriptions
@@ -7215,6 +7261,56 @@ SUBROUTINE ReportGlass
     IF (HasComplexWindows)  Write(OutputFileInits,'(A)') '! <WindowConstruction:Complex>,Construction Name,Index,#Layers,'//  &
                             'U-factor {W/m2-K},SHGC'
 
+    IF (HasEQLWindows)  &
+      Write(OutputFileInits,'(A)') '! <Construction:WindowEquivalentLayer>,Construction Name,Index,#Layers,'//  &
+                            'U-factor {W/m2-K},SHGC, Solar Transmittance at Normal Incidence'
+    IF( W5GlsMatEQL .GT. 0) &
+      Write(OutputFileInits, '(A)') '! <WindowMaterial:Glazing:EquivalentLayer>, '// &
+                               'Material Name, Optical Data Type, Spectral Data Set Name, '// &
+                               'Front Side Beam-Beam Solar Transmittance, Back Side Beam-Beam Solar Transmittance, '//&
+                               'Front Side Beam-Beam Solar Reflectance, Back Side Beam-Beam Solar Reflectance, '//&
+                               'Front Side Beam-Diffuse Solar Transmittance, Back Side Beam-Diffuse Solar Transmittance, , '//&
+                               'Front Side Beam-Diffuse Solar Reflectance, Back Side Beam-Diffuse Solar Reflectance, '//&
+                               'Diffuse-Diffuse Solar Transmittance, Front Side Diffuse-Diffuse Solar Reflectance, '//&
+                               'Back Side Diffuse-Diffuse Solar Reflectance, Infrared Transmittance, '//&
+                               'Front Side Infrared Emissivity, Back Side Infrared Emissivity'
+    IF( TotShadesEQL .GT. 0) &
+      Write(OutputFileInits, '(A)') '! <WindowMaterial:Shade:EquivalentLayer>, '// &
+                               'Material Name, '// &
+                               'Front Side Beam-Beam Solar Transmittance, Back Side Beam-Beam Solar Transmittance, '//&
+                               'Front Side Beam-Diffuse Solar Transmittance, Back Side Beam-Diffuse Solar Transmittance, , '//&
+                               'Front Side Beam-Diffuse Solar Reflectance, Back Side Beam-Diffuse Solar Reflectance, '//&
+                               'Infrared Transmittance, Front Side Infrared Emissivity, Back Side Infrared Emissivity'
+
+    IF( TotDrapesEQL .GT. 0) &
+      Write(OutputFileInits, '(A)') '! <WindowMaterial:Drape:EquivalentLayer>, '// &
+                               'Material Name, '// &
+                               'Front Side Beam-Beam Solar Transmittance, Back Side Beam-Beam Solar Transmittance, '//&
+                               'Front Side Beam-Diffuse Solar Transmittance, Back Side Beam-Diffuse Solar Transmittance, , '//&
+                               'Front Side Beam-Diffuse Solar Reflectance, Back Side Beam-Diffuse Solar Reflectance, '//&
+                               'Infrared Transmittance, Front Side Infrared Emissivity, Back Side Infrared Emissivity, '//&
+                               'Width of Pleated Fabric, Length of Pleated Fabric'
+
+    IF( TotBlindsEQL .GT. 0) &
+      Write(OutputFileInits, '(A)') '! <WindowMaterial:Blind:EquivalentLayer>, '// &
+                     'Material Name, '// &
+                     'Slat Orientation, Slat Width, Slat Separation, Slat Crown, Slat Angle, '//&
+                     'Front Side Slate Beam-Diffuse Solar Transmittance, Back Side Slate Beam-Diffuse Solar Transmittance, '//&
+                     'Front Side Slate Beam-Diffuse Solar Reflectance, Back Side Slate Beam-Diffuse Solar Reflectance, '//&
+                     'Slat Diffuse-Diffuse Solar Transmittance, Front Side Slat Diffuse-Diffuse Solar Reflectance, '//&
+                     'Back Side Slat Diffuse-Diffuse Solar Reflectance, Infrared Transmittance, '//&
+                     'Front Side Infrared Emissivity, Back Side Infrared Emissivity, Slat Angle Control'
+    IF( TotScreensEQL .GT. 0) &
+      Write(OutputFileInits, '(A)') '! <WindowMaterial:Screen:EquivalentLayer>, '// &
+                     'Material Name, '// &
+                     'Screen Beam-Beam Solar Transmittance, Screen Beam-Diffuse Solar Transmittance, '//&
+                     'Screen Beam-Diffuse Solar Reflectance, Screen Infrared Transmittance, '//&
+                     'Screen Infrared Emissivity, Screen Wire Spacing, Screen Wire Diameter'
+    IF( W5GapMatEQL .GT. 0) &
+      Write(OutputFileInits,'(A)')   &
+         '! <WindowMaterial:Gap:EquivalentLayer>, Material Name, GasType, Gap Thickness {m}, Gap Vent Type'
+
+
     DO ThisNum=1,TotConstructs
 
       IF (Construct(ThisNum)%WindowTypeBSDF) THEN
@@ -7229,46 +7325,62 @@ SUBROUTINE ReportGlass
                                    trim(RoundSigDigits(Construct(ThisNum)%SummerSHGC,3))
 
       ELSE IF (Construct(ThisNum)%TypeIsWindow) THEN
-        ! Calculate for ASHRAE winter and summer conditions: (1)nominal center-of-glass conductance,
-        ! (2) solar heat gain coefficient (SHGC), including inside and outside air films,
+        ! Calculate for ASHRAE winter and summer conditions:
+        ! (1) nominal center-of-glass conductance, including inside and outside air films,
+        ! (2) solar heat gain coefficient (SHGC),
         ! (3) solar transmittance at normal incidence, and (4) visible transmittance at normal incidence.
 
-        CALL CalcNominalWindowCond(ThisNum,1,NominalConductanceWinter,SHGCWinter,TransSolNorm,TransVisNorm,ErrFlag)
+        IF (Construct(ThisNum)%WindowTypeEQL) THEN
+            ! for equivalent layer Window already calculated
+            ! NominalU(ThisNum)=NominalConductanceWinter
+            ! Save the SHGC for later use in tabular report IVRS
+            ! Construct(ThisNum)%SummerSHGC = SHGCSummer
+            Construct(ThisNum)%VisTransNorm =0.0d0   ! TODO list
 
-        IF(ErrFlag == 1) THEN
-          CALL ShowWarningError('Window construction '//TRIM(Construct(ThisNum)%Name)// &
-             ' has an interior or exterior blind')
-          CALL ShowContinueError('but the corresponding construction without the blind cannot be found.')
-          CALL ShowContinueError('The ReportGlass entry for this construction will not be printed in eplusout.eio.')
-          CYCLE
-        END IF
+            Write(OutputFileInits,799) trim(Construct(ThisNum)%Name), trim(RoundSigDigits(ThisNum)), &
+                                       trim(RoundSigDigits(Construct(ThisNum)%TotSolidLayers)), &
+                                       trim(RoundSigDigits(NominalU(ThisNum),3)), &
+                                       trim(RoundSigDigits(Construct(ThisNum)%SummerSHGC,3)), &
+                                       trim(RoundSigDigits(Construct(ThisNum)%SolTransNorm,3))
 
-        ! Skip constructions with between-glass shade/blind until method is worked out to determine
-        ! nominal conductance and SHGC.
+        ELSE
 
-        IF(ErrFlag == 2) THEN
-          CALL ShowWarningError('Window construction '//TRIM(Construct(ThisNum)%Name)// &
-             ' has a between-glass shade or blind')
-          CALL ShowContinueError('The ReportGlass entry for this construction will not be printed in eplusout.eio.')
-          CYCLE
-        END IF
+            CALL CalcNominalWindowCond(ThisNum,1,NominalConductanceWinter,SHGCWinter,TransSolNorm,TransVisNorm,ErrFlag)
 
-        NominalU(ThisNum)=NominalConductanceWinter
+            IF(ErrFlag == 1) THEN
+              CALL ShowWarningError('Window construction '//TRIM(Construct(ThisNum)%Name)// &
+                 ' has an interior or exterior blind')
+              CALL ShowContinueError('but the corresponding construction without the blind cannot be found.')
+              CALL ShowContinueError('The ReportGlass entry for this construction will not be printed in eplusout.eio.')
+              CYCLE
+            END IF
 
-        CALL CalcNominalWindowCond(ThisNum,2,NominalConductanceSummer,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            ! Skip constructions with between-glass shade/blind until method is worked out to determine
+            ! nominal conductance and SHGC.
 
-        ! Save the SHGC for later use in tabular report IVRS
-        Construct(ThisNum)%SummerSHGC = SHGCSummer
-        Construct(ThisNum)%VisTransNorm = TransVisNorm
+            IF(ErrFlag == 2) THEN
+              CALL ShowWarningError('Window construction '//TRIM(Construct(ThisNum)%Name)// &
+                 ' has a between-glass shade or blind')
+              CALL ShowContinueError('The ReportGlass entry for this construction will not be printed in eplusout.eio.')
+              CYCLE
+            END IF
 
-        Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),trim(RoundSigDigits(ThisNum)),   &
-                                 trim(RoundSigDigits(Construct(ThisNum)%TotLayers)),              &
-                                 trim(Roughness(Construct(ThisNum)%OutsideRoughness)),            &
-                                 trim(RoundSigDigits(NominalConductanceWinter,3)),                &
-                                 trim(RoundSigDigits(SHGCSummer,3)),                              &
-                                 trim(RoundSigDigits(TransSolNorm,3)),                            &
-                                trim(RoundSigDigits(TransVisNorm,3))
+            NominalU(ThisNum)=NominalConductanceWinter
+            IF (.NOT. Construct(ThisNum)%WindowTypeEQL) THEN
+               CALL CalcNominalWindowCond(ThisNum,2,NominalConductanceSummer,SHGCSummer,TransSolNorm,TransVisNorm,ErrFlag)
+            ENDIF
+            ! Save the SHGC for later use in tabular report IVRS
+            Construct(ThisNum)%SummerSHGC = SHGCSummer
+            Construct(ThisNum)%VisTransNorm = TransVisNorm
 
+            Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),trim(RoundSigDigits(ThisNum)),   &
+                                     trim(RoundSigDigits(Construct(ThisNum)%TotLayers)),              &
+                                     trim(Roughness(Construct(ThisNum)%OutsideRoughness)),            &
+                                     trim(RoundSigDigits(NominalConductanceWinter,3)),                &
+                                     trim(RoundSigDigits(SHGCSummer,3)),                              &
+                                     trim(RoundSigDigits(TransSolNorm,3)),                            &
+                                    trim(RoundSigDigits(TransVisNorm,3))
+        ENDIF
     !    Write(OutputFileConstrainParams, 705)  TRIM(Construct(ThisNum)%Name), SHGCSummer ,TransVisNorm
 
  700  FORMAT(' WindowConstruction',8(',',A))
@@ -7277,6 +7389,14 @@ SUBROUTINE ReportGlass
  704  FORMAT(' WindowMaterial:Blind',8(',',A))
  706  FORMAT(' WindowMaterial:Screen',11(',',A))
  707  FORMAT(' WindowMaterial:Glazing',16(',',A))
+
+ 708  FORMAT(' WindowMaterial:Glazing:EquivalentLayer',17(',',A))
+ 709  FORMAT(' WindowMaterial:Shade:EquivalentLayer',10(',',A))
+ 710  FORMAT(' WindowMaterial:Drape:EquivalentLayer',11(',',A))
+ 711  FORMAT(' WindowMaterial:Screen:EquivalentLayer',11(',',A))
+ 712  FORMAT(' WindowMaterial:Blind:EquivalentLayer',16(',',A))
+ 713  FORMAT(' WindowMaterial:Gap:EquivalentLayer',4(',',A))
+ 799  FORMAT(' Construction:WindowEquivalentLayer',6(',',A))
 
         DO I=1,Construct(ThisNum)%TotLayers
           Layer=Construct(ThisNum)%LayerPoint(I)
@@ -7345,6 +7465,97 @@ SUBROUTINE ReportGlass
                                        trim(RoundSigDigits(Material(Layer)%GlassTransDirtFactor,5)),             &
                                        trim(SolarDiffusing)
 
+          CASE (GlassEquivalentLayer)
+            OpticalDataType = 'SpectralAverage'
+            SpectralDataName = ' '
+            Write(OutputFileInits,708) TRIM(Material(Layer)%Name), &
+                                       trim(OpticalDataType), trim(SpectralDataName), &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamBeam,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamBeam,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamBeam,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamBeam,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausDiffDiff,5)),       &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontDiffDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackDiffDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausThermal,5)),        &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalFront,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalBack,5))
+
+          CASE (ShadeEquivalentLayer)
+            Write(OutputFileInits,709) TRIM(Material(Layer)%Name),                                 &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamBeam,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamBeam,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausThermal,4)),        &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalFront,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalBack,4))
+
+          CASE (DrapeEquivalentLayer)
+            Write(OutputFileInits,710) TRIM(Material(Layer)%Name),                                 &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamBeam,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausThermal,4)),        &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalFront,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalBack,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%PleatedDrapeWidth,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%PleatedDrapeLength,5))
+
+          CASE (ScreenEquivalentLayer)
+              Write(OutputFileInits,711) TRIM(Material(Layer)%Name),                               &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamBeam,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamDiff,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamDiff,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausThermal,4)),        &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalFront,4)),  &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalBack,4)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ScreenWireSpacing,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ScreenWireDiameter,5))
+
+          CASE (BlindEquivalentLayer)
+              SlateOrientation = 'Horizontal'
+              IF (Material(Layer)%SlatOrientation == Vertical) THEN
+                SlateOrientation = 'Vertical'
+              ENDIF
+              Write(OutputFileInits,712) TRIM(Material(Layer)%Name), &
+                                       trim(SlateOrientation), &
+                                       trim(RoundSigDigits(Material(Layer)%SlatWidth,5)),          &
+                                       trim(RoundSigDigits(Material(Layer)%SlatSeparation,5)),     &
+                                       trim(RoundSigDigits(Material(Layer)%SlatCrown,5)),          &
+                                       trim(RoundSigDigits(Material(Layer)%SlatAngle,5)),          &
+                                       trim(RoundSigDigits(Material(Layer)%TausFrontBeamDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%TausBackBeamDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontBeamDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackBeamDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausDiffDiff,5)),       &
+                                       trim(RoundSigDigits(Material(Layer)%ReflFrontDiffDiff,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%ReflBackDiffDiff,5)),   &
+                                       trim(RoundSigDigits(Material(Layer)%TausThermal,5)),        &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalFront,5)),  &
+                                       trim(RoundSigDigits(Material(Layer)%EmissThermalBack,5))
+
+          CASE (GapEquivalentLayer)
+              GapVentType = 'Sealed'
+              IF (Material(Layer)%GapVentType == 2) THEN
+                GapVentType = 'VentedIndoor'
+              ELSEIF(Material(Layer)%GapVentType == 3) THEN
+                GapVentType = 'VentedOutdoor'
+              ENDIF
+              Write(OutputFileInits,713) TRIM(Material(Layer)%Name), &
+                                       trim(GasTypeName(Material(Layer)%GasType(1))),      &
+                                       trim(RoundSigDigits(Material(Layer)%Thickness,3)),  &
+                                       trim(GapVentType)
           END SELECT
         ENDDO
 
@@ -7357,6 +7568,7 @@ SUBROUTINE ReportGlass
     DO ThisNum=1,TotConstructs
 
       IF (.not. Construct(ThisNum)%TypeIsWindow) CYCLE
+      IF (Construct(ThisNum)%WindowTypeEQL) CYCLE        ! skip if equivalent layer window
 
       ! Calculate for ASHRAE winter and summer conditions: (1)nominal center-of-glass conductance,
       ! (2) solar heat gain coefficient (SHGC), including inside and outside air films,
@@ -7459,9 +7671,9 @@ DO BlindNum = 1,TotBlinds
 
   DO ISolVis = 1,2
     IF(ISolVis == 1) THEN  ! For solar calculation
-      BLD_PR( 4) = 0.0
-      BLD_PR( 5) = 0.0
-      BLD_PR( 6) = 0.0
+      BLD_PR( 4) = 0.0d0
+      BLD_PR( 5) = 0.0d0
+      BLD_PR( 6) = 0.0d0
       BLD_PR( 7) = Blind(BlindNum)%SlatTransSolBeamDiff
       BLD_PR( 8) = Blind(BlindNum)%SlatFrontReflSolBeamDiff
       BLD_PR( 9) = Blind(BlindNum)%SlatBackReflSolBeamDiff
@@ -7469,9 +7681,9 @@ DO BlindNum = 1,TotBlinds
       BLD_PR(11) = Blind(BlindNum)%SlatFrontReflSolDiffDiff
       BLD_PR(12) = Blind(BlindNum)%SlatBackReflSolDiffDiff
     ELSE                   ! For visible calculation
-      BLD_PR( 4) = 0.0
-      BLD_PR( 5) = 0.0
-      BLD_PR( 6) = 0.0
+      BLD_PR( 4) = 0.0d0
+      BLD_PR( 5) = 0.0d0
+      BLD_PR( 6) = 0.0d0
       BLD_PR( 7) = Blind(BlindNum)%SlatTransVisBeamDiff
       BLD_PR( 8) = Blind(BlindNum)%SlatFrontReflVisBeamDiff
       BLD_PR( 9) = Blind(BlindNum)%SlatBackReflVisBeamDiff
@@ -7490,7 +7702,7 @@ DO BlindNum = 1,TotBlinds
 
     DO ISlatAng = 1,MaxSlatAngs
 
-      st_lay = 0.
+      st_lay = 0.0d0
       IF(Blind(BlindNum)%SlatAngleType == FixedSlats) THEN
         bld_el = Blind(BlindNum)%SlatAngle * DegToRadians
       ELSE  ! Variable slat angle
@@ -7531,7 +7743,7 @@ DO BlindNum = 1,TotBlinds
       sun_el_deg(IProfAng) = 57.2958d0 * sun_el
 
       DO ISlatAng = 1,MaxSlatAngs
-        st_lay = 0.
+        st_lay = 0.0d0
         IF(Blind(BlindNum)%SlatAngleType == FixedSlats) THEN
           bld_el = Blind(BlindNum)%SlatAngle * DegToRadians
         ELSE  ! Variable slat angle
@@ -7678,7 +7890,7 @@ DO SurfNum = 1, TotSurfaces
       SurfaceScreens(ScreenNum)%MaterialNumber = MatNum
 !     Invert calculation done in GetMaterialInput to find Diameter to Spacing ratio (Props(7)/Props(6))
 !     Material(MaterNum)%Trans = (1 - MaterialProps(7)/MaterialProps(6))**2.0
-      SurfaceScreens(ScreenNum)%ScreenDiameterToSpacingRatio = 1.0 - SQRT(Material(MatNum)%Trans)
+      SurfaceScreens(ScreenNum)%ScreenDiameterToSpacingRatio = 1.0d0 - SQRT(Material(MatNum)%Trans)
 
       IF(SameString(Material(MatNum)%ReflectanceModeling,'DoNotModel'))THEN
         SurfaceScreens(ScreenNum)%ScreenBeamReflectanceAccounting = DoNotModel
@@ -7693,11 +7905,11 @@ DO SurfNum = 1, TotSurfaces
       SurfaceScreens(ScreenNum)%ReflectCylinderVis   = Material(MatNum)%ReflectShadeVis/(1 - Material(MatNum)%Trans)
 
 !     Integrate the transmittance over a quarter hemisphere for use in diffuse calculations
-      SumTrans      = 0.0
-      SumTransVis   = 0.0
-      SumReflect    = 0.0
-      SumReflectVis = 0.0
-      SumArea       = 0.0
+      SumTrans      = 0.0d0
+      SumTransVis   = 0.0d0
+      SumReflect    = 0.0d0
+      SumReflectVis = 0.0d0
+      SumArea       = 0.0d0
 !     Integration over quarter hemisphere in polar coordinates and converting to rectangular to call screen model.
 !     Proceed in reverse order such that the last calculation yields zero sun angle to window screen normal (angles=0,0).
 !     The properties calculated at zero sun angle are then used elsewhere prior to the start of the actual simulation.
@@ -7763,12 +7975,12 @@ OPEN(UNIT=ScreenTransUnitNo,FILE='eplusscreen.csv',ERR=99999,STATUS='unknown',ac
     IF(Material(MatNum)%ScreenMapResolution .NE. 0)THEN
       ALLOCATE(ScreenTrans(ScreenNum)%Trans(90/Material(MatNum)%ScreenMapResolution+1,90/Material(MatNum)%ScreenMapResolution+1))
       ALLOCATE(ScreenTrans(ScreenNum)%Scatt(90/Material(MatNum)%ScreenMapResolution+1,90/Material(MatNum)%ScreenMapResolution+1))
-      ScreenTrans(ScreenNum)%Trans = 0.0
-      ScreenTrans(ScreenNum)%Scatt = 0.0
+      ScreenTrans(ScreenNum)%Trans = 0.0d0
+      ScreenTrans(ScreenNum)%Scatt = 0.0d0
       DO J = 90/Material(MatNum)%ScreenMapResolution+1, 1, -1
         DO I = 90/Material(MatNum)%ScreenMapResolution+1, 1, -1
-          SunAzimuth  = Material(MatNum)%ScreenMapResolution*(J-1)*(Pi/180.0)
-          SunAltitude = Material(MatNum)%ScreenMapResolution*(I-1)*(Pi/180.0)
+          SunAzimuth  = Material(MatNum)%ScreenMapResolution*(J-1)*(Pi/180.0d0)
+          SunAltitude = Material(MatNum)%ScreenMapResolution*(I-1)*(Pi/180.0d0)
           CALL CalcScreenTransmittance(0, Phi=SunAltitude, Theta=SunAzimuth, ScreenNumber=ScreenNum)
           ScreenTrans(ScreenNum)%Trans(J,I) = SurfaceScreens(ScreenNum)%BmBmTrans
           ScreenTrans(ScreenNum)%Scatt(J,I) = SurfaceScreens(ScreenNum)%BmDifTrans
@@ -7940,11 +8152,11 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
       end do
 
       do k=1,4
-          X(k,k)=X(k,k)+1.
+          X(k,k)=X(k,k)+1.0d0
       end do
 
       indx = 0
-      CALL InvertMatrix(X,Xinv,indx,4,4)
+      CALL InvertMatrix(X,Xinv,indx,4,4) !Objexx:Note X modified by this call
 
 !---------Calculate diffuse short-wave properties for the front side of the blind
 
@@ -7957,10 +8169,10 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
 
 !     Radiosities
 
-      J(1)=1.
-      J(2)=0.
+      J(1)=1.0d0
+      J(2)=0.0d0
       do k=3,6
-          J(k)=0.
+          J(k)=0.0d0
           do m=3,6
               J(k)=J(k)+Xinv(k-2,m-2)*Q(m)
           end do
@@ -7969,7 +8181,7 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
 !     Irradiances
 
       do k=1,6
-          G(k)=0.
+          G(k)=0.0d0
           do m=1,6
               !G(k)=G(k)+F(k,m)*J(m)
               G(k)=G(k)+J(m)*F(m,k)
@@ -7978,13 +8190,13 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
 
 !     Slat edge correction factor
         phib = b_el
-        delphis = PiOvr2/10.
+        delphis = PiOvr2/10.d0
         DO IUpDown = 1,2
           DO Iphis = 1,10
-            phis = -(iphis-0.5)*delphis
-            IF(IUpDown == 2) phis = (iphis-0.5)*delphis
-            fEdgeSource(Iphis) = 0.
-            fEdge1 = 0
+            phis = -(iphis-0.5d0)*delphis
+            IF(IUpDown == 2) phis = (iphis-0.5d0)*delphis
+            fEdgeSource(Iphis) = 0.0d0
+            fEdge1 = 0.0d0
             gamma = phib - phis
             IF(ABS(SIN(gamma))>0.01d0) THEN
               IF((phib > 0.0 .AND. phib <= PiOvr2 .AND. phis <= phib) .OR. &
@@ -7996,14 +8208,14 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
           END DO
           fEdgeA(IUpDown) = DiffuseAverage(fEdgeSource)
         END DO
-        fEdge = 0.5*(fEdgeA(1) + fEdgeA(2))
+        fEdge = 0.5d0*(fEdgeA(1) + fEdgeA(2))
 
 !     Front diffuse-diffuse transmittance (transmittance of slat edge assumed zero)
-      p(9) = G(2)*(1.-fEdge)
+      p(9) = G(2)*(1.0d0-fEdge)
 
 !     Front diffuse-diffuse reflectance (edge of slat is assumed to have same diffuse
 !     reflectance as front side of slat, c(11))
-      p(10) = G(1)*(1.-fEdge) + fEdge*C(11)
+      p(10) = G(1)*(1.0d0-fEdge) + fEdge*C(11)
 
 !-----------Calculate diffuse short-wave properties for the back side of the blind
 
@@ -8016,10 +8228,10 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
 
 !     Radiosities
 
-      J(1)=0.
-      J(2)=1.
+      J(1)=0.0d0
+      J(2)=1.0d0
       do k=3,6
-          J(k)=0.
+          J(k)=0.0d0
           do m=3,6
               J(k)=J(k)+Xinv(k-2,m-2)*Q(m)
           end do
@@ -8028,7 +8240,7 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
 !     Irradiances
 
       do k=1,6
-          G(k)=0.
+          G(k)=0.0d0
           do m=1,6
              !G(k)=G(k)+F(k,m)*J(m)
               G(k)=G(k)+J(m)*F(m,k)
@@ -8036,10 +8248,10 @@ SUBROUTINE BlindOpticsDiffuse (BlindNum,ISolVis,c,b_el,p)
       end do
 
 !     Back diffuse-diffuse transmittance
-      p(11)=G(1)*(1.-fEdge)
+      p(11)=G(1)*(1.0d0-fEdge)
 
 !     Back hemi-hemi reflectance
-      p(12)=G(2)*(1.-fEdge) + fEdge*C(11)
+      p(12)=G(2)*(1.0d0-fEdge) + fEdge*C(11)
 
 IF(ISolVis == 1) THEN
 
@@ -8060,11 +8272,11 @@ IF(ISolVis == 1) THEN
       end do
 
       do k=1,4
-          X(k,k)=X(k,k)+1.
+          X(k,k)=X(k,k)+1.0d0
       end do
 
       indx = 0
-      CALL InvertMatrix(X,Xinv,indx,4,4)
+      CALL InvertMatrix(X,Xinv,indx,4,4) !Objexx: Note X modified by this call
 
 !---------Calculate diffuse IR properties for the FRONT side of the blind
 
@@ -8077,10 +8289,10 @@ IF(ISolVis == 1) THEN
 
 !     Radiosities
 
-      J(1)=1.
-      J(2)=0.
+      J(1)=1.0d0
+      J(2)=0.0d0
       do k=3,6
-          J(k)=0.
+          J(k)=0.0d0
           do m=3,6
               J(k)=J(k)+Xinv(k-2,m-2)*Q(m)
           end do
@@ -8088,7 +8300,7 @@ IF(ISolVis == 1) THEN
 
 !     Irradiances
       do k=1,6
-          G(k)=0.
+          G(k)=0.0d0
           do m=1,6
               !G(k)=G(k)+F(k,m)*J(m)
               G(k)=G(k)+J(m)*F(m,k)
@@ -8116,10 +8328,10 @@ IF(ISolVis == 1) THEN
 
 !     Radiosities
 
-      J(1)=0.
-      J(2)=1.
+      J(1)=0.0d0
+      J(2)=1.0d0
       do k=3,6
-          J(k)=0.
+          J(k)=0.0d0
           do m=3,6
               J(k)=J(k)+Xinv(k-2,m-2)*Q(m)
           end do
@@ -8128,7 +8340,7 @@ IF(ISolVis == 1) THEN
 !     Irradiances
 
       do k=1,6
-          G(k)=0.
+          G(k)=0.0d0
           do m=1,6
              !G(k)=G(k)+F(k,m)*J(m)
               G(k)=G(k)+J(m)*F(m,k)
@@ -8244,7 +8456,7 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
       INTEGER i,k,m               ! Array indices
       INTEGER indx(4)             ! Indices for LU decomposition
 
-      p = 0.
+      p = 0.0d0
 
 !     Elevation of radiation source; source is assumed to be in a plane that
 !     (1) contains the slat outward normal and (2) is perpendicular to plane of the blinds.
@@ -8271,8 +8483,8 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
 !       edge of the slat. fEdge is ratio of area subtended by edge of slat
 !       to area between tops of adjacent slats.
 
-        fEdge  = 0.
-        fEdge1 = 0.
+        fEdge  = 0.0d0
+        fEdge1 = 0.0d0
         gamma = phib - phis
         IF(ABS(SIN(gamma))>0.01d0) THEN
           IF((phib > 0.0 .AND. phib <= PiOvr2 .AND. phis <= phib) .OR. &
@@ -8288,7 +8500,7 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
         p(1+i) = BlindBeamBeamTrans(phis,phib,Blind(BlindNum)%SlatWidth,Blind(BlindNum)%SlatSeparation, &
                     Blind(BlindNum)%SlatThickness)
 !       Direct-to-direct reflectance; this is zero for now since all reflection is assumed to be diffuse.
-        p(2+i)=0.
+        p(2+i)=0.0d0
 
 !       View factors between slat sections for calculating direct-to-diffuse transmittance and reflectance
         CALL ViewFac(c(2),c(3),phib,phis,F)
@@ -8303,7 +8515,7 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
         end do
 
         do k=1,4
-          X(k,k)=X(k,k)+1.
+          X(k,k)=X(k,k)+1.0d0
         end do
 
         indx = 0
@@ -8321,14 +8533,14 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
 
 !       Correct for fraction of beam that is not directly transmitted; 1 - this fraction is
 !       the fraction of the incoming beam that is incident on the front or back surfaces of the slats.
-        Q(3) = Q(3)*(1.-p(1+i))
-        Q(4) = Q(4)*(1.-p(1+i))
+        Q(3) = Q(3)*(1.0d0-p(1+i))
+        Q(4) = Q(4)*(1.0d0-p(1+i))
 
 !       Radiosities (radiance of slat sections)
-        J(1)=0.
-        J(2)=0.
+        J(1)=0.0d0
+        J(2)=0.0d0
         do k=3,6
-          J(k)=0.
+          J(k)=0.0d0
           do m=3,4
             J(k)=J(k) + Xinv(k-2,m-2)*Q(m)
           end do
@@ -8336,18 +8548,18 @@ SUBROUTINE BlindOpticsBeam (BlindNum,c,b_el,s_el,p)
 
 !       Irradiance on slat sections
         do k=1,6
-          G(k)=0.
+          G(k)=0.0d0
           do m=3,6
             G(k)=G(k)+J(m)*F(m,k)
           end do
         end do
 
 !       Direct-to-diffuse transmittance
-        p(5+i)=G(2)*(1.-fEdge)
+        p(5+i)=G(2)*(1.0d0-fEdge)
 
 !       Direct-to-diffuse reflectance (assuming the edge reflectance is the same as the
 !       reflectance of the front side of the slat, C(8))
-        p(6+i)=G(1)*(1.-fEdge) + fEdge*C(8)
+        p(6+i)=G(1)*(1.0d0-fEdge) + fEdge*C(8)
 
       END DO  ! End of loop over front and back side properties of blind
 
@@ -8403,11 +8615,11 @@ SUBROUTINE ViewFac(s,h,phib,phis,F)
       INTEGER       ::  i,j              ! View factor array indices
 
       h2=h**2
-      ht=2*h
+      ht=2.0d0*h
       co=cos(phis)
-      if (abs(co) < 0.001d0) co=0.
+      if (abs(co) < 0.001d0) co=0.0d0
       w=ht
-      if (co.ne.0.) w=s*cos(phib-phis)/co
+      if (co.ne.0.0d0) w=s*cos(phib-phis)/co
       L3=s*h/abs(w)
       if (L3 > s) L3=s
       L5=s-L3
@@ -8420,10 +8632,10 @@ SUBROUTINE ViewFac(s,h,phib,phis,F)
       d5=sqrt(MAX(0.d0,L5*L5+h2-a*L5))
       d6=sqrt(MAX(0.d0,L5*L5+h2+a*L5))
       do i=1,6
-        F(i,i)=0.
+        F(i,i)=0.0d0
       end do
-      F(1,1)=0.
-      F(1,2)=(d1+d2-2*s)/ht
+      F(1,1)=0.0d0
+      F(1,2)=(d1+d2-2.0d0*s)/ht
       F(1,3)=(h+L3-d3)/ht
       F(1,4)=(h+L3-d4)/ht
       F(1,5)=(L5+d3-d1)/ht
@@ -8432,13 +8644,13 @@ SUBROUTINE ViewFac(s,h,phib,phis,F)
       F(2,4)=(L3+d6-d1)/ht
       F(2,5)=(h+L5-d5)/ht
       F(2,6)=(h+L5-d6)/ht
-      F(3,4)=(d3+d4-ht)/(2*L3)
-      F(3,5)=0.
-      F(3,6)=(d2+h-d4-d5)/(2*L3)
-      F(4,5)=(d1+h-d3-d6)/(2*L3)
-      F(4,6)=0.
-      F(5,6)=0.
-      if (L5 > 0.) F(5,6)=(d5+d6-ht)/(2*L5)
+      F(3,4)=(d3+d4-ht)/(2.0d0*L3)
+      F(3,5)=0.0d0
+      F(3,6)=(d2+h-d4-d5)/(2.0d0*L3)
+      F(4,5)=(d1+h-d3-d6)/(2.0d0*L3)
+      F(4,6)=0.0d0
+      F(5,6)=0.0d0
+      if (L5 > 0.0d0) F(5,6)=(d5+d6-ht)/(2.0d0*L5)
       L(1)=h
       L(2)=h
       L(3)=L3
@@ -8447,8 +8659,8 @@ SUBROUTINE ViewFac(s,h,phib,phis,F)
       L(6)=L5
       do i=2,6
         do j=1,i-1
-          F(i,j)=0.
-          if (L(i) > 0.) F(i,j)=F(j,i)*L(j)/L(i)
+          F(i,j)=0.0d0
+          if (L(i) > 0.0d0) F(i,j)=F(j,i)*L(j)/L(i)
         end do
       end do
 RETURN
@@ -8478,21 +8690,21 @@ SUBROUTINE InvertMatrix(a, y, indx, np, n)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
       INTEGER, INTENT(IN)      :: np, n       ! Dimension of matrix
-      REAL(r64), INTENT(IN)         :: a(np,np)    ! Matrix to be inverted
-      REAL(r64), INTENT(OUT)        :: y(np,np)    ! Inverse of matrix a
+      REAL(r64), INTENT(INOUT) :: a(np,np) ! Matrix to be inverted !Objexx:ArgIN Changed IN to INOUT: LUDCMP is in-place LU decomposition
+      REAL(r64), INTENT(OUT)   :: y(np,np)    ! Inverse of matrix a
       INTEGER, INTENT(OUT)     :: indx(np)    ! Index vector for LU decomposition
 
           ! SUBROUTINE LOCAL VARIABLE DEFINITIONS:
       INTEGER                  :: i,j         ! Array indices
       INTEGER                  :: d
 
-      y=0.0
+      y=0.0d0
       DO i=1,n
-        y(i,i) = 1.
+        y(i,i) = 1.0d0
       END DO
       indx=0
 
-      CALL LUDCMP(a,n,np,indx,d)
+      CALL LUDCMP(a,n,np,indx,d) !Objexx:ArgIN a was marked IN but is modified by this in-place LU decomposition
 
       DO j=1,n
         CALL LUBKSB(a,n,np,indx,y(1,j))
@@ -8544,40 +8756,40 @@ SUBROUTINE LUDCMP(A,N,NP,INDX,D)
       INTEGER   I,J,K,imax
 
       D=1
-      DO 12 I=1,N
-          AAMAX=0.
-          DO 11 J=1,N
+      DO I=1,N
+          AAMAX=0.0d0
+          DO J=1,N
               IF (ABS(A(I,J)) > AAMAX) AAMAX=ABS(A(I,J))
-   11     CONTINUE
+          END DO
 
-          IF (AAMAX.EQ.0.) THEN
+          IF (AAMAX.EQ.0.0d0) THEN
             CALL ShowFatalError('Singular matrix in LUDCMP, window calculations')
           ENDIF
-          VV(I)=1./AAMAX           ! Was commented out prior to 10/5/01, which caused overflows
+          VV(I)=1.0d0/AAMAX           ! Was commented out prior to 10/5/01, which caused overflows
                                    ! in this routine in rare cases
 
-   12 CONTINUE
+      END DO
 
-      DO 19 J=1,N
+      DO J=1,N
           IF (J > 1) THEN
-              DO 14 I=1,J-1
+              DO I=1,J-1
                   SUM=A(I,J)
                   IF (I > 1)THEN
-                      DO 13 K=1,I-1
+                      DO K=1,I-1
                           SUM=SUM-A(I,K)*A(K,J)
-   13                 CONTINUE
+                      ENDDO
 
                       A(I,J)=SUM
                   ENDIF
-   14         CONTINUE
+              ENDDO
           ENDIF
-          AAMAX=0.
-          DO 16 I=J,N
+          AAMAX=0.0d0
+          DO I=J,N
               SUM=A(I,J)
               IF (J > 1)THEN
-                  DO 15 K=1,J-1
+                  DO K=1,J-1
                       SUM=SUM-A(I,K)*A(K,J)
-   15             CONTINUE
+                  ENDDO
                   A(I,J)=SUM
               ENDIF
 
@@ -8586,14 +8798,14 @@ SUBROUTINE LUDCMP(A,N,NP,INDX,D)
                   IMAX=I
                   AAMAX=DUM
               ENDIF
-   16     CONTINUE
+          ENDDO
 
           IF (J.NE.IMAX)THEN
-              DO 17 K=1,N
+              DO K=1,N
                   DUM=A(IMAX,K)
                   A(IMAX,K)=A(J,K)
                   A(J,K)=DUM
-   17         CONTINUE
+              ENDDO
 
               D=-D
               VV(IMAX)=VV(J)
@@ -8601,17 +8813,17 @@ SUBROUTINE LUDCMP(A,N,NP,INDX,D)
 
           INDX(J)=IMAX
           IF(J.NE.N)THEN
-              IF(A(J,J).EQ.0.) A(J,J)=rTinyValue
+              IF(A(J,J).EQ.0.0d0) A(J,J)=rTinyValue
 
-              DUM=1./A(J,J)
-              DO 18 I=J+1,N
+              DUM=1.0d0/A(J,J)
+              DO I=J+1,N
                   A(I,J)=A(I,J)*DUM
-   18         CONTINUE
+              ENDDO
 
           ENDIF
-   19 CONTINUE
+      ENDDO
 
-      IF(A(N,N).EQ.0.) A(N,N)=rTinyValue
+      IF(A(N,N).EQ.0.0d0) A(N,N)=rTinyValue
       RETURN
 END SUBROUTINE LUDCMP
 !*****************************************************************************************
@@ -8661,33 +8873,211 @@ SUBROUTINE LUBKSB(A,N,NP,INDX,B)
 
       II=0
 
-      DO 12 I=1,N
+      DO I=1,N
           LL=INDX(I)
           SUM=B(LL)
           B(LL)=B(I)
           IF (II.NE.0)THEN
-              DO 11 J=II,I-1
+              DO J=II,I-1
                   SUM=SUM-A(I,J)*B(J)
-   11         CONTINUE
-          ELSE IF (SUM.NE.0.) THEN
+              ENDDO
+          ELSE IF (SUM.NE.0.0d0) THEN
               II=I
           ENDIF
 
           B(I)=SUM
-   12 CONTINUE
+      ENDDO
 
-      DO 14 I=N,1,-1
+      DO I=N,1,-1
           SUM=B(I)
           IF(I.LT.N)THEN
-              DO 13 J=I+1,N
+              DO J=I+1,N
                   SUM=SUM-A(I,J)*B(J)
-   13         CONTINUE
+              ENDDO
           ENDIF
 
           B(I)=SUM/A(I,I)
-   14 CONTINUE
+      ENDDO
       RETURN
 END SUBROUTINE LUBKSB
+
+
+! added for custom solar or visible spectrum
+SUBROUTINE CheckAndReadCustomSprectrumData
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         T. Hong
+          !       DATE WRITTEN   August 2013
+          !       MODIFIED
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Check, read, and assign the custom solar or visible spectrum to:
+          !  solar: nume, wle(nume), e(nume). nume = 107
+          !  visible: numt3, wlt3(numt3), y30(numt3). numt3 = 81
+          !
+          ! Three related IDD objects:
+          !  EnergyManagementSystem:ConstructionIndexVariable
+          !  Site:SolarAndVisibleSpectrum, Site:SpectrumData
+
+          ! METHODOLOGY EMPLOYED:
+          ! Overwriting the default values
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+
+  USE InputProcessor
+  !USE DataGlobals ,    ONLY: AnyEnergyManagementSystemInModel
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL :: ErrorsFound = .false.    ! If errors detected in input
+  INTEGER :: NumAlphas                ! Number of Alphas for each GetobjectItem call
+  INTEGER :: NumNumbers               ! Number of Numbers for each GetobjectItem call
+  INTEGER :: NumArgs
+  INTEGER :: IOStatus
+  CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: cAlphaArgs     ! Alpha input items for object
+  REAL(r64), ALLOCATABLE, DIMENSION(:) :: rNumericArgs      ! Numeric input items for object
+
+  LOGICAL, SAVE :: RunMeOnceFlag = .FALSE. ! This subroutine only needs to be run once
+  CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+  CHARACTER(len=MaxNameLength) :: cSolarSpectrum
+  CHARACTER(len=MaxNameLength) :: cVisibleSpectrum
+  INTEGER :: iSolarSpectrum = 0
+  INTEGER :: iVisibleSpectrum = 0
+  INTEGER :: NumSiteSpectrum = 0
+  INTEGER :: Loop
+  INTEGER :: iTmp
+
+  IF (RunMeOnceFlag) RETURN
+
+  ! Step 1 - check whether there is custom solar or visible spectrum
+  cCurrentModuleObject = 'Site:SolarAndVisibleSpectrum'
+  NumSiteSpectrum = GetNumObjectsFound(cCurrentModuleObject)
+
+  ! no custom spectrum data, done!
+  IF (NumSiteSpectrum == 0) THEN
+    RunMeOnceFlag = .TRUE.
+    RETURN
+  ENDIF
+
+  ! read custom spectrum data from Site:SolarAndVisibleSpectrum
+  IF (NumSiteSpectrum > 1) THEN ! throw error
+    Call ShowSevereError('Only one '//TRIM(cCurrentModuleObject)//' object is allowed')
+    Errorsfound = .true.
+  ENDIF
+
+   CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlphas,NumNumbers)
+   ALLOCATE(cAlphaArgs(NumAlphas))
+   cAlphaArgs=' '
+   ALLOCATE(rNumericArgs(NumNumbers))
+   rNumericArgs=0.0d0
+
+  IF (NumSiteSpectrum == 1) THEN
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+
+    ! use default spectrum data, done!
+    IF (SameString(cAlphaArgs(2), 'Default')) THEN
+      RunMeOnceFlag = .TRUE.
+      RETURN
+    ENDIF
+
+    ! now read custom solar and visible spectrum data
+    cSolarSpectrum = cAlphaArgs(3)
+    cVisibleSpectrum = cAlphaArgs(4)
+
+    cCurrentModuleObject = 'Site:SpectrumData'
+    NumSiteSpectrum = GetNumObjectsFound(cCurrentModuleObject)
+    IF (NumSiteSpectrum == 0) THEN ! throw error
+      Call ShowSevereError('No '//TRIM(cCurrentModuleObject)//' object is found')
+      Errorsfound = .true.
+    ENDIF
+
+   DEALLOCATE (cAlphaArgs)
+   DEALLOCATE (rNumericArgs)
+
+   CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlphas,NumNumbers)
+   ALLOCATE(cAlphaArgs(NumAlphas))
+   cAlphaArgs=' '
+   ALLOCATE(rNumericArgs(NumNumbers))
+   rNumericArgs=0.0d0
+
+    iSolarSpectrum = 0
+    iVisibleSpectrum = 0
+    DO Loop = 1, NumSiteSpectrum
+      ! Step 2 - read user-defined spectrum data
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+      IF (SameString(cAlphaArgs(1), cSolarSpectrum)) THEN
+        iSolarSpectrum = Loop
+        ! overwrite the default solar spectrum
+        IF (NumNumbers > 2*nume) THEN
+          Call ShowSevereError('Solar spectrum data pair is more than 107 - '//  &
+             TRIM(cCurrentModuleObject)//' - '//TRIM(cAlphaArgs(1)))
+          Errorsfound = .true.
+        ELSE
+          ! Step 3 - overwrite default solar spectrum data
+          DO iTmp = 1, nume
+            IF (iTmp <= NumNumbers /2) THEN
+              wle(iTmp) = rNumericArgs(2*iTmp-1)
+              e(iTmp) = rNumericArgs(2*iTmp)
+            ELSE
+              wle(iTmp) = 0.0D0
+              e(iTmp) = 0.0D0
+            ENDIF
+          END DO
+        ENDIF
+      ENDIF
+      IF (SameString(cAlphaArgs(1), cVisibleSpectrum)) THEN
+        iVisibleSpectrum = Loop
+        ! overwrite the default solar spectrum
+        IF (NumNumbers > 2*numt3) THEN
+          Call ShowSevereError('Visible spectrum data pair is more than 81 - '//  &
+             TRIM(cCurrentModuleObject)//' - '//TRIM(cAlphaArgs(1)))
+          Errorsfound = .true.
+        ELSE
+          ! Step 3 - overwrite default visible spectrum data
+          DO iTmp = 1, numt3
+            IF (iTmp <= NumNumbers /2) THEN
+              wlt3(iTmp) = rNumericArgs(2*iTmp-1)
+              y30(iTmp) = rNumericArgs(2*iTmp)
+            ELSE
+              wlt3(iTmp) = 0.0D0
+              y30(iTmp) = 0.0D0
+            ENDIF
+          END DO
+        ENDIF
+      ENDIF
+      IF ((iSolarSpectrum > 0) .AND. (iVisibleSpectrum > 0)) EXIT
+    END DO
+  ENDIF
+
+  DEALLOCATE (cAlphaArgs)
+  DEALLOCATE (rNumericArgs)
+
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError('Errors found in processing input for user-defined solar/visible spectrum')
+  ENDIF
+
+  RunMeOnceFlag = .TRUE.
+
+  RETURN
+END SUBROUTINE CheckAndReadCustomSprectrumData
+
 
 !*****************************************************************************************
 

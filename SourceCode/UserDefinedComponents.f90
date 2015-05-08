@@ -286,7 +286,7 @@ SUBROUTINE SimUserDefinedPlantComponent(LoopNum, LoopSideNum, EquipType,EquipNam
   ENDIF
 
   IF (InitLoopEquip .OR. BeginEnvrnFlag) THEN
-    CALL InitPlantUserComponent(CompNum, ThisLoop, MyLoad)
+    CALL InitPlantUserComponent(CompNum, LoopNum, MyLoad)
     ! find loop connection number from LoopNum and LoopSide
     ThisLoop = 0
     DO Loop = 1, UserPlantComp(CompNum)%NumPlantConnections
@@ -334,9 +334,11 @@ SUBROUTINE SimUserDefinedPlantComponent(LoopNum, LoopSideNum, EquipType,EquipNam
 
   CALL InitPlantUserComponent(CompNum, ThisLoop, MyLoad)
 
-  IF (UserPlantComp(CompNum)%Loop(ThisLoop)%ErlSimProgramMngr > 0) THEN
-    CALL ManageEMS(emsCallFromUserDefinedComponentModel, &
-                 ProgramManagerToRun = UserPlantComp(CompNum)%Loop(ThisLoop)%ErlSimProgramMngr)
+  IF (ThisLoop > 0) THEN
+    IF (UserPlantComp(CompNum)%Loop(ThisLoop)%ErlSimProgramMngr > 0) THEN
+      CALL ManageEMS(emsCallFromUserDefinedComponentModel, &
+                   ProgramManagerToRun = UserPlantComp(CompNum)%Loop(ThisLoop)%ErlSimProgramMngr)
+    ENDIF
   ENDIF
 
   IF (UserPlantComp(CompNum)%ErlSimProgramMngr > 0) THEN
@@ -608,8 +610,8 @@ SUBROUTINE SimZoneAirUserDefined(CompName,ZoneNum,SensibleOutputProvided,LatentO
                 - PsyHFnTdbW(Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%Temp,MinHumRat, 'SimZoneAirUserDefined'))
 
 ! CR9155 Remove specific humidity calculations
-  SpecHumOut = Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%HumRat 
-  SpecHumIn  = Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%HumRat 
+  SpecHumOut = Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%HumRat
+  SpecHumIn  = Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%HumRat
   LatentOutputProvided = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
 
 
@@ -875,10 +877,10 @@ SUBROUTINE GetUserDefinedComponents
           aArgCount = (ConnectionLoop-1) *  6 + 3
           UserPlantComp(CompLoop)%Loop(ConnectionLoop)%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Inlet, ConnectionLoop, ObjectIsNotParent)
           UserPlantComp(CompLoop)%Loop(ConnectionLoop)%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount + 1),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Outlet, ConnectionLoop, ObjectIsNotParent)
 
           CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),  &
              'Plant Nodes '//LoopStr)
@@ -1213,10 +1215,10 @@ SUBROUTINE GetUserDefinedComponents
         IF (UserCoil(CompLoop)%PlantIsConnected) THEN ! get input
           UserCoil(CompLoop)%Loop%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(9),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Inlet, 2, ObjectIsNotParent)
           UserCoil(CompLoop)%Loop%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(10),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Outlet, 2, ObjectIsNotParent)
 
           CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(9),cAlphaArgs(10),'Plant Nodes')
 
@@ -1414,7 +1416,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(6) ) THEN
         UserZoneAirHVAC(CompLoop)%SourceAir%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),UserZoneAirHVAC(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                           NodeType_Air,NodeConnectionType_Inlet,2,ObjectIsNotParent)
           !model input related internal variables
         CALL SetupEMSInternalVariable( 'Inlet Temperature for Secondary Air Connection' , UserZoneAirHVAC(CompLoop)%Name, &
                                        '[C]',      UserZoneAirHVAC(CompLoop)%SourceAir%InletTemp )
@@ -1433,7 +1435,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(7) ) THEN
         UserZoneAirHVAC(CompLoop)%SourceAir%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),UserZoneAirHVAC(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                           NodeType_Air,NodeConnectionType_Outlet,2,ObjectIsNotParent)
         CALL SetupEMSActuator('Secondary Air Connection', UserZoneAirHVAC(CompLoop)%Name, &
                                         'Outlet Temperature', '[C]', lDummy, &
                                         UserZoneAirHVAC(CompLoop)%SourceAir%OutletTemp )
@@ -1459,10 +1461,10 @@ SUBROUTINE GetUserDefinedComponents
           aArgCount = (ConnectionLoop-1) *  2 + 8
           UserZoneAirHVAC(CompLoop)%Loop(ConnectionLoop)%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Inlet, (ConnectionLoop+2), ObjectIsNotParent)
           UserZoneAirHVAC(CompLoop)%Loop(ConnectionLoop)%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount + 1),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Outlet, (ConnectionLoop+2), ObjectIsNotParent)
           CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),'Plant Nodes')
           UserZoneAirHVAC(CompLoop)%Loop(ConnectionLoop)%HowLoadServed = HowMet_NoneDemand
           UserZoneAirHVAC(CompLoop)%Loop(ConnectionLoop)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
@@ -1688,7 +1690,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(6) ) THEN
         UserAirTerminal(CompLoop)%SourceAir%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(6))
+                           NodeType_Air,NodeConnectionType_Inlet,2,ObjectIsNotParent,cAlphaFieldNames(6))
           !model input related internal variables
         CALL SetupEMSInternalVariable( 'Inlet Temperature for Secondary Air Connection' , UserAirTerminal(CompLoop)%Name, &
                                        '[C]',      UserAirTerminal(CompLoop)%SourceAir%InletTemp )
@@ -1707,7 +1709,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(7) ) THEN
         UserAirTerminal(CompLoop)%SourceAir%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(7))
+                           NodeType_Air,NodeConnectionType_Outlet,2,ObjectIsNotParent,cAlphaFieldNames(7))
         CALL SetupEMSActuator('Secondary Air Connection', UserAirTerminal(CompLoop)%Name, &
                                         'Outlet Temperature', '[C]', lDummy, &
                                         UserAirTerminal(CompLoop)%SourceAir%OutletTemp )
@@ -1733,10 +1735,10 @@ SUBROUTINE GetUserDefinedComponents
           aArgCount = (ConnectionLoop-1) *  2 + 8
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent,cAlphaFieldNames(aArgCount))
+               NodeConnectionType_Inlet, (ConnectionLoop+2), ObjectIsNotParent,cAlphaFieldNames(aArgCount))
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount + 1),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent,cAlphaFieldNames(aArgCount+1))
+               NodeConnectionType_Outlet, (ConnectionLoop+2), ObjectIsNotParent,cAlphaFieldNames(aArgCount+1))
           CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),'Plant Nodes')
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%HowLoadServed = HowMet_NoneDemand
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn

@@ -69,14 +69,20 @@ MODULE ScheduleManager
          'Control                     ',&
          'Mode                        '/)
 
+  INTEGER, PARAMETER :: ScheduleInput_year    = 1
+  INTEGER, PARAMETER :: ScheduleInput_compact = 2
+  INTEGER, PARAMETER :: ScheduleInput_file    = 3
+  INTEGER, PARAMETER :: ScheduleInput_constant= 4
+  INTEGER, PARAMETER :: ScheduleInput_external= 5
+
           ! DERIVED TYPE DEFINITIONS
   TYPE ScheduleTypeData
        CHARACTER(len=MaxNameLength) :: Name = Blank ! Schedule Type Name
-       LOGICAL :: Limited                   = .false. ! True if this Schedule Type has limits
-       REAL(r64) :: Minimum   = 0.0     ! Minimum for limited schedule
-       REAL(r64) :: Maximum   = 0.0     ! Maximum for limited schedule
-       LOGICAL :: IsReal                    = .true.  ! True if this is a "real" schedule, false if integer
-       INTEGER :: UnitType = 0
+       LOGICAL :: Limited     = .false. ! True if this Schedule Type has limits
+       REAL(r64) :: Minimum   = 0.0d0   ! Minimum for limited schedule
+       REAL(r64) :: Maximum   = 0.0d0   ! Maximum for limited schedule
+       LOGICAL :: IsReal      = .true.  ! True if this is a "real" schedule, false if integer
+       INTEGER :: UnitType    = 0       ! reference ScheduleTypeLimit table
   END TYPE
 
   TYPE DayScheduleData
@@ -99,6 +105,7 @@ MODULE ScheduleManager
        CHARACTER(len=MaxNameLength) :: Name = Blank   ! Schedule Name
        INTEGER :: ScheduleTypePtr           = 0       ! Index of Schedule Type
        INTEGER :: WeekSchedulePointer(366)  = 0       ! one created for each day of possible simulation
+       INTEGER :: SchType                   = 0       ! what kind of object has been input.
        LOGICAL :: Used                   = .false. ! Indicator for this schedule being "used".
        LOGICAL :: MaxMinSet              = .false.    ! Max/min values have been stored for this schedule
        REAL(r64) :: MaxValue             = 0.0D0     ! Maximum value for this schedule
@@ -132,6 +139,7 @@ END INTERFACE CheckDayScheduleValueMinMax
 
 !Logical Variables for Module
   LOGICAL :: ScheduleInputProcessed = .false.            ! This is false until the Schedule Input has been processed.
+  LOGICAL :: ScheduleDSTSFileWarningIssued = .false.
 
 !Derived Types Variables
 
@@ -430,7 +438,7 @@ SUBROUTINE ProcessScheduleInput
   ALLOCATE(cNumericFields(MaxNums))
   cNumericFields=' '
   ALLOCATE(Numbers(MaxNums)) ! Maximum Numbers possible
-  Numbers=0.0
+  Numbers=0.0d0
   ALLOCATE(lAlphaBlanks(MaxAlps))
   lAlphaBlanks=.true.
   ALLOCATE(lNumericBlanks(MaxNums))
@@ -459,7 +467,7 @@ SUBROUTINE ProcessScheduleInput
     ALLOCATE(cNumericFields(MaxNums))
     cNumericFields=' '
     ALLOCATE(Numbers(MaxNums)) ! Maximum Numbers possible
-    Numbers=0.0
+    Numbers=0.0d0
     ALLOCATE(lNumericBlanks(MaxNums))
     lNumericBlanks=.true.
   ENDIF
@@ -505,7 +513,7 @@ SUBROUTINE ProcessScheduleInput
     ALLOCATE(DaySchedule(LoopIndex)%TSValue(24,NumOfTimeStepInHour))
     DO Count=1,24
       DO TS=1,NumOfTimeStepInHour
-        DaySchedule(LoopIndex)%TSValue(Count,TS)=0.0
+        DaySchedule(LoopIndex)%TSValue(Count,TS)=0.0d0
       ENDDO
     ENDDO
   ENDDO
@@ -559,11 +567,11 @@ SUBROUTINE ProcessScheduleInput
         ScheduleType(LoopIndex)%IsReal=.true.
       ENDIF
     ENDIF
-    IF (NumAlphas .GE. 3) THEN
+    IF (NumAlphas .ge. 3) THEN
       IF (.not. lAlphaBlanks(3)) THEN
         ScheduleType(LoopIndex)%UnitType = FindItem(Alphas(3), &
                             ScheduleTypeLimitUnitTypes,NumScheduleTypeLimitUnitTypes)
-        IF (ScheduleType(LoopIndex)%UnitType .EQ. 0) THEN
+        IF (ScheduleType(LoopIndex)%UnitType .eq. 0) THEN
           CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="' // TRIM(Alphas(1)) //   &
                               '", '//trim(cAlphaFields(3))//'="' // TRIM(Alphas(3)) //'" is invalid.')
         END IF
@@ -793,7 +801,7 @@ SUBROUTINE ProcessScheduleInput
     ENDIF
 
 ! check to see if there are any fields
-    IF (Numbers(1) <= 0.0) THEN
+    IF (Numbers(1) <= 0.0d0) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
          '", Insufficient data entered for a full schedule day.')
       CALL ShowContinueError('...Minutes per Item field = ['//trim(RoundSigDigits(INT(Numbers(1))))//'].')
@@ -987,6 +995,7 @@ SUBROUTINE ProcessScheduleInput
       IF (IsBlank) Alphas(1)='xxxxx'
     ENDIF
     Schedule(LoopIndex)%Name=Alphas(1)
+    Schedule(LoopIndex)%SchType=ScheduleInput_year
     ! Validate ScheduleType
     IF (NumScheduleTypes > 0) THEN
       CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
@@ -1101,6 +1110,7 @@ SUBROUTINE ProcessScheduleInput
     ENDIF
     SchNum=SchNum+1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_compact
     ! Validate ScheduleType
     CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
     IF (CheckIndex == 0) THEN
@@ -1208,6 +1218,14 @@ For:  DO WHILE (NumField < NumAlphas) ! Continues until next "Through"
               ENDIF
             ENDDO
           ENDIF
+        ELSE
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+               '", Looking for "For" field, found='//TRIM(Alphas(NumField)))
+          ErrorsFound=.true.
+!          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Schedule(SchNum)%Name)//  &
+!               '", Expecting "For:" day types')
+!          CALL ShowContinueError('Instead, found entry='//TRIM(Alphas(NumField)))
+          EXIT Through
         ENDIF
         ! Check for "Interpolate"
         NumField=NumField+1
@@ -1396,6 +1414,7 @@ Until:  DO
     ENDIF
     SchNum = SchNum + 1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_file
     ! Validate ScheduleType
     IF (NumScheduleTypes > 0) THEN
       CheckIndex=0
@@ -1414,13 +1433,13 @@ Until:  DO
         Schedule(SchNum)%ScheduleTypePtr=CheckIndex
       ENDIF
     ENDIF
-    hourlyFileValues = 0 !set default values to zero
+    hourlyFileValues = 0.0d0 !set default values to zero
 
     ! Numbers(1) - which column
     curcolCount=Numbers(1)
     ! Numbers(2) - number of rows to skip
     skiprowCount=Numbers(2)
-    IF (Numbers(3) == 0) Numbers(3)=8760
+    IF (Numbers(3) == 0) Numbers(3)=8760.0d0
     IF (Numbers(3) /= 8760 .and. Numbers(3) /= 8784) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
          '", '//TRIM(cNumericFields(3))//' must = 8760 or 8784 (for a leap year)')
@@ -1474,7 +1493,7 @@ Until:  DO
     ENDIF
 
     numHourlyValues=Numbers(3)
-    rowLimitCount=(Numbers(3)*60)/MinutesPerItem
+    rowLimitCount=(Numbers(3)*60.0d0)/MinutesPerItem
     hrLimitCount=60/MinutesPerItem
 
 !    ! Number of numbers in the Numbers list okay to process
@@ -1588,7 +1607,7 @@ Until:  DO
         rowCnt = rowCnt + 1
         colCnt = 0
         wordStart = 1
-        columnValue = 0
+        columnValue = 0.0d0
         !scan through the line looking for a specific column
         DO
           sepPos = INDEX(LineIn, ColumnSep)
@@ -1617,19 +1636,19 @@ Until:  DO
             endif
             EXIT
           END IF
-          IF (colCnt .EQ. curcolCount) EXIT
+          IF (colCnt .eq. curcolCount) EXIT
         END DO
-        IF (colCnt .EQ. curcolCount) THEN
+        IF (colCnt .eq. curcolCount) THEN
           columnValue = ProcessNumber(subString,errflag)
           IF (errflag) THEN
             numerrors=numerrors+1
-            columnValue = 0
+            columnValue = 0.0d0
           ENDIF
         ELSE
-          columnValue = 0
+          columnValue = 0.0d0
         END IF
         hourlyFileValues(rowCnt) = columnValue
-        IF (rowCnt .EQ. rowLimitCount) EXIT
+        IF (rowCnt .eq. rowLimitCount) EXIT
       END DO
       CLOSE(SchdFile)
 
@@ -1752,6 +1771,7 @@ Until:  DO
     ENDIF
     SchNum = SchNum + 1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_constant
     ! Validate ScheduleType
     IF (NumScheduleTypes > 0) THEN
       CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
@@ -1808,6 +1828,7 @@ Until:  DO
     ENDIF
     SchNum=SchNum+1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_external
 
     ! Validate ScheduleType
     CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
@@ -1856,7 +1877,7 @@ Until:  DO
     IsNotOK=.false.
     IsBlank=.false.
 
-    IF (NumExternalInterfaceSchedules .GE. 1) THEN
+    IF (NumExternalInterfaceSchedules .ge. 1) THEN
      CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank, 'The schedule object with the name "' &
               //TRIM(Alphas(1))//'" is defined as an ExternalInterface:Schedule and ' &
               //'ExternalInterface:FunctionalMockupUnitImport:To:Schedule. This will cause the schedule to be overwritten' &
@@ -1871,6 +1892,7 @@ Until:  DO
    ! END IF
     SchNum=SchNum+1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_external
 
     ! Validate ScheduleType
     CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
@@ -1920,7 +1942,7 @@ Until:  DO
     IsNotOK=.false.
     IsBlank=.false.
 
-    IF (NumExternalInterfaceSchedules .GE. 1) THEN
+    IF (NumExternalInterfaceSchedules .ge. 1) THEN
      CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank, 'The schedule object with the name "' &
               //TRIM(Alphas(1))//'" is defined as an ExternalInterface:Schedule and ' &
               //'ExternalInterface:FunctionalMockupUnitExport:To:Schedule. This will cause the schedule to be overwritten' &
@@ -1935,6 +1957,7 @@ Until:  DO
 
     SchNum=SchNum+1
     Schedule(SchNum)%Name=Alphas(1)
+    Schedule(SchNum)%SchType=ScheduleInput_external
 
     ! Validate ScheduleType
     CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
@@ -1975,7 +1998,7 @@ Until:  DO
   ENDDO
 
 
-  ! Validate by ScheduleType
+  ! Validate by ScheduleLimitsType
   DO SchNum=1,NumSchedules
     NumPointer=Schedule(SchNum)%ScheduleTypePtr
     IF (.not. ScheduleType(NumPointer)%Limited) CYCLE
@@ -2418,10 +2441,21 @@ REAL(r64) FUNCTION GetCurrentScheduleValue(ScheduleIndex)
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
           ! na
 
-!  IF (.not. ScheduleInputProcessed) THEN
-!    CALL ProcessScheduleInput
-!    ScheduleInputProcessed=.true.
-!  ENDIF
+  IF (.not. ScheduleDSTSFileWarningIssued) THEN
+    IF (DSTIndicator == 1) THEN
+      IF (Schedule(ScheduleIndex)%SchType == ScheduleInput_file) THEN
+        CALL ShowWarningError('GetCurrentScheduleValue: Schedule="'//trim(Schedule(ScheduleIndex)%Name)//  &
+           '" is a Schedule:File')
+        CALL ShowContinueError('...Use of Schedule:File when DaylightSavingTime is in effect is not recommended.')
+        CALL ShowContinueError('...1) Remove RunperiodControl:DaylightSavingTime object or remove DST period from Weather File.')
+        CALL ShowContinueError('...2) Configure other schedules and Schedule:File to account for occupant behavior during DST.')
+        CALL ShowContinueError('...   If you have already done this, you can ignore this message.')
+        CALL ShowContinueError('...When active, DaylightSavingTime will shift all scheduled items by one hour, '//  &
+           'retaining the same day type as the original.')
+        ScheduleDSTSFileWarningIssued=.true.
+      ENDIF
+    ENDIF
+  ENDIF
 
   IF (ScheduleIndex == -1) THEN
     GetCurrentScheduleValue=1.0d0
@@ -2770,9 +2804,9 @@ FUNCTION GetScheduleType(ScheduleIndex) RESULT (TypeOfSchedule)
     ScheduleInputProcessed=.True.
   ENDIF
 
-  IF ((ScheduleIndex .GT. 0) .AND. (ScheduleIndex .LE. NumSchedules)) THEN
+  IF ((ScheduleIndex .gt. 0) .AND. (ScheduleIndex .le. NumSchedules)) THEN
     curSchType = Schedule(ScheduleIndex)%ScheduleTypePtr
-    IF ((curSchType .GT. 0) .AND. (curSchType .LE. NumScheduleTypes)) THEN
+    IF ((curSchType .gt. 0) .AND. (curSchType .le. NumScheduleTypes)) THEN
       TypeOfSchedule = ScheduleType(curSchType)%Name
     ELSE
       TypeOfSchedule = ''
@@ -2861,7 +2895,7 @@ SUBROUTINE GetScheduleValuesForDay(ScheduleIndex,DayValues,JDay,CurDayofWeek)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)           :: ScheduleIndex
-  REAL(r64), INTENT(OUT)             :: DayValues(:,:)
+  REAL(r64), INTENT(OUT)        :: DayValues(:,:)
   INTEGER, INTENT(IN), OPTIONAL :: JDay
   INTEGER, INTENT(IN), OPTIONAL :: CurDayofWeek
 
@@ -3076,7 +3110,7 @@ SUBROUTINE ProcessIntervalFields(Untils,Numbers,NumUntils,NumNumbers,MinuteValue
   INTEGER EMin
   INTEGER sFld
 
-  MinuteValue=0.0
+  MinuteValue=0.0d0
   SetMinuteValue=.false.
   SHr=1
   SMin=1
@@ -3564,11 +3598,11 @@ LOGICAL FUNCTION dCheckScheduleValueMinMax1(ScheduleIndex,MinString,Minimum) !,M
   LOGICAL :: MaxValueOk
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -3672,11 +3706,11 @@ LOGICAL FUNCTION dCheckScheduleValueMinMax2(ScheduleIndex,MinString,Minimum,MaxS
   END IF
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -3774,11 +3808,11 @@ LOGICAL FUNCTION rCheckScheduleValueMinMax1(ScheduleIndex,MinString,Minimum)
   LOGICAL :: MaxValueOk
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -3872,11 +3906,11 @@ LOGICAL FUNCTION rCheckScheduleValueMinMax2(ScheduleIndex,MinString,Minimum,MaxS
   LOGICAL :: MaxValueOk
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -3970,9 +4004,9 @@ LOGICAL FUNCTION rCheckScheduleValue(ScheduleIndex,Value)
   rCheckScheduleValue=.false.
 
   IF (ScheduleIndex == -1) THEN
-    rCheckScheduleValue=(Value == 1.0)
+    rCheckScheduleValue=(Value == 1.0d0)
   ELSEIF (ScheduleIndex == 0) THEN
-    rCheckScheduleValue=(Value == 0.0)
+    rCheckScheduleValue=(Value == 0.0d0)
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValue called with ScheduleIndex out of range')
   ENDIF
@@ -4110,11 +4144,11 @@ LOGICAL FUNCTION rCheckDayScheduleValueMinMax(ScheduleIndex,Minimum,MinString,Ma
   LOGICAL :: MaxValueOk
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
     CALL ShowFatalError('CheckDayScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -4200,11 +4234,11 @@ LOGICAL FUNCTION sCheckDayScheduleValueMinMax(ScheduleIndex,Minimum,MinString,Ma
   LOGICAL :: MaxValueOk
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
     CALL ShowFatalError('CheckDayScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
@@ -4371,11 +4405,11 @@ FUNCTION GetScheduleMinValue(ScheduleIndex) RESULT(MinimumValue)
   INTEGER Loop
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('GetScheduleMinValue called with ScheduleIndex out of range')
   ENDIF
@@ -4455,11 +4489,11 @@ FUNCTION GetScheduleMaxValue(ScheduleIndex) RESULT(MaximumValue)
   INTEGER Loop
 
   IF (ScheduleIndex == -1) THEN
-    MinValue = 1.0
-    MaxValue = 1.0
+    MinValue = 1.0d0
+    MaxValue = 1.0d0
   ELSEIF (ScheduleIndex == 0) THEN
-    MinValue = 0.0
-    MaxValue = 0.0
+    MinValue = 0.0d0
+    MaxValue = 0.0d0
   ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleMaxValue called with ScheduleIndex out of range')
   ENDIF
@@ -4818,8 +4852,8 @@ FUNCTION ScheduleAverageHoursPerWeek(ScheduleIndex,StartDayOfWeek,isItLeapYear) 
   ENDIF
 
   DayT=StartDayOfWeek
-  AverageHoursPerWeek=0.0
-  TotalHours=0.0
+  AverageHoursPerWeek=0.0d0
+  TotalHours=0.0d0
 
   IF (DayT == 0) RETURN
 

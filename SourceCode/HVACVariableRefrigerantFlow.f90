@@ -50,11 +50,6 @@ INTEGER, PARAMETER :: Resistive    = 2 ! uses electric resistance heater for def
 INTEGER, PARAMETER :: Timed    = 1 ! defrost cycle is timed
 INTEGER, PARAMETER :: OnDemand = 2 ! defrost cycle occurs only when required
 
-!Condenser Type
-INTEGER, PARAMETER :: AirCooled        = 1 ! Air-cooled condenser
-INTEGER, PARAMETER :: WaterCooled      = 2 ! Water-cooled condenser
-INTEGER, PARAMETER :: EvapCooled       = 3 ! Evaporatively-cooled condenser
-
 ! Thermostat Priority Control Type
 INTEGER, PARAMETER :: LoadPriority = 1 ! total of zone loads dictate operation in cooling or heating
 INTEGER, PARAMETER :: ZonePriority = 2 ! # of zones requireing cooling or heating dictate operation in cooling or heating
@@ -113,34 +108,34 @@ TYPE VRFCondenserEquipment
   INTEGER      :: SourceLoopSideNum          =0   ! plant data for water-coole only
   INTEGER      :: SourceBranchNum            =0   ! plant data for water-coole only
   INTEGER      :: SourceCompNum              =0   ! plant data for water-coole only
-  REAL(r64)    :: WaterCondenserDesignMassFlow =0.0 ! plant data for water-coole only
-  REAL(r64)    :: WaterCondenserMassFlow     =0.0 ! Water condenser flow rate (kg/s)
-  REAL(r64)    :: QCondenser                 =0.0 ! Water condenser heat rejection/absorption (W)
-  REAL(r64)    :: QCondEnergy                =0.0 ! Water condenser heat rejection/aborption energy (J)
-  REAL(r64)    :: CondenserSideOutletTemp    =0.0 ! Water condenser outlet temp (C)
+  REAL(r64)    :: WaterCondenserDesignMassFlow =0.0d0 ! plant data for water-coole only
+  REAL(r64)    :: WaterCondenserMassFlow     =0.0d0 ! Water condenser flow rate (kg/s)
+  REAL(r64)    :: QCondenser                 =0.0d0 ! Water condenser heat rejection/absorption (W)
+  REAL(r64)    :: QCondEnergy                =0.0d0 ! Water condenser heat rejection/aborption energy (J)
+  REAL(r64)    :: CondenserSideOutletTemp    =0.0d0 ! Water condenser outlet temp (C)
   INTEGER      :: SchedPtr                   =-1  ! Pointer to the correct schedule
-  REAL(r64)    :: CoolingCapacity            =0.0 ! Nominal VRF heat pump cooling capacity (W)
-  REAL(r64)    :: TotalCoolingCapacity       =0.0 ! Nominal VRF heat pump cooling capacity (W)
+  REAL(r64)    :: CoolingCapacity            =0.0d0 ! Nominal VRF heat pump cooling capacity (W)
+  REAL(r64)    :: TotalCoolingCapacity       =0.0d0 ! Nominal VRF heat pump cooling capacity (W)
   REAL(r64)    :: CoolingCombinationRatio    =1.d0 ! Ratio or terminal unit cooling capacity to VRF condenser capacity
-  REAL(r64)    :: VRFCondPLR                 =0.0 ! Condenser part-load ratio wrt total capacity
-  REAL(r64)    :: VRFCondRTF                 =0.0 ! Condenser runtime fraction
-  REAL(r64)    :: VRFCondCyclingRatio        =0.0 ! Condenser cycling ratio below MinPLR
-  REAL(r64)    :: CondenserInletTemp         =0.0 ! Condenser entering air temperature (C)
-  REAL(r64)    :: CoolingCOP                 =0.0 ! Nominal VRF heat pump cooling COP (W/W)
-  REAL(r64)    :: OperatingCoolingCOP        =0.0 ! Operating VRF heat pump cooling COP (W/W)
-  REAL(r64)    :: RatedCoolingPower          =0.0 ! Rated cooling power = Rated Cooling Capacity / Rated COP (W)
-  REAL(r64)    :: HeatingCapacity            =0.0 ! Nominal VRF heat pump heating capacity (W)
+  REAL(r64)    :: VRFCondPLR                 =0.0d0 ! Condenser part-load ratio wrt total capacity
+  REAL(r64)    :: VRFCondRTF                 =0.0d0 ! Condenser runtime fraction
+  REAL(r64)    :: VRFCondCyclingRatio        =0.0d0 ! Condenser cycling ratio below MinPLR
+  REAL(r64)    :: CondenserInletTemp         =0.0d0 ! Condenser entering air temperature (C)
+  REAL(r64)    :: CoolingCOP                 =0.0d0 ! Nominal VRF heat pump cooling COP (W/W)
+  REAL(r64)    :: OperatingCoolingCOP        =0.0d0 ! Operating VRF heat pump cooling COP (W/W)
+  REAL(r64)    :: RatedCoolingPower          =0.0d0 ! Rated cooling power = Rated Cooling Capacity / Rated COP (W)
+  REAL(r64)    :: HeatingCapacity            =0.0d0 ! Nominal VRF heat pump heating capacity (W)
   REAL(r64)    :: HeatingCapacitySizeRatio   =1.d0 ! Ratio of heating to cooling when autosizing
   LOGICAL      :: LockHeatingCapacity        =.FALSE. ! used in sizing to size VRF heat cap to VRF cool cap
-  REAL(r64)    :: TotalHeatingCapacity       =0.0 ! Nominal VRF heat pump heating capacity (W)
+  REAL(r64)    :: TotalHeatingCapacity       =0.0d0 ! Nominal VRF heat pump heating capacity (W)
   REAL(r64)    :: HeatingCombinationRatio    =1.d0 ! Ratio or terminal unit heating capacity to VRF condenser capacity
-  REAL(r64)    :: HeatingCOP                 =0.0 ! Nominal VRF heat pump heating COP
-  REAL(r64)    :: OperatingHeatingCOP        =0.0 ! Operating VRF heat pump heating COP
-  REAL(r64)    :: RatedHeatingPower          =0.0 ! Rated heating power = Rated Heating Capacity / Rated COP (W)
-  REAL(r64)    :: MinOATCooling              =0.0 ! Minimum outdoor air dry-bulb temp in cooling mode (C)
-  REAL(r64)    :: MaxOATCooling              =0.0 ! Maximum outdoor air dry-bulb temp in cooling mode (C)
-  REAL(r64)    :: MinOATHeating              =0.0 ! Minimum outdoor air dry-bulb temp in heating mode (C)
-  REAL(r64)    :: MaxOATHeating              =0.0 ! Maximum outdoor air dry-bulb temp in heating mode (C)
+  REAL(r64)    :: HeatingCOP                 =0.0d0 ! Nominal VRF heat pump heating COP
+  REAL(r64)    :: OperatingHeatingCOP        =0.0d0 ! Operating VRF heat pump heating COP
+  REAL(r64)    :: RatedHeatingPower          =0.0d0 ! Rated heating power = Rated Heating Capacity / Rated COP (W)
+  REAL(r64)    :: MinOATCooling              =0.0d0 ! Minimum outdoor air dry-bulb temp in cooling mode (C)
+  REAL(r64)    :: MaxOATCooling              =0.0d0 ! Maximum outdoor air dry-bulb temp in cooling mode (C)
+  REAL(r64)    :: MinOATHeating              =0.0d0 ! Minimum outdoor air dry-bulb temp in heating mode (C)
+  REAL(r64)    :: MaxOATHeating              =0.0d0 ! Maximum outdoor air dry-bulb temp in heating mode (C)
   INTEGER      :: CoolCapFT                  =0   ! index to cooling capacity function of temperature curve
   INTEGER      :: CoolEIRFT                  =0   ! index to cooling EIR function of temperature curve
   INTEGER      :: HeatCapFT                  =0   ! index to heating capacity function of temperature curve
@@ -160,70 +155,70 @@ TYPE VRFCondenserEquipment
   INTEGER      :: CoolPLFFPLR                =0   ! index to cooling PLF function of PLR curve
   INTEGER      :: HeatPLFFPLR                =0   ! index to heating PLF function of PLR curve
   INTEGER      :: HeatingPerformanceOATType  =0   ! Temperature type for heating performance curves
-  REAL(r64)    :: MinPLR                     =0.0 ! minimum PLR before cycling occurs
+  REAL(r64)    :: MinPLR                     =0.0d0 ! minimum PLR before cycling occurs
   INTEGER      :: MasterZonePtr              =0   ! index to master thermostat zone
   INTEGER      :: MasterZoneTUIndex          =0   ! index to TU in master thermostat zone
   INTEGER      :: ThermostatPriority         =0   ! VRF priority control (1=LoadPriority, 2=ZonePriority, etc)
   INTEGER      :: SchedPriorityPtr           =0   ! VRF priority control schedule pointer
   INTEGER      :: ZoneTUListPtr              =0   ! index to zone terminal unit list
   LOGICAL      :: HeatRecoveryUsed           =.FALSE. ! .TRUE. = heat recovery used
-  REAL(r64)    :: VertPipeLngth              =0.0 ! vertical piping length (m)
+  REAL(r64)    :: VertPipeLngth              =0.0d0 ! vertical piping length (m)
   INTEGER      :: PCFLengthCoolPtr           =0   ! piping correction factor for length in cooling mode curve index
   INTEGER      :: PCFLengthCoolPtrType       =0   ! PCF for length curve type
-  REAL(r64)    :: PCFHeightCool              =0.0 ! piping correction factor for height in cooling mode
-  REAL(r64)    :: EquivPipeLngthCool         =0.0 ! equivalent piping length for cooling
+  REAL(r64)    :: PCFHeightCool              =0.0d0 ! piping correction factor for height in cooling mode
+  REAL(r64)    :: EquivPipeLngthCool         =0.0d0 ! equivalent piping length for cooling
   REAL(r64)    :: PipingCorrectionCooling    =1.d0 ! piping correction factor for cooling
   INTEGER      :: PCFLengthHeatPtr           =0   ! piping correction factor for length in heating mode curve index
   INTEGER      :: PCFLengthHeatPtrType       =0   ! PCF for length curve type
-  REAL(r64)    :: PCFHeightHeat              =0.0 ! piping correction factor for height in heating mode
-  REAL(r64)    :: EquivPipeLngthHeat         =0.0 ! equivalent piping length for heating
+  REAL(r64)    :: PCFHeightHeat              =0.0d0 ! piping correction factor for height in heating mode
+  REAL(r64)    :: EquivPipeLngthHeat         =0.0d0 ! equivalent piping length for heating
   REAL(r64)    :: PipingCorrectionHeating    =1.d0 ! piping correction factor for heating
-  REAL(r64)    :: CCHeaterPower              =0.0 ! crankcase heater power per compressor (W)
-  REAL(r64)    :: CompressorSizeRatio        =0.0 ! ratio of min compressor size to total capacity
+  REAL(r64)    :: CCHeaterPower              =0.0d0 ! crankcase heater power per compressor (W)
+  REAL(r64)    :: CompressorSizeRatio        =0.0d0 ! ratio of min compressor size to total capacity
   INTEGER      :: NumCompressors             =0   ! number of compressors in VRF condenser
-  REAL(r64)    :: MaxOATCCHeater             =0.0 ! maximum outdoor air dry-bulb temp for crankcase heater operation (C)
+  REAL(r64)    :: MaxOATCCHeater             =0.0d0 ! maximum outdoor air dry-bulb temp for crankcase heater operation (C)
   INTEGER      :: DefrostEIRPtr              =0   ! index to defrost EIR curve
-  REAL(r64)    :: DefrostFraction            =0.0 ! defrost time period fraction (hr)
+  REAL(r64)    :: DefrostFraction            =0.0d0 ! defrost time period fraction (hr)
   INTEGER      :: DefrostStrategy            =0   ! Type of defrost (reversecycle or resistive)
   INTEGER      :: DefrostControl             =0   ! type of defrost control (timed or ondemand)
-  REAL(r64)    :: DefrostCapacity            =0.0 ! capacity of resistive defrost heating element (W)
-  REAL(r64)    :: DefrostPower               =0.0 ! power used during defrost (W)
-  REAL(r64)    :: DefrostConsumption         =0.0 ! energy used during defrost (J)
-  REAL(r64)    :: MaxOATDefrost              =0.0 ! maximum outdoor air dry-bulb temp for defrost operation (C)
+  REAL(r64)    :: DefrostCapacity            =0.0d0 ! capacity of resistive defrost heating element (W)
+  REAL(r64)    :: DefrostPower               =0.0d0 ! power used during defrost (W)
+  REAL(r64)    :: DefrostConsumption         =0.0d0 ! energy used during defrost (J)
+  REAL(r64)    :: MaxOATDefrost              =0.0d0 ! maximum outdoor air dry-bulb temp for defrost operation (C)
   INTEGER      :: CondenserType              =0   ! condenser type, evap- or air-cooled
   INTEGER      :: CondenserNodeNum           =0   ! condenser inlet node number
   LOGICAL      :: SkipCondenserNodeNumCheck  =.FALSE. ! used to check for duplicate node names
   INTEGER      :: CondenserOutletNodeNum     =0   ! condenser outlet node number
-  REAL(r64)    :: WaterCondVolFlowRate       =0.0 ! water condenser volume flow rate (m3/s)
-  REAL(r64)    :: EvapCondEffectiveness      =0.0 ! evaporative condenser effectiveness
-  REAL(r64)    :: EvapCondAirVolFlowRate     =0.0 ! air volume flow rate through condenser (m3/s)
-  REAL(r64)    :: EvapCondPumpPower          =0.0 ! evaporative condenser water pump power (W)
+  REAL(r64)    :: WaterCondVolFlowRate       =0.0d0 ! water condenser volume flow rate (m3/s)
+  REAL(r64)    :: EvapCondEffectiveness      =0.0d0 ! evaporative condenser effectiveness
+  REAL(r64)    :: EvapCondAirVolFlowRate     =0.0d0 ! air volume flow rate through condenser (m3/s)
+  REAL(r64)    :: EvapCondPumpPower          =0.0d0 ! evaporative condenser water pump power (W)
   INTEGER      :: CoolCombRatioPTR           = 0  ! index to cooling combination ratio curve pointer
   INTEGER      :: HeatCombRatioPTR           = 0  ! index to heating combination ratio curve pointer
   INTEGER      :: OperatingMode              = 0  ! VRF Condenser operating mode, 0=off, 1=cooling, 2=heating, 3=HR
-  REAL(r64)    :: ElecPower                  =0.0 ! VRF Condenser power (W)
-  REAL(r64)    :: ElecCoolingPower           =0.0 ! VRF Condenser power in cooling mode (W)
-  REAL(r64)    :: ElecHeatingPower           =0.0 ! VRF Condenser power in heating mode (W)
-  REAL(r64)    :: CoolElecConsumption        =0.0 ! VRF Condenser cooling energy (J)
-  REAL(r64)    :: HeatElecConsumption        =0.0 ! VRF Condenser heating energy (J)
-  REAL(r64)    :: CrankCaseHeaterPower       =0.0 ! VRF Condenser crankcase heater power (W)
-  REAL(r64)    :: CrankCaseHeaterElecConsumption =0.0 ! VRF Condenser crankcase heater energy (J)
-  REAL(r64)    :: EvapCondPumpElecPower      =0.0 ! VRF Condenser evaporatively cooled condenser pump power (W)
-  REAL(r64)    :: EvapCondPumpElecConsumption=0.0 ! VRF Condenser evaporatively cooled condenser pump elec consumption (J)
-  REAL(R64)    :: EvapWaterConsumpRate       =0.0 ! VRF Condenser evaporatively cooled condenser water consumption (m3/s)
+  REAL(r64)    :: ElecPower                  =0.0d0 ! VRF Condenser power (W)
+  REAL(r64)    :: ElecCoolingPower           =0.0d0 ! VRF Condenser power in cooling mode (W)
+  REAL(r64)    :: ElecHeatingPower           =0.0d0 ! VRF Condenser power in heating mode (W)
+  REAL(r64)    :: CoolElecConsumption        =0.0d0 ! VRF Condenser cooling energy (J)
+  REAL(r64)    :: HeatElecConsumption        =0.0d0 ! VRF Condenser heating energy (J)
+  REAL(r64)    :: CrankCaseHeaterPower       =0.0d0 ! VRF Condenser crankcase heater power (W)
+  REAL(r64)    :: CrankCaseHeaterElecConsumption =0.0d0 ! VRF Condenser crankcase heater energy (J)
+  REAL(r64)    :: EvapCondPumpElecPower      =0.0d0 ! VRF Condenser evaporatively cooled condenser pump power (W)
+  REAL(r64)    :: EvapCondPumpElecConsumption=0.0d0 ! VRF Condenser evaporatively cooled condenser pump elec consumption (J)
+  REAL(R64)    :: EvapWaterConsumpRate       =0.0d0 ! VRF Condenser evaporatively cooled condenser water consumption (m3/s)
   INTEGER      :: HRMaxTempLimitIndex        =0   ! Warning message recurring error index
   INTEGER      :: CoolingMaxTempLimitIndex   =0   ! Warning message recurring error index
   INTEGER      :: HeatingMaxTempLimitIndex   =0   ! Warning message recurring error index
   INTEGER      :: FuelType                   =0   ! Fuel type
-  REAL(r64)    :: SUMultiplier               =0.0 ! exponential timer for mode changes
-  REAL(r64)    :: TUCoolingLoad              =0.0 ! total TU cooling load for each VRF system
-  REAL(r64)    :: TUHeatingLoad              =0.0 ! total TU heating load for each VRF system
+  REAL(r64)    :: SUMultiplier               =0.0d0 ! exponential timer for mode changes
+  REAL(r64)    :: TUCoolingLoad              =0.0d0 ! total TU cooling load for each VRF system
+  REAL(r64)    :: TUHeatingLoad              =0.0d0 ! total TU heating load for each VRF system
   LOGICAL      :: SwitchedMode               = .FALSE. ! used to derate capacity/power when system changes operating mode
 
   ! begin variables used for heat recovery mode
-  REAL(r64)    :: OperatingCOP               =0.0 ! Operating VRF heat pump COP (total TU capacity/total power)
-  REAL(r64)    :: MinOATHeatRecovery         =0.0 ! Minimum outdoor air temperature for heat recovery operation (C)
-  REAL(r64)    :: MaxOATHeatRecovery         =0.0 ! Maximum outdoor air temperature for heat recovery operation (C)
+  REAL(r64)    :: OperatingCOP               =0.0d0 ! Operating VRF heat pump COP (total TU capacity/total power)
+  REAL(r64)    :: MinOATHeatRecovery         =0.0d0 ! Minimum outdoor air temperature for heat recovery operation (C)
+  REAL(r64)    :: MaxOATHeatRecovery         =0.0d0 ! Maximum outdoor air temperature for heat recovery operation (C)
   INTEGER      :: HRCAPFTCool                =0   ! Index to cool capacity as a function of temperature curve for heat recovery
   REAL(r64)    :: HRCAPFTCoolConst           =0.9d0 ! constant used if curve is blank
   INTEGER      :: HRCAPFTCoolType            =0   ! Curve type for HRCAPFTCool
@@ -263,8 +258,8 @@ TYPE VRFCondenserEquipment
   CHARACTER(len=MaxNameLength) :: CondensateCollectName = ' ' ! name of water source e.g. water storage tank
   INTEGER ::CondensateTankID                 = 0 !
   INTEGER ::CondensateTankSupplyARRID        = 0 !
-  REAL(r64)   :: CondensateVdot = 0.0 ! rate of water condensation from air stream [m3/s]
-  REAL(r64)   :: CondensateVol  = 0.0 ! amount of water condensed from air stream [m3]
+  REAL(r64)   :: CondensateVdot = 0.0d0 ! rate of water condensation from air stream [m3/s]
+  REAL(r64)   :: CondensateVol  = 0.0d0 ! amount of water condensed from air stream [m3]
   !end variables for water system interactions
 
   ! begin variables for Basin Heater interactions
@@ -313,27 +308,27 @@ TYPE VRFTerminalUnitEquipment
   INTEGER      :: VRFTUOAMixerOANodeNum      =0   ! OA node number for this TU's OA mixer
   INTEGER      :: VRFTUOAMixerRelNodeNum     =0   ! Relief node number for this TU's OA mixer
   INTEGER      :: VRFTUOAMixerRetNodeNum     =0   ! Return node number for this TU's OA mixer
-  REAL(r64)    :: MaxCoolAirVolFlow          =0.0 ! supply air volumetric flow rate during cooling operation [m3/s]
-  REAL(r64)    :: MaxHeatAirVolFlow          =0.0 ! supply air volumetric flow rate during heating operation [m3/s]
-  REAL(r64)    :: MaxNoCoolAirVolFlow        =0.0 ! supply air volumetric flow rate when no cooling [m3/s]
-  REAL(r64)    :: MaxNoHeatAirVolFlow        =0.0 ! supply air volumetric flow rate when no heating [m3/s]
-  REAL(r64)    :: MaxCoolAirMassFlow         =0.0 ! supply air mass flow rate during cooling operation [kg/s]
-  REAL(r64)    :: MaxHeatAirMassFlow         =0.0 ! supply air mass flow rate during heating operation [kg/s]
-  REAL(r64)    :: MaxNoCoolAirMassFlow       =0.0 ! supply air mass flow rate when no cooling [kg/s]
-  REAL(r64)    :: MaxNoHeatAirMassFlow       =0.0 ! supply air mass flow rate when no heating [kg/s]
-  REAL(r64)    :: CoolOutAirVolFlow          =0.0 ! OA volumetric flow rate during cooling operation [m3/s]
-  REAL(r64)    :: HeatOutAirVolFlow          =0.0 ! OA volumetric flow rate during heating operation [m3/s]
-  REAL(r64)    :: NoCoolHeatOutAirVolFlow    =0.0 ! OA volumetric flow rate when no cooling or heating [m3/s]
-  REAL(r64)    :: CoolOutAirMassFlow         =0.0 ! OA mass flow rate during cooling operation [kg/s]
-  REAL(r64)    :: HeatOutAirMassFlow         =0.0 ! OA mass flow rate during heating operation [kg/s]
-  REAL(r64)    :: NoCoolHeatOutAirMassFlow   =0.0 ! OA mass flow rate when no cooling or heating [kg/s]
+  REAL(r64)    :: MaxCoolAirVolFlow          =0.0d0 ! supply air volumetric flow rate during cooling operation [m3/s]
+  REAL(r64)    :: MaxHeatAirVolFlow          =0.0d0 ! supply air volumetric flow rate during heating operation [m3/s]
+  REAL(r64)    :: MaxNoCoolAirVolFlow        =0.0d0 ! supply air volumetric flow rate when no cooling [m3/s]
+  REAL(r64)    :: MaxNoHeatAirVolFlow        =0.0d0 ! supply air volumetric flow rate when no heating [m3/s]
+  REAL(r64)    :: MaxCoolAirMassFlow         =0.0d0 ! supply air mass flow rate during cooling operation [kg/s]
+  REAL(r64)    :: MaxHeatAirMassFlow         =0.0d0 ! supply air mass flow rate during heating operation [kg/s]
+  REAL(r64)    :: MaxNoCoolAirMassFlow       =0.0d0 ! supply air mass flow rate when no cooling [kg/s]
+  REAL(r64)    :: MaxNoHeatAirMassFlow       =0.0d0 ! supply air mass flow rate when no heating [kg/s]
+  REAL(r64)    :: CoolOutAirVolFlow          =0.0d0 ! OA volumetric flow rate during cooling operation [m3/s]
+  REAL(r64)    :: HeatOutAirVolFlow          =0.0d0 ! OA volumetric flow rate during heating operation [m3/s]
+  REAL(r64)    :: NoCoolHeatOutAirVolFlow    =0.0d0 ! OA volumetric flow rate when no cooling or heating [m3/s]
+  REAL(r64)    :: CoolOutAirMassFlow         =0.0d0 ! OA mass flow rate during cooling operation [kg/s]
+  REAL(r64)    :: HeatOutAirMassFlow         =0.0d0 ! OA mass flow rate during heating operation [kg/s]
+  REAL(r64)    :: NoCoolHeatOutAirMassFlow   =0.0d0 ! OA mass flow rate when no cooling or heating [kg/s]
   INTEGER      :: FanOpModeSchedPtr          =0   ! Pointer to the correct fan operating mode schedule
   INTEGER      :: FanAvailSchedPtr           =0   ! Pointer to the correct fan availability schedule
   INTEGER      :: FanIndex                   =0   ! Index to fan object
   REAL(r64)    :: FanPower                   =0.d0 ! power reported by fan component
   INTEGER      :: OpMode                     =0   ! operation mode: 1 = cycling fan, cycling coil 2 = constant fan, cycling coil
   INTEGER      :: FanPlace                   =0   ! fan placement; 1=blow through, 2=draw through
-  REAL(r64)    :: ActualFanVolFlowRate       =0.0 ! volumetric flow rate from fan object
+  REAL(r64)    :: ActualFanVolFlowRate       =0.0d0 ! volumetric flow rate from fan object
   CHARACTER(len=MaxNameLength) :: OAMixerName=' ' ! name of outside air mixer
   INTEGER      :: OAMixerIndex               =0   ! index to outside air mixer
   LOGICAL      :: OAMixerUsed                =.FALSE. ! true if OA Mixer object is used
@@ -341,8 +336,8 @@ TYPE VRFTerminalUnitEquipment
   INTEGER      :: HeatCoilIndex              =0   ! index to terminal unit heating coil
   INTEGER      :: DXCoolCoilType_Num         =0   ! type of VRF cooling coil
   INTEGER      :: DXHeatCoilType_Num         =0   ! type of VRF cooling coil
-  REAL(r64)    :: ParasiticElec              =0.0 ! parasitic electric for VRF terminal unit
-  REAL(r64)    :: ParasiticOffElec           =0.0 ! parasitic electric for VRF terminal unit when off
+  REAL(r64)    :: ParasiticElec              =0.0d0 ! parasitic electric for VRF terminal unit
+  REAL(r64)    :: ParasiticOffElec           =0.0d0 ! parasitic electric for VRF terminal unit when off
   REAL(r64)    :: HeatingSpeedRatio          = 1.d0 ! Fan speed ratio in heating mode
   REAL(r64)    :: HeatingCapacitySizeRatio   =1.d0 ! Ratio of heating to cooling when autosizing
   REAL(r64)    :: CoolingSpeedRatio          = 1.d0 ! Fan speed ratio in cooling mode
@@ -388,13 +383,13 @@ END TYPE VRFTerminalUnitEquipment
   INTEGER :: NumVRFCond           = 0        ! total number of VRF condensers
   INTEGER :: NumVRFTU             = 0        ! total number of VRF terminal units
   INTEGER :: NumVRFTULists        = 0        ! The number of VRF TU lists
-  REAL(r64) :: CompOnMassFlow     = 0.0      ! Supply air mass flow rate w/ compressor ON
-  REAL(r64) :: OACompOnMassFlow   = 0.0      ! OA mass flow rate w/ compressor ON
-  REAL(r64) :: CompOffMassFlow    = 0.0      ! Supply air mass flow rate w/ compressor OFF
-  REAL(r64) :: OACompOffMassFlow  = 0.0      ! OA mass flow rate w/ compressor OFF
-  REAL(r64) :: CompOnFlowRatio    = 0.0      ! fan flow ratio when coil on
-  REAL(r64) :: CompOffFlowRatio   = 0.0      ! fan flow ratio when coil off
-  REAL(r64) :: FanSpeedRatio      = 0.0      ! ratio of air flow ratio passed to fan object
+  REAL(r64) :: CompOnMassFlow     = 0.0d0      ! Supply air mass flow rate w/ compressor ON
+  REAL(r64) :: OACompOnMassFlow   = 0.0d0      ! OA mass flow rate w/ compressor ON
+  REAL(r64) :: CompOffMassFlow    = 0.0d0      ! Supply air mass flow rate w/ compressor OFF
+  REAL(r64) :: OACompOffMassFlow  = 0.0d0      ! OA mass flow rate w/ compressor OFF
+  REAL(r64) :: CompOnFlowRatio    = 0.0d0      ! fan flow ratio when coil on
+  REAL(r64) :: CompOffFlowRatio   = 0.0d0      ! fan flow ratio when coil off
+  REAL(r64) :: FanSpeedRatio      = 0.0d0      ! ratio of air flow ratio passed to fan object
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: HeatingLoad     ! defines a heating load on VRFTerminalUnits
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CoolingLoad     ! defines a cooling load on VRFTerminalUnits
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: LastModeHeating ! defines last mode was heating mode
@@ -646,7 +641,7 @@ SUBROUTINE SimVRFCondenserPlant(VRFType, VRFTypeNum, VRFName, VRFNum, FirstHVACI
      IF (VRFNum /= 0) THEN  ! if 0, fall through to next
        SELECT CASE (VRFTypeNum)
        CASE (TypeOf_HeatPumpVRF)
-            MinCap = 0.0
+            MinCap = 0.0d0
             MaxCap = VRF(VRFNum)%HeatingCapacity ! should be greater than cooling capacity
             OptCap = VRF(VRFNum)%HeatingCapacity ! connects to single loop, how to switch between cooling/heating capacity?
        CASE DEFAULT
@@ -1000,9 +995,9 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
     END IF
 
     ! Initializing defrost adjustment factors
-    LoadDueToDefrost = 0.0
+    LoadDueToDefrost = 0.0d0
     HeatingCapacityMultiplier = 1.d0
-    FractionalDefrostTime = 0.0
+    FractionalDefrostTime = 0.0d0
     InputPowerMultiplier = 1.d0
 
     ! Check outdoor temperature to determine of defrost is active
@@ -1027,7 +1022,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
       END IF
 
 
-      IF (FractionalDefrostTime .GT. 0.0) THEN
+      IF (FractionalDefrostTime .GT. 0.0d0) THEN
         ! Calculate defrost adjustment factors depending on defrost control strategy
         IF (VRF(VRFCond)%DefrostStrategy .EQ. ReverseCycle) THEN
           LoadDueToDefrost = (0.01d0 * FractionalDefrostTime) * &
@@ -1037,7 +1032,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
                                  MAX(15.555d0,InletAirWetbulbC),MAX(15.555d0,OutdoorDryBulb))
 
 !         Warn user if curve output goes negative
-          IF(DefrostEIRTempModFac .LT. 0.0)THEN
+          IF(DefrostEIRTempModFac .LT. 0.0d0)THEN
             IF(.NOT. Warmupflag)THEN
               IF(VRF(VRFCond)%DefrostHeatErrorIndex == 0)THEN
                 CALL ShowSevereMessage(TRIM(cVRFTypes(VRF_HeatPump))//' "'//TRIM(VRF(VRFCond)%Name)//'":')
@@ -1052,7 +1047,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
                  TRIM(VRF(VRFCond)%Name)//'":'//&
                 ' Defrost Energy Input Ratio Modifier curve (function of temperature) output is negative warning continues...' &
                 , VRF(VRFCond)%DefrostHeatErrorIndex, DefrostEIRTempModFac, DefrostEIRTempModFac)
-              DefrostEIRTempModFac = 0.0
+              DefrostEIRTempModFac = 0.0d0
             END IF
           END IF
 
@@ -1281,7 +1276,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
 
   IF(VRF(VRFCond)%MinPLR .GT. 0.0d0)THEN
     CyclingRatio = MIN(1.0d0,VRF(VRFCond)%VRFCondPLR/VRF(VRFCond)%MinPLR)
-    IF(VRF(VRFCond)%VRFCondPLR .LT. VRF(VRFCond)%MinPLR .AND. VRF(VRFCond)%VRFCondPLR .GT. 0.0)THEN
+    IF(VRF(VRFCond)%VRFCondPLR .LT. VRF(VRFCond)%MinPLR .AND. VRF(VRFCond)%VRFCondPLR .GT. 0.0d0)THEN
       VRF(VRFCond)%VRFCondPLR = VRF(VRFCond)%MinPLR
     END IF
   END IF
@@ -1382,7 +1377,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
     END IF
   ELSE IF(VRF(VRFCond)%CondenserType == WaterCooled) THEN
 
-    IF(CondCapacity .GT. 0.0)THEN
+    IF(CondCapacity .GT. 0.0d0)THEN
       CondenserWaterMassFlowRate = CondWaterMassFlow
     ELSE
       CondenserWaterMassFlowRate = 0.d0
@@ -1399,7 +1394,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
                                    VRF(VRFCond)%CondenserInletTemp,                      &
                                    PlantLoop(VRF(VRFCond)%SourceLoopNum)%FluidIndex, &
                                    'VRFCondenser')
-    IF(CondWaterMassFlow .GT. 0.0)THEN
+    IF(CondWaterMassFlow .GT. 0.0d0)THEN
       CondOutletTemp = VRF(VRFCond)%QCondenser/(CondWaterMassFlow*CpCond) + CondInletTemp
     ELSE
       CondOutletTemp = CondInletTemp
@@ -1593,7 +1588,7 @@ SUBROUTINE GetVRFInput
     ALLOCATE(lNumericFieldBlanks(MaxNumbers))
     lNumericFieldBlanks=.false.
     ALLOCATE(rNumericArgs(MaxNumbers))
-    rNumericArgs=0.0
+    rNumericArgs=0.0d0
 
     NumVRFTU  = NumVRFCTU
     IF (NumVRFTU > 0) THEN
@@ -2333,8 +2328,8 @@ SUBROUTINE GetVRFInput
         END IF
       END IF
 
-!  REAL(r64)    :: MinOATHeatRecovery         =0.0 ! Minimum outdoor air temperature for heat recovery operation (C)
-!  REAL(r64)    :: MaxOATHeatRecovery         =0.0 ! Maximum outdoor air temperature for heat recovery operation (C)
+!  REAL(r64)    :: MinOATHeatRecovery         =0.0d0 ! Minimum outdoor air temperature for heat recovery operation (C)
+!  REAL(r64)    :: MaxOATHeatRecovery         =0.0d0 ! Maximum outdoor air temperature for heat recovery operation (C)
       IF(VRF(VRFNum)%HeatRecoveryUsed)THEN
         IF(lNumericFieldBlanks(29))THEN
           VRF(VRFNum)%MinOATHeatRecovery = MAX(VRF(VRFNum)%MinOATCooling,VRF(VRFNum)%MinOATHeating)
@@ -2380,8 +2375,8 @@ SUBROUTINE GetVRFInput
         END IF
 
 !  INTEGER      :: HRCAPFTCool                =0   ! Index to cool capacity as a function of temperature curve for heat recovery
-!  REAL(r64)    :: HRInitialCoolCapFrac       =0.0 ! Fractional cooling degradation at the start of heat recovery from cooling mode
-!  REAL(r64)    :: HRCoolCapTC                =0.0 ! Time constant used to recover from intial degratation in cooling heat recovery
+!  REAL(r64)    :: HRInitialCoolCapFrac       =0.0d0 ! Fractional cooling degradation at the start of heat recovery from cooling mode
+!  REAL(r64)    :: HRCoolCapTC                =0.0d0 ! Time constant used to recover from intial degratation in cooling heat recovery
         VRF(VRFNum)%HRCAPFTCool = GetCurveIndex(cAlphaArgs(40))
         IF(VRF(VRFNum)%HRCAPFTCool .GT. 0)THEN
           ! Verify Curve Object, only legal type is bi-quadratic or linear, quadratic, or cubic
@@ -2403,8 +2398,8 @@ SUBROUTINE GetVRFInput
         VRF(VRFNum)%HRCoolCapTC          = rNumericArgs(32)
 
 !  INTEGER      :: HREIRFTCool                =0   ! Index to cool EIR as a function of temperature curve for heat recovery
-!  REAL(r64)    :: HRInitialCoolEIRFrac       =0.0 ! Fractional EIR degradation at the start of heat recovery from cooling mode
-!  REAL(r64)    :: HRCoolEIRTC                =0.0 ! Time constant used to recover from intial degratation in cooling heat recovery
+!  REAL(r64)    :: HRInitialCoolEIRFrac       =0.0d0 ! Fractional EIR degradation at the start of heat recovery from cooling mode
+!  REAL(r64)    :: HRCoolEIRTC                =0.0d0 ! Time constant used to recover from intial degratation in cooling heat recovery
         VRF(VRFNum)%HREIRFTCool = GetCurveIndex(cAlphaArgs(41))
         IF(VRF(VRFNum)%HREIRFTCool .GT. 0)THEN
           ! Verify Curve Object, only legal type is bi-quadratic or linear, quadratic, or cubic
@@ -2424,8 +2419,8 @@ SUBROUTINE GetVRFInput
         VRF(VRFNum)%HRCoolEIRTC          = rNumericArgs(34)
 
 !  INTEGER      :: HRCAPFTHeat                =0   ! Index to heat capacity as a function of temperature curve for heat recovery
-!  REAL(r64)    :: HRInitialHeatCapFrac       =0.0 ! Fractional heating degradation at the start of heat recovery from heating mode
-!  REAL(r64)    :: HRHeatCapTC                =0.0 ! Time constant used to recover from intial degratation in heating heat recovery
+!  REAL(r64)    :: HRInitialHeatCapFrac       =0.0d0 ! Fractional heating degradation at the start of heat recovery from heating mode
+!  REAL(r64)    :: HRHeatCapTC                =0.0d0 ! Time constant used to recover from intial degratation in heating heat recovery
         VRF(VRFNum)%HRCAPFTHeat = GetCurveIndex(cAlphaArgs(42))
         IF(VRF(VRFNum)%HRCAPFTHeat .GT. 0)THEN
           ! Verify Curve Object, only legal type is bi-quadratic or linear, quadratic, or cubic
@@ -2445,8 +2440,8 @@ SUBROUTINE GetVRFInput
         VRF(VRFNum)%HRHeatCapTC          = rNumericArgs(36)
 
 !  INTEGER      :: HREIRFTHeat                =0   ! Index to heat EIR as a function of temperature curve for heat recovery
-!  REAL(r64)    :: HRInitialHeatEIRFrac       =0.0 ! Fractional EIR degradation at the start of heat recovery from heating mode
-!  REAL(r64)    :: HRHeatEIRTC                =0.0 ! Time constant used to recover from intial degratation in heating heat recovery
+!  REAL(r64)    :: HRInitialHeatEIRFrac       =0.0d0 ! Fractional EIR degradation at the start of heat recovery from heating mode
+!  REAL(r64)    :: HRHeatEIRTC                =0.0d0 ! Time constant used to recover from intial degratation in heating heat recovery
         VRF(VRFNum)%HREIRFTHeat = GetCurveIndex(cAlphaArgs(43))
         IF(VRF(VRFNum)%HREIRFTHeat .GT. 0)THEN
           ! Verify Curve Object, only legal type is bi-quadratic or linear, quadratic, or cubic
@@ -2655,7 +2650,7 @@ SUBROUTINE GetVRFInput
 
           ! Check fan's schedule for cycling fan operation if constant volume fan is used
           IF(VRFTU(VRFTUNum)%FanOpModeSchedPtr .GT. 0 .AND. FanType_Num == FanType_SimpleConstVolume)THEN
-            IF (.NOT. CheckScheduleValueMinMax(VRFTU(VRFTUNum)%FanOpModeSchedPtr,'>',0.,'<=',1.)) THEN
+            IF (.NOT. CheckScheduleValueMinMax(VRFTU(VRFTUNum)%FanOpModeSchedPtr,'>',0.0d0,'<=',1.0d0)) THEN
               CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(VRFTU(VRFTUNum)%Name))
               CALL ShowContinueError('For fan type = '//TRIM(cFanTypes(FanType_SimpleConstVolume)))
               CALL ShowContinueError('Fan operating mode must be continuous (fan operating mode schedule values > 0).')
@@ -3288,7 +3283,8 @@ SUBROUTINE GetVRFInput
       CALL SetupOutputVariable('VRF Heat Pump COP []', &
                                 VRF(NumCond)%OperatingCOP,'System','Average', VRF(NumCond)%Name)
 
-      IF(VRF(NumCond)%DefrostStrategy == Resistive)THEN
+      IF(VRF(NumCond)%DefrostStrategy == Resistive .OR. &
+        (VRF(NumCond)%DefrostStrategy == ReverseCycle .AND. VRF(NumCond)%FuelType == FuelTypeElectric))THEN
         CALL SetupOutputVariable('VRF Heat Pump Defrost Electric Power [W]', &
                                 VRF(NumCond)%DefrostPower, 'System','Average', VRF(NumCond)%Name)
         CALL SetupOutputVariable('VRF Heat Pump Defrost Electric Energy [J]', &
@@ -3297,10 +3293,10 @@ SUBROUTINE GetVRFInput
       ELSE ! defrost energy appied to fuel type
         CALL SetupOutputVariable('VRF Heat Pump Defrost '// &
                                 TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Rate [W]', &
-                                VRF(NumCond)%ElecHeatingPower, 'System','Average', VRF(NumCond)%Name)
+                                VRF(NumCond)%DefrostPower, 'System','Average', VRF(NumCond)%Name)
         CALL SetupOutputVariable('VRF Heat Pump Defrost '// &
                                 TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Energy [J]', &
-                                VRF(NumCond)%HeatElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
+                                VRF(NumCond)%DefrostConsumption, 'System','Sum', VRF(NumCond)%Name, &
                                 ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
                                 EndUseKey='HEATING',GroupKey='System')
       END IF
@@ -3607,17 +3603,17 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
     ! outside air mixer is optional, check that node num > 0
     IF(OutsideAirNode .GT. 0)THEN
       Node(OutsideAirNode)%MassFlowRateMax = MAX(VRFTU(VRFTUNum)%CoolOutAirMassFlow,VRFTU(VRFTUNum)%HeatOutAirMassFlow)
-      Node(OutsideAirNode)%MassFlowRateMin = 0.0
-      Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
+      Node(OutsideAirNode)%MassFlowRateMin = 0.0d0
+      Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
     END IF
     Node(OutNode)%MassFlowRateMax = MAX(VRFTU(VRFTUNum)%MaxCoolAirMassFlow,VRFTU(VRFTUNum)%MaxHeatAirMassFlow)
-    Node(OutNode)%MassFlowRateMin = 0.0
-    Node(OutNode)%MassFlowRateMinAvail = 0.0
+    Node(OutNode)%MassFlowRateMin = 0.0d0
+    Node(OutNode)%MassFlowRateMinAvail = 0.0d0
     Node(InNode)%MassFlowRateMax = MAX(VRFTU(VRFTUNum)%MaxCoolAirMassFlow,VRFTU(VRFTUNum)%MaxHeatAirMassFlow)
-    Node(InNode)%MassFlowRateMin = 0.0
-    Node(InNode)%MassFlowRateMinAvail = 0.0
+    Node(InNode)%MassFlowRateMin = 0.0d0
+    Node(InNode)%MassFlowRateMinAvail = 0.0d0
     IF(VRFTU(VRFTUNum)%VRFTUOAMixerRelNodeNum .GT. 0)THEN
-      Node(VRFTU(VRFTUNum)%VRFTUOAMixerRelNodeNum)%MassFlowRateMinAvail = 0.0
+      Node(VRFTU(VRFTUNum)%VRFTUOAMixerRelNodeNum)%MassFlowRateMinAvail = 0.0d0
     END IF
 
     MyEnvrnFlag(VRFTUNum) = .FALSE.
@@ -3749,7 +3745,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
         ENDIF
 
 
-        IF(VRFTU(VRFTUNum)%ActualFanVolFlowRate .GT. 0.0)THEN
+        IF(VRFTU(VRFTUNum)%ActualFanVolFlowRate .GT. 0.0d0)THEN
           VRFTU(VRFTUNum)%HeatingSpeedRatio = VRFTU(VRFTUNum)%MaxHeatAirVolFlow/VRFTU(VRFTUNum)%ActualFanVolFlowRate
           VRFTU(VRFTUNum)%CoolingSpeedRatio = VRFTU(VRFTUNum)%MaxCoolAirVolFlow/VRFTU(VRFTUNum)%ActualFanVolFlowRate
         END IF
@@ -3786,7 +3782,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
 !  TUListNum = VRFTU(VRFTUNum)%TUListIndex
 
   IF (VRFTU(VRFTUNum)%FanOpModeSchedPtr .GT. 0) THEN
-    IF (GetCurrentScheduleValue(VRFTU(VRFTUNum)%FanOpModeSchedPtr) .EQ. 0.0) THEN
+    IF (GetCurrentScheduleValue(VRFTU(VRFTUNum)%FanOpModeSchedPtr) .EQ. 0.0d0) THEN
       VRFTU(VRFTUNum)%OpMode = CycFanCycCoil
     ELSE
       VRFTU(VRFTUNum)%OpMode = ContFanCycCoil
@@ -3795,7 +3791,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
 
   ! if condenser is off, all terminal unit coils are off
 !!!LKL Discrepancy < 0
-  IF (GetCurrentScheduleValue(VRF(VRFCond)%SchedPtr) .EQ. 0.0) THEN
+  IF (GetCurrentScheduleValue(VRF(VRFCond)%SchedPtr) .EQ. 0.0d0) THEN
     HeatingLoad(VRFCond) = .FALSE.
     CoolingLoad(VRFCond) = .FALSE.
   ELSE
@@ -4450,7 +4446,7 @@ SUBROUTINE SizeVRF(VRFTUNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad, FSEC
           !       DATE WRITTEN   August 2010
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -4499,8 +4495,58 @@ SUBROUTINE SizeVRF(VRFTUNum)
   LOGICAL, SAVE :: MyOneTimeEIOFlag = .TRUE. ! eio header flag reporting
   REAL(r64)     :: OnOffAirFlowRat ! temporary variable used when sizing coils
   REAL(r64)     :: DXCoilCap      ! capacity of DX cooling coil (W)
+  LOGICAL       :: IsAutosize     ! Indicator to autosize
+  REAL(r64)     :: MaxCoolAirVolFlowDes        ! Autosized supply air during cooling for reporting
+  REAL(r64)     :: MaxCoolAirVolFlowUser       ! Hardsized supply air during cooling for reporting
+  REAL(r64)     :: MaxHeatAirVolFlowDes        ! Autosized supply air during heating for reporting
+  REAL(r64)     :: MaxHeatAirVolFlowUser       ! Hardsized supply air during heating for reporting
+  REAL(r64)     :: MaxNoCoolAirVolFlowDes      ! Autosized supply air flow when no cooling is needed for reporting
+  REAL(r64)     :: MaxNoCoolAirVolFlowUser     ! Hardsized supply air flow when no cooling is needed for reporting
+  REAL(r64)     :: MaxNoHeatAirVolFlowDes      ! Autosized supply air flow when no heating is needed for reporting
+  REAL(r64)     :: MaxNoHeatAirVolFlowUser     ! Hardsized supply air flow when no heating is needed for reporting
+  REAL(r64)     :: CoolOutAirVolFlowDes        ! Autosized outdoor air flow during cooling for reporting
+  REAL(r64)     :: CoolOutAirVolFlowUser       ! Hardsized outdoor air flow during cooling for reporting
+  REAL(r64)     :: HeatOutAirVolFlowDes        ! Autosized outdoor air flow during heating for reporting
+  REAL(r64)     :: HeatOutAirVolFlowUser       ! Hardsized outdoor air flow during heating for reporting
+  REAL(r64)     :: NoCoolHeatOutAirVolFlowDes  ! Autosized outdoor air when unconditioned for reporting
+  REAL(r64)     :: NoCoolHeatOutAirVolFlowUser ! Hardsized outdoor air when unconditioned for reporting
+  REAL(r64)     :: CoolingCapacityDes          ! Autosized cooling capacity for reporting
+  REAL(r64)     :: CoolingCapacityUser         ! Hardsized cooling capacity for reporting
+  REAL(r64)     :: HeatingCapacityDes          ! Autosized heating capacity for reporting
+  REAL(r64)     :: HeatingCapacityUser         ! Hardsized heating capacity for reporting
+  REAL(r64)     :: DefrostCapacityDes          ! Autosized defrost heater capacity for reporting
+  REAL(r64)     :: DefrostCapacityUser         ! Hardsized defrost heater capacity for reporting
+  REAL(r64)     :: EvapCondAirVolFlowRateDes   ! Autosized evaporative condenser flow for reporting
+  REAL(r64)     :: EvapCondAirVolFlowRateUser  ! Hardsized evaporative condenser flow for reporting
+  REAL(r64)     :: EvapCondPumpPowerDes        ! Autosized evaporative condenser pump power for reporting
+  REAL(r64)     :: EvapCondPumpPowerUser       ! Hardsized evaporative condenser pump power for reporting
 
   VRFCond = VRFTU(VRFTUNum)%VRFSysNum
+  IsAutosize = .FALSE.
+  MaxCoolAirVolFlowDes = 0.0d0
+  MaxCoolAirVolFlowUser = 0.0d0
+  MaxHeatAirVolFlowDes = 0.0d0
+  MaxHeatAirVolFlowUser = 0.0d0
+  MaxNoCoolAirVolFlowDes = 0.0d0
+  MaxNoCoolAirVolFlowUser = 0.0d0
+  MaxNoHeatAirVolFlowDes = 0.0d0
+  MaxNoHeatAirVolFlowUser = 0.0d0
+  CoolOutAirVolFlowDes = 0.0d0
+  CoolOutAirVolFlowUser = 0.0d0
+  HeatOutAirVolFlowDes = 0.0d0
+  HeatOutAirVolFlowUser = 0.0d0
+  NoCoolHeatOutAirVolFlowDes = 0.0d0
+  NoCoolHeatOutAirVolFlowUser = 0.0d0
+  CoolingCapacityDes = 0.0d0
+  CoolingCapacityUser = 0.0d0
+  HeatingCapacityDes = 0.0d0
+  HeatingCapacityUser = 0.0d0
+  DefrostCapacityDes = 0.0d0
+  DefrostCapacityUser = 0.0d0
+  EvapCondAirVolFlowRateDes = 0.0d0
+  EvapCondAirVolFlowRateUser = 0.0d0
+  EvapCondPumpPowerDes = 0.0d0
+  EvapCondPumpPowerUser = 0.0d0
 
   IF (MyOneTimeFlag) THEN
     ! initialize the environment and sizing flags
@@ -4510,122 +4556,324 @@ SUBROUTINE SizeVRF(VRFTUNum)
   END IF
 
   IF (VRFTU(VRFTUNum)%MaxCoolAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%MaxCoolAirVolFlow = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                            FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (VRFTU(VRFTUNum)%MaxCoolAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%MaxCoolAirVolFlow = 0.0
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%MaxCoolAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                        'User-Specified Supply Air Flow Rate During Cooling Operation [m3/s]', &
+                        VRFTU(VRFTUNum)%MaxCoolAirVolFlow)
       END IF
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-                     'Supply Air Flow Rate During Cooling Operation [m3/s]', VRFTU(VRFTUNum)%MaxCoolAirVolFlow)
+    ELSE
+      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
+      MaxCoolAirVolFlowDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                            FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+      IF (MaxCoolAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxCoolAirVolFlowDes = 0.0d0
+      END IF
 
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%MaxCoolAirVolFlow = MaxCoolAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate During Cooling Operation [m3/s]', MaxCoolAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%MaxCoolAirVolFlow > 0.0d0 .AND. MaxCoolAirVolFlowDes > 0.0d0) THEN
+          MaxCoolAirVolFlowUser = VRFTU(VRFTUNum)%MaxCoolAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate During Cooling Operation [m3/s]', MaxCoolAirVolFlowDes, &
+                     'User-Specified Supply Air Flow Rate During Cooling Operation [m3/s]', MaxCoolAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxCoolAirVolFlowDes - MaxCoolAirVolFlowUser)/MaxCoolAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                   //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate During Cooling Operation of '// &
+                                      TRIM(RoundSigDigits(MaxCoolAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate During Cooling Operation of ' // &
+                                      TRIM(RoundSigDigits(MaxCoolAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%MaxHeatAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%MaxHeatAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                        'User-Specified Supply Air Flow Rate During Heating Operation [m3/s]', &
+                        VRFTU(VRFTUNum)%MaxHeatAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%MaxHeatAirVolFlow = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+      MaxHeatAirVolFlowDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                             FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (VRFTU(VRFTUNum)%MaxHeatAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%MaxHeatAirVolFlow = 0.0
+      IF (MaxHeatAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxHeatAirVolFlowDes = 0.0d0
       END IF
 
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-                     'Supply Air Flow Rate During Heating Operation [m3/s]', VRFTU(VRFTUNum)%MaxHeatAirVolFlow)
-
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%MaxHeatAirVolFlow = MaxHeatAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate During Heating Operation [m3/s]', MaxHeatAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%MaxHeatAirVolFlow > 0.0d0 .AND. MaxHeatAirVolFlowDes > 0.0d0) THEN
+          MaxHeatAirVolFlowUser = VRFTU(VRFTUNum)%MaxHeatAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate During Heating Operation [m3/s]', MaxHeatAirVolFlowDes, &
+                     'User-Specified Supply Air Flow Rate During Heating Operation [m3/s]', MaxHeatAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxHeatAirVolFlowDes - MaxHeatAirVolFlowUser)/MaxHeatAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for' &
+                                     //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate During Heating Operation of '// &
+                                      TRIM(RoundSigDigits(MaxHeatAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate During Heating Operation of ' // &
+                                      TRIM(RoundSigDigits(MaxHeatAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                        'User-Specified Supply Air Flow Rate When No Cooling is Needed [m3/s]', &
+                        VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow = VRFTU(VRFTUNum)%MaxCoolAirVolFlow
-      IF (VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow = 0.0
+      MaxNoCoolAirVolFlowDes = VRFTU(VRFTUNum)%MaxCoolAirVolFlow
+      IF (MaxNoCoolAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxNoCoolAirVolFlowDes = 0.0d0
       END IF
 
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-                     'Supply Air Flow Rate When No Cooling is Needed [m3/s]', VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow)
-
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow = MaxNoCoolAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate  When No Cooling is Needed [m3/s]', MaxNoCoolAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow > 0.0d0 .AND. MaxNoCoolAirVolFlowDes > 0.0d0) THEN
+          MaxNoCoolAirVolFlowUser = VRFTU(VRFTUNum)%MaxNoCoolAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate  When No Cooling is Needed [m3/s]', MaxNoCoolAirVolFlowDes, &
+                     'User-Specified Supply Air Flow Rate  When No Cooling is Needed [m3/s]', MaxNoCoolAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxNoCoolAirVolFlowDes - MaxNoCoolAirVolFlowUser)/MaxNoCoolAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for '&
+                                   //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate  When No Cooling is Needed of '// &
+                                      TRIM(RoundSigDigits(MaxNoCoolAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate  When No Cooling is Needed of ' // &
+                                      TRIM(RoundSigDigits(MaxNoCoolAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                         'User-Specified Supply Air Flow Rate When No Heating is Needed [m3/s]', &
+                        VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow = VRFTU(VRFTUNum)%MaxHeatAirVolFlow
-      IF (VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow = 0.0
+      MaxNoHeatAirVolFlowDes = VRFTU(VRFTUNum)%MaxHeatAirVolFlow
+      IF (MaxNoHeatAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxNoHeatAirVolFlowDes = 0.0d0
       END IF
 
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-                     'Supply Air Flow Rate When No Heating is Needed [m3/s]', VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow)
-
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow = MaxNoHeatAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate  When No Heating is Needed [m3/s]', MaxNoHeatAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow > 0.0d0 .AND. MaxNoHeatAirVolFlowDes > 0.0d0) THEN
+          MaxNoHeatAirVolFlowUser = VRFTU(VRFTUNum)%MaxNoHeatAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Supply Air Flow Rate  When No Heating is Needed [m3/s]', MaxNoHeatAirVolFlowDes, &
+                     'User-Specified Supply Air Flow Rate  When No Heating is Needed [m3/s]', MaxNoHeatAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxNoHeatAirVolFlowDes - MaxNoHeatAirVolFlowUser)/MaxNoHeatAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                    //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Supply Air Flow Rate  When No Heating is Needed of '// &
+                                      TRIM(RoundSigDigits(MaxNoHeatAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Supply Air Flow Rate  When No Heating is Needed of ' // &
+                                      TRIM(RoundSigDigits(MaxNoHeatAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%CoolOutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,VRFTU(VRFTUNum)%MaxCoolAirVolFlow)
-      IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%CoolOutAirVolFlow = 0.0
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                        'User-Specified Outdoor Air Flow Rate During Cooling Operation [m3/s]', &
+                        VRFTU(VRFTUNum)%CoolOutAirVolFlow)
       END IF
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-                     'Outdoor Air Flow Rate During Cooling Operation [m3/s]',VRFTU(VRFTUNum)%CoolOutAirVolFlow)
+    ELSE
+      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
+      CoolOutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,VRFTU(VRFTUNum)%MaxCoolAirVolFlow)
+      IF (CoolOutAirVolFlowDes < SmallAirVolFlow) THEN
+        CoolOutAirVolFlowDes = 0.0d0
+      END IF
 
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%CoolOutAirVolFlow = CoolOutAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Outdoor Air Flow Rate During Cooling Operation [m3/s]', CoolOutAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow > 0.0d0 .AND. CoolOutAirVolFlowDes > 0.0d0) THEN
+          CoolOutAirVolFlowUser = VRFTU(VRFTUNum)%CoolOutAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Outdoor Air Flow Rate During Cooling Operation [m3/s]', CoolOutAirVolFlowDes, &
+                     'User-Specified Outdoor Air Flow Rate During Cooling Operation [m3/s]', CoolOutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(CoolOutAirVolFlowDes - CoolOutAirVolFlowUser)/CoolOutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                       //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Outdoor Air Flow Rate During Cooling Operation of '// &
+                                      TRIM(RoundSigDigits(CoolOutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Outdoor Air Flow Rate During Cooling Operation of ' // &
+                                      TRIM(RoundSigDigits(CoolOutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%HeatOutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%HeatOutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,VRFTU(VRFTUNum)%MaxHeatAirVolFlow)
-      IF (VRFTU(VRFTUNum)%HeatOutAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%HeatOutAirVolFlow = 0.0
-      END IF
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
                      'Outdoor Air Flow Rate During Heating Operation [m3/s]',VRFTU(VRFTUNum)%CoolOutAirVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
+      HeatOutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,VRFTU(VRFTUNum)%MaxHeatAirVolFlow)
+      IF (HeatOutAirVolFlowDes < SmallAirVolFlow) THEN
+        HeatOutAirVolFlowDes = 0.0d0
+      END IF
 
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%HeatOutAirVolFlow = HeatOutAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Outdoor Air Flow Rate During Heating Operation [m3/s]', HeatOutAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%HeatOutAirVolFlow > 0.0d0 .AND. HeatOutAirVolFlowDes > 0.0d0) THEN
+          HeatOutAirVolFlowUser = VRFTU(VRFTUNum)%HeatOutAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                     'Design Size Outdoor Air Flow Rate During Heating Operation [m3/s]', HeatOutAirVolFlowDes, &
+                     'User-Specified Outdoor Air Flow Rate During Heating Operation [m3/s]', HeatOutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(HeatOutAirVolFlowDes - HeatOutAirVolFlowUser)/HeatOutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                    //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Outdoor Air Flow Rate During Heating Operation of '// &
+                                      TRIM(RoundSigDigits(HeatOutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Outdoor Air Flow Rate During Heating Operation of ' // &
+                                      TRIM(RoundSigDigits(HeatOutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                    'User-Specified Outdoor Air Flow Rate When No Cooling or Heating is Needed [m3/s]', &
+                    VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name)
-      VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
+      NoCoolHeatOutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
                                                     VRFTU(VRFTUNum)%HeatOutAirVolFlow, &
                                                     VRFTU(VRFTUNum)%CoolOutAirVolFlow)
-      IF (VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow < SmallAirVolFlow) THEN
-        VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow = 0.0
+      IF (NoCoolHeatOutAirVolFlowDes < SmallAirVolFlow) THEN
+        NoCoolHeatOutAirVolFlowDes = 0.0d0
       END IF
-      CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
-              'Outdoor Air Flow Rate When No Cooling or Heating is Needed [m3/s]',VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow)
 
+      IF (IsAutosize) THEN
+        VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow = NoCoolHeatOutAirVolFlowDes
+        CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                    'Design Size Outdoor Air Flow Rate When No Cooling or Heating is Needed [m3/s]', &
+                    NoCoolHeatOutAirVolFlowDes)
+      ELSE
+        IF (VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow > 0.0d0 .AND. NoCoolHeatOutAirVolFlowDes > 0.0d0) THEN
+          NoCoolHeatOutAirVolFlowUser = VRFTU(VRFTUNum)%NoCoolHeatOutAirVolFlow
+          CALL ReportSizingOutput(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num), VRFTU(VRFTUNum)%Name, &
+                    'Design Size Outdoor Air Flow Rate When No Cooling or Heating is Needed [m3/s]', &
+                    NoCoolHeatOutAirVolFlowDes, &
+                    'User-Specified Outdoor Air Flow Rate When No Cooling or Heating is Needed [m3/s]', &
+                    NoCoolHeatOutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(NoCoolHeatOutAirVolFlowDes - NoCoolHeatOutAirVolFlowUser)/NoCoolHeatOutAirVolFlowUser) &
+                          > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                     //TRIM(cVRFTUTypes(VRFTU(VRFTUNum)%VRFTUType_Num))//' '//TRIM(VRFTU(VRFTUNum)%Name))
+              CALL ShowContinueError('User-Specified Outdoor Air Flow Rate When No Cooling or Heating is Needed of '// &
+                                      TRIM(RoundSigDigits(NoCoolHeatOutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Outdoor Air Flow Rate When No Cooling or Heating is Needed of ' &
+                                     //  TRIM(RoundSigDigits(NoCoolHeatOutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
   IF(CheckVRFCombinationRatio(VRFCond))THEN
@@ -4633,13 +4881,13 @@ SUBROUTINE SizeVRF(VRFTUNum)
     ! set up the outside air data for sizing the DX coils
     ZoneEqDXCoil = .TRUE.
     IF (CurZoneEqNum > 0) THEN
-      IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow > 0.0 .OR. VRFTU(VRFTUNum)%HeatOutAirVolFlow > 0.0) THEN
+      IF (VRFTU(VRFTUNum)%CoolOutAirVolFlow > 0.0d0.OR. VRFTU(VRFTUNum)%HeatOutAirVolFlow > 0.0d0) THEN
         ZoneEqSizing(CurZoneEqNum)%OAVolFlow = MAX(VRFTU(VRFTUNum)%CoolOutAirVolFlow,VRFTU(VRFTUNum)%HeatOutAirVolFlow)
       ELSE
-        ZoneEqSizing(CurZoneEqNum)%OAVolFlow = 0.0
+        ZoneEqSizing(CurZoneEqNum)%OAVolFlow = 0.0d0
       END IF
     ELSE
-     ZoneEqSizing(CurZoneEqNum)%OAVolFlow = 0.0
+     ZoneEqSizing(CurZoneEqNum)%OAVolFlow = 0.0d0
     END IF
     ! simulate the TU to size the coils
     CALL CalcVRF(VRFTUNum,.TRUE.,0.0d0,TUCoolingCapacity,OnOffAirFlowRat)
@@ -4669,23 +4917,72 @@ SUBROUTINE SizeVRF(VRFTUNum)
     END DO
 
     IF(FoundAll)THEN
+      IsAutosize = .FALSE.
       IF(VRF(VRFCond)%CoolingCapacity == Autosize)THEN
-        VRF(VRFCond)%CoolingCapacity = TUCoolingCapacity
-        CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
-                                    'Rated Total Cooling Capacity (gross) [W]', VRF(VRFCond)%CoolingCapacity)
+        IsAutosize = .TRUE.
       END IF
+        CoolingCapacityDes = TUCoolingCapacity
+      IF (IsAutosize) THEN
+        VRF(VRFCond)%CoolingCapacity = CoolingCapacityDes
+        CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                                    'Design Size Rated Total Cooling Capacity (gross) [W]', CoolingCapacityDes)
+      ELSE
+        IF (VRF(VRFCond)%CoolingCapacity > 0.0d0 .AND. CoolingCapacityDes > 0.0d0) THEN
+          CoolingCapacityUser = VRF(VRFCond)%CoolingCapacity
+          CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                                    'Design Size Rated Total Cooling Capacity (gross) [W]', CoolingCapacityDes, &
+                                    'User-Specified Rated Total Cooling Capacity (gross) [W]', CoolingCapacityUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(CoolingCapacityDes - CoolingCapacityUser)/CoolingCapacityUser)> AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                          //TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' '//TRIM(VRFTU(VRFCond)%Name))
+              CALL ShowContinueError('User-Specified Rated Total Cooling Capacity (gross) of '// &
+                                      TRIM(RoundSigDigits(CoolingCapacityUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Rated Total Cooling Capacity (gross) of ' // &
+                                      TRIM(RoundSigDigits(CoolingCapacityDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+
       IF(VRF(VRFCond)%CoolingCapacity .GT. 0.0d0)THEN
         VRF(VRFCond)%CoolingCombinationRatio = TUCoolingCapacity / VRF(VRFCond)%CoolingCapacity
       END IF
 
+      IsAutosize = .FALSE.
       IF(VRF(VRFCond)%HeatingCapacity == Autosize)THEN
-        IF(VRF(VRFCond)%LockHeatingCapacity)THEN
-          VRF(VRFCond)%HeatingCapacity = VRF(VRFCond)%CoolingCapacity * VRF(VRFCond)%HeatingCapacitySizeRatio
-        ELSE
-          VRF(VRFCond)%HeatingCapacity = TUHeatingCapacity
-        END IF
+        IsAutosize = .TRUE.
+      END IF
+      IF(VRF(VRFCond)%LockHeatingCapacity)THEN
+        HeatingCapacityDes = VRF(VRFCond)%CoolingCapacity * VRF(VRFCond)%HeatingCapacitySizeRatio
+      ELSE
+        HeatingCapacityDes = TUHeatingCapacity
+      END IF
+      IF (IsAutosize) THEN
+        VRF(VRFCond)%HeatingCapacity = HeatingCapacityDes
         CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
-               'Rated Total Heating Capacity [W]', VRF(VRFCond)%HeatingCapacity)
+                                    'Design Size Rated Total Heating Capacity [W]', HeatingCapacityDes)
+      ELSE
+        IF (VRF(VRFCond)%HeatingCapacity > 0.0d0 .AND. HeatingCapacityDes > 0.0d0) THEN
+          HeatingCapacityUser = VRF(VRFCond)%HeatingCapacity
+          CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                                    'Design Size Rated Total Heating Capacity [W]', HeatingCapacityDes, &
+                                    'User-Specified Rated Total Heating Capacity [W]', HeatingCapacityUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(HeatingCapacityDes - HeatingCapacityUser)/HeatingCapacityUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                       //TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' '//TRIM(VRFTU(VRFCond)%Name))
+              CALL ShowContinueError('User-Specified Rated Total Heating Capacity of '// &
+                                      TRIM(RoundSigDigits(HeatingCapacityUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Rated Total Heating Capacity of ' // &
+                                      TRIM(RoundSigDigits(HeatingCapacityDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
       END IF
 
       IF(VRF(VRFCond)%HeatingCapacity .GT. 0.0d0)THEN
@@ -4737,37 +5034,103 @@ SUBROUTINE SizeVRF(VRFTUNum)
       ELSE
         HeatCombinationRatio(VRFCond) = 1.0d0
       END IF
-
+        ! autosize resistive defrost heater capacity
+      IsAutosize = .FALSE.
       IF (VRF(VRFCond)%DefrostCapacity == AutoSize) THEN
-
-        IF (VRF(VRFCond)%DefrostStrategy == Resistive) THEN
-          VRF(VRFCond)%DefrostCapacity = VRF(VRFCond)%CoolingCapacity
-        ELSE
-          VRF(VRFCond)%DefrostCapacity = 0.d0
+        IsAutosize = .TRUE.
+      END IF
+      IF (VRF(VRFCond)%DefrostStrategy == Resistive) THEN
+          DefrostCapacityDes = VRF(VRFCond)%CoolingCapacity
+      ELSE
+          DefrostCapacityDes = 0.d0
+      END IF
+      IF (IsAutosize) THEN
+        VRF(VRFCond)%DefrostCapacity = DefrostCapacityDes
+        CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                                'Design Size Resistive Defrost Heater Capacity', DefrostCapacityDes)
+      ELSE
+        IF (VRF(VRFCond)%DefrostCapacity > 0.0d0 .AND. DefrostCapacityDes > 0.0d0) THEN
+          DefrostCapacityUser = VRF(VRFCond)%DefrostCapacity
+          CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                                'Design Size Resistive Defrost Heater Capacity', DefrostCapacityDes, &
+                                'User-Specified Resistive Defrost Heater Capacity', DefrostCapacityUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(DefrostCapacityDes - DefrostCapacityUser)/DefrostCapacityUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                               //TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' '//TRIM(VRFTU(VRFCond)%Name))
+              CALL ShowContinueError('User-Specified Resistive Defrost Heater Capacity of '// &
+                                      TRIM(RoundSigDigits(DefrostCapacityUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Resistive Defrost Heater Capacity of ' // &
+                                      TRIM(RoundSigDigits(DefrostCapacityDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
         END IF
-        CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
-                                'Resistive Defrost Heater Capacity', VRF(VRFCond)%DefrostCapacity)
-
       END IF
 
+      IsAutosize = .FALSE.
       IF (VRF(VRFCond)%EvapCondAirVolFlowRate == AutoSize) THEN
-
+        IsAutosize = .TRUE.
+      END IF
         ! Auto size condenser air flow to Total Capacity * 0.000114 m3/s/w (850 cfm/ton)
-        VRF(VRFCond)%EvapCondAirVolFlowRate = VRF(VRFCond)%CoolingCapacity*0.000114d0
-
+        EvapCondAirVolFlowRateDes = VRF(VRFCond)%CoolingCapacity*0.000114d0
+      IF (IsAutosize) THEN
+        VRF(VRFCond)%EvapCondAirVolFlowRate = EvapCondAirVolFlowRateDes
         CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
-              'Evaporative Condenser Air Flow Rate [m3/s]', VRF(VRFCond)%EvapCondAirVolFlowRate)
-
+                    'Design Size Evaporative Condenser Air Flow Rate [m3/s]', EvapCondAirVolFlowRateDes)
+      ELSE
+        IF (VRF(VRFCond)%EvapCondAirVolFlowRate > 0.0d0 .AND. EvapCondAirVolFlowRateDes > 0.0d0) THEN
+          EvapCondAirVolFlowRateUser = VRF(VRFCond)%EvapCondAirVolFlowRate
+          CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                  'Design Size Evaporative Condenser Air Flow Rate [m3/s]', EvapCondAirVolFlowRateDes, &
+                  'User-Specified Evaporative Condenser Air Flow Rate [m3/s]', EvapCondAirVolFlowRateUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(EvapCondAirVolFlowRateDes - EvapCondAirVolFlowRateUser)/EvapCondAirVolFlowRateUser) &
+                            > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for ' &
+                                    //TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' '//TRIM(VRFTU(VRFCond)%Name))
+              CALL ShowContinueError('User-Specified Evaporative Condenser Air Flow Rate of '// &
+                                    TRIM(RoundSigDigits(EvapCondAirVolFlowRateUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Evaporative Condenser Air Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(EvapCondAirVolFlowRateDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
       END IF
 
+      IsAutosize = .FALSE.
       IF (VRF(VRFCond)%EvapCondPumpPower == AutoSize) THEN
-
+        IsAutosize = .TRUE.
+      END IF
         ! Auto size evap condenser pump power to Total Capacity * 0.004266 w/w (15 w/ton)
-        VRF(VRFCond)%EvapCondPumpPower = VRF(VRFCond)%CoolingCapacity*0.004266d0
-
+      EvapCondPumpPowerDes = VRF(VRFCond)%CoolingCapacity*0.004266d0
+      IF (IsAutosize) THEN
+        VRF(VRFCond)%EvapCondPumpPower = EvapCondPumpPowerDes
         CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
-                           'Evaporative Condenser Pump Rated Power Consumption [W]',   &
-                            VRF(VRFCond)%EvapCondPumpPower)
+                           'Design Size Evaporative Condenser Pump Rated Power Consumption [W]', EvapCondPumpPowerDes)
+
+      ELSE
+        IF (VRF(VRFCond)%EvapCondPumpPower > 0.0d0 .AND. EvapCondPumpPowerDes > 0.0d0) THEN
+          EvapCondPumpPowerUser = VRF(VRFCond)%EvapCondPumpPower
+          CALL ReportSizingOutput(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum), VRF(VRFCond)%Name, &
+                           'Design Size Evaporative Condenser Pump Rated Power Consumption [W]', EvapCondPumpPowerDes, &
+                           'User-Specified Evaporative Condenser Pump Rated Power Consumption [W]', EvapCondPumpPowerUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(EvapCondPumpPowerDes - EvapCondPumpPowerUser)/EvapCondPumpPowerUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVRF: Potential issue with equipment sizing for '  &
+                                 //TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' '//TRIM(VRFTU(VRFCond)%Name))
+              CALL ShowContinueError('User-Specified Evaporative Condenser Pump Rated Power Consumption of '// &
+                                      TRIM(RoundSigDigits(EvapCondPumpPowerUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Evaporative Condenser Pump Rated Power Consumption of ' // &
+                                     TRIM(RoundSigDigits(EvapCondPumpPowerDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
       END IF
 
       ! Report to eio other information not related to autosizing
@@ -4785,8 +5148,8 @@ SUBROUTINE SizeVRF(VRFTUNum)
     END IF
   END IF
 
-  990 FORMAT('! <VRF System Information>, VRF System Type, VRF System Name, ' &
-                'VRF System Cooling Combination Ratio, VRF System Heating Combination Ratio, ',  &
+  990 FORMAT('! <VRF System Information>, VRF System Type, VRF System Name, ', &
+                'VRF System Cooling Combination Ratio, VRF System Heating Combination Ratio, ', &
         'VRF System Cooling Piping Correction Factor, VRF System Heating Piping Correction Factor')
   991 FORMAT(' VRF System Information',6(', ',A))
 
@@ -4870,7 +5233,7 @@ SUBROUTINE SizeVRFCondenser(VRFCond)
         CALL RegisterPlantCompDesignFlow(VRF(VRFCond)%CondenserNodeNum,VRF(VRFCond)%WaterCondVolFlowRate)
 
       ELSE
-        CALL ShowContinueError('Autosizing of condenser water flow rate requires a condenser loop Sizing:Plant object')
+        CALL ShowSevereError('Autosizing of condenser water flow rate requires a condenser loop Sizing:Plant object')
         CALL ShowContinueError('... occurs in AirConditioner:VariableRefrigerantFlow object='//TRIM(VRF(VRFCond)%Name))
         CALL ShowContinueError('... plant loop name must be referenced in Sizing:Plant object')
         ErrorsFound = .TRUE.
@@ -4987,7 +5350,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !
   INTEGER, PARAMETER   :: MaxIte   = 500          ! maximum number of iterations
-  REAL(r64), PARAMETER :: MinPLF   = 0.0          ! minimum part load factor allowed
+  REAL(r64), PARAMETER :: MinPLF   = 0.0d0          ! minimum part load factor allowed
   REAL(r64), PARAMETER :: ErrorTol = 0.001d0      ! tolerance for RegulaFalsi iterations
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -5029,7 +5392,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
 
   ! do nothing else if TU is scheduled off
 !!!LKL Discrepancy < 0
-  IF (GetCurrentScheduleValue(VRFTU(VRFTUNum)%SchedPtr) .EQ. 0.0) RETURN
+  IF (GetCurrentScheduleValue(VRFTU(VRFTUNum)%SchedPtr) .EQ. 0.0d0) RETURN
 
   ! do nothing if TU has no load (TU will be modeled using PLR=0)
   IF (QZnReq == 0.d0) RETURN
@@ -5059,9 +5422,9 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
   END IF
 
   ! Otherwise the coil needs to turn on. Get full load result
-  PartLoadRatio  = 1.0
+  PartLoadRatio  = 1.0d0
   CALL CalcVRF(VRFTUNum, FirstHVACIteration, PartLoadRatio, FullOutput, OnOffAirFlowRatio)
-  PartLoadRatio  = 0.0
+  PartLoadRatio  = 0.0d0
 
   IF ((VRFCoolingMode .AND. .NOT. VRF(VRFCond)%HeatRecoveryUsed) .OR. &
       (VRF(VRFCond)%HeatRecoveryUsed .AND. HRCoolingMode)) THEN
@@ -5069,7 +5432,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
     ! If the QZnReq <= FullOutput the unit needs to run full out
     IF (QZnReq  <=  FullOutput) THEN
       ! if no coil present in terminal unit, no need to reset PLR?
-      IF(VRFTU(VRFTUNum)%CoolingCoilPresent)PartLoadRatio = 1.0
+      IF(VRFTU(VRFTUNum)%CoolingCoilPresent)PartLoadRatio = 1.0d0
       RETURN
     END IF
   ELSE IF((VRFHeatingMode .AND. .NOT. VRF(VRFCond)%HeatRecoveryUsed) .OR. &
@@ -5078,7 +5441,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
     ! If the QZnReq >= FullOutput the unit needs to run full out
     IF (QZnReq  >=  FullOutput) THEN
       ! if no coil present in terminal unit, no need reset PLR?
-      IF(VRFTU(VRFTUNum)%HeatingCoilPresent)PartLoadRatio = 1.0
+      IF(VRFTU(VRFTUNum)%HeatingCoilPresent)PartLoadRatio = 1.0d0
       RETURN
     END IF
   ELSE
@@ -5095,9 +5458,9 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
     Par(2)=0.0d0
     Par(4)=0.0d0
     IF (FirstHVACIteration) THEN
-      Par(3) = 1.0
+      Par(3) = 1.0d0
     ELSE
-      Par(3) = 0.0
+      Par(3) = 0.0d0
     END IF
 !    Par(4) = OpMode
     Par(5) = QZnReq
@@ -5329,7 +5692,7 @@ SUBROUTINE CalcVRF(VRFTUNum, FirstHVACIteration, PartLoadRatio, LoadMet, OnOffAi
 
   IF(PRESENT(LatOutputProvided))THEN
 !   CR9155 Remove specific humidity calculations
-    SpecHumOut = Node(VRFTUOutletNodeNum)%HumRat 
+    SpecHumOut = Node(VRFTUOutletNodeNum)%HumRat
     SpecHumIn  = Node(VRFTUInletNodeNum)%HumRat
     LatOutputProvided = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
   END IF
@@ -6062,7 +6425,7 @@ SUBROUTINE InitializeOperatingMode(FirstHVACIteration,VRFCond,TUListNum,OnOffAir
         CASE(ThermostatOffsetPriority)
           TUIndex = VRF(VRFCond)%MasterZoneTUIndex
           IF (VRFTU(TUIndex)%FanOpModeSchedPtr .GT. 0) THEN
-            IF (GetCurrentScheduleValue(VRFTU(TUIndex)%FanOpModeSchedPtr) .EQ. 0.0) THEN
+            IF (GetCurrentScheduleValue(VRFTU(TUIndex)%FanOpModeSchedPtr) .EQ. 0.0d0) THEN
               FanOpMode = CycFanCycCoil
             ELSE
               FanOpMode = ContFanCycCoil

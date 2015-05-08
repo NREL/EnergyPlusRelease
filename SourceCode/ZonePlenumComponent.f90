@@ -40,19 +40,19 @@ TYPE ZoneReturnPlenumConditions
   CHARACTER(len=MaxNameLength) :: ZonePlenumName =' '
   CHARACTER(len=MaxNameLength) :: ZoneName       =' '
   CHARACTER(len=MaxNameLength) :: ZoneNodeName   =' '
-  REAL(r64)    :: ZoneTemp                       =0.0
-  REAL(r64)    :: ZoneHumRat                     =0.0
-  REAL(r64)    :: ZoneEnthalpy                   =0.0
-  REAL(r64)    :: OutletTemp                     =0.0
-  REAL(r64)    :: OutletHumRat                   =0.0
-  REAL(r64)    :: OutletEnthalpy                 =0.0
-  REAL(r64)    :: OutletPressure                 =0.0
+  REAL(r64)    :: ZoneTemp                       =0.0d0
+  REAL(r64)    :: ZoneHumRat                     =0.0d0
+  REAL(r64)    :: ZoneEnthalpy                   =0.0d0
+  REAL(r64)    :: OutletTemp                     =0.0d0
+  REAL(r64)    :: OutletHumRat                   =0.0d0
+  REAL(r64)    :: OutletEnthalpy                 =0.0d0
+  REAL(r64)    :: OutletPressure                 =0.0d0
   INTEGER      :: ZoneNodeNum                    =0
   INTEGER      :: ActualZoneNum                  =0
   INTEGER      :: OutletNode                     =0
-  REAL(r64)    :: OutletMassFlowRate             =0.0 !MassFlow through the ZonePlenum being Simulated [kg/Sec]
-  REAL(r64)    :: OutletMassFlowRateMaxAvail     =0.0 ! [kg/Sec]
-  REAL(r64)    :: OutletMassFlowRateMinAvail     =0.0 ! [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRate             =0.0d0 !MassFlow through the ZonePlenum being Simulated [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRateMaxAvail     =0.0d0 ! [kg/Sec]
+  REAL(r64)    :: OutletMassFlowRateMinAvail     =0.0d0 ! [kg/Sec]
   INTEGER      :: NumInducedNodes                =0
   INTEGER, DIMENSION(:), ALLOCATABLE      ::InducedNode
   REAL(r64), DIMENSION(:), ALLOCATABLE    ::InducedMassFlowRate
@@ -81,19 +81,19 @@ TYPE ZoneSupplyPlenumConditions
   CHARACTER(len=MaxNameLength) :: ZonePlenumName =' '
   CHARACTER(len=MaxNameLength) :: ZoneName       =' '
   CHARACTER(len=MaxNameLength) :: ZoneNodeName   =' '
-  REAL(r64)    :: ZoneTemp                       =0.0
-  REAL(r64)    :: ZoneHumRat                     =0.0
-  REAL(r64)    :: ZoneEnthalpy                   =0.0
-  REAL(r64)    :: InletTemp                      =0.0
-  REAL(r64)    :: InletHumRat                    =0.0
-  REAL(r64)    :: InletEnthalpy                  =0.0
-  REAL(r64)    :: InletPressure                  =0.0
+  REAL(r64)    :: ZoneTemp                       =0.0d0
+  REAL(r64)    :: ZoneHumRat                     =0.0d0
+  REAL(r64)    :: ZoneEnthalpy                   =0.0d0
+  REAL(r64)    :: InletTemp                      =0.0d0
+  REAL(r64)    :: InletHumRat                    =0.0d0
+  REAL(r64)    :: InletEnthalpy                  =0.0d0
+  REAL(r64)    :: InletPressure                  =0.0d0
   INTEGER      :: ZoneNodeNum                    =0
   INTEGER      :: ActualZoneNum                  =0
   INTEGER      :: InletNode                      =0
-  REAL(r64)    :: InletMassFlowRate              =0.0 !MassFlow through the ZonePlenum being Simulated [kg/Sec]
-  REAL(r64)    :: InletMassFlowRateMaxAvail      =0.0 ! [kg/Sec]
-  REAL(r64)    :: InletMassFlowRateMinAvail      =0.0 ! [kg/Sec]
+  REAL(r64)    :: InletMassFlowRate              =0.0d0 !MassFlow through the ZonePlenum being Simulated [kg/Sec]
+  REAL(r64)    :: InletMassFlowRateMaxAvail      =0.0d0 ! [kg/Sec]
+  REAL(r64)    :: InletMassFlowRateMinAvail      =0.0d0 ! [kg/Sec]
   LOGICAL      :: InitFlag                       =.false.
   INTEGER      :: NumOutletNodes                 =0
   INTEGER, DIMENSION(:), ALLOCATABLE ::OutletNode
@@ -164,9 +164,9 @@ SUBROUTINE SimAirZonePlenum(CompName, iCompType, CompIndex, FirstHVACIteration, 
   CHARACTER(len=*), INTENT(IN)  :: CompName
   INTEGER, INTENT(IN)           :: iCompType
   INTEGER, INTENT(INOUT)        :: CompIndex
-  LOGICAL, OPTIONAL, INTENT(IN) :: FirstHVACIteration
-  LOGICAL, OPTIONAL, INTENT(IN) :: FirstCall
-  LOGICAL, OPTIONAL             :: PlenumInletChanged
+  LOGICAL, OPTIONAL, INTENT(IN) :: FirstHVACIteration !Objexx:OPTIONAL Used without PRESENT check
+  LOGICAL, OPTIONAL, INTENT(IN) :: FirstCall !Objexx:OPTIONAL Used without PRESENT check
+  LOGICAL, OPTIONAL             :: PlenumInletChanged !Objexx:OPTIONAL Used without PRESENT check
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -362,7 +362,7 @@ SUBROUTINE GetZonePlenumInput
     ALLOCATE(cNumericFields(MaxNums))
     cNumericFields=' '
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
     ALLOCATE(lAlphaBlanks(MaxAlphas))
     lAlphaBlanks=.TRUE.
     ALLOCATE(lNumericBlanks(MaxNums))
@@ -461,13 +461,13 @@ SUBROUTINE GetZonePlenumInput
         ALLOCATE(ZoneRetPlenCond(ZonePlenumNum)%InducedHumRat(ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes))
         ALLOCATE(ZoneRetPlenCond(ZonePlenumNum)%InducedEnthalpy(ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes))
         ALLOCATE(ZoneRetPlenCond(ZonePlenumNum)%InducedPressure(ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes))
-        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRate = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRateMaxAvail = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRateMinAvail = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedTemp = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedHumRat = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedEnthalpy = 0.0
-        ZoneRetPlenCond(ZonePlenumNum)%InducedPressure = 0.0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRate = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRateMaxAvail = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRateMinAvail = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedTemp = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedHumRat = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedEnthalpy = 0.0d0
+        ZoneRetPlenCond(ZonePlenumNum)%InducedPressure = 0.0d0
         DO NodeNum = 1, NumNodes
           ZoneRetPlenCond(ZonePlenumNum)%InducedNode(NodeNum) = NodeNums(NodeNum)
           UniqueNodeError=.false.
@@ -499,23 +499,23 @@ SUBROUTINE GetZonePlenumInput
       ALLOCATE(ZoneRetPlenCond(ZonePlenumNum)%ZoneEqNum(ZoneRetPlenCond(ZonePlenumNum)%NumInletNodes))
 
       ZoneRetPlenCond(ZonePlenumNum)%InletNode = 0
-      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletTemp = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletHumRat = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletEnthalpy = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%InletPressure = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletTemp = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletHumRat = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%OutletPressure = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%ZoneTemp = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%ZoneHumRat = 0.0
-      ZoneRetPlenCond(ZonePlenumNum)%ZoneEnthalpy = 0.0
+      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletTemp = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletHumRat = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletEnthalpy = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%InletPressure = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletTemp = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletHumRat = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%OutletPressure = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%ZoneTemp = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%ZoneHumRat = 0.0d0
+      ZoneRetPlenCond(ZonePlenumNum)%ZoneEnthalpy = 0.0d0
 
       DO NodeNum = 1, ZoneRetPlenCond(ZonePlenumNum)%NumInletNodes
 
@@ -626,23 +626,23 @@ SUBROUTINE GetZonePlenumInput
       ALLOCATE(ZoneSupPlenCond(ZonePlenumNum)%OutletPressure(ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes))
 
       ZoneSupPlenCond(ZonePlenumNum)%OutletNode = 0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletTemp = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletHumRat = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%OutletPressure = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletTemp = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletHumRat = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletEnthalpy = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%InletPressure = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%ZoneTemp = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%ZoneHumRat = 0.0
-      ZoneSupPlenCond(ZonePlenumNum)%ZoneEnthalpy = 0.0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletTemp = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletHumRat = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%OutletPressure = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletTemp = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletHumRat = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletEnthalpy = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%InletPressure = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%ZoneTemp = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%ZoneHumRat = 0.0d0
+      ZoneSupPlenCond(ZonePlenumNum)%ZoneEnthalpy = 0.0d0
 
       DO NodeNum = 1, ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
 
@@ -784,9 +784,9 @@ SUBROUTINE InitAirZoneReturnPlenum(ZonePlenumNum)
     DO PlenumZoneNum = 1,  NumZoneReturnPlenums
 
       ZoneNodeNum = ZoneRetPlenCond(PlenumZoneNum)%ZoneNodeNum
-      Node(ZoneNodeNum)%Temp = 20.0
-      Node(ZoneNodeNum)%MassFlowRate = 0.0
-      Node(ZoneNodeNum)%Quality = 1.0
+      Node(ZoneNodeNum)%Temp = 20.0d0
+      Node(ZoneNodeNum)%MassFlowRate = 0.0d0
+      Node(ZoneNodeNum)%Quality = 1.0d0
       Node(ZoneNodeNum)%Press = OutBaroPress
       Node(ZoneNodeNum)%HumRat = OutHumRat
       Node(ZoneNodeNum)%Enthalpy = PsyHFnTdbW(Node(ZoneNodeNum)%Temp,Node(ZoneNodeNum)%HumRat)
@@ -889,9 +889,9 @@ SUBROUTINE InitAirZoneSupplyPlenum(ZonePlenumNum, FirstHVACIteration, FirstCall)
     DO PlenumZoneNum = 1,  NumZoneSupplyPlenums
 
       ZoneNodeNum = ZoneSupPlenCond(PlenumZoneNum)%ZoneNodeNum
-      Node(ZoneNodeNum)%Temp = 20.0
-      Node(ZoneNodeNum)%MassFlowRate = 0.0
-      Node(ZoneNodeNum)%Quality = 1.0
+      Node(ZoneNodeNum)%Temp = 20.0d0
+      Node(ZoneNodeNum)%MassFlowRate = 0.0d0
+      Node(ZoneNodeNum)%Quality = 1.0d0
       Node(ZoneNodeNum)%Press = OutBaroPress
       Node(ZoneNodeNum)%HumRat = OutHumRat
       Node(ZoneNodeNum)%Enthalpy = PsyHFnTdbW(Node(ZoneNodeNum)%Temp,Node(ZoneNodeNum)%HumRat)
@@ -913,14 +913,14 @@ SUBROUTINE InitAirZoneSupplyPlenum(ZonePlenumNum, FirstHVACIteration, FirstCall)
   ZoneNodeNum = ZoneSupPlenCond(ZonePlenumNum)%ZoneNodeNum
 
   IF (FirstHVACIteration .AND. FirstCall) THEN
-    IF (Node(InletNode)%MassFlowRate > 0.0) THEN
+    IF (Node(InletNode)%MassFlowRate > 0.0d0) THEN
       Node(ZoneNodeNum)%MassFlowRate = Node(InletNode)%MassFlowRate
       DO NodeIndex=1,ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
          OutletNode = ZoneSupPlenCond(ZonePlenumNum)%OutletNode(NodeIndex)
          Node(OutletNode)%MassFlowRate = Node(InletNode)%MassFlowRate / ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
       END DO
     END IF
-    IF (Node(InletNode)%MassFlowRateMaxAvail > 0.0) THEN
+    IF (Node(InletNode)%MassFlowRateMaxAvail > 0.0d0) THEN
       Node(ZoneNodeNum)%MassFlowRateMaxAvail = Node(InletNode)%MassFlowRateMaxAvail
       DO NodeIndex=1,ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
         OutletNode = ZoneSupPlenCond(ZonePlenumNum)%OutletNode(NodeIndex)
@@ -933,18 +933,18 @@ SUBROUTINE InitAirZoneSupplyPlenum(ZonePlenumNum, FirstHVACIteration, FirstCall)
 
   IF (FirstCall) THEN
 
-    IF(Node(InletNode)%MassFlowRateMaxAvail == 0.0) THEN !For Node inlet Max Avail = 0.0
+    IF(Node(InletNode)%MassFlowRateMaxAvail == 0.0d0) THEN !For Node inlet Max Avail = 0.0
 
       DO NodeIndex=1,ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
         OutletNode = ZoneSupPlenCond(ZonePlenumNum)%OutletNode(NodeIndex)
-        Node(OutletNode)%MassFlowRate = 0.0
-        Node(OutletNode)%MassFlowRateMaxAvail = 0.0
-        Node(OutletNode)%MassFlowRateMinAvail = 0.0
+        Node(OutletNode)%MassFlowRate = 0.0d0
+        Node(OutletNode)%MassFlowRateMaxAvail = 0.0d0
+        Node(OutletNode)%MassFlowRateMinAvail = 0.0d0
       END DO
 
-      Node(ZoneNodeNum)%MassFlowRate = 0.0
-      Node(ZoneNodeNum)%MassFlowRateMaxAvail = 0.0
-      Node(ZoneNodeNum)%MassFlowRateMinAvail = 0.0
+      Node(ZoneNodeNum)%MassFlowRate = 0.0d0
+      Node(ZoneNodeNum)%MassFlowRateMaxAvail = 0.0d0
+      Node(ZoneNodeNum)%MassFlowRateMinAvail = 0.0d0
 
     END IF !For Node inlet Max Avail = 0.0
 
@@ -1026,18 +1026,18 @@ SUBROUTINE CalcAirZoneReturnPlenum(ZonePlenumNum)
   INTEGER :: IndNum = 0       ! induced air index
   INTEGER :: ADUNum = 0       ! air distribution unit number
   INTEGER :: ADUListIndex = 0 ! air distribution unit index in zone return plenum data structure
-  REAL(r64) :: TotIndMassFlowRate = 0.0  ! total induced air mass flow rate [kg/s]
+  REAL(r64) :: TotIndMassFlowRate = 0.0d0  ! total induced air mass flow rate [kg/s]
 
 
   ! Reset the totals to zero before they are summed.
-  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletTemp = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletHumRat = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletPressure = 0.0
-  ZoneRetPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0
-  TotIndMassFlowRate = 0.0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMaxAvail = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRateMinAvail = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletTemp = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletHumRat = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletPressure = 0.0d0
+  ZoneRetPlenCond(ZonePlenumNum)%OutletEnthalpy = 0.0d0
+  TotIndMassFlowRate = 0.0d0
 
   DO InletNodeNum = 1, ZoneRetPlenCond(ZonePlenumNum)%NumInletNodes
     ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate + &
@@ -1048,7 +1048,7 @@ SUBROUTINE CalcAirZoneReturnPlenum(ZonePlenumNum)
                                                 ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail(InletNodeNum)
   END DO
 
-  IF (ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate .GT. 0.0) THEN
+  IF (ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate .GT. 0.0d0) THEN
 
     ! "Momentum balance" to get outlet air pressure
     DO InletNodeNum = 1, ZoneRetPlenCond(ZonePlenumNum)%NumInletNodes
@@ -1156,9 +1156,9 @@ SUBROUTINE CalcAirZoneSupplyPlenum(ZonePlenumNum, FirstCall)
   ELSE
     ! This is the second time through and this is where the mass flows from the outlets are
     ! summed and then assigned upstream to the inlet node.
-    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0
-    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0
-    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0
+    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate = 0.0d0
+    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMaxAvail = 0.0d0
+    ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRateMinAvail = 0.0d0
     DO NodeIndex=1,ZoneSupPlenCond(ZonePlenumNum)%NumOutletNodes
       ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate = ZoneSupPlenCond(ZonePlenumNum)%InletMassFlowRate + &
           ZoneSupPlenCond(ZonePlenumNum)%OutletMassFlowRate(NodeIndex)
@@ -1271,10 +1271,11 @@ SUBROUTINE UpdateAirZoneReturnPlenum(ZonePlenumNum)
 
   IF (Contaminant%GenericContamSimulation) Then
     If(ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate .gt. 0.d0) Then
-      ! CO2 balance to get outlet air CO2
+      ! Contaminant balance to get outlet air generic contaminant
       Node(OutletNode)%GenContam = 0.0d0
       DO InletNodeNum = 1, ZoneRetPlenCond(ZonePlenumNum)%NumInletNodes
-        Node(OutletNode)%GenContam =Node(OutletNode)%CO2+Node(ZoneRetPlenCond(ZonePlenumNum)%InletNode(InletNodeNum))%GenContam * &
+        Node(OutletNode)%GenContam =Node(OutletNode)%GenContam + &
+           Node(ZoneRetPlenCond(ZonePlenumNum)%InletNode(InletNodeNum))%GenContam * &
            ZoneRetPlenCond(ZonePlenumNum)%InletMassFlowRate(InletNodeNum) / ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate
       END DO
       Node(ZoneNode)%GenContam = Node(OutletNode)%GenContam

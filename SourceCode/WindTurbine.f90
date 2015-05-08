@@ -48,46 +48,46 @@ TYPE WindTurbineParams
     INTEGER   :: ControlType         = 0   ! Control type
     INTEGER   :: SchedPtr            = 0   ! Schedule
     INTEGER   :: NumOfBlade          = 0   ! Blade number
-    REAL(r64) :: RatedRotorSpeed     = 0.0 ! Rated rotor speed in m/s
-    REAL(r64) :: RotorDiameter       = 0.0 ! Diameter of rotor in m
-    REAL(r64) :: RotorHeight         = 0.0 ! Overall height of the rotor in m
-    REAL(r64) :: RatedPower          = 0.0 ! Nominal average power outpout at the rated wind speed in Watts
-    REAL(r64) :: RatedWindSpeed      = 0.0 ! Rated wind speed showing maximum power output in Watts
-    REAL(r64) :: CutInSpeed          = 0.0 ! Minimum wind speed for system operation in m/s
-    REAL(r64) :: CutOutSpeed         = 0.0 ! Maximum wind speed for system operation in m/s
-    REAL(r64) :: SysEfficiency       = 0.0 ! Overall system efficiency including subsystems and losses
-    REAL(r64) :: MaxTipSpeedRatio    = 0.0 ! Maximum tip speed ratio
-    REAL(r64) :: MaxPowerCoeff       = 0.0 ! Maximum power coefficient
-    REAL(r64) :: LocalAnnualAvgWS    = 0.0 ! Annual average wind speed locally measured in m/s
-    REAL(r64) :: AnnualTMYWS         = 0.0 ! Annual average wind speed from stat file in m/s
-    REAL(r64) :: HeightForLocalWS    = 0.0 ! Height of the local station in m
-    REAL(r64) :: ChordArea           = 0.0 ! Chord area of a single blade for VAWTs in m2
-    REAL(r64) :: DragCoeff           = 0.0 ! Empirical blade drag coefficient for VAWTs
-    REAL(r64) :: LiftCoeff           = 0.0 ! Empirical blade lift coefficient for VAWTs
-    REAL(r64) :: PowerCoeffC1        = 0.0 ! Empirical power coefficient 1 for analytical calculation
-    REAL(r64) :: PowerCoeffC2        = 0.0 ! Empirical power coefficient 2 for analytical calculation
-    REAL(r64) :: PowerCoeffC3        = 0.0 ! Empirical power coefficient 3 for analytical calculation
-    REAL(r64) :: PowerCoeffC4        = 0.0 ! Empirical power coefficient 4 for analytical calculation
-    REAL(r64) :: PowerCoeffC5        = 0.0 ! Empirical power coefficient 5 for analytical calculation
-    REAL(r64) :: PowerCoeffC6        = 0.0 ! Empirical power coefficient 6 for analytical calculation
-    REAL(r64) :: TotPower            = 0.0 ! Maximum power produced from the wind in Watts
-    REAL(r64) :: Power               = 0.0 ! Actual power wind turbine supplies to the building in Watts
-    REAL(r64) :: TotEnergy           = 0.0 ! Maximum energy produced from the wind in Joules
-    REAL(r64) :: Energy              = 0.0 ! Actual energy wind turbine supplies to the building in Joules
-    REAL(r64) :: LocalWindSpeed      = 0.0 ! Local wind speed estimated at the particular height in m/s
-    REAL(r64) :: LocalAirDensity     = 0.0 ! Local air density estimated at the particular height kg/m3
-    REAL(r64) :: PowerCoeff          = 0.0 ! Power coefficient determined
-    REAL(r64) :: ChordalVel          = 0.0 ! Chordal velocity for VAWTs in m/s
-    REAL(r64) :: NormalVel           = 0.0 ! Normal velocity for VAWTs in m/s
-    REAL(r64) :: RelFlowVel          = 0.0 ! Relative flow velocity for VAWTs in m/s
-    REAL(r64) :: TipSpeedRatio       = 0.0 ! Relative flow velocity for VAWTs in m/s
-    REAL(r64) :: WSFactor            = 0.0 ! Relative flow velocity for VAWTs in m/s
-    REAL(r64) :: AngOfAttack         = 0.0 ! Angle of attack in degree
-    REAL(r64) :: IntRelFlowVel       = 0.0 ! Integral of relative flow velocity
-    REAL(r64) :: TanForce            = 0.0 ! Tnagential force
-    REAL(r64) :: NorForce            = 0.0 ! Normal force in N.m
-    REAL(r64) :: TotTorque           = 0.0 ! Total torque in N.m
-    REAL(r64) :: AzimuthAng          = 0.0 ! Azimuth angle between blades
+    REAL(r64) :: RatedRotorSpeed     = 0.0d0 ! Rated rotor speed in m/s
+    REAL(r64) :: RotorDiameter       = 0.0d0 ! Diameter of rotor in m
+    REAL(r64) :: RotorHeight         = 0.0d0 ! Overall height of the rotor in m
+    REAL(r64) :: RatedPower          = 0.0d0 ! Nominal average power outpout at the rated wind speed in Watts
+    REAL(r64) :: RatedWindSpeed      = 0.0d0 ! Rated wind speed showing maximum power output in Watts
+    REAL(r64) :: CutInSpeed          = 0.0d0 ! Minimum wind speed for system operation in m/s
+    REAL(r64) :: CutOutSpeed         = 0.0d0 ! Maximum wind speed for system operation in m/s
+    REAL(r64) :: SysEfficiency       = 0.0d0 ! Overall system efficiency including subsystems and losses
+    REAL(r64) :: MaxTipSpeedRatio    = 0.0d0 ! Maximum tip speed ratio
+    REAL(r64) :: MaxPowerCoeff       = 0.0d0 ! Maximum power coefficient
+    REAL(r64) :: LocalAnnualAvgWS    = 0.0d0 ! Annual average wind speed locally measured in m/s
+    REAL(r64) :: AnnualTMYWS         = 0.0d0 ! Annual average wind speed from stat file in m/s
+    REAL(r64) :: HeightForLocalWS    = 0.0d0 ! Height of the local station in m
+    REAL(r64) :: ChordArea           = 0.0d0 ! Chord area of a single blade for VAWTs in m2
+    REAL(r64) :: DragCoeff           = 0.0d0 ! Empirical blade drag coefficient for VAWTs
+    REAL(r64) :: LiftCoeff           = 0.0d0 ! Empirical blade lift coefficient for VAWTs
+    REAL(r64) :: PowerCoeffC1        = 0.0d0 ! Empirical power coefficient 1 for analytical calculation
+    REAL(r64) :: PowerCoeffC2        = 0.0d0 ! Empirical power coefficient 2 for analytical calculation
+    REAL(r64) :: PowerCoeffC3        = 0.0d0 ! Empirical power coefficient 3 for analytical calculation
+    REAL(r64) :: PowerCoeffC4        = 0.0d0 ! Empirical power coefficient 4 for analytical calculation
+    REAL(r64) :: PowerCoeffC5        = 0.0d0 ! Empirical power coefficient 5 for analytical calculation
+    REAL(r64) :: PowerCoeffC6        = 0.0d0 ! Empirical power coefficient 6 for analytical calculation
+    REAL(r64) :: TotPower            = 0.0d0 ! Maximum power produced from the wind in Watts
+    REAL(r64) :: Power               = 0.0d0 ! Actual power wind turbine supplies to the building in Watts
+    REAL(r64) :: TotEnergy           = 0.0d0 ! Maximum energy produced from the wind in Joules
+    REAL(r64) :: Energy              = 0.0d0 ! Actual energy wind turbine supplies to the building in Joules
+    REAL(r64) :: LocalWindSpeed      = 0.0d0 ! Local wind speed estimated at the particular height in m/s
+    REAL(r64) :: LocalAirDensity     = 0.0d0 ! Local air density estimated at the particular height kg/m3
+    REAL(r64) :: PowerCoeff          = 0.0d0 ! Power coefficient determined
+    REAL(r64) :: ChordalVel          = 0.0d0 ! Chordal velocity for VAWTs in m/s
+    REAL(r64) :: NormalVel           = 0.0d0 ! Normal velocity for VAWTs in m/s
+    REAL(r64) :: RelFlowVel          = 0.0d0 ! Relative flow velocity for VAWTs in m/s
+    REAL(r64) :: TipSpeedRatio       = 0.0d0 ! Relative flow velocity for VAWTs in m/s
+    REAL(r64) :: WSFactor            = 0.0d0 ! Relative flow velocity for VAWTs in m/s
+    REAL(r64) :: AngOfAttack         = 0.0d0 ! Angle of attack in degree
+    REAL(r64) :: IntRelFlowVel       = 0.0d0 ! Integral of relative flow velocity
+    REAL(r64) :: TanForce            = 0.0d0 ! Tnagential force
+    REAL(r64) :: NorForce            = 0.0d0 ! Normal force in N.m
+    REAL(r64) :: TotTorque           = 0.0d0 ! Total torque in N.m
+    REAL(r64) :: AzimuthAng          = 0.0d0 ! Azimuth angle between blades
 END TYPE WindTurbineParams
 
 ! MODULE VARIABLES DECLARATIONS:
@@ -305,7 +305,7 @@ REAL(r64), PARAMETER :: DefaultH       = 50.0d0   ! Default of height for local 
   ALLOCATE(cNumericFields(NumNumbers))
   cNumericFields=' '
   ALLOCATE(rNumericArgs(NumNumbers))
-  rNumericArgs=0.0
+  rNumericArgs=0.0d0
   ALLOCATE(lAlphaBlanks(NumAlphas))
   lAlphaBlanks=.true.
   ALLOCATE(lNumericBlanks(NumNumbers))
@@ -431,7 +431,7 @@ DO WindTurbineNum = 1, NumWindTurbines
     ENDIF
 
     WindTurbineSys(WindTurbineNum)%RatedWindSpeed = rNumericArgs(6)     ! Rated wind speed
-    IF (WindTurbineSys(WindTurbineNum)%RatedWindSpeed == 0.0) THEN
+    IF (WindTurbineSys(WindTurbineNum)%RatedWindSpeed == 0.0d0) THEN
       IF (lNumericBlanks(6)) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cNumericFields(6))//' is required but input is blank.')
@@ -444,7 +444,7 @@ DO WindTurbineNum = 1, NumWindTurbines
     ENDIF
 
     WindTurbineSys(WindTurbineNum)%CutInSpeed = rNumericArgs(7)      ! Minimum wind speed for system operation
-    IF (WindTurbineSys(WindTurbineNum)%CutInSpeed == 0.0) THEN
+    IF (WindTurbineSys(WindTurbineNum)%CutInSpeed == 0.0d0) THEN
       IF (lNumericBlanks(7)) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cNumericFields(7))//' is required but input is blank.')
@@ -457,7 +457,7 @@ DO WindTurbineNum = 1, NumWindTurbines
     ENDIF
 
     WindTurbineSys(WindTurbineNum)%CutOutSpeed = rNumericArgs(8)      ! Minimum wind speed for system operation
-    IF (WindTurbineSys(WindTurbineNum)%CutOutSpeed == 0.0) THEN
+    IF (WindTurbineSys(WindTurbineNum)%CutOutSpeed == 0.0d0) THEN
       IF (lNumericBlanks(8)) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cNumericFields(8))//' is required but input is blank.')
@@ -475,7 +475,7 @@ DO WindTurbineNum = 1, NumWindTurbines
 
     WindTurbineSys(WindTurbineNum)%SysEfficiency = rNumericArgs(9)   ! Overall wind turbine system efficiency
     IF (lNumericBlanks(9) .OR. WindTurbineSys(WindTurbineNum)%SysEfficiency == 0.0d0 .OR. &
-        WindTurbineSys(WindTurbineNum)%SysEfficiency > 1.0) THEN
+        WindTurbineSys(WindTurbineNum)%SysEfficiency > 1.0d0) THEN
         WindTurbineSys(WindTurbineNum)%SysEfficiency = SysEffDefault
         CALL ShowWarningError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cNumericFields(9))//'=['//trim(RoundSigDigits(rNumericArgs(9),2))//'].')
@@ -719,7 +719,7 @@ LOGICAL   :: fileExists    ! true if in.stat file exists
 LOGICAL   :: warningShown  ! true if the <365 warning has already been shown
 CHARACTER(len=200) :: lineIn
 REAL(r64), DIMENSION(12) :: MonthWS
-REAL(r64),SAVE :: AnnualTMYWS=0.0   ! Annual average wind speed in stat file
+REAL(r64),SAVE :: AnnualTMYWS=0.0d0   ! Annual average wind speed in stat file
 REAL(r64) :: LocalTMYWS    ! Annual average wind speed at the rotor height
 
         ! Estimate average annual wind speed once
@@ -745,7 +745,7 @@ REAL(r64) :: LocalTMYWS    ! Annual average wind speed at the rotor height
          if (lnPtr == 0) CYCLE
          ! tab delimited file
          lineIn=lineIn(lnptr+10:)
-         MonthWS=0.0
+         MonthWS=0.0d0
          wsStatFound=.true.
          warningShown=.false.
          DO mon=1,12
@@ -804,7 +804,7 @@ IF (AnnualTMYWS > 0.0d0 .AND. WindTurbineSys(WindTurbineNum)%WSFactor == 0.0d0 .
     WindTurbineSys(WindTurbineNum)%WSFactor = LocalTMYWS / WindTurbineSys(WindTurbineNum)%LocalAnnualAvgWS
 END IF
     ! Assign factor of 1.0 if no stat file or no input of local average wind speed
-IF (WindTurbineSys(WindTurbineNum)%WSFactor == 0.0d0) WindTurbineSys(WindTurbineNum)%WSFactor = 1.0
+IF (WindTurbineSys(WindTurbineNum)%WSFactor == 0.0d0) WindTurbineSys(WindTurbineNum)%WSFactor = 1.0d0
 
     ! Do every time step initialization
  WindTurbineSys(WindTurbineNum)%Power          = 0.0d0
@@ -856,11 +856,11 @@ INTEGER, INTENT(IN)           :: WindTurbineNum   ! System is on
 LOGICAL, INTENT(IN)           :: RunFlag          ! System is on
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-REAL(r64), PARAMETER :: MaxTheta     = 90.0     ! Maximum of theta
-REAL(r64), PARAMETER :: MaxDegree    = 360.0    ! Maximum limit of outdoor air wind speed in m/s
-REAL(r64), PARAMETER :: PitchAngle   = 0.0      ! No pitch control, i.e. maximum rotor speed
-REAL(r64), PARAMETER :: SecInMin     = 60.0
-REAL(r64), PARAMETER :: MaxTSR       = 12.0     ! Maximum of tip speed ratio
+REAL(r64), PARAMETER :: MaxTheta     = 90.0d0     ! Maximum of theta
+REAL(r64), PARAMETER :: MaxDegree    = 360.0d0    ! Maximum limit of outdoor air wind speed in m/s
+REAL(r64), PARAMETER :: PitchAngle   = 0.0d0      ! No pitch control, i.e. maximum rotor speed
+REAL(r64), PARAMETER :: SecInMin     = 60.0d0
+REAL(r64), PARAMETER :: MaxTSR       = 12.0d0     ! Maximum of tip speed ratio
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -953,7 +953,7 @@ IF (GetCurrentScheduleValue(WindTurbineSys(WindTurbineNum)%SchedPtr) > 0 .AND. &
        IF (C1 > 0.0d0 .AND. C2 > 0.0d0 .AND. C3 > 0.0d0 .AND. C4 >= 0.0d0 .AND. C5 > 0.0d0 .AND. C6 > 0.0d0) THEN
             ! Analytical approximation
             ! Maximum power, i.e., rotor speed is at maximum, and pitch angle is zero
-         TipSpeedRatioAtI = 1.0d0 / ( (1.0d0 / (TipSpeedRatio + 0.08 * PitchAngle)) - (0.035d0 / (PitchAngle**3 + 1.0d0)))
+         TipSpeedRatioAtI = 1.0d0 / ( (1.0d0 / (TipSpeedRatio + 0.08d0 * PitchAngle)) - (0.035d0 / (PitchAngle**3 + 1.0d0)))
          PowerCoeff = C1 * ((C2 / TipSpeedRatioAtI) - (C3 * PitchAngle) - (C4 * PitchAngle**1.5d0) - C5) * &
                     (EXP(-(C6 / TipSpeedRatioAtI)))
          IF (PowerCoeff > MaxPowerCoeff) THEN
@@ -968,7 +968,7 @@ IF (GetCurrentScheduleValue(WindTurbineSys(WindTurbineNum)%SchedPtr) > 0 .AND. &
        IF (LocalWindSpeed >= WindTurbineSys(WindTurbineNum)%RatedWindSpeed .OR. &
            WTPower > WindTurbineSys(WindTurbineNum)%RatedPower) THEN
          WTPower    = WindTurbineSys(WindTurbineNum)%RatedPower
-         PowerCoeff = WTPower / (0.5d0 * LocalAirDensity * SweptArea * LocalWindSpeed**3.0)
+         PowerCoeff = WTPower / (0.5d0 * LocalAirDensity * SweptArea * LocalWindSpeed**3.0d0)
        END IF
             ! Recalculated Cp at the rated power
        WindTurbineSys(WindTurbineNum)%PowerCoeff  = PowerCoeff
@@ -986,10 +986,10 @@ IF (GetCurrentScheduleValue(WindTurbineSys(WindTurbineNum)%SchedPtr) > 0 .AND. &
        IF (AzimuthAng > MaxTheta ) THEN  ! Number of blades is 2 or 3
        AzimuthAng = AzimuthAng - MaxTheta
           IF (AzimuthAng == MaxTheta) THEN  ! 2 blades
-              AzimuthAng = 0.0
+              AzimuthAng = 0.0d0
           END IF
        ELSE IF (AzimuthAng == MaxTheta) THEN ! 4 blades
-       AzimuthAng = 0.0
+       AzimuthAng = 0.0d0
        END IF
 
        InducedVel = LocalWindSpeed * 2.0d0/3.0d0

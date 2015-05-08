@@ -45,11 +45,11 @@ INTEGER, PARAMETER    :: MaxSetBackCount = 3
 
           ! DERIVED TYPE DEFINITIONS:
 TYPE Energy
-  REAL(r64):: TotDemand  = 0.0
-  REAL(r64):: Elec       = 0.0
-  REAL(r64):: Gas        = 0.0
-  REAL(r64):: Purch      = 0.0
-  REAL(r64):: Other      = 0.0
+  REAL(r64):: TotDemand  = 0.0d0
+  REAL(r64):: Elec       = 0.0d0
+  REAL(r64):: Gas        = 0.0d0
+  REAL(r64):: Purch      = 0.0d0
+  REAL(r64):: Other      = 0.0d0
 END TYPE Energy
 
 TYPE CoilType
@@ -154,8 +154,8 @@ LOGICAL :: VentLoadsReportEnabled=.true.
 LOGICAL :: VentEnergyReportEnabled=.false.
 LOGICAL :: VentReportStructureCreated=.false.
 INTEGER :: TotalLoopConnects=0  ! Total number of loop connections
-INTEGER :: MaxLoopArraySize = 10
-INTEGER :: MaxCompArraySize = 50
+INTEGER :: MaxLoopArraySize = 100
+INTEGER :: MaxCompArraySize = 500
 INTEGER :: DBFlag=0
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: SetBackCounter
@@ -1210,6 +1210,9 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
   INTEGER :: DemandSideLoopType
   LOGICAL,Save :: OneTimeFlag  = .True.  ! Flag set to make sure you initialize reports one time
   LOGICAL      :: Found
+  integer :: countloop
+
+  RETURN
 
   IF(OneTimeFlag)THEN
     ALLOCATE (LoopStack(MaxLoopArraySize))
@@ -1225,9 +1228,15 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
     TempLoopStack%LoopNum = 0
     TempLoopStack%LoopType = 0
     ConnectionFlag = .FALSE.
+!    countloop=0
+!    write(outputfiledebug,*) '1228=lt,lc,lnum,cflag,arrcnt',looptype,loopcount,loopnum,connectionflag,arraycount
 
       DO While (LoopCount > 0)
+!        write(outputfiledebug,*) '1231==lt,lc,lnum,cflag,arrcnt',looptype,loopcount,loopnum,connectionflag,arraycount
+!        write(outputfiledebug,*) 'loop=plname',trim(plantloop(loopnum)%name)
         LoopCount = LoopCount - 1
+!        countloop=countloop+1
+!        if (countloop > 100) exit
         IF (LoopType ==1)THEN
           DO BranchNum = 1, VentRepPlantSupplySide(LoopNum)%TotalBranches
             DO SupplySideCompNum = 1, VentRepPlantSupplySide(LoopNum)%Branch(BranchNum)%TotalComponents
@@ -1244,14 +1253,16 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
               IF(DemandSideLoopType == 1 .OR. DemandSideLoopType == 2)THEN
                 ConnectionFlag = .TRUE.
                 ArrayCount = ArrayCount + 1
-                IF(ArrayCount == MaxCompArraySize) THEN
-                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize*2))
+                IF(ArrayCount > MaxCompArraySize) THEN
+!                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize*2))
+                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize+100))
                   TempDemandSideConnect(1:MaxCompArraySize) = DemandSideConnect(1:MaxCompArraySize)
                   DEALLOCATE(DemandSideConnect)
                   ALLOCATE(DemandSideConnect(MaxCompArraySize*2))
                   DemandSideConnect(1:MaxCompArraySize) = TempDemandSideConnect(1:MaxCompArraySize)
                   DEALLOCATE(TempDemandSideConnect)
-                  MaxCompArraySize=MaxCompArraySize*2
+!                  MaxCompArraySize=MaxCompArraySize*2
+                  MaxCompArraySize=MaxCompArraySize+100
                 END IF
                 DemandSideConnect(ArrayCount)%LoopType = DemandSideLoopType
                 DemandSideConnect(ArrayCount)%LoopNum  = DemandSideLoopNum
@@ -1259,6 +1270,7 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
                 DemandSideConnect(ArrayCount)%CompNum = DemandSideCompNum
 
                 found = .FALSE.
+                write(outputfiledebug,*) '1271=lstacksize',size(loopstack)
                 DO Index = 1, SIZE(LoopStack)
                   IF(DemandSideLoopNum ==  LoopStack(Index)%LoopNum .AND. &
                      DemandSideLoopType ==LoopStack(Index)%LoopType)THEN
@@ -1268,15 +1280,21 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
                 END DO
                 IF(.NOT. found)THEN
                   LoopCount = LoopCount+1
-                  IF(LoopCount == MaxLoopArraySize)THEN
-                    ALLOCATE(TempLoopStack(MaxLoopArraySize*2))
+ !       write(outputfiledebug,*) '1280=lc,mxsize',loopcount,maxlooparraysize
+ !       write(outputfiledebug,*) '1281=dsloopnum,dslooptype',DemandSideLoopNum,DemandSideLoopType
+                  IF(LoopCount > MaxLoopArraySize)THEN
+!                    ALLOCATE(TempLoopStack(MaxLoopArraySize*2))
+                    ALLOCATE(TempLoopStack(MaxLoopArraySize+100))
                     TempLoopStack(1:MaxLoopArraySize) = LoopStack(1:MaxLoopArraySize)
                     DEALLOCATE(LoopStack)
-                    ALLOCATE(LoopStack(MaxLoopArraySize*2))
+!                    ALLOCATE(LoopStack(MaxLoopArraySize*2))
+                    ALLOCATE(LoopStack(MaxLoopArraySize+100))
                     LoopStack(1:MaxLoopArraySize) = TempLoopStack(1:MaxLoopArraySize)
                     DEALLOCATE(TempLoopStack)
-                    MaxLoopArraySize=MaxLoopArraySize*2
+!                    MaxLoopArraySize=MaxLoopArraySize*2
+                    MaxLoopArraySize=MaxLoopArraySize+100
                   END IF
+ !               write(outputfiledebug,*) '1294=lcnt,dsloopnum,dslooptype',loopcount,DemandSideLoopNum,DemandSideLoopType
                   LoopStack(LoopCount)%LoopNum = DemandSideLoopNum
                   LoopStack(LoopCount)%LoopType = DemandSideLoopType
                 END IF
@@ -1299,14 +1317,17 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
               IF(DemandSideLoopType == 1 .OR. DemandSideLoopType == 2)THEN
                  ConnectionFlag = .TRUE.
                  ArrayCount = ArrayCount + 1
-                IF(ArrayCount == MaxCompArraySize)THEN
-                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize*2))
+                IF(ArrayCount > MaxCompArraySize)THEN
+!                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize*2))
+                  ALLOCATE(TempDemandSideConnect(MaxCompArraySize+100))
                   TempDemandSideConnect(1:MaxCompArraySize) = DemandSideConnect(1:MaxCompArraySize)
                   DEALLOCATE(DemandSideConnect)
-                  ALLOCATE(DemandSideConnect(MaxCompArraySize*2))
+!                  ALLOCATE(DemandSideConnect(MaxCompArraySize*2))
+                  ALLOCATE(DemandSideConnect(MaxCompArraySize+100))
                   DemandSideConnect(1:MaxCompArraySize) = TempDemandSideConnect(1:MaxCompArraySize)
                   DEALLOCATE(TempDemandSideConnect)
-                  MaxCompArraySize=MaxCompArraySize*2
+!                  MaxCompArraySize=MaxCompArraySize*2
+                  MaxCompArraySize=MaxCompArraySize+100
                 END IF
                 DemandSideConnect(ArrayCount)%LoopType = DemandSideLoopType
                 DemandSideConnect(ArrayCount)%LoopNum  = DemandSideLoopNum
@@ -1323,14 +1344,19 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
                 END DO
                 IF(.NOT. found)THEN
                   LoopCount = LoopCount+1
-                  IF(LoopCount == MaxLoopArraySize)THEN
-                    ALLOCATE(TempLoopStack(MaxLoopArraySize*2))
+ !       write(outputfiledebug,*) '1341=lcnt,arrsize',loopcount,maxlooparraysize
+ !       write(outputfiledebug,*) '1342=lsloopnum,dslooptype',DemandSideLoopNum,DemandSideLoopType
+                  IF(LoopCount > MaxLoopArraySize)THEN
+!                    ALLOCATE(TempLoopStack(MaxLoopArraySize*2))
+                    ALLOCATE(TempLoopStack(MaxLoopArraySize+100))
                     TempLoopStack(1:MaxLoopArraySize) = LoopStack(1:MaxLoopArraySize)
                     DEALLOCATE(LoopStack)
-                    ALLOCATE(LoopStack(MaxLoopArraySize*2))
+!                    ALLOCATE(LoopStack(MaxLoopArraySize*2))
+                    ALLOCATE(LoopStack(MaxLoopArraySize+100))
                     LoopStack(1:MaxLoopArraySize) = TempLoopStack(1:MaxLoopArraySize)
                     DEALLOCATE(TempLoopStack)
-                    MaxLoopArraySize=MaxLoopArraySize*2
+!                    MaxLoopArraySize=MaxLoopArraySize*2
+                    MaxLoopArraySize=MaxLoopArraySize+100
                   END IF
                   LoopStack(LoopCount)%LoopNum = DemandSideLoopNum
                   LoopStack(LoopCount)%LoopType = DemandSideLoopType
@@ -1339,6 +1365,7 @@ TYPE (IdentifyLoop), SAVE, ALLOCATABLE, DIMENSION(:) :: TempLoopStack
             END DO
           END DO
         ELSE
+          write(outputfiledebug,*) '1361=error'
             !error
         END IF
 
@@ -2183,65 +2210,65 @@ SUBROUTINE AllocateAndSetUpVentReports
   FirstHeatCoolHour = 0
   NoLoadFlag = .FALSE.
 
-  MaxCoolingLoadMetByVent   = 0.0
-  MaxCoolingLoadAddedByVent = 0.0
-  MaxOvercoolingByVent      = 0.0
-  MaxHeatingLoadMetByVent   = 0.0
-  MaxHeatingLoadAddedByVent = 0.0
-  MaxOverheatingByVent      = 0.0
-  MaxNoLoadHeatingByVent    = 0.0
-  MaxNoLoadCoolingByVent    = 0.0
+  MaxCoolingLoadMetByVent   = 0.0d0
+  MaxCoolingLoadAddedByVent = 0.0d0
+  MaxOvercoolingByVent      = 0.0d0
+  MaxHeatingLoadMetByVent   = 0.0d0
+  MaxHeatingLoadAddedByVent = 0.0d0
+  MaxOverheatingByVent      = 0.0d0
+  MaxNoLoadHeatingByVent    = 0.0d0
+  MaxNoLoadCoolingByVent    = 0.0d0
 
-ZoneOAMassFlow       = 0.0
-ZoneOAMass           = 0.0
-ZoneOAVolFlowStdRho  = 0.0
-ZoneOAVolStdRho      = 0.0
-ZoneOAVolFlowCrntRho = 0.0
-ZoneOAVolCrntRho     = 0.0
-ZoneMechACH          = 0.0
+ZoneOAMassFlow       = 0.0d0
+ZoneOAMass           = 0.0d0
+ZoneOAVolFlowStdRho  = 0.0d0
+ZoneOAVolStdRho      = 0.0d0
+ZoneOAVolFlowCrntRho = 0.0d0
+ZoneOAVolCrntRho     = 0.0d0
+ZoneMechACH          = 0.0d0
 
   !SYSTEM LOADS REPORT
-SysTotZoneLoadHTNG  = 0.0
-SysTotZoneLoadCLNG  = 0.0
-SysOALoadHTNG       = 0.0
-SysOALoadCLNG       = 0.0
-SysTotHTNG          = 0.0
-SysTotCLNG          = 0.0
+SysTotZoneLoadHTNG  = 0.0d0
+SysTotZoneLoadCLNG  = 0.0d0
+SysOALoadHTNG       = 0.0d0
+SysOALoadCLNG       = 0.0d0
+SysTotHTNG          = 0.0d0
+SysTotCLNG          = 0.0d0
 
   !SYSTEM ENERGY USE REPORT
-SysTotElec          = 0.0
-SystotGas           = 0.0
-SysTotSteam         = 0.0
-SysTotH2OCOLD       = 0.0
-SysTotH2OHOT        = 0.0
+SysTotElec          = 0.0d0
+SystotGas           = 0.0d0
+SysTotSteam         = 0.0d0
+SysTotH2OCOLD       = 0.0d0
+SysTotH2OHOT        = 0.0d0
 
   !SYSTEM COMPONENT LOADS REPORT
-SysFANCompHTNG      = 0.0
-SysCCCompCLNG       = 0.0
-SysHCCompHTNG       = 0.0
-SysHeatExHTNG       = 0.0
-SysHeatExCLNG       = 0.0
+SysFANCompHTNG      = 0.0d0
+SysCCCompCLNG       = 0.0d0
+SysHCCompHTNG       = 0.0d0
+SysHeatExHTNG       = 0.0d0
+SysHeatExCLNG       = 0.0d0
 SysSolarCollectHeating = 0.d0
 SysSolarCollectCooling = 0.d0
 SysUserDefinedTerminalHeating = 0.d0
 SysUserDefinedTerminalCooling = 0.d0
-SysHumidHTNG        = 0.0
-SysEvapCLNG         = 0.0
-DesDehumidCLNG      = 0.0
-SysDomesticH20      = 0.0
+SysHumidHTNG        = 0.0d0
+SysEvapCLNG         = 0.0d0
+DesDehumidCLNG      = 0.0d0
+SysDomesticH20      = 0.0d0
 
   !SYSTEM COMPONENT ENERGY REPORT
-SysFANCompElec      = 0.0
-SysHCCompH2OHOT     = 0.0
-SysCCCompH2OCOLD    = 0.0
-SysHCCompElec       = 0.0
-SysCCCompElec       = 0.0
-SysHCCompElecRes    = 0.0
-SysHCCompGas        = 0.0
-SysHCCompSteam      = 0.0
-SysHumidElec        = 0.0
-DesDehumidElec      = 0.0
-SysEvapElec         = 0.0
+SysFANCompElec      = 0.0d0
+SysHCCompH2OHOT     = 0.0d0
+SysCCCompH2OCOLD    = 0.0d0
+SysHCCompElec       = 0.0d0
+SysCCCompElec       = 0.0d0
+SysHCCompElecRes    = 0.0d0
+SysHCCompGas        = 0.0d0
+SysHCCompSteam      = 0.0d0
+SysHumidElec        = 0.0d0
+DesDehumidElec      = 0.0d0
+SysEvapElec         = 0.0d0
 
 IF (AirLoopLoadsReportEnabled) THEN
   DO SysIndex=1,NumPrimaryAirSys
@@ -3541,52 +3568,52 @@ SUBROUTINE ReportSystemEnergyUse
 IF (.not. AirLoopLoadsReportEnabled) RETURN
 
   !SYSTEM LOADS REPORT
-SysTotZoneLoadHTNG  = 0.0
-SysTotZoneLoadCLNG  = 0.0
-SysOALoadHTNG       = 0.0
-SysOALoadCLNG       = 0.0
-SysTotHTNG          = 0.0
-SysTotCLNG          = 0.0
+SysTotZoneLoadHTNG  = 0.0d0
+SysTotZoneLoadCLNG  = 0.0d0
+SysOALoadHTNG       = 0.0d0
+SysOALoadCLNG       = 0.0d0
+SysTotHTNG          = 0.0d0
+SysTotCLNG          = 0.0d0
 
   !SYSTEM ENERGY USE REPORT
-SysTotElec          = 0.0
-SystotGas           = 0.0
-SysTotSteam         = 0.0
-SysTotH2OCOLD       = 0.0
-SysTotH2OHOT        = 0.0
+SysTotElec          = 0.0d0
+SystotGas           = 0.0d0
+SysTotSteam         = 0.0d0
+SysTotH2OCOLD       = 0.0d0
+SysTotH2OHOT        = 0.0d0
 
   !SYSTEM COMPONENT LOADS REPORT
-SysFANCompHTNG      = 0.0
-SysCCCompCLNG       = 0.0
-SysHCCompHTNG       = 0.0
-SysHeatExHTNG       = 0.0
-SysHeatExCLNG       = 0.0
+SysFANCompHTNG      = 0.0d0
+SysCCCompCLNG       = 0.0d0
+SysHCCompHTNG       = 0.0d0
+SysHeatExHTNG       = 0.0d0
+SysHeatExCLNG       = 0.0d0
 SysSolarCollectHeating = 0.d0
 SysSolarCollectCooling = 0.d0
 SysUserDefinedTerminalHeating = 0.d0
 SysUserDefinedTerminalCooling = 0.d0
-SysHumidHTNG        = 0.0
-SysEvapCLNG         = 0.0
-DesDehumidCLNG      = 0.0
-SysDomesticH20      = 0.0
+SysHumidHTNG        = 0.0d0
+SysEvapCLNG         = 0.0d0
+DesDehumidCLNG      = 0.0d0
+SysDomesticH20      = 0.0d0
 
   !SYSTEM COMPONENT ENERGY REPORT
-SysFANCompElec      = 0.0
-SysHCCompH2OHOT     = 0.0
-SysCCCompH2OCOLD    = 0.0
-SysHCCompElec       = 0.0
-SysCCCompElec       = 0.0
-SysHCCompElecRes    = 0.0
-SysHCCompGas        = 0.0
-SysHCCompSteam      = 0.0
-SysHumidElec        = 0.0
-DesDehumidElec      = 0.0
-SysEvapElec         = 0.0
+SysFANCompElec      = 0.0d0
+SysHCCompH2OHOT     = 0.0d0
+SysCCCompH2OCOLD    = 0.0d0
+SysHCCompElec       = 0.0d0
+SysCCCompElec       = 0.0d0
+SysHCCompElecRes    = 0.0d0
+SysHCCompGas        = 0.0d0
+SysHCCompSteam      = 0.0d0
+SysHumidElec        = 0.0d0
+DesDehumidElec      = 0.0d0
+SysEvapElec         = 0.0d0
 
 
   DO AirLoopNum = 1, NumPrimaryAirSys
     DO BranchNum = 1, PrimaryAirSystem(AirLoopNum)%NumBranches
-      IF(Node(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%NodeNumOut)%massflowrate <= 0.0)CYCLE
+      IF(Node(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%NodeNumOut)%massflowrate <= 0.0d0)CYCLE
       DO CompNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%TotalComponents
         CompName = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
         CompType = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
@@ -3597,7 +3624,7 @@ SysEvapElec         = 0.0
                    (PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) -   &
                        PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
         CompLoad = CompLoad * TimeStepSys * SecInHour
-        CompEnergyUse = 0.0
+        CompEnergyUse = 0.0d0
         EnergyType = iRT_None
         CompLoadFlag=.TRUE.
         CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3619,7 +3646,7 @@ SysEvapElec         = 0.0
              (PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) -   &
                  PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
           CompLoad = CompLoad * TimeStepSys * SecInHour
-          CompEnergyUse = 0.0
+          CompEnergyUse = 0.0d0
           EnergyType = iRT_None
           CompLoadFlag=.TRUE.
           CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3647,7 +3674,7 @@ SysEvapElec         = 0.0
             CompLoad = Node(OutletNodeNum)%massflowrate*(PsyHFnTdbW(Node(InletNodeNum)%Temp,   &
                Node(InletNodeNum)%HumRat) - PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
             CompLoad = CompLoad * TimeStepSys * SecInHour
-            CompEnergyUse = 0.0
+            CompEnergyUse = 0.0d0
             EnergyType = iRT_None
             CompLoadFlag=.TRUE.
             CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3677,7 +3704,7 @@ SysEvapElec         = 0.0
     ZoneLoad= ZoneSysEnergyDemand(ActualZoneNum)%TotalOutputRequired
 
         !if system operating in deadband reset zone load
-    IF (DeadbandOrSetback(ActualZoneNum)) ZoneLoad = 0.0
+    IF (DeadbandOrSetback(ActualZoneNum)) ZoneLoad = 0.0d0
 
         ! retrieve air loop indexes
     AirLoopNum = ZoneEquipConfig(CtrlZoneNum)%AirLoopNum
@@ -3703,8 +3730,8 @@ SysEvapElec         = 0.0
       ELSEIF(AirDistHeatInletNodeNum > 0 .AND. AirDistCoolInletNodeNum == 0)THEN
         ADUHeatFlowrate = MAX(Node(ZoneEquipConfig(CtrlZoneNum)%AirDistUnitHeat(ZoneInNum)%InNode)%MassFlowRate,0.0d0)
       ELSE
-        ADUCoolFlowrate = 0.0
-        ADUHeatFlowrate = 0.0
+        ADUCoolFlowrate = 0.0d0
+        ADUHeatFlowrate = 0.0d0
       END IF
 
 
@@ -3722,7 +3749,7 @@ SysEvapElec         = 0.0
           ADUNum=ADUHeatNum
         ENDIF
 
-        CompLoad = 0.0
+        CompLoad = 0.0d0
         IF(ZoneEquipList(EquipListNum)%EquipData(ADUNum)%NumInlets > 0)THEN
           DO nodes = 1, ZoneEquipList(EquipListNum)%EquipData(ADUNum)%NumInlets
             InletNodeNum = ZoneEquipList(EquipListNum)%EquipData(ADUNum)%InletNodeNums(index)
@@ -3738,7 +3765,7 @@ SysEvapElec         = 0.0
         CompLoad = CompLoad * TimeStepSys * SecInHour
         CompName = ZoneEquipList(EquipListNum)%EquipData(ADUNum)%Name
         CompType = ZoneEquipList(EquipListNum)%EquipData(ADUNum)%TypeOf
-        CompEnergyUse =0.0
+        CompEnergyUse =0.0d0
         EnergyType = iRT_None
         CompLoadFlag = .TRUE.
         CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3758,7 +3785,7 @@ SysEvapElec         = 0.0
           CompLoad = Node(InletNodeNum)%massflowrate*(PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) &
                        - PsyHFnTdbW(Node(OutletNodeNum)%Temp, Node(OutletNodeNum)%HumRat))
           CompLoad = CompLoad * TimeStepSys * SecInHour
-          CompEnergyUse =0.0
+          CompEnergyUse =0.0d0
           EnergyType = iRT_None
           CompLoadFlag = .TRUE.
           CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3786,7 +3813,7 @@ SysEvapElec         = 0.0
             CompLoad = Node(InletNodeNum)%massflowrate*(PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) &
                          - PsyHFnTdbW(Node(OutletNodeNum)%Temp, Node(OutletNodeNum)%HumRat))
             CompLoad = CompLoad * TimeStepSys * SecInHour
-            CompEnergyUse =0.0
+            CompEnergyUse =0.0d0
             EnergyType = iRT_None
             CompLoadFlag = .TRUE.
             CALL CalcSystemEnergyUse(CompLoadFlag, AirLoopNum,CompType,EnergyType,CompLoad,CompEnergyUse)
@@ -3898,7 +3925,7 @@ SELECT CASE(CompType)
 ! Outside Air System
   CASE('AIRLOOPHVAC:OUTDOORAIRSYSTEM')
     IF (CompLoadFlag) THEN
-      IF(CompLoad > 0.0)THEN
+      IF(CompLoad > 0.0d0)THEN
         SysOALoadCLNG(AirLoopNum) =  SysOALoadCLNG(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysOALoadHTNG(AirLoopNum) =  SysOALoadHTNG(AirLoopNum) + ABS(CompLoad)
@@ -3906,6 +3933,12 @@ SELECT CASE(CompType)
     ENDIF
 ! Outdoor Air Mixer
   CASE('OUTDOORAIR:MIXER')
+       CONTINUE !No energy transfers to account for
+
+  CASE('AIRTERMINAL:SINGLEDUCT:INLETSIDEMIXER')
+       CONTINUE !No energy transfers to account for
+
+  CASE('AIRTERMINAL:SINGLEDUCT:SUPPLYSIDEMIXER')
        CONTINUE !No energy transfers to account for
 
 ! Fan Types for the air sys simulation
@@ -3929,7 +3962,8 @@ SELECT CASE(CompType)
        'COIL:COOLING:DX:VARIABLESPEED', &
        'COILSYSTEM:COOLING:WATER:HEATEXCHANGERASSISTED', &
        'COIL:COOLING:WATER:DETAILEDGEOMETRY', &
-       'COIL:COOLING:WATER')
+       'COIL:COOLING:WATER', &
+       'COIL:COOLING:DX:SINGLESPEED:THERMALSTORAGE')
 
        IF(CompLoadFlag)SysCCCompCLNG(AirLoopNum) = SysCCCompCLNG(AirLoopNum) + ABS(CompLoad)
        SELECT CASE(EnergyType)
@@ -4001,6 +4035,8 @@ SELECT CASE(CompType)
     END SELECT
 
 !DX Systems
+  CASE('AIRLOOPHVAC:UNITARYSYSTEM')
+       CONTINUE !All energy transfers accounted for in subcomponent models
   CASE('AIRLOOPHVAC:UNITARYHEATPUMP:AIRTOAIR')
        CONTINUE !All energy transfers accounted for in subcomponent models
   CASE('AIRLOOPHVAC:UNITARYHEATPUMP:WATERTOAIR')
@@ -4060,7 +4096,7 @@ SELECT CASE(CompType)
        'HEATEXCHANGER:AIRTOAIR:SENSIBLEANDLATENT', &
        'HEATEXCHANGER:DESICCANT:BALANCEDFLOW')
     IF (CompLoadFlag) THEN
-      IF(CompLoad > 0.0 )THEN
+      IF(CompLoad > 0.0d0 )THEN
         SysHeatExCLNG(AirLoopNum) =  SysHeatExCLNG(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysHeatExHTNG(AirLoopNum) =  SysHeatExHTNG(AirLoopNum) + ABS(CompLoad)
@@ -4093,7 +4129,7 @@ SELECT CASE(CompType)
        CONTINUE ! duct losses should be accounted for here ???
                 ! requires addition of a new variable to sum duct losses
 ! Example:
-!      IF(CompLoad > 0.0)THEN
+!      IF(CompLoad > 0.0d0)THEN
 !        SysDuctHTNG(AirLoopNum) =  SysDuctHTNG(AirLoopNum) + ABS(CompLoad)
 !      ELSE
 !        SysDuctCLNG(AirLoopNum) =  SysDuctCLNG(AirLoopNum) + ABS(CompLoad)
@@ -4104,7 +4140,7 @@ SELECT CASE(CompType)
   CASE('SOLARCOLLECTOR:FLATPLATE:PHOTOVOLTAICTHERMAL', &
        'SOLARCOLLECTOR:UNGLAZEDTRANSPIRED')
     IF (CompLoadFlag) THEN
-      IF(CompLoad > 0.0 ) THEN
+      IF(CompLoad > 0.0d0 ) THEN
         SysSolarCollectCooling(AirLoopNum) =  SysSolarCollectCooling(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysSolarCollectHeating(AirLoopNum) =  SysSolarCollectHeating(AirLoopNum) + ABS(CompLoad)
@@ -4114,7 +4150,7 @@ SELECT CASE(CompType)
   CASE('AIRTERMINAL:SINGLEDUCT:USERDEFINED')
   ! User component model energy use should be accounted for here
     IF (CompLoadFlag) THEN
-      IF(CompLoad > 0.0 )THEN
+      IF(CompLoad > 0.0d0 )THEN
         SysUserDefinedTerminalCooling(AirLoopNum) =  SysUserDefinedTerminalCooling(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysUserDefinedTerminalHeating(AirLoopNum) =  SysUserDefinedTerminalHeating(AirLoopNum) + ABS(CompLoad)
@@ -4191,7 +4227,8 @@ SUBROUTINE ReportMaxVentilationLoads
                                         GetFanCoilZoneInletAirNode, GetFanCoilReturnAirNode
   USE UnitVentilator ,           Only : GetUnitVentilatorOutAirNode, GetUnitVentilatorMixedAirNode, &
                                         GetUnitVentilatorZoneInletAirNode, GetUnitVentilatorReturnAirNode
-  USE PurchasedAirManager,       Only : GetPurchasedAirOutAirMassFlow
+  USE PurchasedAirManager,       Only : GetPurchasedAirOutAirMassFlow, GetPurchasedAirZoneInletAirNode, &
+                                        GetPurchasedAirMixedAirTemp, GetPurchasedAirMixedAirHumRat, GetPurchasedAirReturnAirNode
   USE HVACStandAloneERV ,        Only : GetStandAloneERVOutAirNode, GetStandAloneERVReturnAirNode, &
                                         GetStandAloneERVZoneInletAirNode
 
@@ -4228,6 +4265,8 @@ SUBROUTINE ReportMaxVentilationLoads
     REAL(r64)   ::  AirSysOutAirFlow         ! outside air flow rate for zone from primary air system
 
     REAL(r64)   ::  ZFAUEnthReturnAir !Zone forced Air unit enthalpy of the return air
+    REAL(r64)   ::  ZFAUTempMixedAir  !Zone forced Air unit dry-bulb temperature of the mixed air
+    REAL(r64)   ::  ZFAUHumRatMixedAir  !Zone forced Air unit humidity ratio of the mixed air
     REAL(r64)   ::  ZFAUEnthMixedAir  !Zone forced Air unit enthalpy of the mixed air
     REAL(r64)   ::  ZFAUFlowRate
     REAL(r64)   ::  ZFAUZoneVentLoad !ventilation load attributed to a particular zone from zone forced air units
@@ -4249,38 +4288,38 @@ SUBROUTINE ReportMaxVentilationLoads
     IF (.not. VentReportStructureCreated) RETURN
     IF (.not. VentLoadsReportEnabled) RETURN
     !following inits are array assignments across all controlled zones.
-    ZoneOAMassFlow               = 0.0
-    ZoneOAMass                   = 0.0
-    ZoneOAVolFlowStdRho          = 0.0
-    ZoneOAVolStdRho              = 0.0
-    ZoneOAVolFlowCrntRho         = 0.0
-    ZoneOAVolCrntRho             = 0.0
-    ZoneMechACH                  = 0.0
-    MaxCoolingLoadMetByVent      = 0.0
-    MaxCoolingLoadAddedByVent    = 0.0
-    MaxOvercoolingByVent         = 0.0
-    MaxHeatingLoadMetByVent      = 0.0
-    MaxHeatingLoadAddedByVent    = 0.0
-    MaxOverheatingByVent         = 0.0
-    MaxNoLoadHeatingByVent       = 0.0
-    MaxNoLoadCoolingByVent       = 0.0
+    ZoneOAMassFlow               = 0.0d0
+    ZoneOAMass                   = 0.0d0
+    ZoneOAVolFlowStdRho          = 0.0d0
+    ZoneOAVolStdRho              = 0.0d0
+    ZoneOAVolFlowCrntRho         = 0.0d0
+    ZoneOAVolCrntRho             = 0.0d0
+    ZoneMechACH                  = 0.0d0
+    MaxCoolingLoadMetByVent      = 0.0d0
+    MaxCoolingLoadAddedByVent    = 0.0d0
+    MaxOvercoolingByVent         = 0.0d0
+    MaxHeatingLoadMetByVent      = 0.0d0
+    MaxHeatingLoadAddedByVent    = 0.0d0
+    MaxOverheatingByVent         = 0.0d0
+    MaxNoLoadHeatingByVent       = 0.0d0
+    MaxNoLoadCoolingByVent       = 0.0d0
 
   DO CtrlZoneNum=1,NumOfZones
     IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
     ! first clear out working variables from previous zone.
     AirDistCoolInletNodeNum      = 0
     AirDistHeatInletNodeNum      = 0
-    ADUCoolFlowrate              = 0.0
-    ADUHeatFlowrate              = 0.0
-    AirSysTotalMixFlowRate       = 0.0
-    AirSysZoneVentLoad           = 0.0
-    AirSysOutAirFlow             = 0.0
-    ZFAUFlowRate                 = 0.0
-    ZFAUZoneVentLoad             = 0.0
-    ZFAUOutAirFlow               = 0.0
-    OutAirFlow                   = 0.0
-    ZoneFlowFrac                 = 0.0
-    ZoneVolume                   = 0.0
+    ADUCoolFlowrate              = 0.0d0
+    ADUHeatFlowrate              = 0.0d0
+    AirSysTotalMixFlowRate       = 0.0d0
+    AirSysZoneVentLoad           = 0.0d0
+    AirSysOutAirFlow             = 0.0d0
+    ZFAUFlowRate                 = 0.0d0
+    ZFAUZoneVentLoad             = 0.0d0
+    ZFAUOutAirFlow               = 0.0d0
+    OutAirFlow                   = 0.0d0
+    ZoneFlowFrac                 = 0.0d0
+    ZoneVolume                   = 0.0d0
 
     !retrieve the zone load for each zone
     ActualZoneNum = ZoneEquipConfig(CtrlZoneNum)%ActualZoneNum
@@ -4288,7 +4327,7 @@ SUBROUTINE ReportMaxVentilationLoads
     ZoneVolume     = Zone(ActualZoneNum)%Volume * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier  !CR 7170
 
         !if system operating in deadband reset zone load
-    IF (DeadbandOrSetback(ActualZoneNum)) ZoneLoad = 0.0
+    IF (DeadbandOrSetback(ActualZoneNum)) ZoneLoad = 0.0d0
     IF (DeadbandOrSetback(ActualZoneNum))THEN
      DBFlag = 1
     ELSE
@@ -4320,20 +4359,24 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
              (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
         ELSE
-          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
         ENDIF
 
       CASE (PkgTermHPAirToAir_Num, PkgTermACAirToAir_Num, PkgTermHPWaterToAir_Num)
-        OutAirNode = GetPTUnitOutAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+        OutAirNode = GetPTUnitOutAirNode(ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum), &
+                                ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipType_Num(thisZoneEquipNum) )
         If (OutAirNode > 0)  ZFAUOutAirFlow = ZFAUOutAirFlow + Node(OutAirNode)%MassFlowRate
 
         ZoneInletAirNode =   &
-           GetPTUnitZoneInletAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+           GetPTUnitZoneInletAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) , &
+                                      ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipType_Num(thisZoneEquipNum))
         If (ZoneInletAirNode > 0) ZFAUFlowRate =  MAX(Node(ZoneInletAirNode)%MassFlowRate,0.0d0)
         MixedAirNode  =   &
-           GetPTUnitMixedAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+           GetPTUnitMixedAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum), &
+                                  ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipType_Num(thisZoneEquipNum) )
         ReturnAirNode =   &
-           GetPTUnitReturnAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+           GetPTUnitReturnAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum), &
+                                   ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipType_Num(thisZoneEquipNum) )
         If ((MixedAirNode > 0) .AND. (ReturnAirNode > 0)) then
           ZFAUEnthMixedAir  = PsyHFnTdbW(Node(MixedAirNode)%Temp, Node(MixedAirNode)%HumRat)
           ZFAUEnthReturnAir = PsyHFnTdbW(Node(ReturnAirNode)%Temp, Node(ReturnAirNode)%HumRat)
@@ -4341,7 +4384,7 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
              (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
         ELSE
-          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
         ENDIF
 
       CASE (FanCoil4Pipe_Num)
@@ -4363,7 +4406,7 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
              (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
         ELSE
-          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
         ENDIF
 
       CASE (UnitVentilator_Num)
@@ -4388,14 +4431,33 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
              (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
         ELSE
-          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
         ENDIF
       CASE (PurchasedAir_Num)
         ZFAUOutAirFlow = ZFAUOutAirFlow +   &
           GetPurchasedAirOutAirMassFlow( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
-
-        ! can't use existing algorithms for purchase air because there is no OA mixer
-
+        ZoneInletAirNode =   &
+           GetPurchasedAirZoneInletAirNode(   &
+              ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+        If (ZoneInletAirNode > 0) ZFAUFlowRate =  MAX(Node(ZoneInletAirNode)%MassFlowRate,0.0d0)
+        ZFAUTempMixedAir  =  &
+           GetPurchasedAirMixedAirTemp(   &
+              ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+        ZFAUHumRatMixedAir  =  &
+           GetPurchasedAirMixedAirHumRat(   &
+              ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+        ReturnAirNode =   &
+           GetPurchasedAirReturnAirNode(   &
+              ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
+        If ((ZFAUFlowRate > 0) .AND. (ReturnAirNode > 0)) then
+          ZFAUEnthMixedAir  = PsyHFnTdbW(ZFAUTempMixedAir, ZFAUHumRatMixedAir)
+          ZFAUEnthReturnAir = PsyHFnTdbW(Node(ReturnAirNode)%Temp, Node(ReturnAirNode)%HumRat)
+           !Calculate the zone ventilation load for this supply air path (i.e. zone inlet)
+          ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
+             (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
+        ELSE
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
+        ENDIF
       CASE (ERVStandAlone_Num)
         OutAirNode =   &
            GetStandAloneERVOutAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
@@ -4415,7 +4477,7 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad = ZFAUZoneVentLoad +   &
              (ZFAUFlowRate)*(ZFAUEnthMixedAir-ZFAUEnthReturnAir)* TimeStepSys * SecInHour !*KJperJ
         ELSE
-          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
+          ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0d0
         ENDIF
 
       END SELECT
@@ -4459,8 +4521,8 @@ SUBROUTINE ReportMaxVentilationLoads
       MixedAirNode     = PrimaryAirSystem(AirLoopNum)%OASysOutletNodeNum
       ReturnAirNode    = PrimaryAirSystem(AirLoopNum)%OASysInletNodeNum
       IF(MixedAirNode == 0 .OR. ReturnAirNode == 0)  then
-        AirSysZoneVentLoad = 0.0
-        AirSysOutAirFlow   = 0.0
+        AirSysZoneVentLoad = 0.0d0
+        AirSysOutAirFlow   = 0.0d0
       ELSE
         !Calculate return and mixed air ethalpies
         AirSysEnthReturnAir = PsyHFnTdbW(Node(ReturnAirNode)%Temp, Node(ReturnAirNode)%HumRat)
@@ -4470,17 +4532,17 @@ SUBROUTINE ReportMaxVentilationLoads
           OutAirNode = PrimaryAirSystem(AirLoopNum)%OAMixOAInNodeNum
           AirSysOutAirFlow = Node(OutAirNode)%MassFlowRate
         ELSE
-          AirSysOutAirFlow = 0.0
+          AirSysOutAirFlow = 0.0d0
         END IF
 
         AirSysTotalMixFlowRate = Node(MixedAirNode)%MassFlowRate
 
-        IF(AirSysTotalMixFlowRate .NE. 0.0) THEN
+        IF(AirSysTotalMixFlowRate .NE. 0.0d0) THEN
           ZoneFlowFrac = (ADUCoolFlowrate+ADUHeatFlowrate)/AirSysTotalMixFlowRate
           AirSysOutAirFlow  = ZoneFlowFrac * AirSysOutAirFlow
         ELSE
-          ZoneFlowfrac = 0.0
-          AirSysOutAirFlow  = 0.0
+          ZoneFlowfrac = 0.0d0
+          AirSysOutAirFlow  = 0.0d0
         END IF
         !Calculate the zone ventilation load for this supply air path (i.e. zone inlet)
         AirSysZoneVentLoad =   &
@@ -4504,7 +4566,7 @@ SUBROUTINE ReportMaxVentilationLoads
     currentZoneAirDensity =   PsyRhoAirFnPbTdbW(OutBaroPress, MAT(ActualZoneNum), ZoneAirHumRatAvg(ActualZoneNum))
     IF (currentZoneAirDensity > 0.0D0) ZoneOAVolFlowCrntRho(CtrlZoneNum)  = ZoneOAMassFlow(CtrlZoneNum) / currentZoneAirDensity
     ZoneOAVolCrntRho(CtrlZoneNum)  = ZoneOAVolFlowCrntRho(CtrlZoneNum) * TimeStepSys* SecInHour
-    if (ZoneVolume > 0.0)  ZoneMechACH(CtrlZoneNum)    = (ZoneOAVolCrntRho(CtrlZoneNum) / TimeStepSys)/ZoneVolume
+    if (ZoneVolume > 0.0d0)  ZoneMechACH(CtrlZoneNum)    = (ZoneOAVolCrntRho(CtrlZoneNum) / TimeStepSys)/ZoneVolume
 
     !store data for predefined tabular report on outside air
     IF (ZonePreDefRep(ActualZoneNum)%isOccupied) THEN
@@ -4648,7 +4710,7 @@ SUBROUTINE MatchPlantSys(AirLoopNum,BranchNum)
           END IF
         END DO
         DO SubCompNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubcomps
-!!!!!          IF(SysVentLoad == 0.0)EXIT
+!!!!!          IF(SysVentLoad == 0.0d0)EXIT
           DO VarNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars
             IF(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%MeteredVar(VarNum)%ResourceType  &
                  == iRT_EnergyTransfer)THEN
@@ -4665,7 +4727,7 @@ SUBROUTINE MatchPlantSys(AirLoopNum,BranchNum)
             END IF
           END DO
           DO SubSubCompNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubcomps
-!!!!!            IF(SysVentLoad == 0.0)EXIT
+!!!!!            IF(SysVentLoad == 0.0d0)EXIT
             DO VarNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
                                                    SubSubComp(SubSubCompNum)%NumMeteredVars
               IF(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%SubSubComp(SubSubCompNum)%  &

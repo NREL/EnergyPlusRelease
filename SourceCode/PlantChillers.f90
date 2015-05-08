@@ -48,54 +48,54 @@ INTEGER, PARAMETER :: LeavingSetpointModulated = 203
 
           ! MODULE VARIABLE DECLARATIONS:
 INTEGER, SAVE ,PUBLIC    :: NumElectricChillers    =0   ! number of Electric chillers specified in input
-REAL(r64)                :: CondMassFlowRate       =0.0 ! Kg/s - condenser mass flow rate, water side
-REAL(r64)                :: EvapMassFlowRate       =0.0 ! Kg/s - evaporator mass flow rate, water side
-REAL(r64)                :: CondOutletTemp         =0.0 ! C - condenser outlet temperature, air or water side
-REAL(r64)                :: CondOutletHumRat       =0.0 ! kg/kg - condenser outlet humditiy ratio, air side
-REAL(r64)                :: EvapOutletTemp         =0.0 ! C - evaporator outlet temperature, water side
-REAL(r64)                :: Power                  =0.0 ! W - rate of chiller energy use
-REAL(r64)                :: QEvaporator            =0.0 ! W - rate of heat transfer to the evaporator coil
-REAL(r64)                :: QCondenser             =0.0 ! W - rate of heat transfer to the condenser coil
-REAL(r64)                :: Energy                 =0.0 ! J - chiller energy use
-REAL(r64)                :: EvaporatorEnergy       =0.0 ! J - rate of heat transfer to the evaporator coil
-REAL(r64)                :: CondenserEnergy        =0.0 ! J - rate of heat transfer to the condenser coil
-REAL(r64)                :: QHeatRecovered         =0.0 ! W - rate of heat transfer to the Heat Recovery coil
-REAL(r64)                :: HeatRecOutletTemp      =0.0 ! C - Heat Rec outlet temperature, water side
+REAL(r64)                :: CondMassFlowRate       =0.0d0 ! Kg/s - condenser mass flow rate, water side
+REAL(r64)                :: EvapMassFlowRate       =0.0d0 ! Kg/s - evaporator mass flow rate, water side
+REAL(r64)                :: CondOutletTemp         =0.0d0 ! C - condenser outlet temperature, air or water side
+REAL(r64)                :: CondOutletHumRat       =0.0d0 ! kg/kg - condenser outlet humditiy ratio, air side
+REAL(r64)                :: EvapOutletTemp         =0.0d0 ! C - evaporator outlet temperature, water side
+REAL(r64)                :: Power                  =0.0d0 ! W - rate of chiller energy use
+REAL(r64)                :: QEvaporator            =0.0d0 ! W - rate of heat transfer to the evaporator coil
+REAL(r64)                :: QCondenser             =0.0d0 ! W - rate of heat transfer to the condenser coil
+REAL(r64)                :: Energy                 =0.0d0 ! J - chiller energy use
+REAL(r64)                :: EvaporatorEnergy       =0.0d0 ! J - rate of heat transfer to the evaporator coil
+REAL(r64)                :: CondenserEnergy        =0.0d0 ! J - rate of heat transfer to the condenser coil
+REAL(r64)                :: QHeatRecovered         =0.0d0 ! W - rate of heat transfer to the Heat Recovery coil
+REAL(r64)                :: HeatRecOutletTemp      =0.0d0 ! C - Heat Rec outlet temperature, water side
 REAL(r64)                :: AvgCondSinkTemp        =0.d0!  condenser temperature value for use in curves [C]
-REAL(r64)                :: ChillerCyclingRatio    =0.0 ! Cycling ratio for chiller when load is below MinPLR
-REAL(r64)                :: BasinHeaterPower       =0.0 ! Basin heater power (W)
+REAL(r64)                :: ChillerCyclingRatio    =0.0d0 ! Cycling ratio for chiller when load is below MinPLR
+REAL(r64)                :: BasinHeaterPower       =0.0d0 ! Basin heater power (W)
 
 !engine driven:
 INTEGER                  :: NumEngineDrivenChillers =0   ! number of EngineDriven chillers specified in input
-REAL(r64)                :: HeatRecInletTemp        =0.0 ! Inlet Temperature of the heat recovery fluid
-REAL(r64)                :: HeatRecMdotActual       =0.0 ! reporting: Heat Recovery Loop Mass flow rate
-REAL(r64)                :: HeatRecMdotDesign       =0.0
-REAL(r64)                :: QTotalHeatRecovered     =0.0 ! total heat recovered (W)
-REAL(r64)                :: QJacketRecovered        =0.0 ! heat recovered from jacket (W)
-REAL(r64)                :: QLubeOilRecovered       =0.0 ! heat recovered from lube (W)
-REAL(r64)                :: QExhaustRecovered       =0.0 ! exhaust gas heat recovered (W)
-REAL(r64)                :: FuelEnergyUseRate       =0.0 ! Fuel Energy used (W)
-REAL(r64)                :: TotalHeatEnergyRec      =0.0 ! total heat recovered (J)
-REAL(r64)                :: JacketEnergyRec         =0.0 ! heat recovered from jacket (J)
-REAL(r64)                :: LubeOilEnergyRec        =0.0 ! heat recovered from lube (J)
-REAL(r64)                :: ExhaustEnergyRec        =0.0 ! exhaust gas heat recovered (J)
-REAL(r64)                :: FuelEnergy              =0.0 ! Fuel Energy used (J)
-REAL(r64)                :: FuelMdot                =0.0 ! Fuel Amount used (Kg/s)
-REAL(r64)                :: ExhaustStackTemp        =0.0 ! Exhaust Stack Temperature (C)
+REAL(r64)                :: HeatRecInletTemp        =0.0d0 ! Inlet Temperature of the heat recovery fluid
+REAL(r64)                :: HeatRecMdotActual       =0.0d0 ! reporting: Heat Recovery Loop Mass flow rate
+REAL(r64)                :: HeatRecMdotDesign       =0.0d0
+REAL(r64)                :: QTotalHeatRecovered     =0.0d0 ! total heat recovered (W)
+REAL(r64)                :: QJacketRecovered        =0.0d0 ! heat recovered from jacket (W)
+REAL(r64)                :: QLubeOilRecovered       =0.0d0 ! heat recovered from lube (W)
+REAL(r64)                :: QExhaustRecovered       =0.0d0 ! exhaust gas heat recovered (W)
+REAL(r64)                :: FuelEnergyUseRate       =0.0d0 ! Fuel Energy used (W)
+REAL(r64)                :: TotalHeatEnergyRec      =0.0d0 ! total heat recovered (J)
+REAL(r64)                :: JacketEnergyRec         =0.0d0 ! heat recovered from jacket (J)
+REAL(r64)                :: LubeOilEnergyRec        =0.0d0 ! heat recovered from lube (J)
+REAL(r64)                :: ExhaustEnergyRec        =0.0d0 ! exhaust gas heat recovered (J)
+REAL(r64)                :: FuelEnergy              =0.0d0 ! Fuel Energy used (J)
+REAL(r64)                :: FuelMdot                =0.0d0 ! Fuel Amount used (Kg/s)
+REAL(r64)                :: ExhaustStackTemp        =0.0d0 ! Exhaust Stack Temperature (C)
 
 !gas turbine
 INTEGER                  :: NumGTChillers    =0   ! number of GT chillers specified in input
 
 ! const COP
 INTEGER                  :: NumConstCOPChillers =0
-REAL(r64)                :: EvapInletTemp       =0.0
-REAL(r64)                :: CondInletTemp       =0.0
+REAL(r64)                :: EvapInletTemp       =0.0d0
+REAL(r64)                :: CondInletTemp       =0.0d0
 
 TYPE BaseChillerSpecs
   CHARACTER(len=MaxNameLength) :: Name     =' ' ! user identifier
   INTEGER           :: CondenserType       =0    ! Type of Condenser - Air or Water Cooled
-  REAL(r64)         :: NomCap            =0.0 ! design nominal capacity of chiller
-  REAL(r64)         :: COP               =0.0 ! COP
+  REAL(r64)         :: NomCap            =0.0d0 ! design nominal capacity of chiller
+  REAL(r64)         :: COP               =0.0d0 ! COP
   INTEGER           :: FlowMode          = FlowModeNotSet ! one of 3 modes for componet flow during operation
   LOGICAL           :: ModulatedFlowSetToLoop= .FALSE. ! True if the setpoint is missing at the outlet node
   LOGICAL           :: ModulatedFlowErrDone  = .FALSE.  ! true if setpoint warning issued
@@ -104,10 +104,10 @@ TYPE BaseChillerSpecs
   INTEGER           :: EvapOutletNodeNum =0   ! Node number on the outlet side of the plant
   INTEGER           :: CondInletNodeNum  =0   ! Node number on the inlet side of the condenser
   INTEGER           :: CondOutletNodeNum =0   ! Node number on the outlet side of the condenser
-  REAL(r64)         :: EvapVolFlowRate     =0.0 ! m**3/s - design nominal water volumetric flow rate through the evaporator
-  REAL(r64)         :: EvapMassFlowRateMax =0.0 ! kg/s - design water mass flow rate through evaporator
-  REAL(r64)         :: CondVolFlowRate     =0.0 ! m**3/s - design nominal water volumetric flow rate through the condenser
-  REAL(r64)         :: CondMassFlowRateMax =0.0 ! kg/s - design water mass flow rate through condenser
+  REAL(r64)         :: EvapVolFlowRate     =0.0d0 ! m**3/s - design nominal water volumetric flow rate through the evaporator
+  REAL(r64)         :: EvapMassFlowRateMax =0.0d0 ! kg/s - design water mass flow rate through evaporator
+  REAL(r64)         :: CondVolFlowRate     =0.0d0 ! m**3/s - design nominal water volumetric flow rate through the condenser
+  REAL(r64)         :: CondMassFlowRateMax =0.0d0 ! kg/s - design water mass flow rate through condenser
   INTEGER           :: CWLoopNum     = 0  ! chilled water plant loop index number
   INTEGER           :: CWLoopSideNum = 0  ! chilled water plant loop side index
   INTEGER           :: CWBranchNum   = 0  ! chilled water plant loop branch index
@@ -117,16 +117,16 @@ TYPE BaseChillerSpecs
   INTEGER           :: CDBranchNum   = 0  ! condenser water plant loop branch index
   INTEGER           :: CDCompNum     = 0  ! condenser water plant loop component index
 
-  REAL(r64)         :: SizFac                    = 0.0 ! sizing factor
-  REAL(r64)         :: BasinHeaterPowerFTempDiff = 0.0 ! Basin heater capacity per degree C below setpoint (W/C)
-  REAL(r64)         :: BasinHeaterSetPointTemp   = 0.0 ! Setpoint temperature for basin heater operation (C)
+  REAL(r64)         :: SizFac                    = 0.0d0 ! sizing factor
+  REAL(r64)         :: BasinHeaterPowerFTempDiff = 0.0d0 ! Basin heater capacity per degree C below setpoint (W/C)
+  REAL(r64)         :: BasinHeaterSetPointTemp   = 0.0d0 ! Setpoint temperature for basin heater operation (C)
   INTEGER           :: BasinHeaterSchedulePtr  = 0   ! Pointer to basin heater schedule
 
   INTEGER           :: ErrCount1 = 0      ! for recurring error messages
   INTEGER           :: ErrCount2 = 0      ! for recurring error messages
   CHARACTER(len=220):: MsgBuffer1    = ' ' !- buffer to print warning messages on following time step
   CHARACTER(len=300):: MsgBuffer2    = ' ' !- buffer to print warning messages on following time step
-  REAL(r64)         :: MsgDataLast   = 0.0 ! value of data when warning occurred (passed to Recurring Warn)
+  REAL(r64)         :: MsgDataLast   = 0.0d0 ! value of data when warning occurred (passed to Recurring Warn)
   LOGICAL           :: PrintMessage  = .FALSE. ! logical to determine if message is valid
   INTEGER           :: MsgErrorCount = 0   ! number of occurrences of warning
 
@@ -138,20 +138,20 @@ END TYPE
 TYPE, PUBLIC             :: ElectricChillerSpecs
   TYPE(BaseChillerSpecs) :: Base
 
-  REAL(r64)         :: MinPartLoadRat      =0.0 ! (Electric MIN) min allowed operating frac full load
-  REAL(r64)         :: MaxPartLoadRat      =0.0 ! (Electric MAX) max allowed operating frac full load
-  REAL(r64)         :: OptPartLoadRat      =0.0 ! (Electric BEST) optimal operating frac full load
-  REAL(r64)         :: TempDesCondIn       =0.0 ! C - (Electric ADJTC(1)The design secondary loop fluid
+  REAL(r64)         :: MinPartLoadRat      =0.0d0 ! (Electric MIN) min allowed operating frac full load
+  REAL(r64)         :: MaxPartLoadRat      =0.0d0 ! (Electric MAX) max allowed operating frac full load
+  REAL(r64)         :: OptPartLoadRat      =0.0d0 ! (Electric BEST) optimal operating frac full load
+  REAL(r64)         :: TempDesCondIn       =0.0d0 ! C - (Electric ADJTC(1)The design secondary loop fluid
                                                 ! temperature at the chiller condenser side inlet
-  REAL(r64)         :: TempRiseCoef        =0.0 ! (Electric ADJTC(2)) correction factor for off ChillDesign oper.
-  REAL(r64)         :: TempDesEvapOut      =0.0 ! C - (Electric ADJTC(3)The design primary loop fluid
+  REAL(r64)         :: TempRiseCoef        =0.0d0 ! (Electric ADJTC(2)) correction factor for off ChillDesign oper.
+  REAL(r64)         :: TempDesEvapOut      =0.0d0 ! C - (Electric ADJTC(3)The design primary loop fluid
                                                 ! temperature at the chiller evaporator side outlet
-  REAL(r64),DIMENSION(3) :: CapRatCoef          =0.0 ! (Electric RCAVC() ) coeff of cap ratio poly fit
-  REAL(r64),DIMENSION(3) :: PowerRatCoef        =0.0 ! (Electric ADJEC() ) coeff of power rat poly fit
-  REAL(r64),DIMENSION(3) :: FullLoadCoef        =0.0 ! (Electric RPWRC() ) coeff of full load poly. fit
-  REAL(r64)         :: TempLowLimitEvapOut =0.0 ! C - low temperature shut off
-  REAL(r64)         :: DesignHeatRecVolFlowRate = 0.0 ! m3/s, Design Water mass flow rate through heat recovery loop
-  REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0 ! kg/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64),DIMENSION(3) :: CapRatCoef          =0.0d0 ! (Electric RCAVC() ) coeff of cap ratio poly fit
+  REAL(r64),DIMENSION(3) :: PowerRatCoef        =0.0d0 ! (Electric ADJEC() ) coeff of power rat poly fit
+  REAL(r64),DIMENSION(3) :: FullLoadCoef        =0.0d0 ! (Electric RPWRC() ) coeff of full load poly. fit
+  REAL(r64)         :: TempLowLimitEvapOut =0.0d0 ! C - low temperature shut off
+  REAL(r64)         :: DesignHeatRecVolFlowRate = 0.0d0 ! m3/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64)         :: DesignHeatRecMassFlowRate = 0.0d0 ! kg/s, Design Water mass flow rate through heat recovery loop
   LOGICAL           :: HeatRecActive = .False.    ! True entered Heat Rec Vol Flow Rate >0
   INTEGER           :: HeatRecInletNodeNum = 0    ! Node number on the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum = 0   ! Node number on the heat recovery outlet side of the condenser
@@ -170,36 +170,36 @@ TYPE EngineDrivenChillerSpecs
   CHARACTER(len=MaxNameLength) :: FuelType  =' '  ! Type of Fuel - DIESEL, GASOLINE, GAS
 
 
-  REAL(r64)         :: MinPartLoadRat       =0.0 ! (EngineDriven MIN) min allowed operating frac full load
-  REAL(r64)         :: MaxPartLoadRat       =0.0 ! (EngineDriven MAX) max allowed operating frac full load
-  REAL(r64)         :: OptPartLoadRat       =0.0 ! (EngineDriven BEST) optimal operating frac full load
-  REAL(r64)         :: TempDesCondIn        =0.0 ! C - (EngineDriven ADJTC(1)The design secondary loop fluid
+  REAL(r64)         :: MinPartLoadRat       =0.0d0 ! (EngineDriven MIN) min allowed operating frac full load
+  REAL(r64)         :: MaxPartLoadRat       =0.0d0 ! (EngineDriven MAX) max allowed operating frac full load
+  REAL(r64)         :: OptPartLoadRat       =0.0d0 ! (EngineDriven BEST) optimal operating frac full load
+  REAL(r64)         :: TempDesCondIn        =0.0d0 ! C - (EngineDriven ADJTC(1)The design secondary loop fluid
                                                  ! temperature at the chiller condenser side inlet
-  REAL(r64)         :: TempRiseCoef         =0.0 ! (EngineDriven ADJTC(2)) correction factor for off ChillDesign oper.
-  REAL(r64)         :: TempDesEvapOut       =0.0 ! C - (EngineDriven ADJTC(3)The design primary loop fluid
+  REAL(r64)         :: TempRiseCoef         =0.0d0 ! (EngineDriven ADJTC(2)) correction factor for off ChillDesign oper.
+  REAL(r64)         :: TempDesEvapOut       =0.0d0 ! C - (EngineDriven ADJTC(3)The design primary loop fluid
                                                  ! temperature at the chiller evaporator side outlet
-  REAL(r64),DIMENSION(3) :: CapRatCoef           =0.0 ! (EngineDriven RCAVC() ) coeff of cap ratio poly fit
-  REAL(r64),DIMENSION(3) :: PowerRatCoef         =0.0 ! (EngineDriven ADJEC() ) coeff of power rat poly fit
-  REAL(r64),DIMENSION(3) :: FullLoadCoef         =0.0 ! (EngineDriven RPWRC() ) coeff of full load poly. fit
-  REAL(r64)         :: TempLowLimitEvapOut  =0.0 ! C - low temperature shut off
+  REAL(r64),DIMENSION(3) :: CapRatCoef           =0.0d0 ! (EngineDriven RCAVC() ) coeff of cap ratio poly fit
+  REAL(r64),DIMENSION(3) :: PowerRatCoef         =0.0d0 ! (EngineDriven ADJEC() ) coeff of power rat poly fit
+  REAL(r64),DIMENSION(3) :: FullLoadCoef         =0.0d0 ! (EngineDriven RPWRC() ) coeff of full load poly. fit
+  REAL(r64)         :: TempLowLimitEvapOut  =0.0d0 ! C - low temperature shut off
 
   INTEGER           :: ClngLoadtoFuelCurve   =0   !Coeff of Shaft Power to Fuel Energy Input Coeff Poly Fit
   INTEGER           :: RecJacHeattoFuelCurve =0   !Curve Index for Ratio of Recoverable Jacket Heat to
   INTEGER           :: RecLubeHeattoFuelCurve=0   !Curve Index for Ratio of Recoverable Lube Oil Heat to
   INTEGER           :: TotExhausttoFuelCurve =0   !Curve Index for Total Exhaust heat Input to Fuel Energy Input Coeffs Poly Fit
-  REAL(r64)         :: ExhaustTemp           =0.0 !(TEXDC) Exhaust Gas Temp to Fuel Energy Input
+  REAL(r64)         :: ExhaustTemp           =0.0d0 !(TEXDC) Exhaust Gas Temp to Fuel Energy Input
   INTEGER           :: ExhaustTempCurve      =0   !Curve Index for Exhaust Gas Temp to Fuel Energy Input Coeffs Poly Fit
-  REAL(r64)         :: UA                    =0.0 !(UACDC) exhaust gas Heat Exchanger UA to Capacity
-  REAL(r64),DIMENSION(2) :: UACoef                =0.0   !Heat Exchanger UA Coeffs Poly Fit
-  REAL(r64)         :: MaxExhaustperPowerOutput =0.0 !MAX EXHAUST FLOW PER W DSL POWER OUTPUT COEFF
-  REAL(r64)         :: DesignMinExitGasTemp     =0.0 !Steam Saturation Temperature
-  REAL(r64)         :: FuelHeatingValue         =0.0 ! Heating Value of Fuel in kJ/kg
-  REAL(r64)         :: DesignHeatRecVolFlowRate =0.0 ! m3/s, Design Water mass flow rate through heat recovery loop
-  REAL(r64)         :: DesignHeatRecMassFlowRate=0.0 ! kg/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64)         :: UA                    =0.0d0 !(UACDC) exhaust gas Heat Exchanger UA to Capacity
+  REAL(r64),DIMENSION(2) :: UACoef                =0.0d0   !Heat Exchanger UA Coeffs Poly Fit
+  REAL(r64)         :: MaxExhaustperPowerOutput =0.0d0 !MAX EXHAUST FLOW PER W DSL POWER OUTPUT COEFF
+  REAL(r64)         :: DesignMinExitGasTemp     =0.0d0 !Steam Saturation Temperature
+  REAL(r64)         :: FuelHeatingValue         =0.0d0 ! Heating Value of Fuel in kJ/kg
+  REAL(r64)         :: DesignHeatRecVolFlowRate =0.0d0 ! m3/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64)         :: DesignHeatRecMassFlowRate=0.0d0 ! kg/s, Design Water mass flow rate through heat recovery loop
   LOGICAL           :: HeatRecActive        =.false. ! True entered Heat Rec Vol Flow Rate >0
   INTEGER           :: HeatRecInletNodeNum  =0  ! Node number on the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum =0  ! Node number on the heat recovery outlet side of the condenser
-  REAL(r64)         :: HeatRecMaxTemp       =0.0 !Max Temp that can be produced in heat recovery
+  REAL(r64)         :: HeatRecMaxTemp       =0.0d0 !Max Temp that can be produced in heat recovery
   INTEGER           :: HRLoopNum     = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRLoopSideNum = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRBranchNum   = 0  ! heat recovery water plant loop branch index
@@ -211,55 +211,55 @@ TYPE GTChillerSpecs
 
   CHARACTER(len=MaxNameLength) :: FuelType =' '  ! Type of Fuel - DIESEL, GASOLINE, GAS
 
-  REAL(r64)         :: MinPartLoadRat      =0.0  ! (GT MIN) min allowed operating frac full load
-  REAL(r64)         :: MaxPartLoadRat      =0.0  ! (GT MAX) max allowed operating frac full load
-  REAL(r64)         :: OptPartLoadRat      =0.0  ! (GT BEST) optimal operating frac full load
-  REAL(r64)         :: TempDesCondIn       =0.0  ! C - (GT ADJTC(1)The design secondary loop fluid
+  REAL(r64)         :: MinPartLoadRat      =0.0d0  ! (GT MIN) min allowed operating frac full load
+  REAL(r64)         :: MaxPartLoadRat      =0.0d0  ! (GT MAX) max allowed operating frac full load
+  REAL(r64)         :: OptPartLoadRat      =0.0d0  ! (GT BEST) optimal operating frac full load
+  REAL(r64)         :: TempDesCondIn       =0.0d0  ! C - (GT ADJTC(1)The design secondary loop fluid
                                                  ! temperature at the chiller condenser side inlet
-  REAL(r64)         :: TempRiseCoef        =0.0  ! (GT ADJTC(2)) correction factor for off ChillDesign oper.
-  REAL(r64)         :: TempDesEvapOut      =0.0  ! C - (GT ADJTC(3)The design primary loop fluid
+  REAL(r64)         :: TempRiseCoef        =0.0d0  ! (GT ADJTC(2)) correction factor for off ChillDesign oper.
+  REAL(r64)         :: TempDesEvapOut      =0.0d0  ! C - (GT ADJTC(3)The design primary loop fluid
                                                  ! temperature at the chiller evaporator side outlet
-  REAL(r64),DIMENSION(3) :: CapRatCoef     =0.0  ! (GT RCAVC() ) coeff of cap ratio poly fit
-  REAL(r64),DIMENSION(3) :: PowerRatCoef   =0.0  ! (GT ADJEC() ) coeff of power rat poly fit
-  REAL(r64),DIMENSION(3) :: FullLoadCoef   =0.0  ! (GT RPWRC() ) coeff of full load poly. fit
-  REAL(r64)         :: TempLowLimitEvapOut =0.0  ! C - low temperature shut off
+  REAL(r64),DIMENSION(3) :: CapRatCoef     =0.0d0  ! (GT RCAVC() ) coeff of cap ratio poly fit
+  REAL(r64),DIMENSION(3) :: PowerRatCoef   =0.0d0  ! (GT ADJEC() ) coeff of power rat poly fit
+  REAL(r64),DIMENSION(3) :: FullLoadCoef   =0.0d0  ! (GT RPWRC() ) coeff of full load poly. fit
+  REAL(r64)         :: TempLowLimitEvapOut =0.0d0  ! C - low temperature shut off
 
   ! "special" GT chiller input parameters
-  REAL(r64)         :: FuelEnergyIn            =0.0 !(EFUEL) Amount of Fuel Energy Required to run gas turbine
-  REAL(r64),DIMENSION(3) :: PLBasedFuelInputCoef    =0.0 !(FUL1GC) Part Load Ratio Based Fuel Input Coefficients Poly Fit
-  REAL(r64),DIMENSION(3) :: TempBasedFuelInputCoef  =0.0 !(FUL2GC) Ambient Temperature Based Fuel Input Coeff Poly Fit
+  REAL(r64)         :: FuelEnergyIn            =0.0d0 !(EFUEL) Amount of Fuel Energy Required to run gas turbine
+  REAL(r64),DIMENSION(3) :: PLBasedFuelInputCoef    =0.0d0 !(FUL1GC) Part Load Ratio Based Fuel Input Coefficients Poly Fit
+  REAL(r64),DIMENSION(3) :: TempBasedFuelInputCoef  =0.0d0 !(FUL2GC) Ambient Temperature Based Fuel Input Coeff Poly Fit
 
-  REAL(r64)         :: ExhaustFlow             =0.0  !(FEX) Exhaust Gas Flow Rate cubic meters per second
-  REAL(r64),DIMENSION(3) :: ExhaustFlowCoef    =0.0  !(FEXGC) Exhaust Gas Flow Rate Input Coef Poly Fit
+  REAL(r64)         :: ExhaustFlow             =0.0d0  !(FEX) Exhaust Gas Flow Rate cubic meters per second
+  REAL(r64),DIMENSION(3) :: ExhaustFlowCoef    =0.0d0  !(FEXGC) Exhaust Gas Flow Rate Input Coef Poly Fit
 
-  REAL(r64)         :: ExhaustTemp             =0.0  !(TEX) Exhaust Gas Temperature in C
-  REAL(r64),DIMENSION(3) :: PLBasedExhaustTempCoef  =0.0  !(TEX1GC) Part Load Ratio Based Exhaust Temperature Input Coeffs Poly Fit
-  REAL(r64),DIMENSION(3) :: TempBasedExhaustTempCoef=0.0  !(TEX2GC) Ambient Temperature Based Exhaust Gas Temp to
+  REAL(r64)         :: ExhaustTemp             =0.0d0  !(TEX) Exhaust Gas Temperature in C
+  REAL(r64),DIMENSION(3) :: PLBasedExhaustTempCoef  =0.0d0  !(TEX1GC) Part Load Ratio Based Exhaust Temperature Input Coeffs Poly Fit
+  REAL(r64),DIMENSION(3) :: TempBasedExhaustTempCoef=0.0d0  !(TEX2GC) Ambient Temperature Based Exhaust Gas Temp to
                                                           ! Fuel Energy Input Coeffs Poly Fit
 
-  REAL(r64)         :: HeatRecLubeEnergy       =0.0  !(ELUBE) Recoverable Lube Oil Energy
-  REAL(r64)         :: HeatRecLubeRate         =0.0  !(ELUBE) Recoverable Lube Oil Rate of Rwecovery (W)
-  REAL(r64),DIMENSION(3) :: HeatRecLubeEnergyCoef   =0.0  !(ELUBEGC)  Recoverable Lube Oil Energy Input Coef Poly Fit
+  REAL(r64)         :: HeatRecLubeEnergy       =0.0d0  !(ELUBE) Recoverable Lube Oil Energy
+  REAL(r64)         :: HeatRecLubeRate         =0.0d0  !(ELUBE) Recoverable Lube Oil Rate of Rwecovery (W)
+  REAL(r64),DIMENSION(3) :: HeatRecLubeEnergyCoef   =0.0d0  !(ELUBEGC)  Recoverable Lube Oil Energy Input Coef Poly Fit
 
-  REAL(r64)         :: UAtoCapRat              =0.0  !(UACGC) Heat Exchanger UA to Capacity
-  REAL(r64),DIMENSION(3) :: UAtoCapCoef        =0.0  !Heat Exchanger UA to Capacity Coeffs Poly Fit
+  REAL(r64)         :: UAtoCapRat              =0.0d0  !(UACGC) Heat Exchanger UA to Capacity
+  REAL(r64),DIMENSION(3) :: UAtoCapCoef        =0.0d0  !Heat Exchanger UA to Capacity Coeffs Poly Fit
 
-  REAL(r64)         :: GTEngineCapacity        =0.0  ! Capacity of GT Unit attached to Chiller
-  REAL(r64)         :: MaxExhaustperGTPower    =0.0  !Max Exhaust Flow per KW Power Out
-  REAL(r64)         :: DesignSteamSatTemp      =0.0  !Steam Saturation Temperature
-  REAL(r64)         :: ExhaustStackTemp        =0.0  !Temperature of Exhaust Gases
+  REAL(r64)         :: GTEngineCapacity        =0.0d0  ! Capacity of GT Unit attached to Chiller
+  REAL(r64)         :: MaxExhaustperGTPower    =0.0d0  !Max Exhaust Flow per KW Power Out
+  REAL(r64)         :: DesignSteamSatTemp      =0.0d0  !Steam Saturation Temperature
+  REAL(r64)         :: ExhaustStackTemp        =0.0d0  !Temperature of Exhaust Gases
 
   INTEGER           :: HeatRecInletNodeNum     =0    ! Node number on the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum    =0    ! Node number on the heat recovery outlet side of the condenser
 
-  REAL(r64)         :: HeatRecInletTemp        =0.0  !Inlet Temperature of the heat recovery fluid
-  REAL(r64)         :: HeatRecOutletTemp       =0.0  !Outlet Temperature of the heat recovery fluid
-  REAL(r64)         :: HeatRecMdot             =0.0  ! reporting: Heat Recovery Loop Mass flow rate
-  REAL(r64)         :: DesignHeatRecVolFlowRate=0.0    ! m3/s, Design Water mass flow rate through heat recovery loop
-  REAL(r64)         :: DesignHeatRecMassFlowRate=0.0   ! kg/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64)         :: HeatRecInletTemp        =0.0d0  !Inlet Temperature of the heat recovery fluid
+  REAL(r64)         :: HeatRecOutletTemp       =0.0d0  !Outlet Temperature of the heat recovery fluid
+  REAL(r64)         :: HeatRecMdot             =0.0d0  ! reporting: Heat Recovery Loop Mass flow rate
+  REAL(r64)         :: DesignHeatRecVolFlowRate=0.0d0    ! m3/s, Design Water mass flow rate through heat recovery loop
+  REAL(r64)         :: DesignHeatRecMassFlowRate=0.0d0   ! kg/s, Design Water mass flow rate through heat recovery loop
   LOGICAL           :: HeatRecActive        =.false. ! True entered Heat Rec Vol Flow Rate >0
-  REAL(r64)         :: FuelHeatingValue        =0.0   !Heating Value of Fuel in kJ/kg
-  REAL(r64)         :: HeatRecMaxTemp          =0.0  !Max Temp that can be produced in heat recovery
+  REAL(r64)         :: FuelHeatingValue        =0.0d0   !Heating Value of Fuel in kJ/kg
+  REAL(r64)         :: HeatRecMaxTemp          =0.0d0  !Max Temp that can be produced in heat recovery
   INTEGER           :: HRLoopNum     = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRLoopSideNum = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRBranchNum   = 0  ! heat recovery water plant loop branch index
@@ -272,20 +272,20 @@ TYPE ConstCOPChillerSpecs
 END TYPE ConstCOPChillerSpecs
 
 TYPE BaseReportVars
-  REAL(r64)    :: Power          = 0.0 !
-  REAL(r64)    :: QEvap          = 0.0 !
-  REAL(r64)    :: QCond          = 0.0 !
-  REAL(r64)    :: Energy         = 0.0 !
-  REAL(r64)    :: EvapEnergy     = 0.0 !
-  REAL(r64)    :: CondEnergy     = 0.0 !
-  REAL(r64)    :: CondInletTemp  = 0.0 !
-  REAL(r64)    :: EvapInletTemp  = 0.0 !
-  REAL(r64)    :: CondOutletTemp = 0.0 !
-  REAL(r64)    :: EvapOutletTemp = 0.0 !
-  REAL(r64)    :: Evapmdot       = 0.0 !
-  REAL(r64)    :: Condmdot       = 0.0 !
-  REAL(r64)    :: BasinHeaterPower       = 0.0  ! Basin heater power (W)
-  REAL(r64)    :: BasinHeaterConsumption = 0.0  ! Basin heater energy consumption (J)
+  REAL(r64)    :: Power          = 0.0d0 !
+  REAL(r64)    :: QEvap          = 0.0d0 !
+  REAL(r64)    :: QCond          = 0.0d0 !
+  REAL(r64)    :: Energy         = 0.0d0 !
+  REAL(r64)    :: EvapEnergy     = 0.0d0 !
+  REAL(r64)    :: CondEnergy     = 0.0d0 !
+  REAL(r64)    :: CondInletTemp  = 0.0d0 !
+  REAL(r64)    :: EvapInletTemp  = 0.0d0 !
+  REAL(r64)    :: CondOutletTemp = 0.0d0 !
+  REAL(r64)    :: EvapOutletTemp = 0.0d0 !
+  REAL(r64)    :: Evapmdot       = 0.0d0 !
+  REAL(r64)    :: Condmdot       = 0.0d0 !
+  REAL(r64)    :: BasinHeaterPower       = 0.0d0  ! Basin heater power (W)
+  REAL(r64)    :: BasinHeaterConsumption = 0.0d0  ! Basin heater energy consumption (J)
 END TYPE BaseReportVars
 
 TYPE ElectricReportVars
@@ -301,42 +301,42 @@ END TYPE ElectricReportVars
 
 TYPE EngineDrivenReportVars
   TYPE(BaseReportVars) :: Base
-  REAL(r64)    :: QJacketRecovered       = 0.0 ! reporting: Heat Recovered from Jacket (W)
-  REAL(r64)    :: QLubeOilRecovered      = 0.0 ! reporting: Heat Recovered from Lubricant (W)
-  REAL(r64)    :: QExhaustRecovered      = 0.0 ! reporting: exhaust gas heat recovered (W)
-  REAL(r64)    :: QTotalHeatRecovered    = 0.0 ! reporting: Total Heat Recovered (W)
-  REAL(r64)    :: TotalHeatEnergyRec     = 0.0 ! reporting: total heat recovered (J)
-  REAL(r64)    :: JacketEnergyRec        = 0.0 ! reporting: heat recovered from jacket (J)
-  REAL(r64)    :: LubeOilEnergyRec       = 0.0 ! reporting: heat recovered from lube (J)
-  REAL(r64)    :: ExhaustEnergyRec       = 0.0 ! reporting: exhaust gas heat recovered (J)
-  REAL(r64)    :: FuelEnergy             = 0.0 ! reporting: Fuel Energy used (J)
-  REAL(r64)    :: FuelEnergyUseRate      = 0.0 ! reporting: Fuel Energy used (W)
-  REAL(r64)    :: FuelMdot               = 0.0 ! reporting: Fuel used (Kg/s)
-  REAL(r64)    :: ExhaustStackTemp       = 0.0 ! reporting: Exhaust Stack Temperature (C)
-  REAL(r64)    :: HeatRecInletTemp       = 0.0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
-  REAL(r64)    :: HeatRecOutletTemp      = 0.0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
-  REAL(r64)    :: HeatRecMdot            = 0.0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
-  REAL(r64)    :: FuelCOP                = 0.0 ! reporting: Fuel COP [delivered cooling rate/fuel energy input rate] (W/W)
+  REAL(r64)    :: QJacketRecovered       = 0.0d0 ! reporting: Heat Recovered from Jacket (W)
+  REAL(r64)    :: QLubeOilRecovered      = 0.0d0 ! reporting: Heat Recovered from Lubricant (W)
+  REAL(r64)    :: QExhaustRecovered      = 0.0d0 ! reporting: exhaust gas heat recovered (W)
+  REAL(r64)    :: QTotalHeatRecovered    = 0.0d0 ! reporting: Total Heat Recovered (W)
+  REAL(r64)    :: TotalHeatEnergyRec     = 0.0d0 ! reporting: total heat recovered (J)
+  REAL(r64)    :: JacketEnergyRec        = 0.0d0 ! reporting: heat recovered from jacket (J)
+  REAL(r64)    :: LubeOilEnergyRec       = 0.0d0 ! reporting: heat recovered from lube (J)
+  REAL(r64)    :: ExhaustEnergyRec       = 0.0d0 ! reporting: exhaust gas heat recovered (J)
+  REAL(r64)    :: FuelEnergy             = 0.0d0 ! reporting: Fuel Energy used (J)
+  REAL(r64)    :: FuelEnergyUseRate      = 0.0d0 ! reporting: Fuel Energy used (W)
+  REAL(r64)    :: FuelMdot               = 0.0d0 ! reporting: Fuel used (Kg/s)
+  REAL(r64)    :: ExhaustStackTemp       = 0.0d0 ! reporting: Exhaust Stack Temperature (C)
+  REAL(r64)    :: HeatRecInletTemp       = 0.0d0 ! reporting: Heat Recovery Loop Inlet Temperature (C)
+  REAL(r64)    :: HeatRecOutletTemp      = 0.0d0 ! reporting: Heat Recovery Loop Outlet Temperature (C)
+  REAL(r64)    :: HeatRecMdot            = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate (kg/s)
+  REAL(r64)    :: FuelCOP                = 0.0d0 ! reporting: Fuel COP [delivered cooling rate/fuel energy input rate] (W/W)
 END TYPE EngineDrivenReportVars
 
 TYPE GasTurbineReportVars
   TYPE(BaseReportVars) :: Base
-  REAL(r64)    :: HeatRecLubeEnergy    = 0.0 ! reporting: Heat Recovered from Lubricant(J)
-  REAL(r64)    :: HeatRecLubeRate      = 0.0 ! reporting: Recoverable Lube Oil Rate of Rwecovery (W)
-  REAL(r64)    :: FuelEnergyUsed       = 0.0 ! reporting: Fuel Energy used
-  REAL(r64)    :: FuelEnergyUsedRate   = 0.0 ! reporting: Fuel energy used rate (fuel consumption rate)
-  REAL(r64)    :: FuelMassUsed         = 0.0 ! reporting: Fuel Amount used
-  REAL(r64)    :: FuelMassUsedRate     = 0.0 ! reporting: Fuel amount used (fuel Mass consumption rate)
-  REAL(r64)    :: ExhaustStackTemp     = 0.0 ! reporting: Exhaust Stack Temperature
-  REAL(r64)    :: HeatRecInletTemp     = 0.0 ! reporting: Heat Recovery Loop Inlet Temperature
-  REAL(r64)    :: HeatRecOutletTemp    = 0.0 ! reporting: Heat Recovery Loop Outlet Temperature
-  REAL(r64)    :: HeatRecMdot          = 0.0 ! reporting: Heat Recovery Loop Mass flow rate
-  REAL(r64)    :: FuelCOP              = 0.0 ! reporting: Fuel coefficient of performance (Qevap/FuelEnergyUsedRate)
+  REAL(r64)    :: HeatRecLubeEnergy    = 0.0d0 ! reporting: Heat Recovered from Lubricant(J)
+  REAL(r64)    :: HeatRecLubeRate      = 0.0d0 ! reporting: Recoverable Lube Oil Rate of Rwecovery (W)
+  REAL(r64)    :: FuelEnergyUsed       = 0.0d0 ! reporting: Fuel Energy used
+  REAL(r64)    :: FuelEnergyUsedRate   = 0.0d0 ! reporting: Fuel energy used rate (fuel consumption rate)
+  REAL(r64)    :: FuelMassUsed         = 0.0d0 ! reporting: Fuel Amount used
+  REAL(r64)    :: FuelMassUsedRate     = 0.0d0 ! reporting: Fuel amount used (fuel Mass consumption rate)
+  REAL(r64)    :: ExhaustStackTemp     = 0.0d0 ! reporting: Exhaust Stack Temperature
+  REAL(r64)    :: HeatRecInletTemp     = 0.0d0 ! reporting: Heat Recovery Loop Inlet Temperature
+  REAL(r64)    :: HeatRecOutletTemp    = 0.0d0 ! reporting: Heat Recovery Loop Outlet Temperature
+  REAL(r64)    :: HeatRecMdot          = 0.0d0 ! reporting: Heat Recovery Loop Mass flow rate
+  REAL(r64)    :: FuelCOP              = 0.0d0 ! reporting: Fuel coefficient of performance (Qevap/FuelEnergyUsedRate)
 END TYPE GasTurbineReportVars
 
 TYPE ConstCOPReportVars
     TYPE(BaseReportVars) :: Base
-  REAL(r64)    :: ActualCOP      = 0.0 !
+  REAL(r64)    :: ActualCOP      = 0.0d0 !
 END TYPE ConstCOPReportVars
 
 TYPE (ElectricChillerSpecs), ALLOCATABLE, PUBLIC, DIMENSION(:)  :: ElectricChiller  !dimension to number of machines
@@ -745,7 +745,7 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
         CALL InitConstCOPChiller(ChillNum,RunFlag,MyLoad)
         CALL SizeConstCOPChiller(ChillNum)
         IF (LoopNum == ConstCOPChiller(ChillNum)%Base%CWLoopNum) THEN
-          MinCap = 0
+          MinCap = 0.0d0
           MaxCap = ConstCOPChiller(ChillNum)%Base%NomCap
           OptCap = ConstCOPChiller(ChillNum)%Base%NomCap
         ELSE
@@ -809,6 +809,7 @@ SUBROUTINE GetElectricChillerInput
   USE PlantUtilities,    ONLY: RegisterPlantCompDesignFlow
   USE ScheduleManager,    ONLY: GetScheduleIndex
   USE DataSizing,        ONLY: Autosize
+  USE DataGlobals,       ONLY: AnyEnergyManagementSystemInModel
 
   IMPLICIT NONE !
 
@@ -877,13 +878,13 @@ SUBROUTINE GetElectricChillerInput
 
 
     ElectricChiller(ChillerNum)%Base%NomCap              = rNumericArgs(1)
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
     ElectricChiller(ChillerNum)%Base%COP                 = rNumericArgs(2)
-    IF (rNumericArgs(2) == 0.0) THEN
+    IF (rNumericArgs(2) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),3)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
@@ -978,7 +979,7 @@ SUBROUTINE GetElectricChillerInput
     ElectricChiller(ChillerNum)%CapRatCoef(1)       = rNumericArgs(11)
     ElectricChiller(ChillerNum)%CapRatCoef(2)       = rNumericArgs(12)
     ElectricChiller(ChillerNum)%CapRatCoef(3)       = rNumericArgs(13)
-    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0) THEN
+    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Sum of Capacity Ratio Coef = 0.0, chiller='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
@@ -990,7 +991,7 @@ SUBROUTINE GetElectricChillerInput
     ElectricChiller(ChillerNum)%FullLoadCoef(3)     = rNumericArgs(19)
     ElectricChiller(ChillerNum)%TempLowLimitEvapOut = rNumericArgs(20)
     ElectricChiller(ChillerNum)%Base%SizFac              = rNumericArgs(22)
-    IF (ElectricChiller(ChillerNum)%Base%SizFac <= 0.0) ElectricChiller(ChillerNum)%Base%SizFac = 1.0d0
+    IF (ElectricChiller(ChillerNum)%Base%SizFac <= 0.0d0) ElectricChiller(ChillerNum)%Base%SizFac = 1.0d0
 
     SELECT CASE (TRIM(cAlphaArgs(7)))
     CASE ( 'CONSTANTFLOW' )
@@ -1014,7 +1015,7 @@ SUBROUTINE GetElectricChillerInput
 
    ! These are the Heat Recovery Inputs
     ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(21)
-    IF ((ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0) &
+    IF ((ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0d0) &
         .OR. (ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate == Autosize ) ) THEN
       ElectricChiller(ChillerNum)%HeatRecActive=.true.
       ElectricChiller(ChillerNum)%HeatRecInletNodeNum   = &
@@ -1042,7 +1043,7 @@ SUBROUTINE GetElectricChillerInput
       ! Condenser flow rate must be specified for heat reclaim
       IF (ElectricChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
           ElectricChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-        IF(ElectricChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0)THEN
+        IF(ElectricChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0d0)THEN
           CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(10))//'='//TRIM(RoundSigDigits(rNumericArgs(10),6)))
           CALL ShowSevereError('Condenser fluid flow rate must be specified for Heat Reclaim applications.')
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
@@ -1089,7 +1090,7 @@ SUBROUTINE GetElectricChillerInput
 
     ELSE
       ElectricChiller(ChillerNum)%HeatRecActive=.false.
-      ElectricChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
+      ElectricChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0d0
       ElectricChiller(ChillerNum)%HeatRecInletNodeNum   = 0
       ElectricChiller(ChillerNum)%HeatRecOutletNodeNum   = 0
       ! if heat recovery is not used, don't care about condenser flow rate for air/evap-cooled equip.
@@ -1209,7 +1210,10 @@ SUBROUTINE GetElectricChillerInput
            ElectricChillerReport(ChillerNum)%ChillerCondAvgTemp, 'System','Average',ElectricChiller(ChillerNum)%Base%Name)
 
      ENDIF
-
+     IF (AnyEnergyManagementSystemInModel) THEN
+       CALL SetupEMSInternalVariable('Chiller Nominal Capacity', ElectricChiller(ChillerNum)%Base%Name, '[W]', &
+                                     ElectricChiller(ChillerNum)%Base%NomCap  )
+     ENDIF
   END DO
 
 
@@ -1242,7 +1246,8 @@ SUBROUTINE GetEngineDrivenChillerInput
   USE OutAirNodeManager, ONLY: CheckAndAddAirNodeNumber
   USE General,           ONLY: RoundSigDigits
   USE PlantUtilities,    ONLY: RegisterPlantCompDesignFlow
-  USE ScheduleManager,    ONLY: GetScheduleIndex
+  USE ScheduleManager,   ONLY: GetScheduleIndex
+  USE DataGlobals,       ONLY: AnyEnergyManagementSystemInModel
 
   IMPLICIT NONE !
 
@@ -1294,14 +1299,14 @@ SUBROUTINE GetEngineDrivenChillerInput
     EngineDrivenChiller(ChillerNum)%Base%Name                = cAlphaArgs(1)
 
     EngineDrivenChiller(ChillerNum)%Base%NomCap              = rNumericArgs(1)
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
 
     EngineDrivenChiller(ChillerNum)%Base%COP                 = rNumericArgs(2)
-    IF (rNumericArgs(2) == 0.0) THEN
+    IF (rNumericArgs(2) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
@@ -1410,7 +1415,7 @@ SUBROUTINE GetEngineDrivenChillerInput
     EngineDrivenChiller(ChillerNum)%CapRatCoef(1)       = rNumericArgs(11)
     EngineDrivenChiller(ChillerNum)%CapRatCoef(2)       = rNumericArgs(12)
     EngineDrivenChiller(ChillerNum)%CapRatCoef(3)       = rNumericArgs(13)
-    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0) THEN
+    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Sum of Capacity Ratio Coef = 0.0, chiller='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
@@ -1504,7 +1509,7 @@ SUBROUTINE GetEngineDrivenChillerInput
 
     EngineDrivenChiller(ChillerNum)%FuelHeatingValue = rNumericArgs(25)
     EngineDrivenChiller(ChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(26)
-    IF (EngineDrivenChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF (EngineDrivenChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0d0) THEN
       EngineDrivenChiller(ChillerNum)%HeatRecActive=.true.
       EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(13),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
@@ -1528,7 +1533,7 @@ SUBROUTINE GetEngineDrivenChillerInput
       ! Condenser flow rate must be specified for heat reclaim
       IF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
           EngineDrivenChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-        IF(EngineDrivenChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0)THEN
+        IF(EngineDrivenChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0d0)THEN
           CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(10))//'='//TRIM(RoundSigDigits(rNumericArgs(10),6)))
           CALL ShowSevereError('Condenser fluid flow rate must be specified for Heat Reclaim applications.')
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
@@ -1541,7 +1546,7 @@ SUBROUTINE GetEngineDrivenChillerInput
 
 
       EngineDrivenChiller(ChillerNum)%HeatRecActive=.false.
-      EngineDrivenChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
+      EngineDrivenChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0d0
       EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum   = 0
       EngineDrivenChiller(ChillerNum)%HeatRecOutletNodeNum   = 0
       ! if heat recovery is not used, don't care about condenser flow rate for air/evap-cooled equip.
@@ -1578,7 +1583,7 @@ SUBROUTINE GetEngineDrivenChillerInput
 
     EngineDrivenChiller(ChillerNum)%HeatRecMaxTemp = rNumericArgs(27)
     EngineDrivenChiller(ChillerNum)%Base%SizFac = rNumericArgs(28)
-    IF (EngineDrivenChiller(ChillerNum)%Base%SizFac <= 0.0) EngineDrivenChiller(ChillerNum)%Base%SizFac = 1.0d0
+    IF (EngineDrivenChiller(ChillerNum)%Base%SizFac <= 0.0d0) EngineDrivenChiller(ChillerNum)%Base%SizFac = 1.0d0
 
     !   Basin heater power as a function of temperature must be greater than or equal to 0
     EngineDrivenChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff = rNumericArgs(29)
@@ -1716,6 +1721,10 @@ SUBROUTINE GetEngineDrivenChillerInput
 
 
      ENDIF
+     IF (AnyEnergyManagementSystemInModel) THEN
+       CALL SetupEMSInternalVariable('Chiller Nominal Capacity', EngineDrivenChiller(ChillerNum)%Base%Name, '[W]', &
+                                     EngineDrivenChiller(ChillerNum)%Base%NomCap  )
+     ENDIF
   END DO
 
 RETURN
@@ -1745,7 +1754,8 @@ SUBROUTINE GetGTChillerInput
   USE OutAirNodeManager, ONLY: CheckAndAddAirNodeNumber
   USE General,           ONLY: RoundSigDigits
   USE PlantUtilities,    ONLY: RegisterPlantCompDesignFlow
-  USE ScheduleManager,    ONLY: GetScheduleIndex
+  USE ScheduleManager,   ONLY: GetScheduleIndex
+  USE DataGlobals,       ONLY: AnyEnergyManagementSystemInModel
 
   IMPLICIT NONE !
 
@@ -1796,14 +1806,14 @@ SUBROUTINE GetGTChillerInput
     GTChiller(ChillerNum)%Base%Name                = cAlphaArgs(1)
 
     GTChiller(ChillerNum)%Base%NomCap              = rNumericArgs(1)
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
 
     GTChiller(ChillerNum)%Base%COP                 = rNumericArgs(2)
-    IF (rNumericArgs(2) == 0.0) THEN
+    IF (rNumericArgs(2) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
@@ -1891,7 +1901,7 @@ SUBROUTINE GetGTChillerInput
     GTChiller(ChillerNum)%CapRatCoef(1)       = rNumericArgs(11)
     GTChiller(ChillerNum)%CapRatCoef(2)       = rNumericArgs(12)
     GTChiller(ChillerNum)%CapRatCoef(3)       = rNumericArgs(13)
-    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0) THEN
+    IF ((rNumericArgs(11)+rNumericArgs(12)+rNumericArgs(13)) == 0.0d0) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Sum of Capacity Ratio Coef = 0.0, chiller='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
@@ -1940,7 +1950,7 @@ SUBROUTINE GetGTChillerInput
 
     !Get the Heat Recovery information
     GTChiller(ChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(45)
-    IF (GTChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF (GTChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0d0) THEN
       GTChiller(ChillerNum)%HeatRecActive=.true.
       GTChiller(ChillerNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
@@ -1965,7 +1975,7 @@ SUBROUTINE GetGTChillerInput
        ! Condenser flow rate must be specified for heat reclaim
       IF (GTChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
           GTChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-        IF(GTChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0)THEN
+        IF(GTChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0d0)THEN
           CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(10))//'='//TRIM(RoundSigDigits(rNumericArgs(10),6)))
           CALL ShowSevereError('Condenser fluid flow rate must be specified for Heat Reclaim applications.')
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
@@ -1976,7 +1986,7 @@ SUBROUTINE GetGTChillerInput
 
     ELSE
       GTChiller(ChillerNum)%HeatRecActive=.false.
-      GTChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
+      GTChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0d0
       GTChiller(ChillerNum)%HeatRecInletNodeNum    = 0
       GTChiller(ChillerNum)%HeatRecOutletNodeNum   = 0
       IF ((.NOT. lAlphaFieldBlanks(7))  .OR. (.NOT. lAlphaFieldBlanks(8))) THEN
@@ -2047,7 +2057,7 @@ SUBROUTINE GetGTChillerInput
 
     GTChiller(ChillerNum)%HeatRecMaxTemp = rNumericArgs(46)
     GTChiller(ChillerNum)%Base%SizFac = rNumericArgs(47)
-    IF (GTChiller(ChillerNum)%Base%SizFac <= 0.0) GTChiller(ChillerNum)%Base%SizFac = 1.0d0
+    IF (GTChiller(ChillerNum)%Base%SizFac <= 0.0d0) GTChiller(ChillerNum)%Base%SizFac = 1.0d0
 
     !   Basin heater power as a function of temperature must be greater than or equal to 0
     GTChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff = rNumericArgs(48)
@@ -2166,6 +2176,11 @@ SUBROUTINE GetGTChillerInput
      CALL SetupOutputVariable('Chiller COP [W/W]', &
           GTChillerReport(ChillerNum)%FuelCOP,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
+     IF (AnyEnergyManagementSystemInModel) THEN
+       CALL SetupEMSInternalVariable('Chiller Nominal Capacity', GTChiller(ChillerNum)%Base%Name, '[W]', &
+                                     GTChiller(ChillerNum)%Base%NomCap  )
+     ENDIF
+
   END DO
 
 RETURN
@@ -2197,6 +2212,7 @@ SUBROUTINE GetConstCOPChillerInput
   USE OutAirNodeManager, ONLY: CheckAndAddAirNodeNumber
   USE General, ONLY: RoundSigDigits
   USE ScheduleManager,    ONLY: GetScheduleIndex
+  USE DataGlobals,        ONLY: AnyEnergyManagementSystemInModel
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2254,13 +2270,13 @@ SUBROUTINE GetConstCOPChillerInput
     ENDIF
     ConstCOPChiller(ChillerNum)%Base%Name                = cAlphaArgs(1)
     ConstCOPChiller(ChillerNum)%Base%NomCap              = rNumericArgs(1)
-    IF (rNumericArgs(1) == 0.0) THEN
+    IF (rNumericArgs(1) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
     ENDIF
     ConstCOPChiller(ChillerNum)%Base%COP                 = rNumericArgs(2)
-    IF (rNumericArgs(2) == 0.0) THEN
+    IF (rNumericArgs(2) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       ErrorsFound=.true.
@@ -2282,7 +2298,7 @@ SUBROUTINE GetConstCOPChillerInput
     ConstCOPChiller(ChillerNum)%Base%EvapVolFlowRate     = rNumericArgs(3)
     IF (ConstCOPChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
         ConstCOPChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN ! Condenser flow rate not used for these cond types
-      ConstCOPChiller(ChillerNum)%Base%CondVolFlowRate   = 0.0011
+      ConstCOPChiller(ChillerNum)%Base%CondVolFlowRate   = 0.0011d0
     ELSE
       ConstCOPChiller(ChillerNum)%Base%CondVolFlowRate   = rNumericArgs(4)
     ENDIF
@@ -2469,6 +2485,10 @@ SUBROUTINE GetConstCOPChillerInput
                ConstCOPChillerReport(ChillerNum)%Base%BasinHeaterConsumption,'System','Sum',ConstCOPChiller(ChillerNum)%Base%Name, &
                ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
         END IF
+     ENDIF
+     IF (AnyEnergyManagementSystemInModel) THEN
+       CALL SetupEMSInternalVariable('Chiller Nominal Capacity', ConstCOPChiller(ChillerNum)%Base%Name, '[W]', &
+                                     ConstCOPChiller(ChillerNum)%Base%NomCap  )
      ENDIF
   END DO
 
@@ -2728,10 +2748,10 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad )
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
       Node(CondOutletNode)%MassFlowRateMax      = Node(CondInletNode)%MassFlowrate
-      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0
-      Node(CondInletNode)%MassFlowRateMin       = 0.0
-      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0
-      Node(CondOutletNode)%MassFlowRateMin      = 0.0
+      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0d0
+      Node(CondInletNode)%MassFlowRateMin       = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMin      = 0.0d0
     END IF
 
     IF (ElectricChiller(ChillNum)%HeatRecActive) THEN
@@ -3117,10 +3137,10 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad)
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
       Node(CondOutletNode)%MassFlowRateMax      = Node(CondInletNode)%MassFlowrate
-      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0
-      Node(CondInletNode)%MassFlowRateMin       = 0.0
-      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0
-      Node(CondOutletNode)%MassFlowRateMin      = 0.0
+      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0d0
+      Node(CondInletNode)%MassFlowRateMin       = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMin      = 0.0d0
     END IF
 
     IF (EngineDrivenChiller(ChillNum)%HeatRecActive) THEN
@@ -3445,10 +3465,10 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad)
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
       Node(CondOutletNode)%MassFlowRateMax      = Node(CondInletNode)%MassFlowrate
-      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0
-      Node(CondInletNode)%MassFlowRateMin       = 0.0
-      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0
-      Node(CondOutletNode)%MassFlowRateMin      = 0.0
+      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0d0
+      Node(CondInletNode)%MassFlowRateMin       = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMin      = 0.0d0
     END IF
 
     IF (GTChiller(ChillNum)%HeatRecActive) THEN
@@ -3735,10 +3755,10 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad)
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
       Node(CondOutletNode)%MassFlowRateMax      = Node(CondInletNode)%MassFlowrate
-      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0
-      Node(CondInletNode)%MassFlowRateMin       = 0.0
-      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0
-      Node(CondOutletNode)%MassFlowRateMin      = 0.0
+      Node(CondInletNode)%MassFlowRateMinAvail  = 0.0d0
+      Node(CondInletNode)%MassFlowRateMin       = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMinAvail = 0.0d0
+      Node(CondOutletNode)%MassFlowRateMin      = 0.0d0
     END IF
     MyEnvironFlag(ChillNum) = .FALSE.
   END IF
@@ -3929,7 +3949,7 @@ SUBROUTINE SizeElectricChiller(ChillNum)
                               'Design Condenser Water Flow Rate [m3/s]', &
                               ElectricChiller(ChillNum)%Base%CondVolFlowRate)
     ELSE
-      CALL ShowContinueError('Autosizing of Electric Chiller condenser flow rate requires a condenser')
+      CALL ShowSevereError('Autosizing of Electric Chiller condenser flow rate requires a condenser')
       CALL ShowContinueError('loop Sizing:Plant object')
       CALL ShowContinueError('Occurs in Electric Chiller object='//TRIM(ElectricChiller(ChillNum)%Base%Name))
       ErrorsFound = .TRUE.
@@ -4113,7 +4133,7 @@ SUBROUTINE SizeEngineDrivenChiller(ChillNum)
                               'Design Condenser Water Flow Rate [m3/s]', &
                               EngineDrivenChiller(ChillNum)%Base%CondVolFlowRate)
     ELSE
-      CALL ShowContinueError('Autosizing of EngineDriven Chiller condenser flow rate requires a condenser')
+      CALL ShowSevereError('Autosizing of EngineDriven Chiller condenser flow rate requires a condenser')
       CALL ShowContinueError('loop Sizing:Plant object')
       CALL ShowContinueError('Occurs in EngineDriven Chiller object='//TRIM(EngineDrivenChiller(ChillNum)%Base%Name))
       ErrorsFound = .TRUE.
@@ -4273,7 +4293,7 @@ SUBROUTINE SizeGTChiller(ChillNum)
                                  GTChiller(ChillNum)%TempDesCondIn,                      &
                                  PlantLoop(GTChiller(ChillNum)%Base%CDLoopNum)%FluidIndex, &
                                  'SizeGTChiller')
-        tmpCondVolFlowRate = tmpNomCap *  (1. + 1./GTChiller(ChillNum)%Base%COP) / &
+        tmpCondVolFlowRate = tmpNomCap *  (1.0d0 + 1.0d0/GTChiller(ChillNum)%Base%COP) / &
                                 ( PlantSizData(PltSizCondNum)%DeltaT * Cp * Rho)
         IF (PlantSizesOkayToFinalize) GTChiller(ChillNum)%Base%CondVolFlowRate = tmpCondVolFlowRate
       ELSE
@@ -4284,7 +4304,7 @@ SUBROUTINE SizeGTChiller(ChillNum)
                               'Design Condenser Water Flow Rate [m3/s]', &
                               GTChiller(ChillNum)%Base%CondVolFlowRate)
     ELSE
-      CALL ShowContinueError('Autosizing of Gas Turbine Chiller condenser flow rate requires a condenser')
+      CALL ShowSevereError('Autosizing of Gas Turbine Chiller condenser flow rate requires a condenser')
       CALL ShowContinueError('loop Sizing:Plant object')
       CALL ShowContinueError('Occurs in Gas Turbine Chiller object='//TRIM(GTChiller(ChillNum)%Base%Name))
       ErrorsFound = .TRUE.
@@ -4462,7 +4482,7 @@ SUBROUTINE SizeConstCOPChiller(ChillNum)
                               'Design Condenser Water Flow Rate [m3/s]', &
                               ConstCOPChiller(ChillNum)%Base%CondVolFlowRate)
     ELSE
-      CALL ShowContinueError('Autosizing of Constant COP Chiller condenser flow rate requires a condenser')
+      CALL ShowSevereError('Autosizing of Constant COP Chiller condenser flow rate requires a condenser')
       CALL ShowContinueError('loop Sizing:Plant object')
       CALL ShowContinueError('Occurs in Chiller:ConstantCOP object='//TRIM(ConstCOPChiller(ChillNum)%Base%Name))
       ErrorsFound = .TRUE.
@@ -4574,28 +4594,28 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag)
   INTEGER                :: LoopSideNum
   INTEGER                :: BranchNum
   INTEGER                :: CompNum
-  REAL(r64),SAVE  :: TimeStepSysLast=0.0     ! last system time step (used to check for downshifting)
+  REAL(r64),SAVE  :: TimeStepSysLast=0.0d0     ! last system time step (used to check for downshifting)
   REAL(r64)       :: CurrentEndTime          ! end time of time step for current simulation time step
-  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0  ! end time of time step for last simulation time step
+  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0d0  ! end time of time step for last simulation time step
   CHARACTER(len=6):: OutputChar = ' '        ! character string for warning messages
   REAL(r64)       :: Cp ! local for fluid specif heat, for evaporator
   REAL(r64)       :: CpCond ! local for fluid specif heat, for condenser
 
           !set module level inlet and outlet nodes
-  EvapMassFlowRate           = 0.0
-  CondMassFlowRate           = 0.0
-  Power                      = 0.0
-  Energy                     = 0.0
-  QCondenser                 = 0.0
-  QEvaporator                = 0.0
-  CondenserEnergy            = 0.0
-  EvaporatorEnergy           = 0.0
-  QHeatRecovered             = 0.0
+  EvapMassFlowRate           = 0.0d0
+  CondMassFlowRate           = 0.0d0
+  Power                      = 0.0d0
+  Energy                     = 0.0d0
+  QCondenser                 = 0.0d0
+  QEvaporator                = 0.0d0
+  CondenserEnergy            = 0.0d0
+  EvaporatorEnergy           = 0.0d0
+  QHeatRecovered             = 0.0d0
   EvapInletNode  = ElectricChiller(ChillNum)%Base%EvapInletNodeNum
   EvapOutletNode = ElectricChiller(ChillNum)%Base%EvapOutletNodeNum
   CondInletNode  = ElectricChiller(ChillNum)%Base%CondInletNodeNum
   CondOutletNode = ElectricChiller(ChillNum)%Base%CondOutletNodeNum
-  FRAC               = 1.0
+  FRAC               = 1.0d0
   LoopNum            = ElectricChiller(ChillNum)%Base%CWLoopNum
   LoopSideNum        = ElectricChiller(ChillNum)%Base%CWLoopSideNum
   BranchNum          = ElectricChiller(ChillNum)%Base%CWBranchNum
@@ -4636,7 +4656,7 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag)
     IF(EquipFlowCtrl == ControlType_SeriesActive .OR. PlantLoop(LoopNum)%LoopSide(LoopSideNum)%FlowLock==1) THEN
       EvapMassFlowRate = Node(EvapInletNode)%MassFlowrate
     ELSE
-      EvapMassFlowRate           = 0.0
+      EvapMassFlowRate           = 0.0d0
       CALL SetComponentFlowRate( EvapMassFlowRate,  &
                               EvapInletNode , EvapOutletNode  , &
                               ElectricChiller(ChillNum)%Base%CWLoopNum,     &
@@ -4651,7 +4671,7 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag)
                 Comp(ElectricChiller(ChillNum)%Base%CDCompNum)%FlowCtrl == ControlType_SeriesActive) THEN
         CondMassFlowRate           = Node(CondInletNode)%MassFlowrate
       ELSE
-        CondMassFlowRate           = 0.0
+        CondMassFlowRate           = 0.0d0
         CALL SetComponentFlowRate(CondMassFlowRate, CondInletNode, CondOutletNode, &
                               ElectricChiller(ChillNum)%Base%CDLoopNum, &
                               ElectricChiller(ChillNum)%Base%CDLoopSideNum, &
@@ -4720,7 +4740,7 @@ END IF
   IF (ElectricChiller(ChillNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
       !  Warn user if entering condenser temperature falls below 0C
-      IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 0.0d0 .and. .not. WarmupFlag) THEN
         ElectricChiller(ChillNum)%Base%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         ElectricChiller(ChillNum)%Base%MsgBuffer1 = 'CalcElectricChillerModel - Chiller:Electric "' &
@@ -4797,25 +4817,25 @@ END IF
   !Calculate the PLR. When there is Min PLR and the load is less than Min PLR then the Frac Full load Power
   !is calculated at Min PLR, while all other calculations are based on the actual PLR. So in that case once
   !FracFullLoadPower is calculated the PLR should be recalculated
-  IF (AvailChillerCap > 0.0) THEN
+  IF (AvailChillerCap > 0.0d0) THEN
     PartLoadRat = MAX(MinPartLoadRat, MIN(ABS(MyLoad)/AvailChillerCap,MaxPartLoadRat))
   ENDIF
 
  ! from BLAST...RPOWER=RPWRC(1)+RPWRC(2)*RCLOAD+RPWRC(3)*RCLOAD**2
   FracFullLoadPower = FullLoadFactor(1)                      &
                     + FullLoadFactor(2) * PartLoadRat      &
-                    + FullLoadFactor(3) * PartLoadRat ** 2.d0
+                    + FullLoadFactor(3) * PartLoadRat ** 2
 
   !If the PLR is less than Min PLR calculate the actual PLR for calculations. The power will then adjust for
   !the cycling.
-  IF (AvailChillerCap > 0.0) THEN
+  IF (AvailChillerCap > 0.0d0) THEN
     IF(ABS(MyLoad)/AvailChillerCap .LT. MinPartLoadRat) THEN
      OperPartLoadRat = ABS(MyLoad)/AvailChillerCap
     ELSE
      OperPartLoadRat = PartLoadRat
     END IF
   ELSE
-    OperPartLoadRat = 0.0
+    OperPartLoadRat = 0.0d0
   ENDIF
 
   Cp = GetSpecificHeatGlycol(PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%FluidName,  &
@@ -4839,7 +4859,7 @@ END IF
        IF (OperPartLoadRat .LT. MinPartLoadRat) THEN
         FRAC = MIN(1.0d0,(OperPartLoadRat/MinPartLoadRat))
        ELSE
-        FRAC = 1.0
+        FRAC = 1.0d0
        END IF
        Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap/RatedCOP * FRAC
 
@@ -4900,7 +4920,7 @@ END IF
           ELSE
 
             ! Try to request zero flow
-            EvapMassFlowRate=0.0
+            EvapMassFlowRate=0.0d0
             ! Use SetComponentFlowRate to decide actual flow
             Call SetComponentFlowRate( EvapMassFlowRate,  &
                               EvapInletNode , EvapOutletNode  , &
@@ -4999,7 +5019,7 @@ END IF
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       ELSE
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End IF
@@ -5011,7 +5031,7 @@ END IF
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       Else
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End If
@@ -5028,10 +5048,10 @@ END IF
     ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap /RatedCOP * FRAC
 
-    IF(EvapMassFlowRate == 0.0) THEN
-     QEvaporator = 0.0
+    IF(EvapMassFlowRate == 0.0d0) THEN
+     QEvaporator = 0.0d0
      EvapOutletTemp = Node(EvapInletNode)%Temp
-     Power = 0.0
+     Power = 0.0d0
      ElectricChiller(ChillNum)%Base%PrintMessage = .FALSE.
     END IF
     IF(QEvaporator == 0.0d0 .AND. ElectricChiller(ChillNum)%Base%CondenserType == EvapCooled) THEN
@@ -5103,7 +5123,7 @@ END IF
       ENDIF
     ENDIF
     IF(.NOT.WarmupFlag)THEN
-      If (AvailNomCapRat < 0.0 ) then     ! apparently the real reason energy goes negative
+      If (AvailNomCapRat < 0.0d0 ) then     ! apparently the real reason energy goes negative
         CALL ShowSevereError('CalcElectricChillerModel: Capacity ratio below zero for ElectricChiller='//  &
                               TRIM(ElectricChiller(ChillNum)%Base%Name))
         CALL ShowContinueErrorTimeStamp(' ')
@@ -5115,8 +5135,8 @@ END IF
     ENDIF
     ! If makes it here, set limits, chiller can't have negative energy/power
     ! proceeding silently for now but may want to throw error here
-    Power = 0.0
-    Energy = 0.0
+    Power = 0.0d0
+    Energy = 0.0d0
   ENDIF
   RETURN
 END SUBROUTINE CalcElectricChillerModel
@@ -5208,9 +5228,9 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   REAL(r64)              :: FRAC
   INTEGER                :: LoopNum
   INTEGER                :: LoopSideNum
-  REAL(r64),SAVE  :: TimeStepSysLast=0.0     ! last system time step (used to check for downshifting)
+  REAL(r64),SAVE  :: TimeStepSysLast=0.0d0     ! last system time step (used to check for downshifting)
   REAL(r64)       :: CurrentEndTime          ! end time of time step for current simulation time step
-  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0  ! end time of time step for last simulation time step
+  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0d0  ! end time of time step for last simulation time step
   CHARACTER(len=6):: OutputChar = ' '        ! character string for warning messages
   REAL(r64)       :: Cp                      ! local for fluid specif heat, for evaporator
   REAL(r64)       :: CpCond                  ! local for fluid specif heat, for condenser
@@ -5232,30 +5252,30 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 !  LOGICAL,SAVE :: PossibleSubCooling=.FALSE.
 
       !set module level inlet and outlet nodes
-  EvapMassFlowRate           = 0.0
-  CondMassFlowRate           = 0.0
-  Power                      = 0.0
-  QCondenser                 = 0.0
-  QEvaporator                = 0.0
-  Energy                     = 0.0
-  CondenserEnergy            = 0.0
-  EvaporatorEnergy           = 0.0
-  HeatRecCp                  = 0.0
-  HeatRecMdotActual          = 0.0
-  QTotalHeatRecovered        = 0.0
-  QJacketRecovered           = 0.0
-  QLubeOilRecovered          = 0.0
-  QExhaustRecovered          = 0.0
-  EngineDrivenFuelEnergy     = 0.0
-  FuelEnergyUseRate          = 0.0
-  TotalHeatEnergyRec         = 0.0
-  JacketEnergyRec            = 0.0
-  LubeOilEnergyRec           = 0.0
-  ExhaustEnergyRec           = 0.0
-  FuelEnergy                 = 0.0
-  FuelMdot                   = 0.0
-  ExhaustStackTemp           = 0.0
-  FRAC                       = 1.0
+  EvapMassFlowRate           = 0.0d0
+  CondMassFlowRate           = 0.0d0
+  Power                      = 0.0d0
+  QCondenser                 = 0.0d0
+  QEvaporator                = 0.0d0
+  Energy                     = 0.0d0
+  CondenserEnergy            = 0.0d0
+  EvaporatorEnergy           = 0.0d0
+  HeatRecCp                  = 0.0d0
+  HeatRecMdotActual          = 0.0d0
+  QTotalHeatRecovered        = 0.0d0
+  QJacketRecovered           = 0.0d0
+  QLubeOilRecovered          = 0.0d0
+  QExhaustRecovered          = 0.0d0
+  EngineDrivenFuelEnergy     = 0.0d0
+  FuelEnergyUseRate          = 0.0d0
+  TotalHeatEnergyRec         = 0.0d0
+  JacketEnergyRec            = 0.0d0
+  LubeOilEnergyRec           = 0.0d0
+  ExhaustEnergyRec           = 0.0d0
+  FuelEnergy                 = 0.0d0
+  FuelMdot                   = 0.0d0
+  ExhaustStackTemp           = 0.0d0
+  FRAC                       = 1.0d0
 
   IF (EngineDrivenChiller(ChillerNum)%HeatRecActive) THEN
      HeatRecInletTemp           = Node(EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum)%Temp
@@ -5341,7 +5361,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   IF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
 !  Warn user if entering condenser temperature falls below 0C
-      IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 0.0d0 .and. .not. WarmupFlag) THEN
         EngineDrivenChiller(ChillerNum)%Base%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         EngineDrivenChiller(ChillerNum)%Base%MsgBuffer1 = 'CalcEngineDrivenChillerModel - Chiller:EngineDriven "' &
@@ -5437,7 +5457,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 
   !  from BLAST...RCLOAD=AMAX1(MINCHFR(I,IPLCTR),AMIN1(CHLRLOAD(I)/CHLROCAP(I) &
   !         /RCAV,MAXCHFR(I,IPLCTR)))
- IF (AvailChillerCap > 0.0) THEN
+ IF (AvailChillerCap > 0.0d0) THEN
    PartLoadRat = MAX(MinPartLoadRat, MIN(ABS(MyLoad)/AvailChillerCap,MaxPartLoadRat))
  ENDIF
    ! from BLAST...RPOWER=RPWRC(1)+RPWRC(2)*RCLOAD+RPWRC(3)*RCLOAD**2
@@ -5445,7 +5465,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
                       + FullLoadFactor(2) * PartLoadRat      &
                       + FullLoadFactor(3) * PartLoadRat ** 2
 
- IF (AvailChillerCap > 0.0) THEN
+ IF (AvailChillerCap > 0.0d0) THEN
    IF(ABS(MyLoad)/AvailChillerCap .LT. MinPartLoadRat) THEN
      OperPartLoadRat = ABS(MyLoad)/AvailChillerCap
    ELSE
@@ -5524,7 +5544,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         END SELECT
       ELSE
         ! Try to request zero flow
-        EvapMassFlowRate=0.0
+        EvapMassFlowRate=0.0d0
         ! Use SetComponentFlowRate to decide actual flow
         Call SetComponentFlowRate( EvapMassFlowRate,  &
                           EvapInletNode , EvapOutletNode  , &
@@ -5625,7 +5645,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       Else
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End IF
@@ -5637,7 +5657,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       Else
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End If
@@ -5654,10 +5674,10 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap /COP * FRAC
 
-    IF(EvapMassFlowRate == 0.0) THEN
-      QEvaporator = 0.0
+    IF(EvapMassFlowRate == 0.0d0) THEN
+      QEvaporator = 0.0d0
       EvapOutletTemp = Node(EvapInletNode)%Temp
-      Power = 0.0
+      Power = 0.0d0
       EngineDrivenChiller(ChillerNum)%Base%PrintMessage = .FALSE.
     END IF
     IF(QEvaporator == 0.0d0 .AND. EngineDrivenChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
@@ -5700,7 +5720,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 !Use Curve fit to determine Fuel Energy Input.  For electric power generated in Watts, the fuel
 !energy input is calculated in J/s.  The PLBasedFuelInputCurve selects ratio of fuel flow (J/s)/cooling load (J/s).
   IF (PartLoadRat == 0)THEN
-    EngineDrivenFuelEnergy = 0
+    EngineDrivenFuelEnergy = 0.0d0
   ELSE
     PartLoadRat = MAX(MinPartLoadRat,PartLoadRat)
     ClngLoadFuelRat = CurveValue(EngineDrivenChiller(ChillerNum)%ClngLoadtoFuelCurve, PartLoadRat)
@@ -5743,7 +5763,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 
     QExhaustRecovered = MAX(ExhaustGasFlow*ExhaustCP*(ExhaustTemp-ExhaustStackTemp),0.0d0)
   ELSE
-    QExhaustRecovered = 0
+    QExhaustRecovered = 0.0d0
   END IF
 
 
@@ -5790,7 +5810,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
       ENDIF
     ENDIF
     IF(.NOT.WarmupFlag)THEN
-      If (AvailNomCapRat < 0.0 ) then     ! apparently the real reason energy goes negative
+      If (AvailNomCapRat < 0.0d0 ) then     ! apparently the real reason energy goes negative
         CALL ShowSevereError('CalcEngineDrivenChillerModel: Capacity ratio below zero for EngineDrivenChiller='//  &
                               TRIM(EngineDrivenChiller(ChillerNum)%Base%Name))
         CALL ShowContinueErrorTimeStamp(' ')
@@ -5802,8 +5822,8 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
     ENDIF
     ! If makes it here, set limits, chiller can't have negative energy/power
     ! proceeding silently for now but may want to throw error here
-    Power = 0.0
-    Energy = 0.0
+    Power = 0.0d0
+    Energy = 0.0d0
   ENDIF
 
   RETURN
@@ -5885,7 +5905,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   INTEGER                :: EvapOutletNode        ! evaporator outlet node number, water side
   INTEGER                :: CondInletNode         ! condenser inlet node number, water side
   INTEGER                :: CondOutletNode        ! condenser outlet node number, water side
-  REAL(r64), SAVE             :: EvapMassFlowRateMax=0.0   ! Max Design Evaporator Mass Flow Rate converted from Volume Flow Rate
+  REAL(r64), SAVE             :: EvapMassFlowRateMax=0.0d0   ! Max Design Evaporator Mass Flow Rate converted from Volume Flow Rate
   REAL(r64)              :: TempLowLimitEout      ! C - Evaporator low temp. limit cut off
 ! Special variables for GT Chiller
   REAL(r64)              :: RPLoad
@@ -5903,9 +5923,9 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   REAL(r64)              :: AmbientDeltaT         !(ATAIR) Difference between ambient actual and ambient design temperatures
   REAL(r64)         :: DesignSteamSatTemp         !Saturization Temperature of Steam in Stack
   REAL(r64)         :: ExhaustStackTemp           !Temperature of Exhaust Gases
-  REAL(r64),SAVE  :: TimeStepSysLast=0.0     ! last system time step (used to check for downshifting)
+  REAL(r64),SAVE  :: TimeStepSysLast=0.0d0     ! last system time step (used to check for downshifting)
   REAL(r64)       :: CurrentEndTime          ! end time of time step for current simulation time step
-  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0  ! end time of time step for last simulation time step
+  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0d0  ! end time of time step for last simulation time step
   CHARACTER(len=6):: OutputChar = ' '        ! character string for warning messages
 
   INTEGER           :: HeatRecInNode     !Heat Recovery Fluid Inlet Node Num
@@ -5926,22 +5946,22 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   REAL(r64)   :: CpCond  ! local for fluid specif heat, for condenser
 
           !set module level inlet and outlet nodes
-  EvapMassFlowRate           = 0.0
-  CondMassFlowRate           = 0.0
-  Power                      = 0.0
-  QCondenser                 = 0.0
-  QEvaporator                = 0.0
-  Energy                     = 0.0
-  CondenserEnergy            = 0.0
-  EvaporatorEnergy           = 0.0
+  EvapMassFlowRate           = 0.0d0
+  CondMassFlowRate           = 0.0d0
+  Power                      = 0.0d0
+  QCondenser                 = 0.0d0
+  QEvaporator                = 0.0d0
+  Energy                     = 0.0d0
+  CondenserEnergy            = 0.0d0
+  EvaporatorEnergy           = 0.0d0
   EvapInletNode  = GTChiller(ChillerNum)%Base%EvapInletNodeNum
   EvapOutletNode = GTChiller(ChillerNum)%Base%EvapOutletNodeNum
   CondInletNode  = GTChiller(ChillerNum)%Base%CondInletNodeNum
   CondOutletNode = GTChiller(ChillerNum)%Base%CondOutletNodeNum
   HeatRecInNode  = GTChiller(ChillerNum)%HeatRecInletNodeNum
   HeatRecOutNode = GTChiller(ChillerNum)%HeatRecOutletNodeNum
-  QHeatRecLube   = 0.0
-  FRAC           = 1.0
+  QHeatRecLube   = 0.0d0
+  FRAC           = 1.0d0
   LoopNum        = GTChiller(ChillerNum)%Base%CWLoopNum
   LoopSideNum    = GTChiller(ChillerNum)%Base%CWLoopSideNum
   EvapInletTemp  = Node(EvapInletNode)%Temp
@@ -6017,7 +6037,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
   IF (GTChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
 !  Warn user if entering condenser temperature falls below 0C
-    IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
+    IF(Node(CondInletNode)%Temp .LT. 0.0d0 .and. .not. WarmupFlag) THEN
       GTChiller(ChillerNum)%Base%PrintMessage = .TRUE.
       WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
       GTChiller(ChillerNum)%Base%MsgBuffer1 = 'CalcGasTurbineChillerModel - Chiller:CombustionTurbine "' &
@@ -6112,7 +6132,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 
   !  from BLAST...RCLOAD=AMAX1(MINCHFR(I,IPLCTR),AMIN1(CHLRLOAD(I)/CHLROCAP(I) &
   !         /RCAV,MAXCHFR(I,IPLCTR)))
-  IF (AvailChillerCap > 0.0) THEN
+  IF (AvailChillerCap > 0.0d0) THEN
     PartLoadRat = MAX(MinPartLoadRat, MIN(ABS(MyLoad)/AvailChillerCap,MaxPartLoadRat))
   ENDIF
 
@@ -6121,7 +6141,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
                       + FullLoadFactor(2) * PartLoadRat      &
                       + FullLoadFactor(3) * PartLoadRat ** 2
 
-  IF (AvailChillerCap > 0.0) THEN
+  IF (AvailChillerCap > 0.0d0) THEN
     IF(ABS(MyLoad)/AvailChillerCap .LT. MinPartLoadRat) THEN
      OperPartLoadRat = ABS(MyLoad)/AvailChillerCap
     ELSE
@@ -6143,7 +6163,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
     IF (OperPartLoadRat .LT. MinPartLoadRat) THEN
      FRAC = MIN(1.0d0,(OperPartLoadRat/MinPartLoadRat))
     ELSE
-     FRAC = 1.0
+     FRAC = 1.0d0
     END IF
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap/COP * FRAC
 
@@ -6197,7 +6217,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         END SELECT
       ELSE
         ! Try to request zero flow
-        EvapMassFlowRate=0.0
+        EvapMassFlowRate=0.0d0
         ! Use SetComponentFlowRate to decide actual flow
         Call SetComponentFlowRate( EvapMassFlowRate,  &
                           EvapInletNode , EvapOutletNode  , &
@@ -6292,7 +6312,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       Else
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End IF
@@ -6304,7 +6324,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
         EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
       Else
-        QEvaporator = 0.0
+        QEvaporator = 0.0d0
         EvapOutletTemp = Node(EvapInletNode)%Temp
       End If
     End If
@@ -6312,7 +6332,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
     IF (OperPartLoadRat .LT. MinPartLoadRat) THEN
       FRAC = MIN(1.0d0,(OperPartLoadRat/MinPartLoadRat))
     ELSE
-      FRAC = 1.0
+      FRAC = 1.0d0
     END IF
 
     ! set the module level variable used for reporting FRAC
@@ -6321,10 +6341,10 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
     ! Chiller is false loading below PLR = minimum unloading ratio, find PLR used for energy calculation
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap /COP * FRAC
 
-    IF(EvapMassFlowRate == 0.0) THEN
-     QEvaporator = 0.0
+    IF(EvapMassFlowRate == 0.0d0) THEN
+     QEvaporator = 0.0d0
      EvapOutletTemp = Node(EvapInletNode)%Temp
-     Power = 0.0
+     Power = 0.0d0
      GTChiller(ChillerNum)%Base%PrintMessage = .FALSE.
     END IF
     IF(QEvaporator == 0.0d0 .AND. GTChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
@@ -6377,17 +6397,17 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 !               RPLOAD = PREQD/CHLROCAP(TypeIndex)
 !
 !               IF (RFLAGS(81)) WRITE (OUTPUT,703) PREQD,ETOWER(TypeIndex),RPLOAD
-!               IF (PREQD .GT. 0.) THEN
+!               IF (PREQD .GT. 0.0d0) THEN
     IF (AvailChillerCap >0)THEN
       RPLoad = Power / AvailChillerCap
     ELSE
-      RPLoad = 0.0
+      RPLoad = 0.0d0
     END IF
 
     IF (Power > 0) THEN
 !D$                               FOR EACH CHILLER OPERATING
 !                  MAXSZ = NUMCHSIZ(TypeIndex,IPLCTR)
-!                  DO 100 IS = 1,MAXSZ
+!                  DO IS = 1,MAXSZ
 !
 !                     NUMOPR = CHLRIOPR(IS,TypeIndex)
 !                     IF (NUMOPR.GT.0) THEN
@@ -6459,7 +6479,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 
 !                        UAG=UACGC(1,IPLCTR)*GTDSLCAP(IS,TypeIndex,IPLCTR)**      &
 !                            UACGC(2,IPLCTR)
-    IF (PLoad /= 0.0)THEN
+    IF (PLoad /= 0.0d0)THEN
       UAtoCapRat = GTChiller(ChillerNum)%UAtoCapCoef(1) * GTEngineCapacity **  &
                        GTChiller(ChillerNum)%UAtoCapCoef(2)
 
@@ -6474,7 +6494,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
                            EXP(UAtoCapRat/(MAX(ExhaustFlow, MaxExhaustperGTPower * GTEngineCapacity) * ExhaustCP))
 
 
-!                        EEX = AMAX1 ( FEX*1.047*(TEX-TSTACK),0.)
+!                        EEX = AMAX1 ( FEX*1.047*(TEX-TSTACK),0.0d0)
 !                        ELUBE=PLOAD*(ELUBEGC(1,IPLCTR)+ELUBEGC(2,IPLCTR) &
 !                              *RLOAD+ELUBEGC(3,IPLCTR)*RLD2 )
     END IF
@@ -6485,7 +6505,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
                               GTChiller(ChillerNum)%HeatRecLubeEnergyCoef(3)*RL2)
 
     ELSE
-      QHeatRecLube = 0.0
+      QHeatRecLube = 0.0d0
     End If
 
 !                        CHLRFUEL(TypeIndex) = CHLRFUEL(TypeIndex) + EFUEL * NUMOPR
@@ -6499,7 +6519,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
 ! Thigh = Energy / (Mdot*Cp) + Tlow
 
     !Need to set the HeatRecRatio to 1.0 if it is not modified
-    HeatRecRatio= 1.0
+    HeatRecRatio= 1.0d0
 
     IF (GTChiller(ChillerNum)%HeatRecActive) THEN
        !This mdot is input specified mdot "Desired Flowrate", already set at node in init routine
@@ -6521,25 +6541,25 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
       IF(HeatRecOutTemp > GTChiller(ChillerNum)%HeatRecMaxTemp) THEN
         IF(GTChiller(ChillerNum)%HeatRecMaxTemp /= HeatRecInTemp)THEN
           MinHeatRecMdot = (QHeatRecLube)/(HeatRecCp * (GTChiller(ChillerNum)%HeatRecMaxTemp - HeatRecInTemp))
-          If(MinHeatRecMdot < 0.0) MinHeatRecMdot = 0.0
+          If(MinHeatRecMdot < 0.0d0) MinHeatRecMdot = 0.0d0
         END IF
 
         !Recalculate Outlet Temperature, with adjusted flowrate
-        IF ((MinHeatRecMdot .GT. 0.0) .AND. (HeatRecCp .GT. 0.0)) THEN
+        IF ((MinHeatRecMdot .GT. 0.0d0) .AND. (HeatRecCp .GT. 0.0d0)) THEN
           HeatRecOutTemp = (QHeatRecLube)/(MinHeatRecMdot * HeatRecCp) + HeatRecInTemp
           HeatRecRatio = HeatRecMdot/MinHeatRecMdot
         ELSE
           HeatRecOutTemp = HeatRecInTemp
-          HeatRecRatio = 0.0
+          HeatRecRatio = 0.0d0
         END IF
       End If
 
       QHeatRecLube = QHeatRecLube*HeatRecRatio
     ELSE
-      HeatRecInTemp=0.0
-      HeatRecMDot=0.0
-      HeatRecCp=0.0
-      HeatRecOutTemp=0.0
+      HeatRecInTemp=0.0d0
+      HeatRecMDot=0.0d0
+      HeatRecCp=0.0d0
+      HeatRecOutTemp=0.0d0
     ENDIF
 
   END IF
@@ -6579,7 +6599,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
       ENDIF
     ENDIF
     IF(.NOT.WarmupFlag)THEN
-      If (AvailNomCapRat < 0.0 ) then     ! apparently the real reason energy goes negative
+      If (AvailNomCapRat < 0.0d0 ) then     ! apparently the real reason energy goes negative
         CALL ShowSevereError('CalcGTChillerModel: Capacity ratio below zero for GTChiller='//  &
                               TRIM(GTChiller(ChillerNum)%Base%Name))
         CALL ShowContinueErrorTimeStamp(' ')
@@ -6591,8 +6611,8 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
     ENDIF
     ! If makes it here, set limits, chiller can't have negative energy/power
     ! proceeding silently for now but may want to throw error here
-    Power = 0.0
-    Energy = 0.0
+    Power = 0.0d0
+    Energy = 0.0d0
   ENDIF
   RETURN
 END SUBROUTINE CalcGTChillerModel
@@ -6650,9 +6670,9 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
 !  LOGICAL,SAVE           :: PossibleSubCooling=.FALSE.
   INTEGER                :: LoopNum
   INTEGER                :: LoopSideNum
-  REAL(r64),SAVE  :: TimeStepSysLast=0.0     ! last system time step (used to check for downshifting)
+  REAL(r64),SAVE  :: TimeStepSysLast=0.0d0     ! last system time step (used to check for downshifting)
   REAL(r64)       :: CurrentEndTime          ! end time of time step for current simulation time step
-  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0  ! end time of time step for last simulation time step
+  REAL(r64),SAVE  :: CurrentEndTimeLast=0.0d0  ! end time of time step for last simulation time step
   CHARACTER(len=6):: OutputChar = ' '        ! character string for warning messages
   REAL(r64)       :: Cp      ! local for fluid specif heat, for evaporator
   REAL(r64)       :: CpCond  ! local for fluid specif heat, for condenser
@@ -6900,7 +6920,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
           END SELECT
         ELSE
             ! Try to request zero flow
-          EvapMassFlowRate=0.0
+          EvapMassFlowRate=0.0d0
             ! Use SetComponentFlowRate to decide actual flow
             Call SetComponentFlowRate( EvapMassFlowRate,  &
                               EvapInletNode , EvapOutletNode  , &
@@ -6970,7 +6990,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
            EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
            EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
        Else
-           QEvaporator = 0.0
+           QEvaporator = 0.0d0
            EvapOutletTemp = Node(EvapInletNode)%Temp
        End If
      End IF
@@ -6982,16 +7002,16 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
            EvapDeltaTemp = QEvaporator/EvapMassFlowRate/Cp
            EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
        Else
-           QEvaporator = 0.0
+           QEvaporator = 0.0d0
            EvapOutletTemp = Node(EvapInletNode)%Temp
        End If
      End If
       !Calculate the Power consumption of the Const COP chiller which is a simplified calculation
      Power = QEvaporator / ConstCOPChiller(ChillNum)%Base%COP
-     IF(EvapMassFlowRate == 0.0) THEN
-      QEvaporator = 0.0
+     IF(EvapMassFlowRate == 0.0d0) THEN
+      QEvaporator = 0.0d0
       EvapOutletTemp = Node(EvapInletNode)%Temp
-      Power = 0.0
+      Power = 0.0d0
       ConstCOPChiller(ChillNum)%Base%PrintMessage = .FALSE.
      END IF
      IF(QEvaporator == 0.0d0 .AND. ConstCOPChiller(ChillNum)%Base%CondenserType == EvapCooled) THEN
@@ -7048,8 +7068,8 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
     ENDIF
     ! If makes it here, set limits, chiller can't have negative energy/power
     ! proceeding silently for now but may want to throw error here
-    Power = 0.0
-    Energy = 0.0
+    Power = 0.0d0
+    Energy = 0.0d0
 
   ENDIF
 RETURN
@@ -7170,7 +7190,7 @@ IMPLICIT NONE
   QCond = QTotal - QHeatRec
 
   ! Calculate a new Heat Recovery Coil Outlet Temp
-  IF (HeatRecMassFlowRate > 0.0) THEN
+  IF (HeatRecMassFlowRate > 0.0d0) THEN
     HeatRecOutletTemp = QHeatRec/(HeatRecMassFlowRate*CpHeatRec) + HeatRecInletTemp
   Else
     HeatRecOutletTemp = HeatRecInletTemp
@@ -7229,7 +7249,7 @@ IMPLICIT NONE
   HeatRecOutNode = EngineDrivenChiller(ChillerNum)%HeatRecOutletNodeNum
 
   !Need to set the HeatRecRatio to 1.0 if it is not modified
-  HeatRecRatio= 1.0
+  HeatRecRatio= 1.0d0
 
 !  !This mdot is input specified mdot "Desired Flowrate", already set in init routine
   HeatRecMdot = Node(HeatRecInNode)%MassFlowRate
@@ -7255,16 +7275,16 @@ IMPLICIT NONE
   IF(HeatRecOutTemp > EngineDrivenChiller(ChillerNum)%HeatRecMaxTemp) THEN
    IF(EngineDrivenChiller(ChillerNum)%HeatRecMaxTemp /= HeatRecInTemp)THEN
       MinHeatRecMdot = (EnergyRecovered)/(HeatRecCp * (EngineDrivenChiller(ChillerNum)%HeatRecMaxTemp - HeatRecInTemp))
-      If(MinHeatRecMdot < 0.0) MinHeatRecMdot = 0.0
+      If(MinHeatRecMdot < 0.0d0) MinHeatRecMdot = 0.0d0
     END IF
 
     !Recalculate Outlet Temperature, with adjusted flowrate
-    IF ((MinHeatRecMdot .GT. 0.0) .AND. (HeatRecCp .GT. 0.0)) THEN
+    IF ((MinHeatRecMdot .GT. 0.0d0) .AND. (HeatRecCp .GT. 0.0d0)) THEN
       HeatRecOutTemp = (EnergyRecovered)/(MinHeatRecMdot * HeatRecCp) + HeatRecInTemp
       HeatRecRatio = HeatRecMdot/MinHeatRecMdot
     ELSE
       HeatRecOutTemp = HeatRecInTemp
-      HeatRecRatio = 0.0
+      HeatRecRatio = 0.0d0
     END IF
 
   END IF
@@ -7338,19 +7358,19 @@ IMPLICIT NONE
     END IF
 
 
-    ElectricChillerReport(Num)%Base%Power            = 0.0
-    ElectricChillerReport(Num)%Base%QEvap            = 0.0
-    ElectricChillerReport(Num)%Base%QCond            = 0.0
-    ElectricChillerReport(Num)%Base%Energy           = 0.0
-    ElectricChillerReport(Num)%Base%EvapEnergy       = 0.0
-    ElectricChillerReport(Num)%Base%CondEnergy       = 0.0
+    ElectricChillerReport(Num)%Base%Power            = 0.0d0
+    ElectricChillerReport(Num)%Base%QEvap            = 0.0d0
+    ElectricChillerReport(Num)%Base%QCond            = 0.0d0
+    ElectricChillerReport(Num)%Base%Energy           = 0.0d0
+    ElectricChillerReport(Num)%Base%EvapEnergy       = 0.0d0
+    ElectricChillerReport(Num)%Base%CondEnergy       = 0.0d0
     ElectricChillerReport(Num)%Base%EvapInletTemp    = Node(EvapInletNode)%Temp
     ElectricChillerReport(Num)%Base%CondInletTemp    = Node(CondInletNode)%Temp
     ElectricChillerReport(Num)%Base%CondOutletTemp   = Node(CondOutletNode)%Temp
     ElectricChillerReport(Num)%Base%EvapOutletTemp   = Node(EvapOutletNode)%Temp
     ElectricChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     ElectricChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    ElectricChillerReport(Num)%ActualCOP        = 0.0
+    ElectricChillerReport(Num)%ActualCOP        = 0.0d0
     IF (ElectricChiller(Num)%Base%CondenserType == EvapCooled) THEN
       ElectricChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
       ElectricChillerReport(Num)%Base%BasinHeaterConsumption = BasinHeaterPower*ReportingConstant
@@ -7360,8 +7380,8 @@ IMPLICIT NONE
 
       CALL SafeCopyPlantNode( HeatRecInNode, HeatRecOutNode)
 
-      ElectricChillerReport(Num)%QHeatRecovery = 0.0
-      ElectricChillerReport(Num)%EnergyHeatRecovery = 0.0
+      ElectricChillerReport(Num)%QHeatRecovery = 0.0d0
+      ElectricChillerReport(Num)%EnergyHeatRecovery = 0.0d0
       ElectricChillerReport(Num)%HeatRecInletTemp   = Node(HeatRecInNode)%Temp
       ElectricChillerReport(Num)%HeatRecOutletTemp  = Node(HeatRecOutNode)%Temp
       ElectricChillerReport(Num)%HeatRecMassFlow    = Node(HeatRecInNode)%MassFlowRate
@@ -7395,10 +7415,10 @@ IMPLICIT NONE
       ElectricChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
       ElectricChillerReport(Num)%Base%BasinHeaterConsumption = BasinHeaterPower*ReportingConstant
     ENDIF
-    IF (Power .NE. 0.0) THEN
+    IF (Power .NE. 0.0d0) THEN
        ElectricChillerReport(Num)%ActualCOP     = QEvaporator/Power
     ELSE
-       ElectricChillerReport(Num)%ActualCOP     = 0.0
+       ElectricChillerReport(Num)%ActualCOP     = 0.0d0
     END IF
 
     If(ElectricChiller(Num)%HeatRecActive) Then
@@ -7490,19 +7510,19 @@ IMPLICIT NONE
     Node(EvapOutletNode)%Temp     = Node(EvapInletNode)%Temp
     Node(CondOutletNode)%Temp     = Node(CondInletNode)%Temp
 
-    EngineDrivenChillerReport(Num)%Base%Power            = 0
-    EngineDrivenChillerReport(Num)%Base%QEvap            = 0
-    EngineDrivenChillerReport(Num)%Base%QCond            = 0
-    EngineDrivenChillerReport(Num)%Base%Energy           = 0
-    EngineDrivenChillerReport(Num)%Base%EvapEnergy       = 0
-    EngineDrivenChillerReport(Num)%Base%CondEnergy       = 0
+    EngineDrivenChillerReport(Num)%Base%Power            = 0.0d0
+    EngineDrivenChillerReport(Num)%Base%QEvap            = 0.0d0
+    EngineDrivenChillerReport(Num)%Base%QCond            = 0.0d0
+    EngineDrivenChillerReport(Num)%Base%Energy           = 0.0d0
+    EngineDrivenChillerReport(Num)%Base%EvapEnergy       = 0.0d0
+    EngineDrivenChillerReport(Num)%Base%CondEnergy       = 0.0d0
     EngineDrivenChillerReport(Num)%Base%EvapInletTemp  = Node(EvapInletNode)%Temp
     EngineDrivenChillerReport(Num)%Base%CondInletTemp  = Node(CondInletNode)%Temp
     EngineDrivenChillerReport(Num)%Base%CondOutletTemp   = Node(CondOutletNode)%Temp
     EngineDrivenChillerReport(Num)%Base%EvapOutletTemp   = Node(EvapOutletNode)%Temp
     EngineDrivenChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     EngineDrivenChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    EngineDrivenChillerReport(Num)%FuelCOP          = 0
+    EngineDrivenChillerReport(Num)%FuelCOP          = 0.0d0
     IF (EngineDrivenChiller(Num)%Base%CondenserType == EvapCooled) THEN
       EngineDrivenChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
       EngineDrivenChillerReport(Num)%Base%BasinHeaterConsumption = BasinHeaterPower*ReportingConstant
@@ -7524,10 +7544,10 @@ IMPLICIT NONE
     EngineDrivenChillerReport(Num)%Base%EvapOutletTemp   = Node(EvapOutletNode)%Temp
     EngineDrivenChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     EngineDrivenChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    IF (FuelEnergyUseRate .NE. 0.0) THEN
+    IF (FuelEnergyUseRate .NE. 0.0d0) THEN
       EngineDrivenChillerReport(Num)%FuelCOP          = QEvaporator/FuelEnergyUseRate
     ELSE
-      EngineDrivenChillerReport(Num)%FuelCOP          = 0.0
+      EngineDrivenChillerReport(Num)%FuelCOP          = 0.0d0
     END IF
     IF (EngineDrivenChiller(Num)%Base%CondenserType == EvapCooled) THEN
       EngineDrivenChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
@@ -7630,28 +7650,28 @@ IMPLICIT NONE
     ENDIF
 
 
-    GTChillerReport(Num)%Base%Power            = 0
-    GTChillerReport(Num)%Base%QEvap            = 0
-    GTChillerReport(Num)%Base%QCond            = 0
-    GTChillerReport(Num)%Base%Energy           = 0
-    GTChillerReport(Num)%Base%EvapEnergy       = 0
-    GTChillerReport(Num)%Base%CondEnergy       = 0
+    GTChillerReport(Num)%Base%Power            = 0.0d0
+    GTChillerReport(Num)%Base%QEvap            = 0.0d0
+    GTChillerReport(Num)%Base%QCond            = 0.0d0
+    GTChillerReport(Num)%Base%Energy           = 0.0d0
+    GTChillerReport(Num)%Base%EvapEnergy       = 0.0d0
+    GTChillerReport(Num)%Base%CondEnergy       = 0.0d0
     GTChillerReport(Num)%Base%EvapInletTemp  = Node(EvapInletNode)%Temp
     GTChillerReport(Num)%Base%CondInletTemp  = Node(CondInletNode)%Temp
     GTChillerReport(Num)%Base%CondOutletTemp   = Node(CondOutletNode)%Temp
     GTChillerReport(Num)%Base%EvapOutletTemp   = Node(EvapOutletNode)%Temp
     GTChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     GTChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    GTChillerReport(Num)%FuelEnergyUsedRate = 0.0
-    GTChillerReport(Num)%FuelMassUsedRate   = 0.0
-    GTChillerReport(Num)%FuelEnergyUsed     = 0.0
-    GTChillerReport(Num)%FuelMassUsed       = 0.0
+    GTChillerReport(Num)%FuelEnergyUsedRate = 0.0d0
+    GTChillerReport(Num)%FuelMassUsedRate   = 0.0d0
+    GTChillerReport(Num)%FuelEnergyUsed     = 0.0d0
+    GTChillerReport(Num)%FuelMassUsed       = 0.0d0
 
-    GTChillerReport(Num)%HeatRecLubeEnergy    = 0.0
-    GTChillerReport(Num)%HeatRecLubeRate      = 0.0
-    GTChillerReport(Num)%ExhaustStackTemp     = 0.0
+    GTChillerReport(Num)%HeatRecLubeEnergy    = 0.0d0
+    GTChillerReport(Num)%HeatRecLubeRate      = 0.0d0
+    GTChillerReport(Num)%ExhaustStackTemp     = 0.0d0
     GTChillerReport(Num)%HeatRecMdot          = GTChiller(Num)%HeatRecMdot
-    GTChillerReport(Num)%FuelCOP              = 0.0
+    GTChillerReport(Num)%FuelCOP              = 0.0d0
     IF (GTChiller(Num)%Base%CondenserType == EvapCooled) THEN
       GTChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
       GTChillerReport(Num)%Base%BasinHeaterConsumption = BasinHeaterPower*ReportingConstant
@@ -7690,10 +7710,10 @@ IMPLICIT NONE
     GTChillerReport(Num)%HeatRecInletTemp     = GTChiller(Num)%HeatRecInletTemp
     GTChillerReport(Num)%HeatRecOutletTemp    = GTChiller(Num)%HeatRecOutletTemp
     GTChillerReport(Num)%HeatRecMdot          = GTChiller(Num)%HeatRecMdot
-    IF (GTChillerReport(Num)%FuelEnergyUsedRate .NE. 0.0) THEN
+    IF (GTChillerReport(Num)%FuelEnergyUsedRate .NE. 0.0d0) THEN
       GTChillerReport(Num)%FuelCOP              = GTChillerReport(Num)%Base%QEvap/GTChillerReport(Num)%FuelEnergyUsedRate
     ELSE
-      GTChillerReport(Num)%FuelCOP              = 0.0
+      GTChillerReport(Num)%FuelCOP              = 0.0d0
     END IF
     IF (GTChiller(Num)%Base%CondenserType == EvapCooled) THEN
       GTChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
@@ -7750,19 +7770,19 @@ IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
 
   IF (MyLoad >= 0.d0 .OR. .NOT. RunFlag)THEN !Chiller not running so pass inlet states to outlet states
-    ConstCOPChillerReport(Num)%Base%Power            = 0.0
-    ConstCOPChillerReport(Num)%Base%QEvap            = 0.0
-    ConstCOPChillerReport(Num)%Base%QCond            = 0.0
-    ConstCOPChillerReport(Num)%Base%Energy           = 0.0
-    ConstCOPChillerReport(Num)%Base%EvapEnergy       = 0.0
-    ConstCOPChillerReport(Num)%Base%CondEnergy       = 0.0
+    ConstCOPChillerReport(Num)%Base%Power            = 0.0d0
+    ConstCOPChillerReport(Num)%Base%QEvap            = 0.0d0
+    ConstCOPChillerReport(Num)%Base%QCond            = 0.0d0
+    ConstCOPChillerReport(Num)%Base%Energy           = 0.0d0
+    ConstCOPChillerReport(Num)%Base%EvapEnergy       = 0.0d0
+    ConstCOPChillerReport(Num)%Base%CondEnergy       = 0.0d0
     ConstCOPChillerReport(Num)%Base%CondInletTemp    = Node(CondInletNode)%Temp
     ConstCOPChillerReport(Num)%Base%EvapInletTemp    = Node(EvapInletNode)%Temp
     ConstCOPChillerReport(Num)%Base%CondOutletTemp   = Node(CondInletNode)%Temp
     ConstCOPChillerReport(Num)%Base%EvapOutletTemp   = Node(EvapInletNode)%Temp
     ConstCOPChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     ConstCOPChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    ConstCOPChillerReport(Num)%ActualCOP        = 0.0
+    ConstCOPChillerReport(Num)%ActualCOP        = 0.0d0
     IF (ConstCOPChiller(Num)%Base%CondenserType == EvapCooled) THEN
       ConstCOPChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower
       ConstCOPChillerReport(Num)%Base%BasinHeaterConsumption = BasinHeaterPower*ReportingConstant
@@ -7786,10 +7806,10 @@ IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
     ConstCOPChillerReport(Num)%Base%EvapOutletTemp   = EvapOutletTemp
     ConstCOPChillerReport(Num)%Base%Evapmdot         = EvapMassFlowRate
     ConstCOPChillerReport(Num)%Base%Condmdot         = CondMassFlowRate
-    IF (Power .ne. 0.0) THEN
+    IF (Power .ne. 0.0d0) THEN
        ConstCOPChillerReport(Num)%ActualCOP = QEvaporator/Power
     ELSE
-       ConstCOPChillerReport(Num)%ActualCOP = 0.0
+       ConstCOPChillerReport(Num)%ActualCOP = 0.0d0
     END IF
     IF (ConstCOPChiller(Num)%Base%CondenserType == EvapCooled) THEN
       ConstCOPChillerReport(Num)%Base%BasinHeaterPower       = BasinHeaterPower

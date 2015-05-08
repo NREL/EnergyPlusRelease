@@ -1,7 +1,8 @@
 SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq, &
                              ActuatedNode,MaxFlow,MinFlow,TempInNode,TempOutNode, &
                              ControlOffSet,AirMassFlow,Action,ControlCompTypeNum, &
-                             CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex)
+                             CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex, &
+                             ControlledZoneIndex)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard J. Liesen
@@ -63,6 +64,7 @@ INTEGER, INTENT (IN), OPTIONAL   :: EquipIndex      ! Identifier for equipment o
 INTEGER, INTENT (IN), OPTIONAL   :: LoopNum ! for plant components, plant loop index
 INTEGER, INTENT (IN), OPTIONAL   :: LoopSide ! for plant components, plant loop side index
 INTEGER, INTENT (IN), OPTIONAL   :: BranchIndex ! for plant components, plant branch index
+INTEGER, INTENT (IN), OPTIONAL   :: ControlledZoneIndex ! controlled zone index for the zone containing the component
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !Iteration maximum for reheat control
@@ -123,8 +125,9 @@ REAL(r64)        :: LoadMet     ! Actual output of unit (watts)
 !INTEGER, SAVE    :: ErrCount1=0 ! for recurring error
 LOGICAL          :: WaterCoilAirFlowControl ! True if controlling air flow through water coil, water flow fixed
 INTEGER          :: SimCompNum  ! internal number for case statement
-TYPE (IntervalHalf), SAVE :: ZoneInterHalf=IntervalHalf(0.0,0.0,0.0,0.0,0.0,0.0,.false.,.false.,.false.,.false.)
-TYPE (ZoneEquipControllerProps), SAVE :: ZoneController=ZoneEquipControllerProps(0.0,0.0,0.0,0.0,0.0)
+TYPE (IntervalHalf), SAVE :: ZoneInterHalf=IntervalHalf(0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,.false.,.false.,.false.,.false.)
+TYPE (ZoneEquipControllerProps), SAVE :: ZoneController=ZoneEquipControllerProps(0.0d0,0.0d0,0.0d0,0.0d0,0.0d0)
+REAL(r64)        :: HalvingPrec = 0.0d0 ! precision of halving algorithm
 
  IF (ControlCompTypeNum /= 0) THEN
    SimCompNum=ControlCompTypeNum
@@ -136,17 +139,19 @@ TYPE (ZoneEquipControllerProps), SAVE :: ZoneController=ZoneEquipControllerProps
  Iter = 0
  Converged = .False.
  WaterCoilAirFlowControl = .FALSE.
+ LoadMet = 0.0d0
+ HalvingPrec = 0.0d0
 
  !At the beginning of every time step the value is reset to the User Input
- ZoneController%SetPoint = 0.0
+ ZoneController%SetPoint = 0.0d0
 
  !Set to converged controller
  ZoneInterHalf%MaxFlowCalc = .True.
  ZoneInterHalf%MinFlowCalc = .False.
  ZoneInterHalf%NormFlowCalc = .False.
  ZoneInterHalf%MinFlowResult = .False.
- ZoneInterHalf%MaxResult    = 1.0
- ZoneInterHalf%MinResult    = 0.0
+ ZoneInterHalf%MaxResult    = 1.0d0
+ ZoneInterHalf%MinResult    = 0.0d0
 
 !Start the Solution Iteration
 Do While (.Not. Converged)
@@ -189,6 +194,7 @@ Do While (.Not. Converged)
  !Record the minimum results and set flow to half way between the max and min and find results
  Else If(ZoneInterHalf%MinFlowResult) Then
     ZoneInterHalf%MinResult = ZoneController%SensedValue
+    HalvingPrec = (ZoneInterHalf%MaxResult-ZoneInterHalf%MinResult) * (1.0d0/REAL(2**(MaxIter-3)))
     ZoneInterHalf%MidFlow = (ZoneInterHalf%MaxFlow + &
                                          ZoneInterHalf%MinFlow)/2.0d0
     ZoneController%CalculatedSetPoint = (ZoneInterHalf%MaxFlow + &
@@ -207,17 +213,17 @@ Do While (.Not. Converged)
        ZoneInterHalf%MinFlowCalc = .False.
        ZoneInterHalf%NormFlowCalc = .False.
        ZoneInterHalf%MinFlowResult = .False.
-       ZoneInterHalf%MaxResult    = 1.0
-       ZoneInterHalf%MinResult    = 0.0
+       ZoneInterHalf%MaxResult    = 1.0d0
+       ZoneInterHalf%MinResult    = 0.0d0
        SELECT CASE (SimCompNum)
        CASE (4:6) !hot water baseboards use min flow
-         ZoneController%CalculatedSetPoint = 0.0                                     !CR7253
+         ZoneController%CalculatedSetPoint = 0.0d0                                     !CR7253
        CASE Default
          ZoneController%CalculatedSetPoint = ZoneInterHalf%MaxFlow                    !CR7253
        END SELECT
        !Set the Actuated node massflowrate with zero value
        IF (PRESENT(LoopNum)) THEN ! this is a plant component
-         CALL SetActuatedBranchFlowRate(ZoneController%CalculatedSetPoint,ActuatedNode,LoopNum,LoopSide, BranchIndex, .FALSE.)
+         CALL SetActuatedBranchFlowRate(ZoneController%CalculatedSetPoint,ActuatedNode,LoopNum,LoopSide, BranchIndex, .FALSE.) !Objexx:OPTIONAL LoopSide, BranchIndex used without PRESENT check
        ELSE ! assume not a plant component
          Node(ActuatedNode)%MassFlowRate = ZoneController%CalculatedSetPoint
        ENDIF
@@ -242,8 +248,8 @@ Do While (.Not. Converged)
          ZoneInterHalf%MinFlowCalc = .False.
          ZoneInterHalf%NormFlowCalc = .False.
          ZoneInterHalf%MinFlowResult = .False.
-         ZoneInterHalf%MaxResult    = 1.0
-         ZoneInterHalf%MinResult    = 0.0
+         ZoneInterHalf%MaxResult    = 1.0d0
+         ZoneInterHalf%MinResult    = 0.0d0
       ! MaxResult is greater than MinResult so simulation control algorithm may proceed normally
       ElseIf(ZoneInterHalf%MaxResult .gt. ZoneInterHalf%MinResult) Then
       !Now check to see if the setpoint is outside the endpoints of the control range
@@ -256,8 +262,8 @@ Do While (.Not. Converged)
            ZoneInterHalf%MinFlowCalc = .False.
            ZoneInterHalf%NormFlowCalc = .False.
            ZoneInterHalf%MinFlowResult = .False.
-           ZoneInterHalf%MaxResult    = 1.0
-           ZoneInterHalf%MinResult    = 0.0
+           ZoneInterHalf%MaxResult    = 1.0d0
+           ZoneInterHalf%MinResult    = 0.0d0
         ! Then check if too hot and if so set it to the maximum flow
         Else If(ZoneController%SetPoint .ge. ZoneInterHalf%MaxResult) Then
            ZoneController%CalculatedSetPoint = ZoneInterHalf%MaxFlow
@@ -267,8 +273,8 @@ Do While (.Not. Converged)
            ZoneInterHalf%MinFlowCalc = .False.
            ZoneInterHalf%NormFlowCalc = .False.
            ZoneInterHalf%MinFlowResult = .False.
-           ZoneInterHalf%MaxResult    = 1.0
-           ZoneInterHalf%MinResult    = 0.0
+           ZoneInterHalf%MaxResult    = 1.0d0
+           ZoneInterHalf%MinResult    = 0.0d0
         ! If between the max and mid set to new flow and raise min to mid
         Else If((ZoneController%SetPoint .lt. ZoneInterHalf%MaxResult) .and. &
             (ZoneController%SetPoint .ge. ZoneInterHalf%MidResult)) Then
@@ -303,8 +309,8 @@ Do While (.Not. Converged)
     ZoneInterHalf%MinFlowCalc = .False.
     ZoneInterHalf%NormFlowCalc = .False.
     ZoneInterHalf%MinFlowResult = .False.
-    ZoneInterHalf%MaxResult    = 1.0
-    ZoneInterHalf%MinResult    = 0.0
+    ZoneInterHalf%MaxResult    = 1.0d0
+    ZoneInterHalf%MinResult    = 0.0d0
  Else If(ZoneController%CalculatedSetPoint .lt.  &
          ZoneController%MinSetPoint) Then
     ZoneController%CalculatedSetPoint = ZoneController%MinSetPoint
@@ -313,8 +319,8 @@ Do While (.Not. Converged)
     ZoneInterHalf%MinFlowCalc = .False.
     ZoneInterHalf%NormFlowCalc = .False.
     ZoneInterHalf%MinFlowResult = .False.
-    ZoneInterHalf%MaxResult    = 1.0
-    ZoneInterHalf%MinResult    = 0.0
+    ZoneInterHalf%MaxResult    = 1.0d0
+    ZoneInterHalf%MinResult    = 0.0d0
  End IF
 
   ! check if hunting down around the limit of a significant mass flow in systems.
@@ -325,13 +331,13 @@ Do While (.Not. Converged)
     ZoneInterHalf%MinFlowCalc = .False.
     ZoneInterHalf%NormFlowCalc = .False.
     ZoneInterHalf%MinFlowResult = .False.
-    ZoneInterHalf%MaxResult    = 1.0
-    ZoneInterHalf%MinResult    = 0.0
+    ZoneInterHalf%MaxResult    = 1.0d0
+    ZoneInterHalf%MinResult    = 0.0d0
   ENDIF
 
   !Set the Actuated node massflowrate with the new value
   IF (PRESENT(LoopNum)) THEN ! this is a plant component
-    CALL SetActuatedBranchFlowRate(ZoneController%CalculatedSetPoint,ActuatedNode,LoopNum,LoopSide, BranchIndex, .FALSE.)
+    CALL SetActuatedBranchFlowRate(ZoneController%CalculatedSetPoint,ActuatedNode,LoopNum,LoopSide, BranchIndex, .FALSE.) !Objexx:OPTIONAL LoopSide, BranchIndex used without PRESENT check
   ELSE ! assume not a plant component, leave alone
     Node(ActuatedNode)%MassFlowRate = ZoneController%CalculatedSetPoint
   ENDIF
@@ -354,16 +360,16 @@ Do While (.Not. Converged)
      ! simulate series piu reheat coil
      CALL SimulateWaterCoilComponents(CompName,FirstHVACIteration,CompNum)
      ! Calculate the control signal (the variable we are forcing to zero)
-     CpAir = PsyCpAirFnWTdb(Node(TempOutNode)%HumRat,0.5d0*(Node(TempOutNode)%Temp + Node(TempInNode)%Temp))
-     LoadMet = CpAir*Node(TempOutNode)%MassFlowRate*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp)
+     CpAir = PsyCpAirFnWTdb(Node(TempOutNode)%HumRat,0.5d0*(Node(TempOutNode)%Temp + Node(TempInNode)%Temp)) !Objexx:OPTIONAL TempInNode, TempOutNode used without PRESENT check
+     LoadMet = CpAir*Node(TempOutNode)%MassFlowRate*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp) !Objexx:OPTIONAL TempInNode, TempOutNode used without PRESENT check
      ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
 
    CASE(2) ! 'AIRTERMINAL:SINGLEDUCT:SERIESPIU:REHEAT'
      ! simulate series piu reheat coil
      CALL SimulateWaterCoilComponents(CompName,FirstHVACIteration,CompNum)
      ! Calculate the control signal (the variable we are forcing to zero)
-     CpAir = PsyCpAirFnWTdb(Node(TempOutNode)%HumRat,0.5d0*(Node(TempOutNode)%Temp + Node(TempInNode)%Temp))
-     LoadMet = CpAir*Node(TempOutNode)%MassFlowRate*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp)
+     CpAir = PsyCpAirFnWTdb(Node(TempOutNode)%HumRat,0.5d0*(Node(TempOutNode)%Temp + Node(TempInNode)%Temp)) !Objexx:OPTIONAL TempInNode, TempOutNode used without PRESENT check
+     LoadMet = CpAir*Node(TempOutNode)%MassFlowRate*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp) !Objexx:OPTIONAL TempInNode, TempOutNode used without PRESENT check
      ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
 
    CASE(3) ! 'COIL:HEATING:WATER'
@@ -376,7 +382,7 @@ Do While (.Not. Converged)
        ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
      ELSE
        WaterCoilAirFlowControl = .TRUE.
-       LoadMet = Node(TempOutNode)%MassFlowRate*CpAir*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp)
+       LoadMet = Node(TempOutNode)%MassFlowRate*CpAir*(Node(TempOutNode)%Temp - Node(TempInNode)%Temp) !Objexx:OPTIONAL TempInNode, TempOutNode used without PRESENT check
        ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
      END IF
 
@@ -400,13 +406,13 @@ Do While (.Not. Converged)
 
    CASE(7) ! 'ZONEHVAC:FOURPIPEFANCOIL'
      ! Simulate fancoil unit
-     CALL Calc4PipeFanCoil(CompNum,FirstHVACIteration,LoadMet)
+     CALL Calc4PipeFanCoil(CompNum,ControlledZoneIndex,FirstHVACIteration,LoadMet)
      !Calculate the control signal (the variable we are forcing to zero)
      ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
 
    CASE(8) !'ZONEHVAC:OUTDOORAIRUNIT'
      ! Simulate outdoor air unit components
-     CALL CalcOAUnitCoilComps(CompNum,FirstHVACIteration,EquipIndex,LoadMet)
+     CALL CalcOAUnitCoilComps(CompNum,FirstHVACIteration,EquipIndex,LoadMet) !Objexx:OPTIONAL EquipIndex used without PRESENT check
      !Calculate the control signal (the variable we are forcing to zero)
      ZoneController%SensedValue = (LoadMet - QZnReq) / Denom
 
@@ -435,21 +441,21 @@ Do While (.Not. Converged)
  END SELECT
 
  ! Check for Controller convergence to see if within the offset
- IF(ABS(ZoneController%SensedValue) .le. ControlOffset) Then
+ IF(ABS(ZoneController%SensedValue) .le. ControlOffset .or. ABS(ZoneController%SensedValue) .le. HalvingPrec) Then
       !Set to converged controller
       Converged = .True.
       ZoneInterHalf%MaxFlowCalc = .True.
       ZoneInterHalf%MinFlowCalc = .False.
       ZoneInterHalf%NormFlowCalc = .False.
       ZoneInterHalf%MinFlowResult = .False.
-      ZoneInterHalf%MaxResult    = 1.0
-      ZoneInterHalf%MinResult    = 0.0
+      ZoneInterHalf%MaxResult    = 1.0d0
+      ZoneInterHalf%MinResult    = 0.0d0
       Exit
  End If
 
  Iter = Iter + 1
  IF ((Iter > MaxIter).AND.(.NOT.WarmUpFlag)) THEN
-   IF (CompErrIndex == 0) THEN
+   ! IF (CompErrIndex == 0) THEN
      CALL ShowWarningMessage ('ControlCompOutput: Maximum iterations exceeded for '//TRIM(CompType)//' = '//TRIM(CompName))
      CALL ShowContinueError('... Load met       = '//TRIM(TrimSigDigits(LoadMet,5))//' W.')
      CALL ShowContinueError('... Load requested = '//TRIM(TrimSigDigits(QZnReq,5))//' W.')
@@ -462,7 +468,7 @@ Do While (.Not. Converged)
      CALL ShowRecurringWarningErrorAtEnd('ControlCompOutput: Maximum iterations error for '//TRIM(CompType)//  &
            ' = '//TRIM(CompName),CompErrIndex,ReportMaxOf=ABS((LoadMet-QZnReq)*100.d0/Denom),ReportMaxUnits='%',  &
            ReportMinOf=ABS((LoadMet-QZnReq)*100.d0/Denom),ReportMinUnits='%')
-   ENDIF
+   ! ENDIF
    CALL ShowRecurringWarningErrorAtEnd('ControlCompOutput: Maximum iterations error for '//TRIM(CompType)//  &
            ' = '//TRIM(CompName),CompErrIndex,ReportMaxOf=ABS((LoadMet-QZnReq)*100.d0/Denom),ReportMaxUnits='%',  &
            ReportMinOf=ABS((LoadMet-QZnReq)*100.d0/Denom),ReportMinUnits='%')
@@ -535,6 +541,61 @@ SUBROUTINE CheckSysSizing(CompType,CompName)
 
 END SUBROUTINE CheckSysSizing
 
+SUBROUTINE CheckThisAirSystemForSizing(AirLoopNum, AirLoopWasSized )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   October 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing,  ONLY: SysSizingRunDone,NumSysSizInput, SysSizInput
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)   :: AirLoopNum
+  LOGICAL, INTENT (OUT) :: AirLoopWasSized
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+  INTEGER :: ThisAirSysSizineInputLoop
+
+  IF (SysSizingRunDone) THEN
+    DO ThisAirSysSizineInputLoop = 1, NumSysSizInput
+      IF (SysSizInput(ThisAirSysSizineInputLoop)%AirLoopNum == AirLoopNum) THEN
+        AirLoopWasSized = .TRUE.
+        EXIT
+      ELSE
+        AirLoopWasSized = .FALSE.
+      ENDIF
+    ENDDO
+  ELSE
+    AirLoopWasSized = .FALSE.
+  ENDIF 
+
+  RETURN
+
+END SUBROUTINE CheckThisAirSystemForSizing
+
 SUBROUTINE CheckZoneSizing(CompType,CompName)
 
           ! SUBROUTINE INFORMATION:
@@ -591,6 +652,62 @@ SUBROUTINE CheckZoneSizing(CompType,CompName)
   RETURN
 
 END SUBROUTINE CheckZoneSizing
+
+SUBROUTINE CheckThisZoneForSizing(ZoneNum, ZoneWasSized)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   Oct 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! utility routine to see if a particular zone has a Sizing:Zone object for it 
+          ! and that sizing was done. 
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing, ONLY: ZoneSizingRunDone, NumZoneSizingInput, ZoneSizingInput
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: ZoneNum ! zone index to be checked
+  LOGICAL, INTENT(OUT) :: ZoneWasSized
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ThisSizingInput
+
+  IF (ZoneSizingRunDone) THEN
+    DO ThisSizingInput =  1, NumZoneSizingInput
+      IF (ZoneSizingInput(ThisSizingInput)%ZoneNum == ZoneNum) THEN
+        ZoneWasSized =  .TRUE.
+        EXIT
+      ELSE 
+        ZoneWasSized =  .FALSE.
+      ENDIF
+    ENDDO
+  ELSE
+    ZoneWasSized =  .FALSE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CheckThisZoneForSizing
 
 SUBROUTINE ValidateComponent(CompType,CompName,IsNotOK,CallString)
 
@@ -782,10 +899,10 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   LocalWetBulbTemp = Sum(Surface(SurfPtrARR)%Area * Surface(SurfPtrARR)%OutWetBulbTemp) &
                         / Sum(Surface(SurfPtrARR)%Area)
 
-  LocalOutHumRat   = PsyWFnTdbTwbPb(LocalOutDryBulbTemp,localWetBulbTemp,OutBaroPress)
+  LocalOutHumRat   = PsyWFnTdbTwbPb(LocalOutDryBulbTemp,localWetBulbTemp,OutBaroPress,calledfrom='CalcPassiveExteriorBaffleGap')
 
-  RhoAir     = PsyRhoAirFnPbTdbW(OutBaroPress,LocalOutDryBulbTemp,LocalOutHumRat)
-  CpAir      = PsyCpAirFnWTdb(LocalOutHumRat,LocalOutDryBulbTemp)
+  RhoAir     = PsyRhoAirFnPbTdbW(OutBaroPress,LocalOutDryBulbTemp,LocalOutHumRat,calledfrom='CalcPassiveExteriorBaffleGap')
+  CpAir      = PsyCpAirFnWTdb(LocalOutHumRat,LocalOutDryBulbTemp,calledfrom='CalcPassiveExteriorBaffleGap')
   If (.NOT. IsRain) Then
     Tamb       = LocalOutDryBulbTemp
   ELSE ! when raining we use wetbulb not drybulb
@@ -797,22 +914,22 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   !loop through underlying surfaces and collect needed data
   NumSurfs =  size(SurfPtrARR)
   ALLOCATE(HSkyARR(NumSurfs))
-  HSkyARR = 0.0
+  HSkyARR = 0.0d0
   ALLOCATE(HGroundARR(NumSurfs))
-  HGroundARR = 0.0
+  HGroundARR = 0.0d0
   ALLOCATE(HAirARR(NumSurfs))
-  HAirARR = 0.0
+  HAirARR = 0.0d0
   ALLOCATE(LocalWindArr(NumSurfs))
-  LocalWindArr = 0.0
+  LocalWindArr = 0.0d0
   Allocate(HPlenARR(NumSurfs))
-  HPlenARR = 0.0
+  HPlenARR = 0.0d0
   ALLOCATE(HExtARR(NumSurfs))
-  HExtARR = 0.0
+  HExtARR = 0.0d0
 
   Do thisSurf =1, NumSurfs
     SurfPtr = SurfPtrARR(thisSurf)
     ! Initializations for this surface
-    HMovInsul     = 0.0
+    HMovInsul     = 0.0d0
     LocalWindArr(thisSurf) = Surface(SurfPtr)%WindSpeed
     CALL InitExteriorConvectionCoeff(SurfPtr,HMovInsul,Roughness,AbsExt,TmpTsBaf, &
                                 HExtARR(thisSurf),HSkyARR(thisSurf),HGroundARR(thisSurf),HAirARR(thisSurf))
@@ -821,7 +938,7 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
     TsoK = TH(SurfPtr,1,1) + KelvinConv
     TsBaffK = TmpTsBaf + KelvinConv
     If (TsBaffK == TsoK) Then ! avoid divide by zero
-       HPlenARR(thisSurf) = 0.0  ! no net heat transfer if same temperature
+       HPlenARR(thisSurf) = 0.0d0  ! no net heat transfer if same temperature
     ELSE
        HPlenARR(thisSurf) = Sigma*AbsExt*AbsThermSurf*(TsBaffK**4 - TsoK**4)/(TsBaffK - TsoK)
     ENDIF
@@ -845,7 +962,7 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   IF ( .NOT. BeginEnvrnFlag )THEN
       MyICSEnvrnFlag = .TRUE.
   ENDIF
-  If (A == 0.0) then  ! should have been caught earlier
+  If (A == 0.0d0) then  ! should have been caught earlier
 
   ENDIF
   ! now figure area-weighted averages from underlying surfaces.
@@ -867,7 +984,7 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   Tso      = SUM(TH((SurfPtrARR),1,1)*Surface(SurfPtrARR)%Area)          /A
   Isc      = SUm(QRadSWOutIncident(SurfPtrARR)*Surface(SurfPtrARR)%Area) /A
 
-  TmeanK = 0.5*(TmpTsBaf + Tso)+ KelvinConv
+  TmeanK = 0.5d0*(TmpTsBaf + Tso)+ KelvinConv
 
   gr = g * GapThick**3 * ABS(Tso - TmpTsBaf) * RhoAir**2 / (TmeanK * nu**2)
 
@@ -876,15 +993,15 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   HcPlen = NuPlen *(k / GapThick)
 
   ! now model natural ventilation of plenum gap.
-  VdotWind = Cv * (VentArea / 2.) * Vwind
+  VdotWind = Cv * (VentArea / 2.0d0) * Vwind
 
   IF (TaGap > Tamb) Then
     VdotThermal = Cd * (VentArea / 2.d0)*(2.d0*g*HdeltaNPL*(TaGap - Tamb)/(TaGap + KelvinConv) )**0.5d0
   ELSEIF ( TaGap == Tamb) then
-    VdotThermal = 0
+    VdotThermal = 0.0d0
   ELSE
-    IF ((ABS(tilt) < 5.0 ) .OR. (ABS(Tilt - 180) < 5.0)) Then
-      VdotThermal = 0.0   ! stable bouyancy situation
+    IF ((ABS(tilt) < 5.0d0) .OR. (ABS(Tilt - 180) < 5.0d0)) Then
+      VdotThermal = 0.0d0   ! stable bouyancy situation
     ELSE
       VdotThermal = Cd * (VentArea / 2.d0)*(2.d0*g*HdeltaNPL*(Tamb - TaGap )/(Tamb+ KelvinConv))**0.5d0
     ENDIF
@@ -982,7 +1099,7 @@ SUBROUTINE PassiveGapNusseltNumber(AspRat,Tilt ,Tso,Tsi, Gr, gNu)
         gnu901 = 1.d0 + 1.7596678d-10 * ra**2.2984755d0   ! eq. 51
       endif
       if(ra > 1.0d4 .and. ra <= 5.0d4) gnu901 =      0.028154d0      * ra**0.4134d0      ! eq. 50
-      if(ra > 5.0e4)                   gnu901 =      0.0673838d0     * ra**(1.0d0/3.0d0)   ! eq. 49
+      if(ra > 5.0d4)                   gnu901 =      0.0673838d0     * ra**(1.0d0/3.0d0)   ! eq. 49
 
       gnu902 = 0.242d0 * (ra/AspRat)**.272d0               ! eq. 52
       gnu90 = MAX(gnu901,gnu902)

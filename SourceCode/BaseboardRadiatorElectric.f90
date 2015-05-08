@@ -49,24 +49,24 @@ TYPE ElecBaseboardParams
     INTEGER :: ZonePtr                 = 0
     INTEGER :: SchedPtr                = 0
     INTEGER :: TotSurfToDistrib        = 0
-    REAL(r64) :: NominalCapacity       =0.0
-    REAL(r64) :: BaseBoardEfficiency   =0.0
-    REAL(r64) :: AirInletTemp          =0.0
-    REAL(r64) :: AirInletHumRat        =0.0
-    REAL(r64) :: AirOutletTemp         =0.0
-    REAL(r64) :: ElecUseLoad           =0.0
-    REAL(r64) :: ElecUseRate           =0.0
-    REAL(r64) :: FracRadiant           =0.0
-    REAL(r64) :: FracConvect           =0.0
-    REAL(r64) :: FracDistribPerson     =0.0
-    REAL(r64) :: TotPower              =0.0
-    REAL(r64) :: Power                 =0.0
-    REAL(r64) :: ConvPower             =0.0
-    REAL(r64) :: RadPower              =0.0
-    REAL(r64) :: TotEnergy             =0.0
-    REAL(r64) :: Energy                =0.0
-    REAL(r64) :: ConvEnergy            =0.0
-    REAL(r64) :: RadEnergy             =0.0
+    REAL(r64) :: NominalCapacity       =0.0d0
+    REAL(r64) :: BaseBoardEfficiency   =0.0d0
+    REAL(r64) :: AirInletTemp          =0.0d0
+    REAL(r64) :: AirInletHumRat        =0.0d0
+    REAL(r64) :: AirOutletTemp         =0.0d0
+    REAL(r64) :: ElecUseLoad           =0.0d0
+    REAL(r64) :: ElecUseRate           =0.0d0
+    REAL(r64) :: FracRadiant           =0.0d0
+    REAL(r64) :: FracConvect           =0.0d0
+    REAL(r64) :: FracDistribPerson     =0.0d0
+    REAL(r64) :: TotPower              =0.0d0
+    REAL(r64) :: Power                 =0.0d0
+    REAL(r64) :: ConvPower             =0.0d0
+    REAL(r64) :: RadPower              =0.0d0
+    REAL(r64) :: TotEnergy             =0.0d0
+    REAL(r64) :: Energy                =0.0d0
+    REAL(r64) :: ConvEnergy            =0.0d0
+    REAL(r64) :: RadEnergy             =0.0d0
     REAL(r64), ALLOCATABLE, DIMENSION(:) :: FracDistribToSurf
 END TYPE ElecBaseboardParams
 
@@ -561,16 +561,16 @@ SUBROUTINE InitElectricBaseboard(BaseboardNum, ControlledZoneNumSub, FirstHVACIt
   ElecBaseboard(BaseboardNum)%AirInletHumRat = Node(ZoneNode)%HumRat
 
      ! Set the reporting variables to zero at each timestep.
-  ElecBaseboard(BaseboardNum)%TotPower    = 0.0
-  ElecBaseboard(BaseboardNum)%Power       = 0.0
-  ElecBaseboard(BaseboardNum)%ConvPower   = 0.0
-  ElecBaseboard(BaseboardNum)%RadPower    = 0.0
-  ElecBaseboard(BaseboardNum)%TotEnergy   = 0.0
-  ElecBaseboard(BaseboardNum)%Energy      = 0.0
-  ElecBaseboard(BaseboardNum)%ConvEnergy  = 0.0
-  ElecBaseboard(BaseboardNum)%RadEnergy   = 0.0
-  ElecBaseboard(BaseboardNum)%ElecUseLoad = 0.0
-  ElecBaseboard(BaseboardNum)%ElecUseRate = 0.0
+  ElecBaseboard(BaseboardNum)%TotPower    = 0.0d0
+  ElecBaseboard(BaseboardNum)%Power       = 0.0d0
+  ElecBaseboard(BaseboardNum)%ConvPower   = 0.0d0
+  ElecBaseboard(BaseboardNum)%RadPower    = 0.0d0
+  ElecBaseboard(BaseboardNum)%TotEnergy   = 0.0d0
+  ElecBaseboard(BaseboardNum)%Energy      = 0.0d0
+  ElecBaseboard(BaseboardNum)%ConvEnergy  = 0.0d0
+  ElecBaseboard(BaseboardNum)%RadEnergy   = 0.0d0
+  ElecBaseboard(BaseboardNum)%ElecUseLoad = 0.0d0
+  ElecBaseboard(BaseboardNum)%ElecUseRate = 0.0d0
 
  RETURN
 END SUBROUTINE InitElectricBaseboard
@@ -580,7 +580,7 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -597,6 +597,7 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! USE STATEMENTS:
   USE DataSizing
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -613,20 +614,56 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: NominalCapacityDes    ! Design capacity value for reproting
+  REAL(r64) :: NominalCapacityUser   ! User hard-sized UA value for reproting
+  LOGICAL   :: IsAutosize            ! Indicator to autosizing nominal capacity
+
+  IsAutosize = .FALSE.
+  NominalCapacityDes = 0.0d0
+  NominalCapacityUser = 0.0d0
 
   IF (CurZoneEqNum > 0) THEN
 
     IF (ElecBaseboard(BaseboardNum)%NominalCapacity == AutoSize) THEN
-      CALL CheckZoneSizing(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName)
-      ElecBaseboard(BaseboardNum)%NominalCapacity = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad *   &
-         CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
-
-      CALL ReportSizingOutput(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName,&
-                                'Nominal Capacity [W]',ElecBaseboard(BaseboardNum)%NominalCapacity)
+      IsAutosize = .TRUE.
     END IF
-
+        ! Check if all are hard-sized
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation should continue
+      IF (ElecBaseboard(BaseboardNum)%NominalCapacity > 0.0d0) THEN
+        CALL ReportSizingOutput(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName,&
+                                'User-Specified Nominal Capacity [W]',ElecBaseboard(BaseboardNum)%NominalCapacity)
+      END IF
+    ELSE ! Autosize or hard-size with sizing run
+      CALL CheckZoneSizing(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName)
+         NominalCapacityDes = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad *   &
+                              CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
+      IF (IsAutoSize) THEN
+        ElecBaseboard(BaseboardNum)%NominalCapacity = NominalCapacityDes
+        CALL ReportSizingOutput(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName,&
+                                'Design Size Nominal Capacity [W]',NominalCapacityDes)
+      ELSE ! Hard-size with sizing data
+        IF (ElecBaseboard(BaseboardNum)%NominalCapacity > 0.0d0 .AND. NominalCapacityDes > 0.0d0) THEN
+          NominalCapacityUser = ElecBaseboard(BaseboardNum)%NominalCapacity
+          CALL ReportSizingOutput(cCMO_BBRadiator_Electric,ElecBaseboard(BaseboardNum)%EquipName,&
+                                'Design Size Nominal Capacity [W]',NominalCapacityDes, &
+                                'User-Specified Nominal Capacity [W]',NominalCapacityUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(NominalCapacityDes - NominalCapacityUser)/NominalCapacityUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeElecBaseboard: Potential issue with equipment sizing for ' &
+                                     //'ZoneHVAC:Baseboard:RadiantConvective:Electric="'//  &
+                                     TRIM(ElecBaseboard(BaseboardNum)%EquipName)//'".')
+              CALL ShowContinueError('User-Specified Nominal Capacity of '// &
+                                      TRIM(RoundSigDigits(NominalCapacityUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Nominal Capacity of ' // &
+                                      TRIM(RoundSigDigits(NominalCapacityDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
   END IF
-
 
   RETURN
 END SUBROUTINE SizeElectricBaseboard
@@ -1073,7 +1110,7 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
   REAL(r64)           :: Area        ! Effective surface area
 
           ! FLOW:
-  SumHATsurf = 0.0
+  SumHATsurf = 0.0d0
 
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst, Zone(ZoneNum)%SurfaceLast
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
@@ -1086,17 +1123,17 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
         Area = Area + SurfaceWindow(SurfNum)%DividerArea
       END IF
 
-      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
+      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
         ! Window frame contribution
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%FrameArea &
-          * (1.0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
+          * (1.0d0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
       END IF
 
-      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
+      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0d0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
            .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntBlindOn) THEN
         ! Window divider contribution (only from shade or blind for window with divider and interior shade or blind)
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%DividerArea &
-          * (1.0 + 2.0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
+          * (1.0d0 + 2.0d0 * SurfaceWindow(SurfNum)%ProjCorrDivIn) * SurfaceWindow(SurfNum)%DividerTempSurfIn
       END IF
     END IF
 

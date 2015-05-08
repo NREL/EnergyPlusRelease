@@ -17,6 +17,18 @@ PUBLIC
 
 CONTAINS
 
+SUBROUTINE SQLiteBegin
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+  INTEGER :: result
+END SUBROUTINE SQLiteBegin
+
+SUBROUTINE SQLiteCommit
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+  INTEGER :: result
+END SUBROUTINE SQLiteCommit
+
 SUBROUTINE CreateSQLiteDatabase
 
    ! SUBROUTINE INFORMATION:
@@ -339,6 +351,26 @@ SUBROUTINE CreateSQLiteTabularDataRecords(body,rowLabels,columnLabels,ReportName
 
 
 END SUBROUTINE CreateSQLiteTabularDataRecords
+
+SUBROUTINE InitializeIndexes
+
+    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+    ! SUBROUTINE ARGUMENT DEFINITIONS:
+    ! na
+
+    ! SUBROUTINE PARAMETER DEFINITIONS:
+    ! na
+
+    ! INTERFACE BLOCK SPECIFICATIONS:
+    ! na
+
+    ! DERIVED TYPE DEFINITIONS:
+    ! na
+
+    ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+END SUBROUTINE InitializeIndexes
 
 SUBROUTINE InitializeTabularDataTable
 

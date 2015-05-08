@@ -42,7 +42,8 @@ PUBLIC ! Everything private unless explicitly made public
       SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq, &
                                    ActuatedNode,MaxFlow,MinFlow,TempInNode,TempOutNode, &
                                    ControlOffSet,AirMassFlow,Action,ControlCompTypeNum, &
-                                   CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex)
+                                   CompErrIndex,EquipIndex,LoopNum, LoopSide, BranchIndex, &
+                                   ControlledZoneIndex)
         USE DataPrecisionGlobals
 
         CHARACTER(len=*), INTENT (IN)           :: CompName            ! The component Name
@@ -64,6 +65,7 @@ PUBLIC ! Everything private unless explicitly made public
         INTEGER, INTENT (IN), OPTIONAL          :: LoopNum             ! for plant components, plant loop index
         INTEGER, INTENT (IN), OPTIONAL          :: LoopSide            ! for plant components, plant loop side index
         INTEGER, INTENT (IN), OPTIONAL          :: BranchIndex         ! for plant components, plant branch index
+        INTEGER, INTENT (IN), OPTIONAL          :: ControlledZoneIndex ! controlled zone index for the zone containing the component
       END SUBROUTINE ControlCompOutput
 
 
@@ -359,6 +361,14 @@ INTERFACE SetupZoneInternalGain
     REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: CarbonDioxideGainRate ! target CO2 gain value (m3/s)
     REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: GenericContamGainRate ! target generic air contaminant value (m3/s)
   END SUBROUTINE
+END INTERFACE
+
+INTERFACE SetATMixerPriFlow
+  SUBROUTINE SetATMixerPriFlow(ATMixerNum,PriAirMassFlowRate)
+    USE DataPrecisionGlobals
+    INTEGER, INTENT(IN)              :: ATMixerNum            ! Air terminal mixer index
+    REAL(r64), INTENT (IN), OPTIONAL :: PriAirMassFlowRate    ! Air terminal mixer primary air mass flow rate [kg/s]
+  END SUBROUTINE SetATMixerPriFlow
 END INTERFACE
 
 !     NOTICE

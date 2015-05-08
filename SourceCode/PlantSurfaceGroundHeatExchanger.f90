@@ -77,13 +77,13 @@ TYPE SurfaceGroundHeatExchangerData
   CHARACTER(len=MaxNameLength) :: InletNode         =Blank ! surface GHE inlet fluid node
   CHARACTER(len=MaxNameLength) :: OutletNode        =Blank ! surface GHE outlet fluid node
   REAL(r64)                    :: DesignMassFlowRate =0.d0 !
-  REAL(r64)                    :: TubeDiameter      =0.0   ! hydronic tube inside diameter
-  REAL(r64)                    :: TubeSpacing       =0.0   ! tube spacing
-  REAL(r64)                    :: SurfaceLength     =0.0   ! active length of surface GHE
-  REAL(r64)                    :: SurfaceWidth      =0.0   ! active width of surface GHE
-  REAL(r64)                    :: TopThermAbs       =0.0   ! Thermal absortivity of top layer
-  REAL(r64)                    :: TopSolarAbs       =0.0   ! solar absortivity of top layer
-  REAL(r64)                    :: BtmThermAbs       =0.0   ! Thermal absortivity of bottom layer
+  REAL(r64)                    :: TubeDiameter      =0.0d0   ! hydronic tube inside diameter
+  REAL(r64)                    :: TubeSpacing       =0.0d0   ! tube spacing
+  REAL(r64)                    :: SurfaceLength     =0.0d0   ! active length of surface GHE
+  REAL(r64)                    :: SurfaceWidth      =0.0d0   ! active width of surface GHE
+  REAL(r64)                    :: TopThermAbs       =0.0d0   ! Thermal absortivity of top layer
+  REAL(r64)                    :: TopSolarAbs       =0.0d0   ! solar absortivity of top layer
+  REAL(r64)                    :: BtmThermAbs       =0.0d0   ! Thermal absortivity of bottom layer
   INTEGER                      :: LowerSurfCond     =0     ! Type of lower surf. boundary condition
   INTEGER                      :: TubeCircuits      =0     ! number of circuits in total
   INTEGER                      :: ConstructionNum   =0     ! construction index number
@@ -144,18 +144,18 @@ END TYPE SurfaceGroundHeatExchangerQTF
 
 TYPE SurfaceGroundHeatExchngrReport
   ! Report data
-  REAL(r64)                    :: InletTemp             =0.0 ! water inlet temperature
-  REAL(r64)                    :: OutletTemp            =0.0 ! water outlet temperature
-  REAL(r64)                    :: MassFlowRate          =0.0 ! water mass flow rate
-  REAL(r64)                    :: TopSurfaceTemp        =0.0 ! Top surface temperature
-  REAL(r64)                    :: BtmSurfaceTemp        =0.0 ! Bottom  surface temperature
-  REAL(r64)                    :: TopSurfaceFlux        =0.0 ! Top  surface heat flux
-  REAL(r64)                    :: BtmSurfaceFlux        =0.0 ! Bottom  surface heat flux
-  REAL(r64)                    :: HeatTransferRate      =0.0 ! total fluid heat transfer rate, Watts
-  REAL(r64)                    :: SurfHeatTransferRate  =0.0 ! total surface heat transfer rate, Watts
-  REAL(r64)                    :: Energy                =0.0 ! cumulative energy, Joules
-  REAL(r64)                    :: SurfEnergy            =0.0 ! cumulative energy, Joules
-  REAL(r64)                    :: SourceTemp            =0.0 ! Source temperature
+  REAL(r64)                    :: InletTemp             =0.0d0 ! water inlet temperature
+  REAL(r64)                    :: OutletTemp            =0.0d0 ! water outlet temperature
+  REAL(r64)                    :: MassFlowRate          =0.0d0 ! water mass flow rate
+  REAL(r64)                    :: TopSurfaceTemp        =0.0d0 ! Top surface temperature
+  REAL(r64)                    :: BtmSurfaceTemp        =0.0d0 ! Bottom  surface temperature
+  REAL(r64)                    :: TopSurfaceFlux        =0.0d0 ! Top  surface heat flux
+  REAL(r64)                    :: BtmSurfaceFlux        =0.0d0 ! Bottom  surface heat flux
+  REAL(r64)                    :: HeatTransferRate      =0.0d0 ! total fluid heat transfer rate, Watts
+  REAL(r64)                    :: SurfHeatTransferRate  =0.0d0 ! total surface heat transfer rate, Watts
+  REAL(r64)                    :: Energy                =0.0d0 ! cumulative energy, Joules
+  REAL(r64)                    :: SurfEnergy            =0.0d0 ! cumulative energy, Joules
+  REAL(r64)                    :: SourceTemp            =0.0d0 ! Source temperature
 END TYPE SurfaceGroundHeatExchngrReport
 
 
@@ -176,38 +176,38 @@ INTEGER :: OutletNodeNum      =0         ! oulet node number
 INTEGER :: ConstructionNum    =0         ! construction index number
 INTEGER :: TopRoughness       =0         ! roughness of top layer
 INTEGER :: BtmRoughness       =0         ! roughness of bottom layer
-REAL(r64)    :: InletTemp          =0.0       ! water inlet temperature
-REAL(r64)    :: OutletTemp         =0.0       ! water outlet temperature
-REAL(r64)    :: FlowRate           =0.0       ! water mass flow rate
-REAL(r64)    :: TopSurfTemp        =0.0       ! Top  surface temperature
-REAL(r64)    :: BtmSurfTemp        =0.0       ! Bottom  surface temperature
-REAL(r64)    :: TopSurfFlux        =0.0       ! Top  surface heat flux
-REAL(r64)    :: BtmSurfFlux        =0.0       ! Bottom  surface heat flux
-REAL(r64)    :: SourceFlux         =0.0       ! total heat transfer rate, Watts
-REAL(r64)    :: SourceTemp         =0.0       ! total heat transfer rate, Watts
-REAL(r64)    :: SurfaceArea        =0.0       ! surface GHE surface area
-REAL(r64)    :: TopThermAbs        =0.0       ! Thermal absortivity of top layer
-REAL(r64)    :: BtmThermAbs        =0.0       ! Thermal absortivity of bottom layer
-REAL(r64)    :: TopSolarAbs        =0.0       ! Solar absortivity of top layer
+REAL(r64)    :: InletTemp          =0.0d0       ! water inlet temperature
+REAL(r64)    :: OutletTemp         =0.0d0       ! water outlet temperature
+REAL(r64)    :: FlowRate           =0.0d0       ! water mass flow rate
+REAL(r64)    :: TopSurfTemp        =0.0d0       ! Top  surface temperature
+REAL(r64)    :: BtmSurfTemp        =0.0d0       ! Bottom  surface temperature
+REAL(r64)    :: TopSurfFlux        =0.0d0       ! Top  surface heat flux
+REAL(r64)    :: BtmSurfFlux        =0.0d0       ! Bottom  surface heat flux
+REAL(r64)    :: SourceFlux         =0.0d0       ! total heat transfer rate, Watts
+REAL(r64)    :: SourceTemp         =0.0d0       ! total heat transfer rate, Watts
+REAL(r64)    :: SurfaceArea        =0.0d0       ! surface GHE surface area
+REAL(r64)    :: TopThermAbs        =0.0d0       ! Thermal absortivity of top layer
+REAL(r64)    :: BtmThermAbs        =0.0d0       ! Thermal absortivity of bottom layer
+REAL(r64)    :: TopSolarAbs        =0.0d0       ! Solar absortivity of top layer
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
 
 
   ! weather data records updated every zone time step
-REAL(r64)    :: PastBeamSolarRad   =0.0       ! Previous beam normal solar irradiance
-REAL(r64)    :: PastSolarDirCosVert=0.0       ! Previous vertical component of solar normal
-REAL(r64)    :: PastDifSolarRad    =0.0       ! Previous sky diffuse solar horizontal irradiance
-REAL(r64)    :: PastGroundTemp     =0.0       ! Previous ground temperature
+REAL(r64)    :: PastBeamSolarRad   =0.0d0       ! Previous beam normal solar irradiance
+REAL(r64)    :: PastSolarDirCosVert=0.0d0       ! Previous vertical component of solar normal
+REAL(r64)    :: PastDifSolarRad    =0.0d0       ! Previous sky diffuse solar horizontal irradiance
+REAL(r64)    :: PastGroundTemp     =0.0d0       ! Previous ground temperature
 LOGICAL :: PastIsRain         =.false.   ! Previous Surfaces are wet for this time interval
 LOGICAL :: PastIsSnow         =.false.   ! Previous Snow on the ground for this time interval
-REAL(r64)    :: PastOutBaroPress   =0.0       ! Previous outdoor air barometric pressure
-REAL(r64)    :: PastOutDryBulbTemp =0.0       ! Previous outdoor air dry bulb temperature
-REAL(r64)    :: PastOutHumRat      =0.0       ! Previous outdoor air humidity ratio
-REAL(r64)    :: PastOutAirDensity  =0.0       ! Previous outdoor air density
-REAL(r64)    :: PastOutWetBulbTemp =0.0       ! Previous outdoor air wet bulb temperature
-REAL(r64)    :: PastOutDewPointTemp=0.0       ! Previous outdoor dewpoint temperature
-REAL(r64)    :: PastSkyTemp        =0.0       ! Previous sky temperature
-REAL(r64)    :: PastWindSpeed      =0.0       ! Previous outdoor air wind speed
-REAL(r64)    :: PastCloudFraction  =0.0       ! Previous Fraction of sky covered by clouds
+REAL(r64)    :: PastOutBaroPress   =0.0d0       ! Previous outdoor air barometric pressure
+REAL(r64)    :: PastOutDryBulbTemp =0.0d0       ! Previous outdoor air dry bulb temperature
+REAL(r64)    :: PastOutHumRat      =0.0d0       ! Previous outdoor air humidity ratio
+REAL(r64)    :: PastOutAirDensity  =0.0d0       ! Previous outdoor air density
+REAL(r64)    :: PastOutWetBulbTemp =0.0d0       ! Previous outdoor air wet bulb temperature
+REAL(r64)    :: PastOutDewPointTemp=0.0d0       ! Previous outdoor dewpoint temperature
+REAL(r64)    :: PastSkyTemp        =0.0d0       ! Previous sky temperature
+REAL(r64)    :: PastWindSpeed      =0.0d0       ! Previous outdoor air wind speed
+REAL(r64)    :: PastCloudFraction  =0.0d0       ! Previous Fraction of sky covered by clouds
 
 
   ! time keeping variables used for keeping track of average flux over each time step
@@ -467,7 +467,7 @@ SUBROUTINE GetSurfaceGroundHeatExchanger
       CALL ShowContinueError('Value must be greater than 0.0')
       ErrorsFound=.true.
     END IF
-    IF (rNumericArgs(3) == 0.0) THEN
+    IF (rNumericArgs(3) == 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(3))//'='//TRIM(RoundSigDigits(rNumericArgs(3),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
@@ -477,13 +477,13 @@ SUBROUTINE GetSurfaceGroundHeatExchanger
     ! surface geometry data
     SurfaceGHE(Item)%SurfaceLength = rNumericArgs(4)
     SurfaceGHE(Item)%SurfaceWidth   = rNumericArgs(5)
-    IF (rNumericArgs(4) <= 0.0) THEN
+    IF (rNumericArgs(4) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(4))//'='//TRIM(RoundSigDigits(rNumericArgs(4),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
       ErrorsFound=.true.
     END IF
-    IF (rNumericArgs(5) <= 0.0) THEN
+    IF (rNumericArgs(5) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(5))//'='//TRIM(RoundSigDigits(rNumericArgs(5),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
@@ -735,17 +735,17 @@ SUBROUTINE InitSurfaceGroundHeatExchanger(SurfaceGHENum,RunFlag)
       SurfaceGHEQTF(Surface)%QbtmHistory = 0.0D0
       SurfaceGHEQTF(Surface)%QtopHistory = 0.0D0
       SurfaceGHEQTF(Surface)%QsrcHistory = 0.0D0
-      SurfaceGHEQTF(Surface)%TsrcConstCoef  = 0.0
-      SurfaceGHEQTF(Surface)%TsrcVarCoef    = 0.0
-      SurfaceGHEQTF(Surface)%QbtmConstCoef  = 0.0
-      SurfaceGHEQTF(Surface)%QbtmVarCoef    = 0.0
-      SurfaceGHEQTF(Surface)%QtopConstCoef  = 0.0
-      SurfaceGHEQTF(Surface)%QtopVarCoef    = 0.0
-      SurfaceGHEQTF(Surface)%QSrc           = 0.0
-      SurfaceGHEQTF(Surface)%QSrcAvg        = 0.0
-      SurfaceGHEQTF(Surface)%LastQSrc       = 0.0
-      SurfaceGHEQTF(Surface)%LastSysTimeElapsed   = 0.0
-      SurfaceGHEQTF(Surface)%LastTimeStepSys      = 0.0
+      SurfaceGHEQTF(Surface)%TsrcConstCoef  = 0.0d0
+      SurfaceGHEQTF(Surface)%TsrcVarCoef    = 0.0d0
+      SurfaceGHEQTF(Surface)%QbtmConstCoef  = 0.0d0
+      SurfaceGHEQTF(Surface)%QbtmVarCoef    = 0.0d0
+      SurfaceGHEQTF(Surface)%QtopConstCoef  = 0.0d0
+      SurfaceGHEQTF(Surface)%QtopVarCoef    = 0.0d0
+      SurfaceGHEQTF(Surface)%QSrc           = 0.0d0
+      SurfaceGHEQTF(Surface)%QSrcAvg        = 0.0d0
+      SurfaceGHEQTF(Surface)%LastQSrc       = 0.0d0
+      SurfaceGHEQTF(Surface)%LastSysTimeElapsed   = 0.0d0
+      SurfaceGHEQTF(Surface)%LastTimeStepSys      = 0.0d0
 
      END DO
      ! initialize past weather variables
@@ -930,8 +930,8 @@ SUBROUTINE CalcSurfaceGroundHeatExchanger(SurfaceGHENum, FirstHVACIteration)    
     OldPastFluxTop = 1.0d+30
     OldPastFluxBtm = 1.0d+30
     OldSourceFlux = 1.0d+30
-    TempB=0.0
-    TempT=0.0
+    TempB=0.0d0
+    TempT=0.0d0
     iter=0
     DO  ! iterate to find surface heat balances
         ! update coefficients
@@ -1095,7 +1095,7 @@ SUBROUTINE CalcSurfaceGroundHeatExchanger(SurfaceGHENum, FirstHVACIteration)    
       CALL CalcSourceTempCoefficents(SurfaceGHENum, TempBtm, TempTop)
       SourceFlux = CalcSourceFlux(SurfaceGHENum)
       ! check source flux convergence
-      IF(ABS((OldSourceFlux - SourceFlux)/(1.0E-20+OldSourceFlux)) <= SrcFluxTol) EXIT
+      IF(ABS((OldSourceFlux - SourceFlux)/(1.0d-20+OldSourceFlux)) <= SrcFluxTol) EXIT
       OldSourceFlux = SourceFlux
 
 
@@ -1462,14 +1462,14 @@ FUNCTION CalcSourceFlux(SurfaceGHENum)
 
 
   ! Effectiveness * Modot * specific heat
-  IF(FlowRate > 0.0)THEN
+  IF(FlowRate > 0.0d0)THEN
     EpsMdotCp = CalcHXEffectTerm(SurfaceGHENum,InletTemp,FlowRate)
     ! calc flux
     CalcSourceFlux = (InletTemp - SurfaceGHEQTF(SurfaceGHENum)%TsrcConstCoef  ) / &
                      (SurfaceArea/EpsMdotCp + SurfaceGHEQTF(SurfaceGHENum)%TsrcVarCoef )
   ELSE
-    EpsMdotCp = 0.0
-    CalcSourceFlux = 0.0
+    EpsMdotCp = 0.0d0
+    CalcSourceFlux = 0.0d0
   ENDIF
 
 
@@ -1699,7 +1699,7 @@ REAL(r64) FUNCTION CalcHXEffectTerm(SurfaceGHENum,Temperature,WaterMassFlow)
 
 
           ! Calculate the Reynold's number from RE=(4*Mdot)/(Pi*Mu*Diameter)
-  ReD = 4.0 * WaterMassFlow / ( PI * MUactual * SurfaceGHE(SurfaceGHENum)%TubeDiameter * &
+  ReD = 4.0d0 * WaterMassFlow / ( PI * MUactual * SurfaceGHE(SurfaceGHENum)%TubeDiameter * &
                                 SurfaceGHE(SurfaceGHENum)%TubeCircuits)
 
 
@@ -1724,9 +1724,9 @@ REAL(r64) FUNCTION CalcHXEffectTerm(SurfaceGHENum,Temperature,WaterMassFlow)
   NTU = PI * Kactual * NuD * PipeLength / (WaterMassFlow * CpWater)
           ! Calculate Epsilon*MassFlowRate*Cp
   IF (-NTU >= EXP_LowerLimit) THEN
-    CalcHXEffectTerm = (1.-EXP(-NTU))*WaterMassFlow*CpWater
+    CalcHXEffectTerm = (1.0d0-EXP(-NTU))*WaterMassFlow*CpWater
   ELSE
-    CalcHXEffectTerm = 1.0*WaterMassFlow*CpWater
+    CalcHXEffectTerm = 1.0d0*WaterMassFlow*CpWater
   ENDIF
 
 
@@ -1831,7 +1831,7 @@ SUBROUTINE CalcTopSurfTemp (SurfaceNum, FluxTop, TempTop, ThisDrybulb, ThisWetBu
     RadCoef      = StefBoltzmann*TopThermAbs*((SurfTempAbs**4)-(SkyTempAbs**4))/ &
                                (SurfTempAbs-SkyTempAbs)
   ELSE
-    RadCoef =  0.0
+    RadCoef =  0.0d0
   ENDIF
 
 
@@ -1928,7 +1928,7 @@ SUBROUTINE CalcBottomSurfTemp (SurfaceNum, FluxBtm, TempBtm, ThisDrybulb, ThisWi
       RadCoef = StefBoltzmann*TopThermAbs*((SurfTempAbs**4)-(ExtTempAbs**4))/ &
                                 (SurfTempAbs-ExtTempAbs)
     ELSE
-      RadCoef=0.0
+      RadCoef=0.0d0
     ENDIF
 
     ! total absorbed solar - no ground solar
@@ -2042,7 +2042,7 @@ SUBROUTINE UpdateSurfaceGroundHeatExchngr(SurfaceGHENum)    !DSU
   ! Calculate the water side outlet conditions and set the
   ! appropriate conditions on the correct HVAC node.
   IF(PlantLoop(SurfaceGHE(SurfaceGHENum)%LoopNum)%FluidName =='WATER')THEN
-    IF (InletTemp .LT. 0.0) THEN
+    IF (InletTemp .LT. 0.0d0) THEN
       CALL ShowRecurringWarningErrorAtEnd('UpdateSurfaceGroundHeatExchngr: Water is frozen in Surf HX='//  &
                      TRIM(SurfaceGHE(SurfaceGHENum)%Name),SurfaceGHE(SurfaceGHENum)%FrozenErrIndex2,InletTemp,InletTemp)
     END IF
@@ -2054,7 +2054,7 @@ SUBROUTINE UpdateSurfaceGroundHeatExchngr(SurfaceGHENum)    !DSU
 
   Call SafeCopyPlantNode(SurfaceGHE(SurfaceGHENum)%InletNodeNum, SurfaceGHE(SurfaceGHENum)%OutletNodeNum)
   ! check for flow
-  IF ( (CpFluid > 0.0) .AND. (FlowRate > 0.0) ) THEN
+  IF ( (CpFluid > 0.0d0) .AND. (FlowRate > 0.0d0) ) THEN
     Node(SurfaceGHE(SurfaceGHENum)%OutletNodeNum)%Temp   = InletTemp - SurfaceArea*SourceFlux / (FlowRate*CpFluid)
     Node(SurfaceGHE(SurfaceGHENum)%OutletNodeNum)%Enthalpy = Node(SurfaceGHE(SurfaceGHENum)%OutletNodeNum)%Temp *CpFluid
   END IF

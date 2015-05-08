@@ -307,8 +307,8 @@ CONTAINS
     ALLOCATE(intvtcflag(TotSurfaces))
     ALLOCATE(MyEnvrnFlag(TotSurfaces))
 
-    extvtc=-1
-    intvtc=-1
+    extvtc=-1.0d0
+    intvtc=-1.0d0
     extvtcflag=.FALSE.
     intvtcflag=.FALSE.
     MyEnvrnFlag=.TRUE.
@@ -349,7 +349,7 @@ CONTAINS
     ALLOCATE(cNumericFieldNames(MaxNums))
     cNumericFieldNames=' '
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
     ALLOCATE(lAlphaBlanks(MaxAlphas))
     lAlphaBlanks=.false.
     ALLOCATE(lNumericBlanks(MaxNums))
@@ -420,8 +420,8 @@ CONTAINS
        Material(matid)%isodata(Material(matid)%niso)=Material(matid)%Porosity*wdensity
 
        Material(matid)%niso=Material(matid)%niso+1
-       Material(matid)%isorh(Material(matid)%niso)=0.0
-       Material(matid)%isodata(Material(matid)%niso)=0.0
+       Material(matid)%isorh(Material(matid)%niso)=0.0d0
+       Material(matid)%isodata(Material(matid)%niso)=0.0d0
     ENDDO
 
 
@@ -454,7 +454,7 @@ CONTAINS
              DO jj=1,Material(matid)%niso-1
                 IF(Material(matid)%isodata(jj)>Material(matid)%isodata(jj+1))THEN
                    isoerrrise=.TRUE.
-                   avdata=(Material(matid)%isodata(jj)+Material(matid)%isodata(jj+1))/2.0
+                   avdata=(Material(matid)%isodata(jj)+Material(matid)%isodata(jj+1))/2.0d0
                    Material(matid)%isodata(jj)=avdata
                    Material(matid)%isodata(jj+1)=avdata
                    avflag=.FALSE.
@@ -843,7 +843,7 @@ CONTAINS
       IF (Surface(sid)%Class == SurfaceClass_Window) CYCLE
       IF (Surface(sid)%HeatTransferAlgorithm /= HeatTransferModel_HAMT) CYCLE
       ! Boundary Cells
-      runor=-0.02
+      runor=-0.02d0
       ! Air Convection Cell
       cid=cid+1
       firstcell(sid)=cid
@@ -912,8 +912,8 @@ CONTAINS
 
             ! Make cells smaller near the surface
             cells(cid)%length(1)=Material(matid)%Thickness* &
-                 ((SIN(pi*(-REAL(did)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0)- &
-                 (SIN(pi*(-REAL(did-1)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0))
+                 ((SIN(pi*(-REAL(did,r64)/REAL(Material(matid)%divs,r64))-pi/2.0d0)/2.0d0)- &
+                 (SIN(pi*(-REAL(did-1,r64)/REAL(Material(matid)%divs,r64))-pi/2.0d0)/2.0d0))
 
             cells(cid)%origin(1)=runor+cells(cid)%length(1)/2.0d0
             runor=runor+cells(cid)%length(1)
@@ -989,14 +989,14 @@ CONTAINS
       IF (Surface(sid)%HeatTransferAlgorithm /= HeatTransferModel_HAMT) CYCLE
       cells(Extcell(sid))%origin(1)=cells(Extcell(sid))%origin(1)+cells(Extcell(sid))%length(1)/2.0d0
       cells(Intcell(sid))%origin(1)=cells(Intcell(sid))%origin(1)-cells(Intcell(sid))%length(1)/2.0d0
-      cells(Extcell(sid))%volume=0.0
-      cells(Intcell(sid))%volume=0.0
-      watertot(sid)=0.0
-      surfrh(sid)=0.0
-      surfextrh(sid)=0.0
-      surftemp(sid)=0.0
-      surfexttemp(sid)=0.0
-      surfvp(sid)=0.0
+      cells(Extcell(sid))%volume=0.0d0
+      cells(Intcell(sid))%volume=0.0d0
+      watertot(sid)=0.0d0
+      surfrh(sid)=0.0d0
+      surfextrh(sid)=0.0d0
+      surftemp(sid)=0.0d0
+      surfexttemp(sid)=0.0d0
+      surfvp(sid)=0.0d0
       CALL SetUpOutputVariable('HAMT Surface Average Water Content Ratio [kg/kg]',watertot(sid),  &
          'Zone','State',Surface(sid)%Name)
       CALL SetUpOutputVariable('HAMT Surface Inside Face Temperature [C]',surftemp(sid),  &
@@ -1318,7 +1318,7 @@ CONTAINS
              ENDIF
 
              IF(cells(cid)%vtc>0)THEN
-                vaporr1=1.0/(cells(cid)%overlap(ii)*cells(cid)%vtc)
+                vaporr1=1.0d0/(cells(cid)%overlap(ii)*cells(cid)%vtc)
              ELSE IF(cells(cid)%matid>0)THEN
                 vaporr1=(cells(cid)%dist(ii)*cells(cid)%mu)/(cells(cid)%overlap(ii)*WVDC(cells(cid)%tempp1,OutBaroPress))
              ELSE
@@ -1426,10 +1426,10 @@ CONTAINS
 
        ! Calculate the liquid and vapor resisitances
        DO cid=Extcell(sid),Intcell(sid)
-          phioosum=0.0
-          phiorsum=0.0
-          vpoosum=0.0
-          vporsum=0.0
+          phioosum=0.0d0
+          phiorsum=0.0d0
+          vpoosum=0.0d0
+          vporsum=0.0d0
 
           DO ii=1,adjmax
              adj=cells(cid)%adjs(ii)
@@ -1437,54 +1437,54 @@ CONTAINS
              IF(adj==-1)EXIT
 
              IF(cells(cid)%vtc>0)THEN
-                vaporr1=1.0/(cells(cid)%overlap(ii)*cells(cid)%vtc)
+                vaporr1=1.0d0/(cells(cid)%overlap(ii)*cells(cid)%vtc)
              ELSE IF(cells(cid)%matid>0)THEN
                 vaporr1=(cells(cid)%dist(ii)*cells(cid)%mu)/(cells(cid)%overlap(ii)*WVDC(cells(cid)%tempp1,OutBaroPress))
              ELSE
-                vaporr1=0.0
+                vaporr1=0.0d0
              ENDIF
 
              IF(cells(adj)%vtc>0)THEN
-                vaporr2=1.0/(cells(cid)%overlap(ii)*cells(adj)%vtc)
+                vaporr2=1.0d0/(cells(cid)%overlap(ii)*cells(adj)%vtc)
              ELSE IF(cells(adj)%matid>0)THEN
                 vaporr2=(cells(adj)%dist(adjl)*cells(adj)%mu)/(cells(cid)%overlap(ii)*WVDC(cells(adj)%tempp1,OutBaroPress))
              ELSE
-                vaporr2=0.0
+                vaporr2=0.0d0
              ENDIF
              IF(vaporr1+vaporr2>0)THEN
-                vpoosum=vpoosum+1.0/(vaporr1+vaporr2)
+                vpoosum=vpoosum+1.0d0/(vaporr1+vaporr2)
                 vporsum=vporsum+(cells(adj)%vpp1/(vaporr1+vaporr2))
              ENDIF
 
              IF((cells(cid)%dw>0).AND.(cells(cid)%dwdphi>0))THEN
                 rhr1=cells(cid)%dist(ii)/(cells(cid)%overlap(ii)*cells(cid)%dw*cells(cid)%dwdphi)
              ELSE
-                rhr1=0.0
+                rhr1=0.0d0
              ENDIF
              IF((cells(adj)%dw>0).AND.(cells(adj)%dwdphi>0))THEN
                 rhr2=cells(adj)%dist(adjl)/(cells(cid)%overlap(ii)*cells(adj)%dw*cells(adj)%dwdphi)
              ELSE
-                rhr2=0.0
+                rhr2=0.0d0
              ENDIF
 
              !             IF(rhr1+rhr2>0)THEN
              IF(rhr1*rhr2>0)THEN
-                phioosum=phioosum+1.0/(rhr1+rhr2)
+                phioosum=phioosum+1.0d0/(rhr1+rhr2)
                 phiorsum=phiorsum+(cells(adj)%rhp1/(rhr1+rhr2))
              ENDIF
 
           ENDDO
 
           ! Moisture Capacitance
-          IF(cells(cid)%dwdphi>0.0)THEN
+          IF(cells(cid)%dwdphi>0.0d0)THEN
              wcap=cells(cid)%dwdphi*cells(cid)%volume
           ELSE
-             wcap=0.0
+             wcap=0.0d0
           ENDIF
 
           ! Calculate the RH for the next time step
           denominator=(phioosum+vpoosum*cells(cid)%vpsat+wcap/deltat)
-          if (denominator /= 0.0) then
+          if (denominator /= 0.0d0) then
             cells(cid)%rhp1=(phiorsum+vporsum+(wcap*cells(cid)%rh)/deltat)/denominator
           else
             call ShowSevereError('CalcHeatBalHAMT: demoninator in calculating RH is zero.  Check material properties for accuracy.')
@@ -1498,7 +1498,7 @@ CONTAINS
        ENDDO
 
        !Check for convergence or too many itterations
-       sumtp1=0.0
+       sumtp1=0.0d0
        DO cid=Extcell(sid),Intcell(sid)
           IF(sumtp1<ABS(cells(cid)%tempp2-cells(cid)%tempp1))THEN
              sumtp1=ABS(cells(cid)%tempp2-cells(cid)%tempp1)

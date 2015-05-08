@@ -52,9 +52,9 @@ TYPE DemandManagerListData
   CHARACTER(len=MaxNameLength)   :: Name = ''                     ! Name of DEMAND MANAGER LIST
   INTEGER                        :: Meter = 0                     ! Index to meter to demand limit
   INTEGER                        :: LimitSchedule = 0             ! Schedule index for demand limit
-  REAL(r64)                      :: SafetyFraction = 1.0          ! Multiplier applied to demand limit schedule
+  REAL(r64)                      :: SafetyFraction = 1.0d0          ! Multiplier applied to demand limit schedule
   INTEGER                        :: BillingSchedule = 0           ! Schedule index for billing month periods
-  REAL(r64)                      :: BillingPeriod = 0.0           ! Current billing period value
+  REAL(r64)                      :: BillingPeriod = 0.0d0           ! Current billing period value
   INTEGER                        :: PeakSchedule = 0              ! Schedule index for billing month periods
   INTEGER                        :: AveragingWindow = 1           ! Number of timesteps for averaging demand window
   REAL(r64), ALLOCATABLE, DIMENSION(:)    :: History                   ! Demand window history
@@ -62,15 +62,15 @@ TYPE DemandManagerListData
   INTEGER                        :: NumOfManager                  ! Number of DEMAND MANAGERs
   INTEGER, ALLOCATABLE, DIMENSION(:) :: Manager                   ! Indexes for DEMAND MANAGERs
 
-  REAL(r64)                      :: MeterDemand = 0.0             ! Meter demand at this timestep
-  REAL(r64)                      :: AverageDemand = 0.0           ! Current demand over the demand window
-  REAL(r64)                      :: PeakDemand = 0.0              ! Peak demand in the billing month so far
+  REAL(r64)                      :: MeterDemand = 0.0d0             ! Meter demand at this timestep
+  REAL(r64)                      :: AverageDemand = 0.0d0           ! Current demand over the demand window
+  REAL(r64)                      :: PeakDemand = 0.0d0              ! Peak demand in the billing month so far
 
-  REAL(r64)                      :: ScheduledLimit = 0.0          ! Scheduled demand limit
-  REAL(r64)                      :: DemandLimit = 0.0             ! Scheduled demand limit * Safety Fraction
-  REAL(r64)                      :: AvoidedDemand = 0.0           ! Demand avoided by active DEMAND MANAGERs
-  REAL(r64)                      :: OverLimit = 0.0               ! Amount that demand limit is exceeded
-  REAL(r64)                      :: OverLimitDuration = 0.0       ! Number of hours that demand limit is exceeded
+  REAL(r64)                      :: ScheduledLimit = 0.0d0          ! Scheduled demand limit
+  REAL(r64)                      :: DemandLimit = 0.0d0             ! Scheduled demand limit * Safety Fraction
+  REAL(r64)                      :: AvoidedDemand = 0.0d0           ! Demand avoided by active DEMAND MANAGERs
+  REAL(r64)                      :: OverLimit = 0.0d0               ! Amount that demand limit is exceeded
+  REAL(r64)                      :: OverLimitDuration = 0.0d0       ! Number of hours that demand limit is exceeded
 
 END TYPE DemandManagerListData
 
@@ -95,9 +95,9 @@ TYPE DemandManagerData
   INTEGER                        :: ElapsedRotationTime = 0       ! Elapsed time for the current rotation (min)
   INTEGER                        :: RotatedLoadNum = 0            ! Index for rotated load
 
-  REAL(r64)                      :: LowerLimit = 0.0              ! Lowest demand limit as fraction of design level
+  REAL(r64)                      :: LowerLimit = 0.0d0              ! Lowest demand limit as fraction of design level
                                                                   ! Lowest heating setpoint for thermostats
-  REAL(r64)                      :: UpperLimit = 0.0              ! Not used for demand limit
+  REAL(r64)                      :: UpperLimit = 0.0d0              ! Not used for demand limit
                                                                   ! Highest cooling setpoint for thermostats
   INTEGER                        :: NumOfLoads = 0                ! Number of load objects
   INTEGER, ALLOCATABLE, DIMENSION(:) :: Load                      ! Pointers to load objects
@@ -172,15 +172,15 @@ SUBROUTINE ManageDemand
       IF (ClearHistory) THEN
         ! Clear historical variables
         DO ListNum = 1, NumDemandManagerList
-          DemandManagerList(ListNum)%History = 0.0
-          DemandManagerList(ListNum)%MeterDemand = 0.0
-          DemandManagerList(ListNum)%AverageDemand = 0.0
-          DemandManagerList(ListNum)%PeakDemand = 0.0
-          DemandManagerList(ListNum)%ScheduledLimit = 0.0
-          DemandManagerList(ListNum)%DemandLimit = 0.0
-          DemandManagerList(ListNum)%AvoidedDemand = 0.0
-          DemandManagerList(ListNum)%OverLimit = 0.0
-          DemandManagerList(ListNum)%OverLimitDuration = 0.0
+          DemandManagerList(ListNum)%History = 0.0d0
+          DemandManagerList(ListNum)%MeterDemand = 0.0d0
+          DemandManagerList(ListNum)%AverageDemand = 0.0d0
+          DemandManagerList(ListNum)%PeakDemand = 0.0d0
+          DemandManagerList(ListNum)%ScheduledLimit = 0.0d0
+          DemandManagerList(ListNum)%DemandLimit = 0.0d0
+          DemandManagerList(ListNum)%AvoidedDemand = 0.0d0
+          DemandManagerList(ListNum)%OverLimit = 0.0d0
+          DemandManagerList(ListNum)%OverLimitDuration = 0.0d0
         END DO  ! ListNum
 
         ! Clear demand manager variables
@@ -307,7 +307,7 @@ SUBROUTINE SimulateDemandManagerList(ListNum, ResimExt, ResimHB, ResimHVAC)
   IF (OnPeak) THEN
     OverLimit = AverageDemand - DemandManagerList(ListNum)%DemandLimit
 
-    IF (OverLimit > 0.0) THEN
+    IF (OverLimit > 0.0d0) THEN
 
       SELECT CASE (DemandManagerList(ListNum)%ManagerPriority)
 
@@ -426,7 +426,7 @@ SUBROUTINE GetDemandManagerListInput
     ALLOCATE(AlphArray(NumAlphas))
     AlphArray=Blank
     ALLOCATE(NumArray(NumNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
     ALLOCATE(DemandManagerList(NumDemandManagerList))
 
@@ -505,7 +505,7 @@ SUBROUTINE GetDemandManagerListInput
 ! Round to nearest timestep
 ! Can make this fancier to include windows that do not fit the timesteps
       ALLOCATE(DemandManagerList(ListNum)%History(DemandManagerList(ListNum)%AveragingWindow))
-      DemandManagerList(ListNum)%History = 0.0
+      DemandManagerList(ListNum)%History = 0.0d0
 
       ! Validate Demand Manager Priority
       SELECT CASE (AlphArray(6))
@@ -525,7 +525,7 @@ SUBROUTINE GetDemandManagerListInput
       END SELECT
 
       ! Get DEMAND MANAGER Type and Name pairs
-      DemandManagerList(ListNum)%NumOfManager = INT((NumAlphas - 6) / 2.0)
+      DemandManagerList(ListNum)%NumOfManager = INT((NumAlphas - 6) / 2.0d0)
 
       IF (DemandManagerList(ListNum)%NumOfManager > 0) THEN
         ALLOCATE(DemandManagerList(ListNum)%Manager(DemandManagerList(ListNum)%NumOfManager))
@@ -708,7 +708,7 @@ SUBROUTINE GetDemandManagerInput
     ALLOCATE(AlphArray(MaxAlphas))
     AlphArray=Blank
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
     ALLOCATE(DemandMgr(NumDemandMgr))
 
@@ -913,7 +913,7 @@ SUBROUTINE GetDemandManagerInput
         DO Item = 1, NumAlphas-4
           LoadPtr = FindItemInList(AlphArray(Item+4),LightsObjects%Name,NumLightsStatements)
           IF (LoadPtr > 0) THEN
-            DO Item1=1,TStatObjects(LoadPtr)%NumOfZones
+            DO Item1=1,LightsObjects(LoadPtr)%NumOfZones
               LoadNum=LoadNum+1
               DemandMgr(MgrNum)%Load(LoadNum) = LightsObjects(LoadPtr)%StartPtr+Item1-1
             ENDDO
@@ -1384,7 +1384,7 @@ SUBROUTINE UpdateDemandManagers
 !    IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
 !      Available = .TRUE.  ! No schedule defaults to available
 !    ELSE
-     IF (GetCurrentScheduleValue(DemandMgr(MgrNum)%AvailSchedule) > 0.0) THEN
+     IF (GetCurrentScheduleValue(DemandMgr(MgrNum)%AvailSchedule) > 0.0d0) THEN
        Available = .TRUE.
      ELSE
        Available = .FALSE.
@@ -1403,7 +1403,7 @@ SUBROUTINE UpdateDemandManagers
         ! Check for expiring limit duration
         IF (DemandMgr(MgrNum)%ElapsedTime >= DemandMgr(MgrNum)%LimitDuration) THEN
           DemandMgr(MgrNum)%ElapsedTime = 0
-          DemandMgr(MgrNum)%ElapsedRotationTime = 0.0
+          DemandMgr(MgrNum)%ElapsedRotationTime = 0
           DemandMgr(MgrNum)%Active = .FALSE.
 
           ! Demand Manager is not available, remove demand limits from all loads
@@ -1422,7 +1422,7 @@ SUBROUTINE UpdateDemandManagers
               DemandMgr(MgrNum)%ElapsedRotationTime = DemandMgr(MgrNum)%ElapsedRotationTime + MinutesPerTimeStep
 
               IF (DemandMgr(MgrNum)%ElapsedRotationTime >= DemandMgr(MgrNum)%RotationDuration) THEN
-                DemandMgr(MgrNum)%ElapsedRotationTime = 0.0
+                DemandMgr(MgrNum)%ElapsedRotationTime = 0
 
                 IF (DemandMgr(MgrNum)%NumOfLoads > 1) THEN
                   ! Turn ON limiting for the old rotated load
@@ -1445,7 +1445,7 @@ SUBROUTINE UpdateDemandManagers
               DemandMgr(MgrNum)%ElapsedRotationTime = DemandMgr(MgrNum)%ElapsedRotationTime + MinutesPerTimeStep
 
               IF (DemandMgr(MgrNum)%ElapsedRotationTime >= DemandMgr(MgrNum)%RotationDuration) THEN
-                DemandMgr(MgrNum)%ElapsedRotationTime = 0.0
+                DemandMgr(MgrNum)%ElapsedRotationTime = 0
 
                 IF (DemandMgr(MgrNum)%NumOfLoads > 1) THEN
                   ! Turn OFF limiting for the old rotated load
@@ -1531,8 +1531,8 @@ SUBROUTINE ReportDemandManagerList(ListNum)
     ! Reset variables for new billing period
     !DemandManagerList(ListNum)%History = 0.0        ! Don't reset--continue from previous billing period
     !DemandManagerList(ListNum)%AverageDemand = 0.0  ! Don't reset--continue from previous billing period
-    DemandManagerList(ListNum)%PeakDemand = 0.0
-    DemandManagerList(ListNum)%OverLimitDuration = 0.0
+    DemandManagerList(ListNum)%PeakDemand = 0.0d0
+    DemandManagerList(ListNum)%OverLimitDuration = 0.0d0
 
     DemandManagerList(ListNum)%BillingPeriod = BillingPeriod
   END IF
@@ -1563,15 +1563,15 @@ SUBROUTINE ReportDemandManagerList(ListNum)
       MAX(DemandManagerList(ListNum)%AverageDemand,DemandManagerList(ListNum)%PeakDemand)
 
     OverLimit = DemandManagerList(ListNum)%AverageDemand - DemandManagerList(ListNum)%ScheduledLimit
-    IF (OverLimit > 0.0) THEN
+    IF (OverLimit > 0.0d0) THEN
       DemandManagerList(ListNum)%OverLimit = OverLimit
-      DemandManagerList(ListNum)%OverLimitDuration = DemandManagerList(ListNum)%OverLimitDuration + (MinutesPerTimeStep / 60.0)
+      DemandManagerList(ListNum)%OverLimitDuration = DemandManagerList(ListNum)%OverLimitDuration + (MinutesPerTimeStep / 60.0d0)
     ELSE
-      DemandManagerList(ListNum)%OverLimit = 0.0
+      DemandManagerList(ListNum)%OverLimit = 0.0d0
     END IF
 
   ELSE
-    DemandManagerList(ListNum)%OverLimit = 0.0
+    DemandManagerList(ListNum)%OverLimit = 0.0d0
   END IF
 
   RETURN

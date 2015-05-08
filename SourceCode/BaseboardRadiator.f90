@@ -54,22 +54,22 @@ PRIVATE ! Everything private unless explicitly made public
     INTEGER      :: WaterOutletNode           = 0
     INTEGER      :: ControlCompTypeNum        = 0
     INTEGER      :: CompErrIndex              = 0
-    REAL(r64)    :: UA                        =0.0
-    REAL(r64)    :: WaterMassFlowRate         =0.0
-    REAL(r64)    :: WaterVolFlowRateMax       =0.0  ! m3/s
-    REAL(r64)    :: WaterMassFlowRateMax      =0.0  ! kg/s
-    REAL(r64)    :: Offset                    =0.0
-    REAL(r64)    :: AirMassFlowRate           =0.0  ! kg/s
-    REAL(r64)    :: DesAirMassFlowRate        =0.0  ! kg/s
-    REAL(r64)    :: WaterInletTemp            =0.0
-    REAL(r64)    :: WaterOutletTemp           =0.0
-    REAL(r64)    :: WaterInletEnthalpy        =0.0
-    REAL(r64)    :: WaterOutletEnthalpy       =0.0
-    REAL(r64)    :: AirInletTemp              =0.0
-    REAL(r64)    :: AirInletHumRat            =0.0
-    REAL(r64)    :: AirOutletTemp             =0.0
-    REAL(r64)    :: Power                     =0.0
-    REAL(r64)    :: Energy                    =0.0
+    REAL(r64)    :: UA                        =0.0d0
+    REAL(r64)    :: WaterMassFlowRate         =0.0d0
+    REAL(r64)    :: WaterVolFlowRateMax       =0.0d0  ! m3/s
+    REAL(r64)    :: WaterMassFlowRateMax      =0.0d0  ! kg/s
+    REAL(r64)    :: Offset                    =0.0d0
+    REAL(r64)    :: AirMassFlowRate           =0.0d0  ! kg/s
+    REAL(r64)    :: DesAirMassFlowRate        =0.0d0  ! kg/s
+    REAL(r64)    :: WaterInletTemp            =0.0d0
+    REAL(r64)    :: WaterOutletTemp           =0.0d0
+    REAL(r64)    :: WaterInletEnthalpy        =0.0d0
+    REAL(r64)    :: WaterOutletEnthalpy       =0.0d0
+    REAL(r64)    :: AirInletTemp              =0.0d0
+    REAL(r64)    :: AirInletHumRat            =0.0d0
+    REAL(r64)    :: AirOutletTemp             =0.0d0
+    REAL(r64)    :: Power                     =0.0d0
+    REAL(r64)    :: Energy                    =0.0d0
     INTEGER      :: LoopNum                   =0  ! plant loop index
     INTEGER      :: LoopSideNum               =0  ! plant loop side index
     INTEGER      :: BranchNum                 =0  ! plant loop branch index
@@ -197,8 +197,8 @@ CONTAINS
 
     Baseboard(BaseboardNum)%WaterOutletTemp   = Baseboard(BaseboardNum)%WaterInletTemp
     Baseboard(BaseboardNum)%AirOutletTemp     = Baseboard(BaseboardNum)%AirInletTemp
-    Baseboard(BaseboardNum)%Power             = 0.0
-    Baseboard(BaseboardNum)%WaterMassFlowRate = 0.0
+    Baseboard(BaseboardNum)%Power             = 0.0d0
+    Baseboard(BaseboardNum)%WaterMassFlowRate = 0.0d0
     ! init hot water flow rate to zero
     DummyMdot = 0.d0
     CALL SetActuatedBranchFlowRate(DummyMdot,Baseboard(BaseboardNum)%WaterInletNode,  &
@@ -216,7 +216,7 @@ CONTAINS
     ! the demand limits are in place and there needs to be feedback to the Zone Equipment
     If(FirstHVACIteration)Then
        MaxWaterFlow = Baseboard(BaseboardNum)%WaterMassFlowRateMax
-       MinWaterFlow = 0.0
+       MinWaterFlow = 0.0d0
     Else
        MaxWaterFlow = Node(Baseboard(BaseboardNum)%WaterInletNode)%MassFlowRateMaxAvail
        MinWaterFlow = Node(Baseboard(BaseboardNum)%WaterInletNode)%MassFlowRateMinAvail
@@ -523,11 +523,11 @@ SUBROUTINE InitBaseboard(BaseboardNum, ControlledZoneNumSub)
                                 PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex, &
                                 'BaseboardRadiator:InitBaseboard')
     Node(WaterInletNode)%Enthalpy      = Cp*Node(WaterInletNode)%Temp
-    Node(WaterInletNode)%Quality       = 0.0
-    Node(WaterInletNode)%Press         = 0.0
-    Node(WaterInletNode)%HumRat        = 0.0
+    Node(WaterInletNode)%Quality       = 0.0d0
+    Node(WaterInletNode)%Press         = 0.0d0
+    Node(WaterInletNode)%HumRat        = 0.0d0
     ! pick a mass flow rate that depends on the max water mass flow rate. CR 8842 changed to factor of 2.0
-    IF (Baseboard(BaseboardNum)%AirMassFlowRate <= 0.0) THEN
+    IF (Baseboard(BaseboardNum)%AirMassFlowRate <= 0.0d0) THEN
       Baseboard(BaseboardNum)%AirMassFlowRate = 2.0d0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
     END IF
     MyEnvrnFlag(BaseboardNum) = .FALSE.
@@ -554,7 +554,7 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -570,7 +570,7 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
 
           ! USE STATEMENTS:
   USE DataSizing
-  USE General, ONLY: SolveRegulaFalsi
+  USE General, ONLY: SolveRegulaFalsi, RoundSigDigits
   USE PlantUtilities, ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE DataLoopNode, ONLY: Node
@@ -604,11 +604,23 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
   REAL(r64)           :: rho             ! local fluid density
   REAL(r64)           :: Cp              ! local fluid specific heat
   REAL(r64)           :: tmpWaterVolFlowRateMax ! local design plant fluid flow rate
+  LOGICAL             :: FlowAutosize            ! Indicator to autosizing water volume flow
+  LOGICAL             :: UAAutosize              ! Indicator to autosizing UA
+  REAL(r64)           :: WaterVolFlowRateMaxDes  ! Design water volume flow for reproting
+  REAL(r64)           :: WaterVolFlowRateMaxUser ! User hard-sized volume flow for reporting
+  REAL(r64)           :: UADes                   ! Design UA value for reproting
+  REAL(r64)           :: UAUser                  ! User hard-sized value for reporting
 
   PltSizHeatNum = 0
   PltSizNum = 0
-  DesCoilLoad = 0.0
+  DesCoilLoad = 0.0d0
   ErrorsFound = .FALSE.
+  FlowAutosize = .FALSE.
+  UAAutosize = .FALSE.
+  WaterVolFlowRateMaxDes = 0.0d0
+  WaterVolFlowRateMaxUser = 0.0d0
+  UADes = 0.0d0
+  UAUser = 0.0d0
 
   ! find the appropriate heating Plant Sizing object
   PltSizHeatNum = PlantLoop(Baseboard(BaseboardNum)%LoopNum)%PlantSizNum
@@ -618,6 +630,14 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
     IF (CurZoneEqNum > 0) THEN
 
       IF (Baseboard(BaseboardNum)%WaterVolFlowRateMax == AutoSize) THEN
+        FlowAutosize = .TRUE.
+      END IF
+      IF (.NOT. FlowAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation should continue
+        IF (Baseboard(BaseboardNum)%WaterVolFlowRateMax > 0.0d0) THEN
+          CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID,&
+                 'User-Specified Maximum Water Flow Rate [m3/s]',Baseboard(BaseboardNum)%WaterVolFlowRateMax)
+        END IF
+      ELSE
         CALL CheckZoneSizing(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID)
         DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
         IF (DesCoilLoad >= SmallLoad) THEN
@@ -629,18 +649,52 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
                                       InitConvTemp, &
                                       PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex,&
                                       cCMO_BBRadiator_Water//':SizeBaseboard')
-          Baseboard(BaseboardNum)%WaterVolFlowRateMax = DesCoilLoad / &
-                                                          ( PlantSizData(PltSizHeatNum)%DeltaT * Cp * rho )
+          WaterVolFlowRateMaxDes = DesCoilLoad / ( PlantSizData(PltSizHeatNum)%DeltaT * Cp * rho )
         ELSE
-
-          Baseboard(BaseboardNum)%WaterVolFlowRateMax = 0.d0
-
+          WaterVolFlowRateMaxDes = 0.0d0
         END IF
-        CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID,&
-                                'Maximum Water Flow Rate [m3/s]',Baseboard(BaseboardNum)%WaterVolFlowRateMax)
+
+        IF (FlowAutosize) THEN
+          Baseboard(BaseboardNum)%WaterVolFlowRateMax = WaterVolFlowRateMaxDes
+          CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID,&
+                                'Design Size Maximum Water Flow Rate [m3/s]',WaterVolFlowRateMaxDes)
+        ELSE ! hard-sized with sizing data
+          IF (Baseboard(BaseboardNum)%WaterVolFlowRateMax > 0.0d0 .AND. WaterVolFlowRateMaxDes > 0.0d0) THEN
+            WaterVolFlowRateMaxUser = Baseboard(BaseboardNum)%WaterVolFlowRateMax
+            CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID,&
+                                'Design Size Maximum Water Flow Rate [m3/s]',WaterVolFlowRateMaxDes, &
+                                'User-Specified Maximum Water Flow Rate [m3/s]',WaterVolFlowRateMaxUser)
+            ! Report a warning to note difference between the two
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(WaterVolFlowRateMaxDes - WaterVolFlowRateMaxUser)/WaterVolFlowRateMaxUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeBaseboard: Potential issue with equipment sizing for ZoneHVAC:Baseboard:Convective:Water="' &
+                                           //   TRIM(Baseboard(BaseboardNum)%EquipID)//'".')
+                CALL ShowContinueError('User-Specified Maximum Water Flow Rate of '// &
+                                      TRIM(RoundSigDigits(WaterVolFlowRateMaxUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Water Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(WaterVolFlowRateMaxDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-      IF (Baseboard(BaseboardNum)%UA == AutoSize ) THEN
-        CALL CheckZoneSizing(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID)
+
+          ! UA sizing
+          ! Set hard-sized values to the local variable to correct a false indication aftet SolFla function calculation
+      IF (Baseboard(BaseboardNum)%UA == Autosize) THEN
+        UAAutosize = .TRUE.
+      ELSE
+        UAUser = Baseboard(BaseboardNum)%UA
+      END IF
+      IF (.NOT. UAAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation should continue
+        IF (Baseboard(BaseboardNum)%UA >0.0d0) THEN
+          CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID, &
+                                  'User-Specified U-Factor Times Area Value [W/K]',Baseboard(BaseboardNum)%UA)
+        END IF
+      ELSE
+        !CALL CheckZoneSizing(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID)
         Baseboard(BaseboardNum)%WaterInletTemp = PlantSizData(PltSizHeatNum)%ExitTemp
         Baseboard(BaseboardNum)%AirInletTemp = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
         Baseboard(BaseboardNum)%AirInletHumRat = FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtHeatPeak
@@ -652,45 +706,65 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
         Node(WaterInletNode)%MassFlowRate = rho * Baseboard(BaseboardNum)%WaterVolFlowRateMax
         DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
         IF (DesCoilLoad >= SmallLoad) THEN
-          ! pick an air  mass flow rate that is twice the water mass flow rate (CR8842)
+           ! pick an air  mass flow rate that is twice the water mass flow rate (CR8842)
           Baseboard(BaseboardNum)%DesAirMassFlowRate = 2.0d0 * rho * Baseboard(BaseboardNum)%WaterVolFlowRateMax
-          ! pass along the coil number and the design load to the residual calculation
+           ! pass along the coil number and the design load to the residual calculation
           Par(1) = DesCoilLoad
           Par(2) = BaseboardNum
-          ! set the lower and upper limits on the UA
+           ! set the lower and upper limits on the UA
           UA0 = .001d0 * DesCoilLoad
           UA1 = DesCoilLoad
-          ! Invert the baseboard model: given the design inlet conditions and the design load,
-          ! find the design UA.
-            CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, UA, HWBaseboardUAResidual, UA0, UA1, Par)
+            ! Invert the baseboard model: given the design inlet conditions and the design load,
+            ! find the design UA.
+          CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, UA, HWBaseboardUAResidual, UA0, UA1, Par)
             ! if the numerical inversion failed, issue error messages.
-            IF (SolFla == -1) THEN
-              CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
+          IF (SolFla == -1) THEN
+            CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
                  cCMO_BBRadiator_Water//'="'// &
                  TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
-              CALL ShowContinueError('Iteration limit exceeded in calculating coil UA')
+            CALL ShowContinueError('Iteration limit exceeded in calculating coil UA')
               ErrorsFound = .TRUE.
-            ELSE IF (SolFla == -2) THEN
-              CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
+          ELSE IF (SolFla == -2) THEN
+            CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
                  cCMO_BBRadiator_Water//'="'// &
                  TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
-              CALL ShowContinueError('Bad starting values for UA')
+            CALL ShowContinueError('Bad starting values for UA')
               ErrorsFound = .TRUE.
-            END IF
-            Baseboard(BaseboardNum)%UA = UA
-          ELSE
-            Baseboard(BaseboardNum)%UA = 0.0
           END IF
+            UADes = UA !Baseboard(BaseboardNum)%UA = UA
+        ELSE
+          UADes = 0.0d0
+        END IF
+
+        IF (UAAutosize) THEN
+          Baseboard(BaseboardNum)%UA = UADes
           CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID, &
-                                  'U-Factor Times Area Value [W/K]',Baseboard(BaseboardNum)%UA)
+                                  'Design Size U-Factor Times Area Value [W/K]',UADes)
+        ELSE ! Hard-sized with sizing data
+          IF (UAUser > 0.0d0 .AND. UADes > 0.0d0) THEN
+            CALL ReportSizingOutput(cCMO_BBRadiator_Water,Baseboard(BaseboardNum)%EquipID, &
+                                  'Design Size U-Factor Times Area Value [W/K]',UADes, &
+                                  'User-Specified U-Factor Times Area Value [W/K]',UAUser)
+            ! Report difference between design size and hard-sized values
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(UADes-UAUser)/UAUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeBaseboard: Potential issue with equipment sizing for ZoneHVAC:Baseboard:Convective:Water="' &
+                                     //       TRIM(Baseboard(BaseboardNum)%EquipID)//'".')
+                CALL ShowContinueError('User-Specified U-Factor Times Area Value of '// &
+                                      TRIM(RoundSigDigits(UAUser,2))// ' [W/K]')
+                CALL ShowContinueError('differs from Design Size U-Factor Times Area Value of ' // &
+                                      TRIM(RoundSigDigits(UADes,2))// ' [W/K]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-
     END IF
-
   ELSE
-    ! if there is no heating Sizing:Plant object and autosizng was requested, issue an error message
-    IF (Baseboard(BaseboardNum)%WaterVolFlowRateMax == AutoSize .OR. &
-        Baseboard(BaseboardNum)%UA == AutoSize) THEN
+      ! if there is no heating Sizing:Plant object and autosizng was requested, issue an error message
+    IF (FlowAutoSize .OR. UAAutoSize) THEN
       CALL ShowSevereError('SizeBaseboard: '//cCMO_BBRadiator_Water//'="'// &
                  TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
       CALL ShowContinueError('...Autosizing of hot water baseboard requires a heating loop Sizing:Plant object')
@@ -793,7 +867,7 @@ END SUBROUTINE SizeBaseboard
     ELSE
       AirMassFlowRate = Baseboard(BaseboardNum)%AirMassFlowRate
             ! pick a mass flow rate that depends on the max water mass flow rate. CR 8842 changed to factor of 2.0
-      IF (AirMassFlowRate <= 0.0) &
+      IF (AirMassFlowRate <= 0.0d0) &
             AirMassFlowRate = 2.0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
     END IF
 
@@ -815,15 +889,15 @@ END SUBROUTINE SizeBaseboard
       ! the calculation up into steps and check the size of the exponential arguments.
       AA = -CapacityRatio*(NTU)**0.78d0
       IF (AA.LT.EXP_LowerLimit) THEN
-        BB = 0.0
+        BB = 0.0d0
       ELSE
         BB = EXP(AA)
       END IF
-      CC = (1./CapacityRatio)*(NTU)**0.22d0*(BB-1.)
+      CC = (1.0d0/CapacityRatio)*(NTU)**0.22d0*(BB-1.0d0)
       IF (CC.LT.EXP_LowerLimit) THEN
-        Effectiveness = 1.0
+        Effectiveness = 1.0d0
       ELSE
-        Effectiveness  = 1. - EXP(CC)
+        Effectiveness  = 1.d0 - EXP(CC)
       END IF
       AirOutletTemp = AirInletTemp + Effectiveness*CapacitanceMin*(WaterInletTemp-AirInletTemp)/CapacitanceAir
       WaterOutletTemp = WaterInletTemp - CapacitanceAir*(AirOutletTemp-AirInletTemp)/CapacitanceWater
@@ -831,21 +905,21 @@ END SUBROUTINE SizeBaseboard
        Baseboard(BaseboardNum)%WaterOutletEnthalpy = Baseboard(BaseboardNum)%WaterInletEnthalpy - &
         LoadMet/WaterMassFlowRate
     ELSE
-      CapacitanceWater = 0.
+      CapacitanceWater = 0.0d0
       CapacitanceMax = CapacitanceAir
-      CapacitanceMin = 0.
-      NTU = 0.
-      Effectiveness = 0.
+      CapacitanceMin = 0.0d0
+      NTU = 0.0d0
+      Effectiveness = 0.0d0
       AirOutletTemp = AirInletTemp
       WaterOutletTemp = WaterInletTemp
-      LoadMet = 0.
+      LoadMet = 0.0d0
       Baseboard(BaseboardNum)%WaterOutletEnthalpy = Baseboard(BaseboardNum)%WaterInletEnthalpy
-      WaterMassFlowRate = 0.0
+      WaterMassFlowRate = 0.0d0
 
       CALL SetActuatedBranchFlowRate(WaterMassFlowRate,Baseboard(BaseboardNum)%WaterInletNode,  &
                                    Baseboard(BaseboardNum)%LoopNum,Baseboard(BaseboardNum)%LoopSideNum, &
                                    Baseboard(BaseboardNum)%BranchNum, .FALSE. )
-      AirMassFlowRate = 0.0
+      AirMassFlowRate = 0.0d0
     END IF
 
     Baseboard(BaseboardNum)%WaterOutletTemp = WaterOutletTemp
@@ -1185,15 +1259,15 @@ PRIVATE ! Everything private unless explicitly made public
     CHARACTER(len=MaxNameLength) :: EquipType =' '
     CHARACTER(len=MaxNameLength) :: Schedule  =' '
     INTEGER      :: SchedPtr                       = 0
-    REAL(r64)    :: NominalCapacity                =0.0
-    REAL(r64)    :: BaseBoardEfficiency            =0.0
-    REAL(r64)    :: AirInletTemp                   =0.0
-    REAL(r64)    :: AirInletHumRat                 =0.0
-    REAL(r64)    :: AirOutletTemp                  =0.0
-    REAL(r64)    :: Power                          =0.0
-    REAL(r64)    :: Energy                         =0.0
-    REAL(r64)    :: ElecUseLoad                    =0.0
-    REAL(r64)    :: ElecUseRate                    =0.0
+    REAL(r64)    :: NominalCapacity                =0.0d0
+    REAL(r64)    :: BaseBoardEfficiency            =0.0d0
+    REAL(r64)    :: AirInletTemp                   =0.0d0
+    REAL(r64)    :: AirInletHumRat                 =0.0d0
+    REAL(r64)    :: AirOutletTemp                  =0.0d0
+    REAL(r64)    :: Power                          =0.0d0
+    REAL(r64)    :: Energy                         =0.0d0
+    REAL(r64)    :: ElecUseLoad                    =0.0d0
+    REAL(r64)    :: ElecUseRate                    =0.0d0
   END TYPE BaseboardParams
 
   !MODULE VARIABLE DECLARATIONS:
@@ -1522,10 +1596,10 @@ SUBROUTINE InitBaseboard(BaseboardNum, ControlledZoneNum)
   END IF
 
   ! Set the reporting variables to zero at each timestep.
-  Baseboard(BaseboardNum)%Energy = 0.0
-  Baseboard(BaseboardNum)%Power  = 0.0
-  Baseboard(BaseboardNum)%ElecUseLoad = 0.0
-  Baseboard(BaseboardNum)%ElecUseRate = 0.0
+  Baseboard(BaseboardNum)%Energy = 0.0d0
+  Baseboard(BaseboardNum)%Power  = 0.0d0
+  Baseboard(BaseboardNum)%ElecUseLoad = 0.0d0
+  Baseboard(BaseboardNum)%ElecUseRate = 0.0d0
 
    ! Do the every time step initializations
   ZoneNode = ZoneEquipConfig(ControlledZoneNum)%ZoneNode
@@ -1541,7 +1615,7 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   February 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1558,6 +1632,8 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! USE STATEMENTS:
   USE DataSizing
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
+
 
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1575,20 +1651,54 @@ SUBROUTINE SizeElectricBaseboard(BaseboardNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL   :: IsAutosize           ! Indicator to autosizing nominal capacity
+  REAL(r64) :: NominalCapacityDes   ! Design nominal capacity for reporting
+  REAL(r64) :: NominalCapacityUser  ! User hard-sized nominal capacity for reporting
+
+  IsAutosize = .FALSE.
+  NominalCapacityDes = 0.0d0
+  NominalCapacityUser = 0.0d0
 
   IF (CurZoneEqNum > 0) THEN
-
     IF (Baseboard(BaseboardNum)%NominalCapacity == AutoSize) THEN
-      CALL CheckZoneSizing(Baseboard(BaseboardNum)%EquipType,Baseboard(BaseboardNum)%EquipName)
-      Baseboard(BaseboardNum)%NominalCapacity = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad *   &
-         CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
-
-      CALL ReportSizingOutput(cCMO_BBRadiator_Electric,Baseboard(BaseboardNum)%EquipName,&
-                                'Nominal Capacity [W]',Baseboard(BaseboardNum)%NominalCapacity)
+      IsAutosize = .TRUE.
     END IF
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (Baseboard(BaseboardNum)%NominalCapacity > 0.0d0) THEN
+        CALL ReportSizingOutput(cCMO_BBRadiator_Electric,Baseboard(BaseboardNum)%EquipName,&
+                                'User-Specified Nominal Capacity [W]',Baseboard(BaseboardNum)%NominalCapacity)
+      END IF
+    ELSE ! Autosize or hard-size with design run
+      CALL CheckZoneSizing(Baseboard(BaseboardNum)%EquipType,Baseboard(BaseboardNum)%EquipName)
+      NominalCapacityDes = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad *   &
+                            CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
 
+      IF (IsAutosize) THEN
+        Baseboard(BaseboardNum)%NominalCapacity = NominalCapacityDes
+        CALL ReportSizingOutput(cCMO_BBRadiator_Electric,Baseboard(BaseboardNum)%EquipName,&
+                                'Design Size Nominal Capacity [W]',NominalCapacityDes)
+      ELSE ! hard-sized with sizing data
+        IF (Baseboard(BaseboardNum)%NominalCapacity > 0.0d0 .AND. NominalCapacityDes > 0.0d0) THEN
+          NominalCapacityUser = Baseboard(BaseboardNum)%NominalCapacity
+          CALL ReportSizingOutput(cCMO_BBRadiator_Electric,Baseboard(BaseboardNum)%EquipName,&
+                                'Design Size Nominal Capacity [W]',NominalCapacityDes, &
+                                'User-Specified Nominal Capacity [W]',NominalCapacityUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(NominalCapacityDes - NominalCapacityUser)/NominalCapacityUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeBaseboard: Potential issue with equipment sizing for ZoneHVAC:Baseboard:Convective:Electric="'&
+                                   //      TRIM(Baseboard(BaseboardNum)%EquipName)//'".')
+              CALL ShowContinueError('User-Specified Nominal Capacity of '// &
+                                      TRIM(RoundSigDigits(NominalCapacityUser,2))// ' [W]')
+              CALL ShowContinueError('differs from Design Size Nominal Capacity of ' // &
+                                      TRIM(RoundSigDigits(NominalCapacityDes,2))// ' [W]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            ENDIF
+          END IF
+        END IF
+      END IF
+    END IF
   END IF
-
 
   RETURN
 END SUBROUTINE SizeElectricBaseboard
@@ -1669,8 +1779,8 @@ SUBROUTINE SimElectricConvective(BaseboardNum, LoadMet)
     ELSE
        !if there is an off condition the BB does nothing.
       AirOutletTemp = AirInletTemp
-      QBBCap = 0.
-      Baseboard(BaseboardNum)%ElecUseRate = 0.0
+      QBBCap = 0.0d0
+      Baseboard(BaseboardNum)%ElecUseRate = 0.0d0
     END IF
 
     Baseboard(BaseboardNum)%AirOutletTemp = AirOutletTemp

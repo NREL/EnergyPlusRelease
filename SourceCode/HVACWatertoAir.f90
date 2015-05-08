@@ -55,64 +55,64 @@ TYPE WatertoAirHPEquipConditions
   INTEGER                      :: WAHPPlantTypeOfNum   = 0   ! type of component in plant
   CHARACTER(len=MaxNameLength) :: Refrigerant          =' '  ! Refrigerant name
   LOGICAL                      :: Simflag              = .false.
-  REAL(r64) :: InletAirMassFlowRate  =0.0 ! Inlet Air Mass Flow through the Water to Air Heat Pump being Simulated [kg/s]
-  REAL(r64) :: OutletAirMassFlowRate =0.0 ! Outlet Air Mass Flow through the Water to Air Heat Pump being Simulated [kg/s]
-  REAL(r64) :: InletAirDBTemp        =0.0 ! Inlet Air Dry Bulb Temperature [C]
-  REAL(r64) :: InletAirHumRat        =0.0 ! Inlet Air Humidity Ratio [kg/kg]
-  REAL(r64) :: OutletAirDBTemp       =0.0 ! Outlet Air Dry Bulb Temperature [C]
-  REAL(r64) :: OutletAirHumRat       =0.0 ! Outlet Air Humidity Ratio [kg/kg]
-  REAL(r64) :: InletAirEnthalpy      =0.0 ! Inlet Air Enthalpy [J/kg]
-  REAL(r64) :: OutletAirEnthalpy     =0.0 ! Outlet Air Enthalpy [J/kg]
+  REAL(r64) :: InletAirMassFlowRate  =0.0d0 ! Inlet Air Mass Flow through the Water to Air Heat Pump being Simulated [kg/s]
+  REAL(r64) :: OutletAirMassFlowRate =0.0d0 ! Outlet Air Mass Flow through the Water to Air Heat Pump being Simulated [kg/s]
+  REAL(r64) :: InletAirDBTemp        =0.0d0 ! Inlet Air Dry Bulb Temperature [C]
+  REAL(r64) :: InletAirHumRat        =0.0d0 ! Inlet Air Humidity Ratio [kg/kg]
+  REAL(r64) :: OutletAirDBTemp       =0.0d0 ! Outlet Air Dry Bulb Temperature [C]
+  REAL(r64) :: OutletAirHumRat       =0.0d0 ! Outlet Air Humidity Ratio [kg/kg]
+  REAL(r64) :: InletAirEnthalpy      =0.0d0 ! Inlet Air Enthalpy [J/kg]
+  REAL(r64) :: OutletAirEnthalpy     =0.0d0 ! Outlet Air Enthalpy [J/kg]
 
-  REAL(r64) :: InletWaterTemp        =0.0 ! Inlet Water Temperature [C]
-  REAL(r64) :: OutletWaterTemp       =0.0 ! Outlet Water Temperature [C]
+  REAL(r64) :: InletWaterTemp        =0.0d0 ! Inlet Water Temperature [C]
+  REAL(r64) :: OutletWaterTemp       =0.0d0 ! Outlet Water Temperature [C]
 
-  REAL(r64) :: InletWaterMassFlowRate=0.0 ! Inlet Water Mass Flow Rate [kg/s]
-  REAL(r64) :: OutletWaterMassFlowRate=0.0 ! Outlet Water Mass Flow Rate [kg/s]
-  REAL(r64) :: DesignWaterMassFlowRate=0.0  ! Design Water Mass Flow Rate [kg/s]
-  REAL(r64) :: DesignWaterVolFlowRate =0.0  ! Design Water Volumetric Flow Rate [m3/s]
-  REAL(r64) :: InletWaterEnthalpy     =0.0  ! Inlet Water Enthalpy [J/kg]
-  REAL(r64) :: OutletWaterEnthalpy    =0.0  ! Outlet Water Enthalpy [J/kg]
+  REAL(r64) :: InletWaterMassFlowRate=0.0d0 ! Inlet Water Mass Flow Rate [kg/s]
+  REAL(r64) :: OutletWaterMassFlowRate=0.0d0 ! Outlet Water Mass Flow Rate [kg/s]
+  REAL(r64) :: DesignWaterMassFlowRate=0.0d0  ! Design Water Mass Flow Rate [kg/s]
+  REAL(r64) :: DesignWaterVolFlowRate =0.0d0  ! Design Water Volumetric Flow Rate [m3/s]
+  REAL(r64) :: InletWaterEnthalpy     =0.0d0  ! Inlet Water Enthalpy [J/kg]
+  REAL(r64) :: OutletWaterEnthalpy    =0.0d0  ! Outlet Water Enthalpy [J/kg]
 
-  REAL(r64) :: Power                  =0.0  ! Power Consumption [W]
-  REAL(r64) :: Energy                 =0.0  ! Energy Consumption [J]
-  REAL(r64) :: QSensible              =0.0 ! Sensible Load Side Heat Transfer Rate [W]
-  REAL(r64) :: QLatent                =0.0 ! Latent Load Side Heat Transfer Rate [W]
-  REAL(r64) :: QSource                =0.0 ! Source Side Heat Transfer Rate [W]
-  REAL(r64) :: EnergySensible = 0.0        ! Sensible Load Side Heat Transferred [J]
-  REAL(r64) :: EnergyLatent =0.0          ! Latent Load Side Heat Transferred [J]
-  REAL(r64) :: EnergySource =0.0          ! Source Side Heat Transferred [J]
-  REAL(r64) :: RunFrac           =0.0 ! Duty Factor
-  REAL(r64) :: PartLoadRatio     =0.0 ! Part Load Ratio
-  REAL(r64) :: HeatingCapacity   =0.0 ! Nominal Heating Capacity
-  REAL(r64) :: CoolingCapacity   =0.0 ! Nominal Cooling Capacity
-  REAL(r64) :: QLoadTotal        =0.0 ! Load Side Total Heat Transfer Rate [W]
-  REAL(r64) :: EnergyLoadTotal =0.0       ! Load Side Total Heat Transferred [J]
-  REAL(r64) :: Twet_Rated        =0.0 ! Nominal Time for Condensate Removal to Begin [s]
-  REAL(r64) :: Gamma_Rated       =0.0 ! Ratio of Initial Moisture Evaporation Rate and Steady-state Latent Capacity
-  REAL(r64) :: MaxONOFFCyclesperHour =0.0 ! Maximum cycling rate of heat pump [cycles/hr]
-  REAL(r64) :: HPTimeConstant        =0.0 ! Heat pump time constant [s]
-  REAL(r64) :: FanDelayTime          =0.0 ! Fan delay time, time delay for the HP's fan to
+  REAL(r64) :: Power                  =0.0d0  ! Power Consumption [W]
+  REAL(r64) :: Energy                 =0.0d0  ! Energy Consumption [J]
+  REAL(r64) :: QSensible              =0.0d0 ! Sensible Load Side Heat Transfer Rate [W]
+  REAL(r64) :: QLatent                =0.0d0 ! Latent Load Side Heat Transfer Rate [W]
+  REAL(r64) :: QSource                =0.0d0 ! Source Side Heat Transfer Rate [W]
+  REAL(r64) :: EnergySensible = 0.0d0        ! Sensible Load Side Heat Transferred [J]
+  REAL(r64) :: EnergyLatent =0.0d0          ! Latent Load Side Heat Transferred [J]
+  REAL(r64) :: EnergySource =0.0d0          ! Source Side Heat Transferred [J]
+  REAL(r64) :: RunFrac           =0.0d0 ! Duty Factor
+  REAL(r64) :: PartLoadRatio     =0.0d0 ! Part Load Ratio
+  REAL(r64) :: HeatingCapacity   =0.0d0 ! Nominal Heating Capacity
+  REAL(r64) :: CoolingCapacity   =0.0d0 ! Nominal Cooling Capacity
+  REAL(r64) :: QLoadTotal        =0.0d0 ! Load Side Total Heat Transfer Rate [W]
+  REAL(r64) :: EnergyLoadTotal =0.0d0       ! Load Side Total Heat Transferred [J]
+  REAL(r64) :: Twet_Rated        =0.0d0 ! Nominal Time for Condensate Removal to Begin [s]
+  REAL(r64) :: Gamma_Rated       =0.0d0 ! Ratio of Initial Moisture Evaporation Rate and Steady-state Latent Capacity
+  REAL(r64) :: MaxONOFFCyclesperHour =0.0d0 ! Maximum cycling rate of heat pump [cycles/hr]
+  REAL(r64) :: HPTimeConstant        =0.0d0 ! Heat pump time constant [s]
+  REAL(r64) :: FanDelayTime          =0.0d0 ! Fan delay time, time delay for the HP's fan to
                                              ! shut off after compressor cycle off [s]
 
-  REAL(r64) :: SourceSideUACoeff     =0.0 ! Source Side Heat Transfer coefficient [W/C]
-  REAL(r64) :: LoadSideTotalUACoeff  =0.0 ! Load Side Total Heat Transfer coefficient [W/C]
-  REAL(r64) :: LoadSideOutsideUACoeff=0.0     ! Load Side Outside Heat Transfer coefficient [W/C]
-  REAL(r64) :: CompPistonDisp        =0.0     ! Compressor Piston Displacement [m3/s]
-  REAL(r64) :: CompClearanceFactor   =0.0     ! Compressor Clearance Factor
-  REAL(r64) :: CompSucPressDrop      =0.0 ! Suction Pressure Drop [Pa]
-  REAL(r64) :: SuperheatTemp         =0.0 ! Superheat Temperature [C]
-  REAL(r64) :: PowerLosses           =0.0 ! Constant Part of the Compressor Power Losses [W]
-  REAL(r64) :: LossFactor        =0.0 ! Compressor Power Loss Factor
-  REAL(r64) :: RefVolFlowRate    =0.0 ! Refrigerant Volume Flow rate at the beginning
+  REAL(r64) :: SourceSideUACoeff     =0.0d0 ! Source Side Heat Transfer coefficient [W/C]
+  REAL(r64) :: LoadSideTotalUACoeff  =0.0d0 ! Load Side Total Heat Transfer coefficient [W/C]
+  REAL(r64) :: LoadSideOutsideUACoeff=0.0d0     ! Load Side Outside Heat Transfer coefficient [W/C]
+  REAL(r64) :: CompPistonDisp        =0.0d0     ! Compressor Piston Displacement [m3/s]
+  REAL(r64) :: CompClearanceFactor   =0.0d0     ! Compressor Clearance Factor
+  REAL(r64) :: CompSucPressDrop      =0.0d0 ! Suction Pressure Drop [Pa]
+  REAL(r64) :: SuperheatTemp         =0.0d0 ! Superheat Temperature [C]
+  REAL(r64) :: PowerLosses           =0.0d0 ! Constant Part of the Compressor Power Losses [W]
+  REAL(r64) :: LossFactor        =0.0d0 ! Compressor Power Loss Factor
+  REAL(r64) :: RefVolFlowRate    =0.0d0 ! Refrigerant Volume Flow rate at the beginning
                                     ! of the Compression [m3/s]
-  REAL(r64) :: VolumeRatio       =0.0 ! Built-in-volume ratio [~]
-  REAL(r64) :: LeakRateCoeff     =0.0 ! Coefficient for the relationship between
+  REAL(r64) :: VolumeRatio       =0.0d0 ! Built-in-volume ratio [~]
+  REAL(r64) :: LeakRateCoeff     =0.0d0 ! Coefficient for the relationship between
                                     ! Pressure Ratio and Leakage Rate [~]
-  REAL(r64) :: SourceSideHTR1    =0.0 ! Source Side Heat Transfer Resistance coefficient 1 [~]
-  REAL(r64) :: SourceSideHTR2    =0.0 ! Source Side Heat Transfer Resistance coefficient 2 [k/kW]
-  REAL(r64) :: HighPressCutOff   =0.0 ! High Pressure Cut-off [Pa]
-  REAL(r64) :: LowPressCutOff    =0.0 ! Low Pressure Cut-off [Pa]
+  REAL(r64) :: SourceSideHTR1    =0.0d0 ! Source Side Heat Transfer Resistance coefficient 1 [~]
+  REAL(r64) :: SourceSideHTR2    =0.0d0 ! Source Side Heat Transfer Resistance coefficient 2 [k/kW]
+  REAL(r64) :: HighPressCutOff   =0.0d0 ! High Pressure Cut-off [Pa]
+  REAL(r64) :: LowPressCutOff    =0.0d0 ! Low Pressure Cut-off [Pa]
   INTEGER   :: CompressorType    =0   ! Type of Compressor ie. Reciprocating,Rotary or Scroll
   INTEGER   :: AirInletNodeNum   =0   ! air side coil inlet node number
   INTEGER   :: AirOutletNodeNum  =0   ! air side coil outlet node number
@@ -392,7 +392,7 @@ SUBROUTINE GetWatertoAirHPInput
     ALLOCATE(lNumericBlanks(MaxNums))
     lNumericBlanks=.TRUE.
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
       ! Get the data for detailed cooling Heat Pump
     CurrentModuleObject = 'Coil:Cooling:WaterToAirHeatPump:ParameterEstimation'
@@ -516,7 +516,7 @@ SUBROUTINE GetWatertoAirHPInput
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
         ! save the design source side flow rate for use by plant loop sizing algorithms
-        CALL RegisterPlantCompDesignFlow(WatertoAirHP(HPNum)%WaterInletNodeNum,0.5*WatertoAirHP(HPNum)%DesignWaterVolFlowRate)
+        CALL RegisterPlantCompDesignFlow(WatertoAirHP(HPNum)%WaterInletNodeNum,0.5d0*WatertoAirHP(HPNum)%DesignWaterVolFlowRate)
 
         !create predefined report entries
         CALL PreDefTableEntry(pdchCoolCoilType,WatertoAirHP(HPNum)%Name,CurrentModuleObject)
@@ -636,7 +636,7 @@ SUBROUTINE GetWatertoAirHPInput
              ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
         ! save the design source side flow rate for use by plant loop sizing algorithms
-        CALL RegisterPlantCompDesignFlow(WatertoAirHP(HPNum)%WaterInletNodeNum,0.5*WatertoAirHP(HPNum)%DesignWaterVolFlowRate)
+        CALL RegisterPlantCompDesignFlow(WatertoAirHP(HPNum)%WaterInletNodeNum,0.5d0*WatertoAirHP(HPNum)%DesignWaterVolFlowRate)
 
         !create predefined report entries
         CALL PreDefTableEntry(pdchHeatCoilType,WatertoAirHP(HPNum)%Name,CurrentModuleObject)
@@ -919,15 +919,15 @@ SUBROUTINE InitWatertoAirHP(HPNum,InitFlag,MaxONOFFCyclesperHour,HPTimeConstant,
 
     Node(WaterInletNode)%Temp          = 5.0d0
     Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(WaterInletNode)%Quality       = 0.0
-    Node(WaterInletNode)%Press         = 0.0
-    Node(WaterInletNode)%HumRat        = 0.0
+    Node(WaterInletNode)%Quality       = 0.0d0
+    Node(WaterInletNode)%Press         = 0.0d0
+    Node(WaterInletNode)%HumRat        = 0.0d0
 
     Node(PlantOutletNode)%Temp          = 5.0d0
     Node(PlantOutletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(PlantOutletNode)%Quality       = 0.0
-    Node(PlantOutletNode)%Press         = 0.0
-    Node(PlantOutletNode)%HumRat        = 0.0
+    Node(PlantOutletNode)%Quality       = 0.0d0
+    Node(PlantOutletNode)%Press         = 0.0d0
+    Node(PlantOutletNode)%HumRat        = 0.0d0
 
     WatertoAirHP(HPNum)%SimFlag = .TRUE.
 
@@ -967,8 +967,8 @@ SUBROUTINE InitWatertoAirHP(HPNum,InitFlag,MaxONOFFCyclesperHour,HPTimeConstant,
 !  ENDIF
 
 
-  IF(((SensLoad .NE. 0.0 .OR. LatentLoad .NE. 0.0) .OR. (SensLoad .EQ. 0.0 .AND. InitFlag)) &
-     .AND. Node(AirInletNode)%MassFlowRate > 0.0 .AND. PartLoadRatio > 0.0) THEN
+  IF(((SensLoad .NE. 0.0d0 .OR. LatentLoad .NE. 0.0d0) .OR. (SensLoad .EQ. 0.0d0 .AND. InitFlag)) &
+     .AND. Node(AirInletNode)%MassFlowRate > 0.0d0 .AND. PartLoadRatio > 0.0d0) THEN
     !set the water side flow rate to the design flow rate unless constrained by
     !the demand side manager (MIN/MAX available). now done by call to setcomponentFlowRate
     WatertoAirHP(HPNum)%InletWaterMassFlowRate = WatertoAirHP(HPNum)%DesignWaterMassFlowRate
@@ -980,7 +980,7 @@ SUBROUTINE InitWatertoAirHP(HPNum,InitFlag,MaxONOFFCyclesperHour,HPTimeConstant,
   ELSE !heat pump is off
     WatertoAirHP(HPNum)%InletWaterMassFlowRate = 0.d0
 
-    WatertoAirHP(HPNum)%InletAirMassFlowRate = 0.0
+    WatertoAirHP(HPNum)%InletAirMassFlowRate = 0.0d0
   ENDIF
   !constrain water flow provided by plant
   CALL SetComponentFlowRate(WatertoAirHP(HPNum)%InletWaterMassFlowRate, &
@@ -1002,22 +1002,22 @@ SUBROUTINE InitWatertoAirHP(HPNum,InitFlag,MaxONOFFCyclesperHour,HPTimeConstant,
   WatertoAirHP(HPNum)%InletAirEnthalpy     = Node(AirInletNode)%Enthalpy
 
 
-  WatertoAirHP(HPNum)%Power=0.0
-  WatertoAirHP(HPNum)%Energy=0.0
-  WatertoAirHP(HPNum)%QLoadTotal=0.0
-  WatertoAirHP(HPNum)%QSensible=0.0
-  WatertoAirHP(HPNum)%QLatent=0.0
-  WatertoAirHP(HPNum)%QSource=0.0
-  WatertoAirHP(HPNum)%EnergyLoadTotal=0.0
-  WatertoAirHP(HPNum)%EnergySensible=0.0
-  WatertoAirHP(HPNum)%EnergyLatent=0.0
-  WatertoAirHP(HPNum)%EnergySource=0.0
-  WatertoAirHP(HPNum)%RunFrac=0.0
-  WatertoAirHP(HPNum)%OutletAirDBTemp=0.0
-  WatertoAirHP(HPNum)%OutletAirHumRat=0.0
-  WatertoAirHP(HPNum)%OutletWaterTemp=0.0
-  WatertoAirHP(HPNum)%OutletAirEnthalpy = 0.0
-  WatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0
+  WatertoAirHP(HPNum)%Power=0.0d0
+  WatertoAirHP(HPNum)%Energy=0.0d0
+  WatertoAirHP(HPNum)%QLoadTotal=0.0d0
+  WatertoAirHP(HPNum)%QSensible=0.0d0
+  WatertoAirHP(HPNum)%QLatent=0.0d0
+  WatertoAirHP(HPNum)%QSource=0.0d0
+  WatertoAirHP(HPNum)%EnergyLoadTotal=0.0d0
+  WatertoAirHP(HPNum)%EnergySensible=0.0d0
+  WatertoAirHP(HPNum)%EnergyLatent=0.0d0
+  WatertoAirHP(HPNum)%EnergySource=0.0d0
+  WatertoAirHP(HPNum)%RunFrac=0.0d0
+  WatertoAirHP(HPNum)%OutletAirDBTemp=0.0d0
+  WatertoAirHP(HPNum)%OutletAirHumRat=0.0d0
+  WatertoAirHP(HPNum)%OutletWaterTemp=0.0d0
+  WatertoAirHP(HPNum)%OutletAirEnthalpy = 0.0d0
+  WatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0d0
 
   RETURN
 
@@ -1200,7 +1200,7 @@ SUBROUTINE CalcWatertoAirHPCooling(HPNum,CyclingScheme,FirstHVACIteration,Runtim
       !Set indoor air conditions to the rated condition
       LoadSideInletDBTemp_Init = 26.7d0
       LoadSideInletHumRat_Init = 0.0111d0
-      LoadSideAirInletEnth_Init = PsyHFnTdbW(LoadSideInletDBTemp,LoadSideInletHumRat)
+      LoadSideAirInletEnth_Init = PsyHFnTdbW(LoadSideInletDBTemp_Init,LoadSideInletHumRat_Init)
       FirstTime=.false.
     ENDIF
 
@@ -1247,7 +1247,7 @@ SUBROUTINE CalcWatertoAirHPCooling(HPNum,CyclingScheme,FirstHVACIteration,Runtim
     FinalSimFlag= .FALSE.
 
 ! If heat pump is not operating, return
-IF (SensDemand == 0.0 .OR. LoadSideMassFlowRate <= 0.0 .OR. SourceSideMassFlowRate <= 0.0)THEN
+IF (SensDemand == 0.0d0 .OR. LoadSideMassFlowRate <= 0.0d0 .OR. SourceSideMassFlowRate <= 0.0d0)THEN
    WatertoAirHP(HPNum)%SimFlag = .FALSE.
    RETURN
 ELSE
@@ -1272,11 +1272,11 @@ IF(initialQSource==0.0d0)  initialQSource = NominalCoolingCapacity
 !is enabled. 1st iteration to calculate the QLatent(rated) at (TDB,TWB)indoorair=(26.7C,19.4C)
 !and 2nd iteration to calculate the  QLatent(actual)
 
-QLatRated=0
-QLatActual=0
+QLatRated=0.0d0
+QLatActual=0.0d0
 !IF((RuntimeFrac .GE. 1.0) .OR. (Twet_rated .LE. 0.0) .OR. (Gamma_rated .LE. 0.0)) THEN
 ! Cycling fan does not required latent degradation model, only the constant fan case
-IF((RuntimeFrac .GE. 1.0) .OR. (Twet_rated .LE. 0.0) .OR. (Gamma_rated .LE. 0.0) .OR. (CyclingScheme .EQ. CycFanCycCoil)) THEN
+IF((RuntimeFrac .GE. 1.0d0) .OR. (Twet_rated .LE. 0.0d0) .OR. (Gamma_rated .LE. 0.0d0) .OR. (CyclingScheme .EQ. CycFanCycCoil)) THEN
   LatDegradModelSimFlag = .FALSE.
   !Set NumIteration4=1 so that latent model would quit after 1 simulation with the actual condition
   NumIteration4=1
@@ -1341,7 +1341,7 @@ END IF
       SourceSideTemp = SourceSideInletTemp +initialQSource/(SourceSideEffect * CpFluid * SourceSideMassFlowRate)
 
       ! Compute the Effective Surface Temperature
-      LoadSideEffec=1-EXP(-LoadSideoutsideUA/(LoadSideMassFlowRate*CpAir))
+      LoadSideEffec=1.0d0-EXP(-LoadSideoutsideUA/(LoadSideMassFlowRate*CpAir))
       EffectiveSatEnth=LoadSideAirInletEnth-initialQloadTotal/(LoadSideEffec*LoadSideMassFlowRate)
 
 !      ! Set up the Initial Range of Effective Surface Temperature
@@ -1360,7 +1360,7 @@ END IF
 !          RETURN
 !        END IF
 !
-!        EffectiveSurfaceTemp=0.5*(EffectiveSurfaceTemp1+EffectiveSurfaceTemp2)
+!        EffectiveSurfaceTemp=0.5d0*(EffectiveSurfaceTemp1+EffectiveSurfaceTemp2)
 !        EffectiveSatEnth1=PsyHFnTdbRhPb(EffectiveSurfaceTemp,1.0,PB)
 !
 !        IF(ABS(EffectiveSatEnth-EffectiveSatEnth1).LT.0.01 .OR. &
@@ -1395,7 +1395,7 @@ END IF
 !          WatertoAirHP(HPNum)%SimFlag = .FALSE.
 !          RETURN
 !        END IF
-!        EvapTemp=0.5*(EvapTemp1+EvapTemp2)
+!        EvapTemp=0.5d0*(EvapTemp1+EvapTemp2)
 !        EvapSatEnth1=PsyHFnTdbRhPb(EvapTemp,1.0,PB)
 !        IF(ABS((EvapSatEnth-EvapSatEnth1)/EvapSatEnth).LT.ERR1) THEN
 !         EXIT LOOP2
@@ -1452,12 +1452,12 @@ END IF
       END SELECT
 
       ! Determine the Load Side Outlet Enthalpy (Saturated Gas)
-      Quality = 1
+      Quality = 1.0d0
       LoadSideOutletEnth = GetSatEnthalpyRefrig(Refrigerant, LoadSideTemp, Quality,   &
          RefrigIndex,'CalcWatertoAirHPCooling:LoadSideTemp')
 
       ! Determine Source Side Outlet Enthalpy (Saturated Liquid)
-      Quality=0
+      Quality=0.0d0
       SourceSideOutletEnth = GetSatEnthalpyRefrig(Refrigerant, SourceSideTemp, Quality,   &
          RefrigIndex,'CalcWatertoAirHPCooling:SourceSideTemp')
       ! Determine Superheated Temperature of the Load Side outlet/compressor Inlet
@@ -1491,7 +1491,7 @@ END IF
 !             RETURN
 !           END IF
 !
-!               CompSuctionTemp = 0.5 * ( CompSuctionTemp1 + CompSuctionTemp2 )
+!               CompSuctionTemp = 0.5d0 * ( CompSuctionTemp1 + CompSuctionTemp2 )
 !               CompSuctionEnth = GetSupHeatEnthalpyRefrig(Refrigerant, CompSuctionTemp, SuctionPr, RefrigIndex)
 !               CompSuctionDensity = GetSupHeatDensityRefrig(Refrigerant, CompSuctionTemp, SuctionPr, RefrigIndex)
 !
@@ -1888,7 +1888,7 @@ SUBROUTINE CalcWatertoAirHPHeating(HPNum,CyclingScheme,FirstHVACIteration,Runtim
     LoadSideAirInletEnth=WatertoAirHP(HPNum)%InletAirEnthalpy
 
 ! If heat pump is not operating, return
-IF (SensDemand == 0.0 .OR. LoadSideMassFlowRate <= 0.0 .OR. SourceSideMassFlowRate <= 0.0)THEN
+IF (SensDemand == 0.0d0 .OR. LoadSideMassFlowRate <= 0.0d0 .OR. SourceSideMassFlowRate <= 0.0d0)THEN
    WatertoAirHP(HPNum)%SimFlag = .FALSE.
    RETURN
 ELSE
@@ -1939,14 +1939,14 @@ IF(initialQSource==0.0d0)  initialQSource = NominalHeatingCapacity
 
 !      IF (SourceSideFluidName=='WATER') THEN
       IF (SourceSideFluidIndex== WaterIndex) THEN
-        SourceSideEffect = 1- EXP( -SourceSideUA / (CpFluid * SourceSideMassFlowRate))  ! SourceSideFluidName=='Water'
+        SourceSideEffect = 1.0d0- EXP( -SourceSideUA / (CpFluid * SourceSideMassFlowRate))  ! SourceSideFluidName=='Water'
       ELSE
         DegradFactor=DegradF(SourceSideFluidName,SourceSideInletTemp,SourceSideFluidIndex)
         SourceSideEffect = 1 / ((SourceSideHTRes1 * SourceSideVolFlowRate**(-0.8d0)) / DegradFactor + SourceSideHTRes2)
       END IF
 
        ! Determine Load Side Effectiveness
-       LoadSideEffect = 1- EXP( -LoadSideUA / (CpAir * LoadSideMassFlowRate))
+       LoadSideEffect = 1.0d0- EXP( -LoadSideUA / (CpAir * LoadSideMassFlowRate))
 
 
        ! Determine Source Side Tempertaure (Evap. Temp for this mode)
@@ -2000,13 +2000,13 @@ IF(initialQSource==0.0d0)  initialQSource = NominalHeatingCapacity
 
        ! Determine the Source Side Outlet Enthalpy
        ! Quality of the refrigerant leaving the evaporator is saturated gas
-       Quality = 1
+       Quality = 1.0d0
        SourceSideOutletEnth = GetSatEnthalpyRefrig(Refrigerant, SourceSideTemp, Quality,   &
             RefrigIndex,'CalcWatertoAirHPHeating:SourceSideTemp')
 
        ! Determine Load Side Outlet Enthalpy
        ! Quality of the refrigerant leaving the condenser is saturated liguid
-       Quality = 0
+       Quality = 0.0d0
        LoadSideOutletEnth = GetSatEnthalpyRefrig(Refrigerant, LoadSideTemp, Quality,    &
             RefrigIndex,'CalcWatertoAirHPHeating:LoadSideTemp')
 
@@ -2043,7 +2043,7 @@ IF(initialQSource==0.0d0)  initialQSource = NominalHeatingCapacity
 !             RETURN
 !           END IF
 !
-!               CompSuctionTemp = 0.5 * ( CompSuctionTemp1 + CompSuctionTemp2 )
+!               CompSuctionTemp = 0.5d0 * ( CompSuctionTemp1 + CompSuctionTemp2 )
 !               CompSuctionEnth = GetSupHeatEnthalpyRefrig(Refrigerant, CompSuctionTemp, SuctionPr, RefrigIndex)
 !               CompSuctionDensity = GetSupHeatDensityRefrig(Refrigerant, CompSuctionTemp, SuctionPr, RefrigIndex)
 !
@@ -2149,9 +2149,9 @@ IF(initialQSource==0.0d0)  initialQSource = NominalHeatingCapacity
   IF (CyclingScheme .EQ. ContFanCycCoil) THEN
     ! continuous fan, cycling compressor
     WatertoAirHP(HPNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideAirOutletEnth + &
-                                          (1.-PartLoadRatio)*LoadSideAirInletEnth
+                                          (1.0d0-PartLoadRatio)*LoadSideAirInletEnth
     WatertoAirHP(HPNum)%OutletAirHumRat = PartLoadRatio*LoadsideOutletHumRat + &
-                                          (1.-PartLoadRatio)*LoadsideInletHumRat
+                                          (1.0d0-PartLoadRatio)*LoadsideInletHumRat
     WatertoAirHP(HPNum)%OutletAirDBTemp = PsyTdbFnHW(WatertoAirHP(HPNum)%OutletAirEnthalpy,WatertoAirHP(HPNum)%OutletAirHumRat)
   ELSE
     ! default to cycling fan, cycling compressor
@@ -2242,19 +2242,19 @@ SUBROUTINE UpdateWatertoAirHP(HPNum)
  !WatertoAirHP(HPNum)%Simflag=.FALSE.
   IF(.NOT. WatertoAirHP(HPNum)%Simflag)THEN
     ! Heatpump is off; just pass through conditions
-    WatertoAirHP(HPNum)%Power=0.0
-    WatertoAirHP(HPNum)%Energy=0.0
-    WatertoAirHP(HPNum)%QLoadTotal=0.0
-    WatertoAirHP(HPNum)%QSensible=0.0
-    WatertoAirHP(HPNum)%QLatent=0.0
-    WatertoAirHP(HPNum)%QSource=0.0
+    WatertoAirHP(HPNum)%Power=0.0d0
+    WatertoAirHP(HPNum)%Energy=0.0d0
+    WatertoAirHP(HPNum)%QLoadTotal=0.0d0
+    WatertoAirHP(HPNum)%QSensible=0.0d0
+    WatertoAirHP(HPNum)%QLatent=0.0d0
+    WatertoAirHP(HPNum)%QSource=0.0d0
   ! These will be overwritten below based on variables above that are already set to 0.
   !  WatertoAirHP(HPNum)%EnergyLoadTotal=0.0
   !  WatertoAirHP(HPNum)%EnergySensible=0.0
   !  WatertoAirHP(HPNum)%EnergySource=0.0
   !  WatertoAirHP(HPNum)%EnergyLatent=0.0
-    WatertoAirHP(HPNum)%RunFrac=0
-    WatertoAirHP(HPNum)%PartLoadRatio=0
+    WatertoAirHP(HPNum)%RunFrac=0.0d0
+    WatertoAirHP(HPNum)%PartLoadRatio=0.0d0
     WatertoAirHP(HPNum)%OutletAirDBTemp=WatertoAirHP(HPNum)%InletAirDBTemp
     WatertoAirHP(HPNum)%OutletAirHumRat=WatertoAirHP(HPNum)%InletAirHumRat
     WatertoAirHP(HPNum)%OutletWaterTemp=WatertoAirHP(HPNum)%InletWaterTemp
@@ -2396,8 +2396,8 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
 !  No moisture evaporation (latent degradation) occurs for runtime fraction of 1.0
 !  All latent degradation model parameters cause divide by 0.0 if not greater than 0.0
 !  Latent degradation model parameters initialize to 0.0 meaning no evaporation model used.
-   IF((RTF.GE.1.0) .OR. (QLatRated.EQ.0.0) .OR. (QLatActual.EQ.0.0) .OR. (Twet_rated.LE.0.0) .OR. &
-      (Gamma_rated.LE.0.0) .OR. (MaxONOFFCyclesperHour.LE.0.0) .OR. (HPTimeConstant.LE.0.0) .OR. (RTF.LE. 0.0)) THEN
+   IF((RTF.GE.1.0d0) .OR. (QLatRated.EQ.0.0d0) .OR. (QLatActual.EQ.0.0d0) .OR. (Twet_rated.LE.0.0d0) .OR. &
+      (Gamma_rated.LE.0.0d0) .OR. (MaxONOFFCyclesperHour.LE.0.0d0) .OR. (HPTimeConstant.LE.0.0d0) .OR. (RTF.LE. 0.0d0)) THEN
      SHReff = SHRss
      RETURN
    ENDIF
@@ -2411,7 +2411,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
 !  Calculate the compressor on and off times using a converntional thermostat curve
    Ton  = 3600.d0/(4.d0*MaxONOFFCyclesperHour*(1.d0-RTF))   ! duration of cooling coil on-cycle (sec)
 
-   IF ((CyclingScheme .EQ. CycFanCycCoil).AND.(FanDelayTime.NE.0.0)) THEN
+   IF ((CyclingScheme .EQ. CycFanCycCoil).AND.(FanDelayTime.NE.0.0d0)) THEN
 !  For CycFanCycCoil, moisture is evaporated from the cooling coil back to the air stream
 !  until the fan cycle off. Assume no evaporation from the coil after the fan shuts off.
    Toff = FanDelayTime
@@ -2422,7 +2422,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    END IF
 
 !  Cap Toff to meet the equation restriction
-   IF(Gamma .GT. 0.0)THEN
+   IF(Gamma .GT. 0.0d0)THEN
      Toffa = MIN(Toff, 2.d0*Twet/Gamma)
    ELSE
      Toffa = Toff
@@ -2432,7 +2432,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    aa = (Gamma*Toffa) - (0.25d0/Twet)*(Gamma**2)*(Toffa**2)
 
    To1 = aa+HPTimeConstant
-   Error = 1.0
+   Error = 1.0d0
    DO WHILE (Error .gt. 0.001d0)
        To2 = aa-HPTimeConstant*(EXP(-To1/HPTimeConstant)-1.0d0)
        Error = ABS((To2-To1)/To1)
@@ -2447,10 +2447,10 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    LHRmult = MAX(((Ton-To2)/(Ton+HPTimeConstant*(aa-1.0d0))),0.0d0)
 
 !  Calculate part-load or "effective" sensible heat ratio
-   SHReff = 1.0-(1.0-SHRss)*LHRmult
+   SHReff = 1.0d0-(1.0d0-SHRss)*LHRmult
 
    IF (SHReff .LT. SHRss) SHReff = SHRss ! Effective SHR can be less than the steady-state SHR
-   IF (SHReff .GT. 1.0) SHReff=1.0 ! Effective sensible heat ratio can't be greater than 1.0
+   IF (SHReff .GT. 1.0d0) SHReff=1.0d0 ! Effective sensible heat ratio can't be greater than 1.0
 
  RETURN
 
@@ -2598,7 +2598,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
 
           ! USE STATEMENTS:
   USE FluidProperties, ONLY: FindGlycol
-  USE InputProcessor,  ONLY: FindItemInList
+  USE InputProcessor,  ONLY: FindItemInList, SameString
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2627,11 +2627,11 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
     GetCoilsInputFlag=.false.
   End If
 
-  IF (CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION' .or.   &
-      CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION') THEN
+  IF (SameString(CoilType,'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION') .or.   &
+      SameString(CoilType,'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION')) THEN
     WhichCoil=FindItemInList(CoilName,WaterToAirHP%Name,NumWaterToAirHPs)
     IF (WhichCoil /= 0) THEN
-      IF (CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION') THEN
+      IF (SameString(CoilType,'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION')) THEN
         CoilCapacity=WaterToAirHP(WhichCoil)%HeatingCapacity
       ELSE
         CoilCapacity=WaterToAirHP(WhichCoil)%CoolingCapacity
@@ -2644,7 +2644,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
   IF (WhichCoil == 0) THEN
     CALL ShowSevereError('Could not find CoilType="'//TRIM(CoilType)//'" with Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    CoilCapacity=-1000.
+    CoilCapacity=-1000.0d0
   ENDIF
 
   RETURN
@@ -2846,70 +2846,70 @@ TYPE SimpleWatertoAirHPConditions
   CHARACTER(len=MaxNameLength) :: WatertoAirHPType=' ' ! Type of WatertoAirHP ie. Heating or Cooling
   INTEGER   :: WAHPPlantTypeOfNum              = 0     ! type of component in plant
   LOGICAL   :: Simflag                         =.false. ! Heat Pump Simulation Flag
-  REAL(r64) :: AirVolFlowRate                  =0.0  ! Air Volumetric Flow Rate[m3/s]
-  REAL(r64) :: AirMassFlowRate                 =0.0  ! Air Mass Flow Rate[kg/s]
-  REAL(r64) :: InletAirDBTemp                  =0.0  ! Inlet Air Dry Bulb Temperature [C]
-  REAL(r64) :: InletAirHumRat                  =0.0  ! Inlet Air Humidity Ratio [kg/kg]
-  REAL(r64) :: InletAirEnthalpy                =0.0  ! Inlet Air Enthalpy [J/kg]
-  REAL(r64) :: OutletAirDBTemp                 =0.0  ! Outlet Air Dry Bulb Temperature [C]
-  REAL(r64) :: OutletAirHumRat                 =0.0  ! Outlet Air Humidity Ratio [kg/kg]
-  REAL(r64) :: OutletAirEnthalpy               =0.0  ! Outlet Air Enthalpy [J/kg]
-  REAL(r64) :: WaterVolFlowRate                =0.0  ! Water Volumetric Flow Rate [m3/s]
-  REAL(r64) :: WaterMassFlowRate               =0.0  ! Water Mass Flow Rate [kg/s]
-  REAL(r64) :: DesignWaterMassFlowRate         =0.0
-  REAL(r64) :: InletWaterTemp                  =0.0  ! Inlet Water Temperature [C]
-  REAL(r64) :: InletWaterEnthalpy              =0.0  ! Inlet Water Enthalpy [J/kg]
-  REAL(r64) :: OutletWaterTemp                 =0.0  ! Outlet Water Temperature [C]
-  REAL(r64) :: OutletWaterEnthalpy             =0.0  ! Outlet Water Enthalpy [J/kg]
-  REAL(r64) :: Power                           =0.0  ! Power Consumption [W]
-  REAL(r64) :: QLoadTotal                      =0.0  ! Load Side Total Heat Transfer Rate [W]
-  REAL(r64) :: QSensible                       =0.0  ! Sensible Load Side Heat Transfer Rate [W]
-  REAL(r64) :: QLatent                         =0.0  ! Latent Load Side Heat Transfer Rate [W]
-  REAL(r64) :: QSource                         =0.0  ! Source Side Heat Transfer Rate [W]
-  REAL(r64) :: Energy                          =0.0  ! Energy Consumption [J]
-  REAL(r64) :: EnergyLoadTotal                 =0.0  ! Load Side Total Heat Transferred [J]
-  REAL(r64) :: EnergySensible                  =0.0  ! Sensible Load Side Heat Transferred [J]
-  REAL(r64) :: EnergyLatent                    =0.0  ! Latent Load Side Heat Transferred [J]
-  REAL(r64) :: EnergySource                    =0.0  ! Source Side Heat Transferred [J]
-  REAL(r64) :: COP                             =0.0  ! Heat Pump Coefficient of Performance [-]
-  REAL(r64) :: RunFrac                         =0.0  ! Duty Factor
-  REAL(r64) :: PartLoadRatio                   =0.0  ! Part Load Ratio
+  REAL(r64) :: AirVolFlowRate                  =0.0d0  ! Air Volumetric Flow Rate[m3/s]
+  REAL(r64) :: AirMassFlowRate                 =0.0d0  ! Air Mass Flow Rate[kg/s]
+  REAL(r64) :: InletAirDBTemp                  =0.0d0  ! Inlet Air Dry Bulb Temperature [C]
+  REAL(r64) :: InletAirHumRat                  =0.0d0  ! Inlet Air Humidity Ratio [kg/kg]
+  REAL(r64) :: InletAirEnthalpy                =0.0d0  ! Inlet Air Enthalpy [J/kg]
+  REAL(r64) :: OutletAirDBTemp                 =0.0d0  ! Outlet Air Dry Bulb Temperature [C]
+  REAL(r64) :: OutletAirHumRat                 =0.0d0  ! Outlet Air Humidity Ratio [kg/kg]
+  REAL(r64) :: OutletAirEnthalpy               =0.0d0  ! Outlet Air Enthalpy [J/kg]
+  REAL(r64) :: WaterVolFlowRate                =0.0d0  ! Water Volumetric Flow Rate [m3/s]
+  REAL(r64) :: WaterMassFlowRate               =0.0d0  ! Water Mass Flow Rate [kg/s]
+  REAL(r64) :: DesignWaterMassFlowRate         =0.0d0
+  REAL(r64) :: InletWaterTemp                  =0.0d0  ! Inlet Water Temperature [C]
+  REAL(r64) :: InletWaterEnthalpy              =0.0d0  ! Inlet Water Enthalpy [J/kg]
+  REAL(r64) :: OutletWaterTemp                 =0.0d0  ! Outlet Water Temperature [C]
+  REAL(r64) :: OutletWaterEnthalpy             =0.0d0  ! Outlet Water Enthalpy [J/kg]
+  REAL(r64) :: Power                           =0.0d0  ! Power Consumption [W]
+  REAL(r64) :: QLoadTotal                      =0.0d0  ! Load Side Total Heat Transfer Rate [W]
+  REAL(r64) :: QSensible                       =0.0d0  ! Sensible Load Side Heat Transfer Rate [W]
+  REAL(r64) :: QLatent                         =0.0d0  ! Latent Load Side Heat Transfer Rate [W]
+  REAL(r64) :: QSource                         =0.0d0  ! Source Side Heat Transfer Rate [W]
+  REAL(r64) :: Energy                          =0.0d0  ! Energy Consumption [J]
+  REAL(r64) :: EnergyLoadTotal                 =0.0d0  ! Load Side Total Heat Transferred [J]
+  REAL(r64) :: EnergySensible                  =0.0d0  ! Sensible Load Side Heat Transferred [J]
+  REAL(r64) :: EnergyLatent                    =0.0d0  ! Latent Load Side Heat Transferred [J]
+  REAL(r64) :: EnergySource                    =0.0d0  ! Source Side Heat Transferred [J]
+  REAL(r64) :: COP                             =0.0d0  ! Heat Pump Coefficient of Performance [-]
+  REAL(r64) :: RunFrac                         =0.0d0  ! Duty Factor
+  REAL(r64) :: PartLoadRatio                   =0.0d0  ! Part Load Ratio
 
-  REAL(r64) :: RatedWaterVolFlowRate           =0.0  ! Rated/Ref Water Volumetric Flow Rate [m3/s]
-  REAL(r64) :: RatedAirVolFlowRate             =0.0  ! Rated/Ref Air Volumetric Flow Rate [m3/s]
-  REAL(r64) :: RatedCapHeat                    =0.0  ! Rated/Ref Heating Capacity [W]
-  REAL(r64) :: RatedPowerHeat                  =0.0  ! Rated/Ref Heating Power Consumption[W]
-  REAL(r64) :: RatedCOPHeat                    =0.0  ! Rated/Ref Heating COP [W/W]
-  REAL(r64) :: RatedCapCoolTotal               =0.0  ! Rated/Ref Total Cooling Capacity [W]
-  REAL(r64) :: RatedCapCoolSens                =0.0  ! Rated/Ref Sensible Cooling Capacity [W]
-  REAL(r64) :: RatedPowerCool                  =0.0  ! Rated/Ref Cooling Power Consumption[W]
-  REAL(r64) :: RatedCOPCool                    =0.0  ! Rated/Ref Cooling COP [W/W]
-  REAL(r64) :: HeatCap1                        =0.0  ! 1st coefficient of the Heating capacity performance curve
-  REAL(r64) :: HeatCap2                        =0.0  ! 2nd coefficient of the Heating capacity performance curve
-  REAL(r64) :: HeatCap3                        =0.0  ! 3rd coefficient of the Heating capacity performance curve
-  REAL(r64) :: HeatCap4                        =0.0  ! 4th coefficient of the Heating capacity performance curve
-  REAL(r64) :: HeatCap5                        =0.0  ! 5th coefficient of the Heating capacity performance curve
-  REAL(r64) :: HeatPower1                      =0.0  ! 1st coefficient of the Heating power consumption curve
-  REAL(r64) :: HeatPower2                      =0.0  ! 2nd coefficient of the Heating power consumption curve
-  REAL(r64) :: HeatPower3                      =0.0  ! 3rd coefficient of the Heating power consumption curve
-  REAL(r64) :: HeatPower4                      =0.0  ! 4th coefficient of the Heating power consumption curve
-  REAL(r64) :: HeatPower5                      =0.0  ! 5th coefficient of the Heating power consumption curve
-  REAL(r64) :: TotalCoolCap1                   =0.0  ! 1st coefficient of the Total Cooling capacity performance curve
-  REAL(r64) :: TotalCoolCap2                   =0.0  ! 2nd coefficient of the Total Cooling capacity performance curve
-  REAL(r64) :: TotalCoolCap3                   =0.0  ! 3rd coefficient of the Total Cooling capacity performance curve
-  REAL(r64) :: TotalCoolCap4                   =0.0  ! 4th coefficient of the Total Cooling capacity performance curve
-  REAL(r64) :: TotalCoolCap5                   =0.0  ! 5th coefficient of the Total Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap1                    =0.0  ! 1st coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap2                    =0.0  ! 2nd coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap3                    =0.0  ! 3rd coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap4                    =0.0  ! 4th coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap5                    =0.0  ! 5th coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: SensCoolCap6                    =0.0  ! 6th coefficient of the Sensible Cooling capacity performance curve
-  REAL(r64) :: CoolPower1                      =0.0  ! 1st coefficient of the Cooling power consumption curve
-  REAL(r64) :: CoolPower2                      =0.0  ! 2nd coefficient of the Cooling power consumption curve
-  REAL(r64) :: CoolPower3                      =0.0  ! 3rd coefficient of the Cooling power consumption curve
-  REAL(r64) :: CoolPower4                      =0.0  ! 4th coefficient of the Cooling power consumption curve
-  REAL(r64) :: CoolPower5                      =0.0  ! 5th coefficient of the Cooling power consumption curve
+  REAL(r64) :: RatedWaterVolFlowRate           =0.0d0  ! Rated/Ref Water Volumetric Flow Rate [m3/s]
+  REAL(r64) :: RatedAirVolFlowRate             =0.0d0  ! Rated/Ref Air Volumetric Flow Rate [m3/s]
+  REAL(r64) :: RatedCapHeat                    =0.0d0  ! Rated/Ref Heating Capacity [W]
+  REAL(r64) :: RatedPowerHeat                  =0.0d0  ! Rated/Ref Heating Power Consumption[W]
+  REAL(r64) :: RatedCOPHeat                    =0.0d0  ! Rated/Ref Heating COP [W/W]
+  REAL(r64) :: RatedCapCoolTotal               =0.0d0  ! Rated/Ref Total Cooling Capacity [W]
+  REAL(r64) :: RatedCapCoolSens                =0.0d0  ! Rated/Ref Sensible Cooling Capacity [W]
+  REAL(r64) :: RatedPowerCool                  =0.0d0  ! Rated/Ref Cooling Power Consumption[W]
+  REAL(r64) :: RatedCOPCool                    =0.0d0  ! Rated/Ref Cooling COP [W/W]
+  REAL(r64) :: HeatCap1                        =0.0d0  ! 1st coefficient of the Heating capacity performance curve
+  REAL(r64) :: HeatCap2                        =0.0d0  ! 2nd coefficient of the Heating capacity performance curve
+  REAL(r64) :: HeatCap3                        =0.0d0  ! 3rd coefficient of the Heating capacity performance curve
+  REAL(r64) :: HeatCap4                        =0.0d0  ! 4th coefficient of the Heating capacity performance curve
+  REAL(r64) :: HeatCap5                        =0.0d0  ! 5th coefficient of the Heating capacity performance curve
+  REAL(r64) :: HeatPower1                      =0.0d0  ! 1st coefficient of the Heating power consumption curve
+  REAL(r64) :: HeatPower2                      =0.0d0  ! 2nd coefficient of the Heating power consumption curve
+  REAL(r64) :: HeatPower3                      =0.0d0  ! 3rd coefficient of the Heating power consumption curve
+  REAL(r64) :: HeatPower4                      =0.0d0  ! 4th coefficient of the Heating power consumption curve
+  REAL(r64) :: HeatPower5                      =0.0d0  ! 5th coefficient of the Heating power consumption curve
+  REAL(r64) :: TotalCoolCap1                   =0.0d0  ! 1st coefficient of the Total Cooling capacity performance curve
+  REAL(r64) :: TotalCoolCap2                   =0.0d0  ! 2nd coefficient of the Total Cooling capacity performance curve
+  REAL(r64) :: TotalCoolCap3                   =0.0d0  ! 3rd coefficient of the Total Cooling capacity performance curve
+  REAL(r64) :: TotalCoolCap4                   =0.0d0  ! 4th coefficient of the Total Cooling capacity performance curve
+  REAL(r64) :: TotalCoolCap5                   =0.0d0  ! 5th coefficient of the Total Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap1                    =0.0d0  ! 1st coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap2                    =0.0d0  ! 2nd coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap3                    =0.0d0  ! 3rd coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap4                    =0.0d0  ! 4th coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap5                    =0.0d0  ! 5th coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: SensCoolCap6                    =0.0d0  ! 6th coefficient of the Sensible Cooling capacity performance curve
+  REAL(r64) :: CoolPower1                      =0.0d0  ! 1st coefficient of the Cooling power consumption curve
+  REAL(r64) :: CoolPower2                      =0.0d0  ! 2nd coefficient of the Cooling power consumption curve
+  REAL(r64) :: CoolPower3                      =0.0d0  ! 3rd coefficient of the Cooling power consumption curve
+  REAL(r64) :: CoolPower4                      =0.0d0  ! 4th coefficient of the Cooling power consumption curve
+  REAL(r64) :: CoolPower5                      =0.0d0  ! 5th coefficient of the Cooling power consumption curve
 
   INTEGER      :: AirInletNodeNum              =0    ! Node Number of the Air Inlet
   INTEGER      :: AirOutletNodeNum             =0     ! Node Number of the Air Outlet
@@ -2934,12 +2934,12 @@ TYPE SimpleWatertoAirHPConditions
   INTEGER      :: CompanionCoolingCoilNum      =0    ! Heating coil companion cooling coil index
   INTEGER      :: CompanionHeatingCoilNum      =0    ! Cooling coil companion heating coil index
 
-  REAL(r64) :: Twet_Rated                      =0.0  ! Nominal Time for Condensate Removal to Begin [s]
-  REAL(r64) :: Gamma_Rated                     =0.0  ! Ratio of Initial Moisture Evaporation Rate
+  REAL(r64) :: Twet_Rated                      =0.0d0  ! Nominal Time for Condensate Removal to Begin [s]
+  REAL(r64) :: Gamma_Rated                     =0.0d0  ! Ratio of Initial Moisture Evaporation Rate
                                                    ! and Steady-state Latent Capacity
-  REAL(r64) :: MaxONOFFCyclesperHour           =0.0  ! Maximum cycling rate of heat pump [cycles/hr]
-  REAL(r64) :: HPTimeConstant                  =0.0  ! Heat pump time constant [s]
-  REAL(r64) :: FanDelayTime                    =0.0  ! Fan delay time, time delay for the HP's fan to
+  REAL(r64) :: MaxONOFFCyclesperHour           =0.0d0  ! Maximum cycling rate of heat pump [cycles/hr]
+  REAL(r64) :: HPTimeConstant                  =0.0d0  ! Heat pump time constant [s]
+  REAL(r64) :: FanDelayTime                    =0.0d0  ! Fan delay time, time delay for the HP's fan to
  END TYPE SimpleWatertoAirHPConditions
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -2952,24 +2952,24 @@ LOGICAL        :: GetCoilsInputFlag = .TRUE.       ! Flag set to make sure you g
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: SimpleHPTimeStepFlag  ! determines whether the previous operating mode for the coil and it's partner has been initialized
 
-REAL(r64) :: SourceSideMassFlowRate =0.0 ! Source Side Mass flow rate [Kg/s]
-REAL(r64) :: SourceSideInletTemp    =0.0 ! Source Side Inlet Temperature [C]
-REAL(r64) :: SourceSideInletEnth    =0.0 ! Source Side Inlet Enthalpy [J/kg]
-REAL(r64) :: LoadSideMassFlowRate   =0.0 ! Load Side Mass flow rate [Kg/s]
-REAL(r64) :: LoadSideInletDBTemp    =0.0 ! Load Side Inlet Dry Bulb Temp [C]
-REAL(r64) :: LoadSideInletWBTemp    =0.0 ! Load Side Inlet Wet Bulb Temp [C]
-REAL(r64) :: LoadSideInletHumRat    =0.0 ! Load Side Outlet Humidity ratio
-REAL(r64) :: LoadSideInletEnth      =0.0 ! Load Side Inlet Enthalpy [J/kg]
-REAL(r64) :: LoadSideOutletDBTemp   =0.0 ! Load Side Outlet Dry Bulb Temp [C]
-REAL(r64) :: LoadSideOutletHumRat   =0.0 ! Load Side Outlet Humidity ratio
-REAL(r64) :: LoadSideOutletEnth     =0.0 ! Load Side Outlet Enthalpy [J/kg]
-REAL(r64) :: QSensible              =0.0 ! Load side sensible heat transfer rate [W]
-REAL(r64) :: QLoadTotal             =0.0 ! Load side total heat transfer rate [W]
-REAL(r64) :: QLatRated              =0.0 ! Latent Capacity [W] rated at entering air conditions [Tdb=26.7C Twb=19.4C]
-REAL(r64) :: QLatActual             =0.0 ! Actual Latent Capacity [W]
-REAL(r64) :: QSource                =0.0 ! Source side heat transfer rate [W]
-REAL(r64) :: Winput                 =0.0 ! Power Consumption [W]
-REAL(r64) :: PLRCorrLoadSideMdot    =0.0 ! Load Side Mdot corrected for Part Load Ratio of the unit
+REAL(r64) :: SourceSideMassFlowRate =0.0d0 ! Source Side Mass flow rate [Kg/s]
+REAL(r64) :: SourceSideInletTemp    =0.0d0 ! Source Side Inlet Temperature [C]
+REAL(r64) :: SourceSideInletEnth    =0.0d0 ! Source Side Inlet Enthalpy [J/kg]
+REAL(r64) :: LoadSideMassFlowRate   =0.0d0 ! Load Side Mass flow rate [Kg/s]
+REAL(r64) :: LoadSideInletDBTemp    =0.0d0 ! Load Side Inlet Dry Bulb Temp [C]
+REAL(r64) :: LoadSideInletWBTemp    =0.0d0 ! Load Side Inlet Wet Bulb Temp [C]
+REAL(r64) :: LoadSideInletHumRat    =0.0d0 ! Load Side Outlet Humidity ratio
+REAL(r64) :: LoadSideInletEnth      =0.0d0 ! Load Side Inlet Enthalpy [J/kg]
+REAL(r64) :: LoadSideOutletDBTemp   =0.0d0 ! Load Side Outlet Dry Bulb Temp [C]
+REAL(r64) :: LoadSideOutletHumRat   =0.0d0 ! Load Side Outlet Humidity ratio
+REAL(r64) :: LoadSideOutletEnth     =0.0d0 ! Load Side Outlet Enthalpy [J/kg]
+REAL(r64) :: QSensible              =0.0d0 ! Load side sensible heat transfer rate [W]
+REAL(r64) :: QLoadTotal             =0.0d0 ! Load side total heat transfer rate [W]
+REAL(r64) :: QLatRated              =0.0d0 ! Latent Capacity [W] rated at entering air conditions [Tdb=26.7C Twb=19.4C]
+REAL(r64) :: QLatActual             =0.0d0 ! Actual Latent Capacity [W]
+REAL(r64) :: QSource                =0.0d0 ! Source side heat transfer rate [W]
+REAL(r64) :: Winput                 =0.0d0 ! Power Consumption [W]
+REAL(r64) :: PLRCorrLoadSideMdot    =0.0d0 ! Load Side Mdot corrected for Part Load Ratio of the unit
 
           ! Subroutine Specifications for the Module
           ! Driver/Manager Routines
@@ -3108,10 +3108,10 @@ SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
 
   ! Calculate the Correct Water to Air HP Model with the current HPNum
   IF((SimpleWatertoAirHP(HPNum)%WaterCyclingMode)==WaterCycling)THEN
-   WaterPartLoad = RuntimeFrac
-        !IF (WaterPartLoad < 0.1)THEN
-	!	WaterPartLoad = 0.1
-	!ENDIF
+    WaterPartLoad = RuntimeFrac
+        !IF (WaterPartLoad < 0.1d0)THEN
+  ! WaterPartLoad = 0.1d0
+  !ENDIF
   ELSE
     WaterPartLoad = 1.0d0
   ENDIF
@@ -3242,7 +3242,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
     ALLOCATE(lNumericBlanks(MaxNums))
     lNumericBlanks=.TRUE.
     ALLOCATE(NumArray(MaxNums))
-    NumArray=0.0
+    NumArray=0.0d0
 
 
       ! Get the data for cooling coil
@@ -3617,33 +3617,47 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
   IF(FirstHVACIteration)THEN
     IF(SimpleHPTimeStepFlag(HPNum))THEN
       IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
-        IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
-          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
-          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Cooling
-        ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%WaterFlowMode)THEN
-          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
-          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Heating
-        END IF
+        IF (SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum .GT. 0) THEN
+          IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
+            SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Cooling
+          ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
+            SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Heating
+          END IF
+          SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum) = .FALSE.
+        ELSE
+          IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
+          ENDIF
+        ENDIF
         SimpleHPTimeStepFlag(HPNum) = .FALSE.
-        SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum) = .FALSE.
       ELSE
         ! it is a heating coil
-        IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
-          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
-          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Heating
-        ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%WaterFlowMode)THEN
-          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
-          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Cooling
-        END IF
+        IF(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum .GT. 0) THEN
+          IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
+            SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Heating
+          ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
+            SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Cooling
+          END IF
+          SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum) = .FALSE.
+        ELSE
+          IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+            SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
+          ENDIF
+        ENDIF
         SimpleHPTimeStepFlag(HPNum) = .FALSE.
-        SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum) = .FALSE.
       END IF
     END IF
-    ELSE
+  ELSE
     SimpleHPTimeStepFlag(HPNum) = .TRUE.
     IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
+      IF(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum .GT. 0) &
       SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum) = .TRUE.
     ELSE
+      IF(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum .GT. 0) &
       SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum) = .TRUE.
     END IF
   END IF
@@ -3656,30 +3670,30 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
     WaterInletNode = SimpleWatertoAirHP(HPNum)%WaterInletNodeNum
 
     !Initialize all report variables to a known state at beginning of simulation
-    SimpleWatertoAirHP(HPNum)%AirVolFlowRate=0.0
-    SimpleWatertoAirHP(HPNum)%InletAirDBTemp=0.0
-    SimpleWatertoAirHP(HPNum)%InletAirHumRat=0.0
-    SimpleWatertoAirHP(HPNum)%OutletAirDBTemp=0.0
-    SimpleWatertoAirHP(HPNum)%OutletAirHumRat=0.0
-    SimpleWatertoAirHP(HPNum)%WaterVolFlowRate=0.0
-    SimpleWatertoAirHP(HPNum)%WaterMassFlowRate=0.0
-    SimpleWatertoAirHP(HPNum)%InletWaterTemp=0.0
-    SimpleWatertoAirHP(HPNum)%InletWaterEnthalpy = 0.0
-    SimpleWatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0
-    SimpleWatertoAirHP(HPNum)%OutletWaterTemp=0.0
-    SimpleWatertoAirHP(HPNum)%Power=0.0
-    SimpleWatertoAirHP(HPNum)%QLoadTotal=0.0
-    SimpleWatertoAirHP(HPNum)%QSensible=0.0
-    SimpleWatertoAirHP(HPNum)%QLatent=0.0
-    SimpleWatertoAirHP(HPNum)%QSource=0.0
-    SimpleWatertoAirHP(HPNum)%Energy=0.0
-    SimpleWatertoAirHP(HPNum)%EnergyLoadTotal=0.0
-    SimpleWatertoAirHP(HPNum)%EnergySensible=0.0
-    SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0
-    SimpleWatertoAirHP(HPNum)%EnergySource=0.0
-    SimpleWatertoAirHP(HPNum)%COP=0.0
-    SimpleWatertoAirHP(HPNum)%RunFrac=0.0
-    SimpleWatertoAirHP(HPNum)%PartLoadRatio=0.0
+    SimpleWatertoAirHP(HPNum)%AirVolFlowRate=0.0d0
+    SimpleWatertoAirHP(HPNum)%InletAirDBTemp=0.0d0
+    SimpleWatertoAirHP(HPNum)%InletAirHumRat=0.0d0
+    SimpleWatertoAirHP(HPNum)%OutletAirDBTemp=0.0d0
+    SimpleWatertoAirHP(HPNum)%OutletAirHumRat=0.0d0
+    SimpleWatertoAirHP(HPNum)%WaterVolFlowRate=0.0d0
+    SimpleWatertoAirHP(HPNum)%WaterMassFlowRate=0.0d0
+    SimpleWatertoAirHP(HPNum)%InletWaterTemp=0.0d0
+    SimpleWatertoAirHP(HPNum)%InletWaterEnthalpy = 0.0d0
+    SimpleWatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0d0
+    SimpleWatertoAirHP(HPNum)%OutletWaterTemp=0.0d0
+    SimpleWatertoAirHP(HPNum)%Power=0.0d0
+    SimpleWatertoAirHP(HPNum)%QLoadTotal=0.0d0
+    SimpleWatertoAirHP(HPNum)%QSensible=0.0d0
+    SimpleWatertoAirHP(HPNum)%QLatent=0.0d0
+    SimpleWatertoAirHP(HPNum)%QSource=0.0d0
+    SimpleWatertoAirHP(HPNum)%Energy=0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergyLoadTotal=0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergySensible=0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergySource=0.0d0
+    SimpleWatertoAirHP(HPNum)%COP=0.0d0
+    SimpleWatertoAirHP(HPNum)%RunFrac=0.0d0
+    SimpleWatertoAirHP(HPNum)%PartLoadRatio=0.0d0
 
     rho = GetDensityGlycol(PlantLoop(SimpleWatertoAirHP(HPNum)%LoopNum)%FluidName, &
                               InitConvTemp, &
@@ -3706,15 +3720,15 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
 
     Node(WaterInletNode)%Temp          = 5.0d0
     Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(WaterInletNode)%Quality       = 0.0
-    Node(WaterInletNode)%Press         = 0.0
-    Node(WaterInletNode)%HumRat        = 0.0
+    Node(WaterInletNode)%Quality       = 0.0d0
+    Node(WaterInletNode)%Press         = 0.0d0
+    Node(WaterInletNode)%HumRat        = 0.0d0
 
     Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Temp          = 5.0d0
     Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Quality       = 0.0
-    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Press         = 0.0
-    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%HumRat        = 0.0
+    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Quality       = 0.0d0
+    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Press         = 0.0d0
+    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%HumRat        = 0.0d0
 
     SimpleWatertoAirHP(HPNum)%SimFlag = .TRUE.
 
@@ -3735,7 +3749,7 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
   AirInletNode = SimpleWatertoAirHP(HPNum)%AirInletNodeNum
   WaterInletNode = SimpleWatertoAirHP(HPNum)%WaterInletNodeNum
 
-  IF ((SensLoad .NE. 0.0 .OR. LatentLoad .NE. 0.0).AND.(Node(AirInletNode)%MassFlowRate > 0.0)) THEN
+  IF ((SensLoad .NE. 0.0d0 .OR. LatentLoad .NE. 0.0d0).AND.(Node(AirInletNode)%MassFlowRate > 0.0d0)) THEN
 
    ! changed the water mass flow rate to be equal to the design times run time fraction in order to account for
    ! cycling of equipment
@@ -3764,20 +3778,34 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
     SimpleWatertoAirHP(HPNum)%AirMassFlowRate   = 0.d0
     IF((SimpleWatertoAirHP(HPNum)%WaterCyclingMode)==WaterConstant)THEN
       IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
-        IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
-          ! do nothing, there will be flow through this coil
-        ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Cooling)THEN
-          ! set the flow rate to full design flow
-          SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
-        END IF
+        IF (SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum .GT. 0) THEN
+          IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
+            ! do nothing, there will be flow through this coil
+          ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Cooling)THEN
+            ! set the flow rate to full design flow
+            SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+          END IF
+        ELSE
+          IF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Cooling)THEN
+            ! set the flow rate to full design flow
+            SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+          END IF
+        ENDIF
       ELSEIF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPHeatingEquationFit)THEN
         ! It's a heating coil
-        IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
-          ! do nothing, there will be flow through this coil
-        ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Heating)THEN
-          ! set the flow rate to full design flow
-          SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
-        END IF
+        IF(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum .GT. 0) THEN
+          IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
+            ! do nothing, there will be flow through this coil
+          ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Heating)THEN
+            ! set the flow rate to full design flow
+            SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+          END IF
+        ELSE
+          IF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Heating)THEN
+            ! set the flow rate to full design flow
+            SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+          END IF
+        ENDIF
       END IF
     ENDIF
   ENDIF
@@ -3802,23 +3830,23 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
    SimpleWatertoAirHP(HPNum)%FanDelayTime         = FanDelayTime
 
    ! Outlet variables
-   SimpleWatertoAirHP(HPNum)%Power=0.0
-   SimpleWatertoAirHP(HPNum)%QLoadTotal=0.0
-   SimpleWatertoAirHP(HPNum)%QSensible=0.0
-   SimpleWatertoAirHP(HPNum)%QLatent=0.0
-   SimpleWatertoAirHP(HPNum)%QSource=0.0
-   SimpleWatertoAirHP(HPNum)%Energy=0.0
-   SimpleWatertoAirHP(HPNum)%EnergyLoadTotal=0.0
-   SimpleWatertoAirHP(HPNum)%EnergySensible=0.0
-   SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0
-   SimpleWatertoAirHP(HPNum)%EnergySource=0.0
-   SimpleWatertoAirHP(HPNum)%COP=0.0
+   SimpleWatertoAirHP(HPNum)%Power=0.0d0
+   SimpleWatertoAirHP(HPNum)%QLoadTotal=0.0d0
+   SimpleWatertoAirHP(HPNum)%QSensible=0.0d0
+   SimpleWatertoAirHP(HPNum)%QLatent=0.0d0
+   SimpleWatertoAirHP(HPNum)%QSource=0.0d0
+   SimpleWatertoAirHP(HPNum)%Energy=0.0d0
+   SimpleWatertoAirHP(HPNum)%EnergyLoadTotal=0.0d0
+   SimpleWatertoAirHP(HPNum)%EnergySensible=0.0d0
+   SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0d0
+   SimpleWatertoAirHP(HPNum)%EnergySource=0.0d0
+   SimpleWatertoAirHP(HPNum)%COP=0.0d0
 
-   SimpleWatertoAirHP(HPNum)%OutletAirDBTemp=0.0
-   SimpleWatertoAirHP(HPNum)%OutletWaterTemp=0.0
-   SimpleWatertoAirHP(HPNum)%OutletAirHumRat=0.0
-   SimpleWatertoAirHP(HPNum)%OutletAirEnthalpy = 0.0
-   SimpleWatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0
+   SimpleWatertoAirHP(HPNum)%OutletAirDBTemp=0.0d0
+   SimpleWatertoAirHP(HPNum)%OutletWaterTemp=0.0d0
+   SimpleWatertoAirHP(HPNum)%OutletAirHumRat=0.0d0
+   SimpleWatertoAirHP(HPNum)%OutletAirEnthalpy = 0.0d0
+   SimpleWatertoAirHP(HPNum)%OutletWaterEnthalpy = 0.0d0
 
   RETURN
 
@@ -3829,7 +3857,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad, FSEC
           !       DATE WRITTEN   June 2009
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3853,7 +3881,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
   USE Psychrometrics
   USE DataPlant,          ONLY: PlantLoop, MyPlantSizingIndex
   USE DataHVACGlobals,    ONLY: SmallAirVolFlow, SmallLoad
-  USE General,            ONLY: TrimSigDigits
+  USE General,            ONLY: TrimSigDigits, RoundSigDigits
   USE PlantUtilities,     ONLY: RegisterPlantCompDesignFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE DataAirSystems,     ONLY: PrimaryAirSystem
@@ -3914,55 +3942,144 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
   REAL(r64) :: SystemCapacity
   REAL(r64) :: rho
   REAL(r64) :: cp
-
+  LOGICAL   :: IsAutosize                ! Indicator to autosize
+  LOGICAL   :: HardSizeNoDesRun          ! Indicator to hardsize and no sizing run
+  REAL(r64) :: RatedAirVolFlowRateDes    ! Autosized rated air flow for reporting
+  REAL(r64) :: RatedAirVolFlowRateUser   ! Hardsized rated air flow for reporting
+  REAL(r64) :: RatedCapCoolTotalDes      ! Autosized rated cooling capacity for reporting
+  REAL(r64) :: RatedCapCoolTotalUser     ! Hardsized rated cooling capacity for reporting
+  REAL(r64) :: RatedCapCoolSensDes       ! Autosized rated sensible cooling capacity for reporting
+  REAL(r64) :: RatedCapCoolSensUser      ! Hardsized rated sensible cooling capacity for reporting
+  REAL(r64) :: RatedCapHeatDes           ! Autosized rated heating capacity for reporting
+  REAL(r64) :: RatedCapHeatUser          ! Hardsized rated heating capacity for reporting
+  REAL(r64) :: RatedWaterVolFlowRateDes  ! Autosized rated water flow rate for reporting
+  REAL(r64) :: RatedWaterVolFlowRateUser ! Hardsized rated water flow rate for reporting
+  LOGICAL :: SizingDesRunThisAirSys            ! true if a particular air system had a Sizing:System object and system sizing done
+  LOGICAL :: SizingDesRunThisZone              ! true if a particular zone had a Sizing:Zone object and zone sizing was done
 
   PltSizNum = 0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  IF (SysSizingRunDone .OR. ZoneSizingRunDone) THEN
+    HardSizeNoDesRun = .FALSE.
+  ELSE
+    HardSizeNoDesRun = .TRUE.
+  ENDIF
+  IF (CurSysNum > 0) THEN
+    CALL CheckThisAirSystemForSizing(CurSysNum, SizingDesRunThisAirSys )
+  ELSE
+    SizingDesRunThisAirSys =  .FALSE.
+  ENDIF
+  IF (CurZoneEqNum > 0) THEN
+    CALL CheckThisZoneForSizing(CurZoneEqNum, SizingDesRunThisZone)
+  ELSE
+    SizingDesRunThisZone =  .FALSE.
+  ENDIF
+  RatedAirVolFlowRateDes = 0.0d0
+  RatedAirVolFlowRateUser = 0.0d0
+  RatedCapCoolTotalDes = 0.0d0
+  RatedCapCoolTotalUser = 0.0d0
+  RatedCapCoolSensDes = 0.0d0
+  RatedCapCoolSensUser = 0.0d0
+  RatedCapHeatDes = 0.0d0
+  RatedCapHeatUser = 0.0d0
+  RatedWaterVolFlowRateDes = 0.0d0
+  RatedWaterVolFlowRateUser = 0.0d0
 
   IF (SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate == AutoSize) THEN
-
-    IF (CurSysNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurSysNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisAirSys) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Air Flow Rate [m3/s]', &
+                             SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate)
+      END IF
+    ELSE
       CALL CheckSysSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
-        SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
+        RatedAirVolFlowRateDes = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate = 0.0
+        RatedAirVolFlowRateDes = 0.0d0
       END IF
-
     END IF
-
-    IF (CurZoneEqNum > 0) THEN
-
+  ELSE IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. SizingDesRunThisZone) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Air Flow Rate [m3/s]', &
+                             SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate)
+      END IF
+    ELSE
       CALL CheckZoneSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
-      SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+      RatedAirVolFlowRateDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                             FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate < SmallAirVolFlow) THEN
-        SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate = 0.0
+      IF (RatedAirVolFlowRateDes < SmallAirVolFlow) THEN
+        RatedAirVolFlowRateDes = 0.0d0
       END IF
-
     END IF
-
-    CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+  END IF
+  IF (.NOT. HardSizeNoDesRun) THEN
+    IF (IsAutosize) THEN
+      SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate = RatedAirVolFlowRateDes
+      CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                              SimpleWatertoAirHP(HPNum)%Name, &
-                            'Rated Air Flow Rate [m3/s]', &
-                             SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate)
-
+                            'Design Size Rated Air Flow Rate [m3/s]', &
+                             RatedAirVolFlowRateDes)
+    ELSE
+      IF (SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate > 0.0d0 .AND. RatedAirVolFlowRateDes > 0.0d0 &
+              .AND. .NOT. HardSizeNoDesRun) THEN
+        RatedAirVolFlowRateUser = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'Design Size Rated Air Flow Rate [m3/s]', &
+                             RatedAirVolFlowRateDes, &
+                            'User-Specified Rated Air Flow Rate [m3/s]', &
+                             RatedAirVolFlowRateUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(RatedAirVolFlowRateDes - RatedAirVolFlowRateUser)/RatedAirVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeHVACWaterToAir: Potential issue with equipment sizing for coil ' &
+                                  //TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)// &
+                                  ':WATERTOAIRHEATPUMP:EQUATIONFIT "'// TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
+            CALL ShowContinueError('User-Specified Rated Air Volume Flow Rate of '// &
+                                      TRIM(RoundSigDigits(RatedAirVolFlowRateUser,5))// ' [m3/s]')
+            CALL ShowContinueError('differs from Design Size Rated Air Volume Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(RatedAirVolFlowRateDes,5))// ' [m3/s]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF
+    END IF
   END IF
 
   RatedCapCoolTotalAutosized = .FALSE.
   RatedCapCoolSensAutosized  = .FALSE.
 
+IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'COOLING') THEN
 ! size rated total cooling capacity
   IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal == AutoSize .AND. &
       SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'COOLING') THEN
-
     RatedCapCoolTotalAutosized = .TRUE.
-
-    IF (CurSysNum > 0) THEN
-
+  END IF
+  IF (SizingDesRunThisAirSys .OR. SizingDesRunThisZone) HardSizeNoDesRun = .FALSE.
+  IF (CurSysNum > 0) THEN
+    IF (.NOT. RatedCapCoolTotalAutosized .AND. .NOT. SizingDesRunThisAirSys) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Total Cooling Capacity [W]', &
+                             SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+      END IF
+    ELSE
       CALL CheckSysSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
@@ -3979,7 +4096,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
             MixTemp = FinalSysSizing(CurSysNum)%CoolMixTemp
             MixHumRat = FinalSysSizing(CurSysNum)%CoolMixHumRat
           ELSE ! there is precooling of OA stream
-            IF (VolFlowRate > 0.0) THEN
+            IF (VolFlowRate > 0.0d0) THEN
               OutAirFrac = FinalSysSizing(CurSysNum)%DesOutAirVolFlow / VolFlowRate
             ELSE
               OutAirFrac = 1.0d0
@@ -4015,22 +4132,30 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
         END IF
         CoolCapAtPeak = MAX(0.0d0, CoolCapAtPeak)
         IF(TotCapTempModFac .GT. 0.0d0)THEN
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
+          RatedCapCoolTotalDes = CoolCapAtPeak / TotCapTempModFac
         ELSE
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = CoolCapAtPeak
+          RatedCapCoolTotalDes = CoolCapAtPeak
         END IF
       ELSE
-        SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = 0.0
+        RatedCapCoolTotalDes = 0.0d0
       END IF
-
-    ELSE IF (CurZoneEqNum > 0) THEN
-
+    END IF
+  ELSE IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. RatedCapCoolTotalAutosized .AND. .NOT. SizingDesRunThisZone) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Total Cooling Capacity [W]', &
+                             SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+      END IF
+    ELSE
       CALL CheckZoneSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
         IF(ZoneEqDXCoil)THEN
-          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0) THEN
+          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0d0) THEN
             MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
             MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
           ELSE
@@ -4048,7 +4173,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
         IF (DDNum > 0 .and. TimeStepNumAtMax > 0) THEN
           OutTemp = DesDayWeath(DDNum)%Temp(TimeStepNumAtMax)
         ELSE
-          OutTemp = 0.0
+          OutTemp = 0.0d0
         ENDIF
         rhoair = PsyRhoAirFnPbTdbW(StdBaroPress,MixTemp,MixHumRat,RoutineName)
         MixEnth = PsyHFnTdbW(MixTemp,MixHumRat,RoutineName)
@@ -4073,37 +4198,62 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
         END IF
         CoolCapAtPeak = MAX(0.0d0, CoolCapAtPeak)
         IF(TotCapTempModFac .GT. 0.0d0)THEN
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
+          RatedCapCoolTotalDes = CoolCapAtPeak / TotCapTempModFac
         ELSE
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = CoolCapAtPeak
+          RatedCapCoolTotalDes = CoolCapAtPeak
         END IF
       ELSE
-        SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = 0.0
+        RatedCapCoolTotalDes = 0.0d0
       END IF
-
     END IF
-
-    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal < SmallLoad) THEN
-      SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = 0.0
+    IF (RatedCapCoolTotalDes < SmallLoad) THEN
+      RatedCapCoolTotalDes = 0.0d0
     END IF
-
-    CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+  END IF
+  IF (.NOT. HardSizeNoDesRun) THEN
+    IF (RatedCapCoolTotalAutosized) THEN
+      SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal = RatedCapCoolTotalDes
+      CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                              SimpleWatertoAirHP(HPNum)%Name, &
-                            'Rated Total Cooling Capacity [W]', &
-                             SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
-    CALL PreDefTableEntry(pdchCoolCoilTotCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
-    CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
+                            'Design Size Rated Total Cooling Capacity [W]', &
+                             RatedCapCoolTotalDes)
+      CALL PreDefTableEntry(pdchCoolCoilTotCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+      CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
                                  - SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
-    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
-      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
+        CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
                                    / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
-      CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedPowerCool &
+        CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedPowerCool &
                                    / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
-    ELSE
-      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
-      CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
-    ENDIF
-
+      ELSE
+        CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+        CALL PreDefTableEntry(pdchCoolCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+      ENDIF
+    ELSE ! Hardsized with sizing data
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal > 0.0d0 .AND. RatedCapCoolTotalDes > 0.0d0 &
+                     .AND. .NOT. HardSizeNoDesRun) THEN
+        RatedCapCoolTotalUser = SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'Design Size Rated Total Cooling Capacity [W]', &
+                             RatedCapCoolTotalDes, &
+                            'User-Specified Rated Total Cooling Capacity [W]', &
+                             RatedCapCoolTotalUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(RatedCapCoolTotalDes - RatedCapCoolTotalUser)/RatedCapCoolTotalUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeHVACWaterToAir: Potential issue with equipment sizing for coil ' &
+                                  //TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)// &
+                                  ':WATERTOAIRHEATPUMP:EQUATIONFIT "'// TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
+            CALL ShowContinueError('User-Specified Rated Total Cooling Capacity of '// &
+                                      TRIM(RoundSigDigits(RatedCapCoolTotalUser,2))// ' [W]')
+            CALL ShowContinueError('differs from Design Size Rated Total Cooling Capacity of ' // &
+                                      TRIM(RoundSigDigits(RatedCapCoolTotalDes,2))// ' [W]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF
+    END IF
   END IF
 
 ! Set the global DX cooling coil capacity variable for use by other objects
@@ -4114,11 +4264,19 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
 ! size rated sensible cooling capacity
   IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolSens == AutoSize .AND. &
       SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'COOLING') THEN
-
     RatedCapCoolSensAutosized  = .TRUE.
-
-    IF (CurSysNum > 0) THEN
-
+  END IF
+  IF (SizingDesRunThisAirSys .OR. SizingDesRunThisZone)  HardSizeNoDesRun = .FALSE.
+  IF (CurSysNum > 0) THEN
+    IF (.NOT. RatedCapCoolSensAutosized .AND. .NOT. SizingDesRunThisAirSys) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolSens > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Sensible Cooling Capacity [W]', &
+                             SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+      END IF
+    ELSE
       CALL CheckSysSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
@@ -4135,7 +4293,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
             MixTemp = FinalSysSizing(CurSysNum)%CoolMixTemp
             MixHumRat = FinalSysSizing(CurSysNum)%CoolMixHumRat
           ELSE ! there is precooling of OA stream
-            IF (VolFlowRate > 0.0) THEN
+            IF (VolFlowRate > 0.0d0) THEN
               OutAirFrac = FinalSysSizing(CurSysNum)%DesOutAirVolFlow / VolFlowRate
             ELSE
               OutAirFrac = 1.0d0
@@ -4173,19 +4331,27 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
           SensCapAtPeak = rhoair * VolFlowRate * CpAir * (24.0d0-SupTemp)
         END IF
         SensCapAtPeak = MAX(0.0d0, SensCapAtPeak)
-        SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = SensCapAtPeak / SensCapTempModFac
+        RatedCapCoolSensDes = SensCapAtPeak / SensCapTempModFac
       ELSE
-        SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = 0.0
+        RatedCapCoolSensDes = 0.0d0
       END IF
-
-    ELSE IF (CurZoneEqNum > 0) THEN
-
+    END IF
+  ELSE IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. RatedCapCoolSensAutosized .AND. .NOT. SizingDesRunThisZone) THEN ! Simulation continue
+      HardSizeNoDesRun = .TRUE.
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolSens > 0.0d0) THEN
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'User-Specified Rated Sensible Cooling Capacity [W]', &
+                             SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+      END IF
+    ELSE
       CALL CheckZoneSizing('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                           SimpleWatertoAirHP(HPNum)%Name)
       VolFlowRate = SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
         IF(ZoneEqDXCoil)THEN
-          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0) THEN
+          IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0d0) THEN
             MixTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
             MixHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
           ELSE
@@ -4203,7 +4369,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
         IF (DDNum > 0 .and. TimeStepNumAtMax > 0) THEN
           OutTemp = DesDayWeath(DDNum)%Temp(TimeStepNumAtMax)
         ELSE
-          OutTemp = 0.0
+          OutTemp = 0.0d0
         ENDIF
         rhoair = PsyRhoAirFnPbTdbW(StdBaroPress,MixTemp,MixHumRat,RoutineName)
         MixEnth = PsyHFnTdbW(MixTemp,MixHumRat,RoutineName)
@@ -4231,34 +4397,58 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
         END IF
         SensCapAtPeak = MAX(0.0d0, SensCapAtPeak)
         IF(SensCapTempModFac .GT. 0.0d0)THEN
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = SensCapAtPeak / SensCapTempModFac
+          RatedCapCoolSensDes = SensCapAtPeak / SensCapTempModFac
         ELSE
-          SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = SensCapAtPeak
+          RatedCapCoolSensDes = SensCapAtPeak
         END IF
       ELSE
-        SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = 0.0
+        RatedCapCoolSensDes = 0.0d0
       END IF
-
     END IF
-
-    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolSens < SmallLoad) THEN
-      SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = 0.0
-    END IF
-
-    CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+  END IF
+  IF (RatedCapCoolSensDes < SmallLoad) THEN
+    RatedCapCoolSensDes = 0.0d0
+  END IF
+  IF (.NOT. HardSizeNoDesRun) THEN
+    IF (RatedCapCoolSensAutosized) THEN
+      SimpleWatertoAirHP(HPNum)%RatedCapCoolSens = RatedCapCoolSensDes
+      CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                              SimpleWatertoAirHP(HPNum)%Name, &
-                            'Rated Sensible Cooling Capacity [W]', &
-                             SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
-    CALL PreDefTableEntry(pdchCoolCoilSensCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
-    CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
+                            'Design Size Rated Sensible Cooling Capacity [W]', &
+                             RatedCapCoolSensDes)
+      CALL PreDefTableEntry(pdchCoolCoilSensCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
+      CALL PreDefTableEntry(pdchCoolCoilLatCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal &
                                  - SimpleWatertoAirHP(HPNum)%RatedCapCoolSens)
-    IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
-      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal /= 0.0d0) THEN
+        CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapCoolSens &
                                  / SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal)
+      ELSE
+        CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
+      ENDIF
     ELSE
-      CALL PreDefTableEntry(pdchCoolCoilSHR,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
-    ENDIF
-
+      IF (SimpleWatertoAirHP(HPNum)%RatedCapCoolSens > 0.0d0 .AND. RatedCapCoolSensDes > 0.0d0) THEN
+        RatedCapCoolSensUser = SimpleWatertoAirHP(HPNum)%RatedCapCoolSens
+        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'Design Size Rated Sensible Cooling Capacity [W]', &
+                             RatedCapCoolSensDes, &
+                            'User-Specified Rated Sensible Cooling Capacity [W]', &
+                             RatedCapCoolSensUser)
+        IF (DisplayExtraWarnings) THEN
+          IF ((ABS(RatedCapCoolSensDes - RatedCapCoolSensUser)/RatedCapCoolSensUser) > AutoVsHardSizingThreshold) THEN
+            CALL ShowMessage('SizeHVACWaterToAir: Potential issue with equipment sizing for coil ' &
+                                    //TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)// &
+                                  ':WATERTOAIRHEATPUMP:EQUATIONFIT "'// TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
+            CALL ShowContinueError('User-Specified Rated Sensible Cooling Capacity of '// &
+                                      TRIM(RoundSigDigits(RatedCapCoolSensUser,2))// ' [W]')
+            CALL ShowContinueError('differs from Design Size Rated Sensible Cooling Capacity of ' // &
+                                      TRIM(RoundSigDigits(RatedCapCoolSensDes,2))// ' [W]')
+            CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+            CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+          END IF
+        ENDIF
+      END IF
+    END IF
   END IF
 
 ! test autosized sensible and total cooling capacity for total > sensible
@@ -4317,29 +4507,35 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
     END IF
   END IF
 
+ENDIF ! Cooling Coild
+
+IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'HEATING') THEN
 ! size rated heating capacity
+  IsAutosize = .FALSE.
   IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat == AutoSize .AND. &
       SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'HEATING') THEN
-
+    IsAutosize = .TRUE.
+  END IF
 !   simply set heating capacity equal to the cooling capacity
-    SimpleWatertoAirHP(HPNum)%RatedCapHeat = DXCoolCap
-
-    IF(SimpleWatertoAirHP(HPNum)%RatedCapHeat == Autosize)THEN
+  IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'HEATING') THEN
+    RatedCapHeatDes = DXCoolCap
+    IF (RatedCapHeatDes ==  autosize) THEN
       CALL ShowWarningError('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT "'// &
                             TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
       CALL ShowContinueError(RoutineName//': Heating coil could not be autosized since cooling coil was not previously sized.')
       CALL ShowContinueError('... Cooling coil must be upstream of heating coil.')
       CALL ShowContinueError('... Manually sizing this heating coil will be required.')
     END IF
-
-    IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat < SmallLoad) THEN
-      SimpleWatertoAirHP(HPNum)%RatedCapHeat = 0.0
+    IF (RatedCapHeatDes < SmallLoad) THEN
+      RatedCapHeatDes = 0.0d0
     END IF
-
+  END IF
+  IF (IsAutosize) THEN
+    SimpleWatertoAirHP(HPNum)%RatedCapHeat = RatedCapHeatDes
     CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                              SimpleWatertoAirHP(HPNum)%Name, &
-                            'Rated Heating Capacity [W]', &
-                             SimpleWatertoAirHP(HPNum)%RatedCapHeat)
+                            'Design Size Rated Heating Capacity [W]', &
+                             RatedCapHeatDes)
     CALL PreDefTableEntry(pdchHeatCoilNomCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapHeat)
     IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat /= 0.0d0) THEN
       CALL PreDefTableEntry(pdchHeatCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedPowerHeat &
@@ -4347,8 +4543,30 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
     ELSE
       CALL PreDefTableEntry(pdchHeatCoilNomEff,SimpleWatertoAirHP(HPNum)%Name,0.0d0)
     ENDIF
+  ELSE
+    IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat > 0.0d0 .AND. RatedCapHeatDes > 0.0d0 .AND. .NOT. HardSizeNoDesRun) THEN
+      RatedCapHeatUser = SimpleWatertoAirHP(HPNum)%RatedCapHeat
+      CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                             SimpleWatertoAirHP(HPNum)%Name, &
+                            'Design Size Rated Heating Capacity [W]', &
+                             RatedCapHeatDes, &
+                            'User-Specified Rated Heating Capacity [W]', &
+                             RatedCapHeatUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(RatedCapHeatDes - RatedCapHeatUser)/RatedCapHeatUser) > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeHVACWaterToAir: Potential issue with equipment sizing for coil ' &
+                                    //TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)// &
+                                  ':WATERTOAIRHEATPUMP:EQUATIONFIT "'// TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
+          CALL ShowContinueError('User-Specified Rated Heating Capacity of '// &
+                                      TRIM(RoundSigDigits(RatedCapHeatUser,2))// ' [W]')
+          CALL ShowContinueError('differs from Design Size Rated Heating Capacity of ' // &
+                                      TRIM(RoundSigDigits(RatedCapHeatDes,2))// ' [W]')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
   END IF
-
 
   ! Check that heat pump heating capacity is within 20% of cooling capacity. Check only for heating coil and report both.
   IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'HEATING' .AND. &
@@ -4377,6 +4595,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
 
   END IF
 
+ENDIF ! Heating
 
 ! size rated power
   IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'COOLING') THEN
@@ -4390,10 +4609,14 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
   END IF
 
 ! Size water volumetric flow rate
+  IsAutosize = .FALSE.
   IF (SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate == AutoSize)THEN
+    IsAutosize = .TRUE.
+  END IF
 
 !   WSHP condenser can be on either a plant loop or condenser loop. Test each to find plant sizing number.
 !   first check to see if coil is connected to a plant loop, no warning on this CALL
+  IF (IsAutosize) THEN
     PltSizNum = &
         MyPlantSizingIndex('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                            SimpleWatertoAirHP(HPNum)%Name, &
@@ -4422,13 +4645,8 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
 
       IF (SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'HEATING') THEN
 
-        SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate = SimpleWatertoAirHP(HPNum)%RatedCapHeat / &
-                                                       ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
-
-        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
-                                  SimpleWatertoAirHP(HPNum)%Name, &
-                                  'Rated Water Flow Rate [m3/s]', SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate)
-
+        RatedWaterVolFlowRateDes = SimpleWatertoAirHP(HPNum)%RatedCapHeat / &
+                                   ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
       ELSEIF(SimpleWatertoAirHP(HPNum)%WaterToAirHPType == 'COOLING') THEN
 
 !       use companion heating coil capacity to calculate volumetric flow rate
@@ -4438,31 +4656,50 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
           SystemCapacity = SimpleWatertoAirHP(HPNum)%RatedCapCoolTotal
         END IF
 
-          SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate = &
-                      SystemCapacity / &
-                    ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
-
-        CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
-                                  SimpleWatertoAirHP(HPNum)%Name, &
-                                  'Rated Water Flow Rate [m3/s]', SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate)
-
+        RatedWaterVolFlowRateDes = &
+                                SystemCapacity / &
+                                ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
       END IF
-
     ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a loop Sizing:Plant object')
-        CALL ShowContinueError('Autosizing also requires physical connection to a plant or condenser loop.')
-        CALL ShowContinueError('Occurs in ' // &
-                 'COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT' // ' Object=' &
+      CALL ShowSevereError('Autosizing of water flow requires a loop Sizing:Plant object')
+      CALL ShowContinueError('Autosizing also requires physical connection to a plant or condenser loop.')
+      CALL ShowContinueError('Occurs in ' // &
+             'COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT' // ' Object=' &
                 //TRIM(SimpleWatertoAirHP(HPNum)%Name))
-        ErrorsFound = .TRUE.
-
+      ErrorsFound = .TRUE.
     END IF
-
+  END IF
+  IF (IsAutosize) THEN
+    SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate = RatedWaterVolFlowRateDes
+    CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                                  SimpleWatertoAirHP(HPNum)%Name, &
+                                  'Design Size Rated Water Flow Rate [m3/s]', RatedWaterVolFlowRateDes)
+  ELSE
+    IF (SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate > 0.0d0 .AND. RatedWaterVolFlowRateDes > 0.0d0) THEN
+      RatedWaterVolFlowRateUser = SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate
+      CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
+                                  SimpleWatertoAirHP(HPNum)%Name, &
+                                  'Design Size Rated Water Flow Rate [m3/s]', RatedWaterVolFlowRateDes, &
+                                  'User-Specified Rated Water Flow Rate [m3/s]', RatedWaterVolFlowRateUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(RatedWaterVolFlowRateDes - RatedWaterVolFlowRateUser)/RatedWaterVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeHVACWaterToAir: Potential issue with equipment sizing for coil ' &
+                                  //TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)// &
+                                  ':WATERTOAIRHEATPUMP:EQUATIONFIT "'// TRIM(SimpleWatertoAirHP(HPNum)%Name)//'"')
+          CALL ShowContinueError('User-Specified Rated Water Flow Rate of '// &
+                                      TRIM(RoundSigDigits(RatedWaterVolFlowRateUser,5))// ' [m3/s]')
+          CALL ShowContinueError('differs from Design Size Rated Water Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(RatedWaterVolFlowRateDes,5))// ' [m3/s]')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
   END IF
 
 ! Save component design water volumetric flow rate.
 ! Use 1/2 flow since both cooling and heating coil will save flow yet only 1 will operate at a time
-  IF(SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate .GT. 0.0)THEN
+  IF(SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate .GT. 0.0d0)THEN
     CALL RegisterPlantCompDesignFlow(SimpleWatertoAirHP(HPNum)%WaterInletNodeNum,  &
        0.5d0*SimpleWatertoAirHP(HPNum)%RatedWaterVolFlowRate)
   END IF
@@ -4646,7 +4883,7 @@ SUBROUTINE CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,Latent
                                   'CalcHPCoolingSimple:SourceSideInletTemp')
 
    !Check for flows, do not perform simulation if no flow in load side or source side.
-  IF (SourceSideMassFlowRate <= 0.0 .OR. LoadSideMassFlowRate <= 0.0)THEN
+  IF (SourceSideMassFlowRate <= 0.0d0 .OR. LoadSideMassFlowRate <= 0.0d0)THEN
      SimpleWatertoAirHP(HPNum)%SimFlag = .FALSE.
      RETURN
   ELSE
@@ -4661,7 +4898,7 @@ SUBROUTINE CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,Latent
   !Loop the calculation at least once depending whether the latent degradation model
   !is enabled. 1st iteration to calculate the QLatent(rated) at (TDB,TWB)indoorair=(26.7C,19.4C)
   !and 2nd iteration to calculate the  QLatent(actual)
-  IF((RuntimeFrac .GE. 1.0) .OR. (Twet_rated .LE. 0.0) .OR. (Gamma_rated .LE. 0.0)) THEN
+  IF((RuntimeFrac .GE. 1.0d0) .OR. (Twet_rated .LE. 0.0d0) .OR. (Gamma_rated .LE. 0.0d0)) THEN
     LatDegradModelSimFlag = .FALSE.
     !Set NumIteration=1 so that latent model would quit after 1 simulation with the actual condition
     NumIteration=1
@@ -4750,9 +4987,9 @@ LOOP: DO
   IF (CyclingScheme .EQ. ContFanCycCoil) THEN
     ! continuous fan, cycling compressor
     SimpleWatertoAirHP(HPNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideOutletEnth + &
-                                                  (1.-PartLoadRatio)*LoadSideInletEnth
+                                                  (1.0d0-PartLoadRatio)*LoadSideInletEnth
     SimpleWatertoAirHP(HPNum)%OutletAirHumRat   = PartLoadRatio*LoadsideOutletHumRat + &
-                                                  (1.-PartLoadRatio)*LoadSideInletHumRat
+                                                  (1.0d0-PartLoadRatio)*LoadSideInletHumRat
     SimpleWatertoAirHP(HPNum)%OutletAirDBTemp   = PsyTdbFnHW(SimpleWatertoAirHP(HPNum)%OutletAirEnthalpy,  &
                                                              SimpleWatertoAirHP(HPNum)%OutletAirHumRat,    &
                                                              RoutineName)
@@ -4786,8 +5023,8 @@ LOOP: DO
   SimpleWatertoAirHP(HPNum)%EnergySensible=QSensible*ReportingConstant
   SimpleWatertoAirHP(HPNum)%EnergyLatent=(QLoadTotal - QSensible)*ReportingConstant
   SimpleWatertoAirHP(HPNum)%EnergySource=QSource*ReportingConstant
-  IF(RunTimeFrac == 0.0) THEN
-    SimpleWatertoAirHP(HPNum)%COP = 0.0
+  IF(RunTimeFrac == 0.0d0) THEN
+    SimpleWatertoAirHP(HPNum)%COP = 0.0d0
   ELSE
     SimpleWatertoAirHP(HPNum)%COP = QLoadTotal/Winput
   END IF
@@ -4919,7 +5156,7 @@ SUBROUTINE CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompOp
                                    RoutineName//':SourceSideInletTemp')
 
  !Check for flows, do not perform simulation if no flow in load side or source side.
-  IF (SourceSideMassFlowRate <= 0.0 .OR. LoadSideMassFlowRate <= 0.0)THEN
+  IF (SourceSideMassFlowRate <= 0.0d0 .OR. LoadSideMassFlowRate <= 0.0d0)THEN
     SimpleWatertoAirHP(HPNum)%SimFlag = .FALSE.
     RETURN
   ELSE
@@ -4990,10 +5227,10 @@ SUBROUTINE CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompOp
   SimpleWatertoAirHP(HPNum)%Energy=Winput*ReportingConstant
   SimpleWatertoAirHP(HPNum)%EnergyLoadTotal=QLoadTotal*ReportingConstant
   SimpleWatertoAirHP(HPNum)%EnergySensible=QSensible*ReportingConstant
-  SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0
+  SimpleWatertoAirHP(HPNum)%EnergyLatent=0.0d0
   SimpleWatertoAirHP(HPNum)%EnergySource=QSource*ReportingConstant
-  IF(RunTimeFrac == 0.0) THEN
-    SimpleWatertoAirHP(HPNum)%COP = 0.0
+  IF(RunTimeFrac == 0.0d0) THEN
+    SimpleWatertoAirHP(HPNum)%COP = 0.0d0
   ELSE
     SimpleWatertoAirHP(HPNum)%COP = QLoadTotal/Winput
   END IF
@@ -5054,19 +5291,19 @@ SUBROUTINE UpdateSimpleWatertoAirHP(HPNum)
   !WatertoAirHP(HPNum)%Simflag=.FALSE.
   IF(.NOT. SimpleWatertoAirHP(HPNum)%Simflag)THEN
     ! Heatpump is off; just pass through conditions
-    SimpleWatertoAirHP(HPNum)%Power               = 0.0
-    SimpleWatertoAirHP(HPNum)%QLoadTotal          = 0.0
-    SimpleWatertoAirHP(HPNum)%QSensible           = 0.0
-    SimpleWatertoAirHP(HPNum)%QLatent             = 0.0
-    SimpleWatertoAirHP(HPNum)%QSource             = 0.0
-    SimpleWatertoAirHP(HPNum)%Energy              = 0.0
-    SimpleWatertoAirHP(HPNum)%EnergyLoadTotal     = 0.0
-    SimpleWatertoAirHP(HPNum)%EnergySensible      = 0.0
-    SimpleWatertoAirHP(HPNum)%EnergyLatent        = 0.0
-    SimpleWatertoAirHP(HPNum)%EnergySource        = 0.0
-    SimpleWatertoAirHP(HPNum)%COP                 = 0.0
-    SimpleWatertoAirHP(HPNum)%RunFrac             = 0.0
-    SimpleWatertoAirHP(HPNum)%PartLoadRatio       = 0.0
+    SimpleWatertoAirHP(HPNum)%Power               = 0.0d0
+    SimpleWatertoAirHP(HPNum)%QLoadTotal          = 0.0d0
+    SimpleWatertoAirHP(HPNum)%QSensible           = 0.0d0
+    SimpleWatertoAirHP(HPNum)%QLatent             = 0.0d0
+    SimpleWatertoAirHP(HPNum)%QSource             = 0.0d0
+    SimpleWatertoAirHP(HPNum)%Energy              = 0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergyLoadTotal     = 0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergySensible      = 0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergyLatent        = 0.0d0
+    SimpleWatertoAirHP(HPNum)%EnergySource        = 0.0d0
+    SimpleWatertoAirHP(HPNum)%COP                 = 0.0d0
+    SimpleWatertoAirHP(HPNum)%RunFrac             = 0.0d0
+    SimpleWatertoAirHP(HPNum)%PartLoadRatio       = 0.0d0
 
     SimpleWatertoAirHP(HPNum)%OutletAirDBTemp     = SimpleWatertoAirHP(HPNum)%InletAirDBTemp
     SimpleWatertoAirHP(HPNum)%OutletAirHumRat     = SimpleWatertoAirHP(HPNum)%InletAirHumRat
@@ -5208,13 +5445,13 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
 !  No moisture evaporation (latent degradation) occurs for runtime fraction of 1.0
 !  All latent degradation model parameters cause divide by 0.0 if not greater than 0.0
 !  Latent degradation model parameters initialize to 0.0 meaning no evaporation model used.
-   IF((RTF.GE.1.0) .OR. (QLatRated.EQ.0.0) .OR. (QLatActual.EQ.0.0) .OR. (Twet_rated.LE.0.0) .OR. &
-      (Gamma_rated.LE.0.0) .OR. (MaxONOFFCyclesperHour.LE.0.0) .OR. (HPTimeConstant.LE.0.0) .OR. (RTF.LE. 0.0)) THEN
+   IF((RTF.GE.1.0d0) .OR. (QLatRated.EQ.0.0d0) .OR. (QLatActual.EQ.0.0d0) .OR. (Twet_rated.LE.0.0d0) .OR. &
+      (Gamma_rated.LE.0.0d0) .OR. (MaxONOFFCyclesperHour.LE.0.0d0) .OR. (HPTimeConstant.LE.0.0d0) .OR. (RTF.LE. 0.0d0)) THEN
      SHReff = SHRss
      RETURN
    ENDIF
 
-   Twet_max   = 9999.0 ! high limit for Twet
+   Twet_max   = 9999.0d0 ! high limit for Twet
 
 !  Calculate the model parameters at the actual operating conditions
    Twet    = MIN(Twet_rated*QLatRated /(QLatActual+1.d-10),Twet_max)
@@ -5223,7 +5460,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
 !  Calculate the compressor on and off times using a converntional thermostat curve
    Ton  = 3600.d0/(4.d0*MaxONOFFCyclesperHour*(1.d0-RTF))   ! duration of cooling coil on-cycle (sec)
 
-   IF ((CyclingScheme .EQ. CycFanCycCoil).AND.(FanDelayTime.NE.0.0)) THEN
+   IF ((CyclingScheme .EQ. CycFanCycCoil).AND.(FanDelayTime.NE.0.0d0)) THEN
     ! For CycFanCycCoil, moisture is evaporated from the cooling coil back to the air stream
     ! until the fan cycle off. Assume no evaporation from the coil after the fan shuts off.
         Toff = FanDelayTime
@@ -5234,7 +5471,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    END IF
 
 !  Cap Toff to meet the equation restriction
-   IF(Gamma .GT. 0.0)THEN
+   IF(Gamma .GT. 0.0d0)THEN
      Toffa = MIN(Toff, 2.d0*Twet/Gamma)
    ELSE
      Toffa = Toff
@@ -5244,7 +5481,7 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    aa = (Gamma*Toffa) - (0.25d0/Twet)*(Gamma**2)*(Toffa**2)
 
    To1 = aa+HPTimeConstant
-   Error = 1.0
+   Error = 1.0d0
    DO WHILE (Error .gt. 0.001d0)
        To2 = aa-HPTimeConstant*(EXP(-To1/HPTimeConstant)-1.0d0)
        Error = ABS((To2-To1)/To1)
@@ -5259,10 +5496,10 @@ FUNCTION CalcEffectiveSHR(HPNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual
    LHRmult = MAX(((Ton-To2)/(Ton+HPTimeConstant*(aa-1.0d0))),0.0d0)
 
 !  Calculate part-load or "effective" sensible heat ratio
-   SHReff = 1.0-(1.0-SHRss)*LHRmult
+   SHReff = 1.0d0-(1.0d0-SHRss)*LHRmult
 
    IF (SHReff .LT. SHRss) SHReff = SHRss ! Effective SHR can be less than the steady-state SHR
-   IF (SHReff .GT. 1.0) SHReff=1.0 ! Effective sensible heat ratio can't be greater than 1.0
+   IF (SHReff .GT. 1.0d0) SHReff=1.0d0 ! Effective sensible heat ratio can't be greater than 1.0
 
  RETURN
 
@@ -5350,7 +5587,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
 
           ! USE STATEMENTS:
   USE FluidProperties, ONLY: FindGlycol
-  USE InputProcessor,  ONLY: FindItemInList
+  USE InputProcessor,  ONLY: FindItemInList, SameString
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -5379,11 +5616,11 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
     GetCoilsInputFlag=.FALSE.
   End If
 
-  IF (CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT' .or.   &
-      CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT') THEN
+  IF (SameString(CoilType,'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT') .or.   &
+      SameString(CoilType,'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT')) THEN
     WhichCoil=FindItemInList(CoilName,SimpleWaterToAirHP%Name,NumWaterToAirHPs)
     IF (WhichCoil /= 0) THEN
-      IF (CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT') THEN
+      IF (SameString(CoilType,'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT')) THEN
         CoilCapacity=SimpleWaterToAirHP(WhichCoil)%RatedCapHeat
       ELSE
         CoilCapacity=SimpleWaterToAirHP(WhichCoil)%RatedCapCoolTotal
@@ -5396,7 +5633,7 @@ FUNCTION GetCoilCapacity(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
   IF (WhichCoil == 0) THEN
     CALL ShowSevereError('Could not find CoilType="'//TRIM(CoilType)//'" with Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    CoilCapacity=-1000.
+    CoilCapacity=-1000.0d0
   ENDIF
 
   RETURN
@@ -5466,7 +5703,7 @@ FUNCTION GetCoilAirFlowRate(CoilType,CoilName,ErrorsFound) RESULT(CoilAirFlowRat
   IF (WhichCoil == 0) THEN
     CALL ShowSevereError('Could not find CoilType="'//TRIM(CoilType)//'" with Name="'//TRIM(CoilName)//'"')
     ErrorsFound=.true.
-    CoilAirFlowRate=-1000.
+    CoilAirFlowRate=-1000.0d0
   ENDIF
 
   RETURN

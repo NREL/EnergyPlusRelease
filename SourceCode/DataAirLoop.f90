@@ -59,7 +59,7 @@ TYPE DefinePriAirSysAvailMgrs
   INTEGER                                               :: AvailStatus      =0   ! system availability status
   INTEGER                                               :: StartTime        =0   ! cycle on time (in SimTimeSteps)
   INTEGER                                               :: StopTime         =0   ! cycle off time (in SimTimeSteps)
-  REAL(r64)                                             :: ReqSupplyFrac    =0.0 ! required system flow rate (as a fraction)
+  REAL(r64)                                             :: ReqSupplyFrac    =0.0d0 ! required system flow rate (as a fraction)
   CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: AvailManagerName ! name of each availability manager
   INTEGER,DIMENSION(:),ALLOCATABLE                      :: AvailManagerType ! type of availability manager
   INTEGER, DIMENSION(:), ALLOCATABLE                    :: AvailManagerNum  ! index for availability manager
@@ -79,6 +79,7 @@ TYPE AirLoopControlData ! Derived type for air control information
   INTEGER :: CycFanSchedPtr   =0   ! index of schedule indicating whether fan is cycling or continuous in a unitary system
   INTEGER :: FanOpMode        =0   ! 1=cycling fan cycling compressor; 2=constant fan cycling comptressor
   LOGICAL :: UnitarySys       =.FALSE. ! TRUE if a unitary system
+  LOGICAL :: UnitarySysSimulating = .TRUE. ! set FALSE for AirloopUnitarySystem after simulating to downstream coils can size independently
   LOGICAL :: Simple       =.false. ! TRUE if system has 1 branch and 1 component
   LOGICAL :: CanNotLockoutEcono           =.false. ! user input says econo lockout not allowed
   LOGICAL :: CanLockoutEconoWithHeating   =.false. ! user input says econo lockout with heating is allowed
@@ -130,6 +131,25 @@ TYPE OAControllerData
   LOGICAL :: EconoActive       =.false. ! if true economizer is active
   LOGICAL :: HighHumCtrlActive =.false. ! if true high humidity control is active
 END TYPE OAControllerData
+
+TYPE OutsideAirSysProps
+  CHARACTER(len=MaxNameLength) :: Name  = ' '
+  CHARACTER(len=MaxNameLength) :: ControllerListName  = ' '
+  CHARACTER(len=MaxNameLength) :: ComponentListName  = ' '
+  INTEGER      :: ControllerListNum     = 0                ! index of the Controller List
+  INTEGER      :: NumComponents         = 0
+  INTEGER      :: NumControllers        = 0
+  INTEGER      :: NumSimpleControllers  = 0                ! number of CONTROLLER:SIMPLE objects in OA Sys controller list
+  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ComponentName
+  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ComponentType
+  INTEGER, DIMENSION(:), ALLOCATABLE :: ComponentType_Num  ! Parameterized (see above) Component Types this
+                                                           ! module can address
+  INTEGER, DIMENSION(:), ALLOCATABLE :: ComponentIndex     ! Which one in list -- updated by routines called from here
+  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerName
+  CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: ControllerType
+  INTEGER, DIMENSION(:), ALLOCATABLE :: ControllerIndex    ! Which one in list -- updated by routines called from here
+END TYPE OutsideAirSysProps
+
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
@@ -141,15 +161,18 @@ END TYPE OAControllerData
  TYPE (AirLoopControlData), ALLOCATABLE, DIMENSION(:) ::AirLoopControlInfo
  TYPE (AirLoopFlowData), ALLOCATABLE, DIMENSION(:) :: AirLoopFlow
  TYPE (OAControllerData), ALLOCATABLE, DIMENSION(:) :: OAControllerInfo
+ TYPE (OutsideAirSysProps), ALLOCATABLE, DIMENSION(:) :: OutsideAirSys
 
+
+ INTEGER :: NumOASystems=0           ! Number of Outdoor Air Systems
  INTEGER :: LoopFanOperationMode      = 0   ! OnOff fan operation mode
- REAL(r64)    :: LoopSystemOnMassFlowrate  = 0.0 ! Loop mass flow rate during on cycle using an OnOff fan
- REAL(r64)    :: LoopSystemOffMassFlowrate = 0.0 ! Loop mass flow rate during off cycle using an OnOff fan
- REAL(r64)    :: LoopOnOffFanPartLoadRatio = 0.0 ! OnOff fan part load ratio
- REAL(r64)    :: LoopHeatingCoilMaxRTF     = 0.0 ! Maximum run time fraction for electric or gas heating coil in an HVAC Air Loop
- REAL(r64)    :: LoopONOffFanRTF           = 0.0 ! OnOff fan run time fraction in an HVAC Air Loop
- REAL(r64)    :: LoopDXCoilRTF             = 0.0 ! OnOff fan run time fraction in an HVAC Air Loop
- REAL(r64)    :: LoopCompCycRatio          = 0.0 ! Loop compressor cycling ratio for multispeed heat pump
+ REAL(r64)    :: LoopSystemOnMassFlowrate  = 0.0d0 ! Loop mass flow rate during on cycle using an OnOff fan
+ REAL(r64)    :: LoopSystemOffMassFlowrate = 0.0d0 ! Loop mass flow rate during off cycle using an OnOff fan
+ REAL(r64)    :: LoopOnOffFanPartLoadRatio = 0.0d0 ! OnOff fan part load ratio
+ REAL(r64)    :: LoopHeatingCoilMaxRTF     = 0.0d0 ! Maximum run time fraction for electric or gas heating coil in an HVAC Air Loop
+ REAL(r64)    :: LoopONOffFanRTF           = 0.0d0 ! OnOff fan run time fraction in an HVAC Air Loop
+ REAL(r64)    :: LoopDXCoilRTF             = 0.0d0 ! OnOff fan run time fraction in an HVAC Air Loop
+ REAL(r64)    :: LoopCompCycRatio          = 0.0d0 ! Loop compressor cycling ratio for multispeed heat pump
  LOGICAL :: AirLoopInputsFilled   = .FALSE. ! Set to TRUE after first pass through air loop
 
 !     NOTICE

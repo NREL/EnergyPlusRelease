@@ -296,9 +296,9 @@ SUBROUTINE InitZoneEquipment(FirstHVACIteration)
          IF (.not. ZoneEquipConfig(ControlledZoneNum)%IsControlled) CYCLE
 
          ZoneNodeNum = ZoneEquipConfig(ControlledZoneNum)%ZoneNode
-         Node(ZoneNodeNum)%Temp = 20.0
-         Node(ZoneNodeNum)%MassFlowRate = 0.0
-         Node(ZoneNodeNum)%Quality = 1.0
+         Node(ZoneNodeNum)%Temp = 20.0d0
+         Node(ZoneNodeNum)%MassFlowRate = 0.0d0
+         Node(ZoneNodeNum)%Quality = 1.0d0
          Node(ZoneNodeNum)%Press = OutBaroPress
          Node(ZoneNodeNum)%HumRat = OutHumRat
          Node(ZoneNodeNum)%Enthalpy = PsyHFnTdbW(Node(ZoneNodeNum)%Temp,Node(ZoneNodeNum)%HumRat)
@@ -312,9 +312,9 @@ SUBROUTINE InitZoneEquipment(FirstHVACIteration)
          DO ZoneInNode = 1,  ZoneEquipConfig(ControlledZoneNum)%NumInletNodes
 
            InNodeNum = ZoneEquipConfig(ControlledZoneNum)%InletNode(ZoneInNode)
-           Node(InNodeNum)%Temp = 20.0
-           Node(InNodeNum)%MassFlowRate = 0.0
-           Node(InNodeNum)%Quality = 1.0
+           Node(InNodeNum)%Temp = 20.0d0
+           Node(InNodeNum)%MassFlowRate = 0.0d0
+           Node(InNodeNum)%Quality = 1.0d0
            Node(InNodeNum)%Press = OutBaroPress
            Node(InNodeNum)%HumRat = OutHumRat
            Node(InNodeNum)%Enthalpy = PsyHFnTdbW(Node(InNodeNum)%Temp,Node(InNodeNum)%HumRat)
@@ -330,9 +330,9 @@ SUBROUTINE InitZoneEquipment(FirstHVACIteration)
          DO ZoneExhNode = 1,  ZoneEquipConfig(ControlledZoneNum)%NumExhaustNodes
 
            ExhNodeNum = ZoneEquipConfig(ControlledZoneNum)%ExhaustNode(ZoneExhNode)
-           Node(ExhNodeNum)%Temp = 20.0
-           Node(ExhNodeNum)%MassFlowRate = 0.0
-           Node(ExhNodeNum)%Quality = 1.0
+           Node(ExhNodeNum)%Temp = 20.0d0
+           Node(ExhNodeNum)%MassFlowRate = 0.0d0
+           Node(ExhNodeNum)%Quality = 1.0d0
            Node(ExhNodeNum)%Press = OutBaroPress
            Node(ExhNodeNum)%HumRat = OutHumRat
            Node(ExhNodeNum)%Enthalpy = PsyHFnTdbW(Node(ExhNodeNum)%Temp,Node(ExhNodeNum)%HumRat)
@@ -348,9 +348,9 @@ SUBROUTINE InitZoneEquipment(FirstHVACIteration)
          ! BG CR 7122 following resets return air node.
          ZoneReturnAirNode = ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode
          IF (ZoneReturnAirNode > 0) THEN
-             Node(ZoneReturnAirNode)%Temp = 20.0
-             Node(ZoneReturnAirNode)%MassFlowRate = 0.0
-             Node(ZoneReturnAirNode)%Quality = 1.0
+             Node(ZoneReturnAirNode)%Temp = 20.0d0
+             Node(ZoneReturnAirNode)%MassFlowRate = 0.0d0
+             Node(ZoneReturnAirNode)%Quality = 1.0d0
              Node(ZoneReturnAirNode)%Press = OutBaroPress
              Node(ZoneReturnAirNode)%HumRat = OutHumRat
              Node(ZoneReturnAirNode)%Enthalpy = PsyHFnTdbW(Node(ZoneReturnAirNode)%Temp,Node(ZoneReturnAirNode)%HumRat)
@@ -385,9 +385,9 @@ SUBROUTINE InitZoneEquipment(FirstHVACIteration)
              Node(ExhNodeNum)%Enthalpy = Node(ZoneNodeNum)%Enthalpy
              Node(ExhNodeNum)%Press = Node(ZoneNodeNum)%Press
              Node(ExhNodeNum)%Quality = Node(ZoneNodeNum)%Quality
-             Node(ExhNodeNum)%MassFlowRate = 0.0
-             Node(ExhNodeNum)%MassFlowRateMaxAvail = 0.0
-             Node(ExhNodeNum)%MassFlowRateMinAvail = 0.0
+             Node(ExhNodeNum)%MassFlowRate = 0.0d0
+             Node(ExhNodeNum)%MassFlowRateMaxAvail = 0.0d0
+             Node(ExhNodeNum)%MassFlowRateMinAvail = 0.0d0
              IF (Contaminant%CO2Simulation) Then
                Node(ExhNodeNum)%CO2 = Node(ZoneNodeNum)%CO2
              End If
@@ -432,7 +432,7 @@ SUBROUTINE SizeZoneEquipment
           ! na
 
           ! USE STATEMENTS:
-  USE DataHeatBalFanSys, ONLY: NonAirSystemResponse, SysDepZoneLoads
+  USE DataHeatBalFanSys, ONLY: NonAirSystemResponse, SysDepZoneLoads, TempZoneThermostatSetPoint
   USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, DeadBandOrSetback
   USE DataLoopNode, ONLY: Node
   USE DataHVACGlobals, ONLY: SmallLoad, SmallTempDiff
@@ -477,8 +477,8 @@ SUBROUTINE SizeZoneEquipment
   DO ControlledZoneNum = 1, NumOfZones
     IF (.not. ZoneEquipConfig(ControlledZoneNum)%IsControlled) CYCLE
     ActualZoneNum = CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ActualZoneNum
-    NonAirSystemResponse(ActualZoneNum) = 0.0
-    SysDepZoneLoads(ActualZoneNum) = 0.0
+    NonAirSystemResponse(ActualZoneNum) = 0.0d0
+    SysDepZoneLoads(ActualZoneNum) = 0.0d0
 
     CALL InitSystemOutputRequired(ActualZoneNum, SysOutputProvided, LatOutputProvided)
 
@@ -490,7 +490,7 @@ SUBROUTINE SizeZoneEquipment
     IF ( .NOT. DeadBandOrSetback(ActualZoneNum) .AND. &
          ABS(ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired) .GT. SmallLoad) THEN
       ! Determine design supply air temperture and design supply air temperature difference
-      IF (ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired < 0.0) THEN  ! Cooling case
+      IF (ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired < 0.0d0) THEN  ! Cooling case
         ! If the user specify the design cooling supply air temperature, then
         IF (CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
           Temp = CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolDesTemp
@@ -523,64 +523,10 @@ SUBROUTINE SizeZoneEquipment
 !!!PH/WFB/LKL (UCDV model)        MassFlowRate = SysOutputProvided / (CpAir*DeltaTemp)
         MassFlowRate = MAX( SysOutputProvided/(CpAir*DeltaTemp), 0.0d0)
       ELSE
-        MassFlowRate = 0.0
+        MassFlowRate = 0.0d0
       ENDIF
 
-      ! check for low delta T to avoid very high flow rates
-      IF(DeltaTempWarning(ControlledZoneNum))THEN
-        IF(ABS(DeltaTemp) .LT. 5.0d0 .AND. ABS(DeltaTemp) > SmallTempDiff)THEN ! Vdot exceeds 1200 cfm/ton @ DT=5
-          IF(ABS(DeltaTemp) .GE. 2.0d0)THEN ! Vdot exceeds 3000 cfm/ton @ DT=2
-            CALL ShowWarningError('SizeZoneEquipment: Supply air temperature (calculated) within 5C of'// &
-                                  ' zone setpoint temperature')
-          ELSE
-            CALL ShowSevereError('SizeZoneEquipment: Supply air temperature (calculated) within 2C of'// &
-                                 ' zone setpoint temperature')
-          END IF
-          CALL ShowContinueError('...check zone thermostat set point and design supply air temperatures')
-          IF(ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired < 0.0)THEN
-            CALL ShowContinueError('...zone = "'//TRIM(CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ZoneName)// &
-                                   '" first occurrence during cooling load calculations')
-          ELSE
-            CALL ShowContinueError('...zone = "'//TRIM(CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ZoneName)// &
-                                   '" first occurrence during heating load calculations')
-          END IF
-          IF(SysOutputProvided .LT. 0.0d0)THEN
-            CALL ShowContinueError('...predicted zone cooling load = '//TRIM(RoundSigDigits(SysOutputProvided,2))//' W')
-          ELSE
-            CALL ShowContinueError('...predicted zone heating load = '//TRIM(RoundSigDigits(SysOutputProvided,2))//' W')
-          END IF
-          CALL ShowContinueError('...zone temperature            = '//TRIM(RoundSigDigits(Node(ZoneNode)%Temp,2))//' C')
-          CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(Temp,2))//' C')
-          CALL ShowContinueError('...temperature difference      = '//TRIM(RoundSigDigits(DeltaTemp,5))//' C')
-          CALL ShowContinueError('...calculated mass flow rate   = '// &
-                                                 TRIM(RoundSigDigits((SysOutputProvided/(CpAir*DeltaTemp)),5))//' kg/s')
-          IF(SysOutputProvided .LT. 0.0d0 .AND. Temp .GT. Node(ZoneNode)%Temp) &
-            CALL ShowContinueError('...Note: supply air temperature should be less than zone'// &
-                                   ' temperature during cooling air flow calculations')
-          IF(SysOutputProvided .GT. 0.0d0 .AND. Temp .LT. Node(ZoneNode)%Temp) &
-            CALL ShowContinueError('...Note: supply air temperature should be greater than zone'// &
-                                   ' temperature during heating air flow calculations')
-          DeltaTempWarning(ControlledZoneNum) = .FALSE.
-        ELSE IF(ABS(DeltaTemp) > SmallTempDiff .AND. SysOutputProvided .GT. 0.0d0 .AND. Temp .LT. Node(ZoneNode)%Temp)THEN
-          CALL ShowSevereError('SizeZoneEquipment: Supply air temperature is less than zone'// &
-                                   ' temperature during heating air flow calculations')
-          CALL ShowContinueError('...zone temperature            = '//TRIM(RoundSigDigits(Node(ZoneNode)%Temp,2))//' C')
-          CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(Temp,2))//' C')
-          CALL ShowContinueError('...occurs in zone              = '// &
-                           TRIM(CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ZoneName))
-          DeltaTempWarning(ControlledZoneNum) = .FALSE.
-        ELSE IF(ABS(DeltaTemp) > SmallTempDiff .AND. SysOutputProvided .LT. 0.0d0 .AND. Temp .GT. Node(ZoneNode)%Temp)THEN
-          CALL ShowSevereError('SizeZoneEquipment: Supply air temperature is greater than zone'// &
-                                   ' temperature during cooling air flow calculations')
-          CALL ShowContinueError('...zone temperature            = '//TRIM(RoundSigDigits(Node(ZoneNode)%Temp,2))//' C')
-          CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(Temp,2))//' C')
-          CALL ShowContinueError('...occurs in zone              = '// &
-                           TRIM(CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%ZoneName))
-          DeltaTempWarning(ControlledZoneNum) = .FALSE.
-        END IF
-      END IF
-
-      IF (CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%SupplyAirAdjustFactor > 1.0) THEN
+      IF (CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%SupplyAirAdjustFactor > 1.0d0) THEN
         MassFlowRate = MassFlowRate * CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%SupplyAirAdjustFactor
       ENDIF
     ELSE
@@ -588,23 +534,23 @@ SUBROUTINE SizeZoneEquipment
       Temp = Node(ZoneNode)%Temp
       HumRat = Node(ZoneNode)%HumRat
       Enthalpy = Node(ZoneNode)%Enthalpy
-      MassFlowRate = 0.0
+      MassFlowRate = 0.0d0
 
     END IF
 
     CALL UpdateSystemOutputRequired(ActualZoneNum, SysOutputProvided, LatOutputProvided)
 
-    IF (SysOutputProvided > 0.0) THEN
+    IF (SysOutputProvided > 0.0d0) THEN
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatLoad = SysOutputProvided
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatMassFlow = MassFlowRate
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneTemp = Node(ZoneNode)%Temp
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneHumRat = Node(ZoneNode)%HumRat
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatOutTemp = OutDryBulbTemp
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatOutHumRat = OutHumRat
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolLoad = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolMassFlow = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneTemp = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneHumRat = 0.0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolLoad = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolMassFlow = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneTemp = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneHumRat = 0.0d0
     ELSE
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolLoad = -SysOutputProvided
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolMassFlow = MassFlowRate
@@ -612,10 +558,10 @@ SUBROUTINE SizeZoneEquipment
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneHumRat = Node(ZoneNode)%HumRat
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolOutTemp = OutDryBulbTemp
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolOutHumRat = OutHumRat
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatLoad = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatMassFlow = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneTemp = 0.0
-      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneHumRat = 0.0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatLoad = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatMassFlow = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneTemp = 0.0d0
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneHumRat = 0.0d0
     END IF
 
     IF (SupplyAirNode > 0) THEN
@@ -642,10 +588,12 @@ SUBROUTINE SizeZoneEquipment
     ELSE
       RetTemp = Node(ZoneNode)%Temp
     END IF
-    IF (CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatLoad > 0.0) THEN
+    IF (CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatLoad > 0.0d0) THEN
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatZoneRetTemp = RetTemp
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%HeatTstatTemp = TempZoneThermostatSetPoint(ActualZoneNum)
     ELSE
       CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolZoneRetTemp = RetTemp
+      CalcZoneSizing(ControlledZoneNum,CurOverallSimDay)%CoolTstatTemp = TempZoneThermostatSetPoint(ActualZoneNum)
     END IF
   END DO
 
@@ -704,12 +652,12 @@ SUBROUTINE SetUpZoneSizingArrays
   INTEGER :: TimeStepIndex      ! zone time step index
   REAL(r64)    :: TotPeopleInZone    ! total (maximum) number of people in a zone
   INTEGER :: PeopleNum          ! index of People structure
-  REAL(r64)    :: OAFromPeople = 0.0 ! min OA calculated from zone occupancy [m3/s]
-  REAL(r64)    :: OAFromArea = 0.0   ! min OA calculated from zone area and OA flow per area [m3/s]
+  REAL(r64)    :: OAFromPeople = 0.0d0 ! min OA calculated from zone occupancy [m3/s]
+  REAL(r64)    :: OAFromArea = 0.0d0   ! min OA calculated from zone area and OA flow per area [m3/s]
   INTEGER :: ZoneIndex          ! index of Zone Sizing zone name in zone array
   INTEGER :: ZoneSizIndex       ! zone sizing do loop index
   LOGICAL :: ErrorsFound=.false.! Set to true if errors in input, fatal at end of routine
-  REAL (r64) :: SchMax   = 0.0  ! maximum people multiplier value
+  REAL (r64) :: SchMax   = 0.0d0  ! maximum people multiplier value
   REAL(r64) :: OAVolumeFlowRate ! outside air flow rate (m3/s)
   LOGICAL :: UseOccSchFlag      ! flag to use occupancy schedule when calculating OA
   LOGICAL :: UseMinOASchFlag    ! flag to use min OA schedule when calculating OA
@@ -730,6 +678,8 @@ SUBROUTINE SetUpZoneSizingArrays
                               TRIM(ZoneSizingInput(ZoneSizIndex)%ZoneName)//  &
                               '", Zone is not found in the Controlled Zones List')
         ENDIF
+      ELSE
+        ZoneSizingInput(ZoneSizIndex)%ZoneNum = ZoneIndex
       ENDIF
       IF (ZoneSizingInput(ZoneSizIndex)%CoolAirDesMethod == FromDDCalc .or.   &
           ZoneSizingInput(ZoneSizIndex)%HeatAirDesMethod == FromDDCalc) THEN
@@ -774,9 +724,9 @@ SUBROUTINE SetUpZoneSizingArrays
     ALLOCATE( DesDayWeath(DesDayNum)%Temp(NumOfTimeStepInHour*24) )
     ALLOCATE( DesDayWeath(DesDayNum)%HumRat(NumOfTimeStepInHour*24) )
     ALLOCATE( DesDayWeath(DesDayNum)%Press(NumOfTimeStepInHour*24) )
-    DesDayWeath(DesDayNum)%Temp = 0.0
-    DesDayWeath(DesDayNum)%HumRat = 0.0
-    DesDayWeath(DesDayNum)%Press = 0.0
+    DesDayWeath(DesDayNum)%Temp = 0.0d0
+    DesDayWeath(DesDayNum)%HumRat = 0.0d0
+    DesDayWeath(DesDayNum)%Press = 0.0d0
   END DO
   ! Fill zone sizing arrays from input array
   DO DesDayNum=1,TotDesDays+TotRunDesPersDays
@@ -915,7 +865,9 @@ SUBROUTINE SetUpZoneSizingArrays
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(NumOfTimeStepInDay))
+      ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(NumOfTimeStepInDay))
+      ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(NumOfTimeStepInDay))
@@ -929,42 +881,48 @@ SUBROUTINE SetUpZoneSizingArrays
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(NumOfTimeStepInDay))
+      ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(NumOfTimeStepInDay))
+      ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(NumOfTimeStepInDay))
       ALLOCATE(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(NumOfTimeStepInDay))
       DO TimeStepIndex=1,NumOfTimeStepInDay
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%DesHeatSetPtSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%DesCoolSetPtSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
-        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
-        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%DesHeatSetPtSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%DesCoolSetPtSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
+        ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
      END DO
     END DO
   END DO
@@ -1104,7 +1062,9 @@ SUBROUTINE SetUpZoneSizingArrays
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(NumOfTimeStepInDay))
+    ALLOCATE(FinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(NumOfTimeStepInDay))
+    ALLOCATE(FinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(NumOfTimeStepInDay))
@@ -1118,40 +1078,46 @@ SUBROUTINE SetUpZoneSizingArrays
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(NumOfTimeStepInDay))
+    ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(NumOfTimeStepInDay))
+    ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(NumOfTimeStepInDay))
     ALLOCATE(CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(NumOfTimeStepInDay))
    DO TimeStepIndex=1,NumOfTimeStepInDay
-      FinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
-      FinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
-      CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+      FinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
+      FinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
+      CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
     END DO
 
     ! setup CalcFinalZoneSizing structure for use with EMS, some as sensors, some as actuators
@@ -1240,7 +1206,7 @@ SUBROUTINE SetUpZoneSizingArrays
     IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
     ! Use the max occupancy data from the PEOPLE structure to calculate design min OA for each zone
     ! from the outside air flow per person input
-    TotPeopleInZone = 0.0
+    TotPeopleInZone = 0.0d0
     ZoneIndex = FinalZoneSizing(CtrlZoneNum)%ActualZoneNum
     DO PeopleNum=1,TotPeople
       IF (People(PeopleNum)%ZonePtr == FinalZoneSizing(CtrlZoneNum)%ActualZoneNum) THEN
@@ -1329,7 +1295,7 @@ SUBROUTINE SetUpZoneSizingArrays
   WRITE (OutputFileInits, 991) GlobalHeatSizingFactor
   DO CtrlZoneNum = 1,NumOfZones
     IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-    IF (FinalZoneSizing(CtrlZoneNum)%HeatSizingFactor .NE. 1.0) THEN
+    IF (FinalZoneSizing(CtrlZoneNum)%HeatSizingFactor .NE. 1.0d0) THEN
       WRITE (OutputFileInits, 992) TRIM(FinalZoneSizing(CtrlZoneNum)%ZoneName), FinalZoneSizing(CtrlZoneNum)%HeatSizingFactor
     END IF
   END DO
@@ -1337,7 +1303,7 @@ SUBROUTINE SetUpZoneSizingArrays
   WRITE (OutputFileInits, 994) GlobalCoolSizingFactor
   DO CtrlZoneNum = 1,NumOfZones
     IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-    IF (FinalZoneSizing(CtrlZoneNum)%CoolSizingFactor .NE. 1.0) THEN
+    IF (FinalZoneSizing(CtrlZoneNum)%CoolSizingFactor .NE. 1.0d0) THEN
       WRITE (OutputFileInits, 995) TRIM(FinalZoneSizing(CtrlZoneNum)%ZoneName), FinalZoneSizing(CtrlZoneNum)%CoolSizingFactor
     END IF
   END DO
@@ -1399,44 +1365,48 @@ SUBROUTINE RezeroZoneSizingArrays
     DO CtrlZoneNum = 1,NumOfZones
       DO TimeStepIndex=1,NumOfTimeStepInDay
         IF (ALLOCATED(ZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq)) THEN
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
           !not used directly in output report
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%DesHeatSetPtSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%DesHeatSetPtSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
         END IF
         IF (ALLOCATED(CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq)) THEN
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
         END IF
         IF (ALLOCATED(ZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq)) THEN
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
           !not used directly in output report
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%DesCoolSetPtSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%DesCoolSetPtSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+          ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
         END IF
         IF (ALLOCATED(CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq)) THEN
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+          CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
         END IF
       END DO
       ZoneSizing(CtrlZoneNum,DesDayNum)%CoolDesDay               = ' '     ! name of a cooling design day
@@ -1467,9 +1437,11 @@ SUBROUTINE RezeroZoneSizingArrays
       ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
+      ZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTemp            = 0.0d0   ! current zone thermostat temperature (heating, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
+      ZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTemp            = 0.0d0   ! current zone thermostat temperature (cooling, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
       ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
@@ -1519,9 +1491,11 @@ SUBROUTINE RezeroZoneSizingArrays
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
+      CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTemp            = 0.0d0   ! current zone thermostat temperature (heating, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
+      CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTemp            = 0.0d0   ! current zone Tstat temperature (cooling, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
       CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
@@ -1547,40 +1521,44 @@ SUBROUTINE RezeroZoneSizingArrays
   DO CtrlZoneNum = 1,NumOfZones
     DO TimeStepIndex=1,NumOfTimeStepInDay
       IF (ALLOCATED(FinalZoneSizing(CtrlZoneNum)%HeatFlowSeq)) THEN
-        FinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
+        FinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
       END IF
       IF (ALLOCATED(CalcFinalZoneSizing(CtrlZoneNum)%HeatFlowSeq)) THEN
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatFlowSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatLoadSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = 0.0d0
       END IF
       IF (ALLOCATED(FinalZoneSizing(CtrlZoneNum)%CoolFlowSeq)) THEN
-        FinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-        FinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+        FinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        FinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
       END IF
       IF (ALLOCATED(CalcFinalZoneSizing(CtrlZoneNum)%CoolFlowSeq)) THEN
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0
-        CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolFlowSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolLoadSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = 0.0d0
+        CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = 0.0d0
       END IF
     END DO
     FinalZoneSizing(CtrlZoneNum)%CoolDesDay               = ' '     ! name of a cooling design day
@@ -1611,9 +1589,11 @@ SUBROUTINE RezeroZoneSizingArrays
     FinalZoneSizing(CtrlZoneNum)%HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
     FinalZoneSizing(CtrlZoneNum)%HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
     FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
+    FinalZoneSizing(CtrlZoneNum)%HeatTstatTemp            = 0.0d0   ! current zone thermostat temperature (heating, time step)
     FinalZoneSizing(CtrlZoneNum)%CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
     FinalZoneSizing(CtrlZoneNum)%CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
     FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
+    FinalZoneSizing(CtrlZoneNum)%CoolTstatTemp            = 0.0d0   ! current zone thermostat temperature (cooling, time step)
     FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
     FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
     FinalZoneSizing(CtrlZoneNum)%HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
@@ -1663,9 +1643,11 @@ SUBROUTINE RezeroZoneSizingArrays
     CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTemp             = 0.0d0   ! current zone temperature (heating, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTemp              = 0.0d0   ! current outdoor temperature (heating, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTemp          = 0.0d0   ! current zone return temperature (heating, time step)
+    CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTemp            = 0.0d0   ! current zone thermostat temperature (heating, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTemp             = 0.0d0   ! current zone temperature (cooling, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTemp              = 0.0d0   ! current Outdoor temperature (cooling, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTemp          = 0.0d0   ! current zone return temperature (cooling, time step)
+    CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTemp            = 0.0d0   ! current zone thermostat temperature (cooling, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRat           = 0.0d0   ! current zone humidity ratio (heating, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRat           = 0.0d0   ! current zone humidity ratio (cooling, time step)
     CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRat            = 0.0d0   ! current outdoor humidity ratio (heating, time step)
@@ -1715,10 +1697,10 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
                          OutputFileZoneSizing, OutputFileDebug, emsCallFromZoneSizing, AnyEnergyManagementSystemInModel, &
                          isPulseZoneSizing, OutputFileZonePulse
   USE DataInterfaces, ONLY: SetupEMSActuator
-  USE DataHVACGlobals, ONLY: FracTimeStepZone, SmallMassFlow
+  USE DataHVACGlobals, ONLY: FracTimeStepZone, SmallMassFlow, SmallTempDiff
   USE DataEnvironment, ONLY : StdBaroPress, StdRhoAir
-  USE General, ONLY: MovingAvg
-  USE DataHeatBalFanSys, ONLY: ZoneThermostatSetPointHi, ZoneThermostatSetPointLo
+  USE General, ONLY: MovingAvg, RoundSigDigits
+  USE DataHeatBalFanSys, ONLY: ZoneThermostatSetPointHi, ZoneThermostatSetPointLo,TempZoneThermostatSetPoint
   USE EMSManager, ONLY: ManageEMS
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1766,6 +1748,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
   REAL(r64)    :: MaxOfMinCoolMassFlow ! max of the user specified design cooling minimum flows and min OA flow [kg/s]
   REAL(r64)    :: MaxHeatVolFlow     ! max of user specified design heating max flow [m3/s]
   CHARACTER(len=8) :: HrMinString   ! store hour/minute string before assigning to peak string array
+  REAL(r64)    :: SupplyTemp        ! supply air temperature [C]
+  REAL(r64)    :: DeltaTemp         ! supply air delta temperature [deltaC]
 
   SELECT CASE (CallIndicator)
 
@@ -1790,16 +1774,18 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
 
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        IF (ZoneThermostatSetPointHi(CtrlZoneNum) > 0.0 .AND.   &
+        IF (ZoneThermostatSetPointHi(CtrlZoneNum) > 0.0d0 .AND.   &
                ZoneThermostatSetPointHi(CtrlZoneNum) > ZoneSizThermSetPtHi(CtrlZoneNum)) THEN
           ZoneSizThermSetPtHi(CtrlZoneNum) = ZoneThermostatSetPointHi(CtrlZoneNum)
         END IF
-        IF (ZoneThermostatSetPointLo(CtrlZoneNum) > 0.0 .AND.   &
+        IF (ZoneThermostatSetPointLo(CtrlZoneNum) > 0.0d0 .AND.   &
                ZoneThermostatSetPointLo(CtrlZoneNum) < ZoneSizThermSetPtLo(CtrlZoneNum)) THEN
           ZoneSizThermSetPtLo(CtrlZoneNum) = ZoneThermostatSetPointLo(CtrlZoneNum)
         END IF
         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatSetPtSeq(TimeStepInDay) = ZoneThermostatSetPointLo(CtrlZoneNum)
+        ZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTempSeq(TimeStepInDay) = TempZoneThermostatSetPoint(CtrlZoneNum)
         ZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolSetPtSeq(TimeStepInDay) = ZoneThermostatSetPointHi(CtrlZoneNum)
+        ZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTempSeq(TimeStepInDay) = TempZoneThermostatSetPoint(CtrlZoneNum)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) = &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatFlowSeq(TimeStepInDay) + &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatMassFlow * FracTimeStepZone
@@ -1815,6 +1801,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepInDay) = &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepInDay) + &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTemp * FracTimeStepZone
+        CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTempSeq(TimeStepInDay) = &
+          TempZoneThermostatSetPoint(CtrlZoneNum)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneHumRatSeq(TimeStepInDay) = &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneHumRatSeq(TimeStepInDay) + &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneHumRat * FracTimeStepZone
@@ -1836,6 +1824,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepInDay) = &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepInDay) + &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTemp * FracTimeStepZone
+        CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTempSeq(TimeStepInDay) = &
+          TempZoneThermostatSetPoint(CtrlZoneNum)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneHumRatSeq(TimeStepInDay) = &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneHumRatSeq(TimeStepInDay) + &
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneHumRat * FracTimeStepZone
@@ -1848,37 +1838,37 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
 
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolFlowSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolFlowSeq = AvgData
       END DO
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolLoadSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolLoadSeq = AvgData
       END DO
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatFlowSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatFlowSeq = AvgData
       END DO
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatLoadSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatLoadSeq = AvgData
       END DO
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq = AvgData
       END DO
       DO CtrlZoneNum = 1,NumOfZones
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
-        AvgData = 0.0
+        AvgData = 0.0d0
         CALL MovingAvg(CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
         CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq = AvgData
       END DO
@@ -1900,6 +1890,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatOutTempSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtHeatPeak = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq(TimeStepIndex)
+            CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTemp = &
+              CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTempSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneHumRatAtHeatPeak = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneHumRatSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%OutHumRatAtHeatPeak = &
@@ -1907,7 +1899,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%TimeStepNumAtHeatMax = TimeStepIndex
           END IF
         END DO
-        IF (CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatMassFlow > 0.0) THEN
+        IF (CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatMassFlow > 0.0d0) THEN
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatVolFlow = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatMassFlow &
               / CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesHeatDens
@@ -1935,6 +1927,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolOutTempSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneRetTempAtCoolPeak = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq(TimeStepIndex)
+            CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTemp = &
+              CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTempSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneHumRatAtCoolPeak = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneHumRatSeq(TimeStepIndex)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%OutHumRatAtCoolPeak = &
@@ -1942,7 +1936,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
             CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%TimeStepNumAtCoolMax = TimeStepIndex
           END IF
         END DO
-        IF (CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolMassFlow > 0.0) THEN
+        IF (CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolMassFlow > 0.0d0) THEN
           CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolVolFlow = &
               CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolMassFlow &
               / CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%DesCoolDens
@@ -1968,6 +1962,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
           CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneTempSeq
           CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatOutTempSeq
           CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneRetTempSeq
+          CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTempSeq
+          CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTemp = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatTstatTemp
           CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatZoneHumRatSeq
           CalcFinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%HeatOutHumRatSeq
           CalcFinalZoneSizing(CtrlZoneNum)%ZoneTempAtHeatPeak = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtHeatPeak
@@ -1999,6 +1995,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
           CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneTempSeq
           CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolOutTempSeq
           CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneRetTempSeq
+          CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTempSeq
+          CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTemp = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolTstatTemp
           CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolZoneHumRatSeq
           CalcFinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%CoolOutHumRatSeq
           CalcFinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak = CalcZoneSizing(CtrlZoneNum,CurOverallSimDay)%ZoneTempAtCoolPeak
@@ -2087,7 +2085,102 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
                               TRIM(CalcFinalZoneSizing(I)%HeatDesDay),':Des Heat Mass Flow [kg/s]',  &
                       SizingFileColSep,TRIM(CalcFinalZoneSizing(I)%ZoneName),   &
                               TRIM(CalcFinalZoneSizing(I)%CoolDesDay),':Des Cool Mass Flow [kg/s]'
+
+! Should this be done only if there is a cooling load? Or would this message help dermine why there was no load?
+        IF (ABS(CalcFinalZoneSizing(I)%DesCoolLoad) > 1.d-8) THEN
+          ! check for low cooling delta T from supply to zone to see if air volume flow rate might be excessively high
+          IF (CalcFinalZoneSizing(I)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
+            SupplyTemp = CalcFinalZoneSizing(I)%CoolDesTemp
+            DeltaTemp = SupplyTemp - CalcFinalZoneSizing(I)%ZoneTempatCoolPeak
+          ELSE
+            DeltaTemp = -ABS(CalcFinalZoneSizing(I)%CoolDesTempDiff)
+            SupplyTemp = DeltaTemp + CalcFinalZoneSizing(I)%ZoneTempatCoolPeak
+          END IF
+
+          ! check for low delta T to avoid very high flow rates
+          IF(ABS(DeltaTemp) .LT. 5.0d0 .AND. ABS(DeltaTemp) > SmallTempDiff)THEN ! Vdot exceeds 1200 cfm/ton @ DT=5
+            IF(ABS(DeltaTemp) .GE. 2.0d0)THEN ! Vdot exceeds 3000 cfm/ton @ DT=2
+              CALL ShowWarningError('UpdateZoneSizing: Cooling supply air temperature (calculated) within 5C of'// &
+                                    ' zone temperature')
+            ELSE
+              CALL ShowSevereError('UpdateZoneSizing: Cooling supply air temperature (calculated) within 2C of'// &
+                                   ' zone temperature')
+            END IF
+            CALL ShowContinueError('...check zone thermostat set point and design supply air temperatures')
+            CALL ShowContinueError('...zone name = '//TRIM(CalcFinalZoneSizing(I)%ZoneName))
+            CALL ShowContinueError('...design sensible cooling load = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%DesCoolLoad,2))//' W')
+            CALL ShowContinueError('...thermostat set point temp    = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%CoolTstatTemp,3))//' C')
+            CALL ShowContinueError('...zone temperature             = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%ZoneTempatCoolPeak,3))//' C')
+            CALL ShowContinueError('...supply air temperature       = '//TRIM(RoundSigDigits(SupplyTemp,3))//' C')
+            CALL ShowContinueError('...temperature difference       = '//TRIM(RoundSigDigits(DeltaTemp,5))//' C')
+            CALL ShowContinueError('...calculated volume flow rate  = '// &
+                 TRIM(RoundSigDigits((CalcFinalZoneSizing(I)%DesCoolVolFlow),5))//' m3/s')
+            CALL ShowContinueError('...calculated mass flow rate    = '// &
+                 TRIM(RoundSigDigits((CalcFinalZoneSizing(I)%DesCoolMassFlow),5))//' kg/s')
+            IF(SupplyTemp .GT. CalcFinalZoneSizing(I)%ZoneTempatCoolPeak) &
+              CALL ShowContinueError('...Note: supply air temperature should be less than zone'// &
+                                     ' temperature during cooling air flow calculations')
+          ELSE IF(ABS(DeltaTemp) > SmallTempDiff .AND. SupplyTemp .GT. CalcFinalZoneSizing(I)%ZoneTempatCoolPeak)THEN
+            CALL ShowSevereError('UpdateZoneSizing: Supply air temperature is greater than zone'// &
+                                 ' temperature during cooling air flow calculations')
+            CALL ShowContinueError('...zone temperature            = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%ZoneTempatCoolPeak,3))//' C')
+            CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(SupplyTemp,3))//' C')
+            CALL ShowContinueError('...occurs in zone              = '//TRIM(CalcFinalZoneSizing(I)%ZoneName))
+          END IF
+        END IF
+! Should this be done only if there is a heating load? Or would this message help dermine why there was no load?
+        IF (ABS(CalcFinalZoneSizing(I)%DesHeatLoad) > 1.d-8) THEN ! ABS() ?
+          ! check for low cooling delta T from supply to zone to see if air volume flow rate might be excessively high
+          IF (CalcFinalZoneSizing(I)%ZnHeatDgnSAMethod == SupplyAirTemperature) THEN
+            SupplyTemp = CalcFinalZoneSizing(I)%HeatDesTemp
+            DeltaTemp = SupplyTemp - CalcFinalZoneSizing(I)%ZoneTempatHeatPeak
+          ELSE
+            DeltaTemp = CalcFinalZoneSizing(I)%HeatDesTempDiff
+            SupplyTemp = DeltaTemp + CalcFinalZoneSizing(I)%ZoneTempatHeatPeak
+          END IF
+
+          IF(ABS(DeltaTemp) .LT. 5.0d0 .AND. ABS(DeltaTemp) > SmallTempDiff)THEN ! Vdot exceeds 1200 cfm/ton @ DT=5
+            IF(ABS(DeltaTemp) .GE. 2.0d0)THEN ! Vdot exceeds 3000 cfm/ton @ DT=2
+              CALL ShowWarningError('UpdateZoneSizing: Heating supply air temperature (calculated) within 5C of'// &
+                                    ' zone temperature')
+            ELSE
+              CALL ShowSevereError('UpdateZoneSizing: Heating supply air temperature (calculated) within 2C of'// &
+                                   ' zone temperature')
+            END IF
+            CALL ShowContinueError('...check zone thermostat set point and design supply air temperatures')
+            CALL ShowContinueError('...zone name = '//TRIM(CalcFinalZoneSizing(I)%ZoneName))
+            CALL ShowContinueError('...design heating load         = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%DesCoolLoad,2))//' W')
+            CALL ShowContinueError('...thermostat set piont temp   = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%HeatTstatTemp,3))//' C')
+            CALL ShowContinueError('...zone temperature            = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%ZoneTempatHeatPeak,3))//' C')
+            CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(SupplyTemp,3))//' C')
+            CALL ShowContinueError('...temperature difference      = '//TRIM(RoundSigDigits(DeltaTemp,5))//' C')
+            CALL ShowContinueError('...calculated volume flow rate = '// &
+                 TRIM(RoundSigDigits((CalcFinalZoneSizing(I)%DesHeatVolFlow),5))//' m3/s')
+            CALL ShowContinueError('...calculated mass flow rate   = '// &
+                 TRIM(RoundSigDigits((CalcFinalZoneSizing(I)%DesHeatMassFlow),5))//' kg/s')
+            IF(SupplyTemp .LT. CalcFinalZoneSizing(I)%ZoneTempatHeatPeak) &
+              CALL ShowContinueError('...Note: supply air temperature should be greater than zone'// &
+                                     ' temperature during heating air flow calculations')
+          ELSE IF(ABS(DeltaTemp) > SmallTempDiff .AND. SupplyTemp .LT. CalcFinalZoneSizing(I)%ZoneTempatHeatPeak)THEN
+            CALL ShowSevereError('UpdateZoneSizing: Supply air temperature is less than zone'// &
+                                 ' temperature during heating air flow calculations')
+            CALL ShowContinueError('...zone temperature            = '// &
+                 TRIM(RoundSigDigits(CalcFinalZoneSizing(I)%ZoneTempatHeatPeak,3))//' C')
+            CALL ShowContinueError('...supply air temperature      = '//TRIM(RoundSigDigits(SupplyTemp,3))//' C')
+            CALL ShowContinueError('...occurs in zone              = '// &
+                 TRIM(CalcFinalZoneSizing(I)%ZoneName))
+          END IF
+        END IF
+
         ENDDO
+
         WRITE(OutputFileZoneSizing,fmta) ' '
   !      HourFrac = 0.0
         Minutes=0
@@ -2227,6 +2320,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutTempSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex) = &
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneRetTempSeq(TimeStepIndex)
+            ZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex) = &
+              CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatTstatTempSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex) = &
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%HeatZoneHumRatSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%HeatOutHumRatSeq(TimeStepIndex) = &
@@ -2237,6 +2332,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutTempSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex) = &
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneRetTempSeq(TimeStepIndex)
+            ZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex) = &
+              CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolTstatTempSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex) = &
               CalcZoneSizing(CtrlZoneNum,DesDayNum)%CoolZoneHumRatSeq(TimeStepIndex)
             ZoneSizing(CtrlZoneNum,DesDayNum)%CoolOutHumRatSeq(TimeStepIndex) = &
@@ -2262,6 +2359,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
             CalcFinalZoneSizing(CtrlZoneNum)%HeatOutTempSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex) = &
             CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneRetTempSeq(TimeStepIndex)
+          FinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex) = &
+            CalcFinalZoneSizing(CtrlZoneNum)%HeatTstatTempSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex) = &
             CalcFinalZoneSizing(CtrlZoneNum)%HeatZoneHumRatSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%HeatOutHumRatSeq(TimeStepIndex) = &
@@ -2272,6 +2371,8 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
             CalcFinalZoneSizing(CtrlZoneNum)%CoolOutTempSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex) = &
             CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneRetTempSeq(TimeStepIndex)
+          FinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex) = &
+            CalcFinalZoneSizing(CtrlZoneNum)%CoolTstatTempSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex) = &
             CalcFinalZoneSizing(CtrlZoneNum)%CoolZoneHumRatSeq(TimeStepIndex)
           FinalZoneSizing(CtrlZoneNum)%CoolOutHumRatSeq(TimeStepIndex) = &
@@ -2282,11 +2383,11 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         IF (.not. ZoneEquipConfig(CtrlZoneNum)%IsControlled) CYCLE
         ! Now take into account the user specified sizing factor and user specified cooling design air flow
         ! rate
-        TotCoolSizMult = 0.0
+        TotCoolSizMult = 0.0d0
         ! Calculate a sizing factor from the user specified cooling design air flow rate
-        IF (FinalZoneSizing(CtrlZoneNum)%InpDesCoolAirFlow > 0.0 .AND. &
+        IF (FinalZoneSizing(CtrlZoneNum)%InpDesCoolAirFlow > 0.0d0 .AND. &
             FinalZoneSizing(CtrlZoneNum)%CoolAirDesMethod == InpDesAirFlow .AND. &
-            FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0) THEN
+            FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0d0) THEN
           TotCoolSizMult = (FinalZoneSizing(CtrlZoneNum)%InpDesCoolAirFlow / &
             FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow) * FinalZoneSizing(CtrlZoneNum)%CoolSizingFactor
         ! If no user specified cooling design air flow rate input, use the user specified szing factor
@@ -2295,7 +2396,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         END IF
         ! If the cooling sizing multiplier is not 1, adjust the cooling design data
         IF (ABS(TotCoolSizMult-1.0d0) > .00001d0) THEN
-          IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0) THEN
+          IF (FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow > 0.0d0) THEN
             TimeStepAtPeak = FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtCoolMax
             DDNum = FinalZoneSizing(CtrlZoneNum)%CoolDDNum
             FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow = CalcFinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow * TotCoolSizMult
@@ -2308,17 +2409,17 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
                        / FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow
             OAFrac = MIN(1.0d0,MAX(0.0d0,OAFrac))
             FinalZoneSizing(CtrlZoneNum)%DesCoolCoilInTemp = OAFrac*DesDayWeath(DDNum)%Temp(TimeStepAtPeak) + &
-                                                      (1.-OAFrac)*FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak
+                                                      (1.0d0-OAFrac)*FinalZoneSizing(CtrlZoneNum)%ZoneTempAtCoolPeak
             FinalZoneSizing(CtrlZoneNum)%DesCoolCoilInHumRat = &
                                                  OAFrac*DesDayWeath(DDNum)%HumRat(TimeStepAtPeak) + &
-                                                 (1.-OAFrac)*FinalZoneSizing(CtrlZoneNum)%ZoneHumRatAtCoolPeak
+                                                 (1.0d0-OAFrac)*FinalZoneSizing(CtrlZoneNum)%ZoneHumRatAtCoolPeak
           ELSE
             FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow = FinalZoneSizing(CtrlZoneNum)%InpDesCoolAirFlow
             FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow = FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow * &
               FinalZoneSizing(CtrlZoneNum)%DesCoolDens
           END IF
           DO DDNum = 1,TotDesDays+TotRunDesPersDays
-            IF (ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow > 0.0) THEN
+            IF (ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow > 0.0d0) THEN
               TimeStepAtPeak = ZoneSizing(CtrlZoneNum,DDNum)%TimeStepNumAtCoolMax
               ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow = CalcZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow * &
                                                                TotCoolSizMult
@@ -2331,10 +2432,10 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
                          / ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow
               OAFrac = MIN(1.0d0,MAX(0.0d0,OAFrac))
               ZoneSizing(CtrlZoneNum,DDNum)%DesCoolCoilInTemp = OAFrac*DesDayWeath(DDNum)%Temp(TimeStepAtPeak) + &
-                                                        (1.-OAFrac)*ZoneSizing(CtrlZoneNum,DDNum)%ZoneTempAtCoolPeak
+                                                        (1.0d0-OAFrac)*ZoneSizing(CtrlZoneNum,DDNum)%ZoneTempAtCoolPeak
               ZoneSizing(CtrlZoneNum,DDNum)%DesCoolCoilInHumRat = &
                                                    OAFrac*DesDayWeath(DDNum)%HumRat(TimeStepAtPeak) + &
-                                                   (1.-OAFrac)*ZoneSizing(CtrlZoneNum,DDNum)%ZoneHumRatAtCoolPeak
+                                                   (1.0d0-OAFrac)*ZoneSizing(CtrlZoneNum,DDNum)%ZoneHumRatAtCoolPeak
             ELSE
               ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow = ZoneSizing(CtrlZoneNum,DDNum)%InpDesCoolAirFlow
               ZoneSizing(CtrlZoneNum,DDNum)%DesCoolMassFlow = ZoneSizing(CtrlZoneNum,DDNum)%DesCoolVolFlow * &
@@ -2377,7 +2478,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         END DO
 ! IF cooling flow rate is 0, this data may be used to size a HP so initialize DDNum, TimeStepatPeak, and sizing data (end of IF)
         ! check for flow rate having been set (by MinOA or other min) but no timestep at max
-!        IF (FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow > 0.0 .AND. &
+!        IF (FinalZoneSizing(CtrlZoneNum)%DesCoolMassFlow > 0.0d0 .AND. &
          IF ((FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtCoolMax == 0 .OR. &
               FinalZoneSizing(CtrlZoneNum)%CoolDDNum == 0) ) THEN
           DO DDNum = 1,TotDesDays+TotRunDesPersDays
@@ -2424,16 +2525,16 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         END IF
         ! Now take into account the user specified sizing factor or user specified heating design air flow
         ! rate (which overrides the sizing factor)
-        TotHeatSizMult = 0.0
+        TotHeatSizMult = 0.0d0
         ! Calculate a sizing factor from the user specified heating design air flow rate
-        IF (FinalZoneSizing(CtrlZoneNum)%InpDesHeatAirFlow > 0.0 .AND. &
+        IF (FinalZoneSizing(CtrlZoneNum)%InpDesHeatAirFlow > 0.0d0 .AND. &
             FinalZoneSizing(CtrlZoneNum)%HeatAirDesMethod == InpDesAirFlow .AND. &
-            FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+            FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
           TotHeatSizMult = (FinalZoneSizing(CtrlZoneNum)%InpDesHeatAirFlow / &
             FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow) * FinalZoneSizing(CtrlZoneNum)%HeatSizingFactor
         ! Calculate a sizing factor from the user specified max heating design air flow rates
         ELSE IF ( FinalZoneSizing(CtrlZoneNum)%HeatAirDesMethod == DesAirFlowWithLim .AND. &
-            FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+            FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
             MaxHeatVolFlow = MAX(FinalZoneSizing(CtrlZoneNum)%DesHeatMaxAirFlow, &
                                                              FinalZoneSizing(CtrlZoneNum)%DesHeatMaxAirFlow2, &
                                                              FinalZoneSizing(CtrlZoneNum)%DesCoolVolFlow * &
@@ -2450,7 +2551,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         END IF
 
         IF (ABS(TotHeatSizMult-1.0d0) > .00001d0 ) THEN
-         IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0) THEN
+         IF (FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow > 0.0d0) THEN
             TimeStepAtPeak = FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtHeatMax
             DDNum = FinalZoneSizing(CtrlZoneNum)%HeatDDNum
             FinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow = CalcFinalZoneSizing(CtrlZoneNum)%DesHeatVolFlow * TotHeatSizMult
@@ -2472,7 +2573,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
               FinalZoneSizing(CtrlZoneNum)%DesHeatDens
           END IF
           DO DDNum = 1,TotDesDays+TotRunDesPersDays
-            IF (ZoneSizing(CtrlZoneNum,DDNum)%DesHeatVolFlow > 0.0) THEN
+            IF (ZoneSizing(CtrlZoneNum,DDNum)%DesHeatVolFlow > 0.0d0) THEN
               TimeStepAtPeak = ZoneSizing(CtrlZoneNum,DDNum)%TimeStepNumAtHeatMax
               ZoneSizing(CtrlZoneNum,DDNum)%DesHeatVolFlow = CalcZoneSizing(CtrlZoneNum,DDNum)%DesHeatVolFlow * &
                                                                TotHeatSizMult
@@ -2520,7 +2621,7 @@ SUBROUTINE UpdateZoneSizing(CallIndicator)
         END DO
 ! IF heating flow rate is 0, this data may be used to size a HP so initialize DDNum, TimeStepatPeak, and sizing data (end of IF)
         ! check for flow rate having been set (by MinOA or other min) but no timestep at max
-!        IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow > 0.0 .AND. &
+!        IF (FinalZoneSizing(CtrlZoneNum)%DesHeatMassFlow > 0.0d0 .AND. &
          IF ((FinalZoneSizing(CtrlZoneNum)%TimeStepNumAtHeatMax == 0 .OR. &
               FinalZoneSizing(CtrlZoneNum)%HeatDDNum == 0) ) THEN
           DO DDNum = 1,TotDesDays+TotRunDesPersDays
@@ -2666,6 +2767,8 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
   USE UserDefinedComponents, ONLY: SimZoneAirUserDefined
   USE SystemAvailabilityManager, ONLY: GetZoneEqAvailabilityManager
   USE DataGlobals, ONLY: isPulseZoneSizing
+  USE EvaporativeCoolers, ONLY: SimZoneEvaporativeCoolerUnit
+  USE HVACUnitarySystem, ONLY: SimUnitarySystem
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2847,11 +2950,16 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
                                  FirstHVACIteration, SysOutputProvided, LatOutputProvided, &
                                  ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
 
-           CASE (PkgTermHPAirToAir_Num, PkgTermACAirToAir_Num)  ! 'ZoneHVAC:PackagedTerminalHeatPump'
+           CASE (PkgTermHPAirToAir_Num, PkgTermACAirToAir_Num, PkgTermHPWaterToAir_Num)  ! 'ZoneHVAC:PackagedTerminalHeatPump'
                                          ! 'ZoneHVAC:PackagedTerminalAirConditioner'
+                                         ! 'ZoneHVAC:WaterToAirHeatPump'
              CALL SimPackagedTerminalUnit(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, &
                                  FirstHVACIteration, SysOutputProvided, LatOutputProvided, &
-                                 ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
+                                 ZoneEquipTypeNum, ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
+
+           CASE (ZoneUnitarySystem_Num)  ! 'AirloopHVAC:UnitarySystem'
+             CALL SimUnitarySystem(PrioritySimOrder(EquipTypeNum)%EquipName, FirstHVACIteration, &
+                                 ActualZoneNum, ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr),ZoneEquipment=.TRUE.)
 
            CASE (ZoneDXDehumidifier_Num) ! 'ZoneHVAC:Dehumidifier:DX'
              CALL SimZoneDehumidifier(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, &
@@ -2864,13 +2972,8 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
                                        ! temperature) SysOutputProvided amount was already sent above to
                                        ! next Predict-Correct series of calcs via SysDepZoneLoads
 
-           CASE (PkgTermHPWaterToAir_Num)  ! 'ZoneHVAC:WaterToAirHeatPump'
-             CALL SimPackagedTerminalUnit(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, &
-                                          FirstHVACIteration, SysOutputProvided, LatOutputProvided, &
-                                          ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
-
            CASE (FanCoil4Pipe_Num) ! 'ZoneHVAC:FourPipeFanCoil'
-             CALL SimFanCoilUnit(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, &
+             CALL SimFanCoilUnit(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, ControlledZoneNum, &
                                      FirstHVACIteration, SysOutputProvided, LatOutputProvided, &
                                      ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
 
@@ -2996,6 +3099,11 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
                                   SysOutputProvided,  LatOutputProvided,&
                                   ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
 
+           CASE (ZoneEvaporativeCoolerUnit_Num)
+             CALL SimZoneEvaporativeCoolerUnit(PrioritySimOrder(EquipTypeNum)%EquipName, ActualZoneNum, &
+                                  SysOutputProvided,  LatOutputProvided,&
+                                  ZoneEquipList(CurZoneEqNum)%EquipIndex(EquipPtr))
+
            CASE DEFAULT
 
          END SELECT
@@ -3014,7 +3122,7 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
        IF (AirLoopInit) THEN
          IF (AirLoopNum > 0) THEN
            IF ( .NOT. PrimaryAirSystem(AirLoopNum)%OASysExists) THEN
-             IF (ZoneEquipConfig(ControlledZoneNum)%ZoneExh > 0.0 .AND. .NOT. ZoneEquipConfig(ControlledZoneNum)%FlowError .AND. &
+             IF (ZoneEquipConfig(ControlledZoneNum)%ZoneExh > 0.0d0 .AND. .NOT. ZoneEquipConfig(ControlledZoneNum)%FlowError .AND. &
                  AirLoopsSimOnce) THEN
                IF (.NOT. isPulseZoneSizing) THEN
                  CALL ShowWarningError('In zone ' // TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName) // &
@@ -3028,7 +3136,7 @@ SUBROUTINE SimZoneEquipment(FirstHVACIteration, SimAir)
              ! ZoneEquipConfig(ControlledZoneNum)%ZoneExh = 0.0
            END IF
          ELSE
-           IF (ZoneEquipConfig(ControlledZoneNum)%ZoneExh > 0.0 .AND. .NOT. ZoneEquipConfig(ControlledZoneNum)%FlowError .AND. &
+           IF (ZoneEquipConfig(ControlledZoneNum)%ZoneExh > 0.0d0 .AND. .NOT. ZoneEquipConfig(ControlledZoneNum)%FlowError .AND. &
                AirLoopsSimOnce) THEN
              IF (.NOT. isPulseZoneSizing) THEN
                CALL ShowWarningError('In zone ' // TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName) // &
@@ -3183,10 +3291,10 @@ SUBROUTINE SetZoneEquipSimOrder(ControlledZoneNum, ActualZoneNum)
        DO ComparedEquipTypeNum = EquipTypeNum, NumOfEquipTypes
 
          IF (CurEqCoolingPriority > PrioritySimOrder(ComparedEquipTypeNum)%CoolingPriority .AND. &
-             ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired .LT. 0.0 &
+             ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired .LT. 0.0d0 &
                                           .OR. &
              CurEqHeatingPriority > PrioritySimOrder(ComparedEquipTypeNum)%HeatingPriority .AND. &
-             ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired .GE. 0.0) THEN
+             ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputRequired .GE. 0.0d0) THEN
 
            EquipTypeTemp = PrioritySimOrder(EquipTypeNum)%EquipType
            PrioritySimOrder(EquipTypeNum)%EquipType = PrioritySimOrder(ComparedEquipTypeNum)%EquipType
@@ -3375,27 +3483,27 @@ SUBROUTINE UpdateSystemOutputRequired(ZoneNum, SysOutputProvided, LatOutputProvi
       CASE (0) ! uncontrolled zone; shouldn't ever get here, but who knows
         CurDeadbandOrSetback(ZoneNum) = .FALSE.
       CASE (SingleHeatingSetPoint)
-        IF ((ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired - 1.0) .LT. 0.0) THEN
+        IF ((ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired - 1.0d0) .LT. 0.0d0) THEN
           CurDeadBandOrSetback(ZoneNum) = .TRUE.
         ELSE
           CurDeadBandOrSetback(ZoneNum) = .FALSE.
         END IF
       CASE (SingleCoolingSetPoint)
-        IF ((ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired + 1.0) .GT. 0.0) THEN
+        IF ((ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired + 1.0d0) .GT. 0.0d0) THEN
           CurDeadBandOrSetback(ZoneNum) = .TRUE.
         ELSE
           CurDeadBandOrSetback(ZoneNum) = .FALSE.
         END IF
       CASE (SingleHeatCoolSetPoint)
-        IF (ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP .LT. 0.0 .AND. &
-            ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP .GT. 0.0) THEN
+        IF (ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP .LT. 0.0d0 .AND. &
+            ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP .GT. 0.0d0) THEN
           CurDeadBandOrSetback(ZoneNum) = .TRUE.
         ELSE
           CurDeadBandOrSetback(ZoneNum) = .FALSE.
         END IF
       CASE (DualSetPointWithDeadBand)
-        IF (ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP .LT. 0.0 .AND. &
-            ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP .GT. 0.0) THEN
+        IF (ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP .LT. 0.0d0 .AND. &
+            ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP .GT. 0.0d0) THEN
           CurDeadBandOrSetback(ZoneNum) = .TRUE.
         ELSE
           CurDeadBandOrSetback(ZoneNum) = .FALSE.
@@ -3536,7 +3644,7 @@ SUBROUTINE CalcZoneMassBalance
           Node(RetNode)%MassFlowRateMax = Node(ZoneNode)%MassFlowRateMax
           Node(RetNode)%MassFlowRateMin = Node(ZoneNode)%MassFlowRateMin
           Node(RetNode)%MassFlowRateMaxAvail = Node(ZoneNode)%MassFlowRateMaxAvail
-          Node(RetNode)%MassFlowRateMinAvail = 0.0
+          Node(RetNode)%MassFlowRateMinAvail = 0.0d0
        End If
 
        TotSupplyAirMassFlowRate = TotInletAirMassFlowRate - (TotExhaustAirMassFlowRate - ZoneEquipConfig(ZoneNum)%ZoneExh) &
@@ -3584,11 +3692,11 @@ SUBROUTINE CalcZoneMassBalance
        AirLoopNum = ZoneEquipConfig(ZoneNum)%AirLoopNum
        IF (AirLoopNum > 0 .AND. RetNode > 0) THEN
          IF (PrimaryAirSystem(AirLoopNum)%OASysExists) THEN
-           IF (AirLoopFlow(AirLoopNum)%RetFlow0 > 0.0) THEN
+           IF (AirLoopFlow(AirLoopNum)%RetFlow0 > 0.0d0) THEN
              Node(RetNode)%MassFlowRate = Node(RetNode)%MassFlowRate * &
                (AirLoopFlow(AirLoopNum)%RetFlow/AirLoopFlow(AirLoopNum)%RetFlow0)
            ELSE
-             Node(RetNode)%MassFlowRate = 0.0
+             Node(RetNode)%MassFlowRate = 0.0d0
            END IF
          END IF
        END IF
@@ -3706,12 +3814,12 @@ SUBROUTINE CalcZoneMassBalance
        TempRetAir  = TempZoneAir
      ENDIF
 
-     WinGapFlowtoRA = 0.0
-     WinGapTtoRA = 0.0
-     WinGapFlowTtoRA = 0.0
+     WinGapFlowtoRA = 0.0d0
+     WinGapTtoRA = 0.0d0
+     WinGapFlowTtoRA = 0.0d0
 
      DO SurfNum = Zone(ActualZoneNum)%SurfaceFirst,Zone(ActualZoneNum)%SurfaceLast
-       IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0 .AND.   &
+       IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0d0 .AND.   &
           SurfaceWindow(SurfNum)%AirflowDestination == AirFlowWindow_Destination_ReturnAir) THEN
          FlowThisTS = PsyRhoAirFnPbTdbW(OutBaroPress,SurfaceWindow(SurfNum)%TAirFlowGapOutlet, Node(ZoneNode)%HumRat) * &
            SurfaceWindow(SurfNum)%AirFlowThisTS * Surface(SurfNum)%Width
@@ -3719,13 +3827,13 @@ SUBROUTINE CalcZoneMassBalance
          WinGapFlowTtoRA = WinGapFlowTtoRA + FlowThisTS * SurfaceWindow(SurfNum)%TAirFlowGapOutlet
        END IF
      END DO
-     IF(WinGapFlowtoRA > 0.0) WinGapTtoRA = WinGapFlowTtoRA / WinGapFlowtoRA
+     IF(WinGapFlowtoRA > 0.0d0) WinGapTtoRA = WinGapFlowTtoRA / WinGapFlowtoRA
      ! the flag NoHeatToReturnAir is TRUE if the system is zonal only or is central with on/off air flow. In these
      ! cases the heat to return air is treated as a zone heat gain and dealt with in CalcZoneSums in
      ! MODULE ZoneTempPredictorCorrector.
      IF (.NOT. Zone(ActualZoneNum)%NoHeatToReturnAir) THEN
-       IF(MassFlowRA > 0.0) Then
-         IF(WinGapFlowtoRA > 0.0) THEN
+       IF(MassFlowRA > 0.0d0) Then
+         IF(WinGapFlowtoRA > 0.0d0) THEN
            ! Add heat-to-return from window gap airflow
            IF(MassFlowRA >= WinGapFlowtoRA) THEN
              TempRetAir = (WinGapFlowTtoRA + (MassFlowRA-WinGapFlowtoRA)*TempZoneAir)/MassFlowRA
@@ -3754,11 +3862,11 @@ SUBROUTINE CalcZoneMassBalance
          END IF
        ELSE  ! No return air flow
          ! Assign all heat-to-return from window gap airflow to zone air
-         IF(WinGapFlowToRA > 0.0) &
+         IF(WinGapFlowToRA > 0.0d0) &
            SysDepZoneLoads(ActualZoneNum) = SysDepZoneLoads(ActualZoneNum) + &
              WinGapFlowToRA * CpAir * (WinGapTtoRA - TempZoneAir)
          ! Assign all heat-to-return from lights to zone air
-         IF(QRetAir > 0.0) &
+         IF(QRetAir > 0.0d0) &
            SysDepZoneLoads(ActualZoneNum) = SysDepZoneLoads(ActualZoneNum) + QRetAir
          Node(ReturnNode)%Temp = Node(ZoneNode)%Temp
        END IF

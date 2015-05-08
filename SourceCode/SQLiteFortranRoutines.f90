@@ -202,6 +202,8 @@ MODULE SQLiteProcedures
     INTEGER, PARAMETER :: SQLITE_ROW = 100
 
 ! public routines
+PUBLIC SQLiteBegin
+PUBLIC SQLiteCommit
 PUBLIC CreateSQLiteDatabase
 PUBLIC CreateSQLiteReportVariableDictionaryRecord
 PUBLIC CreateSQLiteReportVariableDataRecord
@@ -216,6 +218,7 @@ PUBLIC CreateSQLiteMeterRecord
 PUBLIC CreateSQLiteDaylightMapTitle
 PUBLIC CreateSQLiteDaylightMap
 PUBLIC CreateSQLiteTabularDataRecords
+PUBLIC InitializeIndexes
 
 ! private routines
 PRIVATE InitializeSQLiteTables
@@ -279,6 +282,20 @@ PRIVATE TimestepTypeName
 PRIVATE StorageType
 
 CONTAINS
+
+SUBROUTINE SQLiteBegin
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+  INTEGER :: result
+  result = SQLiteExecuteCommandMacro ('BEGIN;')
+END SUBROUTINE SQLiteBegin
+
+SUBROUTINE SQLiteCommit
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+  INTEGER :: result
+  result = SQLiteExecuteCommandMacro ('COMMIT;')
+END SUBROUTINE SQLiteCommit
 
 SUBROUTINE CreateSQLiteDatabase
 
@@ -368,7 +385,7 @@ SUBROUTINE CreateSQLiteDatabase
         result = SQLiteExecuteCommandMacro ('PRAGMA synchronous = OFF;')
 
         CALL InitializeSQLiteTables
-        CALL InitializeIndexes
+!        CALL InitializeIndexes
 
         IF (WriteTabularDataToSQLite) THEN
           CALL InitializeTabularDataTable

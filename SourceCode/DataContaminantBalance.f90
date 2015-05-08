@@ -55,52 +55,52 @@ TYPE :: ZoneContControls
 END TYPE ZoneContControls
 
 TYPE ZoneSystemContaminantDemandData                   ! Contaminent loads to be met (kg air per second)
-  REAL(r64) :: OutputRequiredToCO2SP              =0.0 ! Load required to meet CO2 setpoint
-  REAL(r64) :: RemainingOutputReqToCO2SP          =0.0 ! Remaining load required to meet CO2 setpoint
-  REAL(r64) :: OutputRequiredToGCSP              =0.0 ! Load required to meet generic contaminant setpoint
-  REAL(r64) :: RemainingOutputReqToGCSP          =0.0 ! Remaining load required to meet generic contaminant setpoint
+  REAL(r64) :: OutputRequiredToCO2SP              =0.0d0 ! Load required to meet CO2 setpoint
+  REAL(r64) :: RemainingOutputReqToCO2SP          =0.0d0 ! Remaining load required to meet CO2 setpoint
+  REAL(r64) :: OutputRequiredToGCSP              =0.0d0 ! Load required to meet generic contaminant setpoint
+  REAL(r64) :: RemainingOutputReqToGCSP          =0.0d0 ! Remaining load required to meet generic contaminant setpoint
 END TYPE ZoneSystemContaminantDemandData
 
 TYPE ZoneContamGenericDataConstant
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the constant generic contaminant source and sink
   CHARACTER(len=MaxNameLength) :: ZoneName             =' ' ! Name of the zone
   INTEGER                      :: ActualZoneNum        =0   ! Zone number
-  REAL(r64) :: GCGenerateRate                          =0.0 ! Generic contaminant design generation rate [m3/s]
+  REAL(r64) :: GCGenerateRate                          =0.0d0 ! Generic contaminant design generation rate [m3/s]
   INTEGER :: GCGenerateRateSchedPtr                    = 0  ! Generic contaminant design generation rate schedule pointer
-  REAL(r64) :: GCRemovalCoef                           =0.0 ! Generic contaminant design removal coefficient [m3/s]
+  REAL(r64) :: GCRemovalCoef                           =0.0d0 ! Generic contaminant design removal coefficient [m3/s]
   INTEGER :: GCRemovalCoefSchedPtr                     = 0  ! Generic contaminant design removal coefficient schedule pointer
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataPDriven
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the pressure driven generic contaminant source and sink
   CHARACTER(len=MaxNameLength) :: SurfName             =' ' ! Name of the surface
   INTEGER                      :: SurfNum              =0   ! Surface number
-  REAL(r64) :: GCGenRateCoef                           =0.0 ! Generic contaminant design generation rate coefficeint [m3/s]
+  REAL(r64) :: GCGenRateCoef                           =0.0d0 ! Generic contaminant design generation rate coefficeint [m3/s]
   INTEGER :: GCGenRateCoefSchedPtr                     = 0  ! Generic contaminant design generation rate schedule pointer
-  REAL(r64) :: GCExpo                                  =0.0 ! Generic contaminant exponent []
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCExpo                                  =0.0d0 ! Generic contaminant exponent []
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataCutoff
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the cutoff generic contaminant source and sink
   CHARACTER(len=MaxNameLength) :: ZoneName             =' ' ! Name of the zone
   INTEGER                      :: ActualZoneNum        =0   ! Zone number
-  REAL(r64) :: GCGenerateRate                          =0.0 ! Generic contaminant design generation rate [m3/s]
+  REAL(r64) :: GCGenerateRate                          =0.0d0 ! Generic contaminant design generation rate [m3/s]
   INTEGER :: GCGenerateRateSchedPtr                    = 0  ! Generic contaminant design generation rate schedule pointer
-  REAL(r64) :: GCCutoffValue                           =0.0 ! Cutoff value [ppm]
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCCutoffValue                           =0.0d0 ! Cutoff value [ppm]
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataDecay
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the decay generic contaminant source and sink
   CHARACTER(len=MaxNameLength) :: ZoneName             =' ' ! Name of the zone
   INTEGER                      :: ActualZoneNum        =0   ! Zone number
-  REAL(r64) :: GCInitEmiRate                           =0.0 ! Generic contaminant design generation rate [m3/s]
+  REAL(r64) :: GCInitEmiRate                           =0.0d0 ! Generic contaminant design generation rate [m3/s]
   INTEGER :: GCEmiRateSchedPtr                         = 0  ! Generic contaminant emission rate schedule pointer
-  REAL(r64) :: GCTime                                  =0.0 ! Time since the styart of emission [s]
-  REAL(r64) :: GCDelayTime                             =0.0 ! Delay time constant [s]
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCTime                                  =0.0d0 ! Time since the styart of emission [s]
+  REAL(r64) :: GCDelayTime                             =0.0d0 ! Delay time constant [s]
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataBLDiff
@@ -108,36 +108,41 @@ TYPE ZoneContamGenericDataBLDiff
                                                             ! and sink
   CHARACTER(len=MaxNameLength) :: SurfName             =' ' ! Name of the surface
   INTEGER                      :: SurfNum              =0   ! Surface number
-  REAL(r64) :: GCTranCoef                              =0.0 ! Generic contaminant mass transfer coefficeint [m/s]
+  REAL(r64) :: GCTranCoef                              =0.0d0 ! Generic contaminant mass transfer coefficeint [m/s]
   INTEGER :: GCTranCoefSchedPtr                        = 0  ! Generic contaminant mass transfer coefficeint schedule pointer
-  REAL(r64) :: GCHenryCoef                             =0.0 ! Generic contaminant Henry adsorption constant or
+  REAL(r64) :: GCHenryCoef                             =0.0d0 ! Generic contaminant Henry adsorption constant or
                                                             ! partition coefficient []
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataDVS
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the deposition velocity generic contaminant sink
   CHARACTER(len=MaxNameLength) :: SurfName             =' ' ! Name of the surface
   INTEGER                      :: SurfNum              =0   ! Surface number
-  REAL(r64) :: GCDepoVelo                              =0.0 ! Generic contaminant deposition velocity [m/s]
+  REAL(r64) :: GCDepoVelo                              =0.0d0 ! Generic contaminant deposition velocity [m/s]
   INTEGER :: GCDepoVeloPtr                             = 0  ! Generic contaminant deposition velocity sink schedule pointer
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE ZoneContamGenericDataDRS
   CHARACTER(len=MaxNameLength) :: Name                 =' ' ! Name of the deposition rate generic contaminant sink
   CHARACTER(len=MaxNameLength) :: ZoneName             =' ' ! Name of the zone
   INTEGER                      :: ActualZoneNum        =0   ! Zone number
-  REAL(r64) :: GCDepoRate                              =0.0 ! Generic contaminant deposition rate [m/s]
+  REAL(r64) :: GCDepoRate                              =0.0d0 ! Generic contaminant deposition rate [m/s]
   INTEGER :: GCDepoRatePtr                             = 0  ! Generic contaminant deposition rate sink schedule pointer
-  REAL(r64) :: GCGenRate                               =0.0 ! Generic contaminant design generation rate [m3/s] for reporting
+  REAL(r64) :: GCGenRate                               =0.0d0 ! Generic contaminant design generation rate [m3/s] for reporting
 END TYPE
 
 TYPE (ZoneSystemContaminantDemandData), ALLOCATABLE, DIMENSION(:)     :: ZoneSysContDemand
 
 
 ! MODULE VARIABLE Type DECLARATIONS:
-TYPE (ContaminantData) :: Contaminant=ContaminantData(.false.,.false.,0,.false.,0)
+TYPE (ContaminantData), SAVE :: Contaminant=ContaminantData  &
+   (.false.,  &   ! A logical flag to determine whether any contaminants are simulated or not
+    .false.,  &   ! CO2 simulation flag
+    0,  &         ! CO2 outdoor level schedule pointer
+    .false.,  &   ! Generic contaminant simulation flag
+    0)            ! Generic contaminant outdoor level schedule pointer
 
 TYPE (ZoneContControls), ALLOCATABLE, DIMENSION(:)     :: ContaminantControlledZone
 

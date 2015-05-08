@@ -418,9 +418,9 @@ function PsyCpAirFnWTdb(dw,T,calledfrom) result(cpa)
       REAL(r64) h2  ! PsyHFnTdbW result of input humidity ratio and tt
       REAL(r64) w  ! humidity ratio
 
-      REAL(r64), SAVE :: dwSave = -100
-      REAL(r64), SAVE :: Tsave = -100
-      REAL(r64), SAVE :: cpaSave = -100
+      REAL(r64), SAVE :: dwSave = -100.0d0
+      REAL(r64), SAVE :: Tsave = -100.0d0
+      REAL(r64), SAVE :: cpaSave = -100.0d0
 
       !check if last call had the same input and if it did just use the
       !saved output.
@@ -1277,7 +1277,7 @@ FUNCTION PsyRhFnTdbWPb(TDB,dW,PB,calledfrom) RESULT(RHValue)
 #endif
 
   !                   VALIDITY TEST
-        IF (RHValue < 0.0 .or. RHValue > 1.0) THEN
+        IF (RHValue < 0.0d0 .or. RHValue > 1.0d0) THEN
           IF (RHValue > 1.0d0) THEN
 #ifdef EP_psych_errors
             IF (RHValue > 1.01d0) THEN
@@ -1392,7 +1392,7 @@ FUNCTION PsyTwbFnTdbWPb(Tdb,W,Pb,calledfrom)  RESULT (Twb_result)
   Tdb_tag = ISHFT(Tdb_tag, -Grid_shift)
   W_tag = ISHFT(W_tag, -Grid_shift)
   Pb_tag = ISHFT(Pb_tag, -Grid_shift)
-  hash = IAND(IEOR(Tdb_tag,IEOR(W_tag,Pb_tag)), (twbcache_size - 1))
+  hash = IAND(IEOR(Tdb_tag,IEOR(W_tag,Pb_tag)), INT(twbcache_size - 1,i64))
 
   IF (cached_Twb(hash)%iTdb /= Tdb_tag .OR. cached_Twb(hash)%iW /= W_tag .OR. cached_Twb(hash)%iPb /= Pb_tag) THEN
     cached_Twb(hash)%iTdb = Tdb_tag
@@ -1809,7 +1809,7 @@ FUNCTION PsyWFnTdpPb(TDP,PB,calledfrom) RESULT(W)
 END FUNCTION PsyWFnTdpPb
 
 
-FUNCTION PsyWFnTdbH(TDB,H,calledfrom) RESULT(W)
+FUNCTION PsyWFnTdbH(TDB,H,calledfrom, SuppressWarnings) RESULT(W)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         George Shih
@@ -1835,6 +1835,7 @@ FUNCTION PsyWFnTdbH(TDB,H,calledfrom) RESULT(W)
       REAL(r64), intent(in) :: TDB    ! dry-bulb temperature {C}
       REAL(r64), intent(in) :: H      ! enthalpy {J/kg}
       character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages)
+      LOGICAL, INTENT(IN), OPTIONAL :: SuppressWarnings     ! if calling function is calculating an intermediate state 
       REAL(r64)        :: W      ! result=> humidity ratio
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -1847,7 +1848,13 @@ FUNCTION PsyWFnTdbH(TDB,H,calledfrom) RESULT(W)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-          ! na
+  LOGICAL  :: ReportWarnings
+
+  ReportWarnings = .TRUE.
+
+  IF (PRESENT(SuppressWarnings)) THEN
+    IF (SuppressWarnings) ReportWarnings = .FALSE.
+  ENDIF
 
 !CP-------- here is 1.2, 1200., 1.004, or 1004.  --------
       W=(H-1.00484d3*TDB)/(2.50094d6+1.85895d3*TDB)
@@ -1860,7 +1867,7 @@ FUNCTION PsyWFnTdbH(TDB,H,calledfrom) RESULT(W)
       IF (W < 0.0d0) THEN
 #ifdef EP_psych_errors
         IF (W < -.0001d0) THEN
-          IF (.not. WarmupFlag) THEN
+          IF (.not. WarmupFlag .AND.  ReportWarnings) THEN
             IF (iPsyErrIndex(iPsyWFnTdbH) == 0) THEN
               String=' Dry-Bulb= '//TRIM(TrimSigDigits(TDB,2))//' Enthalpy= '//TRIM(TrimSigDigits(H,3))
               CALL ShowWarningMessage('Calculated Humidity Ratio invalid (PsyWFnTdbH)')
@@ -2150,7 +2157,7 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
   !Both Intel & GNU are happy to use .iand.
   Tdb_tag = ISHFT(Tdb_tag, -Grid_Shift)
-  hash = IAND(Tdb_tag, (psatcache_size - 1))
+  hash = IAND(Tdb_tag, INT(psatcache_size - 1,i64))
 
   IF (cached_psat(hash)%iTdb /= Tdb_tag) THEN
     cached_Psat(hash)%iTdb = Tdb_tag
@@ -2375,9 +2382,9 @@ FUNCTION PsyTsatFnHPb(H,PB,calledfrom) RESULT(T)
 !                                      CHECK H IN RANGE.
       HH = H + 1.78637d4
 
-      IF (H >= 0.0) THEN
+      IF (H >= 0.0d0) THEN
         Hloc = MAX(0.00001d0,H)
-      ELSE IF (H < 0.0) THEN
+      ELSE IF (H < 0.0d0) THEN
         Hloc = MIN(-.00001d0,H)
       END IF
 
@@ -2633,7 +2640,7 @@ FUNCTION PsyTsatFnPb(Press,calledfrom) RESULT(Temp)
 
       ! Setting Value of PsyTsatFnPb= 0C, due to non-continuous function for Saturation Pressure at 0C.
       Else IF((Press > 611.000d0) .and. (Press < 611.25d0))Then
-         tSat= 0.0
+         tSat= 0.0d0
 
       Else
       ! Iterate to find the saturation temperature

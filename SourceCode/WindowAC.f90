@@ -29,9 +29,9 @@ MODULE WindowAC
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataSizing
-USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, OutputFileDebug, SysSizingCalc
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeSTamp, &
-                           SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd
+USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, OutputFileDebug, SysSizingCalc, &
+                               DisplayExtraWarnings
+USE DataInterfaces
 Use DataEnvironment, ONLY: OutBaroPress, OutDryBulbTemp, OutRelHum, StdBaroPress, StdRhoAir
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, DXElecCoolingPower, OnOffFanPartLoadFraction, &
                            SmallAirVolFlow, CoilDX_CoolingSingleSpeed,CoilDX_CoolingHXAssisted, &
@@ -65,10 +65,10 @@ TYPE WindACData
   INTEGER                      :: SchedPtr         =0    ! index to schedule
   INTEGER                      :: FanSchedPtr      =0    ! index to fan operating mode schedule
   INTEGER                      :: FanAvailSchedPtr = 0   ! index to fan availability schedule
-  REAL(r64)                    :: MaxAirVolFlow    =0.0  ! m3/s
-  REAL(r64)                    :: MaxAirMassFlow   =0.0  ! kg/s
-  REAL(r64)                    :: OutAirVolFlow    =0.0  ! m3/s
-  REAL(r64)                    :: OutAirMassFlow   =0.0  ! kg/s
+  REAL(r64)                    :: MaxAirVolFlow    =0.0d0  ! m3/s
+  REAL(r64)                    :: MaxAirMassFlow   =0.0d0  ! kg/s
+  REAL(r64)                    :: OutAirVolFlow    =0.0d0  ! m3/s
+  REAL(r64)                    :: OutAirMassFlow   =0.0d0  ! kg/s
   INTEGER                      :: AirInNode        =0    ! inlet air node number
   INTEGER                      :: AirOutNode       =0    ! outlet air node number
   INTEGER                      :: OutsideAirNode   =0    ! outside air node number
@@ -92,22 +92,22 @@ TYPE WindACData
   INTEGER :: FanPlace          =0 ! fan placement; 1=blow through, 2=draw through
   INTEGER :: MaxIterIndex1     =0
   INTEGER :: MaxIterIndex2     =0
-  REAL(r64)                    :: ConvergenceTol    =0.0 ! Convergence tolerance, fraction (ZoneLoad - Equip Output)/ZoneLoad
+  REAL(r64)                    :: ConvergenceTol    =0.0d0 ! Convergence tolerance, fraction (ZoneLoad - Equip Output)/ZoneLoad
   ! Calc data
-  REAL(r64)                    :: PartLoadFrac      =0.0 ! part load fraction for the unit
+  REAL(r64)                    :: PartLoadFrac      =0.0d0 ! part load fraction for the unit
   Logical                      :: EMSOverridePartLoadFrac = .FALSE.
   REAL(r64)                    :: EMSValueForPartLoadFrac = 0.0D0 !
   ! Report data
-  REAL(r64)                    :: TotCoolEnergyRate =0.0 ! total cooling output [W]
-  REAL(r64)                    :: TotCoolEnergy     =0.0 ! total cooling output [J]
-  REAL(r64)                    :: SensCoolEnergyRate=0.0 ! sensible cooling output [W]
-  REAL(r64)                    :: SensCoolEnergy    =0.0 ! sensible cooling output [J]
-  REAL(r64)                    :: LatCoolEnergyRate =0.0 ! sensible cooling output [W]
-  REAL(r64)                    :: LatCoolEnergy     =0.0 ! sensible cooling output [J]
-  REAL(r64)                    :: ElecPower         =0.0 ! electricity consumed [W]
-  REAL(r64)                    :: ElecConsumption   =0.0 ! electricity consumed [J]
-  REAL(r64)                    :: FanPartLoadRatio  =0.0 ! fan part-load ratio for time step
-  REAL(r64)                    :: CompPartLoadRatio =0.0 ! compressor part-load ratio for time step
+  REAL(r64)                    :: TotCoolEnergyRate =0.0d0 ! total cooling output [W]
+  REAL(r64)                    :: TotCoolEnergy     =0.0d0 ! total cooling output [J]
+  REAL(r64)                    :: SensCoolEnergyRate=0.0d0 ! sensible cooling output [W]
+  REAL(r64)                    :: SensCoolEnergy    =0.0d0 ! sensible cooling output [J]
+  REAL(r64)                    :: LatCoolEnergyRate =0.0d0 ! sensible cooling output [W]
+  REAL(r64)                    :: LatCoolEnergy     =0.0d0 ! sensible cooling output [J]
+  REAL(r64)                    :: ElecPower         =0.0d0 ! electricity consumed [W]
+  REAL(r64)                    :: ElecConsumption   =0.0d0 ! electricity consumed [J]
+  REAL(r64)                    :: FanPartLoadRatio  =0.0d0 ! fan part-load ratio for time step
+  REAL(r64)                    :: CompPartLoadRatio =0.0d0 ! compressor part-load ratio for time step
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
   INTEGER                      :: AvailStatus          = 0
 END TYPE WindACData
@@ -230,6 +230,7 @@ ELSE
 END IF
 
 ZoneEqDXCoil = .TRUE.
+ZoneCoolingOnlyFan = .TRUE.
 
 ! Initialize the window AC unit
 CALL InitWindowAC(WindACNum, QZnReq, ZoneNum, FirstHVACIteration)
@@ -239,7 +240,8 @@ CALL SimCyclingWindowAC(WindACNum,ZoneNum,FirstHVACIteration,PowerMet,QZnReq,Lat
 ! Report the result of the simulation
 CALL ReportWindowAC(WindACNum)
 
-ZoneEqDXCoil = .TRUE.
+ZoneEqDXCoil = .FALSE.
+ZoneCoolingOnlyFan = .FALSE.
 
 RETURN
 END SUBROUTINE SimWindowAC
@@ -340,7 +342,7 @@ cAlphaFields=' '
 ALLOCATE(cNumericFields(NumNumbers))
 cNumericFields=' '
 ALLOCATE(Numbers(NumNumbers))
-Numbers=0.0
+Numbers=0.0d0
 ALLOCATE(lAlphaBlanks(NumAlphas))
 lAlphaBlanks=.TRUE.
 ALLOCATE(lNumericBlanks(NumNumbers))
@@ -761,11 +763,11 @@ IF (BeginEnvrnFlag .and. MyEnvrnFlag(WindACNum)) THEN
   WindAC(WindACNum)%OutAirMassFlow = RhoAir*WindAC(WindACNum)%OutAirVolFlow
   ! set the node max and min mass flow rates
   Node(OutsideAirNode)%MassFlowRateMax = WindAC(WindACNum)%OutAirMassFlow
-  Node(OutsideAirNode)%MassFlowRateMin = 0.0
+  Node(OutsideAirNode)%MassFlowRateMin = 0.0d0
   Node(OutNode)%MassFlowRateMax = WindAC(WindACNum)%MaxAirMassFlow
-  Node(OutNode)%MassFlowRateMin = 0.0
+  Node(OutNode)%MassFlowRateMin = 0.0d0
   Node(InNode)%MassFlowRateMax = WindAC(WindACNum)%MaxAirMassFlow
-  Node(InNode)%MassFlowRateMin = 0.0
+  Node(InNode)%MassFlowRateMin = 0.0d0
   MyEnvrnFlag(WindACNum) = .FALSE.
 END IF ! end one time inits
 
@@ -774,7 +776,7 @@ IF (.not. BeginEnvrnFlag) THEN
 ENDIF
 
 IF (WindAC(WindACNum)%FanSchedPtr .GT. 0) THEN
-  IF (GetCurrentScheduleValue(WindAC(WindACNum)%FanSchedPtr) .EQ. 0.0) THEN
+  IF (GetCurrentScheduleValue(WindAC(WindACNum)%FanSchedPtr) .EQ. 0.0d0) THEN
     WindAC(WindACNum)%OpMode = CycFanCycCoil
   ELSE
     WindAC(WindACNum)%OpMode = ContFanCycCoil
@@ -786,41 +788,41 @@ InletNode = WindAC(WindACNum)%AirInNode
 OutsideAirNode = WindAC(WindACNum)%OutsideAirNode
 AirRelNode = WindAC(WindACNum)%AirReliefNode
 ! Set the inlet node mass flow rate
-IF (GetCurrentScheduleValue(WindAC(WindACNum)%SchedPtr) .LE. 0.0 &
+IF (GetCurrentScheduleValue(WindAC(WindACNum)%SchedPtr) .LE. 0.0d0 &
     .OR. (GetCurrentScheduleValue(WindAC(WindACNum)%FanAvailSchedPtr) .LE. 0.0d0 .AND. &
     .NOT. ZoneCompTurnFansOn) .OR. ZoneCompTurnFansOff) THEN
-  WindAC(WindACNum)%PartLoadFrac = 0.0
-  Node(InletNode)%MassFlowRate = 0.0
-  Node(InletNode)%MassFlowRateMaxAvail = 0.0
-  Node(InletNode)%MassFlowRateMinAvail = 0.0
-  Node(OutsideAirNode)%MassFlowRate = 0.0
-  Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0
-  Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
-  Node(AirRelNode)%MassFlowRate = 0.0
-  Node(AirRelNode)%MassFlowRateMaxAvail = 0.0
-  Node(AirRelNode)%MassFlowRateMinAvail = 0.0
+  WindAC(WindACNum)%PartLoadFrac = 0.0d0
+  Node(InletNode)%MassFlowRate = 0.0d0
+  Node(InletNode)%MassFlowRateMaxAvail = 0.0d0
+  Node(InletNode)%MassFlowRateMinAvail = 0.0d0
+  Node(OutsideAirNode)%MassFlowRate = 0.0d0
+  Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0d0
+  Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
+  Node(AirRelNode)%MassFlowRate = 0.0d0
+  Node(AirRelNode)%MassFlowRateMaxAvail = 0.0d0
+  Node(AirRelNode)%MassFlowRateMinAvail = 0.0d0
 ELSE
-  WindAC(WindACNum)%PartLoadFrac = 1.0
+  WindAC(WindACNum)%PartLoadFrac = 1.0d0
   Node(InletNode)%MassFlowRate = WindAC(WindACNum)%MaxAirMassFlow
   Node(InletNode)%MassFlowRateMaxAvail = Node(InletNode)%MassFlowRate
   Node(InletNode)%MassFlowRateMinAvail = Node(InletNode)%MassFlowRate
   Node(OutsideAirNode)%MassFlowRate = WindAC(WindACNum)%OutAirMassFlow
   Node(OutsideAirNode)%MassFlowRateMaxAvail = WindAC(WindACNum)%OutAirMassFlow
-  Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
+  Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
   Node(AirRelNode)%MassFlowRate = WindAC(WindACNum)%OutAirMassFlow
   Node(AirRelNode)%MassFlowRateMaxAvail = WindAC(WindACNum)%OutAirMassFlow
-  Node(AirRelNode)%MassFlowRateMinAvail = 0.0
+  Node(AirRelNode)%MassFlowRateMinAvail = 0.0d0
 END IF
 
 ! Original thermostat control logic (works only for cycling fan systems)
-IF(QZnReq .LT. (-1.d0*SmallLoad) .AND. .NOT. CurDeadbandOrSetback(ZoneNum) .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0)THEN
+IF(QZnReq .LT. (-1.d0*SmallLoad) .AND. .NOT. CurDeadbandOrSetback(ZoneNum) .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0d0)THEN
   CoolingLoad = .TRUE.
 ELSE
   CoolingLoad = .FALSE.
 END IF
 
 ! Constant fan systems are tested for ventilation load to determine if load to be met changes.
-IF(WindAC(WindACNum)%OpMode .EQ. ContFanCycCoil .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0 &
+IF(WindAC(WindACNum)%OpMode .EQ. ContFanCycCoil .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0d0 &
     .AND. (GetCurrentScheduleValue(WindAC(WindACNum)%FanAvailSchedPtr) .GT. 0.0d0 .OR. &
     ZoneCompTurnFansOn) .AND. .NOT. ZoneCompTurnFansOn)THEN
 
@@ -846,7 +848,7 @@ SUBROUTINE SizeWindowAC(WindACNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   January 2002
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -862,6 +864,7 @@ SUBROUTINE SizeWindowAC(WindACNum)
           ! USE STATEMENTS:
   USE InputProcessor
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits    
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -878,23 +881,61 @@ SUBROUTINE SizeWindowAC(WindACNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          ! na
+  REAL(r64) :: MaxAirVolFlowDes    ! Autosized maximum air flow for reproting 
+  REAL(r64) :: MaxAirVolFlowUser   ! Hardsized maximum air flow for reproting
+  REAL(r64) :: OutAirVolFlowDes    ! Autosized outdoor air flow for reproting
+  REAL(r64) :: OutAirVolFlowUser   ! Hardsized outdoor ari flow for reporting  
+  LOGICAL   :: IsAutosize          ! Indicator to autosize
+
+  IsAutosize = .FALSE.
+  MaxAirVolFlowDes = 0.0d0
+  MaxAirVolFlowUser = 0.0d0
+  OutAirVolFlowDes = 0.0d0
+  OutAirVolFlowUser = 0.0d0
 
   IF (WindAC(WindACNum)%MaxAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name)
-      WindAC(WindACNum)%MaxAirVolFlow = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
-      IF (WindAC(WindACNum)%MaxAirVolFlow < SmallAirVolFlow) THEN
-        WindAC(WindACNum)%MaxAirVolFlow = 0.0
-      END IF
-
-      CALL ReportSizingOutput(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name, &
-                              'Maximum Supply Air Flow Rate [m3/s]', WindAC(WindACNum)%MaxAirVolFlow)
-    END IF
-
+    IsAutosize = .TRUE.  
   END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! Simulation continue
+      IF (WindAC(WindACNum)%MaxAirVolFlow > 0.0d0) THEN  
+        CALL ReportSizingOutput(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name, &
+                              'Maximum Supply Air Flow Rate [m3/s]', WindAC(WindACNum)%MaxAirVolFlow)
+      END IF
+    ELSE  
+      CALL CheckZoneSizing(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name)
+      MaxAirVolFlowDes = FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow
+      IF (MaxAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        WindAC(WindACNum)%MaxAirVolFlow = MaxAirVolFlowDes  
+        CALL ReportSizingOutput(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name, &
+                              'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes)
+      ELSE
+        IF (WindAC(WindACNum)%MaxAirVolFlow > 0.0d0 .AND. MaxAirVolFlowDes > 0.0d0) THEN  
+          MaxAirVolFlowUser = WindAC(WindACNum)%MaxAirVolFlow
+          CALL ReportSizingOutput(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name, &
+                              'Design Size Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowDes, &
+                              'User-Specified Maximum Supply Air Flow Rate [m3/s]', MaxAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowDes - MaxAirVolFlowUser)/MaxAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeWindowAC: Potential issue with equipment sizing for ' &
+                                         //TRIM(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType))//' '// &
+                                          TRIM(WindAC(WindACNum)%Name))
+              CALL ShowContinueError('User-Specified Maximum Supply Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Supply Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF   
+      END IF  
+    END IF
+  END IF
+
 
   IF (WindAC(WindACNum)%OutAirVolFlow == AutoSize) THEN
 
@@ -903,7 +944,7 @@ SUBROUTINE SizeWindowAC(WindACNum)
       CALL CheckZoneSizing(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name)
       WindAC(WindACNum)%OutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA,WindAC(WindACNum)%MaxAirVolFlow)
       IF (WindAC(WindACNum)%OutAirVolFlow < SmallAirVolFlow) THEN
-        WindAC(WindACNum)%OutAirVolFlow = 0.0
+        WindAC(WindACNum)%OutAirVolFlow = 0.0d0
       END IF
       CALL ReportSizingOutput(cWindowAC_UnitTypes(WindAC(WindACNum)%UnitType), WindAC(WindACNum)%Name, &
                               'Maximum Outdoor Air Flow Rate [m3/s]',WindAC(WindACNum)%OutAirVolFlow)
@@ -1012,13 +1053,13 @@ ELSE IF  (WindAC(WindACNum)%OPMode == ContFanCycCoil) THEN
   END IF
 END IF
 
-OnOffFanPartLoadFraction = 1.0
+OnOffFanPartLoadFraction = 1.0d0
 
 IF (UnitOn .AND. CoilOn) THEN
   HXUnitOn = .FALSE.
   CALL ControlCycWindACOutput(WindACNum,FirstHVACIteration,OpMode,QZnReq,PartLoadFrac,HXUnitOn)
 ELSE
-   PartLoadFrac = 0.0
+   PartLoadFrac = 0.0d0
    HXUnitOn = .FALSE.
 END IF
 
@@ -1038,8 +1079,8 @@ SensCoolOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - &
                              PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
 
 ! CR9155 Remove specific humidity calculations
-SpecHumOut = Node(OutletNode)%HumRat 
-SpecHumIn  = Node(InletNode)%HumRat 
+SpecHumOut = Node(OutletNode)%HumRat
+SpecHumIn  = Node(InletNode)%HumRat
 LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s
 
 QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -1050,9 +1091,9 @@ IF (WindAC(WindACNum)%OpMode .EQ. CycFanCycCoil) THEN
   WindAC(WindACNum)%FanPartLoadRatio = WindAC(WindACNum)%PartLoadFrac
 ELSE
   IF (UnitOn) THEN
-    WindAC(WindACNum)%FanPartLoadRatio = 1.0
+    WindAC(WindACNum)%FanPartLoadRatio = 1.0d0
   ELSE
-    WindAC(WindACNum)%FanPartLoadRatio = 0.0
+    WindAC(WindACNum)%FanPartLoadRatio = 0.0d0
   END IF
 END IF
 WindAC(WindACNum)%SensCoolEnergyRate = ABS(MIN(0.0d0,SensCoolOut))
@@ -1243,7 +1284,7 @@ SUBROUTINE ControlCycWindACOutput(WindACNum,FirstHVACIteration,OpMode,QZnReq,Par
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !
 INTEGER, PARAMETER  ::   MaxIter = 50         !maximum number of iterations
-REAL(r64), PARAMETER     ::   MinPLF = 0.0         !minimum part load factor allowed
+REAL(r64), PARAMETER     ::   MinPLF = 0.0d0         !minimum part load factor allowed
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1285,7 +1326,7 @@ CALL CalcWindowACOutput(WindACNum,FirstHVACIteration,OpMode,0.0d0,HXUnitOn,NoCoo
 
 ! If NoCoolOutput < QZnReq, the coil needs to be off
 IF (NoCoolOutput < QZnReq) THEN
-  PartLoadFrac = 0.0
+  PartLoadFrac = 0.0d0
   RETURN
 END IF
 
@@ -1294,22 +1335,22 @@ CALL CalcWindowACOutput(WindACNum,FirstHVACIteration,OpMode,1.0d0,HXUnitOn,FullO
 
 ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCoolOutput
 ! Check that this is the case; if not set PartLoadFrac = 0.0 (off) and return
-IF (FullOutput >= 0.0 .OR. FullOutput >= NoCoolOutput) THEN
-  PartLoadFrac = 0.0
+IF (FullOutput >= 0.0d0 .OR. FullOutput >= NoCoolOutput) THEN
+  PartLoadFrac = 0.0d0
   RETURN
 END IF
 
 ! If the QZnReq <= FullOutput the unit needs to run full out
 IF (QZnReq  <=  FullOutput .AND. WindAC(WindACNum)%DXCoilType_Num /= CoilDX_CoolingHXAssisted) THEN
-  PartLoadFrac = 1.0
+  PartLoadFrac = 1.0d0
   RETURN
 END IF
 
 ! If the QZnReq <= FullOutput and a HXAssisted coil is used, check the node setpoint for a maximum humidity ratio set piont
 ! HumRatMax will either equal -999 if no setpoint exists or could be 0 if no moisture load is present
 IF (QZnReq  <=  FullOutput .AND. WindAC(WindACNum)%DXCoilType_Num == CoilDX_CoolingHXAssisted .AND. &
-    Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .LE. 0.0) THEN
-  PartLoadFrac = 1.0
+    Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .LE. 0.0d0) THEN
+  PartLoadFrac = 1.0d0
   RETURN
 END IF
 
@@ -1319,9 +1360,9 @@ END IF
 PartLoadFrac = MAX(MinPLF, ABS(QZnReq - NoCoolOutput) / ABS(FullOutput - NoCoolOutput))
 
   ErrorToler = WindAC(WindACNum)%ConvergenceTol !Error tolerance for convergence from input deck
-  Error = 1.0             !initialize error value for comparison against tolerance
+  Error = 1.0d0             !initialize error value for comparison against tolerance
   Iter = 0                !initialize iteration counter
-  Relax = 1.0
+  Relax = 1.0d0
 
   DO WHILE ((ABS(Error) .GT. ErrorToler) .AND. (Iter .LE. MaxIter) .AND. PartLoadFrac .GT. MinPLF)
     ! Get result when DX coil is operating at partloadfrac
@@ -1332,7 +1373,7 @@ PartLoadFrac = MAX(MinPLF, ABS(QZnReq - NoCoolOutput) / ABS(FullOutput - NoCoolO
     PartLoadFrac = MAX(MinPLF,MIN(1.0d0,PartLoadFrac))
     Iter = Iter + 1
     IF (Iter == 16) THEN
-      Relax = 0.5
+      Relax = 0.5d0
     END IF
   END DO
   IF (Iter .GT. MaxIter) THEN
@@ -1348,7 +1389,7 @@ PartLoadFrac = MAX(MinPLF, ABS(QZnReq - NoCoolOutput) / ABS(FullOutput - NoCoolO
 
   IF(WindAC(WindACNum)%DXCoilType_Num == CoilDX_CoolingHXAssisted .AND. &
      Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .LT. Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRat .AND. &
-     Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .GT. 0.0) THEN
+     Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .GT. 0.0d0) THEN
 
 !   Run the HX to recovery energy and improve latent performance
     HXUnitOn = .TRUE.
@@ -1358,13 +1399,13 @@ PartLoadFrac = MAX(MinPLF, ABS(QZnReq - NoCoolOutput) / ABS(FullOutput - NoCoolO
 
     IF(Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRatMax .LT. Node(WindAC(WindACNum)%CoilOutletNodeNum)%HumRat .OR. &
        QZnReq  <=  FullOutput) THEN
-      PartLoadFrac = 1.0
+      PartLoadFrac = 1.0d0
       RETURN
     END IF
 
-    Error = 1.0             !initialize error value for comparison against tolerance
+    Error = 1.0d0             !initialize error value for comparison against tolerance
     Iter = 0                !initialize iteration counter
-    Relax = 1.0
+    Relax = 1.0d0
 
     DO WHILE ((ABS(Error) .GT. ErrorToler) .AND. (Iter .LE. MaxIter) .AND. PartLoadFrac .GT. MinPLF)
       ! Get result when DX coil is operating at partloadfrac
@@ -1375,7 +1416,7 @@ PartLoadFrac = MAX(MinPLF, ABS(QZnReq - NoCoolOutput) / ABS(FullOutput - NoCoolO
       PartLoadFrac = MAX(MinPLF,MIN(1.0d0,PartLoadFrac))
       Iter = Iter + 1
       IF (Iter == 16) THEN
-        Relax = 0.5
+        Relax = 0.5d0
       END IF
     END DO
     IF (Iter .GT. MaxIter) THEN

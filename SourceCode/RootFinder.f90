@@ -87,19 +87,19 @@ MODULE RootFinder
   !   RF,                   & ! RootFinderData
   !   iSlopeIncreasing,     & ! SlopeType
   !   iMethodBrent,         & ! MethodType
-  !   1.0E-6,               & ! TolX
-  !   1.0E-6,               & ! ATolX
-  !   1.0E-4                & ! ATolY
+  !   1.0d-6,               & ! TolX
+  !   1.0d-6,               & ! ATolX
+  !   1.0d-4                & ! ATolY
   ! )
   ! CALL InitializeRootFinder(   &
   !   RF,                   & ! RootFinderData
-  !   0.0,                  & ! XMin
-  !   1.0                   & ! XMax
+  !   0.0d0,                & ! XMin
+  !   1.0d0                 & ! XMax
   ! )
   !
   ! IterationCount = 0
   ! IsDoneFlag = .FALSE.
-  ! RF%XCandidate = 0.1 ! Sets X to initial value XInit
+  ! RF%XCandidate = 0.1d0 ! Sets X to initial value XInit
   !
   ! DO WHILE ( .NOT.IsDoneFlag  )
   !   IterationCount = IterationCount+1
@@ -268,19 +268,19 @@ SUBROUTINE SetupRootFinder( RootFinderData, SlopeType, MethodType, TolX, ATolX, 
   RootFinderData%Controls%MethodType = MethodType
 
   ! Load relative tolerance parameter for X variables
-  IF ( TolX < 0.0 ) THEN
+  IF ( TolX < 0.0d0 ) THEN
     CALL ShowFatalError('SetupRootFinder: Invalid tolerance specification for X variables. TolX >= 0')
   END IF
   RootFinderData%Controls%TolX = TolX
 
   ! Load absolute tolerance parameter for X variables
-  IF ( ATolX < 0.0 ) THEN
+  IF ( ATolX < 0.0d0 ) THEN
     CALL ShowFatalError('SetupRootFinder: Invalid absolute tolerance specification for X variables. ATolX >= 0')
   END IF
   RootFinderData%Controls%ATolX = ATolX
 
   ! Load absolute tolerance parameter for Y variables
-  IF ( ATolY < 0.0 ) THEN
+  IF ( ATolY < 0.0d0 ) THEN
     CALL ShowFatalError('SetupRootFinder: Invalid absolute tolerance specification for Y variables. ATolY >= 0')
   END IF
   RootFinderData%Controls%ATolY = ATolY
@@ -336,46 +336,46 @@ SUBROUTINE ResetRootFinder( RootFinderData, XMin, XMax )
 
   ! Reset min point
   RootFinderData%MinPoint%X           = XMin
-  RootFinderData%MinPoint%Y           = 0.0
+  RootFinderData%MinPoint%Y           = 0.0d0
   RootFinderData%MinPoint%DefinedFlag = .FALSE.
 
   ! Reset max point
   RootFinderData%MaxPoint%X           = XMax
-  RootFinderData%MaxPoint%Y           = 0.0
+  RootFinderData%MaxPoint%Y           = 0.0d0
   RootFinderData%MaxPoint%DefinedFlag = .FALSE.
 
   ! Reset lower point
-  RootFinderData%LowerPoint%X           = 0.0
-  RootFinderData%LowerPoint%Y           = 0.0
+  RootFinderData%LowerPoint%X           = 0.0d0
+  RootFinderData%LowerPoint%Y           = 0.0d0
   RootFinderData%LowerPoint%DefinedFlag = .FALSE.
 
   ! Reset upper point
-  RootFinderData%UpperPoint%X           = 0.0
-  RootFinderData%UpperPoint%Y           = 0.0
+  RootFinderData%UpperPoint%X           = 0.0d0
+  RootFinderData%UpperPoint%Y           = 0.0d0
   RootFinderData%UpperPoint%DefinedFlag = .FALSE.
 
   ! Reset previous point
-  RootFinderData%CurrentPoint%X           = 0.0
-  RootFinderData%CurrentPoint%Y           = 0.0
+  RootFinderData%CurrentPoint%X           = 0.0d0
+  RootFinderData%CurrentPoint%Y           = 0.0d0
   RootFinderData%CurrentPoint%DefinedFlag = .FALSE.
 
   ! Reset iterate history with last 3 best points
   RootFinderData%NumHistory             = 0
-  RootFinderData%History(:)%X           = 0.0
-  RootFinderData%History(:)%Y           = 0.0
+  RootFinderData%History(:)%X           = 0.0d0
+  RootFinderData%History(:)%Y           = 0.0d0
   RootFinderData%History(:)%DefinedFlag = .FALSE.
 
   ! Reset increments over successive iterationes
-  RootFinderData%Increment%X            = 0.0
-  RootFinderData%Increment%Y            = 0.0
+  RootFinderData%Increment%X            = 0.0d0
+  RootFinderData%Increment%Y            = 0.0d0
   RootFinderData%Increment%DefinedFlag  = .FALSE.
 
-  RootFinderData%XCandidate = 0.0
+  RootFinderData%XCandidate = 0.0d0
 
   ! Reset default state
   RootFinderData%StatusFlag = iStatusNone
   RootFinderData%CurrentMethodType = iMethodNone
-  RootFinderData%ConvergenceRate = -1.0
+  RootFinderData%ConvergenceRate = -1.0d0
 
   RETURN
 
@@ -425,7 +425,7 @@ SUBROUTINE InitializeRootFinder( RootFinderData, XMin, XMax )
           ! FLOW:
   XMinReset = XMin
   IF ( XMin > XMax) THEN
-    IF (XMax == 0.0) THEN
+    IF (XMax == 0.0d0) THEN
       XMinReset = XMax
     ELSE
       CALL ShowFatalError( &
@@ -829,13 +829,13 @@ INTEGER FUNCTION CheckInternalConsistency( RootFinderData )
   IF ( RootFinderData%MinPoint%DefinedFlag ) THEN
     SELECT CASE ( RootFinderData%Controls%SlopeType )
     CASE ( iSlopeIncreasing )
-      IF ( RootFinderData%MinPoint%Y >= 0.0 ) THEN
+      IF ( RootFinderData%MinPoint%Y >= 0.0d0 ) THEN
         CheckInternalConsistency = iStatusOKMin
         RETURN
       END IF
 
     CASE ( iSlopeDecreasing )
-      IF ( RootFinderData%MinPoint%Y <= 0.0 ) THEN
+      IF ( RootFinderData%MinPoint%Y <= 0.0d0 ) THEN
         CheckInternalConsistency = iStatusOKMin
         RETURN
       END IF
@@ -854,13 +854,13 @@ INTEGER FUNCTION CheckInternalConsistency( RootFinderData )
   IF ( RootFinderData%MaxPoint%DefinedFlag ) THEN
     SELECT CASE ( RootFinderData%Controls%SlopeType )
     CASE ( iSlopeIncreasing )
-      IF ( RootFinderData%MaxPoint%Y <= 0.0 ) THEN
+      IF ( RootFinderData%MaxPoint%Y <= 0.0d0 ) THEN
         CheckInternalConsistency = iStatusOKMax
         RETURN
       END IF
 
     CASE ( iSlopeDecreasing )
-      IF ( RootFinderData%MaxPoint%Y >= 0.0 ) THEN
+      IF ( RootFinderData%MaxPoint%Y >= 0.0d0 ) THEN
         CheckInternalConsistency = iStatusOKMax
         RETURN
       END IF
@@ -1266,13 +1266,13 @@ LOGICAL FUNCTION CheckMinConstraint( RootFinderData )
 
   SelectSlope: SELECT CASE ( RootFinderData%Controls%SlopeType )
   CASE ( iSlopeIncreasing )
-    IF ( RootFinderData%MinPoint%Y >= 0.0 ) THEN
+    IF ( RootFinderData%MinPoint%Y >= 0.0d0 ) THEN
       CheckMinConstraint = .TRUE.
       RETURN
     END IF
 
   CASE ( iSlopeDecreasing )
-    IF ( RootFinderData%MinPoint%Y <= 0.0 ) THEN
+    IF ( RootFinderData%MinPoint%Y <= 0.0d0 ) THEN
       CheckMinConstraint = .TRUE.
       RETURN
     END IF
@@ -1340,13 +1340,13 @@ LOGICAL FUNCTION CheckMaxConstraint( RootFinderData )
   ! Check for max constrained convergence with respect to the new iterate (X,Y)
   SelectSlope: SELECT CASE ( RootFinderData%Controls%SlopeType )
   CASE ( iSlopeIncreasing )
-    IF ( RootFinderData%MaxPoint%Y <= 0.0 ) THEN
+    IF ( RootFinderData%MaxPoint%Y <= 0.0d0 ) THEN
       CheckMaxConstraint = .TRUE.
       RETURN
     END IF
 
   CASE ( iSlopeDecreasing )
-    IF ( RootFinderData%MaxPoint%Y >= 0.0 ) THEN
+    IF ( RootFinderData%MaxPoint%Y >= 0.0d0 ) THEN
       CheckMaxConstraint = .TRUE.
       RETURN
     END IF
@@ -1519,7 +1519,7 @@ LOGICAL FUNCTION CheckBracketRoundOff( RootFinderData )
   ! Check for round-off error in Lower/Upper interval
   IF ( RootFinderData%LowerPoint%DefinedFlag .AND.  RootFinderData%UpperPoint%DefinedFlag ) THEN
     DeltaUL = RootFinderData%UpperPoint%X - RootFinderData%LowerPoint%X
-    TypUL   = (ABS(RootFinderData%UpperPoint%X) + ABS(RootFinderData%LowerPoint%X))/2.0
+    TypUL   = (ABS(RootFinderData%UpperPoint%X) + ABS(RootFinderData%LowerPoint%X))/2.0d0
     TolUL   = RootFinderData%Controls%TolX * ABS(TypUL) + RootFinderData%Controls%ATolX
 
     ! Halve tolerance to reflect the fact that solution can be anywhere between the lower and upper points.
@@ -1657,7 +1657,7 @@ SUBROUTINE UpdateBracket( RootFinderData, X, Y )
 
   CASE ( iSlopeIncreasing )
     ! Update lower point
-    IF ( Y <= 0.0 ) THEN
+    IF ( Y <= 0.0d0 ) THEN
       IF ( .NOT.RootFinderData%LowerPoint%DefinedFlag ) THEN
         RootFinderData%LowerPoint%DefinedFlag = .TRUE.
         RootFinderData%LowerPoint%X = X
@@ -1726,7 +1726,7 @@ SUBROUTINE UpdateBracket( RootFinderData, X, Y )
   ! Monotone, decreasing function
   CASE ( iSlopeDecreasing )
     ! Update lower point
-    IF ( Y >= 0.0 ) THEN
+    IF ( Y >= 0.0d0 ) THEN
       IF ( .NOT.RootFinderData%LowerPoint%DefinedFlag ) THEN
         RootFinderData%LowerPoint%DefinedFlag = .TRUE.
         RootFinderData%LowerPoint%X = X
@@ -1860,8 +1860,8 @@ SUBROUTINE UpdateHistory( RootFinderData, X, Y )
   !   SIGN(History(1)%Y) = - SIGN(History(3)%Y)
   ! to ensure that the history points bracket the candidate root.
   RootFinderData%History(:)%DefinedFlag = .FALSE.
-  RootFinderData%History(:)%X = 0.0
-  RootFinderData%History(:)%Y = 0.0
+  RootFinderData%History(:)%X = 0.0d0
+  RootFinderData%History(:)%Y = 0.0d0
 
   NumHistory = 0
   IF ( RootFinderData%LowerPoint%DefinedFlag ) THEN
@@ -1965,12 +1965,12 @@ SUBROUTINE UpdateRootFinder( RootFinderData, X, Y )
     RootFinderData%Increment%X = X - RootFinderData%CurrentPoint%X
     RootFinderData%Increment%Y = Y - RootFinderData%CurrentPoint%Y
 
-    IF ( ABS(RootFinderData%CurrentPoint%Y) > 0.0 ) THEN
+    IF ( ABS(RootFinderData%CurrentPoint%Y) > 0.0d0 ) THEN
       ! NOTE: Should be smaller than one for convergent process
       RootFinderData%ConvergenceRate = ABS(Y) / ABS(RootFinderData%CurrentPoint%Y)
     ELSE
       ! NOTE: Should never happen
-      RootFinderData%ConvergenceRate = -1.0
+      RootFinderData%ConvergenceRate = -1.0d0
     END IF
   END IF
 
@@ -2097,7 +2097,7 @@ SUBROUTINE AdvanceRootFinder( RootFinderData )
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)                               :: XNext = 0.0
+  REAL(r64)                               :: XNext = 0.0d0
 
           ! FLOW:
 
@@ -2323,7 +2323,7 @@ REAL(r64) FUNCTION BisectionMethod( RootFinderData )
 
           ! FLOW:
   RootFinderData%CurrentMethodType = iMethodBisection
-  BisectionMethod = (RootFinderData%LowerPoint%X + RootFinderData%UpperPoint%X)/2.0
+  BisectionMethod = (RootFinderData%LowerPoint%X + RootFinderData%UpperPoint%X)/2.0d0
 
   RETURN
 END FUNCTION BisectionMethod
@@ -2383,7 +2383,7 @@ REAL(r64) FUNCTION FalsePositionMethod( RootFinderData )
   Num = RootFinderData%UpperPoint%X - RootFinderData%LowerPoint%X
   Den = RootFinderData%UpperPoint%Y - RootFinderData%LowerPoint%Y
 
-  IF ( Den /= 0.0 ) THEN
+  IF ( Den /= 0.0d0 ) THEN
     ! False position method
     RootFinderData%CurrentMethodType = iMethodFalsePosition
     XCandidate = RootFinderData%LowerPoint%X - RootFinderData%LowerPoint%Y * Num/Den
@@ -2530,7 +2530,7 @@ LOGICAL FUNCTION SecantFormula( RootFinderData, XNext )
 
   ! Cannot use secant with infinite slope (Den==0).
   ! Cannot use secant with null slope (Num==0).
-  IF ( Den /= 0.0 .AND. Num /= 0.0 ) THEN
+  IF ( Den /= 0.0d0 .AND. Num /= 0.0d0 ) THEN
     XNext = RootFinderData%CurrentPoint%X - RootFinderData%CurrentPoint%Y * Num/Den
     SecantFormula = .TRUE.
   ELSE
@@ -2612,11 +2612,11 @@ REAL(r64) FUNCTION BrentMethod( RootFinderData )
     FC = RootFinderData%History(3)%Y
 
     ! Should never happen if CheckRootFinderConvergence() is invoked prior to this subroutine
-    IF (FC == 0.0) THEN
+    IF (FC == 0.0d0) THEN
       BrentMethod = C
       RETURN
     ! Should never happen if CheckRootFinderConvergence() is invoked prior to this subroutine
-    ELSE IF (FA == 0.0) THEN
+    ELSE IF (FA == 0.0d0) THEN
       BrentMethod = A
       RETURN
     ELSE

@@ -100,12 +100,12 @@ TYPE, PUBLIC :: SurfaceDataFD
   REAL(r64),    ALLOCATABLE, DIMENSION(:) :: EnthLast
   INTEGER                                 :: GSloopCounter = 0 ! count of inner loop iterations
   INTEGER                                 :: GSloopErrorCount = 0 ! recurring error counter
-  REAL(r64)                               :: MaxNodeDelTemp = 0 ! largest change in node temps after calc
+  REAL(r64)                               :: MaxNodeDelTemp = 0.0d0 ! largest change in node temps after calc
 
 END TYPE SurfaceDataFD
 
 TYPE MaterialDataFD
-  REAL(r64) :: tk1          =0.0  ! Temperature coefficient for thermal conductivity
+  REAL(r64) :: tk1          =0.0d0  ! Temperature coefficient for thermal conductivity
   INTEGER   :: numTempEnth  = 0   ! number of Temperature/Enthalpy pairs
   INTEGER   :: numTempCond  = 0   ! number of Temperature/Conductivity pairs
   REAL(r64), ALLOCATABLE, DIMENSION(:,:)  :: TempEnth  !  Temperature enthalpy Function Pairs,
@@ -595,8 +595,8 @@ SUBROUTINE InitHeatBalFiniteDiff
       SurfaceFD(SurfNum)%TDTLast        = TempInitValue
       SurfaceFD(SurfNum)%TDOld          = TempInitValue
       SurfaceFD(SurfNum)%TDreport       = TempInitValue
-      SurfaceFD(SurfNum)%RH             = 0.0
-      SurfaceFD(SurfNum)%RHreport       = 0.0
+      SurfaceFD(SurfNum)%RH             = 0.0d0
+      SurfaceFD(SurfNum)%RHreport       = 0.0d0
       SurfaceFD(SurfNum)%EnthOld        = EnthInitValue
       SurfaceFD(SurfNum)%EnthNew        = EnthInitValue
       SurfaceFD(SurfNum)%EnthLast       = EnthInitValue
@@ -807,7 +807,7 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
         ConstructFD(ConstrNum)%Thickness(Layer) = Material(CurrentLayer)%Thickness
 
         SigmaR(ConstrNum) = SigmaR(ConstrNum) + Material(CurrentLayer)%Resistance  ! add resistance of R layer
-        SigmaC(ConstrNum) = SigmaC(ConstrNum)  + 0.0                               !  no capacitance for R layer
+        SigmaC(ConstrNum) = SigmaC(ConstrNum)  + 0.0d0                               !  no capacitance for R layer
 
         Alpha = kt/(Material(CurrentLayer)%Density*Material(CurrentLayer)%SpecHeat)
 
@@ -831,7 +831,7 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
         ConstructFD(ConstrNum)%Thickness(Layer) = Material(CurrentLayer)%Thickness
 
         SigmaR(ConstrNum) = SigmaR(ConstrNum) + Material(CurrentLayer)%Resistance  ! add resistance of R layer
-        SigmaC(ConstrNum) = SigmaC(ConstrNum)  + 0.0                               !  no capacitance for R layer
+        SigmaC(ConstrNum) = SigmaC(ConstrNum)  + 0.0d0                               !  no capacitance for R layer
 
         Alpha = kt/(Material(CurrentLayer)%Density*Material(CurrentLayer)%SpecHeat)
         mAlpha = 0.d0
@@ -890,11 +890,13 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
                                     //' material conductivity = ' //TRIM(RoundSigDigits(Material(CurrentLayer)%Conductivity, 3)) &
                                     //' [W/m-K]')
             CALL ShowContinueError('Material thermal diffusivity = ' //TRIM(RoundSigDigits(Alpha, 3)) //' [m2/s]')
+            CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
+                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
             IF (Material(CurrentLayer)%Thickness < ThinMaterialLayerThreshold) THEN
               CALL ShowContinueError('Material may be too thin to be modeled well, thickness = ' &
                                       // TRIM(RoundSigDigits(Material(currentLayer)%Thickness, 5 ))//' [m]')
               CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
-                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
+                                      //  TRIM(RoundSigDigits(ThinMaterialLayerThreshold , 5)) // ' [m]')
             ENDIF
             Material(CurrentLayer)%WarnedForHighDiffusivity = .TRUE.
           ENDIF
@@ -1009,8 +1011,8 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
     SurfaceFD(Surf)%TDTLast        = TempInitValue
     SurfaceFD(Surf)%TDOld          = TempInitValue
     SurfaceFD(Surf)%TDreport       = TempInitValue
-    SurfaceFD(Surf)%RH             = 0.0
-    SurfaceFD(Surf)%RHreport       = 0.0
+    SurfaceFD(Surf)%RH             = 0.0d0
+    SurfaceFD(Surf)%RHreport       = 0.0d0
     SurfaceFD(Surf)%EnthOld        = EnthInitValue
     SurfaceFD(Surf)%EnthNew        = EnthInitValue
     SurfaceFD(Surf)%EnthLast       = EnthInitValue
@@ -1116,7 +1118,7 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
   INTEGER  :: TotNodes
   INTEGER  :: delt
   INTEGER  :: GSiter !  iteration counter for implicit repeat calculation
-  REAL(r64) :: MaxDelTemp = 0
+  REAL(r64) :: MaxDelTemp = 0.0d0
   INTEGER   :: NodeNum
 
   ConstrNum=Surface(surf)%Construction
@@ -1124,8 +1126,8 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
   TotNodes = ConstructFD(ConstrNum)%TotNodes
   TotLayers = Construct(ConstrNum)%TotLayers
 
-  TempSurfInTmp =0.0
-  TempSurfOutTmp=0.0
+  TempSurfInTmp =0.0d0
+  TempSurfOutTmp=0.0d0
 
 
   Delt = ConstructFD(ConstrNum)%DeltaTime    !   (seconds)
@@ -1268,10 +1270,10 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
 
   TempSurfOutTmp = SurfaceFD(Surf)%TDT(1)
   TempSurfInTmp  = SurfaceFD(Surf)%TDT(TotNodes+1)
-  RhoVaporSurfIn(surf) = 0.0
+  RhoVaporSurfIn(surf) = 0.0d0
 
   ! determine largest change in node temps
-  MaxDelTemp      = 0.0
+  MaxDelTemp      = 0.0d0
   DO NodeNum = 1, TotNodes+1   !need to consider all nodes
     MaxDelTemp = MAX(ABS(SurfaceFD(Surf)%TDT(NodeNum) - SurfaceFD(Surf)%TDreport(NodeNum)), MaxDelTemp)
   ENDDO
@@ -1725,7 +1727,7 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
       kt1 = MaterialFD(MatLay)%tk1  !  linear coefficient (normally zero)
       kt= kto + kt1*((TDT(I)+TDT(I+1))/2.d0 - 20.d0)
 
-      IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
+      IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.0d0) THEN ! Multiple Linear Segment Function
 
         DepVarCol= 2  ! thermal conductivity
         IndVarCol=1  !temperature
@@ -1762,7 +1764,7 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
       ELSE  ! Regular or phase change material layer
 
              !  check for phase change material
-        IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.) THEN    !  phase change material,  Use TempEnth Data to generate Cp
+        IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.0d0) THEN    !  phase change material,  Use TempEnth Data to generate Cp
 !               CheckhT = Material(MatLay)%TempEnth       ! debug
 
           !       Enthalpy function used to get average specific heat.  Updated by GS so enthalpy function is followed.
@@ -1782,19 +1784,19 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
 !     Choose Regular or Transparent Insulation Case
 
-        IF(HMovInsul <= 0. ) THEN  !  regular  case
+        IF(HMovInsul <= 0.0d0 ) THEN  !  regular  case
 
           SELECT CASE (CondFDSchemeType)
           CASE (CrankNicholsonSecondOrder)
              !  Second Order equation
-            TDT(I)= (1.*QRadSWOutFD + (0.5d0*Cp*Delx*RhoS*TD(I))/DelT + (0.5*kt*(-1.*TD(I) + TD(I+1)))/Delx  &
-                     + (0.5d0*kt*TDT(I+1))/Delx + 0.5d0*hgnd*Tgnd + 0.5d0*hgnd*(-1.*TD(I) + Tgnd) + 0.5d0*hconvo*Toa +   &
+            TDT(I)= (1.0d0*QRadSWOutFD + (0.5d0*Cp*Delx*RhoS*TD(I))/DelT + (0.5d0*kt*(-1.0d0*TD(I) + TD(I+1)))/Delx  &
+                     + (0.5d0*kt*TDT(I+1))/Delx + 0.5d0*hgnd*Tgnd + 0.5d0*hgnd*(-1.0d0*TD(I) + Tgnd) + 0.5d0*hconvo*Toa +   &
                         0.5d0*hrad*Toa  &
                      + 0.5d0*hconvo*(-1.d0*TD(I) + Toa) + 0.5d0*hrad*(-1.d0*TD(I) + Toa) + 0.5d0*hsky*Tsky +   &
                         0.5d0*hsky*(-1.d0*TD(I) + Tsky))/  &
                        (0.5d0*hconvo + 0.5d0*hgnd + 0.5d0*hrad + 0.5d0*hsky + (0.5d0*kt)/Delx + (0.5d0*Cp*Delx*RhoS)/DelT)
-!feb2012            TDT(I)= (1.*QRadSWOutFD + (0.5d0*Cp*Delx*RhoS*TD(I))/DelT + (0.5*kt*(-1.*TD(I) + TD(I+1)))/Delx  &
-!feb2012                     + (0.5d0*kt*TDT(I+1))/Delx + 0.5d0*hgnd*Tgnd + 0.5d0*hgnd*(-1.*TD(I) + Tgnd) + 0.5d0*hconvo*Toa +   &
+!feb2012            TDT(I)= (1.0d0*QRadSWOutFD + (0.5d0*Cp*Delx*RhoS*TD(I))/DelT + (0.5d0*kt*(-1.0d0*TD(I) + TD(I+1)))/Delx  &
+!feb2012                     + (0.5d0*kt*TDT(I+1))/Delx + 0.5d0*hgnd*Tgnd + 0.5d0*hgnd*(-1.0d0*TD(I) + Tgnd) + 0.5d0*hconvo*Toa +   &
 !feb2012                        0.5d0*hrad*Toa  &
 !feb2012                     + 0.5d0*hconvo*(-1.d0*TD(I) + Toa) + 0.5d0*hrad*(-1.d0*TD(I) + Toa) + 0.5d0*hsky*Tsky +   &
 !feb2012                        0.5d0*hsky*(-1.d0*TD(I) + Tsky))/  &
@@ -1802,16 +1804,16 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
           CASE (FullyImplicitFirstOrder)
            !   First Order
-            TDT(I)=(2*Delt*Delx*QRadSWOutFD + Cp*Delx**2*RhoS*TD(I) &
-                    + 2*Delt*kt*TDT(I+1) + 2*Delt*Delx*hgnd*Tgnd  &
-                    + 2*Delt*Delx*hconvo*Toa + 2*Delt*Delx*hrad*Toa + 2*Delt*Delx*hsky*Tsky)/  &
-                     (2*Delt*Delx*hconvo + 2*Delt*Delx*hgnd + 2*Delt*Delx*hrad +  &
-                       2*Delt*Delx*hsky + 2*Delt*kt + Cp*Delx**2*RhoS)
+            TDT(I)=(2.0d0*Delt*Delx*QRadSWOutFD + Cp*Delx**2*RhoS*TD(I) &
+                    + 2.0d0*Delt*kt*TDT(I+1) + 2.0d0*Delt*Delx*hgnd*Tgnd  &
+                    + 2.0d0*Delt*Delx*hconvo*Toa + 2.0d0*Delt*Delx*hrad*Toa + 2.0d0*Delt*Delx*hsky*Tsky)/  &
+                     (2.0d0*Delt*Delx*hconvo + 2.0d0*Delt*Delx*hgnd + 2.0d0*Delt*Delx*hrad +  &
+                       2.0d0*Delt*Delx*hsky + 2.0d0*Delt*kt + Cp*Delx**2*RhoS)
 
           END SELECT
 
 
-        ELSE IF ( HMovInsul > 0.) Then      !  Transparent insulation on outside
+        ELSE IF ( HMovInsul > 0.0d0) Then      !  Transparent insulation on outside
       !  Transparent insulaton additions
 
         !Movable Insulation Layer Outside surface temp
@@ -1956,12 +1958,12 @@ SUBROUTINE InteriorNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,Ent
   ktA1 = kto + kt1*((TDT(I)+TDT(I+1))/2.d0 - 20.0d0)   ! Will be overridden if variable k
   ktA2 = kto + kt1*((TDT(I)+TDT(I-1))/2.d0 - 20.0d0)   ! Will be overridden if variable k
 
-  IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
+  IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.0d0) THEN ! Multiple Linear Segment Function
 
     DepVarCol = 2  ! thermal conductivity
     IndVarCol = 1  !temperature
-    ktA1 = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I+1))/2.,IndVarCol,DepVarCol)
-    ktA2 = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I-1))/2.,IndVarCol,DepVarCol)
+    ktA1 = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I+1))/2.0d0 ,IndVarCol,DepVarCol)
+    ktA2 = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I-1))/2.0d0 ,IndVarCol,DepVarCol)
   ENDIF
 
   RhoS = Material(MatLay)%Density
@@ -1969,7 +1971,7 @@ SUBROUTINE InteriorNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,Ent
   Cp   = Cpo  ! Will be changed if PCM
   Delx = ConstructFD(ConstrNum)%Delx(Lay)
 
-  IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.) THEN    !  phase change material,  Use TempEnth Data
+  IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.0d0) THEN    !  phase change material,  Use TempEnth Data
 
     DepVarCol = 2  ! enthalpy
     IndVarCol = 1  !temperature
@@ -1992,7 +1994,7 @@ SUBROUTINE InteriorNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,Ent
   CASE (CrankNicholsonSecondOrder)
     ! Adams-Moulton second order
     TDT(I)= ((Cp*Delx*RhoS*TD(I))/Delt +   &
-              0.5d0*((ktA2*(-1.*TD(I) + TD(I-1)))/Delx + (ktA1*(-1.d0*TD(I) + TD(I+1)))/Delx) +   &
+              0.5d0*((ktA2*(-1.0d0*TD(I) + TD(I-1)))/Delx + (ktA1*(-1.d0*TD(I) + TD(I+1)))/Delx) +   &
               (0.5d0*ktA2*TDT(I-1))/Delx + (0.5d0*ktA1*TDT(I+1))/Delx)/  &
               ((0.5d0*(ktA1+ktA2))/Delx + (Cp*Delx*RhoS)/Delt)
 
@@ -2109,7 +2111,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
   kt11=  MaterialFD(MatLay)%tk1
   kt1= kt1o + kt11*((TDT(I)+TDT(I-1))/2.d0 -20.d0)
 
-  IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
+  IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.0d0) THEN ! Multiple Linear Segment Function
 
     IndVarCol = 1  ! temperature
     DepVarCol = 2  ! thermal conductivity
@@ -2126,7 +2128,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
   kt21=  MaterialFD(MatLay2)%tk1
   kt2= kt2o + kt21*((TDT(I)+TDT(I+1))/2.d0 -20.d0)
 
-  IF( SUM(MaterialFD(MatLay2)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
+  IF( SUM(MaterialFD(MatLay2)%TempCond(1:3,2)) >= 0.0d0) THEN ! Multiple Linear Segment Function
 
     IndVarCol = 1  ! temperature
     DepVarCol = 2  ! thermal conductivity
@@ -2148,8 +2150,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
 !     Source/Sink Flux Capability ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    QSSFlux = 0.0
-    IF (Surface(Surf)%Area >0.0 .and.   &
+    QSSFlux = 0.0d0
+    IF (Surface(Surf)%Area >0.0d0 .and.   &
         Construct(ConstrNum)%SourceSinkPresent .and. Lay == Construct(ConstrNum)%SourceAfterLayer) then
 
       QSSFlux = QRadSysSource(Surf)/Surface(Surf)%Area   &
@@ -2172,8 +2174,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
      IndVarCol = 1  ! temperature
      DepVarCol = 2  ! thermal conductivity
 
-      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) < 0.  &
-             .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.) THEN    !  phase change material Layer2,  Use TempEnth Data
+      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) < 0.0d0  &
+             .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.0d0) THEN    !  phase change material Layer2,  Use TempEnth Data
 
         Enth2Old = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth2New = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TDT(I),IndVarCol,DepVarCol)
@@ -2213,8 +2215,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
      IndVarCol = 1  ! temperature
      DepVarCol = 2  ! thermal conductivity
 
-      IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.  &
-          .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) < 0.) THEN    !  phase change material Layer1,  Use TempEnth Data
+      IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.0d0  &
+          .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) < 0.0d0) THEN    !  phase change material Layer1,  Use TempEnth Data
 
         Enth1Old = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth1New = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TDT(I),IndVarCol,DepVarCol)
@@ -2254,8 +2256,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
       IndVarCol = 1  ! temperature
       DepVarCol = 2  ! thermal conductivity
 
-      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.  &
-          .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.) THEN    !  phase change material both layers,  Use TempEnth Data
+      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.0d0  &
+          .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.0d0) THEN    !  phase change material both layers,  Use TempEnth Data
 
         Enth1Old = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth2Old = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TD(I),IndVarCol,DepVarCol)
@@ -2276,8 +2278,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
           Cp2 = Max(Cpo2,(Enth2New -Enth2Old)/(TDT(I)-TD(I)))
         END IF
 
-      ELSE IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.  &
-                .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) < 0.) THEN    !  phase change material Layer1,  Use TempEnth Data
+      ELSE IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.0d0  &
+                .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) < 0.0d0) THEN    !  phase change material Layer1,  Use TempEnth Data
 
         Enth1Old = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth1New = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TDT(I),IndVarCol,DepVarCol)
@@ -2291,8 +2293,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
         Cp2 = Cpo2
 
-      ELSE IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) < 0.  &
-              .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.) THEN    !  phase change material Layer2,  Use TempEnth Data
+      ELSE IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) < 0.0d0  &
+              .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.0d0) THEN    !  phase change material Layer2,  Use TempEnth Data
 
         Enth2Old = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth2New = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TDT(I),IndVarCol,DepVarCol)
@@ -2386,7 +2388,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
   REAL(r64),DIMENSION(:), INTENT(InOut) :: RH    !INSIDE SURFACE TEMPERATURE OF EACH HEAT TRANSFER SURF.
   REAL(r64),DIMENSION(:), INTENT(InOut) :: EnthOld    ! Old Nodal enthalpy
   REAL(r64),DIMENSION(:), INTENT(InOut) :: EnthNew    ! New Nodal enthalpy
-  REAL(r64),DIMENSION(:), INTENT(InOut) :: TDreport    ! Temperature value from previous HeatSurfaceHeatManager titeration's value 
+  REAL(r64),DIMENSION(:), INTENT(InOut) :: TDreport    ! Temperature value from previous HeatSurfaceHeatManager titeration's value
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -2461,12 +2463,12 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
     kt  = kto + kt1*((TDT(I)+TDT(i-1))/2.d0 - 20.d0)
 
 
-    IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
+    IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.0d0) THEN ! Multiple Linear Segment Function
 
       DepVarCol= 2  ! thermal conductivity
       IndVarCol=1  !temperature
           !  Use average  of surface and first node temp for determining k
-      kt  = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I-1))/2.,IndVarCol,DepVarCol)
+      kt  = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I-1))/2.0d0 ,IndVarCol,DepVarCol)
 
     ENDIF
 
@@ -2504,7 +2506,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
     ELSE  !  Regular or PCM
 
 
-      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.) THEN    !  phase change material,  Use TempEnth Data
+      IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) >= 0.0d0) THEN    !  phase change material,  Use TempEnth Data
 
         DepVarCol= 2  ! enthalpy
         IndVarCol=1  !temperature
@@ -2645,7 +2647,7 @@ SUBROUTINE CheckFDSurfaceTempLimits(SurfNum,CheckTemperature)
         CALL ShowContinueErrorTimeStamp(' ')
         IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
           CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-          IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+          IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
             CALL ShowContinueError('...Internal Heat Gain ['//  &
                  trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
           ELSE
@@ -2684,7 +2686,7 @@ SUBROUTINE CheckFDSurfaceTempLimits(SurfNum,CheckTemperature)
         CALL ShowContinueErrorTimeStamp(' ')
         IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
           CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
-          IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+          IF (Zone(ZoneNum)%FloorArea > 0.0d0) THEN
             CALL ShowContinueError('...Internal Heat Gain ['//  &
                  trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
           ELSE

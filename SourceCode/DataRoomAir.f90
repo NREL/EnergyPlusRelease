@@ -7,6 +7,8 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
           !                      Jan 2004, CC
           !                      Aug 2005, BG -- added structures for user-defined patterns
           !                      June 2008, BG -- revised for system time step history terms
+          !                      Aug 2013, Sam Brunswick -- added structures for improved RoomAirModelCrossVent
+          !                     
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -124,7 +126,7 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
         CHARACTER(len=MaxNameLength)   :: ZoneName          =' '
         INTEGER                        :: ZonePtr           =0   ! Pointer to the zone number for this statement
         INTEGER                        :: ClassType         =0   !depending on type of model
-        REAL(r64)                      :: Height            =0.0 !height
+        REAL(r64)                      :: Height            =0.0d0 !height
         LOGICAL, ALLOCATABLE, DIMENSION(:) :: SurfMask           !limit of 60 surfaces at current sizing
     END TYPE AirNodeData
 
@@ -134,10 +136,10 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
         INTEGER                        :: ZonePtr           =0   ! Pointer to the zone number for this statement
         INTEGER                        :: SchedGainsPtr     =-1  ! Schedule for internal gain fraction to occupied zone
         CHARACTER(len=MaxNameLength)   :: SchedGainsName    =' ' ! Gains Schedule name
-        REAL(r64)                      :: NumPlumesPerOcc   =1.0 ! Effective number of plumes per occupant
-        REAL(r64)                      :: ThermostatHeight  =0.0 ! Height of thermostat/ temperature control sensor
-        REAL(r64)                      :: ComfortHeight     =0.0 ! Height at which air temperature is measured for comfort purposes
-        REAL(r64)                      :: TempTrigger       =0.0 ! Minimum temperature difference between TOC TMX for stratification
+        REAL(r64)                      :: NumPlumesPerOcc   =1.0d0 ! Effective number of plumes per occupant
+        REAL(r64)                      :: ThermostatHeight  =0.0d0 ! Height of thermostat/ temperature control sensor
+        REAL(r64)                      :: ComfortHeight     =0.0d0 ! Height at which air temperature is measured for comfort purposes
+        REAL(r64)                      :: TempTrigger       =0.0d0 ! Minimum temperature difference between TOC TMX for stratification
     END TYPE DVData
 
     TYPE CVData
@@ -149,68 +151,76 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
                                                                  ! for comfort models
     END TYPE CVData
 
-    TYPE CVTemp
-        REAL(r64)                      :: In                =23.0d0
-        REAL(r64)                      :: Out               =23.0d0
-        REAL(r64)                      :: Med               =23.0d0
-        REAL(r64)                      :: OutRoom           =23.0d0
-    END TYPE CVTemp
+    TYPE CVFlow
+        INTEGER(r64)                   :: FlowFlag           =0 ! Equal to 1 if the opening has inflow, else equal to 0.
+        REAL(r64)                      :: Width              =0.0d0 ! Width of the opening [m]
+        REAL(r64)                      :: Area               =0.0d0 ! Area of the opening [m2]
+        REAL(r64)                      :: Fin                =0.0d0 ! Inflow volume flux through the opening [m3/s]
+        REAL(r64)                      :: Uin                =0.0d0 ! Inflow air velocity through the opening [m/s]
+        REAL(r64)                      :: Vjet               =0.0d0 ! Average maximum jet velocity for the opening [m/s]
+        REAL(r64)                      :: Yjet               =0.0d0 ! Y in "Y = aX + b" formula
+        REAL(r64)                      :: Ujet               =0.0d0 ! Volume average jet region velocity [m/s]
+        REAL(r64)                      :: Yrec               =0.0d0 ! Y in "Y = aX + b" formula
+        REAL(r64)                      :: Urec               =0.0d0 ! Area-averaged velocity in the y-z plane with maximum flow [m/s]
+        REAL(r64)                      :: YQrec              =0.0d0 ! Y in "Y = aX + b" formula
+        REAL(r64)                      :: Qrec               =0.0d0 ! Total flow rate for the recirculation regions in the plane of maximum flow [m3/s]
+    END TYPE CVFlow
 
     TYPE CVDVParameters
-      REAL(r64)                        :: Width             =0.0
-      REAL(r64)                        :: Height            =0.0
+      REAL(r64)                        :: Width             =0.0d0
+      REAL(r64)                        :: Height            =0.0d0
       Integer                          :: Shadow            =0
-      REAL(r64)                        :: Zmin              =0.0
-      REAL(r64)                        :: Zmax              =0.0
+      REAL(r64)                        :: Zmin              =0.0d0
+      REAL(r64)                        :: Zmax              =0.0d0
     END TYPE CVDVParameters
 
     TYPE UFIData
       CHARACTER(len=MaxNameLength)   :: ZoneName          =' '   ! Name of zone
       INTEGER    :: ZonePtr           =0     ! Pointer to the zone number for this statement
       INTEGER    :: ZoneEquipPtr      = 0    ! Pointer to zone equip for this UFAD zone
-      REAL(r64)  :: DiffusersPerZone  =0.0   ! Number of diffusers in this zone
-      REAL(r64)  :: PowerPerPlume     =0.0   ! Power in each plume [W]
-      REAL(r64)  :: DiffArea          =0.0   ! Effective area of a diffuser [m2]
-      REAL(r64)  :: DiffAngle         =0.0   ! angle between diffuser slots and vertical (degrees)
-      REAL(r64)  :: HeatSrcHeight     =0.0   ! height of heat source above floor [m]
-      REAL(r64)  :: ThermostatHeight  =0.0   ! Height of thermostat/ temperature control sensor [m]
-      REAL(r64)  :: ComfortHeight     =0.0   ! Height at which air temperature is measured for
+      REAL(r64)  :: DiffusersPerZone  =0.0d0   ! Number of diffusers in this zone
+      REAL(r64)  :: PowerPerPlume     =0.0d0   ! Power in each plume [W]
+      REAL(r64)  :: DiffArea          =0.0d0   ! Effective area of a diffuser [m2]
+      REAL(r64)  :: DiffAngle         =0.0d0   ! angle between diffuser slots and vertical (degrees)
+      REAL(r64)  :: HeatSrcHeight     =0.0d0   ! height of heat source above floor [m]
+      REAL(r64)  :: ThermostatHeight  =0.0d0   ! Height of thermostat/ temperature control sensor [m]
+      REAL(r64)  :: ComfortHeight     =0.0d0   ! Height at which air temperature is measured for
                                              ! comfort purposes [m]
-      REAL(r64)  :: TempTrigger       =0.0   ! Minimum temperature difference between TOC TMX
+      REAL(r64)  :: TempTrigger       =0.0d0   ! Minimum temperature difference between TOC TMX
                                              ! for stratification [deltaC]
       INTEGER    :: DiffuserType      =0     ! 1=Swirl, 2=variable area, 3=displacement, 4=linear bar grille, 5=custom
-      REAL(r64)  :: TransHeight       =0.0   ! user specified transition height [m]
+      REAL(r64)  :: TransHeight       =0.0d0   ! user specified transition height [m]
       LOGICAL    :: CalcTransHeight   =.FALSE. ! flag to calc trans height or use user specified input
-      REAL(r64)  :: A_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: B_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: C_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: D_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: E_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: A_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: B_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: C_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: D_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: E_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
     END TYPE UFIData
     TYPE UFEData
       CHARACTER(len=MaxNameLength)   :: ZoneName          =' '   ! Name of zone
       INTEGER    :: ZonePtr           =0     ! Pointer to the zone number for this statement
       INTEGER    :: ZoneEquipPtr      = 0    ! Pointer to zone equip for this UFAD zone
-      REAL(r64)  :: DiffusersPerZone  =0.0   ! Number of diffusers in this zone
-      REAL(r64)  :: PowerPerPlume     =0.0   ! Power in each plume [W]
-      REAL(r64)  :: DiffArea          =0.0   ! Effective area of a diffuser [m2]
-      REAL(r64)  :: DiffAngle         =0.0   ! angle between diffuser slots and vertical (degrees)
-      REAL(r64)  :: HeatSrcHeight     =0.0   ! height of heat source above floor [m]
-      REAL(r64)  :: ThermostatHeight  =0.0   ! Height of thermostat/ temperature control sensor [m]
-      REAL(r64)  :: ComfortHeight     =0.0   ! Height at which air temperature is measured for
+      REAL(r64)  :: DiffusersPerZone  =0.0d0   ! Number of diffusers in this zone
+      REAL(r64)  :: PowerPerPlume     =0.0d0   ! Power in each plume [W]
+      REAL(r64)  :: DiffArea          =0.0d0   ! Effective area of a diffuser [m2]
+      REAL(r64)  :: DiffAngle         =0.0d0   ! angle between diffuser slots and vertical (degrees)
+      REAL(r64)  :: HeatSrcHeight     =0.0d0   ! height of heat source above floor [m]
+      REAL(r64)  :: ThermostatHeight  =0.0d0   ! Height of thermostat/ temperature control sensor [m]
+      REAL(r64)  :: ComfortHeight     =0.0d0   ! Height at which air temperature is measured for
                                              ! comfort purposes [m]
-      REAL(r64)  :: TempTrigger       =0.0   ! Minimum temperature difference between TOC TMX
+      REAL(r64)  :: TempTrigger       =0.0d0   ! Minimum temperature difference between TOC TMX
                                              ! for stratification [deltaC]
       INTEGER    :: DiffuserType      =0     ! 1=Swirl, 2=variable area, 3=displacement, 4=linear bar grille, 5=custom
-      REAL(r64)  :: TransHeight       =0.0   ! user specified transition height [m]
+      REAL(r64)  :: TransHeight       =0.0d0   ! user specified transition height [m]
       LOGICAL    :: CalcTransHeight   =.FALSE. ! flag to calc trans height or use user specified input
-      REAL(r64)  :: A_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: B_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: C_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: D_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: E_Kc              =0.0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
-      REAL(r64)  :: WinWidth          =0.0   ! sum of widths of exterior windows in zone
-      REAL(r64)  :: NumExtWin         =0.0   ! number of exterior windows in the zone
+      REAL(r64)  :: A_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: B_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: C_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: D_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: E_Kc              =0.0d0   ! Coefficient A in Formula Kc = A*Gamma**B + C + D*Gamma + E*Gamma**2
+      REAL(r64)  :: WinWidth          =0.0d0   ! sum of widths of exterior windows in zone
+      REAL(r64)  :: NumExtWin         =0.0d0   ! number of exterior windows in the zone
       LOGICAL    :: ShadeDown         =.TRUE. ! signals shade up or down
     END TYPE UFEData
     ! END UCSD
@@ -228,22 +238,22 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
     Type ConstGradPattern ! nested structure in RoomAirPattern
       !user variables
       CHARACTER(len=MaxNameLength)   :: Name            =' ' !name
-      REAL(r64)                      :: Gradient        = 0.0 ! value of vertical gradient [C/m]
+      REAL(r64)                      :: Gradient        = 0.0d0 ! value of vertical gradient [C/m]
     END TYPE ConstGradPattern
 
     TYPE TwoVertGradInterpolPattern ! nested structure in RoomAirPattern
       !user variables
       CHARACTER(len=MaxNameLength)   :: Name           =' ' !name
-      REAL(r64)                      :: TstatHeight    = 0.0 ! Height of thermostat/ temperature control sensor
-      REAL(r64)                      :: TleavingHeight = 0.0 ! height of return air node where leaving zone
-      REAL(r64)                      :: TexhaustHeight = 0.0 ! height of exhaust air node where leaving zone
-      REAL(r64)                      :: LowGradient    = 0.0 ! lower value of vertical gradient [C/m]
-      REAL(r64)                      :: HiGradient     = 0.0 ! upper value of vertical gradient [C/m]
+      REAL(r64)                      :: TstatHeight    = 0.0d0 ! Height of thermostat/ temperature control sensor
+      REAL(r64)                      :: TleavingHeight = 0.0d0 ! height of return air node where leaving zone
+      REAL(r64)                      :: TexhaustHeight = 0.0d0 ! height of exhaust air node where leaving zone
+      REAL(r64)                      :: LowGradient    = 0.0d0 ! lower value of vertical gradient [C/m]
+      REAL(r64)                      :: HiGradient     = 0.0d0 ! upper value of vertical gradient [C/m]
       INTEGER                        :: InterpolationMode = 0 ! control for interpolation mode
-      REAL(r64)                      :: UpperBoundTempScale = 0.0 ! temperature value for HiGradient
-      REAL(r64)                      :: LowerBoundTempScale = 0.0 ! temperature value for LowGradient
-      REAL(r64)                      :: UpperBoundHeatRateScale = 0.0 ! load value for HiGradient
-      REAL(r64)                      :: LowerBoundHeatRateScale = 0.0 ! load value for lowGradient
+      REAL(r64)                      :: UpperBoundTempScale = 0.0d0 ! temperature value for HiGradient
+      REAL(r64)                      :: LowerBoundTempScale = 0.0d0 ! temperature value for LowGradient
+      REAL(r64)                      :: UpperBoundHeatRateScale = 0.0d0 ! load value for HiGradient
+      REAL(r64)                      :: LowerBoundHeatRateScale = 0.0d0 ! load value for lowGradient
     END TYPE
 
     TYPE TempVsHeightPattern   ! to be used as nested structure in RoomAirPattern
@@ -259,16 +269,16 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
       TYPE(TwoVertGradInterpolPattern) :: TwoGradPatrn ! Two gradient interpolation pattern
       TYPE(TempVsHeightPattern)        :: VertPatrn    ! Vertical gradient profile pattern
       TYPE(SurfMapPattern )            :: MapPatrn     ! Generic Surface map pattern
-      REAL(r64)                    :: DeltaTstat    = 0.0 ! (Tstat - MAT) offset   deg C
-      REAL(r64)                    :: DeltaTleaving = 0.0 ! (Tleaving - MAT) deg C
-      REAL(r64)                    :: DeltaTexhaust = 0.0 ! (Texhaust - MAT) deg C
+      REAL(r64)                    :: DeltaTstat    = 0.0d0 ! (Tstat - MAT) offset   deg C
+      REAL(r64)                    :: DeltaTleaving = 0.0d0 ! (Tleaving - MAT) deg C
+      REAL(r64)                    :: DeltaTexhaust = 0.0d0 ! (Texhaust - MAT) deg C
     END TYPE TemperaturePatternStruct
 
     TYPE SurfaceAssocNestedStruct
       CHARACTER(Len=MaxNameLength) :: Name = ' ' ! unique identifier
       INTEGER   :: SurfID        = 0    ! id in HB surface structs
       REAL(r64) :: TadjacentAir  = 23.0d0  ! place to put resulting temperature value
-      REAL(r64) :: Zeta          = 0.0  ! non-dimensional height in zone ot
+      REAL(r64) :: Zeta          = 0.0d0  ! non-dimensional height in zone ot
     END TYPE SurfaceAssocNestedStruct
 
 
@@ -283,7 +293,7 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
       CHARACTER(len=MaxNameLength) :: PatternCntrlSched = ' ' !name of schedule that selects pattern
       INTEGER                      :: PatternSchedID = 0 ! index of pattern selecting schedule
       !calculated and from elsewhere
-      REAL(r64)                    :: ZoneHeight  = 0.0  ! in meters, from Zone%CeilingHeight
+      REAL(r64)                    :: ZoneHeight  = 0.0d0  ! in meters, from Zone%CeilingHeight
       INTEGER                      :: ReturnAirNodeID = 0 ! index in Node array
       INTEGER                      :: ZoneNodeID      = 0 ! index in Node array for this zone
       INTEGER, ALLOCATABLE, DIMENSION(:) :: ExhaustAirNodeID ! indexes in Node array
@@ -316,9 +326,9 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
     REAL(r64), ALLOCATABLE,  DIMENSION(:)      :: ConvectiveFloorSplit
     REAL(r64), ALLOCATABLE,  DIMENSION(:)      :: InfiltratFloorSplit
     ! UCSD
-    REAL(r64), ALLOCATABLE, DIMENSION  (:)       :: DVHcIn
-    INTEGER                               :: TotUCSDDV            = 0 ! Total number of UCSDDV zones
-    LOGICAL,ALLOCATABLE,DIMENSION(:)      :: IsZoneDV           ! Is the air model for the zone UCSDDV?
+    REAL(r64), ALLOCATABLE, DIMENSION  (:)     :: DVHcIn
+    INTEGER                                    :: TotUCSDDV            = 0 ! Total number of UCSDDV zones
+    LOGICAL,ALLOCATABLE,DIMENSION(:)           :: IsZoneDV           ! Is the air model for the zone UCSDDV?
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZTOC               ! Temperature of occupied (lower) zone
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: AvgTempGrad        ! vertical Average Temperature Gradient in the room
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZTMX               ! Temperature of the mixing(upper) layer
@@ -328,9 +338,9 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZTFLOOR
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: HeightTransition
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: FracMinFlow
-    INTEGER, ALLOCATABLE, DIMENSION(:)    :: ZoneDVMixedFlag
+    INTEGER, ALLOCATABLE, DIMENSION(:)         :: ZoneDVMixedFlag
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneDVMixedFlagRep
-    LOGICAL, ALLOCATABLE, DIMENSION(:)    :: ZoneAirSystemON
+    LOGICAL, ALLOCATABLE, DIMENSION(:)         :: ZoneAirSystemON
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: TCMF               ! comfort temperature
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneCeilingHeight
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: MATFloor           ! [C] floor level mean air temp
@@ -384,36 +394,41 @@ MODULE DataRoomAirModel     ! EnergyPlus Data-Only Module
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneM2MX           ! [C] difference equation's Mixed  air temp at t minus 2
     ! UCSD-CV
     REAL(r64), ALLOCATABLE, DIMENSION  (:)     :: CVHcIn
-    INTEGER                               :: TotUCSDCV           =0 ! Total number of UCSDDV zones
-    LOGICAL,ALLOCATABLE,DIMENSION(:)      :: IsZoneCV            ! Is the air model for the zone UCSDDV?
+    INTEGER                                    :: TotUCSDCV           =0 ! Total number of UCSDDV zones
+    LOGICAL,ALLOCATABLE,DIMENSION(:)           :: IsZoneCV            ! Is the air model for the zone UCSDDV?
     REAL(r64),ALLOCATABLE,DIMENSION(:)         :: ZoneCVisMixing      ! Zone set to CV is actually using a mixing model
-    TYPE (CVTemp), ALLOCATABLE, DIMENSION(:) :: ZTJET        ! Jet Temperatures
-    TYPE (CVTemp), ALLOCATABLE, DIMENSION(:) :: ZTREC        ! Recirculation Temperatures
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZTJET               ! Jet Temperatures
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZTREC               ! Recirculation Temperatures
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: RoomOutflowTemp     !Temperature of air flowing out of the room
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: JetRecAreaRatio
-    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: UPsOFo
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Urec                ! Recirculation region average velocity
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Ujet                ! Jet region average velocity
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Qrec                ! Recirculation zone total flow rate
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Qtot                ! Total volumetric inflow rate through all active aperatures [m3/s]
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: RecInflowRatio      ! Ratio of the recirculation volumetric flow rate to the total inflow flow rate []
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Uhc
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Ain                 ! Inflow aperture area
-    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Lroom               ! CV Zone average length
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Droom               ! CV Zone average length
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Dstar               ! CV Zone average length, wind direction corrected
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: Tin                 ! Inflow air temperature
-    INTEGER, ALLOCATABLE, DIMENSION(:,:)  :: AirflowNetworkSurfaceUCSDCV  ! table for AirflowNetwork surfaces organization
+    REAL(r64), ALLOCATABLE, DIMENSION(:)       :: TotArea             ! Sum of the areas of all apertures in the zone
+    INTEGER, ALLOCATABLE, DIMENSION(:,:)       :: AirflowNetworkSurfaceUCSDCV  ! table for AirflowNetwork surfaces organization
+    TYPE (CVFlow), ALLOCATABLE, DIMENSION(:,:) :: CVJetRecFlows       ! Jet and recirculation zone flows and properties
     TYPE (CVDVParameters), ALLOCATABLE,   &
-                       DIMENSION(:)       :: SurfParametersCVDV ! Surface parameters
-    INTEGER                               :: CVNumAirflowNetworkSurfaces =0 ! total number of AirFlowNetwork surfaces.
-                                                                   ! Interzone surfaces counts twice.
-    REAL(r64),ALLOCATABLE, DIMENSION(:)        :: Rfr                ! Ration between inflow and recirculation air flows
-    REAL(r64),ALLOCATABLE, DIMENSION(:)        :: ZoneCVhasREC       ! Airflow pattern is C(0), CR(1)
-    INTEGER, ALLOCATABLE, DIMENSION(:)    :: IsWidth            ! '1' means CV aperture width < aperture heigth
-    LOGICAL                               :: UCSDModelUsed = .false.
-    LOGICAL                               :: MundtModelUsed = .false.
+                       DIMENSION(:)            :: SurfParametersCVDV  ! Surface parameters
+    INTEGER                                    :: CVNumAirflowNetworkSurfaces =0 ! total number of AirFlowNetwork surfaces.
+                                                                      ! Interzone surfaces counts twice.
+    REAL(r64),ALLOCATABLE, DIMENSION(:)        :: Rfr                 ! Ration between inflow and recirculation air flows
+    REAL(r64),ALLOCATABLE, DIMENSION(:)        :: ZoneCVhasREC        ! Airflow pattern is C(0), CR(1)
+    LOGICAL                                    :: UCSDModelUsed = .false.
+    LOGICAL                                    :: MundtModelUsed = .false.
     ! UCSD-UF
-    INTEGER                               :: TotUCSDUI           =0 ! total number of UCSDUI zones
-    INTEGER                               :: TotUCSDUE           =0 ! total number of UCSDUE zones
-    LOGICAL,ALLOCATABLE,DIMENSION(:)      :: IsZoneUI               ! controls program flow, for interior or exterior UFAD model
-    INTEGER,ALLOCATABLE,DIMENSION(:)      :: ZoneUFPtr
+    INTEGER                                    :: TotUCSDUI           =0 ! total number of UCSDUI zones
+    INTEGER                                    :: TotUCSDUE           =0 ! total number of UCSDUE zones
+    LOGICAL,ALLOCATABLE,DIMENSION(:)           :: IsZoneUI               ! controls program flow, for interior or exterior UFAD model
+    INTEGER,ALLOCATABLE,DIMENSION(:)           :: ZoneUFPtr
     REAL(r64), ALLOCATABLE, DIMENSION  (:)     :: UFHcIn
-    INTEGER, ALLOCATABLE, DIMENSION(:)    :: ZoneUFMixedFlag
+    INTEGER, ALLOCATABLE, DIMENSION(:)         :: ZoneUFMixedFlag
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneUFMixedFlagRep
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneUFGamma
     REAL(r64), ALLOCATABLE, DIMENSION(:)       :: ZoneUFPowInPlumes  ! [W]

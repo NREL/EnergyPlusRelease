@@ -23,16 +23,20 @@ MODULE SingleDuct
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, &
-                           InitConvTemp, SysSizingCalc, NumOfZones
+                           InitConvTemp, SysSizingCalc, NumOfZones, DisplayExtraWarnings
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, SmallAirVolFlow, TurnFansOn, SingleCoolingSetPoint, &
-                           SingleHeatingSetPoint, SingleHeatCoolSetPoint, DualSetPointWithDeadBand
+                           SingleHeatingSetPoint, SingleHeatCoolSetPoint, DualSetPointWithDeadBand, &
+                           ATMixer_InletSide, ATMixer_SupplySide
 USE DataHeatBalFanSys, ONLY: TempControlType
 USE BranchNodeConnections, ONLY: SetUpCompSets, TestCompSet
 USE DataSizing
 USE Psychrometrics, ONLY:PsyRhoAirFnPbTdbW, PsyCpAirFnWTdb
 USE FluidProperties
-USE DataInterfaces
+USE DataInterfaces,  ONLY: ControlCompOutput, ShowWarningError, ShowFatalError, ShowSevereError, &
+                           SetupOutputVariable, ShowContinueError, ShowWarningMessage,  &
+                           ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd,   &
+                           ShowRecurringContinueErrorAtEnd, ShowMessage
 
   ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -65,7 +69,7 @@ INTEGER, PARAMETER :: FanType_VS = 1
 INTEGER, PARAMETER :: ConstantMinFrac = 1
 INTEGER, PARAMETER :: ScheduledMinFrac = 2
 INTEGER, PARAMETER :: FixedMin = 3
-
+INTEGER            :: NumATMixers=0
 
   ! DERIVED TYPE DEFINITIONS
 TYPE SysDesignParams
@@ -140,6 +144,9 @@ TYPE SysDesignParams
   INTEGER      :: HWLoopSide       = 0 !plant topology, loop side number
   INTEGER      :: HWBranchIndex    = 0 !plant topology, Branch number
   INTEGER      :: HWCompIndex      = 0 !plant topology, Component number
+  CHARACTER(len=MaxNameLength) :: ZoneHVACUnitType     =' '  ! type of Zone HVAC unit for air terminal mixer units
+  CHARACTER(len=MaxNameLength) :: ZoneHVACUnitName     =' '  ! name of Zone HVAC unit for air terminal mixer units
+  INTEGER                      :: SecInNode        =0    ! zone or zone unit air node number
 
 ! warning variables
   INTEGER      :: IterationLimit   = 0 ! Used for RegulaFalsi error -1
@@ -147,6 +154,36 @@ TYPE SysDesignParams
 
 END TYPE SysDesignParams
 
+TYPE AirTerminalMixerData
+  ! Input data
+  CHARACTER(len=MaxNameLength) :: Name                 =' '  ! name of unit
+  INTEGER                      :: MixerType            =0    ! type of inlet mixer, 1 = inlet side, 2 = supply side
+  INTEGER                      :: ZoneHVACUnitType     =0    ! type of Zone HVAC unit. ZoneHVAC:WaterToAirHeatPump =1, ZoneHVAC:FourPipeFanCoil = 2
+  CHARACTER(len=MaxNameLength) :: ZoneHVACUnitName     =' '  ! name of Zone HVAC unit
+  INTEGER                      :: SecInNode            =0    ! secondary air inlet node number
+  INTEGER                      :: PriInNode            =0    ! primary air inlet node number
+  INTEGER                      :: MixedAirOutNode      =0    ! mixed air outlet node number
+
+  REAL(r64)                    :: ZoneAirTemp          =0.0D0    ! zone air in temp
+  REAL(r64)                    :: ZoneAirHumRat        =0.0D0    ! zone air in hum rat
+  REAL(r64)                    :: ZoneAirEnthalpy      =0.0D0    ! zone air in enthalpy
+  REAL(r64)                    :: ZoneAirPressure      =0.0D0    ! zone air in pressure
+  REAL(r64)                    :: ZoneAirMassFlowRate  =0.0D0    ! zone air in mass flow rate
+
+  REAL(r64)                    :: DOASTemp             =0.0D0    ! DOAS air in temp
+  REAL(r64)                    :: DOASHumRat           =0.0D0    ! DOAS air in hum rat
+  REAL(r64)                    :: DOASEnthalpy         =0.0D0    ! DOAS air in enthalpy
+  REAL(r64)                    :: DOASPressure         =0.0D0    ! DOAS air in pressure
+  REAL(r64)                    :: DOASMassFlowRate     =0.0D0    ! DOAS air in mass flow rate
+
+  REAL(r64)                    :: MixedAirTemp         =0.0D0    ! mixed air in temp
+  REAL(r64)                    :: MixedAirHumRat       =0.0D0    ! mixed air in hum rat
+  REAL(r64)                    :: MixedAirEnthalpy     =0.0D0    ! mixed air in enthalpy
+  REAL(r64)                    :: MixedAirPressure     =0.0D0    ! mixed air in pressure
+  REAL(r64)                    :: MixedAirMassFlowRate =0.0D0    ! mixed air in mass flow rate
+
+  REAL(r64)                    :: MaxAirMassFlowRate   =0.0D0    ! maximum air mass flow rate allowed through component
+END TYPE AirTerminalMixerData
 
 TYPE SysFlowConditions
   REAL(r64) :: AirMassFlowRate                    = 0.0D0 ! MassFlow through the Sys being Simulated [kg/Sec]
@@ -155,6 +192,7 @@ TYPE SysFlowConditions
   REAL(r64) :: AirTemp                            = 0.0D0 ! (C)
   REAL(r64) :: AirHumRat                          = 0.0D0 ! (Kg/Kg)
   REAL(r64) :: AirEnthalpy                        = 0.0D0 ! (J/Kg)
+  REAL(r64) :: AirPressure                        = 0.0 !
 END TYPE SysFlowConditions
 
 
@@ -162,11 +200,13 @@ END TYPE SysFlowConditions
   TYPE (SysDesignParams), ALLOCATABLE, DIMENSION(:)   :: Sys
   TYPE (SysFlowConditions), ALLOCATABLE, DIMENSION(:) :: SysInlet
   TYPE (SysFlowConditions), ALLOCATABLE, DIMENSION(:) :: SysOutlet
+  TYPE (AirTerminalMixerData), ALLOCATABLE, DIMENSION(:) :: SysATMixer
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: MassFlow1 ! previous value of the terminal unit mass flow rate
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: MassFlow2 ! previous value of the previous value of the mass flow rate
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: MassFlow3
   REAL(r64), ALLOCATABLE, DIMENSION(:) :: MassFlowDiff
   LOGICAL :: GetInputFlag = .True.  ! Flag set to make sure you get input once
+  LOGICAL :: GetATMixerFlag = .True.  ! Flag set to make sure you get input once
   INTEGER :: NumConstVolSys = 0
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
 
@@ -179,13 +219,20 @@ END TYPE SysFlowConditions
           ! Driver/Manager Routines
 Public  SimulateSingleDuct
 Public  GetHVACSingleDuctSysIndex
+Public  SimATMixer
+Public  GetATMixerOutNode
+Public  GetATMixerPriNode
+Public  GetATMixerSecNode
+Public  GetATMixer
 
           ! Get Input routines for module
 PRIVATE GetSysInput
+PRIVATE GetATMixers
 
           ! Initialization routines for module
 PRIVATE InitSys
 PRIVATE SizeSys
+PRIVATE InitATMixer
 
           ! Algorithms for the module
 Private SimVAV
@@ -194,9 +241,11 @@ Private SimVAVVS
 Private CalcVAVVS
 Private SimCBVAV
 Private CalcOAMassFlow
+Private CalcATMixer
 
           ! Update routine to check convergence and update nodes
 Private UpdateSys
+Private UpdateATMixer
 
           ! Reporting routines for module
 Private ReportSys
@@ -554,7 +603,7 @@ SUBROUTINE GetSysInput
         ELSEIf ((Sys(SysNum)%ZoneMinAirFracSchPtr > 0) .and. &
             ( Sys(SysNum)%ZoneMinAirFracMethod == ScheduledMinFrac) ) THEN
           ! check range of values in schedule
-          IF (.NOT. CheckScheduleValueMinMax(Sys(SysNum)%ZoneMinAirFracSchPtr,'>=',0.,'<=',1.)) Then
+          IF (.NOT. CheckScheduleValueMinMax(Sys(SysNum)%ZoneMinAirFracSchPtr,'>=',0.0d0,'<=',1.0d0)) Then
             CALL ShowSevereError('Error found in '//TRIM(cAlphaFields(6))//' = '//TRIM(Alphas(6)) )
             CAll ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
             CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
@@ -598,8 +647,9 @@ SUBROUTINE GetSysInput
         END IF
         IF (SameString(Alphas(10),'Reverse')) THEN
           Sys(SysNum)%DamperHeatingAction = ReverseAction
+        ELSE
+          Sys(SysNum)%DamperHeatingAction = Normal
         END IF
-
         ! Register component set data
         CALL TestCompSet(Sys(SysNum)%SysType,Sys(SysNum)%SysName, &
                          NodeID(Sys(SysNum)%InletNodeNum),NodeID(Sys(SysNum)%ReheatAirOutletNode),'Air Nodes')
@@ -1090,7 +1140,7 @@ SUBROUTINE GetSysInput
         ELSEIf ((Sys(SysNum)%ZoneMinAirFracSchPtr > 0) .and. &
             ( Sys(SysNum)%ZoneMinAirFracMethod == ScheduledMinFrac) ) THEN
           ! check range of values in schedule
-          IF (.NOT. CheckScheduleValueMinMax(Sys(SysNum)%ZoneMinAirFracSchPtr,'>=',0.,'<=',1.)) Then
+          IF (.NOT. CheckScheduleValueMinMax(Sys(SysNum)%ZoneMinAirFracSchPtr,'>=',0.0d0,'<=',1.0d0)) Then
             CALL ShowSevereError('Error found in '//TRIM(cAlphaFields(6))//' = '//TRIM(Alphas(6)) )
             CAll ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
             CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
@@ -1847,7 +1897,7 @@ SUBROUTINE SizeSys(SysNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   September 2001
-          !       MODIFIED       na
+          !       MODIFIED       August 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1871,6 +1921,7 @@ SUBROUTINE SizeSys(SysNum)
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE DataPlant,           ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1888,10 +1939,11 @@ SUBROUTINE SizeSys(SysNum)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER             :: PltSizHeatNum ! index of plant sizing object for 1st heating loop
-  REAL(r64)           :: CoilInTemp
-  REAL(r64)           :: CoilOutTemp
-  REAL(r64)           :: CoilOutHumRat
-  REAL(r64)           :: DesCoilLoad
+  REAL(r64)           :: CoilInTemp = 0.0D0
+  REAL(r64)           :: DesCoilLoad = 0.0D0
+  REAL(r64)           :: DesZoneHeatLoad = 0.0D0
+  REAL(r64)           :: ZoneDesTemp = 0.0D0
+  REAL(r64)           :: ZoneDesHumRat = 0.0D0
   REAL(r64)           :: DesMassFlow
   REAL(r64)           :: TempSteamIn
   REAL(r64)           :: EnthSteamOutWet
@@ -1909,47 +1961,129 @@ SUBROUTINE SizeSys(SysNum)
   REAL(r64)           :: Cp  ! local fluid specific heat
   INTEGER             :: DummyWaterIndex = 1
   REAL(r64)           :: UserInputMaxHeatAirVolFlowRate = 0.0D0  ! user input for MaxHeatAirVolFlowRate
+  LOGICAL             :: IsAutosize
+  REAL(r64)           :: MaxAirVolFlowRateDes              ! Autosized maximum air flow rate for reporting
+  REAL(r64)           :: MaxAirVolFlowRateUser             ! Hardsized maximum air flow rate for reporting
+  REAL(r64)           :: MaxHeatAirVolFlowRateDes          ! Autosized maximum heating air flow rate for reporting
+  REAL(r64)           :: MaxHeatAirVolFlowRateUser         ! Hardsized maximum heating air flow rate for reporting
+  REAL(r64)           :: MaxAirVolFlowRateDuringReheatDes  ! Autosized maximum air flow durign reheat for reporting
+  REAL(r64)           :: MaxAirVolFlowRateDuringReheatUser ! Hardsized maximum air flow durign reheat for reporting
+  REAL(r64)           :: MaxAirVolFractionDuringReheatDes  ! Autosized maximum air fraction durign reheat for reporting
+  REAL(r64)           :: MaxAirVolFractionDuringReheatUser ! Hardsized maximum air flow durign reheat for reporting
+  REAL(r64)           :: MaxReheatWaterVolFlowDes          ! Autosized reheat water flow or reporting
+  REAL(r64)           :: MaxReheatWaterVolFlowUser         ! Hardsized reheat water flow for reporting
+  REAL(r64)           :: MaxReheatSteamVolFlowDes          ! Autosized reheat steam flow for reporting
+  REAL(r64)           :: MaxReheatSteamVolFlowUser         ! Hardsized reheat steam flow for reporting
 
   PltSizHeatNum = 0
   DesMassFlow = 0.0D0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxAirVolFlowRateDes = 0.0d0
+  MaxAirVolFlowRateUser = 0.0d0
+  MaxHeatAirVolFlowRateDes = 0.0d0
+  MaxHeatAirVolFlowRateUser = 0.0d0
+  MaxAirVolFlowRateDuringReheatDes = 0.0d0
+  MaxAirVolFlowRateDuringReheatUser = 0.0d0
+  MaxAirVolFractionDuringReheatDes = 0.0d0
+  MaxAirVolFractionDuringReheatUser = 0.0d0
+  MaxReheatWaterVolFlowDes = 0.0d0
+  MaxReheatWaterVolFlowUser = 0.0d0
+  MaxReheatSteamVolFlowDes = 0.0d0
+  MaxReheatSteamVolFlowUser = 0.0d0
 
   IF (Sys(SysNum)%MaxAirVolFlowRate == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
-
-      Sys(SysNum)%MaxAirVolFlowRate = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
-                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-
-      IF (Sys(SysNum)%MaxAirVolFlowRate < SmallAirVolFlow) THEN
-          Sys(SysNum)%MaxAirVolFlowRate = 0.0D0
-      END IF
-      CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-                              'Maximum Air Flow Rate [m3/s]', Sys(SysNum)%MaxAirVolFlowRate)
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
 
-  IF (Sys(SysNum)%MaxHeatAirVolFlowRate == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-      CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
-      Sys(SysNum)%MaxHeatAirVolFlowRate =  TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
-      IF (Sys(SysNum)%MaxHeatAirVolFlowRate < SmallAirVolFlow) THEN
-          Sys(SysNum)%MaxHeatAirVolFlowRate = 0.0D0
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation continue
+      IF (Sys(SysNum)%MaxAirVolFlowRate > 0.0d0) THEN
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                            'User-Specified Maximum Air Flow Rate [m3/s]', Sys(SysNum)%MaxAirVolFlowRate)
       END IF
-      CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-                              'Maximum Heating Air Flow Rate [m3/s]', Sys(SysNum)%MaxHeatAirVolFlowRate)
+    ELSE ! Autosize or hard-size with sizing run
+
+      CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
+
+      MaxAirVolFlowRateDes = MAX(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+                                           TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
+
+      IF (MaxAirVolFlowRateDes < SmallAirVolFlow) THEN
+          MaxAirVolFlowRateDes = 0.0D0
+      END IF
+      IF (IsAutosize) THEN
+        Sys(SysNum)%MaxAirVolFlowRate = MaxAirVolFlowRateDes
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateDes)
+      ELSE ! Hard-size with sizing data
+        IF (Sys(SysNum)%MaxAirVolFlowRate > 0.0d0 .AND. MaxAirVolFlowRateDes > 0.0d0) THEN
+          MaxAirVolFlowRateUser = Sys(SysNum)%MaxAirVolFlowRate
+          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateDes, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', MaxAirVolFlowRateUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowRateDes -  MaxAirVolFlowRateUser)/MaxAirVolFlowRateUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+              CALL ShowContinueError('User-Specified Maximum Air Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxAirVolFlowRateUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Air Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxAirVolFlowRateDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
+  END IF
 
-    UserInputMaxHeatAirVolFlowRate = 0.0D0
-
-  ELSE
-
-    UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate
-
+  IsAutosize = .FALSE.
+  IF (Sys(SysNum)%MaxHeatAirVolFlowRate == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN ! simulation should continue
+      UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate
+      IF (Sys(SysNum)%MaxHeatAirVolFlowRate > 0.d0) THEN
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                      'User-Specified Maximum Heating Air Flow Rate [m3/s]', Sys(SysNum)%MaxHeatAirVolFlowRate)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
+      MaxHeatAirVolFlowRateDes =  TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
+      IF (MaxHeatAirVolFlowRateDes < SmallAirVolFlow) THEN
+          MaxHeatAirVolFlowRateDes = 0.0D0
+      END IF
+      IF (IsAutosize) THEN
+        Sys(SysNum)%MaxHeatAirVolFlowRate = MaxHeatAirVolFlowRateDes
+        UserInputMaxHeatAirVolFlowRate = 0.0D0
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                              'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatAirVolFlowRateDes)
+      ELSE ! Hard-size with sizing data
+        IF (Sys(SysNum)%MaxHeatAirVolFlowRate > 0.0d0 .AND. MaxHeatAirVolFlowRateDes > 0.0d0) THEN
+          MaxHeatAirVolFlowRateUser = Sys(SysNum)%MaxHeatAirVolFlowRate
+          UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate
+          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                              'Design Size Maximum Heating Air Flow Rate [m3/s]', MaxHeatAirVolFlowRateDes, &
+                              'User-Specified Maximum Heating Air Flow Rate [m3/s]', MaxHeatAirVolFlowRateUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxHeatAirVolFlowRateDes - MaxHeatAirVolFlowRateUser)/MaxHeatAirVolFlowRateUser ) &
+                                          > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+              CALL ShowContinueError('User-Specified Maximum Heating Air Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxHeatAirVolFlowRateUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Heating Air Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxHeatAirVolFlowRateDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
   END IF
 
   IF (Sys(SysNum)%ZoneMinAirFracMethod == ScheduledMinFrac) Then
@@ -1981,29 +2115,82 @@ SUBROUTINE SizeSys(SysNum)
 
   END IF
 
+  IsAutosize = .FALSE.
   IF(Sys(SysNum)%MaxAirVolFlowRateDuringReheat == Autocalculate)THEN
-    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(0.002032D0*Sys(SysNum)%ZoneFloorArea, &
-                                                     Sys(SysNum)%MaxAirVolFlowRate)
-    ! apply limit based on min stop
-    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
-                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) )
-    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-               'Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
-               Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%ZoneFloorArea)
+    IsAutosize = .TRUE.
   END IF
 
+  MaxAirVolFlowRateDuringReheatDes = MIN(0.002032D0*Sys(SysNum)%ZoneFloorArea, &
+                                     Sys(SysNum)%MaxAirVolFlowRate)
+    ! apply limit based on min stop
+  MaxAirVolFlowRateDuringReheatDes = MAX(MaxAirVolFlowRateDuringReheatDes, &
+                                  (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) )
+  IF (IsAutosize) THEN
+    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MaxAirVolFlowRateDuringReheatDes
+    CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+               'Design Size Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
+               MaxAirVolFlowRateDuringReheatDes/Sys(SysNum)%ZoneFloorArea)
+  ELSE ! Hard size with sizing data
+    IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0d0 .AND. MaxAirVolFlowRateDuringReheatDes > 0.0d0 ) THEN
+      MaxAirVolFlowRateDuringReheatUser = Sys(SysNum)%MaxAirVolFlowRateDuringReheat
+      CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+               'Design Size Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
+               MaxAirVolFlowRateDuringReheatDes/Sys(SysNum)%ZoneFloorArea, &
+               'User-Specified Maximum Flow per Zone Floor Area during Reheat [m3/s-m2]', &
+               MaxAirVolFlowRateDuringReheatUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(MaxAirVolFlowRateDuringReheatDes - MaxAirVolFlowRateDuringReheatUser)/MaxAirVolFlowRateDuringReheatUser) &
+                                       > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+          CALL ShowContinueError('User-Specified Maximum Flow per Zone Floor Area during Reheat of '// &
+                                    TRIM(RoundSigDigits(MaxAirVolFlowRateDuringReheatUser,5))// ' [m3/s-m2]')
+          CALL ShowContinueError('differs from Design Size Maximum Flow per Zone Floor Area during Reheat of ' // &
+                                    TRIM(RoundSigDigits(MaxAirVolFlowRateDuringReheatDes,5))// ' [m3/s-m2]')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
+  END IF
+
+  IsAutosize = .FALSE.
   IF(Sys(SysNum)%MaxAirVolFractionDuringReheat == Autocalculate)THEN
-    IF(Sys(SysNum)%MaxAirVolFlowRate .GT. 0.0D0)THEN
-      Sys(SysNum)%MaxAirVolFractionDuringReheat = MIN(1.0D0,(0.002032D0*Sys(SysNum)%ZoneFloorArea/ &
+    IsAutosize = .TRUE.
+  END IF
+  IF(Sys(SysNum)%MaxAirVolFlowRate .GT. 0.0D0)THEN
+    MaxAirVolFractionDuringReheatDes = MIN(1.0D0,(0.002032D0*Sys(SysNum)%ZoneFloorArea/ &
                                                       Sys(SysNum)%MaxAirVolFlowRate))
       ! apply limit based on min stop
-      Sys(SysNum)%MaxAirVolFractionDuringReheat = MAX(Sys(SysNum)%MaxAirVolFractionDuringReheat, &
+    MaxAirVolFractionDuringReheatDes = MAX(MaxAirVolFractionDuringReheatDes, &
                                                       Sys(SysNum)%ZoneMinAirFrac )
-    ELSE
-      Sys(SysNum)%MaxAirVolFractionDuringReheat = 0.0D0
-    END IF
+  ELSE
+    MaxAirVolFractionDuringReheatDes = 0.0D0
+  END IF
+  IF (IsAutosize) THEN
+    Sys(SysNum)%MaxAirVolFractionDuringReheat = MaxAirVolFractionDuringReheatDes
     CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-         'Maximum Flow Fraction during Reheat []', Sys(SysNum)%MaxAirVolFractionDuringReheat)
+            'Design Size Maximum Flow Fraction during Reheat []', MaxAirVolFractionDuringReheatDes)
+  ELSE
+    IF (Sys(SysNum)%MaxAirVolFractionDuringReheat > 0.0d0 .AND. MaxAirVolFractionDuringReheatDes > 0.0d0) THEN
+      MaxAirVolFractionDuringReheatUser = Sys(SysNum)%MaxAirVolFractionDuringReheat
+      CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                 'Design Size Maximum Flow Fraction during Reheat []', MaxAirVolFractionDuringReheatDes, &
+                 'User-Specified Maximum Flow Fraction during Reheat []',MaxAirVolFractionDuringReheatUser)
+      IF (DisplayExtraWarnings) THEN
+        IF ((ABS(MaxAirVolFractionDuringReheatDes - MaxAirVolFractionDuringReheatUser)/MaxAirVolFractionDuringReheatUser) &
+                                > AutoVsHardSizingThreshold) THEN
+          CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+          CALL ShowContinueError('User-Specified Maximum Flow Fraction during Reheat of '// &
+                                    TRIM(RoundSigDigits(MaxAirVolFractionDuringReheatUser,5))// ' []')
+          CALL ShowContinueError('differs from Design Size Maximum Flow Fraction during Reheat of ' // &
+                                    TRIM(RoundSigDigits(MaxAirVolFractionDuringReheatDes,5))// ' []')
+          CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+          CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+        END IF
+      ENDIF
+    END IF
   END IF
 
   ! use the larger of the two reheat flow rate methods for the simulated maximum flow during reheat
@@ -2011,10 +2198,9 @@ SUBROUTINE SizeSys(SysNum)
                   Sys(SysNum)%MaxAirVolFractionDuringReheat * Sys(SysNum)%MaxAirVolFlowRate)
   Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(Sys(SysNum)%MaxAirVolFlowRateDuringReheat,Sys(SysNum)%MaxAirVolFlowRate)
 
-
-
   IF (CurZoneEqNum > 0) THEN
-    TermUnitSizing(CurZoneEqNum)%ReheatMult = 1.0D0
+    TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult = 1.0D0
+    TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = 1.0d0
     IF (ZoneSizingRunDone) THEN
       IF (Sys(SysNum)%SysType_Num == SingleDuctVAVReheatVSFan) THEN
         TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(UserInputMaxHeatAirVolFlowRate, &
@@ -2047,117 +2233,208 @@ SUBROUTINE SizeSys(SysNum)
     END IF
     IF (TermUnitSizing(CurZoneEqNum)%AirVolFlow > SmallAirVolFlow) THEN
       IF (Sys(SysNum)%DamperHeatingAction == ReverseAction .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
-        TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
-                                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) ) &
+        TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult =  MIN(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                                                                       Sys(SysNum)%MaxAirVolFlowRate ) &
                                                              / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatLoadMult = TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult
+      ELSEIF (Sys(SysNum)%DamperHeatingAction == ReverseAction .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat == 0.0D0) THEN
+        TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult =  Sys(SysNum)%MaxAirVolFlowRate / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult
+      ELSEIF (Sys(SysNum)%DamperHeatingAction == Normal .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
+        TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult =  MIN(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
+                                                          (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) ) &
+                                                              / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = 1.0d0
+      ELSEIF (Sys(SysNum)%DamperHeatingAction == Normal .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat == 0.0D0) THEN
+        TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult =  (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) &
+                                                              / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = 1.0D0
       ELSE
-        TermUnitSizing(CurZoneEqNum)%ReheatMult =  Sys(SysNum)%MaxAirVolFlowRate / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult =  Sys(SysNum)%MaxAirVolFlowRate / TermUnitSizing(CurZoneEqNum)%AirVolFlow
+        TermUnitSizing(CurZoneEqNum)%ReheatLoadMult = TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult
       END IF
-      TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(1.0D0,TermUnitSizing(CurZoneEqNum)%ReheatMult)
+      TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult = MAX(1.0D0, TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult)
+      TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = MAX(1.0D0, TermUnitSizing(CurZoneEqNum)%ReheatLoadMult )
     ELSE
-      TermUnitSizing(CurZoneEqNum)%ReheatMult =  1.0D0
+      TermUnitSizing(CurZoneEqNum)%ReheatAirFlowMult = 1.0D0
+      TermUnitSizing(CurZoneEqNum)%ReheatLoadMult    = 1.0D0
     END IF
   END IF
 
-  IF ((Sys(SysNum)%MaxReheatWaterVolFlow == AutoSize).or.(Sys(SysNum)%MaxReheatSteamVolFlow == AutoSize)) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+  IsAutosize = .FALSE.
+  IF (Sys(SysNum)%MaxReheatWaterVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (Sys(SysNum)%MaxReheatWaterVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                   'User-Specified Maximum Reheat Water Flow Rate [m3/s]', Sys(SysNum)%MaxReheatWaterVolFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
       IF (SameString(Sys(SysNum)%ReheatComp,'Coil:Heating:Water')) THEN
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',Sys(SysNum)%ReheatName,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',Sys(SysNum)%ReheatName,ErrorsFound)
-        PlantSizingErrorsFound = .FALSE.
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', Sys(SysNum)%ReheatName, CoilWaterInletNode, &
+        IF (IsAutosize) THEN
+          PlantSizingErrorsFound = .FALSE.
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', Sys(SysNum)%ReheatName, CoilWaterInletNode, &
                                        CoilWaterOutletNode, PlantSizingErrorsFound)
-        IF(PlantSizingErrorsFound)THEN
-          CALL ShowContinueError('...Occurs in '//TRIM(Sys(SysNum)%SysType)//':'//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.TRUE.
-        END IF
-        IF (PltSizHeatNum > 0) THEN
-          CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU
-          CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-          CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-          DesMassFlow = StdRhoAir *   &
-                               TermUnitSizing(CurZoneEqNum)%AirVolFlow
-          DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
-                          * DesMassFlow * (CoilOutTemp-CoilInTemp)
-          IF (DesCoilLoad >= SmallLoad) THEN
-
-            rho = GetDensityGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
-                                   60.d0, &
-                                   PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
-                                   'SizeSys')
-
-            Cp  = GetSpecificHeatGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
-                                   60.d0, &
-                                   PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
-                                   'SizeSys')
-
-            Sys(SysNum)%MaxReheatWaterVolFlow = DesCoilLoad / &
-                                                  ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                   Cp * rho )
-          ELSE
-            Sys(SysNum)%MaxReheatWaterVolFlow = 0.0D0
+          IF(PlantSizingErrorsFound)THEN
+            CALL ShowContinueError('...Occurs in '//TRIM(Sys(SysNum)%SysType)//':'//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.TRUE.
           END IF
-          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-                                  'Maximum Reheat Water Flow Rate [m3/s]', Sys(SysNum)%MaxReheatWaterVolFlow)
-          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-                                  'Reheat Coil Sizing Air Volume Flow Rate [m3/s]', TermUnitSizing(CurZoneEqNum)%AirVolFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in AirTerminal Object='//TRIM(Sys(SysNum)%SysName))
-          Errorsfound = .TRUE.
+          IF (PltSizHeatNum > 0) THEN
+            CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU
+            DesMassFlow = StdRhoAir *   &
+                                 TermUnitSizing(CurZoneEqNum)%AirVolFlow
+            DesZoneHeatLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
+            ZoneDesTemp = CalcFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
+            ZoneDesHumRat = CalcFinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtHeatPeak
+            ! the coil load is the zone design heating load plus (or minus!) the reheat load
+            DesCoilLoad = DesZoneHeatLoad + PsyCpAirFnWTdb(ZoneDesHumRat, 0.5d0*(CoilInTemp+ZoneDesTemp)) &
+                             * DesMassFlow * (ZoneDesTemp-CoilInTemp)
+            IF (DesCoilLoad >= SmallLoad) THEN
+
+              rho = GetDensityGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
+                                   60.d0, &
+                                   PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
+                                   'SizeSys')
+
+              Cp  = GetSpecificHeatGlycol(PlantLoop(Sys(SysNum)%HWLoopNum)%FluidName, &
+                                   60.d0, &
+                                   PlantLoop(Sys(SysNum)%HWLoopNum)%FluidIndex, &
+                                   'SizeSys')
+
+              MaxReheatWaterVolFlowDes = DesCoilLoad / &
+                                       ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                       Cp * rho )
+            ELSE
+              MaxReheatWaterVolFlowDes = 0.0D0
+            END IF
+          ELSE
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in AirTerminal Object='//TRIM(Sys(SysNum)%SysName))
+            Errorsfound = .TRUE.
+          END IF
         END IF
-      ELSEIF (SameString(Sys(SysNum)%ReheatComp,'Coil:Heating:Steam')) THEN
+        IF (IsAutosize) THEN
+          Sys(SysNum)%MaxReheatWaterVolFlow = MaxReheatWaterVolFlowDes
+          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                                'Design Size Maximum Reheat Water Flow Rate [m3/s]', MaxReheatWaterVolFlowDes)
+          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                                'Design Size Reheat Coil Sizing Air Volume Flow Rate [m3/s]', &
+                                TermUnitSizing(CurZoneEqNum)%AirVolFlow)
+        ELSE ! Hard-size with sizing data
+          IF (Sys(SysNum)%MaxReheatWaterVolFlow > 0.0d0 .AND. MaxReheatWaterVolFlowDes > 0.0d0) THEN
+            MaxReheatWaterVolFlowUser = Sys(SysNum)%MaxReheatWaterVolFlow
+            CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                                'Design Size Maximum Reheat Water Flow Rate [m3/s]', MaxReheatWaterVolFlowDes, &
+                                'User-Specified Maximum Reheat Water Flow Rate [m3/s]', MaxReheatWaterVolFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxReheatWaterVolFlowDes - MaxReheatWaterVolFlowUser)/MaxReheatWaterVolFlowUser) &
+                                > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+                CALL ShowContinueError('User-Specified Maximum Reheat Water Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxReheatWaterVolFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Reheat Water Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxReheatWaterVolFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
+      END IF
+    END IF
+  ELSE
+    Sys(SysNum)%MaxReheatWaterVolFlow = 0.0D0
+  END IF
+
+  IsAutosize = .FALSE.
+  IF (Sys(SysNum)%MaxReheatSteamVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (Sys(SysNum)%MaxReheatSteamVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                   'User-Specified Maximum Reheat Steam Flow Rate [m3/s]', Sys(SysNum)%MaxReheatSteamVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
+      IF (SameString(Sys(SysNum)%ReheatComp,'Coil:Heating:Steam')) THEN
         CoilSteamInletNode = GetCoilSteamInletNode('Coil:Heating:Steam',Sys(SysNum)%ReheatName,ErrorsFound)
         CoilSteamOutletNode = GetCoilSteamOutletNode('Coil:Heating:Steam',Sys(SysNum)%ReheatName,ErrorsFound)
-        PlantSizingErrorsFound = .FALSE.
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', Sys(SysNum)%ReheatName, CoilSteamInletNode, &
+        IF (IsAutosize) THEN
+          PlantSizingErrorsFound = .FALSE.
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', Sys(SysNum)%ReheatName, CoilSteamInletNode, &
                                        CoilSteamOutletNode, PlantSizingErrorsFound)
-        IF(PlantSizingErrorsFound)THEN
-          CALL ShowContinueError('...Occurs in '//TRIM(Sys(SysNum)%SysType)//':'//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.TRUE.
-        END IF
-        IF (PltSizHeatNum > 0) THEN
-          CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU
-          CoilOutTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-          CoilOutHumRat = TermUnitFinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-          DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
-          DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
-                          * DesMassFlow * (CoilOutTemp-CoilInTemp)
-          IF (DesCoilLoad >= SmallLoad) THEN
-             TempSteamIn= 100.00d0
-             EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
-             EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
-             LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
-             SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
+          IF(PlantSizingErrorsFound)THEN
+            CALL ShowContinueError('...Occurs in '//TRIM(Sys(SysNum)%SysType)//':'//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.TRUE.
+          END IF
+          IF (PltSizHeatNum > 0) THEN
+            CoilInTemp = TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU
+            DesMassFlow = StdRhoAir * TermUnitSizing(CurZoneEqNum)%AirVolFlow
+            DesZoneHeatLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
+            ZoneDesTemp = CalcFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
+            ZoneDesHumRat = CalcFinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtHeatPeak
+            ! the coil load is the zone design heating load plus (or minus!) the reheat load
+            DesCoilLoad = DesZoneHeatLoad + PsyCpAirFnWTdb(ZoneDesHumRat, 0.5d0*(CoilInTemp+ZoneDesTemp)) &
+                             * DesMassFlow * (ZoneDesTemp-CoilInTemp)
+            IF (DesCoilLoad >= SmallLoad) THEN
+               TempSteamIn= 100.00d0
+               EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
+               EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
+               LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
+               SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,Sys(SysNum)%FluidIndex,'SizeHVACSingleDuct')
 
-             Cp = GetSpecificHeatGlycol('WATER', &
+               Cp = GetSpecificHeatGlycol('WATER', &
                                         PlantSizData(PltSizHeatNum)%ExitTemp, &
                                         DummyWaterIndex, &
                                         'SizeSys')
-             Sys(SysNum)%MaxReheatSteamVolFlow = DesCoilLoad /(SteamDensity*(LatentHeatSteam + &
-              PlantSizData(PltSizHeatNum)%DeltaT * Cp ))
+               MaxReheatSteamVolFlowDes = DesCoilLoad /(SteamDensity*(LatentHeatSteam + &
+                                        PlantSizData(PltSizHeatNum)%DeltaT * Cp ))
+            ELSE
+              MaxReheatSteamVolFlowDes = 0.0D0
+            END IF
           ELSE
-            Sys(SysNum)%MaxReheatSteamVolFlow = 0.0D0
+            CALL ShowSevereError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in AirTerminal:SingleDuct:ConstantVolume:Reheat Object='//TRIM(Sys(SysNum)%SysName))
+            Errorsfound = .TRUE.
           END IF
-          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
-                                  'Maximum Reheat Steam Flow Rate [m3/s]', Sys(SysNum)%MaxReheatSteamVolFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in AirTerminal:SingleDuct:ConstantVolume:Reheat Object='//TRIM(Sys(SysNum)%SysName))
-          Errorsfound = .TRUE.
         END IF
-      ELSE
-
-        Sys(SysNum)%MaxReheatWaterVolFlow = 0.0D0
-        Sys(SysNum)%MaxReheatSteamVolFlow = 0.0D0
-
+        IF (IsAutosize) THEN
+          Sys(SysNum)%MaxReheatSteamVolFlow = MaxReheatSteamVolFlowDes
+          CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                                  'Design Size Maximum Reheat Steam Flow Rate [m3/s]', MaxReheatSteamVolFlowDes)
+        ELSE
+          IF (Sys(SysNum)%MaxReheatSteamVolFlow > 0.0d0 .AND. MaxReheatSteamVolFlowDes > 0.0d0) THEN
+            MaxReheatSteamVolFlowUser = Sys(SysNum)%MaxReheatSteamVolFlow
+            CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
+                                  'Design Size Maximum Reheat Steam Flow Rate [m3/s]', MaxReheatSteamVolFlowDes, &
+                                  'User-Specified Maximum Reheat Steam Flow Rate [m3/s]', MaxReheatSteamVolFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxReheatSteamVolFlowDes - MaxReheatSteamVolFlowUser)/MaxReheatSteamVolFlowUser) &
+                                   > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeHVACSingleDuct: Potential issue with equipment sizing for '// &
+                                    TRIM(Sys(SysNum)%SysType)//' = "'//TRIM(Sys(SysNum)%SysName)//'".')
+                CALL ShowContinueError('User-Specified Maximum Reheat Steam Flow Rate of '// &
+                                    TRIM(RoundSigDigits(MaxReheatSteamVolFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Reheat Steam Flow Rate of ' // &
+                                    TRIM(RoundSigDigits(MaxReheatSteamVolFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-
     END IF
-
+  ELSE
+    Sys(SysNum)%MaxReheatSteamVolFlow = 0.0D0
   END IF
 
   IF (CurZoneEqNum > 0) THEN
@@ -2165,11 +2442,15 @@ SUBROUTINE SizeSys(SysNum)
     TermUnitSizing(CurZoneEqNum)%MaxHWVolFlow = Sys(SysNum)%MaxReheatWaterVolFlow
     TermUnitSizing(CurZoneEqNum)%MaxSTVolFlow = Sys(SysNum)%MaxReheatSteamVolFlow
     IF (Sys(SysNum)%ReheatComp_Num == HCoilType_SimpleHeating) THEN
-      CALL SetCoilDesFlow(Sys(SysNum)%ReheatComp,Sys(SysNum)%ReheatName,TermUnitSizing(CurZoneEqNum)%AirVolFlow,&
-                          ErrorsFound)
+      IF (Sys(SysNum)%DamperHeatingAction == Normal) THEN
+        CALL SetCoilDesFlow(Sys(SysNum)%ReheatComp,Sys(SysNum)%ReheatName,Sys(SysNum)%ZoneMinAirFrac*Sys(SysNum)%MaxAirVolFlowRate,&
+                            ErrorsFound)
+      ELSE
+        CALL SetCoilDesFlow(Sys(SysNum)%ReheatComp,Sys(SysNum)%ReheatName,TermUnitSizing(CurZoneEqNum)%AirVolFlow,&
+                            ErrorsFound)
+      END IF
     END IF
   END IF
-
 
   IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
     ! check for inconsistent dual max input
@@ -2192,7 +2473,6 @@ SUBROUTINE SizeSys(SysNum)
     ENDIF
   ENDIF
 
-
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Preceding sizing errors cause program termination')
   END IF
@@ -2200,7 +2480,6 @@ SUBROUTINE SizeSys(SysNum)
   RETURN
 
 END SUBROUTINE SizeSys
-
  ! End Initialization Section of the Module
 !******************************************************************************
 
@@ -2351,8 +2630,8 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
     MassFlow = MAX(MassFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
     MassFlow = MIN(MassFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
 
-    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
-       .AND. VAVTerminalRatio .GT. 0.0) then
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated &
+       .AND. VAVTerminalRatio .GT. 0.0d0) then
       MassFlow = MassFlow * VAVTerminalRatio
       If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
         MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
@@ -2370,7 +2649,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 !     END IF
 
      ! Apply the zone maximum outdoor air fraction for VAV boxes - a TRACE feature
-    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0d0) THEN
       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
     ENDIF
 
@@ -2385,9 +2664,9 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
     END IF
 
-    ! the AirflowNetwork model overrids the mass flow rate value 
-    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
-       .AND. VAVTerminalRatio .GT. 0.0) then
+    ! the AirflowNetwork model overrids the mass flow rate value
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated &
+       .AND. VAVTerminalRatio .GT. 0.0d0) then
       MassFlow = MassFlow * VAVTerminalRatio
       If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
         MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
@@ -2486,8 +2765,8 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
     MassFlow = MIN(MassFlow, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
     MassFlow = MAX(MassFlow, SysInlet(SysNum)%AirMassFlowRateMinAvail)
 
-    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
-       .AND. VAVTerminalRatio .GT. 0.0) then
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated &
+       .AND. VAVTerminalRatio .GT. 0.0d0) then
       MassFlow = MassFlow * VAVTerminalRatio
       If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
         MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
@@ -3564,9 +3843,9 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
         FanOp = 1
         Par(1) = REAL(SysNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.d0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0d0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = REAL(HCType,r64)
@@ -3608,9 +3887,9 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
         FanOp = 1
         Par(1) = REAL(SysNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.d0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0d0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = REAL(HCType,r64)
@@ -4512,18 +4791,836 @@ SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType
        (Sys(SDSIndex)%SysType_Num .NE. SingleDuctVAVReheat) ) THEN
       CALL ShowSevereError(TRIM(ThisObjectType)//', GetHVACSingleDuctSysIndex: Could not find allowed types='//TRIM(SDSName))
       CALL ShowContinueError('The allowed types are: AirTerminal:SingleDuct:ConstantVolume:Reheat and ' &
-           //'AirTerminal:SingleDuct:VAV:Reheat') 
+           //'AirTerminal:SingleDuct:VAV:Reheat')
       ErrorsFound=.TRUE.
     END IF
     If (Sys(SDSIndex)%SysType_Num .EQ. SingleDuctVAVReheat) Then
-      If (PRESENT(DamperInletNode)) DamperInletNode = Sys(SDSIndex)%InletNodeNum     
-      If (PRESENT(DamperOutletNode)) DamperOutletNode = Sys(SDSIndex)%OutletNodeNum     
+      If (PRESENT(DamperInletNode)) DamperInletNode = Sys(SDSIndex)%InletNodeNum
+      If (PRESENT(DamperOutletNode)) DamperOutletNode = Sys(SDSIndex)%OutletNodeNum
     End If
   ENDIF
 
   RETURN
 
 END SUBROUTINE GetHVACSingleDuctSysIndex
+
+SUBROUTINE SimATMixer(SysName,FirstHVACIteration,SysIndex)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Simulate an Air Terminal Mixer component
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+      USE InputProcessor, ONLY: FindItemInList
+
+    IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS
+    CHARACTER(len=*), INTENT(IN) :: SysName
+    LOGICAL, INTENT(IN)      :: FirstHVACIteration
+    INTEGER, INTENT(INOUT)   :: SysIndex
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER      :: SysNum = 0
+
+IF (GetATMixerFlag) THEN
+  CALL GetATMixers
+  GetATMixerFlag = .FALSE.
+ENDIF
+
+IF (SysIndex == 0) THEN
+  SysNum=FindItemInList(TRIM(SysName),SysATMixer%Name,NumATMixers)
+  SysIndex=SysNum
+  IF (SysNum == 0) THEN
+      CALL ShowFatalError('Object '//TRIM(SysName)//' not found')
+  ENDIF
+ELSE
+  SysNum=SysIndex
+ENDIF
+
+Call InitATMixer(SysNum, FirstHVACIteration) ! Not being used, is placeholder
+
+CALL CalcATMixer(SysNum)
+
+CALL UpdateATMixer(SysNum)
+
+RETURN
+
+END SUBROUTINE SimATMixer
+
+SUBROUTINE GetATMixers
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Get input for inlet side air temrinal mixers and store it in the inlet side air terminal mixer array
+
+          ! METHODOLOGY EMPLOYED:
+          ! Use the Get routines from the InputProcessor module.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+    USE InputProcessor,    ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList
+    USE NodeInputManager,  ONLY: GetOnlySingleNode
+    USE DataInterfaces,    ONLY: SetupOutputVariable
+    USE DataZoneEquipment, ONLY: ZoneEquipConfig, ZoneEquipList, EquipmentData, SubEquipmentData
+    USE DataLoopNode
+    USE DataIPShortCuts
+    USE BranchNodeConnections, ONLY: TestCompSet, SetUpCompSets
+    USE DataGlobals,      ONLY: NumOfZones
+ !   USE DataDefineEquip,   ONLY: AirDistUnit, NumAirDistUnits
+!    USE PackagedTerminalHeatPump, ONLY: GetPTUnitZoneInletAirNode, GetPTUnitIndex, GetPTUnitInletAirNode
+!    USE FanCoilUnits, ONLY: GetFanCoilIndex, GetFanCoilZoneInletAirNode, GetFanCoilInletAirNode
+
+    IMPLICIT NONE
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: NumNums                ! Number of REAL(r64) numbers returned by GetObjectItem
+INTEGER :: NumAlphas              ! Number of alphanumerics returned by GetObjectItem
+INTEGER :: InletATMixerNum        ! Index of inlet side mixer air terminal unit
+INTEGER :: SupplyATMixerNum       ! Index of supply side mixer air terminal unit
+INTEGER :: NumInletATMixers       ! Number of inlet side mixer air terminal units
+INTEGER :: NumSupplyATMixers      ! Number of supply side mixer air terminal units
+INTEGER :: IOSTAT
+CHARACTER(len=*), PARAMETER    :: RoutineName='GetATMixers: ' ! include trailing blank space
+LOGICAL :: ErrorsFound=.false.    ! Error flag
+LOGICAL :: IsNotOK                ! Flag to verify name
+LOGICAL :: IsBlank                ! Flag for blank name
+INTEGER :: NodeNum                ! Index to node number
+INTEGER :: CtrlZone               ! Index to control zone
+LOGICAL :: ZoneNodeNotFound       ! Flag for error checking
+LOGICAL :: ZoneEquipNodeNotFound  ! Flag for error checking
+INTEGER :: ADUNum                 ! Air distribution unit index
+INTEGER :: SupAirIn               ! Supply air inlet node index
+LOGICAL :: ErrFlag                ! error flag from component validation
+
+
+NumInletATMixers = GetNumObjectsFound('AirTerminal:SingleDuct:InletSideMixer')
+NumSupplyATMixers = GetNumObjectsFound('AirTerminal:SingleDuct:SupplySideMixer')
+
+NumATMixers = NumInletATMixers + NumSupplyATMixers
+ALLOCATE(SysATMixer(NumATMixers))
+
+cCurrentModuleObject='AirTerminal:SingleDuct:InletSideMixer'
+
+  DO InletATMixerNum=1,NumInletATMixers
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),InletATMixerNum,cAlphaArgs,NumAlphas,&
+                       rNumericArgs,NumNums,IOSTAT,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
+                       AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    IsNotOK=.false.
+    IsBlank=.false.
+    CALL VerifyName(cAlphaArgs(1),SysATMixer%Name,InletATMixerNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
+    IF (IsNotOK) THEN
+      ErrorsFound=.true.
+      IF (IsBlank) cAlphaArgs(1)='xxxxxxxx'
+    ENDIF
+    SysATMixer(InletATMixerNum)%Name = TRIM(cAlphaArgs(1))
+    SysATMixer(InletATMixerNum)%MixerType = 1 ! inlet side mixer
+    IF (TRIM(cAlphaArgs(2)) == 'ZONEHVAC:WATERTOAIRHEATPUMP') THEN
+      SysATMixer(InletATMixerNum)%ZoneHVACUnitType = 1
+    ELSE IF (TRIM(cAlphaArgs(2)) == 'ZONEHVAC:FOURPIPEFANCOIL') THEN
+      SysATMixer(InletATMixerNum)%ZoneHVACUnitType = 2
+    END IF
+
+    SysATMixer(InletATMixerNum)%ZoneHVACUnitName = TRIM(cAlphaArgs(3))
+
+    CALL ValidateComponent(cAlphaArgs(2),SysATMixer(InletATMixerNum)%ZoneHVACUnitName, &
+                                                                  ErrFlag,TRIM(cCurrentModuleObject))
+
+    SysATMixer(InletATMixerNum)%MixedAirOutNode  = &
+               GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(4))
+
+    SysATMixer(InletATMixerNum)%PriInNode   = &
+               GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(5))
+    SysATMixer(InletATMixerNum)%SecInNode  = &
+               GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(6))
+   ! Check for dupes in the three nodes.
+    IF (SysATMixer(InletATMixerNum)%SecInNode == SysATMixer(InletATMixerNum)%PriInNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(InletATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(5))//' = '//TRIM(NodeID(SysATMixer(InletATMixerNum)%PriInNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(4))//'.')
+      ErrorsFound=.true.
+    ELSEIF (SysATMixer(InletATMixerNum)%SecInNode == SysATMixer(InletATMixerNum)%MixedAirOutNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(InletATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(6))//' = '//TRIM(NodeID(SysATMixer(InletATMixerNum)%MixedAirOutNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(4))//'.')
+      ErrorsFound=.true.
+    ENDIF
+
+    IF (SysATMixer(InletATMixerNum)%PriInNode == SysATMixer(InletATMixerNum)%MixedAirOutNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(InletATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(6))//' = '//TRIM(NodeID(SysATMixer(InletATMixerNum)%MixedAirOutNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(5))//'.')
+      ErrorsFound=.true.
+    ENDIF
+
+
+   ! Air Terminal inlet node must be the same as a zone exhaust node
+   ZoneNodeNotFound = .TRUE.
+   ControlledZoneLoop: DO CtrlZone = 1,NumOfZones
+     IF (.NOT. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
+     DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumExhaustNodes
+       IF (SysATMixer(InletATMixerNum)%SecInNode .EQ. ZoneEquipConfig(CtrlZone)%ExhaustNode(NodeNum)) THEN
+         ZoneNodeNotFound = .FALSE.
+         DO SupAirIn = 1,ZoneEquipConfig(CtrlZone)%NumInletNodes
+           IF (SysATMixer(InletATMixerNum)%SecInNode .EQ. ZoneEquipConfig(CtrlZone)%ExhaustNode(SupAirIn)) THEN
+             ZoneEquipConfig(CtrlZone)%AirDistUnitCool(SupAirIn)%InNode = SysATMixer(InletATMixerNum)%PriInNode
+             ZoneEquipConfig(CtrlZone)%AirDistUnitCool(SupAirIn)%OutNode = SysATMixer(InletATMixerNum)%MixedAirOutNode
+             ZoneEquipConfig(CtrlZone)%AirDistUnitHeat(SupAirIn)%InNode = SysATMixer(InletATMixerNum)%PriInNode
+             ZoneEquipConfig(CtrlZone)%AirDistUnitHeat(SupAirIn)%OutNode = SysATMixer(InletATMixerNum)%MixedAirOutNode
+           END IF
+         END DO
+         EXIT ControlledZoneLoop
+       END IF
+      END DO
+    END DO ControlledZoneLoop
+    IF(ZoneNodeNotFound)THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = "'//TRIM(SysATMixer(InletATMixerNum)%Name)//'".'// &
+                         ' Inlet Side Air Terminal Mixer air inlet node name must be the same as a zone exhaust node name.')
+      CALL ShowContinueError('..Zone exhaust node name is specified in ZoneHVAC:EquipmentConnections object.')
+      CALL ShowContinueError('..Inlet Side Air Terminal Mixer inlet node name = '//  &
+         TRIM(NodeID(SysATMixer(InletATMixerNum)%SecInNode)))
+      ErrorsFound=.TRUE.
+    END IF
+
+    CALL TestCompSet(TRIM(cCurrentModuleObject),SysATMixer(InletATMixerNum)%Name,cAlphaArgs(5), &
+                     cAlphaArgs(4),'Air Nodes')
+
+  END DO
+
+cCurrentModuleObject='AirTerminal:SingleDuct:SupplySideMixer'
+
+  DO SupplyATMixerNum=NumInletATMixers+1,NumInletATMixers+NumSupplyATMixers
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),SupplyATMixerNum,cAlphaArgs,NumAlphas,&
+                       rNumericArgs,NumNums,IOSTAT,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
+                       AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    IsNotOK=.false.
+    IsBlank=.false.
+    CALL VerifyName(cAlphaArgs(1),SysATMixer%Name,SupplyATMixerNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
+    IF (IsNotOK) THEN
+      ErrorsFound=.true.
+      IF (IsBlank) cAlphaArgs(1)='xxxxxxxx'
+    ENDIF
+    SysATMixer(SupplyATMixerNum)%Name = TRIM(cAlphaArgs(1))
+    SysATMixer(SupplyATMixerNum)%MixerType = 2 ! supply side mixer
+    IF (TRIM(cAlphaArgs(2)) == 'ZONEHVAC:WATERTOAIRHEATPUMP') THEN
+      SysATMixer(SupplyATMixerNum)%ZoneHVACUnitType = 1
+    ELSE IF (TRIM(cAlphaArgs(2)) == 'ZONEHVAC:FOURPIPEFANCOIL') THEN
+      SysATMixer(SupplyATMixerNum)%ZoneHVACUnitType = 2
+    END IF
+
+    SysATMixer(SupplyATMixerNum)%ZoneHVACUnitName = TRIM(cAlphaArgs(3))
+
+    CALL ValidateComponent(cAlphaArgs(2),SysATMixer(SupplyATMixerNum)%ZoneHVACUnitName, &
+                                                                  ErrFlag,TRIM(cCurrentModuleObject))
+
+    SysATMixer(SupplyATMixerNum)%MixedAirOutNode  = &
+               GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(4))
+
+   SysATMixer(SupplyATMixerNum)%PriInNode   = &
+               GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(5))
+    SysATMixer(SupplyATMixerNum)%SecInNode  = &
+               GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                                 NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(6))
+   ! Check for dupes in the three nodes.
+    IF (SysATMixer(SupplyATMixerNum)%SecInNode == SysATMixer(SupplyATMixerNum)%PriInNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(SupplyATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(5))//' = '//TRIM(NodeID(SysATMixer(SupplyATMixerNum)%PriInNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(4))//'.')
+      ErrorsFound=.true.
+    ELSEIF (SysATMixer(SupplyATMixerNum)%SecInNode == SysATMixer(SupplyATMixerNum)%MixedAirOutNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(SupplyATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(6))//' = '//TRIM(NodeID(SysATMixer(SupplyATMixerNum)%MixedAirOutNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(4))//'.')
+      ErrorsFound=.true.
+    ENDIF
+
+    IF (SysATMixer(SupplyATMixerNum)%PriInNode == SysATMixer(SupplyATMixerNum)%MixedAirOutNode) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(SysATMixer(SupplyATMixerNum)%Name)//  &
+                           ' '//TRIM(cAlphaArgs(6))//' = '//TRIM(NodeID(SysATMixer(SupplyATMixerNum)%MixedAirOutNode))// &
+                           ' duplicates the '//TRIM(cAlphaArgs(5))//'.')
+      ErrorsFound=.true.
+    ENDIF
+
+    CALL TestCompSet(TRIM(cCurrentModuleObject),SysATMixer(SupplyATMixerNum)%Name,cAlphaArgs(5), &
+                     cAlphaArgs(4),'Air Nodes')
+
+    ! Air Terminal outlet node must be the same as a zone inlet node
+    ZoneNodeNotFound = .TRUE.
+    ControlZoneLoop: DO CtrlZone = 1,NumOfZones
+      IF (.not. ZoneEquipConfig(CtrlZone)%IsControlled) CYCLE
+      DO NodeNum = 1,ZoneEquipConfig(CtrlZone)%NumInletNodes
+        IF (SysATMixer(SupplyATMixerNum)%MixedAirOutNode .EQ. ZoneEquipConfig(CtrlZone)%InletNode(NodeNum)) THEN
+          ZoneNodeNotFound = .FALSE.
+          DO SupAirIn = 1,ZoneEquipConfig(CtrlZone)%NumInletNodes
+            IF (SysATMixer(SupplyATMixerNum)%MixedAirOutNode .EQ. ZoneEquipConfig(CtrlZone)%InletNode(SupAirIn)) THEN
+              ZoneEquipConfig(CtrlZone)%AirDistUnitCool(SupAirIn)%InNode = SysATMixer(SupplyATMixerNum)%PriInNode
+              ZoneEquipConfig(CtrlZone)%AirDistUnitCool(SupAirIn)%OutNode = SysATMixer(SupplyATMixerNum)%MixedAirOutNode
+              ZoneEquipConfig(CtrlZone)%AirDistUnitHeat(SupAirIn)%InNode = SysATMixer(SupplyATMixerNum)%PriInNode
+              ZoneEquipConfig(CtrlZone)%AirDistUnitHeat(SupAirIn)%OutNode = SysATMixer(SupplyATMixerNum)%MixedAirOutNode
+            END IF
+          END DO
+          EXIT ControlZoneLoop
+        END IF
+      END DO
+    END DO ControlZoneLoop
+    IF(ZoneNodeNotFound)THEN
+       CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = "'//TRIM(SysATMixer(SupplyATMixerNum)%Name)//'".'// &
+                         ' Supply Side Air Terminal Mixer air outlet node name must be the same as a zone inlet node name.')
+       CALL ShowContinueError('..Zone exhaust node name is specified in ZoneHVAC:EquipmentConnections object.')
+       CALL ShowContinueError('..Inlet Side Air Terminal Mixer inlet node name = '//  &
+          TRIM(NodeID(SysATMixer(SupplyATMixerNum)%SecInNode)))
+       ErrorsFound=.TRUE.
+    END IF
+  END DO
+
+IF (ErrorsFound) THEN
+  CALL ShowFatalError(RoutineName//'Errors found in input.  Program terminates.')
+ENDIF
+
+RETURN
+END SUBROUTINE GetATMixers
+
+SUBROUTINE InitATMixer(ATMixerNum,FirstHVACIteration)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Initialize the AirTerminalMixers data structure with node data
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+    USE DataLoopNode
+
+    IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS
+    INTEGER, INTENT(IN) :: ATMixerNum
+    LOGICAL, INTENT(IN) :: FirstHVACIteration
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: InletNode
+INTEGER :: PriInNode
+INTEGER :: MixedAirOutNode
+
+InletNode = SysATMixer(ATMixerNum)%SecInNode
+PriInNode = SysATMixer(ATMixerNum)%PriInNode
+MixedAirOutNode = SysATMixer(ATMixerNum)%MixedAirOutNode
+
+IF (FirstHVACIteration) THEN
+!  SysATMixer(ATMixerNum)%ZoneAirMassFlowRate = SysATMixer(ATMixerNum)%MaxAirMassFlowRate
+END IF
+
+IF (BeginDayFlag) THEN
+END IF
+
+IF (FirstHVACIteration) THEN
+END IF
+
+RETURN
+END SUBROUTINE InitATMixer
+
+SUBROUTINE CalcATMixer(SysNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Calculate the mixed air flow and conditions in the air terminal mixer
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+USE Psychrometrics, ONLY:PsyTdbFnHW
+Use DataEnvironment, ONLY: StdRhoAir
+
+    IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS
+    INTEGER, INTENT(IN) :: SysNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  REAL(r64) :: PriMassFlowRate = 0.0d0
+  REAL(r64) :: PriPressure = 0.0d0
+  REAL(r64) :: PriEnthalpy = 0.0d0
+  REAL(r64) :: PriHumRat = 0.0d0
+  REAL(r64) :: PriTemp = 0.0d0
+
+  REAL(r64) :: SecAirMassFlowRate = 0.0d0
+  REAL(r64) :: SecAirPressure = 0.0d0
+  REAL(r64) :: SecAirEnthalpy = 0.0d0
+  REAL(r64) :: SecAirHumRat = 0.0d0
+  REAL(r64) :: SecAirTemp = 0.0d0
+
+  REAL(r64) :: MixedAirMassFlowRate = 0.0d0
+  REAL(r64) :: MixedAirPressure = 0.0d0
+  REAL(r64) :: MixedAirEnthalpy = 0.0d0
+  REAL(r64) :: MixedAirHumRat = 0.0d0
+  REAL(r64) :: MixedAirTemp = 0.0d0
+
+
+  PriEnthalpy = Node(SysATMixer(SysNum)%PriInNode)%Enthalpy
+  PriHumRat = Node(SysATMixer(SysNum)%PriInNode)%HumRat
+  PriTemp = Node(SysATMixer(SysNum)%PriInNode)%Temp
+  PriMassFlowRate = Node(SysATMixer(SysNum)%PriInNode)%MassFlowRate
+
+  SecAirMassFlowRate = Node(SysATMixer(SysNum)%SecInNode)%MassFlowRate
+  SecAirEnthalpy = Node(SysATMixer(SysNum)%SecInNode)%Enthalpy
+  SecAirHumRat = Node(SysATMixer(SysNum)%SecInNode)%HumRat
+  SecAirTemp = Node(SysATMixer(SysNum)%SecInNode)%Temp
+
+  IF (SysATMixer(SysNum)%MixerType == ATMixer_SupplySide) THEN
+    MixedAirMassFlowRate = SecAirMassFlowRate + PriMassFlowRate
+  ELSE
+    ! for inlet side mixer, the mixed air flow has been set, but we don't know the secondary flow
+    MixedAirMassFlowRate = Node(SysATMixer(SysNum)%MixedAirOutNode)%MassFlowRate
+    SecAirMassFlowRate = MAX(MixedAirMassFlowRate - PriMassFlowRate,0.0d0)
+    Node(SysATMixer(SysNum)%SecInNode)%MassFlowRate = SecAirMassFlowRate
+  END IF
+  ! now calculate the mixed (outlet) conditions
+  IF (MixedAirMassFlowRate > 0.0d0) THEN
+    MixedAirEnthalpy = (SecAirMassFlowRate*SecAirEnthalpy + PriMassFlowRate*PriEnthalpy) / MixedAirMassFlowRate
+    MixedAirHumRat = (SecAirMassFlowRate*SecAirHumRat + PriMassFlowRate*PriHumRat) / MixedAirMassFlowRate
+    ! Mixed air temperature is calculated from the mixed air enthalpy and humidity ratio.
+    MixedAirTemp = PsyTdbFnHW(MixedAirEnthalpy,MixedAirHumRat)
+  END IF
+
+  SysATMixer(SysNum)%MixedAirMassFlowRate = MixedAirMassFlowRate
+  SysATMixer(SysNum)%MixedAirEnthalpy = MixedAirEnthalpy
+  SysATMixer(SysNum)%MixedAirHumRat = MixedAirHumRat
+  SysATMixer(SysNum)%MixedAirTemp = MixedAirTemp
+
+  RETURN
+
+END SUBROUTINE CalcATMixer
+
+SUBROUTINE UpdateATMixer(SysNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE
+          ! Move the results of CalcATMixer to the affected nodes
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+    USE DataLoopNode
+
+    IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS
+    INTEGER, INTENT(IN) :: SysNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: MixedAirOutNode
+
+MixedAirOutNode = SysATMixer(SysNum)%MixedAirOutNode
+
+! mixed air data
+Node(MixedAirOutNode)%Temp = SysATMixer(SysNum)%MixedAirTemp
+Node(MixedAirOutNode)%HumRat = SysATMixer(SysNum)%MixedAirHumRat
+Node(MixedAirOutNode)%Enthalpy = SysATMixer(SysNum)%MixedAirEnthalpy
+Node(MixedAirOutNode)%Press = SysATMixer(SysNum)%MixedAirPressure
+Node(MixedAirOutNode)%MassFlowRate = SysATMixer(SysNum)%MixedAirMassFlowRate
+
+RETURN
+END SUBROUTINE UpdateATMixer
+
+SUBROUTINE GetATMixerPriNode(ZoneEquipName,ATMixerPriNode)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the zone air inlet node for a given ATMixer
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: ZoneEquipName
+  INTEGER, INTENT(INOUT)       :: ATMixerPriNode
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ATMixerIndex ! local air terminal mixer index
+
+  LOGICAL ErrorsFound ! for error trapping
+
+  IF (GetATMixerFlag) THEN
+    CALL GetATMixers
+    GetATMixerFlag = .FALSE.
+  END IF
+
+  ATMixerIndex = FindItemInList(ZoneEquipName,SysATMixer%Name,NumATMixers)
+  IF (ATMixerIndex > 0) THEN
+    ATMixerPriNode = SysATMixer(ATMixerIndex)%PriInNode
+  END IF
+
+  IF (ATMixerIndex == 0) THEN
+    CALL ShowSevereError('GetATMixerPriNode: Air Terminal Mixer zone air inlet node not found for zone equipment='//  &
+       TRIM(ZoneEquipName))
+    ErrorsFound=.TRUE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE GetATMixerPriNode
+
+SUBROUTINE GetATMixerSecNode(ZoneEquipName,ATMixerSecNode)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the zone air inlet node for a given ATMixer
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: ZoneEquipName
+  INTEGER, INTENT(INOUT)       :: ATMixerSecNode
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ATMixerIndex ! local air terminal mixer index
+
+  LOGICAL ErrorsFound ! for error trapping
+
+  IF (GetATMixerFlag) THEN
+    CALL GetATMixers
+    GetATMixerFlag = .FALSE.
+  END IF
+
+  ATMixerIndex = FindItemInList(ZoneEquipName,SysATMixer%Name,NumATMixers)
+  IF (ATMixerIndex > 0) THEN
+    ATMixerSecNode = SysATMixer(ATMixerIndex)%SecInNode
+  END IF
+
+  IF (ATMixerIndex == 0) THEN
+    CALL ShowSevereError('GetATMixerSecNode: Air Terminal Mixer zone air inlet node not found for zone equipment='//  &
+       TRIM(ZoneEquipName))
+    ErrorsFound=.TRUE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE GetATMixerSecNode
+
+SUBROUTINE GetATMixerOutNode(ZoneEquipName,ATMixerOutNode)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the mixed air outlet node for a given ATMixer
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: ZoneEquipName
+  INTEGER, INTENT(INOUT)       :: ATMixerOutNode
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ATMixerIndex ! local air terminal mixer index
+
+  LOGICAL ErrorsFound ! for error trapping
+
+  IF (GetATMixerFlag) THEN
+    CALL GetATMixers
+    GetATMixerFlag = .FALSE.
+  END IF
+
+  ATMixerIndex = FindItemInList(ZoneEquipName,SysATMixer%Name,NumATMixers)
+  IF (ATMixerIndex > 0) THEN
+    ATMixerOutNode = SysATMixer(ATMixerIndex)%MixedAirOutNode
+  END IF
+
+  IF (ATMixerIndex == 0) THEN
+    CALL ShowSevereError('GetATMixerOutNode: Air Terminal Mixer outlet node not found for zone equipment='//TRIM(ZoneEquipName))
+    ErrorsFound=.TRUE.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE GetATMixerOutNode
+
+SUBROUTINE GetATMixer(ZoneEquipName,ATMixerName,ATMixerNum,ATMixerType,ATMixerPriNode,ATMixerSecNode,ATMixerOutNode)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets: 1) the index of the named AT Mixer in the SysATMixer data array
+          !                       2) the node number of the primary air inlet node of the AT Mixer
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor, ONLY: FindItemInList
+  ! USE ZoneAirLoopEquipmentManager, ONLY: GetZoneAirLoopEquipment
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN)  :: ZoneEquipName    ! zone unit name name
+  CHARACTER(len=*), INTENT(OUT) :: ATMixerName      ! air terminal mixer name
+  INTEGER, INTENT(OUT)          :: ATMixerNum       ! air terminal mixer index
+  INTEGER, INTENT(OUT)          :: ATMixerType      ! air teminal mixer type
+  INTEGER, INTENT(OUT)          :: ATMixerPriNode   ! air terminal mixer primary air node number
+  INTEGER, INTENT(OUT)          :: ATMixerSecNode   ! air terminal mixer secondary air node number
+  INTEGER, INTENT(OUT)          :: ATMixerOutNode   ! air terminal mixer outlet air node number
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ATMixerIndex ! local air terminal mixer index
+
+  LOGICAL ErrorsFound ! for error trapping
+
+  IF (GetATMixerFlag) THEN
+    ! CALL GetZoneAirLoopEquipment
+    CALL GetATMixers
+    GetATMixerFlag = .FALSE.
+  END IF
+
+  IF (NumATMixers <= 0) THEN
+    ATMixerNum = 0
+    ATMixerName = ' '
+    ATMixerPriNode = 0
+    ATMixerSecNode = 0
+    ATMixerOutNode = 0
+    ATMixerType    = 0
+    RETURN
+  END IF
+
+  ATMixerIndex = FindItemInList(ZoneEquipName,SysATMixer%ZoneHVACUnitName,NumATMixers)
+  IF (ATMixerIndex > 0) THEN
+    ATMixerNum = ATMixerIndex
+    ATMixerName    = SysATMixer(ATMixerIndex)%Name
+    ATMixerPriNode = SysATMixer(ATMixerIndex)%PriInNode
+    ATMixerSecNode = SysATMixer(ATMixerIndex)%SecInNode
+    ATMixerOutNode = SysATMixer(ATMixerIndex)%MixedAirOutNode
+    ATMixerType    = SysATMixer(ATMixerIndex)%MixerType
+  ELSE
+    ATMixerNum = 0
+    ATMixerName = ' '
+    ATMixerPriNode = 0
+    ATMixerSecNode = 0
+    ATMixerOutNode = 0
+    ATMixerType    = 0
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetATMixer
+
+SUBROUTINE SetATMixerPriFlow(ATMixerNum,PriAirMassFlowRate)
+
+         ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Buhl
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This Subroutine sets the primary air mass flow rate on the primary air inlet
+          ! node of a terminal unit mixer component.
+
+          ! METHODOLOGY EMPLOYED:
+          ! The flow is set to either the input PriAirMassFlowRate if this optional input
+          ! parameter is present, or to the maximum available mass flow rate of the primary
+          ! air inlet node.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! none
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)         :: ATMixerNum                 ! Air terminal mixer index
+  REAL(r64), INTENT (IN), OPTIONAL :: PriAirMassFlowRate    ! Air terminal mixer primary air mass flow rate [kg/s]
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: PriAirNode         ! air terminal mixer primary air inlet node number
+
+  IF (ATMixerNum <= 0) RETURN
+  PriAirNode = SysATMixer(ATMixerNum)%PriInNode
+  IF (PRESENT(PriAirMassFlowRate)) THEN
+    Node(PriAirNode)%MassFlowRate = PriAirMassFlowRate
+  ELSE
+    Node(PriAirNode)%MassFlowRate = Node(PriAirNode)%MassFlowRateMaxAvail
+  END IF
+
+  RETURN
+
+END SUBROUTINE SetATMixerPriFlow
 
 !        End of Reporting subroutines for the Sys Module
 ! *****************************************************************************

@@ -148,7 +148,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
 
     ! See if Material was defined with R only.  (No density is defined then and not applicable for EMPD).
     !  What about materials other than "regular materials" (e.g. Glass, Air, etc)
-    IF (Material(MaterNum)%Group == RegularMaterial .and. MaterialProps(1) > 0.0) THEN
+    IF (Material(MaterNum)%Group == RegularMaterial .and. MaterialProps(1) > 0.0d0) THEN
       IF (Material(MaterNum)%ROnly) THEN
 !        CALL ShowSevereError('EMPD base material = "'//TRIM(Material(MaterNum)%Name)//  &
 !                             '" was Material:NoMass. It cannot be used for EMPD calculations.')
@@ -187,7 +187,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
     IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) CYCLE
     ConstrNum = Surface(SurfNum)%Construction
     MatNum  = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
-    If (Material(MatNum)%EMPDValue .GT. 0.0 .AND. Surface(SurfNum)%Zone .gt. 0) then
+    If (Material(MatNum)%EMPDValue .GT. 0.0d0 .AND. Surface(SurfNum)%Zone .gt. 0) then
        EMPDzone(Surface(SurfNum)%Zone) = .True.
     else
       ErrCount=ErrCount+1
@@ -299,7 +299,7 @@ SUBROUTINE InitMoistureBalanceEMPD
     do SurfNum = 1, TotSurfaces
        ZoneNum               = Surface(SurfNum)%Zone
        IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
-       IF(ZoneAirHumRat(ZoneNum) == 0.0)Then
+       IF(ZoneAirHumRat(ZoneNum) == 0.0d0)Then
           MoistEMPDOld(SurfNum) = 0.0001d0
           MoistEMPDInt(SurfNum) = 0.0001d0
           MoistEMPDNew(SurfNum) = 0.0001d0
@@ -313,8 +313,8 @@ SUBROUTINE InitMoistureBalanceEMPD
     !Initialize the report variable
     RhoVapEMPD = 0.015d0
     WSurfEMPD  = 0.015d0
-    RHEMPD = 0.0
-    MoistEMPDFlux = 0.0
+    RHEMPD = 0.0d0
+    MoistEMPDFlux = 0.0d0
 
     Call GetMoistureBalanceEMPDInput
 
@@ -407,7 +407,7 @@ USE Psychrometrics, ONLY:PsyRhFnTdbWPb,PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyRho
        OneTimeFlag = .True.
     end if
 
-    MoistEMPDFlux(SurfNum) = 0.0
+    MoistEMPDFlux(SurfNum) = 0.0d0
     Flag = 1
     NOFITR = 0
     If ( .NOT. Surface(SurfNum)%HeatTransSurf ) Then
@@ -417,7 +417,7 @@ USE Psychrometrics, ONLY:PsyRhFnTdbWPb,PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyRho
     MatNum  = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)   ! Then find the material pointer
 
     ZoneNum   = Surface(SurfNum)%Zone
-    If (Material(MatNum)%EMPDValue .LE. 0.0) Then
+    If (Material(MatNum)%EMPDValue .LE. 0.0d0) Then
        MoistEMPDNew(SurfNum)= PsyRhovFnTdbWPb(TempZone,ZoneAirHumRat(ZoneNum),OutBaroPress,'CalcMoistureEMPD')
        RETURN
     End If
@@ -428,8 +428,8 @@ USE Psychrometrics, ONLY:PsyRhFnTdbWPb,PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyRho
     DO WHILE (Flag > 0 )
        RVaver = (MoistEMPDNew(SurfNum)+MoistEMPDOld(SurfNum))/2.0d0
        RHaver = RVaver*461.52d0*(Taver+KelvinConv)*exp(-23.7093d0+4111.0d0/(Taver+237.7d0))
-       if (RHaver .GT. 1.0) RHaver = 1.0
-       if (RHaver .LT. 0.0) RHaver = 0.00001d0
+       if (RHaver .GT. 1.0d0) RHaver = 1.0d0
+       if (RHaver .LT. 0.0d0) RHaver = 0.00001d0
 
        AT = (Material(MatNum)%MoistACoeff*Material(MatNum)%MoistBCoeff*RHaver**Material(MatNum)%MoistBCoeff + &
            Material(MatNum)%MoistCCoeff*Material(MatNum)%MoistDCoeff*RHaver**Material(MatNum)%MoistDCoeff)/RVaver
@@ -446,7 +446,7 @@ USE Psychrometrics, ONLY:PsyRhFnTdbWPb,PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyRho
                                          1.0d0,BB,CC)
 
        Flag = 0
-       ERRORM = ABS((MoistEMPDNew(SurfNum)-MoistEMPDInt(SurfNum))/MoistEMPDInt(SurfNum))*100.0
+       ERRORM = ABS((MoistEMPDNew(SurfNum)-MoistEMPDInt(SurfNum))/MoistEMPDInt(SurfNum))*100.0d0
        IF (ERRORM .GT. ERROR) Flag = Flag+1
 
 
@@ -473,7 +473,7 @@ USE Psychrometrics, ONLY:PsyRhFnTdbWPb,PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyRho
 
     ! Put results in the single precision reporting variable
     RhoVapEMPD(SurfNum) = MoistEMPDNew(SurfNum)
-    RHEMPD(SurfNum) = PsyRhFnTdbRhovLBnd0C(TempSurfIn,RhoVapEMPD(SurfNum),'CalcMoistureEMPD')*100.0
+    RHEMPD(SurfNum) = PsyRhFnTdbRhovLBnd0C(TempSurfIn,RhoVapEMPD(SurfNum),'CalcMoistureEMPD')*100.0d0
     WSurfEMPD(SurfNum) = PsyWFnTdbRhPb(TempSurfIn,RHEMPD(SurfNum)/100.0,OutBaroPress,'CalcMoistureEMPD')
 
 

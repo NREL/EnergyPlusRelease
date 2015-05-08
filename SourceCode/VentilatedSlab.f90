@@ -28,10 +28,8 @@ MODULE VentilatedSlab
   ! Use statements for data only modules
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, BeginTimeStepFlag, MaxNameLength, &
-                           InitConvTemp, SysSizingCalc, WarmUpFlag
-USE DataInterfaces,  ONLY: ShowWarningError, ShowWarningMessage, ShowFatalError, ShowSevereError, ShowContinueError, &
-                           SetupOutputVariable, ShowContinueErrorTimeStamp, &
-                           ShowRecurringWarningErrorAtEnd,CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
+                           InitConvTemp, SysSizingCalc, WarmUpFlag, DisplayExtraWarnings
+USE DataInterfaces
 
 USE DataSurfaces,      ONLY : Surface, TotSurfaces
 USE DataHeatBalFanSys, ONLY : QRadSysSource
@@ -127,10 +125,10 @@ TYPE, PUBLIC :: VentilatedSlabData
 
 
 
-  REAL(r64)                    :: TotalSurfaceArea  = 0.0 ! Total surface area for all surfaces that are part of this system
-  REAL(r64)                    :: CoreDiameter      = 0.0 ! tube diameter for embedded tubing
-  REAL(r64)                    :: CoreLength        = 0.0 ! tube length embedded in radiant surface
-  REAL(r64)                    :: CoreNumbers        = 0.0 ! tube length embedded in radiant surface
+  REAL(r64)                    :: TotalSurfaceArea  = 0.0d0 ! Total surface area for all surfaces that are part of this system
+  REAL(r64)                    :: CoreDiameter      = 0.0d0 ! tube diameter for embedded tubing
+  REAL(r64)                    :: CoreLength        = 0.0d0 ! tube length embedded in radiant surface
+  REAL(r64)                    :: CoreNumbers        = 0.0d0 ! tube length embedded in radiant surface
   INTEGER                      :: ControlType       = 0   ! Control type for the system
                                                           ! (MAT, MRT, Op temp, ODB, OWB, DPTZ, Surf Temp.)
   INTEGER                      :: ReturnAirNode           =0   ! inlet air node number
@@ -145,8 +143,8 @@ TYPE, PUBLIC :: VentilatedSlabData
   INTEGER                      :: Fan_Index           =0
   INTEGER                      :: ControlCompTypeNum =0
   INTEGER                      :: CompErrIndex       =0
-  REAL(r64)                    :: MaxAirVolFlow       =0.0 ! m3/s
-  REAL(r64)                    :: MaxAirMassFlow      =0.0 ! kg/s
+  REAL(r64)                    :: MaxAirVolFlow       =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxAirMassFlow      =0.0d0 ! kg/s
   INTEGER                      :: OAControlType       =0 ! type of control; options are VARIABLE PERCENT and FIXED TEMPERATURE
   CHARACTER(len=MaxNameLength) :: MinOASchedName      =' ' ! schedule of fraction for minimum outside air (all controls)
   INTEGER                      :: MinOASchedPtr       =0   ! index to schedule
@@ -158,10 +156,10 @@ TYPE, PUBLIC :: VentilatedSlabData
   INTEGER                      :: OutsideAirNode      =0   ! outside air node number
   INTEGER                      :: AirReliefNode       =0   ! relief air node number
   INTEGER                      :: OAMixerOutNode      =0   ! outlet node after the outside air mixer (inlet to coils if present)
-  REAL(r64)                    :: OutAirVolFlow       =0.0 ! m3/s
-  REAL(r64)                    :: OutAirMassFlow      =0.0 ! kg/s
-  REAL(r64)                    :: MinOutAirVolFlow    =0.0 ! m3/s
-  REAL(r64)                    :: MinOutAirMassFlow   =0.0 ! kg/s
+  REAL(r64)                    :: OutAirVolFlow       =0.0d0 ! m3/s
+  REAL(r64)                    :: OutAirMassFlow      =0.0d0 ! kg/s
+  REAL(r64)                    :: MinOutAirVolFlow    =0.0d0 ! m3/s
+  REAL(r64)                    :: MinOutAirMassFlow   =0.0d0 ! kg/s
   INTEGER                      :: SysConfg            =0 ! type of coil option; options are BOTH, HEATING, COOLING, AND NONE
   INTEGER                      :: CoilOption          =0 ! type of coil option; options are BOTH, HEATING, COOLING, AND NONE
   LOGICAL                      :: HCoilPresent        =.false. ! .TRUE. if ventilated slab has a heating coil
@@ -173,18 +171,18 @@ TYPE, PUBLIC :: VentilatedSlabData
   INTEGER                      :: HCoil_FluidIndex    =0
   CHARACTER(len=MaxNameLength) :: HCoilSchedName      =' ' ! availability schedule for the heating coil
   INTEGER                      :: HCoilSchedPtr       =0   ! index to schedule
-  REAL(r64)                    :: HCoilSchedValue     =0.0
-  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxVolHotSteamFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MaxHotWaterFlow     =0.0 ! kg/s
-  REAL(r64)                    :: MaxHotSteamFlow=0.0
-  REAl(r64)                    :: MinHotSteamFlow =0.0
-  REAL(r64)                    :: MinVolHotWaterFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinVolHotSteamFlow  =0.0 ! m3/s
-  REAL(r64)                    :: MinHotWaterFlow     =0.0 ! kg/s
+  REAL(r64)                    :: HCoilSchedValue     =0.0d0
+  REAL(r64)                    :: MaxVolHotWaterFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxVolHotSteamFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxHotWaterFlow     =0.0d0 ! kg/s
+  REAL(r64)                    :: MaxHotSteamFlow=0.0d0
+  REAl(r64)                    :: MinHotSteamFlow =0.0d0
+  REAL(r64)                    :: MinVolHotWaterFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinVolHotSteamFlow  =0.0d0 ! m3/s
+  REAL(r64)                    :: MinHotWaterFlow     =0.0d0 ! kg/s
   INTEGER                      :: HotControlNode      =0   ! hot water control node
   INTEGER                      :: HotCoilOutNodeNum   =0   ! outlet of coil
-  REAL(r64)                    :: HotControlOffset    =0.0 ! control tolerance
+  REAL(r64)                    :: HotControlOffset    =0.0d0 ! control tolerance
   INTEGER                      :: HWLoopNum           =0   ! index for plant loop with hot water coil
   INTEGER                      :: HWLoopSide          =0   ! index for plant loop side for hot water coil
   INTEGER                      :: HWBranchNum         =0   ! index for plant branch for hot water coil
@@ -213,14 +211,14 @@ TYPE, PUBLIC :: VentilatedSlabData
                                                            ! 'CoilSystem:Cooling:Water:HeatExchangerAssisted'
   CHARACTER(len=MaxNameLength) :: CCoilSchedName      =' ' ! availability schedule for the cooling coil
   INTEGER                      :: CCoilSchedPtr       =0   ! index to schedule
-  REAL(r64)                    :: CCoilSchedValue     =0.0
-  REAL(r64)                    :: MaxVolColdWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MaxColdWaterFlow    =0.0 ! kg/s
-  REAL(r64)                    :: MinVolColdWaterFlow =0.0 ! m3/s
-  REAL(r64)                    :: MinColdWaterFlow    =0.0 ! kg/s
+  REAL(r64)                    :: CCoilSchedValue     =0.0d0
+  REAL(r64)                    :: MaxVolColdWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MaxColdWaterFlow    =0.0d0 ! kg/s
+  REAL(r64)                    :: MinVolColdWaterFlow =0.0d0 ! m3/s
+  REAL(r64)                    :: MinColdWaterFlow    =0.0d0 ! kg/s
   INTEGER                      :: ColdControlNode     =0   ! chilled water control node
   INTEGER                      :: ColdCoilOutNodeNum  =0   ! chilled water coil out nod
-  REAL(r64)                    :: ColdControlOffset   =0.0 ! control tolerance
+  REAL(r64)                    :: ColdControlOffset   =0.0d0 ! control tolerance
   INTEGER                      :: CWLoopNum           =0   ! index for plant loop with chilled water coil
   INTEGER                      :: CWLoopSide          =0   ! index for plant loop side for chilled water coil
   INTEGER                      :: CWBranchNum         =0   ! index for plant branch for chilled water coil
@@ -245,32 +243,32 @@ TYPE, PUBLIC :: VentilatedSlabData
   CHARACTER(len=MaxNameLength) :: DSSlabInNodeName  =' '
   CHARACTER(len=MaxNameLength) :: DSSlabOutNodeName  =' '
   ! Report data
-  REAL(r64)                    :: DirectHeatLossPower          =0.0 ! system direct heat loss in W
-  REAL(r64)                    :: DirectHeatLossEnergy         =0.0 ! system direct heat loss in J
-  REAL(r64)                    :: DirectHeatGainPower          =0.0 ! system direct heat gain in W
-  REAL(r64)                    :: DirectHeatGainEnergy         =0.0 ! system direct heat gain in J
-  REAL(r64)                    :: TotalVentSlabRadPower        =0.0
-  REAL(r64)                    :: RadHeatingPower              =0.0 ! radiant heating output in watts
-  REAL(r64)                    :: RadHeatingEnergy             =0.0 ! radiant heating output in J
-  REAL(r64)                    :: RadCoolingPower              =0.0 ! radiant cooling output in watts
-  REAL(r64)                    :: RadCoolingEnergy             =0.0 ! radiant cooling output in J
-  REAL(r64)                    :: HeatCoilPower                =0.0
-  REAL(r64)                    :: HeatCoilEnergy               =0.0
-  REAL(r64)                    :: TotCoolCoilPower             =0.0
-  REAL(r64)                    :: TotCoolCoilEnergy            =0.0
-  REAL(r64)                    :: SensCoolCoilPower            =0.0
-  REAL(r64)                    :: SensCoolCoilEnergy           =0.0
-  REAL(r64)                    :: LateCoolCoilPower            =0.0
-  REAL(r64)                    :: LateCoolCoilEnergy           =0.0
-  REAL(r64)                    :: ElecFanPower                 =0.0
-  REAL(r64)                    :: ElecFanEnergy                =0.0
-  REAL(r64)                    :: AirMassFlowRate              =0.0 ! Circulated air mass flow rate in kg/s
-  REAL(r64)                    :: AirVolFlow                   =0.0 ! Circulated air volumetric flow rate in m3/s
-  REAL(r64)                    :: SlabInTemp                   =0.0 ! Slab inlet temp in degree C
-  REAL(r64)                    :: SlabOutTemp                  =0.0 ! Slab outlet temp in degree C
-  REAL(r64)                    :: ReturnAirTemp                =0.0 !
-  REAL(r64)                    :: FanOutletTemp                =0.0 ! FanOutlet temp in degree C
-  REAL(r64)                    :: ZoneInletTemp                =0.0 ! supply air temp
+  REAL(r64)                    :: DirectHeatLossPower          =0.0d0 ! system direct heat loss in W
+  REAL(r64)                    :: DirectHeatLossEnergy         =0.0d0 ! system direct heat loss in J
+  REAL(r64)                    :: DirectHeatGainPower          =0.0d0 ! system direct heat gain in W
+  REAL(r64)                    :: DirectHeatGainEnergy         =0.0d0 ! system direct heat gain in J
+  REAL(r64)                    :: TotalVentSlabRadPower        =0.0d0
+  REAL(r64)                    :: RadHeatingPower              =0.0d0 ! radiant heating output in watts
+  REAL(r64)                    :: RadHeatingEnergy             =0.0d0 ! radiant heating output in J
+  REAL(r64)                    :: RadCoolingPower              =0.0d0 ! radiant cooling output in watts
+  REAL(r64)                    :: RadCoolingEnergy             =0.0d0 ! radiant cooling output in J
+  REAL(r64)                    :: HeatCoilPower                =0.0d0
+  REAL(r64)                    :: HeatCoilEnergy               =0.0d0
+  REAL(r64)                    :: TotCoolCoilPower             =0.0d0
+  REAL(r64)                    :: TotCoolCoilEnergy            =0.0d0
+  REAL(r64)                    :: SensCoolCoilPower            =0.0d0
+  REAL(r64)                    :: SensCoolCoilEnergy           =0.0d0
+  REAL(r64)                    :: LateCoolCoilPower            =0.0d0
+  REAL(r64)                    :: LateCoolCoilEnergy           =0.0d0
+  REAL(r64)                    :: ElecFanPower                 =0.0d0
+  REAL(r64)                    :: ElecFanEnergy                =0.0d0
+  REAL(r64)                    :: AirMassFlowRate              =0.0d0 ! Circulated air mass flow rate in kg/s
+  REAL(r64)                    :: AirVolFlow                   =0.0d0 ! Circulated air volumetric flow rate in m3/s
+  REAL(r64)                    :: SlabInTemp                   =0.0d0 ! Slab inlet temp in degree C
+  REAL(r64)                    :: SlabOutTemp                  =0.0d0 ! Slab outlet temp in degree C
+  REAL(r64)                    :: ReturnAirTemp                =0.0d0 !
+  REAL(r64)                    :: FanOutletTemp                =0.0d0 ! FanOutlet temp in degree C
+  REAL(r64)                    :: ZoneInletTemp                =0.0d0 ! supply air temp
   CHARACTER(len=MaxNameLength) :: AvailManagerListName         = ' ' ! Name of an availability manager list object
   INTEGER                      :: AvailStatus                  = 0
 
@@ -281,11 +279,11 @@ TYPE (VentilatedSlabData), ALLOCATABLE, PUBLIC, DIMENSION(:) :: VentSlab
   ! MODULE VARIABLE DECLARATIONS:
 LOGICAL :: HCoilOn         =.false. ! TRUE if the heating coil (gas or electric especially) should be running
 INTEGER, PUBLIC :: NumOfVentSlabs  =0       ! Number of ventilated slab in the input file
-REAL(r64)    :: OAMassFlowRate  =0.0     ! Outside air mass flow rate for the ventilated slab
+REAL(r64)    :: OAMassFlowRate  =0.0d0     ! Outside air mass flow rate for the ventilated slab
 DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:) :: QRadSysSrcAvg ! Average source over the time step for a particular radiant surfaceD
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: ZeroSourceSumHATsurf ! Equal to SumHATsurf for all the walls in a zone with no source
 INTEGER :: MaxCloNumOfSurfaces    =0 ! Used to set allocate size in CalcClo routine
-REAL(r64)    :: QZnReq          =0.0     ! heating or cooling needed by system [watts]
+REAL(r64)    :: QZnReq          =0.0d0     ! heating or cooling needed by system [watts]
 
   ! Record keeping variables used to calculate QRadSysSrcAvg locally
 
@@ -502,7 +500,7 @@ SUBROUTINE GetVentilatedSlabInput
    ALLOCATE(cNumericFields(NumNumbers))
    cNumericFields=' '
    ALLOCATE(rNumericArgs(NumNumbers))
-   rNumericArgs=0.0
+   rNumericArgs=0.0d0
    ALLOCATE(lAlphaBlanks(NumAlphas))
    lAlphaBlanks=.true.
    ALLOCATE(lNumericBlanks(NumNumbers))
@@ -597,7 +595,7 @@ SUBROUTINE GetVentilatedSlabInput
       MaxCloNumOfSurfaces=Max(MaxCloNumOfSurfaces,VentSlab(Item)%NumOfSurfaces)
       VentSlab(Item)%SurfaceName(1)     = VentSlab(Item)%SurfListName
       VentSlab(Item)%SurfacePtr(1)      = FindIteminList(VentSlab(Item)%SurfaceName(1),Surface%Name,TotSurfaces)
-      VentSlab(Item)%SurfaceFlowFrac(1) = 1.0
+      VentSlab(Item)%SurfaceFlowFrac(1) = 1.0d0
           ! Error checking for single surfaces
       IF (VentSlab(Item)%SurfacePtr(1) == 0) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
@@ -676,7 +674,7 @@ SUBROUTINE GetVentilatedSlabInput
           CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
             trim(cAlphaFields(7))//'="'//trim(cAlphaArgs(7))//'" not found.')
           ErrorsFound=.TRUE.
-        ELSEIF (.not. CheckScheduleValueMinMax(VentSlab(Item)%MaxOASchedPtr,'>=0',0.0,'<=',1.0)) THEN
+        ELSEIF (.not. CheckScheduleValueMinMax(VentSlab(Item)%MaxOASchedPtr,'>=0',0.0d0,'<=',1.0d0)) THEN
           CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
             trim(cAlphaFields(7))//'="'//trim(cAlphaArgs(7))//'" values out of range [0,1].')
           ErrorsFound=.TRUE.
@@ -689,7 +687,7 @@ SUBROUTINE GetVentilatedSlabInput
           CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
             trim(cAlphaFields(7))//'="'//trim(cAlphaArgs(7))//'" not found.')
           ErrorsFound=.TRUE.
-        ELSEIF (.not. CheckScheduleValueMinMax(VentSlab(Item)%MaxOASchedPtr,'>=0',0.0)) THEN
+        ELSEIF (.not. CheckScheduleValueMinMax(VentSlab(Item)%MaxOASchedPtr,'>=0',0.0d0)) THEN
           CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
             trim(cAlphaFields(7))//'="'//trim(cAlphaArgs(7))//'" values out of range (must be >=0).')
           ErrorsFound=.TRUE.
@@ -1089,8 +1087,8 @@ SUBROUTINE GetVentilatedSlabInput
        endif
 
 
-       VentSlab(Item)%MinVolHotWaterFlow = 0.0
-       VentSlab(Item)%MinVolHotSteamFlow = 0.0
+       VentSlab(Item)%MinVolHotWaterFlow = 0.0d0
+       VentSlab(Item)%MinVolHotSteamFlow = 0.0d0
 
     ! The heating coil control node is necessary for a hot water coil, but not necessary for an
     ! electric or gas coil.
@@ -1195,7 +1193,7 @@ SUBROUTINE GetVentilatedSlabInput
          ENDIF
        endif
 
-       VentSlab(Item)%MinVolColdWaterFlow = 0.0
+       VentSlab(Item)%MinVolColdWaterFlow = 0.0d0
 
        VentSlab(Item)%ColdControlNode   = &
              GetOnlySingleNode(cAlphaArgs(32),ErrorsFound,CurrentModuleObject,cAlphaArgs(1), &
@@ -1449,7 +1447,7 @@ IF (MyOneTimeFlag) THEN
 
     ! Initialize total areas for all radiant systems
     DO RadNum = 1, NumOfVentSlabs
-      VentSlab(Item)%TotalSurfaceArea = 0.0
+      VentSlab(Item)%TotalSurfaceArea = 0.0d0
       DO SurfNum = 1, VentSlab(Item)%NumOfSurfaces
         VentSlab(Item)%TotalSurfaceArea = VentSlab(Item)%TotalSurfaceArea &
                                                 +Surface(VentSlab(Item)%SurfacePtr(SurfNum))%Area
@@ -1574,13 +1572,13 @@ IF (BeginEnvrnFlag .AND. MyEnvrnFlag(Item) .AND. .NOT. MyPlantScanFlag(item)) TH
 
     ! set the node max and min mass flow rates
     Node(OutsideAirNode)%MassFlowRateMax = VentSlab(Item)%OutAirMassFlow
-    Node(OutsideAirNode)%MassFlowRateMin = 0.0
+    Node(OutsideAirNode)%MassFlowRateMin = 0.0d0
 
     Node(OutNode)%MassFlowRateMax = VentSlab(Item)%MaxAirMassFlow
-    Node(OutNode)%MassFlowRateMin = 0.0
+    Node(OutNode)%MassFlowRateMin = 0.0d0
 
     Node(InNode)%MassFlowRateMax = VentSlab(Item)%MaxAirMassFlow
-    Node(InNode)%MassFlowRateMin = 0.0
+    Node(InNode)%MassFlowRateMin = 0.0d0
 
     IF (VentSlab(Item)%HCoilPresent ) THEN ! Only initialize these if a heating coil is actually present
 
@@ -1604,7 +1602,7 @@ IF (BeginEnvrnFlag .AND. MyEnvrnFlag(Item) .AND. .NOT. MyPlantScanFlag(item)) TH
 
       END IF
       IF (VentSlab(Item)%HCoil_PlantTypeNum == TypeOf_CoilSteamAirHeating .AND. .NOT. MyPlantScanFlag(item)) THEN
-        TempSteamIn= 100.00
+        TempSteamIn= 100.00d0
         SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,VentSlab(Item)%HCoil_FluidIndex,'InitVentilatedSlab')
         VentSlab(Item)%MaxHotSteamFlow = SteamDensity*VentSlab(Item)%MaxVolHotSteamFlow
         VentSlab(Item)%MinHotSteamFlow = SteamDensity*VentSlab(Item)%MinVolHotSteamFlow
@@ -1679,7 +1677,7 @@ END IF  ! ...end start of environment inits
           ! Initialize the relief air (same as inlet conditions to the Ventilated Slab ..
           ! Note that mass flow rates will be taken care of later.
   Node(AirRelNode) = Node(InNode)
-  OAMassFlowRate   = 0.0
+  OAMassFlowRate   = 0.0d0
 
           ! Just in case the system is off and conditions do not get sent through
           ! the system for some reason, set the outlet conditions equal to the inlet
@@ -1718,7 +1716,7 @@ SUBROUTINE SizeVentilatedSlab(Item)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
-          !       MODIFIED       na
+          !       MODIFIED       July 2013 Daeho Kang, add component sizing table entries
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1741,6 +1739,7 @@ SUBROUTINE SizeVentilatedSlab(Item)
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE DataPlant,       ONLY: PlantLoop, MyPlantSizingIndex
   USE ReportSizingManager, ONLY: ReportSizingOutput
+  USE General,             ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1760,16 +1759,16 @@ SUBROUTINE SizeVentilatedSlab(Item)
   INTEGER             :: PltSizHeatNum ! index of plant sizing object for 1st heating loop
   INTEGER             :: PltSizCoolNum ! index of plant sizing object for 1st cooling loop
   LOGICAL             :: ErrorsFound
-  REAL(r64)                :: CoilInTemp
-  REAL(r64)                :: CoilOutTemp
-  REAL(r64)                :: CoilOutHumRat
-  REAL(r64)                :: CoilInHumRat
-  REAL(r64)                :: DesCoilLoad
-  REAL(r64)                :: TempSteamIn
-  REAL(r64)                :: EnthSteamInDry
-  REAL(r64)                :: EnthSteamOutWet
-  REAL(r64)                :: LatentHeatSteam
-  REAL(r64)                :: SteamDensity
+  REAL(r64)           :: CoilInTemp
+  REAL(r64)           :: CoilOutTemp
+  REAL(r64)           :: CoilOutHumRat
+  REAL(r64)           :: CoilInHumRat
+  REAL(r64)           :: DesCoilLoad
+  REAL(r64)           :: TempSteamIn
+  REAL(r64)           :: EnthSteamInDry
+  REAL(r64)           :: EnthSteamOutWet
+  REAL(r64)           :: LatentHeatSteam
+  REAL(r64)           :: SteamDensity
   INTEGER             :: CoilWaterInletNode=0
   INTEGER             :: CoilWaterOutletNode=0
   INTEGER             :: CoilSteamInletNode=0
@@ -1779,157 +1778,336 @@ SUBROUTINE SizeVentilatedSlab(Item)
   REAL(r64)           :: rho
   REAL(r64)           :: Cp
   INTEGER             :: DummyWaterIndex = 1
+  LOGICAL             :: IsAutosize              ! Indicator to autosize
+  REAL(r64)           :: MaxAirVolFlowDes        ! Autosized maximum air flow for reporting
+  REAL(r64)           :: MaxAirVolFlowUser       ! Hardsized maximum air flow for reporting
+  REAL(r64)           :: OutAirVolFlowDes        ! Autosized outdoor air flow for reporting
+  REAL(r64)           :: OutAirVolFlowUser       ! Hardsized outdoor air flow for reporting
+  REAL(r64)           :: MinOutAirVolFlowDes     ! Autosized minimum outdoor air flow for reporting
+  REAL(r64)           :: MinOutAirVolFlowUser    ! Hardsized minimum outdoor air flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowDes   ! Autosized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotWaterFlowUser  ! Hardsized maximum hot water flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowDes   ! Autosized maximum hot steam flow for reporting
+  REAL(r64)           :: MaxVolHotSteamFlowUser  ! Hardsized maximum hot steam flow for reporting
+  REAL(r64)           :: MaxVolColdWaterFlowDes  ! Autosized maximum cold water flow for reporting
+  REAL(r64)           :: MaxVolColdWaterFlowUser ! Hardsized maximum cold water flow for reporting
 
   PltSizCoolNum = 0
   PltSizHeatNum = 0
   ErrorsFound = .FALSE.
+  IsAutosize = .FALSE.
+  MaxAirVolFlowDes = 0.0d0
+  MaxAirVolFlowUser = 0.0d0
+  OutAirVolFlowDes = 0.0d0
+  OutAirVolFlowUser = 0.0d0
+  MinOutAirVolFlowDes = 0.0d0
+  MinOutAirVolFlowUser = 0.0d0
+  MaxVolHotWaterFlowDes = 0.0d0
+  MaxVolHotWaterFlowUser = 0.0d0
+  MaxVolHotSteamFlowDes = 0.0d0
+  MaxVolHotSteamFlowUser = 0.0d0
+  MaxVolColdWaterFlowDes = 0.0d0
+  MaxVolColdWaterFlowUser = 0.0d0
 
   IF (VentSlab(Item)%MaxAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (VentSlab(Item)%MaxAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', VentSlab(Item)%MaxAirVolFlow)
+      END IF
+    ELSE ! Autosize or hard-size with sizing run
       CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
-      VentSlab(Item)%MaxAirVolFlow = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+      MaxAirVolFlowDes = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                               FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (VentSlab(Item)%MaxAirVolFlow < SmallAirVolFlow) THEN
-        VentSlab(Item)%MaxAirVolFlow = 0.0
+      IF (MaxAirVolFlowDes < SmallAirVolFlow) THEN
+        MaxAirVolFlowDes = 0.0d0
       END IF
-      CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                              'Maximum Air Flow Rate [m3/s]', VentSlab(Item)%MaxAirVolFlow)
+      IF (IsAutosize) THEN
+        VentSlab(Item)%MaxAirVolFlow = MaxAirVolFlowDes
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowDes)
+      ELSE ! Hard-size with sizing data
+        IF (VentSlab(Item)%MaxAirVolFlow > 0.0d0 .AND. MaxAirVolFlowDes > 0.0d0) THEN
+          MaxAirVolFlowUser = VentSlab(Item)%MaxAirVolFlow
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Maximum Air Flow Rate [m3/s]', MaxAirVolFlowDes, &
+                              'User-Specified Maximum Air Flow Rate [m3/s]', MaxAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxAirVolFlowDes - MaxAirVolFlowUser)/MaxAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+              CALL ShowContinueError('User-Specified Maximum Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Air Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
+  IsAutosize = .FALSE.
   IF (VentSlab(Item)%OutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
-      VentSlab(Item)%OutAirVolFlow = VentSlab(Item)%MaxAirVolFlow
-      CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                              'Maximum Outdoor Air Flow Rate [m3/s]', VentSlab(Item)%OutAirVolFlow)
-    END IF
-
+    IsAutosize = .TRUE.
   END IF
-
-  IF (VentSlab(Item)%MinOutAirVolFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
-      CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
-      VentSlab(Item)%MinOutAirVolFlow = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
-                                                   VentSlab(Item)%MaxAirVolFlow)
-      IF (VentSlab(Item)%MinOutAirVolFlow < SmallAirVolFlow) THEN
-        VentSlab(Item)%MinOutAirVolFlow = 0.0
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (VentSlab(Item)%OutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'User-Specified Maximum Outdoor Air Flow Rate [m3/s]', VentSlab(Item)%OutAirVolFlow)
       END IF
-      CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                              'Minimum Outdoor Air Flow Rate [m3/s]',VentSlab(Item)%MinOutAirVolFlow)
-
+    ELSE ! Autosize or hard-size with sizing run
+      CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
+      OutAirVolFlowDes = VentSlab(Item)%MaxAirVolFlow
+      IF (IsAutosize) THEN
+        VentSlab(Item)%OutAirVolFlow = OutAirVolFlowDes
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowDes)
+      ELSE
+        IF (VentSlab(Item)%OutAirVolFlow > 0.0d0 .AND. OutAirVolFlowDes > 0.0d0) THEN
+          OutAirVolFlowUser = VentSlab(Item)%OutAirVolFlow
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowDes, &
+                              'User-Specified Maximum Outdoor Air Flow Rate [m3/s]', OutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(OutAirVolFlowDes - OutAirVolFlowUser)/OutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+              CALL ShowContinueError('User-Specified Maximum Outdoor Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(OutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Outdoor Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(OutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
-  IF ((VentSlab(Item)%MaxVolHotWaterFlow==AutoSize).or.(VentSlab(Item)%MaxVolHotSteamFlow==AutoSize))THEN
-    IF (VentSlab(Item)%HCoilType == Heating_WaterCoilType) THEN
 
-      IF (CurZoneEqNum > 0) THEN
+  IsAutosize = .FALSE.
+  IF (VentSlab(Item)%MinOutAirVolFlow == AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (VentSlab(Item)%MinOutAirVolFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'User-Specified Minimum Outdoor Air Flow Rate [m3/s]',VentSlab(Item)%MinOutAirVolFlow)
+      END IF
+    ELSE
+      CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
+      MinOutAirVolFlowDes = MIN(FinalZoneSizing(CurZoneEqNum)%MinOA, &
+                                                   VentSlab(Item)%MaxAirVolFlow)
+      IF (MinOutAirVolFlowDes < SmallAirVolFlow) THEN
+        MinOutAirVolFlowDes = 0.0d0
+      END IF
+      IF (IsAutosize) THEN
+        VentSlab(Item)%MinOutAirVolFlow = MinOutAirVolFlowDes
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Minimum Outdoor Air Flow Rate [m3/s]',MinOutAirVolFlowDes)
+      ELSE ! Hard-size with sizing data
+        IF (VentSlab(Item)%MinOutAirVolFlow > 0.0d0 .AND. MinOutAirVolFlowDes > 0.0d0) THEN
+          MinOutAirVolFlowUser = VentSlab(Item)%MinOutAirVolFlow
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                              'Design Size Minimum Outdoor Air Flow Rate [m3/s]',MinOutAirVolFlowDes, &
+                              'User-Specified Minimum Outdoor Air Flow Rate [m3/s]',MinOutAirVolFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MinOutAirVolFlowDes - MinOutAirVolFlowUser)/MinOutAirVolFlowUser) > AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+              CALL ShowContinueError('User-Specified Minimum Outdoor Air Flow Rate of '// &
+                                      TRIM(RoundSigDigits(MinOutAirVolFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Minimum Outdoor Air Flow Rate of ' // &
+                                      TRIM(RoundSigDigits(MinOutAirVolFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
+    END IF
+  END IF
 
+  IsAutosize = .FALSE.
+  IF (VentSlab(Item)%MaxVolHotWaterFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF (VentSlab(Item)%HCoilType == Heating_WaterCoilType) THEN
+
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+        IF (VentSlab(Item)%MaxVolHotWaterFlow > 0.0d0) THEN
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                  'User-Specified Maximum Hot Water Flow [m3/s]', VentSlab(Item)%MaxVolHotWaterFlow)
+        END IF
+      ELSE  ! Autosize or hard-size with sizing run
         CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
 
         CoilWaterInletNode = GetCoilWaterInletNode('Coil:Heating:Water',VentSlab(Item)%HCoilName,ErrorsFound)
         CoilWaterOutletNode = GetCoilWaterOutletNode('Coil:Heating:Water',VentSlab(Item)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', VentSlab(Item)%HCoilName, CoilWaterInletNode, &
+        IF (IsAutosize ) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Water', VentSlab(Item)%HCoilName, CoilWaterInletNode, &
                                        CoilWaterOutletNode, ErrorsFound)
-
-        IF (PltSizHeatNum > 0) THEN
-          IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
-            CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+        !END IF
+          IF (PltSizHeatNum > 0) THEN
+            IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
+              CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                               * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                               * (CoilOutTemp-CoilInTemp)
-            rho = GetDensityGlycol(PlantLoop(VentSlab(Item)%HWLoopNum )%fluidName, &
+              rho = GetDensityGlycol(PlantLoop(VentSlab(Item)%HWLoopNum )%fluidName, &
                                     60.d0, &
                                       PlantLoop( VentSlab(Item)%HWLoopNum )%fluidIndex, &
                                         'SizeVentilatedSlab' )
 
-            Cp  = GetSpecificHeatGlycol(PlantLoop(VentSlab(Item)%HWLoopNum )%fluidName, &
+              Cp  = GetSpecificHeatGlycol(PlantLoop(VentSlab(Item)%HWLoopNum )%fluidName, &
                                     60.d0, &
                                       PlantLoop( VentSlab(Item)%HWLoopNum )%fluidIndex, &
                                         'SizeVentilatedSlab' )
 
-            VentSlab(Item)%MaxVolHotWaterFlow = DesCoilLoad / &
-                                                       ( PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                       Cp * rho )
+              MaxVolHotWaterFlowDes = DesCoilLoad / &
+                                    ( PlantSizData(PltSizHeatNum)%DeltaT * &
+                                    Cp * rho )
+            ELSE
+              MaxVolHotWaterFlowDes = 0.0d0
+            END IF
           ELSE
-            VentSlab(Item)%MaxVolHotWaterFlow = 0.0
-          END IF
-          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                                  'Maximum Hot Water Flow [m3/s]', VentSlab(Item)%MaxVolHotWaterFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of water flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // cMO_VentilatedSlab // ' Object=' &
+            CALL ShowSevereError('Autosizing of water flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // cMO_VentilatedSlab // ' Object=' &
                                //TRIM(VentSlab(Item)%Name))
-          ErrorsFound = .TRUE.
+            ErrorsFound = .TRUE.
+          END IF
         END IF
-
+        IF (IsAutosize) THEN
+          VentSlab(Item)%MaxVolHotWaterFlow =  MaxVolHotWaterFlowDes
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                  'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes)
+        ELSE ! Hard-size with sizing data
+          IF (VentSlab(Item)%MaxVolHotWaterFlow > 0.0d0 .AND. MaxVolHotWaterFlowDes > 0.0d0) THEN
+            MaxVolHotWaterFlowUser = VentSlab(Item)%MaxVolHotWaterFlow
+            CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                  'Design Size Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowDes, &
+                                  'User-Specified Maximum Hot Water Flow [m3/s]', MaxVolHotWaterFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotWaterFlowDes -  MaxVolHotWaterFlowUser)/MaxVolHotWaterFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+                CALL ShowContinueError('User-Specified Maximum Hot Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Hot Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotWaterFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-    ELSEIF(VentSlab(Item)%HCoilType == Heating_SteamCoilType) THEN
+    END IF
+  ELSE
+    VentSlab(Item)%MaxVolHotWaterFlow = 0.0d0
+  END IF
 
-      IF (CurZoneEqNum > 0) THEN
+  IsAutosize = .FALSE.
+  IF (VentSlab(Item)%MaxVolHotSteamFlow==AutoSize) THEN
+    IsAutosize = .TRUE.
+  END IF
+  IF(VentSlab(Item)%HCoilType == Heating_SteamCoilType) THEN
 
+    IF (CurZoneEqNum > 0) THEN
+      IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+        IF (VentSlab(Item)%MaxVolHotSteamFlow > 0.0d0) THEN
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                'User-Specified Maximum Steam Flow [m3/s]', VentSlab(Item)%MaxVolHotSteamFlow)
+        END IF
+      ELSE  ! Autosize or hard-size with sizing run
         CALL CheckZoneSizing('ZoneHVAC:VentilatedSlab', VentSlab(Item)%Name)
 
         CoilSteamInletNode = GetCoilSteamInletNode('Coil:Heating:Steam',VentSlab(Item)%HCoilName,ErrorsFound)
         CoilSteamOutletNode = GetCoilSteamOutletNode('Coil:Heating:Steam',VentSlab(Item)%HCoilName,ErrorsFound)
-        PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', VentSlab(Item)%HCoilName, CoilSteamInletNode, &
+        IF (IsAutosize ) THEN
+          PltSizHeatNum = MyPlantSizingIndex('Coil:Heating:Steam', VentSlab(Item)%HCoilName, CoilSteamInletNode, &
                                        CoilSteamOutletNode, ErrorsFound)
-
-        IF (PltSizHeatNum > 0) THEN
-          IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
-            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
-            CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-            CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
-            DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
+          IF (PltSizHeatNum > 0) THEN
+            IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallAirVolFlow) THEN
+              CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTemp
+              CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
+              CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
+              DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5d0*(CoilInTemp+CoilOutTemp)) &
                               * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                               * (CoilOutTemp-CoilInTemp)
 
-            TempSteamIn= 100.00
-            EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
-            EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
-            LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
-            SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
-            Cp = GetSpecificHeatGlycol('WATER', 60.d0, DummyWaterIndex, 'SizeVentilatedSlab')
-            rho = GetDensityGlycol('WATER', 60.d0, DummyWaterIndex, 'SizeVentilatedSlab')
-            VentSlab(Item)%MaxVolHotSteamFlow = DesCoilLoad/((PlantSizData(PltSizHeatNum)%DeltaT * &
-                                                                             Cp  * rho )+ &
-                                                                                    SteamDensity* LatentHeatSteam)
+              TempSteamIn= 100.00d0
+              EnthSteamInDry =  GetSatEnthalpyRefrig('STEAM',TempSteamIn,1.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
+              EnthSteamOutWet=  GetSatEnthalpyRefrig('STEAM',TempSteamIn,0.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
+              LatentHeatSteam=EnthSteamInDry-EnthSteamOutWet
+              SteamDensity=GetSatDensityRefrig('STEAM',TempSteamIn,1.0d0,VentSlab(Item)%HCoil_FluidIndex,'SizeVentilatedSlab')
+              Cp = GetSpecificHeatGlycol('WATER', 60.d0, DummyWaterIndex, 'SizeVentilatedSlab')
+              rho = GetDensityGlycol('WATER', 60.d0, DummyWaterIndex, 'SizeVentilatedSlab')
+              MaxVolHotSteamFlowDes = DesCoilLoad/((PlantSizData(PltSizHeatNum)%DeltaT * &
+                                    Cp  * rho )+ &
+                                    SteamDensity* LatentHeatSteam)
+            ELSE
+              MaxVolHotSteamFlowDes = 0.0d0
+            END IF
           ELSE
-            VentSlab(Item)%MaxVolHotSteamFlow = 0.0
-          END IF
-          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                                  'Maximum Steam Flow [m3/s]', VentSlab(Item)%MaxVolHotSteamFlow)
-        ELSE
-          CALL ShowContinueError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
-          CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:VentilatedSlab' // ' Object=' &
+            CALL ShowSevereError('Autosizing of Steam flow requires a heating loop Sizing:Plant object')
+            CALL ShowContinueError('Occurs in ' // 'ZoneHVAC:VentilatedSlab' // ' Object=' &
                                //TRIM(VentSlab(Item)%Name))
-          ErrorsFound = .TRUE.
+            ErrorsFound = .TRUE.
+          END IF
         END IF
-
+        IF (IsAutosize) THEN
+          VentSlab(Item)%MaxVolHotSteamFlow = MaxVolHotSteamFlowDes
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                  'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes)
+        ELSE
+          IF (VentSlab(Item)%MaxVolHotSteamFlow > 0.0d0 .AND. MaxVolHotSteamFlowDes > 0.0d0) THEN
+            MaxVolHotSteamFlowUser = VentSlab(Item)%MaxVolHotSteamFlow
+            CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                  'Design Size Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowDes, &
+                                  'User-Specified Maximum Steam Flow [m3/s]', MaxVolHotSteamFlowUser)
+            IF (DisplayExtraWarnings) THEN
+              IF ((ABS(MaxVolHotSteamFlowDes -  MaxVolHotSteamFlowUser)/MaxVolHotSteamFlowUser) > AutoVsHardSizingThreshold) THEN
+                CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+                CALL ShowContinueError('User-Specified Maximum Steam Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowUser,5))// ' [m3/s]')
+                CALL ShowContinueError('differs from Design Size Maximum Steam Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolHotSteamFlowDes,5))// ' [m3/s]')
+                CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+                CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+              END IF
+            ENDIF
+          END IF
+        END IF
       END IF
-    ELSE
-
-      VentSlab(Item)%MaxVolHotWaterFlow = 0.0
-      VentSlab(Item)%MaxVolHotSteamFlow = 0.0
-
     END IF
-
+  ELSE
+    VentSlab(Item)%MaxVolHotSteamFlow = 0.0d0
   END IF
 
+  IsAutosize = .FALSE.
   IF (VentSlab(Item)%MaxVolColdWaterFlow == AutoSize) THEN
-
-    IF (CurZoneEqNum > 0) THEN
-
+    IsAutosize = .TRUE.
+  END IF
+  IF (CurZoneEqNum > 0) THEN
+    IF (.NOT. IsAutosize .AND. .NOT. ZoneSizingRunDone) THEN
+      IF (VentSlab(Item)%MaxVolColdWaterFlow > 0.0d0) THEN
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                            'User-Specified Maximum Cold Water Flow [m3/s]', VentSlab(Item)%MaxVolColdWaterFlow)
+      END IF
+    ELSE
       CALL CheckZoneSizing(cMO_VentilatedSlab, VentSlab(Item)%Name)
       IF (VentSlab(Item)%CCoilType == Cooling_CoilHXAssisted) THEN
         CoolingCoilName = GetHXDXCoilName(VentSlab(Item)%CCoilTypeCh,VentSlab(Item)%CCoilName,ErrorsFound)
@@ -1940,44 +2118,65 @@ SUBROUTINE SizeVentilatedSlab(Item)
       END IF
       CoilWaterInletNode = GetCoilWaterInletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
       CoilWaterOutletNode = GetCoilWaterOutletNode(CoolingCoilType,CoolingCoilName,ErrorsFound)
-      PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType,CoolingCoilName, CoilWaterInletNode, &
+      IF (IsAutosize) THEN
+        PltSizCoolNum = MyPlantSizingIndex(CoolingCoilType,CoolingCoilName, CoilWaterInletNode, &
                                          CoilWaterOutletNode, ErrorsFound)
-
-      IF (PltSizCoolNum > 0) THEN
-        IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
-          CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
-          CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
-          CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
-          DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
+        IF (PltSizCoolNum > 0) THEN
+          IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow >= SmallAirVolFlow) THEN
+            CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
+            CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
+            CoilOutHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
+            CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInHumRat
+            DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
                           * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
-          rho = GetDensityGlycol(PlantLoop(VentSlab(Item)%CWLoopNum )%fluidName, &
+            rho = GetDensityGlycol(PlantLoop(VentSlab(Item)%CWLoopNum )%fluidName, &
                                     5.d0, &
                                       PlantLoop( VentSlab(Item)%CWLoopNum )%fluidIndex, &
                                         'SizeVentilatedSlab' )
 
-          Cp  = GetSpecificHeatGlycol(PlantLoop(VentSlab(Item)%CWLoopNum )%fluidName, &
+            Cp  = GetSpecificHeatGlycol(PlantLoop(VentSlab(Item)%CWLoopNum )%fluidName, &
                                     5.d0, &
                                       PlantLoop( VentSlab(Item)%CWLoopNum )%fluidIndex, &
                                         'SizeVentilatedSlab' )
 
-          VentSlab(Item)%MaxVolColdWaterFlow = DesCoilLoad / &
-                                                     ( PlantSizData(PltSizCoolNum)%DeltaT * &
-                                                     Cp  * rho )
+            MaxVolColdWaterFlowDes = DesCoilLoad / &
+                                   ( PlantSizData(PltSizCoolNum)%DeltaT * &
+                                   Cp  * rho )
+          ELSE
+            MaxVolColdWaterFlowDes = 0.0d0
+          END IF
         ELSE
-          VentSlab(Item)%MaxVolColdWaterFlow = 0.0
-        END IF
-        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
-                                'maximum cold water flow [m3/s]', VentSlab(Item)%MaxVolColdWaterFlow)
-      ELSE
-        CALL ShowContinueError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
-        CALL ShowContinueError('Occurs in ' // cMO_VentilatedSlab // ' Object=' &
+          CALL ShowSevereError('Autosizing of water flow requires a cooling loop Sizing:Plant object')
+          CALL ShowContinueError('Occurs in ' // cMO_VentilatedSlab // ' Object=' &
                                //TRIM(VentSlab(Item)%Name))
-        Errorsfound = .TRUE.
+          Errorsfound = .TRUE.
+        END IF
       END IF
-
+      IF (IsAutosize) THEN
+        VentSlab(Item)%MaxVolColdWaterFlow = MaxVolColdWaterFlowDes
+        CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                'Design Size Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowDes)
+      ELSE
+        IF (VentSlab(Item)%MaxVolColdWaterFlow > 0.0d0 .AND. MaxVolColdWaterFlowDes > 0.0d0) THEN
+          MaxVolColdWaterFlowUser = VentSlab(Item)%MaxVolColdWaterFlow
+          CALL ReportSizingOutput(cMO_VentilatedSlab, VentSlab(Item)%Name, &
+                                'Design Size Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowDes, &
+                                'User-Specified Maximum Cold Water Flow [m3/s]', MaxVolColdWaterFlowUser)
+          IF (DisplayExtraWarnings) THEN
+            IF ((ABS(MaxVolColdWaterFlowDes -  MaxVolColdWaterFlowUser)/MaxVolColdWaterFlowUser) >AutoVsHardSizingThreshold) THEN
+              CALL ShowMessage('SizeVentilatedSlab: Potential issue with equipment sizing for ZoneHVAC:VentilatedSlab = " '// &
+                                      TRIM(VentSlab(Item)%Name)//'".')
+              CALL ShowContinueError('User-Specified Maximum Cold Water Flow of '// &
+                                      TRIM(RoundSigDigits(MaxVolColdWaterFlowUser,5))// ' [m3/s]')
+              CALL ShowContinueError('differs from Design Size Maximum Cold Water Flow of ' // &
+                                      TRIM(RoundSigDigits(MaxVolColdWaterFlowDes,5))// ' [m3/s]')
+              CALL ShowContinueError('This may, or may not, indicate mismatched component sizes.')
+              CALL ShowContinueError('Verify that the value entered is intended and is consistent with other components.')
+            END IF
+          ENDIF
+        END IF
+      END IF
     END IF
-
   END IF
 
   IF (VentSlab(Item)%CCoilType == Cooling_CoilHXAssisted) THEN
@@ -2212,7 +2411,7 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
 
   FanElecPower   = 0.0D0
           ! initialize local variables
-  ControlNode    = 0.0D0
+  ControlNode    = 0
   QUnitOut       = 0.0D0
   LatentOutput   = 0.0D0
   MaxWaterFlow   = 0.0D0
@@ -2235,7 +2434,7 @@ SELECT CASE (VentSlab(Item)%ControlType)
       CASE (MRTControl)
         SetpointTemp = MRT(ZoneNum)
       CASE (OPTControl)
-        SetpointTemp = 0.5*(MAT(ZoneNum)+MRT(ZoneNum))
+        SetpointTemp = 0.5d0*(MAT(ZoneNum)+MRT(ZoneNum))
       CASE (ODBControl)
         SetpointTemp = OutDryBulbTemp
       CASE (OWBControl)
@@ -2260,18 +2459,18 @@ IF (((SetpointTemp >= AirTempHeatHi) .AND. (SetpointTemp <= AirTempCoolLo)) .OR.
 
           ! System is off or has no load upon it; set the flow rates to zero and then
           ! simulate the components with the no flow conditions
-    Node(InletNode)%MassFlowRate              = 0.0
-    Node(InletNode)%MassFlowRateMaxAvail      = 0.0
-    Node(InletNode)%MassFlowRateMinAvail      = 0.0
-    Node(OutletNode)%MassFlowRate             = 0.0
-    Node(OutletNode)%MassFlowRateMaxAvail     = 0.0
-    Node(OutletNode)%MassFlowRateMinAvail     = 0.0
-    Node(OutsideAirNode)%MassFlowRate         = 0.0
-    Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0
-    Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0
-    Node(AirRelNode)%MassFlowRate             = 0.0
-    Node(AirRelNode)%MassFlowRateMaxAvail     = 0.0
-    Node(AirRelNode)%MassFlowRateMinAvail     = 0.0
+    Node(InletNode)%MassFlowRate              = 0.0d0
+    Node(InletNode)%MassFlowRateMaxAvail      = 0.0d0
+    Node(InletNode)%MassFlowRateMinAvail      = 0.0d0
+    Node(OutletNode)%MassFlowRate             = 0.0d0
+    Node(OutletNode)%MassFlowRateMaxAvail     = 0.0d0
+    Node(OutletNode)%MassFlowRateMinAvail     = 0.0d0
+    Node(OutsideAirNode)%MassFlowRate         = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMaxAvail = 0.0d0
+    Node(OutsideAirNode)%MassFlowRateMinAvail = 0.0d0
+    Node(AirRelNode)%MassFlowRate             = 0.0d0
+    Node(AirRelNode)%MassFlowRateMaxAvail     = 0.0d0
+    Node(AirRelNode)%MassFlowRateMinAvail     = 0.0d0
     AirMassFlow                               = Node(FanOutletNode)%MassFlowRate
     HCoilOn                                   = .FALSE.
 
@@ -2360,17 +2559,17 @@ Else ! System On
 
        HCoilOn       = .TRUE.
 
-       IF(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+       IF(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
           MinOAFrac = GetCurrentScheduleValue(VentSlab(Item)%MinOASchedPtr) * &
                     (VentSlab(Item)%MinOutAirMassFlow / Node(OutsideAirNode)%MassFlowRate)
        ELSE
-         MinOAFrac = 0.0
+         MinOAFrac = 0.0d0
        End IF
 
        MinOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
 
       IF ((.NOT.VentSlab(Item)%HCoilPresent) .OR. &
-           (VentSlab(Item)%HCoilSchedValue <= 0.0) ) THEN
+           (VentSlab(Item)%HCoilSchedValue <= 0.0d0) ) THEN
           ! In heating mode, but there is no coil to provide heating.  This is handled
           ! differently than if there was a heating coil present.  Fixed temperature
           ! will still try to vary the amount of outside air to meet the desired
@@ -2412,7 +2611,7 @@ Else ! System On
       CASE (FixedTemperature)
       ! This is basically the same algorithm as for the heating case...
         Tdesired  = GetCurrentScheduleValue(VentSlab(Item)%TempSchedPtr)
-        MaxOAFrac = 1.0
+        MaxOAFrac = 1.0d0
 
         IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
           OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2459,10 +2658,10 @@ Else ! System On
       CASE (FixedOAControl)
               ! In this control type, the outdoor air flow rate is fixed to the maximum value
               ! which is equal to the minimum value, regardless of all the other conditions.
-         If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+         If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
             MaxOAFrac = GetCurrentScheduleValue(VentSlab(Item)%MaxOASchedPtr)
           Else
-            MaxOAFrac = 0.0
+            MaxOAFrac = 0.0d0
           End If
           MaxOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
           OAMassFlowRate = MaxOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2477,7 +2676,7 @@ Else ! System On
       CASE (FixedTemperature)
               ! This is basically the same algorithm as for the heating case...
         Tdesired  = GetCurrentScheduleValue(VentSlab(Item)%TempSchedPtr)
-        MaxOAFrac = 1.0
+        MaxOAFrac = 1.0d0
 
         IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
             OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2595,17 +2794,17 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
 
 
 
-      If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+      If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
          MinOAFrac = GetCurrentScheduleValue(VentSlab(Item)%MinOASchedPtr) * &
                     (VentSlab(Item)%MinOutAirMassFlow / Node(OutsideAirNode)%MassFlowRate)
       Else
-         MinOAFrac = 0.0
+         MinOAFrac = 0.0d0
       End If
       MinOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
 
 
        IF ((.NOT.VentSlab(Item)%CCoilPresent) .OR. &
-           (VentSlab(Item)%CCoilSchedValue <= 0.0) ) THEN
+           (VentSlab(Item)%CCoilSchedValue <= 0.0d0) ) THEN
           ! In cooling mode, but there is no coil to provide cooling.  This is handled
           ! differently than if there was a cooling coil present.  Fixed temperature
           ! will still try to vary the amount of outside air to meet the desired
@@ -2620,10 +2819,10 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
         CASE (FixedOAControl)
           ! In this control type, the outdoor air flow rate is fixed to the maximum value
           ! which is equal to the minimum value, regardless of all the other conditions.
-          If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+          If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
             MaxOAFrac = GetCurrentScheduleValue(VentSlab(Item)%MaxOASchedPtr)
           Else
-            MaxOAFrac = 0.0
+            MaxOAFrac = 0.0d0
           End If
           MaxOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
           OAMassFlowRate = MaxOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2654,7 +2853,7 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
         CASE (FixedTemperature)
           ! This is basically the same algorithm as for the heating case...
           Tdesired  = GetCurrentScheduleValue(VentSlab(Item)%TempSchedPtr)
-          MaxOAFrac = 1.0
+          MaxOAFrac = 1.0d0
 
           IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
             OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2707,10 +2906,10 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
         Case (FixedOAControl)
             ! In this control type, the outdoor air flow rate is fixed to the maximum value
             ! which is equal to the minimum value, regardless of all the other conditions.
-          If(Node(OutsideAirNode)%MassFlowRate > 0.0) Then
+          If(Node(OutsideAirNode)%MassFlowRate > 0.0d0) Then
             MaxOAFrac = GetCurrentScheduleValue(VentSlab(Item)%MaxOASchedPtr)
           Else
-            MaxOAFrac = 0.0
+            MaxOAFrac = 0.0d0
           End If
           MaxOAFrac = MIN(1.0d0,MAX(0.0d0,MinOAFrac))
           OAMassFlowRate = MaxOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2723,7 +2922,7 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
           ! This is basically the same algorithm as for the heating case...
           Tdesired  = GetCurrentScheduleValue(VentSlab(Item)%TempSchedPtr)
 
-          MaxOAFrac = 1.0
+          MaxOAFrac = 1.0d0
 
           IF (ABS(Tinlet-Toutdoor) <= LowTempDiff) THEN ! no difference in indoor and outdoor conditions-->set OA to minimum
             OAMassFlowRate = MinOAFrac*Node(OutsideAirNode)%MassFlowRate
@@ -2798,8 +2997,8 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
 END IF    ! ...end of system ON/OFF IF-THEN block
 
 ! CR9155 Remove specific humidity calculations
-  SpecHumOut = Node(OutletNode)%HumRat 
-  SpecHumIn  = Node(FanOutletNode)%HumRat 
+  SpecHumOut = Node(OutletNode)%HumRat
+  SpecHumIn  = Node(FanOutletNode)%HumRat
   LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
   QTotUnitOut = AirMassFlow * (Node(FanOutletNode)%Enthalpy - Node(OutletNode)%Enthalpy)
@@ -2886,7 +3085,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
   CALL SimVentSlabOAMixer(Item)
   CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index, &
                               ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
-  IF ((VentSlab(Item)%CCoilPresent) .AND. (VentSlab(Item)%CCoilSchedValue >= 0.0)) THEN
+  IF ((VentSlab(Item)%CCoilPresent) .AND. (VentSlab(Item)%CCoilSchedValue >= 0.0d0)) THEN
     IF(VentSlab(Item)%CCoilType == Cooling_CoilHXAssisted) THEN
       CALL SimHXAssistedCoolingCoil(VentSlab(Item)%CCoilName,FirstHVACIteration,On,0.0d0,VentSlab(Item)%CCoil_Index,ContFanCycCoil)
     ELSE
@@ -2898,7 +3097,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
 
 
 
-  IF ((VentSlab(Item)%HCoilPresent).AND. (VentSlab(Item)%HCoilSchedValue >= 0.0)) THEN
+  IF ((VentSlab(Item)%HCoilPresent).AND. (VentSlab(Item)%HCoilSchedValue >= 0.0d0)) THEN
 
     SELECT CASE (VentSlab(Item)%HCoilType)
 
@@ -2910,7 +3109,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
       CASE (Heating_SteamCoilType)
 
          IF (.NOT.HCoilOn) THEN
-          QCoilReq = 0.0
+          QCoilReq = 0.0d0
         ELSE
           HCoilInAirNode = VentSlab(Item)%FanOutletNode
           CpAirZn        = PsyCpAirFnWTdb(Node(HCoilInAirNode)%HumRat,Node(HCoilInAirNode)%Temp)
@@ -2918,7 +3117,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
                                     *(Node(VentSlab(Item)%RadInNode)%Temp)-(Node(HCoilInAirNode)%Temp)
         END IF
 
-        IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+        IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
 
         CALL SimulateSteamCoilComponents(CompName=VentSlab(Item)%HCoilName, &
                                            FirstHVACIteration=FirstHVACIteration,    &
@@ -2930,7 +3129,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
      CASE (Heating_ElectricCoilType,Heating_GasCoilType)
 
         IF (.NOT.HCoilOn) THEN
-          QCoilReq = 0.0
+          QCoilReq = 0.0d0
         ELSE
          HCoilInAirTemp = Node(VentSlab(Item)%FanOutletNode)%Temp
          HCoilOutAirTemp = Node(VentSlab(Item)%RadInNode)%Temp
@@ -2940,7 +3139,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
 
         END IF
 
-        IF (QCoilReq < 0.0) QCoilReq = 0.0    ! a heating coil can only heat, not cool
+        IF (QCoilReq < 0.0d0) QCoilReq = 0.0d0    ! a heating coil can only heat, not cool
 
 
 
@@ -3088,8 +3287,8 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
     FirstTimeFlag=.false.
   ENDIF
 
-  Ckj          = 0.0
-  Cmj          = 0.0
+  Ckj          = 0.0d0
+  Cmj          = 0.0d0
 
   SlabInNode       = VentSlab(Item)%RadInNode
   FanOutletNode    = VentSlab(Item)%FanOutletNode
@@ -3102,7 +3301,7 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
 
           ! Set the conditions on the air side inlet
   ZoneNum       = VentSlab(Item)%ZonePtr
-  ZoneMult      = REAL(Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier)
+  ZoneMult      = REAL(Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier,r64)
   AirMassFlow   = Node(VentSlab(Item)%RadInNode)%MassFlowRate / ZoneMult
 
 
@@ -3111,7 +3310,7 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
       IF (OperatingMode==HeatingMode) THEN
 
         IF ((.NOT.VentSlab(Item)%HCoilPresent) .OR. &
-             (VentSlab(Item)%HCoilSchedValue <= 0.0)) THEN
+             (VentSlab(Item)%HCoilSchedValue <= 0.0d0)) THEN
 
           AirTempIn = Node(FanOutletNode)%Temp
           Node(SlabInNode)%Temp = Node(FanOutletNode)%Temp    ! If coil not available or running, then coil in and out temps same
@@ -3125,7 +3324,7 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
       IF (OperatingMode==CoolingMode) THEN
 
         IF ((.NOT.VentSlab(Item)%CCoilPresent) .OR. &
-             (VentSlab(Item)%CCoilSchedValue <= 0.0)) THEN
+             (VentSlab(Item)%CCoilSchedValue <= 0.0d0)) THEN
 
           AirTempIn = Node(FanOutletNode)%Temp
           Node(SlabInNode)%Temp = Node(FanOutletNode)%Temp    ! If coil not available or running, then coil in and out temps same
@@ -3137,7 +3336,7 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
 
        END IF
 
-IF (AirMassFlow <= 0.0) THEN
+IF (AirMassFlow <= 0.0d0) THEN
           ! No flow or below minimum allowed so there is no heat source/sink
           ! This is possible with a mismatch between system and plant operation
           ! or a slight mismatch between zone and system controls.  This is not
@@ -3153,16 +3352,16 @@ IF (AirMassFlow <= 0.0) THEN
     VentSlab(Item)%SlabOutTemp = VentSlab(Item)%SlabInTemp
 
     ! zero out node flows
-    Node(SlabInNode)%MassFlowRate          = 0.0
-    Node(FanOutletNode)%MassFlowRate       = 0.0
-    Node(OAInletNode)%MassFlowRate         = 0.0
-    Node(MixoutNode)%MassFlowRate          = 0.0
-    Node(Returnairnode)%MassFlowRate       = 0.0
+    Node(SlabInNode)%MassFlowRate          = 0.0d0
+    Node(FanOutletNode)%MassFlowRate       = 0.0d0
+    Node(OAInletNode)%MassFlowRate         = 0.0d0
+    Node(MixoutNode)%MassFlowRate          = 0.0d0
+    Node(Returnairnode)%MassFlowRate       = 0.0d0
     Node(FanOutletNode)%Temp = Node(SlabInNode)%Temp
-    AirMassFlow                            = 0.0
+    AirMassFlow                            = 0.0d0
 END IF
 
-IF (AirMassFlow > 0.0) THEN
+IF (AirMassFlow > 0.0d0) THEN
 
   IF ((VentSlab(Item)%SysConfg == SlabOnly).OR.(VentSlab(Item)%SysConfg == SlabAndZone)) THEN
 
@@ -3189,18 +3388,18 @@ IF (AirMassFlow > 0.0) THEN
       Cf = RadSysToHBQsrcCoef(SurfNum)
 
       Cg = CTFTsrcConstPart(SurfNum)
-      Ch = REAL(Construct(ConstrNum)%CTFTSourceQ(0))
-      Ci = REAL(Construct(ConstrNum)%CTFTSourceIn(0))
-      Cj = REAL(Construct(ConstrNum)%CTFTSourceOut(0))
+      Ch = REAL(Construct(ConstrNum)%CTFTSourceQ(0),r64)
+      Ci = REAL(Construct(ConstrNum)%CTFTSourceIn(0),r64)
+      Cj = REAL(Construct(ConstrNum)%CTFTSourceOut(0),r64)
 
-      Ck = Cg + ( ( Ci*(Ca+Cb*Cd) + Cj*(Cd+Ce*Ca) ) / ( 1. - Ce*Cb ) )
-      Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1. - Ce*Cb ) )
+      Ck = Cg + ( ( Ci*(Ca+Cb*Cd) + Cj*(Cd+Ce*Ca) ) / ( 1.0d0 - Ce*Cb ) )
+      Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1.0d0 - Ce*Cb ) )
 
       Mdot = AirMassFlow * VentSlab(Item)%SurfaceFlowFrac(RadSurfNum)
       CpAirZn        = PsyCpAirFnWTdb(Node(VentSlab(Item)%RadInNode)%HumRat,Node(VentSlab(Item)%RadInNode)%Temp)
 
       QRadSysSource(SurfNum) = VentSlab(Item)%CoreNumbers * EpsMdotCpAirZn * (AirTempIn - Ck) &
-                                /(1. + (EpsMdotCpAirZn*Cl/Surface(SurfNum)%Area) )
+                                /(1.0d0 + (EpsMdotCpAirZn*Cl/Surface(SurfNum)%Area) )
 
     IF (Surface(SurfNum)%ExtBoundCond > 0 .AND. Surface(SurfNum)%ExtBoundCond /= SurfNum) &
              QRadSysSource(Surface(SurfNum)%ExtBoundCond) = QRadSysSource (SurfNum)
@@ -3215,8 +3414,8 @@ IF (AirMassFlow > 0.0) THEN
           ! is set to zero to avoid heating in cooling mode or cooling in heating
           ! mode.
 
-       IF (((OperatingMode == HeatingMode).AND.(QRadSysSource(SurfNum) <= 0.0)) .OR. &
-           ((OperatingMode == CoolingMode).AND.(QRadSysSource(SurfNum) >= 0.0)) ) THEN
+       IF (((OperatingMode == HeatingMode).AND.(QRadSysSource(SurfNum) <= 0.0d0)) .OR. &
+           ((OperatingMode == CoolingMode).AND.(QRadSysSource(SurfNum) >= 0.0d0)) ) THEN
 
 ! IF (.not. WarmupFlag) THEN
 !   TempComparisonErrorCount = TempComparisonErrorCount + 1
@@ -3235,12 +3434,12 @@ IF (AirMassFlow > 0.0) THEN
 !   END IF
 ! END IF
 
-            Node(SlabInNode)%MassFlowRate          = 0.0
-            Node(FanOutletNode)%MassFlowRate       = 0.0
-            Node(OAInletNode)%MassFlowRate         = 0.0
-            Node(MixoutNode)%MassFlowRate          = 0.0
-            Node(Returnairnode)%MassFlowRate       = 0.0
-            AirMassFlow                            = 0.0
+            Node(SlabInNode)%MassFlowRate          = 0.0d0
+            Node(FanOutletNode)%MassFlowRate       = 0.0d0
+            Node(OAInletNode)%MassFlowRate         = 0.0d0
+            Node(MixoutNode)%MassFlowRate          = 0.0d0
+            Node(Returnairnode)%MassFlowRate       = 0.0d0
+            AirMassFlow                            = 0.0d0
 
         DO RadSurfNum2 = 1, VentSlab(Item)%NumOfSurfaces
           SurfNum2 = VentSlab(Item)%SurfacePtr(RadSurfNum2)
@@ -3275,13 +3474,13 @@ IF (AirMassFlow > 0.0) THEN
         DO RadSurfNum2 = 1, VentSlab(Item)%NumOfSurfaces
           IF (TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CondDeltaTemp) ) THEN
           ! Condensation warning--must shut off radiant system
-            Node(SlabInNode)%MassFlowRate          = 0.0
-            Node(FanOutletNode)%MassFlowRate       = 0.0
-            Node(OAInletNode)%MassFlowRate         = 0.0
-            Node(MixoutNode)%MassFlowRate          = 0.0
-            Node(Returnairnode)%MassFlowRate       = 0.0
+            Node(SlabInNode)%MassFlowRate          = 0.0d0
+            Node(FanOutletNode)%MassFlowRate       = 0.0d0
+            Node(OAInletNode)%MassFlowRate         = 0.0d0
+            Node(MixoutNode)%MassFlowRate          = 0.0d0
+            Node(Returnairnode)%MassFlowRate       = 0.0d0
             Node(FanOutletNode)%Temp = Node(SlabInNode)%Temp
-            AirMassFlow                            = 0.0
+            AirMassFlow                            = 0.0d0
             DO RadSurfNum3 = 1, VentSlab(Item)%NumOfSurfaces
               SurfNum2 = VentSlab(Item)%SurfacePtr(RadSurfNum3)
               QRadSysSource(SurfNum2) = 0.0D0
@@ -3320,8 +3519,8 @@ IF (AirMassFlow > 0.0) THEN
     END DO
 
 ! Total Radiant Power
-    AirOutletTempCheck = 0.0
-    TotalVentSlabRadPower = 0.0
+    AirOutletTempCheck = 0.0d0
+    TotalVentSlabRadPower = 0.0d0
     DO RadSurfNum = 1, VentSlab(Item)%NumOfSurfaces
       SurfNum              = VentSlab(Item)%SurfacePtr(RadSurfNum)
       TotalVentSlabRadPower     = TotalVentSlabRadPower + QRadSysSource(SurfNum)
@@ -3331,7 +3530,7 @@ IF (AirMassFlow > 0.0) THEN
 
 ! Return Air temp Check
      IF (VentSlab(Item)%SysConfg == SlabOnly) THEN
-      IF (AirMassFlow> 0.0) THEN
+      IF (AirMassFlow> 0.0d0) THEN
          CpAirZn        = PsyCpAirFnWTdb(Node(VentSlab(Item)%RadInNode)%HumRat,Node(VentSlab(Item)%RadInNode)%Temp)!
          Node(ReturnAirNode)%Temp = Node(SlabInNode)%Temp &
                 -(TotalVentSlabRadPower/(AirMassFlow*CpAirZn))
@@ -3368,7 +3567,7 @@ IF (AirMassFlow > 0.0) THEN
 
 
     IF (VentSlab(Item)%SysConfg == SlabandZone) THEN
-      IF (AirMassFlow> 0.0) THEN
+      IF (AirMassFlow> 0.0d0) THEN
        Node(ZoneAirInNode)%Temp = Node(SlabInNode)%Temp &
                                    -(TotalVentSlabRadPower/(AirMassFlow*CpAirZn))
        IF ( (ABS(Node(ZoneAirInNode)%Temp-AirOutletTempCheck) > TempCheckLimit) .AND. &
@@ -3455,18 +3654,18 @@ IF (AirMassFlow > 0.0) THEN
       Cf = RadSysToHBQsrcCoef(SurfNum)
 
       Cg = CTFTsrcConstPart(SurfNum)
-      Ch = REAL(Construct(ConstrNum)%CTFTSourceQ(0))
-      Ci = REAL(Construct(ConstrNum)%CTFTSourceIn(0))
-      Cj = REAL(Construct(ConstrNum)%CTFTSourceOut(0))
+      Ch = REAL(Construct(ConstrNum)%CTFTSourceQ(0),r64)
+      Ci = REAL(Construct(ConstrNum)%CTFTSourceIn(0),r64)
+      Cj = REAL(Construct(ConstrNum)%CTFTSourceOut(0),r64)
 
-      Ck = Cg + ( ( Ci*(Ca+Cb*Cd) + Cj*(Cd+Ce*Ca) ) / ( 1. - Ce*Cb ) )
-      Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1. - Ce*Cb ) )
+      Ck = Cg + ( ( Ci*(Ca+Cb*Cd) + Cj*(Cd+Ce*Ca) ) / ( 1.0d0 - Ce*Cb ) )
+      Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1.0d0 - Ce*Cb ) )
 
       Mdot = AirMassFlow * FlowFrac
       CpAirZn        = PsyCpAirFnWTdb(Node(VentSlab(Item)%RadInNode)%HumRat,Node(VentSlab(Item)%RadInNode)%Temp)
 
       QRadSysSource(SurfNum) = CNumDS * EpsMdotCpAirZn * (AirTempIn - Ck) &
-                                /(1. + (EpsMdotCpAirZn*Cl/Surface(SurfNum)%Area) )
+                                /(1.0d0 + (EpsMdotCpAirZn*Cl/Surface(SurfNum)%Area) )
 
     IF (Surface(SurfNum)%ExtBoundCond > 0 .AND. Surface(SurfNum)%ExtBoundCond /= SurfNum) &
              QRadSysSource(Surface(SurfNum)%ExtBoundCond) = QRadSysSource (SurfNum)
@@ -3484,8 +3683,8 @@ IF (AirMassFlow > 0.0) THEN
           ! mode.
 
       IF (RadSurfNum.eq.1) THEN
-        IF (((OperatingMode == HeatingMode).AND.(QRadSysSource(SurfNum) <= 0.0)) .OR. &
-           ((OperatingMode == CoolingMode).AND.(QRadSysSource(SurfNum) >= 0.0)) ) THEN
+        IF (((OperatingMode == HeatingMode).AND.(QRadSysSource(SurfNum) <= 0.0d0)) .OR. &
+           ((OperatingMode == CoolingMode).AND.(QRadSysSource(SurfNum) >= 0.0d0)) ) THEN
 !IF (.not. WarmupFlag) THEN
 !  TempComparisonErrorCount = TempComparisonErrorCount + 1
 !  IF (TempComparisonErrorCount <= NumOfVentSlabs) THEN
@@ -3504,12 +3703,12 @@ IF (AirMassFlow > 0.0) THEN
 !  END IF
 !END IF
 
-            Node(SlabInNode)%MassFlowRate          = 0.0
-            Node(FanOutletNode)%MassFlowRate       = 0.0
-            Node(OAInletNode)%MassFlowRate         = 0.0
-            Node(MixoutNode)%MassFlowRate          = 0.0
-            Node(Returnairnode)%MassFlowRate       = 0.0
-            AirMassFlow                            = 0.0
+            Node(SlabInNode)%MassFlowRate          = 0.0d0
+            Node(FanOutletNode)%MassFlowRate       = 0.0d0
+            Node(OAInletNode)%MassFlowRate         = 0.0d0
+            Node(MixoutNode)%MassFlowRate          = 0.0d0
+            Node(Returnairnode)%MassFlowRate       = 0.0d0
+            AirMassFlow                            = 0.0d0
 
         DO RadSurfNum2 = 1, VentSlab(Item)%NumOfSurfaces
           SurfNum2 = VentSlab(Item)%SurfacePtr(RadSurfNum2)
@@ -3536,13 +3735,13 @@ IF (AirMassFlow > 0.0) THEN
         DO RadSurfNum2 = 1, VentSlab(Item)%NumOfSurfaces
           IF (TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CondDeltaTemp) ) THEN
           ! Condensation warning--must shut off radiant system
-            Node(SlabInNode)%MassFlowRate          = 0.0
-            Node(FanOutletNode)%MassFlowRate       = 0.0
-            Node(OAInletNode)%MassFlowRate         = 0.0
-            Node(MixoutNode)%MassFlowRate          = 0.0
-            Node(Returnairnode)%MassFlowRate       = 0.0
+            Node(SlabInNode)%MassFlowRate          = 0.0d0
+            Node(FanOutletNode)%MassFlowRate       = 0.0d0
+            Node(OAInletNode)%MassFlowRate         = 0.0d0
+            Node(MixoutNode)%MassFlowRate          = 0.0d0
+            Node(Returnairnode)%MassFlowRate       = 0.0d0
             Node(FanOutletNode)%Temp = Node(SlabInNode)%Temp
-            AirMassFlow                            = 0.0
+            AirMassFlow                            = 0.0d0
             DO RadSurfNum3 = 1, VentSlab(Item)%NumOfSurfaces
               SurfNum2 = VentSlab(Item)%SurfacePtr(RadSurfNum3)
               QRadSysSource(SurfNum2) = 0.0D0
@@ -3580,8 +3779,8 @@ IF (AirMassFlow > 0.0) THEN
   END DO
 
   ! Total Radiant Power
-    AirOutletTempCheck = 0.0
-    TotalVentSlabRadPower = 0.0
+    AirOutletTempCheck = 0.0d0
+    TotalVentSlabRadPower = 0.0d0
     DO RadSurfNum = 1, VentSlab(Item)%NumOfSurfaces
       SurfNum              = VentSlab(Item)%SurfacePtr(RadSurfNum)
       TotalVentSlabRadPower     = TotalVentSlabRadPower + QRadSysSource(SurfNum)
@@ -3608,7 +3807,7 @@ IF (AirMassFlow > 0.0) THEN
         SurfNum              = VentSlab(Item)%SurfacePtr(RadSurfNum)
 
 
-      IF (AirMassFlow> 0.0) THEN
+      IF (AirMassFlow> 0.0d0) THEN
 
          CpAirZn        = PsyCpAirFnWTdb(Node(VentSlab(Item)%RadInNode)%HumRat,Node(VentSlab(Item)%RadInNode)%Temp)!
 
@@ -3623,7 +3822,7 @@ IF (AirMassFlow > 0.0) THEN
     END DO
 
 ! Return Air temp Check
-      IF (AirMassFlow> 0.0) THEN
+      IF (AirMassFlow> 0.0d0) THEN
 
         CpAirZn                  = PsyCpAirFnWTdb(Node(VentSlab(Item)%RadInNode)%HumRat,Node(VentSlab(Item)%RadInNode)%Temp)
         Node(ReturnAirNode)%Temp = Node(SlabInNode)%Temp - (TotalVentSlabRadPower/(AirMassFlow*CpAirZn))
@@ -3670,7 +3869,7 @@ IF (AirMassFlow > 0.0) THEN
 
   END IF ! SeriesSlabs
 
-END IF !(AirMassFlow > 0.0)
+END IF !(AirMassFlow > 0.0d0)
 
   RETURN
 
@@ -3760,21 +3959,21 @@ SUBROUTINE SimVentSlabOAMixer(Item)
   Node(AirRelNode)%HumRat   = Node(InletNode)%HumRat
   Node(AirRelNode)%Enthalpy = Node(InletNode)%Enthalpy
 
-  IF (Node(InletNode)%MassFlowRate > 0.0) THEN
+  IF (Node(InletNode)%MassFlowRate > 0.0d0) THEN
 
     OAFraction = Node(OutsideAirNode)%MassFlowRate/Node(InletNode)%MassFlowRate
 
   ELSE
-    OAFraction = 0.0
+    OAFraction = 0.0d0
   END IF
 
   Node(InletNode)%Enthalpy = PsyHFnTdbw(Node(InletNode)%Temp, Node(Inletnode)%Humrat)
 
           ! Perform an energy and moisture mass balance on the mixing portion of the OA Mixer of the ventilated slab
   Node(OAMixOutNode)%Enthalpy = OAFraction*Node(OutsideAirNode)%Enthalpy &
-                               +(1.0-OAFraction)*Node(InletNode)%Enthalpy
+                               +(1.0d0-OAFraction)*Node(InletNode)%Enthalpy
   Node(OAMixOutNode)%HumRat   = OAFraction*Node(OutsideAirNode)%HumRat &
-                               +(1.0-OAFraction)*Node(InletNode)%HumRat
+                               +(1.0d0-OAFraction)*Node(InletNode)%HumRat
 
           ! Find the other key state points based on calculated conditions
   Node(OAMixOutNode)%Temp  = PsyTdbFnHW(Node(OAMixOutNode)%Enthalpy,Node(OAMixOutNode)%HumRat)
@@ -3886,19 +4085,19 @@ SUBROUTINE UpdateVentilatedSlab(Item,FirstHVACIteration)
   END DO
 
           ! First sum up all of the heat sources/sinks associated with this system
-    TotalHeatSource = 0.0
+    TotalHeatSource = 0.0d0
     DO RadSurfNum = 1, VentSlab(Item)%NumOfSurfaces
       SurfNum         = VentSlab(Item)%SurfacePtr(RadSurfNum)
       TotalHeatSource = TotalHeatSource + QRadSysSource(SurfNum)
     END DO
     ZoneNum         = VentSlab(Item)%ZonePtr
-    ZoneMult        = REAL(Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier)
+    ZoneMult        = REAL(Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier,r64)
     TotalHeatSource = ZoneMult * TotalHeatSource
 
 
          ! Update the heating side of things
 
-    IF ((CpAppAir > 0.0) .AND. (AirMassFlow > 0.0)) THEN
+    IF ((CpAppAir > 0.0d0) .AND. (AirMassFlow > 0.0d0)) THEN
 
        IF ((VentSlab(Item)%SysConfg == SlabOnly).OR.(VentSlab(Item)%SysConfg==SeriesSlabs)) THEN
             Node(AirInletNode) = Node(AirInletNode)
@@ -3936,15 +4135,15 @@ SUBROUTINE UpdateVentilatedSlab(Item,FirstHVACIteration)
 ! Resolve mixouttemp
 
 
-  IF (Node(AirInletNode)%MassFlowRate > 0.0) THEN
+  IF (Node(AirInletNode)%MassFlowRate > 0.0d0) THEN
 
     OAFraction = Node(OANode)%MassFlowRate/Node(AirInletNode)%MassFlowRate
 
   ELSE
-    OAFraction = 0.0
+    OAFraction = 0.0d0
   END IF
 
-  IF (OAFraction <= 0.0) Then
+  IF (OAFraction <= 0.0d0) Then
 
   Node(MixOutNode)%HumRat   = Node(AirInletNode)%HumRat
   Node(MixOutNode)%Temp     = Node(AirInletNode)%Temp
@@ -3952,9 +4151,9 @@ SUBROUTINE UpdateVentilatedSlab(Item,FirstHVACIteration)
   Else
 
   Node(MixOutNode)%Enthalpy = OAFraction*Node(OANode)%Enthalpy &
-                               +(1.0-OAFraction)*Node(AirInletNode)%Enthalpy
+                               +(1.0d0-OAFraction)*Node(AirInletNode)%Enthalpy
   Node(MixOutNode)%HumRat   = OAFraction*Node(OANode)%HumRat &
-                               +(1.0-OAFraction)*Node(AirInletNode)%HumRat
+                               +(1.0d0-OAFraction)*Node(AirInletNode)%HumRat
 
   Node(MixOutNode)%Temp  = PsyTdbFnHW(Node(MixOutNode)%Enthalpy,Node(MixOutNode)%HumRat)
 
@@ -4134,7 +4333,7 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
   REAL(r64)           :: Area        ! Effective surface area
 
           ! FLOW:
-  SumHATsurf = 0.0
+  SumHATsurf = 0.0d0
 
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
@@ -4147,13 +4346,13 @@ REAL(r64) FUNCTION SumHATsurf(ZoneNum)
         Area = Area + SurfaceWindow(SurfNum)%DividerArea
       END IF
 
-      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0) THEN
+      IF (SurfaceWindow(SurfNum)%FrameArea > 0.0d0) THEN
         ! Window frame contribution
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%FrameArea &
           * (1.0d0 + SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameTempSurfIn
       END IF
 
-      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
+      IF (SurfaceWindow(SurfNum)%DividerArea > 0.0d0 .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntShadeOn &
           .AND. SurfaceWindow(SurfNum)%ShadingFlag /= IntBlindOn) THEN
         ! Window divider contribution (only from shade or blind for window with divider and interior shade or blind)
         SumHATsurf = SumHATsurf + HConvIn(SurfNum) * SurfaceWindow(SurfNum)%DividerArea &
@@ -4219,19 +4418,19 @@ SUBROUTINE ReportVentilatedSlab(Item)
 
 
 ! Slab Part
-  TotalVentSlabRadPower = 0.0
-  ZoneMult         = 1
+  TotalVentSlabRadPower = 0.0d0
+  ZoneMult         = 1.0d0
 
       DO RadSurfNum = 1, VentSlab(Item)%NumOfSurfaces
         SurfNum          = VentSlab(Item)%SurfacePtr(RadSurfNum)
         TotalVentSlabRadPower = TotalVentSlabRadPower + QRadSysSource(SurfNum)
       END DO
-      ZoneMult         = REAL(Zone(VentSlab(Item)%ZonePtr)%Multiplier * Zone(VentSlab(Item)%ZonePtr)%ListMultiplier)
+      ZoneMult = REAL(Zone(VentSlab(Item)%ZonePtr)%Multiplier * Zone(VentSlab(Item)%ZonePtr)%ListMultiplier,r64)
       TotalVentSlabRadPower = ZoneMult * TotalVentSlabRadPower
-      VentSlab(Item)%RadHeatingPower = 0.0
-      VentSlab(Item)%RadCoolingPower = 0.0
+      VentSlab(Item)%RadHeatingPower = 0.0d0
+      VentSlab(Item)%RadCoolingPower = 0.0d0
 
-        IF (TotalVentSlabRadPower >= 0.01) Then
+        IF (TotalVentSlabRadPower >= 0.01d0) Then
 
       VentSlab(Item)%RadHeatingPower = +TotalVentSlabRadPower
         ELSE

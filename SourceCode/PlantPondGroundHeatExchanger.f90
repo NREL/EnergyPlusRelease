@@ -69,15 +69,15 @@ TYPE PondGroundHeatExchangerData
   CHARACTER(len=MaxNameLength) :: OutletNode          =' ' ! pond outlet fluid node
   REAL(r64)                    :: DesignMassFlowRate  =0.d0 ! design flow rate of circulating fluid
   REAL(r64)                    :: DesignCapacity      =0.d0 ! design cooling capacity of pond at
-  REAL(r64)                    :: Depth               =0.0 ! depth of pond
-  REAL(r64)                    :: Area                =0.0 ! area of pond
-  REAL(r64)                    :: TubeInDiameter      =0.0 ! hydronic tube inside diameter
-  REAL(r64)                    :: TubeOutDiameter     =0.0 ! hydronic tube outside diameter
-  REAL(r64)                    :: TubeConductivity    =0.0 ! hydronic tube thermal conductivity
-  REAL(r64)                    :: GrndConductivity    =0.0 ! ground thermal conductivity
-  REAL(r64)                    :: CircuitLength       =0.0 ! length of each circuit
-  REAL(r64)                    :: BulkTemperature     =0.0 ! current pond bulk temperature
-  REAL(r64)                    :: PastBulkTemperature =0.0 ! past pond bulk temperature
+  REAL(r64)                    :: Depth               =0.0d0 ! depth of pond
+  REAL(r64)                    :: Area                =0.0d0 ! area of pond
+  REAL(r64)                    :: TubeInDiameter      =0.0d0 ! hydronic tube inside diameter
+  REAL(r64)                    :: TubeOutDiameter     =0.0d0 ! hydronic tube outside diameter
+  REAL(r64)                    :: TubeConductivity    =0.0d0 ! hydronic tube thermal conductivity
+  REAL(r64)                    :: GrndConductivity    =0.0d0 ! ground thermal conductivity
+  REAL(r64)                    :: CircuitLength       =0.0d0 ! length of each circuit
+  REAL(r64)                    :: BulkTemperature     =0.0d0 ! current pond bulk temperature
+  REAL(r64)                    :: PastBulkTemperature =0.0d0 ! past pond bulk temperature
   INTEGER                      :: NumCircuits         =0 ! number of circuits in total
   INTEGER                      :: InletNodeNum        =0 ! inlet node number
   INTEGER                      :: OutletNodeNum       =0 ! oulet node number
@@ -109,20 +109,20 @@ TYPE(PondGroundHeatExchangerReport), DIMENSION(:), ALLOCATABLE :: PondGHEReport
   ! utility variables initialized once
 INTEGER :: NumOfPondGHEs                 =0 ! Number of pond ground heat exchangers
   ! Utility variables - initialized for each instance of a pond
-REAL(r64)    :: InletTemp                =0.0  ! water inlet temperature
-REAL(r64)    :: OutletTemp               =0.0  ! water outlet temperature
-REAL(r64)    :: FlowRate                 =0.0  ! water mass flow rate
-REAL(r64)    :: HeatTransRate            =0.0  ! total heat transfer rate, Watts
-REAL(r64)    :: PondTemp                 =0.0  ! pond temperature
-REAL(r64)    :: PastPondTemp             =0.0  ! past pond temperature
-REAL(r64)    :: PondArea                 =0.0  ! pond surface area
-REAL(r64)    :: PondDepth                =0.0  ! pond depth
-REAL(r64)    :: TubeInDiameter           =0.0  ! hydronic tube inside diameter
-REAL(r64)    :: TubeOutDiameter          =0.0  ! hydronic tube outside diameter
-REAL(r64)    :: TubeConductivity         =0.0  ! hydronic tube thermal conductivity
-REAL(r64)    :: GrndConductivity         =0.0  ! ground thermal conductivity
-REAL(r64)    :: Concentration            =0.0  ! fluid/glycol concentration 0.0-1.0 proportion.
-REAL(r64)    :: CircLength               =0.0  ! length of each circuit
+REAL(r64)    :: InletTemp                =0.0d0  ! water inlet temperature
+REAL(r64)    :: OutletTemp               =0.0d0  ! water outlet temperature
+REAL(r64)    :: FlowRate                 =0.0d0  ! water mass flow rate
+REAL(r64)    :: HeatTransRate            =0.0d0  ! total heat transfer rate, Watts
+REAL(r64)    :: PondTemp                 =0.0d0  ! pond temperature
+REAL(r64)    :: PastPondTemp             =0.0d0  ! past pond temperature
+REAL(r64)    :: PondArea                 =0.0d0  ! pond surface area
+REAL(r64)    :: PondDepth                =0.0d0  ! pond depth
+REAL(r64)    :: TubeInDiameter           =0.0d0  ! hydronic tube inside diameter
+REAL(r64)    :: TubeOutDiameter          =0.0d0  ! hydronic tube outside diameter
+REAL(r64)    :: TubeConductivity         =0.0d0  ! hydronic tube thermal conductivity
+REAL(r64)    :: GrndConductivity         =0.0d0  ! ground thermal conductivity
+REAL(r64)    :: Concentration            =0.0d0  ! fluid/glycol concentration 0.0-1.0 proportion.
+REAL(r64)    :: CircLength               =0.0d0  ! length of each circuit
 INTEGER :: NumCircuits                   =0 ! number of circuits in total
 INTEGER :: InletNodeNum                  =0  ! inlet node number
 INTEGER :: OutletNodeNum                 =0  ! oulet node number
@@ -359,13 +359,13 @@ SUBROUTINE GetPondGroundHeatExchanger
     ! pond geometry data
     PondGHE(Item)%Depth = rNumericArgs(1)
     PondGHE(Item)%Area  = rNumericArgs(2)
-    IF (rNumericArgs(1) <= 0.0) THEN
+    IF (rNumericArgs(1) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
       ErrorsFound=.true.
     END IF
-    IF (rNumericArgs(2) <= 0.0) THEN
+    IF (rNumericArgs(2) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
@@ -376,13 +376,13 @@ SUBROUTINE GetPondGroundHeatExchanger
     PondGHE(Item)%TubeInDiameter  = rNumericArgs(3)
     PondGHE(Item)%TubeOutDiameter = rNumericArgs(4)
 
-    IF (rNumericArgs(3) <= 0.0) THEN
+    IF (rNumericArgs(3) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(3))//'='//TRIM(RoundSigDigits(rNumericArgs(3),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
       ErrorsFound=.true.
     END IF
-    IF (rNumericArgs(4) <= 0.0) THEN
+    IF (rNumericArgs(4) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(4))//'='//TRIM(RoundSigDigits(rNumericArgs(4),2)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
@@ -399,13 +399,13 @@ SUBROUTINE GetPondGroundHeatExchanger
     PondGHE(Item)%TubeConductivity  = rNumericArgs(5)
     PondGHE(Item)%GrndConductivity  = rNumericArgs(6)
 
-    IF (rNumericArgs(5) <= 0.0) THEN
+    IF (rNumericArgs(5) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(5))//'='//TRIM(RoundSigDigits(rNumericArgs(5),4)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
       ErrorsFound=.true.
     END IF
-    IF (rNumericArgs(6) <= 0.0) THEN
+    IF (rNumericArgs(6) <= 0.0d0) THEN
       CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(6))//'='//TRIM(RoundSigDigits(rNumericArgs(6),4)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Value must be greater than 0.0')
@@ -857,11 +857,11 @@ FUNCTION CalcTotalFLux(PondBulkTemp,PondGHENum)
   SpecHeatAir   = PsyCpAirFnWTdb(HumRatioAir, OutDrybulb)
   LatentHeatAir = PsyHfgAirFnWTdb(HumRatioAir, OutDrybulb,'PondGroundHeatExchanger:CalcTotalFlux')
 
-  FluxEvap = (PrantlAir/SchmidtAir)**2.0/3.0 * ConvCoef/SpecHeatAir * &
+  FluxEvap = (PrantlAir/SchmidtAir)**2.0d0/3.0d0 * ConvCoef/SpecHeatAir * &
              (HumRatioFilm - HumRatioAir) * LatentHeatAir
 
   ! ground heat transfer flux
-  Perimeter = 4.0*SQRT(PondArea)  ! square assumption
+  Perimeter = 4.0d0*SQRT(PondArea)  ! square assumption
   UvalueGround = 0.999d0*(GrndConductivity/PondDepth) + 1.37d0*(GrndConductivity*Perimeter/PondArea)
   FluxGround   = UvalueGround * (PondBulkTemp - GroundTemp_Deep)
 
@@ -937,7 +937,7 @@ FUNCTION CalcSolarFlux()
 
   ! check for sun up.
   IF (.not. SunIsUp) THEN
-    CalcSolarFlux = 0.0
+    CalcSolarFlux = 0.0d0
     RETURN
   END IF
 
@@ -1055,7 +1055,7 @@ FUNCTION CalcEffectiveness(InsideTemperature, PondTemperature,MassFlowRate,PondG
                                    PlantLoop(PondGHE(PondGHENum)%LoopNum)%FluidIndex,CalledFrom)
 
   ! Calculate the Reynold's number from RE=(4*Mdot)/(Pi*Mu*Diameter)
-  ReynoldsNum = 4.0 * MassFlowRate / ( PI * Viscosity * TubeInDiameter * NumCircuits)
+  ReynoldsNum = 4.0d0 * MassFlowRate / ( PI * Viscosity * TubeInDiameter * NumCircuits)
 
   PrantlNum   = Viscosity*SpecificHeat/Conductivity
 
@@ -1107,8 +1107,8 @@ FUNCTION CalcEffectiveness(InsideTemperature, PondTemperature,MassFlowRate,PondG
   ! where: Rtot = Ri,convection + Rconduction + Ro,conveciton
   !        A = Pi*D*TubeLength
 
-  IF(MassFlowRate == 0.0) Then
-    CalcEffectiveness = 1.0
+  IF(MassFlowRate == 0.0d0) Then
+    CalcEffectiveness = 1.0d0
   Else
     NTU = PI * TubeInDiameter * CircLength*NumCircuits / (TotalResistance * MassFlowRate * SpecificHeat)
      ! Calculate effectiveness - formula for static fluid
@@ -1116,7 +1116,7 @@ FUNCTION CalcEffectiveness(InsideTemperature, PondTemperature,MassFlowRate,PondG
   End If
 
   ! Check for frozen pond
-  IF (PondTemperature .LT. 0.0) THEN
+  IF (PondTemperature .LT. 0.0d0) THEN
     PondGHE(PondGHENum)%ConsecutiveFrozen=PondGHE(PondGHENum)%ConsecutiveFrozen+1
     IF (PondGHE(PondGHENum)%FrozenErrIndex == 0) THEN
       CALL ShowWarningMessage('GroundHeatExchanger:Pond="'//trim(PondGHE(PondGHENum)%Name)//  &
@@ -1190,7 +1190,7 @@ SUBROUTINE UpdatePondGroundHeatExchanger(PondGHENum)
 
   CALL SafeCopyPlantNode(InletNodeNum, OutletNodeNum)
 
-  IF ( (CpFluid > 0.0) .AND. (FlowRate > 0.0) ) THEN
+  IF ( (CpFluid > 0.0d0) .AND. (FlowRate > 0.0d0) ) THEN
 
     Node(OutletNodeNum)%Temp         = InletTemp - HeatTransRate / (FlowRate*CpFluid)
     Node(OutletNodeNum)%Enthalpy     = Node(OutletNodeNum)%Temp*CpFluid

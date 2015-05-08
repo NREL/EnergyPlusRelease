@@ -78,6 +78,11 @@ TYPE BasisElemDescr
               !These indices are in the BasisElement array, which matches the row/column of the matrix
 END TYPE BasisElemDescr
 
+TYPE BSDFDaylghtPosition
+  REAL(r64)  :: Altitude   ! Altitude range is from -pi/2 to pi/2. Horizontal vector have altitude of zero
+  REAL(r64)  :: Azimuth    ! Azimuth is measured from positive x counter clockwise. Its range is from -pi to pi
+END TYPE BSDFDaylghtPosition
+
 TYPE BasisStruct
   INTEGER   :: BasisType = 0 ! BasisType_WINDOW or BasisType_Custom  (see HeatBalanceManager)
   INTEGER   :: BasisSymmetryType = 0 ! BasisSymmetry_Axisymmetric or BasisSymmetry_None  (see HeatBalanceManager)
@@ -96,6 +101,10 @@ END TYPE BasisStruct
 TYPE BSDFGeomDescr
   TYPE (BasisStruct)  ::  Inc    !Basis for incident hemisphere
   TYPE (Vector), DIMENSION(:), ALLOCATABLE  :: sInc  !Central direction vectors of incident grid (World coords)
+  TYPE (BSDFDaylghtPosition), DIMENSION(:), ALLOCATABLE :: pInc ! azimuth and altitude of incidence vectors
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: CosInc ! cosine of incident angle
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: DAInc ! cosine of incident angle times delta theta time delta phi 
+                                              ! (used in daylighting calculations)
   INTEGER  :: NSkyUnobs  !Number of Inc basis rays from unobstructed sky
   INTEGER  :: NGndUnobs  !Number of Inc basis rays from unobstructed ground
   INTEGER  :: NSky    !Number of Inc basis rays from sky
@@ -120,6 +129,7 @@ TYPE BSDFGeomDescr
   REAL(r64), DIMENSION(: , :), ALLOCATABLE :: PhiBm ! Theta angle corresponging to beam dir (hour, timestep) (rad)
   TYPE (BasisStruct)  ::  Trn
   TYPE (Vector), DIMENSION(:), ALLOCATABLE    :: sTrn  !Central direction vectors of Outgoing grid (World coords)
+  TYPE (BSDFDaylghtPosition), DIMENSION(:), ALLOCATABLE :: pTrn ! azimuth and altitude of incidence vectors
   INTEGER, DIMENSION(:), ALLOCATABLE    ::  NSurfInt  !No. of basis rays intersecting back surface (dim from
                 !NBkSurf in BSDF State Descr)
   INTEGER, DIMENSION(:,:), ALLOCATABLE    ::  SurfInt  !Basis index (IBkSurf, j) of the jth ray intersecting IBkSurf
@@ -127,7 +137,52 @@ TYPE BSDFGeomDescr
                                                           ! the normal to the back surface
   REAL(r64), DIMENSION(:,:), ALLOCATABLE :: AOverlap ! Overlap areas for each outgoing
                                                      ! direction (Trn) (no of outgoing dir, NBKSurf)
+  REAL(r64), DIMENSION(:,:), ALLOCATABLE :: ARhoVisOverlap ! Overlap areas multiplied with surface reflectance for each outgoing 
+                                                           ! direction (Trn) (no of outgoing dir, NBKSurf)
+  REAL(r64), DIMENSION(:), ALLOCATABLE   :: AveRhoVisOverlap ! Average visible reflectance from overlap surface which 
+                                                             ! originates from one outgoing direction
+  LOGICAL :: InitState = .TRUE.  ! Flag for marking that state needs to be initalized
 END TYPE BSDFGeomDescr
+
+! Structure to keep reference points coefficients for different reference points and illuminance maps
+TYPE BSDFRefPoints
+  INTEGER, DIMENSION(:), ALLOCATABLE  ::  NSky  ! number of sky elements for each window element (# window el)
+  INTEGER, DIMENSION(:), ALLOCATABLE  ::  NGnd  ! number of ground elements for each window element (# window el)
+  INTEGER, DIMENSION(:), ALLOCATABLE  ::  NReflSurf  ! number of Inc basis rays from reflecting surfaces (# window el)
+  INTEGER, DIMENSION(:,:), ALLOCATABLE  ::  SkyIndex  !list of sky basis indices (# window el, NSky)
+  INTEGER, DIMENSION(:,:), ALLOCATABLE  ::  GndIndex  !list of gnd basis indices (# window el, NGnd)
+  TYPE (Vector), DIMENSION(:,:), ALLOCATABLE  ::  GndPt  !gnd intersection pt of gnd basis ray (z=0) (# window el, NGnd)
+  REAL(r64), DIMENSION(:,:), ALLOCATABLE  ::  GndObstrMultiplier !ground obstruction multiplier used in reflection calculatations
+                                                                    ! (# window el, NGnd)
+  INTEGER, DIMENSION(:,:), ALLOCATABLE  ::  RefSurfIndex  ! list of basis indices of rays striking exterior surf 
+                                                            ! (# window el, NReflSurf)
+  INTEGER, DIMENSION(:,:), ALLOCATABLE  ::  RefRayNHits  ! for a given ray striking a surface, no. of surfaces pierced
+                                                            ! (# window el, NReflSurf)
+  REAL(r64), DIMENSION(:,:), ALLOCATABLE  ::  TransOutSurf  ! total transmittance of exterior obstructions for given incoming 
+                                                            ! basis direction. (# window el, NReflSurf)
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE  ::  HitSurfNo  ! for a given ray striking surface, list of intersected surf nos
+                                                            ! (# window el, NReflSurf, RefRayNHits)
+  REAL(r64), DIMENSION(:,:,:), ALLOCATABLE  ::  HitSurfDSq  ! for a given ray striking surface, list of distance^2 from window
+                                                            ! (# window el, NReflSurf, RefRayNHits)
+  TYPE (Vector), DIMENSION(:,:,:), ALLOCATABLE    ::  HitPt  ! for a given ray striking surface, list of hit pts
+                                                             ! (# window el, NReflSurf, RefRayNHits)
+  INTEGER, DIMENSION(:), ALLOCATABLE  :: RefPointIndex  ! outgoing direction which containts reference point 
+                                                          ! (# window el)
+  LOGICAL, DIMENSION(:), ALLOCATABLE :: RefPointIntersection ! determines if reference point is laying in light tube of bsdf
+                                                                ! outgoing direction
+                                                                ! (NTrnBasis)
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: RefPtIntPosFac  ! position factors for intersections from reference point to window for
+                                                            ! each outgoing direction
+                                                            ! (NTrnBasis)
+END TYPE BSDFRefPoints
+
+TYPE BSDFDaylghtGeomDescr
+  TYPE(BSDFRefPoints), DIMENSION(:,:), ALLOCATABLE :: IlluminanceMap    ! array to keep bsdf coefficients for different 
+                                                                              ! illuminance maps
+                                                          ! (# of illuminance maps, # of reference points)
+  TYPE(BSDFRefPoints), DIMENSION(:), ALLOCATABLE :: RefPoint     ! keep reference points daylight coefficients
+                                                          ! (# of reference points)
+END TYPE BSDFDaylghtGeomDescr
 
 TYPE BSDFBkSurfDescr
 
@@ -157,7 +212,8 @@ TYPE BSDFStateDescr
                !viewed part of ground)
   REAL(r64), DIMENSION (:,:), ALLOCATABLE    :: WinBmGndTrans    !Transmittance (hour, timestep) for beam radiation reflected
             !from ground (average over unshaded ground viewed)
-  REAL(r64)                   ::  WinBkHemRefl  =0.  !Window back hemispherical reflectance
+  REAL(r64)                   ::  WinBkHemRefl  =0.0d0  !Window back hemispherical reflectance
+  REAL(r64)                   ::  WinBkHemVisRefl  =0.0d0  !Window back hemispherical reflectance (visible spectrum)
                 !(for reflection of interior diffuse radiation)
   INTEGER                 ::  NLayers  =0  !Number of absorbing layers in this window
   REAL(r64), DIMENSION (:,:,:), ALLOCATABLE  ::  WinBmFtAbs    !Front directional absorptance (layer, hour, timestep)
@@ -182,8 +238,14 @@ TYPE BSDFStateDescr
   REAL(r64), DIMENSION (:), ALLOCATABLE   :: IntegratedBkRefl ! Integrated back layer reflectance (for each back direction)
   REAL(r64), DIMENSION (:), ALLOCATABLE   :: IntegratedBkTrans ! Integrated back layer transmittance (for each back direction)
 
- END TYPE BSDFStateDescr
+END TYPE BSDFStateDescr
 
+TYPE BSDFRefPointsGeomDescr
+   REAL(r64), DIMENSION(:), ALLOCATABLE :: SolidAngle ! Solid angle from daylighting reference point to each window element
+                                                      ! (# window el)                                                    
+   TYPE(vector), DIMENSION(:), ALLOCATABLE :: SolidAngleVec ! unit vector from reference point towards center of window element
+                                                      ! (# window el)  
+END TYPE
 
 TYPE BSDFWindowGeomDescr
         !This contains all the geometry info that we don't want to carry around in SurfaceWindow
@@ -191,12 +253,19 @@ TYPE BSDFWindowGeomDescr
         !will have the structure below allocated
    INTEGER    :: NumStates      !Number of states for this window
    TYPE (BSDFGeomDescr), DIMENSION(:), ALLOCATABLE   :: Geom  !This is dimensioned with number of states
+   TYPE (BSDFDaylghtGeomDescr), DIMENSION(:), ALLOCATABLE   :: DaylghtGeom  !This is dimensioned with number of states
+   LOGICAL :: DaylightingInitialized = .FALSE. ! used for one time initialization only
    INTEGER  ::NBkSurf  =0      !Number of back (interior) surfaces viewed by this window
    TYPE (Vector), DIMENSION(:), ALLOCATABLE    ::  sWinSurf  !Unit vector from window center to center of IBkSurf
    REAL(r64), DIMENSION(:), ALLOCATABLE  ::  sdotN  !Dot product of unit vector s with back surface normal
                ! here s is vector from center of window to center of back surface
                                          !Function of the following subsumed by using an index of 0 if no beam incidence
    !REAL(r64), DIMENSION(: , : ), ALLOCATABLE  ::  SolBmWt  !Intensity wt for beam radiation (Hour, timestep)
+   TYPE(BSDFRefPointsGeomDescr), DIMENSION(:,:), ALLOCATABLE :: IlluminanceMap    ! array to keep bsdf coefficients for 
+                                                                                !different illuminance maps
+                                                          ! (# of illuminance maps, # of reference points)
+   TYPE(BSDFRefPointsGeomDescr), DIMENSION(:), ALLOCATABLE :: RefPoint     ! keep reference points daylight coefficients
+                                                            ! (# of reference points)
 END TYPE BSDFWindowGeomDescr
 
 TYPE BSDFWindowDescript

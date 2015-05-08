@@ -40,7 +40,7 @@ PUBLIC ! Everything private unless explicitly made public
 
 CONTAINS
 
-SUBROUTINE ReportSizingOutput(CompType,CompName,VarDesc,VarValue)
+SUBROUTINE ReportSizingOutput(CompType,CompName,VarDesc,VarValue,UsrDesc,UsrValue)
 
     ! SUBROUTINE INFORMATION:
     !       AUTHOR         Fred Buhl
@@ -63,6 +63,7 @@ SUBROUTINE ReportSizingOutput(CompType,CompName,VarDesc,VarValue)
     USE OutputReportPredefined
     USE General, ONLY: RoundSigDigits
     USE SQLiteProcedures
+    USE DataInterfaces, ONLY: ShowFatalError
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -71,6 +72,8 @@ SUBROUTINE ReportSizingOutput(CompType,CompName,VarDesc,VarValue)
     CHARACTER(len=*), INTENT(IN) :: CompName  ! the name of the component
     CHARACTER(len=*), INTENT(IN) :: VarDesc   ! the description of the input variable
     REAL(r64), INTENT(IN)        :: VarValue  ! the value from the sizing calculation
+    CHARACTER(len=*), INTENT(IN),OPTIONAL :: UsrDesc   ! the description of a user-specified variable
+    REAL(r64), INTENT(IN), OPTIONAL       :: UsrValue  ! the value from the user for the desc item
 
     ! SUBROUTINE PARAMETER DEFINITIONS:
     ! na
@@ -92,6 +95,13 @@ SUBROUTINE ReportSizingOutput(CompType,CompName,VarDesc,VarValue)
     WRITE (OutputFileInits, 991) TRIM(CompType), TRIM(CompName), TRIM(VarDesc), TRIM(RoundSigDigits(VarValue,5))
     !add to tabular output reports
     CALL AddCompSizeTableEntry(CompType,CompName,VarDesc,VarValue)
+
+    IF (PRESENT(UsrDesc) .and. PRESENT(UsrValue)) THEN
+      WRITE (OutputFileInits, 991) TRIM(CompType), TRIM(CompName), TRIM(UsrDesc), TRIM(RoundSigDigits(UsrValue,5))
+      CALL AddCompSizeTableEntry(CompType,CompName,UsrDesc,UsrValue)
+    ELSEIF (PRESENT(UsrDesc) .or. PRESENT(UsrValue)) THEN
+      CALL ShowFatalError('ReportSizingOutput: (Developer Error) - called with user-specified description or value but not both.')
+    ENDIF
 
     ! add to SQL output
     IF (WriteOutputToSQLite) CALL AddSQLiteComponentSizingRecord(CompType, CompName, VarDesc, VarValue)
