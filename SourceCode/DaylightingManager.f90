@@ -4,6 +4,7 @@ MODULE DaylightingManager
           !       AUTHOR         Fred Winkelmann
           !       DATE WRITTEN   July 1997, December 1998
           !       MODIFIED       Oct 2004; LKL -- Efficiencies and code restructure
+          !                      Aug 2012: BG -- Added availability schedule
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -835,7 +836,7 @@ SUBROUTINE CalcDayltgCoeffsRefPoints(ZoneNum)
           ! Provides calculations for Daylighting Coefficients for daylighting reference points
 
           ! METHODOLOGY EMPLOYED:
-          ! Was previously part of CalcDayltgCoeffsRefMapPoints -- broken out to all multiple
+          ! Was previously part of CalcDayltgCoeffsRefMapPoints -- broken out to allow multiple
           ! maps per zone
 
           ! REFERENCES:
@@ -3905,7 +3906,7 @@ SUBROUTINE GetDaylightingParametersInput
         CALL DisplayString('ReturnFrom DElightInputGenerator')
         iErrorFlag = 0
         CALL DisplayString('Calculating DElight DaylightCoefficients')
-        CALL DElightDaylightCoefficients(dLatitude, iErrorFlag)
+        CALL GenerateDElightDaylightCoefficients(dLatitude, iErrorFlag)
         ! Check Error Flag for Warnings or Errors returning from DElight
         ! RJH 2008-03-07: open file for READWRITE and DELETE file after processing
         CALL DisplayString('ReturnFrom DElight DaylightCoefficients Calc')
@@ -4009,7 +4010,7 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
   USE InternalHeatGains, ONLY: CheckLightsReplaceableMinMaxForZone, GetDesignLightingLevelForZone
   USE General, ONLY: TrimSigDigits, RoundSigDigits
   USE OutputReportPredefined
-
+  USE ScheduleManager, ONLY: GetScheduleIndex
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4395,6 +4396,18 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
       ZoneDaylight(ZoneFound)%LightControlSteps=1
     ENDIF
     ZoneDaylight(ZoneFound)%LightControlProbability=rNumericArgs(18)
+
+    IF (.NOT. lAlphaFieldBlanks(2)) THEN
+      ZoneDaylight(ZoneFound)%AvailSchedNum = GetScheduleIndex(cAlphaArgs(2))
+      IF (ZoneDaylight(ZoneFound)%AvailSchedNum == 0) THEN
+        CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) &
+                              //', occurs in '//TRIM(cCurrentModuleObject)//'object for '//TRIM(cAlphaFieldNames(1))//'="'//  &
+                              TRIM(cAlphaArgs(1)) )
+        CALL ShowContinueError('Schedule was not found so controls will always be available, and the simulation continues.')
+      ENDIF
+    ELSE
+      ZoneDaylight(ZoneFound)%AvailSchedNum = 0
+    ENDIF
 
     IF (ZoneDaylight(ZoneFound)%TotalDaylRefPoints >= 1) THEN
       refName = TRIM(cAlphaArgs(1)) // ' - REF 1'
@@ -6165,6 +6178,9 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
           ! From this equation: SETPNT(1) = DILLUN + DILLSW/TVIS1 * VisTransSelected
           SurfaceWindow(IWin)%VisTransSelected = MAX(TVIS2, ASETIL * TVIS1) + 0.000001d0
           SurfaceWindow(IWin)%SwitchingFactor = (TVIS1 - SurfaceWindow(IWin)%VisTransSelected)/ (TVIS1 - TVIS2 + 0.000001d0)
+          ! bound switching factor between 0 and 1
+          SurfaceWindow(IWin)%SwitchingFactor = MIN(1.d0, SurfaceWindow(IWin)%SwitchingFactor)
+          SurfaceWindow(IWin)%SwitchingFactor = MAX(0.D0, SurfaceWindow(IWin)%SwitchingFactor)
         END IF
 
         ! Adjust daylight quantities based on ratio between switched and unswitched visible transmittance
@@ -6627,6 +6643,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
           !       MODIFIED       Mar 2004, FCW: add inter-reflected illuminance from interior windows to DaylIllum
           !                      Apr 2004, FCW: move CALL ReportIllumMap from DayltgInteriorIllum2 (DayltgInteriorMapIllum)
           !                      Apr 2010, BG NREL: remove inter-reflected illuminance to stop double counting
+          !                      Aug 2012, BG NREL: added availability schedule logic
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -6641,7 +6658,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
           ! Based on DOE-2.1E subroutine DLTSYS.
 
           ! USE STATEMENTS:
-          ! na
+  USE ScheduleManager, ONLY : GetCurrentScheduleValue
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -6671,77 +6688,91 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
   REAL(r64) :: XRAN                         ! Random number between 0 and 1
   INTEGER   :: MapNum                       ! Illuminance map number
   INTEGER   :: ILM
+  LOGICAL   :: ScheduledAvailable
 
           ! FLOW:
 
-  TotReduction = 0.
+  TotReduction = 0.d0
+  ScheduledAvailable = .TRUE.
 
-  ! Limit the number of control reference points to 2
-  NREFPT = ZoneDaylight(ZoneNum)%TotalDaylRefPoints
-  IF (NREFPT > 2) NREFPT = 2
-
-  ! Total fraction of zone that is daylit
-  ZFTOT  = ZoneDaylight(ZoneNum)%FracZoneDaylit(1)
-  IF (NREFPT > 1) ZFTOT = ZFTOT + ZoneDaylight(ZoneNum)%FracZoneDaylit(2)
-
-  ! Loop over reference points
-  DO IL = 1,NREFPT
-    DaylIllum(IL)  = ZoneDaylight(ZoneNum)%DaylIllumAtRefPt(IL)
-    IF (DaylIllum(IL) >= ZoneDaylight(ZoneNum)%IllumSetPoint(IL)) THEN
-      FL = 0.
+  ! check if scheduled to be available
+  IF (ZoneDaylight(ZoneNum)%AvailSchedNum > 0) THEN
+    IF (GetCurrentScheduleValue(ZoneDaylight(ZoneNum)%AvailSchedNum) > 0.d0) THEN
+      ScheduledAvailable = .TRUE.
     ELSE
-      FL = (ZoneDaylight(ZoneNum)%IllumSetPoint(IL) - DaylIllum(IL)) / ZoneDaylight(ZoneNum)%IllumSetPoint(IL)
-    END IF
+      ScheduledAvailable = .FALSE.
+    ENDIF
+  ENDIF
 
-    ! BRANCH ON LIGHTING SYSTEM TYPE
-    LSYSTP = ZoneDaylight(ZoneNum)%LightControlType
-    IF (LSYSTP /= 2) THEN
-      ! Continuously dimmable system with linear power curve
-      !
-      ! Fractional output power required to meet setpoint
-      FP = 1.0
-      ! LIGHT-CTRL-TYPE = CONTINUOUS (LSYSTP = 1)
-      IF (FL <= ZoneDaylight(ZoneNum)%MinLightFraction) FP = ZoneDaylight(ZoneNum)%MinPowerFraction
-      ! LIGHT-CTRL-TYPE = CONTINUOUS/OFF (LSYSTP = 3)
-      IF (FL <= ZoneDaylight(ZoneNum)%MinLightFraction .AND. LSYSTP == 3) FP = 0.0
-      IF (FL > ZoneDaylight(ZoneNum)%MinLightFraction .AND. FL < 1.0) &
-        FP = (FL + (1.d0 - FL) * ZoneDaylight(ZoneNum)%MinPowerFraction - ZoneDaylight(ZoneNum)%MinLightFraction) / &
-             (1.d0 - ZoneDaylight(ZoneNum)%MinLightFraction)
+  IF (ScheduledAvailable) THEN
+    ! Limit the number of control reference points to 2
+    NREFPT = ZoneDaylight(ZoneNum)%TotalDaylRefPoints
+    IF (NREFPT > 2) NREFPT = 2
 
-    ELSE ! LSYSTP = 2
-      ! Stepped system
-      FP = 0.
-      IF (DaylIllum(IL) > 0.0 .AND. DaylIllum(IL) < ZoneDaylight(ZoneNum)%IllumSetPoint(IL)) &
-        FP = REAL(INT(ZoneDaylight(ZoneNum)%LightControlSteps*FL) + 1,r64) / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64)
+    ! Total fraction of zone that is daylit
+    ZFTOT  = ZoneDaylight(ZoneNum)%FracZoneDaylit(1)
+    IF (NREFPT > 1) ZFTOT = ZFTOT + ZoneDaylight(ZoneNum)%FracZoneDaylit(2)
 
-      IF (DaylIllum(IL) == 0.) FP = 1.0
+    ! Loop over reference points
+    DO IL = 1,NREFPT
+      DaylIllum(IL)  = ZoneDaylight(ZoneNum)%DaylIllumAtRefPt(IL)
+      IF (DaylIllum(IL) >= ZoneDaylight(ZoneNum)%IllumSetPoint(IL)) THEN
+        FL = 0.
+      ELSE
+        FL = (ZoneDaylight(ZoneNum)%IllumSetPoint(IL) - DaylIllum(IL)) / ZoneDaylight(ZoneNum)%IllumSetPoint(IL)
+      END IF
 
-      IF (ZoneDaylight(ZoneNum)%LightControlProbability < 1.0) THEN
-        ! Manual operation.  Occupant sets lights one level too high a fraction of the time equal to
-        ! 1. - ZoneDaylight(ZoneNum)%LightControlProbability.  RANDOM_NUMBER returns a random number
-        ! between 0 and 1.
-        CALL RANDOM_NUMBER(XRAN)
-        IF (XRAN >= ZoneDaylight(ZoneNum)%LightControlProbability) THEN
-          ! Set level one higher
-          IF (FP < 1.0d0) FP = FP + (1.0d0 / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64))
-        END IF ! XRAN
-      END IF ! Light Control Probability < 1
-    END IF ! Lighting System Type
+      ! BRANCH ON LIGHTING SYSTEM TYPE
+      LSYSTP = ZoneDaylight(ZoneNum)%LightControlType
+      IF (LSYSTP /= 2) THEN
+        ! Continuously dimmable system with linear power curve
+        !
+        ! Fractional output power required to meet setpoint
+        FP = 1.0
+        ! LIGHT-CTRL-TYPE = CONTINUOUS (LSYSTP = 1)
+        IF (FL <= ZoneDaylight(ZoneNum)%MinLightFraction) FP = ZoneDaylight(ZoneNum)%MinPowerFraction
+        ! LIGHT-CTRL-TYPE = CONTINUOUS/OFF (LSYSTP = 3)
+        IF (FL <= ZoneDaylight(ZoneNum)%MinLightFraction .AND. LSYSTP == 3) FP = 0.0
+        IF (FL > ZoneDaylight(ZoneNum)%MinLightFraction .AND. FL < 1.0) &
+          FP = (FL + (1.d0 - FL) * ZoneDaylight(ZoneNum)%MinPowerFraction - ZoneDaylight(ZoneNum)%MinLightFraction) / &
+               (1.d0 - ZoneDaylight(ZoneNum)%MinLightFraction)
 
-    ZoneDaylight(ZoneNum)%RefPtPowerReductionFactor(IL) = FP
+      ELSE ! LSYSTP = 2
+        ! Stepped system
+        FP = 0.
+        IF (DaylIllum(IL) > 0.0 .AND. DaylIllum(IL) < ZoneDaylight(ZoneNum)%IllumSetPoint(IL)) &
+          FP = REAL(INT(ZoneDaylight(ZoneNum)%LightControlSteps*FL) + 1,r64) / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64)
 
-    ! Accumulate net ltg power reduction factor for entire zone
-    ZFRAC = ZoneDaylight(ZoneNum)%FracZoneDaylit(IL)
-    TotReduction = TotReduction + ZoneDaylight(ZoneNum)%RefPtPowerReductionFactor(IL) * ZFRAC
+        IF (DaylIllum(IL) == 0.) FP = 1.0
 
-  END DO ! End of loop over reference points, IL
+        IF (ZoneDaylight(ZoneNum)%LightControlProbability < 1.0) THEN
+          ! Manual operation.  Occupant sets lights one level too high a fraction of the time equal to
+          ! 1. - ZoneDaylight(ZoneNum)%LightControlProbability.  RANDOM_NUMBER returns a random number
+          ! between 0 and 1.
+          CALL RANDOM_NUMBER(XRAN)
+          IF (XRAN >= ZoneDaylight(ZoneNum)%LightControlProbability) THEN
+            ! Set level one higher
+            IF (FP < 1.0d0) FP = FP + (1.0d0 / REAL(ZoneDaylight(ZoneNum)%LightControlSteps,r64))
+          END IF ! XRAN
+        END IF ! Light Control Probability < 1
+      END IF ! Lighting System Type
 
-  ! Correct for fraction of zone (1-ZFTOT) not controlled by
-  ! the reference points.  For this fraction (which is usually zero),
-  ! the electric lighting is unaffected and the power reduction
-  ! factor is therefore 1.0.
-  TotReduction = TotReduction + (1.0 - ZFTOT)
+      ZoneDaylight(ZoneNum)%RefPtPowerReductionFactor(IL) = FP
 
+      ! Accumulate net ltg power reduction factor for entire zone
+      ZFRAC = ZoneDaylight(ZoneNum)%FracZoneDaylit(IL)
+      TotReduction = TotReduction + ZoneDaylight(ZoneNum)%RefPtPowerReductionFactor(IL) * ZFRAC
+
+    END DO ! End of loop over reference points, IL
+
+    ! Correct for fraction of zone (1-ZFTOT) not controlled by
+    ! the reference points.  For this fraction (which is usually zero),
+    ! the electric lighting is unaffected and the power reduction
+    ! factor is therefore 1.0.
+    TotReduction = TotReduction + (1.0 - ZFTOT)
+  ELSE ! controls not currently available
+    TotReduction = 1.d0
+  ENDIF
   ZoneDaylight(ZoneNum)%ZonePowerReductionFactor = TotReduction
 
   IF(TotIllumMaps > 0 .and. .not. DoingSizing .and. .not. WarmupFlag) THEN

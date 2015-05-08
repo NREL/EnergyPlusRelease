@@ -685,6 +685,23 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
 
   IF (BeginEnvrnFlag .AND. PVT(PVTnum)%EnvrnInit ) THEN
 
+    PVT(PVTnum)%MassFlowRate                 = 0.d0
+    PVT(PVTnum)%BypassDamperOff              = .TRUE.
+    PVT(PVTnum)%CoolingUseful                = .FALSE.
+    PVT(PVTnum)%HeatingUseful                = .FALSE.
+    PVT(PVTnum)%Simple%LastCollectorTemp     = 0.d0
+    PVT(PVTnum)%Simple%CollectorTemp         = 0.d0
+    PVT(PVTnum)%Report%ThermEfficiency       = 0.d0
+    PVT(PVTnum)%Report%ThermPower            = 0.d0
+    PVT(PVTnum)%Report%ThermHeatGain         = 0.d0
+    PVT(PVTnum)%Report%ThermHeatLoss         = 0.d0
+    PVT(PVTnum)%Report%ThermEnergy           = 0.d0
+    PVT(PVTnum)%Report%MdotWorkFluid         = 0.d0
+    PVT(PVTnum)%Report%TinletWorkFluid       = 0.d0
+    PVT(PVTnum)%Report%ToutletWorkFluid      = 0.d0
+    PVT(PVTnum)%Report%BypassStatus          = 0.d0
+    
+    
     SELECT CASE (PVT(PVTnum)% WorkingFluidType)
 
     CASE (LiquidWorkingFluid)
@@ -733,7 +750,7 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
                                PVT(PVTnum)%WLoopNum,PVT(PVTnum)%WLoopSideNum , &
                                PVT(PVTnum)%WLoopBranchNum , PVT(PVTnum)%WLoopCompNum)      !DSU
   CASE (AirWorkingFluid)
-    ! nothing to be done
+    PVT(PVTnum)%MassFlowRate = Node(InletNode)%MassFlowRate
 
   END SELECT
 
@@ -1197,7 +1214,18 @@ SUBROUTINE CalcPVTcollectors(PVTnum)
       PVT(PVTnum)%Report%ThermEfficiency  = 0.0D0
       PVT(PVTnum)%Report%ThermEnergy      = 0.0D0
       PVT(PVTnum)%Report%BypassStatus     = 1.0D0
+      PVT(PVTnum)%Report%MdotWorkFluid    = mdot
 
+    ELSE 
+      PVT(PVTnum)%Report%TinletWorkFluid  = Tinlet
+      PVT(PVTnum)%Report%ToutletWorkFluid = Tinlet
+      PVT(PVTnum)%Report%ThermHeatLoss    = 0.0D0
+      PVT(PVTnum)%Report%ThermHeatGain    = 0.0D0
+      PVT(PVTnum)%Report%ThermPower       = 0.0D0
+      PVT(PVTnum)%Report%ThermEfficiency  = 0.0D0
+      PVT(PVTnum)%Report%ThermEnergy      = 0.0D0
+      PVT(PVTnum)%Report%BypassStatus     = 1.0D0
+      PVT(PVTnum)%Report%MdotWorkFluid    = mdot
     ENDIF
   ENDIF
 
@@ -1223,8 +1251,9 @@ SUBROUTINE UpdatePVTcollectors(PVTnum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataLoopNode, ONLY: Node
+  USE DataLoopNode,   ONLY: Node
   USE Psychrometrics, ONLY: PsyHFnTdbW
+  USE PlantUtilities, ONLY: SafeCopyPlantNode
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1249,11 +1278,7 @@ SUBROUTINE UpdatePVTcollectors(PVTnum)
     InletNode  = PVT(PVTnum)%PlantInletNodeNum
     OutletNode = PVT(PVTnum)%PlantOutletNodeNum
 
-    ! Pass all variables from inlet to outlet node
-    !Node(OutletNode) = Node(InletNode) !DSU Don't do this...flow rates have already been updated properly
-
-     ! Set outlet node variables that are possibly changed
-     ! DSU, Shirey, 2/26/2010... shouldn't other outlet node properties be set? (not mass flow stuff, but others?)
+    CALL SafeCopyPlantNode(InletNode, OutletNode)
     Node(OutletNode)%Temp = PVT(PVTnum)%Report%ToutletWorkFluid
 
   CASE (AirWorkingFluid)
@@ -1263,6 +1288,7 @@ SUBROUTINE UpdatePVTcollectors(PVTnum)
     ! Set the outlet nodes for properties that just pass through & not used
     Node(OutletNode)%Quality              = Node(InletNode)%Quality
     Node(OutletNode)%Press                = Node(InletNode)%Press
+    Node(OutletNode)%MassFlowRate         = Node(InletNode)%MassFlowRate
     Node(OutletNode)%MassFlowRateMin      = Node(InletNode)%MassFlowRateMin
     Node(OutletNode)%MassFlowRateMax      = Node(InletNode)%MassFlowRateMax
     Node(OutletNode)%MassFlowRateMinAvail = Node(InletNode)%MassFlowRateMinAvail

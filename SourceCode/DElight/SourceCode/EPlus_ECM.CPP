@@ -57,9 +57,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -71,8 +71,8 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "EPlus_ECM.h"
+#include "DOE2DL.H"
+#include "EPlus_ECM.H"
 
 /******************************** subroutine CalcInterpolationVars *******************************/
 // Called from EPlus_DElight.cpp

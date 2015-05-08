@@ -12,6 +12,7 @@ Module Furnaces
   !                      zone from the furnace object input field. Now, the flow fraction is calculated internally
   !                      B. Nigusse, FSEC, Jan 2012 - added steam and hot water heating coils as an option
   !                      Bo Shen, ORNL, March 2012 - added variable-speed water source heat pump cooling and heating coils, using curve-fits
+  !                      Bo Shen, ORNL, July 2012 - added variable-speed air source heat pump cooling and heating coils, using curve-fits
   !
   !       RE-ENGINEERED  na
 
@@ -105,7 +106,7 @@ USE Psychrometrics, ONLY:PsyHfgAirFnWTdb, PsyCpAirFnWTdb, PsyHFnTdbW, PsyTdbFnHW
 USE ScheduleManager
 USE Fans,    ONLY: SimulateFanComponents
 USE DXCoils, ONLY: SimDXCoil
-USE WatertoAirMulSpeeddHP, ONLY:MaxSpedLevels
+USE VariableSpeedCoils, ONLY:MaxSpedLevels
 
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
@@ -359,14 +360,14 @@ Private HeatPumpRunFrac
 Private CalcNonDXHeatingCoils
 Private HotWaterCoilResidual
 
-        ! modules for variable speed water-to-air heat pump
-Private SimMSWSHP
-Private SetOnOffMassFlowRateMulSpeed
-Private CalcMSWSHeatPump
-Private SetVSWSHPAirFlow
-Private MSWSHPVarSpeedResidual
-Private MSWSHPCyclingResidual
-Private ControlMSWSHPOutput
+        ! modules for variable speed heat pump
+Private SimVariableSpeedHP
+Private SetOnOffMassFlowRateVSCoil
+Private CalcVarSpeedHeatPump
+Private SetVSHPAirFlow
+Private VSHPSpeedResidual
+Private VSHPCyclingResidual
+Private ControlVSHPOutput
 
           ! Reporting routines for module
 Private ReportFurnace
@@ -534,7 +535,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
     MoistureLoad = ZoneSysMoistureDemand(Furnace(FurnaceNum)%ControlZoneNum)% &
                      SequencedOutputRequiredToDehumidSP(Furnace(FurnaceNum)%ZoneSequenceCoolingNum)
   ELSE
-    ZoneLoad= ZoneSysEnergyDemand(Furnace(FurnaceNum)%ControlZoneNum)%TotalOutputRequired
+    ZoneLoad= ZoneSysEnergyDemand(Furnace(FurnaceNum)%ControlZoneNum)%RemainingOutputRequired
     MoistureLoad = ZoneSysMoistureDemand(Furnace(FurnaceNum)%ControlZoneNum)%OutputRequiredToDehumidifyingSP
   ENDIF
 
@@ -577,6 +578,12 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
 
   ! Simulate HeatCool sytems:
   CASE(Furnace_HeatCool, UnitarySys_HeatCool)
+
+   IF(Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+       ! variable speed cooling coil
+       HeatCoilLoad=0.0
+       Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
+   ELSE
      ! calculate the system flow rate
      IF ( .NOT. FirstHVACIteration .AND. Furnace(FurnaceNum)%OpMode == CycFanCycCoil .AND. CoolingLoad &
           .AND. AirLoopControlInfo(AirLoopNum)%EconoActive) THEN
@@ -637,12 +644,15 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
         SuppHeatingCoilFlag = .TRUE.       ! if truee simulates supplemental heating coil
         CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,ReheatCoilLoad,FanOpMode,QActual)
      END IF
-
+   END IF
 
   ! Simulate air-to-air heat pumps:
   CASE(UnitarySys_HeatPump_AirToAir)
-
-
+   IF(Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+       ! variable speed heat pump
+       HeatCoilLoad=0.0
+       Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
+   ELSE
      ! Update the furnace flow rates
      IF ( .NOT. FirstHVACIteration .AND. Furnace(FurnaceNum)%OpMode == CycFanCycCoil .AND. CoolingLoad &
           .AND. AirLoopControlInfo(AirLoopNum)%EconoActive) THEN
@@ -693,7 +703,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
         CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,FanOpMode,QActual)
      ENDIF
 
-
+   END IF
   ! Simulate water-to-air systems:
   CASE(UnitarySys_HeatPump_WaterToAir)
 
@@ -756,7 +766,7 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
      ELSE IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
        ! simulate the heat pump
        HeatCoilLoad=0.0
-       Call SimMSWSHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
+       Call SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, ZoneLoad,MoistureLoad, OnOffAirFlowRatio)
 
      ELSE IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedLooUpTable) THEN
 
@@ -811,6 +821,7 @@ SUBROUTINE GetFurnaceInput
           !                      Bereket Nigusse, April 2010 - deprecated supply air flow fraction through
           !                      controlled zone from the input field.
           !                      Bo Shen, March 2012, add inputs for VS WSHP,
+          !                      Bo Shen, ORNL, July 2012 - added variable-speed air source heat pump cooling and heating coils, using curve-fits
           !       RE-ENGINEERED  na
 
 
@@ -840,12 +851,13 @@ SUBROUTINE GetFurnaceInput
                                           GetWtoAHPSimpleCoilOutletNode=>GetCoilOutletNode, &
                                           GetWtoAHPSimpleCoilIndex=>GetCoilIndex, &
                                           SetSimpleWSHPData, GetWtoAHPSimpleCoilAirFlow=>GetCoilAirFlowRate
-    USE WatertoAirMulSpeeddHP,      ONLY: GetCoilCapacityMulSpeedWSHP, &
-                                          GetCoilInletNodeMulSpeedWSHP, &
-                                          GetCoilOutletNodeMulSpeedWSHP, &
-                                          GetCoilIndexMulSpeedWSHP, &
-                                          GetCoilAirFlowRateMulSpeedWSHP,&
-                                          SetMulSpeedWSHPData
+    USE VariableSpeedCoils,      ONLY: GetCoilCapacityVariableSpeed, &
+                                          GetCoilInletNodeVariableSpeed, &
+                                          GetCoilOutletNodeVariableSpeed, &
+                                          GetCoilIndexVariableSpeed, &
+                                          GetCoilAirFlowRateVariableSpeed,&
+                                          SetVarSpeedCoilData, GetVSCoilCondenserInletNode, &
+                                          GetVSCoilMinOATCompressor
     USE WaterToAirHeatPump,         ONLY: GetWtoAHPCoilCapacity=>GetCoilCapacity, &
                                           GetWtoAHPCoilInletNode=>GetCoilInletNode, &
                                           GetWtoAHPCoilOutletNode=>GetCoilOutletNode,GetWtoAHPCoilIndex=>GetCoilIndex
@@ -1983,8 +1995,14 @@ SUBROUTINE GetFurnaceInput
 !       Find the type of coil. Do not print message since this may not be the correct coil type.
         ErrFlag = .FALSE.
         PrintMessage = .FALSE.
-        Furnace(FurnaceNum)%CoolingCoilType_Num = &
+
+        IF (SameString(CoolingCoilType, 'COIL:COOLING:DX:VARIABLESPEED') )THEN
+          Furnace(FurnaceNum)%CoolingCoilType_Num = Coil_CoolingAirToAirVariableSpeed
+        ELSE
+          Furnace(FurnaceNum)%CoolingCoilType_Num = &
                  GetDXCoilTypeNum(CoolingCoilType,CoolingCoilName,ErrFlag,PrintMessage)
+        END IF
+
 
         ! If coil type not found, check to see if a HX assisted cooling coil is used.
         IF(Furnace(FurnaceNum)%CoolingCoilType_Num .EQ. 0)THEN
@@ -2029,8 +2047,12 @@ SUBROUTINE GetFurnaceInput
 
             ! Get outdoor condenser node from DX coil object
             ErrFlag=.FALSE.
-            Furnace(FurnaceNum)%CondenserNodeNum = &
-                GetDXCoilCondenserInletNode(CoolingCoilType,CoolingCoilName,ErrFlag)
+            IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+                Furnace(FurnaceNum)%CondenserNodeNum = GetVSCoilCondenserInletNode(CoolingCoilName,ErrFlag)
+            ELSE
+                Furnace(FurnaceNum)%CondenserNodeNum = &
+                    GetDXCoilCondenserInletNode(CoolingCoilType,CoolingCoilName,ErrFlag)
+            END IF
             IF (ErrFlag) THEN
               CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
               ErrorsFound=.TRUE.
@@ -2080,9 +2102,14 @@ SUBROUTINE GetFurnaceInput
 
             ! Get outdoor condenser node from heat exchanger assisted DX coil object
             ErrFlag=.FALSE.
+           IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+                Furnace(FurnaceNum)%CondenserNodeNum = GetVSCoilCondenserInletNode(CoolingCoilName,ErrFlag)
+           ELSE
             Furnace(FurnaceNum)%CondenserNodeNum = &
                 GetDXCoilCondenserInletNode('COIL:COOLING:DX:SINGLESPEED', &
                 GetHXDXCoilName(CoolingCoilType,CoolingCoilName,ErrFlag), ErrFlag)
+           END IF
+
             IF (ErrFlag) THEN
               CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
               ErrorsFound=.TRUE.
@@ -2098,7 +2125,32 @@ SUBROUTINE GetFurnaceInput
             END IF
 
           ENDIF ! IF (IsNotOK) THEN
+        ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed )THEN
+        ! BOS ADDED, AUG/2012, VARIIABLE SPEED DX COOLING COIL
+        !  Furnace(FurnaceNum)%DXCoolCoilType = 'COIL:COOLING:DX:VARIABLESPEED'
+        !  Furnace(FurnaceNum)%DXCoolCoilName = CoolingCoilName
+          CALL ValidateComponent(CoolingCoilType,CoolingCoilName,IsNotOK,  &
+                                 TRIM(CurrentModuleObject))
+          IF (IsNotOK) THEN
+            CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+            ErrorsFound=.TRUE.
+          ELSE
+            ErrFlag = .FALSE.
+            Furnace(FurnaceNum)%CoolingCoilIndex = GetCoilIndexVariableSpeed(CoolingCoilType, &
+                        CoolingCoilName,ErrFlag)
+            IF(ErrFlag)THEN
+              CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+              ErrorsFound=.TRUE.
+            END IF
+            CoolingCoilInletNode =GetCoilInletNodeVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+            CoolingCoilOutletNode =GetCoilOutletNodeVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+            Furnace(FurnaceNum)%CondenserNodeNum = GetVSCoilCondenserInletNode(CoolingCoilName,ErrFlag)
 
+            IF (ErrFlag) THEN
+              CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+              ErrorsFound=.TRUE.
+            ENDIF
+          ENDIF
         ELSE
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(12))//' = '//TRIM(Alphas(12)))
@@ -2640,6 +2692,26 @@ SUBROUTINE GetFurnaceInput
           Furnace(FurnaceNum)%DesignFanVolFlowRate = Autosize
         END IF
 
+        IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+             ErrFlag=.FALSE.
+             Furnace(FurnaceNum)%MaxCoolAirVolFlow       &
+                = GetCoilAirFlowRateVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+             IF (ErrFlag) THEN
+                CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+                ErrorsFound=.TRUE.
+             ENDIF
+
+            Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = &
+                 MIN(Furnace(FurnaceNum)%MaxHeatAirVolFlow,Furnace(FurnaceNum)%MaxCoolAirVolFlow)
+            IF(Furnace(FurnaceNum)%MaxHeatAirVolFlow /= Autosize .AND. &
+               Furnace(FurnaceNum)%MaxCoolAirVolFlow /= Autosize)THEN
+              Furnace(FurnaceNum)%DesignFanVolFlowRate = &
+                 MAX(Furnace(FurnaceNum)%MaxHeatAirVolFlow,Furnace(FurnaceNum)%MaxCoolAirVolFlow)
+            ELSE
+              Furnace(FurnaceNum)%DesignFanVolFlowRate = Autosize
+            END IF
+        END IF
+
         IF(FanVolFlowRate .NE. AutoSize)THEN
           IF(FanVolFlowRate .LT. Furnace(FurnaceNum)%MaxCoolAirVolFlow .AND. &
                Furnace(FurnaceNum)%MaxCoolAirVolFlow .NE. AutoSize)THEN
@@ -2680,6 +2752,16 @@ SUBROUTINE GetFurnaceInput
             END IF
           END IF
         END IF
+
+        IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+          ErrFlag=.FALSE.
+          Furnace(FurnaceNum)%DesignCoolingCapacity =   &
+             GetCoilCapacityVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+          IF (ErrFlag) THEN
+            CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            ErrorsFound=.TRUE.
+          ENDIF
+        ENDIF
 
         !Set heating convergence tolerance
         Furnace(FurnaceNum)%HeatingConvergenceTolerance = 0.001
@@ -2887,7 +2969,13 @@ SUBROUTINE GetFurnaceInput
         HeatingCoilName = Alphas(9)
 
         ErrFlag = .FALSE.
-        Furnace(FurnaceNum)%HeatingCoilType_Num = GetDXCoilTypeNum(HeatingCoilType,HeatingCoilName,ErrFlag)
+
+        IF (SameString(HeatingCoilType, 'COIL:HEATING:DX:VARIABLESPEED') )THEN
+           Furnace(FurnaceNum)%HeatingCoilType_Num = Coil_HeatingAirToAirVariableSpeed
+        ELSE
+           Furnace(FurnaceNum)%HeatingCoilType_Num = GetDXCoilTypeNum(HeatingCoilType,HeatingCoilName,ErrFlag)
+        END IF
+
         IF (ErrFlag) THEN
           CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           ErrorsFound=.TRUE.
@@ -2926,7 +3014,17 @@ SUBROUTINE GetFurnaceInput
             ENDIF
 
           ENDIF ! IF (IsNotOK) THEN
-
+        ELSE IF(Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+          CALL ValidateComponent(HeatingCoilType,HeatingCoilName,IsNotOK,  &
+                                 TRIM(CurrentModuleObject))
+          IF (IsNotOK) THEN
+            CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            ErrorsFound=.TRUE.
+          ELSE
+            Furnace(FurnaceNum)%HeatingCoilIndex = GetCoilIndexVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
+            HeatingCoilInletNode=GetCoilInletNodeVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
+            HeatingCoilOutletNode=GetCoilOutletNodeVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
+          ENDIF
         ELSE
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(8))//' = '//TRIM(Alphas(8)))
@@ -2938,8 +3036,13 @@ SUBROUTINE GetFurnaceInput
         CoolingCoilType = Alphas(10)
         CoolingCoilName = Alphas(11)
 
+        IF (SameString(CoolingCoilType, 'COIL:COOLING:DX:VARIABLESPEED') )THEN
+          Furnace(FurnaceNum)%CoolingCoilType_Num = Coil_CoolingAirToAirVariableSpeed
+        END IF
+
         CALL ValidateComponent(CoolingCoilType,CoolingCoilName,IsNotOK,  &
                                TRIM(CurrentModuleObject))
+
         IF (IsNotOK) THEN
           CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           ErrorsFound=.TRUE.
@@ -2948,8 +3051,11 @@ SUBROUTINE GetFurnaceInput
 
           ErrFlag = .FALSE.
           PrintMessage = .FALSE.
-          Furnace(FurnaceNum)%CoolingCoilType_Num = &
-                 GetDXCoilTypeNum(CoolingCoilType,CoolingCoilName,ErrFlag,PrintMessage)
+
+          IF(Furnace(FurnaceNum)%CoolingCoilType_Num /= Coil_CoolingAirToAirVariableSpeed) THEN
+              Furnace(FurnaceNum)%CoolingCoilType_Num = &
+                     GetDXCoilTypeNum(CoolingCoilType,CoolingCoilName,ErrFlag,PrintMessage)
+          END IF
 
           ! If coil type not found, check to see if a HX assisted cooling coil is used.
           IF(Furnace(FurnaceNum)%CoolingCoilType_Num .EQ. 0)THEN
@@ -3003,6 +3109,32 @@ SUBROUTINE GetFurnaceInput
             DXCoilIndex = GetActualDXCoilIndex(CoolingCoilType,CoolingCoilName,ErrorsFound)
             Furnace(FurnaceNum)%ActualDXCoilIndexforHXAssisted = DXCoilIndex
 
+          ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed )THEN
+            ! BOS ADDED, AUG/2012, VARIIABLE SPEED DX COOLING COIL
+            !  Furnace(FurnaceNum)%DXCoolCoilType = 'COIL:COOLING:DX:VARIABLESPEED'
+            !  Furnace(FurnaceNum)%DXCoolCoilName = CoolingCoilName
+              CALL ValidateComponent(CoolingCoilType,CoolingCoilName,IsNotOK,  &
+                                     TRIM(CurrentModuleObject))
+              IF (IsNotOK) THEN
+                CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+                ErrorsFound=.TRUE.
+              ELSE
+                ErrFlag = .FALSE.
+                Furnace(FurnaceNum)%CoolingCoilIndex = GetCoilIndexVariableSpeed(CoolingCoilType, &
+                            CoolingCoilName,ErrFlag)
+                IF(ErrFlag)THEN
+                  CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'".')
+                  ErrorsFound=.TRUE.
+                END IF
+                CoolingCoilInletNode =GetCoilInletNodeVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+                CoolingCoilOutletNode =GetCoilOutletNodeVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+                Furnace(FurnaceNum)%CondenserNodeNum = GetVSCoilCondenserInletNode(CoolingCoilName,ErrFlag)
+
+                IF (ErrFlag) THEN
+                  CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+                  ErrorsFound=.TRUE.
+                ENDIF
+              ENDIF
           ELSE
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(10))//' = '//TRIM(Alphas(10)))
@@ -3011,6 +3143,12 @@ SUBROUTINE GetFurnaceInput
 
         ENDIF
 
+        IF(Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed .AND. &
+                Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+          !Furnace(FurnaceNum)%WatertoAirHPType = WatertoAir_VarSpeedEquationFit
+          CALL SetVarSpeedCoilData(Furnace(FurnaceNum)%CoolingCoilIndex,ErrorsFound, &
+                                CompanionHeatingCoilNum=Furnace(FurnaceNum)%HeatingCoilIndex)
+        END IF
 
         ! Get supplemental heating coil information
         SuppHeatCoilType = Alphas(12)
@@ -3409,6 +3547,28 @@ SUBROUTINE GetFurnaceInput
           Furnace(FurnaceNum)%DesignFanVolFlowRate = Autosize
         END IF
 
+        IF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+             ErrFlag=.FALSE.
+             Furnace(FurnaceNum)%MaxHeatAirVolFlow       &
+                = GetCoilAirFlowRateVariableSpeed(HeatingCoilType,HeatingCoilName,ErrFlag)
+             Furnace(FurnaceNum)%MaxCoolAirVolFlow       &
+                = GetCoilAirFlowRateVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+             IF (ErrFlag) THEN
+                CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+                ErrorsFound=.TRUE.
+             ENDIF
+
+            Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = &
+                 MIN(Furnace(FurnaceNum)%MaxHeatAirVolFlow,Furnace(FurnaceNum)%MaxCoolAirVolFlow)
+            IF(Furnace(FurnaceNum)%MaxHeatAirVolFlow /= Autosize .AND. &
+               Furnace(FurnaceNum)%MaxCoolAirVolFlow /= Autosize)THEN
+              Furnace(FurnaceNum)%DesignFanVolFlowRate = &
+                 MAX(Furnace(FurnaceNum)%MaxHeatAirVolFlow,Furnace(FurnaceNum)%MaxCoolAirVolFlow)
+            ELSE
+              Furnace(FurnaceNum)%DesignFanVolFlowRate = Autosize
+            END IF
+        END IF
+
         IF(FanVolFlowRate .NE. AutoSize)THEN
           IF(FanVolFlowRate .LT. Furnace(FurnaceNum)%MaxCoolAirVolFlow .AND. &
                Furnace(FurnaceNum)%MaxCoolAirVolFlow .NE. AutoSize)THEN
@@ -3443,8 +3603,12 @@ SUBROUTINE GetFurnaceInput
         !Set minimum OAT for heat pump compressor operation
         ! get from coil module
         ErrFlag=.FALSE.
-        Furnace(FurnaceNum)%MinOATCompressor =    &
-           GetMinOATDXCoilCompressor(HeatingCoilType,HeatingCoilName,ErrFlag)
+        IF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+            Furnace(FurnaceNum)%MinOATCompressor = GetVSCoilMinOATCompressor(HeatingCoilName,ErrFlag)
+        ELSE
+            Furnace(FurnaceNum)%MinOATCompressor =    &
+               GetMinOATDXCoilCompressor(HeatingCoilType,HeatingCoilName,ErrFlag)
+        END IF
         IF (ErrFlag) THEN
           CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           ErrorsFound=.TRUE.
@@ -3456,6 +3620,8 @@ SUBROUTINE GetFurnaceInput
         IF (Furnace(FurnaceNum)%CoolingCoilType_Num == CoilDX_CoolingSingleSpeed) THEN
           Furnace(FurnaceNum)%CondenserNodeNum = &
             GetDXCoilCondenserInletNode(CoolingCoilType,CoolingCoilName,ErrFlag)
+        ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+          Furnace(FurnaceNum)%CondenserNodeNum = GetVSCoilCondenserInletNode(CoolingCoilName,ErrFlag)
         ELSE
           Furnace(FurnaceNum)%CondenserNodeNum = &
             GetDXCoilCondenserInletNode('Coil:Cooling:DX:SingleSpeed', &
@@ -3465,6 +3631,27 @@ SUBROUTINE GetFurnaceInput
         IF (ErrFlag) THEN
           CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
           ErrorsFound=.TRUE.
+        ENDIF
+
+
+        IF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+          ErrFlag=.FALSE.
+          Furnace(FurnaceNum)%DesignHeatingCapacity =   &
+             GetCoilCapacityVariableSpeed(HeatingCoilType,HeatingCoilName,ErrFlag)
+          IF (ErrFlag) THEN
+            CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            ErrorsFound=.TRUE.
+          ENDIF
+        ENDIF
+
+        IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed) THEN
+          ErrFlag=.FALSE.
+          Furnace(FurnaceNum)%DesignCoolingCapacity =   &
+             GetCoilCapacityVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
+          IF (ErrFlag) THEN
+            CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
 
         !Set cooling convergence tolerance
@@ -3688,9 +3875,9 @@ SUBROUTINE GetFurnaceInput
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
           ELSE
-            Furnace(FurnaceNum)%HeatingCoilIndex = GetCoilIndexMulSpeedWSHP(HeatingCoilType, HeatingCoilName,ErrFlag)
-            HeatingCoilInletNode=GetCoilInletNodeMulSpeedWSHP(HeatingCoilType, HeatingCoilName,ErrFlag)
-            HeatingCoilOutletNode=GetCoilOutletNodeMulSpeedWSHP(HeatingCoilType, HeatingCoilName,ErrFlag)
+            Furnace(FurnaceNum)%HeatingCoilIndex = GetCoilIndexVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
+            HeatingCoilInletNode=GetCoilInletNodeVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
+            HeatingCoilOutletNode=GetCoilOutletNodeVariableSpeed(HeatingCoilType, HeatingCoilName,ErrFlag)
           ENDIF
         ELSE
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
@@ -3742,10 +3929,10 @@ SUBROUTINE GetFurnaceInput
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
           ELSE
-            Furnace(FurnaceNum)%CoolingCoilIndex = GetCoilIndexMulSpeedWSHP(CoolingCoilType, CoolingCoilName,ErrFlag)
-            CoolingCoilInletNode=GetCoilInletNodeMulSpeedWSHP(CoolingCoilType,  &
+            Furnace(FurnaceNum)%CoolingCoilIndex = GetCoilIndexVariableSpeed(CoolingCoilType, CoolingCoilName,ErrFlag)
+            CoolingCoilInletNode=GetCoilInletNodeVariableSpeed(CoolingCoilType,  &
                                                                 CoolingCoilName,ErrFlag)
-            CoolingCoilOutletNode=GetCoilOutletNodeMulSpeedWSHP(CoolingCoilType,  &
+            CoolingCoilOutletNode=GetCoilOutletNodeVariableSpeed(CoolingCoilType,  &
                                                                 CoolingCoilName,ErrFlag)
           ENDIF
         ELSE
@@ -3765,7 +3952,7 @@ SUBROUTINE GetFurnaceInput
         ELSE IF(Alphas(8) == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .AND. &
                 Alphas(10) == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT') THEN
           Furnace(FurnaceNum)%WatertoAirHPType = WatertoAir_VarSpeedEquationFit
-          CALL SetMulSpeedWSHPData(Furnace(FurnaceNum)%CoolingCoilIndex,ErrorsFound, &
+          CALL SetVarSpeedCoilData(Furnace(FurnaceNum)%CoolingCoilIndex,ErrorsFound, &
                                 CompanionHeatingCoilNum=Furnace(FurnaceNum)%HeatingCoilIndex)
         ELSE
           CALL ShowContinueError('For '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
@@ -4158,8 +4345,8 @@ SUBROUTINE GetFurnaceInput
           ENDIF
         ELSEIF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit) THEN
           ErrFlag=.FALSE.
-          Furnace(FurnaceNum)%MaxHeatAirVolFlow       = GetCoilAirFlowRateMulSpeedWSHP(HeatingCoilType,HeatingCoilName,ErrFlag)
-          Furnace(FurnaceNum)%MaxCoolAirVolFlow       = GetCoilAirFlowRateMulSpeedWSHP(CoolingCoilType,CoolingCoilName,ErrFlag)
+          Furnace(FurnaceNum)%MaxHeatAirVolFlow       = GetCoilAirFlowRateVariableSpeed(HeatingCoilType,HeatingCoilName,ErrFlag)
+          Furnace(FurnaceNum)%MaxCoolAirVolFlow       = GetCoilAirFlowRateVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
          IF (ErrFlag) THEN
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
@@ -4217,7 +4404,7 @@ SUBROUTINE GetFurnaceInput
         ELSEIF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit) THEN
           ErrFlag=.FALSE.
           Furnace(FurnaceNum)%DesignHeatingCapacity =   &
-             GetCoilCapacityMulSpeedWSHP(HeatingCoilType,HeatingCoilName,ErrFlag)
+             GetCoilCapacityVariableSpeed(HeatingCoilType,HeatingCoilName,ErrFlag)
           IF (ErrFlag) THEN
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
@@ -4246,7 +4433,7 @@ SUBROUTINE GetFurnaceInput
        ELSEIF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit) THEN
           ErrFlag=.FALSE.
           Furnace(FurnaceNum)%DesignCoolingCapacity =   &
-             GetCoilCapacityMulSpeedWSHP(CoolingCoilType,CoolingCoilName,ErrFlag)
+             GetCoilCapacityVariableSpeed(CoolingCoilType,CoolingCoilName,ErrFlag)
           IF (ErrFlag) THEN
             CALL ShowContinueError('...occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
             ErrorsFound=.TRUE.
@@ -4460,6 +4647,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
           !                      Bereket Nigusse, June 2010 - added a procedure to calculate supply air flow fraction
           !                      through controlled zone
           !                      Bo Shen, March 2012 - for VS WSHP
+          !                      Bo Shen, ORNL, July 2012 - added variable-speed air source heat pump cooling and heating coils, using curve-fits
 
           !       RE-ENGINEERED  na
 
@@ -4481,7 +4669,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   USE ReportSizingManager,   ONLY: ReportSizingOutput
   USE DataSizing,            ONLY: AutoSize
   USE DataAirLoop,           ONLY: LoopHeatingCoilMaxRTF, AirLoopControlInfo
-  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, ZoneSysMoistureDemand
+  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, ZoneSysMoistureDemand, CurDeadbandOrSetback
   USE DataHeatBalFanSys,     ONLY: TempControlType
   USE DataHeatBalance,       ONLY: Zone
   USE DataAirflowNetwork,    ONLY: SimulateAirflowNetwork, AirflowNetworkControlMultizone
@@ -4565,6 +4753,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   INTEGER             :: InNode                           ! Inlet node number in MSHP loop
   INTEGER             :: OutNode                          ! Outlet node number in MSHP loop
   REAL(r64)           :: RhoAir                           ! Air density at InNode
+  LOGICAL, SAVE       :: MyAirLoopPass = .TRUE.  ! one time allocation flag
 
   InNode  = Furnace(FurnaceNum)%FurnaceInletNodeNum
   OutNode = Furnace(FurnaceNum)%FurnaceOutletNodeNum
@@ -4590,6 +4779,14 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
     MyPlantScanFlag = .TRUE.
     MySuppCoilPlantScanFlag = .TRUE.
   END IF
+
+  IF (BeginEnvrnFlag .and. MyAirLoopPass) THEN
+    AirLoopPass = 0
+    MyAirLoopPass = .FALSE.
+  End If
+  IF (.not. BeginEnvrnFlag) THEN
+    MyAirLoopPass = .TRUE.
+  End If
 
   AirLoopPass = AirLoopPass + 1
   If (AirLoopPass > 2) AirLoopPass = 1
@@ -5037,10 +5234,12 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
   END IF
 
 ! Original thermostat control logic (works only for cycling fan systems)
-  IF(QZnReq .GT. 0.0d0 .AND. QZnReq .GT. (Small5WLoad/Furnace(FurnaceNum)%ControlZoneMassFlowFrac))THEN
+  IF(QZnReq .GT. SmallLoad .AND. QZnReq .GT. (Small5WLoad/Furnace(FurnaceNum)%ControlZoneMassFlowFrac) &
+     .AND. .NOT. CurDeadbandOrSetback(Furnace(FurnaceNum)%ControlZoneNum))THEN
     HeatingLoad = .TRUE.
     CoolingLoad = .FALSE.
-  ELSE IF(QZnReq .LT. 0.0d0 .AND. ABS(QZnReq) .GT. (Small5WLoad/Furnace(FurnaceNum)%ControlZoneMassFlowFrac))THEN
+  ELSE IF(QZnReq .LT. (-1.d0 * SmallLoad) .AND. ABS(QZnReq) .GT. (Small5WLoad/Furnace(FurnaceNum)%ControlZoneMassFlowFrac) &
+    .AND. .NOT. CurDeadbandOrSetback(Furnace(FurnaceNum)%ControlZoneNum))THEN
     HeatingLoad = .FALSE.
     CoolingLoad = .TRUE.
   ELSE
@@ -5056,6 +5255,8 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
          HPDehumidificationLoadFlag = .TRUE.
          HeatingLoad = .FALSE.
          CoolingLoad = .TRUE.
+      ELSE
+         HPDehumidificationLoadFlag = .FALSE.
       ENDIF
   ENDIF
 
@@ -5163,17 +5364,17 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
     END IF ! from IF(Furnace(FurnaceNum)%SuppHeatCoilType_Num == Coil_HeatingSteam) THEN
   END IF ! from IF( FirstHVACIteration ) THEN
 
-  IF( Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit  ) THEN !BoS, variable-speed water source hp
+  IF( Furnace(FurnaceNum)%NumOfSpeedCooling > 0  ) THEN !BoS, variable-speed water source hp
     !Furnace(FurnaceNum)%IdleMassFlowRate = RhoAir*Furnace(FurnaceNum)%IdleVolumeAirRate
       NumOfSpeedCooling = Furnace(FurnaceNum)%NumOfSpeedCooling
       NumOfSpeedHeating = Furnace(FurnaceNum)%NumOfSpeedHeating
     ! IF MSHP system was not autosized and the fan is autosized, check that fan volumetric flow rate is greater than MSHP flow rates
       IF(Furnace(FurnaceNum)%CheckFanFlow)THEN
-        CurrentModuleObject = 'AirLoopHVAC:UnitaryHeatPump:WaterToAir'
+        CurrentModuleObject = 'AirLoopHVAC:UnitaryHeatPump:VariableSpeed'
         CALL GetFanVolFlow(Furnace(FurnaceNum)%FanIndex,Furnace(FurnaceNum)%FanVolFlow)
         IF(Furnace(FurnaceNum)%FanVolFlow .NE. AutoSize)THEN
     !     Check fan versus system supply air flow rates
-          IF(Furnace(FurnaceNum)%FanVolFlow .LT. &
+          IF(Furnace(FurnaceNum)%FanVolFlow + 1d-10 .LT. &
              Furnace(FurnaceNum)%CoolVolumeFlowRate(NumOfSpeedCooling))THEN
             CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
                             //TRIM(TrimSigDigits(Furnace(FurnaceNum)%FanVolFlow,7))//' in fan object ' &
@@ -5194,7 +5395,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
               End If
             End Do
           END IF
-          IF(Furnace(FurnaceNum)%FanVolFlow .LT. &
+          IF(Furnace(FurnaceNum)%FanVolFlow + 1d-10 .LT. &
              Furnace(FurnaceNum)%HeatVolumeFlowRate(NumOfSpeedHeating))THEN
             CALL ShowWarningError(TRIM(CurrentModuleObject)//' - air flow rate = ' &
                             //TRIM(TrimSigDigits(Furnace(FurnaceNum)%FanVolFlow,7))//' in fan object ' &
@@ -5259,7 +5460,9 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 
       Furnace(FurnaceNum)%CheckFanFlow = .FALSE.
 
-     CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+    ! CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+    !        AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+    CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
   ELSE
     CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
   END IF
@@ -5272,8 +5475,8 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
      ( (GetCurrentScheduleValue(Furnace(FurnaceNum)%FanAvailSchedPtr) .GT. 0.0d0 .OR. TurnFansOn) &
           .AND. .NOT. TurnFansOff) )THEN
 
-    IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-        CALL CalcMSWSHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
+    IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+        CALL CalcVarSpeedHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio, SUPHEATERLOAD)
     ELSE
         CALL CalcFurnaceOutput(FurnaceNum,.FALSE.,0,Off,0.0d0,0.0d0,0.0d0,0.0d0,SensibleOutput,  &
@@ -5315,9 +5518,11 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
             HeatingLoad = .TRUE.
           END IF
 
-         IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-           CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
-           CALL CalcMSWSHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
+         IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+           !CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+           !         AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+           CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+           CALL CalcVarSpeedHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio, SUPHEATERLOAD)
          ELSE
           CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
@@ -5328,8 +5533,10 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 !           If changing operating mode (flow rates) does not overshoot heating setpoint, turn off heating
             QZnReq       = 0.0d0
             HeatingLoad  = .FALSE.
-            IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-               CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+            IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+                CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+!               CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                    AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
             ELSE
               CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
             END IF
@@ -5343,8 +5550,11 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
              CoolingLoad = .TRUE.
              HeatingLoad = .FALSE.
            ENDIF
-           IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-               CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+           IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+                CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, &
+                    MoistureLoad, PartLoadRatio)
+!               CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                    AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
            ELSE
                CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad,PartLoadRatio)
            END IF
@@ -5374,9 +5584,12 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
           END IF
           HeatingLoad = .FALSE.
 
-         IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-           CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
-           CALL CalcMSWSHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
+         IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+            CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, &
+             MoistureLoad, PartLoadRatio)
+!           CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                    AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+           CALL CalcVarSpeedHeatPump(FurnaceNum,.FALSE.,off,1,0.0d0,0.0d0,SensibleOutput,LatentOutput, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio, SUPHEATERLOAD)
          ELSE
           CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad,PartLoadRatio)
@@ -5392,8 +5605,11 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
                 QZnReq       = 0.0d0
                 CoolingLoad  = .FALSE.
             ENDIF
-            IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-               CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+            IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+                CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, &
+                    QZnReq, MoistureLoad, PartLoadRatio)
+!               CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                     AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
             ELSE
              CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad,PartLoadRatio)
             END IF
@@ -5402,8 +5618,11 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 !         If the net heating capacity meets the zone heating load but does not overshoot, turn off heating
           QZnReq       = 0.0d0
           HeatingLoad = .FALSE.
-          IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-            CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+          IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+!            CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                        AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+            CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, &
+                 OpMode, QZnReq, MoistureLoad, PartLoadRatio)
           ELSE
             CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad,PartLoadRatio)
           END IF
@@ -5428,8 +5647,11 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
     ELSE
       PartLoadRatio = 0.0D0
     ENDIF
-    IF(Furnace(FurnaceNum)%WatertoAirHPType == WatertoAir_VarSpeedEquationFit) THEN
-       CALL SetOnOffMassFlowRateMulSpeed(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
+    IF(Furnace(FurnaceNum)%NumOfSpeedCooling > 0) THEN
+        CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, &
+         QZnReq, MoistureLoad, PartLoadRatio)
+!       CALL SetOnOffMassFlowRateVSCoil(FurnaceNum, Furnace(FurnaceNum)%ControlZoneNum, FirstHVACIteration, &
+!                AirLoopNum, OnOffAirFlowRatio, OpMode, QZnReq, MoistureLoad, PartLoadRatio)
     ELSE
        CALL SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLoad, MoistureLoad,PartLoadRatio)
     END IF
@@ -5612,6 +5834,7 @@ SUBROUTINE SizeFurnace(FurnaceNum)
           !       MODIFIED       Bereket Nigusse, May 2010, removed the autosize option for the input field supply air
           !                                                 flow fraction through controlled zone.
           !                      Bo Shen, March 2012, size the air flow rates at individual speed levels for VS WSHP
+          !                      Bo Shen, ORNL, July 2012 - added variable-speed air source heat pump cooling and heating coils, using curve-fits
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -5635,7 +5858,7 @@ SUBROUTINE SizeFurnace(FurnaceNum)
   USE DataSizing
   USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
   USE WatertoAirheatPumpSimple,  ONLY: SimWatertoAirHPSimple
-  USE WatertoAirMulSpeeddHP,   ONLY: SimWatertoAirHPMulSpeed, WtoADXCoil
+  USE VariableSpeedCoils,   ONLY: SimVariableSpeedCoils, VarSpeedCoil
   USE ReportSizingManager,       ONLY: ReportSizingOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -5675,55 +5898,69 @@ SUBROUTINE SizeFurnace(FurnaceNum)
            Furnace(FurnaceNum)%CoolingCoilSensDemand, Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
            0,0.0d0, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !CoolPartLoadRatio
            Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, 0, 0.0d0)
-  ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit) THEN
-    CALL SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+  ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit .OR. &
+            Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed ) THEN
+    CALL SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            0,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 )     !conduct the sizing operation in the VS WSHP
-    Furnace(FurnaceNum)%NumOfSpeedCooling = WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%NumOfSpeeds
+    Furnace(FurnaceNum)%NumOfSpeedCooling = VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%NumOfSpeeds
 
-    MulSpeedFlowScale = WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%RatedAirVolFlowRate/ &
-       WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(  &
-          WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%NormSpedLevel)
+    MulSpeedFlowScale = VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%RatedAirVolFlowRate/ &
+       VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(  &
+          VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%NormSpedLevel)
     Do Iter = 1,Furnace(FurnaceNum)%NumOfSpeedCooling
       Furnace(FurnaceNum)%CoolVolumeFlowRate(Iter) =   &
-         WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Iter) * MulSpeedFlowScale
+         VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Iter) * MulSpeedFlowScale
       Furnace(FurnaceNum)%CoolMassFlowRate(Iter) =   &
-         WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirMassFlowRate(Iter) * MulSpeedFlowScale
+         VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirMassFlowRate(Iter) * MulSpeedFlowScale
       Furnace(FurnaceNum)%MSCoolingSpeedRatio(Iter) =   &
-         WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
-                   WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
+         VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
+                   VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%MSRatedAirVolFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
     End Do
 
-    IF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit) THEN
-        CALL SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+    IF (Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit .OR. &
+            Furnace(FurnaceNum)%HeatingCoilType_Num == Coil_HeatingAirToAirVariableSpeed) THEN
+        CALL SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
                0,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
                Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
                0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 ) !conduct the sizing operation in the VS WSHP
 
-        Furnace(FurnaceNum)%NumOfSpeedHeating = WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%NumOfSpeeds
+        Furnace(FurnaceNum)%NumOfSpeedHeating = VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%NumOfSpeeds
 
-        MulSpeedFlowScale = WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%RatedAirVolFlowRate/ &
-                        WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(  &
-                           WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%NormSpedLevel)
+        MulSpeedFlowScale = VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%RatedAirVolFlowRate/ &
+                        VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(  &
+                           VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%NormSpedLevel)
         Do Iter = 1,Furnace(FurnaceNum)%NumOfSpeedHeating
           Furnace(FurnaceNum)%HeatVolumeFlowRate(Iter) =   &
-             WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(Iter) * MulSpeedFlowScale
+             VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(Iter) * MulSpeedFlowScale
           Furnace(FurnaceNum)%HeatMassFlowRate(Iter) =   &
-             WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirMassFlowRate(Iter) * MulSpeedFlowScale
+             VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirMassFlowRate(Iter) * MulSpeedFlowScale
           Furnace(FurnaceNum)%MSHeatingSpeedRatio(Iter) =   &
-             WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
-                WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate&
+             VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
+                VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%MSRatedAirVolFlowRate&
                 (Furnace(FurnaceNum)%NumOfSpeedHeating)
         End Do
     END IF
 
-   Furnace(FurnaceNum)%IdleMassFlowRate = & 
-        min(Furnace(FurnaceNum)%HeatMassFlowRate(1), Furnace(FurnaceNum)%CoolMassFlowRate(1))
-   Furnace(FurnaceNum)%IdleSpeedRatio = &
-        min(Furnace(FurnaceNum)%MSHeatingSpeedRatio(1), Furnace(FurnaceNum)%MSCoolingSpeedRatio(1))
-   Furnace(FurnaceNum)%IdleVolumeAirRate = &
-        min(Furnace(FurnaceNum)%HeatVolumeFlowRate(1), Furnace(FurnaceNum)%CoolVolumeFlowRate(1))
+    IF(Furnace(FurnaceNum)%NumOfSpeedHeating > 0) THEN
+       Furnace(FurnaceNum)%IdleMassFlowRate = &
+            min(Furnace(FurnaceNum)%HeatMassFlowRate(1), Furnace(FurnaceNum)%CoolMassFlowRate(1))
+       Furnace(FurnaceNum)%IdleSpeedRatio = &
+            min(Furnace(FurnaceNum)%MSHeatingSpeedRatio(1), Furnace(FurnaceNum)%MSCoolingSpeedRatio(1))
+       Furnace(FurnaceNum)%IdleVolumeAirRate = &
+            min(Furnace(FurnaceNum)%HeatVolumeFlowRate(1), Furnace(FurnaceNum)%CoolVolumeFlowRate(1))
+    ELSE
+       Furnace(FurnaceNum)%IdleMassFlowRate = Furnace(FurnaceNum)%CoolMassFlowRate(1)
+       Furnace(FurnaceNum)%IdleSpeedRatio =   Furnace(FurnaceNum)%MSCoolingSpeedRatio(1)
+       Furnace(FurnaceNum)%IdleVolumeAirRate = Furnace(FurnaceNum)%CoolVolumeFlowRate(1)
+    END IF
+
+    IF (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil) THEN
+        Furnace(FurnaceNum)%MaxNoCoolHeatAirVolFlow = Furnace(FurnaceNum)%IdleVolumeAirRate
+        Furnace(FurnaceNum)%MaxNoCoolHeatAirMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
+        Furnace(FurnaceNum)%NoHeatCoolSpeedRatio= Furnace(FurnaceNum)%IdleSpeedRatio
+    END IF
 
   END IF
 
@@ -8785,7 +9022,7 @@ SUBROUTINE CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIterati
   USE WaterCoils,                ONLY: SimulateWaterCoilComponents
   USE SteamCoils,                ONLY: SimulateSteamCoilComponents
   USE PlantUtilities,            ONLY: SetComponentFlowRate
-  USE General,                   ONLY: SolveRegulaFalsi
+  USE General,                   ONLY: SolveRegulaFalsi,RoundSigDigits
   USE DataHVACGlobals,           ONLY: SmallLoad
 
   IMPLICIT NONE     ! Enforce explicit typing of all variables in this routine
@@ -8800,6 +9037,7 @@ SUBROUTINE CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIterati
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: ErrTolerance = 0.001d0    ! convergence limit for hotwater coil
+  INTEGER, PARAMETER :: SolveMaxIter=50
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -8880,22 +9118,35 @@ Select Case (CoilTypeNum)
              ELSE
                Par(4) = 0.
              END IF
-             CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+             CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
                                    MinWaterFlow, MaxHotWaterFlow, Par)
              IF (SolFlag == -1) THEN
                IF (Furnace(FurnaceNum)%HotWaterCoilMaxIterIndex == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in Furnace '//TRIM(Furnace(FurnaceNum)%Name))
-                 CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+                 CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed for '//  &
+                    trim(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))//'="'//  &
+                    TRIM(Furnace(FurnaceNum)%Name)//'"')
+                 CALL ShowContinueErrorTimeStamp(' ')
+                 CALL ShowContinueError('  Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                    '] exceeded in calculating hot water mass flow rate')
                ENDIF
-               CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in Furnace '//  &
+               CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (iteration limit ['//  &
+                  trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))//'="'// &
                   TRIM(Furnace(FurnaceNum)%Name),Furnace(FurnaceNum)%HotWaterCoilMaxIterIndex)
              ELSE IF (SolFlag == -2) THEN
                IF (Furnace(FurnaceNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in Furnace '//TRIM(Furnace(FurnaceNum)%Name))
-                 CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+                 CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed (maximum flow limits) for '//  &
+                    trim(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))//'="'// &
+                    TRIM(Furnace(FurnaceNum)%Name)//'"')
+                 CALL ShowContinueErrorTimeStamp(' ')
+                 CALL ShowContinueError('...Bad hot water maximum flow rate limits')
+                 CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinWaterFlow,3))//' kg/s')
+                 CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxHotWaterFlow,3))//' kg/s')
                ENDIF
-               CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in Furnace '//  &
-                  TRIM(Furnace(FurnaceNum)%Name),Furnace(FurnaceNum)%HotWaterCoilMaxIterIndex2)
+               CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (flow limits) for '//  &
+                  trim(cFurnaceTypes(Furnace(FurnaceNum)%FurnaceType_Num))//'="'// &
+                  TRIM(Furnace(FurnaceNum)%Name)//'"', &
+                  Furnace(FurnaceNum)%HotWaterCoilMaxIterIndex2,  &
+                  ReportMinOf=MinWaterFlow,ReportMaxOf=MaxHotWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
              END IF
           ENDIF
        ELSE
@@ -9026,7 +9277,7 @@ END FUNCTION HotWaterCoilResidual
 
 !******************************************************************************
 
-SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlowRatio)
+SUBROUTINE SimVariableSpeedHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlowRatio)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:CalcMSHeatPump
@@ -9094,9 +9345,9 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
   REAL(r64), SAVE   ::  SystemSensibleLoad   ! Positive value means heating required
   REAL(r64)         ::  QToHeatSetPt         ! Load required to meet heating setpoint temp (>0 is a heating load)
   REAL(r64)          :: NoCompOutput  ! output when no active compressor [W]
-  INTEGER           ::  OutNum
-  INTEGER           ::  TotBranchNum
-  INTEGER           ::  ZoneSideNodeNum
+  INTEGER           ::  TotBranchNum ! total exit branch number
+  INTEGER           ::  ZoneSideNodeNum ! zone equip supply node
+  LOGICAL           ::  EconoActive        ! TRUE if Economizer is active
 
                                             ! to be removed by furnace/unitary system
 
@@ -9147,13 +9398,20 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
   OnOffFanPartLoadFraction = 1.0
 
   AirLoopNumber = ZoneEquipConfig(Furnace(FurnaceNum)%ControlZoneNum)%AirLoopNum
+
+  IF(AirLoopNumber /= 0) THEN
+    EconoActive = AirLoopControlInfo(AirLoopNumber)%EconoActive
+  ELSE
+    EconoActive = .FALSE.
+  END IF
+
   SaveMassFlowRate = Node(InletNode)%MassFlowRate
   IF ( .NOT. FirstHVACIteration .AND. Furnace(FurnaceNum)%OPMode == CycFanCycCoil .AND. &
-        (QZnReq < 0.0 .OR. TotalZoneLatentLoad < 0.0  ) &
-       .AND. AirLoopControlInfo(AirLoopNumber)%EconoActive) THEN
+        (QZnReq < (-1.d0*SmallLoad) .OR. TotalZoneLatentLoad < (-1.d0*SmallLoad)  ) &
+       .AND. EconoActive) THEN
        ! for cycling fan, cooling load, check whether furnace can meet load with compressor off
     CompOp = Off
-    CALL ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad, TotalZoneLatentLoad,ZoneNum,  &
+    CALL ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad, TotalZoneLatentLoad,ZoneNum,  &
        SpeedNum,SpeedRatio,PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad)
 
      TotalZoneSensibleLoad = QZnReq
@@ -9163,7 +9421,7 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
       ! compressor on (reset inlet air mass flow rate to starting value)
       Node(InletNode)%MassFlowRate = SaveMassFlowRate
       CompOp = On
-      CALL ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad,TotalZoneLatentLoad,ZoneNum,  &
+      CALL ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad,TotalZoneLatentLoad,ZoneNum,  &
          SpeedNum,SpeedRatio,PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad)
     END IF
   ELSE
@@ -9173,17 +9431,21 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
 !     if(QZnReq < -1000.0 .AND. FurnaceNum == 1 ) then
 !       CompOp      = On
 !     end if
-     CALL ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad,TotalZoneLatentLoad,ZoneNum,  &
+     CALL ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,TotalZoneSensibleLoad,TotalZoneLatentLoad,ZoneNum,  &
         SpeedNum,SpeedRatio,PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad)
   END IF
 
-  IF(SpeedNum > 1)  THEN
-    SaveCompressorPLR = 1.0
-  END IF
+  IF (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool) THEN
+    SaveCompressorPLR = PartLoadFrac
+  ELSE
+     IF(SpeedNum > 1)  THEN
+       SaveCompressorPLR = 1.0
+     END IF
 
-  If (PartLoadFrac .eq. 1.0 .and. SaveCompressorPLR < 1.0) then
-    PartLoadFrac = SaveCompressorPLR
-  End If
+     IF (PartLoadFrac .eq. 1.0 .and. SaveCompressorPLR < 1.0) then
+       PartLoadFrac = SaveCompressorPLR
+     End IF
+  END IF
 
   ReheatCoilLoad = 0.0d0
   TotalZoneSensibleLoad = QZnReq
@@ -9193,8 +9455,8 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
        (Furnace(FurnaceNum)%Humidistat .AND. &
         Furnace(FurnaceNum)%DehumidControlType_Num == DehumidControl_CoolReheat .and. &
        (QLatReq.lt.0.0))) THEN ! if a Humidistat is installed and dehumdification control type is CoolReheat
-    CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,ActualSensibleOutput, QLatUnitOut, &
-                          TotalZoneSensibleLoad,TotalZoneLatentLoad, OnOffAirFlowRatio,ReheatCoilLoad)
+    CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,ActualSensibleOutput, &
+                    QLatUnitOut, TotalZoneSensibleLoad,TotalZoneLatentLoad, OnOffAirFlowRatio,ReheatCoilLoad)
     IF (Furnace(FurnaceNum)%ZoneSequenceHeatingNum > 0) THEN
       QToHeatSetPt=(ZoneSysEnergyDemand(Furnace(FurnaceNum)%ControlZoneNum)% &
                      SequencedOutputRequiredToHeatingSP(Furnace(FurnaceNum)%ZoneSequenceHeatingNum) / &
@@ -9218,7 +9480,7 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
     END IF
 
    SupHeaterLoad = 0.0
-   CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,1,0.0d0,0.0d0,NoCompOutput, QLatUnitOut, &
+   CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,1,0.0d0,0.0d0,NoCompOutput, QLatUnitOut, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad)
 
     IF(NoCompOutput > SystemSensibleLoad .AND. SystemSensibleLoad > 0.0 .AND. ReHeatCoilLoad > 0.0) THEN
@@ -9235,10 +9497,10 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
   TotalZoneSensibleLoad = QZnReq
   TotalZoneLatentLoad = QLatReq
   IF(ReHeatCoilLoad > 0.0) THEN
-     CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
+     CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
                 TotalZoneSensibleLoad,TotalZoneLatentLoad,OnOffAirFlowRatio,ReHeatCoilLoad)
   ELSE
-     CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
+     CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,QSensUnitOut, QLatUnitOut, &
                       TotalZoneSensibleLoad,TotalZoneLatentLoad,OnOffAirFlowRatio,SupHeaterLoad)
   END IF
 
@@ -9250,28 +9512,37 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
 
   QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(Furnace(FurnaceNum)%NodeNumofControlledZone)%Enthalpy)
 
- ! Node(InletNode)%MassFlowRateMaxAvail = AirMassFlow
- ! Node(OutletNode)%MassFlowRateMaxAvail = AirMassFlow
+  Node(InletNode)%MassFlowRateMaxAvail = AirMassFlow
+  Node(OutletNode)%MassFlowRateMaxAvail = AirMassFlow
 
-  !MUST INTIALIZE THE ZONE SIDE ENTERING MASS FLOW, OTHERWISE, IT WILL MESS UP WITH THE VARIABLE AIR FLOW CONTROL
   If(.NOT. FirstHVACIteration .AND. AirMassFlow > 0.0 .AND. AirLoopNumber > 0 ) THEN
       TotBranchNum = PrimaryAirSystem(AirLoopNumber)%NumOutletBranches
-      DO OutNum=1,TotBranchNum
-         ZoneSideNodeNum = AirToZoneNodeInfo(AirLoopNumber)%ZoneEquipSupplyNodeNum(OutNum)
-         Node(ZoneSideNodeNum)%MassFlowRate = AirMassFlow/TotBranchNum  !+ 1d-10 + HVACFlowRateToler * 0.01d0
-      END DO
+      IF(TotBranchNum .EQ. 1) THEN
+         ZoneSideNodeNum = AirToZoneNodeInfo(AirLoopNumber)%ZoneEquipSupplyNodeNum(1)
+! THE MASS FLOW PRECISION of the system solver is not enough for some small air flow rate iterations , BY DEBUGGING
+! it may cause mass flow rate occilations between airloop and zoneequip
+! specify the air flow rate directly for one-to-one system, when the iteration deviation is closing the solver precision level
+         IF(ABS(AirMassFlow - Node(ZoneSideNodeNum)%MassFlowRate) < 0.02) &
+         ! 0.02 is 2 * HVACFlowRateToler, in order to accomodate the system solver precision level
+           Node(ZoneSideNodeNum)%MassFlowRateMaxAvail = AirMassFlow
+           Node(ZoneSideNodeNum)%MassFlowRate = AirMassFlow
+      END IF
+
+     ! the below might be useful if more divergences occur
+     ! Node(PrimaryAirSystem(AirLoopNumber)%Branch(1)%NodeNumIn)%MassFlowRateMaxAvail = AirMassFlow
+     ! Node(PrimaryAirSystem(AirLoopNumber)%Branch(1)%NodeNumIn)%MassFlowRate = AirMassFlow
   END IF
 
   ! report variables
   Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate = ReheatCoilLoad
-  IF(QZnReq > 0.0 ) THEN !HEATING LOAD
+  IF(QZnReq > SmallLoad ) THEN !HEATING LOAD
      Furnace(FurnaceNum)%CoolingCoilSensDemand = 0.0
      Furnace(FurnaceNum)%HeatingCoilSensDemand = QZnReq
-  ELSE 
+  ELSE
      Furnace(FurnaceNum)%CoolingCoilSensDemand = ABS(QZnReq)
-     Furnace(FurnaceNum)%HeatingCoilSensDemand = 0.0  
+     Furnace(FurnaceNum)%HeatingCoilSensDemand = 0.0
   END IF
-  
+
   Furnace(FurnaceNum)%CompPartLoadRatio = SaveCompressorPLR
   IF (Furnace(FurnaceNum)%OpMode .EQ. CycFanCycCoil) THEN
     If (SupHeaterLoad >0.0) Then
@@ -9297,10 +9568,10 @@ SUBROUTINE SimMSWSHP(FurnaceNum,FirstHVACIteration, QZnReq, QLatReq, OnOffAirFlo
 
 
   RETURN
-END SUBROUTINE SimMSWSHP
+END SUBROUTINE SimVariableSpeedHP
 !******************************************************************************
 
-SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,QLatReq,ZoneNum,SpeedNum,  &
+SUBROUTINE ControlVSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnReq,QLatReq,ZoneNum,SpeedNum,  &
                              SpeedRatio,PartLoadFrac,OnOffAirFlowRatio,SupHeaterLoad)
 
           ! SUBROUTINE INFORMATION:
@@ -9389,13 +9660,14 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
 
   ! Get result when DX coil is off
   SupHeaterLoad = 0.0
-  CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,NoCompOutput, LatOutput, &
+  CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,NoCompOutput, LatOutput, &
                           0.0d0, 0.0d0, OnOffAirFlowRatio,SupHeaterLoad)
 
   ! If cooling and NoCompOutput < QZnReq, the coil needs to be off
   ! If heating and NoCompOutput > QZnReq, the coil needs to be off
-  IF ((QZnReq < 0.0 .AND. NoCompOutput < QZnReq) .OR. (QZnReq > 0.0 .AND. NoCompOutput > QZnReq) &
-    .OR. (QZnReq == 0 .AND. QLatReq == 0 ) .OR. (QLatReq < 0.0 .AND. LatOutput < QLatReq)) THEN
+  IF ((QZnReq < (-1.d0*SmallLoad) .AND. NoCompOutput < QZnReq) .OR. (QZnReq > SmallLoad .AND. NoCompOutput > QZnReq) &
+    .OR. ( (ABS(QZnReq) <=SmallLoad) .AND. (ABS(QLatReq) <= SmallLoad) ) &
+    .OR. (QLatReq < (-1.d0*SmallLoad) .AND. LatOutput < QLatReq)) THEN
     RETURN
   END IF
 
@@ -9403,7 +9675,11 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
   PartLoadFrac  = 1.0
   SpeedRatio    = 1.0
   If (Furnace(FurnaceNum)%HeatCoolMode == HeatingMode) Then
-    SpeedNum = Furnace(FurnaceNum)%NumOfSpeedHeating
+    IF (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool) THEN
+        SpeedNum = Furnace(FurnaceNum)%NumOfSpeedCooling
+    ELSE
+        SpeedNum = Furnace(FurnaceNum)%NumOfSpeedHeating
+    END IF
   Else If (Furnace(FurnaceNum)%HeatCoolMode == CoolingMode) Then
     SpeedNum = Furnace(FurnaceNum)%NumOfSpeedCooling
   ELSE
@@ -9411,10 +9687,10 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
     PartLoadFrac  = 0.0
   End If
 
-  CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,FullOutput, LatOutput, &
+  CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,FullOutput, LatOutput, &
                           QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
 
-  IF(QLatReq < 0.0 ) THEN !dehumidification mode
+  IF(QLatReq < (-1.d0*SmallLoad) ) THEN !dehumidification mode
   !  ! If the QLatReq <= LatOutput the unit needs to run full out
     IF (QLatReq <= LatOutput) THEN
       PartLoadFrac = 1.0
@@ -9425,7 +9701,7 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
       RETURN
     END IF
     ErrorToler = 0.001 !Error tolerance for convergence from input deck
-  ELSE IF (QZnReq .LT. 0.0) THEN
+  ELSE IF (QZnReq .LT. (-1.d0*SmallLoad)) THEN
   ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCompOutput
   ! Check that this is the case; if not set PartLoadFrac = 0.0 (off) and return
     IF (FullOutput >= 0.0 .OR. FullOutput >= NoCompOutput) THEN
@@ -9461,8 +9737,8 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
     ErrorToler = 0.001 !Error tolerance for convergence from input deck
   END IF
 
-  IF ((QZnReq .GT. 0.0 .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. 0.0 .AND. QZnReq > FullOutput) &
-     .OR. (QLatReq < 0.0) ) THEN
+  IF ((QZnReq .GT. SmallLoad .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. (-1.d0*SmallLoad) .AND. QZnReq > FullOutput) &
+     .OR. (QLatReq < (-1.d0*SmallLoad)) ) THEN
 
     Par(1) = FurnaceNum
     Par(2) = ZoneNum
@@ -9478,10 +9754,10 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
     Par(9) = CompOp
     Par(10) = 1.0
     ! Check whether the low speed coil can meet the load or not
-    CALL CalcMSWSHeatPump(FurnaceNum, FirstHVACIteration,CompOp,1, 0.0d0, 1.0d0,LowOutput, LatOutput,  &
+    CALL CalcVarSpeedHeatPump(FurnaceNum, FirstHVACIteration,CompOp,1, 0.0d0, 1.0d0,LowOutput, LatOutput,  &
                         QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
-    IF ((QZnReq .GT. 0.0 .AND. QZnReq <= LowOutput) .OR. (QZnReq .LT. 0.0 .AND. QZnReq >= LowOutput) &
-              .OR. (QLatReq < 0.0 .AND. QLatReq > LatOutput)) THEN
+    IF ((QZnReq .GT. SmallLoad .AND. QZnReq <= LowOutput) .OR. (QZnReq .LT. (-1.d0*SmallLoad) .AND. QZnReq >= LowOutput) &
+              .OR. (QLatReq < (-1.d0*SmallLoad) .AND. QLatReq > LatOutput)) THEN
         ! Calculate the part load fraction
       SpeedRatio = 0.0
       SpeedNum = 1
@@ -9491,7 +9767,7 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
         Par(5) = QLatReq
       END IF
 
-      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, PartLoadFrac, MSWSHPCyclingResidual, 0.0d0, 1.0d0, Par)
+      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, PartLoadFrac, VSHPCyclingResidual, 0.0d0, 1.0d0, Par)
       IF (SolFla == -1) THEN
         If ( .NOT. WarmupFlag) Then
           IF (ErrCountCyc .eq. 0) THEN
@@ -9514,12 +9790,12 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
       ! Check to see which speed to meet the load
       PartLoadFrac = 1.0
       SpeedRatio = 1.0
-      If ((QZnReq .LT. 0.0) .OR. (QLatReq < 0.0)) Then ! Cooling
+      If ((QZnReq .LT. (-1.d0*SmallLoad)) .OR. (QLatReq < (-1.d0*SmallLoad))) Then ! Cooling
         DO I=2,Furnace(FurnaceNum)%NumOfSpeedCooling
-          CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
+          CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
                               QZnReq,QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
 
-          IF(QLatReq < 0.0) THEN
+          IF(QLatReq < (-1.d0*SmallLoad)) THEN
             IF(QLatReq > LatOutput) THEN
              SpeedNum = I
              Exit
@@ -9531,7 +9807,7 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
         END DO
       ELSE
         DO I=2,Furnace(FurnaceNum)%NumOfSpeedHeating
-          CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
+          CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,&
                QZnReq,QLatReq,OnOffAirFlowRatio,SupHeaterLoad)
           If (QZnReq <= TempOutput) Then
             SpeedNum = I
@@ -9541,12 +9817,12 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
       END IF
       Par(8) = SpeedNum
 
-      IF(QLatReq < 0.0 ) THEN !calculate latent heat residual
+      IF(QLatReq < (-1.d0*SmallLoad) ) THEN !calculate latent heat residual
         Par(10) = 0.0
         Par(5) = QLatReq
       END IF
 
-      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, SpeedRatio, MSWSHPVarSpeedResidual, 1.0d-10, 1.0d0, Par)
+      CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, SpeedRatio, VSHPSpeedResidual, 1.0d-10, 1.0d0, Par)
       IF (SolFla == -1) THEN
         If ( .NOT. WarmupFlag) Then
           IF (ErrCountVar .eq. 0) THEN
@@ -9572,17 +9848,18 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
   ! if the heating coil cannot meet the load, trim with supplemental heater
   ! occurs with constant fan mode when compressor is on or off
   ! occurs with cycling fan mode when compressor PLR is equal to 1
-  IF ((QZnReq .GT. 0.0 .AND. QZnReq .GT. FullOutput))THEN
+  IF ((QZnReq .GT. SmallLoad .AND. QZnReq .GT. FullOutput) .AND. (Furnace(FurnaceNum)%SuppHeatCoilIndex /= 0))THEN
     PartLoadFrac  = 1.0
     SpeedRatio  = 1.0
-    SpeedNum = Furnace(FurnaceNum)%NumOfSpeedHeating !maximum heating speed
+    IF(Furnace(FurnaceNum)%NumOfSpeedHeating > 0) &
+            SpeedNum = Furnace(FurnaceNum)%NumOfSpeedHeating !maximum heating speed, avoid zero for cooling only mode
 
     IF(OutDryBulbTemp .LE. Furnace(FurnaceNum)%MaxOATSuppHeat)THEN
       SupHeaterLoad = QZnReq - FullOutput
     ELSE
       SupHeaterLoad = 0.0
     END IF
-    CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,QZnReq,  &
+    CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,TempOutput, LatOutput,QZnReq,  &
                         QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
   END IF
 
@@ -9612,7 +9889,7 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
   Furnace(FurnaceNum)%CompSpeedRatio = SpeedRatio
   Furnace(FurnaceNum)%CompSpeedNum = SpeedNum
   Furnace(FurnaceNum)%CoolingCoilLatentDemand = ABS(QLatReq)
-  
+
   IF (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil) THEN
     Furnace(FurnaceNum)%FanPartLoadRatio = 1.0
   ELSE
@@ -9620,11 +9897,12 @@ SUBROUTINE ControlMSWSHPOutput(FurnaceNum,FirstHVACIteration,CompOp,OpMode,QZnRe
   END IF
 
   RETURN
-END SUBROUTINE ControlMSWSHPOutput
+END SUBROUTINE ControlVSHPOutput
 
 !******************************************************************************
 
-SUBROUTINE CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,SensibleLoadMet, LatentLoadMet, &
+SUBROUTINE CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,  &
+                          PartLoadFrac,SensibleLoadMet, LatentLoadMet, &
                           QZnReq, QLatReq, OnOffAirFlowRatio,SupHeaterLoad)
             ! SUBROUTINE INFORMATION:
             !       AUTHOR:          Bo Shen, based on HVACMultiSpeedHeatPump:CalcMSHeatPump
@@ -9642,7 +9920,7 @@ SUBROUTINE CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedR
 
             ! USE STATEMENTS:
 USE Fans,                    ONLY: SimulateFanComponents
-USE WatertoAirMulSpeeddHP,   ONLY: SimWatertoAirHPMulSpeed, WtoADXCoil
+USE VariableSpeedCoils,   ONLY: SimVariableSpeedCoils, VarSpeedCoil
 USE DataEnvironment,           ONLY: OutDryBulbTemp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -9682,24 +9960,51 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
   REAL(r64)    :: ErrorToler    ! supplemental heating coil convergence tollerance
   Logical      :: SuppHeatingCoilFlag !whether to turn on the supplemental heater
   REAL(r64)        :: MaxTemp             ! Maximum temperature for calculating latent load at a constant temperature
+  REAL(r64)        ::HeatCoilLoad         ! REQUIRED HEAT COIL LOAD
 
   ! FLOW
   InletNode  = Furnace(FurnaceNum)%FurnaceInletNodeNum
   OutletNode = Furnace(FurnaceNum)%FurnaceOutletNodeNum
 
+  HeatCoilLoad = 0.0
   SaveCompressorPLR = 0.0
   SavePartloadRatio = 0.0
   ErrorToler = 0.001
   ! Set inlet air mass flow rate based on PLR and compressor on/off air flow rates
-  CALL SetVSWSHPAirFlow(FurnaceNum,PartLoadFrac,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
+  CALL SetVSHPAirFlow(FurnaceNum,PartLoadFrac,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
+
+  IF ((SupHeaterLoad .GT. 1.0d-10) .AND. &
+        (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool) .AND. &
+        (Furnace(FurnaceNum)%SuppHeatCoilIndex .EQ. 0))THEN
+        ! ONLY HEATING COIL, NO SUPPLEMENTAL COIL, USED FOR REHEAT DURING DUHMI
+    HeatCoilLoad  = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadFrac !REHEAT IN FAN ON TIME
+
+    IF( HeatCoilLoad  > SupHeaterLoad) HeatCoilLoad = SupHeaterLoad !HEATING COIL RUN TIME < FAN ON TIME
+
+  ELSE IF ((QZnReq .GT. SmallLoad) .AND. &
+        (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+    HeatCoilLoad      = Furnace(FurnaceNum)%DesignHeatingCapacity * PartLoadFrac
+  ELSE
+    HeatCoilLoad      = 0.0
+  END IF
 
   AirMassFlow = Node(InletNode)%MassFlowRate
   ! if blow through, simulate fan then coils
   IF (Furnace(FurnaceNum)%FanPlace .EQ. BlowThru) THEN
     CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
-    IF (((QZnReq .LT. 0.0) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
-        .OR. (QLatReq < 0.0)) THEN !COOLING MODE or dehumidification mode
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+
+     IF((.NOT. Furnace(FurnaceNum)%CoolingCoilUpstream) .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+            Furnace(FurnaceNum)%OpMode,QCoilActual)
+     END IF
+
+
+    IF (((QZnReq .LT. (-1.d0*SmallLoad)) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
+        .OR. (QLatReq < (-1.d0*SmallLoad))) THEN !COOLING MODE or dehumidification mode
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
@@ -9707,64 +10012,89 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
         SavePartloadRatio = PartLoadFrac
         SaveSpeedRatio = SpeedRatio
 
-      SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
+      SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
     ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
     END IF
 
-    IF (QZnReq .GT. 0)THEN
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
+    IF(Furnace(FurnaceNum)%FurnaceType_Num /= UnitarySys_HeatCool) THEN
+        IF (QZnReq .GT. SmallLoad)THEN
+            Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
 
-        SavePartloadRatio = PartLoadFrac
-        SaveSpeedRatio = SpeedRatio
+            SavePartloadRatio = PartLoadFrac
+            SaveSpeedRatio = SpeedRatio
 
-       SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
-    ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+           SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
+        ELSE
+            Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+        END IF
+    ELSE IF( Furnace(FurnaceNum)%CoolingCoilUpstream .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+            Furnace(FurnaceNum)%OpMode,QCoilActual)
     END IF
 
     ! Call twice to ensure the fan outlet conditions are updated
     CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
-    IF (((QZnReq .LT. 0.0) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
-           .OR. (QLatReq < 0.0)) THEN
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+
+    IF((.NOT. Furnace(FurnaceNum)%CoolingCoilUpstream) .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+            Furnace(FurnaceNum)%OpMode,QCoilActual)
+    END IF
+
+    IF (((QZnReq .LT. (-1.d0*SmallLoad)) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
+           .OR. (QLatReq < (-1.d0*SmallLoad))) THEN
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
 
         SavePartloadRatio = PartLoadFrac
         SaveSpeedRatio = SpeedRatio
-     SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
+     SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
     ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
     END IF
 
-    IF (QZnReq .GT. 0)THEN
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
+    IF(Furnace(FurnaceNum)%FurnaceType_Num /= UnitarySys_HeatCool) THEN
+        IF (QZnReq .GT. SmallLoad)THEN
+            Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
 
-        SavePartloadRatio = PartLoadFrac
-        SaveSpeedRatio = SpeedRatio
-     SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
-    ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+            SavePartloadRatio = PartLoadFrac
+            SaveSpeedRatio = SpeedRatio
+         SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
+        ELSE
+            Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+        END IF
+    ELSE IF( Furnace(FurnaceNum)%CoolingCoilUpstream .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+                Furnace(FurnaceNum)%OpMode,QCoilActual)
     END IF
 
     !  Simulate supplemental heating coil for blow through fan
@@ -9774,9 +10104,18 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
          Furnace(FurnaceNum)%OpMode,QCoilActual)
     ENDIF
   ELSE ! otherwise simulate DX coils then fan then supplemental heater
-    IF(((QZnReq .LT. 0.0) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
-        .OR. (QLatReq < 0.0))THEN
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+
+     IF((.NOT. Furnace(FurnaceNum)%CoolingCoilUpstream) .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+                Furnace(FurnaceNum)%OpMode,QCoilActual)
+     END IF
+
+    IF(((QZnReq .LT. (-1.d0*SmallLoad)) .AND. (OutDryBulbTemp .GT. Furnace(FurnaceNum)%MinOATCompressor)) &
+        .OR. (QLatReq < (-1.d0*SmallLoad)))THEN
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
@@ -9784,28 +10123,36 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
         SavePartloadRatio = PartLoadFrac
         SaveSpeedRatio = SpeedRatio
 
-      SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
+      SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%CoolingCoilIndex)%PartLoadRatio
     ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
+        Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
            Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
            Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
            CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
     END IF
 
-    IF(QZnReq .GT. 0)THEN
-         Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
+    IF(Furnace(FurnaceNum)%FurnaceType_Num /= UnitarySys_HeatCool) THEN
+        IF(QZnReq .GT. SmallLoad)THEN
+             Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, PartLoadFrac, OnOffAirFlowRatio,SpeedNum, SpeedRatio,QZnReq, QLatReq )
 
-        SavePartloadRatio = PartLoadFrac
-        SaveSpeedRatio = SpeedRatio
-      SaveCompressorPLR = WtoADXCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
-    ELSE
-        Call SimWatertoAirHPMulSpeed(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
-           Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
-           Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
-           CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+            SavePartloadRatio = PartLoadFrac
+            SaveSpeedRatio = SpeedRatio
+          SaveCompressorPLR = VarSpeedCoil(Furnace(FurnaceNum)%HeatingCoilIndex)%PartLoadRatio
+        ELSE
+            Call SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%HeatingCoilIndex,&
+               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
+               Furnace(FurnaceNum)%HPTimeConstant,Furnace(FurnaceNum)%FanDelayTime,&
+               CompOp, 0.0d0, OnOffAirFlowRatio,1, 0.0d0,0.0d0, 0.0d0 )
+        END IF
+    ELSE IF( Furnace(FurnaceNum)%CoolingCoilUpstream .AND. &
+                (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+       ! simulate furnace heating coil
+        SuppHeatingCoilFlag = .FALSE.       ! if true simulates supplemental heating coil
+        CALL CalcNonDXHeatingCoils(FurnaceNum,SuppHeatingCoilFlag,FirstHVACIteration,HeatCoilLoad,&
+                Furnace(FurnaceNum)%OpMode,QCoilActual)
     END IF
 
     CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
@@ -9848,12 +10195,12 @@ USE DataEnvironment,           ONLY: OutDryBulbTemp
   Furnace(FurnaceNum)%LatentLoadMet = LatentLoadMet
 
 RETURN
-END SUBROUTINE CalcMSWSHeatPump
+END SUBROUTINE CalcVarSpeedHeatPump
 
 
 !******************************************************************************
 
-REAL(r64) FUNCTION MSWSHPCyclingResidual(PartLoadFrac,Par)
+REAL(r64) FUNCTION VSHPCyclingResidual(PartLoadFrac,Par)
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:MSHPCyclingResidual
           !       DATE WRITTEN   March, 2012
@@ -9937,7 +10284,7 @@ REAL(r64) FUNCTION MSWSHPCyclingResidual(PartLoadFrac,Par)
   SupHeaterLoad     = Par(7)
   CompOp = INT(Par(9))
 
-  CALL CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,1,0.0d0,PartLoadFrac,ZoneSensLoadMet, ZoneLatLoadMet,&
+  CALL CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,1,0.0d0,PartLoadFrac,ZoneSensLoadMet, ZoneLatLoadMet,&
                           QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad)
 
   ResScale = abs(LoadToBeMet)
@@ -9949,19 +10296,19 @@ REAL(r64) FUNCTION MSWSHPCyclingResidual(PartLoadFrac,Par)
 
   ! Calculate residual based on output calculation flag
   IF(Par(10) .EQ. 1.0d0) THEN
-    MSWSHPCyclingResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
+    VSHPCyclingResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
   ELSE
-    MSWSHPCyclingResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
+    VSHPCyclingResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
   END IF
 
   RETURN
 
-END FUNCTION MSWSHPCyclingResidual
+END FUNCTION VSHPCyclingResidual
 
 
 !******************************************************************************
 
-REAL(r64) FUNCTION MSWSHPVarSpeedResidual(SpeedRatio,Par)
+REAL(r64) FUNCTION VSHPSpeedResidual(SpeedRatio,Par)
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, , based on HVACMultiSpeedHeatPump:MSHPVarSpeedgResidual
           !       DATE WRITTEN   March, 2012
@@ -10046,7 +10393,7 @@ REAL(r64) FUNCTION MSWSHPVarSpeedResidual(SpeedRatio,Par)
   SpeedNum     = INT(Par(8))
   CompOp = INT(Par(9))
 
-  Call CalcMSWSHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,1.0d0,ZoneSensLoadMet, ZoneLatLoadMet, &
+  Call CalcVarSpeedHeatPump(FurnaceNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,1.0d0,ZoneSensLoadMet, ZoneLatLoadMet, &
                           QZnReq, QZnLat, OnOffAirFlowRatio,SupHeaterLoad)
 
   ResScale = abs(LoadToBeMet)
@@ -10058,16 +10405,16 @@ REAL(r64) FUNCTION MSWSHPVarSpeedResidual(SpeedRatio,Par)
 
     ! Calculate residual based on output calculation flag
   IF(Par(10) .EQ. 1.0d0) THEN
-    MSWSHPVarSpeedResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
+    VSHPSpeedResidual = (ZoneSensLoadMet - LoadToBeMet)/ResScale
   ELSE
-    MSWSHPVarSpeedResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
+    VSHPSpeedResidual = (ZoneLatLoadMet - LoadToBeMet)/ResScale
   END IF
 
   RETURN
 
-END FUNCTION MSWSHPVarSpeedResidual
+END FUNCTION VSHPSpeedResidual
 
-SUBROUTINE SetVSWSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
+SUBROUTINE SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,SpeedRatio)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen, based on HVACMultiSpeedHeatPump:SetAverageAirFlow
@@ -10118,74 +10465,95 @@ SUBROUTINE SetVSWSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,
   MSHPMassFlowRateHigh = 0.0            ! Mass flow rate at high speed
 
 
- If (.NOT. CurDeadbandOrSetback(Furnace(FurnaceNum)%ControlZoneNum) .AND. Present(SpeedNum) ) Then
-    If (Furnace(FurnaceNum)%HeatCoolMode == HeatingMode) Then
-      If (SpeedNum .eq. 1) Then
-        CompOnMassFlow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
-        CompOnFlowRatio = Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum)
-        MSHPMassFlowRateLow = Furnace(FurnaceNum)%HeatMassFlowRate(1)
-        MSHPMassFlowRateHigh = Furnace(FurnaceNum)%HeatMassFlowRate(1)
-      Else If (SpeedNum .GT. 1) Then
-        CompOnMassFlow = SpeedRatio*Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum) + &
-                         (1.0-SpeedRatio)*Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum-1)
-        CompOnFlowRatio = SpeedRatio*Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum) + &
-                         (1.0-SpeedRatio)*Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum-1)
-        MSHPMassFlowRateLow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum-1)
-        MSHPMassFlowRateHigh = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
-      End If
-    Else If (Furnace(FurnaceNum)%HeatCoolMode == CoolingMode) Then
-      If (SpeedNum .eq. 1) Then
-        CompOnMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
-        CompOnFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum)
-        MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(1)
-        MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(1)
-      Else If (SpeedNum .GT. 1) Then
-        CompOnMassFlow = SpeedRatio*Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum) + &
-                         (1.0-SpeedRatio)*Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum-1)
-        CompOnFlowRatio = SpeedRatio*Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum) + &
-                         (1.0-SpeedRatio)*Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum-1)
-        MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum-1)
-        MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
-      End If
-    End If
-  End If
+  IF (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil) THEN
+   CompOffMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
+   CompOffFlowRatio = Furnace(FurnaceNum)%IdleSpeedRatio
+  ELSE
+   CompOffMassFlow = 0.0
+   CompOffFlowRatio = 0.0
+  END IF
 
-  ! Set up fan flow rate during compressor off time
-  If (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil .AND. Present(SpeedNum)) Then
-    IF (Furnace(FurnaceNum)%AirFlowControl .EQ. UseCompressorOnFlow .AND. CompOnMassFlow > 0.0) THEN
-      IF(SpeedNum == 1) THEN  !LOWEST SPEED USE IDLE FLOW
-        CompOffMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
-        CompOffFlowRatio = Furnace(FurnaceNum)%IdleSpeedRatio       
-      ELSE IF (Furnace(FurnaceNum)%LastMode .EQ. HeatingMode) THEN
-        CompOffMassFlow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
-        CompOffFlowRatio = Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum)
-      ELSE
-        CompOffMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
-        CompOffFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum)
-      END IF
-    END IF
-  End If
-
-  If (Present(SpeedNum)) Then
-    If (SpeedNum > 1) Then
-      AverageUnitMassFlow = CompOnMassFlow
-      FanSpeedRatio       = CompOnFlowRatio
-    Else
+  IF (HeatingLoad .AND. (Furnace(FurnaceNum)%FurnaceType_Num == UnitarySys_HeatCool))THEN
+      CompOnMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
+      CompOnFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(Furnace(FurnaceNum)%NumOfSpeedCooling)
+      MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
+      MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(Furnace(FurnaceNum)%NumOfSpeedCooling)
       AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
       IF(CompOffFlowRatio .GT. 0.0)THEN
         FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
       ELSE
         FanSpeedRatio     = CompOnFlowRatio
       END IF
-    End If
-  Else
-    AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
-    IF(CompOffFlowRatio .GT. 0.0)THEN
-      FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
-    ELSE
-      FanSpeedRatio       = CompOnFlowRatio
-    END IF
-  End If
+  ELSE
+     If (.NOT. CurDeadbandOrSetback(Furnace(FurnaceNum)%ControlZoneNum) .AND. Present(SpeedNum) ) Then
+        If (Furnace(FurnaceNum)%HeatCoolMode == HeatingMode) Then
+          If (SpeedNum .eq. 1) Then
+            CompOnMassFlow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
+            CompOnFlowRatio = Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum)
+            MSHPMassFlowRateLow = Furnace(FurnaceNum)%HeatMassFlowRate(1)
+            MSHPMassFlowRateHigh = Furnace(FurnaceNum)%HeatMassFlowRate(1)
+          Else If (SpeedNum .GT. 1) Then
+            CompOnMassFlow = SpeedRatio*Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum) + &
+                             (1.0-SpeedRatio)*Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum-1)
+            CompOnFlowRatio = SpeedRatio*Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum) + &
+                             (1.0-SpeedRatio)*Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum-1)
+            MSHPMassFlowRateLow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum-1)
+            MSHPMassFlowRateHigh = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
+          End If
+        Else If (Furnace(FurnaceNum)%HeatCoolMode == CoolingMode) Then
+          If (SpeedNum .eq. 1) Then
+            CompOnMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
+            CompOnFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum)
+            MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(1)
+            MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(1)
+          Else If (SpeedNum .GT. 1) Then
+            CompOnMassFlow = SpeedRatio*Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum) + &
+                             (1.0-SpeedRatio)*Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum-1)
+            CompOnFlowRatio = SpeedRatio*Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum) + &
+                             (1.0-SpeedRatio)*Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum-1)
+            MSHPMassFlowRateLow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum-1)
+            MSHPMassFlowRateHigh = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
+          End If
+        End If
+      End If
+
+      ! Set up fan flow rate during compressor off time
+      If (Furnace(FurnaceNum)%OpMode .EQ. ContFanCycCoil .AND. Present(SpeedNum)) Then
+        IF (Furnace(FurnaceNum)%AirFlowControl .EQ. UseCompressorOnFlow .AND. CompOnMassFlow > 0.0) THEN
+          IF(SpeedNum == 1) THEN  !LOWEST SPEED USE IDLE FLOW
+            CompOffMassFlow = Furnace(FurnaceNum)%IdleMassFlowRate
+            CompOffFlowRatio = Furnace(FurnaceNum)%IdleSpeedRatio
+          ELSE IF (Furnace(FurnaceNum)%LastMode .EQ. HeatingMode) THEN
+            CompOffMassFlow = Furnace(FurnaceNum)%HeatMassFlowRate(SpeedNum)
+            CompOffFlowRatio = Furnace(FurnaceNum)%MSHeatingSpeedRatio(SpeedNum)
+          ELSE
+            CompOffMassFlow = Furnace(FurnaceNum)%CoolMassFlowRate(SpeedNum)
+            CompOffFlowRatio = Furnace(FurnaceNum)%MSCoolingSpeedRatio(SpeedNum)
+          END IF
+        END IF
+      End If
+
+      If (Present(SpeedNum)) Then
+        If (SpeedNum > 1) Then
+          AverageUnitMassFlow = CompOnMassFlow
+          FanSpeedRatio       = CompOnFlowRatio
+        Else
+          AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
+          IF(CompOffFlowRatio .GT. 0.0)THEN
+            FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
+          ELSE
+            FanSpeedRatio     = CompOnFlowRatio
+          END IF
+        End If
+      Else
+        AverageUnitMassFlow = (PartLoadRatio * CompOnMassFlow) + ((1-PartLoadRatio) * CompOffMassFlow)
+        IF(CompOffFlowRatio .GT. 0.0)THEN
+          FanSpeedRatio = (PartLoadRatio * CompOnFlowRatio) + ((1-PartLoadRatio) * CompOffFlowRatio)
+        ELSE
+          FanSpeedRatio       = CompOnFlowRatio
+        END IF
+      End If
+  END IF
 
   IF (GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .EQ. 0.0) THEN
     Node(InletNode)%MassFlowRate              = 0.0
@@ -10207,9 +10575,9 @@ SUBROUTINE SetVSWSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio,SpeedNum,
 !  END IF
 
   RETURN
-END SUBROUTINE SetVSWSHPAirFlow
+END SUBROUTINE SetVSHPAirFlow
 
-SUBROUTINE SetOnOffMassFlowRateMulSpeed(FurnaceNum, ZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode,   &
+SUBROUTINE SetOnOffMassFlowRateVSCoil(FurnaceNum, ZoneNum, FirstHVACIteration, AirLoopNum, OnOffAirFlowRatio, OpMode,   &
                                         QZnReq, MoistureLoad, PartLoadRatio)
 
           ! SUBROUTINE INFORMATION:
@@ -10328,9 +10696,9 @@ SUBROUTINE SetOnOffMassFlowRateMulSpeed(FurnaceNum, ZoneNum, FirstHVACIteration,
   END IF
 
 ! Set the system mass flow rates
-  CALL SetVSWSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio)
+  CALL SetVSHPAirFlow(FurnaceNum,PartLoadRatio,OnOffAirFlowRatio)
 
-END SUBROUTINE SetOnOffMassFlowRateMulSpeed
+END SUBROUTINE SetOnOffMassFlowRateVSCoil
 
 ! *****************************************************************************
 

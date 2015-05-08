@@ -63,6 +63,7 @@ Real(r64), Allocatable, Dimension(:)   :: DSXMAT          ! Down Stepped MAT his
 Real(r64), Allocatable, Dimension(:)   :: DSXM2T          ! Down Stepped MAT history storage
 Real(r64), Allocatable, Dimension(:)   :: DSXM3T          ! Down Stepped MAT history storage
 Real(r64), Allocatable, Dimension(:)   :: DSXM4T          ! Down Stepped MAT history storage
+REAL(r64), Allocatable, Dimension(:)   :: XMPT            ! Zone air temperature at previous time step
 
 REAL(r64), Allocatable, Dimension(:)   :: ZTAVComf   ! Zone Air Temperature Averaged over the Zone Time step used
                                                      ! in thermal comfort models (currently Fang model only)
@@ -80,6 +81,7 @@ REAL(r64), ALLOCATABLE, DIMENSION(:)   :: DSWZoneTimeMinus1   ! DownStepped Humi
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: DSWZoneTimeMinus2   ! DownStepped Time Minus 2 Zone Time Steps Term
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: DSWZoneTimeMinus3   ! DownStepped Time Minus 3 Zone Time Steps Term
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: DSWZoneTimeMinus4   ! DownStepped Time Minus 4 Zone Time Steps Term
+REAL(r64), ALLOCATABLE, DIMENSION(:)   :: WZoneTimeMinusP     ! Humidity ratio history terms at previous time step
 
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: ZoneAirHumRatTemp   ! Temp zone air humidity ratio at time plus 1
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: WZoneTimeMinus1Temp ! Zone air humidity ratio at previous timestep

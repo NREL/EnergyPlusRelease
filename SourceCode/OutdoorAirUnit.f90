@@ -150,6 +150,8 @@ TYPE OAUnitData
   INTEGER                      :: NumComponents            = 0
   CHARACTER(len=MaxNameLength) :: ComponentListName        = ' '
   REAL(r64)                    :: CompOutSetTemp      =0.0   ! component outlet setpoint temperature
+  INTEGER                      :: AvailStatus         =0
+  CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
   TYPE(OAEquipList),  &
      ALLOCATABLE,DIMENSION(:)  :: OAEquip
 
@@ -283,7 +285,7 @@ SUBROUTINE SimOutdoorAirUnit(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOut
 
   IF (ZoneSizingCalc .or. SysSizingCalc) RETURN
 
-  CALL InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
+  CALL InitOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration)
 
   CALL CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
 
@@ -300,7 +302,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   July 2009
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -344,7 +346,8 @@ SUBROUTINE GetOutdoorAirUnitInputs
   USE DataPlant,                ONLY : TypeOf_CoilWaterCooling, TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating, &
                                        TypeOf_CoilWaterDetailedFlatCooling
   USE Fans,                     ONLY : GetFanIndex, GetFanType, GetFanAvailSchPtr
-  USE DataHVACGlobals    ,      ONLY : cFanTypes
+  USE DataHVACGlobals,          ONLY : cFanTypes, ZoneComp
+  USE DataZoneEquipment,        ONLY : OutdoorAirUnit_Num
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -873,6 +876,11 @@ SUBROUTINE GetOutdoorAirUnitInputs
            TRIM(cAlphaFields(16))//' is blank and must be entered.')
       ErrorsFound=.true.
     ENDIF
+    IF (.NOT. lAlphaBlanks(17)) THEN
+     OutAirUnit(OAUnitNum)%AvailManagerListName = cAlphaArgs(17)
+     ZoneComp(OutdoorAirUnit_Num)%ZoneCompAvailMgrs(OAUnitNum)%AvailManagerListName  = cAlphaArgs(17)
+    ENDIF
+
   END DO
 
   IF (ErrorsFound) THEN
@@ -935,6 +943,8 @@ SUBROUTINE GetOutdoorAirUnitInputs
     CALL SetupOutputVariable('Outdoor Air Unit Fan Electric Consumption [J]',   &
                             OutAirUnit(OAUnitNum)%ElecFanEnergy,'System','Sum', &
                              OutAirUnit(OAUnitNum)%Name)
+    CALL SetupOutputVariable('Outdoor Air Unit Fan Availability Status',OutAirUnit(OAUnitNum)%AvailStatus, &
+                             'System','Average',OutAirUnit(OAUnitNum)%Name)
 !! Note that the outdoor air unit fan electric is NOT metered because this value is already metered through the fan component
 
   END DO
@@ -944,12 +954,12 @@ SUBROUTINE GetOutdoorAirUnitInputs
 END SUBROUTINE GetOutdoorAirUnitInputs
 
 
-SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
+SUBROUTINE InitOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   July 2009
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -968,8 +978,8 @@ SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
   USE DataLoopNode,      ONLY : Node
   USE ScheduleManager,   ONLY : GetCurrentScheduleValue
   USE DataHeatBalFanSys, ONLY : MAT,ZoneAirHumRat
-  USE DataZoneEquipment, ONLY : ZoneEquipInputsFilled,CheckZoneEquipmentList
-  USE DataHVACGlobals,   ONLY : ShortenTimeStepSys
+  USE DataZoneEquipment, ONLY : ZoneEquipInputsFilled,CheckZoneEquipmentList, OutdoorAirUnit_Num
+  USE DataHVACGlobals,   ONLY : ShortenTimeStepSys, ZoneComp, ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE DataPlant,         ONLY : PlantLoop, ScanPlantLoopsForObject, &
                                 TypeOf_CoilWaterCooling, TypeOf_CoilWaterSimpleHeating, &
                                 TypeOf_CoilSteamAirHeating, TypeOf_CoilWaterDetailedFlatCooling
@@ -979,6 +989,7 @@ SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN) :: OAUnitNum           ! index for the current outdoor air unit
+  INTEGER, INTENT(IN) :: ZoneNum             ! number of zone being served
   LOGICAL, INTENT(IN) :: FirstHVACIteration  ! TRUE if 1st HVAC simulation of system timestep
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -992,7 +1003,6 @@ SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER        :: Loop
-  INTEGER        :: ZoneNum               ! Intermediate variable for keeping track of the zone number
   LOGICAL,SAVE   :: MyOneTimeFlag = .TRUE.
   LOGICAL,SAVE   :: ZoneEquipmentListChecked = .false.  ! True after the Zone Equipment List has been checked for items
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag
@@ -1029,6 +1039,11 @@ SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
     MyOneTimeFlag = .FALSE.
 
   END IF
+
+  IF (ALLOCATED(ZoneComp)) THEN
+    ZoneComp(OutdoorAirUnit_Num)%ZoneCompAvailMgrs(OAUnitNum)%ZoneNum = ZoneNum
+    OutAirUnit(OAUnitNum)%AvailStatus = ZoneComp(OutdoorAirUnit_Num)%ZoneCompAvailMgrs(OAUnitNum)%AvailStatus
+  ENDIF
 
   IF (MyPlantScanFlag(OAUnitNum) .AND. ALLOCATED(PlantLoop))THEN
     DO compLoop=1, OutAirUnit(OAUnitNum)%NumComponents
@@ -1185,7 +1200,7 @@ SUBROUTINE InitOutdoorAirUnit(OAUnitNum,FirstHVACIteration)
 
 
  ! set the mass flow rates from the input volume flow rates
-  IF (OutAirUnit(OAUnitNum)%SFanAvailSchedPtr > 0.0) THEN ! fan is available
+  IF (OAFrac > 0.0 .OR. ZoneCompTurnFansOn .AND. .NOT. ZoneCompTurnFansOff) THEN ! fan is available
     OutAirUnit(OAUnitNum)%OutAirMassFlow = RhoAir*OAFrac*OutAirUnit(OAUnitNum)%OutAirVolFlow
   ELSE
     OutAirUnit(OAUnitNum)%OutAirMassFlow = 0.d0
@@ -1658,7 +1673,7 @@ SUBROUTINE CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatO
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
-          !       MODIFIED
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1690,6 +1705,8 @@ SUBROUTINE CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatO
   USE HVACHXAssistedCoolingCoil, ONLY : CheckHXAssistedCoolingCoilSchedule
   Use SteamCoils,                ONLY : CheckSteamCoilSchedule
   USE Fans,                      ONLY : SimulateFanComponents
+  USE DataHVACGlobals,           ONLY : ZoneCompTurnFansOn, ZoneCompTurnFansOff
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1769,7 +1786,8 @@ SUBROUTINE CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatO
 
   IF ((GetCurrentScheduleValue(OutAirUnit(OAUnitNum)%SchedPtr) <= 0) .OR.   &
       (GetCurrentScheduleValue(OutAirUnit(OAUnitNum)%OutAirSchedPtr) <= 0) .OR. &
-      (GetCurrentScheduleValue(OutAirUnit(OAUnitNum)%SFanAvailSchedPtr) <= 0) ) THEN
+      (GetCurrentScheduleValue(OutAirUnit(OAUnitNum)%SFanAvailSchedPtr) <= 0) .AND. &
+       .NOT. ZoneCompTurnFansOn .OR. ZoneCompTurnFansOff) THEN
           ! System is off or has no load upon the unit; set the flow rates to zero and then
           ! simulate the components with the no flow conditions
     IF (OutAirUnit(OAUnitNum)%ExtFan ) Node(InletNode)%MassFlowRate                  = 0.0
@@ -1796,14 +1814,16 @@ SUBROUTINE CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatO
     Node(OutletNode)%Temp     = Node(SFanOutletNode)%Temp
 
     IF (OutAirUnit(OAUnitNum)%FanPlace .EQ. BlowThru) THEN
-      CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%SFanName,FirstHVACIteration,OutAirUnit(OAUnitNum)%SFan_Index)
+      CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%SFanName,FirstHVACIteration,OutAirUnit(OAUnitNum)%SFan_Index, &
+                                   ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
       OutAirUnit(OAUnitNum)%ElecFanRate=OutAirUnit(OAUnitNum)%ElecFanRate+FanElecPower
       CALL SimZoneOutAirUnitComps(OAUnitNum,FirstHVACIteration)
       IF (OutAirUnit(OAUnitNum)%ExtFan ) CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%ExtFanName, &
                                                FirstHVACIteration,OutAirUnit(OAUnitNum)%ExtFan_Index)
     ELSE IF(OutAirUnit(OAUnitNum)%FanPlace .EQ. DrawThru) THEN
       CALL SimZoneOutAirUnitComps(OAUnitNum,FirstHVACIteration)
-      CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%SFanName,FirstHVACIteration,OutAirUnit(OAUnitNum)%SFan_Index)
+      CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%SFanName,FirstHVACIteration,OutAirUnit(OAUnitNum)%SFan_Index, &
+                                   ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
       IF (OutAirUnit(OAUnitNum)%ExtFan ) CALL SimulateFanComponents(OutAirUnit(OAUnitNum)%ExtFanName, &
                                                FirstHVACIteration,OutAirUnit(OAUnitNum)%ExtFan_Index)
     END IF

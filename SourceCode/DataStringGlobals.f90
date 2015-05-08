@@ -30,8 +30,6 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 
           ! MODULE PARAMETER DEFINITIONS:
-!          CHARACTER(len=55), PARAMETER :: UpperCase='ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİ'
-!          CHARACTER(len=55), PARAMETER :: LowerCase='abcdefghijklmnopqrstuvwxyzàáâãäåæçèéêëìíîïğñòóôõöøùúûüı'
           CHARACTER(len=*), PARAMETER :: UpperCase='ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİ'
           CHARACTER(len=*), PARAMETER :: LowerCase='abcdefghijklmnopqrstuvwxyzàáâãäåæçèéêëìíîïğñòóôõöøùúûüı'
           CHARACTER(len=*), PARAMETER :: AccentedUpperCase='ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİ'
@@ -39,13 +37,17 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=*), PARAMETER :: AllCase=&
        'àáâãäåæçèéêëìíîïğñòóôõöøùúûüıÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 #ifdef WINDOWS
-          CHARACTER(len=1),  PARAMETER :: PathChar='\'
+          CHARACTER(len=1),  PARAMETER :: pathChar='\'
+          CHARACTER(len=1),  PARAMETER :: altpathChar='/'
 #elif defined LINUX
-          CHARACTER(len=1),  PARAMETER :: PathChar='/'
+          CHARACTER(len=1),  PARAMETER :: pathChar='/'
+          CHARACTER(len=1),  PARAMETER :: altpathChar='\'
 #elif defined MAC
-          CHARACTER(len=1),  PARAMETER :: PathChar='/'
+          CHARACTER(len=1),  PARAMETER :: pathChar='/'
+          CHARACTER(len=1),  PARAMETER :: altpathChar='\'
 #else
-          CHARACTER(len=1),  PARAMETER :: PathChar='\'  ! default to Windows
+          CHARACTER(len=1),  PARAMETER :: pathChar='\'  ! default to Windows
+          CHARACTER(len=1),  PARAMETER :: altpathChar='/'
 #endif
           INTEGER,           PARAMETER :: PathLimit=255
           CHARACTER(len=1),  PARAMETER :: CharComma=CHAR(44) !comma
@@ -64,8 +66,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=PathLimit)    :: CurrentWorkingFolder=' '  ! Current working directory for run
           CHARACTER(len=PathLimit+15) :: FullName=' '              ! Full name of file to open, including path
           CHARACTER(len=120) :: IDDVerString=' '                   ! Version information from the IDD (line 1)
-          CHARACTER(len=120) :: VerString='EnergyPlus, Version 7.1'      ! String that represents version information
-          CHARACTER(len=5)   :: MatchVersion='7.1.0' ! String to be matched by Version object
+          CHARACTER(len=120) :: VerString='EnergyPlus, Version 7.2'      ! String that represents version information
+          CHARACTER(len=5)   :: MatchVersion='7.2.0' ! String to be matched by Version object
           CHARACTER(len=40)  :: CurrentDateTime=' '       ! For printing current date and time at start of run
 
 

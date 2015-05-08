@@ -26,7 +26,7 @@ MODULE ExternalInterface
           ! USE STATEMENTS:
   USE DataGlobals, ONLY: MaxNameLength
   USE DataPrecisionGlobals
-  USE DataStringGlobals, ONLY: PathChar
+  USE DataStringGlobals, ONLY: PathChar,AltPathChar,CurrentWorkingFolder
   USE DataInterfaces, ONLY: ShowWarningError, ShowSevereError, &
        ShowFatalError, SetupOutputVariable, ShowContinueError
   USE General, ONLY: TrimSigDigits
@@ -71,6 +71,10 @@ TYPE  fmuInputVariableType
   CHARACTER(len= MaxNameLength)      :: Name = BlankString         ! Name of FMU input variable
   INTEGER                            :: ValueReference = 0.0       ! = fmiValueReference specific to FMU variable
 END TYPE fmuInputVariableType
+
+TYPE  checkFMUInstanceNameType
+  CHARACTER(len= MaxNameLength)      :: Name = BlankString         ! Name of fmu instance
+END TYPE checkFMUInstanceNameType
 
 TYPE  eplusOutputVariableType
   CHARACTER(len=MaxNameLength), DIMENSION(1)       :: Name   = BlankString ! Variable name in EnergyPlus
@@ -152,7 +156,6 @@ TYPE InstanceType
            DIMENSION(:), ALLOCATABLE  :: eplusInputVariableActuator     ! Variable Types structure for energyplus input variables from type actuator
 END TYPE InstanceType
 
-
 TYPE FMUType
   CHARACTER(len=MaxNameLength)  :: Name      = BlankString          ! FMU Filename
   REAL(r64)                     :: TimeOut   = 0.0d0                ! Default TimeOut value
@@ -169,16 +172,21 @@ TYPE FMUType
 END TYPE FMUType
 
           ! MODULE VARIABLE DECLARATIONS:
+
   TYPE (FMUType), &
            DIMENSION(:), ALLOCATABLE      :: FMU  ! Variable Types structure
   TYPE (FMUType), &
            DIMENSION(:), ALLOCATABLE      :: FMUTemp  ! Variable Types structure
+  TYPE (checkFMUInstanceNameType), &
+           DIMENSION(:), ALLOCATABLE      :: checkInstanceName                   ! Variable Types structure for checking instance names
   INTEGER, PUBLIC                         :: NumExternalInterfaces = 0           ! Number of ExternalInterface objects
   INTEGER, PUBLIC                         :: NumExternalInterfacesBCVTB = 0      ! Number of BCVTB ExternalInterface objects
-  INTEGER, PUBLIC                         :: NumExternalInterfacesFMU = 0        ! Number of FMU ExternalInterface objects
+  INTEGER, PUBLIC                         :: NumExternalInterfacesFMUImport = 0  ! Number of FMU ExternalInterface objects
+  INTEGER, PUBLIC                         :: NumExternalInterfacesFMUExport = 0  ! Number of FMU ExternalInterface objects
   INTEGER, PUBLIC                         :: NumFMUObjects = 0                   ! Number of FMU objects
-  LOGICAL, PUBLIC                         :: haveExternalInterfaceBCVTB  = .FALSE.             ! Flag for blank name
-  LOGICAL, PUBLIC                         :: haveExternalInterfaceFMU    = .FALSE.             ! Flag for blank name
+  LOGICAL, PUBLIC                         :: haveExternalInterfaceBCVTB  = .FALSE.          ! Flag for BCVTB interface
+  LOGICAL, PUBLIC                         :: haveExternalInterfaceFMUImport = .FALSE.       ! Flag for FMU-Import interface
+  LOGICAL, PUBLIC                         :: haveExternalInterfaceFMUExport = .FALSE.       ! Flag for FMU-Export interface
   INTEGER                                 :: simulationStatus = 1 ! Status flag. Used to report during
                                                                   ! which phase an error occured.
                                                                   ! (1=initialization, 2=time stepping)
@@ -279,7 +287,7 @@ SUBROUTINE ExternalInterfaceExchangeVariables
 !INTEGER, PARAMETER :: ksRunPeriodDesign = 2
 !INTEGER, PARAMETER :: ksRunPeriodWeather = 3
 
-  IF (haveExternalInterfaceBCVTB) THEN
+  IF (haveExternalInterfaceBCVTB .OR. haveExternalInterfaceFMUExport) THEN
      CALL InitExternalInterface()
      ! Exchange data only after sizing and after warm-up.
      ! Note that checking for ZoneSizingCalc SysSizingCalc does not work here, hence we
@@ -289,7 +297,7 @@ SUBROUTINE ExternalInterfaceExchangeVariables
      ENDIF
   END IF
 
-  IF (haveExternalInterfaceFMU) THEN
+  IF (haveExternalInterfaceFMUImport) THEN
     retValErrMsg = checkOperatingSystem(errorMessage)
     IF (retValErrMsg .NE. 0 ) THEN
        CALL ShowSevereError('ExternalInterface/ExternalInterfaceExchangeVariables:"'//TRIM(errorMessage)//'"')
@@ -297,7 +305,7 @@ SUBROUTINE ExternalInterfaceExchangeVariables
        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        CALL StopExternalInterfaceIfError
     END IF
-    ! initialize the FunctionalMockupUnit interface
+    ! initialize the FunctionalMockupUnitImport interface
     CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW,.FALSE.)
     CALL IEEE_SET_HALTING_MODE(IEEE_INVALID,.FALSE.)
     CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO,.FALSE.)
@@ -370,17 +378,19 @@ SUBROUTINE GetExternalInterfaceInput
            AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
     IF (SameString(cAlphaArgs(1), 'PtolemyServer')) THEN ! The BCVTB interface is activated.
       NumExternalInterfacesBCVTB = NumExternalInterfacesBCVTB + 1
-    ELSEIF (SameString(cAlphaArgs(1), 'FunctionalMockupUnit')) THEN ! The functional mock up unit interface is activated.
-      NumExternalInterfacesFMU = NumExternalInterfacesFMU + 1
+    ELSEIF (SameString(cAlphaArgs(1), 'FunctionalMockupUnitImport')) THEN ! The functional mock up unit import interface is activated.
+      NumExternalInterfacesFMUImport = NumExternalInterfacesFMUImport + 1
+    ELSEIF (SameString(cAlphaArgs(1), 'FunctionalMockupUnitExport')) THEN ! The functional mock up unit export interface is activated.
+      NumExternalInterfacesFMUExport = NumExternalInterfacesFMUExport + 1
     END IF
   END DO
 
-  IF (NumExternalInterfacesBCVTB == 0) THEN
+  IF ((NumExternalInterfacesBCVTB == 0) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Schedule')
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Variable')
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Actuator')
   ENDIF
-  IF (NumExternalInterfacesBCVTB == 1) THEN
+  IF ((NumExternalInterfacesBCVTB == 1) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
      haveExternalInterfaceBCVTB = .TRUE.
      CALL DisplayString('Instantiating Building Controls Virtual Test Bed')
      ALLOCATE(varKeys(maxVar))  ! Keys of report variables used for data exchange
@@ -392,27 +402,44 @@ SUBROUTINE GetExternalInterfaceInput
      ALLOCATE(inpVarNames(maxVar)) ! Names of report variables used for data exchange
      inpVarNames=' '
      CALL VerifyExternalInterfaceObject
+  ELSEIF ((NumExternalInterfacesBCVTB == 1) .AND. (NumExternalInterfacesFMUExport /= 0)) THEN
+    CALL ShowSevereError('GetExternalInterfaceInput: Cannot have Ptolemy and FMU-Export interface simultaneously.')
+    ErrorsFound = .true.
   ENDIF
   IF (NumExternalInterfacesBCVTB > 1) THEN
-     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one ExternalInterface object.')
+     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one Ptolemy interface.')
      CALL ShowContinueError('GetExternalInterfaceInput: Errors found in input.')
      ErrorsFound = .true.
   ENDIF
 
-  IF (NumExternalInterfacesFMU == 0) THEN
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnit:To:Schedule')
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnit:To:Variable')
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnit:To:Actuator')
-  ENDIF
-  IF (NumExternalInterfacesFMU == 1) THEN
-    haveExternalInterfaceFMU = .TRUE.
-    CALL DisplayString('Instantiating FunctionalMockupUnit interface')
-    cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit'
-    NumFMUObjects = GetNumObjectsFound(cCurrentModuleObject)
+  IF ((NumExternalInterfacesFMUExport == 1) .AND. (NumExternalInterfacesBCVTB == 0)) THEN
+    haveExternalInterfaceFMUExport = .TRUE.
+    CALL DisplayString('Instantiating FunctionalMockupUnitExport interface')
     CALL VerifyExternalInterfaceObject
   ENDIF
-  IF (NumExternalInterfacesFMU > 1) THEN
-     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-ExternalInterface in .idf file.')
+  IF (NumExternalInterfacesFMUExport > 1) THEN
+     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-Export interface.')
+     CALL ShowContinueError('Errors found in input.')
+     ErrorsFound = .true.
+  ENDIF
+
+  IF (NumExternalInterfacesFMUImport == 0) THEN
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Schedule')
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Variable')
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Actuator')
+  ENDIF
+  IF ((NumExternalInterfacesFMUImport == 1) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
+    haveExternalInterfaceFMUImport = .TRUE.
+    CALL DisplayString('Instantiating FunctionalMockupUnitImport interface')
+    cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport'
+    NumFMUObjects = GetNumObjectsFound(cCurrentModuleObject)
+    CALL VerifyExternalInterfaceObject
+  ELSEIF ((NumExternalInterfacesFMUImport == 1) .AND. (NumExternalInterfacesFMUExport /= 0)) THEN
+    CALL ShowSevereError('GetExternalInterfaceInput: Cannot have FMU-Import and FMU-Export interface simultaneously.')
+    ErrorsFound = .true.
+  ENDIF
+  IF (NumExternalInterfacesFMUImport > 1) THEN
+     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-Import interface.')
      CALL ShowContinueError('Errors found in input.')
      ErrorsFound = .true.
   ENDIF
@@ -463,7 +490,7 @@ SUBROUTINE StopExternalInterfaceIfError
 
   ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER retVal ! Return value, needed to catch return value of function call
-  IF (NumExternalInterfacesBCVTB /= 0) THEN
+  IF ((NumExternalInterfacesBCVTB /= 0) .OR. (NumExternalInterfacesFMUExport /= 0))  THEN
    IF ( ErrorsFound ) THEN
       ! Check if the socket is open
       IF ( socketFD .GE. 0 ) THEN
@@ -477,7 +504,7 @@ SUBROUTINE StopExternalInterfaceIfError
       CALL ShowFatalError('Error in ExternalInterface: Check EnergyPlus *.err file.')
    ENDIF
   END IF
-  IF (NumExternalInterfacesFMU /= 0) THEN
+  IF (NumExternalInterfacesFMUImport /= 0) THEN
    IF ( ErrorsFound ) THEN
      CALL ShowFatalError('ExternalInterface/StopExternalInterfaceIfError: Error in ExternalInterface:'// &
         'Check EnergyPlus *.err file.')
@@ -1239,7 +1266,7 @@ SUBROUTINE InstantiateInitializeFMU()
       tStart, fmiTrue, tStop, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
-        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: & Error when trying to')
+        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying to')
         CALL ShowContinueError('initialize instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
         ErrorsFound = .true.
@@ -1311,7 +1338,7 @@ SUBROUTINE InitializeFMU()
       tStart, fmiTrue, tStop, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
-        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: & Error when trying to')
+        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying to')
         CALL ShowContinueError('initialize instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
         ErrorsFound = .true.
@@ -1480,13 +1507,12 @@ SUBROUTINE InitExternalInterfaceFMU()
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString
+  USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString, FindItem
   USE DataInterfaces, ONLY:GetVariableKeyCountandType, GetVariableKeys
   USE ScheduleManager, ONLY: GetDayScheduleIndex
   USE RuntimeLanguageProcessor, ONLY: isExternalInterfaceErlVariable, FindEMSVariable
   USE DataIPShortCuts
   USE ISO_C_BINDING, ONLY : C_PTR
-  USE DataStringGlobals, ONLY: CurrentWorkingFolder
   USE DataSystemVariables, ONLY: CheckForActualFileName
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -1558,7 +1584,7 @@ SUBROUTINE InitExternalInterfaceFMU()
        INTEGER(kind=C_INT)                  :: sizefmuWorkingFolder     ! Size of the fmuWorkingFolder trimmed
      END FUNCTION getNumInputVariablesInFMU
   END INTERFACE
-  
+
   INTERFACE
      INTEGER(C_INT) FUNCTION getNumOutputVariablesInFMU(fmuWorkingFolder, sizefmuWorkingFolder) &
      BIND (C, NAME="getNumOutputVariablesInFMU")
@@ -1637,9 +1663,10 @@ SUBROUTINE InitExternalInterfaceFMU()
   CHARACTER(len=MaxNameLength),ALLOCATABLE,DIMENSION(:) :: strippedFileName   ! remove path from entered file name
   CHARACTER(len=300),ALLOCATABLE,DIMENSION(:) :: fullFileName   ! entered file name/found
   INTEGER :: pos
+  INTEGER :: FOUND
 
 IF (FirstCallIni) THEN
-  CALL DisplayString('Initializing FunctionalMockupUnit interface')
+  CALL DisplayString('Initializing FunctionalMockupUnitImport interface')
   ! do one time initializations
   CALL ValidateRunControl
   ALLOCATE(FMU(NumFMUObjects))
@@ -1660,7 +1687,7 @@ IF (FirstCallIni) THEN
   strippedFileName=' '
   ALLOCATE(fullFileName(NumFMUObjects))
   fullFileName=' '
-  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit'
+  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport'
   DO Loop = 1, NumFMUObjects
     CALL GetObjectItem(cCurrentModuleObject, Loop, cAlphaArgs, &
       NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
@@ -1672,8 +1699,13 @@ IF (FirstCallIni) THEN
       pos=INDEX(FMU(Loop)%Name,PathChar,.true.)  ! look backwards
       IF (pos > 0) THEN
         strippedFileName(Loop)=FMU(Loop)%Name(pos+1:)
-      ELSE
-        strippedFileName(Loop)=FMU(Loop)%Name
+      ELSE  ! pos == 0, look for alt path char
+        pos=INDEX(FMU(Loop)%Name,AltPathChar,.true.)  ! look backwards
+        IF (pos > 0) THEN
+          strippedFileName(Loop)=FMU(Loop)%Name(pos+1:)
+        ELSE
+          strippedFileName(Loop)=FMU(Loop)%Name
+        ENDIF
       ENDIF
       fullFileName(Loop)=tempFullFileName
     ELSE
@@ -1757,7 +1789,7 @@ IF (FirstCallIni) THEN
 
   ! get the names of the input variables each fmu(and the names of the
   ! corresponding output variables in EnergyPlus --).
-  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit:From:Variable'
+  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:From:Variable'
   NumFMUInputVariables = GetNumObjectsFound(cCurrentModuleObject)
   ! Determine the number of instances for each FMUs
   DO i =1, NumFMUObjects
@@ -1766,6 +1798,7 @@ IF (FirstCallIni) THEN
     j = 1
     k = 1
     ALLOCATE(FMU(i)%Instance(NumFMUInputVariables))
+    ALLOCATE(checkInstanceName(NumFMUInputVariables))
     DO l = 1, NumFMUInputVariables
       CALL GetObjectItem(cCurrentModuleObject, l, cAlphaArgs, &
       NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
@@ -1773,15 +1806,20 @@ IF (FirstCallIni) THEN
       IF (SameString(cAlphaArgs(3), FMU(i)%Name)) THEN
         Name_NEW = cAlphaArgs(4)
         IF(.NOT. SameString(Name_OLD, Name_NEW)) THEN
-          FMU(i)%NumInstances = j
-          FMU(i)%Instance(j)%Name = Name_New
-          j = j+1
-          Name_OLD = Name_NEW
+          FOUND = FindItem (Name_New, checkInstanceName%Name, NumFMUInputVariables)
+          IF (FOUND == 0) THEN
+            checkInstanceName(l)%Name = Name_New
+            FMU(i)%NumInstances = j
+            FMU(i)%Instance(j)%Name = Name_New
+            j = j+1
+            Name_OLD = Name_NEW
+          ENDIF
         END IF
         FMU(i)%TotNumInputVariablesInIDF = k
         k = k+1
       END IF
     END DO
+    DEALLOCATE(checkInstanceName)
   END DO
 
   DO i = 1, NumFMUObjects
@@ -1797,7 +1835,7 @@ IF (FirstCallIni) THEN
       CALL ShowWarningError('InitExternalInterfaceFMU: The FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no input variables.')
       CALL ShowContinueError('Check the input field of the corresponding object')
-      CALL ShowContinueError('ExternalInterface:FunctionalMockupUnit:From:Variable.')
+      CALL ShowContinueError('ExternalInterface:FunctionalMockupUnitImport:From:Variable.')
     END IF
   END DO
 
@@ -1822,8 +1860,7 @@ IF (FirstCallIni) THEN
       IF ( retVal .NE. 0 ) THEN
         CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
         CALL ShowContinueError('unpack the FMU "'//TRIM(FMU(i)%Name)//'".')
-        CALL ShowContinueError('Check if the FMU exists and is in the same folder as the input file.')
-        CALL ShowContinueError('Also check if the FMU folder is not write protected.')
+        CALL ShowContinueError('Check if the FMU exists. Also check if the FMU folder is not write protected.')
         ErrorsFound = .true.
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         CALL StopExternalInterfaceIfError
@@ -1873,7 +1910,7 @@ IF (FirstCallIni) THEN
         CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when getting version')
         CALL ShowContinueError('number of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
         CALL ShowContinueError('of FMU "'//TRIM(FMU(i)%Name)//'".')
-        CALL ShowContinueError('The version number found ("'//TRIM(FMU(i)%Instance(j)%fmiVersionNumber)//'")')
+        CALL ShowContinueError('The version number found ("'//TRIM(FMU(i)%Instance(j)%fmiVersionNumber(1:3))//'")')
         CALL ShowContinueError('differs from version 1.0 which is currently supported.')
         ErrorsFound = .true.
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1953,7 +1990,7 @@ IF (FirstCallIni) THEN
       CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)//  &
          '"of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no input variables. Check the input field of')
-      CALL ShowContinueError('the corresponding object: ExternalInterface:FunctionalMockupUnit:From:Variable.')
+      CALL ShowContinueError('the corresponding object: ExternalInterface:FunctionalMockupUnitImport:From:Variable.')
     END IF
     END DO
   END DO
@@ -1966,7 +2003,7 @@ IF (FirstCallIni) THEN
       ! get the nmuber of output variables in FMU
       FMU(i)%Instance(j)%NumOutputVariablesInFMU = getNumOutputVariablesInFMU (TRIM(FMU(i)%Instance(j)%WorkingFolder),  &
       LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)))
-       ! check whether the number of input variables in fmu is bigger than in the idf 
+       ! check whether the number of input variables in fmu is bigger than in the idf
       IF (FMU(i)%Instance(j)%NumInputVariablesInFMU .GT. FMU(i)%Instance(j)%NumInputVariablesInIDF) THEN
         CALL ShowSevereError('InitExternalInterfaceFMU: The number of input variables defined in input file ('//&
            TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumInputVariablesInIDF))//')')
@@ -1997,7 +2034,7 @@ IF (FirstCallIni) THEN
 
   ! get the names of the output variables each fmu (and the names of the
   ! corresponding input variables in EnergyPlus -- schedule).
-  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Schedule'
+  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Schedule'
   NumFMUInputVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   DO i =1, NumFMUObjects
@@ -2075,14 +2112,14 @@ IF (FirstCallIni) THEN
       CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Schedule. Check the input field of')
-      CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnit:To:Schedule.')
+      CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnitImport:To:Schedule.')
     END IF
     END DO
   END DO
 
   ! get the names of the output variables each fmu (and the names of the
   ! corresponding input variables in EnergyPlus -- variable).
-  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Variable'
+  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Variable'
   NumFMUInputVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   DO i =1, NumFMUObjects
@@ -2161,7 +2198,7 @@ IF (FirstCallIni) THEN
       CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Variable. Check the input field of')
-      CALL ShowContinueError('the corresponding object:ExternalInterface: FunctionalMockupUnit:To:Variable.')
+      CALL ShowContinueError('the corresponding object:ExternalInterface: FunctionalMockupUnitImport:To:Variable.')
     END IF
     ! set the flag useEMs to true. This will be used then to update the erl variables in erl data structure
     IF ( FMU(i)%Instance(j)%NumOutputVariablesVariable .GE. 1) THEN
@@ -2172,7 +2209,7 @@ IF (FirstCallIni) THEN
 
   ! get the names of the output variables each fmu (and the names of the
   ! corresponding input variables in EnergyPlus -- actuator).
-  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Actuator'
+  cCurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
   NumFMUInputVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   DO i =1, NumFMUObjects
@@ -2251,7 +2288,7 @@ IF (FirstCallIni) THEN
       CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Actuator. Check the input field of')
-      CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnit:To:Actuator.')
+      CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnitImport:To:Actuator.')
     END IF
     ! set the flag useEMs to true. This will be used then to update the erl variables in erl data structure
     IF (FMU(i)%Instance(j)%NumOutputVariablesActuator .GE. 1 ) THEN
@@ -2291,7 +2328,7 @@ IF (FirstCallIni) THEN
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         CALL StopExternalInterfaceIfError
       END IF
-      
+
       CALL DisplayString('Number of inputs in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" &
       of FMU "'//TRIM(FMU(i)%Name)//'" = "'//TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumInputVariablesInIDF))//'".')
       CALL DisplayString('Number of outputs in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" &
@@ -3179,7 +3216,8 @@ SUBROUTINE WarnIfExternalInterfaceObjectsAreUsed(ObjectWord)
   NumObjects = GetNumObjectsFound(TRIM(ObjectWord))
   IF (NumObjects > 0) THEN
      CALL ShowWarningError( 'IDF file contains object "'//TRIM(ObjectWord)//'",')
-     CALL ShowContinueError('but object "ExternalInterface" is not specified. Values will not be updated.')
+     CALL ShowContinueError('but object "ExternalInterface" with appropriate key entry is not specified. '//  &
+        'Values will not be updated.')
   END IF
 
 END SUBROUTINE WarnIfExternalInterfaceObjectsAreUsed
@@ -3224,10 +3262,11 @@ SUBROUTINE VerifyExternalInterfaceObject
   cCurrentModuleObject='ExternalInterface'
   CALL GetObjectItem(cCurrentModuleObject, 1, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
        AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
-  IF ( (.NOT. SameString(cAlphaArgs(1), 'PtolemyServer')).AND.(.NOT. SameString(cAlphaArgs(1), 'FunctionalMockupUnit'))) THEN
+  IF ((.NOT. SameString(cAlphaArgs(1), 'PtolemyServer')).AND.(.NOT. SameString(cAlphaArgs(1), 'FunctionalMockupUnitImport'))&
+      .AND.(.NOT. SameString(cAlphaArgs(1), 'FunctionalMockupUnitExport'))) THEN
      CALL ShowSevereError('VerifyExternalInterfaceObject: '//trim(cCurrentModuleObject)//   &
         ', invalid '//trim(cAlphaFieldNames(1))//'="'//trim(cAlphaArgs(1))//'".')
-     CALL ShowContinueError('only "PtolemyServer or FunctionalMockupUnit" allowed.')
+     CALL ShowContinueError('only "PtolemyServer or FunctionalMockupUnitImport or FunctionalMockupUnitExport" allowed.')
      ErrorsFound = .TRUE.
   ENDIF
 

@@ -339,7 +339,7 @@ LOGICAL :: WeatherFileExists=.FALSE.       ! Set to true if a weather file exist
 Character(len=100) :: LocationTitle=Blank   ! Location Title from input File
 LOGICAL :: LocationGathered=.false.        ! flag to show if Location exists on Input File (we assume one is there and
                                            ! correct on weather file)
-CHARACTER(len=100) :: WeatherFileLocationTitle=Blank ! Location Title from Weather File
+
 REAL(r64)  :: WeatherFileLatitude  = 0.0
 REAL(r64)  :: WeatherFileLongitude = 0.0
 REAL(r64)  :: WeatherFileTimeZone  = 0.0
@@ -4747,7 +4747,7 @@ SUBROUTINE OpenEPlusWeatherFile(ErrorsFound,ProcessHeader)
 
   RETURN
 
-  9997 CALL ShowSevereError('OpenWeatherFile: EPW Weather File appears to be a Unicode file.',OutputFileStandard)
+  9997 CALL ShowSevereError('OpenWeatherFile: EPW Weather File appears to be a Unicode or binary file.',OutputFileStandard)
        CALL ShowContinueError('...This file cannot be read by this program. Please save as PC or Unix file and try again')
        CALL ShowFatalError('Program terminates due to previous condition.')
 
@@ -5447,6 +5447,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
   Integer :: RP    ! number of run periods
   Integer :: RPAW  ! number of run periods, actual weather
   Integer :: Ptr
+  Integer :: LocalLeapYearAdd
 
          ! FLOW:
   RP=GetNumObjectsFound('RunPeriod')
@@ -5457,6 +5458,11 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
 
   cCurrentModuleObject='RunPeriod'
   count=0
+  IF(.not. WFAllowsLeapYears) THEN
+    LocalLeapYearAdd=0
+  ELSE
+    LocalLeapYearAdd=1
+  ENDIF
   DO Loop=1,RP
     CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -5528,7 +5534,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
           ErrorsFound=.true.
         ENDIF
       CASE (2)
-        IF (RunPeriodInput(Loop)%StartDay > 28+LeapYearAdd) THEN
+        IF (RunPeriodInput(Loop)%StartDay > 28+LocalLeapYearAdd) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
              TRIM(cNumericFieldNames(2))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%StartDay))//']')
           CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(1))//'=['//   &
@@ -5561,7 +5567,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
           ErrorsFound=.true.
         ENDIF
       CASE (2)
-        IF (RunPeriodInput(Loop)%EndDay > 28+LeapYearAdd) THEN
+        IF (RunPeriodInput(Loop)%EndDay > 28+LocalLeapYearAdd) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object #'//TRIM(TrimSigDigits(Loop))//', '//  &
              TRIM(cNumericFieldNames(4))//' invalid=['//TRIM(TrimSigDigits(RunPeriodInput(Loop)%EndDay))//']')
           CALL ShowContinueError('Indicated '//trim(cNumericFieldNames(3))//'=['//   &
@@ -9467,7 +9473,7 @@ SUBROUTINE SetupEnvironmentTypes
   INTEGER :: Loop1
   INTEGER :: JDay1
   INTEGER :: JDay2
-
+  INTEGER :: LocalLeapYearAdd
 
           ! Transfer weather file information to the Environment derived type
       Envrn=TotDesDays+1
@@ -9532,13 +9538,15 @@ SUBROUTINE SetupEnvironmentTypes
           Environment(Envrn)%CurrentYear=0
           IF (.not. WFAllowsLeapYears) THEN
             Environment(Envrn)%IsLeapYear=.false.  ! explicit set
+            LocalLeapYearAdd=0
           ELSE
             Environment(Envrn)%IsLeapYear=.true.  ! explicit set
+            LocalLeapYearAdd=1
           ENDIF
           Environment(Envrn)%TreatYearsAsConsecutive=.false.
           Environment(Envrn)%RollDayTypeOnRepeat=RunPeriodInput(Loop)%RollDayTypeOnRepeat
-          Environment(Envrn)%StartJDay=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,LeapYearAdd)
-          Environment(Envrn)%EndJDay=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,LeapYearAdd)
+          Environment(Envrn)%StartJDay=JulianDay(RunPeriodInput(Loop)%StartMonth,RunPeriodInput(Loop)%StartDay,LocalLeapYearAdd)
+          Environment(Envrn)%EndJDay=JulianDay(RunPeriodInput(Loop)%EndMonth,RunPeriodInput(Loop)%EndDay,LocalLeapYearAdd)
         ! need message if isleapyear and wfleapyearind=0
           IF (Environment(Envrn)%StartJDay <= Environment(Envrn)%EndJDay) THEN
             Environment(Envrn)%RawSimDays=(Environment(Envrn)%EndJDay-Environment(Envrn)%StartJDay+1)

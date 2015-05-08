@@ -54,6 +54,11 @@ PRIVATE ! Everything private unless explicitly made public
     INTEGER, PARAMETER :: LimitFlowRate               = 2
     INTEGER, PARAMETER :: LimitCapacity               = 3
     INTEGER, PARAMETER :: LimitFlowRateAndCapacity    = 4
+    CHARACTER(len=*), DIMENSION(4), PARAMETER :: cLimitType=  &
+       (/'NoLimit                 ',  &
+         'LimitFlowRate           ',  &
+         'LimitCapacity           ',  &
+         'LimitFlowRateAndCapacity'/)
   ! Dehumidification and Humidification control type parameters
     INTEGER, PARAMETER :: None                        = 1
     INTEGER, PARAMETER :: ConstantSensibleHeatRatio   = 2
@@ -78,7 +83,7 @@ PRIVATE ! Everything private unless explicitly made public
     INTEGER, PARAMETER :: Deadband                  = 3
   ! Delta humidity ratio limit, 0.00025 equals delta between 45F dewpoint and 46F dewpoint
   ! used to prevent dividing by near zero
-    REAL(r64), PARAMETER :: SmallDeltaHumRat = 0.00025
+    REAL(r64), PARAMETER :: SmallDeltaHumRat = 0.00025d0
 
   ! DERIVED TYPE DEFINITIONS:
     TYPE ZonePurchasedAir
@@ -158,6 +163,9 @@ PRIVATE ! Everything private unless explicitly made public
       INTEGER   :: OAFlowMaxCoolOutputIndex = 0          ! Recurring warning index for OAFlow > Max Cooling Flow error
       INTEGER   :: OAFlowMaxHeatOutputIndex = 0          ! Recurring warning index for OAFlow > Max Heating Flow error
       INTEGER   :: SaturationOutputIndex    = 0          ! Recurring warning index for OAFlow > Max Heating Flow error
+      INTEGER   :: AvailStatus              = 0
+      INTEGER   :: CoolErrIndex             = 0          ! Cooling setpoint error index (recurring errors)
+      INTEGER   :: HeatErrIndex             = 0          ! Heating setpoint error index (recurring errors)
 
       ! Output variables
       REAL(r64) :: SenHeatEnergy           = 0.0d0      ! Sensible heating energy consumed [J]
@@ -806,6 +814,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
         CALL SetupOutputVariable('Ideal Loads Time Heat Recovery Active [hr]', PurchAir(PurchAirNum)%TimeHtRecActive, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
 
+        CALL SetupOutputVariable('Ideal Loads Hybrid Ventilation Availability Status',PurchAir(PurchAirNum)%AvailStatus,&
+                               'System','Average',PurchAir(PurchAirNum)%Name)
+
         IF (AnyEnergyManagementSystemInModel) THEN
           CALL SetupEMSActuator('Ideal Loads Air System', PurchAir(PurchAirNum)%Name, 'Air Mass Flow Rate' , '[kg/s]', &
                                   PurchAir(PurchAirNum)%EMSOverrideMdotOn, PurchAir(PurchAirNum)%EMSValueMassFlowRate )
@@ -877,7 +888,11 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag
       LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MySizeFlag
       LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: OneTimeUnitInitsDone ! True if one-time inits for PurchAirNum are completed
-      LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
+!      LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
+      LOGICAL :: UnitOn   ! simple checks for error
+      LOGICAL :: CoolOn   ! simple checks for error
+      LOGICAL :: HeatOn   ! simple checks for error
+
 
       ! Do the Begin Simulation initializations
       IF (MyOneTimeFlag) THEN
@@ -908,6 +923,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
         ! Set recirculation node number
         ! If exhaust node is specified, then recirculation is exhaust node, otherwise use zone return node
+        ! this check has to be done here because of SimPurchasedAir passing in ControlledZoneNum
         IF (PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum .GT. 0) THEN
           PurchAir(PurchAirNum)%ZoneRecircAirNodeNum = PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum
         ELSE IF (ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode .GT. 0) THEN
@@ -973,36 +989,86 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       ! These initializations are done every iteration
       ! check that supply air temps can meet the zone thermostat setpoints
       IF (PurchAir(PurchAirNum)%MinCoolSuppAirTemp > ZoneThermostatSetPointHi(ActualZoneNum) .AND. &
-          ZoneThermostatSetPointHi(ActualZoneNum) .NE. 0) THEN
-        CALL ShowSevereError('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
-                             TRIM(PurchAir(PurchAirNum)%Name) //' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name) )
-        CALL ShowContinueError('..the minimum supply air temperature for cooling ['//  &
-            TRIM(RoundSigDigits(PurchAir(PurchAirNum)%MinCoolSuppAirTemp,2))// &
-            '] is greater than the zone cooling mean air temperature (MAT) setpoint ['//  &
-            TRIM(RoundSigDigits(ZoneThermostatSetPointHi(ActualZoneNum),2))//'].')
-        CALL ShowContinueError('..For operative and comfort thermostat controls, the MAT setpoint is computed.')
-        CALL ShowContinueError('..This error may indicate that the mean radiant temperature or another comfort factor is too warm.')
+          ZoneThermostatSetPointHi(ActualZoneNum) .NE. 0 .and. PurchAir(PurchAirNum)%CoolingLimit == NoLimit) THEN
+            ! Check if the unit is scheduled off
+        UnitOn = .true.
+        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
+          IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%AvailSchedPtr) <= 0) THEN
+            UnitOn = .FALSE.
+          END IF
+        END IF
+            ! Check if cooling available
+        CoolOn = .TRUE.
+        IF (PurchAir(PurchAirNum)%CoolSchedPtr > 0) THEN
+          IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%CoolSchedPtr) <= 0) THEN
+            CoolOn = .FALSE.
+          END IF
+        END IF
+        IF (UnitOn .and. CoolOn) THEN
+          IF (PurchAir(PurchAirNum)%CoolErrIndex == 0) THEN
+            CALL ShowSevereError('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                               TRIM(PurchAir(PurchAirNum)%Name) //' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name) )
+            CALL ShowContinueError('..the minimum supply air temperature for cooling ['//  &
+                TRIM(RoundSigDigits(PurchAir(PurchAirNum)%MinCoolSuppAirTemp,2))// &
+                '] is greater than the zone cooling mean air temperature (MAT) setpoint ['//  &
+                TRIM(RoundSigDigits(ZoneThermostatSetPointHi(ActualZoneNum),2))//'].')
+            CALL ShowContinueError('..For operative and comfort thermostat controls, the MAT setpoint is computed.')
+            CALL ShowContinueError('..This error may indicate that the mean radiant temperature '//  &
+               'or another comfort factor is too warm.')
+            CALL ShowContinueError('Unit availability is nominally ON and Cooling availability is nominally ON.')
+            CALL ShowContinueError('Limit Cooling Capacity Type='//trim(cLimitType(PurchAir(PurchAirNum)%CoolingLimit)))
 ! could check for optemp control or comfort control here
-        CALL ShowContinueErrorTimeStamp(' ')
-        ErrorsFound=.true.
+            CALL ShowContinueErrorTimeStamp(' ')
+          ENDIF
+          CALL ShowRecurringSevereErrorAtEnd('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                             TRIM(PurchAir(PurchAirNum)%Name) //' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name)// &
+                             ', the minimum supply air temperature for cooling error continues',                     &
+                             PurchAir(PurchAirNum)%CoolErrIndex,ReportMinOf=PurchAir(PurchAirNum)%MinCoolSuppAirTemp, &
+                             ReportMaxOf=PurchAir(PurchAirNum)%MinCoolSuppAirTemp,ReportMinUnits='C',ReportMaxUnits='C')
+        ENDIF
       END IF
       IF (PurchAir(PurchAirNum)%MaxHeatSuppAirTemp < ZoneThermostatSetPointLo(ActualZoneNum) .AND. &
-          ZoneThermostatSetPointLo(ActualZoneNum) .NE. 0) THEN
-        CALL ShowSevereError('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '//&
-                             TRIM(PurchAir(PurchAirNum)%Name) // ' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name) )
-        CALL ShowContinueError('..the maximum supply air temperature for heating ['//  &
-            TRIM(RoundSigDigits(PurchAir(PurchAirNum)%MaxHeatSuppAirTemp,2))// &
-            '] is greater than the zone mean air temperature heating setpoint ['//  &
-            TRIM(RoundSigDigits(ZoneThermostatSetPointLo(ActualZoneNum),2))//'].')
-        CALL ShowContinueError('..For operative and comfort thermostat controls, the MAT setpoint is computed.')
-        CALL ShowContinueError('..This error may indicate that the mean radiant temperature or another comfort factor is too warm.')
+          ZoneThermostatSetPointLo(ActualZoneNum) .NE. 0 .and. PurchAir(PurchAirNum)%HeatingLimit == NoLimit) THEN
+            ! Check if the unit is scheduled off
+        UnitOn = .true.
+        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
+          IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%AvailSchedPtr) <= 0) THEN
+            UnitOn = .FALSE.
+          END IF
+        END IF
+            ! Check if heating and cooling available
+        HeatOn = .TRUE.
+        IF (PurchAir(PurchAirNum)%HeatSchedPtr > 0) THEN
+          IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%HeatSchedPtr) <= 0) THEN
+            HeatOn = .FALSE.
+          END IF
+        END IF
+        IF (UnitOn .and. HeatOn) THEN
+          IF (PurchAir(PurchAirNum)%HeatErrIndex == 0) THEN
+            CALL ShowSevereMessage('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '//&
+                                 TRIM(PurchAir(PurchAirNum)%Name) // ' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name) )
+            CALL ShowContinueError('..the maximum supply air temperature for heating ['//  &
+                TRIM(RoundSigDigits(PurchAir(PurchAirNum)%MaxHeatSuppAirTemp,2))// &
+                '] is less than the zone mean air temperature heating setpoint ['//  &
+                TRIM(RoundSigDigits(ZoneThermostatSetPointLo(ActualZoneNum),2))//'].')
+            CALL ShowContinueError('..For operative and comfort thermostat controls, the MAT setpoint is computed.')
+            CALL ShowContinueError('..This error may indicate that the mean radiant temperature '//  &
+               'or another comfort factor is too cold.')
+            CALL ShowContinueError('Unit availability is nominally ON and Heating availability is nominally ON.')
+            CALL ShowContinueError('Limit Heating Capacity Type='//trim(cLimitType(PurchAir(PurchAirNum)%HeatingLimit)))
 ! could check for optemp control or comfort control here
-        CALL ShowContinueErrorTimeStamp(' ')
-        ErrorsFound=.true.
+            CALL ShowContinueErrorTimeStamp(' ')
+          ENDIF
+          CALL ShowRecurringSevereErrorAtEnd('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                             TRIM(PurchAir(PurchAirNum)%Name) //' serving Zone ' // TRIM(Zone(ActualZoneNum)%Name)// &
+                             ', maximum supply air temperature for heating error continues',                         &
+                             PurchAir(PurchAirNum)%HeatErrIndex,ReportMinOf=PurchAir(PurchAirNum)%MaxHeatSuppAirTemp, &
+                             ReportMaxOf=PurchAir(PurchAirNum)%MaxHeatSuppAirTemp,ReportMinUnits='C',ReportMaxUnits='C')
+        ENDIF
       END IF
-      IF (ErrorsFound .and. .not. WarmupFlag) THEN
-        CALL ShowFatalError('Preceding conditions cause termination.')
-      ENDIF
+!      IF (ErrorsFound .and. .not. WarmupFlag) THEN
+!        CALL ShowFatalError('Preceding conditions cause termination.')
+!      ENDIF
 
       RETURN
 
@@ -1163,6 +1229,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           !       MODIFIED       Shirey, Aug 2009 (LatOutputProvided - now MoistOutputProvided)
           !                      M. Witte June 2011, add new features including DCV, economizer, dehumidification
           !                          and humidification,
+          !                      July 2012, Chandan Sharma - FSEC: Added hybrid ventilation manager
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1178,11 +1245,12 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
          USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, ZoneSysMoistureDemand
          USE DataLoopNode, ONLY: Node
          USE DataZoneEquipment, ONLY: ZoneEquipConfig
-         USE DataHVACGlobals, ONLY: SmallLoad
+         USE DataHVACGlobals, ONLY: SmallLoad, ZoneComp, ForceOff
          USE DataHeatBalance, ONLY: Zone
          USE DataHeatBalFanSys, ONLY:TempControlType
          USE General, ONLY: TrimSigDigits
          USE DataContaminantBalance, ONLY: Contaminant
+         USE DataZoneEquipment, ONLY: PurchasedAir_Num
 
         IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1274,6 +1342,15 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             ! get current zone requirements
          QZnHeatSP       = ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputReqToHeatSP
          QZnCoolSP       = ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputReqToCoolSP
+
+         IF (ALLOCATED(ZoneComp)) THEN
+           ZoneComp(PurchasedAir_Num)%ZoneCompAvailMgrs(PurchAirNum)%ZoneNum = ActualZoneNum
+           PurchAir(PurchAirNum)%AvailStatus = ZoneComp(PurchasedAir_Num)%ZoneCompAvailMgrs(PurchAirNum)%AvailStatus
+            ! Check if the hybrid ventilation availability manager is turning the unit off
+           IF (PurchAir(PurchAirNum)%AvailStatus .EQ. ForceOFf) THEN
+             UnitOn = .FALSE.
+           END IF
+         ENDIF
 
             ! Check if the unit is scheduled off
          IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
@@ -1959,7 +2036,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
            PurchAir(PurchAirNum)%OALatOutput = 0.0d0
 
          END IF
- 
+
          PurchAir(PurchAirNum)%OutdoorAirMassFlowRate = OAMassFlowRate
 
          RETURN

@@ -50,13 +50,14 @@ INTEGER, PARAMETER :: HVACTSReporting = 2  ! value for HVAC Time Step Reporting 
 REAL(r64), PARAMETER    :: MaxEXPArg = 709.78        ! maximum exponent in EXP() function
 REAL(r64), PARAMETER    :: Pi = 3.141592653589793D0   ! Pi 3.1415926535897932384626435
 REAL(r64), PARAMETER    :: PiOvr2 = Pi/2.D0          ! Pi/2
+REAL(r64), PARAMETER    :: GravityConstant = 9.807D0
 REAL(r64), PARAMETER    :: DegToRadians = Pi/180.D0  ! Conversion for Degrees to Radians
 REAL(r64), PARAMETER    :: SecInHour = 3600.0D0      ! Conversion for hours to seconds
 REAL(r64), PARAMETER    :: HoursInDay = 24.0D0       ! Number of Hourse in Day
 REAL(r64), PARAMETER    :: SecsInDay = SecInHour*HoursInDay  ! Number of seconds in Day
 REAL(r64), PARAMETER    :: BigNumber=HUGE(1.0d0)     ! Max Number real used for initializations
 REAL(r64), PARAMETER    :: rTinyValue=EPSILON(1.0d0) ! Tiny value to replace use of TINY(x)
-INTEGER, PARAMETER :: MaxNameLength = 100     ! Maximum Name Length in Characters -- should be the same
+INTEGER, PARAMETER      :: MaxNameLength = 100     ! Maximum Name Length in Characters -- should be the same
                                               ! as MaxAlphaArgLength in InputProcessor module
 
 REAL(r64), PARAMETER    :: KelvinConv = 273.15d0     ! Conversion factor for C to K and K to C
@@ -64,6 +65,7 @@ REAL(r64), PARAMETER    :: InitConvTemp = 5.05d0     ! [deg C], standard init vo
 REAL(r64), PARAMETER    :: AutoCalculate = -99999.d0 ! automatically calculate some fields.
 
 REAL(r64), PARAMETER    :: StefanBoltzmann = 5.6697D-8   ! Stefan-Boltzmann constant in W/(m2*K4)
+REAL(r64), PARAMETER    :: UniversalGasConst = 8314.462175D0 !(J/mol*K)
 
 ! Parameters for EMS Calling Points
 INTEGER, PARAMETER :: emsCallFromZoneSizing                           = 1 ! Indentify where EMS called from

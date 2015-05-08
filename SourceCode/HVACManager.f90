@@ -76,6 +76,7 @@ PRIVATE    UpdateZoneListAndGroupLoads
 PUBLIC     CalcAirFlowSimple
 PRIVATE    ReportAirHeatBalance
 PRIVATE    GetStandAloneERVNodes
+PRIVATE    UpdateZoneInletConvergenceLog
 
 CONTAINS
           ! MODULE SUBROUTINES:
@@ -290,7 +291,7 @@ SUBROUTINE ManageHVAC
     IF (TimeStepSys .LT. TimeStepZone) THEN
 
       CALL ManageHybridVentilation
-      CALL CalcAirFlowSimple
+      CALL CalcAirFlowSimple(SysTimestepLoop)
       if (SimulateAirflowNetwork .gt. AirflowNetworkControlSimple) then
         RollBackFlag = .FALSE.
         CALL ManageAirflowNetworkBalance(.FALSE.)
@@ -494,7 +495,8 @@ SUBROUTINE SimHVAC
   USE SimAirServingZones,              ONLY : ManageAirLoops
   USE DataPlant,                       ONLY : SetAllPlantSimFlagsToValue, TotNumLoops, &
                                               PlantManageSubIterations, PlantManageHalfLoopCalls, &
-                                              DemandSide, SupplySide
+                                              DemandSide, SupplySide, PlantLoop, NumConvergenceHistoryTerms, &
+                                              ConvergenceHistoryARR
   USE PlantUtilities,                  ONLY : CheckPlantMixerSplitterConsistency, &
                                               CheckForRunawayPlantTemps, AnyPlantSplitterMixerLacksContinuity
   USE DataGlobals,                     ONLY : AnyPlantInModel
@@ -528,6 +530,22 @@ SUBROUTINE SimHVAC
   CHARACTER(len=MaxNameLength*2),SAVE :: ErrEnvironmentName=' '
   INTEGER  :: LoopNum
   INTEGER  :: LoopSide
+  INTEGER  :: ThisLoopSide
+  
+  INTEGER  :: AirSysNum
+  INTEGER  :: StackDepth
+  CHARACTER(len=10) :: HistoryStack
+  CHARACTER(len=500) :: HistoryTrace
+  INTEGER   :: ZoneInSysIndex
+  REAL(r64) :: SlopeHumRat
+  REAL(r64) :: SlopeMdot
+  REAL(r64) :: SlopeTemps
+  REAL(r64) :: AvgValue
+  LOGICAL   :: FoundOscillationByDuplicate
+  INTEGER   :: ZoneNum
+  INTEGER   :: NodeIndex
+  LOGICAL   :: MonotonicIncreaseFound
+  LOGICAL   :: MonotonicDecreaseFound
 
           ! Initialize all of the simulation flags to true for the first iteration
   SimZoneEquipmentFlag     = .TRUE.
@@ -650,11 +668,14 @@ SUBROUTINE SimHVAC
           ! Eventually, when all of the flags are set to false, the
           ! simulation has converged for this system time step.
 
+    CALL UpdateZoneInletConvergenceLog
+
     HVACManageIteration = HVACManageIteration + 1   ! Increment the iteration counter
 
   END DO
   IF (AnyPlantInModel) THEN
     If (AnyPlantSplitterMixerLacksContinuity()) THEN
+      ! rerun systems in a "Final flow lock/last iteration" mode
       ! now call for one second to last plant simulation
       SimAirLoopsFlag = .FALSE. 
       SimZoneEquipmentFlag = .FALSE.
@@ -671,6 +692,7 @@ SUBROUTINE SimHVAC
       SimElecCircuitsFlag = .TRUE.
       CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
                                   SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowLocked)
+      CALL UpdateZoneInletConvergenceLog
       ! now call for a last plant simulation
       SimAirLoopsFlag = .FALSE. 
       SimZoneEquipmentFlag = .FALSE.
@@ -687,6 +709,7 @@ SUBROUTINE SimHVAC
       SimElecCircuitsFlag = .TRUE.
       CALL SimSelectedEquipment(SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag,&
                                   SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowLocked)
+      CALL UpdateZoneInletConvergenceLog
     ENDIF
   ENDIF
 
@@ -699,10 +722,6 @@ SUBROUTINE SimHVAC
   ENDDO
 
 
-  ! possible to finally rerun systems in a "Final flow lock/last iteration" mode?
-  ! set some new global flow lock. and call all systems one more time?
-
-
   IF ((HVACManageIteration > MaxIter).AND.(.NOT.WarmUpFlag)) THEN
     ErrCount = ErrCount + 1
     IF (ErrCount < 15) THEN
@@ -711,78 +730,810 @@ SUBROUTINE SimHVAC
       CharErrOut=ADJUSTL(CharErrOut)
       CALL ShowWarningError ('SimHVAC: Maximum iterations ('//TRIM(CharErrOut)//') exceeded for all HVAC loops, at '//  &
                               TRIM(EnvironmentName)//', '//TRIM(CurMnDy)//' '//TRIM(CreateSysTimeIntervalString()))
+      IF (SimAirLoopsFlag) THEN
+        CALL ShowContinueError('The solution for one or more of the Air Loop HVAC systems did not appear to converge')
+      ENDIF
+      IF (SimZoneEquipmentFlag) THEN
+        CALL ShowContinueError('The solution for zone HVAC equipment did not appear to converge')
+      ENDIF
+      IF (SimNonZoneEquipmentFlag) THEN
+        CALL ShowContinueError('The solution for non-zone equipment did not appear to converge')
+      ENDIF
+      IF (SimPlantLoopsFlag) THEN
+        CALL ShowContinueError('The solution for one or more plant systems did not appear to converge')
+      ENDIF
+      IF (SimElecCircuitsFlag) THEN
+        CALL ShowContinueError('The solution for on-site electric generators did not appear to converge')
+      ENDIF
       IF (ErrCount == 1 .and. .not. DisplayExtraWarnings) THEN
         CALL ShowContinueError('...use Output:Diagnostics,DisplayExtraWarnings; '// &
         '  to show more details on each max iteration exceeded.')
       ENDIF
       IF (DisplayExtraWarnings) THEN
-        WRITE(CharErrOut,'(5L1)') SimAirLoopsFlag,SimZoneEquipmentFlag,SimNonZoneEquipmentFlag,SimPlantLoopsFlag, &
-                                  SimElecCircuitsFlag
-        CALL ShowContinueError('SimFlags=['//TRIM(CharErrOut)//'] AirLoops['//CharErrOut(1:1)//'],'// &
-                               'ZoneEq['//CharErrOut(2:2)//'],'// &
-                               'NonZoneEq['//CharErrOut(3:3)//'],'// &
-                               'PlantLoops['//CharErrOut(4:4)//'],'// &
-                               'ElecCircuits['//CharErrOut(5:5)//']..F=ok,T=fail')
-        WRITE(CharErrOut,'(7I1)') HVACEnthTolFlag,HVACFlowTolFlag,HVACHumTolFlag,HVACPressTolFlag,HVACQualTolFlag,  &
-                                  HVACEnergyTolFlag,HVACTempTolFlag
-        CALL ShowContinueError('HVAC Tolerance Flags=['//TRIM(CharErrOut)//'] Enthalpy['//CharErrOut(1:1)//'],'// &
-                               'MassFlow['//CharErrOut(2:2)//'],'// &
-                               'HumRat['//CharErrOut(3:3)//'],'// &
-                               'Pressure['//CharErrOut(4:4)//'],'// &
-                               'FlowQual['//CharErrOut(5:5)//'],'// &
-                               'Energy['//CharErrOut(6:6)//'],'// &
-                               'Temp['//CharErrOut(7:7)//']..0=ok,1=fail')
-        CALL ShowContinueError('HVAC Tolerance Values, Most Recent listed first')
-        que=HVACQuePtr
-        DO WHILE (que > 0)
-          CALL ShowContinueError('HVAC EnthalpyTol='//TRIM(RoundSigDigits(HVACEnthTolValue(que),3))//  &
-                     ', MassFlowTol='//TRIM(RoundSigDigits(HVACFlowTolValue(que),3))// &
-                     ', HumRatTol='//TRIM(RoundSigDigits(HVACHumTolValue(que),4))// &
-                     ', PressureTol='//TRIM(RoundSigDigits(HVACPressTolValue(que),0)))
-          CALL ShowContinueError('     FlowQualTol='//TRIM(RoundSigDigits(HVACQualTolValue(que),2))// &
-                     ', EnergyTol='//TRIM(RoundSigDigits(HVACEnergyTolValue(que),3))//  &
-                     ', TempTol='//TRIM(RoundSigDigits(HVACTempTolValue(que),2)))
-          Call ShowContinueError('HVAC side outlet node=['//TRIM(RoundSigDigits(HVACOutletNodeTolOut(que),0))//  &
-              ' - '//trim(NodeID(HVACOutletNodeTolOut(que)))//']')
-          que=que-1
-          IF (que == 0) que=5
-          if (que == HVACQuePtr) EXIT
-        ENDDO
-        WRITE(CharErrOut,'(8I1)') PlantEnthTolFlag,PlantFlowTolFlag,PlantHumTolFlag,PlantPressTolFlag,PlantQualTolFlag,  &
-                                  PlantEnergyTolFlag,PlantTempTolFlag,PlantFlowFlowTolFlag
-        CALL ShowContinueError('Plant Tolerance Flags=['//TRIM(CharErrOut)//'] Enthalpy['//CharErrOut(1:1)//'],'// &
-                               'MassFlow['//CharErrOut(2:2)//'],'// &
-                               'HumRat['//CharErrOut(3:3)//'],'// &
-                               'Pressure['//CharErrOut(4:4)//'],'// &
-                               'FlowQual['//CharErrOut(5:5)//'],'// &
-                               'Energy['//CharErrOut(6:6)//'],'// &
-                               'Temp['//CharErrOut(7:7)//'],'// &
-                               'PlantFlowMassFlow['//CharErrOut(8:8)//']..0=ok,1=fail')
 
-        CALL ShowContinueError('Plant Tolerance Values, Most Recent listed first')
-        que=PlantQuePtr
-        DO WHILE (que > 0)
-          CALL ShowContinueError('Plant EnthalpyTol='//TRIM(RoundSigDigits(PlantEnthTolValue(que),3))//  &
-                     ', MassFlowTol='//TRIM(RoundSigDigits(PlantFlowTolValue(que),3))// &
-                     ', HumRatTol='//TRIM(RoundSigDigits(PlantHumTolValue(que),4))// &
-                     ', PressureTol='//TRIM(RoundSigDigits(PlantPressTolValue(que),0)))
-          CALL ShowContinueError('     FlowQualTol='//TRIM(RoundSigDigits(PlantQualTolValue(que),2))// &
-                     ', EnergyTol='//TRIM(RoundSigDigits(PlantEnergyTolValue(que),3))//  &
-                     ', TempTol='//TRIM(RoundSigDigits(PlantTempTolValue(que),2)))
-          Call ShowContinueError('Plant side outlet node=['//TRIM(RoundSigDigits(PlantOutletNodeTolOut(que),0))//  &
-              ' - '//trim(NodeID(PlantOutletNodeTolOut(que)))//']')
-          que=que-1
-          IF (que == 0) que=5
-          if (que == PlantQuePtr) EXIT
-        ENDDO
-        CALL ShowContinueError('Plant Flow Tolerance Values, Most Recent listed first')
-        que=PlantFlowQuePtr
-        DO WHILE (que > 0)
-          CALL ShowContinueError('PlantFlowFlowTol='//TRIM(RoundSigDigits(PlantFlowFlowTolValue(que),3)))
-          que=que-1
-          IF (que == 0) que=5
-          if (que == PlantFlowQuePtr) EXIT
-        ENDDO
+        DO AirSysNum = 1, NumPrimaryAirSys
+
+          IF (AirLoopConvergence(AirSysNum)%HVACMassFlowNotConverged) THEN
+
+            CALL ShowContinueError('Air System Named = '//TRIM(AirToZoneNodeInfo(AirSysNum)%AirLoopName)  &
+                                   // ' did not converge for mass flow rate')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACFlowDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+           
+            CALL ShowContinueError('Demand-to-Supply interface mass flow rate check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACFlowSupplyDeck1ToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-demand interface deck 1 mass flow rate check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+                   
+            IF (AirToZoneNodeInfo(AirSysNum)%NumSupplyNodes >= 2) THEN
+              HistoryTrace = ''
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                    // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACFlowSupplyDeck2ToDemandTolValue(StackDepth), 6)) &
+                    // ','
+              ENDDO
+              CALL ShowContinueError('Supply-to-demand interface deck 2 mass flow rate check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            ENDIF
+          ENDIF ! mass flow rate not converged
+          
+          IF (AirLoopConvergence(AirSysNum)%HVACHumRatNotConverged) THEN
+
+            CALL ShowContinueError('Air System Named = '//TRIM(AirToZoneNodeInfo(AirSysNum)%AirLoopName)  &
+                                   // ' did not converge for humidity ratio')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACHumDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Demand-to-Supply interface humidity ratio check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACHumSupplyDeck1ToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-demand interface deck 1 humidity ratio check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+
+            IF (AirToZoneNodeInfo(AirSysNum)%NumSupplyNodes >= 2) THEN
+              HistoryTrace = ''
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                    // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACHumSupplyDeck2ToDemandTolValue(StackDepth), 6)) &
+                    // ','
+              ENDDO
+              CALL ShowContinueError('Supply-to-demand interface deck 2 humidity ratio check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            ENDIF
+          ENDIF ! humidity ratio not converged
+
+          IF (AirLoopConvergence(AirSysNum)%HVACTempNotConverged) THEN
+
+            CALL ShowContinueError('Air System Named = '//TRIM(AirToZoneNodeInfo(AirSysNum)%AirLoopName)  &
+                                   // ' did not converge for temperature')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACTempDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Demand-to-Supply interface temperature check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACTempSupplyDeck1ToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-demand interface deck 1 temperature check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+
+            IF (AirToZoneNodeInfo(AirSysNum)%NumSupplyNodes >= 2) THEN
+              HistoryTrace = ''
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                    // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACTempSupplyDeck1ToDemandTolValue(StackDepth), 6)) &
+                    // ','
+              ENDDO
+              CALL ShowContinueError('Supply-to-demand interface deck 2 temperature check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            ENDIF
+          ENDIF ! Temps not converged
+          IF (AirLoopConvergence(AirSysNum)%HVACEnergyNotConverged) THEN
+
+            CALL ShowContinueError('Air System Named = '//TRIM(AirToZoneNodeInfo(AirSysNum)%AirLoopName)  &
+                                   // ' did not converge for energy')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACEnergyDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Demand-to-Supply interface energy check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACEnergySupplyDeck1ToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-demand interface deck 1 energy check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+
+            IF (AirToZoneNodeInfo(AirSysNum)%NumSupplyNodes >= 2) THEN
+              HistoryTrace = ''
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                    // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACEnergySupplyDeck2ToDemandTolValue(StackDepth), 6)) &
+                    // ','
+              ENDDO
+              CALL ShowContinueError('Supply-to-demand interface deck 2 energy check value iteration history trace: ' &
+                   //TRIM(HistoryTrace) )
+            ENDIF
+          ENDIF ! energy not converged
+          
+        ENDDO  ! loop over air loop systems
+
+        ! loop over zones and check for issues with zone inlet nodes
+        DO ZoneNum = 1, NumOfZones
+
+          DO NodeIndex = 1, ZoneInletConvergence(ZoneNum)%NumInletNodes
+            ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedHumRate  = .FALSE.
+            ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedMassFlow = .FALSE.
+            ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedTemp     = .FALSE.
+            
+            ! Check humidity ratio
+            FoundOscillationByDuplicate = .FALSE.
+            MonotonicDecreaseFound = .FALSE.
+            MonotonicIncreaseFound = .FALSE.
+                        ! check for evidence of oscillation by indentify duplicates when latest value not equal to average
+            AvgValue = SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio) &
+                         / REAL(ConvergLogStackDepth, r64)
+            IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(1) - AvgValue) &
+                > HVACHumRatOscillationToler ) THEN ! last iterate differs from average
+              FoundOscillationByDuplicate = .FALSE.
+              DO StackDepth = 2, ConvergLogStackDepth
+                IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(1) - &
+                   ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(StackDepth)) &
+                    < HVACHumRatOscillationToler) THEN
+                  FoundOscillationByDuplicate = .TRUE.
+                  ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedHumRate = .TRUE.
+                  CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows oscillating humidity ratio across iterations with a repeated value of ' &
+                           //TRIM(RoundSigDigits(  &
+                              ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(1), 6) ) )
+                  EXIT
+                ENDIF
+              ENDDO
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeHumRat = ( SUM( ConvergLogStackARR) &
+                            *SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio)&
+                           - REAL(ConvergLogStackDepth, r64) * SUM((ConvergLogStackARR &
+                                 * ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio)) ) &
+                            / ( SUM(ConvergLogStackARR)**2 &
+                             -  REAL(ConvergLogStackDepth, r64)*SUM( ConvergLogStackARR**2) )
+                IF (ABS(SlopeHumRat) > HVACHumRatSlopeToler) THEN
+                
+                  IF (SlopeHumRat < 0.d0) THEN  ! check for monotic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(StackDepth-1) > &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically decreasing humidity ratio with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeHumRat, 6)) &
+                           //' [ kg-water/kg-dryair/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(StackDepth-1) < &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically increasing humidity ratio with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeHumRat, 6)) &
+                           //' [ kg-water/kg-dryair/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF ! significant slope in iterates
+              ENDIF !no osciallation
+            ENDIF ! last value does not equal average of stack.
+            
+            IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+              HistoryTrace = ' '
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                // TRIM(roundSigDigits(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex) &
+                                        %HumidityRatio(StackDepth), 6) ) // ','
+              ENDDO
+              CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' humidity ratio [kg-water/kg-dryair] iteration history trace (most recent first): ' &
+                           //TRIM(HistoryTrace) )
+            ENDIF ! need to report trace
+            ! end humidity ratio
+            
+            ! Check Mass flow rate
+            FoundOscillationByDuplicate = .FALSE.
+            MonotonicDecreaseFound = .FALSE.
+            MonotonicIncreaseFound = .FALSE.
+                        ! check for evidence of oscillation by indentify duplicates when latest value not equal to average
+            AvgValue = SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate) &
+                         / REAL(ConvergLogStackDepth, r64)
+            IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(1) - AvgValue) &
+                > HVACFlowRateOscillationToler ) THEN ! last iterate differs from average
+              FoundOscillationByDuplicate = .FALSE.
+              DO StackDepth = 2, ConvergLogStackDepth
+                IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(1) - &
+                   ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(StackDepth)) &
+                    < HVACFlowRateOscillationToler) THEN
+                  FoundOscillationByDuplicate = .TRUE.
+                  ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedMassFlow = .TRUE.
+                  CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows oscillating mass flow rate across iterations with a repeated value of ' &
+                           //TRIM(RoundSigDigits(  &
+                              ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(1), 6) ) )
+                  EXIT
+                ENDIF
+              ENDDO
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeMdot = ( SUM( ConvergLogStackARR) &
+                            *SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate)&
+                           - REAL(ConvergLogStackDepth, r64) * SUM((ConvergLogStackARR &
+                                 * ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate)) ) &
+                            / ( SUM(ConvergLogStackARR)**2 &
+                             -  REAL(ConvergLogStackDepth, r64)*SUM( ConvergLogStackARR**2) )
+                IF (ABS(SlopeMdot) > HVACFlowRateSlopeToler) THEN
+                  ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedMassFlow = .TRUE.
+                  IF (SlopeMdot < 0.d0) THEN  ! check for monotic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(StackDepth-1) > &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically decreasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 6)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(StackDepth-1) < &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically increasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 6)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF ! significant slope in iterates
+              ENDIF !no osciallation
+            ENDIF ! last value does not equal average of stack.
+            
+            IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+              HistoryTrace = ' '
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                // TRIM(roundSigDigits(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex) &
+                                        %MassFlowRate(StackDepth), 6) ) // ','
+              ENDDO
+              CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' mass flow rate [kg/s] iteration history trace (most recent first): ' &
+                           //TRIM(HistoryTrace) )
+            ENDIF ! need to report trace
+            ! end mass flow rate
+
+            ! Check Temperatures
+            FoundOscillationByDuplicate = .FALSE.
+            MonotonicDecreaseFound = .FALSE.
+            MonotonicIncreaseFound = .FALSE.
+                        ! check for evidence of oscillation by indentify duplicates when latest value not equal to average
+            AvgValue = SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature) &
+                         / REAL(ConvergLogStackDepth, r64)
+            IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(1) - AvgValue) &
+                > HVACTemperatureOscillationToler ) THEN ! last iterate differs from average
+              FoundOscillationByDuplicate = .FALSE.
+              DO StackDepth = 2, ConvergLogStackDepth
+                IF (ABS(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(1) - &
+                   ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(StackDepth)) &
+                    < HVACTemperatureOscillationToler) THEN
+                  FoundOscillationByDuplicate = .TRUE.
+                  ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedTemp = .TRUE.
+                  CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows oscillating temperatures across iterations with a repeated value of ' &
+                           //TRIM(RoundSigDigits(  &
+                              ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(1), 6) ) )
+                  EXIT
+                ENDIF
+              ENDDO
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeTemps = ( SUM( ConvergLogStackARR) &
+                            *SUM(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature)&
+                           - REAL(ConvergLogStackDepth, r64) * SUM((ConvergLogStackARR &
+                                 * ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature)) ) &
+                            / ( SUM(ConvergLogStackARR)**2 &
+                             -  REAL(ConvergLogStackDepth, r64)*SUM( ConvergLogStackARR**2) )
+                IF (ABS(SlopeTemps) > HVACTemperatureSlopeToler) THEN
+                  ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedTemp = .TRUE.
+                  IF (SlopeTemps < 0.d0) THEN  ! check for monotic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(StackDepth-1) > &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically decreasing temperature with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 4)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, ConvergLogStackDepth
+                      IF (ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(StackDepth-1) < &
+                          ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' shows monotonically increasing temperatures with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 4)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF ! significant slope in iterates
+              ENDIF !no osciallation
+            ENDIF ! last value does not equal average of stack.
+            
+            IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+              HistoryTrace = ' '
+              DO StackDepth = 1, ConvergLogStackDepth
+                HistoryTrace = TRIM(HistoryTrace) &
+                // TRIM(roundSigDigits(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex) &
+                                        %Temperature(StackDepth), 6) ) // ','
+              ENDDO
+              CALL ShowContinueError('Node named ' &
+                           //TRIM(NodeID(ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum)) &
+                           //' temperature [C] iteration history trace (most recent first): ' &
+                           //TRIM(HistoryTrace) )
+            ENDIF ! need to report trace
+            ! end Temperature checks
+
+          ENDDO ! loop over zone inlet nodes
+        ENDDO ! loop over zones
+        
+        DO LoopNum = 1, TotNumLoops
+        
+          IF (PlantConvergence(LoopNum)%PlantMassFlowNotConverged) THEN
+            CALL ShowContinueError('Plant System Named = '//TRIM(PlantLoop(LoopNum)%Name)  &
+                                   // ' did not converge for mass flow rate')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Demand-to-Supply interface mass flow rate check value iteration history trace: ' &
+                 //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-Demand interface mass flow rate check value iteration history trace: ' &
+                 //TRIM(HistoryTrace) )
+            
+            ! now work with history logs for mass flow to detect issues
+            DO ThisLoopSide = 1, SIZE(PlantLoop(LoopNum)%LoopSide)
+              ! loop side inlet node
+              FoundOscillationByDuplicate = .FALSE.
+              MonotonicDecreaseFound = .FALSE.
+              MonotonicIncreaseFound = .FALSE.
+              AvgValue = SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory) &
+                          / REAL(NumConvergenceHistoryTerms, r64)
+              IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(1) - AvgValue) &
+                   > PlantFlowRateOscillationToler) THEN
+                FoundOscillationByDuplicate = .FALSE.
+                DO StackDepth = 2, NumConvergenceHistoryTerms
+                  IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(1) - &
+                       PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(StackDepth)) &
+                         < PlantFlowRateOscillationToler) THEN
+                    FoundOscillationByDuplicate = .TRUE.
+                    CALL ShowContinueError('Node named ' &
+                         //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                         //' shows oscillating flow rates across iterations with a repeated value of ' &
+                         //TRIM(RoundSigDigits(  &
+                            PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(1), 7) ) )
+                    EXIT
+                  ENDIF
+                ENDDO
+              ENDIF
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeMdot = ( SUM( ConvergenceHistoryARR) &
+                          *SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory)&
+                         - REAL(NumConvergenceHistoryTerms, r64) * SUM((ConvergenceHistoryARR &
+                               * PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory)) ) &
+                          / ( SUM(ConvergenceHistoryARR)**2 &
+                           -  REAL(NumConvergenceHistoryTerms, r64)*SUM( ConvergenceHistoryARR**2) )
+                IF (ABS(SlopeMdot) > PlantFlowRateSlopeToler) THEN
+                  IF (SlopeMdot < 0.d0) THEN  ! check for monotonic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(StackDepth-1) > &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                           //' shows monotonically decreasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 7)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotonic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(StackDepth-1) < &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%MassFlowRateHistory(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                           //' shows monotonically increasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 7)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF  ! significant slope found
+              ENDIF ! no oscillation found
+              
+              IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+                HistoryTrace = ' '
+                DO StackDepth = 1, NumConvergenceHistoryTerms
+                  HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode &
+                                            %MassFlowRateHistory(StackDepth), 7) ) // ','
+                ENDDO
+                CALL ShowContinueError('Node named ' &
+                             //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                             //' mass flow rate [kg/s] iteration history trace (most recent first): ' &
+                             //TRIM(HistoryTrace) )
+              ENDIF ! need to report trace 
+              ! end of inlet node
+              
+              ! loop side outlet node
+              FoundOscillationByDuplicate = .FALSE.
+              MonotonicDecreaseFound = .FALSE.
+              MonotonicIncreaseFound = .FALSE.
+              AvgValue = SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory) &
+                          / REAL(NumConvergenceHistoryTerms, r64)
+              IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(1) - AvgValue) &
+                   > PlantFlowRateOscillationToler) THEN
+                FoundOscillationByDuplicate = .FALSE.
+                DO StackDepth = 2, NumConvergenceHistoryTerms
+                  IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(1) - &
+                       PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(StackDepth)) &
+                         < PlantFlowRateOscillationToler) THEN
+                    FoundOscillationByDuplicate = .TRUE.
+                    CALL ShowContinueError('Node named ' &
+                         //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                         //' shows oscillating flow rates across iterations with a repeated value of ' &
+                         //TRIM(RoundSigDigits(  &
+                            PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(1), 7) ) )
+                    EXIT
+                  ENDIF
+                ENDDO
+              ENDIF
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeMdot = ( SUM( ConvergenceHistoryARR) &
+                          *SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory)&
+                         - REAL(NumConvergenceHistoryTerms, r64) * SUM((ConvergenceHistoryARR &
+                               * PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory)) ) &
+                          / ( SUM(ConvergenceHistoryARR)**2 &
+                           -  REAL(NumConvergenceHistoryTerms, r64)*SUM( ConvergenceHistoryARR**2) )
+                IF (ABS(SlopeMdot) > PlantFlowRateSlopeToler) THEN
+                  IF (SlopeMdot < 0.d0) THEN  ! check for monotonic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(StackDepth-1) > &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                           //' shows monotonically decreasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 7)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotonic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(StackDepth-1) < &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%MassFlowRateHistory(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                           //' shows monotonically increasing mass flow rate with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeMdot, 7)) &
+                           //' [kg/s/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF  ! significant slope found
+              ENDIF ! no oscillation found
+              
+              IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+                HistoryTrace = ' '
+                DO StackDepth = 1, NumConvergenceHistoryTerms
+                  HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode &
+                                            %MassFlowRateHistory(StackDepth), 7) ) // ','
+                ENDDO
+                CALL ShowContinueError('Node named ' &
+                             //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                             //' mass flow rate [kg/s] iteration history trace (most recent first): ' &
+                             //TRIM(HistoryTrace) )
+              ENDIF ! need to report trace 
+              ! end of Outlet node
+              
+            END DO  ! plant loop sides
+
+          ENDIF ! mass flow not converged
+          
+          IF (PlantConvergence(LoopNum)%PlantTempNotConverged) THEN
+            CALL ShowContinueError('Plant System Named = '//TRIM(PlantLoop(LoopNum)%Name)  &
+                                   // ' did not converge for temperature')
+            CALL ShowContinueError('Check values should be zero. Most Recent values listed first.')
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantConvergence(LoopNum)%PlantTempDemandToSupplyTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Demand-to-Supply interface temperature check value iteration history trace: ' &
+                 //TRIM(HistoryTrace) )
+            HistoryTrace = ''
+            DO StackDepth = 1, ConvergLogStackDepth
+              HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantConvergence(LoopNum)%PlantTempSupplyToDemandTolValue(StackDepth), 6)) &
+                  // ','
+            ENDDO
+            CALL ShowContinueError('Supply-to-Demand interface temperature check value iteration history trace: ' &
+                 //TRIM(HistoryTrace) )
+
+            ! now work with history logs for mass flow to detect issues
+            DO ThisLoopSide = 1, SIZE(PlantLoop(LoopNum)%LoopSide)
+              ! loop side inlet node
+              FoundOscillationByDuplicate = .FALSE.
+              MonotonicDecreaseFound = .FALSE.
+              MonotonicIncreaseFound = .FALSE.
+              AvgValue = SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory) &
+                          / REAL(NumConvergenceHistoryTerms, r64)
+              IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(1) - AvgValue) &
+                   > PlantTemperatureOscillationToler) THEN
+                FoundOscillationByDuplicate = .FALSE.
+                DO StackDepth = 2, NumConvergenceHistoryTerms
+                  IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(1) - &
+                       PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(StackDepth)) &
+                         < PlantTemperatureOscillationToler) THEN
+                    FoundOscillationByDuplicate = .TRUE.
+                    CALL ShowContinueError('Node named ' &
+                         //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                         //' shows oscillating temperatures across iterations with a repeated value of ' &
+                         //TRIM(RoundSigDigits(  &
+                            PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(1), 5) ) )
+                    EXIT
+                  ENDIF
+                ENDDO
+              ENDIF
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeTemps = ( SUM( ConvergenceHistoryARR) &
+                          *SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory)&
+                         - REAL(NumConvergenceHistoryTerms, r64) * SUM((ConvergenceHistoryARR &
+                               * PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory)) ) &
+                          / ( SUM(ConvergenceHistoryARR)**2 &
+                           -  REAL(NumConvergenceHistoryTerms, r64)*SUM( ConvergenceHistoryARR**2) )
+                IF (ABS(SlopeTemps) > PlantTemperatureSlopeToler) THEN
+                  IF (SlopeTemps < 0.d0) THEN  ! check for monotic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(StackDepth-1) > &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                           //' shows monotonically decreasing temperatures with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 5)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(StackDepth-1) < &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode%TemperatureHistory(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                           //' shows monotonically increasing temperatures with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 5)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF  ! significant slope found
+              ENDIF ! no oscillation found
+              
+              IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+                HistoryTrace = ' '
+                DO StackDepth = 1, NumConvergenceHistoryTerms
+                  HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%InletNode &
+                                            %TemperatureHistory(StackDepth), 5) ) // ','
+                ENDDO
+                CALL ShowContinueError('Node named ' &
+                             //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
+                             //' temperature [C] iteration history trace (most recent first): ' &
+                             //TRIM(HistoryTrace) )
+              ENDIF ! need to report trace 
+              ! end of inlet node
+              
+              ! loop side outlet node
+              FoundOscillationByDuplicate = .FALSE.
+              MonotonicDecreaseFound = .FALSE.
+              MonotonicIncreaseFound = .FALSE.
+              AvgValue = SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory) &
+                          / REAL(NumConvergenceHistoryTerms, r64)
+              IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(1) - AvgValue) &
+                   > PlantTemperatureOscillationToler) THEN
+                FoundOscillationByDuplicate = .FALSE.
+                DO StackDepth = 2, NumConvergenceHistoryTerms
+                  IF (ABS(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(1) - &
+                       PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(StackDepth)) &
+                         < PlantTemperatureOscillationToler) THEN
+                    FoundOscillationByDuplicate = .TRUE.
+                    CALL ShowContinueError('Node named ' &
+                         //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                         //' shows oscillating temperatures across iterations with a repeated value of ' &
+                         //TRIM(RoundSigDigits(  &
+                            PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(1), 5) ) )
+                    EXIT
+                  ENDIF
+                ENDDO
+              ENDIF
+              IF (.NOT. FoundOscillationByDuplicate) THEN
+                SlopeTemps = ( SUM( ConvergenceHistoryARR) &
+                          *SUM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory)&
+                         - REAL(NumConvergenceHistoryTerms, r64) * SUM((ConvergenceHistoryARR &
+                               * PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory)) ) &
+                          / ( SUM(ConvergenceHistoryARR)**2 &
+                           -  REAL(NumConvergenceHistoryTerms, r64)*SUM( ConvergenceHistoryARR**2) )
+                IF (ABS(SlopeTemps) > PlantFlowRateSlopeToler) THEN
+                  IF (SlopeTemps < 0.d0) THEN  ! check for monotic decrease
+                    MonotonicDecreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(StackDepth-1) > &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(StackDepth)) THEN
+                        MonotonicDecreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicDecreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                           //' shows monotonically decreasing temperatures with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 5)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ELSE  ! check for monotic incrase
+                    MonotonicIncreaseFound = .TRUE.
+                    DO StackDepth = 2, NumConvergenceHistoryTerms
+                      IF (PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(StackDepth-1) < &
+                          PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode%TemperatureHistory(StackDepth)) THEN
+                        MonotonicIncreaseFound = .FALSE.
+                        EXIT
+                      ENDIF
+                    ENDDO
+                    IF (MonotonicIncreaseFound) THEN
+                      CALL ShowContinueError('Node named ' &
+                           //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                           //' shows monotonically increasing temperatures with a trend rate across iterations of ' &
+                           //TRIM(RoundSigDigits(SlopeTemps, 5)) &
+                           //' [C/iteration]' )
+                    ENDIF
+                  ENDIF
+                ENDIF  ! significant slope found
+              ENDIF ! no oscillation found
+              
+              IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
+                HistoryTrace = ' '
+                DO StackDepth = 1, NumConvergenceHistoryTerms
+                  HistoryTrace = TRIM(HistoryTrace) &
+                  // TRIM(roundSigDigits(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%OutletNode &
+                                            %TemperatureHistory(StackDepth), 5) ) // ','
+                ENDDO
+                CALL ShowContinueError('Node named ' &
+                             //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
+                             //' temperature [C] iteration history trace (most recent first): ' &
+                             //TRIM(HistoryTrace) )
+              ENDIF ! need to report trace 
+              ! end of Outlet node
+              
+            END DO  ! plant loop sides
+                 
+          ENDIF !temperature not converged
+        ENDDO ! loop over plant loop systems
       ENDIF
     ELSE
       IF (EnvironmentName == ErrEnvironmentName) THEN
@@ -1440,7 +2191,7 @@ SUBROUTINE UpdateZoneListAndGroupLoads
 
 END SUBROUTINE UpdateZoneListAndGroupLoads
 
-SUBROUTINE CalcAirFlowSimple
+SUBROUTINE CalcAirFlowSimple(SysTimestepLoop)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Legacy Code
@@ -1483,6 +2234,7 @@ SUBROUTINE CalcAirFlowSimple
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN), OPTIONAL :: SysTimestepLoop               ! System time step index
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
     REAL(r64), PARAMETER :: StdGravity    = 9.80665d0   ! The acceleration of gravity at the sea level (m/s2)
@@ -1580,8 +2332,8 @@ SUBROUTINE CalcAirFlowSimple
    CrossMixingFlag = .FALSE.
    CrossMixingReportFlag = .FALSE.
    MixingReportFlag = .FALSE.
-   IF (Contaminant%CO2Simulation .AND. TotMixing+TotCrossMixing > 0) MixingMassFlowCO2 = 0.0
-   IF (Contaminant%GenericContamSimulation .AND. TotMixing+TotCrossMixing > 0) MixingMassFlowGC = 0.0
+   IF (Contaminant%CO2Simulation .AND. TotMixing+TotCrossMixing+TotRefDoorMixing > 0) MixingMassFlowCO2 = 0.0
+   IF (Contaminant%GenericContamSimulation .AND. TotMixing+TotCrossMixing+TotRefDoorMixing > 0) MixingMassFlowGC = 0.0
 
    IVF = 0.0
    MCPTI = 0.0
@@ -1613,6 +2365,11 @@ SUBROUTINE CalcAirFlowSimple
    DO J=1,NumOfZones
       ZMAT(J) = MAT(J)
       ZHumRat(J) = ZoneAirHumRat(J)
+      ! This is only temperory fix for CR8867.  (L. Gu 8/12)
+      If (PRESENT(SysTimestepLoop) .AND. SysTimestepLoop == 1) Then
+        ZMAT(J) = XMPT(J)
+        ZHumRat(J) = WZoneTimeMinusP(J)
+      End If
    END DO
 
       ! Process the scheduled Ventilation for air heat balance
@@ -2201,6 +2958,16 @@ IF(TotRefDoorMixing > 0) THEN
        MixingMassFlowXHumRat(ZoneA) = MixingMassFlowXHumRat(ZoneA) + MassFlowXHumRatToA
        MixingMassFlowXHumRat(ZoneB) = MixingMassFlowXHumRat(ZoneB) + MassFlowXHumRatToB
 
+       ! Now to determine the CO2 and generic contaminant conditions
+       IF (Contaminant%CO2Simulation) Then
+         MixingMassFlowCO2(ZoneA) = MixingMassFlowCO2(ZoneA) + MassFlowToA * ZoneAirCO2(ZoneB)
+         MixingMassFlowCO2(ZoneB) = MixingMassFlowCO2(ZoneB) + MassFlowToB * ZoneAirCO2(ZoneA)
+       END IF
+       IF (Contaminant%GenericContamSimulation) Then
+         MixingMassFlowCO2(ZoneA) = MixingMassFlowCO2(ZoneA) + MassFlowToA * ZoneAirGC(ZoneB)
+         MixingMassFlowCO2(ZoneB) = MixingMassFlowCO2(ZoneB) + MassFlowToB * ZoneAirGC(ZoneA)
+       END IF
+
      END DO ! J=1,RefDoorMixing(ZoneA)%NumRefDoorConnections
   END DO !ZoneA=1,(NumofZones - 1)
 END IF !(TotRefrigerationDoorMixing > 0) THEN
@@ -2235,7 +3002,7 @@ END IF !(TotRefrigerationDoorMixing > 0) THEN
        IVF=GetCurrentScheduleValue(Infiltration(J)%SchedPtr) &
            * Infiltration(J)%LeakageArea / 1000.0D0          &
            * SQRT( Infiltration(J)%BasicStackCoefficient * ABS(TempExt-ZMAT(NZ))  &
-                  + Infiltration(J)%BasicWindCoefficient * WindExt**2.0D0  )
+                  + Infiltration(J)%BasicWindCoefficient * WindExt**2  )
        IF (IVF < 0.0D0) IVF=0.0D0
        MCpI_temp=IVF*AirDensity*CpAir
        IF (MCpI_temp < 0.0) MCpI_temp=0.0D0
@@ -2245,7 +3012,7 @@ END IF !(TotRefrigerationDoorMixing > 0) THEN
            * SQRT(  ( Infiltration(J)%FlowCoefficient * Infiltration(J)%AIM2StackCoefficient &
                       * (ABS(TempExt-ZMAT(NZ)) )**Infiltration(J)%PressureExponent)**2       &
                       + (Infiltration(J)%FlowCoefficient * Infiltration(J)%AIM2WindCoefficient &
-                         * (Infiltration(J)%ShelterFactor * WindExt)**(2.0D0*Infiltration(J)%PressureExponent) )**2.0D0 )
+                         * (Infiltration(J)%ShelterFactor * WindExt)**(2.0D0*Infiltration(J)%PressureExponent) )**2 )
        IF (IVF < 0.0D0) IVF=0.0D0
        MCpI_temp=IVF*AirDensity*CpAir
        IF (MCpI_temp < 0.0) MCpI_temp=0.0
@@ -2942,6 +3709,78 @@ SUBROUTINE GetStandAloneERVNodes(OutdoorNum)
   RETURN
 
 END SUBROUTINE GetStandAloneERVNodes
+
+SUBROUTINE UpdateZoneInletConvergenceLog
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataConvergPArams, ONLY: ZoneInletConvergence, ConvergLogStackDepth
+  USE DataLoopNode ,     ONLY: Node
+  USE DataGlobals,       ONLY: NumOfZones
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER  :: ZoneNum
+  INTEGER  :: ZoneIndex
+  INTEGER  :: NodeIndex
+  INTEGER  :: NodeNum
+  REAL(r64), DIMENSION(ConvergLogStackDepth) :: tmpRealARR
+   
+  DO ZoneNum = 1, NumOfZones
+  
+    DO NodeIndex = 1, ZoneInletConvergence(ZoneNum)%NumInletNodes
+      NodeNum = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum
+
+      tmpRealARR = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(1) = Node(NodeNum)%HumRat
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(2:ConvergLogStackDepth) = &
+                     TmpRealARR(1:ConvergLogStackDepth-1)
+     
+      tmpRealARR = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(1) = Node(NodeNum)%MassFlowRate
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(2:ConvergLogStackDepth) = &
+                     TmpRealARR(1:ConvergLogStackDepth-1)
+                     
+      tmpRealARR = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(1) = Node(NodeNum)%Temp
+      ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(2:ConvergLogStackDepth) = &
+                     TmpRealARR(1:ConvergLogStackDepth-1)
+    ENDDO
+  ENDDO
+
+  RETURN
+
+END SUBROUTINE UpdateZoneInletConvergenceLog
+
+
+
 !     NOTICE
 !
 !     Copyright © 1996-2012 The Board of Trustees of the University of Illinois

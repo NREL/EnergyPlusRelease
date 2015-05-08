@@ -2048,7 +2048,8 @@ SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
   END SELECT
   RhoAir = PsyRhoAirFnPbTdbW(Node(Damper(DamperNum)%OutletNodeNum)%Press, &
                                 Node(Damper(DamperNum)%OutletNodeNum)%Temp, &
-                               Node(Damper(DamperNum)%OutletNodeNum)%HumRat)
+                               Node(Damper(DamperNum)%OutletNodeNum)%HumRat, &
+                               'HVACDualDuctSystem:CalcOAOnlyMassFlow')
   OAMassFlow = OAVdot * RhoAir
 
   ! multiply the supply air flow based on OA requirements by the fractional schedule

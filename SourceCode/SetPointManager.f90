@@ -3276,7 +3276,8 @@ INTEGER  :: TypeNum                  = 0
 INTEGER  :: TowerNum                 = 0
 INTEGER  :: CondLoopNum              = 0
 INTEGER  :: CondBranchNum            = 0
-
+INTEGER  :: NumChiller               = 0
+INTEGER  :: NumCT                    = 0
 ManagerOn = .TRUE.
 
 ! One time initializations
@@ -3794,6 +3795,7 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
     END DO
 
     ! condenser entering water temperature reset setpoint manager
+    NumCT = 0
     cSetPointManagerType = cValidSPMTypes(iSPMType_CondEntReset)
     DO SetPtMgrNum=1,NumCondEntSetPtMgrs
        ! Scan loops and find the loop index that includes the condenser cooling tower node used as setpoint
@@ -3805,8 +3807,12 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                    ! Check if cooling tower is single speed and generate and error
                    IF (PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == &
                        TypeOf_CoolingTower_SingleSpd) THEN
-                      CALL ShowSevereError('Found Single Speed Cooling Tower, Cooling Tower='// &
+                      CALL ShowSevereError(TRIM(cSetPointManagerType)//'="'//  &
+                        trim(CondEntSetPtMgr(SetPtMgrNum)%Name)//'", invalid tower found')
+                      CALL ShowContinueError('Found SingleSpeed Cooling Tower, Cooling Tower='// &
                         TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name))
+                      CALL ShowContinueError('SingleSpeed cooling towers cannot be used with this setpoint manager on each loop')
+                      ErrorsFound=.true.
                    END IF
                    ! Check if there are more than 1 cooling tower on the plant and generate error
                    IF (PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num ==   &
@@ -3814,13 +3820,19 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                        .or. &
                       PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num ==   &
                          TypeOf_CoolingTower_VarSpd) THEN
-                      IF (CompNum .GT. 1 )THEN
-                        CALL ShowSevereError('Found more than one cooling tower, Cooling Tower='//&
+                        NumCT = NumCT + 1
+                      IF (NumCT .GT. 1 )THEN
+                        CALL ShowSevereError(TRIM(cSetPointManagerType)//'="'//  &
+                          TRIM(CondEntSetPtMgr(SetPtMgrNum)%Name)//'", too many towers found')
+                        CALL ShowContinueError('only one cooling tower can be used with this setpoint manager on each loop')
+                        CALL ShowContinueError('Found more than one cooling tower, Cooling Tower='//&
                           TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name))
+                        ErrorsFound=.true.
                       END IF
                    END IF
                  END DO
                END DO
+               NumCT = 0
                ! Scan all attached chillers in the condenser loop index found to find the chiller index
                DO BranchNum = 1, PlantLoop(LoopNum)%LoopSide(DemandSide)%TotalBranches
                  DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(DemandSide)%Branch(BranchNum)%TotalComponents
@@ -3872,6 +3884,8 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
 
     ! Ideal condenser entering water temperature reset setpoint manager
     cSetPointManagerType = cValidSPMTypes(iSPMType_IdealCondEntReset)
+    NumCT = 0
+    NumChiller = 0
     DO SetPtMgrNum=1,NumIdealCondEntSetPtMgrs
        ! Scan loops and find the loop index that includes the condenser cooling tower node used as setpoint
        DO LoopNum = 1, NumCondLoops + NumPlantLoops ! Begin demand side loops ... When condenser is added becomes NumLoops
@@ -3882,17 +3896,26 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                    ! Check if cooling tower is single speed and generate and error
                    IF (PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == &
                        TypeOf_CoolingTower_SingleSpd) THEN
-                      CALL ShowSevereError('Found Single Speed Cooling Tower, Cooling Tower='// &
+                      CALL ShowSevereError(TRIM(cSetPointManagerType)//'="'//  &
+                        TRIM(IdealCondEntSetPtMgr(SetPtMgrNum)%Name)//'", invalid cooling tower found')
+                      CALL ShowContinueError('Found Single Speed Cooling Tower, Cooling Tower='// &
                         TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name))
+                      CALL ShowContinueError('SingleSpeed cooling towers cannot be used with this setpoint manager on each loop')
+                      ErrorsFound=.true.
                    END IF
                    ! Check if there are more than 1 cooling tower on the plant and generate error
                    IF (PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == &
                          TypeOf_CoolingTower_TwoSpd .or. &
                        PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == &
                          TypeOf_CoolingTower_VarSpd) THEN
-                     IF (CompNum .GT. 1 )THEN
-                       CALL ShowSevereError('Found more than one cooling tower, Cooling Tower='//&
+                     NumCT = NumCT + 1
+                     IF (NumCT .GT. 1 )THEN
+                       CALL ShowSevereError(TRIM(cSetPointManagerType)//'="'//  &
+                         TRIM(IdealCondEntSetPtMgr(SetPtMgrNum)%Name)//'", too many cooling towers found')
+                       CALL ShowContinueError('only one cooling tower can be used with this setpoint manager on each loop')
+                       CALL ShowContinueError('Found more than one cooling tower, Cooling Tower='//&
                          TRIM(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%Name))
+                       ErrorsFound=.true.
                      END IF
                    END IF
                    ! Scan the pump on the condenser water loop
@@ -3905,6 +3928,7 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                    END IF
                  END DO
                END DO
+               NumCT = 0
                ! Scan all attached chillers in the condenser loop index found to find the chiller index
                DO BranchNum = 1, PlantLoop(LoopNum)%LoopSide(DemandSide)%TotalBranches
                  DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(DemandSide)%Branch(BranchNum)%TotalComponents
@@ -3935,6 +3959,7 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                              PlantLoop(LoopNum2)%LoopSide(SupplySide)%Branch(BranchNumPlantSide)%TotalComponents
                             IF(PlantLoop(LoopNum2)%LoopSide(SupplySide)%Branch(BranchNumPlantSide)%  &
                                Comp(CompNumPlantSide)%TypeOf_Num == TypeNum) THEN
+                              NumChiller = NumChiller + 1
                               IdealCondEntSetPtMgr(SetPtMgrNum)%LoopIndexPlantSide = LoopNum2
                               IdealCondEntSetPtMgr(SetPtMgrNum)%ChillerIndexPlantSide = CompNumPlantSide
                               IdealCondEntSetPtMgr(SetPtMgrNum)%BranchIndexPlantSide = BranchNumPlantSide
@@ -3951,14 +3976,17 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                                 END DO
                               END DO
                             END IF
-                            IF (CompNumPlantSide .GT. 1 )THEN
-                              CALL ShowSevereError('Found more than one chiller, chiller ='// &
-                                TRIM(PlantLoop(LoopNum2)%LoopSide(SupplySide)%Branch(BranchNumPlantSide)%  &
-                                  Comp(CompNumPlantSide)%Name))
-                            END IF
                           END DO
                         END DO
                       END DO
+                      IF (NumChiller .GT. 1 )THEN
+                        CALL ShowSevereError(TRIM(cSetPointManagerType)//'="'//  &
+                          TRIM(IdealCondEntSetPtMgr(SetPtMgrNum)%Name)//'", too many chillers found')
+                        CALL ShowContinueError('only one chiller can be used with this setpoint manager on each loop')
+                        CALL ShowContinueError('Found more than one chiller, chiller ='// &
+                          TRIM(PlantLoop(LoopNum)%LoopSide(DemandSide)%Branch(BranchNum)%Comp(CompNum)%Name))
+                        ErrorsFound=.true.
+                      END IF
                       IdealCondEntSetPtMgr(SetPtMgrNum)%TypeNum = TypeNum
                       IdealCondEntSetPtMgr(SetPtMgrNum)%CondLoopNum = LoopNum-NumPlantLoops
                       IdealCondEntSetPtMgr(SetPtMgrNum)%TowerNum = CompNum
@@ -3966,6 +3994,7 @@ IF (ZoneEquipInputsFilled .and. AirLoopInputsFilled) THEN ! check that the zone 
                    END IF
                  END DO
                END DO
+               NumChiller = 0
              END IF
           END DO
        END DO
@@ -4850,7 +4879,7 @@ CpAir = PsyCpAirFnWTdb(Node(ZoneInletNode)%HumRat,Node(ZoneInletNode)%Temp)
 ExtrRateNoHC = CpAir*ZoneMassFlow*(TSupNoHC - ZoneTemp)
 IF (ZoneMassFlow.LE.SmallMassFlow) THEN
   TSetPt = TSupNoHC
-ELSE IF (DeadBand) THEN
+ELSE IF (Deadband .OR. ABS(ZoneLoad) < SmallLoad) THEN
   ! if air with no active heating or cooling provides cooling
   IF (ExtrRateNoHC < 0.0) THEN
     ! if still in deadband, do no active heating or cooling;
@@ -4872,9 +4901,7 @@ ELSE IF (DeadBand) THEN
   ELSE
     TSetPt = TSupNoHC
   END IF
-ELSE IF (ABS(ZoneLoad) < SmallLoad) THEN
-  TSetPt = TSupNoHC
-ELSE IF (ZoneLoad < 0) THEN
+ELSE IF (ZoneLoad < (-1.d0*SmallLoad)) THEN
   TSetPt1 = ZoneTemp + ZoneLoad/(CpAir*ZoneMassFlow)
   TSetPt2 = ZoneTemp + ZoneLoadToHeatSetPt/(CpAir*ZoneMassFlow)
   IF (TSetPt1 > TSupNoHC) THEN
@@ -4886,7 +4913,7 @@ ELSE IF (ZoneLoad < 0) THEN
   ELSE
     TSetPt = TSetPt1
   END IF
-ELSE IF (ZoneLoad > 0) THEN
+ELSE IF (ZoneLoad > SmallLoad) THEN
   TSetPt1 = ZoneTemp + ZoneLoad/(CpAir*ZoneMassFlow)
   TSetPt2 = ZoneTemp + ZoneLoadToCoolSetPt/(CpAir*ZoneMassFlow)
   IF (TSetPt1 < TSupNoHC) THEN

@@ -162,6 +162,8 @@ SUBROUTINE SimTranspiredCollector(CompName, CompIndex)
   USE General,          ONLY: TrimSigDigits
   USE DataLoopNode ,    ONLY: Node
   USE ScheduleManager,  ONLY: GetCurrentScheduleValue
+  USE DataHVACGlobals,  ONLY: TempControlTol
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -212,12 +214,15 @@ SUBROUTINE SimTranspiredCollector(CompName, CompIndex)
   CALL InitTranspiredCollector(CompIndex)
 
   ! Control point of deciding if transpired collector is active or not.
-  IF ( ( any(Node(UTSC(CompIndex)%InletNode)%Temp < Node(UTSC(CompIndex)%ControlNode)%TempSetPoint) .OR. & ! heating required
-       ( any(Node(UTSC(CompIndex)%InletNode)%Temp < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)).and. &
-         any(Node(UTSC(CompIndex)%ZoneNode)%Temp  < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)) ) ) .AND. &
-       (GetCurrentScheduleValue(UTSC(CompIndex)%SchedPtr) > 0.0) .AND. &  !availability Schedle
+  IF ( ( ANY((Node(UTSC(CompIndex)%InletNode)%Temp + TempControlTol) &
+               < Node(UTSC(CompIndex)%ControlNode)%TempSetPoint) .OR. & ! heating required
+       ( ANY((Node(UTSC(CompIndex)%InletNode)%Temp + TempControlTol) &  ! free heating helpful
+              < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)).and. &
+         ANY((Node(UTSC(CompIndex)%ZoneNode)%Temp+ TempControlTol)  &   ! free heating helpful
+              < GetCurrentScheduleValue(UTSC(CompIndex)%FreeHeatSetpointSchedPtr)) ) ) .AND. &
+       (GetCurrentScheduleValue(UTSC(CompIndex)%SchedPtr) > 0.0) .AND. &  !availability Schedule
        (UTSC(CompIndex)%InletMdot > 0.0)   )  THEN  ! OA system is setting mass flow
-           !
+
      UTSC(CompIndex)%isOn = .TRUE.
   ELSE
      UTSC(CompIndex)%isOn = .FALSE.

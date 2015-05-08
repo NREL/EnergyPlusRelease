@@ -190,8 +190,8 @@ CONTAINS
 
     QZnReq = ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputReqToHeatSP
 
-!  IF ((QZnReq <= 0.0) .OR. (Baseboard(BaseboardNum)%WaterInletTemp <= Baseboard(BaseboardNum)%AirInletTemp)) THEN
-  IF (Baseboard(BaseboardNum)%WaterInletTemp <= Baseboard(BaseboardNum)%AirInletTemp) THEN
+  IF ((QZnReq < SmallLoad) .OR. (Baseboard(BaseboardNum)%WaterInletTemp <= Baseboard(BaseboardNum)%AirInletTemp)) THEN
+!  IF (Baseboard(BaseboardNum)%WaterInletTemp <= Baseboard(BaseboardNum)%AirInletTemp) THEN
 ! The baseboard cannot provide cooling.  Thus, if the zone required load is negative or the water inlet
 ! temperature is lower than the zone air temperature, then we need to shut down the baseboard unit
 
@@ -527,10 +527,9 @@ SUBROUTINE InitBaseboard(BaseboardNum, ControlledZoneNumSub)
     Node(WaterInletNode)%Quality       = 0.0
     Node(WaterInletNode)%Press         = 0.0
     Node(WaterInletNode)%HumRat        = 0.0
-    ! pick a mass flow rate that depends on the max water mass flow rate. 0.42 gives an air to water
-    ! capacity ratio of 1 to 10 at max water flow.
+    ! pick a mass flow rate that depends on the max water mass flow rate. CR 8842 changed to factor of 2.0
     IF (Baseboard(BaseboardNum)%AirMassFlowRate <= 0.0) THEN
-      Baseboard(BaseboardNum)%AirMassFlowRate = 0.42d0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
+      Baseboard(BaseboardNum)%AirMassFlowRate = 2.0d0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
     END IF
     MyEnvrnFlag(BaseboardNum) = .FALSE.
   END IF
@@ -626,11 +625,11 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
           Cp =  GetSpecificHeatGlycol(PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidName,  &
                                      60.0d0,                      &
                                      PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex, &
-                                     'SizeBaseboard')
+                                     cCMO_BBRadiator_Water//':SizeBaseboard')
           rho = GetDensityGlycol(PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidName,  &
                                       InitConvTemp, &
                                       PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex,&
-                                      'SizeBaseboard')
+                                      cCMO_BBRadiator_Water//':SizeBaseboard')
           Baseboard(BaseboardNum)%WaterVolFlowRateMax = DesCoilLoad / &
                                                           ( PlantSizData(PltSizHeatNum)%DeltaT * Cp * rho )
         ELSE
@@ -650,14 +649,12 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
         rho = GetDensityGlycol(PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidName,  &
                                InitConvTemp, &
                                PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex,&
-                               'BaseboardRadiator:SizeBaseboard')
+                               cCMO_BBRadiator_Water//':SizeBaseboard')
         Node(WaterInletNode)%MassFlowRate = rho * Baseboard(BaseboardNum)%WaterVolFlowRateMax
         DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor
         IF (DesCoilLoad >= SmallLoad) THEN
-          ! pick an air  mass flow rate that will give a heating capacity of twice the design load
-          ! when effectiveness = 1.
-          Baseboard(BaseboardNum)%DesAirMassFlowRate = 2.d0*DesCoilLoad / (1000.d0 * &
-            (Baseboard(BaseboardNum)%WaterInletTemp - Baseboard(BaseboardNum)%AirInletTemp))
+          ! pick an air  mass flow rate that is twice the water mass flow rate (CR8842)
+          Baseboard(BaseboardNum)%DesAirMassFlowRate = 2.0d0 * rho * Baseboard(BaseboardNum)%WaterVolFlowRateMax
           ! pass along the coil number and the design load to the residual calculation
           Par(1) = DesCoilLoad
           Par(2) = BaseboardNum
@@ -669,13 +666,15 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
             CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, UA, HWBaseboardUAResidual, UA0, UA1, Par)
             ! if the numerical inversion failed, issue error messages.
             IF (SolFla == -1) THEN
-              CALL ShowSevereError('Autosizing of HW baseboard UA failed for baseboard '// &
-                                  TRIM(Baseboard(BaseboardNum)%EquipID))
+              CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
+                 cCMO_BBRadiator_Water//'="'// &
+                 TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
               CALL ShowContinueError('Iteration limit exceeded in calculating coil UA')
               ErrorsFound = .TRUE.
             ELSE IF (SolFla == -2) THEN
-              CALL ShowSevereError('Autosizing of HW baseboard UA failed for baseboard '// &
-                                  TRIM(Baseboard(BaseboardNum)%EquipID))
+              CALL ShowSevereError('SizeBaseboard: Autosizing of HW baseboard UA failed for '//    &
+                 cCMO_BBRadiator_Water//'="'// &
+                 TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
               CALL ShowContinueError('Bad starting values for UA')
               ErrorsFound = .TRUE.
             END IF
@@ -693,8 +692,9 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
     ! if there is no heating Sizing:Plant object and autosizng was requested, issue an error message
     IF (Baseboard(BaseboardNum)%WaterVolFlowRateMax == AutoSize .OR. &
         Baseboard(BaseboardNum)%UA == AutoSize) THEN
-      CALL ShowSevereError('Autosizing of hot water baseboard requires a heating loop Sizing:Plant object')
-      CALL ShowContinueError('Occurs in HW baseboard object='//TRIM(Baseboard(BaseboardNum)%EquipID))
+      CALL ShowSevereError('SizeBaseboard: '//cCMO_BBRadiator_Water//'="'// &
+                 TRIM(Baseboard(BaseboardNum)%EquipID)//'"')
+      CALL ShowContinueError('...Autosizing of hot water baseboard requires a heating loop Sizing:Plant object')
       ErrorsFound = .TRUE.
     END IF
   END IF
@@ -703,7 +703,7 @@ SUBROUTINE SizeBaseboard(BaseboardNum)
   CALL RegisterPlantCompDesignFlow(Baseboard(BaseboardNum)%WaterInletNode,Baseboard(BaseboardNum)%WaterVolFlowRateMax)
 
   IF (ErrorsFound) THEN
-    CALL ShowFatalError('Preceding sizing errors cause program termination')
+    CALL ShowFatalError('SizeBaseboard: Preceding sizing errors cause program termination')
   END IF
 
   RETURN
@@ -733,8 +733,9 @@ END SUBROUTINE SizeBaseboard
           ! USE STATEMENTS:
     USE DataLoopNode, ONLY: Node
     USE DataSizing
-    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, DeadbandOrSetback
+    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
     USE PlantUtilities,        ONLY: SetActuatedBranchFlowRate
+    USE DataHVACGlobals, ONLY: SmallLoad
 
     IMPLICIT NONE
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -785,24 +786,23 @@ END SUBROUTINE SizeBaseboard
     CpWater =  GetSpecificHeatGlycol(PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidName,  &
                            WaterInletTemp,                      &
                            PlantLoop(Baseboard(BaseboardNum)%LoopNum)%FluidIndex, &
-                           'SimHWConvective')
+                           cCMO_BBRadiator_Water//':SimHWConvective')
     CpAir = PsyCpAirFnWTdb(Baseboard(BaseboardNum)%AirInletHumRat,AirInletTemp)
 
     IF (Baseboard(BaseboardNum)%DesAirMassFlowRate > 0.0d0) THEN  ! If UA is autosized, assign design condition
-        AirMassFlowRate = Baseboard(BaseboardNum)%DesAirMassFlowRate
+      AirMassFlowRate = Baseboard(BaseboardNum)%DesAirMassFlowRate
     ELSE
-        AirMassFlowRate = Baseboard(BaseboardNum)%AirMassFlowRate
-            ! pick a mass flow rate that depends on the max water mass flow rate. 0.42 gives an air to water
-            ! capacity ratio of 1 to 10 at max water flow.
-        IF (AirMassFlowRate <= 0.0) &
-            AirMassFlowRate = 0.42d0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
+      AirMassFlowRate = Baseboard(BaseboardNum)%AirMassFlowRate
+            ! pick a mass flow rate that depends on the max water mass flow rate. CR 8842 changed to factor of 2.0
+      IF (AirMassFlowRate <= 0.0) &
+            AirMassFlowRate = 2.0*Baseboard(BaseboardNum)%WaterMassFlowRateMax
     END IF
 
     WaterMassFlowRate = Node(Baseboard(BaseboardNum)%WaterInletNode)%MassFlowRate
     CapacitanceAir = CpAir * AirMassFlowRate
 
-     IF (QZnReq > 0.0d0 &
-       .AND. (.NOT. DeadbandOrSetback(ZoneNum) .OR. MySizeFlag(BaseboardNum)) &
+     IF (QZnReq > SmallLoad &
+       .AND. (.NOT. CurDeadbandOrSetback(ZoneNum) .OR. MySizeFlag(BaseboardNum)) &
        .AND. (GetCurrentScheduleValue(Baseboard(BaseboardNum)%SchedPtr) > 0 .OR. MySizeFlag(BaseboardNum)) &
        .AND. (WaterMassFlowRate > 0.0d0) ) THEN
       CapacitanceWater = CpWater * WaterMassFlowRate
@@ -1071,7 +1071,8 @@ SUBROUTINE UpdateBaseboardPlantConnection(BaseboardTypeNum, &
   IF (CompIndex == 0) THEN
     BaseboardNum = FindItemInList(BaseboardName,Baseboard%EquipID,NumBaseboards)
     IF (BaseboardNum == 0) THEN
-      CALL ShowFatalError('UpdateBaseboardPlantConnection: Specified baseboard not valid ='//TRIM(BaseboardName))
+      CALL ShowFatalError('UpdateBaseboardPlantConnection: Invalid Unit Specified '//cCMO_BBRadiator_Water//  &
+         '="'//TRIM(BaseboardName)//'"')
     ENDIF
     CompIndex=BaseboardNum
   ELSE

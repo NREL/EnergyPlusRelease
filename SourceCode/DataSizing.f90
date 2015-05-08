@@ -62,6 +62,10 @@ INTEGER, PARAMETER :: SteamLoop             = 4
 INTEGER, PARAMETER :: NonCoincident         = 1
 INTEGER, PARAMETER :: Coincident            = 2
 
+! paramters for supply air flow rate method
+INTEGER, PARAMETER :: SupplyAirTemperature  = 1
+INTEGER, PARAMETER :: TemperatureDifference = 2
+
 ! paramters for sizing
 INTEGER, PARAMETER :: FromDDCalc            = 1
 INTEGER, PARAMETER :: InpDesAirFlow         = 2
@@ -79,12 +83,42 @@ REAL(r64), PARAMETER :: AutoSize            = -99999.0d0
 ! parameter for (time-of-peak) sizing format
 CHARACTER(len=*), PARAMETER :: PeakHrMinFmt = "(I2.2,':',I2.2,':00')"
 
+!Zone Outdoor Air Method
+INTEGER, PARAMETER :: ZOAM_FlowPerPerson = 1  ! set the outdoor air flow rate based on number of people in the zone
+INTEGER, PARAMETER :: ZOAM_FlowPerZone = 2    ! sum the outdoor air flow rate per zone based on user input
+INTEGER, PARAMETER :: ZOAM_FlowPerArea = 3    ! sum the outdoor air flow rate based on zone area
+INTEGER, PARAMETER :: ZOAM_FlowPerACH = 4     ! sum the outdoor air flow rate based on number of air changes for the zone
+INTEGER, PARAMETER :: ZOAM_Sum = 5            ! sum the outdoor air flow rate of the people component and the space floor area component
+INTEGER, PARAMETER :: ZOAM_Max = 6            ! use the maximum of the outdoor air flow rate of the people component and
+                                              ! the space floor area component
+
+!System Outdoor Air Method
+INTEGER, PARAMETER :: SOAM_ZoneSum = 1  ! Sum the outdoor air flow rates of all zones
+INTEGER, PARAMETER :: SOAM_VRP = 2      ! Use ASHRAE Standard 62.1-2007 to calculate the system level outdoor air flow rates
+                                        !  considering the zone air distribution effectiveness and the system ventilation efficiency
+INTEGER, PARAMETER :: SOAM_IAQP = 3     ! Use ASHRAE Standard 62.1-2007 IAQP to calculate the system level outdoor air flow rates
+                                        ! based on the CO2 setpoint
+INTEGER, PARAMETER :: SOAM_ProportionalControl = 4     ! Use ASHRAE Standard 62.1-2004 or Trane Engineer's newsletter (volume 34-5)
+                                                       ! to calculate the system level outdoor air flow rates
+INTEGER, PARAMETER :: SOAM_IAQPGC = 5   ! Use ASHRAE Standard 62.1-2004 IAQP to calculate the system level outdoor air flow rates
+                                        ! based on the generic contaminant setpoint
+INTEGER, PARAMETER :: SOAM_IAQPCOM = 6  ! Take the maximum outdoor air rate from both CO2 and generic contaminant controls
+                                        ! based on the generic contaminant setpoint
+
           ! DERIVED TYPE DEFINITIONS:
 TYPE ZoneSizingInputData
   CHARACTER &
     (len=MaxNameLength) :: ZoneName                 = ' '     ! name of a zone
+  INTEGER               :: ZnCoolDgnSAMethod        = 0       ! choice of how to get zone cooling design air temperature;
+                                                              !  1 = specify supply air temperature, 
+                                                              !  2 = calculate from the temperature difference
+  INTEGER               :: ZnHeatDgnSAMethod        = 0       ! choice of how to get zone heating design air temperature;
+                                                              !  1 = specify supply air temperature, 
+                                                              !  2 = calculate from the temperature difference
   REAL(r64)             :: CoolDesTemp              = 0.0d0   ! zone design cooling supply air temperature [C]
   REAL(r64)             :: HeatDesTemp              = 0.0d0   ! zone design heating supply air temperature [C]
+  REAL(r64)             :: CoolDesTempDiff          = 0.0d0   ! zone design cooling supply air temperature difference [deltaC]
+  REAL(r64)             :: HeatDesTempDiff          = 0.0d0   ! zone design heating supply air temperature difference [deltaC]
   REAL(r64)             :: CoolDesHumRat            = 0.0d0   ! zone design cooling supply air humidity ratio [kg-H2O/kg-air]
   REAL(r64)             :: HeatDesHumRat            = 0.0d0   ! zone design heating supply air humidity ratio [kg-H2O/kg-air]
   CHARACTER &
@@ -130,8 +164,16 @@ TYPE ZoneSizingData
     (len=MaxNameLength) :: CoolDesDay               = ' '     ! name of a cooling design day
   CHARACTER &
     (len=MaxNameLength) :: HeatDesDay               = ' '     ! name of a heating design day
+  INTEGER               :: ZnCoolDgnSAMethod        = 0       ! choice of how to get zone cooling design air temperature;
+                                                              !  1 = specify supply air temperature, 
+                                                              !  2 = calculate from the temperature difference
+  INTEGER               :: ZnHeatDgnSAMethod        = 0       ! choice of how to get zone heating design air temperature;
+                                                              !  1 = specify supply air temperature, 
+                                                              !  2 = calculate from the temperature difference
   REAL(r64)             :: CoolDesTemp              = 0.0d0   ! zone design cooling supply air temperature [C]
   REAL(r64)             :: HeatDesTemp              = 0.0d0   ! zone design heating supply air temperature [C]
+  REAL(r64)             :: CoolDesTempDiff          = 0.0d0   ! zone design cooling supply air temperature difference [deltaC]
+  REAL(r64)             :: HeatDesTempDiff          = 0.0d0   ! zone design heating supply air temperature difference [deltaC]
   REAL(r64)             :: CoolDesHumRat            = 0.0d0   ! zone design cooling supply air humidity ratio [kg-H2O/kg-air]
   REAL(r64)             :: HeatDesHumRat            = 0.0d0   ! zone design heating supply air humidity ratio [kg-H2O/kg-air]
   INTEGER               :: OADesMethod              = 0       ! choice of how to calculate minimum outside air;

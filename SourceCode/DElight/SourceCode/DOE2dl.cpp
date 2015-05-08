@@ -52,9 +52,9 @@ using namespace std;
 #include "BGL.h"
 namespace BGL = BldgGeomLib;
 
-#include	"const.h"
-#include	"DBconst.h"
-#include	"def.h"
+#include	"CONST.H"
+#include	"DBCONST.H"
+#include	"DEF.H"
 #include	"helpers.h"
 #include	"hemisphiral.h"
 #include	"NodeMesh2.h"
@@ -62,7 +62,7 @@ namespace BGL = BldgGeomLib;
 #include	"btdf.h"
 #include	"CFSSystem.h"
 #include	"CFSSurface.h"
-#include	"DOE2dl.h"
+#include	"DOE2DL.H"
 
 SURF::SURF() :
 nwndos(0), ncfs(0)

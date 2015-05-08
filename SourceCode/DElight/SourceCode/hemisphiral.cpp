@@ -36,7 +36,6 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 #include <strstream>
 #include <string>
 #include <vector>
-#include <limits>
 using namespace std;
 
 // BGLincludes
@@ -48,9 +47,11 @@ namespace BGL = BldgGeomLib;
 #include "hemisphiral.h"
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
+#ifndef INFINITY
 extern double INFINITY;
+#endif
 extern double NaN_QUIET;
 extern double NaN_SIGNAL;
 extern double MAXPointTol;

@@ -7,6 +7,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
           !                      Remove chiller, make just a storage tank, Michael J. Witte, Sep 2005
           !                      Added detailed ice storage model, Rick Strand, Feb 2006
           !                      B. Griffith, Sept 2010, plant upgrades, fluid properties
+          !                      Enhancements to detailed ice storage model, Rick Strand, Aug 2012
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -43,6 +44,10 @@ MODULE IceThermalStorage  ! Ice Storage Module
 
   INTEGER, PARAMETER :: IceStorageType_Simple   = 1
   INTEGER, PARAMETER :: IceStorageType_Detailed = 2
+  
+  INTEGER, PARAMETER :: DetIceInsideMelt  = 1    ! Inside melt system--charge starting with bare coil
+  INTEGER, PARAMETER :: DetIceOutsideMelt = 2    ! Outside melt system--charge from existing ice layer on coil
+  
        ! ITS parameter
   REAL(r64), PARAMETER :: FreezTemp   = 0.0d0      ! Water freezing Temperature, 0[C]
   REAL(r64), PARAMETER :: FreezTempIP  = 32.0d0    ! Water freezing Temperature, 32[F]
@@ -138,6 +143,9 @@ MODULE IceThermalStorage  ! Ice Storage Module
     REAL(r64)                    :: CompLoad = 0.0              ! load requested by plant [W]
     REAL(r64)                    :: IceFracChange = 0.0         ! Change in fraction of ice stored during the time step [fraction]
     REAL(r64)                    :: IceFracRemaining = 1.0      ! Fraction of ice remaining in storage [fraction]
+    CHARACTER(len=MaxNameLength) :: ThawProcessIndicator = ' '  ! User input determining whether system is inside or outside melt
+    INTEGER                      :: ThawProcessIndex = 0        ! Conversion of thaw process indicator to integer index
+    REAL(r64)                    :: IceFracOnCoil = 1.0d0       ! Fraction of ice on the coil (affects charging) [fraction]
     REAL(r64)                    :: DischargingRate = 0.0       ! Rate at which energy is being added (thawing) to ice unit [W]
     REAL(r64)                    :: DischargingEnergy = 0.0     ! Total energy added to the ice storage unit [J]
     REAL(r64)                    :: ChargingRate = 0.0          ! Rate at which energy is removed (freezing) to ice unit [W]
@@ -561,7 +569,7 @@ SUBROUTINE SimDetailedIceStorage
           ! Determine what the status is regarding the ice storage unit and the loop level flow
   IF ( (ABS(LocalLoad) <= SmallestLoad) .OR. (GetCurrentScheduleValue(DetIceStor(IceNum)%ScheduleIndex) <= 0) ) THEN
           ! No real load on the ice storage device or ice storage OFF--bypass all of the flow and leave the tank alone
-    DetIceStor(IceNum)%CompLoad           = 0.d0
+    DetIceStor(IceNum)%CompLoad           = 0.0d0
     DetIceStor(IceNum)%OutletTemp         = TempIn
     DetIceStor(IceNum)%TankOutletTemp     = TempIn
     mdot = 0.d0
@@ -574,7 +582,7 @@ SUBROUTINE SimDetailedIceStorage
                             DetIceStor(IceNum)%PlantCompNum)
                                   
     DetIceStor(IceNum)%BypassMassFlowRate = mdot
-    DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+    DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
     DetIceStor(IceNum)%MassFlowRate       = mdot
 
   ELSEIF (LocalLoad < 0.0) THEN
@@ -587,7 +595,7 @@ SUBROUTINE SimDetailedIceStorage
           ! device, then we cannot actually do any charging.  Bypass all of the flow.
           ! Also, if the tank is already sufficiently charged, we don't need to
           ! do any further charging.  So, bypass all of the flow.
-      DetIceStor(IceNum)%CompLoad           = 0.0
+      DetIceStor(IceNum)%CompLoad           = 0.0d0
       DetIceStor(IceNum)%OutletTemp         = TempIn
       DetIceStor(IceNum)%TankOutletTemp     = TempIn
       mdot = 0.d0
@@ -600,7 +608,7 @@ SUBROUTINE SimDetailedIceStorage
                               DetIceStor(IceNum)%PlantCompNum)
                                     
       DetIceStor(IceNum)%BypassMassFlowRate = mdot
-      DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+      DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
       DetIceStor(IceNum)%MassFlowRate       = mdot
 
     ELSE
@@ -630,10 +638,14 @@ SUBROUTINE SimDetailedIceStorage
 
           ! Find initial guess at average fraction charged during time step
       ChargeFrac = LocalLoad * TimeStepSys / DetIceStor(IceNum)%NomCapacity
-      IF ((DetIceStor(IceNum)%IceFracRemaining+ChargeFrac) > 1.0) THEN
-        ChargeFrac = 1.0 - DetIceStor(IceNum)%IceFracRemaining
+      IF ((DetIceStor(IceNum)%IceFracRemaining+ChargeFrac) > 1.0d0) THEN
+        ChargeFrac = 1.0d0 - DetIceStor(IceNum)%IceFracRemaining
       END IF
-      AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining + (ChargeFrac/2.0)
+      IF (DetIceStor(IceNum)%ThawProcessIndex == DetIceInsideMelt) THEN
+        AvgFracCharged = DetIceStor(IceNum)%IceFracOnCoil + (ChargeFrac/2.0d0)
+      ELSE ! (DetIceStor(IceNum)%ThawProcessIndex == DetIceOutsideMelt)
+        AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining + (ChargeFrac/2.0d0)
+      END IF
 
       Qstar    = ABS(CurveValue(DetIceStor(IceNum)%ChargeCurveNum,AvgFracCharged,LMTDstar))
 
@@ -663,11 +675,15 @@ SUBROUTINE SimDetailedIceStorage
 
           ! Now make sure that we don't go above 100% charged and calculate the new average fraction
             ChargeFrac = Qstar * (TimeStepSys/DetIceStor(IceNum)%CurveFitTimeStep)
-            IF ((DetIceStor(IceNum)%IceFracRemaining+ChargeFrac) > 1.0) THEN
-              ChargeFrac = 1.0 - DetIceStor(IceNum)%IceFracRemaining
+            IF ((DetIceStor(IceNum)%IceFracRemaining+ChargeFrac) > 1.0d0) THEN
+              ChargeFrac = 1.0d0 - DetIceStor(IceNum)%IceFracRemaining
               Qstar      = ChargeFrac
             END IF
-            AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining + (ChargeFrac/2.0)
+            IF (DetIceStor(IceNum)%ThawProcessIndex == DetIceInsideMelt) THEN
+              AvgFracCharged = DetIceStor(IceNum)%IceFracOnCoil + (ChargeFrac/2.0d0)
+            ELSE ! (DetIceStor(IceNum)%ThawProcessIndex == DetIceOutsideMelt)
+              AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining + (ChargeFrac/2.0d0)
+            END IF
 
           ! Finally, update the actual load and calculate the new outlet temperature; increment iteration counter
             ActualLoad = Qstar * DetIceStor(IceNum)%NomCapacity / DetIceStor(IceNum)%CurveFitTimeStep
@@ -706,7 +722,7 @@ SUBROUTINE SimDetailedIceStorage
           ! approximation.
         DetIceStor(IceNum)%OutletTemp         = ToutNew
         DetIceStor(IceNum)%TankOutletTemp     = ToutNew
-        DetIceStor(IceNum)%BypassMassFlowRate = 0.0
+        DetIceStor(IceNum)%BypassMassFlowRate = 0.0d0
         DetIceStor(IceNum)%TankMassFlowRate   = DetIceStor(IceNum)%MassFlowRate
         DetIceStor(IceNum)%CompLoad           = DetIceStor(IceNum)%MassFlowRate * Cp * ABS(TempIn - ToutNew)
 
@@ -724,7 +740,7 @@ SUBROUTINE SimDetailedIceStorage
           ! device, then we cannot actually do any discharging.  Bypass all of the flow.
           ! Also, if the tank is already discharged, we can't to do any further
           ! discharging.  So, bypass all of the flow.
-      DetIceStor(IceNum)%CompLoad           = 0.0
+      DetIceStor(IceNum)%CompLoad           = 0.0d0
       DetIceStor(IceNum)%OutletTemp         = DetIceStor(IceNum)%InletTemp
       DetIceStor(IceNum)%TankOutletTemp     = DetIceStor(IceNum)%InletTemp
       mdot = 0.d0
@@ -737,7 +753,7 @@ SUBROUTINE SimDetailedIceStorage
                               DetIceStor(IceNum)%PlantCompNum)
                                     
       DetIceStor(IceNum)%BypassMassFlowRate = mdot
-      DetIceStor(IceNum)%TankMassFlowRate   = 0.d0
+      DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
       DetIceStor(IceNum)%MassFlowRate       = mdot
 
     ELSE
@@ -766,10 +782,10 @@ SUBROUTINE SimDetailedIceStorage
 
           ! Find initial guess at average fraction charged during time step
       ChargeFrac = LocalLoad * TimeStepSys / DetIceStor(IceNum)%NomCapacity
-      IF ((DetIceStor(IceNum)%IceFracRemaining-ChargeFrac) < 0.0) ChargeFrac = DetIceStor(IceNum)%IceFracRemaining
-      AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining - (ChargeFrac/2.0)
+      IF ((DetIceStor(IceNum)%IceFracRemaining-ChargeFrac) < 0.0d0) ChargeFrac = DetIceStor(IceNum)%IceFracRemaining
+      AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining - (ChargeFrac/2.0d0)
 
-      Qstar = ABS(CurveValue(DetIceStor(IceNum)%DischargeCurveNum,(1.0-AvgFracCharged),LMTDstar))
+      Qstar = ABS(CurveValue(DetIceStor(IceNum)%DischargeCurveNum,(1.0d0-AvgFracCharged),LMTDstar))
 
       ActualLoad = Qstar * DetIceStor(IceNum)%NomCapacity / DetIceStor(IceNum)%CurveFitTimeStep
 
@@ -793,15 +809,15 @@ SUBROUTINE SimDetailedIceStorage
           ! Calculate new values for LMTDstar and Qstar based on updated outlet temperature
             ToutOld  = ToutNew
             LMTDstar = CalcDetIceStorLMTDstar(TempIn,ToutOld,DetIceStor(IceNum)%FreezingTemp)
-            Qstar    = ABS(CurveValue(DetIceStor(IceNum)%DischargeCurveNum,(1.0-AvgFracCharged),LMTDstar))
+            Qstar    = ABS(CurveValue(DetIceStor(IceNum)%DischargeCurveNum,(1.0d0-AvgFracCharged),LMTDstar))
 
           ! Now make sure that we don't go below 100% discharged and calculate the new average fraction
             ChargeFrac = Qstar * (TimeStepSys/DetIceStor(IceNum)%CurveFitTimeStep)
-            IF ((DetIceStor(IceNum)%IceFracRemaining-ChargeFrac) < 0.0) THEN
+            IF ((DetIceStor(IceNum)%IceFracRemaining-ChargeFrac) < 0.0d0) THEN
               ChargeFrac = DetIceStor(IceNum)%IceFracRemaining
               Qstar      = ChargeFrac
             END IF
-            AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining - (ChargeFrac/2.0)
+            AvgFracCharged = DetIceStor(IceNum)%IceFracRemaining - (ChargeFrac/2.0d0)
 
           ! Finally, update the actual load and calculate the new outlet temperature; increment iteration counter
             ActualLoad = Qstar * DetIceStor(IceNum)%NomCapacity / DetIceStor(IceNum)%CurveFitTimeStep
@@ -1143,6 +1159,20 @@ SUBROUTINE GetIceStorageInput
       ErrorsFound = .TRUE.
     END IF
 
+    DetIceStor(IceNum)%ThawProcessIndicator = cAlphaArgs(9)
+    IF (SameString(DetIceStor(IceNum)%ThawProcessIndicator,'INSIDEMELT')) THEN
+      DetIceStor(IceNum)%ThawProcessIndex = DetIceInsideMelt
+    ELSEIF ( (SameString(DetIceStor(IceNum)%ThawProcessIndicator,'OUTSIDEMELT')) .OR. &
+             (SameString(DetIceStor(IceNum)%ThawProcessIndicator,Blank)) ) THEN
+      DetIceStor(IceNum)%ThawProcessIndex = DetIceOutsideMelt
+    ELSE
+      CALL ShowSevereError('Invalid thaw process indicator of '//TRIM(cAlphaArgs(9))//' was entered')
+      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowContinueError('Value should either be "InsideMelt" or "OutsideMelt"')
+      DetIceStor(IceNum)%ThawProcessIndex = DetIceInsideMelt ! Severe error will end simulation, but just in case...
+      ErrorsFound = .TRUE.
+    END IF
+    
           ! Get the other ice storage parameters (electric, heat loss, freezing temperature) and stupidity check each one
     DetIceStor(IceNum)%DischargeParaElecLoad = rNumericArgs(3)
     DetIceStor(IceNum)%ChargeParaElecLoad    = rNumericArgs(4)
@@ -1179,8 +1209,9 @@ SUBROUTINE GetIceStorageInput
 
           ! Initialize Report Variables
     DetIceStor(IceNum)%CompLoad            = 0.0
-    DetIceStor(IceNum)%IceFracChange       = 0.0
-    DetIceStor(IceNum)%IceFracRemaining    = 1.0
+    DetIceStor(IceNum)%IceFracChange       = 0.0d0
+    DetIceStor(IceNum)%IceFracRemaining    = 1.0d0
+    DetIceStor(IceNum)%IceFracOnCoil       = 1.0d0
     DetIceStor(IceNum)%DischargingRate     = 0.0
     DetIceStor(IceNum)%DischargingEnergy   = 0.0
     DetIceStor(IceNum)%ChargingRate        = 0.0
@@ -1219,6 +1250,8 @@ SUBROUTINE GetIceStorageInput
                                DetIceStor(IceNum)%IceFracChange,'System','Average',DetIceStor(IceNum)%Name)
      CALL SetupOutputVariable('Detailed Ice Thermal Storage End Fraction [Frac]', &
                                DetIceStor(IceNum)%IceFracRemaining,'System','Average',DetIceStor(IceNum)%Name)
+     CALL SetupOutputVariable('Detailed Ice Thermal Storage Fraction on Coil [Frac]', &
+                               DetIceStor(IceNum)%IceFracOnCoil,'System','Average',DetIceStor(IceNum)%Name)
 
           ! Discharge: ITS Information
      CALL SetupOutputVariable('Detailed Ice Thermal Storage Mass Flow Rate [kg/s]', &
@@ -1322,8 +1355,9 @@ SUBROUTINE InitDetailedIceStorage
           ! Make sure all state variables are reset at the beginning of every environment to avoid problems.
           ! The storage unit is assumed to be fully charged at the start of any environment.
           ! The IceNum variable is a module level variable that is already set before this subroutine is called.
-    DetIceStor(IceNum)%IceFracChange       = 0.0
-    DetIceStor(IceNum)%IceFracRemaining    = 1.0
+    DetIceStor(IceNum)%IceFracChange       = 0.0d0
+    DetIceStor(IceNum)%IceFracRemaining    = 1.0d0
+    DetIceStor(IceNum)%IceFracOnCoil       = 1.0d0
     DetIceStor(IceNum)%InletTemp           = 0.0
     DetIceStor(IceNum)%OutletTemp          = 0.0
     DetIceStor(IceNum)%TankOutletTemp      = 0.0
@@ -1357,7 +1391,7 @@ SUBROUTINE InitDetailedIceStorage
           ! Initializations that are done every iteration
           ! Make sure all of the reporting variables are always reset at the start of any iteration
   DetIceStor(IceNum)%CompLoad            = 0.0
-  DetIceStor(IceNum)%IceFracChange       = 0.0
+  DetIceStor(IceNum)%IceFracChange       = 0.0d0
   DetIceStor(IceNum)%DischargingRate     = 0.0
   DetIceStor(IceNum)%DischargingEnergy   = 0.0
   DetIceStor(IceNum)%ChargingRate        = 0.0
@@ -2492,6 +2526,24 @@ SUBROUTINE UpdateIceFractions
                                           -(DetIceStor(IceNum2)%TankLossCoeff*TimeStepSys)
     IF( DetIceStor(IceNum2)%IceFracRemaining < 0.001d0) DetIceStor(IceNum2)%IceFracRemaining = 0.0
     IF( DetIceStor(IceNum2)%IceFracRemaining > 1.000) DetIceStor(IceNum2)%IceFracRemaining = 1.0
+         ! Reset the ice on the coil to zero for inside melt whenever discharging takes place.
+         ! This assumes that any remaining ice floats away from the coil and resettles perfectly.
+         ! While this is not exactly what happens and it is possible theoretically to have multiple
+         ! freeze thaw cycles that are not complete, this is the best we can do.
+    IF (DetIceStor(IceNum2)%ThawProcessIndex == DetIceInsideMelt) THEN
+      IF (DetIceStor(IceNum2)%IceFracChange < 0.0) THEN
+        DetIceStor(IceNum2)%IceFracOnCoil = 0.0
+      ELSE
+         ! Assume loss term does not impact ice on the coil but what is remaining
+        DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracOnCoil &
+                                           +DetIceStor(IceNum2)%IceFracChange
+         ! If the ice remaining has run out because of tank losses, reset ice fraction on coil so that it keeps track of losses
+        IF (DetIceStor(IceNum2)%IceFracOnCoil > DetIceStor(IceNum2)%IceFracRemaining) &
+            DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracRemaining
+      END IF
+    ELSE ! Outside melt system so IceFracOnCoil is always the same as IceFracRemaining (needs to be done for reporting only)
+      DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracRemaining      
+    END IF
   END DO
 
   RETURN

@@ -56,9 +56,9 @@ INTEGER, PARAMETER, DIMENSION(6) :: SubSurfIDs =(/  &
            SurfaceClass_TDD_Dome,   &
            SurfaceClass_TDD_Diffuser/)
 
-INTEGER, PARAMETER :: UnenteredAdjacentZoneSurface=-998     ! allows users to enter one zone surface
+INTEGER, PARAMETER :: UnenteredAdjacentZoneSurface=-998     ! allows users to enter one zone surface ("Zone")
                                                             ! referencing another in adjacent zone
-INTEGER, PARAMETER :: UnreconciledZoneSurface=-999          ! interim value between entering surfaces and reconciling
+INTEGER, PARAMETER :: UnreconciledZoneSurface=-999          ! interim value between entering surfaces ("Surface") and reconciling
                                                             ! surface names in other zones
 
   character(len=*), parameter :: fmt3="(A,3(1x,f18.13))"
@@ -105,6 +105,7 @@ PRIVATE GetSimpleShdSurfaceData
 PRIVATE GetIntMassSurfaceData
 PRIVATE GetShadingSurfReflectanceData
 PRIVATE GetHTSurfExtVentedCavityData
+PRIVATE GetSurfaceHeatTransferAlgorithmOverrides
 PRIVATE GetVertices
 PRIVATE MakeMirrorSurface
 PRIVATE GetWindowShadingControlData
@@ -309,6 +310,20 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
                            Surface(SurfNum)%GrossArea * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
           IF (DetailedWWR) THEN
             WRITE(OutputFileDebug,'(A)') trim(Surface(SurfNum)%Name)//',Wall,'//  &
+               trim(RoundSigDigits(Surface(SurfNum)%GrossArea*Zone(ZoneNum)%Multiplier*Zone(ZoneNum)%ListMultiplier,2))//  &
+               ','//trim(RoundSigDigits(Surface(SurfNum)%Tilt,1))
+          ENDIF
+        ENDIF
+      ELSEIF (Surface(SurfNum)%ExtBoundCond == Ground .or. Surface(SurfNum)%ExtBoundCond == GroundFCfactorMethod) THEN
+        Zone(ZoneNum)%ExteriorTotalGroundSurfArea=Zone(ZoneNum)%ExteriorTotalGroundSurfArea +   &
+                           Surface(SurfNum)%GrossArea
+        IF (Surface(SurfNum)%Class == SurfaceClass_Wall) THEN
+          Zone(ZoneNum)%ExtGrossGroundWallArea = Zone(ZoneNum)%ExtGrossGroundWallArea +   &
+                           Surface(SurfNum)%GrossArea
+          Zone(ZoneNum)%ExtGrossGroundWallArea_Multiplied = Zone(ZoneNum)%ExtGrossGroundWallArea_Multiplied +   &
+                           Surface(SurfNum)%GrossArea * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
+          IF (DetailedWWR) THEN
+            WRITE(OutputFileDebug,'(A)') trim(Surface(SurfNum)%Name)//',Wall-GroundContact,'//  &
                trim(RoundSigDigits(Surface(SurfNum)%GrossArea*Zone(ZoneNum)%Multiplier*Zone(ZoneNum)%ListMultiplier,2))//  &
                ','//trim(RoundSigDigits(Surface(SurfNum)%Tilt,1))
           ENDIF
@@ -724,27 +739,29 @@ SUBROUTINE AllocateModuleArrays
   Z0=0.0d0
 
   ALLOCATE (CBZone(NumOfZones))
-  CBZone=0.0
+  CBZone=0.0d0
   ALLOCATE (DSZone(NumOfZones))
-  DSZone=0.0
+  DSZone=0.0d0
   ALLOCATE (DGZone(NumOfZones))
-  DGZone=0.0
+  DGZone=0.0d0
   ALLOCATE (DBZone(NumOfZones))
-  DBZone=0.0
+  DBZone=0.0d0
   ALLOCATE (QSDifSol(NumOfZones))
-  QSDifSol=0.0
+  QSDifSol=0.0d0
   ALLOCATE (AISurf(TotSurfaces))
-  AISurf=0.0
+  AISurf=0.0d0
   ALLOCATE (AOSurf(TotSurfaces))
-  AOSurf=0.0
+  AOSurf=0.0d0
   ALLOCATE (BmToBmReflFacObs(TotSurfaces))
-  BmToBmReflFacObs=0.0
+  BmToBmReflFacObs=0.0d0
   ALLOCATE (BmToDiffReflFacObs(TotSurfaces))
-  BmToDiffReflFacObs=0.0
+  BmToDiffReflFacObs=0.0d0
   ALLOCATE (BmToDiffReflFacGnd(TotSurfaces))
-  BmToDiffReflFacGnd=0.0
+  BmToDiffReflFacGnd=0.0d0
   ALLOCATE (AWinSurf(TotSurfaces,MaxSolidWinLayers))
-  AWinSurf=0.0
+  AWinSurf=0.0d0
+  ALLOCATE (AWinCFOverlap(TotSurfaces,MaxSolidWinLayers))
+  AWinCFOverlap=0.0d0
 
   RETURN
 
@@ -946,6 +963,7 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
   INTEGER, SAVE :: ErrCount2=0
   INTEGER, SAVE :: ErrCount3=0
   INTEGER, SAVE :: ErrCount4=0  ! counts of interzone area mismatches.
+  LOGICAL :: SubSurfaceSevereDisplayed
  ! INTEGER :: Warning4Count=0  ! counts of nonmatched flat surface subsurface orientations
  ! INTEGER :: Warning5Count=0  ! counts of nonmatched flat surface subsurface orientations - could not be resolved
   LOGICAL :: errFlag
@@ -973,6 +991,8 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
   REAL(r64) :: surfAzimuth
 !  LOGICAL :: Located
   LOGICAL :: sameSurfNormal
+  LOGICAL :: izConstDiff  ! differences in construction for IZ surfaces
+  LOGICAL :: izConstDiffMsg  ! display message about hb diffs only once.
 
           ! FLOW:
 ! Get the total number of surfaces to allocate derived type and for surface loops
@@ -1540,6 +1560,7 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
 ! Now, match up interzone surfaces
 !
   NonMatch=.false.
+  izConstDiffMsg=.false.
   DO SurfNum= 1, MovedSurfs !TotSurfaces
     !  Clean up Shading Surfaces, make sure they don't go through here.
     !  Shading surfaces have "Zone=0", should also have "BaseSurf=0"
@@ -1590,6 +1611,10 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
             ConstrNum = Surface(SurfNum)%Construction
             ConstrNumFound = Surface(Found)%Construction
             IF (ConstrNum <= 0 .or. ConstrNumFound <= 0) CYCLE
+            IF (Construct(ConstrNum)%ReverseConstructionNumLayersWarning .and.   &
+                Construct(ConstrNumFound)%ReverseConstructionNumLayersWarning) CYCLE
+            IF (Construct(ConstrNum)%ReverseConstructionLayersOrderWarning .and.   &
+                Construct(ConstrNumFound)%ReverseConstructionLayersOrderWarning) CYCLE
             TotLay = Construct(ConstrNum)%TotLayers
             TotLayFound = Construct(ConstrNumFound)%TotLayers
             IF(TotLay /= TotLayFound) THEN  ! Different number of layers
@@ -1600,23 +1625,57 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
                                      ' does not have the same number of layers as the construction '   &
                                      //TRIM(Construct(ConstrNumFound)%Name)//  &
                                      ' of adjacent surface '//TRIM(Surface(Found)%Name))
+                IF (.not. Construct(ConstrNum)%ReverseConstructionNumLayersWarning .or.  &
+                    .not. Construct(ConstrNumFound)%ReverseConstructionNumLayersWarning) THEN
+                  CALL ShowContinueError('...this problem for this pair will not be reported again.')
+                  Construct(ConstrNum)%ReverseConstructionNumLayersWarning=.true.
+                  Construct(ConstrNumFound)%ReverseConstructionNumLayersWarning=.true.
+                ENDIF
                 SurfError=.true.
               ENDIF
             ELSE                            ! Same number of layers; check for reverse layers
+              ! check layers as number of layers is the same
+              izConstDiff=.false.
               ! ok if same nominal U
-              IF (ABS(NominalU(ConstrNum)-NominalU(ConstrNumFound)) > .001d0) THEN
-                DO Lay = 1,TotLay
-                  IF(Construct(ConstrNum)%LayerPoint(Lay) /=  &
-                     Construct(ConstrNumFound)%LayerPoint(TotLay-Lay+1)) THEN
-                    CALL ShowSevereError(RoutineName//'Construction '//TRIM(Construct(ConstrNum)%Name)// &
+              DO Lay = 1,TotLay
+                IF(Construct(ConstrNum)%LayerPoint(Lay) /=  &
+                   Construct(ConstrNumFound)%LayerPoint(TotLay-Lay+1)) THEN
+                   izConstDiff=.true.
+                   EXIT  ! exit when diff
+                  END IF
+              END DO
+              IF (izConstDiff .and. ABS(NominalU(ConstrNum)-NominalU(ConstrNumFound)) > .001d0) THEN
+                CALL ShowSevereError(RoutineName//'Construction '//TRIM(Construct(ConstrNum)%Name)// &
+                                    ' of interzone surface '//TRIM(Surface(SurfNum)%Name)// &
+                                    ' does not have the same materials in the reverse order as the construction '   &
+                                    //TRIM(Construct(ConstrNumFound)%Name)//  &
+                                    ' of adjacent surface '//TRIM(Surface(Found)%Name))
+                IF (.not. Construct(ConstrNum)%ReverseConstructionLayersOrderWarning .or.  &
+                    .not. Construct(ConstrNumFound)%ReverseConstructionLayersOrderWarning) THEN
+                  CALL ShowContinueError('...this problem for this pair will not be reported again.')
+                  Construct(ConstrNum)%ReverseConstructionLayersOrderWarning=.true.
+                  Construct(ConstrNumFound)%ReverseConstructionLayersOrderWarning=.true.
+                ENDIF
+                SurfError=.true.
+              ELSEIF (izConstDiff) THEN
+                CALL ShowWarningError(RoutineName//'Construction '//TRIM(Construct(ConstrNum)%Name)// &
                                          ' of interzone surface '//TRIM(Surface(SurfNum)%Name)// &
                                          ' does not have the same materials in the reverse order as the construction '   &
                                          //TRIM(Construct(ConstrNumFound)%Name)//  &
                                          ' of adjacent surface '//TRIM(Surface(Found)%Name))
-                    SurfError=.true.
-                    EXIT  ! Only need to report once
-                  END IF
-                END DO
+                CALL ShowContinueError('...but Nominal U values are similar, diff=['//  &
+                   trim(RoundSigDigits(ABS(NominalU(ConstrNum)-NominalU(ConstrNumFound)),4))//'] ... simulation proceeds.')
+                IF (.not. izConstDiffMsg) THEN
+                  CALL ShowContinueError('...if the two zones are expected to have significantly different temperatures, '//  &
+                     'the proper "reverse" construction should be created.')
+                  izConstDiffMsg=.true.
+                ENDIF
+                IF (.not. Construct(ConstrNum)%ReverseConstructionLayersOrderWarning .or.  &
+                    .not. Construct(ConstrNumFound)%ReverseConstructionLayersOrderWarning) THEN
+                  CALL ShowContinueError('...this problem for this pair will not be reported again.')
+                  Construct(ConstrNum)%ReverseConstructionLayersOrderWarning=.true.
+                  Construct(ConstrNumFound)%ReverseConstructionLayersOrderWarning=.true.
+                ENDIF
               ENDIF
             END IF
 
@@ -1772,11 +1831,12 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
         IF (DisplayExtraWarnings) THEN
           CALL ShowWarningError(RoutineName//'Blank name for Outside Boundary Condition Object, in surface='//  &
                                 TRIM(Surface(SurfNum)%Name))
-          CALL ShowContinueError('Resetting this surface to be an internal zone surface, zone='//TRIM(Surface(SurfNum)%ZoneName))
+          CALL ShowContinueError('Resetting this surface to be an internal zone (adiabatic) surface, zone='//  &
+             TRIM(Surface(SurfNum)%ZoneName))
         ENDIF
         Surface(SurfNum)%ExtBoundCondName=Surface(SurfNum)%Name
         Surface(SurfNum)%ExtBoundCond=SurfNum
-        !SurfError=.true.
+        SurfError=.true.
       ENDIF
     End If
 
@@ -1785,6 +1845,74 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
     CALL ShowSevereError(RoutineName//'Non matching interzone surfaces found')
   End If
 
+!**********************************************************************************
+! Warn about interzone surfaces that have adiabatic windows/vice versa
+  SubSurfaceSevereDisplayed=.false.
+  DO SurfNum=1,TotSurfaces
+    IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+    IF (Surface(SurfNum)%BaseSurf == SurfNum) CYCLE  ! base surface
+    ! not base surface.  Check it.
+    IF (Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond <= 0) THEN  ! exterior or other base surface
+      IF (Surface(SurfNum)%ExtBoundCond /= Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond) THEN ! should match base surface
+        IF (Surface(SurfNum)%ExtBoundCond == SurfNum) THEN
+          CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+             '" exterior condition [adiabatic surface] in a base surface="'//  &
+             trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+             '" with exterior condition ['//  &
+             trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+        ELSEIF (Surface(SurfNum)%ExtBoundCond > 0) THEN
+          CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+             '" exterior condition [interzone surface] in a base surface="'//  &
+             trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+             '" with exterior condition ['//  &
+             trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+        ELSE
+          CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+           '" exterior condition ['//  &
+           trim(cExtBoundCondition(Surface(SurfNum)%ExtBoundCond))//  &
+           '] in a base surface="'//trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+           '" with exterior condition ['//  &
+           trim(cExtBoundCondition(Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond))//']')
+        ENDIF
+        IF (.not. SubSurfaceSevereDisplayed) THEN
+          CALL ShowContinueError('...calculations for heat balance would be compromised.')
+          SubSurfaceSevereDisplayed=.true.
+        ENDIF
+        SurfError=.true.
+      ENDIF
+    ELSEIF (Surface(Surface(SurfNum)%BaseSurf)%BaseSurf == Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond) THEN
+      ! adiabatic surface. make sure subsurfaces match
+      IF (Surface(SurfNum)%ExtBoundCond /= SurfNum) THEN ! not adiabatic surface
+        IF (Surface(SurfNum)%ExtBoundCond > 0) THEN
+          CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+             '" exterior condition [interzone surface] in a base surface="'//  &
+             trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+             '" with exterior condition [adiabatic surface]')
+        ELSE
+          CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+             '" exterior condition ['//  &
+             trim(cExtBoundCondition(Surface(SurfNum)%ExtBoundCond))//  &
+             '] in a base surface="'//trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//  &
+             '" with exterior condition [adiabatic surface]')
+        ENDIF
+        IF (.not. SubSurfaceSevereDisplayed) THEN
+          CALL ShowContinueError('...calculations for heat balance would be compromised.')
+          SubSurfaceSevereDisplayed=.true.
+        ENDIF
+        SurfError=.true.
+      ENDIF
+    ELSEIF (Surface(Surface(SurfNum)%BaseSurf)%ExtBoundCond > 0) THEN  ! interzone surface
+      IF (Surface(SurfNum)%ExtBoundCond == SurfNum) THEN
+        CALL ShowSevereError(RoutineName//'Subsurface="'//trim(Surface(SurfNum)%Name)//  &
+           '" is an adiabatic surface in an Interzone base surface="'//trim(Surface(Surface(SurfNum)%BaseSurf)%Name)//'"')
+        IF (.not. SubSurfaceSevereDisplayed) THEN
+          CALL ShowContinueError('...calculations for heat balance would be compromised.')
+          SubSurfaceSevereDisplayed=.true.
+        ENDIF
+!        SurfError=.true.
+      ENDIF
+    ENDIF
+  ENDDO
 
 !**********************************************************************************
 !   Set up Zone Surface Pointers
@@ -1862,11 +1990,15 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
   ENDIF
 
   DO SurfNum=1,MovedSurfs !TotSurfaces
-    IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
-      IF (Surface(SurfNum)%Area < 1.d-06) THEN
-        CALL ShowSevereError(RoutineName//'Zero or negative surface area, Surface='//Trim(Surface(SurfNum)%Name))
-        SurfError=.true.
-      ENDIF
+    IF (Surface(SurfNum)%Area < 1.d-06) THEN
+      CALL ShowSevereError(RoutineName//'Zero or negative surface area['//trim(RoundSigDigits(Surface(SurfNum)%Area,5))//  &
+         '], Surface='//Trim(Surface(SurfNum)%Name))
+      SurfError=.true.
+    ENDIF
+    IF (Surface(SurfNum)%Area >= 1.d-06 .and. Surface(SurfNum)%Area < .001d0) THEN
+      CALL ShowWarningError(RoutineName//'Very small surface area['//trim(RoundSigDigits(Surface(SurfNum)%Area,5))//  &
+         '], Surface='//Trim(Surface(SurfNum)%Name))
+    ENDIF
   END DO
 
   DO SurfNum=1,MovedSurfs !TotSurfaces
@@ -2117,6 +2249,8 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
   ENDIF
 
  CALL GetHTSurfExtVentedCavityData(ErrorsFound)
+
+ CALL GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
 
  IF (SurfError .or. ErrorsFound) THEN
    ErrorsFound=.true.
@@ -3211,28 +3345,30 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
       ENDIF
 
       CALL CheckConvexity(SurfNum,SurfaceTmp(SurfNum)%Sides)
-      !Check wall height for the CFactor walls
-      IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Wall .and.   &
-          Construct(SurfaceTmp(SurfNum)%Construction)%TypeIsCfactorWall) THEN
-        IF (ABS(SurfaceTmp(SurfNum)%Height - Construct(SurfaceTmp(SurfNum)%Construction)%Height)>0.05) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                     '", underground Wall Height = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Height,2)))
-          CALL ShowContinueError('..which deos not match its construction height.')
+      IF (SurfaceTmp(SurfNum)%Construction > 0) THEN
+        !Check wall height for the CFactor walls
+        IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Wall .and.   &
+            Construct(SurfaceTmp(SurfNum)%Construction)%TypeIsCfactorWall) THEN
+          IF (ABS(SurfaceTmp(SurfNum)%Height - Construct(SurfaceTmp(SurfNum)%Construction)%Height)>0.05d0) THEN
+            CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                       '", underground Wall Height = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Height,2)))
+            CALL ShowContinueError('..which does not match its construction height.')
+          ENDIF
         ENDIF
-      ENDIF
 
-      !Check area and perimeter for the FFactor floors
-      IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Floor .and.   &
-          Construct(SurfaceTmp(SurfNum)%Construction)%TypeIsFfactorFloor) THEN
-        IF (ABS(SurfaceTmp(SurfNum)%Area - Construct(SurfaceTmp(SurfNum)%Construction)%Area)>0.1) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                     '", underground Floor Area = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
-          CALL ShowContinueError('..which does not match its construction area.')
-        ENDIF
-        IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                     '", underground Floor Perimeter = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Perimeter,2)))
-          CALL ShowContinueError('..which is less than its construction exposed perimeter.')
+        !Check area and perimeter for the FFactor floors
+        IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Floor .and.   &
+            Construct(SurfaceTmp(SurfNum)%Construction)%TypeIsFfactorFloor) THEN
+          IF (ABS(SurfaceTmp(SurfNum)%Area - Construct(SurfaceTmp(SurfNum)%Construction)%Area)>0.1d0) THEN
+            CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                       '", underground Floor Area = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Area,2)))
+            CALL ShowContinueError('..which does not match its construction area.')
+          ENDIF
+          IF (SurfaceTmp(SurfNum)%Perimeter < Construct(SurfaceTmp(SurfNum)%Construction)%PerimeterExposed - 0.1) THEN
+            CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                       '", underground Floor Perimeter = '//TRIM(TrimSigDigits(SurfaceTmp(SurfNum)%Perimeter,2)))
+            CALL ShowContinueError('..which is less than its construction exposed perimeter.')
+          ENDIF
         ENDIF
       ENDIF
 
@@ -3758,7 +3894,7 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
           !       DATE WRITTEN   May 2000
-          !       MODIFIED       na
+          !       MODIFIED       August 2012 - line up subsurfaces with base surface types
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3996,32 +4132,53 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
       SurfaceTmp(SurfNum)%ExtBoundCond = ExternalEnvironment
     END IF
 
-    IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnreconciledZoneSurface) THEN ! OtherZone Base Surface
-      SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)
+    IF (SurfaceTmp(SurfNum)%ExtBoundCond == ExternalEnvironment) THEN
+      IF (.not. lAlphaFieldBlanks(5)) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                             '", invalid field '//TRIM(cAlphaFieldNames(5)))
+        CALL ShowContinueError('...when Base surface uses "Outdoors" as '//trim(cAlphaFieldNames(5))//  &
+           ', subsurfaces need to be blank to inherit the outdoor characteristics.')
+        CALL ShowContinueError('...Surface external characteristics changed to reflect base surface.')
+      ENDIF
     ENDIF
 
-    IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnenteredAdjacentZoneSurface) THEN ! OtherZone - unmatched interior surface
+    IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnreconciledZoneSurface) THEN ! "Surface" Base Surface
+      IF (.not. lAlphaFieldBlanks(5)) THEN
+        SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)
+      ELSE
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                             '", invalid blank '//TRIM(cAlphaFieldNames(5)))
+        CALL ShowContinueError('...when Base surface uses "Surface" as '//trim(cAlphaFieldNames(5))//  &
+           ', subsurfaces must also specify specific surfaces in the adjacent zone.')
+        SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)  ! putting it as blank will not confuse things later.
+        ErrorsFound=.true.
+      ENDIF
+    ENDIF
+
+    IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnenteredAdjacentZoneSurface) THEN ! "Zone" - unmatched interior surface
       NeedToAddSurfaces=NeedToAddSurfaces+1
       ! ignoring window5datafiles for now -- will need to add.
     ENDIF
 
     IF (SurfaceTmp(SurfNum)%ExtBoundCond == OtherSideCoefNoCalcExt .or.   &
         SurfaceTmp(SurfNum)%ExtBoundCond == OtherSideCoefCalcExt) THEN
-        IF (cAlphaArgs(5) /= '   ') THEN  ! Otherside Coef special Name
+        IF (.not. lAlphaFieldBlanks(5)) THEN  ! Otherside Coef special Name
           Found=FindItemInList(cAlphaArgs(5),OSC%Name,TotOSC)
           IF (Found == 0) THEN
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                           '", invalid '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+            CALL ShowContinueError('...base surface requires that this subsurface have OtherSideCoefficients -- not found.')
             ErrorsFound=.true.
-          ENDIF
-          ! The following allows for a subsurface that has different characteristics than
-          ! the base surface with OtherSide Coeff -- do we want that or is it an error?
-          SurfaceTmp(SurfNum)%OSCPtr=Found
-          SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)
-          IF (OSC(Found)%SurfFilmCoef > 0.0) THEN
-            SurfaceTmp(SurfNum)%ExtBoundCond=OtherSideCoefCalcExt
-          ELSE
-            SurfaceTmp(SurfNum)%ExtBoundCond = OtherSideCoefNoCalcExt
+          ELSE  ! found
+            ! The following allows for a subsurface that has different characteristics than
+            ! the base surface with OtherSide Coeff -- do we want that or is it an error?
+            SurfaceTmp(SurfNum)%OSCPtr=Found
+            SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(5)
+            IF (OSC(Found)%SurfFilmCoef > 0.0) THEN
+              SurfaceTmp(SurfNum)%ExtBoundCond=OtherSideCoefCalcExt
+            ELSE
+              SurfaceTmp(SurfNum)%ExtBoundCond = OtherSideCoefNoCalcExt
+            ENDIF
           ENDIF
         ENDIF
     ENDIF
@@ -4339,6 +4496,7 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
                                '", invalid '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3)))
         SurfaceTmp(SurfNum)%ZoneName='Unknown Zone'
         ErrorsFound=.true.
+        CYCLE
       ENDIF
       IF (SurfaceTmp(Found)%ExtBoundCond == UnreconciledZoneSurface .and.  &
           SurfaceTmp(Found)%ExtBoundCondName == SurfaceTmp(Found)%Name) THEN   ! Adiabatic surface, no windows or doors allowed
@@ -4349,7 +4507,19 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
           'You must have interior windows or doors on Interzone surfaces for transmission to result.')
       ENDIF
 
-      IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnreconciledZoneSurface) THEN ! OtherZone Base Surface
+      IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnreconciledZoneSurface) THEN ! "Surface" Base Surface
+        IF (.not. GettingIZSurfaces) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                               '", invalid use of object')
+          CALL ShowContinueError('...when Base surface uses "Surface" as '//trim(cAlphaFieldNames(5))//  &
+             ', subsurfaces must also specify specific surfaces in the adjacent zone.')
+          CALL ShowContinueError('...Please use '//trim(cCurrentModuleObject)//':Interzone to enter this surface.')
+          SurfaceTmp(SurfNum)%ExtBoundCondName=blank  ! putting it as blank will not confuse things later.
+          ErrorsFound=.true.
+        ENDIF
+      ENDIF
+
+      IF (SurfaceTmp(SurfNum)%ExtBoundCond == UnreconciledZoneSurface) THEN ! "Surface" Base Surface
         IF (GettingIZSurfaces) THEN
           SurfaceTmp(SurfNum)%ExtBoundCondName=cAlphaArgs(OtherSurfaceField)
           IZFound=FindItemInList(SurfaceTmp(SurfNum)%ExtBoundCondName,Zone%Name,NumOfZones)
@@ -4366,6 +4536,7 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
         ELSE  ! Interior Window
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                                '", invalid Interzone Surface, specify '//trim(cCurrentModuleObject)//':InterZone')
+          CALL ShowContinueError('...when base surface is an interzone surface, subsurface must also be an interzone surface.')
           NeedToAddSubSurfaces=NeedToAddSubSurfaces+1
           ErrorsFound=.true.
         ENDIF
@@ -4382,6 +4553,8 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
           ELSE  ! not correct boundary condition for interzone subsurface
             CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
                                  '", invalid Base Surface type for Interzone Surface')
+            CALL ShowContinueError('...when base surface is not an interzone surface, '//  &
+               'subsurface must also not be an interzone surface.')
             ErrorsFound=.true.
           ENDIF
         ENDIF
@@ -5858,13 +6031,18 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
   ! For shading surfaces, initialize value of reflectance values to default values. These values
   ! may be overridden below for shading surfaces with an associated Shading Surface Reflectance object.
   DO SurfNum = 1, TotSurfaces
-      IF(SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or. SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or. &
-          SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B) THEN
+      IF (.not. (SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or.      &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or.   &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B .or.   &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Overhang .or.     &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) CYCLE
+!      IF(SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or. SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or. &
+!          SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B) THEN
       SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = 0.2
       SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = 0.2
       SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = 0.0
       SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = 0
-    END IF
+!    END IF
   END DO
 
   ! Get the total number of Shading Surface Reflectance objects
@@ -5888,33 +6066,48 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
     ! Check that associated surface is a shading surface
     WrongSurfaceType = .FALSE.
     IF(SurfNum /= 0) THEN
-      IF(SurfaceTmp(SurfNum)%Class /= SurfaceClass_Shading.AND.SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_F .AND. &
-          SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_B) WrongSurfaceType = .TRUE.
+      IF (.not. (SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or.      &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or.   &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B .or.   &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Overhang .or.     &
+                 SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) WrongSurfaceType = .TRUE.
+!      IF(SurfaceTmp(SurfNum)%Class /= SurfaceClass_Shading.AND.SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_F .AND. &
+!          SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_B) WrongSurfaceType = .TRUE.
       IF(WrongSurfaceType) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                             '", surface is not a shading surface.')
+        CALL ShowSevereError('GetShadingSurfReflectanceData: '//TRIM(cCurrentModuleObject)//'="'//  &
+                  TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                  '", surface is not a shading surface.')
         ErrorsFound = .TRUE.
+        CYCLE
       END IF
     END IF
 
     ! If associated surface is a shading surface, set reflectance values
-    IF(.NOT.ErrorsFound) THEN
-      SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = rNumericArgs(3)
-      SurfaceTmp(SurfNum+1)%ShadowSurfGlazingFrac = rNumericArgs(3)
-      SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = (1.-rNumericArgs(3)) * rNumericArgs(1)
-      SurfaceTmp(SurfNum+1)%ShadowSurfDiffuseSolRefl  = (1.-rNumericArgs(3)) * rNumericArgs(1)
-      SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = (1.-rNumericArgs(3)) * rNumericArgs(2)
-      SurfaceTmp(SurfNum+1)%ShadowSurfDiffuseVisRefl  = (1.-rNumericArgs(3)) * rNumericArgs(2)
-      IF(rNumericArgs(3) > 0.0) THEN
-        GlConstrNum = FindItemInList(cAlphaArgs(2),Construct%Name,TotConstructs)
-        IF(GlConstrNum == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
-                             '", '//TRIM(cAlphaFieldNames(2))//' not found='//TRIM(cAlphaArgs(2)))
-          ErrorsFound =.true.
-        END IF
-        SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = GlConstrNum
-        SurfaceTmp(SurfNum+1)%ShadowSurfGlazingConstruct = GlConstrNum
+    SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = rNumericArgs(3)
+    SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(1)
+    SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(2)
+    IF(rNumericArgs(3) > 0.0) THEN
+      GlConstrNum = FindItemInList(cAlphaArgs(2),Construct%Name,TotConstructs)
+      IF(GlConstrNum == 0) THEN
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(SurfaceTmp(SurfNum)%Name)//  &
+                           '", '//TRIM(cAlphaFieldNames(2))//' not found='//TRIM(cAlphaArgs(2)))
+        ErrorsFound =.true.
+      ELSE
+        Construct(GlConstrNum)%IsUsed=.true.
       END IF
+      SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = GlConstrNum
+    END IF
+    SurfNum = FindItemInList('Mir-'//cAlphaArgs(1),SurfaceTmp%Name,TotSurfaces)
+    IF (SurfNum == 0) CYCLE
+    SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = rNumericArgs(3)
+    SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(1)
+    SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = (1.d0-rNumericArgs(3)) * rNumericArgs(2)
+    IF(rNumericArgs(3) > 0.0) THEN
+      GlConstrNum = FindItemInList(cAlphaArgs(2),Construct%Name,TotConstructs)
+      IF(GlConstrNum /= 0) THEN
+        Construct(GlConstrNum)%IsUsed=.true.
+      END IF
+      SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = GlConstrNum
     END IF
 
   END DO  ! End of loop over Shading Surface Reflectance objects
@@ -6112,12 +6305,12 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
                 /SUM(Surface(ExtVentedCavity(Item)%SurfPtrs)%Area)
     DO thisSurf = 1, ExtVentedCavity(Item)%NumSurfs
        SurfID = ExtVentedCavity(Item)%SurfPtrs(thisSurf)
-       If (ABS(Surface(SurfID)%Azimuth - AvgAzimuth) > 15. ) Then
+       If (ABS(Surface(SurfID)%Azimuth - AvgAzimuth) > 15.d0 ) Then
             Call ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(ExtVentedCavity(Item)%Name)//  &
             ', Surface '//TRIM(Surface(SurfID)%name)//' has Azimuth different from others in '// &
             'the associated group.')
        ENDIF
-       IF (ABS(Surface(SurfID)%Tilt - AvgTilt) > 10. ) Then
+       IF (ABS(Surface(SurfID)%Tilt - AvgTilt) > 10.d0 ) Then
             Call ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(ExtVentedCavity(Item)%Name)//  &
             ', Surface '//TRIM(Surface(SurfID)%name)//' has Tilt different from others in '// &
             'the associated group.')
@@ -6188,6 +6381,507 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
   RETURN
 
 END SUBROUTINE GetHTSurfExtVentedCavityData
+
+SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith, portions from ApplyConvectionValue by Linda Lawrie
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataIPShortcuts
+  USE InputProcessor,  ONLY: GetNumObjectsFound, GetObjectItem, FindItemInList
+  USE DataSurfaces,    ONLY: Surface
+  USE DataHeatBalance, ONLY: HeatTransferAlgosUsed, NumberOfHeatTransferAlgosUsed &
+                             ,LowHConvLimit, HighHConvLimit
+  USE General,         ONLY: RoundSigDigits
+
+  USE DataHeatBalSurface ,ONLY:MaxSurfaceTempLimit
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  LOGICAL, INTENT(INOUT) :: ErrorsFound
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+  CHARACTER(len=*), PARAMETER :: fmtA="(A)"
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: CountHTAlgoObjectsSingleSurf
+  INTEGER :: CountHTAlgoObjectsMultiSurf
+  INTEGER :: CountHTAlgoObjectsSurfList
+  INTEGER :: IOStatus   ! Used in GetObjectItem
+  LOGICAL :: ErrorsFoundSingleSurf = .FALSE.
+  LOGICAL :: ErrorsFoundMultiSurf  = .FALSE.
+  LOGICAL :: ErrorsFoundSurfList   = .FALSE.
+  LOGICAL :: ErrorsFoundByConstruct= .FALSE.
+  INTEGER :: tmpAlgoInput
+  INTEGER :: Item
+  INTEGER :: Item1
+  INTEGER :: NumAlphas
+  INTEGER :: NumNumbers
+  INTEGER :: Found
+  LOGICAL :: SurfacesOfType
+  INTEGER :: SurfNum
+!  INTEGER :: Index
+  INTEGER, DIMENSION(:), ALLOCATABLE :: tmpHeatTransferAlgosUsed
+  INTEGER :: NumEMPDMat
+  INTEGER :: NumPCMat
+  INTEGER :: NumVTCMat
+  INTEGER :: NumHAMTMat1
+  INTEGER :: NumHAMTMat2
+  INTEGER :: NumHAMTMat3
+  INTEGER :: NumHAMTMat4
+  INTEGER :: NumHAMTMat5
+  INTEGER :: NumHAMTMat6
+  INTEGER :: SumHAMTMat
+  LOGICAL :: msgneeded
+  CHARACTER(len=MaxNameLength) :: AlgoName
+
+
+  ! first initialize each heat transfer surface with the overall model type, array assignment
+  Surface%HeatTransferAlgorithm  = HeatTransferAlgosUsed(1)
+!
+
+  cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
+  CountHTAlgoObjectsSingleSurf = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+
+  cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
+  DO Item=1, CountHTAlgoObjectsSingleSurf
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    ErrorsFoundSingleSurf = .FALSE.
+    Found = FindItemInList(cAlphaArgs(1), Surface%Name,  TotSurfaces)
+
+    IF (Found == 0) Then
+      Call ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM( cAlphaArgs(1))//  &
+                                '", did not find matching surface.')
+      ErrorsFoundSingleSurf = .TRUE.
+
+    ENDIF
+
+    SELECT CASE (cAlphaArgs(2))
+
+    CASE ('CONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_CTF
+    CASE ('MOISTUREPENETRATIONDEPTHCONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_EMPD
+    CASE ('COMBINEDHEATANDMOISTUREFINITEELEMENT')
+      tmpAlgoInput = HeatTransferModel_HAMT
+    CASE ('CONDUCTIONFINITEDIFFERENCE')
+      tmpAlgoInput = HeatTransferModel_CondFD
+    CASE DEFAULT
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2)))
+      ErrorsFoundSingleSurf = .TRUE.
+    END SELECT
+
+    IF (.NOT. ErrorsFoundSingleSurf) THEN
+      Surface(Found)%HeatTransferAlgorithm   = tmpAlgoInput
+
+      IF (.NOT. ANY(HeatTransferAlgosUsed == tmpAlgoInput)) THEN ! add new algo
+        ALLOCATE(tmpHeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+        tmpHeatTransferAlgosUsed = HeatTransferAlgosUsed
+        NumberOfHeatTransferAlgosUsed = NumberOfHeatTransferAlgosUsed + 1
+        DEALLOCATE(HeatTransferAlgosUsed)
+        ALLOCATE(HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+        HeatTransferAlgosUsed(1:NumberOfHeatTransferAlgosUsed-1) = tmpHeatTransferAlgosUsed
+        HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed) = tmpAlgoInput
+        DEALLOCATE(tmpHeatTransferAlgosUsed)
+      ENDIF
+
+    ELSE
+      ErrorsFound = .TRUE.
+    ENDIF
+  ENDDO  ! single surface heat transfer algorithm override
+
+
+  cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:MultipleSurface'
+  CountHTAlgoObjectsMultiSurf = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+
+  DO Item=1, CountHTAlgoObjectsMultiSurf
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    ErrorsFoundMultiSurf = .FALSE.
+    SELECT CASE (cAlphaArgs(3))
+
+    CASE ('CONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_CTF
+    CASE ('MOISTUREPENETRATIONDEPTHCONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_EMPD
+    CASE ('COMBINEDHEATANDMOISTUREFINITEELEMENT')
+      tmpAlgoInput = HeatTransferModel_HAMT
+    CASE ('CONDUCTIONFINITEDIFFERENCE')
+      tmpAlgoInput = HeatTransferModel_CondFD
+    CASE DEFAULT
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3)))
+      ErrorsFoundMultiSurf = .TRUE.
+    END SELECT
+
+    SELECT CASE(cAlphaArgs(2))
+
+      CASE ('ALLEXTERIORSURFACES')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond > 0) CYCLE    ! Interior surfaces
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE ('ALLEXTERIORWALLS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond > 0) CYCLE    ! Interior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Wall) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+       ENDDO
+
+      CASE('ALLEXTERIORROOFS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond > 0) CYCLE    ! Interior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Roof) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE('ALLEXTERIORFLOORS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond > 0) CYCLE    ! Interior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Floor) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE ('ALLGROUNDCONTACTSURFACES')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond /= Ground) CYCLE    ! ground BC
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+      CASE ('ALLINTERIORSURFACES')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond <= 0) CYCLE    ! Exterior surfaces
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE ('ALLINTERIORWALLS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond <= 0) CYCLE    ! Exterior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Wall) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE('ALLINTERIORROOFS','ALLINTERIORCEILINGS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond <= 0) CYCLE    ! Exterior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Roof) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+
+      CASE('ALLINTERIORFLOORS')
+        SurfacesOfType=.false.
+        DO SurfNum=1,TotSurfaces
+          IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
+          IF (Surface(SurfNum)%ExtBoundCond <= 0) CYCLE    ! Exterior surfaces
+          IF (.not. Surface(SurfNum)%Class == SurfaceClass_Floor) CYCLE
+          IF (Construct(Surface(SurfNum)%Construction)%TypeIsWindow) CYCLE
+          SurfacesOfType=.true.
+          Surface(SurfNum)%HeatTransferAlgorithm   = tmpAlgoInput
+        ENDDO
+      CASE DEFAULT
+        SurfacesOfType=.false.
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2)))
+        ErrorsFoundMultiSurf = .TRUE.
+    END SELECT
+
+    IF (.not. SurfacesOfType) THEN
+      CALL ShowWarningError('In '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))// &
+         '", for Multiple Surface Assignment="'//trim(cAlphaArgs(2))//  &
+         '", there were no surfaces of that type found for assignment.')
+    ELSE
+      IF (.NOT. ANY(HeatTransferAlgosUsed == tmpAlgoInput)) THEN ! add new algo
+        ALLOCATE(tmpHeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+        tmpHeatTransferAlgosUsed = HeatTransferAlgosUsed
+        NumberOfHeatTransferAlgosUsed = NumberOfHeatTransferAlgosUsed + 1
+        DEALLOCATE(HeatTransferAlgosUsed)
+        ALLOCATE(HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+        HeatTransferAlgosUsed(1:NumberOfHeatTransferAlgosUsed-1) = tmpHeatTransferAlgosUsed
+        HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed) = tmpAlgoInput
+        DEALLOCATE(tmpHeatTransferAlgosUsed)
+      ENDIF
+    ENDIF
+    IF (ErrorsFoundMultiSurf) ErrorsFound = .TRUE.
+
+
+  ENDDO ! multi surface heat transfer algo override
+
+
+  cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:SurfaceList'
+  CountHTAlgoObjectsSurfList = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  DO Item=1, CountHTAlgoObjectsSurfList
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    ErrorsFoundSurfList = .FALSE.
+    SELECT CASE (cAlphaArgs(2))
+
+    CASE ('CONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_CTF
+    CASE ('MOISTUREPENETRATIONDEPTHCONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_EMPD
+    CASE ('COMBINEDHEATANDMOISTUREFINITEELEMENT')
+      tmpAlgoInput = HeatTransferModel_HAMT
+    CASE ('CONDUCTIONFINITEDIFFERENCE')
+      tmpAlgoInput = HeatTransferModel_CondFD
+    CASE DEFAULT
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2)))
+      ErrorsFoundSurfList = .TRUE.
+    END SELECT
+
+
+    Do item1 = 3, NumAlphas
+
+      Found = FinditemInList(cAlphaArgs(item1), Surface%Name,  TotSurfaces)
+
+      IF (Found == 0) Then
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM( cAlphaArgs(1))//  &
+                                '", did not find matching surface.')
+        CALL ShowContinueError('Name of surface not found = "'//TRIM(cAlphaArgs(item1))//'"')
+        ErrorsFoundSurfList = .TRUE.
+
+      ENDIF
+
+      IF (.NOT. ErrorsFoundSurfList) THEN
+        Surface(Found)%HeatTransferAlgorithm   = tmpAlgoInput
+        IF (.NOT. ANY(HeatTransferAlgosUsed == tmpAlgoInput)) THEN ! add new algo
+          ALLOCATE(tmpHeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+          tmpHeatTransferAlgosUsed = HeatTransferAlgosUsed
+          NumberOfHeatTransferAlgosUsed = NumberOfHeatTransferAlgosUsed + 1
+          DEALLOCATE(HeatTransferAlgosUsed)
+          ALLOCATE(HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+          HeatTransferAlgosUsed(1:NumberOfHeatTransferAlgosUsed-1) = tmpHeatTransferAlgosUsed
+          HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed) = tmpAlgoInput
+          DEALLOCATE(tmpHeatTransferAlgosUsed)
+        ENDIF
+      ELSE
+        ErrorsFound = .TRUE.
+      ENDIF
+
+    ENDDO
+
+  ENDDO
+
+  cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:Construction'
+  CountHTAlgoObjectsSurfList = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  DO Item=1, CountHTAlgoObjectsSurfList
+    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    ErrorsFoundByConstruct = .FALSE.
+    SELECT CASE (cAlphaArgs(2))
+
+    CASE ('CONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_CTF
+    CASE ('MOISTUREPENETRATIONDEPTHCONDUCTIONTRANSFERFUNCTION')
+      tmpAlgoInput = HeatTransferModel_EMPD
+    CASE ('COMBINEDHEATANDMOISTUREFINITEELEMENT')
+      tmpAlgoInput = HeatTransferModel_HAMT
+    CASE ('CONDUCTIONFINITEDIFFERENCE')
+      tmpAlgoInput = HeatTransferModel_CondFD
+    CASE DEFAULT
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2)))
+      ErrorsFoundByConstruct = .TRUE.
+    END SELECT
+
+    Found = 0
+    Found = FindItemInList(cAlphaArgs(3), Construct%Name,  TotConstructs )
+    IF (Found == 0) THEN
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                             '", invalid '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3)))
+      ErrorsFoundByConstruct = .TRUE.
+    ENDIF
+
+    IF (.NOT. ErrorsFoundByConstruct ) THEN
+      DO item1=1, TotSurfaces
+        IF (Surface(item1)%Construction == Found) THEN
+          Surface(item1)%HeatTransferAlgorithm   = tmpAlgoInput
+          IF (.NOT. ANY(HeatTransferAlgosUsed == tmpAlgoInput)) THEN ! add new algo
+            ALLOCATE(tmpHeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+            tmpHeatTransferAlgosUsed = HeatTransferAlgosUsed
+            NumberOfHeatTransferAlgosUsed = NumberOfHeatTransferAlgosUsed + 1
+            DEALLOCATE(HeatTransferAlgosUsed)
+            ALLOCATE(HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed))
+            HeatTransferAlgosUsed(1:NumberOfHeatTransferAlgosUsed-1) = tmpHeatTransferAlgosUsed
+            HeatTransferAlgosUsed(NumberOfHeatTransferAlgosUsed) = tmpAlgoInput
+            DEALLOCATE(tmpHeatTransferAlgosUsed)
+          ENDIF
+        ENDIF
+      ENDDO
+    ENDIF
+  ENDDO
+
+  ! test for missing materials for algorithms selected
+  NumEMPDMat=GetNumObjectsFound('MaterialProperty:MoisturePenetrationDepth:Settings')
+  NumPCMat=GetNumObjectsFound('MaterialProperty:PhaseChange') ! needs detailed algo
+  NumVTCMat=GetNumObjectsFound('MaterialProperty:VariableThermalConductivity')
+  NumHAMTMat1=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:Settings')
+  NumHAMTMat2=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:SorptionIsotherm')
+  NumHAMTMat3=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:Suction')
+  NumHAMTMat4=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:Redistribution')
+  NumHAMTMat5=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:Diffusion')
+  NumHAMTMat6=GetNumObjectsFound('MaterialProperty:HeatAndMoistureTransfer:ThermalConductivity')
+  SumHAMTMat=NumHAMTMat1+NumHAMTMat2+NumHAMTMat3+NumHAMTMat4+NumHAMTMat5+NumHAMTMat6
+  msgneeded=.false.
+
+  IF (NumEMPDMat > 0 .AND. .NOT. ANY(HeatTransferAlgosUsed == HeatTransferModel_EMPD)) THEN
+    CALL ShowWarningError('The input file includes '// &
+           TRIM(RoundSigDigits(NumEMPDMat))//' MaterialProperty:MoisturePenetrationDepth:Settings objects' &
+           // ' but the moisture penetration depth algorithm is not used anywhere.')
+    msgneeded=.true.
+  ENDIF
+  IF (NumPCMat > 0 .AND. .NOT. ANY(HeatTransferAlgosUsed == HeatTransferModel_CondFD)) THEN
+    CALL ShowWarningError('The input file includes '// &
+        TRIM(RoundSigDigits(NumPCMat))//' MaterialProperty:PhaseChange objects' &
+        // ' but the conduction finite difference algorithm is not used anywhere.')
+    msgneeded=.true.
+  ENDIF
+  IF (NumVTCMat > 0 .AND. .NOT. ANY(HeatTransferAlgosUsed == HeatTransferModel_CondFD)) THEN
+    CALL ShowWarningError('The input file includes '// &
+        TRIM(RoundSigDigits(NumVTCMat))//' MaterialProperty:VariableThermalConductivity objects' &
+        // ' but the conduction finite difference algorithm is not used anywhere.')
+    msgneeded=.true.
+  ENDIF
+  IF (SumHAMTMat > 0 .AND. .NOT. ANY(HeatTransferAlgosUsed == HeatTransferModel_HAMT )) THEN
+    CALL ShowWarningError('The input file includes '// &
+        trim(RoundSigDigits(SumHAMTMat))//' MaterialProperty:HeatAndMoistureTransfer:* objects' &
+        // ' but the combined heat and moisture finite difference algorithm is not used anywhere.')
+    msgneeded=.true.
+  ENDIF
+  IF (msgneeded) THEN
+    CALL ShowContinueError('Previous materials will be ignored due to HeatBalanceAlgorithm choice.')
+  ENDIF
+  msgneeded = .FALSE.
+  IF (NumEMPDMat == 0 .AND. ANY(HeatTransferAlgosUsed == HeatTransferModel_EMPD)) THEN
+    CALL ShowWarningError('The moisture penetration depth conduction transfer function algorithm is used' &
+               // ' but the input file includes no MaterialProperty:MoisturePenetrationDepth:Settings objects.')
+    msgneeded=.TRUE.
+  ENDIF
+  IF (SumHAMTMat == 0 .AND. ANY(HeatTransferAlgosUsed == HeatTransferModel_HAMT ) ) THEN
+    CALL ShowWarningError('The combined heat and moisture finite element algorithm is used but the input file includes '// &
+                            ' no MaterialProperty:HeatAndMoistureTransfer:* objects.')
+    msgneeded=.TRUE.
+  ENDIF
+  IF (msgneeded) THEN
+    CALL ShowContinueError('Certain materials objects are necessary to achieve proper results with the heat transfer ' &
+                            // 'algorithm(s) selected.')
+  ENDIF
+
+
+     ! Write Solution Algorithm to the initialization output file for User Verification
+   Write(OutputFileInits,fmtA) '! <Surface Heat Transfer Algorithm>, Value {CTF - ConductionTransferFunction | '//  &
+           'EMPD - MoisturePenetrationDepthConductionTransferFunction | '// &
+           'CondFD - ConductionFiniteDifference | '// &
+           'HAMT - CombinedHeatAndMoistureFiniteElement} - Description,Inside Surface Max Temperature Limit{C}, ' // &
+           'Surface Convection Coefficient Lower Limit {W/m2-K}, Surface Convection Coefficient Upper Limit {W/m2-K}'
+
+   DO item1 = 1, NumberOfHeatTransferAlgosUsed
+     AlgoName = ' '
+     SELECT CASE (HeatTransferAlgosUsed(item1))
+
+     CASE (HeatTransferModel_CTF)
+       AlgoName = 'CTF - ConductionTransferFunction'
+     CASE (HeatTransferModel_CondFD)
+       AlgoName = 'CondFD - ConductionFiniteDifference'
+     CASE (HeatTransferModel_EMPD)
+       AlgoName = 'EMPD - MoisturePenetrationDepthConductionTransferFunction'
+     CASE (HeatTransferModel_HAMT)
+       AlgoName = 'HAMT - CombinedHeatAndMoistureFiniteElement'
+     END SELECT
+
+     WRITE(OutputFileInits,725) TRIM(AlgoName),TRIM(RoundSigDigits(MaxSurfaceTempLimit,0)), &
+            TRIM(RoundSigDigits(LowHConvLimit, 2)), TRIM(RoundSigDigits(HighHConvLimit, 1))
+   ENDDO
+
+   725 Format('Surface Heat Transfer Algorithm, ',A,',',A, ',', A, ',', A)
+
+   !Assign model type to windows, shading surfaces, and TDDs
+   DO item=1, TotSurfaces
+     IF (Surface(item)%Class == SurfaceClass_Window .OR. &
+         Surface(item)%Class == SurfaceClass_GlassDoor) THEN
+       ! todo, add complex fenestration switch  HeatTransferModel_ComplexFenestration
+       IF (SurfaceWindow(item)%WindowModelType == WindowBSDFModel) THEN
+         Surface(item)%HeatTransferAlgorithm = HeatTransferModel_ComplexFenestration
+       ELSE
+         Surface(item)%HeatTransferAlgorithm = HeatTransferModel_Window5
+       ENDIF
+     ENDIF
+     IF (Surface(item)%Class == SurfaceClass_Detached_B .OR. &
+         Surface(item)%Class == SurfaceClass_Detached_F .OR. &
+         Surface(item)%Class == SurfaceClass_Shading  .OR. &
+         Surface(item)%Class == SurfaceClass_Overhang .OR. &
+         Surface(item)%Class == SurfaceClass_Fin) THEN
+       Surface(item)%HeatTransferAlgorithm = HeatTransferModel_None
+     ENDIF
+     IF ( Surface(item)%Class == SurfaceClass_TDD_Diffuser) THEN
+       Surface(item)%HeatTransferAlgorithm = HeatTransferModel_TDD
+     ENDIF
+
+   ENDDO
+
+
+  RETURN
+
+END SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides
 
 SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
 

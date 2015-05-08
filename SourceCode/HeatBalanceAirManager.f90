@@ -266,7 +266,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   USE InputProcessor,  ONLY: GetNumObjectsFound,GetObjectItem,FindItemInList,VerifyName,GetObjectDefMaxArgs
   USE ScheduleManager, ONLY: GetScheduleIndex,GetScheduleValuesForDay,CheckScheduleValueMinMax,GetScheduleMinValue,GetScheduleName
   USE General,         ONLY: RoundSigDigits
-  USE DataIPShortCuts
+!  USE DataIPShortCuts
   USE SystemAvailabilityManager, ONLY: GetHybridVentilationControlStatus
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -294,8 +294,20 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: SVals1
   REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: SVals2
-  INTEGER                         :: NumAlpha, NumNumber
-  INTEGER                         :: IOStat
+  INTEGER :: NumAlpha                ! Number of Alphas for each GetobjectItem call
+  INTEGER :: NumNumber               ! Number of Numbers for each GetobjectItem call
+  INTEGER :: maxAlpha                ! max of Alphas for allocation
+  INTEGER :: maxNumber               ! max of Numbers for allocation
+  INTEGER :: NumArgs
+  INTEGER :: IOStat
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaFieldNames
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cNumericFieldNames
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericFieldBlanks
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaFieldBlanks
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
+  REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
+  CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+
   INTEGER                         :: i
   INTEGER                         :: Loop
   INTEGER                         :: Loop1
@@ -353,6 +365,8 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
        'System','Average',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Air Balance System Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDTsystem,  &
        'System','Average',Zone(Loop)%Name)
+    CALL SetupOutputVariable('Zone Air Balance System Convective Gains Rate [W]',ZnAirRpt(Loop)%SumNonAirSystem,  &
+       'System','Average',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Air Balance Air Energy Storage Rate [W]',ZnAirRpt(Loop)%CzdTdt,  &
        'System','Average',Zone(Loop)%Name)
     IF (DisplayAdvancedReportVariables) THEN
@@ -360,6 +374,56 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
          'System','Average',Zone(Loop)%Name)
     ENDIF
   END DO
+
+  cCurrentModuleObject='ZoneAirBalance:OutdoorAir'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=NumAlpha
+  maxNumber=NumNumber
+  cCurrentModuleObject='ZoneInfiltration:EffectiveLeakageArea'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneInfiltration:FlowCoefficient'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneInfiltration:DesignFlowRate'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneVentilation:DesignFlowRate'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneVentilation:WindandStackOpenArea'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneMixing'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneCrossMixing'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+  cCurrentModuleObject='ZoneRefrigerationDoorMixing'
+  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  maxAlpha=MAX(NumAlpha,maxAlpha)
+  maxNumber=MAX(NumNumber,maxNumber)
+
+  ALLOCATE(cAlphaArgs(maxAlpha))
+  cAlphaArgs=' '
+  ALLOCATE(cAlphaFieldNames(maxAlpha))
+  cAlphaFieldNames=' '
+  ALLOCATE(cNumericFieldNames(maxNumber))
+  cNumericFieldNames=' '
+  ALLOCATE(rNumericArgs(maxNumber))
+  rNumericArgs=0.0
+  ALLOCATE(lAlphaFieldBlanks(maxAlpha))
+  lAlphaFieldBlanks=.true.
+  ALLOCATE(lNumericFieldBlanks(maxNumber))
+  lNumericFieldBlanks=.true.
 
   cCurrentModuleObject='ZoneAirBalance:OutdoorAir'
   TotZoneAirBalance=GetNumObjectsFound(TRIM(cCurrentModuleObject))
@@ -2729,6 +2793,13 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 END IF !TotRefDoorMixing > 0)
 
   DEALLOCATE(RepVarSet)
+  DEALLOCATE(cAlphaArgs)
+  DEALLOCATE(cAlphaFieldNames)
+  DEALLOCATE(cNumericFieldNames)
+  DEALLOCATE(rNumericArgs)
+  DEALLOCATE(lAlphaFieldBlanks)
+  DEALLOCATE(lNumericFieldBlanks)
+
 
   ALLOCATE(TotInfilVentFlow(NumOfZones))
   TotInfilVentFlow=0.0

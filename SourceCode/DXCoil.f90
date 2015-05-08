@@ -66,7 +66,7 @@ INTEGER, PARAMETER :: On               = 1 ! normal compressor operation
 INTEGER, PARAMETER :: Off              = 0 ! signal DXCoil that compressor shouldn't run
 ! Condenser Type (using same numbering scheme as for chillers)
 INTEGER, PARAMETER :: AirCooled        = 1 ! Air-cooled condenser
-!INTEGER, PARAMETER :: WaterCooled      = 2 ! Water-cooled condenser (not yet implemented)
+INTEGER, PARAMETER :: WaterCooled      = 2 ! Water-cooled condenser (not yet implemented)
 INTEGER, PARAMETER :: EvapCooled       = 3 ! Evaporatively-cooled condenser
 INTEGER, PARAMETER :: WaterHeater      = 4 ! Condenser heats water (e.g., in water heater tank)
 
@@ -135,6 +135,7 @@ TYPE, PUBLIC :: DXCoilData
 !          RatedCoolCap, RatedSHR and RatedCOP do not include the thermal or electrical
 !          effects due to the supply air fan
   REAL(r64) :: RatedTotCap(MaxModes)  =0.0 ! Gross total cooling capacity at rated conditions [watts]
+  REAL(r64) :: HeatSizeRatio          =1.d0 ! heat pump heating to cooling sizing ratio when autosized
   LOGICAL   :: RatedTotCapEMSOverrideOn(MaxModes) = .FALSE.  !if true, then EMS is calling to override rated total capacity
   REAL(r64) :: RatedTotCapEMSOverrideValue(MaxModes) = 0.0  ! value to use for EMS override
 
@@ -203,6 +204,11 @@ TYPE, PUBLIC :: DXCoilData
   INTEGER :: EIRFTemp2              = 0  ! index of energy input ratio modifier curve (low speed)
                                          ! (function of entering wetbulb, outside drybulb)
   REAL(r64) :: RatedEIR2              =0.0 ! rated energy input ratio (low speed, inverse of COP2)
+  REAL(r64) :: InternalStaticPressureDrop = 0.d0 ! for rating VAV system
+  LOGICAL   :: RateWithInternalStaticAndFanObject = .FALSE.
+  INTEGER   :: SupplyFanIndex         = 0
+  CHARACTER(len=MaxNameLength) :: SupplyFanName = ' '
+  CHARACTER(len=MaxNameLength) :: CoilSystemName = ' '
 ! end of multi-speed compressor variables
 
   REAL(r64) :: RatedEIR(MaxModes)     =0.0 ! rated energy input ratio (inverse of COP)
@@ -405,6 +411,7 @@ TYPE, PUBLIC :: DXCoilData
                                                    ! AC latent capacity (dimensionless)
   REAL(r64), DIMENSION(:), ALLOCATABLE :: MSMaxONOFFCyclesperHour ! Maximum ON/OFF cycles per hour for the compressor (cycles/hour)
   REAL(r64), DIMENSION(:), ALLOCATABLE :: MSLatentCapacityTimeConstant ! Time constant for latent capacity to reach steady state
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: MSFanPowerPerEvapAirFlowRate
   REAL(r64) :: FuelUsed            ! Energy used, in addition to electricity [W]
   REAL(r64) :: FuelConsumed        ! Energy consumed, in addition to electricity [J]
   ! End of multispeed DX coil input
@@ -477,6 +484,9 @@ PRIVATE CalcTotCapSHR
 PRIVATE CalcCBF
 PRIVATE AdjustCBF
 
+
+PRIVATE  CalcTwoSpeedDXCoilStandardRating
+
           ! External function calls
 PUBLIC  GetDXCoilIndex
 PUBLIC  GetCoilCapacity
@@ -491,6 +501,8 @@ PRIVATE GetHPCoolingCoilIndex
 PUBLIC  GetDXCoilNumberOfSpeeds
 PUBLIC  SetDXCoolingCoilData
 PUBLIC  SetCoilSystemHeatingDXFlag
+PRIVATE GetFanIndexForTwoSpeedCoil
+PUBLIC  SetCoilSystemCoolingData
 
 CONTAINS
 
@@ -2543,6 +2555,13 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoils
   DXCoil(DXCoilNum)%RatedSHR(1)    = Numbers(2)
   DXCoil(DXCoilNum)%RatedCOP(1)    = Numbers(3)
   DXCoil(DXCoilNum)%RatedAirVolFlowRate(1) = Numbers(4)
+  IF (.NOT. lNumericBlanks(5)) THEN
+    DXCoil(DXCoilNum)%InternalStaticPressureDrop = Numbers(5)
+    DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject = .TRUE.
+  ELSE
+    DXCoil(DXCoilNum)%InternalStaticPressureDrop = -999.d0
+    DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject = .FALSE.
+  ENDIF
 
   DXCoil(DXCoilNum)%AirInNode = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
@@ -2727,10 +2746,10 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoils
 
   DXCoil(DXCoilNum)%RatedEIR(1) = 1.d0 / DXCoil(DXCoilNum)%RatedCOP(1)
 
-  DXCoil(DXCoilNum)%RatedTotCap2 = Numbers(5)
-  DXCoil(DXCoilNum)%RatedSHR2    = Numbers(6)
-  DXCoil(DXCoilNum)%RatedCOP2    = Numbers(7)
-  DXCoil(DXCoilNum)%RatedAirVolFlowRate2 = Numbers(8)
+  DXCoil(DXCoilNum)%RatedTotCap2 = Numbers(6)
+  DXCoil(DXCoilNum)%RatedSHR2    = Numbers(7)
+  DXCoil(DXCoilNum)%RatedCOP2    = Numbers(8)
+  DXCoil(DXCoilNum)%RatedAirVolFlowRate2 = Numbers(9)
 
   DXCoil(DXCoilNum)%CCapFTemp2 = GetCurveIndex(Alphas(10)) ! convert curve name to number
   IF (DXCoil(DXCoilNum)%CCapFTemp2 .EQ. 0) THEN
@@ -2812,52 +2831,52 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoils
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DXCoilNum)%EvapCondEffect(1) = Numbers(9)
+  DXCoil(DXCoilNum)%EvapCondEffect(1) = Numbers(10)
   IF (DXCoil(DXCoilNum)%EvapCondEffect(1) .LT. 0.0d0 .OR. DXCoil(DXCoilNum)%EvapCondEffect(1) .GT. 1.0d0) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
     CALL ShowContinueError('...'//trim(cNumericFields(9))//' cannot be < 0.0 or > 1.0.')
-    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(9),2))//'].')
-    ErrorsFound = .TRUE.
-  END IF
-
-  DXCoil(DXCoilNum)%EvapCondAirFlow(1) = Numbers(10)
-  IF (DXCoil(DXCoilNum)%EvapCondAirFlow(1) .LT. 0.0d0 .AND. DXCoil(DXCoilNum)%EvapCondAirFlow(1) /= AutoSize) THEN
-    CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-    CALL ShowContinueError('...'//trim(cNumericFields(10))//' cannot be < 0.0.')
     CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(10),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) = Numbers(11)
-  IF (DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) .LT. 0.0d0 .AND. &
-      DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) /= AutoSize) THEN
+  DXCoil(DXCoilNum)%EvapCondAirFlow(1) = Numbers(11)
+  IF (DXCoil(DXCoilNum)%EvapCondAirFlow(1) .LT. 0.0d0 .AND. DXCoil(DXCoilNum)%EvapCondAirFlow(1) /= AutoSize) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-    CALL ShowContinueError('...'//trim(cNumericFields(11))//' cannot be < 0.0.')
+    CALL ShowContinueError('...'//trim(cNumericFields(10))//' cannot be < 0.0.')
     CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(11),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DXCoilNum)%EvapCondEffect2 = Numbers(12)
-  IF (DXCoil(DXCoilNum)%EvapCondEffect2 .LT. 0.0d0 .OR. DXCoil(DXCoilNum)%EvapCondEffect2 .GT. 1.0d0) THEN
+  DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) = Numbers(12)
+  IF (DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) .LT. 0.0d0 .AND. &
+      DXCoil(DXCoilNum)%EvapCondPumpElecNomPower(1) /= AutoSize) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-    CALL ShowContinueError('...'//trim(cNumericFields(12))//' cannot be cannot be < 0.0 or > 1.0.')
+    CALL ShowContinueError('...'//trim(cNumericFields(11))//' cannot be < 0.0.')
     CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(12),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DXCoilNum)%EvapCondAirFlow2 = Numbers(13)
-  IF (DXCoil(DXCoilNum)%EvapCondAirFlow2 .LT. 0.0d0 .AND. DXCoil(DXCoilNum)%EvapCondAirFlow2 /= AutoSize) THEN
+  DXCoil(DXCoilNum)%EvapCondEffect2 = Numbers(13)
+  IF (DXCoil(DXCoilNum)%EvapCondEffect2 .LT. 0.0d0 .OR. DXCoil(DXCoilNum)%EvapCondEffect2 .GT. 1.0d0) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-    CALL ShowContinueError('...'//trim(cNumericFields(13))//' cannot be < 0.0.')
+    CALL ShowContinueError('...'//trim(cNumericFields(12))//' cannot be cannot be < 0.0 or > 1.0.')
     CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(13),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DXCoilNum)%EvapCondPumpElecNomPower2 = Numbers(14)
+  DXCoil(DXCoilNum)%EvapCondAirFlow2 = Numbers(14)
+  IF (DXCoil(DXCoilNum)%EvapCondAirFlow2 .LT. 0.0d0 .AND. DXCoil(DXCoilNum)%EvapCondAirFlow2 /= AutoSize) THEN
+    CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
+    CALL ShowContinueError('...'//trim(cNumericFields(13))//' cannot be < 0.0.')
+    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(14),2))//'].')
+    ErrorsFound = .TRUE.
+  END IF
+
+  DXCoil(DXCoilNum)%EvapCondPumpElecNomPower2 = Numbers(15)
   IF (DXCoil(DXCoilNum)%EvapCondPumpElecNomPower2 .LT. 0.0d0 .AND. DXCoil(DXCoilNum)%EvapCondPumpElecNomPower2 /= AutoSize) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
     CALL ShowContinueError('...'//trim(cNumericFields(14))//' cannot be < 0.0.')
-    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(14),2))//'].')
+    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(15),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
@@ -2887,23 +2906,23 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoils
   ENDIF
 
   ! Basin heater power as a function of temperature must be greater than or equal to 0
-  DXCoil(DxCoilNum)%BasinHeaterPowerFTempDiff = Numbers(15)
-  IF(Numbers(15) .LT. 0.0d0) THEN
+  DXCoil(DxCoilNum)%BasinHeaterPowerFTempDiff = Numbers(16)
+  IF(Numbers(16) .LT. 0.0d0) THEN
     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
     CALL ShowContinueError('...'//trim(cNumericFields(15))//' must be >= 0.0.')
-    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(15),2))//'].')
+    CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(16),2))//'].')
     ErrorsFound = .TRUE.
   END IF
 
-  DXCoil(DxCoilNum)%BasinHeaterSetPointTemp = Numbers(16)
+  DXCoil(DxCoilNum)%BasinHeaterSetPointTemp = Numbers(17)
   IF(DXCoil(DxCoilNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0) THEN
-    IF(NumNumbers .LT. 16) THEN
+    IF(NumNumbers .LT. 17) THEN
       DXCoil(DxCoilNum)%BasinHeaterSetPointTemp = 2.0d0
     ENDIF
     IF(DXCoil(DxCoilNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
       CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", freeze possible')
       CALL ShowContinueError('...'//trim(cNumericFields(16))//' is < 2 {C}. Freezing could occur.')
-      CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(16),2))//'].')
+      CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(Numbers(17),2))//'].')
     END IF
   END IF
 
@@ -3642,12 +3661,14 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoolCoils
   ALLOCATE(DXCoil(DXCoilNum)%MSGamma_Rated(DXCoil(DXCoilNum)%NumOfSpeeds))
   ALLOCATE(DXCoil(DXCoilNum)%MSMaxONOFFCyclesperHour(DXCoil(DXCoilNum)%NumOfSpeeds))
   ALLOCATE(DXCoil(DXCoilNum)%MSLatentCapacityTimeConstant(DXCoil(DXCoilNum)%NumOfSpeeds))
+  ALLOCATE(DXCoil(DXCoilNum)%MSFanPowerPerEvapAirFlowRate(DXCoil(DXCoilNum)%NumOfSpeeds))
 
   Do I=1,DXCoil(DXCoilNum)%NumOfSpeeds
-    DXCoil(DXCoilNum)%MSRatedTotCap(I) = Numbers(6+(I-1)*12)
-    DXCoil(DXCoilNum)%MSRatedSHR(I)    = Numbers(7+(I-1)*12)
-    DXCoil(DXCoilNum)%MSRatedCOP(I)    = Numbers(8+(I-1)*12)
-    DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = Numbers(9+(I-1)*12)
+    DXCoil(DXCoilNum)%MSRatedTotCap(I) = Numbers(6+(I-1)*13)
+    DXCoil(DXCoilNum)%MSRatedSHR(I)    = Numbers(7+(I-1)*13)
+    DXCoil(DXCoilNum)%MSRatedCOP(I)    = Numbers(8+(I-1)*13)
+    DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = Numbers(9+(I-1)*13)
+    DXCoil(DXCoilNum)%MSFanPowerPerEvapAirFlowRate(I) = Numbers(10+(I-1)*13)
 
     DXCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(Alphas(13+(I-1)*6)) ! convert curve name to number
     IF (DXCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
@@ -3863,36 +3884,36 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoolCoils
     END IF
 
     ! read data for latent degradation
-    DXCoil(DXCoilNum)%MSTwet_Rated(I) = Numbers(10+(I-1)*12)
+    DXCoil(DXCoilNum)%MSTwet_Rated(I) = Numbers(11+(I-1)*13)
     IF (DXCoil(DXCoilNum)%MSTwet_Rated(I) .LT. 0.0d0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(10+(I-1)*12))//' cannot be < 0.0, '//  &
+      CALL ShowContinueError('...'//TRIM(cNumericFields(11+(I-1)*13))//' cannot be < 0.0, '//  &
          'entered value=['//trim(TrimSigDigits(DXCoil(DXCoilNum)%MSTwet_Rated(I),4))//'].')
       ErrorsFound=.TRUE.
     END IF
-    DXCoil(DXCoilNum)%MSGamma_Rated(I) = Numbers(11+(I-1)*12)
+    DXCoil(DXCoilNum)%MSGamma_Rated(I) = Numbers(12+(I-1)*13)
     IF (DXCoil(DXCoilNum)%MSGamma_Rated(I) .LT. 0.0d0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(11+(I-1)*12))//' cannot be < 0.0, '//  &
+      CALL ShowContinueError('...'//TRIM(cNumericFields(12+(I-1)*13))//' cannot be < 0.0, '//  &
          'entered value=['//trim(TrimSigDigits(DXCoil(DXCoilNum)%MSGamma_Rated(I),4))//'].')
       ErrorsFound=.TRUE.
     END IF
-    DXCoil(DXCoilNum)%MSMaxONOFFCyclesperHour(I) = Numbers(12+(I-1)*12)
+    DXCoil(DXCoilNum)%MSMaxONOFFCyclesperHour(I) = Numbers(13+(I-1)*13)
     IF (DXCoil(DXCoilNum)%Gamma_Rated(I) .LT. 0.0d0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(12+(I-1)*12))//' cannot be < 0.0, '//  &
+      CALL ShowContinueError('...'//TRIM(cNumericFields(13+(I-1)*13))//' cannot be < 0.0, '//  &
          'entered value=['//trim(TrimSigDigits(DXCoil(DXCoilNum)%MSMaxONOFFCyclesperHour(I),2))//'].')
       ErrorsFound=.TRUE.
     END IF
-    DXCoil(DXCoilNum)%MSLatentCapacityTimeConstant(I) = Numbers(13+(I-1)*12)
+    DXCoil(DXCoilNum)%MSLatentCapacityTimeConstant(I) = Numbers(14+(I-1)*13)
     IF (DXCoil(DXCoilNum)%Gamma_Rated(I) .LT. 0.0d0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(13+(I-1)*12))//' cannot be < 0.0, '//  &
+      CALL ShowContinueError('...'//TRIM(cNumericFields(14+(I-1)*13))//' cannot be < 0.0, '//  &
          'entered value=['//trim(TrimSigDigits(DXCoil(DXCoilNum)%MSLatentCapacityTimeConstant(I),2))//'].')
       ErrorsFound=.TRUE.
     END IF
 
-    DXCoil(DXCoilNum)%MSWasteHeatFrac(I) = Numbers(14+(I-1)*12)
+    DXCoil(DXCoilNum)%MSWasteHeatFrac(I) = Numbers(15+(I-1)*13)
 
     ! Read waste heat modifier curve name
     DXCoil(DXCoilNum)%MSWasteHeat(I) = GetCurveIndex(Alphas(18+(I-1)*6)) ! convert curve name to number
@@ -3927,28 +3948,28 @@ DO DXCoilIndex = 1,NumDXMulSpeedCoolCoils
       END SELECT
     END IF
 
-    DXCoil(DXCoilNum)%MSEvapCondEffect(I) = Numbers(15+(I-1)*12)
+    DXCoil(DXCoilNum)%MSEvapCondEffect(I) = Numbers(16+(I-1)*13)
     IF (DXCoil(DXCoilNum)%MSEvapCondEffect(I) .LT. 0.0d0 .OR. DXCoil(DXCoilNum)%MSEvapCondEffect(I) .GT. 1.0d0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(15+(I-1)*12))//' cannot be < 0.0 or > 1.0, '//  &
-         'entered value=['//trim(TrimSigDigits(Numbers(15+(I-1)*12),3))//'].')
+      CALL ShowContinueError('...'//TRIM(cNumericFields(16+(I-1)*13))//' cannot be < 0.0 or > 1.0, '//  &
+         'entered value=['//trim(TrimSigDigits(Numbers(16+(I-1)*13),3))//'].')
       ErrorsFound = .TRUE.
     END IF
 
-    DXCoil(DXCoilNum)%MSEvapCondAirFlow(I) = Numbers(16+(I-1)*12)
+    DXCoil(DXCoilNum)%MSEvapCondAirFlow(I) = Numbers(17+(I-1)*13)
     IF (DXCoil(DXCoilNum)%MSEvapCondAirFlow(I) .LT. 0.0 .AND. DXCoil(DXCoilNum)%MSEvapCondAirFlow(I) /= AutoSize) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(16+(I-1)*12))//' cannot be < 0.0, '//  &
-         'entered value=['//trim(TrimSigDigits(Numbers(16+(I-1)*12),3))//'].')
+      CALL ShowContinueError('...'//TRIM(cNumericFields(17+(I-1)*13))//' cannot be < 0.0, '//  &
+         'entered value=['//trim(TrimSigDigits(Numbers(17+(I-1)*13),3))//'].')
       ErrorsFound = .TRUE.
     END IF
 
-    DXCoil(DXCoilNum)%MSEvapCondPumpElecNomPower(I) = Numbers(17+(I-1)*12)
+    DXCoil(DXCoilNum)%MSEvapCondPumpElecNomPower(I) = Numbers(18+(I-1)*13)
     IF (DXCoil(DXCoilNum)%MSEvapCondPumpElecNomPower(I) .LT. 0.0 .AND. &
         DXCoil(DXCoilNum)%MSEvapCondPumpElecNomPower(I) /= AutoSize) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(DXCoil(DXCoilNum)%Name)//'", invalid')
-      CALL ShowContinueError('...'//TRIM(cNumericFields(17+(I-1)*12))//' cannot be < 0.0, '//  &
-         'entered value=['//trim(TrimSigDigits(Numbers(17+(I-1)*12),3))//'].')
+      CALL ShowContinueError('...'//TRIM(cNumericFields(18+(I-1)*13))//' cannot be < 0.0, '//  &
+         'entered value=['//trim(TrimSigDigits(Numbers(18+(I-1)*13),3))//'].')
       ErrorsFound = .TRUE.
     END IF
 
@@ -5135,6 +5156,8 @@ SUBROUTINE InitDXCoil(DXCoilNum)
     END IF
     HPInletAirHumRat = PsyWFnTdbTwbPb(DXCoil(DXCoilNum)%RatedInletDBTemp,DXCoil(DXCoilNum)%RatedInletWBTemp, &
                        StdBaroPress,RoutineName)
+    HPWHInletDBTemp   = DXCoil(DXCoilNum)%RatedInletDBTemp
+    HPWHInletWBTemp   = DXCoil(DXCoilNum)%RatedInletWBTemp
     DXCoil(DXCoilNum)%RatedAirMassFlowRate(1) = DXCoil(DXCoilNum)%RatedAirVolFlowRate(1)* &
                        PsyRhoAirFnPbTdbW(StdBaroPress,DXCoil(DXCoilNum)%RatedInletDBTemp,HPInletAirHumRat,RoutineName)
 !   get rated coil bypass factor excluding fan heat
@@ -5247,6 +5270,7 @@ SUBROUTINE InitDXCoil(DXCoilNum)
       DXCoil(DXCoilNum)%RatedCBF(Mode) = CalcCBF(DXCoil(DXCoilNum)%DXCoilType,DXCoil(DXCoilNum)%Name,&
                                            RatedInletAirTemp,RatedInletAirHumRat,DXCoil(DXCoilNum)%RatedTotCap(Mode),&
                                            DXCoil(DXCoilNum)%RatedAirMassFlowRate(Mode),DXCoil(DXCoilNum)%RatedSHR(Mode))
+
     END IF
 
     IF (DXCoil(DXCoilNum)%DXCoilType_Num == CoilDX_CoolingTwoStageWHumControl) THEN
@@ -5356,6 +5380,11 @@ SUBROUTINE InitDXCoil(DXCoilNum)
       DXCoil(DXCoilNum)%RatedCBF2 = CalcCBF(DXCoil(DXCoilNum)%DXCoilType,DXCoil(DXCoilNum)%Name,&
                                            RatedInletAirTemp,RatedInletAirHumRat,DXCoil(DXCoilNum)%RatedTotCap2,&
                                            DXCoil(DXCoilNum)%RatedAirMassFlowRate2,DXCoil(DXCoilNum)%RatedSHR2)
+
+      ! call for standard ratings for two-speeed DX coil
+      IF  (DXCoil(DXCoilNum)%CondenserType(1) == AirCooled) THEN
+        CALL CalcTwoSpeedDXCoilStandardRating(DXCoilNum)
+      ENDIF
     END IF
 
 !   Autosizing is completed in Size routine, however, the HPWH disrupts the flow of the eio and reporting
@@ -5668,9 +5697,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF (.NOT. DXCoil(DXCoilNum)%RatedTotCapEMSOverrideOn(Mode) .AND. DisplayExtraWarnings)THEN
@@ -5742,9 +5779,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF (.NOT. DXCoil(DXCoilNum)%RatedTotCapEMSOverrideOn(Mode) .AND. DisplayExtraWarnings)THEN
@@ -5818,7 +5863,7 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
             DXCoil(DXCoilNum)%DXCoilType_Num == CoilVRF_Heating) .AND. &
           DXCoil(DXCoilNum)%RatedTotCap(Mode) == AutoSize) THEN
         IF(DXCoil(DXCoilNum)%CoolingCoilPresent)THEN
-          DXCoil(DXCoilNum)%RatedTotCap(Mode) = DXCoolCap
+          DXCoil(DXCoilNum)%RatedTotCap(Mode) = DXCoolCap * DXCoil(DXCoilNum)%HeatSizeRatio
         ELSE
 
           IF (CurSysNum > 0) THEN
@@ -5858,9 +5903,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF(DisplayExtraWarnings)THEN
@@ -5932,9 +5985,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%RatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%RatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%RatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF(DisplayExtraWarnings)THEN
@@ -6291,9 +6352,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%MSCCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF(DisplayExtraWarnings)THEN
@@ -6357,9 +6426,17 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
               MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,StdBaroPress,RoutineName)
               SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
               TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%MSCCapFTemp(Mode),MixWetBulb,OutTemp)
-              CoolCapAtPeak = rhoair * VolFlowRate * (MixEnth-SupEnth)
-              DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
-              RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+              CoolCapAtPeak = MAX(0.d0, (rhoair * VolFlowRate * (MixEnth-SupEnth)))
+              IF(TotCapTempModFac .GT. 0.d0)THEN
+                DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak / TotCapTempModFac
+              ELSE
+                DXCoil(DXCoilNum)%MSRatedTotCap(Mode) = CoolCapAtPeak
+              END IF
+              IF(DXCoil(DXCoilNum)%RatedTotCap(Mode) .GT. 0.d0)THEN
+                RatedVolFlowPerRatedTotCap = DXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) / DXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+              ELSE
+                RatedVolFlowPerRatedTotCap = 0.d0
+              END IF
               ! check capacity to make sure design volume flow per total capacity is within range
               IF (RatedVolFlowPerRatedTotCap .LT. MinRatedVolFlowPerRatedTotCap) THEN
                 IF(DisplayExtraWarnings)THEN
@@ -6590,12 +6667,13 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
     END IF
   End If
 
-  ! Call routine that computes AHRI certified rating for single-speed DX Cooling Coils
+  ! Call routine that computes AHRI certified rating for single-speed DX Coils
   IF ((DXCoil(DXCoilNum)%DXCoilType_Num == CoilDX_CoolingSingleSpeed .AND. DXCoil(DXCoilNum)%CondenserType(1) == AirCooled) &
        .OR. DXCoil(DXCoilNum)%DXCoilType_Num == CoilDX_HeatingEmpirical) THEN
       CALL CalcDXCoilStandardRating(DXCoil(DXCoilNum)%Name,                          &
                                     DXCoil(DXCoilNum)%DXCoilType,                    &
                                     DXCoil(DXCoilNum)%DXCoilType_Num,                &
+                                    1, &
                                     DXCoil(DXCoilNum)%RatedTotCap(1),                &
                                     DXCoil(DXCoilNum)%RatedCOP(1),                   &
                                     DXCoil(DXCoilNum)%CCapFFlow(1),                  &
@@ -6611,6 +6689,22 @@ SUBROUTINE SizeDXCoil(DXCoilNum)
                                     DXCoil(DXCoilNum)%OATempCompressorOnOffBlank,    &
                                     DXCoil(DXCoilNum)%DefrostControl)
   END IF
+  ! Call routine that computes AHRI certified rating for multi-speed DX cooling Coils
+  IF ( DXCoil(DXCoilNum)%DXCoilType_Num == CoilDX_MultiSpeedCooling) THEN
+      CALL CalcDXCoilStandardRating(DXCoil(DXCoilNum)%Name,                          &
+                                    DXCoil(DXCoilNum)%DXCoilType,                    &
+                                    DXCoil(DXCoilNum)%DXCoilType_Num,                &
+                                    DXCoil(DXCoilNum)%NumOfSpeeds,                   &
+                                    DXCoil(DXCoilNum)%MSRatedTotCap,                 &
+                                    DXCoil(DXCoilNum)%MSRatedCOP,                    &
+                                    DXCoil(DXCoilNum)%MSCCapFFlow,                   &
+                                    DXCoil(DXCoilNum)%MSCCapFTemp,                   &
+                                    DXCoil(DXCoilNum)%MSEIRFFlow,                    &
+                                    DXCoil(DXCoilNum)%MSEIRFTemp,                    &
+                                    DXCoil(DXCoilNum)%MSPLFFPLR,                     &
+                                    DXCoil(DXCoilNum)%MSRatedAirVolFlowRate,         &
+                                    DXCoil(DXCoilNum)%MSFanPowerPerEvapAirFlowRate)
+  END If
 
   !create predefined report entries
   equipName = DXCoil(DXCoilNum)%Name
@@ -7497,7 +7591,7 @@ IF((AirMassFlow .GT. 0.0) .AND. &
 !  tADP = PsyTsatFnHPb(hADP,InletAirPressure)
   wADP = PsyWFnTdbH(tADP,hADP,'CalcDoe2DXCoil')
   hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,'CalcDoe2DXCoil')
-  IF((InletAirEnthalpy-hADP) .NE. 0)THEN
+  IF((InletAirEnthalpy-hADP) > 1.d-10)THEN
     SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
   ELSE
     SHR = 1.0d0
@@ -8085,9 +8179,15 @@ DXCoil(DXCoilNum)%BasinHeaterPower           = 0.0d0
 
 IF (DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode) /= 0) THEN
   OutdoorDryBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%Temp
-  OutdoorHumRat   = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%HumRat
-  OutdoorPressure = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%Press
-  OutdoorWetBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%OutAirWetBulb
+  IF(DXCoil(DXCoilNum)%CondenserType(Mode) == WaterCooled)THEN
+    OutdoorHumRat   = OutHumRat
+    OutdoorPressure = OutBaroPress
+    OutdoorWetBulb  = OutWetBulbTemp
+  ELSE
+    OutdoorHumRat   = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%HumRat
+    OutdoorPressure = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%Press
+    OutdoorWetBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%OutAirWetBulb
+  END IF
 ELSE
   OutdoorDryBulb  = OutDryBulbTemp
   OutdoorHumRat   = OutHumRat
@@ -8300,11 +8400,9 @@ IF((AirMassFlow .GT. 0.0) .AND. &
 !  Get total capacity modifying factor (function of temperature) for off-rated conditions
 !  InletAirHumRat may be modified in this ADP/BF loop, use temporary varible for calculations
    InletAirHumRatTemp = InletAirHumRat
-50 IF(DXCoil(DXCoilNum)%TotCapTempModFacCurveType(1) .EQ. BiQuadratic)THEN
-     TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),InletAirWetbulbC,CondInletTemp)
-   ELSE
-     TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),InletAirWetbulbC)
-   END IF
+! No need to differentiate between curve types, single-independent curve will just use first variable
+! (as long as the first independent variable is the same for both curve types)
+50 TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(Mode),InletAirWetbulbC,CondInletTemp)
 
 !  Warn user if curve output goes negative
    IF(TotCapTempModFac .LT. 0.0)THEN
@@ -8369,7 +8467,7 @@ IF((AirMassFlow .GT. 0.0) .AND. &
 !  tADP = PsyTsatFnHPb(hADP,InletAirPressure)
   wADP = MIN(InletAirHumRat,PsyWFnTdbH(tADP,hADP,'CalcVRFCoolingCoil'))
   hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,'CalcVRFCoolingCoil')
-  IF((InletAirEnthalpy-hADP) .NE. 0)THEN
+  IF((InletAirEnthalpy-hADP) > 1.d-10)THEN
     SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
   ELSE
     SHR = 1.0d0
@@ -8704,9 +8802,15 @@ END IF
 ! Get condenser outdoor node info from DX Heating Coil
 IF (DXCoil(DXCoilNum)%CondenserInletNodeNum(1) /= 0) THEN
   OutdoorDryBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%Temp
-  OutdoorHumRat   = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%HumRat
-  OutdoorPressure = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%Press
-  OutdoorWetBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%OutAirWetBulb
+  IF (DXCoil(DXCoilNum)%CondenserType(Mode) == WaterCooled)THEN
+    OutdoorHumRat   = OutHumRat
+    OutdoorPressure = OutBaroPress
+    OutdoorWetBulb  = OutWetBulbTemp
+  ELSE
+    OutdoorHumRat   = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%HumRat
+    OutdoorPressure = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%Press
+    OutdoorWetBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%OutAirWetBulb
+  END IF
 ELSE
   OutdoorDryBulb  = OutDryBulbTemp
   OutdoorHumRat   = OutHumRat
@@ -8818,8 +8922,10 @@ IF((AirMassFlow .GT. 0.0) .AND. &
 ! Calculate defrost adjustment factors depending on defrost control type
      IF (DXCoil(DXCoilNum)%DefrostControl .EQ. Timed) THEN
        FractionalDefrostTime = DXCoil(DXCoilNum)%DefrostTime
-       HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
-       InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+       IF(FractionalDefrostTime .GT. 0.d0)THEN
+         HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
+         InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+       END IF
      ELSE !else defrost control is on-demand
        FractionalDefrostTime = 1.0d0 / (1.0d0 + 0.01446d0 / OutdoorCoildw)
        HeatingCapacityMultiplier = 0.875d0 * ( 1.0d0 - FractionalDefrostTime)
@@ -8827,7 +8933,7 @@ IF((AirMassFlow .GT. 0.0) .AND. &
      END IF
 
 
-     IF (FractionalDefrostTime .GT. 0.0) THEN
+     IF (FractionalDefrostTime .GT. 0.d0) THEN
 ! Calculate defrost adjustment factors depending on defrost control strategy
        IF (DXCoil(DXCoilNum)%DefrostStrategy .EQ. ReverseCycle) THEN
          LoadDueToDefrost = (0.01d0 * FractionalDefrostTime) * &
@@ -8842,7 +8948,7 @@ IF((AirMassFlow .GT. 0.0) .AND. &
          DXCoil(DXCoilNum)%DefrostPower = DXCoil(DXCoilNum)%DefrostCapacity &
                                           * FractionalDefrostTime
        END IF
-     ELSE ! Defrost is not active because (OutDryBulbTemp .GT. DXCoil(DXCoilNum)%MaxOATDefrost)
+     ELSE ! Defrost is not active because (FractionalDefrostTime .EQ. 0.0)
        DXCoil(DXCoilNum)%DefrostPower =  0.0
      END IF
   END IF
@@ -8995,7 +9101,8 @@ DXCoilHeatInletAirWBTemp(DXCoilNum) = InletAirWetbulbC
 RETURN
 END SUBROUTINE CalcDXHeatingCoil
 
-SUBROUTINE CalcMultiSpeedDXCoil(DXCoilNum,SpeedRatio, CycRatio)
+
+SUBROUTINE CalcMultiSpeedDXCoil(DXCoilNum,SpeedRatio, CycRatio, ForceOn)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -9024,10 +9131,11 @@ USE DataWater,    ONLY: WaterStorage
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-INTEGER :: DXCoilNum        ! the number of the DX heating coil to be simulated
-REAL(r64) :: SpeedRatio       ! = (CompressorSpeed - CompressorSpeedMin) / (CompressorSpeedMax - CompressorSpeedMin)
+INTEGER,   INTENT(IN) :: DXCoilNum        ! the number of the DX heating coil to be simulated
+REAL(r64), INTENT(IN) :: SpeedRatio       ! = (CompressorSpeed - CompressorSpeedMin) / (CompressorSpeedMax - CompressorSpeedMin)
                             ! SpeedRatio varies between 1.0 (maximum speed) and 0.0 (minimum speed)
-REAL(r64) :: CycRatio         ! cycling part load ratio
+REAL(r64), INTENT(IN) :: CycRatio         ! cycling part load ratio
+LOGICAL, INTENT(IN), OPTIONAL :: ForceOn
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
 CHARACTER(len=*), PARAMETER ::  RoutineName='CalcMultiSpeedDXCoil'
@@ -9096,6 +9204,13 @@ REAL(r64) :: OutdoorDryBulb       ! Outdoor dry-bulb temperature at condenser (C
 REAL(r64) :: OutdoorWetBulb       ! Outdoor wet-bulb temperature at condenser (C)
 REAL(r64) :: OutdoorHumRat        ! Outdoor humidity ratio at condenser (kg/kg)
 REAL(r64) :: OutdoorPressure      ! Outdoor barometric pressure at condenser (Pa)
+LOGICAL   :: LocalForceOn
+
+IF (PRESENT(ForceOn)) THEN
+  LocalForceOn = .TRUE.
+ELSE
+  LocalForceOn = .FALSE.
+ENDIF
 
 IF (DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode) /= 0) THEN
   OutdoorDryBulb  = Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(Mode))%Temp
@@ -9128,7 +9243,7 @@ ELSEIF (DXCoil(DXCoilNum)%CondenserType(Mode) == EvapCooled) THEN
 END IF
 
 IF((AirMassFlow .GT. 0.0) .AND. &
-   (GetCurrentScheduleValue(DXCoil(DXCoilNum)%SchedPtr) .GT. 0.0) &
+   ((GetCurrentScheduleValue(DXCoil(DXCoilNum)%SchedPtr) .GT. 0.0) .OR. (LocalForceOn))&
    .AND. (SpeedRatio > 0.0 .OR. CycRatio > 0.0) ) THEN
 
   RhoAir = PsyRhoAirFnPbTdbW(OutdoorPressure,OutdoorDryBulb,OutdoorHumRat)
@@ -9192,7 +9307,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     wADP = PsyWFnTdbH(tADP,hADP)
     hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP)
   ! get corresponding SHR
-    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    IF ((InletAirEnthalpy-hADP) > 1.d-10) THEN
+      SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    ELSE
+      SHR=1.0d0
+    ENDIF
+!cr8918    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
     OutletAirEnthalpy = InletAirEnthalpy - hDelta
   ! get outlet conditions
     hTinwout = InletAirEnthalpy - (1.0d0-SHR)*hDelta
@@ -9260,7 +9380,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     wADP = PsyWFnTdbH(tADP,hADP,'CalcMultiSpeedDXCoil:newdewpointconditions')
     hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,'CalcMultiSpeedDXCoil:newdewpointconditions')
   ! get corresponding SHR
-    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    IF ((InletAirEnthalpy-hADP) > 1.d-10) THEN
+      SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    ELSE
+      SHR=1.0d0
+    ENDIF
+!cr8918    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
     ! get low speed outlet conditions
     LSOutletAirEnthalpy = InletAirEnthalpy - hDelta
     hTinwout = InletAirEnthalpy - (1.0d0-SHR)*hDelta
@@ -9974,6 +10099,10 @@ SUBROUTINE CalcTotCapSHR(InletDryBulb,InletHumRat,InletEnthalpy,InletWetBulb,Air
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: RoutineName='CalcTotCapSHR'
+  INTEGER,   PARAMETER :: MaxIter   = 30      ! Maximum number of iterations for dry evaporator calculations
+  REAL(r64), PARAMETER :: RF        = 0.4d0   ! Relaxation factor for dry evaporator iterations
+  REAL(r64), PARAMETER :: Tolerance = 0.01d0  ! Error tolerance for dry evaporator iterations
+  REAL(r64), PARAMETER :: MinHumRatCalc = 0.00001d0  ! Error tolerance for dry evaporator iterations
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -9994,15 +10123,12 @@ SUBROUTINE CalcTotCapSHR(InletDryBulb,InletHumRat,InletEnthalpy,InletWetBulb,Air
   REAL(r64) :: SHRCalc             ! temporary calculated value of SHR
   REAL(r64) :: TotCapCalc          ! temporary calculated value of total capacity [W]
   INTEGER :: Counter             ! Counter for dry evaporator iterations
-  INTEGER :: MaxIter             ! Maximum number of iterations for dry evaporator calculations
-  REAL(r64) :: RF                  ! Relaxation factor for dry evaporator iterations
-  REAL(r64) :: Tolerance           ! Error tolerance for dry evaporator iterations
   REAL(r64) :: werror              ! Deviation of humidity ratio in dry evaporator iteration loop
 
-  MaxIter = 30
-  RF = 0.4d0
+!  MaxIter = 30
+!  RF = 0.4d0
   Counter = 0
-  Tolerance = 0.01d0
+!  Tolerance = 0.01d0
   werror = 0.0
 
   InletWetBulbCalc = InletWetBulb
@@ -10010,7 +10136,8 @@ SUBROUTINE CalcTotCapSHR(InletDryBulb,InletHumRat,InletEnthalpy,InletWetBulb,Air
 
 !  DO WHILE (ABS(werror) .gt. Tolerance .OR. Counter == 0)
 !   Get capacity modifying factor (function of inlet wetbulb & outside drybulb) for off-rated conditions
-50  TotCapTempModFac = CurveValue(CCapFTemp,InletWetBulbCalc,CondInletTemp)
+   DO
+    TotCapTempModFac = CurveValue(CCapFTemp,InletWetBulbCalc,CondInletTemp)
 !   Get capacity modifying factor (function of mass flow) for off-rated conditions
     TotCapFlowModFac = CurveValue(CCapFFlow,AirMassFlowRatio)
 !   Get total capacity
@@ -10022,12 +10149,18 @@ SUBROUTINE CalcTotCapSHR(InletDryBulb,InletHumRat,InletEnthalpy,InletWetBulb,Air
     tADP = PsyTsatFnHPb(hADP,Pressure)
     wADP = PsyWFnTdbH(tADP,hADP)
     hTinwADP = PsyHFnTdbW(InletDryBulb,wADP)
-    SHRCalc = MIN((hTinwADP-hADP)/(InletEnthalpy-hADP),1.d0)
+    IF ((InletEnthalpy-hADP) > 1.d-10) THEN
+      SHRCalc = MIN((hTinwADP-hADP)/(InletEnthalpy-hADP),1.d0)
+    ELSE
+      SHRCalc=1.0d0
+    ENDIF
 !
 !   Check for dry evaporator conditions (win < wadp)
 !
     IF (wADP .gt. InletHumRatCalc .or. (Counter .ge. 1 .and. Counter .lt. MaxIter)) THEN
-      If(InletHumRatCalc == 0.0)InletHumRatCalc=0.00001d0
+      If(InletHumRatCalc == 0.0)InletHumRatCalc=MinHumRatCalc
+!      InletHumRatCalc=MAX(InletHumRatCalc,MinHumRatCalc)  ! proposed.
+
       werror = (InletHumRatCalc - wADP)/InletHumRatCalc
 !
 !     Increase InletHumRatCalc at constant inlet air temp to find coil dry-out point. Then use the
@@ -10037,9 +10170,12 @@ SUBROUTINE CalcTotCapSHR(InletDryBulb,InletHumRat,InletEnthalpy,InletWetBulb,Air
       InletHumRatCalc = RF*wADP + (1.d0-RF)*InletHumRatCalc
       InletWetBulbCalc = PsyTwbFnTdbWPb(InletDryBulb,InletHumRatCalc,Pressure)
       Counter = Counter + 1
-      IF (ABS(werror) .gt. Tolerance) go to 50   ! Recalculate with modified inlet conditions
-
+      IF (ABS(werror) .gt. Tolerance) CYCLE   ! Recalculate with modified inlet conditions
+      EXIT ! conditions are satisfied
+    ELSE
+      EXIT ! conditions are satisfied
     END IF
+  END DO
 
 ! END DO
 
@@ -10298,7 +10434,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     wADP = PsyWFnTdbH(tADP,hADP,'CalcMultiSpeedDXCoilCooling')
     hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,'CalcMultiSpeedDXCoilCooling highspeed')
     ! get corresponding SHR
-    SHRLS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    IF ((InletAirEnthalpy-hADP) > 1.d-10) THEN
+      SHRLS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    ELSE
+      SHRLS=1.0d0
+    ENDIF
+!cr8918    SHRLS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
     ! get low speed outlet conditions
     LSOutletAirEnthalpy = InletAirEnthalpy - hDelta
     hTinwout = InletAirEnthalpy - (1.0d0-SHRLS)*hDelta
@@ -10330,7 +10471,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     wADP = PsyWFnTdbH(tADP,hADP,RoutineName)
     hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,RoutineName)
     ! get corresponding SHR
-    SHRHS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    IF ((InletAirEnthalpy-hADP) > 1.d-10) THEN
+      SHRHS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    ELSE
+      SHRHS=1.0d0
+    ENDIF
+!cr8918    SHRHS = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
     ! get the part load factor that will account for cycling losses
     PLF = CurveValue(DXCoil(DXCoilNum)%MSPLFFPLR(SpeedNumHS),SpeedRatio)
     IF (PLF < 0.7d0) THEN
@@ -10537,7 +10683,12 @@ IF((AirMassFlow .GT. 0.0) .AND. &
     wADP = PsyWFnTdbH(tADP,hADP,RoutineName)
     hTinwADP = PsyHFnTdbW(InletAirDryBulbTemp,wADP,RoutineName)
     ! get corresponding SHR
-    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    IF ((InletAirEnthalpy-hADP) > 1.d-10) THEN
+      SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
+    ELSE
+      SHR=1.0d0
+    ENDIF
+!cr8918    SHR = MIN((hTinwADP-hADP)/(InletAirEnthalpy-hADP),1.d0)
 
     ! get the part load factor that will account for cycling losses
     PLF = CurveValue(DXCoil(DXCoilNum)%MSPLFFPLR(SpeedNumLS),CycRatio)
@@ -11011,8 +11162,10 @@ IF((AirMassFlow .GT. 0.0) .AND. &
       ! Calculate defrost adjustment factors depending on defrost control type
       IF (DXCoil(DXCoilNum)%DefrostControl .EQ. Timed) THEN
         FractionalDefrostTime = DXCoil(DXCoilNum)%DefrostTime
-        HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
-        InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+        IF(FractionalDefrostTime .GT. 0.d0)THEN
+          HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
+          InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+        END IF
       ELSE !else defrost control is on-demand
         FractionalDefrostTime = 1.0d0 / (1.0d0 + 0.01446d0 / OutdoorCoildw)
         HeatingCapacityMultiplier = 0.875d0 * ( 1.0d0 - FractionalDefrostTime)
@@ -11198,8 +11351,10 @@ IF((AirMassFlow .GT. 0.0) .AND. &
       ! Calculate defrost adjustment factors depending on defrost control type
       IF (DXCoil(DXCoilNum)%DefrostControl .EQ. Timed) THEN
         FractionalDefrostTime = DXCoil(DXCoilNum)%DefrostTime
-        HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
-        InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+        IF(FractionalDefrostTime .GT. 0.d0)THEN
+          HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
+          InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+        END IF
       ELSE !else defrost control is on-demand
         FractionalDefrostTime = 1.0d0 / (1.0d0 + 0.01446d0 / OutdoorCoildw)
         HeatingCapacityMultiplier = 0.875d0 * ( 1.0d0 - FractionalDefrostTime)
@@ -11490,7 +11645,7 @@ ReportingConstant = TimeStepSys*SecInHour
 
 SELECT CASE(DXCoil(DXCoilNum)%DXCoilType_Num)
 
-CASE (CoilDX_HeatingEmpirical)
+CASE (CoilDX_HeatingEmpirical,CoilVRF_Heating)
   DXCoil(DXCoilNum)%TotalHeatingEnergy = DXCoil(DXCoilNum)%TotalHeatingEnergyRate*ReportingConstant
   DXCoil(DXCoilNum)%ElecHeatingConsumption = DXCoil(DXCoilNum)%ElecHeatingPower*ReportingConstant
   DXCoil(DXCoilNum)%DefrostConsumption = DXCoil(DXCoilNum)%DefrostPower*ReportingConstant
@@ -11572,6 +11727,761 @@ LoopDXCoilRTF = MAX(DXCoil(DXCoilNum)%CoolingCoilRuntimeFraction,DXCoil(DXCoilNu
 
 RETURN
 END SUBROUTINE ReportDXCoil
+
+SUBROUTINE CalcTwoSpeedDXCoilStandardRating(DXCoilNum)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith, (Derived from CalcDXCoilStandardRating by Bereket Nigusse & Chandan Sharma)
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Calculate the following
+          !                 (1) Standard Rated (net) Cooling Capacity
+          !                 (2) Energy Efficiency Ratio (EER),
+          !                 (3) Integrated Energy Efficiency Ratio (IEER)
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! ANSI/AHRI Standard 340/360-2007, Peformance Rating of Commercial and Industrial Unitary Air-Conditioning and
+          !  Heat Pump Equipment, Air-Conditioning, Heating, and Refrigeration Institute, Arlingtion VA.
+
+          ! USE STATEMENTS:
+
+  USE CurveManager,    ONLY: CurveValue
+  USE Fans,            ONLY: GetFanPower, GetFanInletNode, GetFanOutletNode, SimulateFanComponents
+  USE DataEnvironment, ONLY: OutBaroPress
+  USE General,         ONLY: SolveRegulaFalsi, RoundSigDigits
+  USE OutputReportPredefined
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)              :: DXCoilNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  ! AHRI Standard 340/360-2007 Peformance Rating of Commercial and Industrial Unitary Air-Conditioning and Heat Pump Equipment
+  REAL(r64), PARAMETER ::    CoolingCoilInletAirWetbulbTempRated = 19.4d0  ! 19.44C (67F)
+  REAL(r64), PARAMETER ::    CoolingCoilInletAirDryblubTempRated = 26.7d0  !
+  REAL(r64), PARAMETER ::    OutdoorUnitInletAirDrybulbTempRated = 35.0d0   ! 35.00C (95F)
+  REAL(r64), PARAMETER, DIMENSION(3) :: OutdoorUnitInletAirDrybulbTempPLTestPoint = &
+                              (/27.5d0, 20.0d0, 18.3d0 /)
+  REAL(r64), PARAMETER, DIMENSION(3) :: NetCapacityFactorPLTestPoint = &
+                              (/0.75d0, 0.50D0, 0.25D0/)
+  REAL(r64), PARAMETER :: ConvFromSIToIP = 3.412141633D0 ! Conversion from SI to IP [3.412 Btu/hr-W]
+
+
+  REAL(r64), PARAMETER ::    AirMassFlowRatioRated = 1.0d0   ! AHRI test is at the design flow rate
+                                                             ! and hence AirMassFlowRatio is 1.0
+
+  REAL(r64), PARAMETER :: DefaultFanPowerPerEvapAirFlowRate = 773.3D0 ! 365 W/1000 scfm or 773.3 W/(m3/s). The AHRI standard
+                                                      ! specifies a nominal/default fan electric power consumption per rated air
+                                                      ! volume flow rate to account for indoor fan electric power consumption
+                                                      ! when the standard tests are conducted on units that do not have an
+                                                      ! indoor air circulting fan. Used if user doesn't enter a specific value.
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+  REAL(r64) :: NetCoolingCapRated = 0.0D0 ! Net Cooling Coil capacity at Rated conditions, accounting for supply fan heat [W]
+  REAL(r64) :: EER = 0.0D0              ! Energy Efficiency Ratio in SI [W/W]
+  REAL(r64) :: IEER = 0.0D0             ! Integerated Energy Efficiency Ratio in SI [W/W]
+  REAL(r64) :: TotCapTempModFac = 0.0D0    ! Total capacity modifier (function of entering wetbulb, outside drybulb) [-]
+  REAL(r64) :: TotCapFlowModFac = 0.0D0    ! Total capacity modifier (function of actual supply air flow vs rated flow) [-]
+  REAL(r64) :: CoolCapFanModPerEvapAirFlowRate=0.0D0  ! Fan power per air volume flow rate through the evaporator coil [W/(m3/s)]
+  REAL(r64) :: EIRTempModFac = 0.0D0       ! EIR modifier (function of entering wetbulb, outside drybulb) [-]
+  REAL(r64) :: EIRFlowModFac = 0.0D0       ! EIR modifier (function of actual supply air flow vs rated flow) [-]
+  REAL(r64) :: EIR
+  REAL(r64) :: TotalElecPowerRated
+  REAL(r64) , DIMENSION(4) :: EER_TestPoint_SI ! 1 = A, 2 = B, 3= C, 4= D
+  REAL(r64) , DIMENSION(4) :: EER_TestPoint_IP ! 1 = A, 2 = B, 3= C, 4= D
+  REAL(r64) , DIMENSION(4) :: NetCapacity_TestPoint ! 1 = A, 2 = B, 3= C, 4= D
+  REAL(r64) , DIMENSION(4) :: NetPower_TestPoint  ! 1 = A, 2 = B, 3= C, 4= D
+  REAL(r64) , DIMENSION(4) :: SupAirMdot_TestPoint ! 1 = A, 2 = B, 3= C, 4= D
+
+  REAL(r64) :: TempDryBlub_Leaving_Apoint = 0.d0
+  REAL(r64) :: OutdoorUnitInletAirDrybulbTempPartLoad
+
+  REAL(r64) :: HighSpeedNetCoolingCap
+  REAL(r64) :: LowSpeedNetCoolingCap
+
+  REAL(r64) :: PartLoadAirMassFlowRate
+  REAL(r64) :: AirMassFlowRatio
+  REAL(r64) :: AccuracyTolerance = 0.2d0 ! tolerance in AHRI 340/360 Table 6 note 1
+  INTEGER   :: MaximumIterations = 500
+  INTEGER   :: SolverFlag
+  REAL(r64), DIMENSION(12)  :: Par                 ! Parameter array passed to solver
+  REAL(r64) :: EIR_HighSpeed
+  REAL(r64) :: EIR_LowSpeed
+  INTEGER   :: FanInletNode
+  INTEGER   :: FanOutletNode
+  INTEGER   :: Iter
+  REAL(r64) :: ExternalStatic
+  REAL(r64) :: FanStaticPressureRise
+  LOGICAL   :: ErrorsFound = .FALSE.
+  REAL(r64) :: FanHeatCorrection
+  REAL(r64) :: FanPowerCorrection
+  REAL(r64) :: FanPowerPerEvapAirFlowRate
+  REAL(r64) :: SpeedRatio
+  REAL(r64) :: CycRatio
+  REAL(r64) :: TargetNetCapacity
+  REAL(r64) :: SupplyAirHumRat
+  REAL(r64) :: SupplyAirRho
+  REAL(r64) :: SupplyAirVolFlowRate
+  REAL(r64) :: HighSpeedTotCoolingCap
+  REAL(r64) :: LowSpeedTotCoolingCap
+  REAL(r64) :: TotCoolingCap
+  REAL(r64) :: NetCoolingCap
+  REAL(r64) :: PLF
+  REAL(r64) :: RunTimeFraction
+  REAL(r64) :: LowerBoundMassFlowRate
+  LOGICAL, SAVE :: OneTimeEIOHeaderWrite = .TRUE.
+  INTEGER :: PartLoadTestPoint
+  INTEGER :: countStaticInputs
+  INTEGER :: Index
+
+  CALL GetFanIndexForTwoSpeedCoil( DXCoilNum, DXCoil(DXCoilNum)%SupplyFanIndex, DXCoil(DXCoilNum)%SupplyFanName)
+  IF (DXCoil(DXCoilNum)%SupplyFanIndex == 0) THEN ! didn't find VAV fan, do not rate this coil
+    DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject = .FALSE.
+    CALL ShowWarningError('CalcTwoSpeedDXCoilStandardRating: Did not find a variable air volume fan associated' &
+                       //' with DX coil named = "'//TRIM(DXCoil(DXCoilNum)%Name)//'". Standard Ratings will not be calculated.')
+    RETURN
+  ENDIF
+
+ ! CALL CheckCurveLimitsForStandardRatings(
+
+  ! Calculate the Indoor fan electric power consumption.  The electric power consumption is estimated
+  ! using either user supplied or AHRI default value for fan power per air volume flow rate
+  IF( DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject) THEN
+
+    TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFFlow(1),AirMassFlowRatioRated)
+    TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(1),CoolingCoilInletAirWetbulbTempRated,    &
+                                 OutdoorUnitInletAirDrybulbTempRated)
+    Do Iter = 1, 4 ! iterative solution in the event that net capacity is near a threshold for external static
+        !Obtain external static pressure from Table 5 in ANSI/AHRI Std. 340/360-2007
+      IF (NetCoolingCapRated <= 21000.d0) THEN
+        ExternalStatic  = 50.d0
+      ELSEIF (21000.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 30800.d0) THEN
+        ExternalStatic  = 60.d0
+      ELSEIF (30800.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 39300.d0) THEN
+        ExternalStatic  = 70.d0
+      ELSEIF (39300.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 61500.d0) THEN
+        ExternalStatic  = 90.d0
+      ELSEIF (61500.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 82100.d0) THEN
+        ExternalStatic  = 100.d0
+      ELSEIF (82100.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 103000.d0) THEN
+        ExternalStatic  = 110.d0
+      ELSEIF (103000.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 117000.d0) THEN
+        ExternalStatic  = 140.d0
+      ELSEIF (117000.d0 < NetCoolingCapRated .AND. NetCoolingCapRated <= 147000.d0) THEN
+        ExternalStatic  = 160.d0
+      ELSEIF (147000.d0 < NetCoolingCapRated) THEN
+        ExternalStatic  = 190.d0
+      ENDIF
+      FanStaticPressureRise = ExternalStatic + DXCoil(DXCoilNum)%InternalStaticPressureDrop
+
+      FanInletNode = GetFanInletNode('FAN:VARIABLEVOLUME', DXCoil(DXCoilNum)%SupplyFanName, errorsFound)
+      FanOutletNode = GetFanOutletNode('FAN:VARIABLEVOLUME', DXCoil(DXCoilNum)%SupplyFanName, errorsFound)
+      ! set node state variables in preparation for fan model.
+      Node(FanInletNode)%MassFlowRate = DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+      Node(FanOutletNode)%MassFlowRate = DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+      Node(FanInletNode)%Temp         = CoolingCoilInletAirDryblubTempRated
+      Node(FanInletNode)%HumRat       = PsyWFnTdbTwbPb(CoolingCoilInletAirDryblubTempRated, CoolingCoilInletAirWetbulbTempRated, &
+                                                       OutBaroPress , 'CalcTwoSpeedDXCoilStandardRating')
+      Node(FanInletNode)%Enthalpy     = PsyHFnTdbW(CoolingCoilInletAirDryblubTempRated, Node(FanInletNode)%HumRat, &
+                                                    'CalcTwoSpeedDXCoilStandardRating')
+
+      CALL SimulateFanComponents(DXCoil(DXCoilNum)%SupplyFanName,.TRUE.,DXCoil(DXCoilNum)%SupplyFanIndex, &
+                                 ZoneCompTurnFansOn = .TRUE. , &
+                                 ZoneCompTurnFansOff = .FALSE. , &
+                                 PressureRise = FanStaticPressureRise)
+      FanHeatCorrection = Node(FanOutletNode)%Enthalpy - Node(FanInletNode)%Enthalpy
+      CALL GetFanPower(DXCoil(DXCoilNum)%SupplyFanIndex, FanPowerCorrection)
+
+      NetCoolingCapRated = DXCoil(DXCoilNum)%RatedTotCap(1) * TotCapTempModFac * TotCapFlowModFac     &
+                         - FanHeatCorrection
+    ENDDO
+
+  ELSE
+    FanPowerPerEvapAirFlowRate=DefaultFanPowerPerEvapAirFlowRate
+    FanPowerCorrection = DefaultFanPowerPerEvapAirFlowRate * DXCoil(DXCoilNum)%RatedAirVolFlowRate(1)
+    FanHeatCorrection  = DefaultFanPowerPerEvapAirFlowRate * DXCoil(DXCoilNum)%RatedAirVolFlowRate(1)
+    TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFFlow(1),AirMassFlowRatioRated)
+    TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(1),CoolingCoilInletAirWetbulbTempRated,    &
+                                 OutdoorUnitInletAirDrybulbTempRated)
+    NetCoolingCapRated = DXCoil(DXCoilNum)%RatedTotCap(1) * TotCapTempModFac * TotCapFlowModFac          &
+                         - FanHeatCorrection
+  ENDIF
+
+  SupAirMdot_TestPoint(1) = DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+
+  ! Calculate Energy Efficiency Ratio (EER) at (19.44C WB and 35.0C DB ), ANSI/AHRI Std. 340/360
+  EIRTempModFac = CurveValue(DXCoil(DXCoilNum)%EIRFTemp(1),CoolingCoilInletAirWetbulbTempRated,     &
+                                  OutdoorUnitInletAirDrybulbTempRated)
+  EIRFlowModFac = CurveValue(DXCoil(DXCoilNum)%EIRFFlow(1),AirMassFlowRatioRated)
+  IF ( DXCoil(DXCoilNum)%RatedCOP(1) > 0.0D0 ) THEN
+       ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
+    EIR = EIRTempModFac * EIRFlowModFac / DXCoil(DXCoilNum)%RatedCOP(1)
+  ELSE
+    EIR = 0.0d0
+  ENDIF
+  TotalElecPowerRated = EIR * (DXCoil(DXCoilNum)%RatedTotCap(1) * TotCapTempModFac * TotCapFlowModFac) &
+                        + FanPowerCorrection
+
+  IF ( TotalElecPowerRated > 0.0D0 ) THEN
+       EER = NetCoolingCapRated / TotalElecPowerRated
+  ELSE
+       EER = 0.0d0
+  ENDIF
+
+! IEER - A point 100 % net capacity
+  EER_TestPoint_SI(1) = EER
+  EER_TestPoint_IP(1) = EER * ConvFromSIToIP
+
+  ! find coil leaving dryblub at point A, with full rated air flow rate.
+  ! init coil
+  DXCoil(DXCoilNum)%InletAirMassFlowRate    = DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+  DXCoil(DXCoilNum)%InletAirMassFlowRateMax = DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+  DXCoil(DXCoilNum)%InletAirTemp            = 26.7d0
+  DXCoil(DXCoilNum)%InletAirHumRat          = PsyWFnTdbTwbPb(26.7d0, 19.4d0, OutBaroPress, &
+                                                         'CalcTwoSpeedDXCoilStandardRating')
+  DXCoil(DXCoilNum)%InletAirEnthalpy        = PsyHFnTdbW(26.7d0, DXCoil(DXCoilNum)%InletAirHumRat, &
+                                                         'CalcTwoSpeedDXCoilStandardRating')
+
+  IF (DXCoil(DXCoilNum)%CondenserInletNodeNum(1) /= 0) THEN
+    Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%Temp = OutdoorUnitInletAirDrybulbTempRated
+  ELSE
+    OutDryBulbTemp = OutdoorUnitInletAirDrybulbTempRated
+  ENDIF
+  SpeedRatio = 1.d0
+  CycRatio   = 1.d0
+  CALL CalcMultiSpeedDXCoil(DXCoilNum, SpeedRatio, CycRatio, ForceOn = .TRUE.)
+  TempDryBlub_Leaving_Apoint = DXCoilOutletTemp(DXCoilNum) ! store result
+
+! IEER - part load test points ***************************************************
+  DO PartLoadTestPoint = 1, 3 !
+  ! determine minimum unloading capacity fraction at point B conditions.
+    IF (DXCoil(DXCoilNum)%CondenserInletNodeNum(1) /= 0) THEN
+      Node(DXCoil(DXCoilNum)%CondenserInletNodeNum(1))%Temp = OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint)
+    ELSE
+      OutDryBulbTemp = OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint)
+    ENDIF
+
+    TargetNetCapacity = NetCapacityFactorPLTestPoint(PartLoadTestPoint) * NetCoolingCapRated
+    Par(1) = REAL(DXCoilNum, r64)
+    Par(2) = TempDryBlub_Leaving_Apoint
+    Par(3) = TargetNetCapacity
+    Par(4) = OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint)
+    Par(5) = CoolingCoilInletAirWetbulbTempRated
+    Par(6) = CoolingCoilInletAirDryblubTempRated
+    Par(7) = NetCoolingCapRated
+    IF (DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject) THEN
+      Par(8)  = 0.0d0
+      Par(9)  = REAL(FanInletNode,  r64)
+      Par(10) = REAL(FanOutletNode, r64)
+      Par(11) = ExternalStatic
+      Par(12) = REAL(DXCoil(DXCoilNum)%SupplyFanIndex, r64)
+    ELSE
+      Par(8) = FanPowerPerEvapAirFlowRate
+      Par(9)  = 0.0d0
+      Par(10) = 0.0d0
+      Par(11) = 0.0d0
+      Par(12) = 0.0d0
+    ENDIF
+
+    LowerBoundMassFlowRate = 0.01d0 * DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+
+    CALL SolveRegulaFalsi(AccuracyTolerance, MaximumIterations, SolverFlag, PartLoadAirMassFlowRate, &
+                                               CalcTwoSpeedDXCoilIEERResidual, LowerBoundMassFlowRate,   &
+                                               DXCoil(DXCoilNum)%RatedAirMassFlowRate(1), Par)
+
+    IF( SolverFlag == -1) THEN
+
+      CALL ShowWarningError('CalcTwoSpeedDXCoilStandardRating: air flow rate solver failed. Iteration limit exceeded ')
+
+      SupAirMdot_TestPoint(1 + PartLoadTestPoint) = -999.d0
+      EER_TestPoint_SI(1+PartLoadTestPoint)       = -999.d0
+      EER_TestPoint_IP(1+PartLoadTestPoint)       = -999.d0
+      NetCapacity_TestPoint(1+PartLoadTestPoint)  = -999.d0
+      NetPower_TestPoint(1+PartLoadTestPoint)     = -999.d0
+
+    ELSEIF (SolverFlag == -2) THEN
+      CALL ShowWarningError('CalcTwoSpeedDXCoilStandardRating: air flow rate solver failed. root not bounded ')
+
+      SupAirMdot_TestPoint(1 + PartLoadTestPoint) = -999.d0
+      EER_TestPoint_SI(1+PartLoadTestPoint)       = -999.d0
+      EER_TestPoint_IP(1+PartLoadTestPoint)       = -999.d0
+      NetCapacity_TestPoint(1+PartLoadTestPoint)  = -999.d0
+      NetPower_TestPoint(1+PartLoadTestPoint)     = -999.d0
+    ELSE
+      ! now we have the supply air flow rate
+      SupAirMdot_TestPoint(1 + PartLoadTestPoint) = PartLoadAirMassFlowRate
+      AirMassFlowRatio = PartLoadAirMassFlowRate / DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+      SupplyAirHumRat  = PsyWFnTdbTwbPb(CoolingCoilInletAirDryblubTempRated, CoolingCoilInletAirWetbulbTempRated, OutBaroPress , &
+                                      'CalcTwoSpeedDXCoilStandardRating')
+      SupplyAirRho =  PsyRhoAirFnPbTdbW(OutBaroPress, CoolingCoilInletAirDryblubTempRated, SupplyAirHumRat, &
+                                      'CalcTwoSpeedDXCoilStandardRating')
+      SupplyAirVolFlowRate = PartLoadAirMassFlowRate / SupplyAirRho
+
+      IF( DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject) THEN
+        FanStaticPressureRise = DXCoil(DXCoilNum)%InternalStaticPressureDrop &
+                       + (ExternalStatic * (AirMassFlowRatio**2))
+        Node(FanInletNode)%MassFlowRate = PartLoadAirMassFlowRate
+        Node(FanInletNode)%Temp         = CoolingCoilInletAirDryblubTempRated
+        Node(FanInletNode)%HumRat       = SupplyAirHumRat
+        Node(FanInletNode)%Enthalpy     = PsyHFnTdbW(CoolingCoilInletAirDryblubTempRated, SupplyAirHumRat, &
+                                                        'CalcTwoSpeedDXCoilStandardRating')
+        CALL SimulateFanComponents(DXCoil(DXCoilNum)%SupplyFanName,.TRUE.,DXCoil(DXCoilNum)%SupplyFanIndex, &
+                                     ZoneCompTurnFansOn = .TRUE. , &
+                                     ZoneCompTurnFansOff = .FALSE. , &
+                                     PressureRise = FanStaticPressureRise)
+        FanHeatCorrection = Node(FanOutletNode)%Enthalpy - Node(FanInletNode)%Enthalpy
+        CALL GetFanPower(DXCoil(DXCoilNum)%SupplyFanIndex, FanPowerCorrection)
+
+      ELSE
+        FanPowerCorrection = FanPowerPerEvapAirFlowRate * PartLoadAirMassFlowRate
+        FanHeatCorrection  = FanPowerPerEvapAirFlowRate * PartLoadAirMassFlowRate
+      ENDIF
+
+
+      TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFFlow(1),AirMassFlowRatio)
+      TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(1),CoolingCoilInletAirWetbulbTempRated,    &
+                                 OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint))
+      HighSpeedTotCoolingCap = DXCoil(DXCoilNum)%RatedTotCap(1) * TotCapTempModFac * TotCapFlowModFac
+      HighSpeedNetCoolingCap = HighSpeedTotCoolingCap - FanHeatCorrection
+
+      EIRTempModFac = CurveValue(DXCoil(DXCoilNum)%EIRFTemp(1),CoolingCoilInletAirWetbulbTempRated,     &
+                                      OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint))
+      EIRFlowModFac = CurveValue(DXCoil(DXCoilNum)%EIRFFlow(1),AirMassFlowRatio)
+      IF ( DXCoil(DXCoilNum)%RatedCOP(1) > 0.0D0 ) THEN
+           ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
+        EIR_HighSpeed = EIRTempModFac * EIRFlowModFac / DXCoil(DXCoilNum)%RatedCOP(1)
+      ELSE
+        EIR = 0.0d0
+      ENDIF
+
+      TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp2,AirMassFlowRatio)
+      TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp2,CoolingCoilInletAirWetbulbTempRated,    &
+                                 OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint))
+      LowSpeedTotCoolingCap = DXCoil(DXCoilNum)%RatedTotCap2 * TotCapTempModFac * TotCapFlowModFac
+      LowSpeedNetCoolingCap = LowSpeedTotCoolingCap - FanHeatCorrection
+
+      EIRTempModFac = CurveValue(DXCoil(DXCoilNum)%EIRFTemp2,CoolingCoilInletAirWetbulbTempRated,     &
+                                      OutdoorUnitInletAirDrybulbTempPLTestPoint(PartLoadTestPoint))
+      EIRFlowModFac = CurveValue(DXCoil(DXCoilNum)%EIRFFlow(1),AirMassFlowRatio)
+      IF ( DXCoil(DXCoilNum)%RatedCOP2 > 0.0D0 ) THEN
+           ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
+        EIR_LowSpeed = EIRTempModFac * EIRFlowModFac / DXCoil(DXCoilNum)%RatedCOP2
+      ELSE
+        EIR_LowSpeed = 0.0d0
+      ENDIF
+
+      IF (LowSpeedNetCoolingCap <= TargetNetCapacity ) THEN
+        CycRatio   = 1.d0
+        SpeedRatio =  (TargetNetCapacity - LowSpeedNetCoolingCap) &
+                     /( HighSpeedNetCoolingCap - LowSpeedNetCoolingCap )
+        TotCoolingCap = HighSpeedTotCoolingCap * SpeedRatio + LowSpeedTotCoolingCap *(1.d0-SpeedRatio)
+        NetCoolingCap = TotCoolingCap - FanHeatCorrection
+        EIR           = EIR_HighSpeed * SpeedRatio  + EIR_LowSpeed * (1.d0-SpeedRatio)
+        TotalElecPowerRated = TotCoolingCap * EIR + FanPowerCorrection
+        EER_TestPoint_SI(1+PartLoadTestPoint)  = NetCoolingCap / TotalElecPowerRated
+        EER_TestPoint_IP(1+PartLoadTestPoint) = EER_TestPoint_SI(1+PartLoadTestPoint) * ConvFromSIToIP
+        NetCapacity_TestPoint(1+PartLoadTestPoint) = NetCoolingCap
+        NetPower_TestPoint(1+PartLoadTestPoint) = TotalElecPowerRated
+      ELSE ! minimum unloading limit exceeded without cycling, so cycle
+        SpeedRatio = 0.d0
+        CycRatio   =  TargetNetCapacity / LowSpeedNetCoolingCap
+        PLF = CurveValue(DXCoil(DXCoilNum)%PLFFPLR(1),CycRatio)
+        IF (PLF < 0.7d0) THEN
+          PLF = 0.7d0
+        END IF
+        RunTimeFraction = CycRatio/ PLF
+        RunTimeFraction = MIN(RunTimeFraction, 1.d0)
+        TotCoolingCap = LowSpeedTotCoolingCap * RunTimeFraction
+        NetCoolingCap = TotCoolingCap - FanHeatCorrection
+        TotalElecPowerRated = LowSpeedTotCoolingCap * EIR_LowSpeed * RunTimeFraction  &
+                              + FanPowerCorrection
+        EER_TestPoint_SI(1+PartLoadTestPoint)  = NetCoolingCap / TotalElecPowerRated
+        EER_TestPoint_IP(1+PartLoadTestPoint) = EER_TestPoint_SI(1+PartLoadTestPoint) * ConvFromSIToIP
+        NetCapacity_TestPoint(1+PartLoadTestPoint) = NetCoolingCap
+        NetPower_TestPoint(1+PartLoadTestPoint) = TotalElecPowerRated
+
+      ENDIF
+
+    ENDIF
+  ENDDO ! loop over 3 part load test points
+
+
+  IEER = (0.02d0*EER_TestPoint_IP(1)) + (0.617d0*EER_TestPoint_IP(2)) +   &
+          (0.238d0*EER_TestPoint_IP(3)) + (0.125d0*EER_TestPoint_IP(4))
+
+  ! begin output
+  IF (OneTimeEIOHeaderWrite) THEN
+    WRITE(OutputFileInits, 890 )
+    OneTimeEIOHeaderWrite = .FALSE.
+    pdstVAVDXCoolCoil         = newPreDefSubTable(pdrEquip,'VAV DX Cooling Standard Rating Details')
+    pdchVAVDXCoolCoilType     = newPreDefColumn(pdstVAVDXCoolCoil,   'DX Cooling Coil Type')
+    pdchVAVDXFanName          = newPreDefColumn(pdstVAVDXCoolCoil,   'Assocated Fan')
+    pdchVAVDXCoolCoilNetCapSI = newPreDefColumn(pdstVAVDXCoolCoil,   'Net Cooling Capacity [W]')
+    pdchVAVDXCoolCoilCOP      = newPreDefColumn(pdstVAVDXCoolCoil,   'COP [W/W]')
+    pdchVAVDXCoolCoilEERIP    = newPreDefColumn(pdstVAVDXCoolCoil,   'EER [Btu/W-h]')
+    pdchVAVDXCoolCoilIEERIP   = newPreDefColumn(pdstVAVDXCoolCoil,   'IEER [Btu/W-h]')
+    pdchVAVDXCoolCoilMdotA    = newPreDefColumn(pdstVAVDXCoolCoil,   'Supply Air Flow 100% [kg/s]')
+    pdchVAVDXCoolCoilCOP_B    = newPreDefColumn(pdstVAVDXCoolCoil,   'COP 75% Capacity [W/W]')
+    pdchVAVDXCoolCoilEER_B_IP = newPreDefColumn(pdstVAVDXCoolCoil,   'EER 75% Capacity [Btu/W-h]')
+    pdchVAVDXCoolCoilMdotB    = newPreDefColumn(pdstVAVDXCoolCoil,   'Supply Air Flow 75% [kg/s]')
+    pdchVAVDXCoolCoilCOP_C    = newPreDefColumn(pdstVAVDXCoolCoil,   'COP 50% Capacity [W/W]')
+    pdchVAVDXCoolCoilEER_C_IP = newPreDefColumn(pdstVAVDXCoolCoil,   'EER 50% Capacity [Btu/W-h]')
+    pdchVAVDXCoolCoilMdotC    = newPreDefColumn(pdstVAVDXCoolCoil,   'Supply Air Flow 50% [kg/s]')
+    pdchVAVDXCoolCoilCOP_D    = newPreDefColumn(pdstVAVDXCoolCoil,   'COP 25% Capacity [W/W]')
+    pdchVAVDXCoolCoilEER_D_IP = newPreDefColumn(pdstVAVDXCoolCoil,   'EER 25% Capacity [Btu/W-h]')
+    pdchVAVDXCoolCoilMdotD    = newPreDefColumn(pdstVAVDXCoolCoil,   'Supply Air Flow 25% [kg/s]')
+
+    ! determine footnote content
+    countStaticInputs = 0
+    DO index =1, NumDXCoils
+
+      If ( DXCoil(index)%RateWithInternalStaticAndFanObject .AND. DXCoil(index)%DXCoilType_Num == CoilDX_CoolingTwoSpeed) THEN
+        countStaticInputs =countStaticInputs + 1
+      ENDIF
+    ENDDO
+
+    IF( countStaticInputs == NumDXMulSpeedCoils) THEN
+      CALL addFootNoteSubTable(pdstVAVDXCoolCoil, &
+                'Packaged VAV unit ratings per ANSI/AHRI Standard 340/360-2007 with Addenda 1 and 2')
+    ELSEIF (countStaticInputs == 0) THEN
+      CALL addFootNoteSubTable(pdstVAVDXCoolCoil, &
+                'Indoor-coil-only unit ratings per ANSI/AHRI Standard 340/360-2007 with Addenda 1 and 2,' &
+                     // ' with supply fan specific power at 365 {W/1000cfm} (773.3 {W/(m3/s)})')
+    ELSE ! both
+      CALL addFootNoteSubTable(pdstVAVDXCoolCoil, &
+                'Packaged VAV unit ratings per ANSI/AHRI Standard 340/360-2007 with Addenda 1 and 2,' &
+                 // ' indoor-coil-only units with supply fan specific power at 365 {W/1000cfm} (773.3 {W/(m3/s)})')
+    ENDIF
+
+  ENDIF
+
+  IF( DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject) THEN
+
+    WRITE (OutputFileInits, 891) TRIM('Coil:Cooling:DX:TwoSpeed'), TRIM(DXCoil(DXCoilNum)%Name), TRIM('Fan:VariableVolume'), &
+                               TRIM(DXCoil(DXCoilNum)%SupplyFanName), &
+                               TRIM(RoundSigDigits(NetCoolingCapRated, 2)),  &
+                               TRIM(RoundSigDigits((NetCoolingCapRated *ConvFromSIToIP), 2)), &
+                               TRIM(RoundSigDigits(IEER, 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(1), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(2), 2)),&
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(3), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(4), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(1), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(2), 2)),&
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(3), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(4), 2)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(1), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(2), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(3), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(4), 4))
+  ELSE
+    WRITE (OutputFileInits, 891) TRIM('Coil:Cooling:DX:TwoSpeed'), TRIM(DXCoil(DXCoilNum)%Name), TRIM('N/A'), &
+                               TRIM('N/A'), &
+                               TRIM(RoundSigDigits(NetCoolingCapRated, 2)),  &
+                               TRIM(RoundSigDigits((NetCoolingCapRated *ConvFromSIToIP), 2)), &
+                               TRIM(RoundSigDigits(IEER, 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(1), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(2), 2)),&
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(3), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_SI(4), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(1), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(2), 2)),&
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(3), 2)), &
+                               TRIM(RoundSigDigits(EER_TestPoint_IP(4), 2)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(1), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(2), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(3), 4)), &
+                               TRIM(RoundSigDigits(SupAirMdot_TestPoint(4), 4))
+  ENDIF
+
+  890 FORMAT('! <VAV DX Cooling Coil Standard Rating Information>, DX Coil Type, DX Coil Name, Fan Type, Fan Name, ', &
+              'Standard Net Cooling Capacity {W}, Standard Net Cooling Capacity {Btu/h}, IEER {Btu/W-h}, ' &
+              'COP 100% Capacity {W/W}, COP 75% Capacity {W/W}, COP 50% Capacity {W/W}, COP 25% Capacity {W/W}, ' &
+              'EER 100% Capacity {Btu/W-h}, EER 75% Capacity {Btu/W-h}, EER 50% Capacity {Btu/W-h}, EER 25% Capacity {Btu/W-h}, ' &
+              'Supply Air Flow 100% {kg/s}, Supply Air Flow 75% {kg/s},Supply Air Flow 50% {kg/s},Supply Air Flow 25% {kg/s}'  )
+
+  891 FORMAT ( ' VAV DX Cooling Coil Standard Rating Information, ',A,',',A,',',A,',',A,',',A,',',A,',',A,',' &
+                    ,A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A)
+
+  CALL PreDefTableEntry(pdchDXCoolCoilType,    TRIM(DXCoil(DXCoilNum)%Name),TRIM('Coil:Cooling:DX:TwoSpeed'))
+  CALL PreDefTableEntry(pdchDXCoolCoilNetCapSI,TRIM(DXCoil(DXCoilNum)%Name),TRIM(RoundSigDigits(NetCoolingCapRated,1)))
+  CALL PreDefTableEntry(pdchDXCoolCoilCOP,     TRIM(DXCoil(DXCoilNum)%Name),TRIM(RoundSigDigits(EER_TestPoint_SI(1),2)))
+  CALL PreDefTableEntry(pdchDXCoolCoilEERIP,   TRIM(DXCoil(DXCoilNum)%Name),TRIM(RoundSigDigits(EER_TestPoint_IP(1),2)))
+  CALL PreDefTableEntry(pdchDXCoolCoilIEERIP,  TRIM(DXCoil(DXCoilNum)%Name),TRIM(RoundSigDigits(IEER,2)))
+  CALL PreDefTableEntry(pdchDXCoolCoilSEERIP,  TRIM(DXCoil(DXCoilNum)%Name),TRIM('N/A') )
+  CALL addFootNoteSubTable(pdstDXCoolCoil,     'ANSI/AHRI ratings include supply fan')
+
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilType,     TRIM(DXCoil(DXCoilNum)%Name),TRIM('Coil:Cooling:DX:TwoSpeed'))
+  IF( DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject) THEN
+    CALL PreDefTableEntry(pdchVAVDXFanName,          TRIM(DXCoil(DXCoilNum)%Name),TRIM(DXCoil(DXCoilNum)%SupplyFanName))
+  ELSE
+    CALL PreDefTableEntry(pdchVAVDXFanName,          TRIM(DXCoil(DXCoilNum)%Name),TRIM('None'))
+  ENDIF
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilNetCapSI, TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(NetCoolingCapRated, 2)) )
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilCOP,      TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_SI(1), 2) ))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilIEERIP,   TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(IEER, 2)) )
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilEERIP,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_IP(1), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilMdotA,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(SupAirMdot_TestPoint(1), 4)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilCOP_B,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_SI(2), 2) ))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilEER_B_IP, TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_IP(2), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilMdotB,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(SupAirMdot_TestPoint(2), 4)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilCOP_C,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_SI(3), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilEER_C_IP, TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_IP(3), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilMdotC,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(SupAirMdot_TestPoint(3), 4)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilCOP_D,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_SI(4), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilEER_D_IP, TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(EER_TestPoint_IP(4), 2)))
+  CALL PreDefTableEntry(pdchVAVDXCoolCoilMdotD,    TRIM(DXCoil(DXCoilNum)%Name), TRIM(RoundSigDigits(SupAirMdot_TestPoint(4), 4)))
+
+
+  RETURN
+
+END SUBROUTINE CalcTwoSpeedDXCoilStandardRating
+
+SUBROUTINE GetFanIndexForTwoSpeedCoil( CoolingCoilIndex ,SupplyFanIndex, SupplyFanName )
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         <author>
+          !       DATE WRITTEN   <date_written>
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This routine looks up the given TwoSpeed DX coil and returns the companion supply fan index
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,            ONLY : FindItemInList, SameString
+  USE DataAirSystems,            ONLY : PrimaryAirSystem
+  USE Fans,                      ONLY : GetFanIndex
+
+  USE DataHVACGlobals,           ONLY : NumPrimaryAirSys
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,          INTENT(IN)               :: CoolingCoilIndex
+  INTEGER,  INTENT(OUT)                      :: SupplyFanIndex
+  CHARACTER(len=MaxNameLength), INTENT(OUT)  :: SupplyFanName
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER :: DXSystem = 14 ! must match SimAirServingZones.f90 (not public)
+  INTEGER, PARAMETER :: Fan_Simple_VAV   = 3 ! must match SimAirServingZones.f90 (not public)
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: FoundBranch
+  INTEGER :: FoundAirSysNum
+  INTEGER :: AirSysNum
+  INTEGER :: BranchNum
+  INTEGER :: CompNum
+  LOGICAL :: ErrorsFound = .FALSE.
+
+  FoundBranch = 0
+  FoundAirSysNum = 0
+  SupplyFanIndex = 0
+  SupplyFanName = 'n/a'
+  DO AirSysNum = 1, NumPrimaryAirSys
+
+    DO BranchNum = 1, PrimaryAirSystem(AirSysNum)%NumBranches
+
+      Do CompNum = 1, PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%TotalComponents
+
+        IF (PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompType_Num == DXSystem) THEN
+
+          IF(SameString(PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%Name, &
+                        DXCoil(CoolingCoilIndex)%CoilSystemName ) ) THEN
+            FoundBranch    = BranchNum
+            FoundAirSysNum = AirSysNum
+            EXIT
+          ENDIF
+        ENDIF
+      ENDDO
+
+      IF (FoundBranch > 0 .and. FoundAirSysNum >0) THEN
+        Do CompNum = 1, PrimaryAirSystem(FoundAirSysNum)%Branch(FoundBranch)%TotalComponents
+          IF (PrimaryAirSystem(FoundAirSysNum)%Branch(FoundBranch)%Comp(CompNum)%CompType_Num == Fan_Simple_VAV) THEN
+            SupplyFanName  = PrimaryAirSystem(FoundAirSysNum)%Branch(FoundBranch)%Comp(CompNum)%Name
+            CALL GetFanIndex(SupplyFanName, SupplyFanIndex, ErrorsFound)
+            EXIT
+          ENDIF
+        ENDDO
+      ENDIF
+    ENDDO
+  ENDDO
+  RETURN
+
+END SUBROUTINE GetFanIndexForTwoSpeedCoil
+
+FUNCTION CalcTwoSpeedDXCoilIEERResidual(SupplyAirMassFlowRate, Par) RESULT (Residuum)
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Brent Griffith
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED
+          !       RE-ENGINEERED
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Calculates residual function (desired outlet temp - actual outlet temp)
+          ! Two Speed DX Coil rating for VAV, output depends on the supply air flow rate which is being varied to zero the residual.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Calls CalcMultiSpeedDXCoil to get outlet temperature at the given supply flow rate and SpeedRatio
+          ! and calculates the residual as defined above
+
+          ! REFERENCES:
+
+          ! USE STATEMENTS:
+  USE DataEnvironment,  ONLY : OutBaroPress
+  USE Fans,   ONLY : SimulateFanComponents
+  USE CurveManager,  ONLY: CurveValue
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN)  :: SupplyAirMassFlowRate ! compressor cycling ratio (1.0 is continuous, 0.0 is off)
+    REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1) = DX coil number
+                                                    ! par(2) = desired air outlet temperature [C]
+                                                    ! par(3) = speed ratio
+                                                    ! par(4) = cycling Ratio
+                                                    ! par(5) = supply air fan operating mode (ContFanCycCoil)
+    REAL(r64)         :: Residuum ! residual to be minimized to zero
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER   :: DXCoilNum       ! index of this coil
+  REAL(r64) :: OutletAirTemp   ! outlet air temperature [C]
+  REAL(r64) :: TargetCoilLeavingDryblub
+  REAL(r64) :: OutdoorUnitInletDryBulb
+  REAL(r64) :: IndoorUnitInletDryBulb
+  REAL(r64) :: IndoorUnitInletWetBulb
+  REAL(r64) :: AirMassFlowRatio
+  REAL(r64) :: SpeedRatio
+  REAL(r64) :: CycRatio
+  REAL(r64) :: SupplyAirRho
+  REAL(r64) :: SupplyAirHumRat
+  REAL(r64) :: NetCoolingCapRated
+  REAL(r64) :: TargetNetCapacity
+  REAL(r64) :: FanPowerPerEvapAirFlowRate
+  INTEGER   :: FanInletNodeNum
+  INTEGER   :: FanOutletNodeNum
+  INTEGER   :: FanIndex
+  REAL(r64) :: FanExternalStaticFull
+  REAL(r64) :: SupplyAirVolFlowRate
+  REAL(r64) :: FanStaticPressureRise
+  REAL(r64) :: FanHeatCorrection
+  REAL(r64) :: TotCapFlowModFac
+  REAL(r64) :: TotCapTempModFac
+  REAL(r64) :: HighSpeedNetCoolingCap
+  REAL(r64) :: LowSpeedNetCoolingCap
+
+  DXCoilNum                = INT(Par(1))
+  TargetCoilLeavingDryblub = Par(2)
+  TargetNetCapacity        = Par(3)
+  OutdoorUnitInletDryBulb  = Par(4)
+  IndoorUnitInletWetBulb   = Par(5)
+  IndoorUnitInletDryBulb   = Par(6)
+  NetCoolingCapRated       = Par(7)
+  FanPowerPerEvapAirFlowRate = Par(8)
+  FanInletNodeNum          = INT(Par(9))
+  FanOutletNodeNum         = INT(Par(10))
+  FanExternalStaticFull    = Par(11)
+  FanIndex                 = INT(Par(12))
+
+
+
+  IF (DXCoil(DXCoilNum)%RatedAirMassFlowRate(1) > 0.d0) THEN
+    AirMassFlowRatio = SupplyAirMassFlowRate / DXCoil(DXCoilNum)%RatedAirMassFlowRate(1)
+  ELSE
+    AirMassFlowRatio = 0.d0
+  ENDIF
+  SupplyAirHumRat  = PsyWFnTdbTwbPb(IndoorUnitInletDryBulb, IndoorUnitInletWetBulb, OutBaroPress , &
+                                    'CalcTwoSpeedDXCoilIEERResidual')
+  SupplyAirRho =  PsyRhoAirFnPbTdbW(OutBaroPress, IndoorUnitInletDryBulb, SupplyAirHumRat, &
+                                    'CalcTwoSpeedDXCoilIEERResidual')
+
+
+  SupplyAirVolFlowRate = SupplyAirMassFlowRate / SupplyAirRho
+
+  IF( DXCoil(DXCoilNum)%RateWithInternalStaticAndFanObject ) THEN
+    ! modify external static per AHRI 340/360, Table 6, note 1.
+    FanStaticPressureRise = DXCoil(DXCoilNum)%InternalStaticPressureDrop &
+                   + (FanExternalStaticFull * (AirMassFlowRatio**2))
+    Node(FanInletNodeNum)%MassFlowRate = SupplyAirMassFlowRate
+    Node(FanOutletNodeNum)%MassFlowRate = SupplyAirMassFlowRate
+    Node(FanInletNodeNum)%Temp         = IndoorUnitInletDryBulb
+    Node(FanInletNodeNum)%HumRat       = PsyWFnTdbTwbPb(IndoorUnitInletDryBulb, IndoorUnitInletWetBulb, &
+                                                       OutBaroPress , 'CalcTwoSpeedDXCoilIEERResidual')
+    Node(FanInletNodeNum)%Enthalpy     = PsyHFnTdbW(IndoorUnitInletDryBulb, Node(FanInletNodeNum)%HumRat, &
+                                                    'CalcTwoSpeedDXCoilIEERResidual')
+    CALL SimulateFanComponents(DXCoil(DXCoilNum)%SupplyFanName,.TRUE.,DXCoil(DXCoilNum)%SupplyFanIndex, &
+                                 ZoneCompTurnFansOn = .TRUE. , &
+                                 ZoneCompTurnFansOff = .FALSE. , &
+                                 PressureRise = FanStaticPressureRise)
+    FanHeatCorrection = Node(FanOutletNodeNum)%Enthalpy - Node(FanInletNodeNum)%Enthalpy
+
+  ELSE
+
+   FanHeatCorrection  = FanPowerPerEvapAirFlowRate * SupplyAirVolFlowRate
+
+  ENDIF
+
+  TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFFlow(1),AirMassFlowRatio)
+  TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp(1),IndoorUnitInletWetBulb,    &
+                               OutdoorUnitInletDryBulb)
+  HighSpeedNetCoolingCap = DXCoil(DXCoilNum)%RatedTotCap(1) * TotCapTempModFac * TotCapFlowModFac       &
+                          - FanHeatCorrection
+
+  TotCapFlowModFac = CurveValue(DXCoil(DXCoilNum)%CCapFFlow(1),AirMassFlowRatio)
+  TotCapTempModFac = CurveValue(DXCoil(DXCoilNum)%CCapFTemp2,IndoorUnitInletWetBulb,    &
+                               OutdoorUnitInletDryBulb)
+  LowSpeedNetCoolingCap = DXCoil(DXCoilNum)%RatedTotCap2 * TotCapTempModFac * TotCapFlowModFac       &
+                              - FanHeatCorrection
+
+  IF (LowSpeedNetCoolingCap <= TargetNetCapacity ) THEN
+    CycRatio   = 1.d0
+    SpeedRatio =  (TargetNetCapacity - LowSpeedNetCoolingCap) &
+                   /( HighSpeedNetCoolingCap - LowSpeedNetCoolingCap )
+  ELSE ! minimum unloading limit exceeded for no cycling
+    SpeedRatio = 0.d0
+    CycRatio   =  TargetNetCapacity / LowSpeedNetCoolingCap
+  ENDIF
+
+  DXCoil(DXCoilNum)%InletAirMassFlowRate    = SupplyAirMassFlowRate
+
+  CALL CalcMultiSpeedDXCoil(DXCoilNum, SpeedRatio, CycRatio, ForceOn = .TRUE.)
+  OutletAirTemp = DXCoilOutletTemp(DXCoilNum)
+  Residuum = TargetCoilLeavingDryblub - OutletAirTemp
+
+  RETURN
+END FUNCTION CalcTwoSpeedDXCoilIEERResidual
+
 
 ! ======================  Utility routines ======================================
 
@@ -12346,7 +13256,8 @@ END FUNCTION GetDXCoilNumberOfSpeeds
 SUBROUTINE SetDXCoolingCoilData(DXCoilNum,ErrorsFound,HeatingCoilPLFCurvePTR,CondenserType,CondenserInletNodeNum, &
                                 MaxOATCrankcaseHeater,MinOATCooling,MaxOATCooling,MinOATHeating,MaxOATHeating, &
                                 HeatingPerformanceOATType,DefrostStrategy,DefrostControl,DefrostEIRPtr, &
-                                DefrostFraction,DefrostCapacity,MaxOATDefrost,CoolingCoilPresent,HeatingCoilPresent)
+                                DefrostFraction,DefrostCapacity,MaxOATDefrost,CoolingCoilPresent,HeatingCoilPresent, &
+                                HeatSizeRatio)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad, FSEC
@@ -12390,6 +13301,7 @@ SUBROUTINE SetDXCoolingCoilData(DXCoilNum,ErrorsFound,HeatingCoilPLFCurvePTR,Con
   REAL(r64),OPTIONAL        :: MaxOATDefrost
   LOGICAL,OPTIONAL          :: CoolingCoilPresent
   LOGICAL,OPTIONAL          :: HeatingCoilPresent
+  REAL(r64),OPTIONAL        :: HeatSizeRatio
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -12483,6 +13395,10 @@ SUBROUTINE SetDXCoolingCoilData(DXCoilNum,ErrorsFound,HeatingCoilPLFCurvePTR,Con
     DXCoil(DXCoilNum)%HeatingCoilPresent=HeatingCoilPresent
   END IF
 
+  IF(PRESENT(HeatSizeRatio))THEN
+    DXCoil(DXCoilNum)%HeatSizeRatio=HeatSizeRatio
+  END IF
+
   RETURN
 
 END SUBROUTINE SetDXCoolingCoilData
@@ -12543,6 +13459,60 @@ SUBROUTINE SetCoilSystemHeatingDXFlag(CoilType, CoilName)
   RETURN
 
 END SUBROUTINE SetCoilSystemHeatingDXFlag
+
+SUBROUTINE SetCoilSystemCoolingData(CoilName, CoilSystemName)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! inform the child DX coil what the name of its parent is.
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  Use InputProcessor, ONLY : FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  CHARACTER(len=*), INTENT(IN) :: CoilSystemName
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  IF (GetCoilsInputFlag) THEN
+    CALL GetDXCoils
+    GetCoilsInputFlag = .FALSE.
+  END IF
+
+  WhichCoil=FindItemInList(CoilName,DXCoil%Name,NumDXCoils)
+  IF (WhichCoil /= 0) THEN
+    DXCoil(WhichCoil)%CoilSystemName = CoilSystemName
+  ELSE
+    CALL ShowSevereError('SetCoilSystemCoolingData: Could not find Coil "Name="'//TRIM(CoilName)//'"')
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE SetCoilSystemCoolingData
 
 !     NOTICE
 !

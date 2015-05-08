@@ -164,7 +164,7 @@ TYPE UnitVentilatorData
   REAL(r64)                    :: ElecPower           =0.0
   REAL(r64)                    :: ElecEnergy          =0.0
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
-  LOGICAL                      :: AvailManagerListFound = .FALSE. ! True if availability manager list name is specified
+  INTEGER                      :: AvailStatus          = 0
                                                                   ! for unit ventilator object
 END TYPE UnitVentilatorData
 
@@ -215,8 +215,8 @@ SUBROUTINE SimUnitVentilator(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOut
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList
-  USE General, ONLY: TrimSigDigits
+  USE InputProcessor,      ONLY: FindItemInList
+  USE General,             ONLY: TrimSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -320,7 +320,6 @@ SUBROUTINE GetUnitVentilatorInput
 
   USE DataSizing,   ONLY: AutoSize
   USE General,      ONLY: TrimSigDigits
-  USE SystemAvailabilityManager, ONLY: GetZoneEqAvailabilityManager
   USE DataZoneEquipment,         ONLY: UnitVentilator_Num, ZoneEquipConfig
   USE DataGlobals,               ONLY: NumOfZones
   USE DataPlant,    ONLY: TypeOf_CoilWaterCooling, TypeOf_CoilWaterDetailedFlatCooling, &
@@ -611,18 +610,10 @@ SUBROUTINE GetUnitVentilatorInput
                       UnitVent(UnitVentNum)%FanType, UnitVent(UnitVentNum)%FanName, &
                       NodeID(UnitVent(UnitVentNum)%OAMixerOutNode), NodeID(UnitVent(UnitVentNum)%FanOutletNode))
 
-    IF (.NOT. lAlphaBlanks(18)) THEN
-      UnitVent(UnitVentNum)%AvailManagerListName = Alphas(18)
-      ErrFlag = .FALSE.
-      CALL GetZoneEqAvailabilityManager(UnitVent(UnitVentNum)%AvailManagerListName,ErrFlag,UnitVentilator_Num,   &
-         UnitVentNum, NumOfUnitVents)
-      IF (ErrFlag) THEN
-        CALL ShowContinueError('...specified in '//TRIM(CurrentModuleObject)//'="'//TRIM(UnitVent(UnitVentNum)%Name)//'"')
-        ErrorsFound=.true.
-      ELSE
-        UnitVent(UnitVentNum)%AvailManagerListFound = .TRUE.
-      ENDIF
-    ENDIF
+   IF (.NOT. lAlphaBlanks(18)) THEN
+     UnitVent(UnitVentNum)%AvailManagerListName = Alphas(18)
+     ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailManagerListName  = Alphas(18)
+   ENDIF
 
 !   A13, \field Coil Option
 !        \required-field
@@ -957,11 +948,9 @@ SUBROUTINE GetUnitVentilatorInput
     CALL SetupOutputVariable('Unit Ventilator Fan Electric Consumption[J]',   &
                              UnitVent(UnitVentNum)%ElecEnergy,'System','Sum', &
                              UnitVent(UnitVentNum)%Name)
-    IF (UnitVent(UnitVentNum)%AvailManagerListFound) THEN
-      CALL SetupOutputVariable('Unit Ventilator Fan Availability Status',&
-                               ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus,&
-                               'System','Average',UnitVent(UnitVentNum)%Name)
-    ENDIF
+    CALL SetupOutputVariable('Unit Ventilator Fan Availability Status',&
+                             UnitVent(UnitVentNum)%AvailStatus,&
+                             'System','Average',UnitVent(UnitVentNum)%Name)
   END DO
 
   RETURN
@@ -987,9 +976,9 @@ SUBROUTINE InitUnitVentilator(UnitVentNum,FirstHVACIteration, ZoneNum)
           ! na
 
           ! USE STATEMENTS:
-  USE DataEnvironment, ONLY: StdBaroPress, StdRhoAir
+  USE DataEnvironment,    ONLY: StdBaroPress, StdRhoAir
   USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, UnitVentilator_Num
-  USE DataHVACGlobals,    ONLY: ZoneComp, ForceOff, CycleOn, NoAction
+  USE DataHVACGlobals,    ONLY: ZoneComp, ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE DataPlant,          ONLY : ScanPlantLoopsForObject, PlantLoop,TypeOf_CoilWaterCooling, &
                                  TypeOf_CoilWaterDetailedFlatCooling, TypeOf_CoilWaterSimpleHeating, &
                                  TypeOf_CoilSteamAirHeating
@@ -1031,9 +1020,7 @@ SUBROUTINE InitUnitVentilator(UnitVentNum,FirstHVACIteration, ZoneNum)
   REAL(r64)      :: rho  ! local fluid density
   LOGICAL        :: errFlag
   LOGICAL        :: SetMassFlowRateToZero ! TRUE when mass flow rates need to be set to zero
-  INTEGER        :: AvailStatus           ! Availability status set by system availability manager
   SetMassFlowRateToZero = .FALSE.
-  AvailStatus = NoAction
           ! FLOW:
 
 ! Do the one time initializations
@@ -1048,6 +1035,11 @@ IF (MyOneTimeFlag) THEN
   MyOneTimeFlag = .FALSE.
 
 END IF
+
+IF (ALLOCATED(ZoneComp)) THEN
+  ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%ZoneNum = ZoneNum
+  UnitVent(UnitVentNum)%AvailStatus = ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus
+ENDIF
 
 IF (MyPlantScanFlag(UnitVentNum) .AND. ALLOCATED(PlantLoop)) THEN
   IF ((UnitVent(UnitVentNum)%HCoil_PlantTypeNum == TypeOf_CoilWaterSimpleHeating) .OR. &
@@ -1214,13 +1206,9 @@ END IF
   OutsideAirNode = UnitVent(UnitVentNum)%OutsideAirNode
   AirRelNode     = UnitVent(UnitVentNum)%AirReliefNode
 
-  IF (UnitVent(UnitVentNum)%AvailManagerListFound) THEN
-    AvailStatus = ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus
-  ENDIF
-
   IF (GetCurrentScheduleValue(UnitVent(UnitVentNum)%SchedPtr) .GT. 0 ) THEN
     IF((GetCurrentScheduleValue(UnitVent(UnitVentNum)%FanAvailSchedPtr) .GT. 0 &
-        .OR. AvailStatus .EQ. CycleOn) .AND. (AvailStatus .NE. ForceOff))THEN
+        .OR. ZoneCompTurnFansOn) .AND. .NOT. ZoneCompTurnFansOff)THEN
       IF ((ABS(ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired) < SmallLoad) .OR. &
          (CurDeadBandOrSetback(ZoneNum))) THEN
         SetMassFlowRateToZero = .TRUE.
@@ -1346,7 +1334,7 @@ SUBROUTINE SizeUnitVentilator(UnitVentNum)
   REAL(r64)           :: EnthSteamOutWet
   REAL(r64)           :: LatentHeatSteam
   REAL(r64)           :: SteamDensity
-  INTEGER             :: RefrigIndex
+  INTEGER             :: RefrigIndex=0
   INTEGER             :: CoilWaterInletNode=0
   INTEGER             :: CoilWaterOutletNode=0
   INTEGER             :: CoilSteamInletNode=0
@@ -1617,6 +1605,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
           !       AUTHOR         Rick Strand
           !       DATE WRITTEN   May 2000
           !       MODIFIED       Don Shirey, Aug 2009 (LatOutputProvided)
+          !                      July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1666,7 +1655,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
   Use SteamCoils,   ONLY: CheckSteamCoilSchedule
   USE DataInterfaces, ONLY: ControlCompOutput
   USE DataZoneEquipment,   ONLY: UnitVentilator_Num
-  USE DataHVACGlobals,    ONLY: ZoneComp, ForceOff, CycleOn, NoAction
+  USE DataHVACGlobals,    ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE PlantUtilities, ONLY: SetComponentFlowRate
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1711,7 +1700,6 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
   REAL(r64)    :: LatentOutput   ! Latent (moisture) add/removal rate, negative is dehumidification [kg/s]
   REAL(r64)    :: SpecHumOut     ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
   REAL(r64)    :: SpecHumIn      ! Specific humidity ratio of inlet air (kg moisture / kg moist air)
-  INTEGER      :: AvailStatus    ! Availability status set by system availability manager
   REAL(r64)    :: mdot
 
  SELECT CASE (UnitVent(UnitVentNum)%CoilOption)
@@ -1810,16 +1798,11 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
 
   QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired ! zone load needed
 
-  AvailStatus = NoAction
-  IF (UnitVent(UnitVentNum)%AvailManagerListFound) THEN
-    AvailStatus = ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus
-  ENDIF
-
   IF ( (ABS(QZnReq) < SmallLoad) .OR. &
        (CurDeadBandOrSetback(ZoneNum)) .OR. &
        (GetCurrentScheduleValue(UnitVent(UnitVentNum)%SchedPtr) <= 0).OR. &
        ((GetCurrentScheduleValue(UnitVent(UnitVentNum)%FanAvailSchedPtr) <= 0 &
-        .AND. AvailStatus .NE. CycleOn) .OR. (AvailStatus .EQ. ForceOff)) ) THEN
+        .AND. .NOT. ZoneCompTurnFansOn) .OR. ZoneCompTurnFansOff) ) THEN
 
           ! Unit is off or has no load upon it; set the flow rates to zero and then
           ! simulate the components with the no flow conditions
@@ -1850,7 +1833,7 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
   ELSE    ! Unit is on-->this section is intended to control the outside air and the main
           !              result is to set the outside air flow rate variable OAMassFlowRate
 
-    IF (QZnReq > 0.0) THEN  ! HEATING MODE
+    IF (QZnReq > SmallLoad) THEN  ! HEATING MODE
 
       ControlNode   = UnitVent(UnitVentNum)%HotControlNode
       ControlOffset = UnitVent(UnitVentNum)%HotControlOffset
@@ -2273,7 +2256,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Rick Strand
           !       DATE WRITTEN   May 2000
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2298,7 +2281,7 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
   USE HVACHXAssistedCoolingCoil, ONLY :SimHXAssistedCoolingCoil
   Use SteamCoils,   ONLY: SimulateSteamCoilComponents
   USE DataZoneEquipment,   ONLY: UnitVentilator_Num
-  USE DataHVACGlobals,     ONLY: ZoneComp, NoAction, ForceOff, CycleOn
+  USE DataHVACGlobals,     ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2323,30 +2306,12 @@ SUBROUTINE CalcUnitVentilatorComponents(UnitVentNum,FirstHVACIteration,LoadMet)
   INTEGER        :: InletNode       ! unit air inlet node
   INTEGER        :: OutletNode      ! unit air outlet node
   REAL(r64)      :: QCoilReq        ! Heat addition required from an electric/gas heating coil
-  LOGICAL        :: UnitVentTurnFansOn   ! TurnFansOn Availalability status as set by SAM
-  LOGICAL        :: UnitVentTurnFansOff  ! TurnFansOff Availalability status as set by SAM
 
-  UnitVentTurnFansOn  = .FALSE.
-  UnitVentTurnFansOff = .FALSE.
           ! FLOW:
   CALL SimUnitVentOAMixer(UnitVentNum)
 
-  IF(UnitVent(UnitVentNum)%AvailManagerListFound)THEN
-    IF(ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus .EQ. CycleOn) THEN
-      UnitVentTurnFansOn = .TRUE.
-      UnitVentTurnFansOff = .FALSE.
-    ELSEIF(ZoneComp(UnitVentilator_Num)%ZoneCompAvailMgrs(UnitVentNum)%AvailStatus .EQ. Forceoff) THEN
-      UnitVentTurnFansOn = .FALSE.
-      UnitVentTurnFansOff = .TRUE.
-    ENDIF
-  ENDIF
-
-  IF (UnitVent(UnitVentNum)%AvailManagerListFound) THEN
-    CALL SimulateFanComponents(UnitVent(UnitVentNum)%FanName,FirstHVACIteration,UnitVent(UnitVentNum)%Fan_Index, &
-                               ZoneCompTurnFansOn = UnitVentTurnFansOn,ZoneCompTurnFansOff = UnitVentTurnFansOff)
-  ELSE
-    CALL SimulateFanComponents(UnitVent(UnitVentNum)%FanName,FirstHVACIteration,UnitVent(UnitVentNum)%Fan_Index)
-  ENDIF
+  CALL SimulateFanComponents(UnitVent(UnitVentNum)%FanName,FirstHVACIteration,UnitVent(UnitVentNum)%Fan_Index, &
+                             ZoneCompTurnFansOn = ZoneCompTurnFansOn, ZoneCompTurnFansOff = ZoneCompTurnFansOff)
 
   IF (UnitVent(UnitVentNum)%CCoilPresent) THEN
     IF(UnitVent(UnitVentNum)%CCoilType == Cooling_CoilHXAssisted) THEN

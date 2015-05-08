@@ -57,6 +57,7 @@ END TYPE IntWinAdjZoneExtWinStruct
 
 TYPE ZoneDaylightCalc
   INTEGER  :: DaylightType               = 0   ! Type of Daylighting (1=Detailed, 2=DElight)
+  INTEGER  :: AvailSchedNum             = 0    ! pointer to availability schedule if present
   INTEGER  :: TotalDaylRefPoints        = 0   ! Number of detailed daylighting reference points in a zone (0,1 or 2)
   INTEGER  :: TotalDElightRefPts        = 0   ! Number of DElight daylighting reference points in a zone (0,1 or 2) - RJH
   REAL(r64), ALLOCATABLE, DIMENSION(:,:) :: DaylRefPtAbsCoord ! =0.0 ! X,Y,Z coordinates of all daylighting reference points

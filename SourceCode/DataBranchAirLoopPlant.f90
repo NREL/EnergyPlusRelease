@@ -33,7 +33,7 @@ PUBLIC ! Data module -- everything public
 
           ! MODULE PARAMETER DEFINITIONS:
 ! Parameters for tolerance
-REAL(r64), PARAMETER :: MassFlowTolerance  = .0000001d0  ! minimum significant mass flow rate (kg/s)
+REAL(r64), PARAMETER :: MassFlowTolerance  = 0.000000001d0  ! minimum significant mass flow rate (kg/s)
 
 ! Pressure Curve Type: None, pressure, or generic curve (if generic it will be a postive value which is the curve manager index)
 INTEGER,          PARAMETER    :: PressureCurve_Error       = -1
@@ -63,12 +63,20 @@ TYPE PlantPressureCurveData
   REAL(r64)                    :: EquivRoughness          = 0.0d0   !- An effective roughness (e) to calculate e/D       [m]
   LOGICAL                      :: ConstantFpresent        = .FALSE. !- Signal for if a constant value of f was entered
   REAL(r64)                    :: ConstantF               = 0.0d0   !- Constant value of f (if applicable)               [-]
+  LOGICAL                      :: EMSOverrideOn = .FALSE. ! if TRUE, then EMS is calling to override curve value
+  REAL(r64)                    :: EMSOverrideCurveValue = 0.0D0 ! Value of curve result EMS is directing to use
+  !  report variables.
+  REAL(r64)                    :: CurveOutput             = 0.0d0
+  REAL(r64)                    :: CurveInput1             = 0.0d0   !- MassFlow                                         [kg/s]
+  REAL(r64)                    :: CurveInput2             = 0.0d0   !- Density                                          [kg/m3]
+  REAL(r64)                    :: CurveInput3             = 0.0d0   !- Velocity                                         [m/s]
 END TYPE PlantPressureCurveData
 
           ! MODULE VARIABLE DECLARATIONS:
 TYPE(PlantPressureCurveData), ALLOCATABLE, DIMENSION(:) :: PressureCurve
+INTEGER :: NumPressureCurves
 
-          ! SUBROUTINE SPECIFICATIONS FOR MODULE 
+          ! SUBROUTINE SPECIFICATIONS FOR MODULE
 
 !=================================================================================================!
 

@@ -303,7 +303,8 @@ DO RecSurfNum = 1,TotSolReflRecSurf
     IF(Surface(ObsSurfNum)%HeatTransSurf .AND. Surface(ObsSurfNum)%ExtBoundCond /= 0) CYCLE
     ! Exclude duplicate shading surfaces
     !IF(Surface(ObsSurfNum)%Name(1:3) == 'Mir') CYCLE
-    IF(Surface(ObsSurfNum)%MirroredSurf) CYCLE
+    !TH2 CR8959
+    !IF(Surface(ObsSurfNum)%MirroredSurf) CYCLE
 
     ! Exclude surfaces that are entirely behind the receiving surface.This is true if dot products of the
     ! rec. surface outward normal and vector from first vertex of rec. surface and each vertex of
@@ -488,6 +489,11 @@ DO RecSurfNum = 1, TotSolReflRecSurf
               NearestHitDistance = HitDistance
               NearestHitSurfNum  = ObsSurfNum
               NearestHitPt = HitPt
+            ELSE IF(HitDistance == NearestHitDistance) THEN ! TH2 CR8959
+              ! Ray hits mirrored surfaces. Choose the surface facing the ray.
+              IF(DOT_PRODUCT(Surface(ObsSurfNum)%OutNormVec,RayVec) <= 0.0d0) THEN
+                NearestHitSurfNum = ObsSurfNum
+              END IF
             END IF
           END IF
         END IF  ! End of check if obstruction was hit
@@ -500,8 +506,8 @@ DO RecSurfNum = 1, TotSolReflRecSurf
         SolReflRecSurf(RecSurfNum)%HitPt(1:3,RecPtNum,RayNum) = NearestHitPt
         ! For hit surface, calculate unit normal vector pointing into the hemisphere
         ! containing the receiving point
-        Vec1 = Surface(ObsSurfNum)%Vertex(1) -  Surface(ObsSurfNum)%Vertex(3)
-        Vec2 = Surface(ObsSurfNum)%Vertex(2) -  Surface(ObsSurfNum)%Vertex(3)
+        Vec1 = Surface(NearestHitSurfNum)%Vertex(1) -  Surface(NearestHitSurfNum)%Vertex(3)
+        Vec2 = Surface(NearestHitSurfNum)%Vertex(2) -  Surface(NearestHitSurfNum)%Vertex(3)
         CALL CrossProduct(Vec1,Vec2,VNorm)
         VNorm = VNorm/SQRT(DOT_PRODUCT(VNorm,VNorm))
         IF(DOT_PRODUCT(VNorm,-RayVec) < 0.0) VNorm = -VNorm
@@ -521,7 +527,7 @@ DO RecSurfNum = 1, TotSolReflRecSurf
           END IF
         ELSE
           ! Shading surface is nearest hit
-          SolReflRecSurf(RecSurfNum)%HitPtSolRefl(RecPtNum,RayNum) = Surface(ObsSurfNum)%ShadowSurfDiffuseSolRefl
+          SolReflRecSurf(RecSurfNum)%HitPtSolRefl(RecPtNum,RayNum) = Surface(NearestHitSurfNum)%ShadowSurfDiffuseSolRefl
         END IF
       ELSE
         ! No obstructions were hit by this ray
@@ -703,7 +709,7 @@ DO IHr = 1,24
               IF (Surface(HitPtSurfNum+1)%ShadowingSurf .AND. Surface(HitPtSurfNum+1)%MirroredSurf) THEN
                 ! Check whether the sun is behind the mirrored shading surface
                 CosIncBmAtHitPt2 = DOT_PRODUCT(Surface(HitPtSurfNum+1)%OutNormVec,SunVec)
-                IF(CosIncBmAtHitPt2 <= 0.0d0) CYCLE
+                IF(CosIncBmAtHitPt2 >= 0.0d0) CYCLE
               ENDIF
             ENDIF
           ENDIF
@@ -719,6 +725,13 @@ DO IHr = 1,24
         DO ObsSurfNum = 1, TotSurfaces
 !        DO loop = 1,SolReflRecSurf(RecSurfNum)%NumPossibleObs
 !          ObsSurfNum = SolReflRecSurf(RecSurfNum)%PossibleObsSurfNums(loop)
+
+          !CR 8959 -- The other side of a mirrored surface cannot obstruct the mirrored surface
+          IF (HitPtSurfNum >0) THEN
+            IF (Surface(HitPtSurfNum)%MirroredSurf) THEN
+              IF (ObsSurfNum == HitPtSurfNum-1) CYCLE
+            END IF
+          END IF
 
           ! skip the hit surface
           IF (ObsSurfNum == HitPtSurfNum) CYCLE
@@ -890,17 +903,20 @@ DO IHr = 1,24
         IF((Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. Surface(ReflSurfNum)%ExtSolar) .OR. &
             (Surface(ReflSurfNum)%ShadowSurfGlazingFrac > 0.0d0 .AND. &
             Surface(ReflSurfNum)%ShadowingSurf)) THEN
-          ReflBmToBmSolObs = 0.0d0
-          ReflFacTimesCosIncSum = 0.0d0
+!cr8947          ReflBmToBmSolObs = 0.0d0
+!cr8947          ReflFacTimesCosIncSum = 0.0d0
           ! Skip if window and not sunlit
           IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. SunlitFrac(ReflSurfNum,IHr,1) < 0.01d0) CYCLE
-          ! Check if sun is in front of this reflecting surface if a window. (Note that we do not do
-          ! this check for shading surfaces since these are assumed be able to reflect from either side.)
+          ! Check if sun is in front of this reflecting surface.
           ReflNorm = Surface(ReflSurfNum)%OutNormVec(1:3)
           CosIncAngRefl = DOT_PRODUCT(SunVec,ReflNorm)
-          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. CosIncAngRefl < 0.0) CYCLE
-          ! The following gives the correct cosine of angle of incidence on shading surfaces
-          CosIncAngRefl = ABS(CosIncAngRefl)
+          IF(CosIncAngRefl < 0.0) CYCLE
+
+! TH2 CR8959
+!          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. CosIncAngRefl < 0.0) CYCLE
+!          ! The following gives the correct cosine of angle of incidence on shading surfaces
+!          CosIncAngRefl = ABS(CosIncAngRefl)
+
           ! Get sun position unit vector for mirror image of sun in reflecting surface
           SunVecMir = SunVec - 2.0d0*DOT_PRODUCT(SunVec,ReflNorm)*ReflNorm
           ! Angle of incidence of reflected beam on receiving surface
@@ -948,6 +964,14 @@ DO IHr = 1,24
                 DO ObsSurfNum = 1, TotSurfaces
                   IF(.NOT.Surface(ObsSurfNum)%ShadowSurfPossibleObstruction) CYCLE
                   IF(ObsSurfNum == ReflSurfNum) CYCLE
+
+                  !TH2 CR8959 -- Skip mirrored surfaces
+                  IF(Surface(ObsSurfNum)%MirroredSurf) CYCLE
+                  !TH2 CR8959 -- The other side of a mirrored surface cannot obstruct the mirrored surface
+                  IF (Surface(ReflSurfNum)%MirroredSurf) THEN
+                    IF (ObsSurfNum == ReflSurfNum-1) CYCLE
+                  END IF
+
                   CALL PierceSurface(ObsSurfNum,HitPtRefl,SunVec,IHitObs,HitPtObs)
                   IF(IHitObs > 0) EXIT
                 END DO
@@ -961,9 +985,11 @@ DO IHr = 1,24
                 ConstrNumRefl = Surface(ReflSurfNum)%Construction
                 SpecReflectance = POLYF(ABS(CosIncAngRefl),Construct(ConstrNumRefl)%ReflSolBeamFrontCoef(1:6))
               END IF
-              IF(Surface(ReflSurfNum)%ShadowingSurf.AND.Surface(ReflSurfNum)%ShadowSurfGlazingConstruct > 0)  &
-                SpecReflectance = Surface(ReflSurfNum)%ShadowSurfGlazingFrac * POLYF(ABS(CosIncAngRefl), &
-                   Construct(Surface(ReflSurfNum)%ShadowSurfGlazingConstruct)%ReflSolBeamFrontCoef(1:6))
+              IF(Surface(ReflSurfNum)%ShadowingSurf.AND.Surface(ReflSurfNum)%ShadowSurfGlazingConstruct > 0) THEN
+                ConstrNumRefl = Surface(ReflSurfNum)%ShadowSurfGlazingConstruct
+                SpecReflectance = Surface(ReflSurfNum)%ShadowSurfGlazingFrac *   &
+                   POLYF(ABS(CosIncAngRefl),Construct(ConstrNumRefl)%ReflSolBeamFrontCoef(1:6))
+              ENDIF
               ! Angle of incidence of reflected beam on receiving surface
               CosIncAngRec = DOT_PRODUCT(SolReflRecSurf(RecSurfNum)%NormVec,SunVecMir)
               ReflFac = SpecReflectance * CosIncAngRec
@@ -976,8 +1002,13 @@ DO IHr = 1,24
       END DO  ! End of loop over obstructing surfaces
       ! Average over receiving points
       NumRecPts = SolReflRecSurf(RecSurfNum)%NumRecPts
-      DO RecPtNum = 1,MaxRecPts
-        CosIncWeighted = ReflFacTimesCosIncSum(RecPtNum) / (ReflBmToBmSolObs(RecPtNum) + 1.0d-8)
+!cr8947      DO RecPtNum = 1,MaxRecPts
+      DO RecPtNum = 1,NumRecPts
+        IF (ReflBmToBmSolObs(RecPtNum) /= 0.0d0) THEN
+          CosIncWeighted = ReflFacTimesCosIncSum(RecPtNum) / ReflBmToBmSolObs(RecPtNum)
+        ELSE
+          CosIncWeighted = 0.0d0
+        ENDIF
         CosIncAveBmToBmSolObs(SurfNum,IHr) = CosIncAveBmToBmSolObs(SurfNum,IHr) + CosIncWeighted
         ReflFacBmToBmSolObs(SurfNum,IHr) = ReflFacBmToBmSolObs(SurfNum,IHr) + ReflBmToBmSolObs(RecPtNum)
       END DO

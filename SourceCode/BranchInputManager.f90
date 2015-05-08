@@ -366,12 +366,13 @@ INTEGER FUNCTION NumBranchesInBranchList(BranchListName)
 END FUNCTION NumBranchesInBranchList
 
 SUBROUTINE GetBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressCurveIndex,NumComps,CompType,CompName, &
-           CompCtrlType,CompInletNodeNames,CompInletNodeNums,CompOutletNodeNames,CompOutletNodeNums,ErrorsFound)
+           CompInletNodeNames,CompInletNodeNums,CompOutletNodeNames,CompOutletNodeNums,ErrorsFound)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda K. Lawrie
           !       DATE WRITTEN   October 1999
           !       MODIFIED       October 2001, Automatic Extensibility
+          !                      September 2012, B. Griffith, removed component control types
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -400,9 +401,6 @@ SUBROUTINE GetBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressC
                  DIMENSION(:)  :: CompType            ! Component Type for each item on Branch
   CHARACTER(len=MaxNameLength), INTENT(OUT), &
                  DIMENSION(:)  :: CompName            ! Component Name for each item on Branch
-  INTEGER, INTENT(OUT), &
-                 DIMENSION(:)  :: CompCtrlType        ! Component Control Type for each item on Branch
-                                                          ! Active, Passive, Bypass
   CHARACTER(len=MaxNameLength), INTENT(OUT), &
                  DIMENSION(:)  :: CompInletNodeNames  ! Component Inlet Node IDs for each item on Branch
   INTEGER, INTENT(OUT), &
@@ -436,7 +434,7 @@ SUBROUTINE GetBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressC
 
   CALL GetInternalBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressCurveIndex,NumComps,BComponents,ErrorsFound)
 
-  MinCompsAllowed=MIN(SIZE(CompType),SIZE(CompName),SIZE(CompCtrlType),SIZE(CompInletNodeNames),  &
+  MinCompsAllowed=MIN(SIZE(CompType),SIZE(CompName),SIZE(CompInletNodeNames),  &
                       SIZE(CompInletNodeNums),SIZE(CompOutletNodeNames),SIZE(CompOutletNodeNums))
   IF (MinCompsAllowed < NumComps) THEN
     CALL ShowSevereError('GetBranchData: Component List arrays not big enough to hold Number of Components')
@@ -449,7 +447,6 @@ SUBROUTINE GetBranchData(LoopName,BranchName,BranchMaxFlow,PressCurveType,PressC
   DO Count=1,NumComps
     CompType(Count)=BComponents(Count)%CType
     CompName(Count)=BComponents(Count)%Name
-    CompCtrlType(Count)=Bcomponents(Count)%CtrlType
     CompInletNodeNames(Count)=BComponents(Count)%InletNodeName
     CompInletNodeNums(Count)=BComponents(Count)%InletNode
     CompOutletNodeNames(Count)=BComponents(Count)%OutletNodeName
@@ -1263,6 +1260,7 @@ SUBROUTINE GetBranchInput
           ! USE STATEMENTS:
   USE InputProcessor, ONLY: SameString
   USE CurveManager, ONLY: GetPressureCurveTypeAndIndex
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1359,6 +1357,7 @@ SUBROUTINE GetBranchInput
           Branch(BCount)%PressureCurveType = PressureCurveType
           Branch(BCount)%PressureCurveIndex = PressureCurveIndex
           Branch(BCount)%NumOfComponents=(NumAlphas-2)/5
+          IF (Branch(BCount)%NumOfComponents*5 /= (NumAlphas-2)) Branch(BCount)%NumOfComponents=Branch(BCount)%NumOfComponents+1
           NumInComps=Branch(BCount)%NumOfComponents
           ALLOCATE(Branch(BCount)%Component(Branch(BCount)%NumOfComponents))
           Comp=1
@@ -1368,11 +1367,14 @@ SUBROUTINE GetBranchInput
                  TRIM(CurrentModuleObject)//', found in '//  &
                  TRIM(CurrentModuleObject)//'='//TRIM(Branch(Count)%Name))
               ErrFound=.true.
-              NumInComps=NumInComps-1
               CYCLE
             ENDIF
             IF (Comp > NumInComps) THEN
-              CALL ShowFatalError('GetBranchInput: Invalid '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+              CALL ShowSevereError('GetBranchInput: '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+              CALL ShowContinueError('...Number of Arguments indicate ['//trim(RoundSigDigits(NumInComps))// &
+                  '], but count of fields indicates ['//trim(RoundSigDigits(Comp))//']')
+              CALL ShowContinueError('...examine '//trim(CurrentModuleObject)//' carefully.')
+              CYCLE
             ENDIF
             Branch(BCount)%Component(Comp)%CType=Alphas(Loop)
             Branch(BCount)%Component(Comp)%Name=Alphas(Loop+1)
@@ -1388,17 +1390,25 @@ SUBROUTINE GetBranchInput
             ELSE
               ConnectionType = NodeConnectionType_Internal
             ENDIF
-            CALL GetNodeNums(Branch(BCount)%Component(Comp)%InletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
-                 TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
-            IF (NumNodes > 1) THEN
-              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
-                 TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
+            IF (.not. lAlphaBlanks(Loop+2)) THEN
+              CALL GetNodeNums(Branch(BCount)%Component(Comp)%InletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
+                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
+              IF (NumNodes > 1) THEN
+                CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
+                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
+                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
+                   TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
+                CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+                ErrFound=.true.
+              ELSE
+                Branch(BCount)%Component(Comp)%InletNode=NodeNums(1)
+              ENDIF
+            ELSE
+              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', required field is blank.')
               CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
                  TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
               CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
               ErrFound=.true.
-            ELSE
-              Branch(BCount)%Component(Comp)%InletNode=NodeNums(1)
             ENDIF
             Branch(BCount)%Component(Comp)%OutletNodeName=Alphas(Loop+3)
                  ! If last component on branch, then outlet node is outlet from branch, otherwise node is internal
@@ -1407,56 +1417,54 @@ SUBROUTINE GetBranchInput
             ELSE
               ConnectionType = NodeConnectionType_Internal
             ENDIF
-            CALL GetNodeNums(Branch(BCount)%Component(Comp)%OutletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
-                 TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
-            IF (NumNodes > 1) THEN
-              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
-                 TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
+            IF (.not. lAlphaBlanks(Loop+3)) THEN
+              CALL GetNodeNums(Branch(BCount)%Component(Comp)%OutletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
+                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
+              IF (NumNodes > 1) THEN
+                CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
+                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
+                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
+                   TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
+                CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+                ErrFound=.true.
+              ELSE
+                Branch(BCount)%Component(Comp)%OutletNode=NodeNums(1)
+              ENDIF
+            ELSE
+              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+3))//', required field is blank.')
               CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
                  TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
               CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
               ErrFound=.true.
-            ELSE
-              Branch(BCount)%Component(Comp)%OutletNode=NodeNums(1)
             ENDIF
-            CALL SetUpCompSets(TRIM(CurrentModuleObject),Branch(BCount)%Name, &
-                                Alphas(Loop),Alphas(Loop+1),Alphas(Loop+2),Alphas(Loop+3))
-            SELECT CASE (Alphas(Loop+4))
-              CASE ('ACTIVE')
-                Branch(BCount)%Component(Comp)%CtrlType=ControlType_Active
-              CASE ('PASSIVE')
-                Branch(BCount)%Component(Comp)%CtrlType=ControlType_Passive
-              CASE ('SERIESACTIVE')
-                Branch(BCount)%Component(Comp)%CtrlType=ControlType_SeriesActive
-              CASE ('BYPASS')
-                Branch(BCount)%Component(Comp)%CtrlType=ControlType_Bypass
-              CASE DEFAULT
-                CALL ShowSevereError('GetBranchInput: Invalid '//TRIM(cAlphaFields(Loop+4))//', Value='//  &
-                   TRIM(Alphas(Loop+4)))
-                CALL ShowContinueError('Occurs for '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
-                   TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
-                CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
-                  ErrFound=.true.
-            END SELECT
+
+            IF (.not. lAlphaBlanks(Loop) .and. .not. lAlphaBlanks(Loop+1) .and.   &  !no blanks in required field set
+                .not. lAlphaBlanks(Loop+2) .and. .not. lAlphaBlanks(Loop+3))       &
+              CALL SetUpCompSets(TRIM(CurrentModuleObject),Branch(BCount)%Name, &
+                     Alphas(Loop),Alphas(Loop+1),Alphas(Loop+2),Alphas(Loop+3))
+
+!            deprecated control type, was using (Alphas(Loop+4))
+
             Comp=Comp+1
           ENDDO
           Branch(BCount)%NumOfComponents=NumInComps
         ENDDO
 
         NumOfBranches=BCount
+        DEALLOCATE(NodeNums)
         DEALLOCATE(Alphas)
         DEALLOCATE(Numbers)
         DEALLOCATE(cAlphaFields)
         DEALLOCATE(cNumericFields)
         DEALLOCATE(lAlphaBlanks)
         DEALLOCATE(lNumericBlanks)
-        CALL TestInletOutletNodes(ErrFound)
-        GetInputFlag=.false.
         IF (ErrFound) THEN
           CALL ShowFatalError('GetBranchInput: Invalid '//TRIM(CurrentModuleObject)//  &
              ' Input, preceding condition(s) cause termination.')
         ENDIF
-      END IF
+        CALL TestInletOutletNodes(ErrFound)
+        GetInputFlag=.false.
+      ENDIF
     ENDIF
 
   RETURN

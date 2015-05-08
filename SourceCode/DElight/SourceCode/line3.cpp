@@ -37,7 +37,7 @@ using namespace std;
 extern double NaN_QUIET;
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
 #include "BGL.h"
 

@@ -40,6 +40,8 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 #include <vector>
 #include <map>
 #include <limits>
+#include <stdlib.h>
+#include <string>
 using namespace std;
 
 // BGLincludes
@@ -50,11 +52,13 @@ namespace BGL = BldgGeomLib;
 #include "hemisphiral.h"
 #include "btdf.h"
 
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
-#include "def.h"
+#include "DEF.H"
 
+#ifndef INFINITY
 extern double INFINITY;
+#endif
 extern double NaN_QUIET;
 extern double NaN_SIGNAL;
 extern double MAXPointTol;

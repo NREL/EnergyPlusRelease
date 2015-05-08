@@ -1125,8 +1125,10 @@ SUBROUTINE SizeHeatingCoil(CoilNum)
                             HeatingCoil(CoilNum)%Name)
       IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow >= SmallMassFlow) THEN
         IF (TermUnitPIU) THEN
-          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * FinalZoneSizing(CurZoneEqNum)%MinOA + &
-                          FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1. - FinalZoneSizing(CurZoneEqNum)%MinOA)
+          ! MinFlowFrac set at bottom of SUBROUTINE SizePIU (here OutAirFrac = min primary air flow frac)
+          OutAirFrac = TermUnitSizing(CurZoneEqNum)%MinFlowFrac
+          CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU * OutAirFrac + &
+                          FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak * (1. - OutAirFrac)
         ELSE IF (TermUnitIU) THEN
           CoilInTemp = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
         ELSE IF (TermUnitSingDuct) THEN

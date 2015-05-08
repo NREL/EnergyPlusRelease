@@ -120,6 +120,8 @@ INTEGER, PARAMETER :: CoilVRF_Heating                 = 22
 INTEGER, PARAMETER :: CoilPerfDX_CoolByPassEmpirical  = 23
 INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPVSEquationFit  = 24
 INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPVSEquationFit  = 25
+INTEGER, PARAMETER :: Coil_CoolingAirToAirVariableSpeed  = 26
+INTEGER, PARAMETER :: Coil_HeatingAirToAirVariableSpeed  = 27
 
 
 
@@ -206,10 +208,12 @@ TYPE DefineZoneCompAvailMgrs
   INTEGER                                               :: AvailStatus      =0   ! system availability status
   INTEGER                                               :: StartTime        =0   ! cycle on time (in SimTimeSteps)
   INTEGER                                               :: StopTime         =0   ! cycle off time (in SimTimeSteps)
-  REAL(r64)                                             :: ReqSupplyFrac    =0.0 ! required system flow rate (as a fraction)
+  CHARACTER(len=MaxNameLength)                          :: AvailManagerListName = ' ' ! name of each availability manager
   CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE :: AvailManagerName ! name of each availability manager
   INTEGER,DIMENSION(:),ALLOCATABLE                      :: AvailManagerType ! type of availability manager
   INTEGER, DIMENSION(:), ALLOCATABLE                    :: AvailManagerNum  ! index for availability manager
+  INTEGER                                               :: ZoneNum         =0   ! cycle off time (in SimTimeSteps)
+  LOGICAL                                               :: Input           = .TRUE.
 END TYPE DefineZoneCompAvailMgrs
 
 
@@ -256,6 +260,8 @@ REAL(r64)     :: UnbalExhMassFlow = 0.0     ! unbalanced zone exhaust from a zon
 REAL(r64)     :: PlenumInducedMassFlow = 0.0 ! secondary air mass flow rate induced from a return plenum [kg/s]
 LOGICAL  :: TurnFansOn = .FALSE.       ! If true overrides fan schedule and cycles fans on
 LOGICAL  :: TurnFansOff = .FALSE.      ! If True overides fan schedule and TurnFansOn and forces fans off
+LOGICAL  :: ZoneCompTurnFansOn = .FALSE.       ! If true overrides fan schedule and cycles fans on
+LOGICAL  :: ZoneCompTurnFansOff = .FALSE.      ! If True overides fan schedule and TurnFansOn and forces fans off
 LOGICAL  :: SetPointErrorFlag = .FALSE. ! True if any needed setpoints not set; if true, program terminates
 LOGICAL  :: DoSetPointTest = .FALSE.    ! True one time only for sensed node setpoint test
 LOGICAL  :: NightVentOn = .FALSE.             ! set TRUE in SimAirServingZone if night ventilation is happening
@@ -272,6 +278,7 @@ LOGICAL  :: AirLoopsSimOnce     =.FALSE.    ! True means that the air loops have
 INTEGER  :: NumHybridVentSysAvailMgrs = 0 ! Number of hybrid ventilation control
 INTEGER, ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailAirLoopNum ! Airloop number in hybrid vent availability manager
 INTEGER, ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailVentCtrl ! Ventilation control action in hybrid vent availability manager
+INTEGER, ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailActualZoneNum ! Actual zone num in hybrid vent availability manager
 INTEGER, ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailANCtrlStatus ! AN control status in hybrid vent availability manager
 INTEGER, ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailMaster   ! Master object name: Ventilation for simple; Zone name for AN
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: HybridVentSysAvailWindModifier ! Wind modifier for AirflowNetwork

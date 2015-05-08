@@ -86,6 +86,8 @@ TYPE StandAloneERVData
   REAL(r64)                    :: AirVolFlowPerOccupant  = 0.0  ! Air flow rate per occupant, used for autosizing
   INTEGER                      :: EconomizerOASchedPtr        = 0    ! schedule to modify outdoor air
   LOGICAL                      :: FlowError              = .TRUE. ! used for one-time warning message for flow imbalance (Init)
+  INTEGER                      :: AvailStatus         =0
+  CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
 
   ! report variables
   REAL(r64)        :: ElecUseRate       =0.0 ! total electric use rate (power) for supply/exhaust fans & generic HX parasitics [W]
@@ -221,7 +223,7 @@ SUBROUTINE SimStandAloneERV(CompName,ZoneNum,FirstHVACIteration,SensLoadMet,LatL
   ENDIF
 
 ! Initialize the Stand Alone ERV unit
-  CALL InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
+  CALL InitStandAloneERV(StandAloneERVNum,ZoneNum,FirstHVACIteration)
 
   CALL CalcStandAloneERV(StandAloneERVNum,FirstHVACIteration,SensLoadMet,LatLoadMet)
 
@@ -235,7 +237,7 @@ SUBROUTINE GetStandAloneERV
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
           !       DATE WRITTEN   June 2003
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -254,11 +256,10 @@ SUBROUTINE GetStandAloneERV
   USE BranchNodeConnections, ONLY: SetUpCompSets
   USE MixedAir, ONLY: SetOAControllerData,CheckOAControllerName
   USE DataHeatBalance, ONLY: Zone
-  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig, ERVStandAlone_Num
   USE DataZoneControls, ONLY: HumidityControlZone, NumHumidityControlZones
   USE Fans, ONLY: GetFanAvailSchPtr, GetFanType, GetFanDesignVolumeFlowRate, GetFanIndex, &
                   GetFanOutletNode
-  USE DataHVACGlobals, ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, FanType_ZoneExhaust
   USE DataSizing, ONLY: AutoSize
   USE General, ONLY: RoundSigDigits
   USE HeatRecovery, ONLY: GetGenericSupplyAirFlowRate=>GetSupplyAirFlowRate, GetHeatExchangerObjectTypeNum, &
@@ -589,6 +590,11 @@ SUBROUTINE GetStandAloneERV
                             //'type ZoneHVAC:EnergyRecoveryVentilator:Controller not found = '//TRIM(Alphas(6)))
         ErrorsFound = .TRUE.
       ENDIF
+    ENDIF
+
+    IF (.NOT. lAlphaBlanks(7)) THEN
+     StandAloneERV(StandAloneERVNum)%AvailManagerListName = Alphas(7)
+     ZoneComp(ERVStandAlone_Num)%ZoneCompAvailMgrs(StandAloneERVNum)%AvailManagerListName  = Alphas(7)
     ENDIF
 
   ! Read supply and exhaust air flow rates
@@ -1077,7 +1083,8 @@ SUBROUTINE GetStandAloneERV
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
     CALL SetupOutputVariable('Stand Alone ERV Electric Consumption[J]',StandAloneERV(StandAloneERVIndex)%ElecUseEnergy,&
                              'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
-
+    CALL SetupOutputVariable('Stand Alone ERV Supply Fan Availability Status',StandAloneERV(StandAloneERVIndex)%AvailStatus, &
+                             'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
   END DO
 
   DEALLOCATE(Alphas)
@@ -1092,12 +1099,12 @@ SUBROUTINE GetStandAloneERV
 
 END SUBROUTINE GetStandAloneERV
 
-SUBROUTINE InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
+SUBROUTINE InitStandAloneERV(StandAloneERVNum,ZoneNum, FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad, FSEC
           !       DATE WRITTEN   June 2003
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1111,7 +1118,7 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
 
           ! USE STATEMENTS:
 !  USE Psychrometrics,     ONLY: PsyRhoAirFnPbTdbW
-  USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList
+  USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList,ERVStandAlone_Num
   USE MixedAir,           ONLY: SimOAController
   USE DataAirLoop,        ONLY: OAControllerInfo
 
@@ -1119,6 +1126,7 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT (IN) :: StandAloneERVNum ! number of the current Stand Alone ERV unit being simulated
+  INTEGER, INTENT (IN) :: ZoneNum             ! number of zone being served unused1208
   LOGICAL, INTENT (IN) :: FirstHVACIteration ! TRUE if first HVAC iteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -1150,6 +1158,11 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
     MySizeFlag  = .TRUE.
     MyOneTimeFlag = .FALSE.
 
+  ENDIF
+
+  IF (ALLOCATED(ZoneComp)) THEN
+    ZoneComp(ERVStandAlone_Num)%ZoneCompAvailMgrs(StandAloneERVNum)%ZoneNum = ZoneNum
+    StandAloneERV(StandAloneERVNum)%AvailStatus = ZoneComp(ERVStandAlone_Num)%ZoneCompAvailMgrs(StandAloneERVNum)%AvailStatus
   ENDIF
 
   ! need to check all units to see if they are on Zone Equipment List or issue warning
@@ -1217,7 +1230,8 @@ SUBROUTINE InitStandAloneERV(StandAloneERVNum,FirstHVACIteration)
                            FirstHVACIteration,0)
     END IF
 
-    IF(GetCurrentScheduleValue(StandAloneERV(StandAloneERVNum)%SupplyAirFanSchPtr) .GT. 0)THEN
+    IF(GetCurrentScheduleValue(StandAloneERV(StandAloneERVNum)%SupplyAirFanSchPtr) .GT. 0 .OR. &
+       ZoneCompTurnFansOn .AND. .NOT. ZoneCompTurnFansOff)THEN
       IF(StandAloneERV(StandAloneERVNum)%ControllerNameDefined)THEN
         IF(OAControllerInfo(StandAloneERV(StandAloneERVNum)%ControllerIndex)%HighHumCtrlActive)THEN
           Node(SupInletNode)%MassFlowRate = MIN(StandAloneERV(StandAloneERVNum)%DesignSAFanMassFlowRate, &
@@ -1520,6 +1534,7 @@ SUBROUTINE CalcStandAloneERV(StandAloneERVNum,FirstHVACIteration,SensLoadMet,Lat
           !       AUTHOR         Richard Raustad, FSEC
           !       DATE WRITTEN   June 2003
           !       MODIFIED       Don Shirey, Aug 2009 (LatentMassLoadMet)
+          !                      July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1597,7 +1612,8 @@ SUBROUTINE CalcStandAloneERV(StandAloneERVNum,FirstHVACIteration,SensLoadMet,Lat
   StandAloneERV(StandAloneERVNum)%ElecUseRate = AirToAirHXElecPower
 
   CALL SimulateFanComponents(StandAloneERV(StandAloneERVNum)%SupplyAirFanName,FirstHVACIteration,  &
-                             StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex)
+                             StandAloneERV(StandAloneERVNum)%SupplyAirFanIndex, &
+                             ZoneCompTurnFansOn =ZoneCompTurnFansOn,ZoneCompTurnFansOff =ZoneCompTurnFansOff)
   StandAloneERV(StandAloneERVNum)%ElecUseRate = StandAloneERV(StandAloneERVNum)%ElecUseRate + FanElecPower
 
   CALL SimulateFanComponents(StandAloneERV(StandAloneERVNum)%ExhaustAirFanName,FirstHVACIteration,  &
@@ -1718,7 +1734,7 @@ SUBROUTINE ReportStandAloneERV(StandAloneERVNum)
           ! na
 
           ! USE STATEMENTS:
-  Use DataHVACGlobals, ONLY: TimeStepSys
+          ! na
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 

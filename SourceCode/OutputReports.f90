@@ -1657,6 +1657,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
   CHARACTER(len=32) :: cSchedMax
   CHARACTER(len=3)  :: SolarDiffusing
   integer fd
+  character(len=MaxNameLength) :: AlgoName
 
   if (totsurfaces > 0 .and. .not. allocated(surface)) then
     ! no error needed, probably in end processing, just return
@@ -1699,8 +1700,9 @@ SUBROUTINE DetailsForSurfaces(RptType)
     write(unit,703) 'Shading_Surfaces','Number of Shading Surfaces',surf-1
     do surf=1,totsurfaces
       if (Surface(surf)%Zone /= 0) EXIT
+      AlgoName = 'None'
       write(unit,704,advance='No') 'Shading',trim(Surface(surf)%Name),trim(cSurfaceClass(Surface(surf)%class)),  &
-                                                          trim(Surface(surf)%BaseSurfName)
+                                                          trim(Surface(surf)%BaseSurfName), TRIM(AlgoName)
       if (RptType == 10) then
         if (Surface(surf)%SchedShadowSurfIndex > 0) then
           scheduleName=GetScheduleName(Surface(surf)%SchedShadowSurfIndex)
@@ -1764,11 +1766,31 @@ SUBROUTINE DetailsForSurfaces(RptType)
         else
           BaseSurfName=Surface(surf)%BaseSurfName
         endif
+        SELECT CASE (Surface(surf)%HeatTransferAlgorithm)
+        CASE (HeatTransferModel_None)
+          AlgoName = 'None'
+        CASE (HeatTransferModel_CTF)
+          AlgoName = 'CTF - ConductionTransferFunction'
+        CASE (HeatTransferModel_CondFD)
+          AlgoName = 'CondFD - ConductionFiniteDifference'
+        CASE (HeatTransferModel_EMPD)
+          AlgoName = 'EMPD - MoisturePenetrationDepthConductionTransferFunction'
+        CASE (HeatTransferModel_HAMT)
+          AlgoName = 'HAMT - CombinedHeatAndMoistureFiniteElement'
+        CASE (HeatTransferModel_Window5)
+          AlgoName = 'Window5 Detailed Fenestration'
+        CASE (HeatTransferModel_ComplexFenestration)
+          AlgoName = 'Window7 Complex Fenestration'
+        CASE (HeatTransferModel_TDD)
+          AlgoName = 'Tubular Daylighting Device'
+        END SELECT
         ! Default Convection Coefficient Calculation Algorithms
         IntConvCoeffCalc=ConvCoeffCalcs(Zone(zonenum)%InsideConvectionAlgo)
         ExtConvCoeffCalc=ConvCoeffCalcs(Zone(zonenum)%OutsideConvectionAlgo)
+
+
         write(unit,704,advance='No') 'HeatTransfer',trim(Surface(surf)%Name),trim(cSurfaceClass(Surface(surf)%class)),  &
-                                                                                                trim(BaseSurfName)
+                                                                              trim(BaseSurfName), trim(AlgoName)
 
         ! Calculate Nominal U-value with convection/film coefficients for reporting by adding on
         ! prescribed R-values for interior and exterior convection coefficients as found in ASHRAE 90.1-2004, Appendix A
@@ -1884,6 +1906,10 @@ SUBROUTINE DetailsForSurfaces(RptType)
           write(unit,705,advance='No') 'Ground'
           write(unit,705,advance='No') 'N/A-Ground'
           write(unit,705,advance='No') trim(IntConvCoeffCalc)
+        elseif (Surface(surf)%extboundcond == GroundFCfactorMethod) then
+          write(unit,705,advance='No') 'FCGround'
+          write(unit,705,advance='No') 'N/A-FCGround'
+          write(unit,705,advance='No') trim(IntConvCoeffCalc)
         elseif (Surface(surf)%extboundcond == OtherSideCoefNoCalcExt .or. Surface(surf)%extboundcond == OtherSideCoefCalcExt) then
           write(unit,705,advance='No') TRIM(OSC(Surface(surf)%OSCPtr)%Name)
           write(unit,705,advance='No') 'N/A-OSC'
@@ -1936,7 +1962,26 @@ SUBROUTINE DetailsForSurfaces(RptType)
         if (Surface(surf)%FrameDivider > 0) then
           fd=Surface(surf)%FrameDivider
           if (FrameDivider(fd)%FrameWidth > 0.0) then
-            write(unit,704,advance='No') 'Frame/Divider',trim(FrameDivider(fd)%Name),'Frame',trim(Surface(surf)%Name)
+            SELECT CASE (Surface(surf)%HeatTransferAlgorithm)
+            CASE (HeatTransferModel_None)
+              AlgoName = 'None'
+            CASE (HeatTransferModel_CTF)
+              AlgoName = 'CTF - ConductionTransferFunction'
+            CASE (HeatTransferModel_CondFD)
+              AlgoName = 'CondFD - ConductionFiniteDifference'
+            CASE (HeatTransferModel_EMPD)
+              AlgoName = 'EMPD - MoisturePenetrationDepthConductionTransferFunction'
+            CASE (HeatTransferModel_HAMT)
+              AlgoName = 'HAMT - CombinedHeatAndMoistureFiniteElement'
+            CASE (HeatTransferModel_Window5)
+              AlgoName = 'Window5 Detailed Fenestration'
+            CASE (HeatTransferModel_ComplexFenestration)
+              AlgoName = 'Window7 Complex Fenestration'
+            CASE (HeatTransferModel_TDD)
+              AlgoName = 'Tubular Daylighting Device'
+            END SELECT
+            write(unit,704,advance='No') 'Frame/Divider',trim(FrameDivider(fd)%Name),'Frame',trim(Surface(surf)%Name) &
+                           , trim(AlgoName)
             write(unit,7045) trim(RoundSigDigits(SurfaceWindow(surf)%FrameArea,2)),  &
                trim(RoundSigDigits(SurfaceWindow(surf)%FrameArea/Surface(surf)%Multiplier,2)),'*','N/A','N/A',  &
                              trim(RoundSigDigits(FrameDivider(fd)%FrameWidth,2)),'N/A'
@@ -1960,8 +2005,26 @@ SUBROUTINE DetailsForSurfaces(RptType)
         else
           BaseSurfName=Surface(surf)%BaseSurfName
         endif
+        SELECT CASE (Surface(surf)%HeatTransferAlgorithm)
+        CASE (HeatTransferModel_None)
+          AlgoName = 'None'
+        CASE (HeatTransferModel_CTF)
+          AlgoName = 'CTF - ConductionTransferFunction'
+        CASE (HeatTransferModel_CondFD)
+          AlgoName = 'CondFD - ConductionFiniteDifference'
+        CASE (HeatTransferModel_EMPD)
+          AlgoName = 'EMPD - MoisturePenetrationDepthConductionTransferFunction'
+        CASE (HeatTransferModel_HAMT)
+          AlgoName = 'HAMT - CombinedHeatAndMoistureFiniteElement'
+        CASE (HeatTransferModel_Window5)
+          AlgoName = 'Window5 Detailed Fenestration'
+        CASE (HeatTransferModel_ComplexFenestration)
+          AlgoName = 'Window7 Complex Fenestration'
+        CASE (HeatTransferModel_TDD)
+          AlgoName = 'Tubular Daylighting Device'
+        END SELECT
         write(unit,704,advance='No') 'HeatTransfer',trim(Surface(surf)%Name),trim(cSurfaceClass(Surface(surf)%class)),  &
-                                                                                            trim(BaseSurfName)
+                                                                                trim(BaseSurfName), trim(AlgoName)
         write(unit,7042,advance='No') trim(TrimSigDigits(Surface(surf)%Sides))
         do vert=1,Surface(surf)%Sides
           if (vert /= Surface(Surf)%Sides) then
@@ -1980,7 +2043,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
   enddo ! zones
 
   700 format('! <Zone/Shading Surfaces>,<Zone Name>/#Shading Surfaces,# Surfaces')
-  701 format('! <HeatTransfer/Shading/Frame/Divider_Surface>,Surface Name,Surface Class,Base Surface')
+  701 format('! <HeatTransfer/Shading/Frame/Divider_Surface>,Surface Name,Surface Class,Base Surface,Heat Transfer Algorithm')
   7011 format(',Construction/Transmittance Schedule,Nominal U (w/o film coefs)/Min Schedule Value,',  &
              'Nominal U (with film coefs)/Max Schedule Value,Solar Diffusing,', &
              'Area (Net),Area (Gross),Area (Sunlit Calc),Azimuth,Tilt,~Width,~Height,Reveal,', &
@@ -1991,7 +2054,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
   7021 format(',{W/m2-K}/{},{W/m2-K}/{},{},{m2},{m2},{m2},{deg},{deg},{m},{m},{m},,,,,,,,,,')
   7022 format(',')
   703 format(A,',',A,',',I5)
-  704 format(A,'_Surface,',A,',',A,',',A)
+  704 format(A,'_Surface,',A,',',A,',',A,',',A)
   7041 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','),A)
   7042 format(',',A)
   7044 format(',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',A,',',2(A,','))

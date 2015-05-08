@@ -119,7 +119,8 @@ REAL(r64) :: StdBaroPress =101325.d0 ! Standard "atmospheric pressure" based on 
 REAL(r64) :: StdRhoAir               ! Standard "rho air" set in WeatherManager - based on StdBaroPress
 REAL(r64) :: TimeZoneNumber          ! Time Zone Number of building location
 REAL(r64) :: TimeZoneMeridian        ! Standard Meridian of TimeZone
-CHARACTER(len=MaxNameLength*2) :: EnvironmentName ! Current environment name (longer for weather file names)
+CHARACTER(len=MaxNameLength*2) :: EnvironmentName=' ' ! Current environment name (longer for weather file names)
+CHARACTER(len=MaxNameLength*2) :: WeatherFileLocationTitle=' ' ! Location Title from Weather File
 CHARACTER(len=20)  :: CurMnDyHr    ! Current Month/Day/Hour timestamp info
 CHARACTER(len=5)   :: CurMnDy      ! Current Month/Day timestamp info
 INTEGER :: CurEnvirNum             ! current environment number

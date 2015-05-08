@@ -2074,6 +2074,8 @@ SUBROUTINE InitZoneAirSetpoints
     WZoneTimeMinus2Temp=0.0
     ALLOCATE(WZoneTimeMinus3Temp(NumOfZones))
     WZoneTimeMinus3Temp=0.0
+    ALLOCATE(WZoneTimeMinusP(NumOfZones))
+    WZoneTimeMinusP=0.0
     ALLOCATE(TempIndZnLd(NumOfZones))
     TempIndZnLd=0.0
     ALLOCATE(TempDepZnLd(NumOfZones))
@@ -2244,6 +2246,7 @@ SUBROUTINE InitZoneAirSetpoints
     WZoneTimeMinus2 = OutHumRat
     WZoneTimeMinus3 = OutHumRat
     WZoneTimeMinus4 = OutHumRat
+    WZoneTimeMinusP = OutHumRat
     DSWZoneTimeMinus1 = OutHumRat
     DSWZoneTimeMinus2 = OutHumRat
     DSWZoneTimeMinus3 = OutHumRat
@@ -3248,6 +3251,7 @@ SUBROUTINE CalcPredictedHumidityRatio(ZoneNum)
           ! USE STATEMENTS:
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
   USE General,         ONLY: RoundSigDigits
+  USE DataSurfaces,    ONLY: Surface, HeatTransferModel_EMPD, HeatTransferModel_HAMT
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -3338,7 +3342,12 @@ SUBROUTINE CalcPredictedHumidityRatio(ZoneNum)
     ! zone humidity ratio.  The A, B, C coefficients are analogous to the heat balance.
     ! SumHmARaW and SumHmARa will be used with the Moisture Balance on the building elements and
     ! are currently set to zero when the CTF only version is used.
-    IF (SolutionAlgo /= UseEMPD .and. SolutionAlgo /= UseHAMT) THEN
+
+    ! if no surface in the zone uses EMPD or HAMT then zero
+    IF ((.NOT. ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_EMPD))&
+      .AND. &
+      (.NOT. ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_HAMT))) &
+       THEN
       SumHmARaW(ZoneNum) = 0.0d0
       SumHmARa(ZoneNum) = 0.0d0
     END IF
@@ -3770,6 +3779,7 @@ SUBROUTINE CorrectZoneAirTemp(ZoneTempChange, ShortenTimeStepSys,  &
                                             ZnAirRPT(ZoneNum)%SumMCpDTzones,  & ! interzone mixing
                                             ZnAirRPT(ZoneNum)%SumMCpDtInfil,  & ! OA of various kinds except via system
                                             ZnAirRPT(ZoneNum)%SumMCpDTsystem, & ! air system
+                                            ZnAirRpt(ZoneNum)%SumNonAirSystem, & ! non air system
                                             ZnAirRPT(ZoneNum)%CzdTdt ,        & ! air mass energy storage term
                                             ZnAirRPT(ZoneNum)%imBalance )       ! measure of imbalance in zone air heat balance
 
@@ -3827,6 +3837,7 @@ SUBROUTINE PushZoneTimestepHistories
         XM3T(ZoneNum) = XM2T(ZoneNum)
         XM2T(ZoneNum) = XMAT(ZoneNum)
         XMAT(ZoneNum) = ZTAV(ZoneNum) ! using average for whole zone time step.
+        XMPT(ZoneNum)  = ZT(ZoneNum)
   !      MAT(ZoneNum)  = ZT(ZoneNum)
 
         WZoneTimeMinus4(ZoneNum) = WZoneTimeMinus3(ZoneNum)
@@ -3834,6 +3845,7 @@ SUBROUTINE PushZoneTimestepHistories
         WZoneTimeMinus2(ZoneNum) = WZoneTimeMinus1(ZoneNum)
         WZoneTimeMinus1(ZoneNum) = ZoneAirHumRatAvg(ZoneNum) ! using average for whole zone time step.
         ZoneAirHumRat(ZoneNum) = ZoneAirHumRatTemp(ZoneNum)
+        WZoneTimeMinusP(ZoneNum) = ZoneAirHumRatTemp(ZoneNum)
         ZoneAirRelHum(ZoneNum) = 100.0 * PsyRhFnTdbWPb(ZT(ZoneNum),ZoneAirHumRat(ZoneNum),OutBaroPress,'CorrectZoneAirTemp')
 
         IF (AirModel(ZoneNum)%AirModelType ==  RoomAirModel_UCSDDV .or. AirModel(ZoneNum)%AirModelType ==  RoomAirModel_UCSDUFI &
@@ -4065,6 +4077,7 @@ SUBROUTINE CorrectZoneHumRat(ZoneNum)
   USE DataZoneEquipment, ONLY: ZoneEquipConfig
   USE ZonePlenum, ONLY: ZoneRetPlenCond, ZoneSupPlenCond, NumZoneReturnPlenums, NumZoneSupplyPlenums
   USE DataDefineEquip, ONLY: AirDistUnit, NumAirDistUnits
+  USE DataSurfaces,  ONLY: Surface, HeatTransferModel_HAMT, HeatTransferModel_EMPD
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -4210,7 +4223,10 @@ SUBROUTINE CorrectZoneHumRat(ZoneNum)
   ! operating and system shutdown.
   ! SumHmARaW and SumHmARa will be used with the moisture balance on the building elements and
   ! are currently set to zero to remind us where they need to be in the future
-  IF (SolutionAlgo /= UseEMPD .and. SolutionAlgo /= UseHAMT) THEN
+  IF ((.NOT. ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_EMPD))&
+      .AND. &
+      (.NOT. ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_HAMT)))&
+     THEN
     SumHmARaW(ZoneNum) = 0.0d0
     SumHmARa(ZoneNum) = 0.0d0
   END IF
@@ -4704,7 +4720,7 @@ SUBROUTINE CalcZoneSums(ZoneNum, SumIntGain, SumHA, SumHATsurf, SumHATref, SumMC
 END SUBROUTINE CalcZoneSums
 
 SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGains, SumHADTsurfs, SumMCpDTzones, &
-          SumMCpDtInfil, SumMCpDTsystem, CzdTdt , imBalance )
+          SumMCpDtInfil, SumMCpDTsystem, SumNonAirSystem, CzdTdt , imBalance )
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -4754,6 +4770,7 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   REAL(r64), INTENT(OUT) :: SumMCpDTzones   ! zone sum of MassFlowRate*cp*(TremotZone - Tz) transfer air from other zone, Mixing
   REAL(r64), INTENT(OUT) :: SumMCpDtInfil   ! Zone sum of MassFlowRate*Cp*(Tout - Tz) transfer from outside, ventil, earth tube
   REAL(r64), INTENT(OUT) :: SumMCpDTsystem  ! Zone sum of air system MassFlowRate*Cp*(Tsup - Tz)
+  REAL(r64), INTENT(OUT) :: SumNonAirSystem ! Zone sum of non air system convective heat gains
   REAL(r64), INTENT(OUT) :: CzdTdt          ! Zone air energy storage term.
   REAL(r64), INTENT(OUT) :: imBalance       ! put all terms in eq. 5 on RHS , should be zero
 
@@ -4790,6 +4807,7 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   SumMCpDTzones  = 0.0D0    ! zone sum of MassFlowRate*cp*(TremotZone - Tz) transfer air from other zone, Mixing
   SumMCpDtInfil  = 0.0D0    ! Zone sum of MassFlowRate*Cp*(Tout - Tz)
   SumMCpDTsystem = 0.0D0    ! Zone sum of air system MassFlowRate*Cp*(Tsup - Tz)
+  SumNonAirSystem= 0.0D0    !
   CzdTdt         = 0.0D0    !
   imBalance      = 0.0D0
   SumSysMCp      = 0.0d0
@@ -4797,7 +4815,7 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
 
   ! Sum all convective internal gains: SumIntGain
   Call SumAllInternalConvectionGains(ZoneNum, SumIntGains)
-  SumIntGains = SumIntGains  + SumConvHTRadSys(ZoneNum)
+
   ! Add heat to return air if zonal system (no return air) or cycling system (return air frequently very
   ! low or zero)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
@@ -4900,6 +4918,9 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
     SumMCpDTsystem = SumMCpDTsystem + MassFlowRate * CpAir * (NodeTemp - MAT(ZoneNum))
 
   END IF
+
+  ! non air system response.
+  SumNonAirSystem  = NonAirSystemResponse(ZoneNum) + SumConvHTRadSys(ZoneNum)
 
   ! Sum all surface convection: SumHA, SumHATsurf, SumHATref (and additional contributions to SumIntGain)
   DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
@@ -5014,12 +5035,12 @@ SUBROUTINE CalcZoneComponentLoadSums(ZoneNum, TempDepCoef, TempIndCoef, SumIntGa
   END SELECT
 
   IF (DisplayZoneAirHeatBalanceOffBalance) THEN
-    imBalance      = SumIntGains + SumHADTsurfs + SumMCpDTzones + SumMCpDtInfil + SumMCpDTsystem - CzdTdt
+    imBalance      = SumIntGains + SumHADTsurfs + SumMCpDTzones + SumMCpDtInfil + SumMCpDTsystem + SumNonAirSystem - CzdTdt
 
     ! throw warning if seriously out of balance (this may need to be removed if too noisy... )
     ! formulate dynamic threshold value based on 20% of quadrature sum of components
     Threshold   =  0.2D0 * SQRT(SumIntGains**2 + SumHADTsurfs**2 + SumMCpDTzones**2 + SumMCpDtInfil**2 &
-                                + SumMCpDTsystem**2 + CzdTdt**2)
+                                + SumMCpDTsystem**2 + SumNonAirSystem**2 + CzdTdt**2)
     IF ((ABS(ImBalance) > Threshold) .AND. (.NOT. WarmUpFlag) &
         .AND. (.NOT. DoingSizing) ) THEN ! air balance is out by more than threshold
       IF (Zone(ZoneNum)%AirHBimBalanceErrIndex == 0) THEN

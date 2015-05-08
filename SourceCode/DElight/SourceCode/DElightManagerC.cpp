@@ -56,9 +56,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -70,8 +70,8 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "tools.h"
+#include "DOE2DL.H"
+#include "TOOLS.H"
 #include "DElightManagerC.h"
 #include "DElight2.h"
 
@@ -155,8 +155,8 @@ try {
     char cFullOutputFilename[250+1];
 
     // Create filenames for DElight input and output files that will default to current working directory.
-    strcpy_s( cFullInputFilename, "eplusout.delightin" );
-    strcpy_s( cFullOutputFilename, "eplusout.delightout" );
+    strcpy( cFullInputFilename, "eplusout.delightin" );
+    strcpy( cFullOutputFilename, "eplusout.delightout" );
 
     /* Set limits of sun position angles. */
 
@@ -211,7 +211,7 @@ catch(string sThrownMsg) {
         // No Error message file open, open one and write the thrown message to it
         ofdmpfile.open("eplusout.delightdfdmp");
         char msg[210];
-        sprintf_s(msg, "%s\n", sThrownMsg.c_str());
+        sprintf(msg, "%s\n", sThrownMsg.c_str());
 		ofdmpfile << msg;
         // Close Error message dump file
         ofdmpfile.close();
@@ -235,7 +235,7 @@ catch(char* cThrownMsg) {
         // No Error message file open, open one and write the thrown message to it
         ofdmpfile.open("eplusout.delightdfdmp");
         char msg[210];
-        sprintf_s(msg, "%s\n", cThrownMsg);
+        sprintf(msg, "%s\n", cThrownMsg);
 		ofdmpfile << msg;
         // Close Error message dump file
         ofdmpfile.close();
@@ -370,7 +370,7 @@ catch(string sThrownMsg) {
         // No Error message file open, open one and write the thrown message to it
         ofdmpfile.open("eplusout.delighteldmp");
         char msg[210];
-        sprintf_s(msg, "%s\n", sThrownMsg.c_str());
+        sprintf(msg, "%s\n", sThrownMsg.c_str());
 		ofdmpfile << msg;
         // Close Error message dump file
         ofdmpfile.close();
@@ -394,7 +394,7 @@ catch(char* cThrownMsg) {
         // No Error message file open, open one and write the thrown message to it
         ofdmpfile.open("eplusout.delighteldmp");
         char msg[210];
-        sprintf_s(msg, "%s\n", cThrownMsg);
+        sprintf(msg, "%s\n", cThrownMsg);
 		ofdmpfile << msg;
         // Close Error message dump file
         ofdmpfile.close();

@@ -41,6 +41,7 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 #include <fstream>
 #include <cstring>
 #include <limits>
+#include <cstdlib>
 
 using namespace std;
 
@@ -49,9 +50,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -63,8 +64,8 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "W4lib.h"
+#include "DOE2DL.H"
+#include "W4Lib.h"
 #include "struct.h"
 
 /****************************** subroutine process_W4glazing_types *****************************/
@@ -174,7 +175,7 @@ int ProcessW4GlassType(
 			fgets(cInputLine, MAX_CHAR_LINE, W4libfile);
 
 		// Scan the sixth line to get the Window ID.
-		sscanf_s(cInputLine,"%*s %*s %*s %d\n",&iW4ID);
+		sscanf(cInputLine,"%*s %*s %*s %d\n",&iW4ID);
 
 		// Check to see if this is the matching W4 entry.
 		if (iW4ID == iGlass_Type) {
@@ -186,15 +187,15 @@ int ProcessW4GlassType(
 
 			// Scan the angular data and Tvis Hemispherical
 			// Tokenize the line label
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			// Tokenize the angular visible data
 			int iAngle;
 			for (iAngle=0; iAngle<10; iAngle++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				dTvis[iAngle] = atof(token);
 			}
 			// Tokenize the hemispherical visible data
-			token = strtok_s(NULL," ",&next_token);
+			token = strtok(NULL," ");
 			dTvisHemi = atof(token);
 
 			// Qikfit the angular visible data.
@@ -215,7 +216,7 @@ int ProcessW4GlassType(
 			struct_init("GLASS",(char *)lib_ptr->glass[lib_ptr->nglass]);
 
 			// Populate the new DElight LIB GLASS entry with the Window4 data
-			sprintf_s(lib_ptr->glass[lib_ptr->nglass]->name, "%d", iGlass_Type);	/* glass type ID: 1 to 11 => DOE2 original, >11 => W4lib.dat, <0 => E10 library */
+			sprintf(lib_ptr->glass[lib_ptr->nglass]->name, "%d", iGlass_Type);	/* glass type ID: 1 to 11 => DOE2 original, >11 => W4lib.dat, <0 => E10 library */
 			lib_ptr->glass[lib_ptr->nglass]->vis_trans = dTvis[0];		/* visible transmittance at normal incidence */
 			lib_ptr->glass[lib_ptr->nglass]->W4hemi_trans = dTvisHemi;	/* Window 4 hemispherical transmittance */
 			lib_ptr->glass[lib_ptr->nglass]->W4vis_fit1 = dTvFit1;		/* Window 4 angular transmission curve fit coef #1 */
@@ -226,7 +227,7 @@ int ProcessW4GlassType(
 				fgets(cInputLine, MAX_CHAR_LINE, W4libfile);
 
 			// Scan the thirty-fourth line to get the inside hemispherical visible reflectance.
-			sscanf_s(cInputLine,"%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %d\n",&lib_ptr->glass[lib_ptr->nglass]->inside_refl);
+			sscanf(cInputLine,"%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %d\n",&lib_ptr->glass[lib_ptr->nglass]->inside_refl);
 
 			// Increment LIB GLASS entry counter
 			(lib_ptr->nglass)++;

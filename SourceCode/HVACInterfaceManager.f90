@@ -89,7 +89,7 @@ PRIVATE SetupCommonPipes
 CONTAINS
 
           ! MODULE SUBROUTINES:
-SUBROUTINE UpdateHVACInterface(OutletNode,InletNode,OutOfToleranceFlag)
+SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutOfToleranceFlag)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Rick Strand
@@ -116,6 +116,8 @@ SUBROUTINE UpdateHVACInterface(OutletNode,InletNode,OutOfToleranceFlag)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)    :: AirLoopNum          ! airloop number for which air loop this is
+  INTEGER, INTENT(IN)    :: CalledFrom          ! 
   INTEGER, INTENT(IN)    :: OutletNode          ! Node number for the outlet of the side of the loop just simulated
   INTEGER, INTENT(IN)    :: InletNode           ! Node number for the inlet of the side that needs the outlet node data
   LOGICAL, INTENT(INOUT) :: OutOfToleranceFlag  ! True when the other side of the loop need to be (re)simulated
@@ -129,62 +131,199 @@ SUBROUTINE UpdateHVACInterface(OutletNode,InletNode,OutOfToleranceFlag)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64), DIMENSION(ConvergLogStackDepth) :: TmpRealARR
   REAL(r64)       :: DeltaEnergy
-
           ! FLOW:
 
   !Calculate the approximate energy difference across interface for comparison
   DeltaEnergy = HVACCpApprox*((Node(OutletNode)%MassFlowRate*Node(OutletNode)%Temp) -  &
                           (Node(InletNode)%MassFlowRate*Node(InletNode)%Temp))
-  HVACEnthTolFlag = 0
-  HVACFlowTolFlag = 0
-  HVACHumTolFlag = 0
-  HVACPressTolFlag = 0
-  HVACQualTolFlag = 0
-  HVACEnergyTolFlag = 0
-  HVACTempTolFlag = 0
 
-  ! HVACQuePtr points to latest "diff"
-  HVACQuePtr=HVACQuePtr+1
-  IF (HVACQuePtr > 5) HVACQuePtr=1
+  AirLoopConvergence(AirLoopNum)%HVACMassFlowNotConverged = .FALSE.
+  AirLoopConvergence(AirLoopNum)%HVACHumRatNotConverged   = .FALSE.
+  AirLoopConvergence(AirLoopNum)%HVACTempNotConverged     = .FALSE.
+  AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged   = .FALSE.
+  AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .FALSE.
+  AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .FALSE.
 
-  HVACOutletNodeTolOut(HVACQuePtr) = OutletNode
+  SELECT CASE (CalledFrom)
+  
+  CASE (CalledFromAirSystemDemandSide)
 
-  HVACEnthTolValue(HVACQuePtr)  = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
-  IF (HVACEnthTolValue(HVACQuePtr)  > HVACEnthalpyToler) THEN
-    HVACEnthTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACFlowTolValue(HVACQuePtr)  = ABS(Node(OutletNode)%MassFlowRate-Node(InletNode)%MassFlowRate)
-  IF (HVACFlowTolValue(HVACQuePtr)  > HVACFlowRateToler) THEN
-    HVACFlowTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACHumTolValue(HVACQuePtr)   = ABS(Node(OutletNode)%HumRat-Node(InletNode)%HumRat)
-  IF (HVACHumTolValue(HVACQuePtr)   > HVACHumRatToler) THEN
-    HVACHumTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACPressTolValue(HVACQuePtr) = ABS(Node(OutletNode)%Press-Node(InletNode)%Press)
-  IF (HVACPressTolValue(HVACQuePtr) > HVACPressToler) THEN
-    HVACPressTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACQualTolValue(HVACQuePtr)  = ABS(Node(OutletNode)%Quality-Node(InletNode)%Quality)
-  IF (HVACQualTolValue(HVACQuePtr)  > HVACQualityToler) THEN
-    HVACQualTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACEnergyTolValue(HVACQuePtr)= DeltaEnergy
-  IF (ABS(DeltaEnergy)          > HVACEnergyToler) THEN
-    HVACEnergyTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
-  HVACTempTolValue(HVACQuePtr)  = ABS(Node(OutletNode)%Temp-Node(InletNode)%Temp)
-  IF (HVACTempTolValue(HVACQuePtr)  > HVACTemperatureToler) THEN
-    HVACTempTolFlag = 1
-    OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-  END IF
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACFlowDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACFlowDemandToSupplyTolValue(1) = &
+                       ABS(Node(OutletNode)%MassFlowRate-Node(InletNode)%MassFlowRate)
+    AirLoopConvergence(AirLoopNum)%HVACFlowDemandToSupplyTolValue(2:ConvergLogStackDepth) = &
+                       TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACFlowDemandToSupplyTolValue(1)   > HVACFlowRateToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACMassFlowNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACHumDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACHumDemandToSupplyTolValue(1) = ABS(Node(OutletNode)%HumRat-Node(InletNode)%HumRat)
+    AirLoopConvergence(AirLoopNum)%HVACHumDemandToSupplyTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACHumDemandToSupplyTolValue(1)   > HVACHumRatToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACHumRatNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACTempDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACTempDemandToSupplyTolValue(1) = ABS(Node(OutletNode)%Temp-Node(InletNode)%Temp)
+    AirLoopConvergence(AirLoopNum)%HVACTempDemandToSupplyTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACTempDemandToSupplyTolValue(1)   > HVACTemperatureToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACTempNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+    
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue(1) = ABS(DeltaEnergy)
+    AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue(2:ConvergLogStackDepth) &
+                    =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF 
+    
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(1) = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(2:ConvergLogStackDepth) &
+        =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(1) > HVACEnthalpyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue
+    AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue(1) = ABS(Node(OutletNode)%Press-Node(InletNode)%Press)
+    AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue(2:ConvergLogStackDepth) &
+        =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue(1) > HVACPressToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+  CASE (CalledFromAirSystemSupplySideDeck1)
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck1ToDemandTolValue(1) &
+            = ABS(Node(OutletNode)%MassFlowRate-Node(InletNode)%MassFlowRate)
+    AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth)&
+            = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck1ToDemandTolValue(1)   > HVACFlowRateToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACMassFlowNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck1ToDemandTolValue(1) = ABS(Node(OutletNode)%HumRat-Node(InletNode)%HumRat)
+    AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
+              = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck1ToDemandTolValue(1)   > HVACHumRatToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACHumRatNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck1ToDemandTolValue(1) = ABS(Node(OutletNode)%Temp-Node(InletNode)%Temp)
+    AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
+        = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck1ToDemandTolValue(1)   > HVACTemperatureToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACTempNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck1ToDemandTolValue(1) = DeltaEnergy
+    AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
+        =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF 
+    
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(1) &
+         = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
+         =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(1) > HVACEnthalpyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue(1) &
+         = ABS(Node(OutletNode)%Press-Node(InletNode)%Press)
+    AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
+         =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue(1) > HVACPressToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+  CASE (CalledFromAirSystemSupplySideDeck2)
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck2ToDemandTolValue(1) &
+         = ABS(Node(OutletNode)%MassFlowRate-Node(InletNode)%MassFlowRate)
+    AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+         = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACFlowSupplyDeck2ToDemandTolValue(1)   > HVACFlowRateToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACMassFlowNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck2ToDemandTolValue(1) &
+          = ABS(Node(OutletNode)%HumRat-Node(InletNode)%HumRat)
+    AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+          = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACHumSupplyDeck2ToDemandTolValue(1)   > HVACHumRatToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACHumRatNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck2ToDemandTolValue(1) &
+           = ABS(Node(OutletNode)%Temp-Node(InletNode)%Temp)
+    AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+           = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACTempSupplyDeck2ToDemandTolValue(1)   > HVACTemperatureToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACTempNotConverged = .TRUE.
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    END IF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck2ToDemandTolValue(1) = DeltaEnergy
+    AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+          =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF 
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(1) &
+          = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
+    AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+          =  TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(1) > HVACEnthalpyToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+    TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue
+    AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue(1) &
+          = ABS(Node(OutletNode)%Press-Node(InletNode)%Press)
+    AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
+          = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue(1) > HVACPressToler) THEN
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
+    ENDIF
+
+  END SELECT
 
           ! Always update the new inlet conditions
   Node(InletNode)%Temp                 = Node(OutletNode)%Temp
@@ -268,41 +407,26 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)       :: DeltaEnergy
   REAL(r64)       :: OldTankOutletTemp
-  REAL(r64)       :: OldTankOutletEnthalpy
+  REAL(r64)       :: OldOtherLoopSideInletMdot
   REAL(r64)       :: TankOutletTemp
   REAL(r64)       :: Cp
   REAL(r64)       :: MixedOutletTemp
   INTEGER         :: ThisLoopSideInletNode
-
+  REAL(r64), DIMENSION(ConvergLogStackDepth) :: TmpRealARR
+  INTEGER :: ZoneInSysIndex
+  
           ! FLOW:
 
     !reset out of tolerance flags
-  PlantEnthTolFlag = 0
-  PlantFlowTolFlag = 0
-  PlantPressTolFlag = 0
-  PlantQualTolFlag = 0
-  PlantEnergyTolFlag = 0
-  PlantTempTolFlag = 0
-
-    ! updatePlantQuePtr points to latest "diff"
-  PlantQuePtr=PlantQuePtr+1
-  IF (PlantQuePtr > 5) PlantQuePtr=1
-
-    !humidity ratio not applicable to hydronic loops
-  PlantHumTolValue(PlantQuePtr) = 0
-
-    !quality is also not applicable because it is arbitrarily set (to 1 or 0) and is not calculated by property routines
-  PlantQualTolValue(PlantQuePtr)  = 0
-
-    ! set the node for reporting
-  PlantOutletNodeTolOut(PlantQuePtr) = ThisLoopSideOutletNode
+  PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .FALSE.
+  PlantConvergence(LoopNum)%PlantTempNotConverged     = .FALSE. 
 
     !set the loopside inlet node
   ThisLoopSideInletNode  = PlantLoop(LoopNum)%LoopSide(ThisLoopSideNum)%NodeNumIn
 
     !save the inlet node temp for DeltaEnergy check
+  OldOtherLoopSideInletMdot = Node(OtherLoopSideInletNode)%MassFlowRate
   OldTankOutletTemp     = Node(OtherLoopSideInletNode)%Temp
-  OldTankOutletEnthalpy = Node(OtherLoopSideInletNode)%enthalpy
 
     !calculate the specific heat
   Cp = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,OldTankOutletTemp, &
@@ -311,19 +435,29 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
     !update the enthalpy
   Node(OtherLoopSideInletNode)%Enthalpy = Cp * Node(OtherLoopSideInletNode)%Temp
 
-    !Calculate the approximate energy difference across interface for comparison
-    !=cp((newflowrate*newtemp)-(oldflowrate*oldtemp))
-  DeltaEnergy = PlantCpApprox*((Node(ThisLoopSideOutletNode)%MassFlowRate*Node(OtherLoopSideInletNode)%Temp) -  &
-                          (Node(ThisLoopSideInletNode)%MassFlowRate*OldTankOutletTemp))
-
     !update the temperatures and flow rates
   IF(CommonPipeType == 1 .OR. CommonPipeType ==2)THEN
         !update the temperature
     CALL UpdateCommonPipe(LoopNum, ThisLoopSideNum, CommonPipeType,FirstHVACIteration, MixedOutletTemp)
     Node(OtherLoopSideInletNode)%Temp = MixedOutletTemp
     TankOutletTemp = MixedOutletTemp
-        !Set the flow tolerance array.  For a common pipe the half loop always sets it's own flow, so this check is not needed.
-    PlantFlowTolValue(PlantQuePtr)  = 0
+    IF (ThisLoopSideNum == DemandSide) THEN
+      TmpRealARR = PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue
+      PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(1) = &
+         ABS(OldOtherLoopSideInletMdot-Node(OtherLoopSideInletNode)%MassFlowRate)
+      PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+      IF (PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(1)  > PlantFlowRateToler) THEN
+        PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .TRUE.
+      ENDIF
+    ELSE
+      TmpRealARR = PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue
+      PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(1) = &
+         ABS(OldOtherLoopSideInletMdot-Node(OtherLoopSideInletNode)%MassFlowRate)
+      PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+      IF (PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(1)  > PlantFlowRateToler) THEN
+        PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .TRUE.
+      ENDIF
+    ENDIF
         !Set the flow rate.  Continuity requires that the flow rates at the half loop inlet and outlet match
     Node(ThisLoopSideInletNode)%MassFlowRate = Node(ThisLoopSideOutletNode)%MassFlowRate
         !Update this loopside inlet node Min/MaxAvail to this loopside outlet node Min/MaxAvail
@@ -335,7 +469,24 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
         !update the temperature
     Node(OtherLoopSideInletNode)%Temp = TankOutletTemp
         !Set the flow tolerance array
-    PlantFlowTolValue(PlantQuePtr)  = ABS(Node(ThisLoopSideOutletNode)%MassFlowRate-Node(OtherLoopSideInletNode)%MassFlowRate)
+    IF (ThisLoopSideNum == DemandSide) THEN
+      TmpRealARR = PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue
+      PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(1) = &
+         ABS(Node(ThisLoopSideOutletNode)%MassFlowRate-Node(OtherLoopSideInletNode)%MassFlowRate)
+      PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+      IF (PlantConvergence(LoopNum)%PlantFlowDemandToSupplyTolValue(1)  > PlantFlowRateToler) THEN
+        PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .TRUE.
+      ENDIF
+    ELSE
+      TmpRealARR = PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue
+      PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(1) = &
+         ABS(Node(ThisLoopSideOutletNode)%MassFlowRate-Node(OtherLoopSideInletNode)%MassFlowRate)
+      PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+      IF (PlantConvergence(LoopNum)%PlantFlowSupplyToDemandTolValue(1)  > PlantFlowRateToler) THEN
+        PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .TRUE.
+      ENDIF
+    ENDIF
+!    PlantFlowTolValue(PlantQuePtr)  = ABS(Node(ThisLoopSideOutletNode)%MassFlowRate-Node(OtherLoopSideInletNode)%MassFlowRate)
         !Set the flow rate
     Node(OtherLoopSideInletNode)%MassFlowRate         = Node(ThisLoopSideOutletNode)%MassFlowRate
         !update the MIN/MAX available flow rates
@@ -346,49 +497,40 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
         !pressure update  DSU? Note: This update assumes that PRESSURE SIMULATION cannot be used with common pipes.
     IF (PlantLoop(LoopNum)%HasPressureComponents) THEN
         !Don't update pressure, let the pressure simulation handle pressures
-      PlantPressTolValue(PlantQuePtr) = 0
     ELSE
         !Do update pressure!
-      PlantPressTolValue(PlantQuePtr) = ABS(Node(ThisLoopSideOutletNode)%Press-Node(OtherLoopSideInletNode)%Press)
       Node(OtherLoopSideInletNode)%Press = Node(ThisLoopSideOutletNode)%Press
     END IF
   ENDIF
 
-    !Set out of tolerance flags
-    !enthalpy
-  PlantEnthTolValue(PlantQuePtr)  = ABS(OldTankOutletEnthalpy-Node(OtherLoopSideInletNode)%Enthalpy)
-  IF (PlantEnthTolValue(PlantQuePtr)  > PlantEnthalpyToler) PlantEnthTolFlag = 1
-
-    !flow rate
-  IF (PlantFlowTolValue(PlantQuePtr)  > PlantFlowRateToler) PlantFlowTolFlag = 1
-
-    !loop pressure
-  IF (PlantPressTolValue(PlantQuePtr) > PlantPressToler) PlantPressTolFlag = 1
-
-    !quality
-  IF (PlantQualTolValue(PlantQuePtr)  > PlantQualityToler) PlantQualTolFlag = 1
-
-    !energy
-  PlantEnergyTolValue(PlantQuePtr)= DeltaEnergy
-  IF (ABS(DeltaEnergy)  > PlantEnergyToler) PlantEnergyTolFlag = 1
-
     !temperature
-  PlantTempTolValue(PlantQuePtr)  = ABS(OldTankOutletTemp-Node(OtherLoopSideInletNode)%Temp)
-  IF (PlantTempTolValue(PlantQuePtr)  > PlantTemperatureToler) PlantTempTolFlag = 1
+  IF (ThisLoopSideNum == DemandSide) THEN
+    TmpRealARR = PlantConvergence(LoopNum)%PlantTempDemandToSupplyTolValue
+    PlantConvergence(LoopNum)%PlantTempDemandToSupplyTolValue(1) = &
+        ABS(OldTankOutletTemp-Node(OtherLoopSideInletNode)%Temp)
+    PlantConvergence(LoopNum)%PlantTempDemandToSupplyTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (PlantConvergence(LoopNum)%PlantTempDemandToSupplyTolValue(1) > PlantTemperatureToler) THEN
+      PlantConvergence(LoopNum)%PlantTempNotConverged = .TRUE.
+    ENDIF
+  ELSE
+    TmpRealARR = PlantConvergence(LoopNum)%PlantTempSupplyToDemandTolValue
+    PlantConvergence(LoopNum)%PlantTempSupplyToDemandTolValue(1) = &
+        ABS(OldTankOutletTemp-Node(OtherLoopSideInletNode)%Temp)
+    PlantConvergence(LoopNum)%PlantTempSupplyToDemandTolValue(2:ConvergLogStackDepth) = TmpRealARR(1:ConvergLogStackDepth-1)
+    IF (PlantConvergence(LoopNum)%PlantTempSupplyToDemandTolValue(1) > PlantTemperatureToler) THEN
+      PlantConvergence(LoopNum)%PlantTempNotConverged = .TRUE.
+    ENDIF
+  ENDIF
 
-    !Evaluate tolerance flags
-  IF(ThisLoopSideNum == DemandSide)THEN
-    If (PlantEnthTolFlag    == 1 .OR. &
-        PlantFlowTolFlag    == 1 .OR. &
-        PlantPressTolFlag   == 1 .OR. &
-        PlantQualTolFlag    == 1 .OR. &
-        PlantEnergyTolFlag  == 1 .OR. &
-        PlantTempTolFlag    == 1)OutOfToleranceFlag = .TRUE.
-
-  ELSE !SupplySide
-    If (PlantFlowTolFlag    == 1)OutOfToleranceFlag = .TRUE.
-!    If (PlantFlowTolFlag    == 1 .OR. &
-!        PlantEnergyTolFlag  == 1)OutOfToleranceFlag = .TRUE.
+    !Set out of tolerance flags
+  IF (ThisLoopSideNum == DemandSide) THEN
+    IF (PlantConvergence(LoopNum)%PlantMassFlowNotConverged .OR. PlantConvergence(LoopNum)%PlantTempNotConverged) THEN
+      OutOfToleranceFlag = .TRUE.
+    ENDIF
+  ELSE
+    IF (PlantConvergence(LoopNum)%PlantMassFlowNotConverged) THEN
+      OutOfToleranceFlag = .TRUE.
+    ENDIF
   ENDIF
 
   RETURN

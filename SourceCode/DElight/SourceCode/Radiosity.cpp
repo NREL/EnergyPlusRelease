@@ -55,9 +55,10 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
+#include "dlmath.h"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -69,9 +70,9 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "Radiosity.h"
-#include "tools.h"
+#include "TOOLS.H"
 
 /************************* subroutine slite_interreflect ************************/
 /* Interreflection calculations based on radiosity approach */
@@ -365,8 +366,11 @@ int wndo_interreflect(
 				}
 				icos1 = 1.0 + scb1 / (1.0 + ssq);
 				icos2 = 1.0 + scb2 / (1.0 + ssq);
-				fij = scb1 * scb2 / (ssq * ssq) * bldg_ptr->zone[iz]->surf[jsurf]->node_areas[jnode] * icos1 * icos2;
-				fij = fij / (1.0 + 0.6 * fij * fij);
+				/*fij = scb1 * scb2 / (ssq * ssq) * bldg_ptr->zone[iz]->surf[jsurf]->node_areas[jnode] * icos1 * icos2;*/
+				/*fij = fij / (1.0 + 0.6 * fij * fij);*/
+				fij = safeDivide(scb1 * scb2 , (ssq * ssq) * bldg_ptr->zone[iz]->surf[jsurf]->node_areas[jnode] * icos1 * icos2);
+				fij = safeDivide(fij , (1.0 + 0.6 * fij * fij));
+				if ( isnan(fij) ) fij=0.;
 
 				/* for overcast sky condition, accumulate reflected light from node on reflecting surface */
 				delf_overcast[inode] += fij * bldg_ptr->zone[iz]->surf[jsurf]->skyolum[jnode];
@@ -387,15 +391,15 @@ int wndo_interreflect(
 	/* improve values for total node luminance for each node on current window */
 	for (inode=0; inode<bldg_ptr->zone[iz]->surf[is]->nnodes; inode++) {
 		/* for overcast sky condition */
-        if ( _isnan(delf_overcast[inode]) )delf_overcast[inode]=0.;
+		if ( isnan(delf_overcast[inode]) )delf_overcast[inode]=0.;
 		bldg_ptr->zone[iz]->surf[is]->wndo[iw]->skyolum[inode] = bldg_ptr->zone[iz]->surf[is]->wndo[iw]->direct_skyolum[inode] + frac * delf_overcast[inode];
 		/* for each Sun Position Altitude */
 		for (iphs=0; iphs<sun_ptr->nphs; iphs++) {
 			/* for each Sun Position Azimuth */
 			for (iths=0; iths<sun_ptr->nths; iths++) {
 				/* for each clear sky sun position */
-				if ( _isnan(delf_skyclear[inode][iphs][iths]) )delf_skyclear[inode][iphs][iths]=0.;
-				if ( _isnan(delf_sunclear[inode][iphs][iths]) )delf_sunclear[inode][iphs][iths]=0.;
+				if ( isnan(delf_skyclear[inode][iphs][iths]) )delf_skyclear[inode][iphs][iths]=0.;
+				if ( isnan(delf_sunclear[inode][iphs][iths]) )delf_sunclear[inode][iphs][iths]=0.;
 				bldg_ptr->zone[iz]->surf[is]->wndo[iw]->skyclum[inode][iphs][iths] = bldg_ptr->zone[iz]->surf[is]->wndo[iw]->direct_skyclum[inode][iphs][iths] + frac * delf_skyclear[inode][iphs][iths];
 				bldg_ptr->zone[iz]->surf[is]->wndo[iw]->sunclum[inode][iphs][iths] = bldg_ptr->zone[iz]->surf[is]->wndo[iw]->direct_sunclum[inode][iphs][iths] + frac * delf_sunclear[inode][iphs][iths];
 			}

@@ -2122,6 +2122,22 @@ SUBROUTINE GetAirflowNetworkInput
       ErrorsFound=.true.
     End If
   End do
+  ! Ensure different CPVNum is used to avoid a single side boundary condition
+  found = .False.
+  Do j=2,AirflowNetworkNumOfExtNode
+    If (MultizoneExternalNodeData(j-1)%CPVNum .NE. MultizoneExternalNodeData(j)%CPVNum) Then 
+      found = .True.
+      Exit
+    End If
+  End do
+  If (.NOT. found) then
+    CALL ShowSevereError('The same Wind Pressure Coefficient Values Object name is used in all ' &
+                        //'AirflowNetwork:MultiZone:ExternalNode objects.') 
+    CALL ShowContinueError('Please input at least two different Wind Pressure Coefficient Values Object names'&
+                          //' to avoid single side boundary condition.')
+    ErrorsFound=.true.
+  End If
+
  End If
 
 
@@ -4166,7 +4182,7 @@ LOGICAL found,OANode
      ! Calculate duct conduction loss
      if (CompTypeNum == CompTypeNum_DWC .AND. CompName == Blank) then ! Duct element only
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4203,7 +4219,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_TMU) then ! Reheat unit: SINGLE DUCT:CONST VOLUME:REHEAT
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4222,7 +4238,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_COI) then ! heating or cooling coil
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4241,7 +4257,7 @@ LOGICAL found,OANode
      end if
      ! Calculate temp in a constant pressure drop element
      if (CompTypeNum == CompTypeNum_CPD .AND. CompName == Blank) then ! constant pressure element only
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
         else ! flow direction is tha opposite as input from node 2 to node 1
@@ -4472,7 +4488,7 @@ LOGICAL found,OANode
      ! Calculate duct moisture diffusion loss
      if (CompTypeNum == CompTypeNum_DWC .AND. CompName == Blank) then ! Duct component only
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4497,7 +4513,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_TMU) then ! Reheat unit: SINGLE DUCT:CONST VOLUME:REHEAT
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4516,7 +4532,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_COI) then ! heating or cooling coil
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4535,7 +4551,7 @@ LOGICAL found,OANode
      end if
      ! Calculate temp in a constant pressure drop component
      if (CompTypeNum == CompTypeNum_CPD .AND. CompName == Blank) then ! constant pressure element only
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
         else ! flow direction is tha opposite as input from node 2 to node 1
@@ -4758,7 +4774,7 @@ LOGICAL found,OANode
      ! Calculate duct moisture diffusion loss
      if (CompTypeNum == CompTypeNum_DWC .AND. CompName == Blank) then ! Duct component only
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4773,7 +4789,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_TMU) then ! Reheat unit: SINGLE DUCT:CONST VOLUME:REHEAT
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4788,7 +4804,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_COI) then ! heating or cooling coil
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -4800,7 +4816,7 @@ LOGICAL found,OANode
      end if
      ! Calculate temp in a constant pressure drop component
      if (CompTypeNum == CompTypeNum_CPD .AND. CompName == Blank) then ! constant pressure element only
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
         else ! flow direction is tha opposite as input from node 2 to node 1
@@ -4998,7 +5014,7 @@ LOGICAL found,OANode
      ! Calculate duct moisture diffusion loss
      if (CompTypeNum == CompTypeNum_DWC .AND. CompName == Blank) then ! Duct component only
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0.d0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -5013,7 +5029,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_TMU) then ! Reheat unit: SINGLE DUCT:CONST VOLUME:REHEAT
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -5028,7 +5044,7 @@ LOGICAL found,OANode
      end if
      if (CompTypeNum == CompTypeNum_COI) then ! heating or cooling coil
         TypeNum = AirflowNetworkCompData(CompNum)%TypeNum
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
            DirSign = 1.0d0
@@ -5040,7 +5056,7 @@ LOGICAL found,OANode
      end if
      ! Calculate temp in a constant pressure drop component
      if (CompTypeNum == CompTypeNum_CPD .AND. CompName == Blank) then ! constant pressure element only
-        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then! flow direction is tha same as input from node 1 to node 2
+        IF (AirflowNetworkLinkSimu(I)%FLOW .GT. 0) then ! flow direction is tha same as input from node 1 to node 2
            LF = AirflowNetworkLinkageData(i)%NodeNums(1)
            LT = AirflowNetworkLinkageData(i)%NodeNums(2)
         else ! flow direction is tha opposite as input from node 2 to node 1
@@ -7116,7 +7132,7 @@ SUBROUTINE HybridVentilationControl
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu
           !       DATE WRITTEN   Dec. 2006
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone hybrid ventilation managers
           !       RE-ENGINEERED  na
 
 
@@ -7134,7 +7150,8 @@ SUBROUTINE HybridVentilationControl
           ! USE STATEMENTS:
   USE InputProcessor, ONLY: SameString
   USE DataHVACGlobals, ONLY: NumHybridVentSysAvailMgrs,HybridVentSysAvailAirLoopNum,HybridVentSysAvailVentCtrl, &
-                             HybridVentSysAvailANCtrlStatus,HybridVentSysAvailMaster,HybridVentSysAvailWindModifier
+                             HybridVentSysAvailANCtrlStatus,HybridVentSysAvailMaster,HybridVentSysAvailWindModifier, &
+                             HybridVentSysAvailActualZoneNum
   USE DataZoneEquipment, ONLY: ZoneEquipConfig
 
 
@@ -7184,11 +7201,20 @@ SUBROUTINE HybridVentilationControl
       ControlType = GetCurrentScheduleValue(HybridVentSysAvailANCtrlStatus(SysAvailNum))
     End If
     Found = .FALSE.
+    ActualZoneNum = 0
     Do ControlledZoneNum=1,NumOfZones
       IF (.not. ZoneEquipConfig(ControlledZoneNum)%IsControlled) CYCLE
       ! Ensure all the zones served by this AirLoopHVAC to be controlled by the hybrid ventilation
-      If (AirLoopNum == ZoneEquipConfig(ControlledZoneNum)%AirLoopNum) Then
-        ActualZoneNum = ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum
+      If (AirLoopNum .GT. 0) THEN
+        If (AirLoopNum == ZoneEquipConfig(ControlledZoneNum)%AirLoopNum) Then
+          ActualZoneNum = ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum
+        End If
+      Else
+        If (HybridVentSysAvailActualZoneNum(SysAvailNum) == ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum) THEN
+          ActualZoneNum = HybridVentSysAvailActualZoneNum(SysAvailNum)
+        Endif
+      Endif
+      If (ActualZoneNum .GT. 0) Then
         Do ANSurfaceNum=1,AirflowNetworkNumOfSurfaces
           SurfNum = MultizoneSurfaceData(ANSurfaceNum)%SurfNum
           If (Surface(SurfNum)%Zone == ActualZoneNum) Then

@@ -745,10 +745,11 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
             SELECT CASE (cAlphaArgs(2))
                 CASE ('FLOOR','CEILING','MUNDTROOM','PLUME4','REESROOM1','REESROOM2','REESROOM3','REESROOM4')
                     ! terminate the program due to a severe error in the specified input
-                    CALL ShowSevereError('No surface names specified.  The air node named ' // &
-                                        TRIM(AirNode(AirNodeNum)%Name) // &
-                                        ' requires name of surfaces associated with it.')
-                    CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+                    CALL ShowSevereError('GetAirNodeData: '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                        '" invalid air node specification.')
+                    CALL ShowContinueError('Mundt Room Air Model: No surface names specified.  '//  &
+                           'Air node="' //TRIM(AirNode(AirNodeNum)%Name) // &
+                           ' requires name of surfaces associated with it.')
                     ErrorsFound=.true.
                 CASE DEFAULT
             END SELECT
@@ -762,10 +763,11 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
             ! and assign .FALSE. to 'SurfNeeded'
             SELECT CASE (cAlphaArgs(2))
                 CASE ('INLET','CONTROL','RETURN','PLUME1','PLUME2','PLUME3')
-                    CALL ShowWarningError('No surface names needed.  The air node named ' // &
-                                        TRIM(AirNode(AirNodeNum)%Name) // &
-                                        ' does not relate to any surfaces.')
-                    CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+                    CALL ShowWarningError('GetAirNodeData: '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+                       '" invalid linkage' )
+                    CALL ShowContinueError('Mundt Room Air Model: No surface names needed.  '//  &
+                       'Air node="' //TRIM(AirNode(AirNodeNum)%Name) // &
+                      ' does not relate to any surfaces.')
                     SurfNeeded = .FALSE.
                 CASE DEFAULT
             END SELECT
@@ -779,8 +781,9 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
 
               ! terminate the program due to a severe error in the specified input
               IF ((NumSurfsInvolved).GT.NumOfSurfs) THEN
-                CALL ShowFatalError('Number of surfaces connected to ' // TRIM(AirNode(AirNodeNum)%Name) // &
-                                    ' is greater than number of surfaces in ' // TRIM(Zone(ZoneNum)%Name))
+                CALL ShowFatalError('GetAirNodeData: Mundt Room Air Model: Number of surfaces connected to ' //  &
+                   TRIM(AirNode(AirNodeNum)%Name) // &
+                   ' is greater than number of surfaces in ' // TRIM(Zone(ZoneNum)%Name))
                 RETURN
               END IF
 
@@ -798,8 +801,9 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
 
               ! report warning error since surface names are specified correctly
               IF ((NumSurfsInvolved).NE.SurfCount) THEN
-                CALL ShowWarningError('Some surface names specified for ' // TRIM(AirNode(AirNodeNum)%Name) // &
-                                      ' are not in ' // TRIM(Zone(ZoneNum)%Name))
+                CALL ShowWarningError('GetAirNodeData: Mundt Room Air Model: Some surface names specified for ' //  &
+                   TRIM(AirNode(AirNodeNum)%Name) // &
+                   ' are not in ' // TRIM(Zone(ZoneNum)%Name))
               END IF
 
             END IF

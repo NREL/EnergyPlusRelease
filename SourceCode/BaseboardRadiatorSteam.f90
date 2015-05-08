@@ -146,8 +146,9 @@ CONTAINS
     USE InputProcessor,        ONLY: FindItemInList,MakeUPPERCase
     USE General,               ONLY: TrimSigDigits
     USE ScheduleManager,       ONLY: GetCurrentScheduleValue
-    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand
+    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
     USE DataInterfaces,        ONLY: ControlCompOutput
+    USE PlantUtilities,        ONLY: SetComponentFlowRate
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -174,6 +175,7 @@ CONTAINS
     REAL(r64)    :: QZnReq                 ! zone load not yet satisfied
     REAL(r64)    :: MaxSteamFlow
     REAL(r64)    :: MinSteamFlow
+    REAL(r64)    :: mdot = 0.d0
 
     IF (GetInputFlag) THEN
       CALL GetSteamBaseboardInput
@@ -212,39 +214,56 @@ CONTAINS
 
       QZnReq = ZoneSysEnergyDemand(ActualZoneNum)%RemainingOutputReqToHeatSP
 
-         ! On the first HVAC iteration the system values are given to the controller, but after that
-         ! the demand limits are in place and there needs to be feedback to the Zone Equipment
-      If(FirstHVACIteration)Then
-         MaxSteamFlow = SteamBaseboard(BaseboardNum)%SteamMassFlowRateMax
-         MinSteamFlow = 0.0
-      Else
-         MaxSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMaxAvail
-         MinSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMinAvail
+      IF (QZnReq > SmallLoad &
+          .AND. .NOT. CurDeadbandOrSetback(ActualZoneNum) &
+          .AND. (GetCurrentScheduleValue(SteamBaseboard(BaseboardNum)%SchedPtr) > 0.0) ) THEN
+
+           ! On the first HVAC iteration the system values are given to the controller, but after that
+           ! the demand limits are in place and there needs to be feedback to the Zone Equipment
+        If(FirstHVACIteration)Then
+           MaxSteamFlow = SteamBaseboard(BaseboardNum)%SteamMassFlowRateMax
+           MinSteamFlow = 0.0
+        Else
+           MaxSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMaxAvail
+           MinSteamFlow = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRateMinAvail
+        ENDIF
+
+        SELECT CASE (SteamBaseboard(BaseboardNum)%EquipType)
+
+          CASE (TypeOf_Baseboard_Rad_Conv_Steam)  ! 'ZoneHVAC:Baseboard:RadiantConvective:Steam'
+            CALL ControlCompOutput(CompName=SteamBaseBoard(BaseboardNum)%EquipID,CompType=cCMO_BBRadiator_Steam, &
+                                   CompNum=BaseboardNum, &
+                                   FirstHVACIteration=FirstHVACIteration,QZnReq=QZnReq, &
+                                   ActuatedNode=SteamBaseboard(BaseboardNum)%SteamInletNode, &
+                                   MaxFlow=MaxSteamFlow,MinFlow=MinSteamFlow, &
+                                   ControlOffset=SteamBaseboard(BaseboardNum)%Offset, &
+                                   ControlCompTypeNum=SteamBaseboard(BaseboardNum)%ControlCompTypeNum, &
+                                   CompErrIndex=SteamBaseboard(BaseboardNum)%CompErrIndex, &
+                                   LoopNum = SteamBaseboard(BaseboardNum)%LoopNum, &
+                                   LoopSide = SteamBaseboard(BaseboardNum)%LoopSideNum, &
+                                   BranchIndex = SteamBaseboard(BaseboardNum)%BranchNum)
+          CASE DEFAULT
+            CALL ShowSevereError('SimSteamBaseboard: Errors in Baseboard='//TRIM(SteamBaseboard(BaseboardNum)%EquipID))
+            CALL ShowContinueError('Invalid or unimplemented equipment type='//  &
+                TRIM(TrimSigDigits(SteamBaseboard(BaseboardNum)%EquipType)))
+            CALL ShowFatalError('Preceding condition causes termination.')
+
+        END SELECT
+
+        PowerMet = SteamBaseboard(BaseboardNum)%TotPower
+      ELSE 
+      ! baseboard is off, don't bother going into ControlCompOutput
+        mdot = 0.d0
+        CALL SetComponentFlowRate(mdot, &
+                                   SteamBaseboard(BaseboardNum)%SteamInletNode, &
+                                   SteamBaseboard(BaseboardNum)%SteamOutletNode, &
+                                   SteamBaseboard(BaseboardNum)%LoopNum, &
+                                   SteamBaseboard(BaseboardNum)%LoopSideNum, &
+                                   SteamBaseboard(BaseboardNum)%BranchNum, &
+                                   SteamBaseboard(BaseboardNum)%CompNum )
+        CALL CalcSteamBaseboard(BaseboardNum, PowerMet)
+
       ENDIF
-
-      SELECT CASE (SteamBaseboard(BaseboardNum)%EquipType)
-
-        CASE (TypeOf_Baseboard_Rad_Conv_Steam)  ! 'ZoneHVAC:Baseboard:RadiantConvective:Steam'
-          CALL ControlCompOutput(CompName=SteamBaseBoard(BaseboardNum)%EquipID,CompType=cCMO_BBRadiator_Steam, &
-                                 CompNum=BaseboardNum, &
-                                 FirstHVACIteration=FirstHVACIteration,QZnReq=QZnReq, &
-                                 ActuatedNode=SteamBaseboard(BaseboardNum)%SteamInletNode, &
-                                 MaxFlow=MaxSteamFlow,MinFlow=MinSteamFlow, &
-                                 ControlOffset=SteamBaseboard(BaseboardNum)%Offset, &
-                                 ControlCompTypeNum=SteamBaseboard(BaseboardNum)%ControlCompTypeNum, &
-                                 CompErrIndex=SteamBaseboard(BaseboardNum)%CompErrIndex, &
-                                 LoopNum = SteamBaseboard(BaseboardNum)%LoopNum, &
-                                 LoopSide = SteamBaseboard(BaseboardNum)%LoopSideNum, &
-                                 BranchIndex = SteamBaseboard(BaseboardNum)%BranchNum)
-        CASE DEFAULT
-          CALL ShowSevereError('SimSteamBaseboard: Errors in Baseboard='//TRIM(SteamBaseboard(BaseboardNum)%EquipID))
-          CALL ShowContinueError('Invalid or unimplemented equipment type='//  &
-              TRIM(TrimSigDigits(SteamBaseboard(BaseboardNum)%EquipType)))
-          CALL ShowFatalError('Preceding condition causes termination.')
-
-      END SELECT
-
-      PowerMet = SteamBaseboard(BaseboardNum)%TotPower
 
       CALL UpdateSteamBaseboard(BaseboardNum)
 
@@ -872,9 +891,11 @@ END SUBROUTINE SizeSteamBaseboard
 
           ! USE STATEMENTS:
     USE ScheduleManager,       ONLY: GetCurrentScheduleValue
-    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, DeadbandOrSetback
+    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
     USE FluidProperties,       ONLY: GetSatEnthalpyRefrig, GetSatDensityRefrig, GetSatSpecificHeatRefrig
     USE DataInterfaces, ONLY: CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
+    USE DataHVACGlobals, ONLY: SmallLoad
+    USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
 
     IMPLICIT NONE
 
@@ -911,29 +932,29 @@ END SUBROUTINE SizeSteamBaseboard
     SteamMassFlowRate = Node(SteamBaseboard(BaseboardNum)%SteamInletNode)%MassFlowRate
     SubCoolDeltaT     = SteamBaseboard(BaseboardNum)%DegOfSubCooling
 
-    IF (QZnReq > 0.0d0 &
-        .AND. .NOT. DeadbandOrSetback(ZoneNum) &
+    IF (QZnReq > SmallLoad &
+        .AND. .NOT. CurDeadbandOrSetback(ZoneNum) &
         .AND. SteamMassFlowRate > 0.0d0 &
         .AND. GetCurrentScheduleValue(SteamBaseboard(BaseboardNum)%SchedPtr) > 0) THEN
        ! Unit is on
-    EnthSteamInDry  = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,1.0d0, &
-                      SteamBaseboard(BaseboardNum)%FluidIndex,'CalcSteamBaseboard')
-    EnthSteamOutWet = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,0.0d0, &
-                      SteamBaseboard(BaseboardNum)%FluidIndex,'CalcSteamBaseboard')
-    LatentHeatSteam = EnthSteamInDry-EnthSteamOutWet
-    Cp = GetSatSpecificHeatRefrig('STEAM',SteamInletTemp,0.0d0,SteamBaseboard(BaseboardNum)%FluidIndex, &
-                                  'CalcSteamBaseboard')
-    SteamBBHeat = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaT*Cp) ! Baseboard heating rate
-    SteamOutletTemp = SteamInletTemp - SubCoolDeltaT ! Outlet temperature of steam
+      EnthSteamInDry  = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,1.0d0, &
+                        SteamBaseboard(BaseboardNum)%FluidIndex,'CalcSteamBaseboard')
+      EnthSteamOutWet = GetSatEnthalpyRefrig('STEAM',SteamInletTemp,0.0d0, &
+                        SteamBaseboard(BaseboardNum)%FluidIndex,'CalcSteamBaseboard')
+      LatentHeatSteam = EnthSteamInDry-EnthSteamOutWet
+      Cp = GetSatSpecificHeatRefrig('STEAM',SteamInletTemp,0.0d0,SteamBaseboard(BaseboardNum)%FluidIndex, &
+                                    'CalcSteamBaseboard')
+      SteamBBHeat = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaT*Cp) ! Baseboard heating rate
+      SteamOutletTemp = SteamInletTemp - SubCoolDeltaT ! Outlet temperature of steam
         ! Estimate radiant heat addition
-    RadHeat = SteamBBHeat * SteamBaseboard(BaseboardNum)%FracRadiant ! Radiant heating rate
-    QBBSteamRadSource(BaseboardNum) = RadHeat ! Radiant heat source which will be distributed to surfaces and people
+      RadHeat = SteamBBHeat * SteamBaseboard(BaseboardNum)%FracRadiant ! Radiant heating rate
+      QBBSteamRadSource(BaseboardNum) = RadHeat ! Radiant heat source which will be distributed to surfaces and people
 
        ! Now, distribute the radiant energy of all systems to the appropriate surfaces, to people, and the air
-    CALL DistributeBBSteamRadGains
+      CALL DistributeBBSteamRadGains
        ! Now "simulate" the system by recalculating the heat balances
-    CALL CalcHeatBalanceOutsideSurf(ZoneNum)
-    CALL CalcHeatBalanceInsideSurf(ZoneNum)
+      CALL CalcHeatBalanceOutsideSurf(ZoneNum)
+      CALL CalcHeatBalanceInsideSurf(ZoneNum)
 
         ! Here an assumption is made regarding radiant heat transfer to people.
         ! While the radiant heat transfer to people array will be used by the thermal comfort
@@ -945,12 +966,12 @@ END SUBROUTINE SizeSteamBaseboard
         ! should include this.
 
         ! Actual system load that the unit should meet
-    LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
-              + (SteamBBHeat * SteamBaseboard(BaseboardNum)%FracConvect) &
-              + (RadHeat * SteamBaseboard(BaseboardNum)%FracDistribPerson)
-    SteamBaseboard(BaseboardNum)%SteamOutletEnthalpy = SteamBaseboard(BaseboardNum)%SteamInletEnthalpy &
-                                                        - SteamBBHeat / SteamMassFlowRate
-    SteamBaseboard(BaseboardNum)%SteamOutletQuality  = 0.0d0
+      LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
+                + (SteamBBHeat * SteamBaseboard(BaseboardNum)%FracConvect) &
+                + (RadHeat * SteamBaseboard(BaseboardNum)%FracDistribPerson)
+      SteamBaseboard(BaseboardNum)%SteamOutletEnthalpy = SteamBaseboard(BaseboardNum)%SteamInletEnthalpy &
+                                                          - SteamBBHeat / SteamMassFlowRate
+      SteamBaseboard(BaseboardNum)%SteamOutletQuality  = 0.0d0
     ELSE
       SteamOutletTemp   = SteamInletTemp
       SteamBBHeat       = 0.0d0

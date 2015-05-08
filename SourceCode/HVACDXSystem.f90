@@ -355,6 +355,7 @@ SUBROUTINE GetDXCoolingSystemInput
     USE BranchNodeConnections, ONLY: SetUpCompSets, TestCompSet
     USE HVACHXAssistedCoolingCoil,  ONLY: GetHXDXCoilName
     USE DataIPShortCuts
+    USE DXCoils,               ONLY: SetCoilSystemCoolingData
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -565,6 +566,11 @@ SUBROUTINE GetDXCoolingSystemInput
           CALL ShowContinueError('In '//TRIM(CurrentModuleObject)//'="'//TRIM(DXCoolingSystem(DXCoolSysNum)%Name)//'".')
           CALL ShowContinueError('Must be Yes or No.')
         END IF
+
+        IF (DXCoolingSystem(DXCoolSysNum)%CoolingCoilType_Num == CoilDX_CoolingTwoSpeed) THEN
+          CALL SetCoilSystemCoolingData(DXCoolingSystem(DXCoolSysNum)%CoolingCoilName, &
+                                        DXCoolingSystem(DXCoolSysNum)%Name )
+        ENDIF
 
       END DO  !End of the DX System Loop
 
@@ -883,6 +889,8 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
     ! still runs to meet the sensible load. Multimode applies to Multimode or HXAssistedCooling coils.
     IF ((SensibleLoad .and. DXCoolingSystem(DXSystemNum)%RunOnSensibleLoad) .OR. &
         (LatentLoad .and. DXCoolingSystem(DXSystemNum)%RunOnLatentLoad)) THEN
+      ! calculate sensible PLR, don't care if latent is true here but need to gaurd for 
+      ! when LatentLoad=TRUE and SensibleLoad=FALSE
       SELECT CASE(DXCoolingSystem(DXSystemNum)%CoolingCoilType_Num)
 
         CASE (CoilDX_CoolingSingleSpeed)  ! COIL:DX:COOLINGBYPASSFACTOREMPIRICAL
@@ -1422,7 +1430,7 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
 !         SUBROUTINE SimDXCoilMultiSpeed(CompName,SpeedRatio,CycRatio,CompIndex,SpeedNum,FanMode,CompOp)
           CALL SimDXCoilMultiSpeed(CompName,0.0d0,1.0d0,DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
           OutletTempLS = DXCoilOutletTemp(DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
-          IF (OutletTempLS > DesOutTemp) THEN
+          IF (OutletTempLS > DesOutTemp .AND. SensibleLoad) THEN
             CycRatio = 1.0
             CALL SimDXCoilMultiSpeed(CompName,1.0d0,1.0d0,DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
             OutletTempHS = DXCoilOutletTemp(DXCoolingSystem(DXSystemNum)%CoolingCoilIndex)
@@ -1456,7 +1464,7 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
             ELSE
               SpeedRatio = 1.0
             END IF
-          ELSE
+          ELSE IF(SensibleLoad)THEN
             SpeedRatio = 0.0
             Par(1) = REAL(DXCoolingSystem(DXSystemNum)%CoolingCoilIndex,r64)
             Par(2) = DesOutTemp
@@ -1478,12 +1486,17 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
                     ' sensible cycling ratio error continues. Sensible cycling ratio statistics follow.' &
                     ,DXCoolingSystem(DXSystemNum)%MSpdCycSensPLRIterIndex,CycRatio,CycRatio)
               END IF
-            ELSE IF (SolFla == -2) THEN
+            ELSE IF (SolFla == -2) THEN ! should never get here, if it does logic above to protect from this
               IF(.NOT. WarmupFlag) &
                 CALL ShowFatalError(TRIM(DXCoolingSystem(DXSystemNum)%DXCoolingSystemType)// &
                                     ' - cycling ratio calculation failed: cycling limits exceeded, for unit='// &
                                     TRIM(DXCoolingSystem(DXSystemNum)%Name))
             END IF
+          ELSE
+            PartLoadFrac = 0.0
+            SpeedRatio = 0.0
+            CycRatio = 0.0
+            DehumidMode  = 0
           END IF
 
           IF (DXCoolingSystem(DXSystemNum)%DehumidControlType .EQ. DehumidControl_CoolReheat) THEN
@@ -1559,7 +1572,7 @@ SUBROUTINE ControlDXSystem(DXSystemNum, FirstHVACIteration, HXUnitOn)
                         ' latent cycling ratio error continues. Latent cycling ratio statistics follow.' &
                         ,DXCoolingSystem(DXSystemNum)%MSpdCycLatPLRIterIndex,CycRatio,CycRatio)
                   END IF
-                ELSE IF (SolFla == -2) THEN
+                ELSE IF (SolFla == -2) THEN ! should never get here, if it does logic above to protect from this
                   IF(.NOT. WarmupFlag) &
                     CALL ShowFatalError(TRIM(DXCoolingSystem(DXSystemNum)%DXCoolingSystemType)//' - cycling ratio' // &
                                         ' calculation failed: cycling limits exceeded, for unit='// &

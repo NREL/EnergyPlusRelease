@@ -850,7 +850,7 @@ SUBROUTINE GetInternalHeatGainsInput
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
           CALL SetupOutputVariable('Zone People Total Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Total Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGain, &
+          CALL SetupOutputVariable('Zone People Total Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
         ENDIF
 
@@ -3706,7 +3706,7 @@ SUBROUTINE ReportInternalHeatGains
         !for tabular report, accumlate the total electricity used for each Light object
         Lights(Loop)%SumConsumption = Lights(Loop)%SumConsumption + Lights(Loop)%Consumption
         !for tabular report, accumulate the time when each Light has consumption (using a very small threshold instead of zero)
-        IF (Lights(Loop)%Consumption > 0.01) THEN
+        IF (Lights(Loop)%Power > 0.01d0 * Lights(Loop)%DesignLevel) THEN
           Lights(Loop)%SumTimeNotZeroCons = Lights(Loop)%SumTimeNotZeroCons + TimeStepZone
         END IF
       ENDIF
@@ -4128,7 +4128,7 @@ SUBROUTINE UpdateInternalGainValues(SuppressRadiationUpdate, SumLatentGains)
     ENDIF
   ENDDO
 
-  If (Contaminant%GenericContamSimulation .AND. ALLOCATED(ZoneGCGain)) Then 
+  If (Contaminant%GenericContamSimulation .AND. ALLOCATED(ZoneGCGain)) Then
     DO NZ = 1, NumOfZones
       CALL SumAllInternalGenericContamGains(NZ, ZoneGCGain(NZ) )
       ZnRpt(NZ)%GCRate = ZoneGCGain(NZ)

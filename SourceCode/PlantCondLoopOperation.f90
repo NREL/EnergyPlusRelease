@@ -238,11 +238,12 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
       RangeLoLimit=PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListPtr)%RangeLowerLimit
       !these limits are stored with absolute values, but the LoopDemand can be negative for cooling
       TestRangeVariable = ABS(RangeVariable)
-      
+
       !trying to do something where the last stage still runs the equipment but at the hi limit.
-      
+
       IF (TestRangeVariable <  RangeLoLimit .OR. TestRangeVariable >  RangeHiLimit) THEN
-        IF ((TestRangeVariable >  RangeHiLimit) .AND. ListPtr == (PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipListNumForLastStage)) THEN
+        IF ((TestRangeVariable >  RangeHiLimit) .AND.   &
+             ListPtr == (PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipListNumForLastStage)) THEN
           ! let this go thru, later AdjustChangeInLoadForLastStageUpperRangeLimit will cap dispatch to RangeHiLimit
           CurListNum = ListNum
           EXIT
@@ -1957,6 +1958,7 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
         ChangeInLoad = MAX(0.0d0, ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
         RemLoopDemand = RemLoopDemand- SIGN(ChangeInLoad, RemLoopDemand)
+        IF (ABS(RemLoopDemand) < SmallLoad) RemLoopDemand = 0.d0
       END DO
 
             ! step 2: If RemLoopDemand is not zero, then distribute remainder sequentially.
@@ -1966,13 +1968,13 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
           CompNum     =  PlantLoop(LoopNum)%OpScheme(CurSchemePtr)%EquipList(ListPtr)%Comp(CompIndex)%CompNumPtr
           IF(.NOT. PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Available)CYCLE
            ChangeInLoad = MIN(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Maxload - &
-                              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload, &
+                              ABS(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload), &
                               ABS(RemLoopDemand))
            ChangeInLoad = MAX(0.0d0, ChangeInLoad)
            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = &
            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload + SIGN(ChangeInLoad, RemLoopDemand)
            RemLoopDemand= RemLoopDemand - SIGN(ChangeInLoad,RemLoopDemand)
-           IF (ABS(RemLoopDemand) < SmallLoad .AND. ABS(RemLoopDemand) > 0.0 )EXIT
+           IF (ABS(RemLoopDemand) < SmallLoad ) RemLoopDemand = 0.d0
         END DO
       END IF
     END SELECT
@@ -2019,7 +2021,7 @@ SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurOpSchemePtr
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)      :: LoopNum         ! component topology
-  INTEGER, INTENT(IN)      :: CurOpSchemePtr  ! currect active operation scheme 
+  INTEGER, INTENT(IN)      :: CurOpSchemePtr  ! currect active operation scheme
   INTEGER, INTENT(IN)      :: CurEquipListPtr ! current equipment list
   REAL(r64), INTENT(INOUT) :: ChangeInLoad    ! positive magnitude of load change
 
@@ -2034,9 +2036,9 @@ SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurOpSchemePtr
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)  :: RangeHiLimit
-          
+
   IF (PlantLoop(LoopNum)%OpScheme(CurOpSchemePtr)%EquipListNumForLastStage == CurEquipListPtr) THEN ! at final last stage
-    
+
     RangeHiLimit = PlantLoop(LoopNum)%OpScheme(CurOpSchemePtr)%EquipList(CurEquipListPtr)%RangeUpperLimit
     ChangeInLoad = MIN(ChangeInLoad, RangeHiLimit)
   ENDIF

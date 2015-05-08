@@ -222,7 +222,7 @@ SUBROUTINE SimPipingSystemCircuit(EquipName, EqNum, FirstHVACIteration, InitLoop
     INTEGER :: CircuitNum
     INTEGER :: DomainNum
     INTEGER :: NumOfPipeCircuits
-
+    
     !Read input if necessary
     IF (GetInputFlag) THEN
         CALL GetPipingSystemsInput()
@@ -1091,25 +1091,33 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
 
     END IF
 
+    !The time init should be done here before we DoOneTimeInits because the DoOneTimeInits
+    ! includes a ground temperature initialization, which is based on the Cur%CurSimTimeSeconds variable
+    ! which would be carried over from the previous environment
+    PipingSystemDomains(DomainNum)%Cur%CurSimTimeStepSize = TimeStepSys*SecInHour
+    PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds =   (dayofSim - 1) * 24           &
+                                                           + (hourofday - 1)               &
+                                                           + (timestep - 1) * timestepZone &
+                                                           + SysTimeElapsed
+    
     !There are also some inits that are "close to one time" inits...(one-time in standalone, each envrn in E+)
     IF(     (BeginSimFlag   .AND. PipingSystemDomains(DomainNum)%BeginSimInit) &
        .OR. (BeginEnvrnFlag .AND. PipingSystemDomains(DomainNum)%BeginSimEnvrn)) THEN
 
-        CALL DoOneTimeInitializations(DomainNum, CircuitNum)
+        ! this seemed to clean up a lot of reverse DD stuff because fluid thermal properties were
+        ! being based on the inlet temperature, which wasn't updated until later
+        InletNodeNum = PipingSystemCircuits(CircuitNum)%InletNodeNum
+        PipingSystemCircuits(CircuitNum)%CurCircuitInletTemp = Node(InletNodeNum)%Temp
+        PipingSystemCircuits(CircuitNum)%InletTemperature = PipingSystemCircuits(CircuitNum)%CurCircuitInletTemp 
 
+        CALL DoOneTimeInitializations(DomainNum, CircuitNum)
+                
         PipingSystemDomains(DomainNum)%BeginSimInit = .FALSE.
         PipingSystemDomains(DomainNum)%BeginSimEnvrn = .FALSE.
 
     END IF
     IF (.NOT. BeginSimFlag) PipingSystemDomains(DomainNum)%BeginSimInit = .TRUE.
     IF (.NOT. BeginEnvrnFlag) PipingSystemDomains(DomainNum)%BeginSimEnvrn = .TRUE.
-
-    !All time inits here
-    PipingSystemDomains(DomainNum)%Cur%CurSimTimeStepSize = TimeStepSys*SecInHour
-    PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds =   (dayofSim - 1) * 24           &
-                                                           + (hourofday - 1)               &
-                                                           + (timestep - 1) * timestepZone &
-                                                           + SysTimeElapsed
 
     !Shift history arrays only if necessary
     IF(ABS(PipingSystemDomains(DomainNum)%Cur%CurSimTimeSeconds-PipingSystemDomains(DomainNum)%Cur%PrevSimTimeSeconds)>1.0E-6)THEN
@@ -4322,7 +4330,6 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     REAL(r64) :: QRAD_A
     REAL(r64) :: QRAD_SO
     REAL(r64) :: Ratio_SO
-    REAL(r64), SAVE :: Last_Ratio_SO
     REAL(r64) :: IncidentSolar_MJhrmin
     REAL(r64) :: AbsorbedIncidentSolar_MJhrmin
     REAL(r64) :: VaporPressureSaturated_kPa
@@ -4450,8 +4457,8 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
 
     !For HOUR_INADAY-0.5 not HOUR_INADAY+0.5, as HOUR_INADAY from 0 to 1, it shows 1 not zero here.
     !Lz longitude of the centre of the local time zone [degrees west of Greenwich].
-    ! For example, Lz = 75, 90, 105 and 120Â° for the Eastern, Central, Rocky Mountain and Pacific time zones (United States)
-    !and Lz = 0Â° for Greenwich, 330Â° for Cairo (Egypt), and 255Â° for Bangkok (Thailand),
+    ! For example, Lz = 75, 90, 105 and 120° for the Eastern, Central, Rocky Mountain and Pacific time zones (United States)
+    !and Lz = 0° for Greenwich, 330° for Cairo (Egypt), and 255° for Bangkok (Thailand),
 
     ! Calculate sunset something, and constrain to a minimum of 0.000001
     X_sunset = 1.0d0 - TAN(Latitude_Radians)**2.0d0 * TAN(Declination)**2.0d0
@@ -4488,9 +4495,8 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
 
     ! Correct the Qrad term ... better way??
     IF (IncidentSolar_MJhrmin .LT. 0.01d0) THEN
-        Ratio_SO = LAST_RATIO_SO
+        Ratio_SO = 0.0d0
     ELSE
-
         IF(QRAD_SO /= 0.d0)THEN
           Ratio_SO = IncidentSolar_MJhrmin / QRAD_SO
         ELSE
@@ -4503,10 +4509,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     ! Constrain Ratio_SO
     Ratio_SO = MIN(Ratio_SO, 1.0d0)
     Ratio_SO = MAX(Ratio_SO, 0.3d0)
-
-    ! Store the previous
-    LAST_RATIO_SO=Ratio_SO
-
+    
     ! Calculate another Q term, [MJ/hr-min]
     AbsorbedIncidentSolar_MJhrmin = ABSOR_CORRECTED * IncidentSolar_MJhrmin
 
@@ -4555,7 +4558,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     EvapotransFluidLoss_mhr = EvapotransFluidLoss_mmhr / 1000.0d0
 
     ! Calculate latent heat, [MJ/kg]
-    ! Full formulation is cubic: L(T) = âˆ’0.0000614342 * T**3 + 0.00158927 * T**2 âˆ’ 2.36418 * T + 2500.79[5]
+    ! Full formulation is cubic: L(T) = -0.0000614342 * T**3 + 0.00158927 * T**2 - 2.36418 * T + 2500.79[5]
     ! In: Cubic fit to Table 2.1,p.16, Textbook: R.R.Rogers & M.K. Yau, A Short Course in Cloud Physics, 3e,(1989), Pergamon press
     ! But a linear relation should suffice;
     ! note-for now using the previous time step temperature as an approximation to help ensure stability

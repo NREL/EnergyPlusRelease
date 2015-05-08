@@ -623,10 +623,13 @@ SUBROUTINE InitializeIndexes
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
+    result = SQLiteExecuteCommandMacro('CREATE INDEX rvdTI ON ReportVariableData (TimeIndex ASC);')
     result = SQLiteExecuteCommandMacro('CREATE INDEX rvdDI ON ReportVariableData (ReportVariableDataDictionaryIndex ASC);')
+    result = SQLiteExecuteCommandMacro('CREATE INDEX rmdTI ON ReportMeterData (TimeIndex ASC);')
     result = SQLiteExecuteCommandMacro('CREATE INDEX rmdDI ON ReportMeterData (ReportMeterDataDictionaryIndex ASC);')
     result = SQLiteExecuteCommandMacro('CREATE INDEX tiTI ON Time (TimeIndex ASC);')
-
+    result = SQLiteExecuteCommandMacro('CREATE INDEX dmhdHRI ON DaylightMapHourlyData (HourlyReportIndex ASC);')
+    
 END SUBROUTINE InitializeIndexes
 
 SUBROUTINE InitializeSimulationsTable
@@ -2319,7 +2322,8 @@ SUBROUTINE InitializeNominalLightingTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro ('CREATE TABLE NominalLighting (NominalLightingIndex INTEGER, ObjectName TEXT, ' &
+    result = SQLiteExecuteCommandMacro ('CREATE TABLE NominalLighting (NominalLightingIndex INTEGER PRIMARY KEY, ' &
+        //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, DesignLevel REAL, FractionReturnAir REAL, FractionRadiant REAL, ' &
         //'FractionShortWave REAL, FractionReplaceable REAL, FractionConvected REAL, EndUseSubcategory TEXT);')
 
@@ -2426,7 +2430,7 @@ SUBROUTINE InitializeNominalPeopleTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalPeople (NominalPeopleIndex INTEGER, '  &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalPeople (NominalPeopleIndex INTEGER PRIMARY KEY, '  &
         //'ObjectName TEXT, ZoneIndex INTEGER,' &
         //'NumberOfPeople INTEGER, NumberOfPeopleScheduleIndex INTEGER, ActivityScheduleIndex INTEGER, FractionRadiant REAL, ' &
         //'FractionConvected REAL, WorkEfficiencyScheduleIndex INTEGER, ClothingEfficiencyScheduleIndex INTEGER, ' &
@@ -2550,7 +2554,8 @@ SUBROUTINE InitializeNominalElectricEquipmentTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalElectricEquipment (NominalElectricEquipmentIndex INTEGER, ' &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalElectricEquipment (' &
+        //'NominalElectricEquipmentIndex INTEGER PRIMARY KEY, ' &
         //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, DesignLevel REAL, ' &
         //'FractionLatent REAL, FractionRadiant REAL, FractionLost REAL, ' &
@@ -2660,7 +2665,8 @@ SUBROUTINE InitializeNominalGasEquipmentTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalGasEquipment(NominalGasEquipmentIndex INTEGER, ObjectName TEXT, ' &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalGasEquipment(NominalGasEquipmentIndex INTEGER PRIMARY KEY, ' &
+        //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, ' &
         //'DesignLevel REAL, FractionLatent REAL, FractionRadiant REAL, FractionLost REAL, ' &
         //'FractionConvected REAL, EndUseSubcategory TEXT);')
@@ -2770,7 +2776,8 @@ SUBROUTINE InitializeNominalSteamEquipmentTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalSteamEquipment(NominalSteamEquipmentIndex INTEGER, ObjectName TEXT, ' &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalSteamEquipment(NominalSteamEquipmentIndex INTEGER PRIMARY KEY, ' &
+        //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, DesignLevel REAL, ' &
         //'FractionLatent REAL, FractionRadiant REAL, FractionLost REAL, ' &
         //'FractionConvected REAL, EndUseSubcategory TEXT);')
@@ -2879,7 +2886,8 @@ SUBROUTINE InitializeNominalHotWaterEquipmentTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalHotWaterEquipment(NominalHotWaterEquipmentIndex INTEGER, ' &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalHotWaterEquipment(' &
+        //'NominalHotWaterEquipmentIndex INTEGER PRIMARY KEY, ' &
         //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, SchedNo INTEGER, DesignLevel REAL, FractionLatent REAL, FractionRadiant REAL, FractionLost REAL, ' &
         //'FractionConvected REAL, EndUseSubcategory TEXT);')
@@ -2989,7 +2997,8 @@ SUBROUTINE InitializeNominalOtherEquipmentTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro ('CREATE TABLE NominalOtherEquipment(NominalOtherEquipmentIndex INTEGER, ObjectName TEXT, ' &
+    result = SQLiteExecuteCommandMacro ('CREATE TABLE NominalOtherEquipment(NominalOtherEquipmentIndex INTEGER PRIMARY KEY, '&
+        //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, DesignLevel REAL, FractionLatent REAL, ' &
         //'FractionRadiant REAL, FractionLost REAL, ' &
         //'FractionConvected REAL, EndUseSubcategory TEXT);')
@@ -3099,7 +3108,7 @@ SUBROUTINE InitializeNominalBaseboardHeatTable
     ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: result
 
-    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalBaseboardHeaters (NominalBaseboardHeaterIndex INTEGER, ' &
+    result = SQLiteExecuteCommandMacro('CREATE TABLE NominalBaseboardHeaters (NominalBaseboardHeaterIndex INTEGER PRIMARY KEY, ' &
         //'ObjectName TEXT, ' &
         //'ZoneIndex INTEGER, ScheduleIndex INTEGER, CapatLowTemperature REAL, LowTemperature REAL, CapatHighTemperature REAL, ' &
         //'HighTemperature REAL, FractionRadiant REAL, FractionConvected REAL, EndUseSubcategory TEXT);')
@@ -5502,7 +5511,7 @@ FUNCTION StorageType(storageTypeIndex) RESULT (name)
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
     ! FUNCTION ARGUMENT DEFINITIONS:
-    INTEGER, INTENT(IN) :: storageTypeIndex  ! storage type index (1 = Sum, 2 = Avg)
+    INTEGER, INTENT(IN) :: storageTypeIndex  ! storage type index (1 = Avg, 2 = Sum)
     CHARACTER(len=100)  :: name
 
     ! FUNCTION PARAMETER DEFINITIONS:
@@ -5520,10 +5529,10 @@ FUNCTION StorageType(storageTypeIndex) RESULT (name)
     SELECT CASE (storageTypeIndex)
 
         CASE(1)
-            name = 'Sum'
+            name = 'Avg'
 
         CASE(2)
-            name = 'Avg'
+            name = 'Sum'
 
         CASE DEFAULT
             name = 'Unknown!!!'

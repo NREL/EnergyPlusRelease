@@ -893,7 +893,7 @@ CONTAINS
           ! SUBROUTINE INFORMATION:
           !   AUTHOR         Rahul Chillar
           !   DATE WRITTEN   Jan 2005
-          !   MODIFIED       na
+          !   MODIFIED       Sept. 2012, B. Griffith, add calls to SetComponentFlowRate for plant interactions
           !   RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -911,6 +911,7 @@ CONTAINS
 
           ! USE STATEMENTS:
    USE DataHVACGlobals, ONLY: TempControlTol
+   USE PlantUtilities,  ONLY: SetComponentFlowRate
 
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1027,11 +1028,16 @@ CONTAINS
           ! Steam Mass Flow Rate Required
           SteamMassFlowRate=QCoilCap/(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
 
-!          IF(SteamMassFlowRate.GT. Node((SteamCoil(CoilNum)%SteamInletNodeNum))%MassFlowRateMaxAvail)Then
-          IF(SteamMassFlowRate.GT.(SteamCoil(CoilNum)%InletSteamMassFlowRate))Then
-              SteamMassFlowRate=SteamCoil(CoilNum)%InletSteamMassFlowRate
-              QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
-          EndIf
+          CALL SetComponentFlowRate( SteamMassFlowRate, &
+                                   SteamCoil(CoilNum)%SteamInletNodeNum, &
+                                   SteamCoil(CoilNum)%SteamOutletNodeNum, &
+                                   SteamCoil(CoilNum)%LoopNum, &
+                                   SteamCoil(CoilNum)%LoopSide, &
+                                   SteamCoil(CoilNum)%BranchNum, &
+                                   SteamCoil(CoilNum)%CompNum )
+
+          ! recalculate if mass flow rate changed in previous call.
+          QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
 
           ! In practice Sensible & Superheated heat transfer is negligible compared to latent part.
           ! This is required for outlet water temperature, otherwise it will be saturation temperature.
@@ -1129,8 +1135,14 @@ CONTAINS
               TempAirOut = TempAirIn
 
               ! Steam Mass Flow Rate Required
-              SteamMassFlowRate=0.0
-
+              SteamMassFlowRate=0.d0
+              CALL SetComponentFlowRate( SteamMassFlowRate, &
+                                       SteamCoil(CoilNum)%SteamInletNodeNum, &
+                                       SteamCoil(CoilNum)%SteamOutletNodeNum, &
+                                       SteamCoil(CoilNum)%LoopNum, &
+                                       SteamCoil(CoilNum)%LoopSide, &
+                                       SteamCoil(CoilNum)%BranchNum, &
+                                       SteamCoil(CoilNum)%CompNum )
               ! Inlet equal to outlet when not required to run.
               TempWaterOut=TempSteamIn
 
@@ -1138,7 +1150,7 @@ CONTAINS
               HeatingCoilLoad = QCoilCap
 
               !The HeatingCoilLoad is the change in the enthalpy of the water
-               SteamCoil(CoilNum)%OutletWaterEnthalpy = SteamCoil(CoilNum)%InletSteamEnthalpy
+              SteamCoil(CoilNum)%OutletWaterEnthalpy = SteamCoil(CoilNum)%InletSteamEnthalpy
 
               ! Outlet flow rate set to inlet
               SteamCoil(CoilNum)%OutletSteamMassFlowRate = SteamMassFlowRate
@@ -1162,12 +1174,17 @@ CONTAINS
 
               ! Steam Mass Flow Rate Required
               SteamMassFlowRate=QCoilCap/(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
+              CALL SetComponentFlowRate( SteamMassFlowRate, &
+                                       SteamCoil(CoilNum)%SteamInletNodeNum, &
+                                       SteamCoil(CoilNum)%SteamOutletNodeNum, &
+                                       SteamCoil(CoilNum)%LoopNum, &
+                                       SteamCoil(CoilNum)%LoopSide, &
+                                       SteamCoil(CoilNum)%BranchNum, &
+                                       SteamCoil(CoilNum)%CompNum )
 
-              IF(SteamMassFlowRate.GT. Node((SteamCoil(CoilNum)%SteamInletNodeNum))%MassFlowRateMaxAvail)Then
-                  SteamMassFlowRate=SteamCoil(CoilNum)%InletSteamMassFlowRate
-                  QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
-                  TempAirOut=TempAirIn+QCoilCap/(AirMassFlow*PsyCpAirFnWTdb(Win,TempAirIn))
-              EndIf
+              ! recalculate in case previous call changed mass flow rate
+              QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
+              TempAirOut=TempAirIn+QCoilCap/(AirMassFlow*PsyCpAirFnWTdb(Win,TempAirIn))
 
               ! Total Heat Transfer to air
               HeatingCoilLoad = QCoilCap
@@ -1192,12 +1209,18 @@ CONTAINS
 
               ! Steam Mass Flow Rate Required
               SteamMassFlowRate=QCoilCap/(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
+              CALL SetComponentFlowRate( SteamMassFlowRate, &
+                                       SteamCoil(CoilNum)%SteamInletNodeNum, &
+                                       SteamCoil(CoilNum)%SteamOutletNodeNum, &
+                                       SteamCoil(CoilNum)%LoopNum, &
+                                       SteamCoil(CoilNum)%LoopSide, &
+                                       SteamCoil(CoilNum)%BranchNum, &
+                                       SteamCoil(CoilNum)%CompNum )
 
-              IF(SteamMassFlowRate.GT. Node((SteamCoil(CoilNum)%SteamInletNodeNum))%MassFlowRateMaxAvail)Then
-                  SteamMassFlowRate=SteamCoil(CoilNum)%InletSteamMassFlowRate
-                  QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
-                  TempAirOut=TempAirIn+QCoilCap/(AirMassFlow*PsyCpAirFnWTdb(Win,TempAirIn))
-              EndIf
+              ! recalculate in case previous call changed mass flow rate
+              QCoilCap = SteamMassFlowRate*(LatentHeatSteam+SubCoolDeltaTemp*CpWater)
+              TempAirOut=TempAirIn+QCoilCap/(AirMassFlow*PsyCpAirFnWTdb(Win,TempAirIn))
+
 
 
               ! Total Heat Transfer to air
@@ -1244,7 +1267,14 @@ CONTAINS
           END IF
 
        ELSE    ! If not running Conditions do not change across coil from inlet to outlet
-
+          SteamMassFlowRate=0.d0
+          CALL SetComponentFlowRate( SteamMassFlowRate, &
+                                   SteamCoil(CoilNum)%SteamInletNodeNum, &
+                                   SteamCoil(CoilNum)%SteamOutletNodeNum, &
+                                   SteamCoil(CoilNum)%LoopNum, &
+                                   SteamCoil(CoilNum)%LoopSide, &
+                                   SteamCoil(CoilNum)%BranchNum, &
+                                   SteamCoil(CoilNum)%CompNum )
           TempAirOut                                 = TempAirIn
           TempWaterOut                               = TempSteamIn
           HeatingCoilLoad                            = 0.0

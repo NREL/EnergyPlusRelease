@@ -283,6 +283,7 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
           Node(OutletNode)%MassFlowRate = MIN(Node(CompOutletNodeNum)%MassFlowRateMaxAvail, Node(OutletNode)%MassFlowRate)
           Node(OutletNode)%MassFlowRate = MIN(Node(CompInletNodeNum)%MassFlowRateMax,       Node(OutletNode)%MassFlowRate)
         ENDDO
+        IF (Node(OutletNode)%MassFlowRate < MassFlowTolerance) Node(OutletNode)%MassFlowRate = 0.d0
         CompFlow =  Node(OutletNode)%MassFlowRate
         Node(InletNode)%MassFlowRate = Node(OutletNode)%MassFlowRate
         DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
@@ -297,6 +298,7 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
         Node(OutletNode)%MassFlowRate = MAX(Node(InletNode)%MassFlowRateMin,      Node(OutletNode)%MassFlowRate)
         Node(OutletNode)%MassFlowRate = MIN(Node(OutletNode)%MassFlowRateMaxAvail, Node(OutletNode)%MassFlowRate)
         Node(OutletNode)%MassFlowRate = MIN(Node(InletNode)%MassFlowRateMax,      Node(OutletNode)%MassFlowRate)
+        IF (Node(OutletNode)%MassFlowRate < MassFlowTolerance) Node(OutletNode)%MassFlowRate = 0.d0
         CompFlow =  Node(OutletNode)%MassFlowRate
         Node(InletNode)%MassFlowRate = Node(OutletNode)%MassFlowRate
       ENDIF
@@ -420,6 +422,7 @@ SUBROUTINE SetActuatedBranchFlowRate(CompFlow,ActuatedNode,LoopNum,LoopSideNum, 
         ! add MassFlowRateMin hardware constraints
         Node(ActuatedNode)%MassFlowRate = MIN(Node(ActuatedNode)%MassFlowRateMaxAvail, Node(ActuatedNode)%MassFlowRate)
         Node(ActuatedNode)%MassFlowRate = MIN(Node(ActuatedNode)%MassFlowRateMax, Node(ActuatedNode)%MassFlowRate)
+        IF (Node(ActuatedNode)%MassFlowRate < MassFlowTolerance) Node(ActuatedNode)%MassFlowRate = 0.d0
         CompFlow  = Node(ActuatedNode)%MassFlowRate
         Do CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
           IF (ActuatedNode == PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn) THEN

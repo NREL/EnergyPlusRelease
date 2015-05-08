@@ -43,6 +43,7 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 */
 #pragma warning(disable:4786)
 
+#include <stdlib.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -61,7 +62,7 @@ namespace BGL = BldgGeomLib;
 #include "btdf.h"
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
 btdf::btdf()
 { }

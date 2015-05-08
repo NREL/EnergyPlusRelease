@@ -143,15 +143,15 @@ SUBROUTINE CheckIFAnyEMS
   NumExternalInterfaceGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   ! added for FMI
-  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Variable'
-  NumExternalInterfaceFunctionalMockupUnitGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Variable'
+  NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   cCurrentModuleObject = 'ExternalInterface:Actuator'
   NumExternalInterfaceActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   ! added for FMI
-  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
-  NumExternalInterfaceFunctionalMockupUnitActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
+  NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
 
   cCurrentModuleObject = 'EnergyManagementSystem:ConstructionIndexVariable'
   NumEMSConstructionIndices = GetNumObjectsFound(TRIM(cCurrentModuleObject))
@@ -160,8 +160,8 @@ SUBROUTINE CheckIFAnyEMS
   IF ((NumSensors + numActuatorsUsed + NumProgramCallManagers + NumErlPrograms + NumErlSubroutines &
       + NumUserGlobalVariables + NumEMSOutputVariables + NumEMSCurveIndices &
       + NumExternalInterfaceGlobalVariables + NumExternalInterfaceActuatorsUsed &
-      + NumEMSConstructionIndices + NumEMSMeteredOutputVariables + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed &
-      + NumExternalInterfaceFunctionalMockupUnitGlobalVariables) > 0 ) THEN
+      + NumEMSConstructionIndices + NumEMSMeteredOutputVariables + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+      + NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables) > 0 ) THEN
     AnyEnergyManagementSystemInModel = .TRUE.
   ELSE
     AnyEnergyManagementSystemInModel = .FALSE.
@@ -287,7 +287,7 @@ SUBROUTINE ManageEMS(iCalledFrom, ProgramManagerToRun)
 
     ! Set actuated variables with new values
   DO ActuatorUsedLoop = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                              + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
     ErlVariableNum = EMSActuatorUsed(ActuatorUsedLoop)%ErlVariableNum
     IF (.NOT. (ErlVariableNum >0)) CYCLE ! this can happen for good reason during sizing
 
@@ -682,11 +682,11 @@ SUBROUTINE GetEMSInput
 
   cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
 
-  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed > 0) THEN
+  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed > 0) THEN
     ALLOCATE(EMSActuatorUsed(numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                              + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed))
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed))
     DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                            + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
+                            + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
        ! If we process the ExternalInterface actuators, all we need to do is to change the
        ! name of the module object, and shift the ActuatorNum in GetObjectItem
        IF ( ActuatorNum <= numActuatorsUsed ) THEN
@@ -699,8 +699,9 @@ SUBROUTINE GetEMSInput
                NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
        ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
-                              + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed) THEN
-         cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
+                              + NumExternalInterfaceActuatorsUsed   &
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed) THEN
+         cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
          CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed-NumExternalInterfaceActuatorsUsed, &
                            cAlphaArgs, NumAlphas, rNumericArgs, &
                            NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
@@ -1058,7 +1059,8 @@ SUBROUTINE ProcessEMSInput(reportErrors)
   END DO  ! SensorNum
 
   ! added for FMI
-  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed
+  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed +   &
+     NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
      ! If we process the ExternalInterface actuators, all we need to do is to change the
 
     IF ( ActuatorNum <= numActuatorsUsed ) THEN
@@ -1066,8 +1068,8 @@ SUBROUTINE ProcessEMSInput(reportErrors)
     ELSE IF ( ActuatorNum > numActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed + NumExternalInterfaceActuatorsUsed) THEN
       cCurrentModuleObject = 'ExternalInterface:Actuator'
     ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
-                           + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitActuatorsUsed) THEN
-      cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnit:To:Actuator'
+                           + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed) THEN
+      cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
     END IF
 
     IF (EMSActuatorUsed(ActuatorNum)%CheckedOkay) CYCLE

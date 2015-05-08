@@ -9,6 +9,7 @@ MODULE SolarShading
           !       MODIFIED       June 2001, FCW, handle window blinds
           !       MODIFIED       May 2004, LKL, Polygons > 4 sides (not subsurfaces)
           !       MODIFIED       January 2007, LKL, Taking parameters back to original integer (HC)
+          !       MODIFIED       August 2011, JHK, Including Complex Fenestration optical calculations
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -42,6 +43,8 @@ USE DaylightingManager, ONLY:ProfileAngle
 USE SolarReflectionManager
 USE DataReportingFlags
 USE DataInterfaces
+USE DataBSDFWindow    , ONLY: SUNCOSTS , MaxBkSurf , ComplexWind
+USE DataVectorTypes
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables
 
@@ -189,6 +192,8 @@ PUBLIC  PerformSolarCalculations
 PRIVATE SUN3
 PRIVATE SUN4
 PRIVATE CalcWinTransDifSolInitialDistribution
+PRIVATE CalcComplexWindowOverlap
+PRIVATE CalcAllComplexWindowsOverlaps
 PUBLIC  CalcInteriorSolarDistribution
 PUBLIC  CalcBeamSolarOnWinRevealSurface
 PUBLIC  CalcWindowProfileAngles
@@ -608,9 +613,9 @@ SUBROUTINE AllocateModuleArrays
   SunlitFrac=0.0
   ALLOCATE (SunlitFracWithoutReveal(TotSurfaces,24,NumOfTimeStepInHour))
   SunlitFracWithoutReveal=0.0
-  ALLOCATE (BackSurfaces(TotSurfaces,20,24,NumOfTimeStepInHour))
+  ALLOCATE (BackSurfaces(TotSurfaces,MaxBkSurf,24,NumOfTimeStepInHour))
   BackSurfaces = 0
-  ALLOCATE (OverlapAreas(TotSurfaces,20,24,NumOfTimeStepInHour))
+  ALLOCATE (OverlapAreas(TotSurfaces,MaxBkSurf,24,NumOfTimeStepInHour))
   OverlapAreas = 0.0
   ALLOCATE (CosIncAngHR(TotSurfaces,24))
   CosIncAngHR=0.0
@@ -752,6 +757,12 @@ SUBROUTINE AllocateModuleArrays
   QRadSWOutIncSkyDiffReflObs=0.0
   ALLOCATE (CosIncidenceAngle(TotSurfaces))
   CosIncidenceAngle=0.0
+  ALLOCATE (BSDFBeamDirectionRep(TotSurfaces))
+  BSDFBeamDirectionRep=0
+  ALLOCATE (BSDFBeamThetaRep(TotSurfaces))
+  BSDFBeamThetaRep=0.0
+  ALLOCATE (BSDFBeamPhiRep(TotSurfaces))
+  BSDFBeamPhiRep=0.0
   ALLOCATE (QRadSWwinAbsTot(TotSurfaces))
   QRadSWwinAbsTot=0.0
   ALLOCATE (SWwinAbsTotalReport(TotSurfaces))
@@ -938,6 +949,12 @@ SUBROUTINE AllocateModuleArrays
                                QRadSWOutIncBmToDiffReflGnd(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
       CALL SetupOutputVariable('Surface Anisotropic Sky Multiplier []', &
                                AnisoSkyMult(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('BSDF Beam Direction Number []',BSDFBeamDirectionRep(SurfLoop),'Zone','Average', &
+                                Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('BSDF Beam Theta Angle [rad]',BSDFBeamThetaRep(SurfLoop),'Zone','Average', &
+                                Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('BSDF Beam Phi Angle [rad]',BSDFBeamPhiRep(SurfLoop),'Zone','Average', &
+                                Surface(SurfLoop)%Name)
     END IF
     IF (.NOT. Surface(SurfLoop)%HeatTransSurf) CYCLE
 
@@ -3489,6 +3506,7 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
           ! BLAST/IBLAST code, original author George Walton
 
           ! USE STATEMENTS:
+  USE WindowComplexManager, ONLY: UpdateComplexWindows
   USE DataSystemVariables, ONLY: DetailedSkyDiffuseAlgorithm
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -3551,12 +3569,28 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
     DO TS=1,NumOfTimeStepInHour
 
             ! Determine solar position.  Default for sun below horizon.
+            ! Run through all hours/ time steps to determine sun directions for WindowComplexManager
 
       CurrentTime=REAL(IHOUR-1,r64)+REAL(TS,r64)*(TimeStepFraction)
       CALL SUN4(CurrentTime,AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
 
       ! Save hourly values for use in DaylightingManager
       IF (TS == NumOfTimeStepInHour) SUNCOSHR(1:3,IHOUR) = SUNCOS
+      ! Save timestep values for use in WindowComplexManager
+      SUNCOSTS(1:3,IHOUR,TS) = SUNCOS
+
+    END DO
+  END DO
+  !
+  !Initialize/update the Complex Fenestration geometry and optical properties
+  CALL UpdateComplexWindows
+  !
+
+ DO IHOUR = 1, 24  ! Do for all hours.
+
+    DO TS=1,NumOfTimeStepInHour
+      !Recover the sun direction from the array stored in previous loop
+      SUNCOS = SUNCOSTS(1:3,IHOUR,TS)
 
       CTHETA=0.0d0
 
@@ -4278,6 +4312,7 @@ SUBROUTINE SHDBKS(NGRS,CurSurf,NBKS,HTS)
     XVT=0.0
     YVT=0.0
     ZVT=0.0
+    call CalcAllComplexWindowsOverlaps
     OneTimeFlag=.false.
   ENDIF
 
@@ -4745,7 +4780,7 @@ SUBROUTINE CalcInteriorSolarOverlaps(IHOUR,NBKS,HTSS,GRSNR,TS)
         IF(OverlapArea > 0.001d0) THEN
           JBKS = JBKS + 1
           IF(Surface(BackSurfNum)%BaseSurf == BackSurfNum) JBKSbase = JBKS
-          IF(JBKS <= 20) THEN
+          IF(JBKS <= MaxBkSurf) THEN
             BackSurfaces(HTSS,JBKS,IHOUR,TS) = BackSurfNum
             ! Remove following IF check: multiplying by sunlit fraction in the following is incorrect
             ! (FCW, 6/28/02)
@@ -4836,6 +4871,8 @@ INTEGER        :: OutShelfSurf      ! Outside daylighting shelf surface number
 REAL(r64)      :: ShelfSolarRad     ! Shelf diffuse solar radiation
 INTEGER        :: BackSurfNum       ! Back surface number
 INTEGER        :: IBack             ! Back surface counter
+INTEGER        :: RevSurfInd        !Back surface counter value for reversed surfaces
+INTEGER        :: KRevSurf          !Additional Back surface counter for reversed surfaces
 INTEGER        :: FloorNum          ! Floor surface number
 INTEGER        :: AdjSurfNum        ! Adjacent surface number
 INTEGER        :: AdjZoneNum        ! Adjacent zone number
@@ -4893,6 +4930,7 @@ REAL(r64)      :: AGlDiffBack       ! Glass layer back diffuse solar absorptance
 REAL(r64)      :: RGlDiffBack       ! Glazing system back diffuse solar reflectance
 REAL(r64)      :: AGlDiffFront      ! Glass layer front diffuse solar absorptance
 REAL(r64)      :: RGlDiffFront      ! Glazing system front diffuse solar reflectance
+REAL(r64)      :: TotReflect        !Total directional-hemispherical solar reflectance of a back surface window
 REAL(r64)      :: RhoBlFront        ! Blind solar front beam reflectance
 REAL(r64)      :: RhoBlBack         ! Blind solar back beam-diffuse reflectance
 REAL(r64)      :: RScBack           ! Screen solar back beam-diffuse reflectance
@@ -4955,8 +4993,10 @@ LOGICAL        :: VarSlats,VarSlatsBack ! True if variable slat angle
 REAL(r64)      :: ADiffWin(5)       ! Diffuse solar absorptance of glass layers, bare window
 REAL(r64)      :: ADiffWinSh(5)     ! Diffuse solar absorptance of glass layers, window with shading device
 REAL(r64)      :: DiffTrans         ! Glazing diffuse solar transmittance (including shade/blind/switching, if present)
-REAL(r64)      :: DiffTransGnd      ! Ground diffuse solar transmittance for glazing with blind with horiz. slats
-REAL(r64)      :: DiffTransSky      ! Sky diffuse solar transmittance for glazing with blind with horiz. slats
+REAL(r64)      :: DiffTransGnd      ! Ground diffuse solar transmittance for glazing with blind with horiz. slats or complex fen
+REAL(r64)      :: DiffTransBmGnd   !Complex fen: diffuse solar transmittance for ground-reflected beam radiation
+REAL(r64)      :: DiffTransSky      ! Sky diffuse solar transmittance for glazing with blind with horiz. slats or complex fen
+REAL(r64)      :: NomDiffTrans     !
 INTEGER        :: BaseSurfNum       ! Base surface number
 REAL(r64)      :: t1,t2,t3          ! Bare-glass beam solar transmittance for glass layers 1,2 and 3
 REAL(r64)      :: t1t2              ! t1*t2
@@ -4998,6 +5038,8 @@ INTEGER        :: NBackGlass        ! Number of glass layers in the "back" const
 REAL(r64)      :: SkySolarInc       ! Incident solar radiation on a window: sky diffuse plus beam
                                     !   reflected from obstruction (W/m2)
 REAL(r64)      :: GndSolarInc       ! Incident solar radiation on a window from the ground (W/m2)
+REAL(r64)      :: SkyGndTrans       ! complex fen: transmitted ground-reflected sky radiation (W/m2)
+REAL(r64)      :: BmGndTrans        ! complex fen: transmitted ground-reflected beam radiation (W/m2)
 
 REAL(r64), SAVE,ALLOCATABLE, DIMENSION(:) :: ExtBeamAbsByShadFac  ! Factor for exterior beam radiation absorbed by shade
                                                              ! (1/m2) (absorbed radation = beam incident * ExtBeamAbsByShad
@@ -5020,6 +5062,32 @@ REAL(r64) :: WinTransBmBmSolar      ! Factor for exterior beam to beam solar tra
                                     !  or window plus shade, into zone at current time (m2)
 REAL(r64) :: WinTransBmDifSolar     ! Factor for exterior beam to diffuse solar transmitted through window,
                                     !  or window plus shade, into zone at current time (m2)
+
+! Variables for complex fenestration
+INTEGER :: CurCplxFenState  ! Current state for complex fenestration
+INTEGER :: CurBackState ! Current state for back surface if that surface is complex fenestration
+INTEGER :: CurTrnDir  ! Current back window surface BSDF direction
+INTEGER :: CurBackDir ! current hit direction to complex fenestration
+INTEGER :: IBm  ! Incoming direction of the Sun (for window BSDF)
+INTEGER :: IConst ! Current surface construction number (it depends of state too)
+INTEGER :: NBkSurf ! Number of back surfaces
+INTEGER :: BaseSurf ! Base surface number for current complex window
+INTEGER :: BackSurfaceNumber ! Back surface number
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: CFBoverlap  ! Sum of boverlap for each back surface
+REAL(r64), ALLOCATABLE, DIMENSION(:, :) :: CFDirBoverlap ! Directional boverlap (Direction, IBack)
+REAL(r64) :: CurLambda ! Current lambda value in BSDF outgoing directions
+REAL(r64) :: DirTrans ! Current BSDF directional transmittance
+                      ! (for incoming I and outgoing J directions)
+REAL(r64) :: bestDot  ! complex fenestration hits other complex fenestration, it is important to find
+                      ! matching beam directions.  Beam leving one window will have certaing number for it's basis
+                      ! while same beam reaching back surface will have different beam number.  This value is used
+                      ! to keep best matching dot product for those directions
+REAL(r64) :: curDot   ! temporary variable for current dot product
+INTEGER :: bestTrn    ! Direction corresponding best dot product for master window
+INTEGER :: bestBackTrn ! Direction corresponding best dot product for back surface window
+INTEGER :: TotSolidLay ! Number of window solid layers
+REAL(r64) :: tempVec1(3) ! temporary vector for performing dot_product
+REAL(r64) :: tempVec2(3) ! temporary vector for performing dot_product
 
 IF (MustAlloc) THEN
   ALLOCATE (DBZoneIntWin(NumOfZones))
@@ -5150,324 +5218,346 @@ DO ZoneNum = 1, NumOfZones
     InOutProjSLFracMult = SurfaceWindow(SurfNum)%InOutProjSLFracMult(HourOfDay)
     IF(SunlitFracWithoutReveal(SurfNum,HourOfDay,TimeStep) > 0.0) THEN
 
-      ! For bare glazing or switchable glazing, the following includes the effects of
-      ! (1) diffuse solar produced by beam solar incident on the outside and inside reveal
-      ! surfaces, and (2) absorption of beam solar by outside and inside reveal surfaces.
-      ! If there is an exterior shade/blind both of these effects are ignored. If there
-      ! is an interior or between-glass shade/blind the effects of beam incident on
-      ! inside reveal surfaces is ignored.
+      IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
 
-      NGlass = Construct(ConstrNum)%TotGlassLayers
+        ! For bare glazing or switchable glazing, the following includes the effects of
+        ! (1) diffuse solar produced by beam solar incident on the outside and inside reveal
+        ! surfaces, and (2) absorption of beam solar by outside and inside reveal surfaces.
+        ! If there is an exterior shade/blind both of these effects are ignored. If there
+        ! is an interior or between-glass shade/blind the effects of beam incident on
+        ! inside reveal surfaces is ignored.
 
-      DO Lay = 1,NGlass
-        ABWin(Lay)    = POLYF(CosInc,Construct(ConstrNum)%AbsBeamCoef(Lay,1:6)) * &
-                          CosInc * SunLitFract * SurfaceWindow(SurfNum)%OutProjSLFracMult(HourOfDay)
-        ADiffWin(Lay) = Construct(ConstrNum)%AbsDiff(Lay)
-        IF(ShadeFlag <= 0 .OR. ShadeFlag >= 10) THEN
+        NGlass = Construct(ConstrNum)%TotGlassLayers
 
-                                 ! Bare window (ShadeFlag = -1 or 0 or shading device of off)
+        DO Lay = 1,NGlass
+          ABWin(Lay)    = POLYF(CosInc,Construct(ConstrNum)%AbsBeamCoef(Lay,1:6)) * &
+                            CosInc * SunLitFract * SurfaceWindow(SurfNum)%OutProjSLFracMult(HourOfDay)
+          ADiffWin(Lay) = Construct(ConstrNum)%AbsDiff(Lay)
+          IF(ShadeFlag <= 0 .OR. ShadeFlag >= 10) THEN
 
-          AWinSurf(SurfNum,Lay) = ABWin(Lay) &
-             ! Add contribution of beam reflected from outside and inside reveal
-            + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNum)%AbsDiff(Lay) &
-            + SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing * Construct(ConstrNum)%AbsDiffBack(Lay)
+                                   ! Bare window (ShadeFlag = -1 or 0 or shading device of off)
 
-        ELSE
-
-                                 ! Shade, screen, blind or switchable glazing on (ShadeFlag > 0)
-
-          FracSunLit = SunLitFract*SurfaceWindow(SurfNum)%OutProjSLFracMult(HourOfDay)
-          IF(ShadeFlag==ExtShadeOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==ExtScreenOn) FracSunLit = SunLitFract
-          IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==BGShadeOn .OR. ShadeFlag==SwitchableGlazing) THEN
-
-                                 ! Shade or switchable glazing on
-
-            ABWinSh(Lay) = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamCoef(Lay,1:6)) * CosInc * FracSunLit
-
-            ADiffWinSh(Lay) = Construct(ConstrNumSh)%AbsDiff(Lay)
+            AWinSurf(SurfNum,Lay) = ABWin(Lay) &
+               ! Add contribution of beam reflected from outside and inside reveal
+              + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNum)%AbsDiff(Lay) &
+              + SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing * Construct(ConstrNum)%AbsDiffBack(Lay)
 
           ELSE
-                                 ! Blind or screen on
 
-            IF(Lay == 1 .AND. ShadeFlag/=ExtScreenOn) CALL ProfileAngle(SurfNum,SOLCOS,Blind(BlNum)%SlatOrientation,ProfAng)
+                                   ! Shade, screen, blind or switchable glazing on (ShadeFlag > 0)
 
-            IF(ShadeFlag == IntBlindOn) THEN
+            FracSunLit = SunLitFract*SurfaceWindow(SurfNum)%OutProjSLFracMult(HourOfDay)
+            IF(ShadeFlag==ExtShadeOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==ExtScreenOn) FracSunLit = SunLitFract
+            IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==BGShadeOn .OR. ShadeFlag==SwitchableGlazing) THEN
 
-                                 ! Interior blind on
-              IF(Lay==1) THEN
-                TGlBm          = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
-                RGlDiffBack    = Construct(ConstrNum)%ReflectSolDiffBack
-                RhoBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
-                RhoBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
-              END IF
-              AGlDiffBack     = Construct(ConstrNum)%AbsDiffBack(Lay)
-              ABWinSh(Lay)    = AbWin(Lay) + (TGlBm*AGlDiffBack*RhoBlFront/(1.d0-RhoBlFront*RGlDiffBack))* &
-                CosInc * FracSunLit
-              ADiffWinSh(Lay) = ADiffWin(Lay) + Construct(ConstrNum)%TransDiff*AGlDiffBack*RhoBlDiffFront/ &
-                                                    (1.d0-RhoBlDiffFront*RGlDiffBack)
-            ELSE IF(ShadeFlag == ExtBlindOn) THEN
+                                   ! Shade or switchable glazing on
 
-                                 ! Exterior blind on
-              IF(Lay==1) THEN
-                TBlBmBm       = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
-                                             Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
-                TBlBmDiff     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
-                RhoBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
-                RhoBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
-                RGlFront      =  POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
-                RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
-                TBlDifDif     = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffTrans)
-                RGlDifFr      = Construct(ConstrNum)%ReflectSolDiffFront
-                RhoBlDifDifBk = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
-              END IF
-              AGlDiffFront = Construct(ConstrNum)%AbsDiff(Lay)
-              ABWinSh(Lay) = TBlBmBm*ABWin(Lay) + ((TBlBmBm*RGlFront*RhoBlBack + TBlBmDiff) * AGlDiffFront / &
-                (1 - RGlDiffFront*RhoBlDiffBack)) * CosInc * FracSunLit
-              !ADiffWinSh(Lay) = 0.0  ! Assumes no contribution from reveal reflection when exterior blind in place
-              !  Replaced above line with (FCW, 2/10/03):
-              ADiffWinSh(Lay) = ADiffWin(Lay) * TBlDifDif/(1.d0-RGlDifFr*RhoBlDifDifBk)
+              ABWinSh(Lay) = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamCoef(Lay,1:6)) * CosInc * FracSunLit
 
-            ELSE IF(ShadeFlag == ExtScreenOn) THEN
-
-                                 ! Exterior screen on
-              IF(Lay==1) THEN
-                TScBmBm       = SurfaceScreens(ScNum)%BmBmTrans
-                TScBmDiff     = SurfaceScreens(ScNum)%BmDifTrans
-                RScBack       = SurfaceScreens(ScNum)%ReflectSolBeamFront
-                RScDifBack   = SurfaceScreens(ScNum)%DifReflect
-                RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
-                RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
-                TScDifDif     = SurfaceScreens(ScNum)%DifDifTrans
-                RGlDifFr      = Construct(ConstrNum)%ReflectSolDiffFront
-              END IF
-              AGlDiffFront = Construct(ConstrNum)%AbsDiff(Lay)
-
-!             Reduce the bare window absorbed beam by the screen beam transmittance and then account for interreflections
-              ABWinSh(Lay) = TScBmBm*ABWin(Lay) + (TScBmBm*RGlFront*RScBack + TScBmDiff) *  &
-                                Construct(ConstrNum)%AbsDiff(Lay)/(1.d0-RGlDiffFront*RScDifBack) * CosInc * FracSunLit
-
-              ADiffWinSh(Lay) = ADiffWin(Lay) * TScDifDif/(1.d0-RGlDifFr*RScDifBack)
+              ADiffWinSh(Lay) = Construct(ConstrNumSh)%AbsDiff(Lay)
 
             ELSE
-                                 ! Between-glass blind on
+                                   ! Blind or screen on
 
-              ! Isolated glass and blind properties at current incidence angle, profile angle and slat angle
-              IF(Lay==1) THEN
-                t1     = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(1,1:6))
-                t2     = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(2,1:6))
-                af1    = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(1,1:6))
-                af2    = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(2,1:6))
-                ab1    = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(1,1:6))
-                ab2    = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(2,1:6))
-                rf1    = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(1,1:6))
-                rf2    = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(2,1:6))
-                rb1    = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(1,1:6))
-                rb2    = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(2,1:6))
-                td1    = Construct(ConstrNum)%tBareSolDiff(1)
-                td2    = Construct(ConstrNum)%tBareSolDiff(2)
-                afd1   = Construct(ConstrNum)%afBareSolDiff(1)
-                afd2   = Construct(ConstrNum)%afBareSolDiff(2)
-                abd1   = Construct(ConstrNum)%abBareSolDiff(1)
-                abd2   = Construct(ConstrNum)%abBareSolDiff(2)
-                rfd1   = Construct(ConstrNum)%rfBareSolDiff(1)
-                rfd2   = Construct(ConstrNum)%rfBareSolDiff(2)
-                rbd1   = Construct(ConstrNum)%rbBareSolDiff(1)
-                rbd2   = Construct(ConstrNum)%rbBareSolDiff(2)
-                tfshBB = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
-                                  Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
-                tfshBd = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
-                tfshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffTrans)
-                tbshBB = BlindBeamBeamTrans(ProfAng,PI-SlatAng,Blind(BlNum)%SlatWidth, &
-                                  Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
-                tbshBd = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffTrans)
-                tbshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffTrans)
-                afshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
-                abshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamAbs)
-                afshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffAbs)
-                abshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffAbs)
-                rfshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
-                rbshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
-                rfshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
-                rbshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
-              END IF
+              IF(Lay == 1 .AND. ShadeFlag/=ExtScreenOn) CALL ProfileAngle(SurfNum,SOLCOS,Blind(BlNum)%SlatOrientation,ProfAng)
 
-              IF(Lay==1.AND.NGlass==3) THEN
-                t1t2 = t1*t2
-                td1td2 = td1*td2
-                t3   = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(3,1:6))
-                af3  = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(3,1:6))
-                ab3  = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(3,1:6))
-                rf3  = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(3,1:6))
-                rb3  = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(3,1:6))
-                td3  = Construct(ConstrNum)%tBareSolDiff(3)
-                afd3 = Construct(ConstrNum)%afBareSolDiff(3)
-                abd3 = Construct(ConstrNum)%abBareSolDiff(3)
-                rfd3 = Construct(ConstrNum)%rfBareSolDiff(3)
-                rbd3 = Construct(ConstrNum)%rbBareSolDiff(3)
-              END IF
+              IF(ShadeFlag == IntBlindOn) THEN
 
-              IF(NGlass==2) THEN
+                                   ! Interior blind on
                 IF(Lay==1) THEN
-                  ABWinSh(1)    = CosInc * FracSunLit * (af1 + t1*tfshBB*rf2*tbshBB*ab1 + &
-                       t1*(rfshB + rfshB*rbd1*rfshd + tfshBB*rf2*tbshBd + tfshBd*rfd2*tbshd)*abd1)
-                  ADiffWinSh(1) = afd1 + td1*(rfshd + rfshd*rbd1*rfshd + tfshd*rfd2*tbshd)*abd1
-                ELSE IF (Lay==2) THEN
-                  ABWinSh(2)    = CosInc * FracSunLit * (t1*rfshB*af2 + &
-                       t1*(rfshB*rf2*rbshd + tfshBd*(1+rfd2*rbshd) + rfshB*rbd1*tfshd)*afd2)
-                  ADiffWinSh(2) = td1*(tfshd*(1+rfd2*rbshd) + rfshd*rbd1*tfshd)*afd2
+                  TGlBm          = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
+                  RGlDiffBack    = Construct(ConstrNum)%ReflectSolDiffBack
+                  RhoBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
+                  RhoBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
                 END IF
-              END IF  ! End of check if NGlass = 2
+                AGlDiffBack     = Construct(ConstrNum)%AbsDiffBack(Lay)
+                ABWinSh(Lay)    = AbWin(Lay) + (TGlBm*AGlDiffBack*RhoBlFront/(1.d0-RhoBlFront*RGlDiffBack))* &
+                  CosInc * FracSunLit
+                ADiffWinSh(Lay) = ADiffWin(Lay) + Construct(ConstrNum)%TransDiff*AGlDiffBack*RhoBlDiffFront/ &
+                                                      (1.d0-RhoBlDiffFront*RGlDiffBack)
+              ELSE IF(ShadeFlag == ExtBlindOn) THEN
 
-              IF(NGlass==3) THEN
+                                   ! Exterior blind on
                 IF(Lay==1) THEN
-                  ABWinSh(1)    = CosInc * FracSunLit * (af1 + t1*rf2*ab1 + t1t2*tfshBB*rf3*tbshBB*t2*ab1 + &
-                         t1t2*(rfshB*td2 + rfshB*rbd2*rfshd*td2 + tfshBd*rfd3*tbshd*td2)*abd1)
-                  ADiffWinSh(1) = afd1 + td1*rbd2*abd1 + &
-                         td1td2*(rfshd*(1 + rbd2*rfshd + td2*rbd1*td2*rfshd) + &
-                         tfshd*(rfd3*tbshd + rfd3*rbshd*rfd3*tbshd))*td2*abd1
-                ELSE IF(Lay==2) THEN
-                  ABWinSh(2)    = CosInc * FracSunLit * (t1*af2 + t1t2*(tfshBB*rf3*tbshBB*ab2 + rfshB*td2*rbd1*afd2) + &
-                         t1t2*(rfshB*(1+rbd2*rfshd) + tfshBB*rf3*tbshBd + tfshBd*rfd3*tbshd)*abd2)
-                  ADiffWinSh(2) = td1*afd2 + td1td2*rfshd*td2*rbd1*afd2 + &
-                         td1td2*(rfshd*(1+rbd2*rfshd) + tfshd*rfd3*tbshd)*abd2
-                ELSE IF(Lay==3) THEN
-                  ABWinSh(3) = CosInc * FracSunLit * (t1t2*tfshBB*af3 + &
-                         t1t2*(tfshBB*rf3*rbshB + tfshBd*(1+rfd3*rbshd) + rfshB*(rbd2*tfshd + td2*rbd1*td2*tfshd))*afd3)
-                  ADiffWinSh(3) = td1td2*(tfshd*(1+rfd3*rbshd) + rfshd*(rbd2*tfshd + td2*rbd1*td2*tfshd))*afd3
+                  TBlBmBm       = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                               Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                  TBlBmDiff     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
+                  RhoBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
+                  RhoBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
+                  RGlFront      =  POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
+                  RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
+                  TBlDifDif     = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffTrans)
+                  RGlDifFr      = Construct(ConstrNum)%ReflectSolDiffFront
+                  RhoBlDifDifBk = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
                 END IF
-              END IF  ! End of check if NGlass = 3
+                AGlDiffFront = Construct(ConstrNum)%AbsDiff(Lay)
+                ABWinSh(Lay) = TBlBmBm*ABWin(Lay) + ((TBlBmBm*RGlFront*RhoBlBack + TBlBmDiff) * AGlDiffFront / &
+                  (1 - RGlDiffFront*RhoBlDiffBack)) * CosInc * FracSunLit
+                !ADiffWinSh(Lay) = 0.0  ! Assumes no contribution from reveal reflection when exterior blind in place
+                !  Replaced above line with (FCW, 2/10/03):
+                ADiffWinSh(Lay) = ADiffWin(Lay) * TBlDifDif/(1.d0-RGlDifFr*RhoBlDifDifBk)
 
-            END IF  ! End of check if blind is interior, exterior or between-glass
-          END IF  ! End of check if a blind is on
+              ELSE IF(ShadeFlag == ExtScreenOn) THEN
 
-          IF(ShadeFlag /= SwitchableGlazing) THEN
+                                   ! Exterior screen on
+                IF(Lay==1) THEN
+                  TScBmBm       = SurfaceScreens(ScNum)%BmBmTrans
+                  TScBmDiff     = SurfaceScreens(ScNum)%BmDifTrans
+                  RScBack       = SurfaceScreens(ScNum)%ReflectSolBeamFront
+                  RScDifBack   = SurfaceScreens(ScNum)%DifReflect
+                  RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
+                  RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
+                  TScDifDif     = SurfaceScreens(ScNum)%DifDifTrans
+                  RGlDifFr      = Construct(ConstrNum)%ReflectSolDiffFront
+                END IF
+                AGlDiffFront = Construct(ConstrNum)%AbsDiff(Lay)
 
-                                  ! Interior or between glass shade or blind on
+  !             Reduce the bare window absorbed beam by the screen beam transmittance and then account for interreflections
+                ABWinSh(Lay) = TScBmBm*ABWin(Lay) + (TScBmBm*RGlFront*RScBack + TScBmDiff) *  &
+                                  Construct(ConstrNum)%AbsDiff(Lay)/(1.d0-RGlDiffFront*RScDifBack) * CosInc * FracSunLit
 
-            AWinSurf(SurfNum,Lay) = ABWinSh(Lay)
-            IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==BGShadeOn.OR.ShadeFlag==BGBlindOn) &
-                ! Add contribution of diffuse from beam on outside reveal
-               AWinSurf(SurfNum,Lay) = AWinSurf(SurfNum,Lay) +  &
-                    ADiffWinSh(Lay) * SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing
+                ADiffWinSh(Lay) = ADiffWin(Lay) * TScDifDif/(1.d0-RGlDifFr*RScDifBack)
 
-          ELSE
-                                  ! Switchable glazing
+              ELSE
+                                   ! Between-glass blind on
 
-            SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
-            AWinSurf(SurfNum,Lay) = InterpSw(SwitchFac,ABWin(Lay),ABWinSh(Lay))
-               ! Add contribution of diffuse from beam on outside and inside reveal
-            AWinSurf(SurfNum,Lay) = AWinSurf(SurfNum,Lay) + &
-                InterpSW(SwitchFac,ADiffWin(Lay),ADiffWinSh(Lay)) &
-                  * SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing + &
-                InterpSW(SwitchFac,Construct(ConstrNum)%AbsDiffBack(Lay),Construct(ConstrNumSh)%AbsDiffBack(Lay)) &
-                  * SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing
-          END IF
-        END IF  ! End of check if window has shading device
-      END DO  ! End of loop over window glass layers
+                ! Isolated glass and blind properties at current incidence angle, profile angle and slat angle
+                IF(Lay==1) THEN
+                  t1     = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(1,1:6))
+                  t2     = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(2,1:6))
+                  af1    = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(1,1:6))
+                  af2    = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(2,1:6))
+                  ab1    = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(1,1:6))
+                  ab2    = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(2,1:6))
+                  rf1    = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(1,1:6))
+                  rf2    = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(2,1:6))
+                  rb1    = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(1,1:6))
+                  rb2    = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(2,1:6))
+                  td1    = Construct(ConstrNum)%tBareSolDiff(1)
+                  td2    = Construct(ConstrNum)%tBareSolDiff(2)
+                  afd1   = Construct(ConstrNum)%afBareSolDiff(1)
+                  afd2   = Construct(ConstrNum)%afBareSolDiff(2)
+                  abd1   = Construct(ConstrNum)%abBareSolDiff(1)
+                  abd2   = Construct(ConstrNum)%abBareSolDiff(2)
+                  rfd1   = Construct(ConstrNum)%rfBareSolDiff(1)
+                  rfd2   = Construct(ConstrNum)%rfBareSolDiff(2)
+                  rbd1   = Construct(ConstrNum)%rbBareSolDiff(1)
+                  rbd2   = Construct(ConstrNum)%rbBareSolDiff(2)
+                  tfshBB = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth, &
+                                    Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                  tfshBd = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
+                  tfshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffTrans)
+                  tbshBB = BlindBeamBeamTrans(ProfAng,PI-SlatAng,Blind(BlNum)%SlatWidth, &
+                                    Blind(BlNum)%SlatSeparation,Blind(BlNum)%SlatThickness)
+                  tbshBd = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffTrans)
+                  tbshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffTrans)
+                  afshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
+                  abshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamAbs)
+                  afshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffAbs)
+                  abshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffAbs)
+                  rfshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
+                  rbshB  = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
+                  rfshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
+                  rbshd  = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
+                END IF
 
-          !-----------------------------------------
-          ! EXTERIOR BEAM ABSORBED BY SHADING DEVICE
-          !-----------------------------------------
+                IF(Lay==1.AND.NGlass==3) THEN
+                  t1t2 = t1*t2
+                  td1td2 = td1*td2
+                  t3   = POLYF(CosInc,Construct(ConstrNum)%tBareSolCoef(3,1:6))
+                  af3  = POLYF(CosInc,Construct(ConstrNum)%afBareSolCoef(3,1:6))
+                  ab3  = POLYF(CosInc,Construct(ConstrNum)%abBareSolCoef(3,1:6))
+                  rf3  = POLYF(CosInc,Construct(ConstrNum)%rfBareSolCoef(3,1:6))
+                  rb3  = POLYF(CosInc,Construct(ConstrNum)%rbBareSolCoef(3,1:6))
+                  td3  = Construct(ConstrNum)%tBareSolDiff(3)
+                  afd3 = Construct(ConstrNum)%afBareSolDiff(3)
+                  abd3 = Construct(ConstrNum)%abBareSolDiff(3)
+                  rfd3 = Construct(ConstrNum)%rfBareSolDiff(3)
+                  rbd3 = Construct(ConstrNum)%rbBareSolDiff(3)
+                END IF
 
-          ! Exterior beam absorbed by INTERIOR SHADE
+                IF(NGlass==2) THEN
+                  IF(Lay==1) THEN
+                    ABWinSh(1)    = CosInc * FracSunLit * (af1 + t1*tfshBB*rf2*tbshBB*ab1 + &
+                         t1*(rfshB + rfshB*rbd1*rfshd + tfshBB*rf2*tbshBd + tfshBd*rfd2*tbshd)*abd1)
+                    ADiffWinSh(1) = afd1 + td1*(rfshd + rfshd*rbd1*rfshd + tfshd*rfd2*tbshd)*abd1
+                  ELSE IF (Lay==2) THEN
+                    ABWinSh(2)    = CosInc * FracSunLit * (t1*rfshB*af2 + &
+                         t1*(rfshB*rf2*rbshd + tfshBd*(1+rfd2*rbshd) + rfshB*rbd1*tfshd)*afd2)
+                    ADiffWinSh(2) = td1*(tfshd*(1+rfd2*rbshd) + rfshd*rbd1*tfshd)*afd2
+                  END IF
+                END IF  ! End of check if NGlass = 2
 
-      IF(ShadeFlag == IntShadeOn) THEN
-        ! Note that AbsBeamShadeCoef includes effect of shade/glazing inter-reflection
-        AbsShade = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamShadeCoef(1:6))
-        ExtBeamAbsByShadFac(SurfNum) = ( AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
+                IF(NGlass==3) THEN
+                  IF(Lay==1) THEN
+                    ABWinSh(1)    = CosInc * FracSunLit * (af1 + t1*rf2*ab1 + t1t2*tfshBB*rf3*tbshBB*t2*ab1 + &
+                           t1t2*(rfshB*td2 + rfshB*rbd2*rfshd*td2 + tfshBd*rfd3*tbshd*td2)*abd1)
+                    ADiffWinSh(1) = afd1 + td1*rbd2*abd1 + &
+                           td1td2*(rfshd*(1 + rbd2*rfshd + td2*rbd1*td2*rfshd) + &
+                           tfshd*(rfd3*tbshd + rfd3*rbshd*rfd3*tbshd))*td2*abd1
+                  ELSE IF(Lay==2) THEN
+                    ABWinSh(2)    = CosInc * FracSunLit * (t1*af2 + t1t2*(tfshBB*rf3*tbshBB*ab2 + rfshB*td2*rbd1*afd2) + &
+                           t1t2*(rfshB*(1+rbd2*rfshd) + tfshBB*rf3*tbshBd + tfshBd*rfd3*tbshd)*abd2)
+                    ADiffWinSh(2) = td1*afd2 + td1td2*rfshd*td2*rbd1*afd2 + &
+                           td1td2*(rfshd*(1+rbd2*rfshd) + tfshd*rfd3*tbshd)*abd2
+                  ELSE IF(Lay==3) THEN
+                    ABWinSh(3) = CosInc * FracSunLit * (t1t2*tfshBB*af3 + &
+                           t1t2*(tfshBB*rf3*rbshB + tfshBd*(1+rfd3*rbshd) + rfshB*(rbd2*tfshd + td2*rbd1*td2*tfshd))*afd3)
+                    ADiffWinSh(3) = td1td2*(tfshd*(1+rfd3*rbshd) + rfshd*(rbd2*tfshd + td2*rbd1*td2*tfshd))*afd3
+                  END IF
+                END IF  ! End of check if NGlass = 3
 
-           + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNumSh)%AbsDiffShade ) * &
-                SurfaceWindow(SurfNum)%GlazedFrac
-        ! In the above, GlazedFrac corrects for shadowing of divider onto interior shade
-      END IF
+              END IF  ! End of check if blind is interior, exterior or between-glass
+            END IF  ! End of check if a blind is on
 
-          ! Exterior beam absorbed by EXTERIOR SHADE
+            IF(ShadeFlag /= SwitchableGlazing) THEN
 
-      IF(ShadeFlag == ExtShadeOn) THEN
-        ExtBeamAbsByShadFac(SurfNum) =  &
-              Construct(ConstrNumSh)%AbsDiffShade * CosInc * SunLitFract
+                                    ! Interior or between glass shade or blind on
 
-      END IF
+              AWinSurf(SurfNum,Lay) = ABWinSh(Lay)
+              IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==BGShadeOn.OR.ShadeFlag==BGBlindOn) &
+                  ! Add contribution of diffuse from beam on outside reveal
+                 AWinSurf(SurfNum,Lay) = AWinSurf(SurfNum,Lay) +  &
+                      ADiffWinSh(Lay) * SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing
 
-          ! Exterior beam absorbed by BETWEEN-GLASS SHADE
+            ELSE
+                                    ! Switchable glazing
 
-      IF(ShadeFlag == BGShadeOn) THEN
-        AbsShade = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamShadeCoef(1:6))
-        ExtBeamAbsByShadFac(SurfNum) = AbsShade * CosInc * SunLitFract + &
-           SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNumSh)%AbsDiffShade
-      END IF
+              SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
+              AWinSurf(SurfNum,Lay) = InterpSw(SwitchFac,ABWin(Lay),ABWinSh(Lay))
+                 ! Add contribution of diffuse from beam on outside and inside reveal
+              AWinSurf(SurfNum,Lay) = AWinSurf(SurfNum,Lay) + &
+                  InterpSW(SwitchFac,ADiffWin(Lay),ADiffWinSh(Lay)) &
+                    * SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing + &
+                  InterpSW(SwitchFac,Construct(ConstrNum)%AbsDiffBack(Lay),Construct(ConstrNumSh)%AbsDiffBack(Lay)) &
+                    * SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing
+            END IF
+          END IF  ! End of check if window has shading device
+        END DO  ! End of loop over window glass layers
 
-          ! Exterior beam absorbed by INTERIOR BLIND
+            !-----------------------------------------
+            ! EXTERIOR BEAM ABSORBED BY SHADING DEVICE
+            !-----------------------------------------
 
-      IF(ShadeFlag == IntBlindOn) THEN
-        TBmBm          = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
-        RGlDiffBack    = Construct(ConstrNum)%ReflectSolDiffBack
-        RhoBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
-        AbsBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
-        RhoBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
-        AbsBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffAbs)
-        AbsShade       = TBmBm * (AbsBlFront + &
-          RhoBlFront*RGlDiffBAck*AbsBlDiffFront/(1.d0-RhoBlDiffFront*RGlDiffBack))
-        AbsShadeDiff   = Construct(ConstrNum)%TransDiff * (AbsBlDiffFront + RhoBlDiffFront * &
-          RGlDiffBAck*AbsBlDiffFront/(1.d0-RhoBlDiffFront*RGlDiffBack))
-        ExtBeamAbsByShadFac(SurfNum) = ( AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
+            ! Exterior beam absorbed by INTERIOR SHADE
 
-          + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * AbsShadeDiff ) * SurfaceWindow(SurfNum)%GlazedFrac
-              ! In the above, GlazedFrac corrects for shadowing of divider onto interior blind
-      END IF
+        IF(ShadeFlag == IntShadeOn) THEN
+          ! Note that AbsBeamShadeCoef includes effect of shade/glazing inter-reflection
+          AbsShade = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamShadeCoef(1:6))
+          ExtBeamAbsByShadFac(SurfNum) = ( AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
 
-        ! Exterior beam absorbed by EXTERIOR BLIND
-
-      IF(ShadeFlag == ExtBlindOn) THEN
-        TBlBmBm       = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth,Blind(BlNum)%SlatSeparation, &
-                                     Blind(BlNum)%SlatThickness)
-        RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
-        AbsBlFront    = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
-        AbsBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamAbs)
-        AbsBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffAbs)
-        RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
-        RhoBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
-        RhoBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
-        TBlBmDiff     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
-        AbsShade      = AbsBlFront + AbsBlBack * RGlFront * TBlBmBm &
-                          + (AbsBlDiffBack*RGlDiffFront/(1.d0-RhoBlDiffBack*RGlDiffFront)) * &
-                            (RGlFront*TBlBmBm*RhoBlBack + TBlBmDiff)
-        ExtBeamAbsByShadFac(SurfNum) = AbsShade * CosInc * SunLitFract * InOutProjSLFracMult
-
-      END IF
-
-        ! Exterior beam absorbed by EXTERIOR SCREEN
-      IF(ShadeFlag == ExtScreenOn) THEN
-        TScBmBm       = SurfaceScreens(SurfaceWindow(SurfNum)%ScreenNumber)%BmBmTrans
-!        TScBmDiff     = SurfaceScreens(SurfaceWindow(SurfNum)%ScreenNumber)%BmDifTrans
-        RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
-        RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
-
-        AbsScBeam     = SurfaceScreens(ScNum)%AbsorpSolarBeamFront
-        AbsScDiffBack = SurfaceScreens(ScNum)%DifScreenAbsorp
-        RScDifBack   = SurfaceScreens(ScNum)%DifReflect
-        RScBack       = SurfaceScreens(ScNum)%ReflectSolBeamFront
-
-        AbsScreen      = AbsScBeam * (1.0d0 + TScBmBm * RGlFront) + &
-                       (AbsScDiffBack*TScBmBm*RGlFront*RGlDiffFront*RScBack/(1.d0-RScDifBack*RGlDiffFront))
-
-        ExtBeamAbsByShadFac(SurfNum) = AbsScreen * CosInc * SunLitFract * InOutProjSLFracMult
-
-      END IF
-
-        ! Exterior beam absorbed by BETWEEN-GLASS BLIND
-
-      IF(ShadeFlag == BGBlindOn) THEN
-        IF(NGlass == 2) THEN
-          AbsShade     = t1*(afshB + tfshBB*rf2*abshB + tfshBd*rfd2*abshd + rfshB*rbd1*afshd)
-          AbsShadeDiff = td1*(afshd*(1 + rfshd*rbd1) + tfshd*rfd2*abshd)
-        ELSE IF(NGlass == 3) THEN
-          AbsShade     = t1t2*(afshB*(1 + tfshBB*rf3) + afshd*(tfshBd*rfd3 + rfshB*(rbd2 + td2*rbd1*td2)))
-          AbsShadeDiff = td1td2*(afshd + tfshd*rfd3*abshd + rfshd*(rfd2 + td2*rbd2*td2)*afshd)
+             + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNumSh)%AbsDiffShade ) * &
+                  SurfaceWindow(SurfNum)%GlazedFrac
+          ! In the above, GlazedFrac corrects for shadowing of divider onto interior shade
         END IF
-        ExtBeamAbsByShadFac(SurfNum) =  AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
-                                          + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * AbsShadeDiff
-      END IF  ! End of check if between-glass blind
+
+            ! Exterior beam absorbed by EXTERIOR SHADE
+
+        IF(ShadeFlag == ExtShadeOn) THEN
+          ExtBeamAbsByShadFac(SurfNum) =  &
+                Construct(ConstrNumSh)%AbsDiffShade * CosInc * SunLitFract
+
+        END IF
+
+            ! Exterior beam absorbed by BETWEEN-GLASS SHADE
+
+        IF(ShadeFlag == BGShadeOn) THEN
+          AbsShade = POLYF(CosInc,Construct(ConstrNumSh)%AbsBeamShadeCoef(1:6))
+          ExtBeamAbsByShadFac(SurfNum) = AbsShade * CosInc * SunLitFract + &
+             SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * Construct(ConstrNumSh)%AbsDiffShade
+        END IF
+
+            ! Exterior beam absorbed by INTERIOR BLIND
+
+        IF(ShadeFlag == IntBlindOn) THEN
+          TBmBm          = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6))
+          RGlDiffBack    = Construct(ConstrNum)%ReflectSolDiffBack
+          RhoBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffRefl)
+          AbsBlFront     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
+          RhoBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffDiffRefl)
+          AbsBlDiffFront = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolFrontDiffAbs)
+          AbsShade       = TBmBm * (AbsBlFront + &
+            RhoBlFront*RGlDiffBAck*AbsBlDiffFront/(1.d0-RhoBlDiffFront*RGlDiffBack))
+          AbsShadeDiff   = Construct(ConstrNum)%TransDiff * (AbsBlDiffFront + RhoBlDiffFront * &
+            RGlDiffBAck*AbsBlDiffFront/(1.d0-RhoBlDiffFront*RGlDiffBack))
+          ExtBeamAbsByShadFac(SurfNum) = ( AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
+
+            + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * AbsShadeDiff ) * SurfaceWindow(SurfNum)%GlazedFrac
+                ! In the above, GlazedFrac corrects for shadowing of divider onto interior blind
+        END IF
+
+          ! Exterior beam absorbed by EXTERIOR BLIND
+
+        IF(ShadeFlag == ExtBlindOn) THEN
+          TBlBmBm       = BlindBeamBeamTrans(ProfAng,SlatAng,Blind(BlNum)%SlatWidth,Blind(BlNum)%SlatSeparation, &
+                                       Blind(BlNum)%SlatThickness)
+          RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
+          AbsBlFront    = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamAbs)
+          AbsBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamAbs)
+          AbsBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffAbs)
+          RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
+          RhoBlDiffBack = InterpSlatAng(SlatAng,VarSlats,Blind(BlNum)%SolBackDiffDiffRefl)
+          RhoBlBack     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolBackBeamDiffRefl)
+          TBlBmDiff     = InterpProfSlatAng(ProfAng,SlatAng,VarSlats,Blind(BlNum)%SolFrontBeamDiffTrans)
+          AbsShade      = AbsBlFront + AbsBlBack * RGlFront * TBlBmBm &
+                            + (AbsBlDiffBack*RGlDiffFront/(1.d0-RhoBlDiffBack*RGlDiffFront)) * &
+                              (RGlFront*TBlBmBm*RhoBlBack + TBlBmDiff)
+          ExtBeamAbsByShadFac(SurfNum) = AbsShade * CosInc * SunLitFract * InOutProjSLFracMult
+
+        END IF
+
+          ! Exterior beam absorbed by EXTERIOR SCREEN
+        IF(ShadeFlag == ExtScreenOn) THEN
+          TScBmBm       = SurfaceScreens(SurfaceWindow(SurfNum)%ScreenNumber)%BmBmTrans
+  !        TScBmDiff     = SurfaceScreens(SurfaceWindow(SurfNum)%ScreenNumber)%BmDifTrans
+          RGlFront      = POLYF(CosInc,Construct(ConstrNum)%ReflSolBeamFrontCoef(1:6))
+          RGlDiffFront  = Construct(ConstrNum)%ReflectSolDiffFront
+
+          AbsScBeam     = SurfaceScreens(ScNum)%AbsorpSolarBeamFront
+          AbsScDiffBack = SurfaceScreens(ScNum)%DifScreenAbsorp
+          RScDifBack   = SurfaceScreens(ScNum)%DifReflect
+          RScBack       = SurfaceScreens(ScNum)%ReflectSolBeamFront
+
+          AbsScreen      = AbsScBeam * (1.0d0 + TScBmBm * RGlFront) + &
+                         (AbsScDiffBack*TScBmBm*RGlFront*RGlDiffFront*RScBack/(1.d0-RScDifBack*RGlDiffFront))
+
+          ExtBeamAbsByShadFac(SurfNum) = AbsScreen * CosInc * SunLitFract * InOutProjSLFracMult
+
+        END IF
+
+          ! Exterior beam absorbed by BETWEEN-GLASS BLIND
+
+        IF(ShadeFlag == BGBlindOn) THEN
+          IF(NGlass == 2) THEN
+            AbsShade     = t1*(afshB + tfshBB*rf2*abshB + tfshBd*rfd2*abshd + rfshB*rbd1*afshd)
+            AbsShadeDiff = td1*(afshd*(1 + rfshd*rbd1) + tfshd*rfd2*abshd)
+          ELSE IF(NGlass == 3) THEN
+            AbsShade     = t1t2*(afshB*(1 + tfshBB*rf3) + afshd*(tfshBd*rfd3 + rfshB*(rbd2 + td2*rbd1*td2)))
+            AbsShadeDiff = td1td2*(afshd + tfshd*rfd3*abshd + rfshd*(rfd2 + td2*rbd2*td2)*afshd)
+          END IF
+          ExtBeamAbsByShadFac(SurfNum) =  AbsShade * CosInc * SunLitFract * InOutProjSLFracMult &
+                                            + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * AbsShadeDiff
+        END IF  ! End of check if between-glass blind
+
+      ELSEIF (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+
+        ! Put in the equivalent layer absorptions
+        DO Lay = 1,SurfaceWindow(SurfNum)%ComplexFen%State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState) &
+             %NLayers
+          ABWin(Lay)    = SurfaceWindow(SurfNum)%ComplexFen &
+                %State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState)%WinBmFtAbs(Lay,HourOfDay,TimeStep) &
+                         * CosInc * SunLitFract * SurfaceWindow(SurfNum)%OutProjSLFracMult(HourOfDay)
+
+            ! Add contribution of beam reflected from outside and inside reveal
+          AWinSurf(SurfNum,Lay) = ABWin(Lay) &
+                + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * &
+                    SurfaceWindow(SurfNum)%ComplexFen &
+                        %State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState)%WinFtHemAbs(Lay)&
+                + SurfaceWindow(SurfNum)%InsRevealDiffOntoGlazing * &
+                    SurfaceWindow(SurfNum)%ComplexFen &
+                        %State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState)%WinBkHemAbs(Lay)
+        END DO
+      ENDIF
 
     END IF ! End of SunLitFrac check
 
@@ -5479,7 +5569,19 @@ DO ZoneNum = 1, NumOfZones
     SkySolarInc = SurfaceWindow(SurfNum)%SkySolarInc
     GndSolarInc = SurfaceWindow(SurfNum)%GndSolarInc
 
-    IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
+    IF (SurfaceWindow(SurfNum)%WindowModelType  /= WindowBSDFModel) THEN ! Regular window
+      DiffTrans = Construct(ConstrNum)%TransDiff
+      IF (DifSolarRad /= 0.0) THEN
+        DSZoneWin = (SkySolarInc * DiffTrans * Surface(SurfNum)%Area) / (DifSolarRad)
+      ELSE
+        DSZoneWin = (SkySolarInc * DiffTrans * Surface(SurfNum)%Area) / (1.d-8)
+      ENDIF
+      IF (GndSolarRad /= 0.0) THEN
+        DGZoneWin = (GndSolarInc * DiffTrans * Surface(SurfNum)%Area) / (GndSolarRad)
+      ELSE
+        DGZoneWin = (GndSolarInc * DiffTrans * Surface(SurfNum)%Area) / (1.d-8)
+      ENDIF
+    ELSEIF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
       DiffTrans = TransTDD(PipeNum, CosInc, SolarAniso)
 
       DSZoneWin = AnisoSkyMult(SurfNum2) * DiffTrans * Surface(SurfNum)%Area
@@ -5508,13 +5610,31 @@ DO ZoneNum = 1, NumOfZones
       !
       ! DGZoneWin = (GndVF*Trans*Area*GndSolarRad + ShelfVF*Trans*Area*ShelfSolarRad) / GndSolarRad
       !
-      DGZoneWin = (Surface(SurfNum)%ViewFactorGround * DiffTrans * Surface(SurfNum)%Area * GndSolarRad &
-        + Shelf(ShelfNum)%ViewFactor * DiffTrans * Surface(SurfNum)%Area * ShelfSolarRad) / GndSolarRad
+      IF (GndSolarRad /= 0.0) THEN
+        DGZoneWin = (Surface(SurfNum)%ViewFactorGround * DiffTrans * Surface(SurfNum)%Area * GndSolarRad &
+          + Shelf(ShelfNum)%ViewFactor * DiffTrans * Surface(SurfNum)%Area * ShelfSolarRad) / GndSolarRad
+      ELSE
+        DGZoneWin = 0.0
+      ENDIF
 
-    ELSE ! Regular window
-      DiffTrans = Construct(ConstrNum)%TransDiff
-      DSZoneWin = SkySolarInc * DiffTrans * Surface(SurfNum)%Area / (DifSolarRad + 1.E-8)
-      DGZoneWin = GndSolarInc * DiffTrans * Surface(SurfNum)%Area / (GndSolarRad + 1.E-8)
+    ELSEIF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN ! complex fenestration
+        !Sky Diffuse transmitted by Complex Fen
+      DiffTransSky  = SurfaceWindow(SurfNum)%ComplexFen%State( SurfaceWindow(SurfNum)%ComplexFen%CurrentState )%WinSkyTrans
+      DSZoneWin = SkySolarInc * DiffTransSky * Surface(SurfNum)%Area / (DifSolarRad + 1.d-8)
+        !Ground Diffuse transmitted by Complex Fen
+      DiffTransGnd = SurfaceWindow(SurfNum)%ComplexFen%State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState)%WinSkyGndTrans
+      DiffTransBmGnd = SurfaceWindow(SurfNum)%ComplexFen%State( SurfaceWindow(SurfNum)%ComplexFen%CurrentState )  &
+             %WinBmGndTrans(HourOfDay,TimeStep)
+      DGZoneWin = ((SurfaceWindow(SurfNum)%BmGndSolarInc * DiffTransBmGnd &
+             +SurfaceWindow(SurfNum)%SkyGndSolarInc * DiffTransGnd ) * Surface(SurfNum)%Area) / (GndSolarRad + 1.d-8)
+        !Define the effective transmittance for total sky and ground radiation
+      DiffTrans = ( SkySolarInc*DiffTransSky +SurfaceWindow(SurfNum)%BmGndSolarInc * DiffTransBmGnd &
+             + SurfaceWindow(SurfNum)%SkyGndSolarInc * DiffTransGnd )/  &
+                (SkySolarInc + SurfaceWindow(SurfNum)%BmGndSolarInc + SurfaceWindow(SurfNum)%SkyGndSolarInc )
+        !Also update the nominal diffuse transmittance
+      NomDiffTrans = SurfaceWindow(SurfNum)%ComplexFen%State(SurfaceWindow(SurfNum)%ComplexFen%CurrentState )%WinDiffTrans
+      Construct(Surface(SurfNum)%Construction)%TransDiff = NomDiffTrans
+
     END IF
 
     IF(ShadeFlag <= 0 .OR. ShadeFlag >= 10) THEN
@@ -5574,12 +5694,18 @@ DO ZoneNum = 1, NumOfZones
       IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
         TBmDif = TransTDD(PipeNum, CosInc, SolarBeam)
         TDDPipe(PipeNum)%TransSolBeam = TBmDif ! Report variable
-      ELSE ! Regular window
+      ELSEIF(SurfaceWindow(SurfNum)%WindowModelType  /= WindowBSDFModel) THEN ! Regular window
         IF(.not.SurfaceWindow(SurfNum)%SolarDiffusing) THEN   ! Clear glazing
           TBmBm = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6)) ![-]
         ELSE                                                  ! Diffusing glazing
           TBmDif = POLYF(CosInc,Construct(ConstrNum)%TransSolBeamCoef(1:6)) ![-]
         END IF
+      ELSEIF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
+        ! Need to check what effect, if any, defining these here has
+        TBmBm = SurfaceWindow(SurfNum)%ComplexFen%State( SurfaceWindow(SurfNum)%ComplexFen%CurrentState )  &
+                 %WinDirSpecTrans( HourOfDay,TimeStep )
+        TBmDif = SurfaceWindow(SurfNum)%ComplexFen%State( SurfaceWindow(SurfNum)%ComplexFen%CurrentState ) &
+                 %WinDirHemiTrans( HourOfDay,TimeStep )  - TBmBm
       END IF
     END IF
 
@@ -5590,8 +5716,14 @@ DO ZoneNum = 1, NumOfZones
     ! Diffuse-diffuse transmittance for bare exterior window
     IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
       TDifBare = TransTDD(PipeNum, CosInc, SolarAniso)
-    ELSE ! Regular window
-      TDifBare = Construct(ConstrNum)%TransDiff
+    ELSE
+      IF ( SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
+            !Complex Fenestration: use hemispherical ave of directional-hemispherical transmittance
+            !Note: this is not quite the same as the effective transmittance for total of sky and ground radiation
+        TDifBare = SurfaceWindow(SurfNum)%ComplexFen%State( SurfaceWindow(SurfNum)%ComplexFen%CurrentState )%WinDiffTrans
+      ELSE ! Regular window
+        TDifBare = Construct(ConstrNum)%TransDiff
+      END IF
     END IF
     SurfaceWindow(SurfNum)%GlTsolDifDif = TDifBare
 
@@ -5734,8 +5866,11 @@ DO ZoneNum = 1, NumOfZones
                         ! Switchable glazing
 
       SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
-      TBmBm     = InterpSw(SwitchFac,TBmBm,TBmAllShBlSc)
-
+      IF(.not.SurfaceWindow(SurfNum)%SolarDiffusing) THEN
+        TBmBm     = InterpSw(SwitchFac,TBmBm,TBmAllShBlSc)
+      ELSE
+        TBmDif    = InterpSw(SwitchFac,TBmDif,TBmAllShBlSc)
+      ENDIF
     END IF
 
     ! The following WinTransBmSolar and WinTransDifSolar will be combined later to give
@@ -5749,7 +5884,10 @@ DO ZoneNum = 1, NumOfZones
       END IF
     END IF
     IF(ShadeFlag < 1 .OR. ShadeFlag == SwitchableGlazing .OR. ShadeFlag >= 10) THEN ! Unshaded or switchable glazing
+      !Note: with previous defs of TBmBm & TBmDif, these come out right for Complex Fenestration
+      ! WinTransBmSolar uses the directional-hemispherical transmittance
       WinTransBmSolar(SurfNum)  = (TBmBm + TBmDif) * SunLitFract * CosInc * Surface(SurfNum)%Area * InOutProjSLFracMult
+
 
       !added TH 12/9/2009
       WinTransBmBmSolar  = TBmBm * SunLitFract * CosInc * Surface(SurfNum)%Area * InOutProjSLFracMult          ! m2
@@ -5765,11 +5903,21 @@ DO ZoneNum = 1, NumOfZones
 
     ! Add diffuse transmitted by window from beam reflected from outside reveal
 
-    WinTransBmSolar(SurfNum) = WinTransBmSolar(SurfNum) + &
-       SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
+    IF( SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN  !Complex Fenestration
+      WinTransBmSolar(SurfNum) = WinTransBmSolar(SurfNum) + &
+        SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * NomDiffTrans * Surface(SurfNum)%Area
 
     !added TH 12/9/2009
-    WinTransBmDifSolar = WinTransBmDifSolar + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
+      WinTransBmDifSolar = WinTransBmDifSolar + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * NomDiffTrans &
+                            * Surface(SurfNum)%Area
+    ELSE  !Regular window
+      WinTransBmSolar(SurfNum) = WinTransBmSolar(SurfNum) + &
+          SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
+
+      !added TH 12/9/2009
+      WinTransBmDifSolar = WinTransBmDifSolar + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans &
+        * Surface(SurfNum)%Area
+    END IF
 
     ! Increment factor for total exterior beam solar entering zone through window as beam or diffuse
 
@@ -5799,11 +5947,17 @@ DO ZoneNum = 1, NumOfZones
       ! The BTOTZone is the solar into zone assuming no inside or outside reveals
       ! The inside reveals receive solar (reflected part + absorbed part) from the window, this amount should be
       ! deducted from the BTOTZone, then adds the InsRevealDiffIntoZone
-      BTOTZone = BTOTZone - SurfaceWindow(SurfNum)%BmSolRefldInsReveal &
+      IF( SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN  !Complex Fenestration
+        BTOTZone = BTOTZone - SurfaceWindow(SurfNum)%BmSolRefldInsReveal &
+                          - SurfaceWindow(SurfNum)%BmSolAbsdInsReveal &
+                          + SurfaceWindow(SurfNum)%InsRevealDiffIntoZone &
+                          + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * NomDiffTrans * Surface(SurfNum)%Area
+      ELSE  !Regular window
+        BTOTZone = BTOTZone - SurfaceWindow(SurfNum)%BmSolRefldInsReveal &
                           - SurfaceWindow(SurfNum)%BmSolAbsdInsReveal &
                           + SurfaceWindow(SurfNum)%InsRevealDiffIntoZone &
                           + SurfaceWindow(SurfNum)%OutsRevealDiffOntoGlazing * DiffTrans * Surface(SurfNum)%Area
-
+      END IF
       ! Add beam solar absorbed by outside reveal to outside of window's base surface.
       ! Add beam solar absorbed by inside reveal to inside of window's base surface.
       ! This ignores 2-D heat transfer effects.
@@ -5869,9 +6023,11 @@ DO ZoneNum = 1, NumOfZones
 
       IF(SolarDistribution ==  FullInteriorExterior) THEN  ! Full interior solar distribution
 
+       IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
         ! Loop over back surfaces irradiated by beam from this exterior window
 
-        DO IBack = 1,20
+        DO IBack = 1,MaxBkSurf
+
           BackSurfNum = BackSurfaces(SurfNum,IBack,HourOfDay,TimeStep)
 
           IF(BackSurfNum == 0) EXIT   ! No more irradiated back surfaces for this exterior window
@@ -5920,6 +6076,13 @@ DO ZoneNum = 1, NumOfZones
             SlatAngBack     = SurfaceWindow(BackSurfNum)%SlatAngThisTS
             VarSlatsBack    = SurfaceWindow(BackSurfNum)%MovableSlats
             CosIncBack      = ABS(CosIncAng(BackSurfNum,HourOfDay,TimeStep))
+            !
+            IF(SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+                !Transmitting window is complex fen, change the incident angle to one for ray joining
+                ! transmitting and back window centers
+              CosIncBack = ABS( ComplexWind(SurfNum)%sdotN(IBack) )
+            ENDIF
+              !
             ConstrNumBackSh = Surface(BackSurfNum)%ShadedConstruction
             IF(SurfaceWindow(BackSurfNum)%StormWinFlag==1) THEN
               ConstrNum   = Surface(BackSurfNum)%StormWinConstruction
@@ -6236,7 +6399,137 @@ DO ZoneNum = 1, NumOfZones
           BmIncInsSurfAmountRep(BackSurfNum) = BmIncInsSurfAmountRep(BackSurfNum) + Boverlap
           BmIncInsSurfAmountRepEnergy(BackSurfNum) = BmIncInsSurfAmountRep(BackSurfNum) * TimeStepZone * SecInHour
         END DO  ! End of loop over back surfaces
+       ELSE IF  (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+         ! For complex window calculation goes over outgoing basis directions
+         ! for current state
+         CurCplxFenState = SurfaceWindow(SurfNum)%ComplexFen%CurrentState
 
+         ! Current incoming direction number (Sun direction)
+         IBm = ComplexWind(SurfNum)%Geom(CurCplxFenState)%SolBmIndex(HourOfDay, TimeStep)
+
+         ! Report variables for complex fenestration here
+         BSDFBeamDirectionRep(SurfNum) = IBm
+         BSDFBeamThetaRep(SurfNum) = ComplexWind(SurfNum)%Geom(CurCplxFenState)%ThetaBm(HourOfDay, TimeStep)
+         BSDFBeamPhiRep(SurfNum) = ComplexWind(SurfNum)%Geom(CurCplxFenState)%PhiBm(HourOfDay, TimeStep)
+
+         ! Get construction number which keeps transmittance properties
+         IConst = SurfaceWindow(SurfNum)%ComplexFen%State(CurCplxFenState)%Konst
+
+         BaseSurf = Surface(SurfNum)%BaseSurf
+         ! Get total number of back surfaces for current window (surface)
+         ! Note that it is organized by base surface
+         NBkSurf   = ShadowComb(BaseSurf)%NumBackSurf
+
+         IF (.not.ALLOCATED(CFBoverlap)) THEN
+           ALLOCATE(CFBoverlap(NBkSurf))
+         END IF
+
+         IF (.not.ALLOCATED(CFDirBoverlap)) THEN
+           ALLOCATE(CFDirBoverlap(ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%NBasis, NBkSurf))
+         END IF
+         
+         CFBoverlap = 0.0d0
+         ! delete values from previous timestep
+         AWinCFOverlap = 0.0d0
+         
+         ! Calculate effects on all back surfaces for each of basis directions.  Each of basis directions from the back of the
+         ! window has to be considered as beam and therefore calcualte CFBoverlap for each of them
+         DO CurTrnDir = 1, ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%NBasis
+           CurLambda = ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%Lamda(CurTrnDir)
+           DirTrans = Construct(IConst)%BSDFInput%SolFrtTrans(CurTrnDir, IBm)
+           ! Now calculate effect of this direction on all back surfaces
+           DO IBack = 1, NBkSurf
+            CFDirBoverlap(CurTrnDir, IBack) = ComplexWind(SurfNum)%Geom(CurCplxFenState)% &
+              Aoverlap(CurTrnDir, IBack) * DirTrans * CurLambda * CosInc
+            CFBoverlap(IBack) = CFBoverlap(IBack) + CFDirBoverlap(CurTrnDir, IBack)
+           END DO ! DO IBack = 1,MaxBkSurf
+         END DO
+
+         ! Summarizing results
+         DO IBack = 1, NBkSurf
+           BackSurfaceNumber = ShadowComb(BaseSurf)%BackSurf(IBack)
+           ConstrNumBack = Surface(BackSurfaceNumber)%Construction
+           ! Surface hit is another complex fenestration
+           IF (SurfaceWindow(BackSurfaceNumber)%WindowModelType == WindowBSDFModel) THEN
+             CurBackState = SurfaceWindow(BackSurfaceNumber)%ComplexFen%CurrentState
+             ! Calculate energy loss per each outgoing orientation
+             DO CurTrnDir = 1, ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%NBasis
+               DO CurBackDir = 1, ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%Trn%NBasis
+                  ! Purpose of this part is to find best match for outgoing beam number of window back surface and incoming beam
+                  ! number of complex fenestration which this beam will hit on (back surface again)
+                  tempVec1(1) = ComplexWind(SurfNum)%Geom(CurCplxFenState)%sTrn(CurTrnDir)%X
+                  tempVec1(2) = ComplexWind(SurfNum)%Geom(CurCplxFenState)%sTrn(CurTrnDir)%Y
+                  tempVec1(3) = ComplexWind(SurfNum)%Geom(CurCplxFenState)%sTrn(CurTrnDir)%Z
+                  tempVec2(1) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%X
+                  tempVec2(2) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%Y
+                  tempVec2(3) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%Z
+                  curDot = DOT_PRODUCT(tempVec1, tempVec2) 
+                  IF (CurBackDir == 1) THEN
+                    bestDot = curDot
+                    bestTrn = CurTrnDir
+                    bestBackTrn = CurBackDir
+                  ELSE
+                    IF (curDot < bestDot) THEN
+                      bestDot = curDot
+                      bestTrn = CurTrnDir
+                      bestBackTrn = CurBackDir
+                    END IF
+                  END IF
+               END DO
+               ! CurLambda = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%Trn%Lamda(CurTrnDir)
+               ! Add influence of this exact direction to what stays in the zone.  It is important to note that
+               ! this needs to be done for each outgoing direction
+               BABSZone = BABSZone + CFDirBoverlap(CurTrnDir, IBack) * &
+                  &     (1 - SurfaceWindow(BackSurfaceNumber)%ComplexFen%State(CurBackState)%IntegratedBkRefl(bestBackTrn))
+               
+               ! Absorptance from current back direction
+               TotSolidLay = Construct(ConstrNumBack)%TotSolidLayers
+               DO Lay = 1, TotSolidLay
+                !IF (ALLOCATED(Construct(ConstrNumBack)%BSDFInput)) THEN
+                  ! CFDirBoverlap is energy transmitted for current basis beam.  It is important to note that AWinOverlap array
+                  ! needs to contain flux and not absorbed energy because later in the code this will be multiplied with window
+                  ! area
+                  AWinCFOverlap(BackSurfaceNumber, Lay) = AWinCFOverlap(BackSurfaceNumber, Lay) + &
+                    & Construct(ConstrNumBack)%BSDFInput%Layer(Lay)%BkAbs(1, bestBackTrn) * CFDirBoverlap(CurTrnDir, IBack) & 
+                    & / Surface(BackSurfaceNumber)%Area
+                !END IF
+               END DO
+               
+               ! Interior beam transmitted to adjacent zone through an interior back window;
+               ! This beam radiation is categorized as diffuse radiation in the adjacent zone.
+               ! Note that this is done for each outgoing direction of exterior window
+
+               AdjSurfNum = Surface(BackSurfaceNumber)%ExtBoundCond
+               IF(AdjSurfNum > 0) THEN
+                  AdjZoneNum = Surface(AdjSurfNum)%Zone
+                  DBZoneIntWin(AdjZoneNum) = DBZoneIntWin(AdjZoneNum) + CFDirBoverlap(CurTrnDir, IBack) * &
+                    & SurfaceWindow(BackSurfaceNumber)%ComplexFen%State(CurBackState)%IntegratedBkTrans(bestBackTrn)
+                  SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRep = &
+                    & SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRep + &
+                    & CFDirBoverlap(CurTrnDir, IBack) * &
+                    & SurfaceWindow(BackSurfaceNumber)%ComplexFen%State(CurBackState)%IntegratedBkTrans(bestBackTrn) * &
+                    & BeamSolarRad   ![W]
+                  SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRepEnergy = & 
+                    & SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRep &
+                    & * TimeStepZone * SecInHour
+               END IF
+             END DO             
+           ELSE
+              IF (Construct(ConstrNumBack)%TransDiff <= 0.0d0) THEN
+                AbsIntSurf = Construct(ConstrNumBack)%InsideAbsorpSolar
+                AISurf(BackSurfaceNumber) = AISurf(BackSurfaceNumber) + CFBoverlap(IBack) * &
+                    AbsIntSurf/Surface(BackSurfaceNumber)%Area
+                BABSZone = BABSZone + CFBoverlap(IBack) * AbsIntSurf                                  
+              ELSE
+                ! Code for mixed windows goes here.  It is same as above code for "ordinary" windows.
+                ! Try to do something which will not produce duplicate code.
+              ENDIF
+            ENDIF
+         END DO
+
+         IF (ALLOCATED(CFBoverlap)) DEALLOCATE(CFBoverlap)
+         IF (ALLOCATED(CFDirBoverlap)) DEALLOCATE(CFDirBoverlap)
+       END IF ! IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
       ELSE  ! Simple interior solar distribution. All beam from exterior windows falls on floor;
             ! some of this is absorbed/transmitted, rest is reflected to other surfaces.
 
@@ -6260,6 +6553,8 @@ DO ZoneNum = 1, NumOfZones
               ! the beam radiation from exterior windows is assumed to be uniformly distributed over the
               ! floor and so it makes no sense to use directional absorptances. Note also that floor windows
               ! are assumed to not have blinds or shades in this calculation.
+              ! For the case of the floor window a complex fenestration (strange situation) the correct back
+              ! diffuse layer absorptions have already been put into the construction
             IF(SurfaceWindow(FloorNum)%StormWinFlag==1) FlConstrNum = Surface(FloorNum)%StormWinConstruction
             AbsBeamTotWin = 0.
             DO Lay = 1,Construct(FlConstrNum)%TotGlassLayers
@@ -6394,6 +6689,9 @@ DO ZoneNum = 1, NumOfZones
           GndSolarInc = SurfaceWindow(SurfNum)%GndSolarInc
           DifSolarInc = SkySolarInc + GndSolarInc
           WinBmSolar(SurfNum)  = BeamSolarRad * WinTransBmSolar(SurfNum)
+          !Note: for complex fenestration, WinTransDifSolar has previously been defined using the effective
+          ! transmittance for sky and ground diffuse radiation (including beam radiation reflected from the ground)
+          ! so these calculations should be correct
           WinDifSolar(SurfNum) = DifSolarInc * WinTransDifSolar(SurfNum)
           WinBmSolarEnergy(SurfNum)  = WinBmSolar(SurfNum) * TimeStepZone * SecInHour
           WinDifSolarEnergy(SurfNum) = WinDifSolar(SurfNum) * TimeStepZone * SecInHour
@@ -10131,6 +10429,228 @@ SUBROUTINE CalcInteriorWinTransDifSolInitialDistribution(ZoneNum, IntWinSurfNum,
   RETURN
 
 END SUBROUTINE CalcInteriorWinTransDifSolInitialDistribution
+
+subroutine CalcComplexWindowOverlap(Geom, Window, ISurf)
+  ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Simon Vidanovic
+          !       DATE WRITTEN   May 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! For each of basis directions on back surface of the window calculates
+          ! overlap areas
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE vectors
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+  ! SUBROUTINE PARAMETER DEFINITIONS:
+
+  INTEGER, INTENT(IN)      ::  ISurf    !Surface number of the complex fenestration
+  TYPE (BSDFWindowGeomDescr),INTENT(IN)    ::  Window  !Window Geometry
+  TYPE (BSDFGeomDescr), INTENT(INOUT)  ::  Geom    !State Geometry
+  ! INTERFACE BLOCK SPECIFICATIONS
+
+  ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)        ::  XShadowProjection   ! temporary buffer
+  REAL(r64)        ::  YShadowProjection   ! temporary buffer
+  REAL(r64)        ::  XSp           !for calc BSDF projection direction
+  REAL(r64)        ::  YSp           !for calc BSDF projection direction
+  REAL(r64)        ::  ZSp           !for calc BSDF projection direction
+  REAL(r64)             ::  SdotX           !temporary variable for manipulating .dot. product
+  REAL(r64)             ::  SdotY           !temporary variable for manipulating .dot. product
+  REAL(r64)             ::  SdotZ           !temporary variable for manipulating .dot. product
+  INTEGER         :: BackSurfaceNumber ! current back surface number
+  INTEGER NVR
+  INTEGER NVT  ! Number of vertices of back surface
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: XVT    ! X,Y,Z coordinates of vertices of
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: YVT    ! back surfaces projected into system
+  REAL(r64), ALLOCATABLE, DIMENSION(:), SAVE :: ZVT    ! relative to receiving surface
+  INTEGER NS1      ! Number of the figure being overlapped
+  INTEGER NS2      ! Number of the figure doing overlapping
+  INTEGER NS3      ! Location to place results of overlap
+  INTEGER IRay     ! Current ray of BSDF direction
+  INTEGER KBkSurf  ! Current back surface
+  INTEGER BaseSurf ! Base surface number
+  INTEGER N, M
+  INTEGER CurBaseSurf ! Currnet base surface number for shadow overlap calcualtions
+  INTEGER curBackSurface ! Current back surface number for base surface
+  INTEGER LOCStore ! Use to store pointer to highes data in local array
+                   ! When that counter is used in this routine, it just
+                   ! can be taken back to old number because all results
+                   ! are stored within this routine
+
+  ALLOCATE(XVT(MaxVerticesPerSurface+1))
+  ALLOCATE(YVT(MaxVerticesPerSurface+1))
+  ALLOCATE(ZVT(MaxVerticesPerSurface+1))
+  XVT=0.0
+  YVT=0.0
+  ZVT=0.0
+
+  ALLOCATE(Geom%Aoverlap(Geom%Trn%NBasis, Window%NBkSurf))
+  Geom%Aoverlap = 0.0d0
+
+  ! First to calculate and store coordinates of the window surface
+  LOCHCA = 1
+  BaseSurf = Surface(ISurf)%BaseSurf
+
+  ! Base surface contains current window surface (ISurf).
+  ! Since that is case, bellow transformation should always return ZVT = 0.0
+  ! for every possible transformation
+  CALL CTRANS(ISurf,BaseSurf,NVT,XVT,YVT,ZVT)
+
+  ! HTRANS routine is using coordinates stored in XVS and YVS in order to calculate
+  ! surface area.  Since both projections are equal to zero, then simply
+  ! compy these values into XVS and YVS arrays
+  DO N = 1, NVT
+    XVS(N) = XVT(N)
+    YVS(N) = YVT(N)
+  END DO
+
+  ! This calculates the area stored in XVS and YVS
+  !CALL HTRANS(1,LOCHCA,NVT)
+  CALL HTRANS1(LOCHCA,NVT)
+  !HCAREA(LOCHCA) = -HCAREA(LOCHCA)
+
+  ! Calculation of overlap areas for each outgoing basis direction
+  DO IRay = 1, Geom%Trn%NBasis ! basis directions loop (on back surface)
+    ! For current basis direction calculate dot product between window surface
+    ! and basis direction.  This will be used to calculate projection of each
+    ! of the back surfaces to window surface for given basis direciton
+    SdotX = Surface(ISurf)%lcsx.dot.Geom%sTrn(IRay)
+    SdotY = Surface(ISurf)%lcsy.dot.Geom%sTrn(IRay)
+    SdotZ = Surface(ISurf)%lcsz.dot.Geom%sTrn(IRay)
+    XSp = -SdotX
+    YSp = -SdotY
+    ZSp = -SdotZ
+
+    ! Projection of shadows for current basis direciton
+    IF (ABS(ZSp) > 1.d-4) THEN
+      XShadowProjection = XSp/ZSp
+      YShadowProjection = YSp/ZSp
+      IF (ABS(XShadowProjection) < 1.d-8) XShadowProjection=0.0
+      IF (ABS(YShadowProjection) < 1.d-8) YShadowProjection=0.0
+    ELSE
+      XShadowProjection = 0.0
+      YShadowProjection = 0.0
+    ENDIF
+
+    DO KBkSurf  = 1 , Window%NBkSurf    !back surf loop
+      !BaseSurf = Surface(ISurf)%BaseSurf
+      BackSurfaceNumber = ShadowComb(BaseSurf)%BackSurf(KBkSurf)
+
+      ! Transform coordinates of back surface from general system to the
+      ! plane of the receiving surface
+      CALL CTRANS(BackSurfaceNumber,BaseSurf,NVT,XVT,YVT,ZVT)
+
+      ! Project "shadow" from back surface along sun's rays to receiving surface.  Back surface vertices
+      ! become clockwise sequential.
+
+      DO N = 1, NVT
+        XVS(N) = XVT(N) - XShadowProjection*ZVT(N)
+        YVS(N) = YVT(N) - YShadowProjection*ZVT(N)
+      END DO
+
+      ! Transform to the homogeneous coordinate system.
+
+      NS3      = LOCHCA+1
+      !NS3      = LOCHCA
+      HCT(NS3) = 0.0d0
+      !CALL HTRANS(1,NS3,NVT)
+      CALL HTRANS1(NS3,NVT)
+
+      ! Determine area of overlap of projected back surface and receiving surface.
+
+      NS1      = 1
+      NS2      = NS3
+      HCT(NS3) = 1.0
+      CALL DeterminePolygonOverlap(NS1,NS2,NS3)
+
+      IF (OverlapStatus == NoOverlap) CYCLE ! to next back surface
+      IF ( (OverlapStatus == TooManyVertices).OR. &
+        (OverlapStatus == TooManyFigures) ) EXIT ! back surfaces DO loop
+
+      LOCHCA         = NS3
+      HCNS(LOCHCA)   = BackSurfaceNumber
+      HCAREA(LOCHCA) = -HCAREA(LOCHCA)
+
+      Geom%Aoverlap(IRay, KBkSurf) = HCAREA(LOCHCA)
+    END DO ! DO KBkSurf  = 1 , NBkSurf
+    
+    ! If some of back surfaces is contained in base surface, then need to substract shadow of subsurface
+    ! from shadow on base surface.  Reson is that above shadowing algorithm is calculating shadow wihtout
+    ! influence of subsurfaces
+    DO KBkSurf  = 1 , Window%NBkSurf    !back surf loop      
+      BackSurfaceNumber = ShadowComb(BaseSurf)%BackSurf(KBkSurf)  
+      CurBaseSurf = Surface(BackSurfaceNumber)%BaseSurf
+      IF (CurBaseSurf /= BackSurfaceNumber) THEN
+        ! Search if that base surface in list of back surfaces for current window
+        CurBackSurface = 0
+        DO N = 1, Window%NBkSurf
+          IF (ShadowComb(BaseSurf)%BackSurf(N) == CurBaseSurf) THEN
+            curBackSurface = N
+            EXIT
+          END IF
+        END DO
+        IF (CurBackSurface /= 0) THEN
+          Geom%Aoverlap(IRay, curBackSurface) = Geom%Aoverlap(IRay, curBackSurface) - Geom%Aoverlap(IRay, KBkSurf)  
+        END IF
+      END IF
+    END DO
+    
+  END DO ! DO IRay = 1, Geom%Trn%NBasis
+
+  ! Reset back shadowing counter since complex windows do not need it anymore
+  LOCHCA = 1
+
+  DEALLOCATE(XVT)
+  DEALLOCATE(YVT)
+  DEALLOCATE(ZVT)
+
+end subroutine CalcComplexWindowOverlap
+
+subroutine CalcAllComplexWindowsOverlaps
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Simon Vidanovic
+          !       DATE WRITTEN   May 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! For each complex window calculates area overlaps for
+          ! assigned basis direction
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+
+  integer iSurf  ! Current surface number
+  integer iState ! current state number
+  integer NumOfStates ! number of states for current window
+
+
+  do iSurf = 1, TotSurfaces
+    if (SurfaceWindow(iSurf)%WindowModelType == WindowBSDFModel) then
+      NumOfStates = ComplexWind(iSurf)%NumStates
+      do iState = 1, NumOfStates
+        call CalcComplexWindowOverlap(ComplexWind(iSurf)%Geom(iState), ComplexWind(iSurf), iSurf)
+      end do
+    end if
+  end do
+
+end subroutine CalcAllComplexWindowsOverlaps
 
 !     NOTICE
 !

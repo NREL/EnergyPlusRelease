@@ -756,6 +756,7 @@ SUBROUTINE GetUserDefinedComponents
           ! USE STATEMENTS:
   USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectDefMaxArgs, GetObjectItem, &
                                    FindItemInList, VerifyName
+  USE General,               ONLY: RoundSigDigits
   USE NodeInputManager,      ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet
   USE DataHeatBalance,       ONLY: Zone, IntGainTypeOf_PlantComponentUserDefined, &
@@ -869,8 +870,7 @@ SUBROUTINE GetUserDefinedComponents
         ALLOCATE(UserPlantComp(CompLoop)%Loop(NumPlantConnections))
         UserPlantComp(CompLoop)%NumPlantConnections = NumPlantConnections
         DO ConnectionLoop = 1, NumPlantConnections
-          WRITE(LoopStr,*) ConnectionLoop
-          LoopStr = ADJUSTL(LoopStr)
+          LoopStr=RoundSigDigits(ConnectionLoop)
           aArgCount = (ConnectionLoop-1) *  6 + 3
           UserPlantComp(CompLoop)%Loop(ConnectionLoop)%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
@@ -879,7 +879,8 @@ SUBROUTINE GetUserDefinedComponents
                GetOnlySingleNode(cAlphaArgs(aArgCount + 1),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
                NodeConnectionType_Outlet, 1, ObjectIsNotParent)
 
-          CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),'Plant Nodes')
+          CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),  &
+             'Plant Nodes '//LoopStr)
 
           SELECT CASE (TRIM(cAlphaArgs(aArgCount + 2)))
           CASE ('DEMANDSLOAD')
@@ -1160,8 +1161,7 @@ SUBROUTINE GetUserDefinedComponents
              GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),UserCoil(CompLoop)%Name, &
                          NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
 
-          WRITE(LoopStr,*) ConnectionLoop
-          LoopStr = ADJUSTL(LoopStr)
+          LoopStr=RoundSigDigits(ConnectionLoop)
             !model input related internal variables
           CALL SetupEMSInternalVariable( 'Inlet Temperature for Air Connection '//TRIM(LoopStr) , UserCoil(CompLoop)%Name, &
                                          '[C]',      UserCoil(CompLoop)%Air(ConnectionLoop)%InletTemp )
@@ -1187,7 +1187,8 @@ SUBROUTINE GetUserDefinedComponents
                                           'Mass Flow Rate', '[kg/s]', lDummy, &
                                           UserCoil(CompLoop)%Air(ConnectionLoop)%OutletMassFlowRate)
 
-          CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),'Air Nodes')
+          CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),  &
+             'Air Nodes '//LoopStr)
 
         ENDDO
 
@@ -1270,10 +1271,10 @@ SUBROUTINE GetUserDefinedComponents
 
       IF (.NOT. lAlphaFieldBlanks(13) ) THEN
 
-        UserCoil(CompLoop)%Zone%ZoneNum = FindItemInList(cAlphaArgs(17),Zone%Name,NumOfZones)
+        UserCoil(CompLoop)%Zone%ZoneNum = FindItemInList(cAlphaArgs(13),Zone%Name,NumOfZones)
         IF (UserCoil(CompLoop)%Zone%ZoneNum == 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Ambient Zone Name not found = '//TRIM(cAlphaArgs(17)))
+            ':  Ambient Zone Name not found = '//TRIM(cAlphaArgs(13)))
           ErrorsFound = .TRUE.
         ELSE
           UserCoil(CompLoop)%Zone%DeviceHasInternalGains = .TRUE.
@@ -1735,8 +1736,7 @@ SUBROUTINE GetUserDefinedComponents
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%HowLoadServed = HowMet_NoneDemand
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
           !Setup Internal Variables
-          WRITE(LoopStr,*) ConnectionLoop
-          LoopStr = ADJUSTL(LoopStr)
+          LoopStr = RoundSigDigits(ConnectionLoop)
           !model input related internal variables
           CALL SetupEMSInternalVariable( 'Inlet Temperature for Plant Connection '//TRIM(LoopStr) ,   &
              UserAirTerminal(CompLoop)%Name, '[C]', &

@@ -274,7 +274,7 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
 
   IF (EcoRoofbeginFlag) THEN
     EcoRoofbeginFlag = .FALSE.
-    IF (SolutionAlgo /= UseCTF) &
+    IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CTF) &
       CALL ShowWarningError('CalcEcoRoof: EcoRoof simulation but HeatBalanceAlgorithm is not ConductionTransferFunction(CTF).'//  &
          ' Has not been tested under other solution approaches.')
     ! ONLY READ ECOROOF PROPERTIES IN THE FIRST TIME

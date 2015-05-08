@@ -201,6 +201,10 @@ MODULE SystemAvailabilityManager
     INTEGER                      :: VentilationPtr         = 0   ! Ventilation object name pointer
     INTEGER                      :: AvailStatus            = 0   ! reports status of availability manager
     CHARACTER(len=MaxNameLength) :: VentilationName        = ' ' ! Ventilation object name
+    LOGICAL                      :: HybridVentMgrConnectedToAirLoop = .TRUE. ! Flag to check whether hybrid ventilation
+                                                                 ! manager is connected to air loop
+    LOGICAL                      :: SimHybridVentSysAvailMgr  = .FALSE. ! Set to false when a zone has two hybrid ventilation
+                                                                 ! managers, one with air loop and one without
   END TYPE DefineHybridVentSysAvailManager
 
   TYPE SysAvailManagerList
@@ -275,7 +279,7 @@ SUBROUTINE ManageSystemAvailability
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   August 2001
           !       MODIFIED       L. Gu, April, 2007. Added hybrid ventilation control
-          !                      Chandan Sharma, March 2011 - FSEC: Added zone sys avail managers
+          !                      Chandan Sharma, March 2011/July 2012 - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -288,7 +292,7 @@ SUBROUTINE ManageSystemAvailability
           ! NA
 
           ! USE STATEMENTS:
-  USE DataZoneEquipment, ONLY: ZoneEquipAvail, TotalNumZoneEquipType
+  USE DataZoneEquipment, ONLY: ZoneEquipAvail, NumValidSysAvailZoneComponents
   USE DataLoopNode
   USE DataAirLoop
   USE DataPlant
@@ -396,7 +400,7 @@ SUBROUTINE ManageSystemAvailability
 
   END DO ! end of plant loop
 
-  DO ZoneEquipType = 1,TotalNumZoneEquipType  ! loop over the zone equipment types
+  DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types which allow system avail managers
     IF(ALLOCATED(ZoneComp))THEN
      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0)THEN
       DO CompNum = 1, ZoneComp(ZoneEquipType)%TotalNumComp
@@ -422,6 +426,22 @@ SUBROUTINE ManageSystemAvailability
             END IF
           END DO ! end of availability manager loop
          ENDIF
+        ELSE
+          ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
+        ENDIF
+        IF (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%ZoneNum .GT. 0) THEN
+          IF (NumHybridVentSysAvailMgrs > 0) THEN
+            DO HybridVentNum = 1, NumHybridVentSysAvailMgrs
+              IF (.NOT. HybridVentSysAvailMgrData(HybridVentNum)%HybridVentMgrConnectedToAirLoop) THEN
+                IF (HybridVentSysAvailMgrData(HybridVentNum)%ActualZoneNum == &
+                    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%ZoneNum) THEN
+                  IF (HybridVentSysAvailMgrData(HybridVentNum)%VentilationCtrl == HybridVentCtrl_Open) THEN
+                    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = ForceOff
+                  END IF
+                END IF
+              ENDIF
+            END DO
+          END IF
         ENDIF
       END DO
      ENDIF
@@ -452,10 +472,11 @@ SUBROUTINE GetSysAvailManagerInputs
 
           ! USE STATEMENTS:
   USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindIteminList, SameString,   &
-        MakeUPPERCase, GetObjectDefMaxArgs
+                              MakeUPPERCase, GetObjectDefMaxArgs
   USE NodeInputManager, ONLY: GetOnlySingleNode, MarkNode
   USE DataHeatBalance,  ONLY: Zone
   USE DataLoopNode
+  USE DataZoneEquipment, ONLY: NumValidSysAvailZoneComponents, cValidSysAvailManagerCompTypes
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -490,6 +511,8 @@ SUBROUTINE GetSysAvailManagerInputs
   LOGICAL       :: IsBlank              ! Flag for blank name
   INTEGER       :: SysAvailNum          ! DO loop index for all System Availability Managers
   INTEGER       :: CyclingTimeSteps
+  INTEGER       :: ZoneEquipType
+  INTEGER       :: TotalNumComp
 
   ! Get the number of occurences of each type of manager and read in data
   cCurrentModuleObject = 'AvailabilityManager:Scheduled'
@@ -545,6 +568,20 @@ SUBROUTINE GetSysAvailManagerInputs
   rNumericArgs=0.0d0
   ALLOCATE(lNumericFieldBlanks(maxNumbers))
   lNumericFieldBlanks=.false.
+
+  IF (.not. ALLOCATED(ZoneComp)) THEN
+    ALLOCATE(ZoneComp(NumValidSysAvailZoneComponents))
+  ENDIF
+
+  DO ZoneEquipType = 1, NumValidSysAvailZoneComponents
+    IF (.not. ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs)) THEN
+      TotalNumComp = GetNumObjectsFound(TRIM(cValidSysAvailManagerCompTypes(ZoneEquipType)))
+      ZoneComp(ZoneEquipType)%TotalNumComp = TotalNumComp
+      IF (TotalNumComp .GT. 0) THEN
+        ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(TotalNumComp))
+      ENDIF
+    ENDIF
+  ENDDO
 
   cCurrentModuleObject = 'AvailabilityManager:Scheduled'
   NumSchedSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
@@ -1405,13 +1442,12 @@ SUBROUTINE GetAirLoopAvailabilityManager(AvailabilityListName,Loop,NumAirLoops,E
 
 END SUBROUTINE GetAirLoopAvailabilityManager
 
-SUBROUTINE GetZoneEqAvailabilityManager(AvailabilityListName,ErrorsFound, &
-                                        ZoneEquipType, CompNum, TotalNumComp)
+SUBROUTINE GetZoneEqAvailabilityManager(ZoneEquipType, CompNum, ErrorsFound)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
           !       DATE WRITTEN   April 2011
-          !       MODIFIED       Chandan Sharma, March 2011 - FSEC: Added zone sys avail managers
+          !       MODIFIED       Chandan Sharma, March 2011/July 2012 - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1428,16 +1464,13 @@ SUBROUTINE GetZoneEqAvailabilityManager(AvailabilityListName,ErrorsFound, &
 
           ! USE STATEMENTS:
   USE InputProcessor, ONLY: FindItemInList
-  USE DataZoneEquipment, ONLY: TotalNumZoneEquipType
-
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: AvailabilityListName  ! name that should be an Availability Manager List Name
   LOGICAL, INTENT(INOUT)       :: ErrorsFound           ! true if certain errors are detected here
   INTEGER, INTENT(IN)          :: ZoneEquipType     ! Type of ZoneHVAC:* component
   INTEGER, INTENT(IN)          :: CompNum           ! Index of a particular ZoneHVAC:* component
-  INTEGER, INTENT(IN)          :: TotalNumComp      ! Total number of ZoneHVAC:* components of same type
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1448,6 +1481,7 @@ SUBROUTINE GetZoneEqAvailabilityManager(AvailabilityListName,ErrorsFound, &
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  CHARACTER(len=MaxNameLength) :: AvailabilityListName  ! name that should be an Availability Manager List Name
   INTEGER :: Found
   INTEGER :: Num
   INTEGER :: CompNumAvailManagers ! Number of availability managers associated with a ZoneHVAC:* component
@@ -1457,64 +1491,51 @@ SUBROUTINE GetZoneEqAvailabilityManager(AvailabilityListName,ErrorsFound, &
     GetAvailListsInput=.FALSE.
   ENDIF
 
-  IF (.not. ALLOCATED(ZoneComp)) THEN
-    ALLOCATE(ZoneComp(TotalNumZoneEquipType))
-  ENDIF
-  IF (.not. ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs)) THEN
-    ZoneComp(ZoneEquipType)%TotalNumComp = TotalNumComp
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(TotalNumComp))
-  ENDIF
-
-  Found=0
-  IF (NumAvailManagerLists > 0) &
-    Found=FindItemInList(AvailabilityListName,SysAvailMgrListData%Name,NumAvailManagerLists)
-
-  IF (Found /= 0) THEN
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers = SysAvailMgrListData(Found)%NumItems
-    CompNumAvailManagers = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime = 0
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime = 0
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%ReqSupplyFrac = 1.0
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(CompNumAvailManagers))
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(CompNumAvailManagers))
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(CompNumAvailManagers))
-    DO Num=1,ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
-      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(Num) = SysAvailMgrListData(Found)%AvailManagerName(Num)
-      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(Num)  = 0
-      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) = SysAvailMgrListData(Found)%AvailManagerType(Num)
-      IF (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) == 0) THEN
-        CALL ShowSevereError('GetZoneEqAvailabilityManager: '//  &
-           'Invalid AvailabilityManagerAssignmentList Type entered="'//  &
-           TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
-        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
-          TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
-         ErrorsFound=.TRUE.
+  IF (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%Input) THEN
+    AvailabilityListName = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerListName
+    Found=0
+    IF (NumAvailManagerLists > 0) &
+      Found = FindItemInList( AvailabilityListName, SysAvailMgrListData%Name,NumAvailManagerLists)
+    IF (Found /= 0) THEN
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers = SysAvailMgrListData(Found)%NumItems
+      CompNumAvailManagers = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StartTime = 0
+      ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%StopTime = 0
+      IF (.NOT. ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName)) THEN
+        ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(CompNumAvailManagers))
+        ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(CompNumAvailManagers))
+        ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(CompNumAvailManagers))
       ENDIF
-      IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_DiffThermo .and.  &
-          Num /= ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers) THEN
-        CALL ShowWarningError('GetZoneEqAvailabilityManager: '//  &
-           'AvailabilityManager:DifferentialThermostat="'//  &
-           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
-        CALL ShowContinueError('...is not the last manager on the AvailabilityManagerAssignmentList.  '//  &
-                               'Any remaining managers will not be used.')
-        CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
-           TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
-      ENDIF
-    END DO  !End of Num Loop
+      DO Num=1,ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(Num) = &
+                                                                     SysAvailMgrListData(Found)%AvailManagerName(Num)
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(Num)  = 0
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) = &
+                                                                     SysAvailMgrListData(Found)%AvailManagerType(Num)
+        IF (ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(Num) == 0) THEN
+          CALL ShowSevereError('GetZoneEqAvailabilityManager: '//  &
+             'Invalid AvailabilityManagerAssignmentList Type entered="'//  &
+             TRIM(SysAvailMgrListData(Found)%cAvailManagerType(Num))//'".')
+          CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+            TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+           ErrorsFound=.TRUE.
+        ENDIF
+        IF (SysAvailMgrListData(Found)%AvailManagerType(Num) == SysAvailMgr_DiffThermo .and.  &
+            Num /= ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers) THEN
+          CALL ShowWarningError('GetZoneEqAvailabilityManager: '//  &
+             'AvailabilityManager:DifferentialThermostat="'//  &
+             TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+          CALL ShowContinueError('...is not the last manager on the AvailabilityManagerAssignmentList.  '//  &
+                                 'Any remaining managers will not be used.')
+          CALL ShowContinueError('Occurs in AvailabilityManagerAssignmentList="'//  &
+             TRIM(SysAvailMgrListData(Found)%AvailManagerName(Num))//'".')
+        ENDIF
+      END DO  !End of Num Loop
+    END IF
+    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%Input = .FALSE.
+  ENDIF
 
-  ELSE
-    IF (AvailabilityListName /= ' ') THEN
-      CALL ShowWarningError('GetZoneEqAvailabilityManager: AvailabilityManagerAssignmentList='//  &
-         TRIM(AvailabilityListName)//' not found in lists.  No availability will be used.')
-    ENDIF
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers = 0
-    CompNumAvailManagers = ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%NumAvailManagers
-    ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailStatus = NoAction
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerName(CompNumAvailManagers))
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerType(CompNumAvailManagers))
-    ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(CompNum)%AvailManagerNum(CompNumAvailManagers))
-  END IF
   RETURN
 
 END SUBROUTINE GetZoneEqAvailabilityManager
@@ -1537,7 +1558,7 @@ SUBROUTINE InitSysAvailManagers
           ! na
 
           ! USE STATEMENTS:
-  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig, NumValidSysAvailZoneComponents
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1558,6 +1579,7 @@ SUBROUTINE InitSysAvailManagers
   LOGICAL,SAVE  :: MyOneTimeFlag = .TRUE.    ! One time flag
   INTEGER       :: SysAvailNum               ! DO loop indes for Sys Avail Manager objects
   INTEGER       :: ControlledZoneNum         ! Index into the ZoneEquipConfig array
+  INTEGER       :: ZoneEquipType
 
   ! One time initializations
   IF (MyOneTimeFlag) THEN
@@ -1566,10 +1588,12 @@ SUBROUTINE InitSysAvailManagers
       IF (NCycSysAvailMgrData(SysAvailNum)%CtrlType .EQ. CycleOnControlZone) THEN
         ! set the controlled zone numbers
         DO ControlledZoneNum = 1,NumOfZones
-          IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NCycSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
-            NCycSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
-            EXIT
-          END IF
+          IF (ALLOCATED(ZoneEquipConfig)) THEN
+            IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NCycSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
+              NCycSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+              EXIT
+            END IF
+          ENDIF
         END DO
       END IF
     END DO
@@ -1577,10 +1601,12 @@ SUBROUTINE InitSysAvailManagers
     DO SysAvailNum = 1,NumNVentSysAvailMgrs
       ! set the controlled zone numbers
       DO ControlledZoneNum = 1,NumOfZones
-        IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NVentSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
-          NVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
-          EXIT
-        END IF
+        IF (ALLOCATED(ZoneEquipConfig)) THEN
+          IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. NVentSysAvailMgrData(SysAvailNum)%ZoneNum ) THEN
+            NVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
+            EXIT
+          END IF
+        ENDIF
       END DO
     END DO
 
@@ -1600,6 +1626,12 @@ SUBROUTINE InitSysAvailManagers
   IF (ALLOCATED(LoTurnOffSysAvailMgrData)) LoTurnOffSysAvailMgrData%AvailStatus = NoAction
   IF (ALLOCATED(LoTurnOnSysAvailMgrData))  LoTurnOnSysAvailMgrData%AvailStatus  = NoAction
 !  HybridVentSysAvailMgrData%AvailStatus= NoAction
+  DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types
+    IF(ALLOCATED(ZoneComp))THEN
+      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) & 
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs%AvailStatus = NoAction
+    ENDIF
+  ENDDO
 
   RETURN
 
@@ -2580,7 +2612,7 @@ SUBROUTINE ManageHybridVentilation
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu
           !       DATE WRITTEN   March 2007
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2593,7 +2625,7 @@ SUBROUTINE ManageHybridVentilation
           ! NA
 
           ! USE STATEMENTS:
-  USE DataZoneEquipment, ONLY: ZoneEquipAvail
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
   USE DataLoopNode
   USE DataAirLoop
 
@@ -2614,6 +2646,7 @@ SUBROUTINE ManageHybridVentilation
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER      :: PriAirSysNum              ! Primary Air System index
   INTEGER      :: SysAvailNum
+  INTEGER      :: ZoneNum
 
   IF (GetHybridInputFlag) THEN
     CALL GetHybridVentilationInputs
@@ -2624,11 +2657,18 @@ SUBROUTINE ManageHybridVentilation
 
   CALL InitHybridVentSysAvailMgr
 
-  DO PriAirSysNum=1,NumPrimaryAirSys
-    DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
-      IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .EQ. PriAirSysNum) &
-      CALL CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
-    END DO
+  DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
+      DO PriAirSysNum=1,NumPrimaryAirSys
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .EQ. PriAirSysNum) &
+        CALL CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
+      END DO
+    ELSE
+      ! Hybrid ventilation manager is applied to zone component
+      IF (HybridVentSysAvailMgrData(SysAvailNum)%SimHybridVentSysAvailMgr) THEN
+        CALL CalcHybridVentSysAvailMgr(SysAvailNum)
+      ENDIF
+    ENDIF
   END DO
 
   RETURN
@@ -2702,6 +2742,7 @@ SUBROUTINE GetHybridVentilationInputs
   ! Allocate the data arrays
   ALLOCATE(HybridVentSysAvailMgrData(NumHybridVentSysAvailMgrs))
   ALLOCATE(HybridVentSysAvailAirLoopNum(NumHybridVentSysAvailMgrs))
+  ALLOCATE(HybridVentSysAvailActualZoneNum(NumHybridVentSysAvailMgrs))
   ALLOCATE(HybridVentSysAvailVentCtrl(NumHybridVentSysAvailMgrs))
   ALLOCATE(HybridVentSysAvailANCtrlStatus(NumHybridVentSysAvailMgrs))
   ALLOCATE(HybridVentSysAvailMaster(NumHybridVentSysAvailMgrs))
@@ -2727,6 +2768,10 @@ SUBROUTINE GetHybridVentilationInputs
     HybridVentSysAvailMgrData(SysAvailNum)%MgrType = SysAvailMgr_HybridVent
 
     HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName = cAlphaArgs(2)
+
+    IF (lAlphaFieldBlanks(2)) THEN ! Hybrid ventilation manager applied to zone
+      HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop = .FALSE.
+    ENDIF
     HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName = cAlphaArgs(3)
     ! Check zone number
     HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum = FindItemInList(cAlphaArgs(3),Zone%Name,NumOfZones)
@@ -3087,10 +3132,17 @@ SUBROUTINE GetHybridVentilationInputs
 
   ! Set up output variables
   DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
-    CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
-                              'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
-    CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
-                              'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
+      CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
+                                'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
+      CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
+                                'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
+    ELSE
+      CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
+                                'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)
+      CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
+                                'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)
+    ENDIF
   END DO
 
   RETURN
@@ -3115,7 +3167,7 @@ SUBROUTINE InitHybridVentSysAvailMgr
           ! na
 
           ! USE STATEMENTS:
-  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig, NumValidSysAvailZoneComponents
   USE InputProcessor, ONLY : SameString
   USE DataHeatBalance,  ONLY: TotVentilation, Ventilation
   USE InputProcessor,   ONLY: FindIteminList
@@ -3145,6 +3197,8 @@ SUBROUTINE InitHybridVentSysAvailMgr
   INTEGER       :: AirLoopCount              ! Air loop name count
   REAL(r64)     :: SchedMax                  ! Maximum value specified in a schedule
   INTEGER       :: SysAvailIndex             ! Hybrid Ventilation Sys Avail Manager index
+  INTEGER       :: ZoneEquipType
+  INTEGER       :: HybridVentNum
 
   ! One time initializations
   IF (MyOneTimeFlag .AND. ALLOCATED(ZoneEquipConfig) .AND. ALLOCATED(PrimaryAirSystem)) THEN
@@ -3171,28 +3225,51 @@ SUBROUTINE InitHybridVentSysAvailMgr
           HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum = AirLoopNum
         END IF
       END DO
-      IF (HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .eq. 0) THEN
-        CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
-             ', AirLoopHVAC name not found=' &
-             //TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
-        ErrorsFound = .TRUE.
-      END IF
-      HybridVentSysAvailAirLoopNum(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum
+      HybridVentSysAvailAirLoopNum(SysAvailNum)    = HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum
+      HybridVentSysAvailActualZoneNum(SysAvailNum) = HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum
 
       ! set the controlled zone numbers
       DO ControlledZoneNum = 1,NumOfZones
         IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum ) THEN
           HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum = ControlledZoneNum
-          IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum > 0) THEN
-            IF (ZoneEquipConfig(ControlledZoneNum)%AirLoopNum /=HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum) THEN
-              CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
-                  ', The controlled zone ='// TRIM(HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)// &
-                  ' is not served by this Air Loop='//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
-              ErrorsFound = .TRUE.
+          IF (HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
+            IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum > 0) THEN
+              IF (ZoneEquipConfig(ControlledZoneNum)%AirLoopNum /=HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum) THEN
+                CALL ShowSevereError(TRIM(cValidSysAvailManagerTypes(HybridVentSysAvailMgrData(SysAvailNum)%MgrType))// &
+                    ', The controlled zone ='// TRIM(HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)// &
+                    ' is not served by this Air Loop='//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName))
+                ErrorsFound = .TRUE.
+              END IF
             END IF
-          END IF
-          EXIT
+            EXIT
+          ENDIF
         END IF
+        IF(ANY(HybridVentSysAvailMgrData%HybridVentMgrConnectedToAirLoop))THEN
+          IF (ZoneEquipConfig(ControlledZoneNum)%AirLoopNum .EQ. HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .AND. &
+              HybridVentSysAvailMgrData(SysAvailNum)%AirLoopNum .GT. 0 ) THEN
+            DO HybridVentNum = 1, NumHybridVentSysAvailMgrs
+              IF (.NOT. HybridVentSysAvailMgrData(HybridVentNum)%HybridVentMgrConnectedToAirLoop .AND. &
+                  (HybridVentNum .NE. SysAvailNum)) THEN
+                IF (ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .EQ. &
+                    HybridVentSysAvailMgrData(HybridVentNum)%ActualZoneNum .AND. &
+                    ZoneEquipConfig(ControlledZoneNum)%ActualZoneNum .GT. 0) THEN
+                  CALL ShowWarningError(TRIM('AvailabilityManager:HybridVentilation')//' = "' // &
+                          TRIM(HybridVentSysAvailMgrData(HybridVentNum)%Name)//'" has the controlled zone name = "' // &
+                          TRIM(HybridVentSysAvailMgrData(HybridVentNum)%ControlZoneName)//'".')
+                  CALL ShowContinueError('This controlled zone already has hybrid ventilation control through this ' //& 
+                          'air loop = "'//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)//'".')
+                  CALL ShowContinueError('Only ' // TRIM('AvailabilityManager:HybridVentilation')//' = "' // &
+                          TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)// &
+                          '" will be simulated. Simulation continues...')
+                ELSE
+                  HybridVentSysAvailMgrData(HybridVentNum)%SimHybridVentSysAvailMgr = .TRUE.
+                END IF
+              ENDIF
+            ENDDO
+          ENDIF
+        ELSE
+          HybridVentSysAvailMgrData%SimHybridVentSysAvailMgr = .TRUE.
+        ENDIF
       END DO
 
       IF (HybridVentSysAvailMgrData(SysAvailNum)%ControlledZoneNum == 0) THEN
@@ -3238,6 +3315,14 @@ SUBROUTINE InitHybridVentSysAvailMgr
     HybridVentSysAvailWindModifier(SysAvailNum) = -1.0
   END DO
 
+  IF (ALLOCATED(HybridVentSysAvailMgrData))  HybridVentSysAvailMgrData%AvailStatus  = NoAction
+
+  DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types
+    IF(ALLOCATED(ZoneComp))THEN
+      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) & 
+        ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs%AvailStatus = NoAction
+    ENDIF
+  ENDDO
   RETURN
 
 END SUBROUTINE InitHybridVentSysAvailMgr
@@ -3247,7 +3332,7 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu
           !       DATE WRITTEN   March 2007
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -3275,12 +3360,13 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
   USE DataZoneControls,  ONLY: HumidityControlZone, NumHumidityControlZones
   USE AirflowNetworkBalanceManager, ONLY: GetZoneInfilAirChangeRate, ManageAirflowNetworkBalance
   USE CurveManager,       ONLY: CurveValue
+  USE DataAirflowNetwork, ONLY: SimulateAirflowNetwork,AirflowNetworkControlSimple
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT (IN)  :: SysAvailNum         ! number of the current scheduled system availability manager
-  INTEGER, INTENT (IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
+  INTEGER,  OPTIONAL,  INTENT(IN)  :: PriAirSysNum        ! number of the primary air system affected by this Avail. Manager
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
 
@@ -3303,6 +3389,7 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
   REAL(r64)    :: OASetPoint      ! Outdoor air setpoint from a given OA setpoint schedule
   REAL(r64)    :: ACH             ! Zone air change per hour
   LOGICAL      :: found           ! Used for humidistat object
+  LOGICAL      :: HybridVentModeOA  ! USed to check whether HybridVentModeOA is allowed
   REAL(r64)    :: ZoneRHHumidifyingSetPoint   ! Zone humidifying setpoint (%)
   REAL(r64)    :: ZoneRHDehumidifyingSetPoint ! Zone dehumidifying setpoint (%)
   INTEGER      :: ControlledZoneNum           ! Index into the ZoneEquipConfig array
@@ -3353,7 +3440,14 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
       CASE(HybridVentMode_OA)
         OASetPoint = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%MinOASchedPtr)
         ACH=0.0
-        If (HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0) Then
+        HybridVentModeOA = .TRUE.
+        IF(.NOT. HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
+          IF (SimulateAirflowNetwork <= AirflowNetworkControlSimple) THEN
+            HybridVentModeOA = .FALSE.
+          ENDIF
+        ENDIF
+
+        If (HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0 .AND. HybridVentModeOA) Then
           CALL ManageAirflowNetworkBalance(.TRUE.)
           ACH = GetZoneInfilAirChangeRate(ZoneNum)
         End If
@@ -3502,9 +3596,11 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
       //'Please check input of control mode schedule')
   END IF
 
-  IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
-    PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = CycleOn
-  END IF
+  IF (HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
+    IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+      PriAirSysAvailMgr(PriAirSysNum)%AvailStatus = CycleOn
+    END IF
+  ENDIF
 
   IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Open .AND. &
       HybridVentSysAvailMgrData(SysAvailNum)%ANControlTypeSchedPtr > 0 .AND. &
@@ -3547,6 +3643,37 @@ SUBROUTINE CalcHybridVentSysAvailMgr(SysAvailNum,PriAirSysNum)
             END IF
           END IF
         END DO
+      END IF
+    END DO
+  ELSEIF(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr > 0) THEN
+    SimpleControlType = GetCurrentScheduleValue(HybridVentSysAvailMgrData(SysAvailNum)%SimpleControlTypeSchedPtr)
+    ! Hybrid ventilation manager is applied to zone component
+    ! setup flag for ventilation objects
+    DO i=1,TotVentilation
+      IF (Ventilation(i)%ZonePtr == HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum) THEN
+        Ventilation(i)%HybridControlType=HybridControlTypeIndiv
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+          Ventilation(i)%HybridControlType = HybridControlTypeClose
+        ELSE
+          IF (SimpleControlType == 1) THEN
+            Ventilation(i)%HybridControlType=HybridControlTypeGlobal
+            Ventilation(i)%HybridControlMasterNum=HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+          END IF
+        END IF
+      END IF
+    END DO
+    ! Setup flag for Mixing objects
+    DO i=1,TotMixing
+      IF (Mixing(i)%ZonePtr == HybridVentSysAvailMgrData(SysAvailNum)%ActualZoneNum) THEN
+        Mixing(i)%HybridControlType=HybridControlTypeIndiv
+        IF (HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl == HybridVentCtrl_Close) THEN
+          Mixing(i)%HybridControlType = HybridControlTypeClose
+        ELSE
+          IF (SimpleControlType == 1) THEN
+            Mixing(i)%HybridControlType=HybridControlTypeGlobal
+            Mixing(i)%HybridControlMasterNum=HybridVentSysAvailMgrData(SysAvailNum)%VentilationPtr
+          END IF
+        END IF
       END IF
     END DO
   END IF

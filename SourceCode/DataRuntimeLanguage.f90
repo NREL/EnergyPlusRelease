@@ -305,10 +305,10 @@ INTEGER :: NumEMSConstructionIndices   = 0 ! count of EMS construction index var
 !#####################################################################
 !code for ExternalInterface
 INTEGER :: NumExternalInterfaceGlobalVariables = 0 ! count of ExternalInterface runtime variable
-INTEGER :: NumExternalInterfaceFunctionalMockupUnitGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMU
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMU
                                                    ! will be updated with values from ExternalInterface
 INTEGER :: NumExternalInterfaceActuatorsUsed   = 0 ! count of ExternalInterface Actuators
-INTEGER :: NumExternalInterfaceFunctionalMockupUnitActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMU
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMU
 
 !#####################################################################
 

@@ -30,6 +30,8 @@ USE DataPrecisionGlobals
 USE DataGlobals,  ONLY: MaxNameLength,AutoCalculate,DegToRadians
 USE DataSurfaces, ONLY: MaxSlatAngs
 USE DataVectorTypes
+USE DataBSDFWindow, ONLY: BSDFWindowInputStruct,BSDFLayerAbsorpStruct
+USE DataComplexFenestration
 
 IMPLICIT NONE   ! Enforce explicit typing of all variables
 
@@ -59,6 +61,8 @@ INTEGER, PARAMETER :: Screen                  = 7
 INTEGER, PARAMETER :: EcoRoof                 = 8
 INTEGER, PARAMETER :: IRTMaterial             = 9
 INTEGER, PARAMETER :: WindowSimpleGlazing     = 10
+INTEGER, PARAMETER :: ComplexWindowShade      = 11
+INTEGER, PARAMETER :: ComplexWindowGap        = 12
 
           ! Parameters to indicate surface roughness for use with the Material
           ! derived type (see below):
@@ -115,12 +119,11 @@ INTEGER, PARAMETER :: DefaultMinNumberOfWarmupDays=6    ! Default minimum number
 INTEGER, PARAMETER :: Isotropic      = 0
 INTEGER, PARAMETER :: Anisotropic    = 1
 
-           ! Parameters for SolutionAlgo
-INTEGER, PARAMETER :: UseCTF  = 0
+           ! Parameters for HeatTransferAlgosUsed
+INTEGER, PARAMETER :: UseCTF  = 1
 INTEGER, PARAMETER :: UseEMPD = 2
 INTEGER, PARAMETER :: UseCondFD  = 5
 INTEGER, PARAMETER :: UseHAMT = 6
-INTEGER, PARAMETER :: UseCondFDSimple  = 7
 
            ! Parameters for ZoneAirSolutionAlgo
 INTEGER, PARAMETER :: Use3rdOrder  = 0
@@ -313,7 +316,7 @@ TYPE MaterialProperties
   INTEGER :: Group       = -1  ! Material type (see Material Parameters above.  Currently
                                ! active: RegularMaterial, Shade, Air, WindowGlass,
                                ! WindowGas, WindowBlind, WindowGasMixture, Screen, EcoRoof,
-                               ! IRTMaterial, WindowSimpleGlazing)
+                               ! IRTMaterial, WindowSimpleGlazing, ComplexWindowShade, ComplexWindowGap)
   INTEGER :: Roughness   = 0   ! Surface roughness index (See Surface Roughness parameters
                                ! above.  Current: VerySmooth, Smooth, MediumSmooth,
                                ! MediumRough, Rough, VeryRough)
@@ -332,14 +335,15 @@ TYPE MaterialProperties
   REAL(r64) :: Thickness      = 0.0 ! Layer thickness (m)
   REAL(r64) :: VaporDiffus    = 0.0 ! Layer vapor diffusivity
   INTEGER :: GasType(5)  = 0   ! Gas type (air=1, argon=2, krypton=3, xenon=4, custom=0) for
-                             !  up to 5 gases in a mixture [Window gas only]
+                             !  up to 5 gases in a mixture [Window gas only].  It is defined as parameter (GasCoefs)
   INTEGER :: GlassSpectralDataPtr = 0   ! Number of a spectral data set associated with a window glass material
   INTEGER :: NumberOfGasesInMixture = 0 ! Number of gases in a window gas mixture
-  REAL(r64) :: GasCon(5,3)    = 0.0 ! Gas conductance coefficients for up to 5 gases in a mixture
-  REAL(r64) :: GasVis(5,3)    = 0.0 ! Gas viscosity coefficients for up to 5 gases in a mixture
-  REAL(r64) :: GasCp(5,3)     = 0.0 ! Gas specific-heat coefficients for up to 5 gases in a mixture
-  REAL(r64) :: GasWght(5)     = 0.0 ! Gas molecular weight for up to 5 gases in a mixture
-  REAL(r64) :: GasFract(5)    = 0.0 ! Gas fractions for up to 5 gases in a mixture
+  REAL(r64) :: GasCon(5,3)          = 0.0 ! Gas conductance coefficients for up to 5 gases in a mixture
+  REAL(r64) :: GasVis(5,3)          = 0.0 ! Gas viscosity coefficients for up to 5 gases in a mixture
+  REAL(r64) :: GasCp(5,3)            = 0.0 ! Gas specific-heat coefficients for up to 5 gases in a mixture
+  REAL(r64) :: GasWght(5)            = 0.0 ! Gas molecular weight for up to 5 gases in a mixture
+  REAL(r64) :: GasSpecHeatRatio(5)  = 0.0 ! Gas specific heat ratio (used for low pressure calculations)
+  REAL(r64) :: GasFract(5)          = 0.0 ! Gas fractions for up to 5 gases in a mixture
 
           ! Radiation parameters
   REAL(r64) :: AbsorpSolar                = 0.d0 ! Layer solar absorptance
@@ -379,6 +383,16 @@ TYPE MaterialProperties
   INTEGER :: BlindDataPtr      =0   ! Pointer to window blind data
   INTEGER :: ScreenDataPtr     =0   ! Pointer to window screen data
   INTEGER :: ScreenMapResolution=0  ! Resolution of azimuth and altitude angles to print in transmittance map
+
+  ! Complex fenestration parameters
+  REAL(r64) :: YoungModulus = 0.0d0      ! Young's modulus (Pa) - used in window deflection calculations
+  REAL(r64) :: PoissonsRatio = 0.0d0    ! Poisson's ratio - used in window deflection calculations
+  REAL(r64) :: DeflectedThickness = 0.d0 ! Minimum gap thickness in deflected state (m).  Used with measured deflection
+  REAL(r64) :: Pressure = 0.d0            ! Window Gap pressure (Pa)
+  INTEGER    :: SupportPillarPtr    = 0    ! Pointer to support pillar data
+  INTEGER    :: DeflectionStatePtr = 0    ! Pointer to deflection state
+  INTEGER    :: ComplexShadePtr    = 0    ! Pointer to complex shade data
+  INTEGER    :: GasPointer = 0            ! Pointer to gas or gas mixture used in the gap
 
           ! Window-shade thermal model parameters
   REAL(r64) :: WinShadeToGlassDist      =0.0   ! Distance between window shade and adjacent glass (m)
@@ -597,15 +611,16 @@ TYPE ConstructionData
   REAL(r64) :: W5FileGlazingSysHeight    =0.0 ! Glass height for construction form Window5 data file (m)
   REAL(r64) :: SummerSHGC                =0.0 ! Calculated ASHRAE SHGC for summer conditions
   REAL(r64) :: VisTransNorm              =0.0 ! The normal visible transmittance
+  REAL(r64) :: SolTransNorm              =0.0D0 ! the normal solar transmittance
 
   LOGICAL :: SourceSinkPresent  =.false.  ! .TRUE. if there is a source/sink within this construction
   LOGICAL :: TypeIsWindow       =.false.  ! True if a window construction, false otherwise
+  LOGICAL :: WindowTypeBSDF      =.false.  ! True for complex window, false otherwise
   LOGICAL :: TypeIsEcoRoof      =.false.  !-- true for construction with ecoRoof outside, the flag
                                           !-- is turned on when the outside layer is of type EcoRoof
   LOGICAL :: TypeIsIRT          =.false.  !-- true for construction with IRT material
   LOGICAL :: TypeIsCfactorWall  =.false.  !-- true for construction with Construction:CfactorUndergroundWall
   LOGICAL :: TypeIsFfactorFloor =.false.  !-- true for construction with Construction:FfactorGroundFloor
-  LOGICAL :: UseHBAlgorithmCondFDDetailed = .FALSE.  !  Override simplified CondFD Altorithm with detailed.
 
   ! Added TH 12/22/2008 for thermochromic windows
   INTEGER   :: TCFlag = 0                   ! 0: this construction is not a thermochromic window construction
@@ -623,6 +638,12 @@ TYPE ConstructionData
   REAL(r64) :: FFactor = 0.0
   REAL(r64) :: Area = 0.0
   REAL(r64) :: PerimeterExposed = 0.0
+
+  LOGICAL   :: ReverseConstructionNumLayersWarning = .false.
+  LOGICAL   :: ReverseConstructionLayersOrderWarning = .false.
+
+  !Complex Fenestration
+  TYPE(BSDFWindowInputStruct) :: BSDFInput ! nest structure with user input for complex fenestration
 
 END TYPE ConstructionData
 
@@ -664,6 +685,9 @@ TYPE ZoneData
     REAL(r64) :: TotalSurfArea          =0.0 ! Total surface area for Zone
     REAL(r64) :: ExteriorTotalSurfArea  =0.0 ! Total surface area of all exterior surfaces for Zone
                                              ! (ignoring windows as they will be included in their base surfaces)
+    REAL(r64) :: ExteriorTotalGroundSurfArea  =0.0 ! Total surface area of all surfaces for Zone with ground contact
+    REAL(r64) :: ExtGrossGroundWallArea       =0.0 ! Ground contact Wall Area for Zone (Gross)
+    REAL(r64) :: ExtGrossGroundWallArea_Multiplied=0.0 ! Ground contact Wall Area for Zone (Gross) with multipliers
     INTEGER :: SystemZoneNodeNumber     = 0  ! This is the zone node number for the system for a controlled zone
     LOGICAL :: IsControlled             = .false.  ! True when this is a controlled zone.
     INTEGER :: TempControlledZoneIndex  = 0  ! this is the index number for TempControlledZone structure for lookup
@@ -1334,6 +1358,7 @@ Type :: AirReportVars
   REAL(r64) :: SumMCpDTzones   = 0.0D0   ! zone sum of MassFlowRate*cp*(TremotZone - Tz) transfer air from other zone, Mixing
   REAL(r64) :: SumMCpDtInfil   = 0.0D0   ! Zone sum of MassFlowRate*Cp*(Tout - Tz) transfer from outside, ventil, earth tube
   REAL(r64) :: SumMCpDTsystem  = 0.0D0   ! Zone sum of air system MassFlowRate*Cp*(Tsup - Tz)
+  REAL(r64) :: SumNonAirSystem = 0.0D0   ! Zone sum of system convective gains, collected via NonAirSystemResponse
   REAL(r64) :: CzdTdt          = 0.0D0   ! Zone air energy storage term.
   REAL(r64) :: imBalance       = 0.0D0   ! put all terms in eq. 5 on RHS , should be zero
   ! for ZoneAirBalance:OutdoorAir object Outputs only
@@ -1555,6 +1580,8 @@ TYPE (ZonePreDefRepType) :: BuildingPreDefRep=  &
 ! MODULE VARIABLE Type DECLARATIONS:
 TYPE (ZoneSimData),            ALLOCATABLE, DIMENSION(:) :: ZoneIntGain
 TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: Material
+TYPE (GapSupportPillar),       ALLOCATABLE, DIMENSION(:) :: SupportPillar
+TYPE (GapDeflectionState),     ALLOCATABLE, DIMENSION(:) :: DeflectionState
 TYPE (ConstructionData),       ALLOCATABLE, DIMENSION(:) :: Construct
 TYPE (SpectralDataProperties), ALLOCATABLE, DIMENSION(:) :: SpectralData
 TYPE (ZoneData),               ALLOCATABLE, DIMENSION(:) :: Zone
@@ -1575,6 +1602,8 @@ TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: Mixing
 TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: CrossMixing
 TYPE (MixingData),             ALLOCATABLE, DIMENSION(:) :: RefDoorMixing
 TYPE (WindowBlindProperties),  ALLOCATABLE, DIMENSION(:) :: Blind
+TYPE (WindowComplexShade),     ALLOCATABLE, DIMENSION(:) :: ComplexShade
+TYPE (WindowThermalModelParams), ALLOCATABLE, DIMENSION(:) :: WindowThermalModel
 TYPE (SurfaceScreenProperties), ALLOCATABLE, DIMENSION(:) :: SurfaceScreens
 TYPE (ScreenTransData),        ALLOCATABLE, DIMENSION(:) :: ScreenTrans
 TYPE (MaterialProperties),     ALLOCATABLE, DIMENSION(:) :: MaterialSave
@@ -1636,7 +1665,9 @@ INTEGER :: DefaultInsideConvectionAlgo=1          ! 1 = simple (ASHRAE); 2 = det
 INTEGER :: DefaultOutsideConvectionAlgo=1         ! 1 = simple (ASHRAE); 2 = detailed; etc (BLAST, TARP, MOWITT, DOE-2)
 INTEGER :: SolarDistribution=0                    ! Solar Distribution Algorithm
 INTEGER :: InsideSurfIterations=0                 ! Counts inside surface iterations
-INTEGER :: SolutionAlgo = UseCTF                  ! UseCTF Solution, UseEMPD moisture solution, UseCondFD solution
+INTEGER :: OverallHeatTransferSolutionAlgo = UseCTF  ! UseCTF Solution, UseEMPD moisture solution, UseCondFD solution
+INTEGER :: NumberOfHeatTransferAlgosUsed = 1
+INTEGER, DIMENSION(:), ALLOCATABLE :: HeatTransferAlgosUsed
 INTEGER :: MaxNumberOfWarmupDays=25               ! Maximum number of warmup days allowed
 INTEGER :: MinNumberOfWarmupDays=6                ! Minimum number of warmup days allowed
 REAL(r64) :: CondFDRelaxFactor = 1.0d0  ! Relaxation factor, for looping across all the surfaces.
@@ -1682,11 +1713,16 @@ INTEGER :: W5GlsMat         =0 ! Window5 Glass Materials, specified by transmitt
 INTEGER :: W5GlsMatAlt      =0 ! Window5 Glass Materials, specified by index of refraction and extinction coeff
 INTEGER :: W5GasMat         =0 ! Window5 Single-Gas Materials
 INTEGER :: W5GasMatMixture  =0 ! Window5 Gas Mixtures
+INTEGER :: W7SupportPillars =0 ! Complex fenestration support pillars
+INTEGER :: W7DeflectionStates =0 ! Complex fenestration deflection states
+INTEGER :: W7MaterialGaps =0   ! Complex fenestration material gaps
 INTEGER :: TotBlinds        =0 ! Total number of blind materials
 INTEGER :: TotScreens       =0 ! Total number of exterior window screen materials
 INTEGER :: TotTCGlazings = 0     ! Number of TC glazing object - WindowMaterial:Glazing:Thermochromic found in the idf file
 INTEGER :: NumSurfaceScreens=0 ! Total number of screens on exterior windows
 INTEGER :: TotShades        =0 ! Total number of shade materials
+INTEGER :: TotComplexShades =0 ! Total number of shading materials for complex fenestrations
+INTEGER :: TotComplexGaps    =0 ! Total number of window gaps for complex fenestrations
 INTEGER :: TotSimpleWindow ! number of simple window systems.
 INTEGER :: TotZoneAirBalance   =0 ! Total Zone Air Balance Statements in input
 INTEGER :: TotFrameDivider  =0 ! Total number of window frame/divider objects
@@ -1766,6 +1802,9 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSWOutIncBmToDiffReflObs !Exterior di
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSWOutIncSkyDiffReflObs  !Exterior diffuse solar incident from sky diffuse
                                                                ! reflection from obstructions (W/m2)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: CosIncidenceAngle   !Cosine of beam solar incidence angle (for reporting)
+INTEGER, ALLOCATABLE, DIMENSION(:) :: BSDFBeamDirectionRep  ! BSDF beam direction number for given complex fenestration state (for reporting) []
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: BSDFBeamThetaRep  ! BSDF beam Theta angle (for reporting) [rad]
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: BSDFBeamPhiRep  ! BSDF beam Phi angle (for reporting) [rad]
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSWwinAbsTot     !Exterior beam plus diffuse solar absorbed in glass layers of window (W)
 !energy
@@ -1791,9 +1830,9 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: InitialDifSolInTransReport  !Report - In
                                                                !transmitted out through inside of window surface (W)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWInAbsTotalReport  !Report - Total interior/exterior shortwave
                                                        !absorbed on inside of surface (W)
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsTotalReport  !Report - Total exterior shortwave/solar 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsTotalReport  !Report - Total exterior shortwave/solar
                                                        !absorbed on outside of surface (W)
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsEnergyReport  !Report - Total exterior shortwave/solar 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SWOutAbsEnergyReport  !Report - Total exterior shortwave/solar
                                                        !absorbed on outside of surface (j)
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: NominalR ! Nominal R value of each material -- used in matching interzone surfaces
@@ -1874,6 +1913,9 @@ DATA GasCoeffsCp    /1002.737d0 , 521.929d0 , 248.091d0 ,  158.340d0, 0.0d0,0.0d
 REAL(r64)         :: GasWght(10)=         & ! Gas molecular weights for gases in a mixture
 !                       Air       Argon     Krypton   Xenon
                    (/28.97d0,     39.948d0,    83.8d0,   131.3d0,     0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0/)
+
+REAL(r64)          :: GasSpecificHeatRatio(10) =    & !Gas specific heat ratios.  Used for gasses in low pressure
+                    (/1.4d0,     1.67d0,    1.68d0,   1.66d0,     0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0/)
 
 !Variables Dimensioned to Number of Zones
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MVFC      ! Design Mixing Flow Rate [m3/s] (Cross Zone Mixing)
@@ -1984,7 +2026,8 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
       IF(Material(MaterNum)%Group == WindowGlass .OR. Material(MaterNum)%Group == WindowGas &
          .OR. Material(MaterNum)%Group == WindowGasMixture &
          .OR. Material(MaterNum)%Group == Shade .OR. Material(MaterNum)%Group == WindowBlind &
-         .OR. Material(MaterNum)%Group == Screen .OR. Material(MaterNum)%Group == WindowSimpleGlazing) &
+         .OR. Material(MaterNum)%Group == Screen .OR. Material(MaterNum)%Group == WindowSimpleGlazing &
+         .OR. Material(MaterNum)%Group == ComplexWindowShade .OR. Material(MaterNum)%Group == ComplexWindowGap) &
          Construct(ConstrNum)%TypeIsWindow = .true.
     END DO
 
@@ -2003,16 +2046,17 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
         IF(Material(MaterNum)%Group /= WindowGlass .AND. Material(MaterNum)%Group /= WindowGas &
          .AND. Material(MaterNum)%Group /= WindowGasMixture &
          .AND. Material(MaterNum)%Group /= Shade .AND. Material(MaterNum)%Group /= WindowBlind &
-         .AND. Material(MaterNum)%Group /= Screen .AND. Material(MaterNum)%Group /= WindowSimpleGlazing) &
+         .AND. Material(MaterNum)%Group /= Screen .AND. Material(MaterNum)%Group /= WindowSimpleGlazing &
+         .AND. Material(MaterNum)%Group /= ComplexWindowShade .AND. Material(MaterNum)%Group /= ComplexWindowGap) &
          WrongMaterialsMix = .true.
       END DO
 
       IF(WrongMaterialsMix) THEN  !Illegal material for a window construction
         CALL ShowSevereError('Error: Window construction='//TRIM(Construct(ConstrNum)%Name)//  &
-                         ' has materials other than glass, gas, shade, screen, blind, or simple system.')
+                         ' has materials other than glass, gas, shade, screen, blind, complex shading, complex gap, or simple system.')
         ErrorsFound = .true.
-
-      ELSE IF(TotLayers > 8) THEN  !Too many layers for a window construction
+      ! Do not check number of layers for BSDF type of window since that can be handled
+      ELSE IF((TotLayers > 8).and.(.not.Construct(ConstrNum)%WindowTypeBSDF)) THEN  !Too many layers for a window construction
         CALL ShowSevereError('CheckAndSetConstructionProperties: Window construction='//TRIM(Construct(ConstrNum)%Name)//  &
                          ' has too many layers (max of 8 allowed -- 4 glass + 3 gap + 1 shading device).')
         ErrorsFound = .true.
@@ -2023,10 +2067,12 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
            .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == WindowGas &
            .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == WindowGasMixture &
            .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == WindowBlind &
-           .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == Screen) THEN
+           .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == Screen &
+           .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == ComplexWindowShade &
+           .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == ComplexWindowGap) THEN
           CALL ShowSevereError('CheckAndSetConstructionProperties: The single-layer window construction='//  &
                    TRIM(Construct(ConstrNum)%Name)// &
-                   ' has a gas, shade, screen or blind material; it should be glass of simple glazing system.')
+                   ' has a gas, complex gap, shade, complex shade, screen or blind material; it should be glass of simple glazing system.')
           ErrorsFound = .true.
         END IF
       END IF
@@ -2042,9 +2088,11 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
         IF(Material(MaterNum)%Group == WindowGlass) TotGlassLayers = TotGlassLayers + 1
         IF(Material(MaterNum)%Group == WindowSimpleGlazing) TotGlassLayers = TotGlassLayers + 1
         IF(Material(MaterNum)%Group == Shade .OR. Material(MaterNum)%Group == WindowBlind .OR. &
-           Material(MaterNum)%Group == Screen) TotShadeLayers = TotShadeLayers + 1
-        IF(Material(MaterNum)%Group == WindowGas .OR. Material(MaterNum)%Group == WindowGasMixture) &
-          TotGasLayers = TotGasLayers + 1
+           Material(MaterNum)%Group == Screen .OR. Material(MaterNum)%Group == ComplexWindowShade)   &
+              TotShadeLayers = TotShadeLayers + 1
+        IF(Material(MaterNum)%Group == WindowGas .OR. Material(MaterNum)%Group == WindowGasMixture .OR.   &
+           Material(MaterNum)%Group == ComplexWindowGap) &
+              TotGasLayers = TotGasLayers + 1
         IF(Layer < TotLayers) THEN
           MaterNumNext = Construct(ConstrNum)%LayerPoint(Layer+1)
           ! Adjacent layers of same type not allowed
@@ -2052,6 +2100,17 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
           IF(Material(MaterNum)%Group == Material(MaterNumNext)%Group) WrongWindowLayering = .true.
         END IF
       END DO
+
+      ! It is not necessary to check rest of BSDF window structure since that is performed inside TARCOG90 routine.
+      ! That routine also allow structures which are not allowed in rest of this routine
+      if (Construct(ConstrNum)%WindowTypeBSDF) then
+        Construct(ConstrNum)%TotGlassLayers = TotGlassLayers
+        Construct(ConstrNum)%TotSolidLayers = TotGlassLayers + TotShadeLayers
+        Construct(ConstrNum)%InsideAbsorpThermal = Material(Construct(ConstrNum)%LayerPoint(InsideLayer))%AbsorpThermalBack
+        Construct(ConstrNum)%OutsideAbsorpThermal = Material(Construct(ConstrNum)%LayerPoint(1))%AbsorpThermalFront
+        return
+      end if
+
       IF(Material(Construct(ConstrNum)%LayerPoint(1))%Group == WindowGas .or. &
          Material(Construct(ConstrNum)%LayerPoint(1))%Group == WindowGasMixture .or. &
          Material(Construct(ConstrNum)%LayerPoint(TotLayers))%Group == WindowGas .or. &
@@ -2103,6 +2162,7 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
           Material(Construct(ConstrNum)%LayerPoint(1))%Group /= Screen .AND. &
           Material(Construct(ConstrNum)%LayerPoint(TotLayers))%Group /= Shade .AND. &
           Material(Construct(ConstrNum)%LayerPoint(TotLayers))%Group /= WindowBlind .AND.  &
+          Material(Construct(ConstrNum)%LayerPoint(TotLayers))%Group /= ComplexWindowShade .AND.  &
          .NOT.WrongWindowLayering) THEN
 
 

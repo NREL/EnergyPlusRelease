@@ -21,7 +21,7 @@ MODULE DataSystemVariables      ! EnergyPlus Data-Only Module
 
           ! USE STATEMENTS:
 USE DataPrecisionGlobals
-USE DataStringGlobals, ONLY: pathChar
+USE DataStringGlobals, ONLY: pathChar, altpathChar, CurrentWorkingFolder, ProgramPath
 
 IMPLICIT NONE   ! Enforce explicit typing of all variables
 
@@ -107,11 +107,11 @@ PUBLIC          ! By definition, all variables which are placed in this data
   CHARACTER(len=255) :: envinputpath2=' '
   CHARACTER(len=255) :: envprogrampath=' '
   LOGICAL :: TestAllPaths=.false.
-  INTEGER :: iEnvSetThreads = 1
+  INTEGER :: iEnvSetThreads = 0
   LOGICAL :: lEnvSetThreadsInput=.false.
-  INTEGER :: iepEnvSetThreads = 1
+  INTEGER :: iepEnvSetThreads = 0
   LOGICAL :: lepSetThreadsInput=.false.
-  INTEGER :: iIDFSetThreads = 1
+  INTEGER :: iIDFSetThreads = 0
   LOGICAL :: lIDFSetThreadsInput=.false.
   INTEGER :: inumActiveSims = 1
   LOGICAL :: lnumActiveSims=.false.
@@ -122,7 +122,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 CONTAINS
 
-subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
+subroutine CheckForActualFileName(originalInputFileName,FileFound,CheckedFileName)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -142,12 +142,12 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
           ! na
 
           ! USE STATEMENTS:
-  USE DataStringGlobals, ONLY: CurrentWorkingFolder, ProgramPath
+          ! na
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: InputFileName ! name as input for object
+  CHARACTER(len=*), INTENT(IN) :: originalInputFileName ! name as input for object
   LOGICAL, INTENT(INOUT) :: FileFound           ! Set to true if file found and is in CheckedFileName
   CHARACTER(len=*), INTENT(INOUT) :: CheckedFileName  ! Blank if not found.
 
@@ -165,6 +165,7 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
   INTEGER, SAVE :: EchoInputFile  ! found unit number for "eplusout.audit"
   INTEGER, EXTERNAL :: FindUnitNumber
   LOGICAL, SAVE :: firstTime=.true.
+  CHARACTER(len=LEN(originalInputFileName)) :: InputFileName ! save for changing out path characters
   INTEGER :: pos
 
   IF (firstTime) THEN
@@ -183,6 +184,13 @@ subroutine CheckForActualFileName(InputFileName,FileFound,CheckedFileName)
   ENDIF
 
   CheckedFileName=blank
+  InputFileName=originalInputFileName
+  pos=INDEX(InputFileName,AltPathChar)
+  DO WHILE(pos > 0)
+    InputFileName(pos:pos)=PathChar
+    pos=INDEX(InputFileName,AltPathChar)
+  ENDDO
+
   INQUIRE(File=trim(InputFileName),Exist=FileExist)
   IF (FileExist) THEN
     FileFound=.true.

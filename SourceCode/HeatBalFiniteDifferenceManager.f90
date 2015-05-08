@@ -26,16 +26,17 @@ MODULE HeatBalFiniteDiffManager
           ! USE STATEMENTS:
           ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals, Only:MaxNameLength,KelvinConv,outputfiledebug, NumOfTimeStepInHour,   &
+USE DataGlobals, Only:MaxNameLength,KelvinConv,outputfiledebug, NumOfTimeStepInHour,DisplayExtraWarnings,   &
                       TimeStepZone,Hourofday,TimeStep,OutputFileInits,BeginEnvrnFlag,DayofSim,WarmupFlag,SecInHour
 USE DataInterfaces
 USE DataMoistureBalance
 USE DataHeatBalance, Only: Material, TotMaterials,MaxLayersInConstruct, QRadThermInAbs,Construct,      &
-                           TotConstructs,SolutionAlgo,UseCondFD,UseCondFDSimple,RegularMaterial,Air
+                           TotConstructs,UseCondFD,RegularMaterial,Air,Zone
 USE DataHeatBalSurface, Only: NetLWRadToSurf, QRadSWOutAbs, QRadSWInAbs,QRadSWOutMvIns, TempSource, &
-                         OpaqSurfInsFaceConductionFlux,OpaqSurfOutsideFaceConductionFlux,OpaqSurfOutsideFaceConduction,QsrcHist,OpaqSurfInsFaceConduction,  &
-                         QdotRadOutRepPerArea,MinSurfaceTempLimit,MaxSurfaceTempLimit,QdotRadNetSurfInRep,QRadNetSurfInReport !, &
-Use DataSurfaces, Only: Surface, TotSurfaces,Ground,SurfaceClass_Window
+                         OpaqSurfInsFaceConductionFlux,OpaqSurfOutsideFaceConductionFlux,  &
+                         OpaqSurfOutsideFaceConduction,QsrcHist,OpaqSurfInsFaceConduction,  &
+                         QdotRadOutRepPerArea,MinSurfaceTempLimit,MaxSurfaceTempLimit,QdotRadNetSurfInRep,QRadNetSurfInReport
+Use DataSurfaces, Only: Surface, TotSurfaces,Ground,SurfaceClass_Window, HeatTransferModel_CondFD
 Use DataHeatBalFanSys, Only: Mat, ZoneAirHumRat, QHTRadSysSurf, QHWBaseboardSurf, QSteamBaseboardSurf, QElecBaseboardSurf
 Use DataEnvironment, Only: SkyTemp, IsRain
 USE Psychrometrics , Only:PsyRhFnTdbRhovLBnd0C,PsyWFnTdbRhPb,PsyHgAirFnWTdb
@@ -49,6 +50,7 @@ PRIVATE   !Make everything private except what is specifically Public
 
           ! MODULE PARAMETER DEFINITIONS:
 REAL(r64), PARAMETER :: Lambda=2500000.0d0
+REAL(r64), PARAMETER :: smalldiff=1.d-8  ! Used in places where "equality" tests should not be used.
 
 INTEGER, PARAMETER :: CrankNicholsonSecondOrder = 1 ! original CondFD scheme.  semi implicit, second order in time
 INTEGER, PARAMETER :: FullyImplicitFirstOrder  = 2 ! fully implicit scheme, first order in time.
@@ -144,7 +146,7 @@ REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QHeatOutFlux    !HeatFlux on Surface f
 !                                                                 ! before CR 8280 -- Qdryout         !HeatFlux on Surface for reporting for Sensible only
 
 
-INTEGER   :: CondFDSchemeType = CrankNicholsonSecondOrder  ! solution scheme for CondFD
+INTEGER   :: CondFDSchemeType = FullyImplicitFirstOrder  ! solution scheme for CondFD - default
 REAL(r64) :: SpaceDescritConstant = 3.d0 ! spatial descritization constant,
 REAL(r64) :: MinTempLimit = -100.d0 ! lower limit check, degree C
 REAL(r64) :: MaxTempLimit =  100.d0 ! upper limit check, degree C
@@ -152,6 +154,7 @@ REAL(r64) :: MaxTempLimit =  100.d0 ! upper limit check, degree C
 INTEGER   :: MaxGSiter = 30  ! maximum number of Gauss Seidel iterations
 REAL(r64) :: fracTimeStepZone_Hour=0.0d0
 LOGICAL   :: GetHBFiniteDiffInputFlag=.true.
+INTEGER :: WarmupSurfTemp=0
           ! Subroutine Specifications for the Heat Balance Module
           ! Driver Routines
 PUBLIC  ManageHeatBalFiniteDiff
@@ -288,7 +291,7 @@ SUBROUTINE GetCondFDInput
   LOGICAL :: ErrorsFound = .false. ! If errors detected in input
 !  INTEGER :: CondFDMat                ! Number of variable property CondFD materials in input
   INTEGER :: ConstructNumber     ! Cconstruction with CondHBsimple to be overridden with CondHBdetailed
-  INTEGER :: TotHBAlgorithmOverrideConstructs  ! Number of constructions where HBAlgoSimplified will be overriddem with detailed.
+
   INTEGER :: NumConstructionAlpha
   Integer :: Loop
   INTEGER :: NumAlphas
@@ -518,28 +521,6 @@ SUBROUTINE GetCondFDInput
     ENDIF
   ENDDO
 
-  cCurrentModuleObject='ConstructionProperty:UseHBAlgorithmCondFDDetailed'    ! Simple algorithm override.
-  TotHBAlgorithmOverrideConstructs = GetNumObjectsFound(trim(cCurrentModuleObject))
-  IF ( TotHBAlgorithmOverrideConstructs .NE. 0 ) Then   !  overrides are present
-    DO Loop=1,TotHBAlgorithmOverrideConstructs
-
-      !Call GetObject routine to retrieve algorithm overrides
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,ConstructionName,NumConstructionAlpha, &
-                   MaterialProps,MaterialNumProp,IOSTAT,  &
-                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
-                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-      ConstructNumber = FindIteminList( Constructionname(1),Construct%Name,TotConstructs)
-      IF (ConstructNumber > 0) THEN
-        Construct(ConstructNumber)%UseHBAlgorithmCondFDDetailed = .True.
-      ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(1))//  &
-           ' entered='//TRIM(ConstructionName(1))//', must match to a valid Construction name.')
-        ErrorsFound=.true.
-      ENDIF
-    End Do
-
-  End If
-
   IF (ErrorsFound) THEN
     CALL ShowFatalError('GetCondFDInput: Errors found getting ConductionFiniteDifference properties. Program terminates.')
   ENDIF
@@ -569,6 +550,7 @@ SUBROUTINE InitHeatBalFiniteDiff
 
           ! USE STATEMENTS:
   USE DataInterfaces, ONLY:SetupOutputVariable
+  USE DataSurfaces, ONLY: HeatTransferModel_CondFD
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -583,41 +565,8 @@ SUBROUTINE InitHeatBalFiniteDiff
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL,SAVE        :: MyEnvrnFlag=.TRUE.
-!  INTEGER :: Lay
   INTEGER :: SurfNum
-!  CHARACTER(len=MaxNameLength) :: LayChar
-
-!  REAL(r64)             :: dxn        ! Intermediate calculation of nodal spacing. This is the full dx. There is
-                                                  ! a half dxn thick node at each surface. dxn is the "capacitor" spacing.
-!  INTEGER                           :: ipts1      ! Intermediate calculation for number of full thickness nodes per layer. There
-                                                  ! are always two half nodes at the layer faces.
-!  INTEGER :: Layer      ! Loop counter
-!  INTEGER :: OutwardMatLayerNum ! layer index, layer outward of the current layer
-!  INTEGER :: layerNode
-!  INTEGER :: Delt
   INTEGER :: ConstrNum    ! Loop counter
-!  INTEGER :: TotNodes     ! Loop counter
-!  INTEGER :: CurrentLayer ! Loop counter
-!  INTEGER :: Surf         ! Loop counter
-!  INTEGER :: index        ! Loop Counters
-
-!  REAL(r64) :: Alpha
-!  REAL(r64) :: Malpha
-!  REAL(r64) :: stabilitytemp
-!  REAL(r64) :: stabilitymoist
-!  REAL(r64) :: RHInit
-!  REAL(r64) :: Uinit
-!  REAL(r64) :: At
-!  REAL(r64) :: Bv
-!  REAL(r64) :: a
-!  REAL(r64) :: b
-!  REAL(r64) :: c
-!  REAL(r64) :: d
-!  REAL(r64) :: kt
-!  REAL(r64) :: RhoS
-!  REAL(r64) :: Por
-!  REAL(r64) :: Cp
-!  REAL(r64) :: Dv
   LOGICAL :: errorsFound
 
   IF (GetHBFiniteDiffInputFlag) THEN
@@ -631,6 +580,7 @@ SUBROUTINE InitHeatBalFiniteDiff
   ! now do begin environment inits.
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
     DO SurfNum=1,TotSurfaces
+      IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CondFD)   CYCLE
       IF(Surface(SurfNum)%Construction <= 0) CYCLE  ! Shading surface, not really a heat transfer surface
       ConstrNum=Surface(SurfNum)%Construction
       IF(Construct(ConstrNum)%TypeIsWindow) CYCLE  !  Windows simulated in Window module
@@ -650,7 +600,20 @@ SUBROUTINE InitHeatBalFiniteDiff
       SurfaceFD(SurfNum)%EnthOld        = EnthInitValue
       SurfaceFD(SurfNum)%EnthNew        = EnthInitValue
       SurfaceFD(SurfNum)%EnthLast       = EnthInitValue
+
+      TempOutsideAirFD(SurfNum)         = 0.d0
+      RhoVaporAirOut(SurfNum)           = 0.d0
+      RhoVaporSurfIn(SurfNum)           = 0.d0
+      RhoVaporAirIn(SurfNum)            = 0.d0
+      HConvExtFD(SurfNum)               = 0.d0
+      HMassConvExtFD(SurfNum)           = 0.d0
+      HConvInFD(SurfNum)                = 0.d0
+      HMassConvInFD(SurfNum)            = 0.d0
+      HSkyFD(SurfNum)                   = 0.d0
+      HGrndFD(SurfNum)                  = 0.d0
+      HAirFD(SurfNum)                   = 0.d0
     ENDDO
+    WarmupSurfTemp=0
     MyEnvrnFlag = .FALSE.
   END IF
   IF (.NOT. BeginEnvrnFlag) THEN
@@ -660,6 +623,7 @@ SUBROUTINE InitHeatBalFiniteDiff
   ! now do every timestep inits
 
   DO SurfNum=1,TotSurfaces
+    IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CondFD)  CYCLE
     IF(Surface(SurfNum)%Construction <= 0) CYCLE  ! Shading surface, not really a heat transfer surface
     ConstrNum=Surface(SurfNum)%Construction
     IF(Construct(ConstrNum)%TypeIsWindow) CYCLE  !  Windows simulated in Window module
@@ -697,7 +661,7 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
           ! na
 
           ! USE STATEMENTS:
-          ! na
+  USE DataSurfaces, ONLY : HeatTransferModel_CondFD
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -939,12 +903,6 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
     END DO   !  end of layer loop.
 
 
-    IF( SolutionAlgo == UseCondFDSimple .and. &
-               .not. construct(ConstrNum)%UseHBAlgorithmCondFDDetailed) THEN
-      TotNodes = 1                        !  Override for SigmaR SigmaC constructs*****************
-      Construct(ConstrNum)%TotLayers = 1  !  Simple one layer approximation
-    END IF
-
     ConstructFD(ConstrNum)%TotNodes = TotNodes
     ConstructFD(ConstrNum)%DeltaTime = Delt
 
@@ -953,44 +911,43 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
   END DO            ! End of Construction Loop.  TotNodes in each construction now set
 
   ! now determine x location, or distance that nodes are from the outside face in meters
-  IF (SolutionAlgo /= UseCondFDSimple) THEN
-    DO ConstrNum = 1, TotConstructs
-       IF (ConstructFD(ConstrNum)%TotNodes > 0) THEN
-         ALLOCATE(ConstructFD(ConstrNum)%NodeXlocation(ConstructFD(ConstrNum)%TotNodes + 1 ))
-         ConstructFD(ConstrNum)%NodeXlocation = 0.d0 ! init them all
-         Ipts1 = 0 ! init counter
-         DO Layer = 1, Construct(ConstrNum)%TotLayers
-           OutwardMatLayerNum = Layer - 1
-           DO layerNode = 1, ConstructFD(ConstrNum)%NodeNumPoint(Layer)
-             Ipts1 = Ipts1 +1
-             IF (Ipts1 == 1) THEN
-               ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = 0.d0 ! first node is on outside face
+  DO ConstrNum = 1, TotConstructs
+     IF (ConstructFD(ConstrNum)%TotNodes > 0) THEN
+       ALLOCATE(ConstructFD(ConstrNum)%NodeXlocation(ConstructFD(ConstrNum)%TotNodes + 1 ))
+       ConstructFD(ConstrNum)%NodeXlocation = 0.d0 ! init them all
+       Ipts1 = 0 ! init counter
+       DO Layer = 1, Construct(ConstrNum)%TotLayers
+         OutwardMatLayerNum = Layer - 1
+         DO layerNode = 1, ConstructFD(ConstrNum)%NodeNumPoint(Layer)
+           Ipts1 = Ipts1 +1
+           IF (Ipts1 == 1) THEN
+             ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = 0.d0 ! first node is on outside face
 
-             ELSEIF (LayerNode == 1) THEN
-               IF ( OutwardMatLayerNum > 0 .AND. OutwardMatLayerNum <= Construct(ConstrNum)%TotLayers ) THEN
-               ! later nodes are Delx away from previous, but use Delx from previous layer
-                 ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = ConstructFD(ConstrNum)%NodeXlocation(Ipts1 - 1) &
-                                                             + ConstructFD(ConstrNum)%Delx(OutwardMatLayerNum)
-               ENDIF
-             ELSE
-               ! later nodes are Delx away from previous
+           ELSEIF (LayerNode == 1) THEN
+             IF ( OutwardMatLayerNum > 0 .AND. OutwardMatLayerNum <= Construct(ConstrNum)%TotLayers ) THEN
+             ! later nodes are Delx away from previous, but use Delx from previous layer
                ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = ConstructFD(ConstrNum)%NodeXlocation(Ipts1 - 1) &
-                                                             + ConstructFD(ConstrNum)%Delx(Layer)
+                                                           + ConstructFD(ConstrNum)%Delx(OutwardMatLayerNum)
              ENDIF
+           ELSE
+             ! later nodes are Delx away from previous
+             ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = ConstructFD(ConstrNum)%NodeXlocation(Ipts1 - 1) &
+                                                           + ConstructFD(ConstrNum)%Delx(Layer)
+           ENDIF
 
-           ENDDO
          ENDDO
-         Layer = Construct(ConstrNum)%TotLayers
-         Ipts1 = Ipts1 +1
-         ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = ConstructFD(ConstrNum)%NodeXlocation(Ipts1 - 1) &
-                                                             + ConstructFD(ConstrNum)%Delx(Layer)
-       ENDIF
-    ENDDO
-  ENDIF
+       ENDDO
+       Layer = Construct(ConstrNum)%TotLayers
+       Ipts1 = Ipts1 +1
+       ConstructFD(ConstrNum)%NodeXlocation(Ipts1) = ConstructFD(ConstrNum)%NodeXlocation(Ipts1 - 1) &
+                                                           + ConstructFD(ConstrNum)%Delx(Layer)
+     ENDIF
+  ENDDO
 
   DO Surf = 1,TotSurfaces
     IF (.not. Surface(Surf)%HeatTransSurf) CYCLE
     IF (Surface(Surf)%Class == SurfaceClass_Window) CYCLE
+    IF (Surface(Surf)%HeatTransferAlgorithm /= HeatTransferModel_CondFD) CYCLE
 !    IF(Surface(Surf)%Construction <= 0) CYCLE  ! Shading surface, not really a heat transfer surface
     ConstrNum=Surface(surf)%Construction
 !    IF(Construct(ConstrNum)%TypeIsWindow) CYCLE  !  Windows simulated in Window module
@@ -1038,6 +995,7 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
   DO SurfNum=1,TotSurfaces
     IF (.not. Surface(SurfNum)%HeatTransSurf) CYCLE
     IF (Surface(SurfNum)%Class == SurfaceClass_Window) CYCLE
+    IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CondFD) CYCLE
  !   If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple)Then
 !
 !    CALL SetupOutputVariable('CondFD Outside Surface Heat Flux [W/m2]',   QFluxOutArrivSurfCond(SurfNum), &
@@ -1099,6 +1057,7 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
   USE General,         ONLY : RoundSigDigits
   USE DataHeatBalance, ONLY : CondFDRelaxFactor
   USE DataGlobals,     ONLY : KickOffSimulation
+  USE DataSurfaces,    ONLY : HeatTransferModel_CondFD
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1132,9 +1091,6 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
   INTEGER  :: TotNodes
   INTEGER  :: delt
   INTEGER  :: GSiter !  iteration counter for implicit repeat calculation
-!  INTEGER, SAVE    :: ErrCount=0
-!  REAL(r64) :: ErrorSignal
-!  INTEGER StartingI     ! Starting node number in layer node arrangement
   REAL(r64) :: MaxDelTemp = 0
   INTEGER   :: NodeNum
 
@@ -1142,6 +1098,10 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
 
   TotNodes = ConstructFD(ConstrNum)%TotNodes
   TotLayers = Construct(ConstrNum)%TotLayers
+
+  TempSurfInTmp =0.0
+  TempSurfOutTmp=0.0
+
 
   Delt = ConstructFD(ConstrNum)%DeltaTime    !   (seconds)
 
@@ -1153,99 +1113,72 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
       SurfaceFD(Surf)%TDTLast = SurfaceFD(Surf)%TDT    !  Save last iteration's TDT (New temperature) values
       SurfaceFD(Surf)%EnthLast = SurfaceFD(Surf)%EnthNew  ! Last iterations new enthalpy value
 
-
-      IF ( SolutionAlgo == UseCondFD  .or. Construct(ConstrNum)%USEHBAlgorithmCondFDDetailed ) Then  ! full Detailed node solution
-
 !  Original loop version
-        I= 1   !  Node counter
-        DO Lay = 1, TotLayers    ! Begin layer loop ...
+      I= 1   !  Node counter
+      DO Lay = 1, TotLayers    ! Begin layer loop ...
 
-          !For the exterior surface node with a convective boundary condition
-          IF(I == 1 .and. Lay ==1)THEN
-            CALL ExteriorBCEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
-                                          SurfaceFD(Surf)%TT, &
-                                          SurfaceFD(Surf)%Rhov, &
-                                          SurfaceFD(Surf)%RhoT, &
-                                          SurfaceFD(Surf)%RH, &
-                                          SurfaceFD(Surf)%TD, &
-                                          SurfaceFD(Surf)%TDT,&
-                                          SurfaceFD(Surf)%EnthOld, &
-                                          SurfaceFD(Surf)%EnthNew, &
-                                          TotNodes,HMovInsul)
-          END IF
+        !For the exterior surface node with a convective boundary condition
+        IF(I == 1 .and. Lay ==1)THEN
+          CALL ExteriorBCEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
+                                        SurfaceFD(Surf)%TT, &
+                                        SurfaceFD(Surf)%Rhov, &
+                                        SurfaceFD(Surf)%RhoT, &
+                                        SurfaceFD(Surf)%RH, &
+                                        SurfaceFD(Surf)%TD, &
+                                        SurfaceFD(Surf)%TDT,&
+                                        SurfaceFD(Surf)%EnthOld, &
+                                        SurfaceFD(Surf)%EnthNew, &
+                                        TotNodes,HMovInsul)
+        END IF
 
-          !For the Layer Interior nodes.  Arrive here after exterior surface node or interface node
+        !For the Layer Interior nodes.  Arrive here after exterior surface node or interface node
 
-          IF(TotNodes .ne. 1) THEN
+        IF(TotNodes .ne. 1) THEN
 
-            DO Ctr=2,ConstructFD(ConstrNum)%NodeNumPoint(Lay)
-              I=I+1
-              CALL InteriorNodeEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
-                                    SurfaceFD(Surf)%TT, &
-                                    SurfaceFD(Surf)%Rhov, &
-                                    SurfaceFD(Surf)%RhoT,&
-                                    SurfaceFD(Surf)%RH, &
-                                    SurfaceFD(Surf)%TD, &
-                                    SurfaceFD(Surf)%TDT, &
-                                    SurfaceFD(Surf)%EnthOld, &
-                                    SurfaceFD(Surf)%EnthNew)
-            END DO
-          END IF
-
-          IF(Lay < TotLayers .and. TotNodes .ne. 1) THEN
-            !Interface equations for 2 capactive materials
+          DO Ctr=2,ConstructFD(ConstrNum)%NodeNumPoint(Lay)
             I=I+1
-            CALL IntInterfaceNodeEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
-                                     SurfaceFD(Surf)%TT, &
-                                     SurfaceFD(Surf)%Rhov, &
-                                     SurfaceFD(Surf)%RhoT, &
-                                     SurfaceFD(Surf)%RH, &
-                                     SurfaceFD(Surf)%TD, &
-                                     SurfaceFD(Surf)%TDT, &
-                                     SurfaceFD(Surf)%EnthOld, &
-                                     SurfaceFD(Surf)%EnthNew,GSiter)
+            CALL InteriorNodeEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
+                                  SurfaceFD(Surf)%TT, &
+                                  SurfaceFD(Surf)%Rhov, &
+                                  SurfaceFD(Surf)%RhoT,&
+                                  SurfaceFD(Surf)%RH, &
+                                  SurfaceFD(Surf)%TD, &
+                                  SurfaceFD(Surf)%TDT, &
+                                  SurfaceFD(Surf)%EnthOld, &
+                                  SurfaceFD(Surf)%EnthNew)
+          END DO
+        END IF
 
-          ELSE IF (Lay == TotLayers) THEN
-            !For the Interior surface node with a convective boundary condition
-            I=I+1
-            CALL InteriorBCEqns(Delt,I,Lay,Surf, &
-                                     SurfaceFD(Surf)%T, &
-                                     SurfaceFD(Surf)%TT, &
-                                     SurfaceFD(Surf)%Rhov, &
-                                     SurfaceFD(Surf)%RhoT, &
-                                     SurfaceFD(Surf)%RH, &
-                                     SurfaceFD(Surf)%TD, &
-                                     SurfaceFD(Surf)%TDT, &
-                                     SurfaceFD(Surf)%EnthOld, &
-                                     SurfaceFD(Surf)%EnthNew)
-          END IF
+        IF(Lay < TotLayers .and. TotNodes .ne. 1) THEN
+          !Interface equations for 2 capactive materials
+          I=I+1
+          CALL IntInterfaceNodeEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
+                                   SurfaceFD(Surf)%TT, &
+                                   SurfaceFD(Surf)%Rhov, &
+                                   SurfaceFD(Surf)%RhoT, &
+                                   SurfaceFD(Surf)%RH, &
+                                   SurfaceFD(Surf)%TD, &
+                                   SurfaceFD(Surf)%TDT, &
+                                   SurfaceFD(Surf)%EnthOld, &
+                                   SurfaceFD(Surf)%EnthNew,GSiter)
 
-        END DO    !The end of the layer loop
+        ELSE IF (Lay == TotLayers) THEN
+          !For the Interior surface node with a convective boundary condition
+          I=I+1
+          CALL InteriorBCEqns(Delt,I,Lay,Surf, &
+                                   SurfaceFD(Surf)%T, &
+                                   SurfaceFD(Surf)%TT, &
+                                   SurfaceFD(Surf)%Rhov, &
+                                   SurfaceFD(Surf)%RhoT, &
+                                   SurfaceFD(Surf)%RH, &
+                                   SurfaceFD(Surf)%TD, &
+                                   SurfaceFD(Surf)%TDT, &
+                                   SurfaceFD(Surf)%EnthOld, &
+                                   SurfaceFD(Surf)%EnthNew)
+        END IF
 
-      ELSE IF (SolutionAlgo == UseCondFDSimple ) Then  !  Do Two node Formulation
-        I = 1
-        Lay=1  ! not used by Simple CondFD -- left for consistency and avoid crashes.
-        CALL ExteriorBCEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T,&
-                                         SurfaceFD(Surf)%TT, &
-                                         SurfaceFD(Surf)%Rhov, &
-                                         SurfaceFD(Surf)%RhoT, &
-                                         SurfaceFD(Surf)%RH, &
-                                         SurfaceFD(Surf)%TD, &
-                                         SurfaceFD(Surf)%TDT, &
-                                         SurfaceFD(Surf)%EnthOld, &
-                                         SurfaceFD(Surf)%EnthNew,TotNodes,HMovInsul)
-        I = TotNodes + 1
-        CALL InteriorBCEqns(Delt,I,Lay,Surf,SurfaceFD(Surf)%T, &
-                                         SurfaceFD(Surf)%TT, &
-                                         SurfaceFD(Surf)%Rhov, &
-                                         SurfaceFD(Surf)%RhoT, &
-                                         SurfaceFD(Surf)%RH, &
-                                         SurfaceFD(Surf)%TD, &
-                                         SurfaceFD(Surf)%TDT, &
-                                         SurfaceFD(Surf)%EnthOld, &
-                                         SurfaceFD(Surf)%EnthNew)
+      END DO    !The end of the layer loop
 
-      END IF
 
       IF (Gsiter .gt. 5) THEN
       !apply Relaxation factor for stability, use current (TDT) and previous (TDTLast) iteration temperature values
@@ -1381,7 +1314,7 @@ SUBROUTINE ReportFiniteDiffInits
 
           ! USE STATEMENTS:
   USE General, ONLY: ScanForReports, RoundSigDigits
-  USE DataHeatBalance, ONLY: MaxAllowedDelTempCondFD, CondFDRelaxFactorInput
+  USE DataHeatBalance, ONLY: MaxAllowedDelTempCondFD, CondFDRelaxFactorInput, HeatTransferAlgosUsed
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1412,75 +1345,75 @@ SUBROUTINE ReportFiniteDiffInits
      trim(cCondFDSchemeType(CondFDSchemeType))//','//  &
      trim(RoundSigDigits(SpaceDescritConstant,2))//','//trim(RoundSigDigits(CondFDRelaxFactorInput,2))//','//  &
      trim(RoundSigDigits(MaxAllowedDelTempCondFD,4))
-
   CALL ScanForReports('Constructions',DoReport,'Constructions')
 
   IF (DoReport) THEN
 
 !                                      Write Descriptions
-    Write(OutputFileInits,'(A)') '! <Construction>,Construction Name,Index,#Layers,#Nodes,Time Step {hours}'
-    Write(OutputFileInits,'(A)') '! <Material>,Material Name,Thickness {m},#Layer Elements,Layer Delta X,'//  &
+    Write(OutputFileInits,'(A)') '! <Construction CondFD>,Construction Name,Index,#Layers,#Nodes,Time Step {hours}'
+    Write(OutputFileInits,'(A)') '! <Material CondFD Summary>,Material Name,Thickness {m},#Layer Elements,Layer Delta X,'//  &
                              'Layer Alpha*Delt/Delx**2,Layer Moisture Stability'
-    IF (SolutionAlgo /= UseCondFDSimple) WRITE(OutputFileInits,'(A)') '! <ConductionFiniteDifference Node>,Node Identifier, '// &
+  !HT Algo issue
+    IF (ANY(HeatTransferAlgosUsed == UseCondFD))  &
+       WRITE(OutputFileInits,'(A)') '! <ConductionFiniteDifference Node>,Node Identifier, '// &
         ' Node Distance From Outside Face {m}, Construction Name, Outward Material Name (or Face), Inward Material Name (or Face)'
     DO ThisNum=1,TotConstructs
 
       IF (Construct(ThisNum)%TypeIsWindow) CYCLE
       IF (Construct(ThisNum)%TypeIsIRT) CYCLE
 
-      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),ThisNum, Construct(ThisNum)%TotLayers,  &
-         Int(ConstructFD(ThisNum)%TotNodes+1),ConstructFD(ThisNum)%DeltaTime/SecInHour
+      Write(OutputFileInits,700) TRIM(Construct(ThisNum)%Name),trim(RoundSigDigits(ThisNum)),  &
+          trim(RoundSigDigits(Construct(ThisNum)%TotLayers)),  &
+          trim(RoundSigDigits(Int(ConstructFD(ThisNum)%TotNodes+1))),  &
+          trim(RoundSigDigits(ConstructFD(ThisNum)%DeltaTime/SecInHour,6))
 !
- 700  FORMAT(' Construction,',A,2(',',I6),',',I6,',',F9.6)
- 701  FORMAT(' Material,',A,',',G15.4,',',I4,',',F15.8,',',F15.8,',',F15.8)
+ 700  FORMAT(' Construction CondFD,',A,2(',',A),',',A,',',A)
+ 701  FORMAT(' Material CondFD Summary,',A,',',A,',',A,',',A,',',A,',',A)
  702  FORMAT(' ConductionFiniteDifference Node,', A, ',', A, ',', A, ',', A, ',', A)
 
 
       DO Layer=1,Construct(ThisNum)%TotLayers
-            Write(OutputFileInits,701) TRIM(ConstructFD(ThisNum)%Name(Layer)),ConstructFD(ThisNum)%Thickness(Layer),      &
-                                       ConstructFD(ThisNum)%NodeNumPoint(Layer),ConstructFD(ThisNum)%Delx(Layer),  &
-                                       ConstructFD(ThisNum)%TempStability(Layer),ConstructFD(ThisNum)%MoistStability(Layer)
+            Write(OutputFileInits,701) TRIM(ConstructFD(ThisNum)%Name(Layer)),  &
+                                       trim(RoundSigDigits(ConstructFD(ThisNum)%Thickness(Layer),4)),      &
+                                       trim(RoundSigDigits(ConstructFD(ThisNum)%NodeNumPoint(Layer))),  &
+                                       trim(RoundSigDigits(ConstructFD(ThisNum)%Delx(Layer),8)),  &
+                                       trim(RoundSigDigits(ConstructFD(ThisNum)%TempStability(Layer),8)),  &
+                                       trim(RoundSigDigits(ConstructFD(ThisNum)%MoistStability(Layer),8))
       ENDDO
 
       !now list each CondFD Node with its X distance from outside face in m along with other identifiers
       Inodes = 0
-      IF (SolutionAlgo /= UseCondFDSimple) THEN
 
-        DO Layer=1,Construct(ThisNum)%TotLayers
-          OutwardMatLayerNum = Layer - 1
-          DO layerNode = 1, ConstructFD(ThisNum)%NodeNumPoint(Layer)
-            Inodes = Inodes + 1
-            WRITE(InodesChar,*)Inodes
-            IF (Inodes == 1) THEN
-              WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
-                                       TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
-                                       TRIM(Construct(ThisNum)%Name) ,          &
-                                       TRIM('Surface Outside Face'),          &
-                                       TRIM(ConstructFD(ThisNum)%Name(Layer))
+      DO Layer=1,Construct(ThisNum)%TotLayers
+        OutwardMatLayerNum = Layer - 1
+        DO layerNode = 1, ConstructFD(ThisNum)%NodeNumPoint(Layer)
+          Inodes = Inodes + 1
+          WRITE(InodesChar,*)Inodes
+          IF (Inodes == 1) THEN
+            WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
+                                     TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
+                                     TRIM(Construct(ThisNum)%Name) ,          &
+                                     TRIM('Surface Outside Face'),          &
+                                     TRIM(ConstructFD(ThisNum)%Name(Layer))
 
-            ELSEIF (layerNode== 1 ) THEN
+          ELSEIF (layerNode== 1 ) THEN
 
-              IF ( OutwardMatLayerNum > 0 .AND. OutwardMatLayerNum <= Construct(ThisNum)%TotLayers ) THEN
-                 WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
-                                       TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
-                                       TRIM(Construct(ThisNum)%Name) ,          &
-                                       TRIM(ConstructFD(ThisNum)%Name(OutwardMatLayerNum)), &
-                                       TRIM(ConstructFD(ThisNum)%Name(Layer))
-  !            ELSE
-  !               WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
-  !                                     TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
-  !                                     TRIM(Construct(ThisNum)%Name) ,          &
-  !                                     TRIM('!?WHY DOES IT COME HERE?!'), &
-  !                                     TRIM(ConstructFD(ThisNum)%Name(Layer))
-              ENDIF
-            ELSEIF (layerNode >1) THEN
-              OutwardMatLayerNum = Layer
-              WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
-                                       TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
-                                       TRIM(Construct(ThisNum)%Name) ,          &
-                                       TRIM(ConstructFD(ThisNum)%Name(OutwardMatLayerNum)), &
-                                       TRIM(ConstructFD(ThisNum)%Name(Layer))
+            IF ( OutwardMatLayerNum > 0 .AND. OutwardMatLayerNum <= Construct(ThisNum)%TotLayers ) THEN
+               WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
+                                     TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
+                                     TRIM(Construct(ThisNum)%Name) ,          &
+                                     TRIM(ConstructFD(ThisNum)%Name(OutwardMatLayerNum)), &
+                                     TRIM(ConstructFD(ThisNum)%Name(Layer))
+
             ENDIF
+          ELSEIF (layerNode >1) THEN
+            OutwardMatLayerNum = Layer
+            WRITE(OutputFileInits,702) TRIM('Node #'//TRIM(ADJUSTL(InodesChar))), &
+                                     TRIM(RoundSigDigits(ConstructFD(ThisNum)%NodeXlocation(Inodes), 8)), &
+                                     TRIM(Construct(ThisNum)%Name) ,          &
+                                     TRIM(ConstructFD(ThisNum)%Name(OutwardMatLayerNum)), &
+                                     TRIM(ConstructFD(ThisNum)%Name(Layer))
+          ENDIF
 
           ENDDO
         ENDDO
@@ -1493,7 +1426,7 @@ SUBROUTINE ReportFiniteDiffInits
                                    TRIM(Construct(ThisNum)%Name) ,          &
                                    TRIM(ConstructFD(ThisNum)%Name(Layer)), &
                                    TRIM('Surface Inside Face')
-      ENDIF ! detailed CondFD
+
     ENDDO
 
   ENDIF
@@ -1571,7 +1504,8 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
           !       DATE WRITTEN   November, 2003
           !       MODIFIED       B. Griffith 2010, fix adiabatic and other side surfaces
           !                      May 2011, B. Griffith, P. Tabares
-          !                      November 2011 P. Tabares fixed problems with adiabatic walls/massless walls and PCM stability problems
+          !                      November 2011 P. Tabares fixed problems with adiabatic walls/massless walls
+          !                      November 2011 P. Tabares fixed problems PCM stability problems
           !       RE-ENGINEERED  Curtis Pedersen 2006
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1584,7 +1518,7 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
           ! na
 
           ! USE STATEMENTS:
-  USE DataSurfaces,          ONLY : OtherSideCondModeledExt, OSCM
+  USE DataSurfaces,          ONLY : OtherSideCondModeledExt, OSCM, HeatTransferModel_CondFD
   USE DataHeatBalSurface  ,  ONLY : QdotRadOutRepPerArea, QdotRadOutRep, QRadOutReport
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1751,10 +1685,8 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
   ELSEIF (Surface(Surf)%ExtBoundCond <= 0) THEN   ! regular outside conditions
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++
- !    Do detailed FD for  the surface   Else will switch to SigmaR,SigmaC
-    IF ( SolutionAlgo == UseCondFD  .or. Construct(ConstrNum)%USEHBAlgorithmCondFDDetailed ) THEN
-                      ! Use detailed CondFD  when specified or
-                      !  when overridden by special construction field
+
+    IF ( Surface(Surf)%HeatTransferAlgorithm == HeatTransferModel_CondFD  ) THEN
 
     ! regular outside conditions
 
@@ -1793,7 +1725,11 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
                    hsky*Rlayer*Tsky)/  &
                    (1 + hconvo*Rlayer + hgnd*Rlayer + hrad*Rlayer + &
                     hsky*Rlayer)
-        TDT(I) = MAX(MinSurfaceTempLimit,MIN(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+        IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+            (TDT(I) < MinSurfaceTempLimit) ) THEN
+          TDT(I) = MAX(MinSurfaceTempLimit,MIN(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!          CALL CheckFDSurfaceTempLimits(I,TDT(I))
+        ENDIF
 
       ELSE  ! Regular or phase change material layer
 
@@ -1881,35 +1817,14 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
         End IF   !  Regular layer or Movable insulation cases
 
-        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+        IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+            (TDT(I) < MinSurfaceTempLimit) ) THEN
+          TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!          CALL CheckFDSurfaceTempLimits(I,TDT(I))
+        ENDIF
 
 
       END IF  ! R layer or Regular layer
-
-
-    ELSE IF (SolutionAlgo == UseCondFDSimple) Then    !  Do sigmaR SigmaC approximation. This is CondFDSimple
-
-!      List(List(Rule(TDT,(1.*QRadSWOutMFD + (0.5*SigmaC*TD)/DelT + (0.5*(-1.*TD + TDP1))/SigmaR + (0.5*TDTP1)/SigmaR + 0.5*hgnd*Tgnd +
-!     -       0.5*hgnd*(-1.*TD + Tgnd) + 0.5*hconvo*Toa + 0.5*hrad*Toa + 0.5*hconvo*(-1.*TD + Toa) + 0.5*hrad*(-1.*TD + Toa) + 0.5*hsky*Tsky +
-!     -       0.5*hsky*(-1.*TD + Tsky))/(0.5*hconvo + 0.5*hgnd + 0.5*hrad + 0.5*hsky + (0.5*SigmaC)/DelT + 0.5/SigmaR))))
-
-
-!   TDT(I) = (1.*QRadSWOutFD + (0.5*SigmaCLoc*TD(I))/Delt + (0.5*(-1.*TD(I) + TD(I+1)))/SigmaRLoc + (0.5*TDT(I+1))/SigmaRLoc + 0.5*hgnd*Tgnd + &
-!           0.5*hgnd*(-1.*TD(I) + Tgnd) + 0.5*hconvo*Toa + 0.5*hrad*Toa + 0.5*hconvo*(-1.*TD(I) + Toa) + 0.5*hrad*(-1.*TD(I) + Toa) + 0.5*hsky*Tsky +  &
-!           0.5*hsky*(-1.*TD(I) + Tsky))/(0.5*hconvo + 0.5*hgnd + 0.5*hrad + 0.5*hsky + (0.5*SigmaCLoc)/Delt + 0.5/SigmaRLoc)
-
-   !  First Order AM
-! (2*DelT*QRadSWOutMFD*SigmaR + SigmaC*SigmaR*TD + 2*DelT*TDTP1 + 2*DelT*hgnd*SigmaR*Tgnd + 2*DelT*hconvo*SigmaR*Toa + 2*DelT*hrad*SigmaR*Toa + 2*DelT*hsky*SigmaR*Tsky)/
- !    -     (2*DelT + 2*DelT*hconvo*SigmaR + 2*DelT*hgnd*SigmaR + 2*DelT*hrad*SigmaR + 2*DelT*hsky*SigmaR + SigmaC*SigmaR))
-
-
-      TDT(I)= (2.d0*delt*QRadSWOutFD*SigmaRLoc + SigmaCLoc*SigmaRLoc*TD(I) +   &
-             2.d0*delt*TDT(I+1) + 2.d0*delt*hgnd*SigmaRLoc*Tgnd + 2.d0*delt*hconvo*SigmaRLoc*Toa +  &
-             2.d0*delt*hrad*SigmaRLoc*Toa + 2.d0*delt*hsky*SigmaRLoc*Tsky)/  &
-            (2.d0*delt + 2.d0*delt*hconvo*SigmaRLoc + 2*delt*hgnd*SigmaRLoc +   &
-             2.d0*delt*hrad*SigmaRLoc + 2.d0*delt*hsky*SigmaRLoc + SigmaCLoc*SigmaRLoc)
-
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
 
 
     END IF   !End IF--ELSE SECTION (regular detailed FD part or SigmaR SigmaC part
@@ -1975,7 +1890,7 @@ SUBROUTINE InteriorNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,Ent
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: NinetyNine=99.0d0
+!  REAL(r64), PARAMETER :: NinetyNine=99.0d0
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -2063,7 +1978,11 @@ SUBROUTINE InteriorNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,Ent
 
   END SELECT
 
-  TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+ IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+     (TDT(I) < MinSurfaceTempLimit) ) THEN
+   TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!   CALL CheckFDSurfaceTempLimits(I,TDT(I))
+  ENDIF
 
 RETURN
 
@@ -2110,7 +2029,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
   REAL(r64),DIMENSION(:), INTENT(InOut) :: EnthNew    ! New Nodal enthalpy
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: NinetyNine=99.0d0
+!  REAL(r64), PARAMETER :: NinetyNine=99.0d0
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -2164,8 +2083,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
   IF( SUM(MaterialFD(MatLay)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
 
+    IndVarCol = 1  ! temperature
     DepVarCol = 2  ! thermal conductivity
-    IndVarCol = 1  !temperature
     kt1       = terpld(MaterialFD(MatLay)%numTempCond,MaterialFD(MatLay)%TempCond,(TDT(I)+TDT(I-1))/2.d0,IndVarCol,DepVarCol)
 
   ENDIF
@@ -2181,8 +2100,8 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
   IF( SUM(MaterialFD(MatLay2)%TempCond(1:3,2)) >= 0.) THEN ! Multiple Linear Segment Function
 
-    DepVarCol= 2  ! thermal conductivity
-    IndVarCol=1  !temperature
+    IndVarCol = 1  ! temperature
+    DepVarCol = 2  ! thermal conductivity
     kt2 =terpld(MaterialFD(MatLay2)%numTempCond,MaterialFD(MatLay2)%TempCond,(TDT(I)+TDT(I+1))/2.d0,IndVarCol,DepVarCol)
 
   ENDIF
@@ -2194,7 +2113,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
   Cp1=Cpo1   !  Will be reset if PCM
   Cp2=Cpo2   !  will be reset if PCM
 
-  IF ( SolutionAlgo == UseCondFD  .or. Construct(ConstrNum)%USEHBAlgorithmCondFDDetailed )THEN
+  IF ( Surface(Surf)%HeatTransferAlgorithm ==  HeatTransferModel_CondFD )THEN  !HT Algo issue
               !Calculate the Dry Heat Conduction Equation
     RLayerPresent = .FALSE.
     RLayer2Present = .false.
@@ -2222,17 +2141,17 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
     ELSE IF ( RLayerPresent .and. .not. RLayer2Present  ) THEN  ! R-layer first
 
      !  Check for PCM second layer
+     IndVarCol = 1  ! temperature
+     DepVarCol = 2  ! thermal conductivity
 
       IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) < 0.  &
              .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.) THEN    !  phase change material Layer2,  Use TempEnth Data
 
-        IndVarCol= 1
-        DepVarCol=2
         Enth2Old = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TD(I),IndVarCol,DepVarCol)
         Enth2New = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TDT(I),IndVarCol,DepVarCol)
         EnthNew(I) = Enth2New  !  This node really doesn't have an enthalpy, this gives it a value
 
-        IF (Enth2New==Enth2Old)  THEN
+        IF (ABS(Enth2New-Enth2Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp2 = Cpo2
         ELSE
           Cp2 = MAX(Cpo2,(Enth2New -Enth2Old)/(TDT(I)-TD(I)))
@@ -2254,11 +2173,17 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
       END SELECT
 
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+      IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+          (TDT(I) < MinSurfaceTempLimit) ) THEN
+        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!        CALL CheckFDSurfaceTempLimits(I,TDT(I))
+      ENDIF
 
     ELSE IF (.not. RLayerPresent .and.  RLayer2Present) THEN  ! R-layer second
 
       !  check for PCM layer before R layer
+     IndVarCol = 1  ! temperature
+     DepVarCol = 2  ! thermal conductivity
 
       IF( SUM(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.  &
           .and. SUM(MaterialFD(MatLay2)%TempEnth(1:3,2)) < 0.) THEN    !  phase change material Layer1,  Use TempEnth Data
@@ -2267,7 +2192,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
         Enth1New = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TDT(I),IndVarCol,DepVarCol)
         EnthNew(I) = Enth1New    !  This node really doesn't have an enthalpy, this gives it a value
 
-        IF (Enth1New==Enth1Old)  THEN
+        IF (ABS(Enth1New-Enth1Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp1=Cpo1
         ELSE
           Cp1=Max(Cpo1,(Enth1New -Enth1Old)/(TDT(I)-TD(I)))
@@ -2288,14 +2213,18 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
       END SELECT
 
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+      IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+          (TDT(I) < MinSurfaceTempLimit) ) THEN
+        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!        CALL CheckFDSurfaceTempLimits(I,TDT(I))
+      ENDIF
 
     ELSE  !   Regular or Phase Change on both sides of interface
           !   Consider the various PCM material location cases
       Cp1 = Cpo1    !  Will be changed if PCM
       Cp2 = Cpo2    !  Will be changed if PCM
-      IndVarCol = 1
-      DepVarCol =2
+      IndVarCol = 1  ! temperature
+      DepVarCol = 2  ! thermal conductivity
 
       IF( Sum(MaterialFD(MatLay)%TempEnth(1:3,2)) > 0.  &
           .and. Sum(MaterialFD(MatLay2)%TempEnth(1:3,2)) > 0.) THEN    !  phase change material both layers,  Use TempEnth Data
@@ -2307,13 +2236,13 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
         EnthNew(I) = Enth1New    !  This node really doesn't have an enthalpy, this gives it a value
 
-        IF (Enth1New==Enth1Old)  THEN
+        IF (ABS(Enth1New-Enth1Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp1 = Cpo1
         ELSE
           Cp1 = MAX(Cpo1,(Enth1New -Enth1Old)/(TDT(I)-TD(I)))
         END IF
 
-        IF (Enth2New==Enth2Old)  THEN
+        IF (ABS(Enth2New-Enth2Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp2 = Cpo2
         ELSE
           Cp2 = Max(Cpo2,(Enth2New -Enth2Old)/(TDT(I)-TD(I)))
@@ -2326,7 +2255,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
         Enth1New = terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TDT(I),IndVarCol,DepVarCol)
         EnthNew(I) = Enth1New    !  This node really doesn't have an enthalpy, this gives it a value
 
-        IF (Enth1New==Enth1Old)  THEN
+        IF (ABS(Enth1New-Enth1Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp1 = Cpo1
         ELSE
           Cp1 = Max(Cpo1,(Enth1New -Enth1Old)/(TDT(I)-TD(I)))
@@ -2341,7 +2270,7 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
         Enth2New = terpld(MaterialFD(MatLay2)%numTempEnth,MaterialFD(MatLay2)%TempEnth,TDT(I),IndVarCol,DepVarCol)
         EnthNew(I) = Enth2New  !  This node really doesn't have an enthalpy, this gives it a value
 
-        IF (Enth2New==Enth2Old)  THEN
+        IF (ABS(Enth2New-Enth2Old) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp2 = Cpo2
         ELSE
           Cp2 = MAX(Cpo2,(Enth2New -Enth2Old)/(TDT(I)-TD(I)))
@@ -2355,21 +2284,26 @@ SUBROUTINE IntInterfaceNodeEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld
 
         CASE (CrankNicholsonSecondOrder)
         !     Regular Internal Interface Node with Source/sink using Adams Moulton second order
-          TDT(I) = MIN(NinetyNine,(2.d0*delt*Delx1*Delx2*QSSFlux - delt*Delx2*kt1*TD(I) - delt*Delx1*kt2*TD(I) +  &
+          TDT(I) = (2.d0*delt*Delx1*Delx2*QSSFlux - delt*Delx2*kt1*TD(I) - delt*Delx1*kt2*TD(I) +  &
                  Cp1*Delx1**2.d0*Delx2*RhoS1*TD(I) + Cp2*Delx1*Delx2**2.d0*RhoS2*TD(I) + delt*Delx2*kt1*TD(I-1) +  &
                  delt*Delx1*kt2*TD(I+1) + delt*Delx2*kt1*TDT(I-1) + delt*Delx1*kt2*TDT(I+1))/   &
-                 (delt*Delx2*kt1 + delt*Delx1*kt2 + Cp1*Delx1**2.d0*Delx2*RhoS1 + Cp2*Delx1*Delx2**2.d0*RhoS2))
+                 (delt*Delx2*kt1 + delt*Delx1*kt2 + Cp1*Delx1**2.d0*Delx2*RhoS1 + Cp2*Delx1*Delx2**2.d0*RhoS2)
 
         CASE (FullyImplicitFirstOrder)
         ! first order adams moulton
-          TDT(I) = MIN(NinetyNine,(2.d0*delt*Delx1*Delx2*QSSFlux + &
+          TDT(I) = (2.d0*delt*Delx1*Delx2*QSSFlux + &
                  Cp1*Delx1**2.d0*Delx2*RhoS1*TD(I) + Cp2*Delx1*Delx2**2.d0*RhoS2*TD(I) +  &
                  2.d0*delt*Delx2*kt1*TDT(I-1) + 2.d0*delt*Delx1*kt2*TDT(I+1))/   &
-                 (2.d0*delt*Delx2*kt1 + 2.d0*delt*Delx1*kt2 + Cp1*Delx1**2.d0*Delx2*RhoS1 + Cp2*Delx1*Delx2**2.d0*RhoS2))
+                 (2.d0*delt*Delx2*kt1 + 2.d0*delt*Delx1*kt2 + Cp1*Delx1**2.d0*Delx2*RhoS1 + Cp2*Delx1*Delx2**2.d0*RhoS2)
 
       END SELECT
 
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+      IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+          (TDT(I) < MinSurfaceTempLimit) ) THEN
+        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!        CALL CheckFDSurfaceTempLimits(I,TDT(I))
+      ENDIF
+
 
       IF (Construct(ConstrNum)%SourceSinkPresent .and. Lay == Construct(ConstrNum)%SourceAfterLayer) Then
         TcondFDSourceNode(Surf)= TDT(I) ! transfer node temp to Radiant System
@@ -2392,7 +2326,8 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
           !       AUTHOR         Richard Liesen
           !       DATE WRITTEN   November, 2003
           !       MODIFIED       B. Griffith, P. Tabares, May 2011, add first order fully implicit, bug fixes, cleanup
-          !                      November 2011 P. Tabares fixed problems with adiabatic walls/massless walls and PCM stability problems
+          !                      November 2011 P. Tabares fixed problems with adiabatic walls/massless walls
+          !                      November 2011 P. Tabares fixed problems PCM stability problems
           !       RE-ENGINEERED  C. O. Pedersen 2006
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2406,6 +2341,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
           ! USE STATEMENTS:
   USE DataHeatBalFanSys, ONLY: Mat, ZoneAirHumRat, QHTRadSysSurf, QHWBaseboardSurf, QSteamBaseboardSurf, QElecBaseboardSurf
+  USE DataSurfaces,      ONLY: HeatTransferModel_CondFD
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2486,7 +2422,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++
    !    Do all the nodes in the surface   Else will switch to SigmaR,SigmaC
-  IF (SolutionAlgo== UseCondFD .or. Construct(ConstrNum)%UseHBAlgorithmCondFDDetailed)  THEN
+  IF (Surface(Surf)%HeatTransferAlgorithm == HeatTransferModel_CondFD) THEN
 
     MatLay = Construct(ConstrNum)%LayerPoint(Lay)
      !  Set Thermal Conductivity.  Can be constant, simple linear temp dep or multiple linear segment temp function dep.
@@ -2517,30 +2453,23 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
             !  Use algebraic equation for TDT based on R
 
       IF (Surface(Surf)%ExtBoundCond > 0 .and. i==1) THEN  !this is for an adiabatic partition
-          !PT added NetLWRadToSurfFD*Rlayer, it was missing!
+
         TDT(I)=(NetLWRadToSurfFD*Rlayer+QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
                     QElecBaseboardSurfFD*Rlayer +  QRadSWInFD*Rlayer + QRadThermInFD*Rlayer +   &
                        TDT(I+1) + hconvi*Rlayer*Tia)/(1.0d0 + hconvi*Rlayer)
 
 
-      ELSE !PT,regular wall
+      ELSE ! regular wall
         TDT(I)=(NetLWRadToSurfFD*Rlayer+QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
                     QElecBaseboardSurfFD*Rlayer + QRadSWInFD*Rlayer + QRadThermInFD*Rlayer +   &
                        TDT(I-1) + hconvi*Rlayer*Tia)/(1.0d0 + hconvi*Rlayer)
       ENDIF
-!feb2012      IF (Surface(Surf)%ExtBoundCond > 0 .and. i==1.d0) THEN  !this is for an interzone partition
-!feb2012        TDT(I)=(QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
-!feb2012                    QElecBaseboardSurfFD*Rlayer + &
-!feb2012                    QRadSWInFD*Rlayer + QRadThermInFD*Rlayer + TDT(I+1) + hconvi*Rlayer*Tia)/(1 + hconvi*Rlayer)
-!feb2012
-!feb2012      ELSE !PT,regular wall
-!feb2012        TDT(I)=(QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
-!feb2012                    QElecBaseboardSurfFD*Rlayer + &
-!feb2012                    QRadSWInFD*Rlayer + QRadThermInFD*Rlayer + TDT(I-1) + hconvi*Rlayer*Tia)/(1 + hconvi*Rlayer)
-!feb2012
-!feb2012      ENDIF
 
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+      IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+          (TDT(I) < MinSurfaceTempLimit) ) THEN
+        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!        CALL CheckFDSurfaceTempLimits(I,TDT(I))
+      ENDIF
 
     ELSE  !  Regular or PCM
 
@@ -2553,7 +2482,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
         EnthOld(I) =terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TD(I),IndVarCol,DepVarCol)
 
         EnthNew(I) =terpld(MaterialFD(MatLay)%numTempEnth,MaterialFD(MatLay)%TempEnth,TDT(I),IndVarCol,DepVarCol)
-        IF (EnthNew(I)==EnthOld(I))  THEN
+        IF (ABS(EnthNew(I)-EnthOld(I)) <= smalldiff .or. ABS(TDT(I)-TD(I)) <= smalldiff)  THEN
           Cp = Cpo
         ELSE
           Cp = MAX(Cpo,(EnthNew(I) -EnthOld(I))/(TDT(I)-TD(I)))
@@ -2604,49 +2533,16 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
         END SELECT
       ENDIF
 
-      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+      IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
+          (TDT(I) < MinSurfaceTempLimit) ) THEN
+        TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
+!        CALL CheckFDSurfaceTempLimits(I,TDT(I))
+      ENDIF
+!      TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
 
 !  Pass inside conduction Flux [W/m2] to DataHeatBalanceSurface array
 !          OpaqSurfInsFaceConductionFlux(Surf)= (TDT(I-1)-TDT(I))*kt/Delx
     END IF  ! Regular or R layer
-
-
-  ELSE IF (SolutionAlgo == UseCondFDSimple) Then  !  Use SigmaR SigmaC  formulation  for speed  (CondFDSimple)
-
-
-   !Interior Node equation for second order Adams-Moulton SigmaR SigmaC formulation with two surface nodes only
-
-!   List(List(Rule(TDT,(2*Delt*NetLWRadToSurfMFD*SigmaR + 2*Delt*QHtRadSysSurfMFD*SigmaR + 2*Delt*QRadSWInMFD*SigmaR + 2*Delt*QRadThermInMFD*SigmaR -
-!     -       Delt*TD - Delt*hconvi*SigmaR*TD + SigmaC*SigmaR*TD + Delt*TDM1 + Delt*TDTM1 + 2*Delt*hconvi*SigmaR*Tia)/
-!     -     (Delt + Delt*hconvi*SigmaR + SigmaC*SigmaR))))
-
-
-
-!     TDT(I) = (2*Delt*NetLWRadToSurfFD*SigmaRLoc + 2*Delt*QHtRadSysSurfFD*SigmaRLoc + 2*Delt*QHWBaseboardSurfFD*SigmaRLoc + &
- !              2*Delt*QRadSWInFD*SigmaRLoc + 2*Delt*QRadThermInFD*SigmaRLoc -  &
-!           Delt*TD(I) - Delt*hconvi*SigmaRLoc*TD(I) + SigmaCLoc*SigmaRLoc*TD(I) +  &
-!           Delt*TD(I-1) + Delt*TDT(I-1) + 2*Delt*hconvi*SigmaRLoc*Tia)/  &
- !          (Delt + Delt*hconvi*SigmaRLoc + SigmaCLoc*SigmaRLoc)
-
-!first Order AM
-!   List(List(Rule(TDT,(2*Delt*NetLWRadToSurfMFD*SigmaR +
-!     -       2*Delt*QHtRadSysSurfMFD*SigmaR +
-!     -       2*Delt*QRadSWInMFD*SigmaR + 2*Delt*QRadThermInMFD*SigmaR +
-!     -       SigmaC*SigmaR*TD + 2*Delt*TDTM1 + 2*Delt*hconvi*SigmaR*Tia)/
-!     -     (2*Delt + 2*Delt*hconvi*SigmaR + SigmaC*SigmaR))))
-
-
-!Tia = 21.   !**************************************TEST OVERIDE OF TIA
-
-    TDT(I) =(2.d0*Delt*NetLWRadToSurfFD*SigmaRLoc +  &
-            2.d0*Delt*QHtRadSysSurfFD*SigmaRLoc +  &
-            2.d0*Delt*QRadSWInFD*SigmaRLoc + 2.d0*Delt*QRadThermInFD*SigmaRLoc +  &
-            SigmaCLoc*SigmaRLoc*TD(I) + 2*Delt*TDT(I-1) + 2.d0*Delt*hconvi*SigmaRLoc*Tia)/  &
-          (2.d0*Delt + 2.d0*Delt*hconvi*SigmaRLoc + SigmaCLoc*SigmaRLoc)
-
-
-
-    TDT(I) = Max(MinSurfaceTempLimit,Min(MaxSurfaceTempLimit,TDT(I)))  !  +++++ Limit Check
 
   END IF   !  End of Regular node or SigmaR SigmaC option
 
@@ -2665,6 +2561,138 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 RETURN
 
 END SUBROUTINE InteriorBCEqns
+
+SUBROUTINE CheckFDSurfaceTempLimits(SurfNum,CheckTemperature)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   August 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Provides a single entry point for checking surface temperature limits as well as
+          ! setting up for recurring errors if too low or too high.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Use methodology similar to HBSurfaceManager
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE General, ONLY: RoundSigDigits
+  USE DataAirFlowNetwork, ONLY: SimulateAirFlowNetwork,AirflowNetworkControlSimple
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)   :: SurfNum  ! surface number
+  REAL(R64), INTENT(IN) :: CheckTemperature  ! calculated temperature, not reset
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ZoneNum
+
+  ZoneNum=Surface(SurfNum)%Zone
+
+!      IF ((TH(SurfNum,1,2) > MaxSurfaceTempLimit) .OR. &
+!          (TH(SurfNum,1,2) < MinSurfaceTempLimit) ) THEN
+  IF (WarmupFlag) WarmupSurfTemp=WarmupSurfTemp+1
+  IF (.not. WarmupFlag  .or. (WarmupFlag .and. WarmupSurfTemp > 10) .or. DisplayExtraWarnings) THEN
+    IF (CheckTemperature < MinSurfaceTempLimit) THEN
+      IF (Surface(SurfNum)%LowTempErrCount == 0) THEN
+        CALL ShowSevereMessage('Temperature (low) out of bounds ['//TRIM(RoundSigDigits(CheckTemperature,2))//  &
+                           '] for zone="'//trim(Zone(ZoneNum)%Name)//'", for surface="'//TRIM(Surface(SurfNum)%Name)//'"')
+        CALL ShowContinueErrorTimeStamp(' ')
+        IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
+          CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
+          IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+            CALL ShowContinueError('...Internal Heat Gain ['//  &
+                 trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
+          ELSE
+            CALL ShowContinueError('...Internal Heat Gain (no floor) ['//  &
+                 trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains,3))//'] W')
+          ENDIF
+          IF (SimulateAirflowNetwork <= AirflowNetworkControlSimple) THEN
+            CALL ShowContinueError('...Infiltration/Ventilation ['//  &
+                   trim(RoundSigDigits(Zone(ZoneNum)%NominalInfilVent,3))//'] m3/s')
+            CALL ShowContinueError('...Mixing/Cross Mixing ['//  &
+                   trim(RoundSigDigits(Zone(ZoneNum)%NominalMixing,3))//'] m3/s')
+          ELSE
+            CALL ShowContinueError('...Airflow Network Simulation: Nominal Infiltration/Ventilation/Mixing not available.')
+          ENDIF
+          IF (Zone(ZoneNum)%isControlled) THEN
+            CALL ShowContinueError('...Zone is part of HVAC controlled system.')
+          ELSE
+            CALL ShowContinueError('...Zone is not part of HVAC controlled system.')
+          ENDIF
+          Zone(ZoneNum)%TempOutOfBoundsReported=.true.
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('Temperature (low) out of bounds for zone='//trim(Zone(ZoneNum)%Name)//  &
+                       ' for surface='//TRIM(Surface(SurfNum)%Name),  &
+                       Surface(SurfNum)%LowTempErrCount,ReportMaxOf=CheckTemperature,ReportMaxUnits='C',  &
+                       ReportMinOf=CheckTemperature,ReportMinUnits='C')
+      ELSE
+        CALL ShowRecurringSevereErrorAtEnd('Temperature (low) out of bounds for zone='//trim(Zone(ZoneNum)%Name)//  &
+                       ' for surface='//TRIM(Surface(SurfNum)%Name),  &
+                       Surface(SurfNum)%LowTempErrCount,ReportMaxOf=CheckTemperature,ReportMaxUnits='C',  &
+                       ReportMinOf=CheckTemperature,ReportMinUnits='C')
+      ENDIF
+    ELSE
+      IF (Surface(SurfNum)%HighTempErrCount == 0) THEN
+        CALL ShowSevereMessage('Temperature (high) out of bounds ('//TRIM(RoundSigDigits(CheckTemperature,2))//  &
+                           '] for zone="'//trim(Zone(ZoneNum)%Name)//'", for surface="'//TRIM(Surface(SurfNum)%Name)//'"')
+        CALL ShowContinueErrorTimeStamp(' ')
+        IF (.not. Zone(ZoneNum)%TempOutOfBoundsReported) THEN
+          CALL ShowContinueError('Zone="'//trim(Zone(ZoneNum)%Name)//'", Diagnostic Details:')
+          IF (Zone(ZoneNum)%FloorArea > 0.0) THEN
+            CALL ShowContinueError('...Internal Heat Gain ['//  &
+                 trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains/Zone(ZoneNum)%FloorArea,3))//'] W/m2')
+          ELSE
+            CALL ShowContinueError('...Internal Heat Gain (no floor) ['//  &
+                 trim(RoundSigDigits(Zone(ZoneNum)%InternalHeatGains,3))//'] W')
+          ENDIF
+          IF (SimulateAirflowNetwork <= AirflowNetworkControlSimple) THEN
+            CALL ShowContinueError('...Infiltration/Ventilation ['//  &
+                   trim(RoundSigDigits(Zone(ZoneNum)%NominalInfilVent,3))//'] m3/s')
+            CALL ShowContinueError('...Mixing/Cross Mixing ['//  &
+                   trim(RoundSigDigits(Zone(ZoneNum)%NominalMixing,3))//'] m3/s')
+          ELSE
+            CALL ShowContinueError('...Airflow Network Simulation: Nominal Infiltration/Ventilation/Mixing not available.')
+          ENDIF
+          IF (Zone(ZoneNum)%isControlled) THEN
+            CALL ShowContinueError('...Zone is part of HVAC controlled system.')
+          ELSE
+            CALL ShowContinueError('...Zone is not part of HVAC controlled system.')
+          ENDIF
+          Zone(ZoneNum)%TempOutOfBoundsReported=.true.
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('Temperature (high) out of bounds for zone='//trim(Zone(ZoneNum)%Name)//  &
+                       ' for surface='//TRIM(Surface(SurfNum)%Name),  &
+                       Surface(SurfNum)%HighTempErrCount,ReportMaxOf=CheckTemperature,ReportMaxUnits='C',  &
+                       ReportMinOf=CheckTemperature,ReportMinUnits='C')
+      ELSE
+        CALL ShowRecurringSevereErrorAtEnd('Temperature (high) out of bounds for zone='//trim(Zone(ZoneNum)%Name)//  &
+                      ' for surface='//TRIM(Surface(SurfNum)%Name),  &
+                       Surface(SurfNum)%HighTempErrCount,ReportMaxOf=CheckTemperature,ReportMaxUnits='C',  &
+                       ReportMinOf=CheckTemperature,ReportMinUnits='C')
+      ENDIF
+    ENDIF
+  ENDIF
+
+
+  RETURN
+
+END SUBROUTINE CheckFDSurfaceTempLimits
 
 ! *****************************************************************************
 

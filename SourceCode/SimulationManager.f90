@@ -489,6 +489,7 @@ SUBROUTINE GetProjectData
   CHARACTER(len=20) :: VersionID=' '
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject
   LOGICAL :: CondFDAlgo
+  INTEGER :: Item
 
   ErrorsFound=.false.
 
@@ -517,21 +518,78 @@ SUBROUTINE GetProjectData
     ErrorsFound=.true.
   ENDIF
 
-  ! Do Mini Get on HB Algorithm
-   CurrentModuleObject='HeatBalanceAlgorithm'
-   Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
-   CondFDAlgo=.false.
-   IF (Num > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+
+  ! Do Mini Gets on HB Algorithm and by-surface overrides
+  CurrentModuleObject='HeatBalanceAlgorithm'
+  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  CondFDAlgo=.false.
+  IF (Num > 0) THEN
+    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-     SELECT CASE (Alphas(1))
-       CASE ('CONDUCTIONFINITEDIFFERENCE','CONDFD','CONDUCTIONFINITEDIFFERENCEDETAILED','CONDUCTIONFINITEDIFFERENCESIMPLIFIED')
+    SELECT CASE (Alphas(1))
+    CASE ('CONDUCTIONFINITEDIFFERENCE','CONDFD','CONDUCTIONFINITEDIFFERENCEDETAILED','CONDUCTIONFINITEDIFFERENCESIMPLIFIED')
+        CondFDAlgo=.true.
+    CASE DEFAULT
+    END SELECT
+  ENDIF
+  CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
+  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  IF (Num > 0) THEN
+    DO Item = 1, Num
+      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      SELECT CASE (Alphas(2))
+      CASE ('CONDUCTIONFINITEDIFFERENCE')
          CondFDAlgo=.true.
 
-       CASE DEFAULT
-     END SELECT
-   ENDIF
+      CASE DEFAULT
+      END SELECT
+    ENDDO
+  ENDIF
+  CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:MultipleSurface'
+  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  IF (Num > 0) THEN
+    DO Item = 1, Num
+      CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      SELECT CASE (Alphas(3))
+      CASE ('CONDUCTIONFINITEDIFFERENCE')
+          CondFDAlgo=.true.
+      CASE DEFAULT
+      END SELECT
+    ENDDO
+  ENDIF
+  CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:SurfaceList'
+  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  IF (Num > 0) THEN
+    DO Item = 1, Num
+      CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      SELECT CASE (cAlphaArgs(2))
+      CASE ('CONDUCTIONFINITEDIFFERENCE')
+          CondFDAlgo=.true.
+      CASE DEFAULT
+      END SELECT
+    ENDDO
+  ENDIF
+  CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:Construction'
+  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  IF (Num > 0) THEN
+    DO Item = 1, Num
+      CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
+                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      SELECT CASE (cAlphaArgs(2))
+      CASE ('CONDUCTIONFINITEDIFFERENCE')
+          CondFDAlgo=.true.
+      CASE DEFAULT
+      END SELECT
+    ENDDO
+  ENDIF
 
   CurrentModuleObject='Timestep'
   Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
@@ -1133,7 +1191,7 @@ SUBROUTINE CloseOutputFiles
   USE SolarShading, ONLY: maxNumberOfFigures
   USE DataRunTimeLanguage
   USE DataBranchNodeConnections, ONLY: NumOfNodeConnections, MaxNumOfNodeConnections
-  USE DataHeatBalance, ONLY: CondFDRelaxFactor, SolutionAlgo, UseCondFD, CondFDRelaxFactorInput
+  USE DataHeatBalance, ONLY: CondFDRelaxFactor, HeatTransferAlgosUsed, UseCondFD, CondFDRelaxFactorInput
   USE General, ONLY: RoundSigDigits
   USE DataSystemVariables !, ONLY: MaxNumberOfThreads,NumberIntRadThreads,iEnvSetThreads
 
@@ -1146,8 +1204,8 @@ SUBROUTINE CloseOutputFiles
   CHARACTER(len=*), PARAMETER :: EndOfDataFormat = '("End of Data")'  ! Signifies the end of the data block in the output file
   CHARACTER(len=*), PARAMETER :: ThreadingHeader = '! <Program Control Information:Threads/Parallel Sims>, '//  &
           'Threading Supported,Maximum Number of Threads, Env Set Threads (OMP_NUM_THREADS), '//  &
-          'EP Env Set Threads (EP_OMP_NUM_THREADS). IDF Set Threads, Number of Threads Used (Interior Radiant Exchange), '//  &
-          'Number NominalSurface, Number Parallel Sims'
+          'EP Env Set Threads (EP_OMP_NUM_THREADS), IDF Set Threads, Number of Threads Used (Interior Radiant Exchange), '//  &
+          'Number Nominal Surfaces, Number Parallel Sims'
   CHARACTER(len=*), PARAMETER :: fmtA='(A)'
 
 
@@ -1161,6 +1219,9 @@ SUBROUTINE CloseOutputFiles
   CHARACTER(len=20) DebugPosition
   INTEGER EchoInputFile  ! found unit number for 'eplusout.audit'
   INTEGER, EXTERNAL :: FindUnitNumber
+  CHARACTER(len=10) :: cEnvSetThreads
+  CHARACTER(len=10) :: cepEnvSetThreads
+  CHARACTER(len=10) :: cIDFSetThreads
 
   EchoInputFile=FindUnitNumber('eplusout.audit')
   ! Record some items on the audit file
@@ -1201,7 +1262,7 @@ SUBROUTINE CloseOutputFiles
     CLOSE (OutputFileStandard,STATUS='DELETE')
   ENDIF
 
-  IF (SolutionAlgo == UseCondFD) THEN ! echo out relaxation factor, it may have been changed by the program
+  IF (ANY(HeatTransferAlgosUsed == UseCondFD)) THEN ! echo out relaxation factor, it may have been changed by the program
      Write(OutputFileInits,'(A)') '! <ConductionFiniteDifference Numerical Parameters>, '//  &
         'Starting Relaxation Factor, Final Relaxation Factor'
      Write(OutputFileInits,'(A)') 'ConductionFiniteDifference Numerical Parameters, '// &
@@ -1210,13 +1271,28 @@ SUBROUTINE CloseOutputFiles
   ENDIF
   ! Report number of threads to eio file
   IF (Threading) THEN
+    IF (iEnvSetThreads == 0) THEN
+      cEnvSetThreads='Not Set'
+    ELSE
+      cEnvSetThreads=RoundSigDigits(iEnvSetThreads)
+    ENDIF
+    IF (iepEnvSetThreads == 0) THEN
+      cepEnvSetThreads='Not Set'
+    ELSE
+      cepEnvSetThreads=RoundSigDigits(iepEnvSetThreads)
+    ENDIF
+    IF (iIDFSetThreads == 0) THEN
+      cIDFSetThreads='Not Set'
+    ELSE
+      cIDFSetThreads=RoundSigDigits(iIDFSetThreads)
+    ENDIF
     IF (lnumActiveSims) THEN
       Write(OutputFileInits,fmtA) ThreadingHeader
       Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, Yes,'// &
                                         TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iEnvSetThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iepEnvSetThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iIDFSetThreads)) // ', '// &
+                                        TRIM(cEnvSetThreads) // ', '// &
+                                        TRIM(cepEnvSetThreads) // ', '// &
+                                        TRIM(cIDFSetThreads) // ', '// &
                                         TRIM(RoundSigDigits(NumberIntRadThreads)) // ', '// &
                                         TRIM(RoundSigDigits(iNominalTotSurfaces)) // ', '// &
                                         TRIM(RoundSigDigits(inumActiveSims))
@@ -1224,11 +1300,11 @@ SUBROUTINE CloseOutputFiles
       Write(OutputFileInits,fmtA) ThreadingHeader
       Write(OutputFileInits,'(A)') 'Program Control:Threads/Parallel Sims, Yes,'// &
                                         TRIM(RoundSigDigits(MaxNumberOfThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iEnvSetThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iepEnvSetThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iIDFSetThreads)) // ', '// &
-                                        TRIM(RoundSigDigits(iNominalTotSurfaces)) // ', '// &
+                                        TRIM(cEnvSetThreads) // ', '// &
+                                        TRIM(cepEnvSetThreads) // ', '// &
+                                        TRIM(cIDFSetThreads) // ', '// &
                                         TRIM(RoundSigDigits(NumberIntRadThreads)) // ', '// &
+                                        TRIM(RoundSigDigits(iNominalTotSurfaces)) // ', '// &
                                         'N/A'
     ENDIF
   ELSE ! no threading
@@ -2618,14 +2694,14 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
     CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,ios,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-    iIDFsetThreadsInput=INT(rNumericArgs(1))
+    iIDFsetThreads=INT(rNumericArgs(1))
     lIDFsetThreadsInput=.true.
-    IF (iIDFsetThreadsInput <= 0) THEN
-      iIDFsetThreadsInput=MaxNumberOfThreads
-      IF (lEnvSetThreadsInput) iIDFsetThreadsInput=iEnvSetThreads
-      IF (lepSetThreadsInput)  iIDFsetThreadsInput=iepEnvSetThreads
+    IF (iIDFsetThreads <= 0) THEN
+      iIDFsetThreads=MaxNumberOfThreads
+      IF (lEnvSetThreadsInput) iIDFsetThreads=iEnvSetThreads
+      IF (lepSetThreadsInput)  iIDFsetThreads=iepEnvSetThreads
     ENDIF
-    IF (iIDFSetThreadsInput > MaxNumberOfThreads) THEN
+    IF (iIDFSetThreads > MaxNumberOfThreads) THEN
       CALL ShowWarningError('CheckThreading: Your chosen number of threads=['//trim(RoundSigDigits(iIDFSetThreadsInput))//  &
          '] is greater than the maximum number of threads=['//trim(RoundSigDigits(MaxNumberOfThreads))//'].')
       CALL ShowContinueError('...execution time for this run may be degraded.')
@@ -2636,12 +2712,12 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
     NumberIntRadThreads=1
     IF (lEnvSetThreadsInput) NumberIntRadThreads=iEnvSetThreads
     IF (lepSetThreadsInput)  NumberIntRadThreads=iepEnvSetThreads
-    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreadsInput
+    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreads
   ELSE
     NumberIntRadThreads=MaxNumberOfThreads
     IF (lEnvSetThreadsInput) NumberIntRadThreads=iEnvSetThreads
     IF (lepSetThreadsInput)  NumberIntRadThreads=iepEnvSetThreads
-    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreadsInput
+    IF (lIDFSetThreadsInput) NumberIntRadThreads=iIDFSetThreads
   ENDIF
 #else
   Threading=.false.

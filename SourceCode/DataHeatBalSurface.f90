@@ -57,30 +57,30 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotConvInRep       !Surface convection 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotConvInRepPerArea !Surface conv heat transfer rate per m2 at inside face surf
                                                             !  (report){w/m2]
 
-!these next three all are for net IR thermal radiation exchange with other surfaces in the model. 
+!these next three all are for net IR thermal radiation exchange with other surfaces in the model.
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadNetSurfInReport       !Surface thermal radiation heat gain at Inside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadNetSurfInRep       !Surface thermal radiation heat transfer inside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadNetSurfInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadNetSurfInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
                                                               !      Inside face surf
 !these next three all are for solar radiation gains on inside face
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSolarInReport       !Surface thermal radiation heat gain at Inside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadSolarInRep       !Surface thermal radiation heat transfer inside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadSolarInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadSolarInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
                                                               !      Inside face surf
 !these next three all are for Lights visible radiation gains on inside face
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadLightsInReport       !Surface thermal radiation heat gain at Inside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadLightsInRep       !Surface thermal radiation heat transfer inside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadLightsInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadLightsInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
                                                               !      Inside face surf
 !these next three all are for Internal Gains sources of radiation gains on inside face
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadIntGainsInReport       !Surface thermal radiation heat gain at Inside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadIntGainsInRep       !Surface thermal radiation heat transfer inside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadIntGainsInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadIntGainsInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
                                                               !      Inside face surf
 !these next three all are for Radiative HVAC sources of radiation gains on inside face
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadHVACInReport       !Surface thermal radiation heat gain at Inside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadHVACInRep       !Surface thermal radiation heat transfer inside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadHVACInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadHVACInRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
                                                               !      Inside face surf
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QConvOutReport       !Surface convection heat gain at Outside face [J]
@@ -90,8 +90,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotConvOutRepPerArea !Surface conv heat
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadOutReport       !Surface thermal radiation heat gain at Outside face [J]
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadOutRep       !Surface thermal radiation heat transfer outside face surface [W]
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadOutRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at 
-                                                              !      Outside face surf 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: QdotRadOutRepPerArea ![W/m2]Surface thermal radiation heat transfer rate per m2 at
+                                                              !      Outside face surf
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceCondGainRep !Equals Opaq Surf Ins Face Cond
                                                                    ! when Opaq Surf Ins Face Cond >= 0
@@ -129,9 +129,9 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfAvgFaceConductionEnergy !Opaque 
                                                                   ! net conduction from outside environ toward inside zone
                                                                   !  from inside of opaque surfaces, for reporting (J)
 
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfStorageGainRep !Equals Opaque surface stored heat conduction flow 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfStorageGainRep !Equals Opaque surface stored heat conduction flow
                                                                    ! when Opaque surface stored heat conduction flow  >= 0
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfStorageCondLossRep !Equals -Opaque surface stored heat conduction flow 
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfStorageCondLossRep !Equals -Opaque surface stored heat conduction flow
                                                                    ! when Opaque surface stored heat conduction flow   < 0
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfStorageConduction !Opaque surface stored heat conduction flow (W)
                                                                   ! storage of heat inside surface, positive is increasing in surf
@@ -145,7 +145,7 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: OpaqSurfInsFaceBeamSolAbsorbed !Opaque s
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: TempSurfOut         !Temperature of the Outside Surface for each heat transfer surface
                                                             ! used for reporting purposes only.  Ref: TH(x,1,1)
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QRadSWOutMvIns      !Short wave radiation absorbed on outside of movable insulation
-REAL(r64), ALLOCATABLE, DIMENSION(:) :: QBV                 !Beam solar absorbed by interior shades in a zone, plus
+!unusedREAL(r64), ALLOCATABLE, DIMENSION(:) :: QBV                 !Beam solar absorbed by interior shades in a zone, plus
                                                             ! diffuse from beam not absorbed in zone, plus
                                                             ! beam absorbed at inside surfaces
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: QC                  !Short-Wave Radiation Converted Direct To Convection

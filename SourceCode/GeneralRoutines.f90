@@ -23,6 +23,7 @@ SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq
   USE DataPrecisionGlobals
   USE DataLoopNode
   USE DataGlobals,            ONLY : WarmUpFlag
+  USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
   USE DataInterfaces,         ONLY : ShowWarningError,ShowFatalError,ShowContinueError,ShowContinueErrorTimeStamp,  &
                                      ShowRecurringWarningErrorAtEnd,ShowWarningMessage,ShowSevereError
   USE InputProcessor,         ONLY : FindItemInSortedList
@@ -35,7 +36,7 @@ SUBROUTINE ControlCompOutput(CompName,CompType,CompNum,FirstHVACIteration,QZnReq
   USE Psychrometrics,         ONLY : PsyCpAirFnWTdb
   USE VentilatedSlab,         ONLY : CalcVentilatedSlabComps
   USE InputProcessor,         ONLY : MakeUPPERCase
-  USE General,                ONLY : TrimSigDigits
+  USE General,                ONLY : TrimSigDigits, RoundSigDigits
   USE SteamBaseboardRadiator, ONLY : CalcSteamBaseboard
   USE OutdoorAirUnit,         ONLY : CalcOAUnitCoilComps
   USE PlantUtilities,         ONLY : SetActuatedBranchFlowRate
@@ -316,6 +317,18 @@ Do While (.Not. Converged)
     ZoneInterHalf%MinResult    = 0.0
  End IF
 
+  ! check if hunting down around the limit of a significant mass flow in systems.
+  IF ((Iter > MaxIter/2) .AND. (ZoneController%CalculatedSetPoint < MassFlowTolerance) ) THEN
+    ZoneController%CalculatedSetPoint = ZoneController%MinSetPoint
+    Converged = .True.
+    ZoneInterHalf%MaxFlowCalc = .True.
+    ZoneInterHalf%MinFlowCalc = .False.
+    ZoneInterHalf%NormFlowCalc = .False.
+    ZoneInterHalf%MinFlowResult = .False.
+    ZoneInterHalf%MaxResult    = 1.0
+    ZoneInterHalf%MinResult    = 0.0
+  ENDIF
+
   !Set the Actuated node massflowrate with the new value
   IF (PRESENT(LoopNum)) THEN ! this is a plant component
     CALL SetActuatedBranchFlowRate(ZoneController%CalculatedSetPoint,ActuatedNode,LoopNum,LoopSide, BranchIndex, .FALSE.)
@@ -443,6 +456,8 @@ Do While (.Not. Converged)
      CALL ShowContinueError('... Error          = '//TRIM(TrimSigDigits(ABS((LoadMet-QZnReq)*100.d0/Denom),8))//' %.')
      CALL ShowContinueError('... Tolerance      = '//TRIM(TrimSigDigits(ControlOffset*100.d0,8))//' %.')
      CALL ShowContinueError('... Error          = (Load met - Load requested) / MAXIMUM(Load requested, 100)')
+     CALL ShowContinueError('... Actuated Node Mass Flow Rate =' &
+           //TRIM(RoundSigDigits(Node(ActuatedNode)%MassFlowRate, 9))//' kg/s')
      CALL ShowContinueErrorTimeStamp(' ')
      CALL ShowRecurringWarningErrorAtEnd('ControlCompOutput: Maximum iterations error for '//TRIM(CompType)//  &
            ' = '//TRIM(CompName),CompErrIndex,ReportMaxOf=ABS((LoadMet-QZnReq)*100.d0/Denom),ReportMaxUnits='%',  &

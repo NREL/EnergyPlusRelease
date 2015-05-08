@@ -103,3 +103,7 @@ typedef unsigned char   Byte;
 typedef unsigned int    UInt;
 typedef bool			Bool;	//	WLC
 #define SELF (*this)    // A syntactic convenience.
+#ifndef _countof
+#define _countof(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+

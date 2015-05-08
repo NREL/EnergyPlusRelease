@@ -170,17 +170,17 @@ SUBROUTINE  ManageSizing
     IF (SizingFileColSep == CharComma) THEN
       OPEN (OutputFileZoneSizing,FILE='epluszsz.csv',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "epluszsz.csv" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "epluszsz.csv" for output (write).')
       ENDIF
     ELSEIF (SizingFileColSep == CharTab) THEN
       OPEN (OutputFileZoneSizing,FILE='epluszsz.tab',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "epluszsz.tab" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "epluszsz.tab" for output (write).')
       ENDIF
     ELSE
       OPEN (OutputFileZoneSizing,FILE='epluszsz.txt',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "epluszsz.txt" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "epluszsz.txt" for output (write).')
       ENDIF
     ENDIF
 
@@ -279,7 +279,7 @@ SUBROUTINE  ManageSizing
             !  After the first iteration of HeatBalance, all the "input" has been gotten
             IF (BeginSimFlag) THEN
               IF (GetNumRangeCheckErrorsFound() > 0) THEN
-                CALL ShowFatalError('Out of "range" values found in input')
+                CALL ShowFatalError(RoutineName//'Out of "range" values found in input')
               ENDIF
             ENDIF
 
@@ -338,17 +338,17 @@ SUBROUTINE  ManageSizing
     IF (SizingFileColSep == CharComma) THEN
       OPEN (OutputFileSysSizing,FILE='eplusssz.csv',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "eplusssz.csv" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "eplusssz.csv" for output (write).')
       ENDIF
     ELSEIF (SizingFileColSep == CharTab) THEN
       OPEN (OutputFileSysSizing,FILE='eplusssz.tab',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "eplusssz.tab" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "eplusssz.tab" for output (write).')
       ENDIF
     ELSE
       OPEN (OutputFileSysSizing,FILE='eplusssz.txt',Action='write',iostat=write_stat)
       IF (write_stat /= 0) THEN
-        CALL ShowFatalError('ManageSizing: Could not open file "eplusssz.txt" for output (write).')
+        CALL ShowFatalError(RoutineName//'Could not open file "eplusssz.txt" for output (write).')
       ENDIF
     ENDIF
     SimAir = .TRUE.
@@ -548,7 +548,7 @@ SUBROUTINE  ManageSizing
                             'Calculated Cooling Design Air Flow Rate [m3/s]', &
                             CalcSysSizing(AirLoopNum)%DesCoolVolFlow)
       CALL PreDefTableEntry(pdchSysSizCalcClAir,curName,CalcSysSizing(AirLoopNum)%DesCoolVolFlow)
-      IF (ABS(CalcSysSizing(AirLoopNum)%DesCoolVolFlow) <= 1.E-8) THEN
+      IF (ABS(CalcSysSizing(AirLoopNum)%DesCoolVolFlow) <= 1.d-8) THEN
         CALL ShowWarningError(RoutineName//'Calculated Cooling Design Air Flow Rate for System='//  &
                           TRIM(FinalSysSizing(AirLoopNum)%AirPriLoopName)//' is zero.')
         CALL ShowContinueError('Check Sizing:Zone and ZoneControl:Thermostat inputs.')
@@ -561,7 +561,7 @@ SUBROUTINE  ManageSizing
                             'Calculated Heating Design Air Flow Rate [m3/s]', &
                             CalcSysSizing(AirLoopNum)%DesHeatVolFlow)
       CALL PreDefTableEntry(pdchSysSizCalcHtAir,curName,CalcSysSizing(AirLoopNum)%DesHeatVolFlow)
-      IF (ABS(CalcSysSizing(AirLoopNum)%DesHeatVolFlow) <= 1.E-8) THEN
+      IF (ABS(CalcSysSizing(AirLoopNum)%DesHeatVolFlow) <= 1.d-8) THEN
         CALL ShowWarningError(RoutineName//'Calculated Heating Design Air Flow Rate for System='//  &
                           TRIM(FinalSysSizing(AirLoopNum)%AirPriLoopName)//' is zero.')
         CALL ShowContinueError('Check Sizing:Zone and ZoneControl:Thermostat inputs.')
@@ -1161,7 +1161,7 @@ SUBROUTINE GetZoneSizingInput
     NumDesDays = GetNumObjectsFound('SizingPeriod:DesignDay') + GetNumObjectsFound('SizingPeriod:WeatherFileDays') +   &
                       GetNumObjectsFound('SizingPeriod:WeatherFileConditionType')
     IF (NumDesDays == 0 .AND. (DoZoneSizing .OR. DoSystemSizing .OR. DoPlantSizing) ) THEN
-      CALL ShowSevereError('Zone Sizing calculations need SizingPeriod:* input.')
+      CALL ShowSevereError('Zone Sizing calculations need SizingPeriod:* input. None found.')
       ErrorsFound = .TRUE.
     END IF
     ALLOCATE(ZoneSizingInput(NumZoneSizingInput))
@@ -1204,43 +1204,139 @@ SUBROUTINE GetZoneSizingInput
           CALL ShowContinueError('Zone may have been entered in a ZoneList assignment.')
         ENDIF
 
-        ZoneSizingInput(ZoneSizIndex)%DesignSpecOAObjName = cAlphaArgs(2)
-
-        ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = rNumericArgs(1)
-        ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = rNumericArgs(2)
-!  N3, \field Zone Cooling Design Supply Air Humidity Ratio
+!  A2, \field Zone Cooling Design Supply Air Temperature Input Method
 !      \required-field
-!      \minimum 0.0
+!      \type choice
+!      \key SupplyAirTemperature
+!      \key TemperatureDifference
+!      \default SupplyAirTemperature
+        SELECT CASE(TRIM(cAlphaArgs(2)))
+          CASE('SUPPLYAIRTEMPERATURE')
+            ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod = SupplyAirTemperature
+          CASE('TEMPERATUREDIFFERENCE')
+            ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod = TemperatureDifference
+          CASE DEFAULT
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'"')
+            CALL ShowContinueError('... valid values are SupplyAirTemperature or TemperatureDifference.')
+            ErrorsFound=.true.
+        END SELECT
+!  N1, \field Zone Cooling Design Supply Air Temperature
 !      \type real
-!      \units kg-H2O/kg-air
+!      \units C
+!      \note Zone Cooling Design Supply Air Temperature is only used when Zone Cooling Design
+!      \note Supply Air Temperature Input Method = SupplyAirTemperature
+        IF (lNumericFieldBlanks(1)) THEN
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0
+        ELSEIF (rNumericArgs(1) < 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(1))//'=['//TRIM(RoundSigDigits(rNumericArgs(1),2))// &
+                   '],  value should not be negative.')
+          ErrorsFound=.true.
+        ELSEIF (rNumericArgs(1) >= 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == SupplyAirTemperature) THEN
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = rNumericArgs(1)
+        ELSE
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTemp = 0.0
+        ENDIF
+!  N2, \field Zone Cooling Design Supply Air Temperature Difference
+!      \type real
+!      \units delta C
+!      \note Zone Cooling Design Supply Air Temperature is only used when Zone Cooling Design
+!      \note Supply Air Temperature Input Method = TemperatureDifference
+!      \note The absolute of this value is value will be subtracted from room temperature
+!      \note at peak load to calculate Zone Cooling Design Supply Air Temperature.
+        IF (lNumericFieldBlanks(2)) THEN
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0
+        ELSEIF (ZoneSizingInput(ZoneSizIndex)%ZnCoolDgnSAMethod == TemperatureDifference) THEN
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = rNumericArgs(2)
+        ELSE
+          ZoneSizingInput(ZoneSizIndex)%CoolDesTempDiff = 0.0
+        ENDIF
+!  A3, \field Zone Heating Design Supply Air Temperature Input Method
+!      \required-field
+!      \type choice
+!      \key SupplyAirTemperature
+!      \key TemperatureDifference
+!      \default SupplyAirTemperature
+        SELECT CASE(TRIM(cAlphaArgs(3)))
+          CASE('SUPPLYAIRTEMPERATURE')
+            ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod = SupplyAirTemperature
+          CASE('TEMPERATUREDIFFERENCE')
+            ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod = TemperatureDifference
+          CASE DEFAULT
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'"')
+            CALL ShowContinueError('... valid values are SupplyAirTemperature or TemperatureDifference.')
+            ErrorsFound=.true.
+          END SELECT
+!  N3, \field Zone Heating Design Supply Air Temperature
+!      \type real
+!      \units C
+!      \note Zone Heating Design Supply Air Temperature is only used when Zone Heating Design
+!      \note Supply Air Temperature Input Method = SupplyAirTemperature
         IF (lNumericFieldBlanks(3)) THEN
-          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = 0.0
-        ELSEIF (rNumericArgs(3) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(3))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(3),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0
+        ELSEIF (rNumericArgs(3) < 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == SupplyAirTemperature) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(3))//'=['//TRIM(RoundSigDigits(rNumericArgs(3),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
+        ELSEIF (rNumericArgs(3) >= 0.0d0 .and. ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == SupplyAirTemperature) THEN
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = rNumericArgs(3)
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = rNumericArgs(3)
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTemp = 0.0
         ENDIF
-!  N4, \field Zone Heating Design Supply Air Humidity Ratio
+!  N4, \field Zone Heating Design Supply Air Temperature Difference
+!      \type real
+!      \units deltaC
+!      \note Zone Heating Design Supply Air Temperature is only used when Zone Heating Design
+!      \note Supply Air Temperature Input Method = TemperatureDifference
+!      \note The absolute of this value is value will be added to room temperature
+!      \note at peak load to calculate Zone Heating Design Supply Air Temperature.
+        IF (lNumericFieldBlanks(4)) THEN
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0
+        ELSEIF (ZoneSizingInput(ZoneSizIndex)%ZnHeatDgnSAMethod == TemperatureDifference) THEN
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = rNumericArgs(4)
+        ELSE
+          ZoneSizingInput(ZoneSizIndex)%HeatDesTempDiff = 0.0
+        ENDIF
+!  N5, \field Zone Cooling Design Supply Air Humidity Ratio
 !      \required-field
 !      \minimum 0.0
 !      \type real
 !      \units kg-H2O/kg-air
-        IF (lNumericFieldBlanks(4)) THEN
-          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = 0.0
-        ELSEIF (rNumericArgs(4) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(4))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(4),2)))
+        IF (lNumericFieldBlanks(5)) THEN
+          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = 0.0
+        ELSEIF (rNumericArgs(5) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(5))//': '//  &
+             TRIM(RoundSigDigits(rNumericArgs(5),2)))
           CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = rNumericArgs(4)
+          ZoneSizingInput(ZoneSizIndex)%CoolDesHumRat = rNumericArgs(5)
         ENDIF
-!  A3, \field Design Specification Object Name
+!  N6, \field Zone Heating Design Supply Air Humidity Ratio
+!      \required-field
+!      \minimum 0.0
+!      \type real
+!      \units kg-H2O/kg-air
+        IF (lNumericFieldBlanks(6)) THEN
+          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = 0.0
+        ELSEIF (rNumericArgs(6) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(6))//': '//  &
+             TRIM(RoundSigDigits(rNumericArgs(6),2)))
+          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ELSE
+          ZoneSizingInput(ZoneSizIndex)%HeatDesHumRat = rNumericArgs(6)
+        ENDIF
+!  A4, \field Design Specification Outdoor Air Object Name
+!      \type object-list
+!      \object-list DesignSpecificationOutdoorAirNames
+        ZoneSizingInput(ZoneSizIndex)%DesignSpecOAObjName = cAlphaArgs(4)
+
         ! Getting zone OA parameters from Design Specification object
-         IF (.NOT. lAlphaFieldBlanks(2)) THEN
+         IF (.NOT. lAlphaFieldBlanks(4)) THEN
            OAIndex=FindItemInList(ZoneSizingInput(ZoneSizIndex)%DesignSpecOAObjName,   &
                  OARequirements%Name,numOARequirements)
            IF (OAIndex > 0) THEN
@@ -1250,8 +1346,8 @@ SUBROUTINE GetZoneSizingInput
              ZoneSizingInput(ZoneSizIndex)%DesOAFlow = OARequirements(OAIndex)%OAFlowPerZone
              ZoneSizingInput(ZoneSizIndex)%ZoneDesignSpecOAIndex = OAIndex
            ELSE
-             CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(2))//'="'//  &
-                TRIM(cAlphaArgs(2))//'".')
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
              ErrorsFound=.true.
            ENDIF
          ELSE ! If no design spec object specified, i.e. no OA, then set OA method to Flow/Person as default but flows to 0
@@ -1261,33 +1357,33 @@ SUBROUTINE GetZoneSizingInput
              ZoneSizingInput(ZoneSizIndex)%DesOAFlow = 0
          ENDIF
 
-!  N5, \field Zone Heating Sizing Factor
+!  N7, \field Zone Heating Sizing Factor
 !      \note if blank, global heating sizing factor from Sizing:Parameters is used.
 !      \minimum> 0
-        IF (lNumericFieldBlanks(5) .or. rNumericArgs(5) == 0.0d0) THEN
+        IF (lNumericFieldBlanks(7) .or. rNumericArgs(7) == 0.0d0) THEN
           ZoneSizingInput(ZoneSizIndex)%HeatSizingFactor = GlobalHeatSizingFactor
-        ELSEIF (rNumericArgs(5) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(5))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(5),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(7) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(7))//'=['//TRIM(RoundSigDigits(rNumericArgs(7),2))//  &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%HeatSizingFactor = rNumericArgs(5)
+          ZoneSizingInput(ZoneSizIndex)%HeatSizingFactor = rNumericArgs(7)
         ENDIF
-!  N6, \field Zone Cooling Sizing Factor
+!  N8, \field Zone Cooling Sizing Factor
 !      \note if blank, global cooling sizing factor from Sizing:Parameters is used.
 !      \minimum> 0
-        IF (lNumericFieldBlanks(6) .or. rNumericArgs(6) == 0.0d0) THEN
+        IF (lNumericFieldBlanks(8) .or. rNumericArgs(8) == 0.0d0) THEN
           ZoneSizingInput(ZoneSizIndex)%CoolSizingFactor = GlobalCoolSizingFactor
-        ELSEIF (rNumericArgs(6) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(6))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(6),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(8) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(8))//'=['//TRIM(RoundSigDigits(rNumericArgs(8),2))//  &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%CoolSizingFactor = rNumericArgs(6)
+          ZoneSizingInput(ZoneSizIndex)%CoolSizingFactor = rNumericArgs(8)
         ENDIF
-!  N7, \field Cooling Design Air Flow Rate
+!  N9, \field Cooling Design Air Flow Rate
 !      \type real
 !      \units m3/s
 !      \minimum 0
@@ -1295,71 +1391,72 @@ SUBROUTINE GetZoneSizingInput
 !      \note This input is used if Cooling Design Air Flow Method is Flow/Zone
 !      \note This value will be multiplied by the global or zone sizing factor and
 !      \note by zone multipliers.
-        IF (lNumericFieldBlanks(7)) THEN
+        IF (lNumericFieldBlanks(9)) THEN
           ZoneSizingInput(ZoneSizIndex)%DesCoolAirFlow =  0.0
-        ELSEIF (rNumericArgs(7) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(7))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(10),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(9) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(9))//'=['//TRIM(RoundSigDigits(rNumericArgs(9),2))//  &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesCoolAirFlow = rNumericArgs(7)
+          ZoneSizingInput(ZoneSizIndex)%DesCoolAirFlow = rNumericArgs(9)
         ENDIF
-!  N8,\field Cooling Minimum Air Flow per Zone Floor Area
+!  N10,\field Cooling Minimum Air Flow per Zone Floor Area
 !      \type real
 !      \units m3/s-m2
 !      \minimum 0
 !      \default .000762
 !      \note default is .15 cfm/ft2
 !      \note This input is used if Cooling Design Air Flow Method is design day with limit
-        IF (lNumericFieldBlanks(8)) THEN
-          IF (rNumericArgs(11) <= 0.0) THEN  ! in case someone changes the default in the IDD
+        IF (lNumericFieldBlanks(10)) THEN
+          IF (rNumericArgs(10) <= 0.0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea =  .000762d0
           ELSE
-            ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea = rNumericArgs(8)
+            ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea = rNumericArgs(10)
           ENDIF
-        ELSEIF (rNumericArgs(8) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(8))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(8),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(10) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(108))//'=['//  &
+             TRIM(RoundSigDigits(rNumericArgs(10),2))//  &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea = rNumericArgs(8)
+          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowPerArea = rNumericArgs(10)
         ENDIF
-!  N9,\field Cooling Minimum Air Flow
+!  N11,\field Cooling Minimum Air Flow
 !      \type real
 !      \units m3/s
 !      \minimum 0
 !      \default 0
 !      \note This input is used if Cooling Design Air Flow Method is design day with limit
-        IF (lNumericFieldBlanks(9)) THEN
+        IF (lNumericFieldBlanks(11)) THEN
           ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlow =  0.0
-        ELSEIF (rNumericArgs(9) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(9))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(9),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(11) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(11))//'=['//TRIM(RoundSigDigits(rNumericArgs(11),2))//  &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlow = rNumericArgs(9)
+          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlow = rNumericArgs(11)
         ENDIF
-!  N10,\field Cooling Minimum Air Flow Fraction
+!  N12,\field Cooling Minimum Air Flow Fraction
 !      \note fraction of the Cooling design Air Flow Rate
 !      \type real
 !      \minimum 0
 !      \default 0
 !      \note This input is currently used in sizing the Fan minimum Flow Rate.
 !      \note It does not currently affect other component autosizing.
-        IF (lNumericFieldBlanks(10)) THEN
+        IF (lNumericFieldBlanks(12)) THEN
           ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowFrac =   0.0
-        ELSEIF (rNumericArgs(10) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(10))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(10),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(12) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(12))//'=['//TRIM(RoundSigDigits(rNumericArgs(12),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowFrac = rNumericArgs(10)
+          ZoneSizingInput(ZoneSizIndex)%DesCoolMinAirFlowFrac = rNumericArgs(12)
         ENDIF
-!  N11,\field Heating Design Air Flow Rate
+!  N13,\field Heating Design Air Flow Rate
 !      \type real
 !      \units m3/s
 !      \minimum 0
@@ -1367,82 +1464,82 @@ SUBROUTINE GetZoneSizingInput
 !      \note This input is used if Heating Design Air Flow Method is Flow/Zone.
 !      \note This value will be multiplied by the global or zone sizing factor and
 !      \note by zone multipliers.
-        IF (lNumericFieldBlanks(11)) THEN
+        IF (lNumericFieldBlanks(13)) THEN
           ZoneSizingInput(ZoneSizIndex)%DesHeatAirFlow = 0.0
-        ELSEIF (rNumericArgs(11) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(11))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(11),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(13) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(13))//'=['//TRIM(RoundSigDigits(rNumericArgs(13),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesHeatAirFlow = rNumericArgs(11)
+          ZoneSizingInput(ZoneSizIndex)%DesHeatAirFlow = rNumericArgs(13)
         ENDIF
-!  N12,\field Heating Maximum Air Flow per Zone Floor Area
+!  N14,\field Heating Maximum Air Flow per Zone Floor Area
 !      \type real
 !      \units m3/s-m2
 !      \minimum 0
 !      \default .002032
 !      \note default is .40 cfm/ft2
 !      \note This input is not currently used for autosizing any of the components.
-        IF (lNumericFieldBlanks(12)) THEN
-          IF (rNumericArgs(12) <= 0.0) THEN  ! in case someone changes the default in the IDD
+        IF (lNumericFieldBlanks(14)) THEN
+          IF (rNumericArgs(14) <= 0.0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = 0.002032d0
           ELSE
-            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = rNumericArgs(12)
+            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = rNumericArgs(14)
           ENDIF
-        ELSEIF (rNumericArgs(12) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(12))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(12),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(14) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(14))//'=['//TRIM(RoundSigDigits(rNumericArgs(14),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = rNumericArgs(12)
+          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowPerArea = rNumericArgs(14)
         ENDIF
-!  N13,\field Heating Maximum Air Flow
+!  N15,\field Heating Maximum Air Flow
 !      \type real
 !      \units m3/s
 !      \minimum 0
 !      \default .1415762
 !      \note default is 300 cfm
 !      \note This input is not currently used for autosizing any of the components.
-        IF (lNumericFieldBlanks(13)) THEN
-          IF (rNumericArgs(13) <= 0.0) THEN  ! in case someone changes the default in the IDD
+        IF (lNumericFieldBlanks(15)) THEN
+          IF (rNumericArgs(15) <= 0.0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = 0.1415762d0
           ELSE
-            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = rNumericArgs(13)
+            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = rNumericArgs(15)
           ENDIF
-        ELSEIF (rNumericArgs(13) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(13))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(13),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(15) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(15))//'=['//TRIM(RoundSigDigits(rNumericArgs(15),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = rNumericArgs(13)
+          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlow = rNumericArgs(15)
         ENDIF
-!  N14;\field Heating Maximum Air Flow Fraction
+!  N16;\field Heating Maximum Air Flow Fraction
 !      \note fraction of the Heating Design Air Flow Rate
 !      \note This input is not currently used for autosizing any of the components.
 !      \type real
 !      \minimum 0
 !      \default 0.3
-        IF (lNumericFieldBlanks(14)) THEN
-          IF (rNumericArgs(14) <= 0.0) THEN  ! in case someone changes the default in the IDD
+        IF (lNumericFieldBlanks(16)) THEN
+          IF (rNumericArgs(16) <= 0.0) THEN  ! in case someone changes the default in the IDD
             ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = 0.3d0
           ELSE
-            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(14)
+            ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(16)
           ENDIF
-        ELSEIF (rNumericArgs(14) < 0.0d0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(14))//': '//  &
-             TRIM(RoundSigDigits(rNumericArgs(14),2)))
-          CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        ELSEIF (rNumericArgs(16) < 0.0d0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(16))//'=['//TRIM(RoundSigDigits(rNumericArgs(16),2))// &
+                   '],  value should not be negative.')
           ErrorsFound=.true.
         ELSE
-          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(14)
+          ZoneSizingInput(ZoneSizIndex)%DesHeatMaxAirFlowFrac = rNumericArgs(16)
         ENDIF
 
-!  A5, \field Zone Air Distribution Object Name
-        IF (.NOT. lAlphaFieldBlanks(5)) THEN
-          ZoneSizingInput(ZoneSizIndex)%ZoneAirDistEffObjName = cAlphaArgs(5)
+!  A7, \field Zone Air Distribution Object Name
+        IF (.NOT. lAlphaFieldBlanks(7)) THEN
+          ZoneSizingInput(ZoneSizIndex)%ZoneAirDistEffObjName = cAlphaArgs(7)
           ObjIndex=FindItemInList(ZoneSizingInput(ZoneSizIndex)%ZoneAirDistEffObjName,  &
              ZoneAirDistribution%Name,numZoneAirDistribution)
           IF (ObjIndex > 0) THEN
@@ -1452,8 +1549,8 @@ SUBROUTINE GetZoneSizingInput
             ZoneSizingInput(ZoneSizIndex)%ZoneAirDistributionIndex = ObjIndex
           ELSE
             ! generate a warning message
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(5))//'="'//  &
-                TRIM(cAlphaArgs(5))//'" not found.')
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... not found '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
             ErrorsFound=.true.
           ENDIF
         ELSE
@@ -1463,7 +1560,7 @@ SUBROUTINE GetZoneSizingInput
           ZoneSizingInput(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
         ENDIF
 
-        SELECT CASE(TRIM(cAlphaArgs(3)))
+        SELECT CASE(TRIM(cAlphaArgs(5)))
           CASE('DESIGNDAY')
             ZoneSizingInput(ZoneSizIndex)%CoolAirDesMethod = FromDDCalc
           CASE('FLOW/ZONE')
@@ -1471,11 +1568,12 @@ SUBROUTINE GetZoneSizingInput
           CASE('DESIGNDAYWITHLIMIT')
             ZoneSizingInput(ZoneSizIndex)%CoolAirDesMethod = DesAirFlowWithLim
           CASE DEFAULT
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(3))//': '//TRIM(cAlphaArgs(3)))
-            CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+            CALL ShowContinueError('... valid values are DesignDay, Flow/Zone or DesignDayWithLimit.')
             ErrorsFound=.true.
         END SELECT
-        SELECT CASE(TRIM(cAlphaArgs(4)))
+        SELECT CASE(TRIM(cAlphaArgs(6)))
           CASE('DESIGNDAY')
             ZoneSizingInput(ZoneSizIndex)%HeatAirDesMethod = FromDDCalc
           CASE('FLOW/ZONE')
@@ -1483,8 +1581,9 @@ SUBROUTINE GetZoneSizingInput
           CASE('DESIGNDAYWITHLIMIT')
             ZoneSizingInput(ZoneSizIndex)%HeatAirDesMethod = DesAirFlowWithLim
           CASE DEFAULT
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(4))//': '//TRIM(cAlphaArgs(4)))
-            CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+            CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+            CALL ShowContinueError('... valid values are DesignDay, Flow/Zone or DesignDayWithLimit.')
             ErrorsFound=.true.
         END SELECT
       END DO
@@ -1650,7 +1749,7 @@ SUBROUTINE GetSystemSizingInput
     NumDesDays = GetNumObjectsFound('SizingPeriod:DesignDay') + GetNumObjectsFound('SizingPeriod:WeatherFileDays') +   &
                       GetNumObjectsFound('SizingPeriod:WeatherFileConditionType')
     IF (NumDesDays == 0 .AND. (DoSystemSizing .OR. DoPlantSizing) ) THEN
-      CALL ShowSevereError('System Sizing calculations need SizingPeriod:* input.')
+      CALL ShowSevereError('System Sizing calculations need SizingPeriod:* input. None found.')
       ErrorsFound = .TRUE.
     END IF
     ALLOCATE(SysSizInput(NumSysSizInput))
@@ -1679,18 +1778,20 @@ SUBROUTINE GetSystemSizingInput
       CASE('VENTILATIONREQUIREMENT')
         SysSizInput(SysSizIndex)%LoadSizeType = Ventilation
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(2))//': '//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        CALL ShowContinueError('... valid values are Sensible, Latent, Total, or VentilationRequirement.')
         ErrorsFound=.true.
     END SELECT
     SELECT CASE(TRIM(cAlphaArgs(3)))
       CASE('COINCIDENT')
-        SysSizInput(SysSizIndex)%SizingOption = 2
+        SysSizInput(SysSizIndex)%SizingOption = Coincident
       CASE('NONCOINCIDENT')
-        SysSizInput(SysSizIndex)%SizingOption = 1
+        SysSizInput(SysSizIndex)%SizingOption = NonCoincident
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(3))//': '//TRIM(cAlphaArgs(3)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        CALL ShowContinueError('... valid values are Coincident or NonCoincident.')
         ErrorsFound=.true.
     END SELECT
     SELECT CASE(TRIM(cAlphaArgs(4)))
@@ -1699,8 +1800,9 @@ SUBROUTINE GetSystemSizingInput
       CASE('NO')
         SysSizInput(SysSizIndex)%CoolOAOption = 2
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(4))//': '//TRIM(cAlphaArgs(4)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+        CALL ShowContinueError('... valid values are Yes or No.')
         ErrorsFound=.true.
     END SELECT
     SELECT CASE(TRIM(cAlphaArgs(5)))
@@ -1709,8 +1811,9 @@ SUBROUTINE GetSystemSizingInput
       CASE('NO')
         SysSizInput(SysSizIndex)%HeatOAOption = 2
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(5))//': '//TRIM(cAlphaArgs(5)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+        CALL ShowContinueError('... valid values are Yes or No.')
         ErrorsFound=.true.
     END SELECT
 
@@ -1721,9 +1824,9 @@ SUBROUTINE GetSystemSizingInput
     IF (lNumericFieldBlanks(1)) THEN
       SysSizInput(SysSizIndex)%DesOutAirVolFlow = autosize
     ELSEIF (rNumericArgs(1) < 0.0d0 .and. rNumericArgs(1) /= autosize) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(1))//': '//  &
-         TRIM(RoundSigDigits(rNumericArgs(1),2)))
-      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(1))//'=['//TRIM(RoundSigDigits(rNumericArgs(1),2))//  &
+                   '],  value should not be negative.')
       ErrorsFound=.true.
     ELSE
       SysSizInput(SysSizIndex)%DesOutAirVolFlow = rNumericArgs(1)
@@ -1740,9 +1843,9 @@ SUBROUTINE GetSystemSizingInput
     IF (lNumericFieldBlanks(2)) THEN
       SysSizInput(SysSizIndex)%SysAirMinFlowRat = 0.0
     ELSEIF (rNumericArgs(2) < 0.0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(2))//': '//  &
-         TRIM(RoundSigDigits(rNumericArgs(2),2)))
-      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(2))//'=['//TRIM(RoundSigDigits(rNumericArgs(2),2))//  &
+                   '],  value should not be negative.')
       ErrorsFound=.true.
     ELSE
       SysSizInput(SysSizIndex)%SysAirMinFlowRat = rNumericArgs(2)
@@ -1766,9 +1869,9 @@ SUBROUTINE GetSystemSizingInput
     IF (lNumericFieldBlanks(11)) THEN
       SysSizInput(SysSizIndex)%DesCoolAirFlow = 0.0
     ELSEIF (rNumericArgs(11) < 0.0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(11))//': '//  &
-         TRIM(RoundSigDigits(rNumericArgs(11),2)))
-      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(11))//'=['//TRIM(RoundSigDigits(rNumericArgs(11),2))//  &
+                   '],  value should not be negative.')
       ErrorsFound=.true.
     ELSE
       SysSizInput(SysSizIndex)%DesCoolAirFlow = rNumericArgs(11)
@@ -1784,9 +1887,9 @@ SUBROUTINE GetSystemSizingInput
     IF (lNumericFieldBlanks(12)) THEN
       SysSizInput(SysSizIndex)%DesHeatAirFlow = 0.0
     ELSEIF (rNumericArgs(12) < 0.0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(12))//': '//  &
-         TRIM(RoundSigDigits(rNumericArgs(12),2)))
-      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(12))//'=['//TRIM(RoundSigDigits(rNumericArgs(12),2))//  &
+                   '],  value should not be negative.')
       ErrorsFound=.true.
     ELSE
       SysSizInput(SysSizIndex)%DesHeatAirFlow = rNumericArgs(12)
@@ -1799,9 +1902,9 @@ SUBROUTINE GetSystemSizingInput
     IF (lNumericFieldBlanks(13)) THEN
       SysSizInput(SysSizIndex)%MaxZoneOAFraction = 0.0
     ELSEIF (rNumericArgs(13) < 0.0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cNumericFieldNames(13))//': '//  &
-         TRIM(RoundSigDigits(rNumericArgs(13),2)))
-      CALL ShowContinueError('.. value should not be negative. Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('... incorrect '//TRIM(cNumericFieldNames(13))//'=['//TRIM(RoundSigDigits(rNumericArgs(13),2))//  &
+                   '],  value should not be negative.')
       ErrorsFound=.true.
     ELSE
       SysSizInput(SysSizIndex)%MaxZoneOAFraction = rNumericArgs(13)
@@ -1812,8 +1915,9 @@ SUBROUTINE GetSystemSizingInput
       CASE('FLOW/SYSTEM')
         SysSizInput(SysSizIndex)%CoolAirDesMethod = InpDesAirFlow
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(6))//': '//TRIM(cAlphaArgs(6)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+        CALL ShowContinueError('... valid values are DesignDay or Flow/System.')
         ErrorsFound=.true.
     END SELECT
     SELECT CASE(TRIM(cAlphaArgs(7)))
@@ -1822,22 +1926,25 @@ SUBROUTINE GetSystemSizingInput
       CASE('FLOW/SYSTEM')
         SysSizInput(SysSizIndex)%HeatAirDesMethod = InpDesAirFlow
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(7))//': '//TRIM(cAlphaArgs(7)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+        CALL ShowContinueError('... valid values are DesignDay or Flow/System.')
         ErrorsFound=.true.
     END SELECT
     SELECT CASE(TRIM(cAlphaArgs(8)))
       CASE('ZONESUM')
-        SysSizInput(SysSizIndex)%SystemOAMethod = 1
+        SysSizInput(SysSizIndex)%SystemOAMethod = SOAM_ZoneSum
       CASE('VENTILATIONRATEPROCEDURE')
-        SysSizInput(SysSizIndex)%SystemOAMethod = 2
+        SysSizInput(SysSizIndex)%SystemOAMethod = SOAM_VRP
         IF(SysSizInput(SysSizIndex)%DesOutAirVolFlow > 0) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//  &
-               '- Design Outdoor Airflow Rate value will be overridden since SystemOAMethod is set to VRP')
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+          CALL ShowContinueError('SystemOAMethod is set to VRP and '//TRIM(cNumericFieldNames(1))//' > 0, '//  &
+             ' user entry will be ignored.')
         END IF
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(8))//': '//TRIM(cAlphaArgs(8)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'".')
+        CALL ShowContinueError('... valid values are ZoneSum or VentilationRateProcedure.')
         ErrorsFound=.true.
     END SELECT
   END DO
@@ -1938,8 +2045,9 @@ SUBROUTINE GetPlantSizingInput
       CASE('STEAM')
         PlantSizData(PltSizIndex)%LoopType = SteamLoop
       CASE DEFAULT
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect '//TRIM(cAlphaFieldNames(2))//': '//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Occurs in Sizing Object='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('...incorrect '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        CALL ShowContinueError('...Valid values are "Heating", "Cooling", "Condenser" or "Steam".')
         ErrorsFound=.true.
     END SELECT
 

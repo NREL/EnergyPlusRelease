@@ -55,9 +55,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -69,18 +69,18 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "DElight2.h"
 #include "struct.h"
-#include "EPlus_LoadData.h"
+#include "EPlus_Loaddata.h"
 #include "EPlus_Geom.h"
-#include "DFCalcs.h"
-#include "EPlus_ECM.h"
-#include "ECM.h"
+#include "DFcalcs.h"
+#include "EPlus_ECM.H"
+#include "ECM.H"
 #include "savedata.h"
-#include "tools.h"
-#include "wxtmy2.h"
-#include "w4lib.h"
+#include "TOOLS.H"
+#include "WxTMY2.h"
+#include "W4Lib.h"
 
 /******************************** subroutine DElightDaylightFactors4EPlus *******************************/
 // Called from DElightManagerC.cpp
@@ -103,7 +103,7 @@ DllExport int	DElightDaylightFactors4EPlus(
 {
 	FILE *infile;						/* input file pointer */
 	FILE *outfile;						/* output file pointer */
-	errno_t err;	// error return value from fopen_s
+	int err;	// error return value from fopen_s
 	SUN_DATA sun_data;	/* sun data structure */
 
     // Init return value  
@@ -114,7 +114,7 @@ DllExport int	DElightDaylightFactors4EPlus(
 	struct_init("LIB",(char *)lib_ptr);
 
 	// Open the input file for loading
-	if((err = fopen_s(&infile, sInputName, "r" )) !=0 ) {
+	if((infile = fopen(sInputName, "r" )) == NULL ) {
 //	if ((infile=fopen(sInputName,"r")) == NULL) {
 		*pofdmpfile << "ERROR: DElight cannot open input file [" <<sInputName << "]\n";
 		return(-3);
@@ -124,7 +124,7 @@ DllExport int	DElightDaylightFactors4EPlus(
 	char cInputLine[MAX_CHAR_LINE+1];	/* Input line */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	char cInputVersion[MAX_CHAR_UNAME+1];
-	sscanf_s(cInputLine,"%*s %s\n",cInputVersion,_countof(cInputVersion));
+	sscanf(cInputLine,"%*s %s\n",cInputVersion,_countof(cInputVersion));
 
 	// If the input version is EPlus then use LoadDataFromEPlus()
 	if (strcmp(cInputVersion,"EPlus") == 0)
@@ -195,7 +195,7 @@ DllExport int	DElightDaylightFactors4EPlus(
 	}
 
 	/* Open output file. */
-	if((err = fopen_s(&outfile, sOutputName, "w" )) !=0 ) {
+	if((outfile = fopen(sOutputName, "w" )) == NULL ) {
 //	if ((outfile=fopen(sOutputName,"w")) == NULL) {
 		*pofdmpfile << "ERROR: DElight Cannot open output file [" <<sOutputName << "]\n";
 		return(-2);

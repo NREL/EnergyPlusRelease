@@ -56,9 +56,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -70,9 +70,9 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "EPlus_Geom.h"
-#include "Geom.h"
+#include "geom.h"
 #include "GeomMesh.h"
 #include "struct.h"
 

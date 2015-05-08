@@ -168,7 +168,10 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysHeatExHTNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysHeatExCLNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: DesDehumidCLNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: DesDehumidElec
-
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysSolarCollectHeating
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysSolarCollectCooling
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysUserDefinedTerminalHeating
+REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysUserDefinedTerminalCooling
 
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysFANCompHTNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysFANCompElec
@@ -2194,6 +2197,10 @@ SUBROUTINE AllocateAndSetUpVentReports
   ALLOCATE(SysEvapElec(NumPrimaryAirSys))
   ALLOCATE(SysHeatExHTNG(NumPrimaryAirSys))
   ALLOCATE(SysHeatExCLNG(NumPrimaryAirSys))
+  ALLOCATE(SysSolarCollectHeating(NumPrimaryAirSys))
+  ALLOCATE(SysSolarCollectCooling(NumPrimaryAirSys))
+  ALLOCATE(SysUserDefinedTerminalHeating(NumPrimaryAirSys))
+  ALLOCATE(SysUserDefinedTerminalCooling(NumPrimaryAirSys))
   ALLOCATE(SysFANCompHTNG(NumPrimaryAirSys))
   ALLOCATE(SysFANCompElec(NumPrimaryAirSys))
   ALLOCATE(SysCCCompCLNG(NumPrimaryAirSys))
@@ -2263,6 +2270,10 @@ SysCCCompCLNG       = 0.0
 SysHCCompHTNG       = 0.0
 SysHeatExHTNG       = 0.0
 SysHeatExCLNG       = 0.0
+SysSolarCollectHeating = 0.d0
+SysSolarCollectCooling = 0.d0
+SysUserDefinedTerminalHeating = 0.d0
+SysUserDefinedTerminalCooling = 0.d0
 SysHumidHTNG        = 0.0
 SysEvapCLNG         = 0.0
 DesDehumidCLNG      = 0.0
@@ -2327,6 +2338,18 @@ IF (AirLoopLoadsReportEnabled) THEN
                            'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
 
     CALL SetupOutputVariable('Air Loop Total Heat Exchanger Cooling Energy[J]', SysHeatExCLNG(SysIndex), &
+                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+
+    CALL SetupOutputVariable('Air Loop Total Solar Collector Heating Energy[J]', SysSolarCollectHeating(SysIndex), &
+                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+
+    CALL SetupOutputVariable('Air Loop Total Solar Collector Cooling Energy[J]', SysSolarCollectCooling(SysIndex), &
+                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+
+    CALL SetupOutputVariable('Air Loop Total User Defined Terminal Heating Energy[J]', SysUserDefinedTerminalHeating(SysIndex), &
+                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+
+    CALL SetupOutputVariable('Air Loop Total User Defined Terminal Cooling Energy[J]', SysUserDefinedTerminalCooling(SysIndex), &
                            'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
 
     CALL SetupOutputVariable('Air Loop Total Humidifier Heating Energy[J]', SysHumidHTNG(SysIndex), &
@@ -4231,6 +4254,10 @@ SysCCCompCLNG       = 0.0
 SysHCCompHTNG       = 0.0
 SysHeatExHTNG       = 0.0
 SysHeatExCLNG       = 0.0
+SysSolarCollectHeating = 0.d0
+SysSolarCollectCooling = 0.d0
+SysUserDefinedTerminalHeating = 0.d0
+SysUserDefinedTerminalCooling = 0.d0
 SysHumidHTNG        = 0.0
 SysEvapCLNG         = 0.0
 DesDehumidCLNG      = 0.0
@@ -4475,9 +4502,11 @@ SysEvapElec         = 0.0
 
   DO AirLoopNum = 1, NumPrimaryAirSys
     SysTotHTNG(AirLoopNum)    = SysFANCompHTNG(AirLoopNum) + SysHCCompHTNG(AirLoopNum) +   &
-                                SysHeatExHTNG(AirLoopNum) + SysHumidHTNG(AirLoopNum)
+                                SysHeatExHTNG(AirLoopNum) + SysHumidHTNG(AirLoopNum)   +   &
+                                SysSolarCollectHeating(AirLoopNum) + SysUserDefinedTerminalHeating(AirLoopNum)
     SysTotCLNG(AirLoopNum)    = SysCCCompCLNG(AirLoopNum) + SysHeatExCLNG(AirLoopNum) +   &
-                                SysEvapCLNG(AirLoopNum) + DesDehumidCLNG(AirLoopNum)
+                                SysEvapCLNG(AirLoopNum) + DesDehumidCLNG(AirLoopNum)  +   &
+                                SysSolarCollectCooling(AirLoopNum) + SysUserDefinedTerminalCooling(AirLoopNum)
     SysTotElec(AirLoopNum)    = SysFANCompElec(AirLoopNum) +  SysHCCompElec(AirLoopNum) +   &
                                 SysCCCompElec(AirLoopNum) + SysHCCompElecRes(AirLoopNum) + &
                                 SysHumidElec(AirLoopNum) + DesDehumidElec(AirLoopNum) +   &
@@ -4561,12 +4590,13 @@ SELECT CASE(CompType)
 
 ! Outside Air System
   CASE('AIRLOOPHVAC:OUTDOORAIRSYSTEM')
-      IF(CompLoad > 0.0 .AND. CompLoadFlag)THEN
+    IF (CompLoadFlag) THEN
+      IF(CompLoad > 0.0)THEN
         SysOALoadCLNG(AirLoopNum) =  SysOALoadCLNG(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysOALoadHTNG(AirLoopNum) =  SysOALoadHTNG(AirLoopNum) + ABS(CompLoad)
       ENDIF
-
+    ENDIF
 ! Outdoor Air Mixer
   CASE('OUTDOORAIR:MIXER')
        CONTINUE !No energy transfers to account for
@@ -4589,6 +4619,7 @@ SELECT CASE(CompType)
        'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT', &
        'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION', &
        'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
+       'COIL:COOLING:DX:VARIABLESPEED', &
        'COILSYSTEM:COOLING:WATER:HEATEXCHANGERASSISTED', &
        'COIL:COOLING:WATER:DETAILEDGEOMETRY', &
        'COIL:COOLING:WATER')
@@ -4608,6 +4639,7 @@ SELECT CASE(CompType)
        'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT', &
        'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION', &
        'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
+       'COIL:HEATING:DX:VARIABLESPEED', &
        'COIL:HEATING:STEAM', &
        'COIL:HEATING:GAS', &
        'COIL:HEATING:DESUPERHEATER')
@@ -4636,7 +4668,7 @@ SELECT CASE(CompType)
   CASE ('COIL:USERDEFINED')
 
     IF(CompLoadFlag) THEN
-      IF (CompLoad < 0.d0) THEN
+      IF (CompLoad > 0.d0) THEN
         SysCCCompCLNG(AirLoopNum) = SysCCCompCLNG(AirLoopNum) + ABS(CompLoad)
       ELSE
         SysHCCompHTNG(AirLoopNum) = SysHCCompHTNG(AirLoopNum) + ABS(CompLoad)
@@ -4650,7 +4682,7 @@ SELECT CASE(CompType)
       CASE (iRT_Steam)
             SysHCCompSteam(AirLoopNum)     = SysHCCompSteam(AirLoopNum) + CompEnergy
       CASE (iRT_Electricity)
-        IF (CompLoad < 0.d0) THEN
+        IF (CompLoad > 0.d0) THEN
           SysCCCompElec(AirLoopNum) = SysCCCompElec(AirLoopNum) + CompEnergy
         ELSE
           SysHCCompElec(AirLoopNum)      = SysHCCompElec(AirLoopNum) + CompEnergy
@@ -4718,11 +4750,13 @@ SELECT CASE(CompType)
   CASE('HEATEXCHANGER:AIRTOAIR:FLATPLATE', &
        'HEATEXCHANGER:AIRTOAIR:SENSIBLEANDLATENT', &
        'HEATEXCHANGER:DESICCANT:BALANCEDFLOW')
-      IF(CompLoad > 0.0)THEN
-        SysHeatExHTNG(AirLoopNum) =  SysHeatExHTNG(AirLoopNum) + ABS(CompLoad)
-      ELSE
+    IF (CompLoadFlag) THEN
+      IF(CompLoad > 0.0 )THEN
         SysHeatExCLNG(AirLoopNum) =  SysHeatExCLNG(AirLoopNum) + ABS(CompLoad)
+      ELSE
+        SysHeatExHTNG(AirLoopNum) =  SysHeatExHTNG(AirLoopNum) + ABS(CompLoad)
       ENDIF
+    ENDIF
 
 ! Air Terminal Types
   CASE('AIRTERMINAL:DUALDUCT:CONSTANTVOLUME:COOL', &
@@ -4760,23 +4794,39 @@ SELECT CASE(CompType)
 ! Solar Collector Types
   CASE('SOLARCOLLECTOR:FLATPLATE:PHOTOVOLTAICTHERMAL', &
        'SOLARCOLLECTOR:UNGLAZEDTRANSPIRED')
-       CONTINUE ! solar collector energy use accounted for here ???
-                ! requires addition of new variables to sum solar collector electric/thermal
-! Example:
-!      IF(CompLoad > 0.0)THEN
-!        SolarCollectorHTNG(AirLoopNum) =  SolarCollectorHTNG(AirLoopNum) + ABS(CompLoad)
-!      ELSE
-!        SolarCollectorCLNG(AirLoopNum) =  SolarCollectorCLNG(AirLoopNum) + ABS(CompLoad)
-!      ENDIF
-!      SELECT CASE(EnergyType)
-!        CASE (iRT_Electricity)
-!              SolarCollectorElec(AirLoopNum) = SolarCollectorElec(AirLoopNum) + CompEnergy
-!      END SELECT
+    IF (CompLoadFlag) THEN
+      IF(CompLoad > 0.0 ) THEN
+        SysSolarCollectCooling(AirLoopNum) =  SysSolarCollectCooling(AirLoopNum) + ABS(CompLoad)
+      ELSE
+        SysSolarCollectHeating(AirLoopNum) =  SysSolarCollectHeating(AirLoopNum) + ABS(CompLoad)
+      ENDIF
+    ENDIF
 
   CASE('AIRTERMINAL:SINGLEDUCT:USERDEFINED')
-    CONTINUE ! User component model energy use should be accounted for here
-    
-
+  ! User component model energy use should be accounted for here
+    IF (CompLoadFlag) THEN
+      IF(CompLoad > 0.0 )THEN
+        SysUserDefinedTerminalCooling(AirLoopNum) =  SysUserDefinedTerminalCooling(AirLoopNum) + ABS(CompLoad)
+      ELSE
+        SysUserDefinedTerminalHeating(AirLoopNum) =  SysUserDefinedTerminalHeating(AirLoopNum) + ABS(CompLoad)
+      ENDIF
+    ENDIF
+    SELECT CASE(EnergyType)
+      CASE (iRT_PlantLoopHeatingDemand, iRT_DistrictHeating)
+            SysHCCompH2OHOT(AirLoopNum)    = SysHCCompH2OHOT(AirLoopNum) + CompEnergy
+      CASE (iRT_PlantLoopCoolingDemand, iRT_DistrictCooling)
+            SysCCCompH2OCOLD(AirLoopNum) = SysCCCompH2OCOLD(AirLoopNum) + CompEnergy
+      CASE (iRT_Steam)
+            SysHCCompSteam(AirLoopNum)     = SysHCCompSteam(AirLoopNum) + CompEnergy
+      CASE (iRT_Electricity)
+        IF (CompLoad > 0.d0) THEN
+          SysCCCompElec(AirLoopNum) = SysCCCompElec(AirLoopNum) + CompEnergy
+        ELSE
+          SysHCCompElec(AirLoopNum)      = SysHCCompElec(AirLoopNum) + CompEnergy
+        ENDIF
+      CASE (iRT_Natural_Gas, iRT_Propane)
+             SysHCCompGas(AirLoopNum)       = SysHCCompGas(AirLoopNum) + CompEnergy
+    END SELECT
 ! Recurring warning for unaccounted equipment types
 ! (should never happen, when this does happen enter appropriate equipment CASE statement above)
   CASE DEFAULT
@@ -4964,7 +5014,7 @@ SUBROUTINE ReportMaxVentilationLoads
           ZFAUZoneVentLoad =  ZFAUZoneVentLoad +  0.0
         ENDIF
 
-      CASE (PkgTermHPAirToAir_Num, PkgTermHPWaterToAir_Num)
+      CASE (PkgTermHPAirToAir_Num, PkgTermACAirToAir_Num, PkgTermHPWaterToAir_Num)
         OutAirNode = GetPTUnitOutAirNode( ZoneEquipList(ZoneEquipConfig(CtrlZoneNum)%EquipListIndex)%EquipIndex(thisZoneEquipNum) )
         If (OutAirNode > 0)  ZFAUOutAirFlow = ZFAUOutAirFlow + Node(OutAirNode)%MassFlowRate
 
@@ -5079,10 +5129,19 @@ SUBROUTINE ReportMaxVentilationLoads
         ELSEIF(AirDistHeatInletNodeNum > 0 .AND. AirDistCoolInletNodeNum == 0)THEN
           ADUHeatFlowrate = ADUHeatFlowrate & ! CR7244 need to accumulate flow across multiple inlets
                             + MAX(Node(ZoneEquipConfig(CtrlZoneNum)%AirDistUnitHeat(ZoneInNum)%InNode)%MassFlowRate,0.0d0)
+        ELSEIF(AirDistCoolInletNodeNum > 0 .AND. AirDistHeatInletNodeNum > 0 .AND. &
+               AirDistCoolInletNodeNum /= AirDistHeatInletNodeNum) THEN
+           ! dual ducts! CR7244 need to accumulate flow across multiple inlets (don't count same inlet twice)
+          ADUHeatFlowrate = ADUHeatFlowrate & ! CR7244 need to accumulate flow across multiple inlets
+                            + MAX(Node(ZoneEquipConfig(CtrlZoneNum)%AirDistUnitHeat(ZoneInNum)%InNode)%MassFlowRate,0.0d0)
+          ADUCoolFlowrate = ADUCoolFlowrate & ! CR7244 need to accumulate flow across multiple inlets
+                            + MAX(Node(ZoneEquipConfig(CtrlZoneNum)%AirDistUnitCool(ZoneInNum)%InNode)%MassFlowRate,0.0d0)
+        ELSEIF(AirDistCoolInletNodeNum > 0 .AND. AirDistHeatInletNodeNum > 0) THEN
+           ! dual ducts! CR7244 need to accumulate flow across multiple inlets (don't count same inlet twice)
+          ADUCoolFlowrate = ADUCoolFlowrate & ! CR7244 need to accumulate flow across multiple inlets
+                            + MAX(Node(ZoneEquipConfig(CtrlZoneNum)%AirDistUnitCool(ZoneInNum)%InNode)%MassFlowRate,0.0d0)
         ELSE
-        ! do nothing (already inits)  ! CR7244 need to accumulate flow across multiple inlets
-          !ADUCoolFlowrate = 0.0
-          !ADUHeatFlowrate = 0.0
+          ! do nothing (already inits)
         END IF
       END DO
 

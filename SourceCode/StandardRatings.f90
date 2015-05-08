@@ -143,7 +143,7 @@ SUBROUTINE CalcChillerIPLV(ChillerName, ChillerType, RefCap, RefCOP, CondenserTy
   REAL(r64) :: CondenserInletTemp        = 0.0D0   ! Entering Condenser Temperature at reduced conditions [C]
   REAL(r64) :: CondenserOutletTemp0      = 0.0D0   ! Lower bound for condenser outlet temperature [C]
   REAL(r64) :: CondenserOutletTemp1      = 0.0D0   ! Upper bound for condenser outlet temperature [C]
-  REAL(r64) :: CondenserOutletTemp       = 0.0D0   ! Calculated condenser outlet temperature which corresponds 
+  REAL(r64) :: CondenserOutletTemp       = 0.0D0   ! Calculated condenser outlet temperature which corresponds
                                                    ! to EnteringWaterTempReduced above [C]
   REAL(r64) :: Cp                        = 0.0D0   ! Water specific heat [J/(kg*C)]
   REAL(r64) :: Rho                       = 0.0D0   ! Water density [kg/m3]
@@ -215,7 +215,7 @@ SUBROUTINE CalcChillerIPLV(ChillerName, ChillerType, RefCap, RefCOP, CondenserTy
          EnteringAirWetbulbTempReduced = 10.0D0 + 14.0D0 * ReducedPLR(RedCapNum)
          CondenserInletTemp = EnteringAirWetbulbTempReduced
        ENDIF
-       
+
        SELECT CASE (ChillerType)
 
          CASE (TypeOf_Chiller_ElectricEIR)
@@ -330,7 +330,7 @@ FUNCTION ReformEIRChillerCondInletTempResidual(CondenserOutletTemp, Par) RESULT 
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN)  :: CondenserOutletTemp        ! Condenser outlet temperature (boundary condition or guess value) [C]
-  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1)  = Condenser inlet temperature at AHRI Standard 
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! par(1)  = Condenser inlet temperature at AHRI Standard
                                                        !           551/591 conditons[C]
                                                        ! par(2)  = Evaporator outlet temperature [C]
                                                        ! par(3)  = Water specific heat [J/(kg*C)]
@@ -615,7 +615,7 @@ SUBROUTINE CheckCurveLimitsForIPLV(ChillerName, ChillerType, CondenserType, CapF
 
 END SUBROUTINE CheckCurveLimitsForIPLV
 
-SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, RatedTotalCapacity, RatedCOP, CapFFlowCurveIndex, &
+SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, ns, RatedTotalCapacity, RatedCOP, CapFFlowCurveIndex, &
                                     CapFTempCurveIndex, EIRFFlowCurveIndex, EIRFTempCurveIndex, PLFFPLRCurveIndex, &
                                     RatedAirVolFlowRate, FanPowerPerEvapAirFlowRateFromInput, RegionNum, MinOATCompressor, &
                                     OATempCompressorOn, OATempCompressorOnOffBlank, DefrostControl)
@@ -625,6 +625,7 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
           !       DATE WRITTEN   February 2010,
           !                      May 2010  Added EER and IEER Calculation
           !                      March 2012  Added HSPF Calculation
+          !                      August 2012 Added SEER for Multi-speed HP
 
           !       RE-ENGINEERED  na
 
@@ -638,6 +639,10 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
           !                 fixed speed indoor supply air fan, and air-cooled condensers. Writes the result to EIO file.
           !                 (5) Heating Seasonal Performance Factor (HSPF) for Air-Source Direct Expansion Heat Pumps having
           !                  a single-speed compressor, fixed speed indoor supply air fan
+          !                 (6) Standard Rated (net) Cooling Capacity; and
+          !                 (7) Seasonal Energy Efficiency Ratio (SEER) for Air-to-Air Heat Pumps having multi-speed
+          !                     compressor.
+          !
           ! METHODOLOGY EMPLOYED:
           ! (A) Methodology for calculating standard ratings for DX air conditioners
           !     (1) Obtains the rated condition parameters:
@@ -682,6 +687,25 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
           !         entire heating season gives the HSPF. The detailed calculation algorithms of calculating HSPF
           !         are described in Engineering Reference.
           !
+          ! (C) Methodology for calculating standard ratings for Multi-Speed Heat Pumps
+          !     (1) Obtains the rated condition parameters:
+          !         Cooling capacity (User specified or Autosized Value)
+          !         Rated Air volume flow rate through the DX Cooling Coil (User specified or autosized value)
+          !
+          !     (2) Evaluates the total cooling coil capacity at AHRI A2 test conditions 26.7C/19.4C/35.0C. Then net
+          !         cooling capacity is determined from the total cooling capacity of the DX coil at the AHRI A2 test
+          !         conditions and accounting for the INDOOR supply air fan effect.  The net total cooling capacity
+          !         is reported at the high (maximum) speed only.
+          !
+          !     (3) Calculates the electric power consumed by the DX Coil Unit (compressor + outdoor condenser fan).
+          !         Evaluates the EIR capacity and flow fraction modifiers at A2, B2, B1, and F1 test coditions per
+          !         AHRI/ANSI Std. 210/240 test procedure for multi-speed compressor.  For any inter-
+          !         mediate operating conditions (speed), the successive lower and the higher speed performnace are
+          !         weighed per the standard.  Electric Power consumption is determined by adding the indoor fan
+          !         electric power to the electric power consumption by the outdoor DX Coil Fan and Compressor Power
+          !         at the AHRI test conditions.  The net total cooling capacity is also corrected for the fan heat
+          !         effect for SEER calculation.
+          !
           ! REFERENCES:
           ! (1) ANSI/AHRI Standard 210/240-2008:  Standard for Performance Rating of Unitary Air-Conditioning and
           !                                       Air-Source Heat Pumps. Arlington, VA:  Air-Conditioning, Heating
@@ -693,32 +717,34 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
 
           ! USE STATEMENTS:
 
-  USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical
+  USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical,CoilDX_MultiSpeedCooling,CoilDX_MultiSpeedHeating
   USE CurveManager,    ONLY: CurveValue, GetCurveMinMaxValues
   USE General,         ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN)     :: DXCoilName          ! Name of DX coil for which HSPF is calculated
-  CHARACTER(len=*), INTENT(IN)     :: DXCoilType          ! Type of DX coil for which HSPF is calculated
-  INTEGER, INTENT(IN)              :: DXCoilType_Num      ! Integer Type of DX coil - heating or cooling
-  INTEGER, INTENT(IN)              :: CapFTempCurveIndex  ! Index for the capacity as a function of temperature modifier curve
-  INTEGER, INTENT(IN)              :: CapFFlowCurveIndex  ! Index for the capacity as a function of flow fraction modifier curve
-  INTEGER, INTENT(IN)              :: EIRFTempCurveIndex  ! Index for the EIR as a function of temperature modifier curve
-  INTEGER, INTENT(IN)              :: EIRFFlowCurveIndex  ! Index for the EIR as a function of flow fraction modifier curve
-  INTEGER, INTENT(IN)              :: PLFFPLRCurveIndex   ! Index for the PLF vs part-load ratio curve
-  INTEGER, INTENT(IN)              :: RegionNum           ! Region number for calculating HSPF of single speed DX heating coil
-  INTEGER, INTENT(IN)              :: DefrostControl      ! defrost control; 1=timed, 2=on-demand
-  REAL(r64), INTENT(IN)            :: RatedTotalCapacity  ! Reference capacity of DX coil [W]
-  REAL(r64), INTENT(IN)            :: RatedCOP            ! Reference coefficient of performance [W/W]
-  REAL(r64), INTENT(IN)            :: RatedAirVolFlowRate ! Reference air flow rate of DX coil [m3/s]
-  REAL(r64), INTENT(IN)            :: FanPowerPerEvapAirFlowRateFromInput  ! Reference fan power per evap air flow rate [W]
-  REAL(r64), INTENT(IN)            :: MinOATCompressor     ! Minimum OAT for heat pump compressor operation [C]
-  REAL(r64), INTENT(IN)            :: OATempCompressorOn   ! The outdoor tempearture when the compressor is automatically turned
+  CHARACTER(len=*), INTENT(IN)     :: DXCoilName              ! Name of DX coil for which HSPF is calculated
+  CHARACTER(len=*), INTENT(IN)     :: DXCoilType              ! Type of DX coil for which HSPF is calculated
+  INTEGER,   INTENT(IN)            :: DXCoilType_Num          ! Integer Type of DX coil - heating or cooling
+  INTEGER,   INTENT(IN)            :: ns                      ! Number of compressor speeds
+  INTEGER,   INTENT(IN)            :: CapFTempCurveIndex(ns)  ! Index for the capacity as a function of temperature modifier curve
+  INTEGER,   INTENT(IN)            :: CapFFlowCurveIndex(ns)  ! Index for the capacity as a function of flow fraction modifier curve
+  INTEGER,   INTENT(IN)            :: EIRFTempCurveIndex(ns)  ! Index for the EIR as a function of temperature modifier curve
+  INTEGER,   INTENT(IN)            :: EIRFFlowCurveIndex(ns)  ! Index for the EIR as a function of flow fraction modifier curve
+  INTEGER,   INTENT(IN)            :: PLFFPLRCurveIndex(ns)   ! Index for the PLF vs part-load ratio curve
+  REAL(r64), INTENT(IN)            :: RatedTotalCapacity(ns)  ! Reference capacity of DX coil [W]
+  REAL(r64), INTENT(IN)            :: RatedCOP(ns)            ! Reference coefficient of performance [W/W]
+  REAL(r64), INTENT(IN)            :: RatedAirVolFlowRate(ns) ! Reference air flow rate of DX coil [m3/s]
+  REAL(r64), INTENT(IN)            :: FanPowerPerEvapAirFlowRateFromInput(ns)  ! Reference fan power per evap air flow rate [W/(m3/s)]
+
+  INTEGER, OPTIONAL, INTENT(IN)    :: RegionNum            ! Region number for calculating HSPF of single speed DX heating coil
+  INTEGER, OPTIONAL, INTENT(IN)    :: DefrostControl       ! defrost control; 1=timed, 2=on-demand
+  REAL(r64), OPTIONAL, INTENT(IN)  :: MinOATCompressor     ! Minimum OAT for heat pump compressor operation [C]
+  REAL(r64), OPTIONAL, INTENT(IN)  :: OATempCompressorOn   ! The outdoor tempearture when the compressor is automatically turned
                                                            ! back on, if applicable, following automatic shut off. This field is
                                                            ! used only for HSPF calculation. [C]
-  LOGICAL, INTENT(IN)              :: OATempCompressorOnOffBlank  ! Flag used to determine low tem[erature cut out factor
+  LOGICAL, OPTIONAL, INTENT(IN)    :: OATempCompressorOnOffBlank  ! Flag used to determine low temperature cut out factor
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   ! AHRI Standard 210/240-2008 Performance Test Conditions for Unitary Air-to-Air Air-Conditioning and Heat Pump Equipment
@@ -752,8 +778,8 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
                                                       ! when the standard tests are conducted on units that do not have an
                                                       ! indoor air circulting fan. Used if user doesn't enter a specific value.
 
-  REAL(r64), PARAMETER :: CorrectionFactor = 0.77D0   ! A correction factor which tends to improve the agreement between 
-                                                      ! calculated and measured building loads, dimensionless. 
+  REAL(r64), PARAMETER :: CorrectionFactor = 0.77D0   ! A correction factor which tends to improve the agreement between
+                                                      ! calculated and measured building loads, dimensionless.
 
   REAL(r64), PARAMETER :: CyclicDegradationCoeff = 0.25D0
 
@@ -794,6 +820,30 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
                                                                0.0D0, 0.0D0, 0.0D0, 0.0D0, 0.0D0/)
                                     ! Fractional bin hours for different bin temperatures for region six, from ANSI/AHRI 210/240
 
+!  Multispeed
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  ! AHRI Standard 210/240-2008 Performance Test Conditions for Unitary Air-to-Air Air-Conditioning and Heat Pump Equipment
+  REAL(r64), PARAMETER ::    IndoorCoilInletAirWetbulbTempRated   = 19.44d0  ! 19.44C (67F)  Tests A2, B2, B1, and F1
+  REAL(r64), PARAMETER ::    OutdoorCoilInletAirDrybulbTempRated  = 35.0d0   ! 35.00C (95F)  Tests A2, B2, B1, and F1
+  REAL(r64), PARAMETER ::    OutdoorCoilInletAirDrybulbTempTestA2 = 35.0d0   ! 35.00C (95F)  Test A2 (high speed)
+  REAL(r64), PARAMETER ::    OutdoorCoilInletAirDrybulbTempTestB2 = 27.78d0  ! 27.78C (82F)  Test B2 (high speed)
+  REAL(r64), PARAMETER ::    OutdoorCoilInletAirDrybulbTempTestB1 = 27.78d0  ! 27.78C (82F)  Test B1 (Low speed)
+  REAL(r64), PARAMETER ::    OutdoorCoilInletAirDrybulbTempTestF1 = 19.44d0  ! 19.44C (67F)  Test B1 (Low speed)
+  REAL(r64), PARAMETER ::    SizingFactor = 1.10d0                           ! sizing factor per AHRI Std 210/240-2008
+
+  ! The AHRI standard specifies a nominal/default fan electric power consumption per rated air volume flow rate
+  ! to account for indoor fan electric power consumption when the standard tests are conducted on units that do
+  ! not have an indoor air circulting fan. Used if user doesn't enter a specific value.
+
+  ! Representative cooling season Outdoor air temperature bin from ANSI/AHRI 210/240-2008
+  INTEGER, PARAMETER   :: NumOfOATempBins = 8         ! number of outdoor temperature bins for cooling season
+  REAL(r64), PARAMETER, DIMENSION(NumOfOATempBins) :: OutdoorBinTemperatureSEER = &
+             (/19.44D0, 22.22D0, 25.00D0, 27.78D0, 30.56D0, 33.33D0, 36.11D0, 38.89D0/)
+  ! Fractional bin hours for different bin temperatures for cooling, from ANSI/AHRI 210/240 - 2008
+  REAL(r64), PARAMETER, DIMENSION(NumOfOATempBins) :: CoolFracBinHoursAtOutdoorBinTemp = &
+             (/0.214D0, 0.231D0, 0.216D0, 0.161D0, 0.104D0, 0.052D0, 0.018D0, 0.004D0/)
+
+
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
@@ -801,31 +851,59 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: FanPowerPerEvapAirFlowRate(ns) ! Fan power per air volume flow rate through the evaporator coil [W/(m3/s)]
+
+  ! Intermediate values calculated from the inputs in the idf file
+  REAL(r64) :: TotCoolCapTestA2(ns)        ! Total cooling capacity at A2 test condition (High speed)
+  REAL(r64) :: TotCoolCapTestB2(ns)        ! Total cooling capacity at B2 test condition (High speed)
+  REAL(r64) :: TotCoolCapTestB1(ns)        ! Total cooling capacity at B1 test condition (Low speed)
+  REAL(r64) :: TotCoolCapTestF1(ns)        ! Total cooling capacity at F1 test condition (Low speed)
+  REAL(r64) :: OutdoorUnitPowerTestA2(ns)  ! Outdoor Unit electric power at A2 test condition (High speed)
+  REAL(r64) :: OutdoorUnitPowerTestB2(ns)  ! Outdoor Unit electric power at B2 test condition (High speed)
+  REAL(r64) :: OutdoorUnitPowerTestB1(ns)  ! Outdoor Unit electric power at B1 test condition (Low speed)
+  REAL(r64) :: OutdoorUnitPowerTestF1(ns)  ! Outdoor Unit electric power at F1 test condition (Low speed)
+
+  REAL(r64) :: CoolingCapacityLS           ! cooling capacity of Mult-speed DX coil at lower speed, [W]
+  REAL(r64) :: CoolingCapacityHS           ! cooling capacity of Mult-speed DX coil at higher speed, [W]
+  REAL(r64) :: CoolingElecPowerLS          ! outdoor unit electric power input at low speed, [W]
+  REAL(r64) :: CoolingElecPowerHS          ! outdoor unit electric power input at high speed, [W]
+  REAL(r64) :: CoolingCapacityMax          ! cooling capacity of Mult-speed DX coil at max speed, [W]
+  REAL(r64) :: CoolingElecPowerMax         ! outdoor unit electric power input at Max speed, [W]
 
   REAL(r64) ::  OutdoorUnitInletAirDrybulbTempReduced  ! Outdoor unit entering air dry-bulb temperature at reduced capacity [C]
 
 ! Inputs to be read from the idf file
-  REAL(r64) :: TotCoolingCapAHRI = 0.0D0         ! Total Cooling Coil capacity (gross) at AHRI test conditions [W]
-  REAL(r64) :: FanPowerPerEvapAirFlowRate=0.0D0  ! Fan power per air volume flow rate through the evaporator coil [W/(m3/s)]
+  REAL(r64) :: TotCoolingCapAHRI = 0.0D0   ! Total Cooling Coil capacity (gross) at AHRI test conditions [W]
+
 
 ! Intermediate values calculated from the inputs in the idf file
+  REAL(r64) :: TotCapFlowModFac(ns)        ! Total capacity modifier f(actual supply air flow vs rated flow) for each speed [-]
+  REAL(r64) :: EIRFlowModFac(ns)           ! EIR modifier f(actual supply air flow vs rated flow) for each speed [-]
   REAL(r64) :: TotCapTempModFac = 0.0D0    ! Total capacity modifier (function of entering wetbulb, outside drybulb) [-]
-  REAL(r64) :: TotCapFlowModFac = 0.0D0    ! Total capacity modifier (function of actual supply air flow vs rated flow) [-]
   REAL(r64) :: EIRTempModFac = 0.0D0       ! EIR modifier (function of entering wetbulb, outside drybulb) [-]
-  REAL(r64) :: EIRFlowModFac = 0.0D0       ! EIR modifier (function of actual supply air flow vs rated flow) [-]
+
   REAL(r64) :: NetCoolingCapAHRI = 0.0D0   ! Net Cooling Coil capacity at AHRI TestB conditions, accounting for supply fan heat [W]
   REAL(r64) :: TotalElecPower = 0.0D0      ! Net power consumption (Cond Fan+Compressor+Indoor Fan) at AHRI test conditions [W]
   REAL(r64) :: TotalElecPowerRated = 0.0D0 ! Net power consumption (Cond Fan+Compressor+Indoor Fan) at Rated test conditions [W]
   REAL(r64) :: EIR= 0.0D0                  ! Energy Efficiency Ratio at AHRI test conditions for SEER [-]
   REAL(r64) :: PartLoadFactor = 0.0D0      ! Part load factor, accounts for thermal lag at compressor startup [-]
   REAL(r64) :: OATempCompressorOff = 0.0D0
+  !
+  REAL(r64) :: PartLoadRatio               = 0.0d0 ! compressor cycling ratio between successive speeds, [-]
+  REAL(r64) :: PartLoadFraction            = 0.0d0 ! part-load fraction that account for the cyclic degradation, [-]
+  REAL(r64) :: NetCoolingCapWeighted       = 0.0d0 ! net tot cooling cap weighted by the fraction of the binned cooling hours [W]
+  REAL(r64) :: TotCoolingElecPowerWeighted = 0.0d0 ! net total cooling electric power input weighted by the fraction of the
+                                                   ! binned cooling hours
+  REAL(r64) :: BuildingCoolingLoad         = 0.0d0 ! Building space cooling load corresponding to an outdoor bin temperature [W]
+  REAL(r64) :: NetTotCoolCapBinned         = 0.0d0 ! Net tot cooling cap corresponding to an outdoor bin temperature [W]
+  REAL(r64) :: TotCoolElecPowerBinned      = 0.0d0 ! Total cooling cap corresponding to an outdoor bin temperature [W]
 
 ! Calculated and reported to the EIO file
-  REAL(r64) :: NetCoolingCapRated = 0.0D0 ! Net Cooling Coil capacity at Rated conditions, accounting for supply fan heat [W]
   REAL(r64) :: SEER = 0.0D0             ! Seasonal Energy Efficiency Ratio in SI [W/W]
   REAL(r64) :: EER = 0.0D0              ! Energy Efficiency Ratio in SI [W/W]
   REAL(r64) :: IEER = 0.0D0             ! Integerated Energy Efficiency Ratio in SI [W/W]
   REAL(r64) :: HSPF = 0.0d0             ! Heating Seasonal Performance Factor in SI [W/W]
+  REAL(r64) :: NetCoolingCapRated(ns)   ! Net Cooling Coil capacity at Rated conditions, accounting for supply fan heat [W]
 
   REAL(r64) :: EERReduced = 0.0d0       ! EER at reduced capacity test conditions (100%, 75%, 50%, and 25%)
   REAL(r64) :: ElecPowerReducedCap      ! Net power consumption (Cond Fan+Compressor) at reduced test condition [W]
@@ -858,9 +936,10 @@ SUBROUTINE CalcDXCoilStandardRating(DXCoilName, DXCoilType, DXCoilType_Num, Rate
                                                                   ! outdoor bin temperature [W]
   REAL(r64) :: TotalResistiveSpaceHeatingElectricalEnergy = 0.0d0 ! Sum of resistance heating electrical energy over the
                                                                   ! entire heating season [W]
-
+!
+  INTEGER   :: BinNum                 ! bin number counter
+  INTEGER   :: spnum                  ! compressor speed number
   INTEGER   :: RedCapNum              ! Integer counter for reduced capacity
-  INTEGER   :: BinNumber              ! Integer counter for bin number
   INTEGER   :: StandardDHRNum         ! Integer counter for standardized DHRs
   LOGICAL   :: CalcCapacity = .TRUE.  ! FALSE if temp. and flow modifier curves limits are not inclusive of AHRI test conditions
   LOGICAL   :: CalcSEER = .TRUE.      ! FALSE if the temp. and flow modifier, and PLF curve limits,
@@ -873,50 +952,56 @@ SELECT CASE(DXCoilType_Num)
 
  CASE (CoilDX_CoolingSingleSpeed)
 
-  CALL CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType_Num, CapFTempCurveIndex, CapFFlowCurveIndex, &
-                                          EIRFTempCurveIndex, EIRFFlowCurveIndex, PLFFPLRCurveIndex, CalcCapacity,CalcSEER, &
+  CALL CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType_Num, CapFTempCurveIndex(1), CapFFlowCurveIndex(1), &
+                                          EIRFTempCurveIndex(1), EIRFFlowCurveIndex(1),   &
+                                          PLFFPLRCurveIndex(1), CalcCapacity,CalcSEER, &
                                           CalcEER,CalcIEER,CalcHSPF)
 
   ! Calculate the Indoor fan electric power consumption.  The electric power consumption is estimated
   ! using either user supplied or AHRI default value for fan power per air volume flow rate
-  IF( FanPowerPerEvapAirFlowRateFromInput <= 0.0D0) THEN
-      FanPowerPerEvapAirFlowRate=DefaultFanPowerPerEvapAirFlowRate
+  FanPowerPerEvapAirFlowRate=0.0D0
+  TotCapTempModFac = 0.0D0
+  EIRFlowModFac = 0.0d0
+  NetCoolingCapRated = 0.0d0
+
+  IF( FanPowerPerEvapAirFlowRateFromInput(1) <= 0.0D0) THEN
+      FanPowerPerEvapAirFlowRate(1)=DefaultFanPowerPerEvapAirFlowRate
   ELSE
-      FanPowerPerEvapAirFlowRate=FanPowerPerEvapAirFlowRateFromInput
+      FanPowerPerEvapAirFlowRate(1)=FanPowerPerEvapAirFlowRateFromInput(1)
   ENDIF
 
   ! Standard Rating Cooling (net) Capacity calculations:
   IF ( CalcCapacity ) THEN
-      TotCapFlowModFac = CurveValue(CapFFlowCurveIndex,AirMassFlowRatioRated)
-      TotCapTempModFac = CurveValue(CapFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated,    &
+      TotCapFlowModFac(1) = CurveValue(CapFFlowCurveIndex(1),AirMassFlowRatioRated)
+      TotCapTempModFac = CurveValue(CapFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated,    &
                                    OutdoorUnitInletAirDrybulbTempRated)
-      NetCoolingCapRated = RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac          &
-                         - FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
+      NetCoolingCapRated(1) = RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)      &
+                            - FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
   ELSE
-      NetCoolingCapRated = 0.0d0
+      NetCoolingCapRated(1) = 0.0d0
   ENDIF
 
   ! SEER calculations:
   IF ( CalcSEER ) THEN
-      TotCapFlowModFac = CurveValue(CapFFlowCurveIndex,AirMassFlowRatioRated)
-      TotCapTempModFac = CurveValue(CapFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated, &
+      TotCapFlowModFac(1) = CurveValue(CapFFlowCurveIndex(1),AirMassFlowRatioRated)
+      TotCapTempModFac = CurveValue(CapFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated, &
                                    OutdoorUnitInletAirDrybulbTemp)
-      TotCoolingCapAHRI = RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac
-      EIRTempModFac = CurveValue(EIRFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated,     &
+      TotCoolingCapAHRI = RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)
+      EIRTempModFac = CurveValue(EIRFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated,     &
                                    OutdoorUnitInletAirDrybulbTemp)
-      EIRFlowModFac = CurveValue(EIRFFlowCurveIndex,AirMassFlowRatioRated)
-      IF ( RatedCOP > 0.0D0 ) THEN ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
-           EIR = EIRTempModFac * EIRFlowModFac / RatedCOP
+      EIRFlowModFac(1) = CurveValue(EIRFFlowCurveIndex(1),AirMassFlowRatioRated)
+      IF ( RatedCOP(1) > 0.0D0 ) THEN ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
+           EIR = EIRTempModFac * EIRFlowModFac(1) / RatedCOP(1)
       ELSE
            EIR = 0.0d0
       ENDIF
       ! Calculate net cooling capacity
-      NetCoolingCapAHRI = TotCoolingCapAHRI - FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
-      TotalElecPower = EIR * TotCoolingCapAHRI + FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
+      NetCoolingCapAHRI = TotCoolingCapAHRI - FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
+      TotalElecPower = EIR * TotCoolingCapAHRI + FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
 
       ! Calculate SEER value from the Energy Efficiency Ratio (EER) at the AHRI test conditions and the part load factor.
       ! First evaluate the Part Load Factor curve at PLR = 0.5 (AHRI Standard 210/240)
-      PartLoadFactor = CurveValue(PLFFPLRCurveIndex,PLRforSEER)
+      PartLoadFactor = CurveValue(PLFFPLRCurveIndex(1),PLRforSEER)
       IF ( TotalElecPower > 0.0D0 ) THEN
            SEER = ( NetCoolingCapAHRI / TotalElecPower ) * PartLoadFactor
       ELSE
@@ -929,26 +1014,26 @@ SELECT CASE(DXCoilType_Num)
   ! EER calculations:
   IF ( CalcEER ) THEN
       ! Calculate the net cooling capacity at the rated conditions (19.44C WB and 35.0C DB )
-      TotCapFlowModFac = CurveValue(CapFFlowCurveIndex,AirMassFlowRatioRated)
-      TotCapTempModFac = CurveValue(CapFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated, &
+      TotCapFlowModFac(1) = CurveValue(CapFFlowCurveIndex(1),AirMassFlowRatioRated)
+      TotCapTempModFac = CurveValue(CapFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated, &
                                     OutdoorUnitInletAirDrybulbTempRated)
-      NetCoolingCapRated = RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac       &
-                         - FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
+      NetCoolingCapRated(1) = RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)   &
+                            - FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
 
       ! Calculate Energy Efficiency Ratio (EER) at (19.44C WB and 35.0C DB ), ANSI/AHRI Std. 340/360
-      EIRTempModFac = CurveValue(EIRFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated,     &
+      EIRTempModFac = CurveValue(EIRFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated,     &
                       OutdoorUnitInletAirDrybulbTempRated)
-      EIRFlowModFac = CurveValue(EIRFFlowCurveIndex,AirMassFlowRatioRated)
-      IF ( RatedCOP > 0.0D0 ) THEN
+      EIRFlowModFac(1) = CurveValue(EIRFFlowCurveIndex(1),AirMassFlowRatioRated)
+      IF ( RatedCOP(1) > 0.0D0 ) THEN
            ! RatedCOP <= 0.0 is trapped in GetInput, but keep this as "safety"
-             EIR = EIRTempModFac * EIRFlowModFac / RatedCOP
+             EIR = EIRTempModFac * EIRFlowModFac(1) / RatedCOP(1)
       ELSE
              EIR = 0.0d0
       ENDIF
-      TotalElecPowerRated = EIR * (RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac) &
-                          + FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
+      TotalElecPowerRated = EIR * (RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)) &
+                          + FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
       IF ( TotalElecPowerRated > 0.0D0 ) THEN
-           EER = NetCoolingCapRated / TotalElecPowerRated
+           EER = NetCoolingCapRated(1) / TotalElecPowerRated
       ELSE
            EER = 0.0d0
       ENDIF
@@ -960,13 +1045,13 @@ SELECT CASE(DXCoilType_Num)
   IF ( CalcIEER ) THEN
        IEER =0.0d0
        ! Calculate the net cooling capacity at the rated conditions (19.44C WB and 35.0C DB )
-       TotCapFlowModFac = CurveValue(CapFFlowCurveIndex,AirMassFlowRatioRated)
-       TotCapTempModFac = CurveValue(CapFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated, &
+       TotCapFlowModFac = CurveValue(CapFFlowCurveIndex(1),AirMassFlowRatioRated)
+       TotCapTempModFac = CurveValue(CapFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated, &
                                     OutdoorUnitInletAirDrybulbTempRated)
-       NetCoolingCapRated = RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac       &
-                            - FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
+       NetCoolingCapRated(1) = RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)      &
+                             - FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
 
-       EIRFlowModFac = CurveValue(EIRFFlowCurveIndex,AirMassFlowRatioRated)
+       EIRFlowModFac(1) = CurveValue(EIRFFlowCurveIndex(1),AirMassFlowRatioRated)
 
        DO RedCapNum = 1, NumOfReducedCap
           ! get the outdoor air dry bulb temperature for the reduced capacity test conditions
@@ -975,23 +1060,23 @@ SELECT CASE(DXCoilType_Num)
           ELSE
               OutdoorUnitInletAirDrybulbTempReduced = 18.3D0
           ENDIF
-          TotCapTempModFac = CurveValue(CapFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated, &
+          TotCapTempModFac = CurveValue(CapFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated, &
                                         OutdoorUnitInletAirDrybulbTempReduced)
-          NetCoolingCapReduced = RatedTotalCapacity * TotCapTempModFac * TotCapFlowModFac   &
-                               - FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate
-          EIRTempModFac = CurveValue(EIRFTempCurveIndex,CoolingCoilInletAirWetbulbTempRated,   &
+          NetCoolingCapReduced = RatedTotalCapacity(1) * TotCapTempModFac * TotCapFlowModFac(1)   &
+                               - FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1)
+          EIRTempModFac = CurveValue(EIRFTempCurveIndex(1),CoolingCoilInletAirWetbulbTempRated,   &
                                      OutdoorUnitInletAirDrybulbTempReduced)
-          IF ( RatedCOP > 0.0D0 ) THEN
-               EIR = EIRTempModFac * EIRFlowModFac / RatedCOP
+          IF ( RatedCOP(1) > 0.0D0 ) THEN
+               EIR = EIRTempModFac * EIRFlowModFac(1) / RatedCOP(1)
           ELSE
                EIR = 0.0d0
           ENDIF
-          LoadFactor = ReducedPLR(RedCapNum) * NetCoolingCapRated / NetCoolingCapReduced
+          LoadFactor = ReducedPLR(RedCapNum) * NetCoolingCapRated(1) / NetCoolingCapReduced
           DegradationCoeff = 1.130D0 - 0.130D0 * LoadFactor
-          ElecPowerReducedCap = DegradationCoeff * EIR * (RatedTotalCapacity &
-                                   * TotCapTempModFac * TotCapFlowModFac)
+          ElecPowerReducedCap = DegradationCoeff * EIR * (RatedTotalCapacity(1) &
+                              * TotCapTempModFac * TotCapFlowModFac(1))
           EERReduced = ( LoadFactor * NetCoolingCapReduced ) / ( LoadFactor*ElecPowerReducedCap + &
-                         FanPowerPerEvapAirFlowRate * RatedAirVolFlowRate)
+                         FanPowerPerEvapAirFlowRate(1) * RatedAirVolFlowRate(1))
           IEER = IEER + IEERWeightingFactor(RedCapNum) * EERReduced
        END DO
 
@@ -999,23 +1084,23 @@ SELECT CASE(DXCoilType_Num)
        IEER = 0.0D0
   ENDIF
     ! Writes the net rated cooling capacity, SEER, EER and IEER values to the EIO file and standard tabular output tables
-  CALL ReportDXCoilRating( DXCoilType, DXCoilName, DXCoilType_Num, NetCoolingCapRated,      &
-                           SEER,SEER * ConvFromSIToIP,EER,EER * ConvFromSIToIP,IEER,IEER * ConvFromSIToIP, &
-                           NetHeatingCapRated, NetHeatingCapH3Test, HSPF,HSPF * ConvFromSIToIP, RegionNum)
+  CALL ReportDXCoilRating( DXCoilType, DXCoilName, DXCoilType_Num, NetCoolingCapRated(1),      &
+                           SEER * ConvFromSIToIP,EER,EER * ConvFromSIToIP,IEER * ConvFromSIToIP, &
+                           NetHeatingCapRated, NetHeatingCapH3Test, HSPF * ConvFromSIToIP, RegionNum)
 
  CASE (CoilDX_HeatingEmpirical)
 
-  CALL CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType_Num, CapFTempCurveIndex, CapFFlowCurveIndex, &
-                                          EIRFTempCurveIndex, EIRFFlowCurveIndex, PLFFPLRCurveIndex, CalcCapacity,&
+  CALL CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType_Num, CapFTempCurveIndex(1), CapFFlowCurveIndex(1), &
+                                          EIRFTempCurveIndex(1), EIRFFlowCurveIndex(1), PLFFPLRCurveIndex(1), CalcCapacity,&
                                           CalcSEER,CalcEER,CalcIEER,CalcHSPF)
 
   IF ( CalcHSPF ) THEN
 
     HSPF = 0.0d0
 
-    CALL CalculateDXHeatingCoilCapacityAndEIR (RatedTotalCapacity, RatedCOP, CapFFlowCurveIndex, CapFTempCurveIndex, &
-                                               EIRFFlowCurveIndex, EIRFTempCurveIndex, RatedAirVolFlowRate, &
-                                               FanPowerPerEvapAirFlowRateFromInput, NetHeatingCapRated, NetHeatingCapH2Test, &
+    CALL CalculateDXHeatingCoilCapacityAndEIR (RatedTotalCapacity(1), RatedCOP(1), CapFFlowCurveIndex(1), CapFTempCurveIndex(1), &
+                                               EIRFFlowCurveIndex(1), EIRFTempCurveIndex(1), RatedAirVolFlowRate(1), &
+                                               FanPowerPerEvapAirFlowRateFromInput(1), NetHeatingCapRated, NetHeatingCapH2Test, &
                                                NetHeatingCapH3Test, ElecPowerRated, ElecPowerH2Test, ElecPowerH3Test)
 
     IF (RegionNum .EQ. 5) THEN
@@ -1043,35 +1128,35 @@ SELECT CASE(DXCoilType_Num)
       DesignHeatingRequirement = DesignHeatingRequirementMin
     ENDIF
 
-    DO BinNumber = 1, TotalNumOfTemperatureBins(RegionNum)
+    DO BinNum = 1, TotalNumOfTemperatureBins(RegionNum)
 
       IF (RegionNum .EQ. 1) THEN
-        FractionalBinHours = RegionOneFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionOneFracBinHoursAtOutdoorBinTemp(BinNum)
       ELSEIF (RegionNum .EQ. 2) THEN
-        FractionalBinHours = RegionTwoFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionTwoFracBinHoursAtOutdoorBinTemp(BinNum)
       ELSEIF (RegionNum .EQ. 3) THEN
-        FractionalBinHours = RegionThreeFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionThreeFracBinHoursAtOutdoorBinTemp(BinNum)
       ELSEIF (RegionNum .EQ. 4) THEN
-        FractionalBinHours = RegionFourFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionFourFracBinHoursAtOutdoorBinTemp(BinNum)
       ELSEIF (RegionNum .EQ. 5) THEN
-        FractionalBinHours = RegionFiveFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionFiveFracBinHoursAtOutdoorBinTemp(BinNum)
       ELSEIF (RegionNum .EQ. 6) THEN
-        FractionalBinHours = RegionSixFracBinHoursAtOutdoorBinTemp(BinNumber)
+        FractionalBinHours = RegionSixFracBinHoursAtOutdoorBinTemp(BinNum)
       ENDIF
 
-      BuildingLoad = (18.33D0 - OutdoorBinTemperature(BinNumber)) / (18.33D0 - OutdoorDesignTemperature(RegionNum)) &
+      BuildingLoad = (18.33D0 - OutdoorBinTemperature(BinNum)) / (18.33D0 - OutdoorDesignTemperature(RegionNum)) &
                              * CorrectionFactor * DesignHeatingRequirement
 
-      IF ((OutdoorBinTemperature(BinNumber) .LE. -8.33D0) .OR. (OutdoorBinTemperature(BinNumber) .GE. 7.22D0)) THEN
+      IF ((OutdoorBinTemperature(BinNum) .LE. -8.33D0) .OR. (OutdoorBinTemperature(BinNum) .GE. 7.22D0)) THEN
         NetHeatingCapReduced = NetHeatingCapH3Test + (NetHeatingCapRated - NetHeatingCapH3Test) * &
-                                                     (OutdoorBinTemperature(BinNumber) + 8.33D0)/ (16.67D0)
+                                                     (OutdoorBinTemperature(BinNum) + 8.33D0)/ (16.67D0)
         ElectricalPowerConsumption = ElecPowerH3Test + (ElecPowerRated - ElecPowerH3Test) * &
-                                                       (OutdoorBinTemperature(BinNumber) + 8.33D0)/ (16.67D0)
+                                                       (OutdoorBinTemperature(BinNum) + 8.33D0)/ (16.67D0)
       ELSE
         NetHeatingCapReduced = NetHeatingCapH3Test + (NetHeatingCapH2Test - NetHeatingCapH3Test) * &
-                                                     (OutdoorBinTemperature(BinNumber) + 8.33D0)/ (10.0D0)
+                                                     (OutdoorBinTemperature(BinNum) + 8.33D0)/ (10.0D0)
         ElectricalPowerConsumption = ElecPowerH3Test + (ElecPowerH2Test - ElecPowerH3Test) * &
-                                                       (OutdoorBinTemperature(BinNumber) + 8.33D0)/ (10.0D0)
+                                                       (OutdoorBinTemperature(BinNum) + 8.33D0)/ (10.0D0)
       ENDIF
 
       IF (NetHeatingCapReduced .NE. 0.0D0) THEN
@@ -1094,10 +1179,10 @@ SELECT CASE(DXCoilType_Num)
         LowTempCutOutFactor = 0.0D0
       ELSE
         IF(.NOT. OATempCompressorOnOffBlank) THEN
-          IF (OutdoorBinTemperature(BinNumber) .LE. OATempCompressorOff) THEN
+          IF (OutdoorBinTemperature(BinNum) .LE. OATempCompressorOff) THEN
             LowTempCutOutFactor = 0.0D0
-          ELSEIF (OutdoorBinTemperature(BinNumber) .GT. OATempCompressorOff .and. &
-                OutdoorBinTemperature(BinNumber) .LE. OATempCompressorOn) THEN
+          ELSEIF (OutdoorBinTemperature(BinNum) .GT. OATempCompressorOff .and. &
+                  OutdoorBinTemperature(BinNum) .LE. OATempCompressorOn) THEN
             LowTempCutOutFactor = 0.5D0
           ELSE
             LowTempCutOutFactor = 1.0D0
@@ -1139,9 +1224,137 @@ SELECT CASE(DXCoilType_Num)
     HSPF = 0.0d0
   ENDIF
     ! Writes the HSPF value to the EIO file and standard tabular output tables
-  CALL ReportDXCoilRating( DXCoilType, DXCoilName, DXCoilType_Num, NetCoolingCapRated,      &
-                           SEER,SEER * ConvFromSIToIP,EER,EER * ConvFromSIToIP,IEER,IEER * ConvFromSIToIP, &
-                           NetHeatingCapRated, NetHeatingCapH3Test, HSPF,HSPF * ConvFromSIToIP, RegionNum)
+  CALL ReportDXCoilRating( DXCoilType, DXCoilName, DXCoilType_Num, NetCoolingCapRated(1),      &
+                           SEER * ConvFromSIToIP,EER,EER * ConvFromSIToIP,IEER * ConvFromSIToIP, &
+                           NetHeatingCapRated, NetHeatingCapH3Test, HSPF * ConvFromSIToIP, RegionNum)
+
+
+CASE (CoilDX_MultiSpeedCooling)  ! Coil:Cooling:DX:MultiSpeed,
+
+  NetCoolingCapRated = 0.0d0
+
+  DO spnum = 1, ns
+      CALL CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType_Num, &
+                                              CapFTempCurveIndex(spnum), CapFFlowCurveIndex(spnum), &
+                                              EIRFTempCurveIndex(spnum), EIRFFlowCurveIndex(spnum), &
+                                              PLFFPLRCurveIndex(spnum), &
+                                              CalcCapacity,CalcSEER,CalcEER,CalcIEER,CalcHSPF)
+      FanPowerPerEvapAirFlowRate(spnum)=0.0d0
+      IF( FanPowerPerEvapAirFlowRateFromInput(spnum) <= 0.0d0) THEN
+          FanPowerPerEvapAirFlowRate(spnum)=DefaultFanPowerPerEvapAirFlowRate
+      ELSE
+          FanPowerPerEvapAirFlowRate(spnum)=FanPowerPerEvapAirFlowRateFromInput(spnum)
+      ENDIF
+  END DO
+
+  ! Calculate the capacity and power for each speed
+  DO spnum = 1, ns
+      TotCapFlowModFac(spnum) = CurveValue(CapFFlowCurveIndex(spnum),AirMassFlowRatioRated)
+      TotCoolCapTestA2(spnum) = RatedTotalCapacity(spnum) &
+                              * CurveValue(CapFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                OutdoorCoilInletAirDrybulbTempTestA2) * TotCapFlowModFac(spnum) &
+                              - FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      TotCoolCapTestB2(spnum) = RatedTotalCapacity(spnum) &
+                              * CurveValue(CapFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                OutdoorCoilInletAirDrybulbTempTestB2) * TotCapFlowModFac(spnum) &
+                              - FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      TotCoolCapTestB1(spnum) = RatedTotalCapacity(spnum) &
+                              * CurveValue(CapFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                OutdoorCoilInletAirDrybulbTempTestB1) * TotCapFlowModFac(spnum) &
+                              - FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      TotCoolCapTestF1(spnum) = RatedTotalCapacity(spnum) &
+                              * CurveValue(CapFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                OutdoorCoilInletAirDrybulbTempTestF1) * TotCapFlowModFac(spnum) &
+                              - FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+
+      EIRFlowModFac(spnum) = CurveValue(EIRFFlowCurveIndex(spnum),AirMassFlowRatioRated)
+      OutdoorUnitPowerTestA2(spnum) = TotCoolCapTestA2(spnum) * EIRFlowModFac(spnum) &
+                                    * CurveValue(EIRFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                      OutdoorCoilInletAirDrybulbTempTestA2) / RatedCOP(spnum)  &
+                                    + FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      OutdoorUnitPowerTestB2(spnum) = TotCoolCapTestB2(spnum) * EIRFlowModFac(spnum) &
+                                    * CurveValue(EIRFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                      OutdoorCoilInletAirDrybulbTempTestB2) / RatedCOP(spnum)  &
+                                    + FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      OutdoorUnitPowerTestB1(spnum) = TotCoolCapTestB1(spnum) * EIRFlowModFac(spnum) &
+                                    * CurveValue(EIRFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                      OutdoorCoilInletAirDrybulbTempTestB1) / RatedCOP(spnum)  &
+                                    + FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+      OutdoorUnitPowerTestF1(spnum) = TotCoolCapTestF1(spnum) * EIRFlowModFac(spnum) &
+                                    * CurveValue(EIRFTempCurveIndex(spnum),IndoorCoilInletAirWetbulbTempRated, &
+                                      OutdoorCoilInletAirDrybulbTempTestF1) / RatedCOP(spnum)  &
+                                    + FanPowerPerEvapAirFlowRate(spnum) * RatedAirVolFlowRate(spnum)
+  END DO
+  ! Standard Rating cooling (net) capacity calculations:
+  NetCoolingCapRated(ns) = TotCoolCapTestA2(ns)
+
+  ! Calculate the SEER value based on contribution of each outdoor air bin temperature
+  DO BinNum = 1, NumOfOATempBins
+      BuildingCoolingLoad = (OutdoorBinTemperatureSEER(BinNum) - 18.3d0) / (35.0d0 - 18.3d0) &
+                          * (TotCoolCapTestA2(ns) / SizingFactor)
+      ! determine the speed number
+      CoolingCapacityMax = TotCoolCapTestB2(ns) &
+                         + ((TotCoolCapTestA2(ns) - TotCoolCapTestB2(ns)) &
+                         / (OutdoorCoilInletAirDrybulbTempTestA2 - OutdoorCoilInletAirDrybulbTempTestB2))  &
+                         * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestB2)
+      CoolingElecPowerMax = OutdoorUnitPowerTestB2(ns) &
+                          + ((OutdoorUnitPowerTestA2(ns) - OutdoorUnitPowerTestB2(ns)) &
+                          / (OutdoorCoilInletAirDrybulbTempTestA2 - OutdoorCoilInletAirDrybulbTempTestB2))  &
+                          * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestB2)
+      SpeedLoop: DO spnum = 1, ns-1
+
+        CoolingCapacityLS = TotCoolCapTestF1(spnum)   &
+                          + ((TotCoolCapTestB1(spnum) - TotCoolCapTestF1(spnum))  &
+                          / (OutdoorCoilInletAirDrybulbTempTestB1 - OutdoorCoilInletAirDrybulbTempTestF1))  &
+                          * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestF1)
+        CoolingElecPowerLS = OutdoorUnitPowerTestF1(spnum) &
+                           + ((OutdoorUnitPowerTestB1(spnum) - OutdoorUnitPowerTestF1(spnum)) &
+                           / (OutdoorCoilInletAirDrybulbTempTestB1 - OutdoorCoilInletAirDrybulbTempTestF1))  &
+                           * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestF1)
+        CoolingCapacityHS = TotCoolCapTestB2(spnum+1) &
+                          + ((TotCoolCapTestA2(spnum+1) - TotCoolCapTestB2(spnum+1)) &
+                          / (OutdoorCoilInletAirDrybulbTempTestA2 - OutdoorCoilInletAirDrybulbTempTestB2))  &
+                          * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestB2)
+        CoolingElecPowerHS = OutdoorUnitPowerTestB2(spnum+1) &
+                           + ((OutdoorUnitPowerTestA2(spnum+1) - OutdoorUnitPowerTestB2(spnum+1)) &
+                           / (OutdoorCoilInletAirDrybulbTempTestA2 - OutdoorCoilInletAirDrybulbTempTestB2))  &
+                           * (OutdoorBinTemperatureSEER(BinNum) - OutdoorCoilInletAirDrybulbTempTestB2)
+
+        IF (BuildingCoolingLoad .LE.  CoolingCapacityLS ) THEN
+            PartLoadRatio = MIN(1.0d0, BuildingCoolingLoad / CoolingCapacityLS)
+            NetTotCoolCapBinned = PartLoadRatio * CoolingCapacityLS
+            PartLoadFraction = 1.0d0 - CyclicDegradationCoeff * (1.0d0 - PartLoadRatio)
+            TotCoolElecPowerBinned = (PartLoadRatio/PartLoadFraction) * CoolingElecPowerLS
+            Exit SpeedLoop
+        ELSEIF ((BuildingCoolingLoad .GT. CoolingCapacityLS) .AND. &
+                (BuildingCoolingLoad .LT. CoolingCapacityHS)) THEN
+            ! cycle between speed "spnum" and "spnum + 1"
+            LoadFactor = MIN(1.0d0, (CoolingCapacityHS - BuildingCoolingLoad)/(CoolingCapacityHS - CoolingCapacityLS))
+            LoadFactor = MAX(0.0d0, LoadFactor)
+            NetTotCoolCapBinned = LoadFactor*CoolingCapacityLS + (1.0d0-LoadFactor)*CoolingCapacityHS
+            TotCoolElecPowerBinned = LoadFactor*CoolingElecPowerLS + (1.0d0-LoadFactor)*CoolingElecPowerHS
+            Exit SpeedLoop
+        ELSEIF (BuildingCoolingLoad .GE.  CoolingCapacityMax) THEN
+            NetTotCoolCapBinned = CoolingCapacityMax
+            TotCoolElecPowerBinned = CoolingElecPowerMax
+            Exit SpeedLoop
+        ENDIF
+      END DO SpeedLoop
+
+      NetCoolingCapWeighted = NetCoolingCapWeighted &
+                            + NetTotCoolCapBinned * CoolFracBinHoursAtOutdoorBinTemp(BinNum)
+      TotCoolingElecPowerWeighted = TotCoolingElecPowerWeighted &
+                                  + TotCoolElecPowerBinned * CoolFracBinHoursAtOutdoorBinTemp(BinNum)
+  END DO
+  IF ( TotCoolingElecPowerWeighted > 0.0d0 ) THEN
+      SEER = NetCoolingCapWeighted / TotCoolingElecPowerWeighted
+  ELSE
+      SEER = 0.0d0
+  ENDIF
+
+  ! Writes the SEER value to the EIO file and standard tabular output tables
+  CALL ReportDXCoilRating( DXCoilType, DXCoilName, DXCoilType_Num, NetCoolingCapRated(ns),      &
+                           SEER * ConvFromSIToIP, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0)
 
  CASE DEFAULT
     !... other DX Coil types will follow here
@@ -1207,7 +1420,7 @@ SUBROUTINE CalculateDXHeatingCoilCapacityAndEIR (RatedTotalCapacity, RatedCOP, C
                                                       ! when the standard tests are conducted on units that do not have an
                                                       ! indoor air circulting fan. Used if user doesn't enter a specific value.
 
-  REAL(r64), PARAMETER :: HeatingCoilInletAirDrybulbTempRated  = 21.11D0  ! Heating coil entering air dry-bulb temperature in 
+  REAL(r64), PARAMETER :: HeatingCoilInletAirDrybulbTempRated  = 21.11D0  ! Heating coil entering air dry-bulb temperature in
                                                                           ! degrees C (70F) Test H1, H2 and H3 (Std. AHRI 210/240)
   REAL(r64), PARAMETER :: HeatingCoilOutdoorUnitInletAirDrybulbTempRated = 8.33D0  ! Outdoor air dry-bulb temp in degrees C (47F)
                                                                                    ! Test H1 (Std. AHRI 210/240)
@@ -1317,8 +1530,8 @@ SUBROUTINE CalculateDXHeatingCoilCapacityAndEIR (RatedTotalCapacity, RatedCOP, C
 RETURN
 END SUBROUTINE CalculateDXHeatingCoilCapacityAndEIR
 
-SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValueSI,SEERValueIP,EERValueSI,EERValueIP, &
-                              IEERValueSI,IEERValueIP,HighHeatingCapVal, LowHeatingCapVal, HSPFValueSI,HSPFValueIP, RegionNum)
+SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValueIP,EERValueSI,EERValueIP, &
+                              IEERValueIP,HighHeatingCapVal, LowHeatingCapVal, HSPFValueIP, RegionNum)
 
     ! SUBROUTINE INFORMATION:
     !       AUTHOR         Bereket Nigusse, Chandan Sharma
@@ -1328,7 +1541,7 @@ SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValu
     !       RE-ENGINEERED  na
 
     ! PURPOSE OF THIS SUBROUTINE:
-    ! This subroutine writes the standard rating (net) cooling capacity, SEER, EER and IEER values in SI and IP units to
+    ! This subroutine writes the standard rating (net) cooling capacity, SEER, EER and IEER values to
     ! the "eio" and tabular output files for Single Speed compressor DX Cooling Coils.
 
     ! METHODOLOGY EMPLOYED:
@@ -1342,7 +1555,7 @@ SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValu
     USE DataGlobals, ONLY : OutputFileInits
     USE General, ONLY: RoundSigDigits
     USE OutputReportPredefined
-    USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical
+    USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical, CoilDX_MultiSpeedCooling
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1350,20 +1563,17 @@ SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValu
     CHARACTER(len=*), INTENT(IN) :: CompType     ! Type of component
     CHARACTER(len=*), INTENT(IN) :: CompName     ! Name of component
     INTEGER, INTENT(IN)          :: CompTypeNum  ! TypeNum of component
-    REAL(r64), INTENT(IN)        :: SEERValueSI  ! SEER value in SI units {W/W}
     REAL(r64), INTENT(IN)        :: SEERValueIP  ! SEER value in IP units {Btu/W-h}
     REAL(r64), INTENT(IN)        :: CoolCapVal   ! Standard total (net) cooling capacity for AHRI Std. 210/240 {W}
                                                  !   or ANSI/AHRI Std. 340/360 {W}
     REAL(r64), INTENT(IN)        :: EERValueSI   ! EER value in SI units {W/W}
     REAL(r64), INTENT(IN)        :: EERValueIP   ! EER value in IP units {Btu/W-h}
-    REAL(r64), INTENT(IN)        :: IEERValueSI  ! IEER value in SI units {W/W}
     REAL(r64), INTENT(IN)        :: IEERValueIP  ! IEER value in IP units {Btu/W-h}
 
     REAL(r64), INTENT(IN)        :: HighHeatingCapVal   ! High Temperature Heating Standard (Net) Rating Capacity
                                                         ! for AHRI Std. 210/240 {W}
     REAL(r64), INTENT(IN)        :: LowHeatingCapVal    ! Low Temperature Heating Standard (Net) Rating Capacity
                                                         ! for AHRI Std. 210/240 {W}
-    REAL(r64), INTENT(IN)        :: HSPFValueSI  ! IEER value in SI units {W/W}
     REAL(r64), INTENT(IN)        :: HSPFValueIP  ! IEER value in IP units {Btu/W-h}
     INTEGER, INTENT(IN)          :: RegionNum    ! Region Number for which HSPF is calculated
 
@@ -1389,23 +1599,21 @@ SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValu
         END IF
 
         WRITE (OutputFileInits, 991) TRIM(CompType), TRIM(CompName),TRIM(RoundSigDigits(CoolCapVal,1)),  &
-                                     TRIM(RoundSigDigits(SEERValueSI,2)),TRIM(RoundSigDigits(SEERValueIP,2)), &
-                                     TRIM(RoundSigDigits(EERValueSI,2)),TRIM(RoundSigDigits(EERValueIP,2)),   &
-                                     TRIM(RoundSigDigits(IEERValueSI,2)),TRIM(RoundSigDigits(IEERValueIP,2))
+                                     TRIM(RoundSigDigits(EERValueSI,2)),TRIM(RoundSigDigits(EERValueIP,2)), &
+                                     TRIM(RoundSigDigits(SEERValueIP,2)), TRIM(RoundSigDigits(IEERValueIP,2))
 
-        CALL PreDefTableEntry(pdchDXCoolCoilType,TRIM(CompName),TRIM(CompType))
-        CALL PreDefTableEntry(pdchDXCoolCoilNetCap,TRIM(CompName),CoolCapVal,1)
-        CALL PreDefTableEntry(pdchDXCoolCoilSEERSI,TRIM(CompName),TRIM(RoundSigDigits(SEERValueSI,2)))
-        CALL PreDefTableEntry(pdchDXCoolCoilSEERIP,TRIM(CompName),TRIM(RoundSigDigits(SEERValueIP,2)))
-        CALL PreDefTableEntry(pdchDXCoolCoilEERSI,TRIM(CompName),TRIM(RoundSigDigits(EERValueSI,2)))
-        CALL PreDefTableEntry(pdchDXCoolCoilEERIP,TRIM(CompName),TRIM(RoundSigDigits(EERValueIP,2)))
-        CALL PreDefTableEntry(pdchDXCoolCoilIEERSI,TRIM(CompName),TRIM(RoundSigDigits(IEERValueSI,2)))
-        CALL PreDefTableEntry(pdchDXCoolCoilIEERIP,TRIM(CompName),TRIM(RoundSigDigits(IEERValueIP,2)))
+        CALL PreDefTableEntry(pdchDXCoolCoilType,    TRIM(CompName),TRIM(CompType))
+        CALL PreDefTableEntry(pdchDXCoolCoilNetCapSI,TRIM(CompName),CoolCapVal,1)
+        CALL PreDefTableEntry(pdchDXCoolCoilCOP,     TRIM(CompName),TRIM(RoundSigDigits(EERValueSI,2)))
+        CALL PreDefTableEntry(pdchDXCoolCoilEERIP,   TRIM(CompName),TRIM(RoundSigDigits(EERValueIP,2)))
+        CALL PreDefTableEntry(pdchDXCoolCoilSEERIP,  TRIM(CompName),TRIM(RoundSigDigits(SEERValueIP,2)))
+        CALL PreDefTableEntry(pdchDXCoolCoilIEERIP,  TRIM(CompName),TRIM(RoundSigDigits(IEERValueIP,2)))
+        CALL addFootNoteSubTable(pdstDXCoolCoil,   'ANSI/AHRI ratings include supply fan')
 
         990 FORMAT('! <DX Cooling Coil Standard Rating Information>, Component Type, Component Name, ',    &
-            'Standard Rating (Net) Cooling Capacity {W}, ', 'SEER in SI Units {W/W}, ', 'SEER in IP Units {Btu/W-h}, ', &
-            'EER in SI Units {W/W}, ', 'EER in IP Units {Btu/W-h}, ','IEER in SI Units {W/W}, ', 'IEER in IP Units {Btu/W-h}')
-        991 FORMAT(' DX Cooling Coil Standard Rating Information, ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A)
+            'Standard Rating (Net) Cooling Capacity {W}, ', 'Standard Rated Net COP {W/W}, ', &
+            'EER {Btu/W-h}, ', 'SEER {Btu/W-h}, ', 'IEER {Btu/W-h}')
+        991 FORMAT(' DX Cooling Coil Standard Rating Information, ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A)
 
       CASE (CoilDX_HeatingEmpirical)
         IF (MyHeatOneTimeFlag) THEN
@@ -1415,20 +1623,38 @@ SUBROUTINE ReportDXCoilRating(CompType,CompName,CompTypeNum, CoolCapVal,SEERValu
 
         WRITE (OutputFileInits, 993) TRIM(CompType), TRIM(CompName), TRIM(RoundSigDigits(HighHeatingCapVal,1)),  &
                                      TRIM(RoundSigDigits(LowHeatingCapVal,1)), &
-                                     TRIM(RoundSigDigits(HSPFValueSI,2)),TRIM(RoundSigDigits(HSPFValueIP,2)), &
+                                     TRIM(RoundSigDigits(HSPFValueIP,2)), &
                                      TRIM(RoundSigDigits(RegionNum))
 
         CALL PreDefTableEntry(pdchDXHeatCoilType,TRIM(CompName),TRIM(CompType))
         CALL PreDefTableEntry(pdchDXHeatCoilHighCap,TRIM(CompName),HighHeatingCapVal,1)
         CALL PreDefTableEntry(pdchDXHeatCoilLowCap,TRIM(CompName),LowHeatingCapVal,1)
-        CALL PreDefTableEntry(pdchDXHeatCoilHSPFSI,TRIM(CompName),TRIM(RoundSigDigits(HSPFValueSI,2)))
         CALL PreDefTableEntry(pdchDXHeatCoilHSPFIP,TRIM(CompName),TRIM(RoundSigDigits(HSPFValueIP,2)))
         CALL PreDefTableEntry(pdchDXHeatCoilRegionNum,TRIM(CompName),TRIM(RoundSigDigits(RegionNum)))
+        CALL addFootNoteSubTable(pdstDXHeatCoil,   'ANSI/AHRI ratings include supply fan')
 
         992 FORMAT('! <DX Heating Coil Standard Rating Information>, Component Type, Component Name, ',    &
-            'High Temperature Heating (net) Rating Capacity {W}, ', 'Low Temperature Heating (net) Rating Capacity {W} ', &
-            'HSPF in SI Units {W/W}, ', 'HSPF in IP Units {Btu/W-h}', 'Region Number')
-        993 FORMAT(' DX Heating Coil Standard Rating Information, ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A)
+            'High Temperature Heating (net) Rating Capacity {W}, ', 'Low Temperature Heating (net) Rating Capacity {W}, ', &
+            'HSPF {Btu/W-h}, ', 'Region Number')
+        993 FORMAT(' DX Heating Coil Standard Rating Information, ',A,', ',A,', ',A,', ',A,', ',A,', ',A)
+
+      CASE (CoilDX_MultiSpeedCooling)
+        IF (MyCoolOneTimeFlag) THEN
+            WRITE(OutputFileInits, 994)
+            MyCoolOneTimeFlag = .FALSE.
+        END IF
+
+        WRITE (OutputFileInits, 995) TRIM(CompType), TRIM(CompName),TRIM(RoundSigDigits(CoolCapVal,1)),  &
+                                     ' ', ' ', TRIM(RoundSigDigits(SEERValueIP,2)), ' '
+
+        CALL PreDefTableEntry(pdchDXCoolCoilType,TRIM(CompName),TRIM(CompType))
+        CALL PreDefTableEntry(pdchDXCoolCoilNetCapSI,TRIM(CompName),CoolCapVal,1)
+        CALL PreDefTableEntry(pdchDXCoolCoilSEERIP,TRIM(CompName),TRIM(RoundSigDigits(SEERValueIP,2)))
+
+        994 FORMAT('! <DX Cooling Coil Standard Rating Information>, Component Type, Component Name, ',    &
+            'Standard Rating (Net) Cooling Capacity {W}, ', 'Standard Rated Net COP {W/W}, ', &
+            'EER {Btu/W-h}, ', 'SEER {Btu/W-h}, ', 'IEER {Btu/W-h}')
+        995 FORMAT(' DX Cooling Coil Standard Rating Information, ',A,', ',A,', ',A,', ',A,', ',A,', ',A,', ',A)
 
       CASE DEFAULT
     END SELECT
@@ -1459,7 +1685,7 @@ SUBROUTINE CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType
           ! USE STATEMENTS:
   USE CurveManager, ONLY: CurveValue, GetCurveMinMaxValues, GetCurveIndex, GetCurveType, GetCurveName
   USE DataGlobals,    ONLY: DisplayExtraWarnings
-  USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical
+  USE DataHVACGlobals, ONLY: CoilDX_CoolingSingleSpeed, CoilDX_HeatingEmpirical, CoilDX_MultiSpeedCooling
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1484,7 +1710,10 @@ SUBROUTINE CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType
                                                 !    (Rated Capacity Std. AHRI 210/240 & AHRI 340/360)
   REAL(r64), PARAMETER :: EAWetBulbTemp=19.44d0 ! Cooling coil entering air wet-bulb temperature in degrees C (67F) Tests A and B
                                                 !    (Std. AHRI 210/240 & AHRI 340/360)
+                                                ! 19.44C (67F)  Tests A2, B2, B1, and F1  (Multi speed DX Coil)
   REAL(r64), PARAMETER :: OAMidDBTemp=27.78d0   ! Outdoor air dry-bulb temp in degrees C (82F) Test B
+                                                !    (For SEER Std. AHRI 210/240)
+  REAL(r64), PARAMETER :: OALowDBTempMS=19.44d0 ! Outdoor air dry-bulb temp in degrees C (67F) Test F1
                                                 !    (For SEER Std. AHRI 210/240)
   REAL(r64), PARAMETER :: PLRforSEER = 0.50d0   ! Cooilng coil part-load ratio (For SEER Std. AHRI 210/240)
   REAL(r64), PARAMETER :: NominalFlowFraction = 1.0d0  ! Cooling coil flow fraction (fraction of rated flow rate)
@@ -1497,6 +1726,13 @@ SUBROUTINE CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType
                                                      !    (Std. AHRI 210/240)
   REAL(r64), PARAMETER :: HeatingIDTemp = 21.11d0    ! Heating coil entering air dry-bulb temperature in degrees C (70F)
                                                      ! Test H1, H2 and H3   (Std. AHRI 210/240)
+
+  REAL(r64), PARAMETER :: OutdoorCoilInletAirDrybulbTempRated  = 35.0d0   ! 35.00C (95F)  Tests A2, B2, B1, and F1
+  REAL(r64), PARAMETER :: OutdoorCoilInletAirDrybulbTempTestA2 = 35.0d0   ! 35.00C (95F)  Test A2 (high speed)
+  REAL(r64), PARAMETER :: OutdoorCoilInletAirDrybulbTempTestB2 = 27.78d0  ! 27.78C (82F)  Test B2 (high speed)
+  REAL(r64), PARAMETER :: OutdoorCoilInletAirDrybulbTempTestB1 = 27.78d0  ! 27.78C (82F)  Test B1 (Low speed)
+  REAL(r64), PARAMETER :: OutdoorCoilInletAirDrybulbTempTestF1 = 19.44d0  ! 19.44C (67F)  Test F1 (Low speed)
+
   CHARACTER(len=*), PARAMETER :: RoutineName='CheckCurveLimitsForStandardRatings: ' ! Include trailing blank space
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -1550,6 +1786,8 @@ SUBROUTINE CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType
 
   LOGICAL :: CapCurveMidOATLimitsExceeded = .FALSE.  ! Logical for capacity curve temperature limits being exceeded (mid temp)
   LOGICAL :: EIRCurveMidOATLimitsExceeded = .FALSE.  ! Logical for EIR curve temperature limits being exceeded (mid temp)
+  LOGICAL :: CapCurveLowOATLimitsExceeded = .FALSE.  ! Logical for capacity curve temperature limits being exceeded (low temp)
+  LOGICAL :: EIRCurveLowOATLimitsExceeded = .FALSE.  ! Logical for EIR curve temperature limits being exceeded (Low temp)
   LOGICAL :: PLFfPLRforSEERLimitsExceeded = .FALSE.  ! Logical for PLF function of PLR limits being exceeded
 
   LOGICAL :: CapCurveIEERLimitsExceeded = .FALSE.  ! Logical for capacity curve temperature limits being exceeded (IEER calcs)
@@ -1809,6 +2047,113 @@ SUBROUTINE CheckCurveLimitsForStandardRatings(DXCoilName, DXCoilType, DXCoilType
       ELSE
         CalcHSPF = .TRUE.
       ENDIF
+
+!   MultiSpeed DX Coil Net Cooling Capacity and SEER:
+    CASE (CoilDX_MultiSpeedCooling)
+      CALL GetCurveMinMaxValues(CapFTempCurveIndex,CapacityWBTempMin,CapacityWBTempMax,CapacityDBTempMin,CapacityDBTempMax)
+      CALL GetCurveMinMaxValues(EIRFTempCurveIndex,EIRWBTempMin,EIRWBTempMax,EIRDBTempMin,EIRDBTempMax)
+      CALL GetCurveMinMaxValues(CapFFlowCurveIndex,CapacityFlowRatioMin,CapacityFlowRatioMax)
+      CALL GetCurveMinMaxValues(EIRFFlowCurveIndex,EIRFlowRatioMin,EIRFlowRatioMax)
+      CALL GetCurveMinMaxValues(PLFFPLRCurveIndex,PLFFPLRMin,PLFFPLRMax)
+
+      ! Checking the limits of capacity modifying curve for temperatures
+      IF ( CapacityDBTempMax < OAHighDBTemp .OR. CapacityDBTempMin > OAHighDBTemp  .OR.                    &
+           CapacityWBTempMax < EAWetBulbTemp .OR. CapacityWBTempMin > EAWetBulbTemp ) THEN
+           CapCurveHighOATLimitsExceeded = .TRUE.
+      END IF
+      ! Checking the limits of capacity modifying curve for flow fraction
+      IF ( CapacityFlowRatioMax < NominalFlowFraction .OR. CapacityFlowRatioMin > NominalFlowFraction ) THEN
+           CapCurveFlowLimitsExceeded = .TRUE.
+      END IF
+      ! Checking the limits of EIR modifying curve for temperatures
+      IF ( EIRDBTempMax < OAHighDBTemp .OR. EIRDBTempMin > OAHighDBTemp .OR.                               &
+           EIRWBTempMax < EAWetBulbTemp .OR. EIRWBTempMin > EAWetBulbTemp ) THEN
+           EIRCurveHighOATLimitsExceeded = .TRUE.
+      END IF
+      ! Checking the limits of EIR modifying curve for flow fraction
+      IF ( EIRFlowRatioMax < NominalFlowFraction .OR. EIRFlowRatioMin > NominalFlowFraction ) THEN
+           EIRCurveFlowLimitsExceeded = .TRUE.
+      END IF
+      ! Checking the limits of capacity modifying curve for temperatures (SEER calculation)
+      IF ( CapacityDBTempMax < OALowDBTempMS .OR. CapacityDBTempMin > OALowDBTempMS  .OR.                      &
+           CapacityWBTempMax < EAWetBulbTemp .OR. CapacityWBTempMin > EAWetBulbTemp ) THEN
+           CapCurveLowOATLimitsExceeded = .TRUE.
+      END IF
+      ! Checking the limits of EIR modifying curve for temperatures (SEER calculation)
+      IF ( EIRDBTempMax < OALowDBTempMS .OR. EIRDBTempMin > OALowDBTempMS .OR.                                 &
+           EIRWBTempMax < EAWetBulbTemp .OR. EIRWBTempMin > EAWetBulbTemp ) THEN
+           EIRCurveLowOATLimitsExceeded = .TRUE.
+      END IF
+
+      IF ( CapCurveHighOATLimitsExceeded .OR. CapCurveFlowLimitsExceeded .OR. EIRCurveHighOATLimitsExceeded .OR.  &
+           EIRCurveFlowLimitsExceeded .OR. CapCurveLowOATLimitsExceeded .OR. EIRCurveLowOATLimitsExceeded ) THEN
+
+           CALL ShowWarningError('The Standard Ratings is calculated for '//TRIM(DXCoilType)//' = '// &
+                                 TRIM(DXCoilName)//' but not at the AHRI test condition due to curve out of bound.')
+           CALL ShowContinueError(' Review the Standard Ratings calculations in the Engineering Reference for this coil type.'// &
+                                  ' Also, use Output:Diagnostics, DisplayExtraWarnings for further guidance.')
+
+           IF (DisplayExtraWarnings) THEN
+            CALL ShowContinueError(RoutineName//'The max and/or min limits specified in the corresponding curve objects did not')
+            CALL ShowContinueError(' allow the curves to be evaluated at the AHRI test conditions required to calculate one or'// &
+                                   ' more of the Standard Rating values.')
+           END IF
+
+           ! For Standard Rating Cooling Capacity:
+           IF (CapCurveHighOATLimitsExceeded .OR. CapCurveFlowLimitsExceeded) THEN
+               IF (DisplayExtraWarnings) THEN
+                   CALL ShowContinueError(TRIM(DXCoilType)//'='//TRIM(DXCoilName)//': '// &
+                            ' The Standard Rating Cooling Capacity calculated is not at the AHRI test condition.')
+                   IF (CapCurveHighOATLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Total Cooling Capacity Function of Temperature Curve, '  &
+                            //'Curve Type = '//TRIM(GetCurveType(CapFTempCurveIndex))//', Curve Name = '    &
+                            //TRIM(GetCurveName(CapFTempCurveIndex)))
+                   END IF
+                   IF (CapCurveFlowLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Total Cooling Capacity Function of Flow Fraction Curve, ' &
+                            //'Curve Type = '//TRIM(GetCurveType(CapFTempCurveIndex))//', Curve Name = '     &
+                            //TRIM(GetCurveName(CapFFlowCurveIndex)))
+                   END IF
+               END IF
+               CalcCapacity = .FALSE.
+           ELSE
+               CalcCapacity = .TRUE.
+           END IF
+
+           ! For MultiSpeed DX Coil SEER:
+
+           IF ( CapCurveLowOATLimitsExceeded .OR. EIRCurveLowOATLimitsExceeded .OR. CapCurveFlowLimitsExceeded  &
+                .OR. EIRCurveFlowLimitsExceeded ) THEN
+               IF (DisplayExtraWarnings) THEN
+                   CALL ShowContinueError(TRIM(DXCoilType)//'='//TRIM(DXCoilName)//': '// &
+                             ' The Seasonal Energy Efficiency Ratio (SEER) calculated is not at the AHRI test condition.')
+                   IF (CapCurveLowOATLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Total Cooling Capacity Function of Temperature Curve, '  &
+                              //'Curve Type = '//TRIM(GetCurveType(CapFTempCurveIndex))//', Curve Name = '  &
+                              //TRIM(GetCurveName(CapFTempCurveIndex)))
+                   END IF
+                   IF (CapCurveFlowLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Total Cooling Capacity Function of Flow Fraction Curve, ' &
+                            //'Curve Type = '//TRIM(GetCurveType(CapFTempCurveIndex))//', Curve Name = '     &
+                            //TRIM(GetCurveName(CapFFlowCurveIndex)))
+                   END IF
+                   IF (EIRCurveLowOATLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Energy Input Ratio Function of Temperature Curve, '  &
+                            //'Curve Type = '//TRIM(GetCurveType(EIRFTempCurveIndex))     &
+                            //', Curve Name = '//TRIM(GetCurveName(EIRFTempCurveIndex)))
+                   END IF
+                   IF (EIRCurveFlowLimitsExceeded) THEN
+                       CALL ShowContinueError(' Check limits in Energy Input Ratio Function of Flow Fraction Curve, ' &
+                            //'Curve Type = '//TRIM(GetCurveType(EIRFFlowCurveIndex))      &
+                            //', Curve Name = '//TRIM(GetCurveName(EIRFFlowCurveIndex)))
+                   END IF
+               END IF
+               CalcSEER = .FALSE.
+           ELSE
+               CalcSEER = .TRUE.
+           END IF
+
+      END IF  ! End of curve error messages
 
     CASE DEFAULT
   END SELECT

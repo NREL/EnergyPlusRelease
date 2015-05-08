@@ -379,7 +379,7 @@ SUBROUTINE ManageElectricLoadCenters(FirstHVACIteration,SimElecCircuits, UpdateM
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
   USE General,         ONLY: TrimSigDigits
   USE DataGlobals,     ONLY: dooutputreporting, MetersHaveBeenInitialized, warmupflag, &
-                             doingsizing, currenttime
+                             doingsizing, currenttime, BeginEnvrnFlag
   USE DataEnvironment, ONLY: Month, DayOfMonth
   USE DataHVACGlobals, only: SysTimeElapsed
 
@@ -418,6 +418,7 @@ SUBROUTINE ManageElectricLoadCenters(FirstHVACIteration,SimElecCircuits, UpdateM
   REAL(r64), external    :: GetInstantMeterValue
   REAL(r64), external    :: GetCurrentMeterValue
   CHARACTER(len=MaxNameLength), external :: GetMeterResourceType
+  LOGICAL, SAVE :: MyEnvrnFlag=.true.
 
   REAL(r64)         :: ElectricProdRate = 0.0d0    ! Electric Power Production Rate of Generators
   REAL(r64)         :: ThermalProdRate = 0.0d0     ! Thermal Power Production Rate of Generators
@@ -465,9 +466,73 @@ SUBROUTINE ManageElectricLoadCenters(FirstHVACIteration,SimElecCircuits, UpdateM
 
     MyOneTimeFlag = .FALSE.
 
-
-
   END IF
+
+  IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
+    WholeBldgElectSummary%ElectricityProd      = 0.d0
+    WholeBldgElectSummary%ElectProdRate        = 0.d0
+    WholeBldgElectSummary%ElectricityPurch     = 0.d0
+    WholeBldgElectSummary%ElectPurchRate       = 0.d0
+    WholeBldgElectSummary%ElectSurplusRate     = 0.d0
+    WholeBldgElectSummary%ElectricitySurplus   = 0.d0
+    WholeBldgElectSummary%ElectricityNetRate   = 0.d0
+    WholeBldgElectSummary%ElectricityNet       = 0.d0
+    WholeBldgElectSummary%TotalBldgElecDemand  = 0.d0
+    WholeBldgElectSummary%TotalHVACElecDemand  = 0.d0
+    WholeBldgElectSummary%TotalElectricDemand  = 0.d0
+    WholeBldgElectSummary%ElecProducedPVRate   = 0.d0
+    WholeBldgElectSummary%ElecProducedWTRate   = 0.d0
+
+    IF (NumLoadCenters > 0) THEN
+      ElecLoadCenter%DCElectricityProd           = 0.d0
+      ElecLoadCenter%DCElectProdRate             = 0.d0
+      ElecLoadCenter%DCpowerConditionLosses      = 0.d0
+      ElecLoadCenter%ElectricityProd             = 0.d0
+      ElecLoadCenter%ElectProdRate               = 0.d0
+      ElecLoadCenter%ThermalProd                 = 0.d0
+      ElecLoadCenter%ThermalProdRate             = 0.d0
+      ElecLoadCenter%TotalPowerRequest           = 0.d0
+      ElecLoadCenter%TotalThermalPowerRequest    = 0.d0
+      ElecLoadCenter%ElectDemand                 = 0.d0
+    ENDIF
+
+    DO LoadCenterNum = 1, NumLoadCenters
+      IF (ElecLoadCenter(LoadCenterNum)%NumGenerators == 0) CYCLE
+      ElecLoadCenter(LoadCenterNum)%ElecGen%ONThisTimestep      = .FALSE.
+      ElecLoadCenter(LoadCenterNum)%ElecGen%DCElectricityProd   = 0.d0
+      ElecLoadCenter(LoadCenterNum)%ElecGen%DCElectProdRate     = 0.d0
+      ElecLoadCenter(LoadCenterNum)%ElecGen%ElectricityProd     = 0.d0
+      ElecLoadCenter(LoadCenterNum)%ElecGen%ElectProdRate       = 0.d0
+      ElecLoadCenter(LoadCenterNum)%ElecGen%ThermalProd         = 0.d0
+      ElecLoadCenter(LoadCenterNum)%ElecGen%ThermalProdRate     = 0.d0
+    ENDDO
+
+    IF (NumInverters > 0) THEN
+      Inverter%AncillACuseRate                   = 0.d0
+      Inverter%AncillACuseEnergy                 = 0.d0
+      Inverter%QdotconvZone                      = 0.d0
+      Inverter%QdotRadZone                       = 0.d0
+    ENDIF
+
+    IF (NumElecStorageDevices > 0) THEN
+      ElecStorage%PelNeedFromStorage             = 0.d0
+      ElecStorage%PelFromStorage                 = 0.d0
+      ElecStorage%PelIntoStorage                 = 0.d0
+      ElecStorage%QdotConvZone                   = 0.d0
+      ElecStorage%QdotRadZone                    = 0.d0
+      ElecStorage%TimeElapsed                    = 0.d0
+      ElecStorage%ElectEnergyinStorage           = 0.d0
+      ElecStorage%StoredPower                    = 0.d0
+      ElecStorage%StoredEnergy                   = 0.d0
+      ElecStorage%DecrementedEnergyStored        = 0.d0
+      ElecStorage%DrawnPower                     = 0.d0
+      ElecStorage%DrawnEnergy                    = 0.d0
+      ElecStorage%ThermLossRate                  = 0.d0
+      ElecStorage%ThermLossEnergy                = 0.d0
+    ENDIF
+    MyEnvrnFlag=.false.
+  ENDIF
+  IF (.not. BeginEnvrnFlag) MyEnvrnFlag=.TRUE.
 
  ! Determine the demand from the simulation for Demand Limit and Track Electrical and Reporting
   ElecFacilityBldg=GetInstantMeterValue(ElecFacilityIndex,1)
@@ -1099,7 +1164,7 @@ SUBROUTINE GetPowerManagerInput
                              IntGainTypeOf_ElectricLoadCenterStorageBattery, &
                              IntGainTypeOf_ElectricLoadCenterTransformer
   USE DataGlobals    , ONLY: NumOfZones, AnyEnergyManagementSystemInModel
-  USE DataInterfaces 
+  USE DataInterfaces
   USE General,         ONLY: RoundSigDigits
 
 
@@ -1608,10 +1673,10 @@ SUBROUTINE GetPowerManagerInput
           CALL SetupEMSActuator('Electrical Storage', ElecStorage(StorNum)%Name, 'Power Charge Rate' , '[W]', &
                      ElecStorage(StorNum)%EMSOverridePelIntoStorage, ElecStorage(StorNum)%EMSValuePelIntoStorage )
         ENDIF
-        
+
         IF (ElecStorage(StorNum)%ZoneNum > 0) THEN
           SELECT CASE (ElecStorage(StorNum)%StorageModelMode)
-          
+
           CASE (SimpleBucketStorage)
             CALL SetupZoneInternalGain(ElecStorage(StorNum)%ZoneNum, &
                      'ElectricLoadCenter:Storage:Simple',  &
@@ -1628,7 +1693,7 @@ SUBROUTINE GetPowerManagerInput
                      ThermalRadiationGainRate = ElecStorage(StorNum)%QdotRadZone)
           END SELECT
         ENDIF
-        
+
      ENDDO
 
   ENDIF !any storage at all
@@ -1803,7 +1868,7 @@ SUBROUTINE GetPowerManagerInput
       CALL SetupOutputVariable('Energy Produced for Cogeneration Transformer [J]', &
            Transformer(TransfNum)%ElecProducedCoGen, 'System', 'Sum', Transformer(TransfNum)%Name ,&
            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='System')
-           
+
       IF (Transformer(TransfNum)%ZoneNum > 0) THEN
         CALL SetupZoneInternalGain(Transformer(TransfNum)%ZoneNum, &
                      'ElectricLoadCenter:Transformer',  &
@@ -1812,8 +1877,8 @@ SUBROUTINE GetPowerManagerInput
                      ConvectionGainRate    =    Transformer(TransfNum)%QdotconvZone, &
                      ThermalRadiationGainRate = Transformer(TransfNum)%QdotRadZone)
       ENDIF
-           
-           
+
+
     ENDDO ! End loop for get transformer inputs
   ENDIF
 
@@ -3042,6 +3107,22 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
     IF(ElecStorage(ElecStorNum)%StorageModelMode == SimpleBucketStorage) THEN
        ElecStorage(ElecStorNum)%LastTimeStepStateOfCharge = ElecStorage(ElecStorNum)%StartingEnergyStored
        ElecStorage(ElecStorNum)%ThisTimeStepStateOfCharge = ElecStorage(ElecStorNum)%StartingEnergyStored
+       ElecStorage(ElecStorNum)%PelNeedFromStorage        = 0.d0
+       ElecStorage(ElecStorNum)%PelFromStorage            = 0.d0
+       ElecStorage(ElecStorNum)%PelIntoStorage            = 0.d0
+       ElecStorage(ElecStorNum)%QdotConvZone              = 0.d0
+       ElecStorage(ElecStorNum)%QdotRadZone               = 0.d0
+       ElecStorage(ElecStorNum)%TimeElapsed               = 0.d0
+       ElecStorage(ElecStorNum)%ElectEnergyinStorage      = 0.d0
+       ElecStorage(ElecStorNum)%StoredPower               = 0.d0
+       ElecStorage(ElecStorNum)%StoredEnergy              = 0.d0
+       ElecStorage(ElecStorNum)%DecrementedEnergyStored   = 0.d0
+       ElecStorage(ElecStorNum)%DrawnPower                = 0.d0
+       ElecStorage(ElecStorNum)%DrawnEnergy               = 0.d0
+       ElecStorage(ElecStorNum)%ThermLossRate             = 0.d0
+       ElecStorage(ElecStorNum)%ThermLossEnergy           = 0.d0
+
+
     ELSEIF(ElecStorage(ElecStorNum)%StorageModelMode == KiBaMBattery) THEN
        initialCharge = Elecstorage(ElecStorNum)%MaxAhCapacity * Elecstorage(ElecStorNum)%StartingSOC
        Elecstorage(ElecStorNum)%LastTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac

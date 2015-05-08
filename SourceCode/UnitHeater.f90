@@ -103,8 +103,7 @@ TYPE UnitHeaterData
   REAL(r64)                    :: ElecPower          =0.0 !
   REAL(r64)                    :: ElecEnergy         =0.0 !
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
-  LOGICAL                      :: AvailManagerListFound = .FALSE. ! True if availability manager list name is specified
-                                                                  ! for unit heater object
+  INTEGER                      :: AvailStatus          = 0
   LOGICAL                      :: FanControlTypeOnOff = .FALSE.   ! True when FanControlType is OnOffCtrl
 END TYPE UnitHeaterData
 
@@ -147,9 +146,9 @@ SUBROUTINE SimUnitHeater(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOutputP
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList
-  USE DataSizing, ONLY: ZoneHeatingOnlyFan
-  USE General, ONLY: TrimSigDigits
+  USE InputProcessor,      ONLY: FindItemInList
+  USE DataSizing,          ONLY: ZoneHeatingOnlyFan
+  USE General,             ONLY: TrimSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -250,13 +249,12 @@ SUBROUTINE GetUnitHeaterInput
   USE Fans,         ONLY: GetFanType, GetFanOutletNode, GetFanIndex, GetFanVolFlow, GetFanAvailSchPtr
   USE WaterCoils,   ONLY: GetCoilWaterInletNode
   USE SteamCoils,   ONLY: GetSteamCoilSteamInletNode=>GetCoilSteamInletNode, GetSteamCoilIndex
-  USE SystemAvailabilityManager, ONLY: GetZOneEqAvailabilityManager
   USE DataZoneEquipment,         ONLY: UnitHeater_Num, ZoneEquipConfig
   USE DataSizing,                ONLY: AutoSize
   USE General,                   ONLY: TrimSigDigits
   USE DataHVACGlobals,           ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, ZoneComp
   USE DataGlobals,               ONLY: NumOfZones
-  USE DataPlant,        ONLY : TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
+  USE DataPlant,                 ONLY : TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -493,15 +491,7 @@ SUBROUTINE GetUnitHeaterInput
 
     IF (.NOT. lAlphaBlanks(10)) THEN
       UnitHeat(UnitHeatNum)%AvailManagerListName = Alphas(10)
-      ErrFlag = .FALSE.
-      CALL GetZoneEqAvailabilityManager(UnitHeat(UnitHeatNum)%AvailManagerListName,ErrFlag,UnitHeater_Num,   &
-         UnitHeatNum, NumOfUnitHeats)
-      IF (ErrFlag) THEN
-        CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = '//TRIM(UnitHeat(UnitHeatNum)%Name))
-        ErrorsFound=.TRUE.
-      ELSE
-        UnitHeat(UnitHeatNum)%AvailManagerListFound = .TRUE.
-      ENDIF
+      ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailManagerListName  = Alphas(10)
     ENDIF
 
     ! check that unit heater air inlet node must be the same as a zone exhaust node
@@ -573,11 +563,8 @@ SUBROUTINE GetUnitHeaterInput
           ! Note that the unit heater fan electric is NOT metered because this value is already metered through the fan component
     CALL SetupOutputVariable('Unit Heater Fan Electric Consumption[J]',UnitHeat(UnitHeatNum)%ElecEnergy, &
                              'System','Sum',UnitHeat(UnitHeatNum)%Name)
-    IF (UnitHeat(UnitHeatNum)%AvailManagerListFound) THEN
-      CALL SetupOutputVariable('Unit Heater Fan Availability Status',&
-                               ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus,&
-                               'System','Average',UnitHeat(UnitHeatNum)%Name)
-    ENDIF
+    CALL SetupOutputVariable('Unit Heater Fan Availability Status', UnitHeat(UnitHeatNum)%AvailStatus,&
+                             'System','Average',UnitHeat(UnitHeatNum)%Name)
   END DO
 
   RETURN
@@ -605,7 +592,7 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
           ! USE STATEMENTS:
   USE DataEnvironment,    ONLY : StdBaroPress, StdRhoAir
   USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, UnitHeater_Num
-  USE DataHVACGlobals,    ONLY: ZoneComp, ForceOff, CycleOn, NoAction
+  USE DataHVACGlobals,    ONLY: ZoneComp, ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE DataPlant,          ONLY : PlantLoop, TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating, &
                                  ScanPlantLoopsForObject
   USE FluidProperties,    ONLY : GetDensityGlycol
@@ -643,7 +630,6 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
 !  INTEGER        :: RefrigIndex
   REAL(r64)      :: rho  ! local fluid density
   LOGICAL        :: errFlag
-  INTEGER        :: AvailStatus    ! Availability status set by system availability manager
   LOGICAL        :: SetMassFlowRateToZero = .FALSE. ! TRUE when mass flow rates need to be set to zero
           ! FLOW:
 
@@ -659,6 +645,11 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
     MyOneTimeFlag = .false.
 
   END IF
+
+  IF (ALLOCATED(ZoneComp)) THEN
+    ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%ZoneNum = ZoneNum
+    UnitHeat(UnitHeatNum)%AvailStatus = ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus
+  ENDIF
 
   IF (MyPlantScanFlag(UnitHeatNum) .AND. ALLOCATED(PlantLoop)) THEN
     IF ((UnitHeat(UnitHeatNum)%HCoil_PlantTypeNum == TypeOf_CoilWaterSimpleHeating) .OR. &
@@ -684,7 +675,6 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
   ELSEIF (MyPlantScanFlag(UnitHeatNum) .AND. .NOT. AnyPlantInModel) THEN
     MyPlantScanFlag(UnitHeatNum) = .FALSE.
   ENDIF
-  AvailStatus = NoAction
   ! need to check all units to see if they are on Zone Equipment List or issue warning
   IF (.not. ZoneEquipmentListChecked .and. ZoneEquipInputsFilled) THEN
     ZoneEquipmentListChecked=.true.
@@ -760,14 +750,10 @@ SUBROUTINE InitUnitHeater(UnitHeatNum, ZoneNum)
   InNode  = UnitHeat(UnitHeatNum)%AirInNode
   OutNode = UnitHeat(UnitHeatNum)%AirOutNode
 
-  IF (UnitHeat(UnitHeatNum)%AvailManagerListFound) THEN
-    AvailStatus = ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus
-  ENDIF
-
   SetMassFlowRateToZero = .FALSE.
   IF(GetCurrentScheduleValue(UnitHeat(UnitHeatNum)%SchedPtr) .GT. 0)THEN
     IF((GetCurrentScheduleValue(UnitHeat(UnitHeatNum)%FanAvailSchedPtr) .GT. 0 &
-        .OR. AvailStatus .EQ. CycleOn) .AND. (AvailStatus .NE. ForceOff))THEN
+        .OR. ZoneCompTurnFansOn) .AND. .NOT. ZoneCompTurnFansOff)THEN
       IF ( UnitHeat(UnitHeatNum)%FanControlTypeOnOff &
            .AND. ((ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired < SmallLoad) .OR. &
            (CurDeadBandOrSetback(ZoneNum)))) THEN
@@ -859,7 +845,7 @@ SUBROUTINE SizeUnitHeater(UnitHeatNum)
   REAL(r64)           :: EnthSteamOutWet
   REAL(r64)           :: LatentHeatSteam
   REAL(r64)           :: SteamDensity
-  INTEGER             :: RefrigIndex
+  INTEGER             :: RefrigIndex=0
   INTEGER             :: CoilWaterInletNode=0
   INTEGER             :: CoilWaterOutletNode=0
   INTEGER             :: CoilSteamInletNode=0
@@ -988,6 +974,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
           !       AUTHOR         Rick Strand
           !       DATE WRITTEN   May 2000
           !       MODIFIED       Don Shirey, Aug 2009 (LatOutputProvided)
+          !                      July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1018,7 +1005,7 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
           ! USE STATEMENTS:
   USE DataZoneEnergyDemands
   USE DataInterfaces, ONLY: ControlCompOutput
-  USE DataHVACGlobals,    ONLY: ZoneComp, ForceOff, CycleOn, NoAction
+  USE DataHVACGlobals,    ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE DataZoneEquipment,   ONLY: UnitHeater_Num
   USE PlantUtilities, ONLY: SetComponentFlowRate
 
@@ -1052,10 +1039,8 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
   REAL(r64)    :: SpecHumOut     ! Specific humidity ratio of outlet air (kg moisture / kg moist air)
   REAL(r64)    :: SpecHumIn      ! Specific humidity ratio of inlet air (kg moisture / kg moist air)
   REAL(r64)    :: mdot  ! local temporary for fluid mass flow rate
-  INTEGER      :: AvailStatus    ! Availability status set by system availability manager
           ! FLOW:
   FanElecPower = 0.0d0
-  AvailStatus  = NoAction
           ! initialize local variables
   QUnitOut      = 0.0d0
   LatentOutput  = 0.0d0
@@ -1068,14 +1053,9 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
 
   QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired ! zone load needed
 
-  AvailStatus = NoAction
-  IF (UnitHeat(UnitHeatNum)%AvailManagerListFound) THEN
-    AvailStatus = ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus
-  ENDIF
-
   IF (GetCurrentScheduleValue(UnitHeat(UnitHeatNum)%SchedPtr) <= 0 .OR. &
        ((GetCurrentScheduleValue(UnitHeat(UnitHeatNum)%FanAvailSchedPtr) <= 0 &
-        .AND. AvailStatus .NE. CycleOn) .OR. (AvailStatus .EQ. ForceOff))) THEN
+        .AND. .NOT. ZoneCompTurnFansOn) .OR. ZoneCompTurnFansOff)) THEN
           ! Case 1: OFF-->unit schedule says that it it not available
           !         OR child fan in not available OR child fan not being cycled ON by sys avail manager
           !         OR child fan being forced OFF by sys avail manager
@@ -1232,7 +1212,7 @@ SUBROUTINE CalcUnitHeaterComponents(UnitHeatNum,FirstHVACIteration,LoadMet)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Rick Strand
           !       DATE WRITTEN   May 2000
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1253,7 +1233,7 @@ SUBROUTINE CalcUnitHeaterComponents(UnitHeatNum,FirstHVACIteration,LoadMet)
   USE WaterCoils,     ONLY : SimulateWaterCoilComponents
   USE SteamCoils,     ONLY : SimulateSteamCoilComponents
   USE DataZoneEquipment,   ONLY: UnitHeater_Num
-  USE DataHVACGlobals,     ONLY: ZoneComp, NoAction, ForceOff, CycleOn
+  USE DataHVACGlobals,     ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1278,28 +1258,10 @@ SUBROUTINE CalcUnitHeaterComponents(UnitHeatNum,FirstHVACIteration,LoadMet)
   INTEGER        :: InletNode       ! unit air inlet node
   INTEGER        :: OutletNode      ! unit air outlet node
   REAL(r64)      :: QCoilReq        ! Heat addition required from an electric/gas heating coil
-  LOGICAL        :: UnitHeatTurnFansOn   ! TurnFansOn Availalability status as set by SAM
-  LOGICAL        :: UnitHeatTurnFansOff  ! TurnFansOff Availalability status as set by SAM
-
-  UnitHeatTurnFansOn  = .FALSE.
-  UnitHeatTurnFansOff = .FALSE.
           ! FLOW:
-  IF(UnitHeat(UnitHeatNum)%AvailManagerListFound)THEN
-    IF(ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus .EQ. CycleOn) THEN
-      UnitHeatTurnFansOn = .TRUE.
-      UnitHeatTurnFansOff = .FALSE.
-    ELSEIF(ZoneComp(UnitHeater_Num)%ZoneCompAvailMgrs(UnitHeatNum)%AvailStatus .EQ. Forceoff) THEN
-      UnitHeatTurnFansOn = .FALSE.
-      UnitHeatTurnFansOff = .TRUE.
-    ENDIF
-  ENDIF
 
-  IF (UnitHeat(UnitHeatNum)%AvailManagerListFound) THEN
-    CALL SimulateFanComponents(UnitHeat(UnitHeatNum)%FanName,FirstHVACIteration,UnitHeat(UnitHeatNum)%Fan_Index, &
-                               ZoneCompTurnFansOn = UnitHeatTurnFansOn,ZoneCompTurnFansOff = UnitHeatTurnFansOff)
-  ELSE
-    CALL SimulateFanComponents(UnitHeat(UnitHeatNum)%FanName,FirstHVACIteration,UnitHeat(UnitHeatNum)%Fan_Index)
-  ENDIF
+  CALL SimulateFanComponents(UnitHeat(UnitHeatNum)%FanName,FirstHVACIteration,UnitHeat(UnitHeatNum)%Fan_Index, &
+                             ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
 
   SELECT CASE (UnitHeat(UnitHeatNum)%HCoilType)
 

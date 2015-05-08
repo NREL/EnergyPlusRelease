@@ -84,6 +84,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
           ! USE STATEMENTS:
   USE DataIPShortCuts
   USE InputProcessor, ONLY: GetNumObjectsFound,GetObjectItem,FindItemInList
+  USE DataSurfaces,   ONLY: HeatTransferModel_EMPD
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -183,6 +184,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
   Do SurfNum=1,TotSurfaces
     if (.NOT. Surface(SurfNum)%HeatTransSurf .OR. &
         Surface(SurfNum)%Class .EQ. SurfaceClass_Window) Cycle ! Heat transfer surface only and not a window
+    IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) CYCLE
     ConstrNum = Surface(SurfNum)%Construction
     MatNum  = Construct(ConstrNum)%LayerPoint(Construct(ConstrNum)%TotLayers)
     If (Material(MatNum)%EMPDValue .GT. 0.0 .AND. Surface(SurfNum)%Zone .gt. 0) then
@@ -631,7 +633,7 @@ SUBROUTINE ReportMoistureBalanceEMPD
   IF (.NOT. DoReport) return
 !
 !   Write Descriptions
-    Write(OutputFileInits,'(A)') '! <EMPD Properties>, Construction Name, Inside Layer Material Name, ' &
+    Write(OutputFileInits,'(A)') '! <Construction EMPD>, Construction Name, Inside Layer Material Name, ' &
                                 // 'Penetration Depth {m}, a, b, c, d'
 
     DO ConstrNum=1,TotConstructs
@@ -644,7 +646,7 @@ SUBROUTINE ReportMoistureBalanceEMPD
       end if
     End Do
 !
- 700  FORMAT(' EMPD Properties, ',A,', ',A,', ',4(F8.4,', '),F8.4)
+ 700  FORMAT(' Construction EMPD, ',A,', ',A,', ',4(F8.4,', '),F8.4)
 
 END SUBROUTINE ReportMoistureBalanceEMPD
 

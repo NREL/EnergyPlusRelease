@@ -26,7 +26,7 @@ MODULE MundtSimMgr
           ! USE STATEMENTS:
     USE DataPrecisionGlobals
     USE DataGlobals,                ONLY : MaxNameLength
-    USE DataInterfaces,             ONLY : ShowWarningError, ShowFatalError
+    USE DataInterfaces,             ONLY : ShowWarningError, ShowSevereError, ShowFatalError
     USE InputProcessor,             ONLY : SameString
 
     IMPLICIT NONE         ! Enforce explicit typing of all variables
@@ -147,6 +147,7 @@ SUBROUTINE ManageMundtModel(ZoneNum)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           ! na
     LOGICAL, SAVE                   :: FirstTimeFlag = .TRUE.  ! Used for allocating arrays
+    LOGICAL :: ErrorsFound
 
           ! FLOW:
 
@@ -166,7 +167,10 @@ SUBROUTINE ManageMundtModel(ZoneNum)
     IF ((SupplyAirVolumeRate.GT.0.0001d0).AND.(QsysCoolTot.GT.0.0001d0)) THEN
 
         ! setup Mundt model
-        CALL SetupMundtModel(ZoneNum)
+        ErrorsFound=.false.
+        CALL SetupMundtModel(ZoneNum,ErrorsFound)
+        IF (ErrorsFound) CALL ShowFatalError('ManageMundtModel: Errors in setting up Mundt Model. '//  &
+           'Preceding condition(s) cause termination.')
 
         ! perform Mundt model calculations
         CALL CalcMundtModel(ZoneNum)
@@ -223,23 +227,24 @@ SUBROUTINE InitMundtModel
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-    INTEGER                         :: SurfNum              ! index for surfaces
-    INTEGER                         :: SurfFirst            ! index number for the first surface in the specified zone
-    INTEGER                         :: NumOfSurfs           ! number of the first surface in the specified zone
-    INTEGER                         :: NodeNum              ! index for air nodes
-    INTEGER                         :: ZoneIndex            ! index for zones
-    INTEGER                         :: NumOfAirNodes        ! total number of nodes in each zone
-    INTEGER                         :: NumOfMundtZones      ! number of zones using the Mundt model
-    INTEGER                         :: MundtZoneIndex       ! index for zones using the Mundt model
-    INTEGER                         :: MaxNumOfSurfs        ! maximum of number of surfaces
-    INTEGER                         :: MaxNumOfFloorSurfs   ! maximum of number of surfaces
-    INTEGER                         :: MaxNumOfAirNodes     ! maximum of number of air nodes
-    INTEGER                         :: MaxNumOfRoomNodes    ! maximum of number of nodes connected to walls
-    INTEGER                         :: RoomNodesCount       ! number of nodes connected to walls
-    INTEGER                         :: FloorSurfCount       ! number of nodes connected to walls
-    INTEGER                         :: AirNodeBeginNum      ! index number of the first air node for this zone
-    INTEGER                         :: AirNodeNum           ! index for air nodes
-    LOGICAL                         :: AirNodeFoundFlag     ! flag used for error check
+    INTEGER  :: SurfNum              ! index for surfaces
+    INTEGER  :: SurfFirst            ! index number for the first surface in the specified zone
+    INTEGER  :: NumOfSurfs           ! number of the first surface in the specified zone
+    INTEGER  :: NodeNum              ! index for air nodes
+    INTEGER  :: ZoneIndex            ! index for zones
+    INTEGER  :: NumOfAirNodes        ! total number of nodes in each zone
+    INTEGER  :: NumOfMundtZones      ! number of zones using the Mundt model
+    INTEGER  :: MundtZoneIndex       ! index for zones using the Mundt model
+    INTEGER  :: MaxNumOfSurfs        ! maximum of number of surfaces
+    INTEGER  :: MaxNumOfFloorSurfs   ! maximum of number of surfaces
+    INTEGER  :: MaxNumOfAirNodes     ! maximum of number of air nodes
+    INTEGER  :: MaxNumOfRoomNodes    ! maximum of number of nodes connected to walls
+    INTEGER  :: RoomNodesCount       ! number of nodes connected to walls
+    INTEGER  :: FloorSurfCount       ! number of nodes connected to walls
+    INTEGER  :: AirNodeBeginNum      ! index number of the first air node for this zone
+    INTEGER  :: AirNodeNum           ! index for air nodes
+    LOGICAL  :: AirNodeFoundFlag     ! flag used for error check
+    LOGICAL  :: ErrorsFound          ! true if errors found in init
 
           ! FLOW:
 
@@ -255,6 +260,7 @@ SUBROUTINE InitMundtModel
     MaxNumOfFloorSurfs  = 0
     MaxNumOfAirNodes    = 0
     MaxNumOfRoomNodes     = 0
+    ErrorsFound=.false.
     DO ZoneIndex =1, NumOfZones
         IF (AirModel(ZoneIndex)%AirModelType.EQ.RoomAirModel_Mundt) THEN
             ! find number of zones using the Mundt model
@@ -313,7 +319,6 @@ SUBROUTINE InitMundtModel
                     ! error check for debugging
                     IF (AirNodeBeginNum.GT.TotNumOfAirNodes) THEN
                         CALL ShowFatalError('An array bound exceeded. Error in InitMundtModel subroutine of MundtSimMgr.')
-                        RETURN
                     END IF
 
                     AirNodeFoundFlag = .FALSE.
@@ -337,8 +342,9 @@ SUBROUTINE InitMundtModel
 
                     ! error check for debugging
                     IF (.NOT.AirNodeFoundFlag) THEN
-                        CALL ShowWarningError('Some air node in '//TRIM(Zone(ZoneIndex)%Name)//' is not found.')
-                        RETURN
+                        CALL ShowSevereError('InitMundtModel: Air Node in Zone="'//TRIM(Zone(ZoneIndex)%Name)//'" is not found.')
+                        ErrorsFound=.true.
+                        CYCLE
                     END IF
 
                     ! count air nodes connected to walls in each zone
@@ -353,7 +359,9 @@ SUBROUTINE InitMundtModel
 
                 END DO
                 ! got data for this zone so exit the zone loop
-                EXIT Zone_Loop
+                IF (AirNodeFoundFlag) THEN
+                  EXIT Zone_Loop
+                ENDIF
 
             END IF
 
@@ -363,6 +371,8 @@ SUBROUTINE InitMundtModel
         MaxNumOfFloorSurfs = MAX(MaxNumOfFloorSurfs,FloorSurfCount)
 
     END DO
+    
+    IF (ErrorsFound) CALL ShowFatalError('InitMundtModel: Preceding condition(s) cause termination.')
 
     ! allocate arrays
     ALLOCATE (RoomNodeIDS(MaxNumOfRoomNodes))
@@ -505,7 +515,7 @@ END SUBROUTINE GetSurfHBDataForMundtModel
 
 !*****************************************************************************************
 
-SUBROUTINE SetupMundtModel(ZoneNum)
+SUBROUTINE SetupMundtModel(ZoneNum,ErrorsFound)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -526,11 +536,13 @@ SUBROUTINE SetupMundtModel(ZoneNum)
 
           ! USE STATEMENTS:
     USE DataRoomAirModel
+    USE DataHeatBalance,            ONLY : Zone
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
     INTEGER, INTENT(IN)                 :: ZoneNum          ! index number for the specified zone
+    LOGICAL, INTENT(INOUT)              :: ErrorsFound      ! true if problems setting up model
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -565,24 +577,31 @@ SUBROUTINE SetupMundtModel(ZoneNum)
             CASE (ReturnAirNode) ! return
                 ReturnNodeID = NodeNum
             CASE DEFAULT
-                CALL ShowWarningError('Non-Standard Type of Air Node for Mundt Model')
+                CALL ShowSevereError('SetupMundtModel: Non-Standard Type of Air Node for Mundt Model')
+                ErrorsFound=.true.
         END SELECT
     END DO
 
     !  get number of floors in the zone and setup FloorSurfSetIDs
-    NumFloorSurfs = COUNT(LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
-    FloorSurfSetIDs = PACK(ID1dsurf,LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
-
-    ! initialize floor surface data (a must since NumFloorSurfs is varied among zones)
-    FloorSurf%Temp = 25.0
-    FloorSurf%Hc   = 0.0
-    FloorSurf%Area = 0.0
-    ! get floor surface data
-    DO SurfNum = 1, NumFloorSurfs
+    IF (MundtFootAirID > 0) THEN
+      NumFloorSurfs = COUNT(LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
+      FloorSurfSetIDs = PACK(ID1dsurf,LineNode(MundtZoneNum,MundtFootAirID)%SurfMask)
+      ! initialize floor surface data (a must since NumFloorSurfs is varied among zones)
+      FloorSurf%Temp = 25.0
+      FloorSurf%Hc   = 0.0
+      FloorSurf%Area = 0.0
+      ! get floor surface data
+      DO SurfNum = 1, NumFloorSurfs
         FloorSurf(SurfNum)%Temp = MundtAirSurf(MundtZoneNum,FloorSurfSetIDs(SurfNum))%Temp
         FloorSurf(SurfNum)%Hc   = MundtAirSurf(MundtZoneNum,FloorSurfSetIDs(SurfNum))%Hc
         FloorSurf(SurfNum)%Area = MundtAirSurf(MundtZoneNum,FloorSurfSetIDs(SurfNum))%Area
-    ENDDO
+      ENDDO
+    ELSE
+      CALL ShowSevereError('SetupMundtModel: Mundt model has no FloorAirNode, Zone='//  &
+          Trim(Zone(ZoneNum)%Name))
+      ErrorsFound=.true.
+    ENDIF
+
 
     RETURN
 

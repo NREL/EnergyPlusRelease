@@ -200,6 +200,7 @@ Public  GetFanOutletNode
 Public  GetFanIndex
 Public  GetFanType
 Public  GetFanVolFlow
+PUBLIC  GetFanPower
 Public  GetFanAvailSchPtr
 Public  SetFanData
 Public  GetFanSpeedRatioCurveIndex
@@ -208,7 +209,8 @@ CONTAINS
 
 ! MODULE SUBROUTINES:
 !*************************************************************************
-SUBROUTINE SimulateFanComponents(CompName,FirstHVACIteration,CompIndex,SpeedRatio,ZoneCompTurnFansOn,ZoneCompTurnFansOff)
+SUBROUTINE SimulateFanComponents(CompName,FirstHVACIteration,CompIndex,SpeedRatio,ZoneCompTurnFansOn,ZoneCompTurnFansOff, &
+                                 PressureRise)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Liesen
@@ -238,6 +240,7 @@ SUBROUTINE SimulateFanComponents(CompName,FirstHVACIteration,CompIndex,SpeedRati
   REAL(r64), OPTIONAL, INTENT(IN) :: SpeedRatio
   LOGICAL,   OPTIONAL, INTENT(IN) :: ZoneCompTurnFansOn   ! Turn fans ON signal from ZoneHVAC component
   LOGICAL,   OPTIONAL, INTENT(IN) :: ZoneCompTurnFansOff  ! Turn Fans OFF signal from ZoneHVAC component
+  REAL(r64), OPTIONAL, INTENT(IN) :: PressureRise         ! Pressure difference to use for DeltaPress
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: Blank = ' '
@@ -304,7 +307,11 @@ SUBROUTINE SimulateFanComponents(CompName,FirstHVACIteration,CompIndex,SpeedRati
   IF (Fan(FanNum)%FanType_Num == FanType_SimpleConstVolume) THEN
     Call SimSimpleFan(FanNum)
   ELSE IF (Fan(FanNum)%FanType_Num == FanType_SimpleVAV) THEN
-    Call SimVariableVolumeFan(FanNum)
+    IF (PRESENT(PressureRise)) THEN
+      Call SimVariableVolumeFan(FanNum, PressureRise)
+    ELSE
+      Call SimVariableVolumeFan(FanNum)
+    ENDIF
   ELSE IF (Fan(FanNum)%FanType_Num == FanType_SimpleOnOff) THEN
     Call SimOnOffFan(FanNum, SpeedRatio)
   ELSE IF (Fan(FanNum)%FanType_Num == FanType_ZoneExhaust) THEN
@@ -1670,7 +1677,7 @@ SUBROUTINE SimSimpleFan(FanNum)
 END SUBROUTINE SimSimpleFan
 
 
-SUBROUTINE SimVariableVolumeFan(FanNum)
+SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Unknown
@@ -1699,6 +1706,7 @@ SUBROUTINE SimVariableVolumeFan(FanNum)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
    Integer, Intent(IN) :: FanNum
+   REAL(r64), INTENT(IN), OPTIONAL :: PressureRise
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1750,7 +1758,11 @@ SUBROUTINE SimVariableVolumeFan(FanNum)
     MotInAirFrac = NightVentPerf(NVPerfNum)%MotInAirFrac
     MaxAirMassFlowRate = NightVentPerf(NVPerfNum)%MaxAirMassFlowRate
   ELSE
-    DeltaPress = Fan(FanNum)%DeltaPress
+    IF (PRESENT(PressureRise)) THEN
+      DeltaPress = PressureRise
+    ELSE
+      DeltaPress = Fan(FanNum)%DeltaPress
+    ENDIF
     FanEff     = Fan(FanNum)%FanEff
     MotEff     = Fan(FanNum)%MotEff
     MotInAirFrac = Fan(FanNum)%MotInAirFrac
@@ -2666,6 +2678,54 @@ SUBROUTINE GetFanVolFlow(FanIndex, FanVolFlow)
   RETURN
 
 END SUBROUTINE GetFanVolFlow
+
+SUBROUTINE GetFanPower(FanIndex, FanPower)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine gets the fan power draw
+          
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)          :: FanIndex
+  REAL(r64),    INTENT(OUT)       :: FanPower
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  IF(FanIndex .EQ. 0)THEN
+    FanPower = 0.d0
+  ELSE
+    FanPower = Fan(FanIndex)%FanPower
+  END IF
+
+  RETURN
+
+END SUBROUTINE GetFanPower
 
 SUBROUTINE GetFanType(FanName,FanType,ErrorsFound,ThisObjectType,ThisObjectName)
 

@@ -55,9 +55,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -69,7 +69,7 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "struct.h"
 
 /****************************** subroutine struct_init *****************************/
@@ -82,16 +82,16 @@ int struct_init(
 	int		ii, jj, kk, ll;
 
 	if (strcmp(type,"WNDO") == 0) {
-		strcpy_s(((WNDO *)sptr)->name,"");
+		strcpy(((WNDO *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((WNDO *)sptr)->origin[ii] = 0.;
 		}
 		((WNDO *)sptr)->height = 0.;
 		((WNDO *)sptr)->width = 0.;
 		((WNDO *)sptr)->nvertices = 0;
-		strcpy_s(((WNDO *)sptr)->glass_type,"");
+		strcpy(((WNDO *)sptr)->glass_type,"");
 		((WNDO *)sptr)->shade_flag = 0;
-		strcpy_s(((WNDO *)sptr)->shade_type,"");
+		strcpy(((WNDO *)sptr)->shade_type,"");
 		for(ii =0; ii<NZSHADES; ii++) {
 			((WNDO *)sptr)->zshade_x[ii] = 0.F;
 			((WNDO *)sptr)->zshade_y[ii] = 0.F;
@@ -130,7 +130,7 @@ int struct_init(
 		((WNDO *)sptr)->wlumskyo = 0;
 	}
 	else if (strcmp(type,"LTSCH") == 0) {
-		strcpy_s(((LTSCH *)sptr)->name,"");
+		strcpy(((LTSCH *)sptr)->name,"");
 		((LTSCH *)sptr)->mon_begin = 0;
 		((LTSCH *)sptr)->day_begin = 0;
 		((LTSCH *)sptr)->mon_end = 0;
@@ -155,7 +155,7 @@ int struct_init(
 		((WLUM *)sptr)->omegaw = 0.;
 	}
 	else if (strcmp(type,"REFPT") == 0) {
-		strcpy_s(((REFPT *)sptr)->name,"");
+		strcpy(((REFPT *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((REFPT *)sptr)->zs[ii] = 0.;
 			((REFPT *)sptr)->bs[ii] = 0.;
@@ -206,7 +206,7 @@ int struct_init(
 		}
 	}
 	else if (strcmp(type,"SURF") == 0) {
-		strcpy_s(((SURF *)sptr)->name,"");
+		strcpy(((SURF *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((SURF *)sptr)->origin[ii] = 0.;
 		}
@@ -275,7 +275,7 @@ int struct_init(
 		}
 	}
 	else if (strcmp(type,"ZONE") == 0) {
-		strcpy_s(((ZONE *)sptr)->name,"");
+		strcpy(((ZONE *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((ZONE *)sptr)->origin[ii] = 0.;
 		}
@@ -306,7 +306,7 @@ int struct_init(
 		for(ii =0; ii<MAX_REF_PTS; ii++) {
 			((ZONE *)sptr)->ref_pt[ii]  = NULL;
 		}
-		strcpy_s(((ZONE *)sptr)->e10zonename,"");
+		strcpy(((ZONE *)sptr)->e10zonename,"");
 		((ZONE *)sptr)->eleclt_details = 0;
 		((ZONE *)sptr)->frac_power = 0.;
 		((ZONE *)sptr)->ltsch_id = 0;
@@ -318,7 +318,7 @@ int struct_init(
 		}
 	}
 	else if (strcmp(type,"BLDG") == 0) {
-		strcpy_s(((BLDG *)sptr)->name,"");
+		strcpy(((BLDG *)sptr)->name,"");
 		((BLDG *)sptr)->lat = 0.;
 		((BLDG *)sptr)->lon = 0.;
 		((BLDG *)sptr)->alt = 0.;
@@ -344,7 +344,7 @@ int struct_init(
 		}
 	}
 	else if (strcmp(type,"ZSHADE") == 0) {
-		strcpy_s(((ZSHADE *)sptr)->name,"");
+		strcpy(((ZSHADE *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((ZSHADE *)sptr)->origin[ii] = 0.;
 		}
@@ -362,7 +362,7 @@ int struct_init(
 		((ZSHADE *)sptr)->tilt_bs = 0.;
 	}
 	else if (strcmp(type,"BSHADE") == 0) {
-		strcpy_s(((BSHADE *)sptr)->name,"");
+		strcpy(((BSHADE *)sptr)->name,"");
 		for(ii =0; ii<NCOORDS; ii++) {
 			((BSHADE *)sptr)->origin[ii] = 0.;
 		}
@@ -387,7 +387,7 @@ int struct_init(
 		((BSHADE *)sptr)->ovrlum = 0.;
 	}
 	else if (strcmp(type,"GLASS") == 0) {
-		strcpy_s(((GLASS *)sptr)->name,"");
+		strcpy(((GLASS *)sptr)->name,"");
 		((GLASS *)sptr)->vis_trans = 1.;
 		((GLASS *)sptr)->inside_refl = 0.15;
 		((GLASS *)sptr)->cam1 = 0.;
@@ -404,12 +404,12 @@ int struct_init(
 		}
 	}
 	else if (strcmp(type,"WSHADE") == 0) {
-		strcpy_s(((WSHADE *)sptr)->name,"");
+		strcpy(((WSHADE *)sptr)->name,"");
 		((WSHADE *)sptr)->vis_trans = 1.;
 		((WSHADE *)sptr)->inside_refl = 0.;
 	}
 	else if (strcmp(type,"LIB") == 0) {
-		strcpy_s(((LIB *)sptr)->name,"");
+		strcpy(((LIB *)sptr)->name,"");
 		((LIB *)sptr)->nglass = 0;
 		((LIB *)sptr)->nwshades = 0;
 		for(ii =0; ii<MAX_LIB_COMPS; ii++) {

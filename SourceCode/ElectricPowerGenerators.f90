@@ -2312,12 +2312,41 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
 
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(GeneratorNum) ) THEN
     !reset to starting condition for different environment runperiods, design days
-    MicroCHP(GeneratorNum)%A42Model%TengLast      = 20.0
-    MicroCHP(GeneratorNum)%A42Model%TempCWOutLast = 20.0
-    MicroCHP(GeneratorNum)%A42Model%TimeElapsed   = 0.0
+    MicroCHP(GeneratorNum)%A42Model%TengLast      = 20.d0
+    MicroCHP(GeneratorNum)%A42Model%TempCWOutLast = 20.d0
+    MicroCHP(GeneratorNum)%A42Model%TimeElapsed   = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%opMode        = 0
+    MicroCHP(GeneratorNum)%A42Model%OffModeTime   = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%StandyByModeTime = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%WarmUpModeTime = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%NormalModeTime = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%CoolDownModeTime = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%Pnet          = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%ElecEff       = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%Qgross        = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%ThermEff      = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%Qgenss        = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%NdotFuel      = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%MdotFuel      = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%Teng          = 20.d0
+    MicroCHP(GeneratorNum)%A42Model%Tcwin         = 20.d0
+    MicroCHP(GeneratorNum)%A42Model%Tcwout        = 20.d0
+    MicroCHP(GeneratorNum)%A42Model%MdotAir       = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%QdotSkin      = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%QdotConvZone  = 0.d0
+    MicroCHP(GeneratorNum)%A42Model%QdotRadZone   = 0.d0
     GeneratorDynamics(DynaCntrlNum)%LastOpMode    = OpModeOFF
-    GeneratorDynamics(DynaCntrlNum)%FuelMdotLastTimestep = 0.0
-    GeneratorDynamics(DynaCntrlNum)%PelLastTimeStep = 0.0
+    GeneratorDynamics(DynaCntrlNum)%CurrentOpMode = OpModeOFF
+    GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastShutDown = 0.d0
+    GeneratorDynamics(DynaCntrlNum)%FractionalDayofLastStartUp  = 0.d0
+    GeneratorDynamics(DynaCntrlNum)%HasBeenOn      = .FALSE.
+    GeneratorDynamics(DynaCntrlNum)%DuringStartUp  = .FALSE.
+    GeneratorDynamics(DynaCntrlNum)%DuringShutDown = .FALSE.
+    GeneratorDynamics(DynaCntrlNum)%FuelMdotLastTimestep = 0.d0
+    GeneratorDynamics(DynaCntrlNum)%PelLastTimeStep = 0.d0
+    GeneratorDynamics(DynaCntrlNum)%NumCycles       = 0
+
+    FuelSupply(MicroCHP(GeneratorNum)%FuelSupplyID)%QskinLoss = 0.d0
 
     CALL InitComponentNodes( 0.d0, MicroCHP(GeneratorNum)%PlantMassFlowRateMax, &
                                  MicroCHP(GeneratorNum)%PlantInletNodeID,  &
@@ -3039,6 +3068,16 @@ SUBROUTINE FigureMicroCHPZoneGains
 
   IF (NumMicroCHPs == 0) RETURN
 
+  IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
+    FuelSupply%QskinLoss  = 0.d0
+    MicroCHP%A42Model%QdotSkin = 0.d0
+    MicroCHP%Report%SkinLossConvect = 0.d0
+    MicroCHP%Report%SkinLossRadiat  = 0.d0
+    MyEnvrnFlag = .FALSE.
+  END IF
+
+  IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
+
   DO CHPnum = 1, NumMicroCHPs
     TotalZoneHeatGain =   FuelSupply(MicroCHP(CHPnum)%FuelSupplyID )%QskinLoss &
                        + MicroCHP( CHPnum )%A42Model%QdotSkin
@@ -3049,13 +3088,7 @@ SUBROUTINE FigureMicroCHPZoneGains
     MicroCHP(CHPnum)%Report%SkinLossRadiat = MicroCHP(CHPnum)%A42Model%QdotRadZone
   ENDDO
 
-  IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
-    MicroCHP%Report%SkinLossConvect = 0.d0
-    MicroCHP%Report%SkinLossRadiat  = 0.d0
-    MyEnvrnFlag = .FALSE.
-  END IF
 
-  IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
   ! this routine needs to do something for zone gains during sizing
 !  IF(DoingSizing)THEN
@@ -7436,9 +7469,61 @@ ENDIF
 
 ! Do the Begin Environment initializations
 IF (BeginEnvrnFlag .and. MyEnvrnFlag(FCnum) .AND. .NOT. MyPlantScanFlag(FCnum)) THEN
+
+  FuelSupply(FuelCell(FCnum)%FuelSupNum)%PfuelCompEl = 0.d0
+  FuelSupply(FuelCell(FCnum)%FuelSupNum)%TfuelIntoFCPM = 0.d0
+  FuelSupply(FuelCell(FCnum)%FuelSupNum)%TfuelIntoCompress    = 0.d0
+  FuelSupply(FuelCell(FCnum)%FuelSupNum)%QskinLoss = 0.d0
+
+  FuelCell(FCnum)%AirSup%TairIntoFCPM   = 0.d0
+  FuelCell(FCnum)%AirSup%PairCompEl     = 0.d0
+  FuelCell(FCnum)%AirSup%TairIntoBlower = 0.d0
+  FuelCell(FCnum)%AirSup%QskinLoss      = 0.d0
+  FuelCell(FCnum)%AirSup%QintakeRecovery = 0.d0
+  FuelCell(FCnum)%FCPM%NumCycles  = 0
+  FuelCell(FCnum)%FCPM%Pel  = 0.d0
+  FuelCell(FCnum)%FCPM%PelLastTimeStep = 0.d0
+  FuelCell(FCnum)%FCPM%Eel  = 0.d0
+  FuelCell(FCnum)%FCPM%PelancillariesAC = 0.d0
+  FuelCell(FCnum)%FCPM%NdotFuel      = 0.d0
+  FuelCell(FCnum)%FCPM%TotFuelInEnthalphy = 0.d0
+  FuelCell(FCnum)%FCPM%NdotProdGas   = 0.d0
+  FuelCell(FCnum)%FCPM%TprodGasLeavingFCPM = 0.d0
+  FuelCell(FCnum)%FCPM%TotProdGasEnthalphy = 0.d0
+  FuelCell(FCnum)%FCPM%NdotAir       = 0.d0
+  FuelCell(FCnum)%FCPM%TotAirInEnthalphy = 0.d0
+  FuelCell(FCnum)%FCPM%NdotLiqwater  = 0.d0
+  FuelCell(FCnum)%FCPM%TwaterInlet   = 0.d0
+  FuelCell(FCnum)%FCPM%WaterInEnthalpy   = 0.d0
   FuelCell(FCnum)%FCPM%TprodGasLeavingFCPM = 200.0
+  FuelCell(FCnum)%FCPM%FractionalDayofLastStartUp = 0.d0
+  FuelCell(FCnum)%FCPM%FractionalDayofLastShutDown = 0.d0
+  FuelCell(FCnum)%FCPM%HasBeenOn = .true.
+  FuelCell(FCnum)%FCPM%DuringShutDown = .FALSE.
+  FuelCell(FCnum)%FCPM%DuringStartUp  = .FALSE.
+  FuelCell(FCnum)%WaterSup%TwaterIntoCompress = 0.d0
+  FuelCell(FCnum)%WaterSup%TwaterIntoFCPM = 0.d0
+  FuelCell(FCnum)%WaterSup%PwaterCompEl  = 0.d0
+  FuelCell(FCnum)%WaterSup%QskinLoss     = 0.d0
+  FuelCell(FCnum)%AuxilHeat%TauxMix      = 0.d0
+  FuelCell(FCnum)%AuxilHeat%NdotAuxMix   = 0.d0
+  FuelCell(FCnum)%AuxilHeat%QskinLoss    = 0.d0
+  FuelCell(FCnum)%AuxilHeat%QairIntake   = 0.d0
+  FuelCell(FCnum)%ExhaustHX%NdotHXleaving = 0.d0
+  FuelCell(FCnum)%ExhaustHX%WaterOutletTemp = 0.d0
+  FuelCell(FCnum)%ExhaustHX%WaterOutletEnthalpy = 0.d0
+
   FuelCell(FCnum)%ElecStorage%LastTimeStepStateOfCharge = FuelCell(FCnum)%ElecStorage%StartingEnergyStored
   FuelCell(FCnum)%ElecStorage%ThisTimeStepStateOfCharge = FuelCell(FCnum)%ElecStorage%StartingEnergyStored
+  FuelCell(FCnum)%ElecStorage%PelNeedFromStorage = 0.d0
+  FuelCell(FCnum)%ElecStorage%IdesiredDischargeCurrent = 0.d0
+  FuelCell(FCnum)%ElecStorage%PelFromStorage  = 0.d0
+  FuelCell(FCnum)%ElecStorage%IfromStorage  = 0.d0
+  FuelCell(FCnum)%ElecStorage%PelIntoStorage  = 0.d0
+  FuelCell(FCnum)%ElecStorage%QairIntake   = 0.d0
+
+  FuelCell(FCnum)%Inverter%PCUlosses  = 0.d0
+  FuelCell(FCnum)%Inverter%QairIntake = 0.d0
 
   rho = GetDensityGlycol(PlantLoop(FuelCell(FCnum)%CWLoopNum)%FluidName, &
                          InitHRTemp, &
@@ -7562,6 +7647,26 @@ SUBROUTINE FigureFuelCellZoneGains
 
   IF (NumFuelCellGenerators == 0) RETURN
 
+  IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
+    FuelCell%FCPM%HasBeenOn = .FALSE.
+    FuelCell%AirSup%PairCompEl = 0.d0
+    FuelCell%QconvZone = 0.d0
+    FuelCell%QradZone  = 0.d0
+    FuelCell%AirSup%QskinLoss = 0.d0
+    FuelSupply%QskinLoss = 0.d0
+    FuelCell%WaterSup%QskinLoss = 0.d0
+    FuelCell%AuxilHeat%QskinLoss = 0.d0
+    FuelCell%FCPM%QdotSkin = 0.d0
+    FuelCell%Report%SkinLossConvect = 0.d0
+    FuelCell%Report%SkinLossRadiat  = 0.d0
+    FuelCell%AuxilHeat%QairIntake   = 0.d0
+    FuelCell%ElecStorage%QairIntake = 0.d0
+    FuelCell%Inverter%QairIntake    = 0.d0
+    MyEnvrnFlag = .FALSE.
+  END IF
+
+  IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
+
   ! this routine needs to do something for zone gains during sizing
 
    !first collect skin losses from different subsystems
@@ -7605,13 +7710,7 @@ SUBROUTINE FigureFuelCellZoneGains
 
   ENDDO ! over number of Fuel cells
 
-  IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
-    FuelCell%Report%SkinLossConvect = 0.d0
-    FuelCell%Report%SkinLossRadiat  = 0.d0
-    MyEnvrnFlag = .FALSE.
-  END IF
 
-  IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
 
 !  IF(DoingSizing)THEN
 
@@ -7945,15 +8044,19 @@ MODULE ICEngineElectricGenerator
           ! USE STATEMENTS:
 USE DataLoopNode
 USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, SecInHour, BeginEnvrnFlag, InitConvTemp
-USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowFatalError,  &
-                           ShowContinueError, SetupOutputVariable
+USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowFatalError, ShowWarningMessage, &
+                           ShowContinueError, SetupOutputVariable,ShowRecurringWarningErrorAtEnd
 USE DataGlobalConstants, ONLY: iGeneratorICEngine
+USE General, ONLY: RoundSigDigits
 
 IMPLICIT NONE         ! Enforce explicit typing of all variables
 
 PRIVATE ! Everything private unless explicitly made public
 
   !MODULE PARAMETER DEFINITIONS
+  REAL(r64), PARAMETER   :: ReferenceTemp = 25.0d0 !Reference temperature by which lower heating
+                                                   ! value is reported.  This should be subtracted
+                                                   ! off of when calculated exhaust energies.
 
 
   ! DERIVED TYPE DEFINITIONS
@@ -7981,6 +8084,7 @@ TYPE ICEngineGeneratorSpecs
                                                             ! Coeffs Poly Fit
        REAL(r64)         :: ExhaustTemp               = 0.0 !(TEXDC) Exhaust Gas Temp to Fuel Energy Input
        INTEGER           :: ExhaustTempCurve          = 0   !Curve Index for Exhaust Gas Temp to Fuel Energy Input Coeffs Poly Fit
+       INTEGER           :: ErrExhaustTempIndex       = 0   ! error index for temp curve
        REAL(r64)         :: UA                        = 0.0 !(UACDC) exhaust gas Heat Exchanger UA to Capacity
        REAL(r64),DIMENSION(2) :: UACoef                    = 0.0 !Heat Exchanger UA Coeffs Poly Fit
        REAL(r64)         :: MaxExhaustperPowerOutput  = 0.0 !MAX EXHAUST FLOW PER W DSL POWER OUTPUT COEFF
@@ -8298,7 +8402,7 @@ SUBROUTINE GetICEngineGeneratorInput
             ! USE STATEMENTS:
   USE InputProcessor, ONLY : GetNumObjectsFound, GetObjectItem, VerifyName
   USE DataIPShortCuts  ! Data for field names, blank numerics
-  USE CurveManager,   ONLY : GetCurveIndex
+  USE CurveManager,   ONLY : GetCurveIndex, CurveValue
   USE NodeInputManager, ONLY: GetOnlySingleNode
   USE BranchNodeConnections, ONLY: TestCompSet
   Use General, Only:  RoundSigDigits
@@ -8314,10 +8418,11 @@ SUBROUTINE GetICEngineGeneratorInput
   INTEGER                     :: NumNums    ! Number of elements in the numeric array
   INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
   CHARACTER(len=MaxNameLength),DIMENSION(10)  :: AlphArray !character string data
-  REAL(r64),                        DIMENSION(11)  :: NumArray  !numeric data
+  REAL(r64),                   DIMENSION(11)  :: NumArray  !numeric data
   LOGICAL, SAVE :: ErrorsFound=.false.  ! error flag
   LOGICAL       :: IsNotOK              ! Flag to verify name
   LOGICAL       :: IsBlank              ! Flag for blank name
+  REAL(r64) :: xValue ! test curve limits
 
          !FLOW
   cCurrentModuleObject = 'Generator:InternalCombustionEngine'
@@ -8402,6 +8507,14 @@ SUBROUTINE GetICEngineGeneratorInput
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(AlphArray(7)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
       ErrorsFound = .TRUE.
+    ELSE
+      xValue = CurveValue(ICEngineGenerator(GeneratorNum)%ExhaustTempCurve, 1.0d0)
+      IF (xValue < ReferenceTemp) THEN
+        CALL ShowSevereError('GetICEngineGeneratorInput: '//trim(cAlphaFieldNames(7))//' output has very low value.')
+        CALL ShowContinueError('...curve generates ['//trim(RoundSigDigits(xValue,3))//' C] at PLR=1.0')
+        CALL ShowContinueError('...this is less than the Reference Temperature ['//trim(RoundSigDigits(ReferenceTemp,2))//  &
+           ' C] and may cause errors.')
+      ENDIF
     END IF
 
     ICEngineGenerator(GeneratorNum)%UACoef(1) = NumArray(5)
@@ -8587,49 +8700,46 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER   :: ExhaustCP = 1.047d0    !Exhaust Gas Specific Heat (J/kg-K)
   REAL(r64), PARAMETER   :: KJtoJ = 1000.d0        !convert Kjoules to joules
-  REAL(r64), PARAMETER   :: ReferenceTemp = 25.0d0 !Reference temperature by which lower heating
-                                                   ! value is reported.  This should be subtracted
-                                                   ! off of when calculated exhaust energies.
 
 
           ! DERIVED TYPE DEFINITIONS
 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)         :: MinPartLoadRat      ! min allowed operating frac full load
-  REAL(r64)         :: MaxPartLoadRat      ! max allowed operating frac full load
-  REAL(r64)         :: PLR                 ! Generator operating part load ratio
-  REAL(r64)         :: RatedPowerOutput    ! Generator nominal capacity (W)
-  REAL(r64)         :: ElecPowerGenerated  ! Generator output (W)
-  REAL(r64)         :: ElectricEnergyGen   ! Generator output (J)
+  REAL(r64) :: MinPartLoadRat      ! min allowed operating frac full load
+  REAL(r64) :: MaxPartLoadRat      ! max allowed operating frac full load
+  REAL(r64) :: PLR                 ! Generator operating part load ratio
+  REAL(r64) :: RatedPowerOutput    ! Generator nominal capacity (W)
+  REAL(r64) :: ElecPowerGenerated  ! Generator output (W)
+  REAL(r64) :: ElectricEnergyGen   ! Generator output (J)
 
 ! Special variables for IC ENGINE Generator
-  REAL(r64)    :: MaxExhaustperPowerOutput !curve fit parameter
-  REAL(r64)    :: ElecOutputFuelRat      !(RELDC) Ratio of generator output to Fuel Energy Input
-  REAL(r64)    :: RecJacHeattoFuelRat  !(RJACDC) Ratio of Recoverable Jacket Heat to Fuel Energy Input
-  REAL(r64)    :: RecLubeHeattoFuelRat !(RLUBDC) Ratio of Recoverable Lube Oil Heat to Fuel Energy Input
-  REAL(r64)    :: TotExhausttoFuelRat  !(REXDC) Total Exhaust Energy Input to Fuel Energy Input
-  REAL(r64)    :: ExhaustTemp          !(TEX) Exhaust Gas Temp
-  REAL(r64)    :: UA                   !(UACDC) exhaust gas Heat Exchanger UA
-  REAL(r64)    :: FuelEnergyUseRate    ! IC ENGINE fuel use rate (W)
-  REAL(r64)    :: FuelEnergyUsed       ! IC ENGINE fuel use (J)
-  REAL(r64)    :: QTotalHeatRecovered
-  REAL(r64)    :: QJacketRec                 ! water jacket heat recovered (W)
-  REAL(r64)    :: QLubeOilRec                ! lube oil cooler heat recovered (W)
-  REAL(r64)    :: QExhaustRec                ! exhaust gas heat recovered (W)
-  REAL(r64)    :: JacketEnergyRec            ! water jacket heat recovered (J)
-  REAL(r64)    :: LubeOilEnergyRec           ! lube oil cooler heat recovered (J)
-  REAL(r64)    :: ExhaustEnergyRec           ! exhaust gas heat recovered (J)
-  REAL(r64)    :: QExhaustTotal   ! total engine exhaust heat (W)
-  REAL(r64)    :: ExhaustGasFlow       ! exhaust gas mass flow rate (kg/s)
-  REAL(r64)    :: ExhaustStackTemp     ! engine stack temp. (C)
-  REAL(r64)    :: DesignMinExitGasTemp   ! design engine stact saturated steam temp. (C)
-  REAL(r64)    :: FuelHeatingValue     !Heating Value of Fuel in kJ/kg
+  REAL(r64) :: MaxExhaustperPowerOutput !curve fit parameter
+  REAL(r64) :: ElecOutputFuelRat      !(RELDC) Ratio of generator output to Fuel Energy Input
+  REAL(r64) :: RecJacHeattoFuelRat  !(RJACDC) Ratio of Recoverable Jacket Heat to Fuel Energy Input
+  REAL(r64) :: RecLubeHeattoFuelRat !(RLUBDC) Ratio of Recoverable Lube Oil Heat to Fuel Energy Input
+  REAL(r64) :: TotExhausttoFuelRat  !(REXDC) Total Exhaust Energy Input to Fuel Energy Input
+  REAL(r64) :: ExhaustTemp          !(TEX) Exhaust Gas Temp
+  REAL(r64) :: UA                   !(UACDC) exhaust gas Heat Exchanger UA
+  REAL(r64) :: FuelEnergyUseRate    ! IC ENGINE fuel use rate (W)
+  REAL(r64) :: FuelEnergyUsed       ! IC ENGINE fuel use (J)
+  REAL(r64) :: QTotalHeatRecovered
+  REAL(r64) :: QJacketRec                 ! water jacket heat recovered (W)
+  REAL(r64) :: QLubeOilRec                ! lube oil cooler heat recovered (W)
+  REAL(r64) :: QExhaustRec                ! exhaust gas heat recovered (W)
+  REAL(r64) :: JacketEnergyRec            ! water jacket heat recovered (J)
+  REAL(r64) :: LubeOilEnergyRec           ! lube oil cooler heat recovered (J)
+  REAL(r64) :: ExhaustEnergyRec           ! exhaust gas heat recovered (J)
+  REAL(r64) :: QExhaustTotal   ! total engine exhaust heat (W)
+  REAL(r64) :: ExhaustGasFlow       ! exhaust gas mass flow rate (kg/s)
+  REAL(r64) :: ExhaustStackTemp     ! engine stack temp. (C)
+  REAL(r64) :: DesignMinExitGasTemp   ! design engine stact saturated steam temp. (C)
+  REAL(r64) :: FuelHeatingValue     !Heating Value of Fuel in kJ/kg
   INTEGER :: HeatRecInNode        !Heat Recovery Fluid Inlet Node Num
-  REAL(r64)    :: HeatRecInTemp        !Heat Recovery Fluid Inlet Temperature (C)
-  REAL(r64)    :: HeatRecMdot          !Heat Recovery Fluid Mass FlowRate (kg/s)
-  REAL(r64)    :: HeatRecCp            !Specific Heat of the Heat Recovery Fluid (J/kg-K)
-  REAL(r64)    :: HRecRatio              !When Max Temp is reached the amount of recovered heat has to be reduced.
+  REAL(r64) :: HeatRecInTemp        !Heat Recovery Fluid Inlet Temperature (C)
+  REAL(r64) :: HeatRecMdot          !Heat Recovery Fluid Mass FlowRate (kg/s)
+  REAL(r64) :: HeatRecCp            !Specific Heat of the Heat Recovery Fluid (J/kg-K)
+  REAL(r64) :: HRecRatio              !When Max Temp is reached the amount of recovered heat has to be reduced.
                                     ! and this assumption uses this ratio to accomplish this task.
 
 
@@ -8720,19 +8830,35 @@ SUBROUTINE CalcICEngineGeneratorModel(GeneratorNum,RunFlag,MyLoad,FirstHVACItera
     IF (PLR > 0.0)THEN
       ExhaustTemp = CurveValue(ICEngineGenerator(GeneratorNum)%ExhaustTempCurve, PLR)
 
-      ExhaustGasFlow = QExhaustTotal / (ExhaustCP*(ExhaustTemp-ReferenceTemp))
+      IF (ExhaustTemp > ReferenceTemp) THEN
 
+        ExhaustGasFlow = QExhaustTotal / (ExhaustCP*(ExhaustTemp-ReferenceTemp))
 
-!Use Curve fit to determine stack temp after heat recovery
-      UA = ICEngineGenerator(GeneratorNum)%UACoef(1) * RatedPowerOutput **  &
+        !Use Curve fit to determine stack temp after heat recovery
+        UA = ICEngineGenerator(GeneratorNum)%UACoef(1) * RatedPowerOutput **  &
                      ICEngineGenerator(GeneratorNum)%UACoef(2)
 
-      DesignMinExitGasTemp = ICEngineGenerator(GeneratorNum)%DesignMinExitGasTemp
+        DesignMinExitGasTemp = ICEngineGenerator(GeneratorNum)%DesignMinExitGasTemp
 
-      ExhaustStackTemp = DesignMinExitGasTemp + (ExhaustTemp - DesignMinExitGasTemp) / &
+        ExhaustStackTemp = DesignMinExitGasTemp + (ExhaustTemp - DesignMinExitGasTemp) / &
                            EXP(UA/(MAX(ExhaustGasFlow, MaxExhaustperPowerOutput * RatedPowerOutput) * ExhaustCP))
 
-      QExhaustRec = MAX(ExhaustGasFlow*ExhaustCP*(ExhaustTemp-ExhaustStackTemp),0.0d0)
+        QExhaustRec = MAX(ExhaustGasFlow*ExhaustCP*(ExhaustTemp-ExhaustStackTemp),0.0d0)
+      ELSE
+        IF (ICEngineGenerator(GeneratorNum)%ErrExhaustTempIndex == 0) THEN
+          CALL ShowWarningMessage('CalcICEngineGeneratorModel: '//trim(ICEngineGenerator(GeneratorNum)%TypeOf)//  &
+              '="'//trim(ICEngineGenerator(GeneratorNum)%Name)//'" low Exhaust Temperature from Curve Value')
+          CALL ShowContinueError('...curve generated temperature=['//trim(RoundSigDigits(ExhaustTemp,3))//  &
+              ' C], PLR=['//trim(RoundSigDigits(PLR,3))//'].')
+          CALL ShowContinueError('...simulation will continue with exhaust heat reclaim set to 0.')
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('CalcICEngineGeneratorModel: '//trim(ICEngineGenerator(GeneratorNum)%TypeOf)//  &
+          '="'//trim(ICEngineGenerator(GeneratorNum)%Name)//'" low Exhaust Temperature continues...',   &
+          ICEngineGenerator(GeneratorNum)%ErrExhaustTempIndex,ReportMinOf=ExhaustTemp,ReportMaxOf=ExhaustTemp,   &
+          ReportMaxUnits='[C]',ReportMinUnits='[C]')
+        QExhaustRec =0.0
+        ExhaustStackTemp = ICEngineGenerator(GeneratorNum)%DesignMinExitGasTemp
+      ENDIF
     ELSE
       QExhaustRec =0.0
     END IF
@@ -10293,8 +10419,9 @@ MODULE MicroturbineElectricGenerator  ! Microturbine Electric Generator Module
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,   ONLY : MaxNameLength, NumOfTimeStepInHour, SecInHour, BeginEnvrnFlag, InitConvTemp
-USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowFatalError,  &
-                           ShowContinueError, SetupOutputVariable
+USE DataInterfaces, ONLY : ShowSevereError, ShowWarningError, ShowSevereMessage, ShowWarningMessage, ShowFatalError,  &
+                           ShowContinueError, SetupOutputVariable,  &
+                           ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
 USE DataGlobalConstants, ONLY: iGeneratorMicroturbine
 
 
@@ -10384,39 +10511,39 @@ TYPE MTGeneratorSpecs
 
 !     Warning message variables
        INTEGER    :: PowerFTempElevErrorIndex     = 0   ! Index to power as a function of temp/elevation warning message
-       INTEGER    :: PowerFTempElevErrorCount     = 0   ! Counter for power as a function of temp/elevation warning messages
+!       INTEGER    :: PowerFTempElevErrorCount     = 0   ! Counter for power as a function of temp/elevation warning messages
        INTEGER    :: EffFTempErrorIndex           = 0   ! Index to efficiency as a function of temperature warning message
-       INTEGER    :: EffFTempErrorCount           = 0   ! Counter for efficiency as a function of temperature warning messages
+!       INTEGER    :: EffFTempErrorCount           = 0   ! Counter for efficiency as a function of temperature warning messages
        INTEGER    :: EffFPLRErrorIndex            = 0   ! Index to efficiency as a function of PLR warning message
-       INTEGER    :: EffFPLRErrorCount            = 0   ! Counter for efficiency as a function of PLR warning messages
+!       INTEGER    :: EffFPLRErrorCount            = 0   ! Counter for efficiency as a function of PLR warning messages
        INTEGER    :: ExhFlowFTempErrorIndex       = 0   ! Index to exhaust flow as a function of temp warning message
-       INTEGER    :: ExhFlowFTempErrorCount       = 0   ! Counter for exhaust flow as a function of temp warning messages
+!       INTEGER    :: ExhFlowFTempErrorCount       = 0   ! Counter for exhaust flow as a function of temp warning messages
        INTEGER    :: ExhFlowFPLRErrorIndex        = 0   ! Index to exhaust flow as a function of PLR warning message
-       INTEGER    :: ExhFlowFPLRErrorCount        = 0   ! Counter for exhaust flow as a function of PLR warning messages
+!       INTEGER    :: ExhFlowFPLRErrorCount        = 0   ! Counter for exhaust flow as a function of PLR warning messages
        INTEGER    :: ExhTempFTempErrorIndex       = 0   ! Index to exhaust temp as a function of temp warning message
-       INTEGER    :: ExhTempFTempErrorCount       = 0   ! Counter for exhaust temp as a function of temp warning messages
+!       INTEGER    :: ExhTempFTempErrorCount       = 0   ! Counter for exhaust temp as a function of temp warning messages
        INTEGER    :: ExhTempFPLRErrorIndex        = 0   ! Index to exhaust temp as a function of PLR warning message
-       INTEGER    :: ExhTempFPLRErrorCount        = 0   ! Counter for exhaust temp as a function of PLR warning messages
+!       INTEGER    :: ExhTempFPLRErrorCount        = 0   ! Counter for exhaust temp as a function of PLR warning messages
        INTEGER    :: HRMinFlowErrorIndex          = 0   ! Index to reclaim water flow rate warning message
-       INTEGER    :: HRMinFlowErrorCount          = 0   ! Counter for reclaim water flow rate warning messages
+!       INTEGER    :: HRMinFlowErrorCount          = 0   ! Counter for reclaim water flow rate warning messages
        INTEGER    :: HRMaxFlowErrorIndex          = 0   ! Index to reclaim water flow rate warning message
-       INTEGER    :: HRMaxFlowErrorCount          = 0   ! Counter for reclaim water flow rate warning messages
+!       INTEGER    :: HRMaxFlowErrorCount          = 0   ! Counter for reclaim water flow rate warning messages
        INTEGER    :: ExhTempLTInletTempIndex      = 0   ! Index to exhaust temp < combustion inlet air temp warning messages
-       INTEGER    :: ExhTempLTInletTempCount      = 0   ! Counter for exhaust temp < combustion inlet air temp warning messages
+!       INTEGER    :: ExhTempLTInletTempCount      = 0   ! Counter for exhaust temp < combustion inlet air temp warning messages
        INTEGER    :: ExhHRLTInletHRIndex          = 0   ! Index to exhaust hum rat < combustion inlet air hum rat warning messages
-       INTEGER    :: ExhHRLTInletHRCount          = 0   ! Counter for exhaust hum rat < combustion inlet air hum rat warn messages
+!       INTEGER    :: ExhHRLTInletHRCount          = 0   ! Counter for exhaust hum rat < combustion inlet air hum rat warn messages
        INTEGER    :: AnciPowerIterErrorIndex      = 0   ! Index to Ancillary Power iteration loop warning messages
-       INTEGER    :: AnciPowerIterErrorCount      = 0   ! Count for Ancillary Power iteration loop warning messages
+!       INTEGER    :: AnciPowerIterErrorCount      = 0   ! Count for Ancillary Power iteration loop warning messages
        INTEGER    :: AnciPowerFMdotFuelErrorIndex = 0   ! Index to Ancillary Power as a function of fuel input warning messages
-       INTEGER    :: AnciPowerFMdotFuelErrorCount = 0   ! Count for Ancillary Power as a function of fuel input warning messages
+!       INTEGER    :: AnciPowerFMdotFuelErrorCount = 0   ! Count for Ancillary Power as a function of fuel input warning messages
        INTEGER    :: HeatRecRateFPLRErrorIndex    = 0   ! Index to heat recovery rate as a function of PLR warning messages
-       INTEGER    :: HeatRecRateFPLRErrorCount    = 0   ! Count for heat recovery rate as a function of PLR warning messages
+!       INTEGER    :: HeatRecRateFPLRErrorCount    = 0   ! Count for heat recovery rate as a function of PLR warning messages
        INTEGER    :: HeatRecRateFTempErrorIndex   = 0   ! Index to heat recovery rate as a function of temp warning messages
-       INTEGER    :: HeatRecRateFTempErrorCount   = 0   ! Count for heat recovery rate as a function of temp warning messages
+!       INTEGER    :: HeatRecRateFTempErrorCount   = 0   ! Count for heat recovery rate as a function of temp warning messages
        INTEGER    :: HeatRecRateFFlowErrorIndex   = 0   ! Index to heat recovery rate as a function of flow warning messages
-       INTEGER    :: HeatRecRateFFlowErrorCount   = 0   ! Count for heat recovery rate as a function of flow warning messages
+!       INTEGER    :: HeatRecRateFFlowErrorCount   = 0   ! Count for heat recovery rate as a function of flow warning messages
        INTEGER    :: ThermEffFTempElevErrorIndex  = 0   ! Index to thermal efficiency as a function of temp/elevation warnings
-       INTEGER    :: ThermEffFTempElevErrorCount  = 0   ! Count for thermal efficiency as a function of temp/elevation warnings
+!       INTEGER    :: ThermEffFTempElevErrorCount  = 0   ! Count for thermal efficiency as a function of temp/elevation warnings
 
 END TYPE MTGeneratorSpecs
 
@@ -11779,7 +11906,6 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
           ! REFERENCES: na
 
           ! USE STATEMENTS:
-  USE DataInterfaces,  ONLY: ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
   USE DataHVACGlobals, ONLY: FirstTimeStepSysFlag
   USE DataEnvironment, ONLY: OutDryBulbTemp, OutHumRat, OutBaroPress, Elevation
   USE CurveManager,    ONLY: CurveValue
@@ -11936,20 +12062,19 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
 !   Warn user if power modifier curve output is less than 0
     IF (PowerFTempElev .LT. 0.0d0) THEN
-      IF (MTGenerator(GeneratorNum)%PowerFTempElevErrorCount .LT. 1) THEN
-        MTGenerator(GeneratorNum)%PowerFTempElevErrorCount = MTGenerator(GeneratorNum)%PowerFTempElevErrorCount + 1
-        CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+      IF (MTGenerator(GeneratorNum)%PowerFTempElevErrorIndex == 0) THEN
+!        MTGenerator(GeneratorNum)%PowerFTempElevErrorCount = MTGenerator(GeneratorNum)%PowerFTempElevErrorCount + 1
+        CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
         CALL ShowContinueError('... Electrical Power Modifier curve (function of temperature and elevation) output is '// &
                                'less than zero ('//TRIM(TrimSigDigits(PowerFTempElev,4))//').')
         CALL ShowContinueError('... Value occurs using a combustion inlet air temperature of ' &
                            //TRIM(TrimSigDigits(CombustionAirInletTemp,2))//' C.')
         CALL ShowContinueError('... and an elevation of '//TRIM(TrimSigDigits(Elevation,2))//' m.')
         CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-      ELSE
-        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+      ENDIF
+      CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
           ' Electrical Power Modifier curve is less than zero warning continues...' &
           , MTGenerator(GeneratorNum)%PowerFTempElevErrorIndex, PowerFTempElev, PowerFTempElev)
-      END IF
       PowerFTempElev = 0.0d0
     END IF
 
@@ -11986,19 +12111,18 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
 !     Warn user if efficiency modifier curve output is less than 0
       IF (ElecEfficiencyFTemp .LT. 0.0d0) THEN
-        IF (MTGenerator(GeneratorNum)%EffFTempErrorCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%EffFTempErrorCount = MTGenerator(GeneratorNum)%EffFTempErrorCount + 1
-          CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+        IF (MTGenerator(GeneratorNum)%EffFTempErrorIndex == 0) THEN
+!          MTGenerator(GeneratorNum)%EffFTempErrorCount = MTGenerator(GeneratorNum)%EffFTempErrorCount + 1
+          CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('... Electrical Efficiency Modifier (function of temperature) output is less than ' &
                             //'zero ('//TRIM(TrimSigDigits(ElecEfficiencyFTemp,4))//').')
           CALL ShowContinueError('... Value occurs using a combustion inlet air temperature of ' &
                              //TRIM(TrimSigDigits(CombustionAirInletTemp,2))//' C.')
           CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Electrical Efficiency Modifier (function of temperature) output is less than zero warning continues...' &
             , MTGenerator(GeneratorNum)%EffFTempErrorIndex, ElecEfficiencyFTemp, ElecEfficiencyFTemp)
-        END IF
         ElecEfficiencyFTemp = 0.0d0
       END IF
 
@@ -12007,19 +12131,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
 !     Warn user if efficiency modifier curve output is less than 0
       IF (ElecEfficiencyFPLR .LT. 0.0d0) THEN
-        IF (MTGenerator(GeneratorNum)%EffFPLRErrorCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%EffFPLRErrorCount = MTGenerator(GeneratorNum)%EffFPLRErrorCount + 1
-          CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+        IF (MTGenerator(GeneratorNum)%EffFPLRErrorIndex == 0) THEN
+          CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('... Electrical Efficiency Modifier (function of part-load ratio) output is less than'// &
                                  ' zero ('//TRIM(TrimSigDigits(ElecEfficiencyFPLR,4))//').')
           CALL ShowContinueError('... Value occurs using a part-load ratio of ' &
                              //TRIM(TrimSigDigits(PLR,3))//'.')
           CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Electrical Efficiency Modifier (function of part-load ratio) output is less than zero warning'// &
             ' continues...', MTGenerator(GeneratorNum)%EffFPLRErrorIndex, ElecEfficiencyFPLR, ElecEfficiencyFPLR)
-        END IF
         ElecEfficiencyFPLR = 0.0d0
       END IF
 
@@ -12046,19 +12168,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         AnciPowerFMdotFuel = CurveValue(MTGenerator(GeneratorNum)%AncillaryPowerFuelCurveNum, MTGenerator(GeneratorNum)%FuelMdot)
 !       Warn user if ancillary power modifier curve output is less than 0
         IF (AnciPowerFMdotFuel .LT. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%AnciPowerFMdotFuelErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%AnciPowerFMdotFuelErrorCount = MTGenerator(GeneratorNum)%AnciPowerFMdotFuelErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%AnciPowerFMdotFuelErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('... Ancillary Power Modifier (function of fuel input) output is less than'// &
                                    ' zero ('//TRIM(TrimSigDigits(AnciPowerFMdotFuel,4))//').')
             CALL ShowContinueError('... Value occurs using a fuel input mass flow rate of ' &
                                    //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%FuelMdot,4))//' kg/s.')
             CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
               ' Ancillary Power Modifier (function of fuel input) output is less than zero warning'// &
               ' continues...', MTGenerator(GeneratorNum)%AnciPowerFMdotFuelErrorIndex, AnciPowerFMdotFuel, AnciPowerFMdotFuel)
-          END IF
           AnciPowerFMdotFuel = 0.0d0
         END IF
       ELSE
@@ -12078,19 +12198,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
     IF (AncPowerCalcIterIndex .GT. MaxAncPowerIter) THEN
 
-      IF (MTGenerator(GeneratorNum)%AnciPowerIterErrorCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%AnciPowerIterErrorCount = MTGenerator(GeneratorNum)%AnciPowerIterErrorCount + 1
-          CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
-          CALL ShowContinueError('... Iteration loop for electric power generation is not converging within tolerance.')
-          CALL ShowContinueError('... Check the Ancillary Power Modifier Curve (function of fuel input).')
-          CALL ShowContinueError('... Ancillary Power = '//TRIM(TrimSigDigits(AncillaryPowerRate,1))//' W.')
-          CALL ShowContinueError('... Fuel input rate = '//TRIM(TrimSigDigits(AnciPowerFMdotFuel,4))//' kg/s.')
-          CALL ShowContinueErrorTimeStamp('... Simulation will continue.')
-      ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+      IF (MTGenerator(GeneratorNum)%AnciPowerIterErrorIndex == 0) THEN
+        CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+        CALL ShowContinueError('... Iteration loop for electric power generation is not converging within tolerance.')
+        CALL ShowContinueError('... Check the Ancillary Power Modifier Curve (function of fuel input).')
+        CALL ShowContinueError('... Ancillary Power = '//TRIM(TrimSigDigits(AncillaryPowerRate,1))//' W.')
+        CALL ShowContinueError('... Fuel input rate = '//TRIM(TrimSigDigits(AnciPowerFMdotFuel,4))//' kg/s.')
+        CALL ShowContinueErrorTimeStamp('... Simulation will continue.')
+      ENDIF
+      CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Iteration loop for electric power generation is not converging within tolerance continues...', &
               MTGenerator(GeneratorNum)%AnciPowerIterErrorIndex)
-      END IF
 
     END IF
 
@@ -12112,20 +12230,18 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
          ThermalEffFTempElev = CurveValue(MTGenerator(GeneratorNum)%ThermEffFTempElevCurveNum, CombustionAirInletTemp, Elevation)
 !       Warn user if power modifier curve output is less than 0
         IF (ThermalEffFTempElev .LT. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%ThermEffFTempElevErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%ThermEffFTempElevErrorCount = MTGenerator(GeneratorNum)%ThermEffFTempElevErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%ThermEffFTempElevErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('... Electrical Power Modifier curve (function of temperature and elevation) output is '// &
                                    'less than zero ('//TRIM(TrimSigDigits(PowerFTempElev,4))//').')
             CALL ShowContinueError('... Value occurs using a combustion inlet air temperature of ' &
                                //TRIM(TrimSigDigits(CombustionAirInletTemp,2))//' C.')
             CALL ShowContinueError('... and an elevation of '//TRIM(TrimSigDigits(Elevation,2))//' m.')
             CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
               ' Electrical Power Modifier curve is less than zero warning continues...' &
               , MTGenerator(GeneratorNum)%ThermEffFTempElevErrorIndex, ThermalEffFTempElev, ThermalEffFTempElev)
-          END IF
           ThermalEffFTempElev = 0.0d0
         END IF
       ELSE
@@ -12139,19 +12255,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         HeatRecRateFPLR  = CurveValue(MTGenerator(GeneratorNum)%HeatRecRateFPLRCurveNum, PLR)
 !       Warn user if heat recovery modifier curve output is less than 0
         IF (HeatRecRateFPLR .LT. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%HeatRecRateFPLRErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%HeatRecRateFPLRErrorCount = MTGenerator(GeneratorNum)%HeatRecRateFPLRErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%HeatRecRateFPLRErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('... Heat Recovery Rate Modifier (function of part-load ratio) output is less than'// &
                                    ' zero ('//TRIM(TrimSigDigits(HeatRecRateFPLR,4))//').')
             CALL ShowContinueError('... Value occurs using a part-load ratio of ' &
                                //TRIM(TrimSigDigits(PLR,3))//'.')
             CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
               ' Heat Recovery Rate Modifier (function of part-load ratio) output is less than zero warning'// &
               ' continues...', MTGenerator(GeneratorNum)%HeatRecRateFPLRErrorIndex, HeatRecRateFPLR, HeatRecRateFPLR)
-          END IF
           HeatRecRateFPLR = 0.0d0
         END IF
       ELSE
@@ -12162,19 +12276,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
       IF (MTGenerator(GeneratorNum)%HeatRecRateFTempCurveNum .GT. 0) THEN
         HeatRecRateFTemp  = CurveValue(MTGenerator(GeneratorNum)%HeatRecRateFTempCurveNum, HeatRecInTemp)
         IF (HeatRecRateFTemp .LT. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%HeatRecRateFTempErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%HeatRecRateFTempErrorCount = MTGenerator(GeneratorNum)%HeatRecRateFTempErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%HeatRecRateFTempErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('... Heat Recovery Rate Modifier (function of inlet water temp) output is less than ' &
                               //'zero ('//TRIM(TrimSigDigits(HeatRecRateFTemp,4))//').')
             CALL ShowContinueError('... Value occurs using an inlet water temperature temperature of ' &
                                //TRIM(TrimSigDigits(HeatRecInTemp,2))//' C.')
             CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
                  ' Heat Recovery Rate Modifier (function of inlet water temp) output is less than zero warning continues...' &
                  , MTGenerator(GeneratorNum)%HeatRecRateFTempErrorIndex, HeatRecRateFTemp, HeatRecRateFTemp)
-          END IF
           HeatRecRateFTemp = 0.0d0
         END IF
       ELSE
@@ -12191,19 +12303,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         HeatRecVolFlowRate = HeatRecMdot / rho
         HeatRecRateFFlow  = CurveValue(MTGenerator(GeneratorNum)%HeatRecRateFWaterFlowCurveNum,HeatRecVolFlowRate)
         IF (HeatRecRateFFlow .LT. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%HeatRecRateFFlowErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%HeatRecRateFFlowErrorCount = MTGenerator(GeneratorNum)%HeatRecRateFFlowErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%HeatRecRateFFlowErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('... Heat Recovery Rate Modifier (function of water flow rate) output is less than ' &
                               //'zero ('//TRIM(TrimSigDigits(HeatRecRateFFlow,4))//').')
             CALL ShowContinueError('... Value occurs using a water flow rate of ' &
                                //TRIM(TrimSigDigits(HeatRecVolFlowRate,4))//' m3/s.')
             CALL ShowContinueErrorTimeStamp('... Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
               ' Heat Recovery Rate Modifier (function of water flow rate) output is less than zero warning continues...' &
               , MTGenerator(GeneratorNum)%HeatRecRateFFlowErrorIndex, HeatRecRateFFlow, HeatRecRateFFlow)
-          END IF
           HeatRecRateFFlow = 0.0d0
         END IF
       ELSE
@@ -12246,34 +12356,30 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
 
 !     Check water mass flow rate against minimum
       IF (MTGenerator(GeneratorNum)%HeatRecMinMassFlowRate .GT. HeatRecMdot .AND. HeatRecMdot .GT. 0.0d0) THEN
-        IF (MTGenerator(GeneratorNum)%HRMinFlowErrorCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%HRMinFlowErrorCount = MTGenerator(GeneratorNum)%HRMinFlowErrorCount + 1
+        IF (MTGenerator(GeneratorNum)%HRMinFlowErrorIndex == 0) THEN
           CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('...Heat reclaim water flow rate is below the generators minimum mass flow rate of (' &
                             //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%HeatRecMinMassFlowRate,4))//').')
           CALL ShowContinueError('...Heat reclaim water mass flow rate = '//TRIM(TrimSigDigits(HeatRecMdot,4))//'.')
           CALL ShowContinueErrorTimeStamp('...Check inputs for heat recovery water flow rate.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
                ' Heat recovery water flow rate is below the generators minimum mass flow rate warning continues...' &
                , MTGenerator(GeneratorNum)%HRMinFlowErrorIndex, HeatRecMdot, HeatRecMdot)
-        END IF
       END IF
 
 !     Check water mass flow rate against maximum
       IF (HeatRecMdot .GT. MTGenerator(GeneratorNum)%HeatRecMaxMassFlowRate .AND. HeatRecMdot .GT. 0.0d0) THEN
-        IF (MTGenerator(GeneratorNum)%HRMaxFlowErrorCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%HRMaxFlowErrorCount = MTGenerator(GeneratorNum)%HRMaxFlowErrorCount + 1
+        IF (MTGenerator(GeneratorNum)%HRMaxFlowErrorIndex == 0) THEN
           CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('...Heat reclaim water flow rate is above the generators maximum mass flow rate of (' &
                             //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%HeatRecMaxMassFlowRate,4))//').')
           CALL ShowContinueError('...Heat reclaim water mass flow rate = '//TRIM(TrimSigDigits(HeatRecMdot,4))//'.')
           CALL ShowContinueErrorTimeStamp('...Check inputs for heat recovery water flow rate.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
                ' Heat recovery water flow rate is above the generators maximum mass flow rate warning continues...' &
                , MTGenerator(GeneratorNum)%HRMaxFlowErrorIndex, HeatRecMdot, HeatRecMdot)
-        END IF
       END IF
 
 !     Set report variables
@@ -12291,19 +12397,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         ExhFlowFTemp = CurveValue(MTGenerator(GeneratorNum)%ExhFlowFTempCurveNum,CombustionAirInletTemp)
 !       Warn user if exhaust modifier curve output is less than or equal to 0
         IF (ExhFlowFTemp .LE. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%ExhFlowFTempErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%ExhFlowFTempErrorCount = MTGenerator(GeneratorNum)%ExhFlowFTempErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%ExhFlowFTempErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('...Exhaust Air Flow Rate Modifier (function of temperature) output is less than or equal '&
                               //'to zero ('//TRIM(TrimSigDigits(ExhFlowFTemp,4))//').')
             CALL ShowContinueError('...Value occurs using a combustion inlet air temperature of ' &
                              //TRIM(TrimSigDigits(CombustionAirInletTemp,2))//'.')
             CALL ShowContinueErrorTimeStamp('...Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Exhaust Air Flow Rate Modifier (function of temperature) output is less than or equal to zero warning continues...'&
             , MTGenerator(GeneratorNum)%ExhFlowFTempErrorIndex, ExhFlowFTemp, ExhFlowFTemp)
-          END IF
           ExhFlowFTemp = 0.0d0
         END IF
       ELSE
@@ -12314,19 +12418,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         ExhFlowFPLR = CurveValue(MTGenerator(GeneratorNum)%ExhFlowFPLRCurveNum,PLR)
 !       Warn user if exhaust modifier curve output is less than or equal to 0
         IF (ExhFlowFPLR .LE. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%ExhFlowFPLRErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%ExhFlowFPLRErrorCount = MTGenerator(GeneratorNum)%ExhFlowFPLRErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%ExhFlowFPLRErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('...Exhaust Air Flow Rate Modifier (function of part-load ratio) output is less than or '&
                               //'equal to zero ('//TRIM(TrimSigDigits(ExhFlowFPLR,4))//').')
             CALL ShowContinueError('...Value occurs using a part-load ratio of ' &
                              //TRIM(TrimSigDigits(PLR,2))//'.')
             CALL ShowContinueErrorTimeStamp('...Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Exhaust Air Flow Rate Modifier (function of part-load ratio) output is less than or equal to zero warning'&
              //' continues...', MTGenerator(GeneratorNum)%ExhFlowFPLRErrorIndex, ExhFlowFPLR, ExhFlowFPLR)
-          END IF
           ExhFlowFPLR = 0.0d0
         END IF
       ELSE
@@ -12349,19 +12451,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         ExhAirTempFTemp = CurveValue(MTGenerator(GeneratorNum)%ExhAirTempFTempCurveNum,CombustionAirInletTemp)
 !       Warn user if exhaust modifier curve output is less than or equal to 0
         IF (ExhAirTempFTemp .LE. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%ExhTempFTempErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%ExhTempFTempErrorCount = MTGenerator(GeneratorNum)%ExhTempFTempErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%ExhTempFTempErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('...Exhaust Air Temperature Modifier (function of temperature) output is less than or equal '&
                               //'to zero ('//TRIM(TrimSigDigits(ExhAirTempFTemp,4))//').')
             CALL ShowContinueError('...Value occurs using a combustion inlet air temperature of ' &
                              //TRIM(TrimSigDigits(CombustionAirInletTemp,2))//'.')
             CALL ShowContinueErrorTimeStamp('...Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Exhaust Air Temperature Modifier (function of temperature) output is less than or equal to zero'//&
             ' warning continues...', MTGenerator(GeneratorNum)%ExhTempFTempErrorIndex, ExhAirTempFTemp, ExhAirTempFTemp)
-          END IF
           ExhAirTempFTemp = 0.0d0
         END IF
       ELSE
@@ -12372,19 +12472,17 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
         ExhAirTempFPLR = CurveValue(MTGenerator(GeneratorNum)%ExhAirTempFPLRCurveNum,PLR)
 !       Warn user if exhaust modifier curve output is less than or equal to 0
         IF (ExhAirTempFPLR .LE. 0.0d0) THEN
-          IF (MTGenerator(GeneratorNum)%ExhTempFPLRErrorCount .LT. 1) THEN
-            MTGenerator(GeneratorNum)%ExhTempFPLRErrorCount = MTGenerator(GeneratorNum)%ExhTempFPLRErrorCount + 1
-            CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+          IF (MTGenerator(GeneratorNum)%ExhTempFPLRErrorIndex == 0) THEN
+            CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
             CALL ShowContinueError('...Exhaust Air Temperature Modifier (function of part-load ratio) output is less than or '&
                               //'equal to zero ('//TRIM(TrimSigDigits(ExhAirTempFPLR,4))//').')
             CALL ShowContinueError('...Value occurs using a part-load ratio of ' &
                              //TRIM(TrimSigDigits(PLR,2))//'.')
             CALL ShowContinueErrorTimeStamp('...Resetting curve output to zero and continuing simulation.')
-          ELSE
-            CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'//&
             ' Exhaust Air Temperature Modifier (function of part-load ratio) output is less than or equal to zero warning' &
              //' continues...', MTGenerator(GeneratorNum)%ExhTempFPLRErrorIndex, ExhAirTempFPLR, ExhAirTempFPLR)
-          END IF
           ExhAirTempFPLR = 0.0d0
         END IF
       ELSE
@@ -12418,27 +12516,24 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
       END IF
 
       IF (MTGenerator(GeneratorNum)%ExhaustAirTemperature .LT. CombustionAirInletTemp) THEN
-        IF (MTGenerator(GeneratorNum)%ExhTempLTInletTempCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%ExhTempLTInletTempCount = MTGenerator(GeneratorNum)%ExhTempLTInletTempCount + 1
-          CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+        IF (MTGenerator(GeneratorNum)%ExhTempLTInletTempIndex == 0) THEN
+          CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('...The model has calculated the exhaust air temperature to be less than '&
                             //'the combustion air inlet temperature.')
           CALL ShowContinueError('...Value of exhaust air temperature   =' &
                                  //TRIM(TrimSigDigits(MTGenerator(GeneratorNum)%ExhaustAirTemperature,4))//' C.')
           CALL ShowContinueError('...Value of combustion air inlet temp ='//TRIM(TrimSigDigits(CombustionAirInletTemp,4))//' C.')
           CALL ShowContinueErrorTimeStamp('... Simulation will continue.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'// &
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'// &
           ' Exhaust air temperature less than combustion air inlet temperature warning continues...', &
             MTGenerator(GeneratorNum)%ExhTempLTInletTempIndex, MTGenerator(GeneratorNum)%ExhaustAirTemperature, &
             MTGenerator(GeneratorNum)%ExhaustAirTemperature)
-        END IF
       END IF
 
       IF (MTGenerator(GeneratorNum)%ExhaustAirHumRat .LT. CombustionAirInletW) THEN
-        IF (MTGenerator(GeneratorNum)%ExhHRLTInletHRCount .LT. 1) THEN
-          MTGenerator(GeneratorNum)%ExhHRLTInletHRCount = MTGenerator(GeneratorNum)%ExhHRLTInletHRCount + 1
-          CALL ShowWarningError('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
+        IF (MTGenerator(GeneratorNum)%ExhHRLTInletHRIndex == 0) THEN
+          CALL ShowWarningMessage('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
           CALL ShowContinueError('...The model has calculated the exhaust air humidity ratio to be less than '&
                             //'the combustion air inlet humidity ratio.')
           CALL ShowContinueError('...Value of exhaust air humidity ratio          =' &
@@ -12446,12 +12541,11 @@ SUBROUTINE CalcMTGeneratorModel(GeneratorNum,Runflag,MyLoad,FirstHVACIteration)
           CALL ShowContinueError('...Value of combustion air inlet humidity ratio ='//TRIM(TrimSigDigits(CombustionAirInletW,6))&
                                  //' kgWater/kgDryAir.')
           CALL ShowContinueErrorTimeStamp('... Simulation will continue.')
-        ELSE
-          CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'// &
+        ENDIF
+        CALL ShowRecurringWarningErrorAtEnd('GENERATOR:MICROTURBINE "'//TRIM(MTGenerator(GeneratorNum)%Name)//'":'// &
           ' Exhaust air humidity ratio less than combustion air inlet humidity ratio warning continues...', &
             MTGenerator(GeneratorNum)%ExhHRLTInletHRIndex, MTGenerator(GeneratorNum)%ExhaustAirHumRat, &
             MTGenerator(GeneratorNum)%ExhaustAirHumRat)
-        END IF
       END IF
 
     END IF ! End of IF (MTGenerator(GeneratorNum)%ExhAirCalcsActive) THEN

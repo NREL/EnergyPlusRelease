@@ -218,31 +218,31 @@ SUBROUTINE GetZoneContaminanInputs
 
   MaxAlpha=-100
   MaxNumber=-100
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:Constant'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:Constant'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:PressureDriven'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:PressureDriven'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:CutoffModel'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:CutoffModel'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:DecaySource'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DecaySource'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:BoudaryLayerDiffusion'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:BoundaryLayerDiffusion'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:DepositionVelocitySink'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:DepositionVelocitySink'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:DepositionRateSink'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DepositionRateSink'
   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
@@ -251,7 +251,7 @@ SUBROUTINE GetZoneContaminanInputs
   IHGNumbers=0.0
   AlphaName=' '
 
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:Constant'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:Constant'
   TotGCGenConstant=GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericConstant(TotGCGenConstant))
 
@@ -364,7 +364,7 @@ SUBROUTINE GetZoneContaminanInputs
 
   END DO
 
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:PressureDriven'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:PressureDriven'
   TotGCGenPDriven=GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericPDriven(TotGCGenPDriven))
 
@@ -469,7 +469,7 @@ SUBROUTINE GetZoneContaminanInputs
                GenericContamGainRate       = ZoneContamGenericPDriven(Loop)%GCGenRate)
   END DO
 
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:CutoffModel'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:CutoffModel'
   TotGCGenCutoff=GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericCutoff(TotGCGenCutoff))
 
@@ -561,7 +561,7 @@ SUBROUTINE GetZoneContaminanInputs
                GenericContamGainRate       = ZoneContamGenericCutoff(Loop)%GCGenRate)
   END DO
 
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:DecaySource'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DecaySource'
   TotGCGenDecay=GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericDecay(TotGCGenDecay))
 
@@ -655,7 +655,7 @@ SUBROUTINE GetZoneContaminanInputs
                GenericContamGainRate       = ZoneContamGenericDecay(Loop)%GCGenRate)
   END DO
 
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:BoudaryLayerDiffusion'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:BoundaryLayerDiffusion'
   TotGCBLDiff =GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericBLDiff(TotGCBLDiff))
 
@@ -749,7 +749,7 @@ SUBROUTINE GetZoneContaminanInputs
                GenericContamGainRate       = ZoneContamGenericBLDiff(Loop)%GCGenRate)
   END DO
 
-  CurrentModuleObject='SurfaceContaminantSourceAndSink:GenericContaminant:DepositionVelocitySink'
+  CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:DepositionVelocitySink'
   TotGCDVS =GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericDVS(TotGCDVS))
 
@@ -833,7 +833,7 @@ SUBROUTINE GetZoneContaminanInputs
                GenericContamGainRate       = ZoneContamGenericDVS(Loop)%GCGenRate)
   END DO
 
-  CurrentModuleObject='ZoneContaminantSourceAndSink:GenericContaminant:DepositionRateSink'
+  CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DepositionRateSink'
   TotGCDRS=GetNumObjectsFound(TRIM(CurrentModuleObject))
   ALLOCATE(ZoneContamGenericDRS(TotGCDRS))
 

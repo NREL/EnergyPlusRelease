@@ -109,8 +109,7 @@ TYPE WindACData
   REAL(r64)                    :: FanPartLoadRatio  =0.0 ! fan part-load ratio for time step
   REAL(r64)                    :: CompPartLoadRatio =0.0 ! compressor part-load ratio for time step
   CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
-  Logical                      :: AvailManagerListFound = .FALSE. ! True if availability manager list name is specified
-                                                                  ! for Window AC object
+  INTEGER                      :: AvailStatus          = 0
 END TYPE WindACData
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -276,11 +275,8 @@ SUBROUTINE GetWindowAC
   USE DataGlobals,           ONLY: AnyEnergyManagementSystemInModel, NumOfZones
   USE DataInterfaces,        ONLY: SetupEMSActuator
   USE MixedAir,              ONLY: GetOAMixerIndex, GetOAMixerNodeNumbers
-  USE DataHvacGlobals,       ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff
-  USE SystemAvailabilityManager, ONLY: GetZoneEqAvailabilityManager
-  USE DataZoneEquipment,         ONLY: WindowAC_Num
-  USE DataHVACGlobals,           ONLY: ZoneComp, cFanTypes
-  USE DataZoneEquipment,         ONLY: ZoneEquipConfig
+  USE DataHvacGlobals,       ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, cFanTypes, ZoneComp
+  USE DataZoneEquipment,     ONLY: WindowAC_Num, ZoneEquipConfig
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -501,14 +497,7 @@ DO WindACIndex = 1,NumWindACCyc
 
   IF (.NOT. lAlphaBlanks(13)) THEN
     WindAC(WindACNum)%AvailManagerListName = Alphas(13)
-    ErrFlag = .FALSE.
-    CALL GetZoneEqAvailabilityManager(WindAC(WindACNum)%AvailManagerListName,ErrFlag,WindowAC_Num,WindACNum,NumWindAC)
-    IF (ErrFlag) THEN
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(WindAC(WindACNum)%Name))
-      ErrorsFound=.true.
-    ELSE
-      WindAC(WindACNum)%AvailManagerListFound = .TRUE.
-    ENDIF
+    ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailManagerListName  = Alphas(13)
   ENDIF
 
   ! Add fan to component sets array
@@ -646,11 +635,8 @@ DO WindACNum=1,NumWindAC
                            WindAC(WindACNum)%Name)
   CALL SetupOutputVariable('Window AC Compressor Part-Load Ratio',WindAC(WindACNum)%CompPartLoadRatio,'System','Average',&
                            WindAC(WindACNum)%Name)
-  IF (WindAC(WindACNum)%AvailManagerListFound) THEN
-    CALL SetupOutputVariable('Window AC Fan Availability Status',&
-                              ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailStatus,&
-                             'System','Average',WindAC(WindACNum)%Name)
-  ENDIF
+  CALL SetupOutputVariable('Window AC Fan Availability Status',WindAC(WindACNum)%AvailStatus,'System','Average',&
+                           WindAC(WindACNum)%Name)
   IF (AnyEnergyManagementSystemInModel) THEN
     CALL SetupEMSActuator('Window Air Conditioner', WindAC(WindACNum)%Name, 'Part Load Ratio' , '[fraction]', &
                            WindAC(WindACNum)%EMSOverridePartLoadFrac, WindAC(WindACNum)%EMSValueForPartLoadFrac )
@@ -680,10 +666,9 @@ SUBROUTINE InitWindowAC(WindACNum,QZnReq,ZoneNum,FirstHVACIteration)
           ! na
 
           ! USE STATEMENTS:
-  USE DataZoneEquipment,     ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, &
-                                   WindowAC_Num, TotalNumZoneEquipType
-  USE DataZoneEnergyDemands, ONLY: CurDeadBandorSetback, ZoneSysEnergyDemand
-  USE DataHVACGlobals,       ONLY: ZoneComp, NoAction, ForceOff, CycleOn
+  USE DataZoneEquipment,     ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, WindowAC_Num
+  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
+  USE DataHvacGlobals,       ONLY: ZoneComp, ZoneCompTurnFansOn, ZoneCompTurnFansOff, SmallLoad
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -715,13 +700,6 @@ SUBROUTINE InitWindowAC(WindACNum,QZnReq,ZoneNum,FirstHVACIteration)
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag  ! one time initialization flag
   REAL(r64)           :: QToCoolSetPt   ! sensible load to cooling setpoint (W)
   REAL(r64)           :: NoCompOutput   ! sensible load delivered with compressor off (W)
-  INTEGER             :: AvailStatus    ! Availability status set by system availability manager
-
-AvailStatus = NoAction
-
-IF (WindAC(WindACNum)%AvailManagerListFound) THEN
-  AvailStatus = ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailStatus
-END IF
 
 ! Do the one time initializations
 IF (MyOneTimeFlag) THEN
@@ -733,6 +711,11 @@ IF (MyOneTimeFlag) THEN
   MyOneTimeFlag = .false.
 
 END IF
+
+IF (ALLOCATED(ZoneComp)) THEN
+  ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%ZoneNum = ZoneNum
+  WindAC(WindACNum)%AvailStatus = ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailStatus
+ENDIF
 
 ! need to check all Window AC units to see if they are on Zone Equipment List or issue warning
 IF (.not. ZoneEquipmentListChecked .and. ZoneEquipInputsFilled) THEN
@@ -790,7 +773,7 @@ AirRelNode = WindAC(WindACNum)%AirReliefNode
 ! Set the inlet node mass flow rate
 IF (GetCurrentScheduleValue(WindAC(WindACNum)%SchedPtr) .LE. 0.0 &
     .OR. (GetCurrentScheduleValue(WindAC(WindACNum)%FanAvailSchedPtr) .LE. 0.0d0 .AND. &
-    AvailStatus .NE. CycleOn) .OR. AvailStatus .EQ. ForceOff) THEN
+    .NOT. ZoneCompTurnFansOn) .OR. ZoneCompTurnFansOff) THEN
   WindAC(WindACNum)%PartLoadFrac = 0.0
   Node(InletNode)%MassFlowRate = 0.0
   Node(InletNode)%MassFlowRateMaxAvail = 0.0
@@ -815,7 +798,7 @@ ELSE
 END IF
 
 ! Original thermostat control logic (works only for cycling fan systems)
-IF(QZnReq .LT. 0.0d0 .AND. .NOT. CurDeadbandOrSetback(ZoneNum) .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0)THEN
+IF(QZnReq .LT. (-1.d0*SmallLoad) .AND. .NOT. CurDeadbandOrSetback(ZoneNum) .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0)THEN
   CoolingLoad = .TRUE.
 ELSE
   CoolingLoad = .FALSE.
@@ -824,7 +807,7 @@ END IF
 ! Constant fan systems are tested for ventilation load to determine if load to be met changes.
 IF(WindAC(WindACNum)%OpMode .EQ. ContFanCycCoil .AND. WindAC(WindACNum)%PartLoadFrac .GT. 0.0 &
     .AND. (GetCurrentScheduleValue(WindAC(WindACNum)%FanAvailSchedPtr) .GT. 0.0d0 .OR. &
-    AvailStatus .EQ. CycleOn) .AND. AvailStatus .NE. ForceOff)THEN
+    ZoneCompTurnFansOn) .AND. .NOT. ZoneCompTurnFansOn)THEN
 
   CALL CalcWindowACOutput(WindACNum,FirstHVACIteration,WindAC(WindACNum)%OpMode, &
                           0.0d0,.FALSE.,NoCompOutput)
@@ -832,7 +815,7 @@ IF(WindAC(WindACNum)%OpMode .EQ. ContFanCycCoil .AND. WindAC(WindACNum)%PartLoad
   QToCoolSetPt=ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
 
 ! If the unit has a net heating capacity and the zone temp is below the Tstat cooling setpoint
-  IF(NoCompOutput .GT. 0.0d0 .AND. QToCoolSetPt .GT. 0.0d0 .AND. CurDeadbandOrSetback(ZoneNum))THEN
+  IF(NoCompOutput .GT. (-1.d0 * SmallLoad) .AND. QToCoolSetPt .GT. (-1.d0 * SmallLoad) .AND. CurDeadbandOrSetback(Zonenum) )THEN
     IF(NoCompOutput .GT. QToCoolSetPt)THEN
       QZnReq       = QToCoolSetPt
       CoolingLoad  = .TRUE.
@@ -1122,7 +1105,7 @@ SUBROUTINE CalcWindowACOutput(WindACNum,FirstHVACIteration,OpMode,PartLoadFrac,H
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   May 2000
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1140,8 +1123,7 @@ USE Fans, ONLY:       SimulateFanComponents
 USE DXCoils, ONLY:    SimDXCoil
 USE HVACHXAssistedCoolingCoil,   ONLY: SimHXAssistedCoolingCoil
 USE InputProcessor,              ONLY: SameString
-USE DataZoneEquipment,           ONLY: WindowAC_Num
-USE DataHVACGlobals,             ONLY: ZoneComp, NoAction, ForceOff, CycleOn
+USE DataHvacGlobals,             ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1169,11 +1151,6 @@ INTEGER :: OutsideAirNode   ! outside air node number in window AC loop
 INTEGER :: AirRelNode       ! relief air node number in window AC loop
 REAL(r64)    :: AirMassFlow      ! total mass flow through the unit
 REAL(r64)    :: MinHumRat        ! minimum of inlet & outlet humidity ratio
-LOGICAL :: WindACTurnFansOn      ! TurnFansOn Availalability status as set by SAM
-LOGICAL :: WindACTurnFansOff     ! TurnFansOff Availalability status as set by SAM
-
-WindACTurnFansOn  = .FALSE.
-WindACTurnFansOff = .FALSE.
 
           ! FLOW
 
@@ -1191,23 +1168,10 @@ END IF
 AirMassFlow = Node(InletNode)%MassFlowRate
 CALL SimOAMixer(WindAC(WindACNum)%OAMixName,FirstHVACIteration,WindAC(WindACNum)%OAMixIndex)
 
-IF(WindAC(WindACNum)%AvailManagerListFound)THEN
-  IF(ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailStatus .EQ. CycleOn) THEN
-    WindACTurnFansOn = .TRUE.
-    WindACTurnFansOff = .FALSE.
-  ELSEIF(ZoneComp(WindowAC_Num)%ZoneCompAvailMgrs(WindACNum)%AvailStatus .EQ. Forceoff) THEN
-    WindACTurnFansOn = .FALSE.
-    WindACTurnFansOff = .TRUE.
-  ENDIF
-ENDIF
 ! if blow through, simulate fan then coil. For draw through, simulate coil then fan.
 IF (WindAC(WindACNum)%FanPlace .EQ. BlowThru) THEN
-  IF (WindAC(WindACNum)%AvailManagerListFound) THEN
-    CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex, &
-                               ZoneCompTurnFansOn = WindACTurnFansOn,ZoneCompTurnFansOff = WindACTurnFansOff)
-  ELSE
-    CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex)
-  ENDIF
+   CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex, &
+                               ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
 END IF
 
 IF(WindAC(WindACNum)%DXCoilType_Num == CoilDX_CoolingHXAssisted) THEN
@@ -1219,12 +1183,8 @@ ELSE
 END IF
 
 IF (WindAC(WindACNum)%FanPlace .EQ. DrawThru) THEN
-  IF (WindAC(WindACNum)%AvailManagerListFound) THEN
-    CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex, &
-                               ZoneCompTurnFansOn = WindACTurnFansOn,ZoneCompTurnFansOff = WindACTurnFansOff)
-  ELSE
-    CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex)
-  ENDIF
+  CALL SimulateFanComponents(WindAC(WindACNum)%FanName,FirstHVACIteration,WindAC(WindACNum)%FanIndex, &
+                             ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
 END IF
 
 MinHumRat = MIN(Node(InletNode)%HumRat,Node(OutletNode)%HumRat)

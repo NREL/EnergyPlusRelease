@@ -1050,6 +1050,7 @@ SUBROUTINE SimHeatPumpWaterHeater(CompName,FirstHVACIteration,SensLoadMet,LatLoa
   ! HPWHs not defined as zone equipment with no plant connections are simulated in NonZoneEquipmentManager.
   ! Plant connected HPWHs are called by PlantLoopEquipments (but only those on supply side ).
   SensLoadMet = 0.0
+  LatLoadMet  = 0.0
 
   LocalRunFlag = .TRUE.
   LocalFlowLock = 1 ! .TRUE.
@@ -1123,7 +1124,10 @@ SUBROUTINE CalcWaterThermalTankZoneGains
   ENDIF
 
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
-    WaterThermalTank%AmbientZoneGain =0.0
+    WaterThermalTank%AmbientZoneGain      = 0.d0
+    WaterThermalTank%FuelEnergy           = 0.d0
+    WaterThermalTank%OffCycParaFuelEnergy = 0.d0
+    WaterThermalTank%OnCycParaFuelEnergy  = 0.d0
     MyEnvrnFlag=.false.
   ENDIF
 
@@ -5386,6 +5390,8 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
     ! (use HPWH or Desuperheater heating coil set point if applicable)
     IF(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum .GT. 0)THEN
       HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Mode = FloatMode
+      HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%SaveMode  = FloatMode
+      HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%SaveWHMode = FloatMode
       SchIndex = HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%SetpointTempSchedule
     ELSE IF(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum .GT. 0)THEN
       WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Mode = FloatMode
@@ -5415,9 +5421,32 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
     WaterThermalTank(WaterThermalTankNum)%SavedSourceOutletTemp = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
     WaterThermalTank(WaterThermalTankNum)%UseOutletTemp         = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
     WaterThermalTank(WaterThermalTankNum)%SavedUseOutletTemp    = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
+    WaterThermalTank(WaterThermalTankNum)%TankTempAvg           = WaterThermalTank(WaterThermalTankNum)%SavedTankTemp
 
     WaterThermalTank(WaterThermalTankNum)%SavedHeaterOn1 = .FALSE.
     WaterThermalTank(WaterThermalTankNum)%SavedHeaterOn2 = .FALSE.
+    WaterThermalTank(WaterThermalTankNum)%Mode           = 0
+    WaterThermalTank(WaterThermalTankNum)%SavedMode      = 0
+    WaterThermalTank(WaterThermalTankNum)%FirstRecoveryDone = .FALSE.
+    WaterThermalTank(WaterThermalTankNum)%FirstRecoveryFuel = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%UnmetEnergy    = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%LossEnergy     = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%FlueLossEnergy = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%UseEnergy      = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%TotalDemandEnergy = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%SourceEnergy   = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%HeaterEnergy   = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%HeaterEnergy1  = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%HeaterEnergy2  = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%FuelEnergy     = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%FuelEnergy1    = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%FuelEnergy2    = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%VentEnergy     = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelEnergy = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%OffCycParaEnergyToTank = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelEnergy = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%OnCycParaEnergyToTank = 0.d0
+    WaterThermalTank(WaterThermalTankNum)%NetHeatTransferEnergy = 0.d0
 
     IF ((WaterThermalTank(WaterThermalTankNum)%SourceDesignVolFlowRate == Autosize) .or. &
         (WaterThermalTank(WaterThermalTankNum)%UseDesignVolFlowRate ==  Autosize) ) THEN
@@ -7896,6 +7925,10 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
       HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
       DO loopIter = 1, 4
         CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
+!       Currently, HPWH heating rate is only a function of inlet evap conditions and air flow rate
+!       If HPWH is ever allowed to vary fan speed, this next sub should be called.
+!       (possibly with an iteration loop to converge on a solution)
+!       CALL CalcDOE2DXCoil(DXCoilNum, HPPartLoadRatio, FirstHVACIteration,PartLoadRatio, FanOpMode)
         CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
 
 !           move the full load outlet temperature rate to the water heater structure variables
@@ -8052,6 +8085,10 @@ SUBROUTINE CalcHeatPumpWaterHeater(WaterThermalTankNum,FirstHVACIteration)
         HPWHCondInletNodeLast = Node(HPWaterInletNode)%Temp
         DO loopIter = 1, 4
           CALL CalcHPWHDXCoil(HPWaterHeater(HPNum)%DXCoilNum, HPPartLoadRatio)
+!         Currently, HPWH heating rate is only a function of inlet evap conditions and air flow rate
+!         If HPWH is ever allowed to vary fan speed, this next sub should be called.
+!         CALL CalcDOE2DXCoil(DXCoilNum, HPPartLoadRatio, FirstHVACIteration,PartLoadRatio, FanOpMode)
+!         (possibly with an iteration loop to converge on a solution)
           CondenserDeltaT = Node(HPWaterOutletNode)%Temp - Node(HPWaterInletNode)%Temp
           WaterThermalTank(WaterThermalTankNum)%SourceInletTemp    = Node(HPWaterInletNode)%Temp + CondenserDeltaT
 

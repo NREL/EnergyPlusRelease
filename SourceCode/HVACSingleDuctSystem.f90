@@ -1506,7 +1506,7 @@ SUBROUTINE GetSysInput
 
       ! Error check to see if a single duct air terminal is assigned to zone that has zone secondary recirculation
       ! specified in the Sizing:Zone object
-      
+
       NumZoneSiz = GetNumObjectsFound("Sizing:Zone")
       IF (NumZoneSiz > 0) THEN
         DO SysIndex=1,NumSys
@@ -1515,7 +1515,8 @@ SUBROUTINE GetSysInput
               IF (FinalZoneSizing(ZoneSizIndex)%ActualZoneNum == Sys(SysIndex)%ActualZoneNum) THEN
                 IF (FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation > 0.0d0) THEN
                   CALL ShowWarningError(RoutineName//'A zone secondary recirculation fraction is specified for zone served by ')
-                  CALL ShowContinueError('...terminal unit "'//TRIM(Sys(SysIndex)%SysName)//'" , that indicates a single path system')
+                  CALL ShowContinueError('...terminal unit "'//TRIM(Sys(SysIndex)%SysName)//  &
+                     '" , that indicates a single path system')
                   CALL ShowContinueError('...The zone secondary recirculation for that zone was set to 0.0')
                   FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
                   EXIT SizLoop
@@ -1525,7 +1526,7 @@ SUBROUTINE GetSysInput
           END DO SizLoop
         END DO
       END IF
-      
+
     DEALLOCATE(Alphas)
     DEALLOCATE(cAlphaFields)
     DEALLOCATE(cNumericFields)
@@ -1954,12 +1955,12 @@ SUBROUTINE SizeSys(SysNum)
       CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                               'Maximum Heating Air Flow Rate [m3/s]', Sys(SysNum)%MaxHeatAirVolFlowRate)
     END IF
-    
+
     UserInputMaxHeatAirVolFlowRate = 0.0
-    
+
   ELSE
-  
-    UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate 
+
+    UserInputMaxHeatAirVolFlowRate = Sys(SysNum)%MaxHeatAirVolFlowRate
 
   END IF
 
@@ -2067,8 +2068,8 @@ SUBROUTINE SizeSys(SysNum)
       TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(1.0D0,TermUnitSizing(CurZoneEqNum)%ReheatMult)
     ELSE
       TermUnitSizing(CurZoneEqNum)%ReheatMult =  1.0D0
-    END IF 
-  END IF    
+    END IF
+  END IF
 
   IF ((Sys(SysNum)%MaxReheatWaterVolFlow == AutoSize).or.(Sys(SysNum)%MaxReheatSteamVolFlow == AutoSize)) THEN
 
@@ -2183,17 +2184,22 @@ SUBROUTINE SizeSys(SysNum)
 
 
   IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.d0) THEN
-    ! check for inconsistent dual max input 
+    ! check for inconsistent dual max input
     IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat < (Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate) ) THEN
-      CALL ShowWarningError('Air Terminal Unit flow limits are not consistent, minimum flow limit is larger than reheat maximum')
-      CALL ShowContinueError('Air Terminal Unit name = '//TRIM(Sys(SysNum)%SysName))
-      CALL ShowContinueError('Maximum terminal flow during reheat = '  &
-            //TRIM(RoundSigDigits(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, 6))//' [m3/s] or flow fraction = ' &
-            //TRIM(RoundSigDigits((Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%MaxAirVolFlowRate ),4)) )
-      CALL ShowContinueError('Minimum terminal flow = '  &
-            //TRIM(RoundSigDigits((Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate), 6))//' [m3/s] or flow fraction = '&
-            //TRIM(RoundSigDigits(Sys(SysNum)%ZoneMinAirFrac,4)) )
-      CALL ShowContinueError('The reheat maximum flow limit will be replaced by the minimum limit, and the simulation continues')
+      ! Only warn when really out of bounds
+      IF ((Sys(SysNum)%ZoneMinAirFrac*Sys(SysNum)%MaxAirVolFlowRate)-Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 1.d-8) THEN
+        CALL ShowWarningError('SingleDuctSystem:SizeSys: Air Terminal Unit flow limits are not consistent, '//  &
+           'minimum flow limit is larger than reheat maximum')
+        CALL ShowContinueError('Air Terminal Unit name = '//TRIM(Sys(SysNum)%SysName))
+        CALL ShowContinueError('Maximum terminal flow during reheat = '  &
+              //TRIM(RoundSigDigits(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, 6))//' [m3/s] or flow fraction = ' &
+              //TRIM(RoundSigDigits((Sys(SysNum)%MaxAirVolFlowRateDuringReheat/Sys(SysNum)%MaxAirVolFlowRate ),4)) )
+        CALL ShowContinueError('Minimum terminal flow = '  &
+              //TRIM(RoundSigDigits((Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate), 6))//  &
+                 ' [m3/s] or flow fraction = '&
+              //TRIM(RoundSigDigits(Sys(SysNum)%ZoneMinAirFrac,4)) )
+        CALL ShowContinueError('The reheat maximum flow limit will be replaced by the minimum limit, and the simulation continues')
+      ENDIF
       Sys(SysNum)%MaxAirVolFlowRateDuringReheat = (Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate)
     ENDIF
   ENDIF
@@ -2221,7 +2227,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           !       MODIFIED       Fred Buhl: added reverse action damper heating action: August 2001
           !                      KHL/TH 7/2010: revise to support dual max
           !                      FB/KHL/TH 9/2010: added maximum supply air temperature leaving reheat coil
-          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor 
+          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor
           !                                 air fraction - a TRACE feature
           !                      Brent Griffith, 5/2012, general cleanup, fix negatives CR 8767, fix phantom coil flows CR 8854
           !       RE-ENGINEERED  na
@@ -2296,7 +2302,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
                                          ! available air mass flow rate [W]
   REAL(r64) :: MinMassAirFlow = 0.0D0   ! the air flow rate during heating for normal acting damper
   REAL(r64) :: QZoneMax2 = 0.0D0        ! temporary variable
-   
+
    ! Note to the perplexed
    !
    ! The SINGLE DUCT:VAV:REHEAT terminal unit originally contained 2 components: a damper
@@ -2319,7 +2325,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   MassFlowBasedOnOA = 0.0d0
   ZoneTemp = Node(ZoneNodeNum)%Temp
   MinMassAirFlow = MinFlowFrac * StdRhoAir * Sys(SysNum)%MaxAirVolFlowRate
-   
+
    !Then depending on if the Load is for heating or cooling it is handled differently.  First
    ! the massflow rate for cooling is determined to meet the entire load.  Then
    ! if the massflow is below the minimum or greater than the Max it is set to either the Min
@@ -2336,12 +2342,12 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
     ELSE
       MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
     END IF
-     
+
      ! Apply the zone maximum outdoor air fraction FOR VAV boxes - a TRACE feature
     IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
     ENDIF
-     
+
      ! calculate supply air flow rate based on user specified OA requirement
     CALL CalcOAMassFlow(SysNum, MassFlowBasedOnOA, AirLoopOAFrac)
     MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
@@ -2414,7 +2420,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 !  ELSE
 !    Sys(SysNum)%DamperPosition = 1.0
 !  END IF
-  
+
   IF (MassFlow == 0.d0) THEN
     Sys(SysNum)%DamperPosition = 0.d0
   ELSEIF ((MassFlow > 0.d0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
@@ -2543,7 +2549,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           MaxAirMassFlowRevAct = MIN(MaxAirMassFlowRevAct,MaxDeviceAirMassFlowReheat)
           MaxAirMassFlowRevAct = MAX(MaxAirMassFlowRevAct, MinAirMassFlowRevAct)
           MaxAirMassFlowRevAct = MIN(MaxAirMassFlowRevAct, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
-          
+
 
           Node(Sys(SysNum)%OutletNodeNum)%MassFlowRateMaxAvail = MaxAirMassFlowRevAct  ! suspect, check how/if used in ControlCompOutput
           CALL ControlCompOutput(CompName=Sys(SysNum)%ReheatName,                  &

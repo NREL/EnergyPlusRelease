@@ -1,4 +1,4 @@
-MODULE WatertoAirMulSpeeddHP
+MODULE VariableSpeedCoils
 
  ! USE STATEMENTS:
   ! Use statements for data only modules
@@ -24,8 +24,11 @@ REAL(r64), PARAMETER ::    RatedInletAirTemp   = 26.6667d0   ! 26.6667C or 80F
 REAL(r64), PARAMETER ::    RatedInletWetbulbTemp = 19.44d0   ! 19.44 or 67F, cooling mode
 REAL(r64), PARAMETER ::    RatedInletAirHumRat = 0.01125d0   ! Humidity ratio corresponding to 80F dry bulb/67F wet bulb
 REAL(r64), PARAMETER ::    RatedInletWaterTemp = 29.4d0      ! 85 F cooling mode
+REAL(r64), PARAMETER ::    RatedAmbAirTemp = 35.0d0      ! 95 F cooling mode
 REAL(r64), PARAMETER ::    RatedInletAirTempHeat = 21.11d0   ! 21.11C or 70F, heating mode
 REAL(r64), PARAMETER ::    RatedInletWaterTempHeat = 21.11d0  ! 21.11C or 70F, heating mode
+REAL(r64), PARAMETER ::    RatedAmbAirTempHeat = 8.33d0  ! 8.33 or 47F, heating mode
+REAL(r64), PARAMETER ::    RatedAmbAirWBHeat = 6.11d0   !  8.33 or 43F, heating mode, rated wet bulb temperature
 
 ! Airflow per total capacity range
 REAL(r64), PARAMETER ::    MaxRatedVolFlowPerRatedTotCap = 0.00006041d0 ! m3/s per watt = 450 cfm/ton
@@ -34,6 +37,17 @@ REAL(r64), PARAMETER ::    MaxHeatVolFlowPerRatedTotCap  = 0.00008056d0 ! m3/s p
 REAL(r64), PARAMETER ::    MaxCoolVolFlowPerRatedTotCap  = 0.00006713d0 ! m3/s per watt = 500 cfm/ton
 REAL(r64), PARAMETER ::    MinOperVolFlowPerRatedTotCap  = 0.00002684d0 ! m3/s per watt = 200 cfm/ton
 
+! Condenser Type
+INTEGER, PARAMETER :: AirCooled        = 1 ! Air-cooled condenser
+INTEGER, PARAMETER :: EvapCooled       = 3 ! Evaporatively-cooled condenser
+
+!Water Systems
+INTEGER, PARAMETER :: CondensateDiscarded = 1001 ! default mode where water is "lost"
+INTEGER, PARAMETER :: CondensateToTank    = 1002 ! collect coil condensate from air and store in water storage tank
+
+INTEGER, PARAMETER :: WaterSupplyFromMains = 101
+INTEGER, PARAMETER :: WaterSupplyFromTank  = 102
+
 ! Curve Types
 INTEGER, PARAMETER :: Linear      = 1
 INTEGER, PARAMETER :: Bilinear    = 2
@@ -41,12 +55,19 @@ INTEGER, PARAMETER :: Quadratic   = 3
 INTEGER, PARAMETER :: Biquadratic = 4
 INTEGER, PARAMETER :: Cubic       = 5
 
+! Defrost strategy (heat pump only)
+INTEGER, PARAMETER :: ReverseCycle     = 1 ! uses reverse cycle defrost strategy
+INTEGER, PARAMETER :: Resistive        = 2 ! uses electric resistance heater for defrost
+! Defrost control  (heat pump only)
+INTEGER, PARAMETER :: Timed            = 1 ! defrost cycle is timed
+INTEGER, PARAMETER :: OnDemand         = 2 ! defrost cycle occurs only when required
+
 INTEGER, PUBLIC, PARAMETER :: MaxSpedLevels = 10  ! Maximum number of speed that supports
 
   ! DERIVED TYPE DEFINITIONS
-TYPE, PUBLIC :: WatertoAirMulSpedCoilData ! water-to-air variable speed coil
+TYPE, PUBLIC :: VariableSpeedCoilData ! variable speed coil
   CHARACTER(len=MaxNameLength) :: Name           =' '    ! Name of the  Coil
-  CHARACTER(len=MaxNameLength) :: WtoADXCoilType     =' '    ! type of coil
+  CHARACTER(len=MaxNameLength) :: VarSpeedCoilType     =' '    ! type of coil
 
   INTEGER :: NumOfSpeeds    =2   ! Number of speeds
   INTEGER :: NormSpedLevel    =MaxSpedLevels   ! Nominal speed level
@@ -68,8 +89,8 @@ TYPE, PUBLIC :: WatertoAirMulSpedCoilData ! water-to-air variable speed coil
 
   INTEGER:: PLFFPLR = 0     ! index of part load curve as a function of part load ratio
 
-  CHARACTER(len=MaxNameLength) :: WatertoAirHPType=' ' ! Type of WatertoAirHP ie. Heating or Cooling
-  INTEGER   :: WAHPPlantTypeOfNum              = 0     ! type of component in plant
+  CHARACTER(len=MaxNameLength) :: CoolHeatType=' ' ! Type of WatertoAirHP ie. Heating or Cooling
+  INTEGER   :: VSCoilTypeOfNum              = 0     ! type of component in plant
   LOGICAL   :: Simflag                         =.false. ! Heat Pump Simulation Flag
   REAL(r64) :: DesignWaterMassFlowRate         =0.0  ! design water mass flow rate [kg/s]
   REAL(r64) :: DesignWaterVolFlowRate          =0.0  ! design water volumetric flow rate [m3/s]
@@ -174,17 +195,89 @@ TYPE, PUBLIC :: WatertoAirMulSpedCoilData ! water-to-air variable speed coil
   !speed number for output
   REAL(r64):: SpeedRatioReport = 0.0
   !speed ratio for output between two neighboring speeds
-  ! End of multispeed DX coil input
+  ! End of multispeed water source coil input
 
-END TYPE WatertoAirMulSpedCoilData
+  !----------------------------------------------------------------
+  !added variables and arrays for variable speed air-source heat pump
+  !defrosting
+  INTEGER :: DefrostStrategy        = 0   ! defrost strategy; 1=reverse-cycle, 2=resistive
+  INTEGER :: DefrostControl         = 0   ! defrost control; 1=timed, 2=on-demand
+  INTEGER :: EIRFPLR                = 0   ! index of energy input ratio vs part-load ratio curve
+  INTEGER :: DefrostEIRFT           = 0   ! index of defrost mode total cooling capacity for reverse cycle heat pump
+  REAL(r64) :: MinOATCompressor       =0.0  ! Minimum OAT for heat pump compressor operation
+  REAL(r64) :: OATempCompressorOn   = 0.0  ! The outdoor tempearture when the compressor is automatically turned back on,
+                                           ! if applicable, following automatic shut off. This field is used only for
+                                           ! HSPF calculation.
+  REAL(r64) :: MaxOATDefrost          =0.0  ! Maximum OAT for defrost operation
+  REAL(r64) :: DefrostTime            =0.0  ! Defrost time period in hours
+  REAL(r64) :: DefrostCapacity        =0.0  ! Resistive defrost to nominal capacity (at 21.11C/8.33C) ratio
+  REAL(r64) :: HPCompressorRuntime    =0.0  ! keep track of compressor runtime
+  REAL(r64) :: HPCompressorRuntimeLast=0.0  ! keep track of last time step compressor runtime (if simulation downshifts)
+  REAL(r64) :: TimeLeftToDefrost      =0.0  ! keep track of time left to defrost heat pump
+  REAL(r64) :: DefrostPower           =0.0  ! power used during defrost
+  REAL(r64) :: DefrostConsumption     =0.0  ! energy used during defrost
+
+  !crankcase heater
+  LOGICAL :: ReportCoolingCoilCrankcasePower =.true. ! logical determines if the cooling coil crankcase heater power is reported
+  REAL(r64) :: CrankcaseHeaterCapacity =0.0 ! total crankcase heater capacity [W]
+  REAL(r64) :: CrankcaseHeaterPower    =0.0 ! report variable for average crankcase heater power [W]
+  REAL(r64) :: MaxOATCrankcaseHeater   =0.0 ! maximum OAT for crankcase heater operation [C]
+  REAL(r64) :: CrankcaseHeaterConsumption  = 0.0 ! report variable for total crankcase heater energy consumption [J]
+
+  !condenser evaporative precooling
+  INTEGER :: CondenserInletNodeNum = 0  ! Node number of outdoor condenser
+  INTEGER :: CondenserType = AirCooled ! Type of condenser for DX cooling coil: AIR COOLED or EVAP COOLED
+  LOGICAL :: ReportEvapCondVars =.false. ! true if any performance mode includes an evap condenser
+  REAL(r64) :: EvapCondPumpElecNomPower =0.0  ! Nominal power input to the evap condenser water circulation pump [W]
+  REAL(r64) :: EvapCondPumpElecPower =0.0    ! Average power consumed by the evap condenser water circulation pump over
+                                           ! the time step [W]
+  REAL(r64) :: EvapWaterConsumpRate =0.0 ! Evap condenser water consumption rate [m3/s]
+  REAL(r64) :: EvapCondPumpElecConsumption =0.0 ! Electric energy consumed by the evap condenser water circulation pump [J]
+  REAL(r64) :: EvapWaterConsump =0.0 ! Evap condenser water consumption [m3]
+  REAL(r64) :: BasinHeaterConsumption    = 0.0  ! Basin heater energy consumption (J)
+
+
+  REAL(r64) :: BasinHeaterPowerFTempDiff   = 0.0 ! Basin heater capacity per degree C below setpoint (W/C)
+  REAL(r64) :: BasinHeaterSetPointTemp     = 0.0 ! setpoint temperature for basin heater operation (C)
+  REAL(r64) :: BasinHeaterPower          = 0.0  ! Basin heater power (W)
+  INTEGER   :: BasinHeaterSchedulePtr  = 0      ! Pointer to basin heater schedule
+
+  REAL(r64) :: EvapCondAirFlow(MaxSpedLevels)=0.0  ! Air flow rate through the evap condenser at high speed, volumetric flow rate
+                                                 ! for water use calcs [m3/s]
+  REAL(r64) :: EvapCondEffect(MaxSpedLevels) =0.0  ! effectiveness of the evaporatively cooled condenser
+                                            ! [high speed for multi-speed unit] (-)
+  REAL(r64) :: MSRatedEvapCondVolFlowPerRatedTotCap(MaxSpedLevels) = 0.0 !evap condenser air flow ratio to capacity
+
+  !begin variables for Water System interactions
+  INTEGER ::EvapWaterSupplyMode                   = WaterSupplyFromMains !  where does water come from
+  CHARACTER(len=MaxNameLength) :: EvapWaterSupplyName = ' ' ! name of water source e.g. water storage tank
+  INTEGER ::EvapWaterSupTankID                    = 0 !
+  INTEGER ::EvapWaterTankDemandARRID              = 0 !
+  INTEGER ::CondensateCollectMode                 = CondensateDiscarded !  where does water come from
+  CHARACTER(len=MaxNameLength) :: CondensateCollectName = ' ' ! name of water source e.g. water storage tank
+  INTEGER ::CondensateTankID                      = 0 !
+  INTEGER ::CondensateTankSupplyARRID             = 0 !
+
+  REAL(r64)   :: CondensateVdot = 0.0 ! rate of water condensation from air stream [m3/s]
+  REAL(r64)   :: CondensateVol  = 0.0 ! amount of water condensed from air stream [m3]
+
+  REAL(r64)   :: CondInletTemp  =0.0            ! Evap condenser inlet temperature [C], report variable
+
+  REAL(r64)   :: SourceAirMassFlowRate = 0.0 ! source air mass flow rate [kg/s]
+  REAL(r64)   :: InletSourceAirTemp = 0.0 !source air temperature entering the outdoor coil [C]
+  REAL(r64)   :: InletSourceAirEnthalpy = 0.0  !source air enthalpy entering the outdoor coil [J/kg]
+
+  !end variables for water system interactions
+
+END TYPE VariableSpeedCoilData
 
 
   ! MODULE VARIABLE DECLARATIONS:
-  ! Identifier is WtoADXCoil
+  ! Identifier is VarSpeedCoil
 INTEGER        :: NumWatertoAirHPs  = 0        ! The Number of Water to Air Heat Pumps found in the Input
 
 LOGICAL        :: GetCoilsInputFlag = .TRUE.       ! Flag set to make sure you get input once
-TYPE (WatertoAirMulSpedCoilData) , PUBLIC, ALLOCATABLE, DIMENSION(:) :: WtoADXCoil
+TYPE (VariableSpeedCoilData) , PUBLIC, ALLOCATABLE, DIMENSION(:) :: VarSpeedCoil
 ! LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
 
 REAL(r64) :: SourceSideMassFlowRate =0.0 ! Source Side Mass flow rate [Kg/s]
@@ -206,33 +299,34 @@ REAL(r64) :: QSource                =0.0 ! Source side heat transfer rate [W]
 REAL(r64) :: Winput                 =0.0 ! Power Consumption [W]
 REAL(r64) :: PLRCorrLoadSideMdot    =0.0 ! Load Side Mdot corrected for Part Load Ratio of the unit
 
-
   ! SUBROUTINE SPECIFICATIONS FOR MODULE
 
           ! Driver/Manager Routines
-PUBLIC SimWatertoAirHPMulSpeed
+PUBLIC SimVariableSpeedCoils
 
           ! Get Input routines for module
-PRIVATE GetMulSpeedWSHPInput
+PRIVATE GetVarSpeedCoilInput
 
           ! Initialization routines for module
-PRIVATE InitMulSpeedWSHPCoil
-PRIVATE SizeMulSpeedWSHPCoil
+PRIVATE InitVarSpeedCoil
+PRIVATE SizeVarSpeedCoil
 
           ! Update routines to check convergence and update nodes
-PUBLIC  CalcMulSpeedWSHPCoilCooling
-PUBLIC  CalcMulSpeedWSHPCoilHeating
+PUBLIC  CalcVarSpeedCoilCooling
+PUBLIC  CalcVarSpeedCoilHeating
 
           ! Update routine
-PRIVATE UpdateMulSpeedWSHP
+PRIVATE UpdateVarSpeedCoil
 
           ! Utility routines
-PUBLIC  GetCoilIndexMulSpeedWSHP
-PUBLIC  GetCoilCapacityMulSpeedWSHP
-PUBLIC  GetCoilInletNodeMulSpeedWSHP
-PUBLIC  GetCoilOutletNodeMulSpeedWSHP
-PUBLIC  GetCoilAirFlowRateMulSpeedWSHP
-PUBLIC  SetMulSpeedWSHPData
+PUBLIC  GetCoilIndexVariableSpeed
+PUBLIC  GetCoilCapacityVariableSpeed
+PUBLIC  GetCoilInletNodeVariableSpeed
+PUBLIC  GetCoilOutletNodeVariableSpeed
+PUBLIC  GetCoilAirFlowRateVariableSpeed
+PUBLIC  GetVSCoilCondenserInletNode
+PUBLIC  GetVSCoilMinOATCompressor
+PUBLIC  SetVarSpeedCoilData
         !SHR, bypass factor routines
 PRIVATE CalcEffectiveSHR
 PRIVATE CalcTotCapSHR_VSWSHP
@@ -243,7 +337,7 @@ CONTAINS
 
 ! MODULE SUBROUTINES:
 !*************************************************************************
-SUBROUTINE SimWatertoAirHPMulSpeed(CompName,CompIndex,&
+SUBROUTINE SimVariableSpeedCoils(CompName,CompIndex,&
            CyclingScheme,MaxONOFFCyclesperHour, &
            HPTimeConstant,FanDelayTime,CompOp, PartLoadFrac, OnOffAirFlowRat,SpeedNum, SpeedRatio, &
            SensLoad, LatentLoad)
@@ -306,13 +400,13 @@ SUBROUTINE SimWatertoAirHPMulSpeed(CompName,CompIndex,&
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
   IF (CompIndex == 0) THEN
-    DXCoilNum = FindItemInList(CompName,WtoADXCoil%Name,NumWatertoAirHPs )
+    DXCoilNum = FindItemInList(CompName,VarSpeedCoil%Name,NumWatertoAirHPs )
     IF (DXCoilNum == 0) THEN
       CALL ShowFatalError('WaterToAirHPVSWEquationFit not found='//TRIM(CompName))
     ENDIF
@@ -320,16 +414,16 @@ SUBROUTINE SimWatertoAirHPMulSpeed(CompName,CompIndex,&
   ELSE
     DXCoilNum=CompIndex
     IF (DXCoilNum > NumWatertoAirHPs  .or. DXCoilNum < 1) THEN
-      CALL ShowFatalError('SimWatertoAirHPMulSpeed: Invalid CompIndex passed='//  &
+      CALL ShowFatalError('SimVariableSpeedCoils: Invalid CompIndex passed='//  &
                           TRIM(TrimSigDigits(DXCoilNum))// &
                           ', Number of Water to Air HPs='//TRIM(TrimSigDigits(NumWatertoAirHPs))//  &
                           ', WaterToAir HP name='//TRIM(CompName))
     ENDIF
-    IF (CompName /= Blank .AND. CompName /= WtoADXCoil(DXCoilNum)%Name) THEN
-      CALL ShowFatalError('SimWatertoAirHPMulSpeed: Invalid CompIndex passed='//  &
+    IF (CompName /= Blank .AND. CompName /= VarSpeedCoil(DXCoilNum)%Name) THEN
+      CALL ShowFatalError('SimVariableSpeedCoils: Invalid CompIndex passed='//  &
                           TRIM(TrimSigDigits(DXCoilNum))// &
                           ', WaterToAir HP name='//TRIM(CompName)//', stored WaterToAir HP Name for that index='//  &
-                          TRIM(WtoADXCoil(DXCoilNum)%Name))
+                          TRIM(VarSpeedCoil(DXCoilNum)%Name))
     ENDIF
   ENDIF
 
@@ -346,33 +440,35 @@ SUBROUTINE SimWatertoAirHPMulSpeed(CompName,CompIndex,&
     SpeedCal = SpeedNum
  END IF
 
- IF(WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit)THEN
+ IF((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit) &
+    .OR. (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==Coil_CoolingAirToAirVariableSpeed) )THEN
     ! Cooling mode
-    CALL InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
+    CALL InitVarSpeedCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
                                   OnOffAirFlowRatio, SpeedRatio, SpeedCal)
-    CALL CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme,RuntimeFrac,&
+    CALL CalcVarSpeedCoilCooling(DXCoilNum,CyclingScheme,RuntimeFrac,&
                 SensLoad,LatentLoad,CompOp,PartLoadFrac,OnOffAirFlowRatio, SpeedRatio, SpeedCal)
-    CALL UpdateMulSpeedWSHP(DXCoilNum)
- ELSEIF(WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit)THEN
+    CALL UpdateVarSpeedCoil(DXCoilNum)
+ ELSEIF((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit)  &
+    .OR. (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==Coil_HeatingAirToAirVariableSpeed) ) THEN
     ! Heating mode
-    CALL InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
+    CALL InitVarSpeedCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
                                   OnOffAirFlowRatio, SpeedRatio, SpeedCal)
-    CALL CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac,&
+    CALL CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac,&
                 SensLoad,CompOp,PartLoadFrac,OnOffAirFlowRatio, SpeedRatio, SpeedCal)
-    CALL UpdateMulSpeedWSHP(DXCoilNum)
+    CALL UpdateVarSpeedCoil(DXCoilNum)
  ELSE
-    CALL ShowFatalError ('SimWatertoAirHPMulSpeed: WatertoAir heatpump not in either HEATING or COOLING mode')
+    CALL ShowFatalError ('SimVariableSpeedCoils: WatertoAir heatpump not in either HEATING or COOLING mode')
  ENDIF
 
  ! two additional output variables
- WtoADXCoil(DXCoilNum)%SpeedNumReport = SpeedCal
- WtoADXCoil(DXCoilNum)%SpeedRatioReport = SpeedRatio
+ VarSpeedCoil(DXCoilNum)%SpeedNumReport = SpeedCal
+ VarSpeedCoil(DXCoilNum)%SpeedRatioReport = SpeedRatio
 
  RETURN
 
-END SUBROUTINE SimWatertoAirHPMulSpeed
+END SUBROUTINE SimVariableSpeedCoils
 
-SUBROUTINE GetMulSpeedWSHPInput
+SUBROUTINE GetVarSpeedCoilInput
 
        ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen
@@ -397,6 +493,9 @@ SUBROUTINE GetMulSpeedWSHPInput
     USE OutputReportPredefined
     USE General,               ONLY: TrimSigDigits
     USE CurveManager,          ONLY: GetCurveIndex, GetCurveType, CurveValue, SetCurveOutputMinMaxValues
+    USE OutAirNodeManager,     ONLY: CheckOutAirNodeNumber
+    USE WaterManager,          ONLY: SetupTankDemandComponent, SetupTankSupplyComponent
+    USE ScheduleManager,       ONLY: GetScheduleIndex
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -404,7 +503,7 @@ SUBROUTINE GetMulSpeedWSHPInput
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-    CHARACTER (len=*), PARAMETER   :: RoutineName='GetMulSpeedWSHPInput: ' ! include trailing blank space
+    CHARACTER (len=*), PARAMETER   :: RoutineName='GetVarSpeedCoilInput: ' ! include trailing blank space
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -414,8 +513,10 @@ SUBROUTINE GetMulSpeedWSHPInput
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
     INTEGER :: DXCoilNum                    ! The Water to Air HP that you are currently loading input into
-    INTEGER :: NumCool                      ! Counter for cooling coil
-    INTEGER :: NumHeat                      ! Counter for heating coil
+    INTEGER :: NumCool                      ! Counter for cooling coil, water source
+    INTEGER :: NumCoolAS                    ! Counter for cooling coil, air source
+    INTEGER :: NumHeat                      ! Counter for heating coil, water source
+    INTEGER :: NumHeatAS                    ! Counter for heating coil, air source
     INTEGER :: WatertoAirHPNum              ! Counter
     INTEGER :: I                            ! Loop index increment
     INTEGER :: NumAlphas                    ! Number of variables in String format
@@ -440,7 +541,9 @@ SUBROUTINE GetMulSpeedWSHPInput
 
     NumCool   = GetNumObjectsFound('COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT')
     NumHeat   = GetNumObjectsFound('COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT')
-    NumWatertoAirHPs = NumCool+NumHeat
+    NumCoolAS  = GetNumObjectsFound('COIL:COOLING:DX:VARIABLESPEED')
+    NumHeatAS   = GetNumObjectsFound('COIL:HEATING:DX:VARIABLESPEED')
+    NumWatertoAirHPs = NumCool+NumHeat+NumCoolAS+NumHeatAS
     DXCoilNum=0
 
     IF(NumWatertoAirHPs <= 0) THEN
@@ -450,7 +553,7 @@ SUBROUTINE GetMulSpeedWSHPInput
 
    ! Allocate Arrays
     IF (NumWatertoAirHPs.GT.0) THEN
-      ALLOCATE(WtoADXCoil(NumWatertoAirHPs))
+      ALLOCATE(VarSpeedCoil(NumWatertoAirHPs))
     ENDIF
 
     CALL GetObjectDefMaxArgs('COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT',NumParams,NumAlphas,NumNums)
@@ -459,6 +562,14 @@ SUBROUTINE GetMulSpeedWSHPInput
     CALL GetObjectDefMaxArgs('COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT',NumParams,NumAlphas,NumNums)
     MaxNums=MAX(MaxNums,NumNums)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
+
+    CALL GetObjectDefMaxArgs('COIL:COOLING:DX:VARIABLESPEED',NumParams,NumAlphas,NumNums)
+    MaxNums=MAX(MaxNums,NumNums)
+    MaxAlphas=MAX(MaxAlphas,NumAlphas)
+    CALL GetObjectDefMaxArgs('COIL:HEATING:DX:VARIABLESPEED',NumParams,NumAlphas,NumNums)
+    MaxNums=MAX(MaxNums,NumNums)
+    MaxAlphas=MAX(MaxAlphas,NumAlphas)
+
     ALLOCATE(AlphArray(MaxAlphas))
     AlphArray=' '
     ALLOCATE(cAlphaFields(MaxAlphas))
@@ -472,7 +583,7 @@ SUBROUTINE GetMulSpeedWSHPInput
     ALLOCATE(NumArray(MaxNums))
     NumArray=0.0
 
-      ! Get the data for cooling coil
+    ! Get the data for cooling coil, WATER SOURCE
     CurrentModuleObject = 'Coil:Cooling:WaterToAirHeatPump:VariableSpeedEquationFit' !for reporting
 
     DO WatertoAirHPNum = 1, NumCool
@@ -488,7 +599,7 @@ SUBROUTINE GetMulSpeedWSHPInput
         IsNotOK=.FALSE.
         IsBlank=.FALSE.
 
-        CALL VerifyName(AlphArray(1),WtoADXCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyName(AlphArray(1),VarSpeedCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
         IF (IsNotOK) THEN
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
@@ -499,28 +610,28 @@ SUBROUTINE GetMulSpeedWSHPInput
           ErrorsFound=.true.
         ENDIF
 
-        WtoADXCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
-        WtoADXCoil(DXCoilNum)%WatertoAirHPType  = 'COOLING'
-        WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum  = TypeOf_CoilVSWAHPCoolingEquationFit
-        WtoADXCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
-        WtoADXCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
-        WtoADXCoil(DXCoilNum)%RatedCapCoolTotal=NumArray(3)
-        WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
-        WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate=NumArray(5)
-        WtoADXCoil(DXCoilNum)%Twet_Rated=NumArray(6)
-        WtoADXCoil(DXCoilNum)%Gamma_Rated=NumArray(7)
-        WtoADXCoil(DXCoilNum)%HOTGASREHEATFLG=INT(NumArray(8))
+        VarSpeedCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
+        VarSpeedCoil(DXCoilNum)%CoolHeatType  = 'COOLING'
+        VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum  = TypeOf_CoilVSWAHPCoolingEquationFit
+        VarSpeedCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
+        VarSpeedCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal=NumArray(3)
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
+        VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate=NumArray(5)
+        VarSpeedCoil(DXCoilNum)%Twet_Rated=NumArray(6)
+        VarSpeedCoil(DXCoilNum)%Gamma_Rated=NumArray(7)
+        VarSpeedCoil(DXCoilNum)%HOTGASREHEATFLG=INT(NumArray(8))
 
-        WtoADXCoil(DXCoilNum)%WaterInletNodeNum    = &
+        VarSpeedCoil(DXCoilNum)%WaterInletNodeNum    = &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
                                    NodeType_Water,NodeConnectionType_Inlet,2,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%WaterOutletNodeNum   = &
+        VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum   = &
                GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
                                    NodeType_Water,NodeConnectionType_Outlet,2,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%AirInletNodeNum      = &
+        VarSpeedCoil(DXCoilNum)%AirInletNodeNum      = &
                GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
                                    NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%AirOutletNodeNum     = &
+        VarSpeedCoil(DXCoilNum)%AirOutletNodeNum     = &
                GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
                                    NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
 
@@ -528,297 +639,301 @@ SUBROUTINE GetMulSpeedWSHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
 
-        If (WtoADXCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
-          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
           CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 2.'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
           ErrorsFound=.TRUE.
         End If
 
-        If ((WtoADXCoil(DXCoilNum)%NormSpedLevel > WtoADXCoil(DXCoilNum)%NumOfSpeeds) &
-            .OR. (WtoADXCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
-          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+        If (VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) THEN
+            VarSpeedCoil(DXCoilNum)%NormSpedLevel = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        END IF
+
+        If ((VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) &
+            .OR. (VarSpeedCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
           CALL ShowContinueError('...'//TRIM(cNumericFields(2))//' must be valid speed level'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(2),0)))
           ErrorsFound=.TRUE.
         End If
 
         !part load curve
-        WtoADXCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(6)) ! convert curve name to number
-        IF (WtoADXCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
+        VarSpeedCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(6)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
           IF (lAlphaBlanks(6)) THEN
-            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
             CALL ShowContinueError('...required '//trim(cAlphaFields(6))//' is blank.')
           ELSE
-            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
             CALL ShowContinueError('...not found '//TRIM(cAlphaFields(6))//'="'//TRIM(AlphArray(6))//'".')
           END IF
           ErrorsFound = .TRUE.
         ELSE
-            CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%PLFFPLR,1.0d0)
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,1.0d0)
             IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
               CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)&
-                        //'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
               CALL ShowContinueError('...'//TRIM(cAlphaFields(6))//' output is not equal to 1.0 '//  &
                                                  '(+ or - 10%) at rated conditions.')
               CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
             END IF
         END IF
 
-        Do I=1,WtoADXCoil(DXCoilNum)%NumOfSpeeds
-            WtoADXCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(9+(I-1)*6)
-            WtoADXCoil(DXCoilNum)%MSRatedSHR(I)    = NumArray(10+(I-1)*6)
-            WtoADXCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(11+(I-1)*6)
-            WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(12+(I-1)*6)
-            WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I) = NumArray(13+(I-1)*6)
-            WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(I) = NumArray(14+(I-1)*6)
+        Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+            VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(9+(I-1)*6)
+            VarSpeedCoil(DXCoilNum)%MSRatedSHR(I)    = NumArray(10+(I-1)*6)
+            VarSpeedCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(11+(I-1)*6)
+            VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(12+(I-1)*6)
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I) = NumArray(13+(I-1)*6)
+            VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(I) = NumArray(14+(I-1)*6)
 
             AlfaFieldIncre = 7+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))&
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is BiQuadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletWetbulbTemp,RatedInletWaterTemp)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletWetbulbTemp,RatedInletWaterTemp)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 8+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre ))//' is blank.')
               ELSE
                 CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'&
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre ))//'="' &
                         //TRIM(AlphArray(AlfaFieldIncre ))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)// &
-                        '="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        '="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre ))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName// &
-                        trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre ))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 9+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre =10+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//&
                         TRIM(cAlphaFields(AlfaFieldIncre))//'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Biquadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRFTemp(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletWetbulbTemp,RatedInletWaterTemp)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletWetbulbTemp,RatedInletWaterTemp)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRFTemp(1))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(1))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre =11+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))&
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject) &
-                        //'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                      TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I))))
+                      TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
            AlfaFieldIncre =12+(I-1)*7
-           WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I) .EQ. 0) THEN
+           VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                      TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I))))
+                      TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
@@ -826,35 +941,35 @@ SUBROUTINE GetMulSpeedWSHPInput
 
             AlfaFieldIncre =13+(I-1)*7
             ! Read waste heat modifier curve name
-            WtoADXCoil(DXCoilNum)%MSWasteHeat(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSWasteHeat(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSWasteHeat(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSWasteHeat(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal types are BiQuadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSWasteHeat(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(I),RatedInletWaterTemp,RatedInletAirTemp)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I),RatedInletWaterTemp,RatedInletAirTemp)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSWasteHeat(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
@@ -862,57 +977,469 @@ SUBROUTINE GetMulSpeedWSHPInput
 
         END DO
 
-        Do I=1,WtoADXCoil(DXCoilNum)%NumOfSpeeds
-            WtoADXCoil(DXCoilNum)%MSRatedPercentTotCap(I) =WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)/ &
-                    WtoADXCoil(DXCoilNum)%MSRatedTotCap(WtoADXCoil(DXCoilNum)%NumOfSpeeds)
-            WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
-                    WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)
-            WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(I) = WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I)/ &
-                    WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)
+        Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+            VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(I) =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(VarSpeedCoil(DXCoilNum)%NumOfSpeeds)
+            VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
         END DO
 
         CALL SetupOutputVariable('VSWatertoAirHP Cooling Electric Consumption [J]', &
-             WtoADXCoil(DXCoilNum)%Energy,'System','Summed',WtoADXCoil(DXCoilNum)%Name,  &
+             VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
 
         CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Cooling Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',WtoADXCoil(DXCoilNum)%Name,  &
+             VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
 
         CALL SetupOutputVariable('VSWatertoAirHP Load Side Sensible Cooling Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergySensible,'System','Summed',WtoADXCoil(DXCoilNum)%Name)
+             VarSpeedCoil(DXCoilNum)%EnergySensible,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
         CALL SetupOutputVariable('VSWatertoAirHP Load Side Latent Cooling Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergyLatent,'System','Summed',WtoADXCoil(DXCoilNum)%Name)
+             VarSpeedCoil(DXCoilNum)%EnergyLatent,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
         CALL SetupOutputVariable('VSWatertoAirHP Source Side Cooling Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergySource,'System','Summed',WtoADXCoil(DXCoilNum)%Name,   &
+             VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,   &
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
         !for table output, being consistent with outher water-to-air coils
-!        IF (WtoADXCoil(DXCoilNum)%RatedCapCoolTotal /= AutoSize) THEN
-!            WtoADXCoil(DXCoilNum)%RatedCapCoolSens = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal &
-!                *WtoADXCoil(DXCoilNum)%MSRatedSHR(WtoADXCoil(DXCoilNum)%NormSpedLevel)
+!        IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal /= AutoSize) THEN
+!            VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+!                *VarSpeedCoil(DXCoilNum)%MSRatedSHR(VarSpeedCoil(DXCoilNum)%NormSpedLevel)
 !        ELSE
-!            WtoADXCoil(DXCoilNum)%RatedCapCoolSens = AUTOSIZE
+!            VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = AUTOSIZE
 !        END IF
 
-        WtoADXCoil(DXCoilNum)%RatedCapCoolSens = AUTOSIZE !always auto-sized, to be determined in the sizing calculation
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = AUTOSIZE !always auto-sized, to be determined in the sizing calculation
 
         !create predefined report entries
-        CALL PreDefTableEntry(pdchCoolCoilType,WtoADXCoil(DXCoilNum)%Name,CurrentModuleObject)
-        CALL PreDefTableEntry(pdchCoolCoilTotCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
-        CALL PreDefTableEntry(pdchCoolCoilSensCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-        CALL PreDefTableEntry(pdchCoolCoilLatCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolTotal &
-                                 - WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-        CALL PreDefTableEntry(pdchCoolCoilSHR,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolSens &
-                                 / WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
-        CALL PreDefTableEntry(pdchCoolCoilNomEff,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedPowerCool &
-                                 / WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
+        CALL PreDefTableEntry(pdchCoolCoilType,VarSpeedCoil(DXCoilNum)%Name,CurrentModuleObject)
+        CALL PreDefTableEntry(pdchCoolCoilTotCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+        CALL PreDefTableEntry(pdchCoolCoilSensCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+        CALL PreDefTableEntry(pdchCoolCoilLatCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                                 - VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+        CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens &
+                                 / VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+        CALL PreDefTableEntry(pdchCoolCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,&
+                VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel))
 
    END DO
 
-      ! Get the data for heating coil
+      !-------------------------AIR SOURCE, COOLING---BEGIN
+   ! Get the data for cooling coil, AIR SOURCE
+     CurrentModuleObject = 'Coil:Cooling:DX:VariableSpeed' !for reporting
+
+    DO WatertoAirHPNum = 1, NumCoolAS
+
+        DXCoilNum= DXCoilNum + 1
+        AlfaFieldIncre = 1
+
+        CALL GetObjectItem(TRIM(CurrentModuleObject),DXCoilNum,AlphArray,NumAlphas, &
+                           NumArray,NumNums,IOSTAT, &
+                           NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
+                           AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
+
+        IsNotOK=.FALSE.
+        IsBlank=.FALSE.
+
+        CALL VerifyName(AlphArray(1),VarSpeedCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
+        IF (IsNotOK) THEN
+          ErrorsFound=.TRUE.
+          IF (IsBlank) AlphArray(1)='xxxxx'
+        ENDIF
+        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
+                                          TRIM(CurrentModuleObject)//' Name')
+        IF (errflag) THEN
+          ErrorsFound=.true.
+        ENDIF
+
+        VarSpeedCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
+        VarSpeedCoil(DXCoilNum)%CoolHeatType  = 'COOLING'
+        VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum  = Coil_CoolingAirToAirVariableSpeed
+        VarSpeedCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
+        VarSpeedCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal=NumArray(3)
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
+        VarSpeedCoil(DXCoilNum)%Twet_Rated=NumArray(5)
+        VarSpeedCoil(DXCoilNum)%Gamma_Rated=NumArray(6)
+
+        VarSpeedCoil(DXCoilNum)%AirInletNodeNum      = &
+               GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
+                                   NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+        VarSpeedCoil(DXCoilNum)%AirOutletNodeNum     = &
+               GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1),  &
+                                   NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+
+        CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),'Air Nodes')
+
+        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 1) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+          CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 1.'//  &
+                                                 ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
+          ErrorsFound=.TRUE.
+        End If
+
+        If (VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) THEN
+            VarSpeedCoil(DXCoilNum)%NormSpedLevel = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        END IF
+
+        If ((VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) &
+            .OR. (VarSpeedCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+          CALL ShowContinueError('...'//TRIM(cNumericFields(2))//' must be valid speed level'//  &
+                                                 ' entered number is '//TRIM(TrimSigDigits(NumArray(2),0)))
+          ErrorsFound=.TRUE.
+        End If
+
+        !part load curve
+        VarSpeedCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(4)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
+          IF (lAlphaBlanks(4)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(6))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(4))//'="'//TRIM(AlphArray(4))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)&
+                        //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(4))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+        END IF
+
+! outdoor condenser node
+       IF (lAlphaBlanks(5)) THEN
+         VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum = 0
+       ELSE
+        VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum = &
+           GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),VarSpeedCoil(DXCoilNum)%Name, &
+                             NodeType_Air,NodeConnectionType_OutsideAirReference,1,ObjectIsNotParent)
+
+         IF (.not. CheckOutAirNodeNumber(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)) THEN
+          CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//  &
+             '", may be invalid')
+          CALL ShowContinueError(TRIM(cAlphaFields(10))//'="'//TRIM(AlphArray(5))// &
+                                   '", node does not appear in an OutdoorAir:NodeList or as an OutdoorAir:Node.')
+          CALL ShowContinueError('This node needs to be included in an air system or the coil model will not be valid' &
+                                 //', and the simulation continues')
+         END IF
+       ENDIF
+
+       IF ((SameString(AlphArray(6),'AirCooled')) .OR. lAlphaBlanks(6)) THEN
+         VarSpeedCoil(DXCoilNum)%CondenserType = AirCooled
+       ELSEIF (SameString(AlphArray(6),'EvaporativelyCooled')) THEN
+         VarSpeedCoil(DXCoilNum)%CondenserType = EvapCooled
+         VarSpeedCoil(DXCoilNum)%ReportEvapCondVars = .TRUE.
+       ELSE
+         CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+         CALL ShowContinueError('...'//TRIM(cAlphaFields(6))//'="'//TRIM(AlphArray(6))//'":')
+         CALL ShowContinueError('...must be AirCooled or EvaporativelyCooled.')
+         ErrorsFound = .TRUE.
+       END IF
+
+      VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower = NumArray(7)
+
+      IF (VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower .LT. 0.0d0) THEN
+         CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+         CALL ShowContinueError('...'//trim(cNumericFields(7))//' cannot be < 0.0.')
+         CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(7),2))//'].')
+         ErrorsFound = .TRUE.
+      END IF
+
+  !Set crankcase heater capacity
+       VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity = NumArray(8)
+       IF (VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity .LT. 0.0d0) THEN
+         CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+         CALL ShowContinueError('...'//trim(cNumericFields(8))//' cannot be < 0.0.')
+         CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(8),2))//'].')
+         ErrorsFound = .TRUE.
+       END IF
+
+  !Set crankcase heater cutout temperature
+      VarSpeedCoil(DXCoilNum)%MaxOATCrankcaseHeater = NumArray(9)
+
+  ! Get Water System tank connections
+  !  A7, \field Name of Water Storage Tank for Supply
+     VarSpeedCoil(DXCoilNum)%EvapWaterSupplyName = AlphArray(7)
+     IF (lAlphaBlanks(7)) THEN
+       VarSpeedCoil(DXCoilNum)%EvapWaterSupplyMode = WaterSupplyFromMains
+     ELSE
+       VarSpeedCoil(DXCoilNum)%EvapWaterSupplyMode = WaterSupplyFromTank
+       CALL SetupTankDemandComponent(VarSpeedCoil(DXCoilNum)%Name,TRIM(CurrentModuleObject), &
+                 VarSpeedCoil(DXCoilNum)%EvapWaterSupplyName, ErrorsFound, VarSpeedCoil(DXCoilNum)%EvapWaterSupTankID, &
+                 VarSpeedCoil(DXCoilNum)%EvapWaterTankDemandARRID )
+     ENDIF
+
+  !A8; \field Name of Water Storage Tank for Condensate Collection
+     VarSpeedCoil(DXCoilNum)%CondensateCollectName = AlphArray(8)
+     IF (lAlphaBlanks(8)) THEN
+       VarSpeedCoil(DXCoilNum)%CondensateCollectMode = CondensateDiscarded
+     ELSE
+       VarSpeedCoil(DxCoilNum)%CondensateCollectMode = CondensateToTank
+       CALL SetupTankSupplyComponent(VarSpeedCoil(DXCoilNum)%Name,TRIM(CurrentModuleObject), &
+                 VarSpeedCoil(DXCoilNum)%CondensateCollectName, ErrorsFound, VarSpeedCoil(DXCoilNum)%CondensateTankID, &
+                 VarSpeedCoil(DXCoilNum)%CondensateTankSupplyARRID )
+     END IF
+
+  !   Basin heater power as a function of temperature must be greater than or equal to 0
+     VarSpeedCoil(DxCoilNum)%BasinHeaterPowerFTempDiff = NumArray(10)
+     IF(NumArray(10) .LT. 0.0d0) THEN
+       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+       CALL ShowContinueError('...'//trim(cNumericFields(10))//' must be >= 0.0.')
+       CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(10),2))//'].')
+       ErrorsFound = .TRUE.
+     END IF
+
+    VarSpeedCoil(DxCoilNum)%BasinHeaterSetPointTemp = NumArray(11)
+    IF(VarSpeedCoil(DxCoilNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0) THEN
+      IF(VarSpeedCoil(DxCoilNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
+        CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//  &
+           '", freeze possible')
+        CALL ShowContinueError('...'//trim(cNumericFields(11))//' is < 2 {C}. Freezing could occur.')
+        CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(11),2))//'].')
+      END IF
+    END IF
+
+    IF(.NOT. lAlphaBlanks(9))THEN
+      VarSpeedCoil(DxCoilNum)%BasinHeaterSchedulePtr   = GetScheduleIndex(AlphArray(9))
+      IF(VarSpeedCoil(DxCoilNum)%BasinHeaterSchedulePtr .EQ. 0)THEN
+        CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+        CALL ShowContinueError('...not found '//TRIM(cAlphaFields(14))//'="'//TRIM(AlphArray(9))//'".')
+        CALL ShowContinueError('Basin heater will be available to operate throughout the simulation.')
+      END IF
+    END IF
+
+    Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(12+(I-1)*6)
+        VarSpeedCoil(DXCoilNum)%MSRatedSHR(I)    = NumArray(13+(I-1)*6)
+        VarSpeedCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(14+(I-1)*6)
+        VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(15+(I-1)*6)
+        VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(I) = NumArray(16+(I-1)*6)
+
+        VarSpeedCoil(DXCoilNum)%EvapCondEffect(I) = NumArray(17+(I-1)*6)
+        IF (VarSpeedCoil(DXCoilNum)%EvapCondEffect(I) .LT. 0.0d0 .OR. VarSpeedCoil(DXCoilNum)%EvapCondEffect(I) .GT. 1.0d0) THEN
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+          CALL ShowContinueError('...'//trim(cNumericFields(17+(I-1)*6))//' cannot be < 0.0 or > 1.0.')
+          CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(17+(I-1)*6),2))//'].')
+          ErrorsFound = .TRUE.
+        END IF
+
+        AlfaFieldIncre = 10+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))&
+                    //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is BiQuadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I)))
+
+          CASE('BIQUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletWetbulbTemp,RatedAmbAirTemp)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I))))
+            CALL ShowContinueError('Curve type must be BiQuadratic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre = 11+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre ))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'&
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre ))//'="' &
+                    //TRIM(AlphArray(AlfaFieldIncre ))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Quadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I)))
+
+          CASE('QUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)// &
+                    '="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre ))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE('CUBIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName// &
+                    trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre ))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I))))
+            CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre =12+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//&
+                    TRIM(cAlphaFields(AlfaFieldIncre))//'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Biquadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I)))
+
+          CASE('BIQUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletWetbulbTemp,RatedAmbAirTemp)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(1))))
+            CALL ShowContinueError('Curve type must be BiQuadratic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre =13+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))&
+                    //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Quadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I)))
+
+          CASE('QUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE('CUBIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject) &
+                    //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                  TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I))))
+            CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+      END DO
+
+      Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+            VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(I) =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(VarSpeedCoil(DXCoilNum)%NumOfSpeeds)
+            VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
+            VarSpeedCoil(DXCoilNum)%MSRatedEvapCondVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
+      END DO
+
+      CALL SetupOutputVariable('VSAirtoAirHP Cooling Electric Consumption [J]', &
+             VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
+             ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
+
+      CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Cooling Energy [J]', &
+             VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
+             ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
+
+      CALL SetupOutputVariable('VSAirtoAirHP Load Side Sensible Cooling Energy [J]', &
+             VarSpeedCoil(DXCoilNum)%EnergySensible,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
+
+      CALL SetupOutputVariable('VSAirtoAirHP Load Side Latent Cooling Energy [J]', &
+             VarSpeedCoil(DXCoilNum)%EnergyLatent,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
+
+      CALL SetupOutputVariable('VSAirtoAirHP Source Side Cooling Energy [J]', &
+             VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,   &
+             ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
+
+
+      VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = AUTOSIZE !always auto-sized, to be determined in the sizing calculation
+
+        !create predefined report entries
+      CALL PreDefTableEntry(pdchCoolCoilType,VarSpeedCoil(DXCoilNum)%Name,CurrentModuleObject)
+      CALL PreDefTableEntry(pdchCoolCoilTotCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+      CALL PreDefTableEntry(pdchCoolCoilSensCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+      CALL PreDefTableEntry(pdchCoolCoilLatCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                                 - VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+      CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens &
+                                 / VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+      CALL PreDefTableEntry(pdchCoolCoilNomEff,VarSpeedCoil(DXCoilNum)%Name, &
+            VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel))
+
+   END DO
+
+   !-------------------------AIR SOURCE COOLING---END
+
+   ! Get the data for heating coil, WATER SOURCE
    CurrentModuleObject = 'Coil:Heating:WaterToAirHeatPump:VariableSpeedEquationFit'
 
    DO WatertoAirHPNum = 1, NumHeat
@@ -927,7 +1454,7 @@ SUBROUTINE GetMulSpeedWSHPInput
         IsNotOK=.FALSE.
         IsBlank=.FALSE.
 
-        CALL VerifyName(AlphArray(1),WtoADXCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyName(AlphArray(1),VarSpeedCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
         IF (IsNotOK) THEN
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
@@ -938,25 +1465,25 @@ SUBROUTINE GetMulSpeedWSHPInput
           ErrorsFound=.true.
         ENDIF
 
-        WtoADXCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
-        WtoADXCoil(DXCoilNum)%WatertoAirHPType  = 'HEATING'
-        WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum  = TypeOf_CoilVSWAHPHeatingEquationFit
-        WtoADXCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
-        WtoADXCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
-        WtoADXCoil(DXCoilNum)%RatedCapHeat=NumArray(3)
-        WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
-        WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate=NumArray(5)
+        VarSpeedCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
+        VarSpeedCoil(DXCoilNum)%CoolHeatType  = 'HEATING'
+        VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum  = TypeOf_CoilVSWAHPHeatingEquationFit
+        VarSpeedCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
+        VarSpeedCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
+        VarSpeedCoil(DXCoilNum)%RatedCapHeat=NumArray(3)
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
+        VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate=NumArray(5)
 
-        WtoADXCoil(DXCoilNum)%WaterInletNodeNum    = &
+        VarSpeedCoil(DXCoilNum)%WaterInletNodeNum    = &
                GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),  &
                          AlphArray(1),NodeType_Water,NodeConnectionType_Inlet,2,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%WaterOutletNodeNum   = &
+        VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum   = &
                GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),  &
                          AlphArray(1),NodeType_Water,NodeConnectionType_Outlet,2,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%AirInletNodeNum      = &
+        VarSpeedCoil(DXCoilNum)%AirInletNodeNum      = &
                GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(CurrentModuleObject),  &
                          AlphArray(1),NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
-        WtoADXCoil(DXCoilNum)%AirOutletNodeNum     = &
+        VarSpeedCoil(DXCoilNum)%AirOutletNodeNum     = &
                GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),  &
                          AlphArray(1),NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
 
@@ -964,293 +1491,298 @@ SUBROUTINE GetMulSpeedWSHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
 
-        If (WtoADXCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
-          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
           CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 2.'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
           ErrorsFound=.TRUE.
         End If
 
-        If ((WtoADXCoil(DXCoilNum)%NormSpedLevel > WtoADXCoil(DXCoilNum)%NumOfSpeeds) &
-            .OR. (WtoADXCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
-          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+        If (VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) THEN
+            VarSpeedCoil(DXCoilNum)%NormSpedLevel = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        END IF
+
+        If ((VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) &
+            .OR. (VarSpeedCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
           CALL ShowContinueError('...'//TRIM(cNumericFields(2))//' must be valid speed level'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(2),0)))
           ErrorsFound=.TRUE.
         End If
 
         !part load curve
-        WtoADXCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(6)) ! convert curve name to number
-        IF (WtoADXCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
+        VarSpeedCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(6)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
           IF (lAlphaBlanks(6)) THEN
-            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
             CALL ShowContinueError('...required '//trim(cAlphaFields(6))//' is blank.')
           ELSE
-            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
             CALL ShowContinueError('...not found '//TRIM(cAlphaFields(6))//'="'//TRIM(AlphArray(6))//'".')
           END IF
           ErrorsFound = .TRUE.
         ELSE
-            CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%PLFFPLR,1.0d0)
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,1.0d0)
             IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
               CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
-                    //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
               CALL ShowContinueError('...'//TRIM(cAlphaFields(6))//' output is not equal to 1.0 '//  &
                                                  '(+ or - 10%) at rated conditions.')
               CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
             END IF
         END IF
 
-        Do I=1,WtoADXCoil(DXCoilNum)%NumOfSpeeds
-            WtoADXCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(6+(I-1)*5)
-            WtoADXCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(7+(I-1)*5)
-            WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(8+(I-1)*5)
-            WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I) = NumArray(9+(I-1)*5)
-            WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(I) = NumArray(10+(I-1)*5)
+        Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+            VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(6+(I-1)*5)
+            VarSpeedCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(7+(I-1)*5)
+            VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(8+(I-1)*5)
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I) = NumArray(9+(I-1)*5)
+            VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(I) = NumArray(10+(I-1)*5)
 
             AlfaFieldIncre = 7+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                             //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is BiQuadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapFTemp(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 8+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="' &
                         //TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 9+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="'//TRIM(AlphArray(14+(I-1)*6))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                            //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                            //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 10+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Biquadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRFTemp(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRFTemp(1))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(1))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
             AlfaFieldIncre = 11+(I-1)*7
-            WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
-                CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="'//TRIM(AlphArray(16+(I-1)*6))//'".')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="'// &
+                    TRIM(AlphArray(16+(I-1)*6))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject) &
-                        //'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                      TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(I))))
+                      TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
             END IF
 
            AlfaFieldIncre = 12+(I-1)*7
-           WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I) .EQ. 0) THEN
+           VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))// &
                         '="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal type is Quadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I)))
 
               CASE('QUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)&
-                        //'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE('CUBIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I),1.0d0)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                      TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(I))))
+                      TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(I))))
                 CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
                 ErrorsFound=.TRUE.
               END SELECT
@@ -1258,35 +1790,35 @@ SUBROUTINE GetMulSpeedWSHPInput
 
             AlfaFieldIncre = 13+(I-1)*7
             ! Read waste heat modifier curve name
-            WtoADXCoil(DXCoilNum)%MSWasteHeat(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
-            IF (WtoADXCoil(DXCoilNum)%MSWasteHeat(I) .EQ. 0) THEN
+            VarSpeedCoil(DXCoilNum)%MSWasteHeat(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+            IF (VarSpeedCoil(DXCoilNum)%MSWasteHeat(I) .EQ. 0) THEN
               IF (lAlphaBlanks(AlfaFieldIncre)) THEN
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", missing')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
                 CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
               ELSE
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
                         //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
               END IF
               ErrorsFound = .TRUE.
             ELSE
               ! Verify Curve Object, only legal types are BiQuadratic
-              SELECT CASE(GetCurveType(WtoADXCoil(DXCoilNum)%MSWasteHeat(I)))
+              SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I)))
 
               CASE('BIQUADRATIC')
-                CurveVal = CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
+                CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I),RatedInletAirTempHeat,RatedInletWaterTempHeat)
                 IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
                   CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
-                        //trim(WtoADXCoil(DXCoilNum)%Name)//'", curve values')
+                        //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
                   CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
                                                      '(+ or - 10%) at rated conditions.')
                   CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
                 END IF
 
               CASE DEFAULT
-                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(WtoADXCoil(DXCoilNum)%Name)//'", invalid')
+                CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
                 CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
-                                     TRIM(GetCurveType(WtoADXCoil(DXCoilNum)%MSWasteHeat(I))))
+                                     TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSWasteHeat(I))))
                 CALL ShowContinueError('Curve type must be BiQuadratic.')
                 ErrorsFound=.TRUE.
               END SELECT
@@ -1294,34 +1826,396 @@ SUBROUTINE GetMulSpeedWSHPInput
 
         END DO
 
-        Do I=1,WtoADXCoil(DXCoilNum)%NumOfSpeeds
-            WtoADXCoil(DXCoilNum)%MSRatedPercentTotCap(I) =WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)/ &
-                    WtoADXCoil(DXCoilNum)%MSRatedTotCap(WtoADXCoil(DXCoilNum)%NumOfSpeeds)
-            WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
-                        WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)
-            WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(I) = WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I)/ &
-                        WtoADXCoil(DXCoilNum)%MSRatedTotCap(I)
+        Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+            VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(I) =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(VarSpeedCoil(DXCoilNum)%NumOfSpeeds)
+            VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
+                        VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(I)/ &
+                        VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
         END DO
 
         CALL SetupOutputVariable('VSWatertoAirHP Heating Electric Consumption [J]', &
-             WtoADXCoil(DXCoilNum)%Energy,'System','Summed',WtoADXCoil(DXCoilNum)%Name,  &
+             VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
 
         CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Heating Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',WtoADXCoil(DXCoilNum)%Name,  &
+             VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
 
         CALL SetupOutputVariable('VSWatertoAirHP Source Side Heating Energy [J]', &
-             WtoADXCoil(DXCoilNum)%EnergySource,'System','Summed',WtoADXCoil(DXCoilNum)%Name,  &
+             VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
         !create predefined report entries
-        CALL PreDefTableEntry(pdchHeatCoilType,WtoADXCoil(DXCoilNum)%Name,CurrentModuleObject)
-        CALL PreDefTableEntry(pdchHeatCoilNomCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapHeat)
-        CALL PreDefTableEntry(pdchHeatCoilNomEff,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedPowerHeat &
-                                 / WtoADXCoil(DXCoilNum)%RatedCapHeat)
+        CALL PreDefTableEntry(pdchHeatCoilType,VarSpeedCoil(DXCoilNum)%Name,CurrentModuleObject)
+        CALL PreDefTableEntry(pdchHeatCoilNomCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapHeat)
+        CALL PreDefTableEntry(pdchHeatCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,&
+                    VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel))
 
    END DO
+
+   !-------------------------AIR SOURCE, HEATING---BEGIN
+   ! Get the data for heating coil, AIR SOURCE
+   CurrentModuleObject = 'COIL:HEATING:DX:VARIABLESPEED'
+
+   DO WatertoAirHPNum = 1, NumHeatAS
+
+      DXCoilNum= DXCoilNum + 1
+
+      CALL GetObjectItem(TRIM(CurrentModuleObject),WatertoAirHPNum,AlphArray,NumAlphas, &
+                           NumArray,NumNums,IOSTAT, &
+                           NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
+                           AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
+
+      IsNotOK=.FALSE.
+      IsBlank=.FALSE.
+
+      CALL VerifyName(AlphArray(1),VarSpeedCoil%Name,DXCoilNum-1, ISNotOK,ISBlank,TRIM(CurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+         ErrorsFound=.TRUE.
+         IF (IsBlank) AlphArray(1)='xxxxx'
+      ENDIF
+      CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
+                                          TRIM(CurrentModuleObject)//' Name')
+      IF (errflag) THEN
+         ErrorsFound=.true.
+      ENDIF
+
+      VarSpeedCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
+      VarSpeedCoil(DXCoilNum)%CoolHeatType  = 'HEATING'
+      VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum  = Coil_HeatingAirToAirVariableSpeed
+      VarSpeedCoil(DXCoilNum)%NumOfSpeeds = INT(NumArray(1))
+      VarSpeedCoil(DXCoilNum)%NormSpedLevel = INT(NumArray(2))
+      VarSpeedCoil(DXCoilNum)%RatedCapHeat=NumArray(3)
+      VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = NumArray(4)
+
+      VarSpeedCoil(DXCoilNum)%AirInletNodeNum      = &
+               GetOnlySingleNode(AlphArray(2),ErrorsFound,TRIM(CurrentModuleObject),  &
+                         AlphArray(1),NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+      VarSpeedCoil(DXCoilNum)%AirOutletNodeNum     = &
+               GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),  &
+                         AlphArray(1),NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+
+      CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),'Air Nodes')
+
+
+      If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 1) Then
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+        CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 1.'//  &
+                                                 ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
+        ErrorsFound=.TRUE.
+      End If
+
+      If (VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) THEN
+        VarSpeedCoil(DXCoilNum)%NormSpedLevel = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+      END IF
+
+      If ((VarSpeedCoil(DXCoilNum)%NormSpedLevel > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) &
+            .OR. (VarSpeedCoil(DXCoilNum)%NormSpedLevel <= 0)) Then
+        CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+        CALL ShowContinueError('...'//TRIM(cNumericFields(2))//' must be valid speed level'//  &
+                                                 ' entered number is '//TRIM(TrimSigDigits(NumArray(2),0)))
+        ErrorsFound=.TRUE.
+      End If
+
+      !part load curve
+      VarSpeedCoil(DXCoilNum)%PLFFPLR = GetCurveIndex(AlphArray(4)) ! convert curve name to number
+      IF (VarSpeedCoil(DXCoilNum)%PLFFPLR .EQ. 0) THEN
+        IF (lAlphaBlanks(4)) THEN
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+          CALL ShowContinueError('...required '//trim(cAlphaFields(4))//' is blank.')
+        ELSE
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+          CALL ShowContinueError('...not found '//TRIM(cAlphaFields(4))//'="'//TRIM(AlphArray(4))//'".')
+        END IF
+        ErrorsFound = .TRUE.
+      ELSE
+          CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,1.0d0)
+          IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+            CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'&
+                  //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+            CALL ShowContinueError('...'//TRIM(cAlphaFields(4))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+            CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+          END IF
+      END IF
+
+      VarSpeedCoil(DXCoilNum)%DefrostEIRFT = GetCurveIndex(AlphArray(5)) ! convert curve name to number
+
+      IF (SameString(AlphArray(6),'ReverseCycle')) THEN
+        IF (VarSpeedCoil(DXCoilNum)%DefrostEIRFT .EQ. 0) THEN
+          IF (lAlphaBlanks(5)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(5))//' is blank.')
+            CALL ShowContinueError('...field is required because '//trim(cAlphaFields(6))//' is "ReverseCycle".')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(5))//'="'//TRIM(AlphArray(5))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is BiQuadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%DefrostEIRFT))
+
+            CASE('BIQUADRATIC')
+
+            CASE DEFAULT
+              CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+              CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(5))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%DefrostEIRFT)))
+              CALL ShowContinueError('Curve type must be BiQuadratic.')
+              ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+     END IF
+
+    IF (SameString(AlphArray(6),'ReverseCycle'))  VarSpeedCoil(DXCoilNum)%DefrostStrategy = ReverseCycle
+    IF (SameString(AlphArray(6),'Resistive')) VarSpeedCoil(DXCoilNum)%DefrostStrategy = Resistive
+    IF (VarSpeedCoil(DXCoilNum)%DefrostStrategy .EQ.0) THEN
+       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+       CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(6))//'="'//TRIM(AlphArray(6))//'".')
+       CALL ShowContinueError('...valid values for this field are ReverseCycle or Resistive.')
+       ErrorsFound = .TRUE.
+    END IF
+
+    IF (SameString(AlphArray(7),'Timed'))     VarSpeedCoil(DXCoilNum)%DefrostControl = Timed
+    IF (SameString(AlphArray(7),'OnDemand'))  VarSpeedCoil(DXCoilNum)%DefrostControl = OnDemand
+    IF (VarSpeedCoil(DXCoilNum)%DefrostControl .EQ.0) THEN
+      CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+      CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(7))//'="'//TRIM(AlphArray(7))//'".')
+      CALL ShowContinueError('...valid values for this field are Timed or OnDemand.')
+      ErrorsFound = .TRUE.
+    END IF
+
+  !Set minimum OAT for heat pump compressor operation
+   VarSpeedCoil(DXCoilNum)%MinOATCompressor = NumArray(5)
+
+   ! reserved for HSPF calculation
+   VarSpeedCoil(DXCoilNum)%OATempCompressorOn = NumArray(6)
+
+   !Set maximum outdoor temp for defrost to occur
+   VarSpeedCoil(DXCoilNum)%MaxOATDefrost = NumArray(7)
+
+  !Set crankcase heater capacity
+   VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity = NumArray(8)
+   IF (VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity .LT. 0.0d0) THEN
+     CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+     CALL ShowContinueError('...'//TRIM(cNumericFields(9))//' cannot be < 0.0.')
+     CALL ShowContinueError('...entered value=['//trim(TrimSigDigits(NumArray(9),2))//'].')
+     ErrorsFound = .TRUE.
+   END IF
+
+   !Set crankcase heater cutout temperature
+   VarSpeedCoil(DXCoilNum)%MaxOATCrankcaseHeater = NumArray(9)
+
+   !Set defrost time period
+   VarSpeedCoil(DXCoilNum)%DefrostTime = NumArray(10)
+   IF(VarSpeedCoil(DXCoilNum)%DefrostTime .EQ. 0.0d0 .AND. VarSpeedCoil(DXCoilNum)%DefrostControl .EQ. 1) THEN
+     CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", ')
+     CALL ShowContinueError('...'//TRIM(cNumericFields(5))//' = 0.0 for defrost control = TIMED.')
+   END IF
+
+  !Set defrost capacity (for resistive defrost)
+   VarSpeedCoil(DXCoilNum)%DefrostCapacity = NumArray(11)
+   IF(VarSpeedCoil(DXCoilNum)%DefrostCapacity .EQ. 0.0d0 .AND. VarSpeedCoil(DXCoilNum)%DefrostStrategy .EQ. 2) THEN
+     CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", ')
+     CALL ShowContinueError('...'//TRIM(cNumericFields(6))//' = 0.0 for defrost strategy = RESISTIVE.')
+   END IF
+
+   Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(12+(I-1)*3)
+        VarSpeedCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(13+(I-1)*3)
+        VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(14+(I-1)*3)
+
+        AlfaFieldIncre = 8+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
+                        //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is BiQuadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I)))
+
+          CASE('BIQUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I),RatedInletAirTempHeat,RatedAmbAirTempHeat)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I))))
+            CALL ShowContinueError('Curve type must be BiQuadratic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre = 9+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="' &
+                    //TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Quadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I)))
+
+          CASE('QUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE('CUBIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(I))))
+            CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre = 10+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre)) &
+                    //'="'//TRIM(AlphArray(AlfaFieldIncre))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Biquadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I)))
+
+          CASE('BIQUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(I),RatedInletAirTempHeat,RatedAmbAirTempHeat)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                                 TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(1))))
+            CALL ShowContinueError('Curve type must be BiQuadratic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+
+        AlfaFieldIncre = 11+(I-1)*4
+        VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
+        IF (VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I) .EQ. 0) THEN
+          IF (lAlphaBlanks(AlfaFieldIncre)) THEN
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", missing')
+            CALL ShowContinueError('...required '//trim(cAlphaFields(AlfaFieldIncre))//' is blank.')
+          ELSE
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...not found '//TRIM(cAlphaFields(AlfaFieldIncre))//'="'//TRIM(AlphArray(16+(I-1)*6))//'".')
+          END IF
+          ErrorsFound = .TRUE.
+        ELSE
+          ! Verify Curve Object, only legal type is Quadratic
+          SELECT CASE(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I)))
+
+          CASE('QUADRATIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//'="' &
+                    //trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE('CUBIC')
+            CurveVal = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I),1.0d0)
+            IF(CurveVal .GT. 1.10d0 .OR. CurveVal .LT. 0.90d0) THEN
+              CALL ShowWarningError(RoutineName//trim(CurrentModuleObject) &
+                    //'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", curve values')
+              CALL ShowContinueError('...'//TRIM(cAlphaFields(AlfaFieldIncre))//' output is not equal to 1.0 '//  &
+                                                 '(+ or - 10%) at rated conditions.')
+              CALL ShowContinueError('...Curve output at rated conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
+            END IF
+
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
+            CALL ShowContinueError('...illegal '//TRIM(cAlphaFields(AlfaFieldIncre))//' type for this object = '// &
+                  TRIM(GetCurveType(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(I))))
+            CALL ShowContinueError('Curve type must be Quadratic or Cubic.')
+            ErrorsFound=.TRUE.
+          END SELECT
+        END IF
+    END DO
+
+    Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(I) =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)/ &
+                VarSpeedCoil(DXCoilNum)%MSRatedTotCap(VarSpeedCoil(DXCoilNum)%NumOfSpeeds)
+        VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(I) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I)/ &
+                    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
+    END DO
+
+    CALL SetupOutputVariable('VSAirtoAirHP Heating Electric Consumption [J]', &
+         VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
+         ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
+
+    CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Heating Energy [J]', &
+         VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
+         ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
+
+    CALL SetupOutputVariable('VSAirtoAirHP Source Side Heating Energy [J]', &
+         VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
+         ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
+
+    !create predefined report entries
+    CALL PreDefTableEntry(pdchHeatCoilType,VarSpeedCoil(DXCoilNum)%Name,CurrentModuleObject)
+    CALL PreDefTableEntry(pdchHeatCoilNomCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapHeat)
+    CALL PreDefTableEntry(pdchHeatCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,&
+                VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel))
+
+  END DO
+
+   !-------------------------AIR SOURCE HEATING---END
 
    DEALLOCATE(AlphArray)
    DEALLOCATE(cAlphaFields)
@@ -1335,48 +2229,149 @@ SUBROUTINE GetMulSpeedWSHPInput
    ENDIF
 
    DO DXCoilNum=1,NumWatertoAirHPs
-            ! Setup Report variables for the Heat Pump
-       CALL SetupOutputVariable('VSWatertoAirHP Power [W]', &
-            WtoADXCoil(DXCoilNum)%Power,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Heat Transfer Rate [W]', &
-            WtoADXCoil(DXCoilNum)%QLoadTotal,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Sensible Heat Transfer Rate [W]', &
-            WtoADXCoil(DXCoilNum)%QSensible,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Latent Heat Transfer Rate [W]', &
-            WtoADXCoil(DXCoilNum)%QLatent,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Heat Transfer Rate [W]', &
-            WtoADXCoil(DXCoilNum)%QSource,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Part Load Ratio', &
-            WtoADXCoil(DXCoilNum)%PartLoadRatio,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Run Time Fraction', &
-            WtoADXCoil(DXCoilNum)%RunFrac,'System','Average',WtoADXCoil(DXCoilNum)%Name)
+    IF((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) .OR. &
+    (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed)) THEN
+        ! Setup Report variables for the Heat Pump
+       CALL SetupOutputVariable('VSAirtoAirHP Power [W]', &
+            VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Sensible Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Latent Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QLatent,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Source Side Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Part Load Ratio []', &
+            VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Run Time Fraction []', &
+            VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
-       CALL SetupOutputVariable('VSWatertoAirHP Air Mass Flow Rate [kg/s]', &
-            WtoADXCoil(DXCoilNum)%AirMassFlowRate,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
-            WtoADXCoil(DXCoilNum)%InletAirDBTemp,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
-            WtoADXCoil(DXCoilNum)%InletAirHumRat,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
-            WtoADXCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
-            WtoADXCoil(DXCoilNum)%OutletAirHumRat,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Water Mass Flow Rate [kg/s]', &
-            WtoADXCoil(DXCoilNum)%WaterMassFlowRate,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Inlet Temperature [C]', &
-            WtoADXCoil(DXCoilNum)%InletWaterTemp,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Outlet Temperature [C]', &
-            WtoADXCoil(DXCoilNum)%OutletWaterTemp,'System','Average',WtoADXCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Air Mass Flow Rate [kg/s]', &
+            VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
        !starting newly added output variables
-       CALL SetupOutputVariable('VSWatertoAirHP Upper Speed Level', &
-            WtoADXCoil(DXCoilNum)%SpeedNumReport,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Speed Ratio between Two Neighboring Speeds', &
-            WtoADXCoil(DXCoilNum)%SpeedRatioReport,'System','Average',WtoADXCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Recoverable Waste Heat [W]', &
-            WtoADXCoil(DXCoilNum)%QWasteHeat,'System','Average',WtoADXCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Upper Speed Level []', &
+            VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Speed Ratio between Two Neighboring Speeds []', &
+            VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
        !end newly added output variables
 
+       !cooling and heating coils separately
+       IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+     ! air source cooling coils
+        IF (VarSpeedCoil(DXCoilNum)%CondensateCollectMode == CondensateToTank) THEN
+          CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condensate Volumetric Flow Rate [m3/s]', &
+            VarSpeedCoil(DXCoilNum)%CondensateVdot, 'System','Average', VarSpeedCoil(DXCoilNum)%Name)
+          CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condensate Volume [m3]',VarSpeedCoil(DXCoilNum)%CondensateVol,&
+                               'System','Sum', VarSpeedCoil(DXCoilNum)%Name,  &
+                               ResourceTypeKey='OnSiteWater', &
+                               EndUseKey='Condensate', GroupKey='System')
+        ENDIF
+
+        IF (VarSpeedCoil(DXCoilNum)%ReportEvapCondVars) THEN
+            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condenser Inlet Temp [C]', &
+                                      VarSpeedCoil(DXCoilNum)%CondInletTemp,'System','Average', VarSpeedCoil(DXCoilNum)%Name)
+            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Water Consumption [m3]',&
+                            VarSpeedCoil(DXCoilNum)%EvapWaterConsump, &
+                                     'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                                      ResourceTypeKey='Water',EndUseKey='Cooling',GroupKey='System')
+            CALL SetupOutputVariable('Mains Water Supply for VSAirtoAirHP Cooling Coil Evap Condenser [m3]', &
+                                        VarSpeedCoil(DXCoilNum)%EvapWaterConsump, &
+                                     'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                                      ResourceTypeKey='MainsWater',EndUseKey='Cooling',GroupKey='System')
+            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Pump Electric Power [W]',&
+                                        VarSpeedCoil(DXCoilNum)%EvapCondPumpElecPower, &
+                                     'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Pump Electric Consumption [J]', &
+                                      VarSpeedCoil(DXCoilNum)%EvapCondPumpElecConsumption,'System','Sum',&
+                                      VarSpeedCoil(DXCoilNum)%Name, &
+                                      ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
+            IF(VarSpeedCoil(DXCoilNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
+              CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Basin Heater Electric Power [W]', &
+                VarSpeedCoil(DXCoilNum)%BasinHeaterPower,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+              CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Basin Heater Electric Consumption [J]', &
+                VarSpeedCoil(DXCoilNum)%BasinHeaterConsumption,'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
+            END IF
+        END IF
+
+        CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Crankcase Heater Power [W]', &
+                            VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower,'System',&
+                           'Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Crankcase Heater Consumption [J]', &
+                                    VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption,  &
+                                    'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                                    ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
+      ELSE
+     ! air source heating coils
+       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Electric Defrost Power [W]', &
+                            VarSpeedCoil(DXCoilNum)%DefrostPower,'System','Average',&
+                            VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Electric Defrost Consumption [J]', &
+                            VarSpeedCoil(DXCoilNum)%DefrostConsumption,'System',&
+                           'Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                           ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
+       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Crankcase Heater Power [W]', &
+                            VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower,'System',&
+                           'Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Crankcase Heater Consumption [J]', &
+                                    VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption,  &
+                                    'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                                    ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
+
+      END IF
+    ELSE
+            ! Setup Report variables for water source Heat Pump
+       CALL SetupOutputVariable('VSWatertoAirHP Power [W]', &
+            VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Sensible Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Latent Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QLatent,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Source Side Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Part Load Ratio []', &
+            VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Run Time Fraction []', &
+            VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+       CALL SetupOutputVariable('VSWatertoAirHP Air Mass Flow Rate [kg/s]', &
+            VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Water Mass Flow Rate [kg/s]', &
+            VarSpeedCoil(DXCoilNum)%WaterMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Source Side Inlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%InletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Source Side Outlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%OutletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+       !starting newly added output variables
+       CALL SetupOutputVariable('VSWatertoAirHP Upper Speed Level []', &
+            VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Speed Ratio between Two Neighboring Speeds []', &
+            VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       CALL SetupOutputVariable('VSWatertoAirHP Recoverable Waste Heat [W]', &
+            VarSpeedCoil(DXCoilNum)%QWasteHeat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+       !end newly added output variables
+    END IF
    END DO
 
   IF (ErrorsFound) THEN
@@ -1386,12 +2381,12 @@ SUBROUTINE GetMulSpeedWSHPInput
 
   RETURN
 
-END SUBROUTINE GetMulSpeedWSHPInput
+END SUBROUTINE GetVarSpeedCoilInput
 
  ! Beginning Initialization Section of the Module
 !******************************************************************************
 
-SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
+SUBROUTINE InitVarSpeedCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
                                   OnOffAirFlowRatio, SpeedRatio, SpeedNum)
 
           ! SUBROUTINE INFORMATION:
@@ -1463,7 +2458,7 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
 
             ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64) :: SmallDifferenceTest=0.00000001d0
-  CHARACTER(len=*), PARAMETER :: RoutineName='InitMulSpeedWSHPCoil'
+  CHARACTER(len=*), PARAMETER :: RoutineName='InitVarSpeedCoil'
 
 
   IF (MyOneTimeFlag) THEN
@@ -1478,39 +2473,47 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
 
   END IF
 
-  IF (MyPlantScanFlag(DXCoilNum) .AND. ALLOCATED(PlantLoop)) THEN
-    errFlag=.false.
-    CALL ScanPlantLoopsForObject(WtoADXCoil(DXCoilNum)%Name,  &
-                                 WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum, &
-                                 WtoADXCoil(DXCoilNum)%LoopNum, &
-                                 WtoADXCoil(DXCoilNum)%LoopSide, &
-                                 WtoADXCoil(DXCoilNum)%BranchNum, &
-                                 WtoADXCoil(DXCoilNum)%CompNum,   &
-                                 errFlag=errFlag)
-    IF (errFlag) THEN
-      CALL ShowFatalError('InitMulSpeedWSHPCoil: Program terminated for previous conditions.')
-    ENDIF
+! water source
+  IF( (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit).OR. &
+    (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit)) THEN
+      IF (MyPlantScanFlag(DXCoilNum) .AND. ALLOCATED(PlantLoop)) THEN
+        errFlag=.false.
+        CALL ScanPlantLoopsForObject(VarSpeedCoil(DXCoilNum)%Name,  &
+                                     VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum, &
+                                     VarSpeedCoil(DXCoilNum)%LoopNum, &
+                                     VarSpeedCoil(DXCoilNum)%LoopSide, &
+                                     VarSpeedCoil(DXCoilNum)%BranchNum, &
+                                     VarSpeedCoil(DXCoilNum)%CompNum,   &
+                                     errFlag=errFlag)
+        IF (errFlag) THEN
+          CALL ShowFatalError('InitVarSpeedCoil: Program terminated for previous conditions.')
+        ENDIF
+        MyPlantScanFlag(DXCoilNum) = .FALSE.
+      ENDIF
+  ELSE
     MyPlantScanFlag(DXCoilNum) = .FALSE.
-  ENDIF
-
+  END IF
 
   IF ( .NOT. SysSizingCalc .AND. MySizeFlag(DXCoilNum) .AND. .NOT. MyPlantScanFlag(DXCoilNum) ) THEN
     ! for each furnace, do the sizing once.
-    CALL SizeMulSpeedWSHPCoil(DXCoilNum)
+    CALL SizeVarSpeedCoil(DXCoilNum)
 
     MySizeFlag(DXCoilNum) = .FALSE.
 
     ! Multispeed Cooling
-    IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit ) THEN
-      Do Mode = 1, WtoADXCoil(DXCoilNum)%NumOfSpeeds
+    IF ((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit ) .OR. &
+        (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==Coil_CoolingAirToAirVariableSpeed))THEN
+      Do Mode = 1, VarSpeedCoil(DXCoilNum)%NumOfSpeeds
         ! Check for zero capacity or zero max flow rate
-        IF (WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode) <= 0.0) THEN
-          CALL ShowSevereError('Sizing: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType)//' '//TRIM(WtoADXCoil(DXCoilNum)%Name)// &
+        IF (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) <= 0.0) THEN
+          CALL ShowSevereError('Sizing: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType)//' '//  &
+             TRIM(VarSpeedCoil(DXCoilNum)%Name)// &
                             ' has zero rated total capacity at speed '//Trim(TrimSigDigits(Mode)))
           ErrorsFound=.TRUE.
         END IF
-        IF (WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) <= 0.0) THEN
-          CALL ShowSevereError('Sizing: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType)//' '//TRIM(WtoADXCoil(DXCoilNum)%Name)// &
+        IF (VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) <= 0.0) THEN
+          CALL ShowSevereError('Sizing: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType)//' '//  &
+             TRIM(VarSpeedCoil(DXCoilNum)%Name)// &
                             ' has zero rated air flow rate at speed '//Trim(TrimSigDigits(Mode)))
           ErrorsFound=.TRUE.
         END IF
@@ -1520,13 +2523,13 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
         !
         ! Check for valid range of (Rated Air Volume Flow Rate / Rated Total Capacity)
         !
-        RatedVolFlowPerRatedTotCap = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)/  &
-                                                 WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+        RatedVolFlowPerRatedTotCap = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)/  &
+                                                 VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode)
        !note: variable-speed HP can exceed the flow rate restrictions at low speed levels
 !        IF (((MinRatedAirVolFlowPerRatedTotCap - RatedVolFlowPerRatedTotCap) > SmallDifferenceTest).OR. &
 !           ((RatedVolFlowPerRatedTotCap - MaxRatedAirVolFlowPerRatedTotCap) > SmallDifferenceTest)) THEN
-!          CALL ShowSevereError ('Sizing: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType) &
-!           // ' "'//TRIM(WtoADXCoil(DXCoilNum)%Name)//  &
+!          CALL ShowSevereError ('Sizing: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType) &
+!           // ' "'//TRIM(VarSpeedCoil(DXCoilNum)%Name)//  &
 !                '": Rated air volume flow rate per watt of rated total '// &
 !                'cooling capacity is out of range at speed '//TRIM(TrimSigDigits(Mode)))
 !          CALL ShowContinueError &
@@ -1535,33 +2538,34 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
 !           Max Rated Vol Flow Per Watt=['// &
 !           TRIM(TrimSigDigits(MaxRatedAirVolFlowPerRatedTotCap,3))//']. See Input-Output Reference Manual for valid range.')
 !        END IF
-!        WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
+!        VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
 !          PsyRhoAirFnPbTdbW(OutBaroPress,RatedInletAirTemp,RatedInletAirHumRat,RoutineName)
 !        ! get high speed rated coil bypass factor
-!        WtoADXCoil(DXCoilNum)%MSRatedCBF(Mode) = CalcCBF(WtoADXCoil(DXCoilNum)%WtoADXCoilType, &
-!               WtoADXCoil(DXCoilNum)%Name,&
-!                                           RatedInletAirTemp,RatedInletAirHumRat,WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode),&
-!                                           WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode), &
-!                           WtoADXCoil(DXCoilNum)%MSRatedSHR(Mode))
+!        VarSpeedCoil(DXCoilNum)%MSRatedCBF(Mode) = CalcCBF(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType, &
+!               VarSpeedCoil(DXCoilNum)%Name,&
+!                                           RatedInletAirTemp,RatedInletAirHumRat,VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode),&
+!                                           VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode), &
+!                           VarSpeedCoil(DXCoilNum)%MSRatedSHR(Mode))
       END DO
     END IF
 
     ! Multispeed Heating
-    IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit) THEN
+    IF ((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit) .OR. &
+        (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==Coil_HeatingAirToAirVariableSpeed))THEN
       RatedHeatPumpIndoorAirTemp = 21.11d0  ! 21.11C or 70F
       RatedHeatPumpIndoorHumRat = 0.00881d0 ! Humidity ratio corresponding to 70F dry bulb/60F wet bulb
-      Do Mode = 1, WtoADXCoil(DXCoilNum)%NumOfSpeeds
+      Do Mode = 1, VarSpeedCoil(DXCoilNum)%NumOfSpeeds
 
-        WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
+        VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
          PsyRhoAirFnPbTdbW(OutBaroPress,RatedHeatPumpIndoorAirTemp,RatedHeatPumpIndoorHumRat,RoutineName)
         ! Check for valid range of (Rated Air Volume Flow Rate / Rated Total Capacity)
         !
-        RatedVolFlowPerRatedTotCap = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)/  &
-                                                  WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode)
+        RatedVolFlowPerRatedTotCap = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)/  &
+                                                  VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode)
         !note: variable-speed HP can exceed the flow rate restrictions at low speed levels
 !        IF (((MinRatedAirVolFlowPerRatedTotCap - RatedVolFlowPerRatedTotCap) > SmallDifferenceTest).OR. &
 !            ((RatedVolFlowperRatedTotCap - MaxRatedAirVolFlowPerRatedTotCap) > SmallDifferenceTest)) THEN
-!          CALL ShowSevereError ('Coil:Heating:DX:MultiSpeed '//TRIM(WtoADXCoil(DXCoilNum)%Name)//  &
+!          CALL ShowSevereError ('Coil:Heating:DX:MultiSpeed '//TRIM(VarSpeedCoil(DXCoilNum)%Name)//  &
 !                              ': Rated air volume flow rate per watt of rated total '// &
 !                'heating capacity is out of range at speed '//TRIM(TrimSigDigits(Mode)))
 !          CALL ShowContinueError('Min Rated Vol Flow Per Watt=['//TRIM(TrimSigDigits &
@@ -1576,28 +2580,28 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
 
   END IF
 
-  IF(SpeedNum > WtoADXCoil(DXCoilNum)%NumOfSpeeds) THEN
-      SpeedCal = WtoADXCoil(DXCoilNum)%NumOfSpeeds
+  IF(SpeedNum > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) THEN
+      SpeedCal = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
   ELSE IF(SpeedNum < 1) THEN
      SpeedCal = 1
   ELSE
      SpeedCal = SpeedNum
   END IF
 
-  IF((SpeedNum <= 1) .OR.(SpeedNum > WtoADXCoil(DXCoilNum)%NumOfSpeeds) ) THEN
-    WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate = WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal)
-    WtoADXCoil(DXCoilNum)%DesignAirVolFlowRate = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal)
-    WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate = WtoADXCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal)
-    WtoADXCoil(DXCoilNum)%DesignWaterVolFlowRate = WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal)
+  IF((SpeedNum <= 1) .OR.(SpeedNum > VarSpeedCoil(DXCoilNum)%NumOfSpeeds) ) THEN
+    VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal)
+    VarSpeedCoil(DXCoilNum)%DesignAirVolFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal)
+    VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal)
+    VarSpeedCoil(DXCoilNum)%DesignWaterVolFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal)
   ELSE
-    WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate = WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal)*SpeedRatio &
-            + (1.0 - SpeedRatio ) * WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal - 1)
-    WtoADXCoil(DXCoilNum)%DesignAirVolFlowRate = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal)*SpeedRatio &
-            + (1.0 - SpeedRatio ) * WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal - 1)
-    WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate = WtoADXCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal)*SpeedRatio &
-            + (1.0 - SpeedRatio ) * WtoADXCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal - 1)
-    WtoADXCoil(DXCoilNum)%DesignWaterVolFlowRate = WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal)*SpeedRatio &
-            + (1.0 - SpeedRatio ) * WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal - 1)
+    VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal - 1)
+    VarSpeedCoil(DXCoilNum)%DesignAirVolFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(SpeedCal - 1)
+    VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(SpeedCal - 1)
+    VarSpeedCoil(DXCoilNum)%DesignWaterVolFlowRate = VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(SpeedCal - 1)
   END IF
 
 
@@ -1605,72 +2609,77 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(DXCoilNum) .AND. .NOT. MyPlantScanFlag(DXCoilNum)) THEN
       ! Do the initializations to start simulation
 
-    AirInletNode   = WtoADXCoil(DXCoilNum)%AirInletNodeNum
-    WaterInletNode = WtoADXCoil(DXCoilNum)%WaterInletNodeNum
+    AirInletNode   = VarSpeedCoil(DXCoilNum)%AirInletNodeNum
 
     !Initialize all report variables to a known state at beginning of simulation
-    WtoADXCoil(DXCoilNum)%AirVolFlowRate=0.0
-    WtoADXCoil(DXCoilNum)%InletAirDBTemp=0.0
-    WtoADXCoil(DXCoilNum)%InletAirHumRat=0.0
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp=0.0
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat=0.0
-    WtoADXCoil(DXCoilNum)%WaterVolFlowRate=0.0
-    WtoADXCoil(DXCoilNum)%WaterMassFlowRate=0.0
-    WtoADXCoil(DXCoilNum)%InletWaterTemp=0.0
-    WtoADXCoil(DXCoilNum)%InletWaterEnthalpy = 0.0
-    WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0
-    WtoADXCoil(DXCoilNum)%OutletWaterTemp=0.0
-    WtoADXCoil(DXCoilNum)%Power=0.0
-    WtoADXCoil(DXCoilNum)%QLoadTotal=0.0
-    WtoADXCoil(DXCoilNum)%QSensible=0.0
-    WtoADXCoil(DXCoilNum)%QLatent=0.0
-    WtoADXCoil(DXCoilNum)%QSource=0.0
-    WtoADXCoil(DXCoilNum)%Energy=0.0
-    WtoADXCoil(DXCoilNum)%EnergyLoadTotal=0.0
-    WtoADXCoil(DXCoilNum)%EnergySensible=0.0
-    WtoADXCoil(DXCoilNum)%EnergyLatent=0.0
-    WtoADXCoil(DXCoilNum)%EnergySource=0.0
-    WtoADXCoil(DXCoilNum)%COP=0.0
-    WtoADXCoil(DXCoilNum)%RunFrac=0.0
-    WtoADXCoil(DXCoilNum)%PartLoadRatio=0.0
+    VarSpeedCoil(DXCoilNum)%AirVolFlowRate=0.0
+    VarSpeedCoil(DXCoilNum)%InletAirDBTemp=0.0
+    VarSpeedCoil(DXCoilNum)%InletAirHumRat=0.0
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp=0.0
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat=0.0
+    VarSpeedCoil(DXCoilNum)%WaterVolFlowRate=0.0
+    VarSpeedCoil(DXCoilNum)%WaterMassFlowRate=0.0
+    VarSpeedCoil(DXCoilNum)%InletWaterTemp=0.0
+    VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy = 0.0
+    VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0
+    VarSpeedCoil(DXCoilNum)%OutletWaterTemp=0.0
+    VarSpeedCoil(DXCoilNum)%Power=0.0
+    VarSpeedCoil(DXCoilNum)%QLoadTotal=0.0
+    VarSpeedCoil(DXCoilNum)%QSensible=0.0
+    VarSpeedCoil(DXCoilNum)%QLatent=0.0
+    VarSpeedCoil(DXCoilNum)%QSource=0.0
+    VarSpeedCoil(DXCoilNum)%Energy=0.0
+    VarSpeedCoil(DXCoilNum)%EnergyLoadTotal=0.0
+    VarSpeedCoil(DXCoilNum)%EnergySensible=0.0
+    VarSpeedCoil(DXCoilNum)%EnergyLatent=0.0
+    VarSpeedCoil(DXCoilNum)%EnergySource=0.0
+    VarSpeedCoil(DXCoilNum)%COP=0.0
+    VarSpeedCoil(DXCoilNum)%RunFrac=0.0
+    VarSpeedCoil(DXCoilNum)%PartLoadRatio=0.0
 
-    rho = GetDensityGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                              InitConvTemp, &
-                              PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
-                              'InitSimpleWatertoAirHP')
-    Cp  = GetSpecificHeatGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                              InitConvTemp, &
-                              PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
-                              'InitSimpleWatertoAirHP')
+    VarSpeedCoil(DXCoilNum)%MaxONOFFCyclesperHour=MaxONOFFCyclesperHour
+    VarSpeedCoil(DXCoilNum)%HPTimeConstant=HPTimeConstant
+    VarSpeedCoil(DXCoilNum)%FanDelayTime=FanDelayTime
 
-!    WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate= &
-!                             rho * WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate
 
-    WtoADXCoil(DXCoilNum)%MaxONOFFCyclesperHour=MaxONOFFCyclesperHour
-    WtoADXCoil(DXCoilNum)%HPTimeConstant=HPTimeConstant
-    WtoADXCoil(DXCoilNum)%FanDelayTime=FanDelayTime
+    IF ((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit) .OR. &
+        (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit))THEN
+        WaterInletNode = VarSpeedCoil(DXCoilNum)%WaterInletNodeNum
 
-    CALL InitComponentNodes(0.d0, WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate, &
-                                  WtoADXCoil(DXCoilNum)%WaterInletNodeNum,  &
-                                  WtoADXCoil(DXCoilNum)%WaterOutletNodeNum , &
-                                  WtoADXCoil(DXCoilNum)%LoopNum, &
-                                  WtoADXCoil(DXCoilNum)%LoopSide, &
-                                  WtoADXCoil(DXCoilNum)%BranchNum, &
-                                  WtoADXCoil(DXCoilNum)%CompNum )
+        rho = GetDensityGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                  InitConvTemp, &
+                                  PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                                  'InitSimpleWatertoAirHP')
+        Cp  = GetSpecificHeatGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                  InitConvTemp, &
+                                  PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                                  'InitSimpleWatertoAirHP')
 
-    Node(WaterInletNode)%Temp          = 5.0
-    Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(WaterInletNode)%Quality       = 0.0
-    Node(WaterInletNode)%Press         = 0.0
-    Node(WaterInletNode)%HumRat        = 0.0
+    !    VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate= &
+    !                             rho * VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate
 
-    Node(WtoADXCoil(DXCoilNum)%WaterOutletNodeNum)%Temp          = 5.0
-    Node(WtoADXCoil(DXCoilNum)%WaterOutletNodeNum)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
-    Node(WtoADXCoil(DXCoilNum)%WaterOutletNodeNum)%Quality       = 0.0
-    Node(WtoADXCoil(DXCoilNum)%WaterOutletNodeNum)%Press         = 0.0
-    Node(WtoADXCoil(DXCoilNum)%WaterOutletNodeNum)%HumRat        = 0.0
+        CALL InitComponentNodes(0.d0, VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate, &
+                                      VarSpeedCoil(DXCoilNum)%WaterInletNodeNum,  &
+                                      VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum , &
+                                      VarSpeedCoil(DXCoilNum)%LoopNum, &
+                                      VarSpeedCoil(DXCoilNum)%LoopSide, &
+                                      VarSpeedCoil(DXCoilNum)%BranchNum, &
+                                      VarSpeedCoil(DXCoilNum)%CompNum )
 
-    WtoADXCoil(DXCoilNum)%SimFlag = .TRUE.
+        Node(WaterInletNode)%Temp          = 5.0
+        Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
+        Node(WaterInletNode)%Quality       = 0.0
+        Node(WaterInletNode)%Press         = 0.0
+        Node(WaterInletNode)%HumRat        = 0.0
+
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Temp          = 5.0
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Quality       = 0.0
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Press         = 0.0
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%HumRat        = 0.0
+    END IF
+
+    VarSpeedCoil(DXCoilNum)%SimFlag = .TRUE.
 
     MyEnvrnFlag(DXCoilNum) = .FALSE.
 
@@ -1686,83 +2695,103 @@ SUBROUTINE InitMulSpeedWSHPCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,F
 
     ! Set water and air inlet nodes
 
-    AirInletNode = WtoADXCoil(DXCoilNum)%AirInletNodeNum
-    WaterInletNode = WtoADXCoil(DXCoilNum)%WaterInletNodeNum
+    AirInletNode = VarSpeedCoil(DXCoilNum)%AirInletNodeNum
+    WaterInletNode = VarSpeedCoil(DXCoilNum)%WaterInletNodeNum
 
   IF ((SensLoad .NE. 0.0 .OR. LatentLoad .NE. 0.0).AND.(Node(AirInletNode)%MassFlowRate > 0.0)) THEN
 
-    WaterFlowScale = WtoADXCoil(DXCoilNum)%RatedWaterMassFlowRate/ &
-    WtoADXCoil(DXCoilNum)%MSRatedWaterMassFlowRate(WtoADXCoil(DXCoilNum)%NormSpedLevel)
-    WtoADXCoil(DXCoilNum)%WaterMassFlowRate =   WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate*WaterFlowScale
+    IF(VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(VarSpeedCoil(DXCoilNum)%NormSpedLevel) > 0.0d0) THEN
+        WaterFlowScale = VarSpeedCoil(DXCoilNum)%RatedWaterMassFlowRate/ &
+        VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(VarSpeedCoil(DXCoilNum)%NormSpedLevel)
+        VarSpeedCoil(DXCoilNum)%WaterMassFlowRate =   VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate*WaterFlowScale
+    ELSE
+        VarSpeedCoil(DXCoilNum)%WaterMassFlowRate = 0.0d0
+    END IF
 
     IF (CyclingScheme .EQ. ContFanCycCoil) THEN
     ! continuous fan, cycling compressor
-       WtoADXCoil(DXCoilNum)%AirMassFlowRate   = Node(AirInletNode)%MassFlowRate
-!    WtoADXCoil(DXCoilNum)%AirMassFlowRate   = WtoADXCoil(DXCoilNum)%DesignAirVolFlowRate*  &
+       VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = Node(AirInletNode)%MassFlowRate
+!    VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = VarSpeedCoil(DXCoilNum)%DesignAirVolFlowRate*  &
 !             PsyRhoAirFnPbTdbW(OutBaroPress,Node(AirInletNode)%Temp,Node(AirInletNode)%HumRat)
         !If air flow is less than 25% rated flow. Then set air flow to the 25% of rated conditions
-        IF(WtoADXCoil(DXCoilNum)%AirMassFlowRate.LT.  &
-             0.25d0*WtoADXCoil(DXCoilNum)%DesignAirVolFlowRate*  &
+        IF(VarSpeedCoil(DXCoilNum)%AirMassFlowRate.LT.  &
+             0.25d0*VarSpeedCoil(DXCoilNum)%DesignAirVolFlowRate*  &
                  PsyRhoAirFnPbTdbW(OutBaroPress,Node(AirInletNode)%Temp,Node(AirInletNode)%HumRat)) THEN
-            WtoADXCoil(DXCoilNum)%AirMassFlowRate =   &
-              0.25d0*WtoADXCoil(DXCoilNum)%DesignAirVolFlowRate* &
+            VarSpeedCoil(DXCoilNum)%AirMassFlowRate =   &
+              0.25d0*VarSpeedCoil(DXCoilNum)%DesignAirVolFlowRate* &
                   PsyRhoAirFnPbTdbW(OutBaroPress,Node(AirInletNode)%Temp,Node(AirInletNode)%HumRat)
         END IF
     ELSE !CYCLIC FAN, NOT CORRECTION, WILL BE PROCESSED IN THE FOLLOWING SUBROUTINES
-      WtoADXCoil(DXCoilNum)%AirMassFlowRate   = Node(AirInletNode)%MassFlowRate
+      VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = Node(AirInletNode)%MassFlowRate
     END IF
 
   ELSE !heat pump is off
-    WtoADXCoil(DXCoilNum)%WaterMassFlowRate = 0.d0
-    WtoADXCoil(DXCoilNum)%AirMassFlowRate   = 0.d0
+    VarSpeedCoil(DXCoilNum)%WaterMassFlowRate = 0.d0
+    VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = 0.d0
   ENDIF
 
-  CALL SetComponentFlowRate(WtoADXCoil(DXCoilNum)%WaterMassFlowRate, &
-                                 WtoADXCoil(DXCoilNum)%WaterInletNodeNum , &
-                                 WtoADXCoil(DXCoilNum)%WaterOutletNodeNum, &
-                                 WtoADXCoil(DXCoilNum)%LoopNum, &
-                                 WtoADXCoil(DXCoilNum)%LoopSide, &
-                                 WtoADXCoil(DXCoilNum)%BranchNum, &
-                                 WtoADXCoil(DXCoilNum)%CompNum )
+  IF ((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit) .OR. &
+        (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit))THEN
+      CALL SetComponentFlowRate(VarSpeedCoil(DXCoilNum)%WaterMassFlowRate, &
+                                     VarSpeedCoil(DXCoilNum)%WaterInletNodeNum , &
+                                     VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum, &
+                                     VarSpeedCoil(DXCoilNum)%LoopNum, &
+                                     VarSpeedCoil(DXCoilNum)%LoopSide, &
+                                     VarSpeedCoil(DXCoilNum)%BranchNum, &
+                                     VarSpeedCoil(DXCoilNum)%CompNum )
 
-   WtoADXCoil(DXCoilNum)%InletAirDBTemp       = Node(AirInletNode)%Temp
-   WtoADXCoil(DXCoilNum)%InletAirHumRat       = Node(AirInletNode)%HumRat
-   WtoADXCoil(DXCoilNum)%InletAirEnthalpy     = Node(AirInletNode)%Enthalpy
-   WtoADXCoil(DXCoilNum)%InletWaterTemp       = Node(WaterInletNode)%Temp
-   WtoADXCoil(DXCoilNum)%InletWaterEnthalpy   = Node(WaterInletNode)%Enthalpy
+       VarSpeedCoil(DXCoilNum)%InletWaterTemp       = Node(WaterInletNode)%Temp
+       VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy   = Node(WaterInletNode)%Enthalpy
+   ELSE
+       VarSpeedCoil(DXCoilNum)%InletWaterTemp       = 0.0d0
+       VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy   = 0.0d0
+   END IF
 
-   WtoADXCoil(DXCoilNum)%MaxONOFFCyclesperHour= MaxONOFFCyclesperHour
-   WtoADXCoil(DXCoilNum)%HPTimeConstant       = HPTimeConstant
-   WtoADXCoil(DXCoilNum)%FanDelayTime         = FanDelayTime
+   VarSpeedCoil(DXCoilNum)%InletAirDBTemp       = Node(AirInletNode)%Temp
+   VarSpeedCoil(DXCoilNum)%InletAirHumRat       = Node(AirInletNode)%HumRat
+   VarSpeedCoil(DXCoilNum)%InletAirEnthalpy     = Node(AirInletNode)%Enthalpy
 
+   VarSpeedCoil(DXCoilNum)%MaxONOFFCyclesperHour= MaxONOFFCyclesperHour
+   VarSpeedCoil(DXCoilNum)%HPTimeConstant       = HPTimeConstant
+   VarSpeedCoil(DXCoilNum)%FanDelayTime         = FanDelayTime
 
-   WtoADXCoil(DXCoilNum)%InletAirPressure    = OutBaroPress !temporary
+   VarSpeedCoil(DXCoilNum)%InletAirPressure    = OutBaroPress !temporary
    ! Outlet variables
-   WtoADXCoil(DXCoilNum)%Power=0.0
-   WtoADXCoil(DXCoilNum)%QLoadTotal=0.0
-   WtoADXCoil(DXCoilNum)%QSensible=0.0
-   WtoADXCoil(DXCoilNum)%QLatent=0.0
-   WtoADXCoil(DXCoilNum)%QSource=0.0
-   WtoADXCoil(DXCoilNum)%QWasteHeat = 0.0
-   WtoADXCoil(DXCoilNum)%Energy=0.0
-   WtoADXCoil(DXCoilNum)%EnergyLoadTotal=0.0
-   WtoADXCoil(DXCoilNum)%EnergySensible=0.0
-   WtoADXCoil(DXCoilNum)%EnergyLatent=0.0
-   WtoADXCoil(DXCoilNum)%EnergySource=0.0
-   WtoADXCoil(DXCoilNum)%COP=0.0
+   VarSpeedCoil(DXCoilNum)%Power=0.0
+   VarSpeedCoil(DXCoilNum)%QLoadTotal=0.0
+   VarSpeedCoil(DXCoilNum)%QSensible=0.0
+   VarSpeedCoil(DXCoilNum)%QLatent=0.0
+   VarSpeedCoil(DXCoilNum)%QSource=0.0
+   VarSpeedCoil(DXCoilNum)%QWasteHeat = 0.0
+   VarSpeedCoil(DXCoilNum)%Energy=0.0
+   VarSpeedCoil(DXCoilNum)%EnergyLoadTotal=0.0
+   VarSpeedCoil(DXCoilNum)%EnergySensible=0.0
+   VarSpeedCoil(DXCoilNum)%EnergyLatent=0.0
+   VarSpeedCoil(DXCoilNum)%EnergySource=0.0
+   VarSpeedCoil(DXCoilNum)%COP=0.0
 
-   WtoADXCoil(DXCoilNum)%OutletAirDBTemp=0.0
-   WtoADXCoil(DXCoilNum)%OutletWaterTemp=0.0
-   WtoADXCoil(DXCoilNum)%OutletAirHumRat=0.0
-   WtoADXCoil(DXCoilNum)%OutletAirEnthalpy = 0.0
-   WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0
+   VarSpeedCoil(DXCoilNum)%OutletAirDBTemp=0.0
+   VarSpeedCoil(DXCoilNum)%OutletWaterTemp=0.0
+   VarSpeedCoil(DXCoilNum)%OutletAirHumRat=0.0
+   VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy = 0.0
+   VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0
+
+   ! bug fix, must set zeros to the variables below, otherwise can't pass switch DD test
+   VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption = 0.0
+   VarSpeedCoil(DXCoilNum)%EvapWaterConsump = 0.0
+   VarSpeedCoil(DXCoilNum)%BasinHeaterConsumption = 0.0
+   VarSpeedCoil(DXCoilNum)%EvapCondPumpElecConsumption = 0.0
+   VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = 0.0
+   VarSpeedCoil(DXCoilNum)%DefrostConsumption = 0.0
+   VarSpeedCoil(DXCoilNum)%CondensateVdot = 0.0
+   VarSpeedCoil(DXCoilNum)%CondensateVol  = 0.0
+   VarSpeedCoil(DXCoilNum)%QWasteHeat = 0.0
 
   RETURN
 
-END SUBROUTINE InitMulSpeedWSHPCoil
+END SUBROUTINE InitVarSpeedCoil
 
-
-SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
+SUBROUTINE SizeVarSpeedCoil(DXCoilNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:SizeHVACWaterToAir
@@ -1805,7 +2834,7 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
   Integer, Intent(IN) :: DXCoilNum
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  CHARACTER(len=*), PARAMETER ::  RoutineName='SizeMulSpeedWSHPCoil'
+  CHARACTER(len=*), PARAMETER ::  RoutineName='SizeVarSpeedCoil'
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1835,6 +2864,9 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
   INTEGER   :: PltSizNum
   LOGICAL   :: RatedCapCoolTotalAutosized
   LOGICAL   :: RatedCapCoolSensAutosized
+  LOGICAL   :: RatedCapHeatAutosized
+  LOGICAL   :: RatedAirFlowAutosized
+  LOGICAL   :: RatedWaterFlowAutosized
   LOGICAL   :: ErrorsFound
   REAL(r64) :: SystemCapacity
   REAL(r64) :: rho
@@ -1853,42 +2885,56 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
   REAL(r64) :: QLoadTotal  !placeholder for calculating SHR
   REAL(r64) :: AirMassFlowRatio !air mass flow ratio
   REAL(r64) :: WaterMassFlowRatio !water mass flow rate
+  REAL(r64) :: RatedSourceTempCool !rated source temperature, space cooling mode
+  CHARACTER(len=MaxNameLength) :: CurrentObjSubfix   ! Object subfix type for printing
 
-  UpperSpeed = WtoADXCoil(DXCoilNum)%NumOfSpeeds
-  NormSpeed = WtoADXCoil(DXCoilNum)%NormSpedLevel
+  UpperSpeed = VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+  NormSpeed = VarSpeedCoil(DXCoilNum)%NormSpedLevel
   PltSizNum = 0
   ErrorsFound = .FALSE.
+  RatedAirFlowAutosized = .FALSE.
+  RatedWaterFlowAutosized = .FALSE.
+  RatedCapHeatAutosized = .FALSE.
 
-  IF (WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate == AutoSize) THEN
+  IF  (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit .OR. &
+  VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit ) THEN
+    CurrentObjSubfix = ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT'
+  ELSE
+   CurrentObjSubfix = ':DX:VARIABLESPEED'
+  END IF
+
+  IF (VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate == AutoSize) THEN
 
     IF (CurSysNum > 0) THEN
 
-      CALL CheckSysSizing('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                          WtoADXCoil(DXCoilNum)%Name)
+      CALL CheckSysSizing('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                          VarSpeedCoil(DXCoilNum)%Name)
       IF (FinalSysSizing(CurSysNum)%DesMainVolFlow >= SmallAirVolFlow) THEN
-        WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = FinalSysSizing(CurSysNum)%DesMainVolFlow
       ELSE
-        WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = 0.0
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = 0.0
       END IF
 
     END IF
 
     IF (CurZoneEqNum > 0) THEN
 
-      CALL CheckZoneSizing('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                          WtoADXCoil(DXCoilNum)%Name)
-      WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
+      CALL CheckZoneSizing('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                          VarSpeedCoil(DXCoilNum)%Name)
+      VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolVolFlow, &
                                             FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
-      IF (WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate < SmallAirVolFlow) THEN
-        WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate = 0.0
+      IF (VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate < SmallAirVolFlow) THEN
+        VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = 0.0
       END IF
 
     END IF
 
-    CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                             WtoADXCoil(DXCoilNum)%Name, &
-                            'Rated Air Flow Rate [m3/s]', &
-                             WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate)
+!    CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+!                             VarSpeedCoil(DXCoilNum)%Name, &
+!                            'Rated Air Flow Rate [m3/s]', &
+!                             VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate)
+
+    RatedAirFlowAutosized = .TRUE.
 
   END IF
 
@@ -1896,16 +2942,16 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
   RatedCapCoolSensAutosized  = .FALSE.
 
 ! size rated total cooling capacity
-  IF (WtoADXCoil(DXCoilNum)%RatedCapCoolTotal == AutoSize .AND. &
-      WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN
+  IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal == AutoSize .AND. &
+      VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
 
     RatedCapCoolTotalAutosized = .TRUE.
 
     IF (CurSysNum > 0) THEN
 
-      CALL CheckSysSizing('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                          WtoADXCoil(DXCoilNum)%Name)
-      VolFlowRate = WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate
+      CALL CheckSysSizing('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                          VarSpeedCoil(DXCoilNum)%Name)
+      VolFlowRate = VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
         IF (CurOASysNum > 0) THEN ! coil is in the OA stream
           MixTemp = FinalSysSizing(CurSysNum)%CoolOutTemp
@@ -1937,7 +2983,7 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,OutBaroPress,RoutineName)
         SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
 
-        TotCapTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(WtoADXCoil(DXCoilNum)%NormSpedLevel), &
+        TotCapTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(VarSpeedCoil(DXCoilNum)%NormSpedLevel), &
                     MixWetBulb,RatedInletWaterTemp)
 !       The mixed air temp for zone equipment without an OA mixer is 0.
 !       This test avoids a negative capacity until a solution can be found.
@@ -1948,19 +2994,19 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         END IF
         CoolCapAtPeak = MAX(0.0d0, CoolCapAtPeak)
         IF(TotCapTempModFac .GT. 0.0d0)THEN
-          WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
+          VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
         ELSE
-          WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak
+          VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak
         END IF
       ELSE
-        WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
       END IF
 
     ELSE IF (CurZoneEqNum > 0) THEN
 
-      CALL CheckZoneSizing('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                          WtoADXCoil(DXCoilNum)%Name)
-      VolFlowRate = WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate
+      CALL CheckZoneSizing('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                          VarSpeedCoil(DXCoilNum)%Name)
+      VolFlowRate = VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate
       IF (VolFlowRate >= SmallAirVolFlow) THEN
         IF(ZoneEqDXCoil)THEN
           IF (ZoneEqSizing(CurZoneEqNum)%OAVolFlow > 0.0) THEN
@@ -1988,7 +3034,7 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         MixWetBulb = PsyTwbFnTdbWPb(MixTemp,MixHumRat,OutBaroPress,RoutineName)
         SupEnth = PsyHFnTdbW(SupTemp,SupHumRat,RoutineName)
 
-        TotCapTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(WtoADXCoil(DXCoilNum)%NormSpedLevel), &
+        TotCapTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(VarSpeedCoil(DXCoilNum)%NormSpedLevel), &
                 MixWetBulb,RatedInletWaterTemp)
 !       The mixed air temp for zone equipment without an OA mixer is 0.
 !       This test avoids a negative capacity until a solution can be found.
@@ -1999,104 +3045,122 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         END IF
         CoolCapAtPeak = MAX(0.0d0, CoolCapAtPeak)
         IF(TotCapTempModFac .GT. 0.0d0)THEN
-          WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
+          VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak / TotCapTempModFac
         ELSE
-          WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak
+          VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = CoolCapAtPeak
         END IF
       ELSE
-        WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
       END IF
 
     END IF
 
-    IF (WtoADXCoil(DXCoilNum)%RatedCapCoolTotal < SmallLoad) THEN
-      WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
+    IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal < SmallLoad) THEN
+      VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = 0.0
     END IF
 
-    CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                             WtoADXCoil(DXCoilNum)%Name, &
+    CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix),&
+                             VarSpeedCoil(DXCoilNum)%Name, &
                             'Rated Total Cooling Capacity [W]', &
-                             WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
-    CALL PreDefTableEntry(pdchCoolCoilTotCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
-    CALL PreDefTableEntry(pdchCoolCoilLatCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolTotal &
-                                 - WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-    IF (WtoADXCoil(DXCoilNum)%RatedCapCoolTotal /= 0.0d0) THEN
-      CALL PreDefTableEntry(pdchCoolCoilSHR,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolSens &
-                                   / WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
-      CALL PreDefTableEntry(pdchCoolCoilNomEff,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedPowerCool &
-                                   / WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
+                             VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+    CALL PreDefTableEntry(pdchCoolCoilTotCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+    CALL PreDefTableEntry(pdchCoolCoilLatCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                                 - VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+    IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens &
+                                   / VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
+      CALL PreDefTableEntry(pdchCoolCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,&
+                VarSpeedCoil(DXCoilNum)%MSRatedCOP(NormSpeed))
     ELSE
-      CALL PreDefTableEntry(pdchCoolCoilSHR,WtoADXCoil(DXCoilNum)%Name,0.0d0)
-      CALL PreDefTableEntry(pdchCoolCoilNomEff,WtoADXCoil(DXCoilNum)%Name,0.0d0)
+      CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,0.0d0)
+      CALL PreDefTableEntry(pdchCoolCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,0.0d0)
     ENDIF
 
   END IF
 
 ! Set the global DX cooling coil capacity variable for use by other objects
-  IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN
-    DXCoolCap = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal
+  IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
+    DXCoolCap = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal
   END IF
 
 ! size rated heating capacity
-  IF (WtoADXCoil(DXCoilNum)%RatedCapHeat == AutoSize .AND. &
-      WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'HEATING') THEN
+  IF (VarSpeedCoil(DXCoilNum)%RatedCapHeat == AutoSize .AND. &
+      VarSpeedCoil(DXCoilNum)%CoolHeatType == 'HEATING') THEN
 
+    RatedCapHeatAutosized = .TRUE.
 !   simply set heating capacity equal to the cooling capacity
-    !WtoADXCoil(DXCoilNum)%RatedCapHeat = DXCoolCap
-    IF(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum > 0) THEN
-        WtoADXCoil(DXCoilNum)%RatedCapHeat = WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal
-        WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = WtoADXCoil(DXCoilNum)%RatedCapHeat !AVOID BEING ZERO
+    !VarSpeedCoil(DXCoilNum)%RatedCapHeat = DXCoolCap
+    IF(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum > 0) THEN
+        VarSpeedCoil(DXCoilNum)%RatedCapHeat = VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal
+        VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = VarSpeedCoil(DXCoilNum)%RatedCapHeat !AVOID BEING ZERO
     ELSE
-        WtoADXCoil(DXCoilNum)%RatedCapHeat = DXCoolCap !previous code, can be risky
+        VarSpeedCoil(DXCoilNum)%RatedCapHeat = DXCoolCap !previous code, can be risky
     END IF
 
-    IF(WtoADXCoil(DXCoilNum)%RatedCapHeat == Autosize)THEN
-      CALL ShowWarningError('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType) &
+    IF(VarSpeedCoil(DXCoilNum)%RatedCapHeat == Autosize)THEN
+      CALL ShowWarningError('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType) &
                     //':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'// &
-                            TRIM(WtoADXCoil(DXCoilNum)%Name)//'"')
+                            TRIM(VarSpeedCoil(DXCoilNum)%Name)//'"')
       CALL ShowContinueError(RoutineName//': Heating coil could not be autosized since cooling coil was not previously sized.')
       CALL ShowContinueError('... Cooling coil must be upstream of heating coil.')
       CALL ShowContinueError('... Manually sizing this heating coil will be required.')
     END IF
 
-    IF (WtoADXCoil(DXCoilNum)%RatedCapHeat < SmallLoad) THEN
-      WtoADXCoil(DXCoilNum)%RatedCapHeat = 0.0
+    IF (VarSpeedCoil(DXCoilNum)%RatedCapHeat < SmallLoad) THEN
+      VarSpeedCoil(DXCoilNum)%RatedCapHeat = 0.0
     END IF
 
-    CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                             WtoADXCoil(DXCoilNum)%Name, &
+    CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix),&
+                             VarSpeedCoil(DXCoilNum)%Name, &
                             'Nominal Heating Capacity [W]', &
-                             WtoADXCoil(DXCoilNum)%RatedCapHeat)
-    CALL PreDefTableEntry(pdchHeatCoilNomCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapHeat)
-    IF (WtoADXCoil(DXCoilNum)%RatedCapHeat /= 0.0d0) THEN
-      CALL PreDefTableEntry(pdchHeatCoilNomEff,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedPowerHeat &
-                             / WtoADXCoil(DXCoilNum)%RatedCapHeat)
+                             VarSpeedCoil(DXCoilNum)%RatedCapHeat)
+    CALL PreDefTableEntry(pdchHeatCoilNomCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapHeat)
+    IF (VarSpeedCoil(DXCoilNum)%RatedCapHeat /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,&
+                VarSpeedCoil(DXCoilNum)%MSRatedCOP(NormSpeed))
     ELSE
-      CALL PreDefTableEntry(pdchHeatCoilNomEff,WtoADXCoil(DXCoilNum)%Name,0.0d0)
+      CALL PreDefTableEntry(pdchHeatCoilNomEff,VarSpeedCoil(DXCoilNum)%Name,0.0d0)
     ENDIF
   END IF
 
+  ! FORCE BACK TO THE RATED AIR FLOW RATE WITH THE SAME RATIO DEFINED BY THE CATLOG DATA
+  IF((RatedCapCoolTotalAutosized) .AND. &
+        (RatedAirFlowAutosized))   THEN
+    VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                    *VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(NormSpeed)
+  ELSE IF((RatedCapHeatAutosized) .AND. &
+        (RatedAirFlowAutosized))   THEN
+      VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate = VarSpeedCoil(DXCoilNum)%RatedCapHeat &
+                    *VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(NormSpeed)
+  END IF
+
+  ! write the air flow sizing output
+  IF(RatedAirFlowAutosized) &
+    CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                             VarSpeedCoil(DXCoilNum)%Name, &
+                            'Rated Air Flow Rate [m3/s]', &
+                             VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate)
 
   ! Check that heat pump heating capacity is within 20% of cooling capacity. Check only for heating coil and report both.
-  IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'HEATING' .AND. &
-      WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum .GT. 0)THEN
+  IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'HEATING' .AND. &
+      VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum .GT. 0)THEN
 
-    IF(WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal .GT. 0.0D0)THEN
+    IF(VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal .GT. 0.0D0)THEN
 
-      IF(ABS(WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal-&
-           WtoADXCoil(DXCoilNum)%RatedCapHeat)/&
-           WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal .GT. 0.2d0) THEN
+      IF(ABS(VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal-&
+           VarSpeedCoil(DXCoilNum)%RatedCapHeat)/&
+           VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal .GT. 0.2d0) THEN
 
-        CALL ShowWarningError('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)// &
-                            ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'//TRIM(WtoADXCoil(DXCoilNum)%Name)//'"')
+        CALL ShowWarningError('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)// &
+                            ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'//TRIM(VarSpeedCoil(DXCoilNum)%Name)//'"')
         CALL ShowContinueError('...used with COIL:'// &
-               TRIM(WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%WaterToAirHPType)// &
+               TRIM(VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%CoolHeatType)// &
                             ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'// &
-               TRIM(WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%Name)//'"')
+               TRIM(VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%Name)//'"')
         CALL ShowContinueError('...heating capacity is disproportionate (> 20% different) to total cooling capacity')
-        CALL ShowContinueError('...heating capacity = '//TRIM(TrimSigDigits(WtoADXCoil(DXCoilNum)%RatedCapHeat,3))//' W')
+        CALL ShowContinueError('...heating capacity = '//TRIM(TrimSigDigits(VarSpeedCoil(DXCoilNum)%RatedCapHeat,3))//' W')
         CALL ShowContinueError('...cooling capacity = '// &
-           TRIM(TrimSigDigits(WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal,3))//' W')
+           TRIM(TrimSigDigits(VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapCoolTotal,3))//' W')
 
       END IF
 
@@ -2104,78 +3168,102 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
 
   END IF
 
+!ASSIGN CAPACITY
+ IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
+    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal/ &
+            VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(NormSpeed)
+  ELSE IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'HEATING') THEN
+    VarSpeedCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) = VarSpeedCoil(DXCoilNum)%RatedCapHeat/ &
+            VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(NormSpeed)
+  END IF
+
+  rhoA = PsyRhoAirFnPbTdbW(OutBaroPress,RatedInletAirTemp,RatedInletAirHumRat,RoutineName)
+  Do Mode = VarSpeedCoil(DXCoilNum)%NumOfSpeeds,1,-1
+     VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) * &
+                VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(Mode)
+     VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) * &
+                VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(Mode)
+     VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
+                rhoA
+    ! EVAPORATIVE PRECOOLING CONDENSER AIR FLOW RATE
+    VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) * &
+                VarSpeedCoil(DXCoilNum)%MSRatedEvapCondVolFlowPerRatedTotCap(Mode)
+  END DO
 
 ! size rated power
-  IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN
+  IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
 
-    WtoADXCoil(DXCoilNum)%RatedCOPCool = WtoADXCoil(DXCoilNum)%MSRatedCOP(WtoADXCoil(DXCoilNum)%NormSpedLevel)
-    WtoADXCoil(DXCoilNum)%RatedPowerCool = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal/WtoADXCoil(DXCoilNum)%RatedCOPCool
+    VarSpeedCoil(DXCoilNum)%RatedCOPCool = VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel)
+    VarSpeedCoil(DXCoilNum)%RatedPowerCool = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal/VarSpeedCoil(DXCoilNum)%RatedCOPCool
 
-  ELSE IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'HEATING') THEN
-    WtoADXCoil(DXCoilNum)%RatedCOPHeat = WtoADXCoil(DXCoilNum)%MSRatedCOP(WtoADXCoil(DXCoilNum)%NormSpedLevel)
-    WtoADXCoil(DXCoilNum)%RatedPowerHeat = WtoADXCoil(DXCoilNum)%RatedCapHeat/WtoADXCoil(DXCoilNum)%RatedCOPHeat
-    WtoADXCoil(DXCoilNum)%RatedCapCoolTotal = WtoADXCoil(DXCoilNum)%RatedCapHeat
+  ELSE IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'HEATING') THEN
+    VarSpeedCoil(DXCoilNum)%RatedCOPHeat = VarSpeedCoil(DXCoilNum)%MSRatedCOP(VarSpeedCoil(DXCoilNum)%NormSpedLevel)
+    VarSpeedCoil(DXCoilNum)%RatedPowerHeat = VarSpeedCoil(DXCoilNum)%RatedCapHeat/VarSpeedCoil(DXCoilNum)%RatedCOPHeat
+    VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal = VarSpeedCoil(DXCoilNum)%RatedCapHeat
   END IF
 
 ! Size water volumetric flow rate
-  IF (WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate == AutoSize)THEN
+  IF ((VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate == AutoSize) .AND. &
+  (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit .OR. &
+  VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit ))  THEN
 
 !!   if not found on a plant loop, check condenser loop and warn user if not found
 !    IF(PltSizNum == 0) THEN
 !
 !      PltSizNum = &
-!          MyCondPlantSizingIndex('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)// &
-!               ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-!                                 WtoADXCoil(DXCoilNum)%Name, &
-!                                 WtoADXCoil(DXCoilNum)%WaterInletNodeNum, &
-!                                 WtoADXCoil(DXCoilNum)%WaterOutletNodeNum, ErrorsFound)
+!          MyCondPlantSizingIndex('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)// &
+!               TRIM(CurrentObjSubfix), &
+!                                 VarSpeedCoil(DXCoilNum)%Name, &
+!                                 VarSpeedCoil(DXCoilNum)%WaterInletNodeNum, &
+!                                 VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum, ErrorsFound)
 !    END IF
 
   !   WSHP condenser can be on either a plant loop or condenser loop. Test each to find plant sizing number.
 !   first check to see if coil is connected to a plant loop, no warning on this CALL
    PltSizNum = &
-        MyPlantSizingIndex('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                           WtoADXCoil(DXCoilNum)%Name, &
-                           WtoADXCoil(DXCoilNum)%WaterInletNodeNum, &
-                           WtoADXCoil(DXCoilNum)%WaterOutletNodeNum, ErrorsFound, .FALSE.)
+        MyPlantSizingIndex('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix), &
+                           VarSpeedCoil(DXCoilNum)%Name, &
+                           VarSpeedCoil(DXCoilNum)%WaterInletNodeNum, &
+                           VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum, ErrorsFound, .FALSE.)
 
     IF (PltSizNum > 0) THEN
-      rho = GetDensityGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
+      rho = GetDensityGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
                              PlantSizData(PltSizNum)%ExitTemp, &
-                             PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                             PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
                              'SizeHVACWaterToAir')
-      Cp  = GetSpecificHeatGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
+      Cp  = GetSpecificHeatGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
                                   PlantSizData(PltSizNum)%ExitTemp, &
-                                  PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                                  PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
                                  'SizeHVACWaterToAir')
 
-      IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'HEATING') THEN
+      IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'HEATING') THEN
 
-        WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate = WtoADXCoil(DXCoilNum)%RatedCapHeat / &
+        VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate = VarSpeedCoil(DXCoilNum)%RatedCapHeat / &
                                                        ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
 
-        CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//&
-                                ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                                  WtoADXCoil(DXCoilNum)%Name, &
-                                  'Rated Water Flow Rate [m3/s]', WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate)
 
-      ELSEIF(WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN
+!        CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//&
+!                                TRIM(CurrentObjSubfix), &
+!                                  VarSpeedCoil(DXCoilNum)%Name, &
+!                                  'Rated Water Flow Rate [m3/s]', VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate)
+
+      ELSEIF(VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
 
 !       use companion heating coil capacity to calculate volumetric flow rate
-        IF(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum .GT. 0)THEN
-          SystemCapacity = WtoADXCoil(WtoADXCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapHeat
+        IF(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum .GT. 0)THEN
+          SystemCapacity = VarSpeedCoil(VarSpeedCoil(DXCoilNum)%CompanionCoolingCoilNum)%RatedCapHeat
         ELSE
-          SystemCapacity = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal
+          SystemCapacity = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal
         END IF
 
-          WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate = &
+          VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate = &
                       SystemCapacity / &
                     ( PlantSizData(PltSizNum)%DeltaT * Cp * rho )
 
-        CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)&
-                                //':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                                  WtoADXCoil(DXCoilNum)%Name, &
-                                  'Rated Water Flow Rate [m3/s]', WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate)
+!        CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)&
+!                                //TRIM(CurrentObjSubfix), &
+!                                  VarSpeedCoil(DXCoilNum)%Name, &
+!                                  'Rated Water Flow Rate [m3/s]', VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate)
 
       END IF
 
@@ -2183,118 +3271,123 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         CALL ShowContinueError('Autosizing of water flow requires a loop Sizing:Plant object')
         CALL ShowContinueError('Autosizing also requires physical connection to a plant or condenser loop.')
         CALL ShowContinueError('Occurs in ' // &
-                 'COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//&
-                        ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' // ' Object=' &
-                //TRIM(WtoADXCoil(DXCoilNum)%Name))
+                 'COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//&
+                        TRIM(CurrentObjSubfix) // ' Object=' &
+                //TRIM(VarSpeedCoil(DXCoilNum)%Name))
         ErrorsFound = .TRUE.
 
     END IF
 
+      ! FORCE BACK TO THE RATED WATER FLOW RATE WITH THE SAME RATIO DEFINED BY THE CATLOG DATA
+    IF(RatedCapCoolTotalAutosized)   THEN
+       VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                        *VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(NormSpeed)
+    ELSE IF(RatedCapHeatAutosized)  THEN
+       VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate = VarSpeedCoil(DXCoilNum)%RatedCapHeat &
+                        *VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(NormSpeed)
+    END IF
+
+    !WRITE THE WATER SIZING OUTPUT
+     CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)&
+                                //TRIM(CurrentObjSubfix), &
+                                  VarSpeedCoil(DXCoilNum)%Name, &
+                                  'Rated Water Flow Rate [m3/s]', VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate)
+
+    ! Ensure water flow rate at lower speed must be lower or
+    ! equal to the flow rate at higher speed. Otherwise, a severe error is isssued.
+    Do Mode = 1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds-1
+      If (VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) .GT. &
+      VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode+1) * 1.05) Then
+        CALL ShowWarningError('SizeDXCoil: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType) &
+                //' '//TRIM(VarSpeedCoil(DXCoilNum)%Name)//', '// &
+          'Speed '//Trim(TrimSigDigits(Mode))//' Rated Air Flow Rate must be less than or equal to '//&
+          'Speed '//Trim(TrimSigDigits(Mode+1))//' Rated Air Flow Rate.')
+        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode),2))//' > '//  &
+                  TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1),2)))
+        CALL ShowFatalError('Preceding conditions cause termination.')
+      End If
+    End Do
+
+    RatedWaterFlowAutosized = .TRUE.
   END IF
 
 ! Save component design water volumetric flow rate.
 ! Use 1/2 flow since both cooling and heating coil will save flow yet only 1 will operate at a time
-  IF(WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate .GT. 0.0)THEN
-    CALL RegisterPlantCompDesignFlow(WtoADXCoil(DXCoilNum)%WaterInletNodeNum,  &
-       0.5d0*WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate)
+  IF(VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate .GT. 0.0)THEN
+    CALL RegisterPlantCompDesignFlow(VarSpeedCoil(DXCoilNum)%WaterInletNodeNum,  &
+       0.5d0*VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate)
   END IF
 
-  IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit .OR. &
-  WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit ) THEN
+  IF (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit .OR. &
+  VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit ) THEN
 
-   IF (PltSizNum > 0) THEN
-     rhoW = rho
-   ELSE IF(WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit) THEN
-     rhoW = GetDensityGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                                 RatedInletWaterTemp, &
-                                 PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
-                                 'SizeMulSpeedWSHPCoil')
-   ELSE
-     rhoW = GetDensityGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                                 RatedInletWaterTempHeat, &
-                                 PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex, &
-                                 'SizeMulSpeedWSHPCoil')
-   END IF
+       RatedSourceTempCool = RatedInletWaterTemp
 
-   IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit) THEN
-    WtoADXCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal/ &
-            WtoADXCoil(DXCoilNum)%MSRatedPercentTotCap(NormSpeed)
-   ELSE IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPHeatingEquationFit) THEN
-    WtoADXCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) = WtoADXCoil(DXCoilNum)%RatedCapHeat/ &
-            WtoADXCoil(DXCoilNum)%MSRatedPercentTotCap(NormSpeed)
-   END IF
+       IF (PltSizNum > 0) THEN
+         rhoW = rho
+       ELSE IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit) THEN
+         rhoW = GetDensityGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                     RatedInletWaterTemp, &
+                                     PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                                     'SizeVarSpeedCoil')
+       ELSE
+         rhoW = GetDensityGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                     RatedInletWaterTempHeat, &
+                                     PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex, &
+                                     'SizeVarSpeedCoil')
+       END IF
 
-   rhoA = PsyRhoAirFnPbTdbW(OutBaroPress,RatedInletAirTemp,RatedInletAirHumRat,RoutineName)
-   WtoADXCoil(DXCoilNum)%RatedWaterMassFlowRate = WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate * rhoW
-   Do Mode = WtoADXCoil(DXCoilNum)%NumOfSpeeds,1,-1
-     WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode) = WtoADXCoil(DXCoilNum)%MSRatedTotCap(UpperSpeed) * &
-                WtoADXCoil(DXCoilNum)%MSRatedPercentTotCap(Mode)
-     WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) = WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode) * &
-                WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowPerRatedTotCap(Mode)
-     WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) = WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode) * &
-                WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(Mode)
-     WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode) = WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode)* &
-                rhoA
-     WtoADXCoil(DXCoilNum)%MSRatedWaterMassFlowRate(Mode) =&
-            WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) * rhoW
-   END DO
+        VarSpeedCoil(DXCoilNum)%RatedWaterMassFlowRate = VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate * rhoW
+        Do Mode = VarSpeedCoil(DXCoilNum)%NumOfSpeeds,1,-1
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) * &
+                    VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowPerRatedTotCap(Mode)
+            VarSpeedCoil(DXCoilNum)%MSRatedWaterMassFlowRate(Mode) =&
+                VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) * rhoW
+        END DO
+  ELSE
+      RatedSourceTempCool = RatedAmbAirTemp
+  END IF
 
     ! Ensure air flow rate at lower speed must be lower or
     ! equal to the flow rate at higher speed. Otherwise, a severe error is isssued.
-    Do Mode = 1,WtoADXCoil(DXCoilNum)%NumOfSpeeds-1
-      If (WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) .GT. WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1)) Then
-        CALL ShowWarningError('SizeDXCoil: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType) &
-                //' '//TRIM(WtoADXCoil(DXCoilNum)%Name)//', '// &
+  Do Mode = 1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds-1
+      If (VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode) .GT. VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1)) Then
+        CALL ShowWarningError('SizeDXCoil: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType) &
+                //' '//TRIM(VarSpeedCoil(DXCoilNum)%Name)//', '// &
           'Speed '//Trim(TrimSigDigits(Mode))//' Rated Air Flow Rate must be less than or equal to '//&
           'Speed '//Trim(TrimSigDigits(Mode+1))//' Rated Air Flow Rate.')
-        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode),2))//' > '//  &
-                  TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1),2)))
+        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode),2))//' > '//  &
+                  TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1),2)))
         CALL ShowFatalError('Preceding conditions cause termination.')
       End If
-    End Do
-
-    ! Ensure water flow rate at lower speed must be lower or
-    ! equal to the flow rate at higher speed. Otherwise, a severe error is isssued.
-    Do Mode = 1,WtoADXCoil(DXCoilNum)%NumOfSpeeds-1
-      If (WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode) .GT. &
-      WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(Mode+1) * 1.05) Then
-        CALL ShowWarningError('SizeDXCoil: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType) &
-                //' '//TRIM(WtoADXCoil(DXCoilNum)%Name)//', '// &
-          'Speed '//Trim(TrimSigDigits(Mode))//' Rated Air Flow Rate must be less than or equal to '//&
-          'Speed '//Trim(TrimSigDigits(Mode+1))//' Rated Air Flow Rate.')
-        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode),2))//' > '//  &
-                  TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(Mode+1),2)))
-        CALL ShowFatalError('Preceding conditions cause termination.')
-      End If
-    End Do
+  End Do
 
    ! Ensure capacity at lower speed must be lower or equal to the capacity at higher speed.
-    Do Mode = 1,WtoADXCoil(DXCoilNum)%NumOfSpeeds-1
-      If (WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode) .GT. WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode+1)) Then
-        CALL ShowWarningError('SizeDXCoil: '//TRIM(WtoADXCoil(DXCoilNum)%WtoADXCoilType)&
-                //' '//TRIM(WtoADXCoil(DXCoilNum)%Name)//', '// &
+  Do Mode = 1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds-1
+      If (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode) .GT. VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode+1)) Then
+        CALL ShowWarningError('SizeDXCoil: '//TRIM(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType)&
+                //' '//TRIM(VarSpeedCoil(DXCoilNum)%Name)//', '// &
           'Speed '//Trim(TrimSigDigits(Mode))//' Rated Total Cooling Capacity must be less than or equal to '//&
           'Speed '//Trim(TrimSigDigits(Mode+1))//' Rated Total Cooling Capacity.')
-        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode),2))//' > '//  &
-                  TRIM(RoundSigDigits(WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode+1),2)))
+        CALL ShowContinueError('Instead, '//TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode),2))//' > '//  &
+                  TRIM(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode+1),2)))
         CALL ShowFatalError('Preceding conditions cause termination.')
       End If
-    End Do
-  END IF
+  End Do
 
   !convert SHR to rated Bypass factor and effective air side surface area
-  IF (WtoADXCoil(DXCoilNum)%WAHPPlantTypeOfNum==TypeOf_CoilVSWAHPCoolingEquationFit) THEN
-    Do Mode = 1,WtoADXCoil(DXCoilNum)%NumOfSpeeds
-        WtoADXCoil(DXCoilNum)%MSRatedCBF(Mode) = &
-        CalcCBF(WtoADXCoil(DXCoilNum)%WtoADXCoilType,WtoADXCoil(DXCoilNum)%Name,&
-                                           RatedInletAirTemp,RatedInletAirHumRat,WtoADXCoil(DXCoilNum)%MSRatedTotCap(Mode),&
-                                           WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode),&
-                                           WtoADXCoil(DXCoilNum)%MSRatedSHR(Mode))
-        IF ( WtoADXCoil(DXCoilNum)%MSRatedCBF(Mode) .gt. 0.0) THEN
-            WtoADXCoil(DXCoilNum)%MSEffectiveAo(Mode) = -log( WtoADXCoil(DXCoilNum)%MSRatedCBF(Mode))* &
-            WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode)
+  IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
+    Do Mode = 1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
+        VarSpeedCoil(DXCoilNum)%MSRatedCBF(Mode) = &
+        CalcCBF(VarSpeedCoil(DXCoilNum)%VarSpeedCoilType,VarSpeedCoil(DXCoilNum)%Name,&
+                                           RatedInletAirTemp,RatedInletAirHumRat,VarSpeedCoil(DXCoilNum)%MSRatedTotCap(Mode),&
+                                           VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode),&
+                                           VarSpeedCoil(DXCoilNum)%MSRatedSHR(Mode))
+        IF ( VarSpeedCoil(DXCoilNum)%MSRatedCBF(Mode) .gt. 0.0) THEN
+            VarSpeedCoil(DXCoilNum)%MSEffectiveAo(Mode) = -log( VarSpeedCoil(DXCoilNum)%MSRatedCBF(Mode))* &
+            VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(Mode)
         ELSE
-            WtoADXCoil(DXCoilNum)%MSEffectiveAo(Mode) = 0.
+            VarSpeedCoil(DXCoilNum)%MSEffectiveAo(Mode) = 0.
         END IF
     End Do
   END IF
@@ -2302,64 +3395,105 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
 ! size rated sensible cooling capacity
  RatedCapCoolSensAutosized  = .TRUE.  !always do that
 
- IF (WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate >= SmallAirVolFloW .AND. WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN
-     RatedAirMassFlowRate = WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate* &
+ IF (VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate >= SmallAirVolFloW .AND. VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN
+     RatedAirMassFlowRate = VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate* &
            PsyRhoAirFnPbTdbW(StdBaroPress,RatedInletAirTemp,RatedInletAirHumRat,RoutineName)
      RatedInletEnth = PsyHFnTdbW(RatedInletAirTemp,RatedInletAirHumRat,RoutineName)
-     CBFRated  = AdjustCBF(WtoADXCoil(DXCoilNum)%MSRatedCBF(NormSpeed),WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(NormSpeed), &
+     CBFRated  = AdjustCBF(VarSpeedCoil(DXCoilNum)%MSRatedCBF(NormSpeed),  &
+        VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(NormSpeed), &
                 RatedAirMassFlowRate)
-     IF(CBFRated > 0.999) CBFRated = 0.999
-     AirMassFlowRatio = WtoADXCoil(DXCoilNum)%RatedAirVolFlowRate/ WtoADXCoil(DXCoilNum)%MSRatedAirVolFlowRate(NormSpeed)
-     WaterMassFlowRatio = WtoADXCoil(DXCoilNum)%RatedWaterVolFlowRate/WtoADXCoil(DXCoilNum)%MSRatedWaterVolFlowRate(NormSpeed)
+     IF(CBFRated > 0.999) CBFRated = 0.999d0
+     AirMassFlowRatio = VarSpeedCoil(DXCoilNum)%RatedAirVolFlowRate/ VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(NormSpeed)
+
+     IF(VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(NormSpeed).GT. 1.0d-10) THEN
+        WaterMassFlowRatio = VarSpeedCoil(DXCoilNum)%RatedWaterVolFlowRate/  &
+           VarSpeedCoil(DXCoilNum)%MSRatedWaterVolFlowRate(NormSpeed)
+     ELSE
+        WaterMassFlowRatio = 1.0d0
+     END IF
 
      CALL CalcTotCapSHR_VSWSHP(RatedInletAirTemp,RatedInletAirHumRat,RatedInletEnth,RatedInletWetbulbTemp, &
                      AirMassFlowRatio, WaterMassFlowRatio, &
                      RatedAirMassFlowRate,CBFRated, &
-                     WtoADXCoil(DXCoilNum)%MSRatedTotCap(NormSpeed),WtoADXCoil(DXCoilNum)%MSCCapFTemp(NormSpeed), &
-                     WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(NormSpeed), WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(NormSpeed),&
+                     VarSpeedCoil(DXCoilNum)%MSRatedTotCap(NormSpeed),VarSpeedCoil(DXCoilNum)%MSCCapFTemp(NormSpeed), &
+                     VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(NormSpeed), VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(NormSpeed),&
                      0.0d0,0,0, 0,&
-                     QLoadTotal1, QLoadTotal2, QLoadTotal,SHR,RatedInletWaterTemp, &
+                     QLoadTotal1, QLoadTotal2, QLoadTotal,SHR,RatedSourceTempCool, &
                      StdBaroPress, 0.0d0, 1)
 
-     WtoADXCoil(DXCoilNum)%RatedCapCoolSens = WtoADXCoil(DXCoilNum)%RatedCapCoolTotal * SHR
+     VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal * SHR
  ELSE
-     WtoADXCoil(DXCoilNum)%RatedCapCoolSens = 0.0
+     VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = 0.0
  END IF
 
- IF (WtoADXCoil(DXCoilNum)%RatedCapCoolSens < SmallLoad) THEN
-    WtoADXCoil(DXCoilNum)%RatedCapCoolSens = 0.0
+ IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolSens < SmallLoad) THEN
+    VarSpeedCoil(DXCoilNum)%RatedCapCoolSens = 0.0
  END IF
 
- IF (WtoADXCoil(DXCoilNum)%WaterToAirHPType == 'COOLING') THEN !always report for cooling mode
-    CALL ReportSizingOutput('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT', &
-                             WtoADXCoil(DXCoilNum)%Name, &
+ IF (VarSpeedCoil(DXCoilNum)%CoolHeatType == 'COOLING') THEN !always report for cooling mode
+    IF(RatedCapCoolTotalAutosized .EQV..TRUE.) &
+       CALL ReportSizingOutput('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)//TRIM(CurrentObjSubfix),&
+                             VarSpeedCoil(DXCoilNum)%Name, &
                             'Rated Sensible Cooling Capacity [W]', &
-                             WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-    CALL PreDefTableEntry(pdchCoolCoilSensCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-    CALL PreDefTableEntry(pdchCoolCoilLatCap,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolTotal &
-                                 - WtoADXCoil(DXCoilNum)%RatedCapCoolSens)
-    IF (WtoADXCoil(DXCoilNum)%RatedCapCoolTotal /= 0.0d0) THEN
-      CALL PreDefTableEntry(pdchCoolCoilSHR,WtoADXCoil(DXCoilNum)%Name,WtoADXCoil(DXCoilNum)%RatedCapCoolSens &
-                                 / WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)
+                             VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+
+    CALL PreDefTableEntry(pdchCoolCoilSensCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+    CALL PreDefTableEntry(pdchCoolCoilLatCap,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal &
+                                 - VarSpeedCoil(DXCoilNum)%RatedCapCoolSens)
+    IF (VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal /= 0.0d0) THEN
+      CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,VarSpeedCoil(DXCoilNum)%RatedCapCoolSens &
+                                 / VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)
     ELSE
-      CALL PreDefTableEntry(pdchCoolCoilSHR,WtoADXCoil(DXCoilNum)%Name,0.0d0)
+      CALL PreDefTableEntry(pdchCoolCoilSHR,VarSpeedCoil(DXCoilNum)%Name,0.0d0)
     ENDIF
 
-  END IF
+ END IF
+
+ ! START SIZING EVAP PRECOOLING PUMP POWER
+   IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed)    THEN
+      IF (VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower == AutoSize) THEN
+   !     Auto size high speed evap condenser pump power to Total Capacity * 0.004266 w/w (15 w/ton)
+        VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower = VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal*0.004266d0
+
+        CALL ReportSizingOutput("AS VS COOLING COIL", VarSpeedCoil(DXCoilNum)%Name, &
+                            'Evaporative Condenser Pump Rated Power Consumption [W]',   &
+                             VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower)
+
+      END IF
+   END IF
+   ! END SIZING EVAP PRE-COOLING PUMP POWER
+
+   !SIZE DEFROST HEATER
+
+    ! Resistive Defrost Heater Capacity = capacity at the first stage
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed)    THEN
+        IF (VarSpeedCoil(DXCoilNum)%DefrostCapacity == AutoSize) THEN
+          IF (VarSpeedCoil(DXCoilNum)%DefrostStrategy == Resistive) THEN
+            VarSpeedCoil(DXCoilNum)%DefrostCapacity = VarSpeedCoil(DXCoilNum)%RatedCapHeat
+          ELSE
+            VarSpeedCoil(DXCoilNum)%DefrostCapacity = 0.0
+          END IF
+
+          CALL ReportSizingOutput("AS VS HEATING COIL", VarSpeedCoil(DXCoilNum)%Name, &
+                                    'Resistive Defrost Heater Capacity', VarSpeedCoil(DXCoilNum)%DefrostCapacity)
+        END IF
+    END IF
+
+   !END SIZING DEFROST HEATER
 
 ! test autosized sensible and total cooling capacity for total > sensible
   IF(RatedCapCoolSensAutosized .AND. RatedCapCoolTotalAutosized .OR. &
      RatedCapCoolSensAutosized)THEN
-    IF(WtoADXCoil(DXCoilNum)%RatedCapCoolSens .GT. WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)THEN
-        CALL ShowWarningError('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)// &
+    IF(VarSpeedCoil(DXCoilNum)%RatedCapCoolSens .GT. VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)THEN
+        CALL ShowWarningError('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)// &
                 ':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'// &
-                               TRIM(WtoADXCoil(DXCoilNum)%Name)//'"')
+                               TRIM(VarSpeedCoil(DXCoilNum)%Name)//'"')
         CALL ShowContinueError(RoutineName//': Rated Sensible Cooling Capacity > Rated Total Cooling Capacity')
         CALL ShowContinueError('Each of these capacity inputs have been autosized.')
         CALL ShowContinueError('Rated Sensible Cooling Capacity = '// &
-                                TRIM(TrimSigDigits(WtoADXCoil(DXCoilNum)%RatedCapCoolSens,2))//' W')
+                                TRIM(TrimSigDigits(VarSpeedCoil(DXCoilNum)%RatedCapCoolSens,2))//' W')
         CALL ShowContinueError('Rated Total Cooling Capacity    = '// &
-                                TRIM(TrimSigDigits(WtoADXCoil(DXCoilNum)%RatedCapCoolTotal,2))//' W')
+                                TRIM(TrimSigDigits(VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal,2))//' W')
         CALL ShowContinueError('See eio file for further details.')
         CALL ShowContinueError('Check Total and Sensible Cooling Capacity Coefficients to ensure they are accurate.')
         CALL ShowContinueError('Check Zone and System Sizing objects to verify sizing inputs.')
@@ -2379,16 +3513,16 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
         CALL ShowContinueError('... to ensure they meet the expected manufacturers performance specifications.')
     END IF
   ELSE If(RatedCapCoolTotalAutosized)THEN
-    IF(WtoADXCoil(DXCoilNum)%RatedCapCoolSens .GT. WtoADXCoil(DXCoilNum)%RatedCapCoolTotal)THEN
-        CALL ShowWarningError('COIL:'//TRIM(WtoADXCoil(DXCoilNum)%WaterToAirHPType)&
+    IF(VarSpeedCoil(DXCoilNum)%RatedCapCoolSens .GT. VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal)THEN
+        CALL ShowWarningError('COIL:'//TRIM(VarSpeedCoil(DXCoilNum)%CoolHeatType)&
                         //':WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT "'// &
-                               TRIM(WtoADXCoil(DXCoilNum)%Name)//'"')
+                               TRIM(VarSpeedCoil(DXCoilNum)%Name)//'"')
         CALL ShowContinueError(RoutineName//': Rated Sensible Cooling Capacity > Rated Total Cooling Capacity')
         CALL ShowContinueError('Only the rated total capacity input is autosized, consider autosizing both inputs.')
         CALL ShowContinueError('Rated Sensible Cooling Capacity = '// &
-                                TRIM(TrimSigDigits(WtoADXCoil(DXCoilNum)%RatedCapCoolSens,2))//' W')
+                                TRIM(TrimSigDigits(VarSpeedCoil(DXCoilNum)%RatedCapCoolSens,2))//' W')
         CALL ShowContinueError('Rated Total Cooling Capacity    = '// &
-                                TRIM(TrimSigDigits(WtoADXCoil(DXCoilNum)%RatedCapCoolTotal,2))//' W')
+                                TRIM(TrimSigDigits(VarSpeedCoil(DXCoilNum)%RatedCapCoolTotal,2))//' W')
         CALL ShowContinueError('See eio file for further details.')
         CALL ShowContinueError('Check Total and Sensible Cooling Capacity Coefficients to ensure they are accurate.')
         CALL ShowContinueError('Check Zone and System Sizing objects to verify sizing inputs.')
@@ -2407,10 +3541,10 @@ SUBROUTINE SizeMulSpeedWSHPCoil(DXCoilNum)
 
   RETURN
 
-END SUBROUTINE SizeMulSpeedWSHPCoil
+END SUBROUTINE SizeVarSpeedCoil
 
 
-SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
+SUBROUTINE  CalcVarSpeedCoilCooling(DXCoilNum,CyclingScheme, &
             RuntimeFrac,SensDemand,LatentDemand,CompOp,PartLoadRatio,OnOffAirFlowRatio, &
             SpeedRatio, SpeedNum)
 
@@ -2447,6 +3581,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
                                   PsyTwbFnTdbWPb,PsyTdbFnHW,PsyWFnTdbH
   USE FluidProperties,      ONLY: GetSpecificHeatGlycol
   USE DataPlant,            ONLY: PlantLoop
+  USE DataWater,       ONLY: WaterStorage
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2465,7 +3600,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER  :: Tref=283.15d0      ! Reference Temperature for performance curves,10C [K]
-  CHARACTER(len=*), PARAMETER :: RoutineName='CalcMultiSpeedWtoADXCoilCooling'
+  CHARACTER(len=*), PARAMETER :: RoutineName='CalcMultiSpeedVarSpeedCoilCooling'
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -2481,7 +3616,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
 
   REAL(r64) :: SHRss                  ! Sensible heat ratio at steady state
   REAL(r64) :: SHReff                 ! Effective sensible heat ratio at part-load condition
-  REAL(r64) :: CpWater                ! Specific heat of water [J/kg_C]
+  REAL(r64) :: CpSource                ! Specific heat of water [J/kg_C]
   REAL(r64) :: CpAir                  ! Specific heat of air [J/kg_C]
   REAL(r64) :: ReportingConstant
 
@@ -2524,6 +3659,27 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
   REAL(r64) :: MaxHumRat  !max possible humidity
   REAL(r64) :: MaxOutletEnth !max possible outlet enthalpy
 
+  ! ADDED VARIABLES FOR air source coil
+  REAL(r64)     :: OutdoorCoilT  = 0.0d0              ! Outdoor coil temperature (C)
+  REAL(r64)     :: OutdoorCoildw  = 0.0d0             ! Outdoor coil delta w assuming coil temp of OutdoorCoilT (kg/kg)
+  REAL(r64)     :: OutdoorDryBulb   = 0.0d0           ! Outdoor dry-bulb temperature at condenser (C)
+  REAL(r64)     :: OutdoorWetBulb   = 0.0d0           ! Outdoor wet-bulb temperature at condenser (C)
+  REAL(r64)     :: OutdoorHumRat   = 0.0d0            ! Outdoor humidity ratio at condenser (kg/kg)
+  REAL(r64)     :: OutdoorPressure   = 0.0d0          ! Outdoor barometric pressure at condenser (Pa)
+  REAL(r64)     :: CrankcaseHeatingPower  = 0.0d0     ! power due to crankcase heater
+  REAL(r64) :: CompAmbTemp = 0.0     ! Ambient temperature at compressor
+  REAL(r64) :: CondInletTemp         ! Condenser inlet temperature (C). Outdoor dry-bulb temp for air-cooled condenser.
+                                 ! Outdoor Wetbulb +(1 - effectiveness)*(outdoor drybulb - outdoor wetbulb) for evap condenser.
+  REAL(r64) :: CondInletHumrat       ! Condenser inlet humidity ratio (kg/kg). Zero for air-cooled condenser.
+                                 ! For evap condenser, its the humidity ratio of the air leaving the evap cooling pads.
+  REAL(r64) :: CondAirMassFlow       ! Condenser air mass flow rate [kg/s]
+  REAL(r64) :: RhoSourceAir         ! Density of air [kg/m3]
+  REAL(r64) :: RhoEvapCondWater         ! Density of water used for evaporative condenser [kg/m3]
+  REAL(r64) :: EvapCondEffectSped      ! condenser evaporative effectiveness at the speed level
+  REAL(r64) :: rhoWater             ! condensed water density
+  REAL(r64) :: SpecHumIn   !inlet air specific humidity
+  REAL(r64) :: SpecHumOut   !outlet air specific humidity
+
   IF (FirstTime) THEN
     !Set indoor air conditions to the rated condition
     LoadSideInletDBTemp_Init = 26.7d0
@@ -2534,36 +3690,100 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
   ENDIF
   LoadSideInletWBTemp_Init = PsyTwbFnTdbWPb(LoadSideInletDBTemp_Init,LoadSideInletHumRat_Init,OutBaroPress,RoutineName)
 
-  MaxSpeed = WtoADXCoil(DXCoilNum)%NumofSpeeds
+  MaxSpeed = VarSpeedCoil(DXCoilNum)%NumofSpeeds
+
+ ! must be placed inside the loop, otherwise cause bug in release mode, need to be present at two places
+ IF(SpeedNum > MaxSpeed) THEN
+   SpeedCal = MaxSpeed
+ ELSE
+    SpeedCal = SpeedNum
+ END IF
 
 
  !  LOAD LOCAL VARIABLES FROM DATA STRUCTURE (for code readability)
   IF (.NOT. (CyclingScheme .EQ. ContFanCycCoil) .AND. PartLoadRatio > 0.0) THEN
-     WtoADXCoil(DXCoilNum)%AirMassFlowRate   = Node(WtoADXCoil(DXCoilNum)%AirInletNodeNum)%MassFlowRate/PartLoadRatio
+     VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = Node(VarSpeedCoil(DXCoilNum)%AirInletNodeNum)%MassFlowRate/PartLoadRatio
   END IF
 
-  Twet_rated             = WtoADXCoil(DXCoilNum)%Twet_rated
-  Gamma_rated            = WtoADXCoil(DXCoilNum)%Gamma_rated
+  Twet_rated             = VarSpeedCoil(DXCoilNum)%Twet_rated
+  Gamma_rated            = VarSpeedCoil(DXCoilNum)%Gamma_rated
 
-  LoadSideMassFlowRate   = WtoADXCoil(DXCoilNum)%AirMassFlowRate
-  SourceSideMassFlowRate = WtoADXCoil(DXCoilNum)%WaterMassFlowRate
-  SourceSideInletTemp    = WtoADXCoil(DXCoilNum)%InletWaterTemp
-  SourceSideInletEnth    = WtoADXCoil(DXCoilNum)%InletWaterEnthalpy
-  CpWater = GetSpecificHeatGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                                   SourceSideInletTemp, &
-                                   PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex,  &
-                                  'CalcVSHPCoolingSimple:SourceSideInletTemp')
+  LoadSideMassFlowRate   = VarSpeedCoil(DXCoilNum)%AirMassFlowRate
+
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+  ! Get condenser outdoor node info from DX COOLING Coil
+      IF (VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum /= 0) THEN
+        OutdoorDryBulb  = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%Temp
+        OutdoorHumRat   = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%HumRat
+        OutdoorPressure = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%Press
+        OutdoorWetBulb  = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%OutAirWetBulb
+      ELSE
+        OutdoorDryBulb  = OutDryBulbTemp
+        OutdoorHumRat   = OutHumRat
+        OutdoorPressure = OutBaroPress
+        OutdoorWetBulb  = OutWetBulbTemp
+      ENDIF
+
+     RhoSourceAir = PsyRhoAirFnPbTdbW(OutdoorPressure,OutdoorDryBulb,OutdoorHumRat)
+
+     IF((SpeedNum == 1) .OR.(SpeedNum > MaxSpeed).OR. (SpeedRatio == 1.0)) THEN
+         CondAirMassFlow =  RhoSourceAir * VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(SpeedCal)
+     ELSE
+         CondAirMassFlow =  RhoSourceAir *(VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%EvapCondAirFlow(SpeedCal - 1))
+     ENDIF
+
+     ! AIR COOL OR EVAP COOLED CONDENSER
+     IF (VarSpeedCoil(DXCoilNum)%CondenserType == EvapCooled) THEN
+      IF((SpeedNum == 1) .OR.(SpeedNum > MaxSpeed).OR. (SpeedRatio == 1.0)) THEN
+         EvapCondEffectSped = VarSpeedCoil(DXCoilNum)%EvapCondEffect(SpeedCal)
+      ELSE
+         EvapCondEffectSped =  VarSpeedCoil(DXCoilNum)%EvapCondEffect(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%EvapCondEffect(SpeedCal - 1)
+      ENDIF
+     ! (Outdoor wet-bulb temp from DataEnvironment) + (1.0-EvapCondEffectiveness) * (drybulb - wetbulb)
+      CondInletTemp   = OutdoorWetBulb + (OutdoorDryBulb-OutdoorWetBulb)*(1.0d0 - EvapCondEffectSped)
+      CondInletHumrat = PsyWFnTdbTwbPb(CondInletTemp,OutdoorWetBulb,OutdoorPressure)
+      CompAmbTemp     = CondInletTemp
+     ELSE !AIR COOLED CONDENSER
+      CondInletTemp   = OutdoorDryBulb ! Outdoor dry-bulb temp
+      CompAmbTemp     = OutdoorDryBulb
+      CondInletHumrat = OutHumRat
+     END IF
+
+     SourceSideMassFlowRate = CondAirMassFlow
+     SourceSideInletTemp    = CondInletTemp
+     SourceSideInletEnth    = PsyHFnTdbW(CondInletTemp,CondInletHumrat,RoutineName)
+     CpSource               = PsyCpAirFnWTdb(CondInletHumrat,CondInletTemp,RoutineName)
+     VarSpeedCoil(DXCoilNum)%CondInletTemp = CondInletTemp
+
+    ! If used in a heat pump, the value of MaxOAT in the heating coil overrides that in the cooling coil (in GetInput)
+     ! Initialize crankcase heater, operates below OAT defined in input deck for HP DX heating coil
+     IF (OutdoorDryBulb .LT. VarSpeedCoil(DXCoilNum)%MaxOATCrankcaseHeater)THEN
+       CrankcaseHeatingPower = VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity
+     ELSE
+       CrankcaseHeatingPower = 0.0
+     END IF
+  ELSE
+      SourceSideMassFlowRate = VarSpeedCoil(DXCoilNum)%WaterMassFlowRate
+      SourceSideInletTemp    = VarSpeedCoil(DXCoilNum)%InletWaterTemp
+      SourceSideInletEnth    = VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy
+      CpSource = GetSpecificHeatGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                       SourceSideInletTemp, &
+                                       PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex,  &
+                                      'CalcVSHPCoolingSimple:SourceSideInletTemp')
+  END IF
 
    !Check for flows, do not perform simulation if no flow in load side or source side.
   IF (SourceSideMassFlowRate <= 0.0 .OR. LoadSideMassFlowRate <= 0.0)THEN
-     WtoADXCoil(DXCoilNum)%SimFlag = .FALSE.
+     VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
      RETURN
   ELSE
-     WtoADXCoil(DXCoilNum)%SimFlag = .TRUE.
+     VarSpeedCoil(DXCoilNum)%SimFlag = .TRUE.
   ENDIF
 
   IF (CompOp .EQ. 0) THEN
-     WtoADXCoil(DXCoilNum)%SimFlag = .FALSE.
+     VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
      RETURN
   ENDIF
 
@@ -2583,30 +3803,30 @@ SUBROUTINE  CalcMulSpeedWSHPCoilCooling(DXCoilNum,CyclingScheme, &
 
 
   !Set indoor air conditions to the actual condition
-  LoadSideInletDBTemp_Unit = WtoADXCoil(DXCoilNum)%InletAirDBTemp
-  LoadSideInletHumRat_Unit = WtoADXCoil(DXCoilNum)%InletAirHumRat
+  LoadSideInletDBTemp_Unit = VarSpeedCoil(DXCoilNum)%InletAirDBTemp
+  LoadSideInletHumRat_Unit = VarSpeedCoil(DXCoilNum)%InletAirHumRat
   LoadSideInletWBTemp_Unit = PsyTwbFnTdbWPb(LoadSideInletDBTemp_Unit,LoadSideInletHumRat_Unit,OutBaroPress,RoutineName)
-  LoadSideInletEnth_Unit = WtoADXCoil(DXCoilNum)%InletAirEnthalpy
+  LoadSideInletEnth_Unit = VarSpeedCoil(DXCoilNum)%InletAirEnthalpy
   CpAir_Unit = PsyCpAirFnWTdb(LoadSideInletHumRat_Unit,LoadSideInletDBTemp_Unit)
 
   RuntimeFrac = 1.0
-  WtoADXCoil(DXCoilNum)%RunFrac = 1.0
+  VarSpeedCoil(DXCoilNum)%RunFrac = 1.0
   IF((SpeedNum == 1) .AND. (PartLoadRatio < 1.0)) THEN
-    PLF = CurveValue(WtoADXCoil(DXCoilNum)%PLFFPLR,PartLoadRatio)
+    PLF = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,PartLoadRatio)
     IF (PLF < 0.7d0) THEN
      PLF = 0.7d0
     END IF
     ! calculate the run time fraction
-    WtoADXCoil(DXCoilNum)%RunFrac = PartLoadRatio / PLF
-    WtoADXCoil(DXCoilNum)%PartLoadRatio    = PartLoadRatio
+    VarSpeedCoil(DXCoilNum)%RunFrac = PartLoadRatio / PLF
+    VarSpeedCoil(DXCoilNum)%PartLoadRatio    = PartLoadRatio
 
-    IF ( WtoADXCoil(DXCoilNum)%RunFrac > 1. ) THEN
-      WtoADXCoil(DXCoilNum)%RunFrac = 1.0d0 ! Reset coil runtime fraction to 1.0
-    ELSE IF ( WtoADXCoil(DXCoilNum)%RunFrac < 0.0 ) THEN
-      WtoADXCoil(DXCoilNum)%RunFrac = 0.0
+    IF ( VarSpeedCoil(DXCoilNum)%RunFrac > 1. ) THEN
+      VarSpeedCoil(DXCoilNum)%RunFrac = 1.0d0 ! Reset coil runtime fraction to 1.0
+    ELSE IF ( VarSpeedCoil(DXCoilNum)%RunFrac < 0.0 ) THEN
+      VarSpeedCoil(DXCoilNum)%RunFrac = 0.0
     END IF
 
-    RuntimeFrac = WtoADXCoil(DXCoilNum)%RunFrac
+    RuntimeFrac = VarSpeedCoil(DXCoilNum)%RunFrac
   END IF
 
 
@@ -2628,45 +3848,67 @@ LOOP: DO
         CpAir = CpAir_Unit
     END IF
 
+    ! must be placed inside the loop, otherwise cause bug in release mode
     IF(SpeedNum > MaxSpeed) THEN
-        SpeedCal = MaxSpeed
+       SpeedCal = MaxSpeed
     ELSE
-        SpeedCal = SpeedNum
+       SpeedCal = SpeedNum
     END IF
 
     IF((SpeedNum == 1) .OR.(SpeedNum > MaxSpeed).OR. (SpeedRatio == 1.0)) THEN
-        AirMassFlowRatio = LoadSideMassFlowRate/ WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate
-        WaterMassFlowRatio = SourceSideMassFlowRate/WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate
+        AirMassFlowRatio = LoadSideMassFlowRate/ VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate
 
-        EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
-        EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-        EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-        EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            WaterMassFlowRatio = 1.0d0
+        ELSE
+            WaterMassFlowRatio = SourceSideMassFlowRate/VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate
+        END IF
 
-        CBFSpeed  = AdjustCBF(WtoADXCoil(DXCoilNum)%MSRatedCBF(SpeedCal),&
-                WtoADXCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal),LoadSideMassFlowRate)
+        EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
+        EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            EIRWaterFFModFac = 1.0d0
+        ELSE
+            EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+        END IF
+
+        EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+
+        CBFSpeed  = AdjustCBF(VarSpeedCoil(DXCoilNum)%MSRatedCBF(SpeedCal),&
+                VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal),LoadSideMassFlowRate)
 
         IF(CBFSpeed > 0.999) CBFSpeed = 0.999
 
         CALL CalcTotCapSHR_VSWSHP(LoadSideInletDBTemp,LoadSideInletHumRat,LoadSideInletEnth,LoadSideInletWBTemp, &
                          AirMassFlowRatio, WaterMassFlowRatio, &
                          LoadSideMassFlowRate,CBFSpeed, &
-                         WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal),WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal), &
-                         WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal), WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),&
+                         VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal),VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal), &
+                         VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal), VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),&
                          0.0d0,0,0, 0,&
                          QLoadTotal1, QLoadTotal2, QLoadTotal,SHR,SourceSideInletTemp, &
-                         WtoADXCoil(DXCoilNum)%InletAirPressure, 0.0d0, 1)
+                         VarSpeedCoil(DXCoilNum)%InletAirPressure, 0.0d0, 1)
 
         Winput = QLoadTotal * EIR
 
-        QWasteHeat =  Winput * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-        QWasteHeat = QWasteHeat * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
-
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            QWasteHeat = 0.0d0
+        ELSE
+            QWasteHeat =  Winput * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+            QWasteHeat = QWasteHeat * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletWBTemp, &
+                        SourceSideInletTemp)
+        END IF
     ELSE
-        AirMassFlowRatio = LoadSideMassFlowRate/ WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate
-        WaterMassFlowRatio = SourceSideMassFlowRate/WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate
-        AoEff = WtoADXCoil(DXCoilNum)%MSEffectiveAo(SpeedCal)*SpeedRatio &
-            + (1.0 - SpeedRatio ) * WtoADXCoil(DXCoilNum)%MSEffectiveAo(SpeedCal - 1)
+        AirMassFlowRatio = LoadSideMassFlowRate/ VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate
+
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            WaterMassFlowRatio = 1.0d0
+        ELSE
+            WaterMassFlowRatio = SourceSideMassFlowRate/VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate
+        END IF
+
+        AoEff = VarSpeedCoil(DXCoilNum)%MSEffectiveAo(SpeedCal)*SpeedRatio &
+            + (1.0 - SpeedRatio ) * VarSpeedCoil(DXCoilNum)%MSEffectiveAo(SpeedCal - 1)
 
         CBFSpeed  = exp(-AoEff/LoadSideMassFlowRate)
 
@@ -2675,33 +3917,54 @@ LOOP: DO
         CALL CalcTotCapSHR_VSWSHP(LoadSideInletDBTemp,LoadSideInletHumRat,LoadSideInletEnth,LoadSideInletWBTemp, &
                  AirMassFlowRatio, WaterMassFlowRatio, &
                  LoadSideMassFlowRate,CBFSpeed, &
-                 WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal - 1),WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal - 1), &
-                 WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal - 1), WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal - 1),&
-                 WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal),WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal), &
-                 WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal), WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),&
+                 VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal - 1),VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal - 1), &
+                 VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal - 1), VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal - 1),&
+                 VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal),VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal), &
+                 VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal), VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),&
                  QLoadTotal1, QLoadTotal2, QLoadTotal,SHR,SourceSideInletTemp, &
-                 WtoADXCoil(DXCoilNum)%InletAirPressure, SpeedRatio, 2)
+                 VarSpeedCoil(DXCoilNum)%InletAirPressure, SpeedRatio, 2)
 
         SpeedCal =  SpeedNum - 1
-        EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
-        EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-        EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-        EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+        EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
+        EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            EIRWaterFFModFac = 1.0d0
+        ELSE
+            EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+        END IF
+
+        EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
         Winput1 = QLoadTotal1 * EIR
 
-        QWasteHeat1 =  Winput1 * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-        QWasteHeat1 = QWasteHeat1 * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            QWasteHeat1 = 0.0d0
+        ELSE
+            QWasteHeat1 =  Winput1 * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+            QWasteHeat1 = QWasteHeat1 * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal), &
+                LoadSideInletWBTemp,SourceSideInletTemp)
+        END IF
 
         SpeedCal =  SpeedNum
-        EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
-        EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-        EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-        EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+        EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
+        EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            EIRWaterFFModFac = 1.0d0
+        ELSE
+            EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+        END IF
+
+        EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
         Winput2 = QLoadTotal2 * EIR
 
-        QWasteHeat2 =  Winput2 * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-        QWasteHeat2 = QWasteHeat2 * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletWBTemp,SourceSideInletTemp)
-
+        IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+            QWasteHeat2 = 0.0d0
+        ELSE
+            QWasteHeat2 =  Winput2 * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+            QWasteHeat2 = QWasteHeat2 * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal), &
+                    LoadSideInletWBTemp,SourceSideInletTemp)
+        END IF
 
         Winput = Winput2*SpeedRatio + (1.0 - SpeedRatio ) * Winput1
         QWasteHeat = QWasteHeat2*SpeedRatio + (1.0 - SpeedRatio ) * QWasteHeat1
@@ -2742,17 +4005,50 @@ LOOP: DO
   END DO LOOP
 
   ! considering hot gas reheat here
-  IF(WtoADXCoil(DXCoilNum)%HOTGASREHEATFLG > 0) THEN
+  IF(VarSpeedCoil(DXCoilNum)%HOTGASREHEATFLG > 0) THEN
     QLoadTotal = QLoadTotal - QWasteHeat
     QSensible = QSensible -QWasteHeat
     SHReff = QSensible/QLoadTotal
+  END IF
+
+  VarSpeedCoil(DXCoilNum)%BasinHeaterPower = 0.0d0
+  VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = 0.0d0
+
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+      IF (VarSpeedCoil(DXCoilNum)%CondenserType == EvapCooled) THEN
+          !******************
+          !             WATER CONSUMPTION IN m3 OF WATER FOR DIRECT
+          !             H2O [m3/sec] = Delta W[KgH2O/Kg air]*Mass Flow Air[Kg air]
+          !                                /RhoWater [kg H2O/m3 H2O]
+          !******************
+             RhoEvapCondWater = RhoH2O(OutdoorDryBulb)
+             VarSpeedCoil(DXCoilNum)%EvapWaterConsumpRate =  (CondInletHumrat - OutdoorHumRat) *  &
+                      CondAirMassFlow/RhoEvapCondWater * RuntimeFrac
+             VarSpeedCoil(DXCoilNum)%EvapCondPumpElecPower = VarSpeedCoil(DXCoilNum)%EvapCondPumpElecNomPower * &
+                                                       RuntimeFrac
+          ! Calculate basin heater power
+            CALL CalcBasinHeaterPower(VarSpeedCoil(DXCoilNum)%BasinHeaterPowerFTempDiff,&
+                                      VarSpeedCoil(DXCoilNum)%BasinHeaterSchedulePtr,&
+                                      VarSpeedCoil(DXCoilNum)%BasinHeaterSetPointTemp,VarSpeedCoil(DXCoilNum)%BasinHeaterPower)
+           VarSpeedCoil(DXCoilNum)%BasinHeaterPower = VarSpeedCoil(DXCoilNum)%BasinHeaterPower * &
+                                                 (1.d0 - RuntimeFrac)
+       END IF
+
+       VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = CrankcaseHeatingPower *(1.0d0 - RuntimeFrac)
+
+        !set water system demand request (if needed)
+       IF ( VarSpeedCoil(DXCoilNum)%EvapWaterSupplyMode == WaterSupplyFromTank) THEN
+           WaterStorage(VarSpeedCoil(DXCoilNum)%EvapWaterSupTankID)%VdotRequestDemand(&
+           VarSpeedCoil(DXCoilNum)%EvapWaterTankDemandARRID)= VarSpeedCoil(DXCoilNum)%EvapWaterConsumpRate
+       ENDIF
+
   END IF
 
   !calculate coil outlet state variables
   LoadSideOutletEnth   = LoadSideInletEnth - QLoadTotal/LoadSideMassFlowRate
   LoadSideOutletDBTemp = LoadSideInletDBTemp - QSensible/(LoadSideMassFlowRate * CpAir)
 
-  MaxHumRat = PsyWFnTdbRhPb(LoadSideOutletDBTemp,0.9999d0,WtoADXCoil(DXCoilNum)%InletAirPressure,RoutineName)
+  MaxHumRat = PsyWFnTdbRhPb(LoadSideOutletDBTemp,0.9999d0,VarSpeedCoil(DXCoilNum)%InletAirPressure,RoutineName)
   MaxOutletEnth = PsyHFnTdbW(LoadSideOutletDBTemp,MaxHumRat,RoutineName)
   IF(LoadSideOutletEnth > MaxOutletEnth) THEN
     LoadSideOutletEnth = MaxOutletEnth
@@ -2767,26 +4063,28 @@ LOOP: DO
   !Actual outlet conditions are "average" for time step
   IF (CyclingScheme .EQ. ContFanCycCoil) THEN
     ! continuous fan, cycling compressor
-    WtoADXCoil(DXCoilNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideOutletEnth + &
+    VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideOutletEnth + &
                                                   (1.-PartLoadRatio)*LoadSideInletEnth
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat   = PartLoadRatio*LoadsideOutletHumRat + &
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat   = PartLoadRatio*LoadsideOutletHumRat + &
                                                   (1.-PartLoadRatio)*LoadSideInletHumRat
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp   = PsyTdbFnHW(WtoADXCoil(DXCoilNum)%OutletAirEnthalpy,  &
-                                                             WtoADXCoil(DXCoilNum)%OutletAirHumRat,    &
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp   = PsyTdbFnHW(VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy,  &
+                                                             VarSpeedCoil(DXCoilNum)%OutletAirHumRat,    &
                                                              RoutineName)
     PLRCorrLoadSideMdot = LoadSideMassFlowRate
   ELSE
     ! default to cycling fan, cycling compressor
-    WtoADXCoil(DXCoilNum)%OutletAirEnthalpy = LoadSideOutletEnth
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat   = LoadsideOutletHumRat
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp   = LoadSideOutletDBTemp
+    VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy = LoadSideOutletEnth
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat   = LoadsideOutletHumRat
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp   = LoadSideOutletDBTemp
     PLRCorrLoadSideMdot = LoadSideMassFlowRate*PartLoadRatio
   END IF
 
    ! scale heat transfer rates to PLR and power to RTF
   QLoadTotal = QLoadTotal*PartLoadRatio
   QSensible  = QSensible*PartLoadRatio
-  Winput     = Winput*RuntimeFrac
+  ! count the powr separately
+  Winput     = Winput*RuntimeFrac  !+ VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower &
+                !+ VarSpeedCoil(DXCoilNum)%BasinHeaterPower + VarSpeedCoil(DXCoilNum)%EvapCondPumpElecPower
   QSource    = QSource*PartLoadRatio
   QWasteHeat = QWasteHeat * PartLoadRatio
 
@@ -2795,35 +4093,57 @@ LOOP: DO
 
   ReportingConstant=TimeStepSys*SecInHour
   !Update heat pump data structure
-  WtoADXCoil(DXCoilNum)%Power               = Winput
-  WtoADXCoil(DXCoilNum)%QLoadTotal          = QLoadTotal
-  WtoADXCoil(DXCoilNum)%QSensible           = QSensible
-  WtoADXCoil(DXCoilNum)%QLatent             = QLoadTotal - QSensible
-  WtoADXCoil(DXCoilNum)%QSource             = QSource
-  WtoADXCoil(DXCoilNum)%Energy=Winput*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLoadTotal=QLoadTotal*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergySensible=QSensible*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLatent=(QLoadTotal - QSensible)*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergySource=QSource*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%Power               = Winput
+  VarSpeedCoil(DXCoilNum)%QLoadTotal          = QLoadTotal
+  VarSpeedCoil(DXCoilNum)%QSensible           = QSensible
+  VarSpeedCoil(DXCoilNum)%QLatent             = QLoadTotal - QSensible
+  VarSpeedCoil(DXCoilNum)%QSource             = QSource
+  VarSpeedCoil(DXCoilNum)%Energy=Winput*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLoadTotal=QLoadTotal*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergySensible=QSensible*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLatent=(QLoadTotal - QSensible)*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergySource=QSource*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption = VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EvapWaterConsump = VarSpeedCoil(DXCoilNum)%EvapWaterConsumpRate*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%BasinHeaterConsumption = VarSpeedCoil(DXCoilNum)%BasinHeaterPower*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EvapCondPumpElecConsumption = VarSpeedCoil(DXCoilNum)%EvapCondPumpElecPower*ReportingConstant
   IF(RunTimeFrac == 0.0) THEN
-    WtoADXCoil(DXCoilNum)%COP = 0.0
+    VarSpeedCoil(DXCoilNum)%COP = 0.0
   ELSE
-    WtoADXCoil(DXCoilNum)%COP = QLoadTotal/Winput
+    VarSpeedCoil(DXCoilNum)%COP = QLoadTotal/Winput
   END IF
-  WtoADXCoil(DXCoilNum)%RunFrac             = RuntimeFrac
-  WtoADXCoil(DXCoilNum)%PartLoadRatio       = PartLoadRatio
-  WtoADXCoil(DXCoilNum)%AirMassFlowRate     = PLRCorrLoadSideMdot
+  VarSpeedCoil(DXCoilNum)%RunFrac             = RuntimeFrac
+  VarSpeedCoil(DXCoilNum)%PartLoadRatio       = PartLoadRatio
+  VarSpeedCoil(DXCoilNum)%AirMassFlowRate     = PLRCorrLoadSideMdot
 
-  WtoADXCoil(DXCoilNum)%WaterMassFlowRate   = SourceSideMassFlowRate
-  WtoADXCoil(DXCoilNum)%OutletWaterTemp     = SourceSideInletTemp + QSource/(SourceSideMassFlowRate * CpWater)
-  WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy = SourceSideInletEnth + QSource/SourceSideMassFlowRate
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+      VarSpeedCoil(DXCoilNum)%WaterMassFlowRate   = 0.0d0
+      VarSpeedCoil(DXCoilNum)%OutletWaterTemp     = 0.0d0
+      VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0d0
+  ELSE
+      VarSpeedCoil(DXCoilNum)%WaterMassFlowRate   = SourceSideMassFlowRate
+      VarSpeedCoil(DXCoilNum)%OutletWaterTemp     = SourceSideInletTemp + QSource/(SourceSideMassFlowRate * CpSource)
+      VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = SourceSideInletEnth + QSource/SourceSideMassFlowRate
+  END IF
 
-  WtoADXCoil(DXCoilNum)%QWasteHeat =  QWasteHeat
+  VarSpeedCoil(DXCoilNum)%QWasteHeat =  QWasteHeat
+
+  IF (VarSpeedCoil(DXCoilNum)%CondensateCollectMode == CondensateToTank) THEN
+      ! calculate and report condensation rates  (how much water extracted from the air stream)
+      ! water flow of water in m3/s for water system interactions
+      rhoWater = RhoH2O(( VarSpeedCoil(DXCoilNum)%InletAirDBTemp + VarSpeedCoil(DXCoilNum)%OutletAirDBTemp)/2.0d0)
+      SpecHumIn = LoadSideInletHumRat / ( 1.d0 + LoadSideInletHumRat) !eq. 9b ASHRAE HOF 2001 page 6.8
+      SpecHumOut = LoadSideOutletHumRat / ( 1.d0 + LoadSideOutletHumRat )
+      !  mdot * del HumRat / rho water
+      VarSpeedCoil(DXCoilNum)%CondensateVdot = MAX(0.0d0, (LoadSideMassFlowRate *   &
+                (SpecHumIn - SpecHumOut) / rhoWater) )
+      VarSpeedCoil(DXCoilNum)%CondensateVol  = VarSpeedCoil(DXCoilNum)%CondensateVdot *ReportingConstant
+  ENDIF
 
   RETURN
-END SUBROUTINE CalcMulSpeedWSHPCoilCooling
+END SUBROUTINE CalcVarSpeedCoilCooling
 
-SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
+SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
         SensDemand,CompOp,PartLoadRatio,OnOffAirFlowRatio, SpeedRatio, SpeedNum)
 
 
@@ -2848,7 +4168,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   USE CurveManager, ONLY: CurveValue
   USE DataHVACGlobals,      ONLY:TimeStepSys, DXElecHeatingPower
   USE Psychrometrics,       ONLY:PsyWFnTdbTwbPb,PsyRhoAirFnPbTdbW,PsyCpAirFnWTdb,PsyTwbFnTdbWPb,  &
-                                 PsyTdbFnHW,PsyWFnTdbH
+                                 PsyTdbFnHW,PsyWFnTdbH,PsyHFnTdbW
   USE FluidProperties,      ONLY:GetSpecificHeatGlycol
   USE DataPlant,            ONLY: PlantLoop
 
@@ -2868,7 +4188,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER  :: Tref=283.15d0      ! Reference Temperature for performance curves,10C [K]
-  CHARACTER(len=*), PARAMETER :: RoutineName='CalcMulSpeedWSHPCoilHeating'
+  CHARACTER(len=*), PARAMETER :: RoutineName='CalcVarSpeedCoilHeating'
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -2878,7 +4198,7 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) :: CpWater                ! Specific heat of water [J/kg_C]
+  REAL(r64) :: CpSource                ! Specific heat of water [J/kg_C]
   REAL(r64) :: CpAir                  ! Specific heat of air [J/kg_C]
 
   REAL(r64) :: AirMassFlowRatio   ! airflow ratio at low speed
@@ -2902,38 +4222,79 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   REAL(r64) :: PLF  !part-load function
   REAL(r64) :: ReportingConstant
 
-  MaxSpeed = WtoADXCoil(DXCoilNum)%NumofSpeeds
+ ! ADDED VARIABLES FOR air source coil
+  REAL(r64)     :: OutdoorCoilT  = 0.0d0              ! Outdoor coil temperature (C)
+  REAL(r64)     :: OutdoorCoildw  = 0.0d0             ! Outdoor coil delta w assuming coil temp of OutdoorCoilT (kg/kg)
+  REAL(r64)     :: OutdoorDryBulb   = 0.0d0           ! Outdoor dry-bulb temperature at condenser (C)
+  REAL(r64)     :: OutdoorWetBulb   = 0.0d0           ! Outdoor wet-bulb temperature at condenser (C)
+  REAL(r64)     :: OutdoorHumRat   = 0.0d0            ! Outdoor humidity ratio at condenser (kg/kg)
+  REAL(r64)     :: OutdoorPressure   = 0.0d0          ! Outdoor barometric pressure at condenser (Pa)
+  REAL(r64)     :: FractionalDefrostTime  = 0.0d0     ! Fraction of time step system is in defrost
+  REAL(r64)     :: HeatingCapacityMultiplier  = 0.0d0 ! Multiplier for heating capacity when system is in defrost
+  REAL(r64)     :: InputPowerMultiplier   = 0.0d0     ! Multiplier for power when system is in defrost
+  REAL(r64)     :: LoadDueToDefrost   = 0.0d0         ! Additional load due to defrost
+  REAL(r64)     :: CrankcaseHeatingPower  = 0.0d0     ! power due to crankcase heater
+  REAL(r64)     :: DefrostEIRTempModFac   = 0.0d0     ! EIR modifier for defrost (function of entering wetbulb, outside drybulb)
+
+  MaxSpeed = VarSpeedCoil(DXCoilNum)%NumofSpeeds
 
  !  LOAD LOCAL VARIABLES FROM DATA STRUCTURE (for code readability)
   IF (.NOT. (CyclingScheme .EQ. ContFanCycCoil) .AND. PartLoadRatio > 0.0) THEN
-     WtoADXCoil(DXCoilNum)%AirMassFlowRate   = Node(WtoADXCoil(DXCoilNum)%AirInletNodeNum)%MassFlowRate/PartLoadRatio
+     VarSpeedCoil(DXCoilNum)%AirMassFlowRate   = Node(VarSpeedCoil(DXCoilNum)%AirInletNodeNum)%MassFlowRate/PartLoadRatio
   END IF
 
-  LoadSideMassFlowRate   = WtoADXCoil(DXCoilNum)%AirMassFlowRate
-  LoadSideInletDBTemp    = WtoADXCoil(DXCoilNum)%InletAirDBTemp
-  LoadSideInletHumRat    = WtoADXCoil(DXCoilNum)%InletAirHumRat
+  LoadSideMassFlowRate   = VarSpeedCoil(DXCoilNum)%AirMassFlowRate
+  LoadSideInletDBTemp    = VarSpeedCoil(DXCoilNum)%InletAirDBTemp
+  LoadSideInletHumRat    = VarSpeedCoil(DXCoilNum)%InletAirHumRat
 
   LoadSideInletWBTemp    = PsyTwbFnTdbWPb(LoadSideInletDBTemp,LoadSideInletHumRat,OutBaroPress,RoutineName)
-  LoadSideInletEnth      = WtoADXCoil(DXCoilNum)%InletAirEnthalpy
+  LoadSideInletEnth      = VarSpeedCoil(DXCoilNum)%InletAirEnthalpy
   CpAir                  = PsyCpAirFnWTdb(LoadSideInletHumRat,LoadSideInletDBTemp,RoutineName)
-  SourceSideMassFlowRate = WtoADXCoil(DXCoilNum)%WaterMassFlowRate
-  SourceSideInletTemp    = WtoADXCoil(DXCoilNum)%InletWaterTemp
-  SourceSideInletEnth    = WtoADXCoil(DXCoilNum)%InletWaterEnthalpy
-  CpWater                = GetSpecificHeatGlycol(PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidName, &
-                                   SourceSideInletTemp, &
-                                   PlantLoop(WtoADXCoil(DXCoilNum)%LoopNum)%FluidIndex,  &
-                                   RoutineName//':SourceSideInletTemp')
+
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+    ! Get condenser outdoor node info from DX Heating Coil
+      IF (VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum /= 0) THEN
+        OutdoorDryBulb  = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%Temp
+        OutdoorHumRat   = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%HumRat
+        OutdoorPressure = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%Press
+        OutdoorWetBulb  = Node(VarSpeedCoil(DXCoilNum)%CondenserInletNodeNum)%OutAirWetBulb
+      ELSE
+        OutdoorDryBulb  = OutDryBulbTemp
+        OutdoorHumRat   = OutHumRat
+        OutdoorPressure = OutBaroPress
+        OutdoorWetBulb  = OutWetBulbTemp
+      ENDIF
+      SourceSideMassFlowRate = 1.0d0 ! not used and avoid divided by zero
+      SourceSideInletTemp    = OutdoorDryBulb
+      SourceSideInletEnth    = PsyHFnTdbW(OutdoorDryBulb,OutdoorHumRat,RoutineName)
+      CpSource               = PsyCpAirFnWTdb(OutHumRat, OutdoorDryBulb,RoutineName)
+
+      ! Initialize crankcase heater, operates below OAT defined in input deck for HP DX heating coil
+     IF (OutdoorDryBulb .LT. VarSpeedCoil(DXCoilNum)%MaxOATCrankcaseHeater)THEN
+       CrankcaseHeatingPower = VarSpeedCoil(DXCoilNum)%CrankcaseHeaterCapacity
+     ELSE
+       CrankcaseHeatingPower = 0.0
+     END IF
+  ELSE
+      SourceSideMassFlowRate = VarSpeedCoil(DXCoilNum)%WaterMassFlowRate
+      SourceSideInletTemp    = VarSpeedCoil(DXCoilNum)%InletWaterTemp
+      SourceSideInletEnth    = VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy
+      CpSource               = GetSpecificHeatGlycol(PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidName, &
+                                       SourceSideInletTemp, &
+                                       PlantLoop(VarSpeedCoil(DXCoilNum)%LoopNum)%FluidIndex,  &
+                                       RoutineName//':SourceSideInletTemp')
+  END IF
 
  !Check for flows, do not perform simulation if no flow in load side or source side.
   IF (SourceSideMassFlowRate <= 0.0 .OR. LoadSideMassFlowRate <= 0.0)THEN
-    WtoADXCoil(DXCoilNum)%SimFlag = .FALSE.
+    VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
     RETURN
   ELSE
-    WtoADXCoil(DXCoilNum)%SimFlag = .TRUE.
+    VarSpeedCoil(DXCoilNum)%SimFlag = .TRUE.
   ENDIF
 
   IF (CompOp .EQ. 0) THEN
-    WtoADXCoil(DXCoilNum)%SimFlag = .FALSE.
+    VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
     RETURN
   ENDIF
 
@@ -2944,87 +4305,202 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   END IF
 
   RuntimeFrac = 1.0
-  WtoADXCoil(DXCoilNum)%RunFrac = 1.0
+  VarSpeedCoil(DXCoilNum)%RunFrac = 1.0
   IF((SpeedNum == 1) .AND. (PartLoadRatio < 1.0)) THEN
-    PLF = CurveValue(WtoADXCoil(DXCoilNum)%PLFFPLR,PartLoadRatio)
+    PLF = CurveValue(VarSpeedCoil(DXCoilNum)%PLFFPLR,PartLoadRatio)
     IF (PLF < 0.7d0) THEN
      PLF = 0.7d0
     END IF
     ! calculate the run time fraction
-    WtoADXCoil(DXCoilNum)%RunFrac = PartLoadRatio / PLF
-    WtoADXCoil(DXCoilNum)%PartLoadRatio    = PartLoadRatio
+    VarSpeedCoil(DXCoilNum)%RunFrac = PartLoadRatio / PLF
+    VarSpeedCoil(DXCoilNum)%PartLoadRatio    = PartLoadRatio
 
-    IF ( WtoADXCoil(DXCoilNum)%RunFrac > 1. ) THEN
-      WtoADXCoil(DXCoilNum)%RunFrac = 1.0d0 ! Reset coil runtime fraction to 1.0
-    ELSE IF( WtoADXCoil(DXCoilNum)%RunFrac < 0.0 ) THEN
-      WtoADXCoil(DXCoilNum)%RunFrac = 0.0
+    IF ( VarSpeedCoil(DXCoilNum)%RunFrac > 1. ) THEN
+      VarSpeedCoil(DXCoilNum)%RunFrac = 1.0d0 ! Reset coil runtime fraction to 1.0
+    ELSE IF( VarSpeedCoil(DXCoilNum)%RunFrac < 0.0 ) THEN
+      VarSpeedCoil(DXCoilNum)%RunFrac = 0.0
     END IF
 
-    RuntimeFrac = WtoADXCoil(DXCoilNum)%RunFrac
+    RuntimeFrac = VarSpeedCoil(DXCoilNum)%RunFrac
   END IF
 
   IF((SpeedNum == 1) .OR.(SpeedNum > MaxSpeed) .OR. (SpeedRatio == 1.0)) THEN
-    AirMassFlowRatio = LoadSideMassFlowRate/ WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate
-    WaterMassFlowRatio = SourceSideMassFlowRate/WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate
+    AirMassFlowRatio = LoadSideMassFlowRate/ VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate
 
-    TotCapTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    TotCapAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
-    TotCapWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        WaterMassFlowRatio = 1.0d0
+    ELSE
+        WaterMassFlowRatio = SourceSideMassFlowRate/VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate
+    END IF
 
-    QLoadTotal = WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+    TotCapTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    TotCapAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
 
-    EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-    EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-    EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        TotCapWaterFFModFac = 1.0d0
+    ELSE
+        TotCapWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
+
+    QLoadTotal = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+
+    EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        EIRWaterFFModFac = 1.0D0
+    ELSE
+        EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
+
+    EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
     Winput = QLoadTotal * EIR
 
-    QWasteHeat =  Winput * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-    QWasteHeat = QWasteHeat * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        QWasteHeat = 0.0d0
+    ELSE
+        QWasteHeat =  Winput * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+        QWasteHeat = QWasteHeat * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal), &
+                    LoadSideInletDBTemp,SourceSideInletTemp)
+    END IF
 
   ELSE
-    AirMassFlowRatio = LoadSideMassFlowRate/ WtoADXCoil(DXCoilNum)%DesignAirMassFlowRate
-    WaterMassFlowRatio = SourceSideMassFlowRate/WtoADXCoil(DXCoilNum)%DesignWaterMassFlowRate
+    AirMassFlowRatio = LoadSideMassFlowRate/ VarSpeedCoil(DXCoilNum)%DesignAirMassFlowRate
+
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        WaterMassFlowRatio = 1.0d0
+    ELSE
+        WaterMassFlowRatio = SourceSideMassFlowRate/VarSpeedCoil(DXCoilNum)%DesignWaterMassFlowRate
+    END IF
 
     SpeedCal =  SpeedNum - 1
-    TotCapTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    TotCapAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
-    TotCapWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    TotCapTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    TotCapAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
 
-    QLoadTotal1 = WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        TotCapWaterFFModFac = 1.0d0
+    ELSE
+        TotCapWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
 
-    EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-    EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-    EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+    QLoadTotal1 = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+
+    EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        EIRWaterFFModFac = 1.0d0
+    ELSE
+        EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
+
+    EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
     Winput1 = QLoadTotal1 * EIR
 
-    QWasteHeat1 =  Winput1 * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-    QWasteHeat1 = QWasteHeat1 * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        QWasteHeat1 = 0.0d0
+    ELSE
+        QWasteHeat1 =  Winput1 * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+        QWasteHeat1 = QWasteHeat1 * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal), &
+                LoadSideInletDBTemp,SourceSideInletTemp)
+    END IF
 
     SpeedCal =  SpeedNum
-    TotCapTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    TotCapAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
-    TotCapWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    TotCapTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    TotCapAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapAirFFlow(SpeedCal),AirMassFlowRatio)
 
-    QLoadTotal2 = WtoADXCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        TotCapWaterFFModFac = 1.0d0
+    ELSE
+        TotCapWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSCCapWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
 
-    EIRTempModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-    EIRAirFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
-    EIRWaterFFModFac = CurveValue(WtoADXCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
-    EIR = (1.0/WtoADXCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
+    QLoadTotal2 = VarSpeedCoil(DXCoilNum)%MSRatedTotCap(SpeedCal) * TotCapTempModFac * TotCapAirFFModFac * TotCapWaterFFModFac
+
+    EIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRFTemp(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
+    EIRAirFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRAirFFlow(SpeedCal),AirMassFlowRatio)
+
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        EIRWaterFFModFac = 1.0d0
+    ELSE
+        EIRWaterFFModFac = CurveValue(VarSpeedCoil(DXCoilNum)%MSEIRWaterFFlow(SpeedCal),WaterMassFlowRatio)
+    END IF
+
+    EIR = (1.0/VarSpeedCoil(DXCoilNum)%MSRatedCOP(SpeedCal)) * EIRTempModFac * EIRAirFFModFac * EIRWaterFFModFac
     Winput2 = QLoadTotal2 * EIR
 
-    QWasteHeat2 =  Winput2 * WtoADXCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
-    QWasteHeat2 = QWasteHeat2 * CurveValue(WtoADXCoil(DXCoilNum)%MSWasteHeat(SpeedCal),LoadSideInletDBTemp,SourceSideInletTemp)
-
+    IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+        QWasteHeat2 = 0.0d0
+    ELSE
+        QWasteHeat2 =  Winput2 * VarSpeedCoil(DXCoilNum)%MSWasteHeatFrac(SpeedCal)
+        QWasteHeat2 = QWasteHeat2 * CurveValue(VarSpeedCoil(DXCoilNum)%MSWasteHeat(SpeedCal), &
+                LoadSideInletDBTemp,SourceSideInletTemp)
+    END IF
 
     QLoadTotal = QLoadTotal2*SpeedRatio + (1.0 - SpeedRatio ) * QLoadTotal1
     Winput = Winput2*SpeedRatio + (1.0 - SpeedRatio ) * Winput1
     QWasteHeat = QWasteHeat2*SpeedRatio + (1.0 - SpeedRatio ) * QWasteHeat1
   END IF
 
+  VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = 0.0d0 !necessary to clear zero for water source coils
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+    ! Calculating adjustment factors for defrost
+    ! Calculate delta w through outdoor coil by assuming a coil temp of 0.82*DBT-9.7(F) per DOE2.1E
+      OutdoorCoilT = 0.82d0 * OutdoorDryBulb - 8.589d0
+      OutdoorCoildw = MAX(1.0d-6,(OutdoorHumRat - PsyWFnTdpPb(OutdoorCoilT,OutdoorPressure)))
+
+    ! Initializing defrost adjustment factors
+      LoadDueToDefrost = 0.0
+      HeatingCapacityMultiplier = 1.0d0
+      FractionalDefrostTime = 0.0
+      InputPowerMultiplier = 1.0d0
+    !
+    ! Check outdoor temperature to determine of defrost is active
+      IF (OutdoorDryBulb .LE. VarSpeedCoil(DXCoilNum)%MaxOATDefrost) THEN
+    ! Calculate defrost adjustment factors depending on defrost control type
+         IF (VarSpeedCoil(DXCoilNum)%DefrostControl .EQ. Timed) THEN
+           FractionalDefrostTime = VarSpeedCoil(DXCoilNum)%DefrostTime
+           HeatingCapacityMultiplier = 0.909d0 - 107.33d0 * OutdoorCoildw
+           InputPowerMultiplier = 0.90d0 - 36.45d0*OutdoorCoildw
+         ELSE !else defrost control is on-demand
+           FractionalDefrostTime = 1.0d0 / (1.0d0 + 0.01446d0 / OutdoorCoildw)
+           HeatingCapacityMultiplier = 0.875d0 * ( 1.0d0 - FractionalDefrostTime)
+           InputPowerMultiplier = 0.954d0 * ( 1.0d0 - FractionalDefrostTime)
+         END IF
+
+         IF (FractionalDefrostTime .GT. 0.0) THEN
+    ! Calculate defrost adjustment factors depending on defrost control strategy
+           IF (VarSpeedCoil(DXCoilNum)%DefrostStrategy .EQ. ReverseCycle) THEN
+             LoadDueToDefrost = (0.01d0 * FractionalDefrostTime) * &
+                                (7.222d0 - OutdoorDryBulb) * &
+                                (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(MaxSpeed)/1.01667d0)
+             DefrostEIRTempModFac = CurveValue(VarSpeedCoil(DXCoilNum)%DefrostEIRFT,&
+                                    MAX(15.555d0,LoadSideInletWBTemp),MAX(15.555d0,OutdoorDryBulb))
+             VarSpeedCoil(DXCoilNum)%DefrostPower =  DefrostEIRTempModFac * &
+                                               (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(MaxSpeed) &
+                                               /1.01667d0)* FractionalDefrostTime
+           ELSE ! Defrost strategy is resistive
+             VarSpeedCoil(DXCoilNum)%DefrostPower = VarSpeedCoil(DXCoilNum)%DefrostCapacity &
+                                              * FractionalDefrostTime
+           END IF
+         ELSE ! Defrost is not active because (OutDryBulbTemp .GT. DXCoil(DXCoilNum)%MaxOATDefrost)
+           VarSpeedCoil(DXCoilNum)%DefrostPower =  0.0
+         END IF
+      END IF
+
+      VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower = CrankcaseHeatingPower *(1.0d0 - RuntimeFrac)
+    !! Modify total heating capacity based on defrost heating capacity multiplier
+    !! MaxHeatCap passed from parent object VRF Condenser and is used to limit capacity of TU's to that available from condenser
+    !  IF(PRESENT(MaxHeatCap))THEN
+    !    TotCap = MIN(MaxHeatCap,TotCap * HeatingCapacityMultiplier)
+    !  ELSE
+    !    TotCap = TotCap * HeatingCapacityMultiplier
+    !  END IF
+      QLoadTotal = QLoadTotal * HeatingCapacityMultiplier
+      ! count the powr separately
+      Winput = Winput * InputPowerMultiplier !+ VarSpeedCoil(DXCoilNum)%DefrostPower
+
+  END IF
 
   Qsource = QLoadTotal+ QWasteHeat -Winput
   QSensible = QLoadTotal
@@ -3042,18 +4518,18 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   ! Actual outlet conditions are "average" for time step
   IF (CyclingScheme .EQ. ContFanCycCoil) THEN
     ! continuous fan, cycling compressor
-    WtoADXCoil(DXCoilNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideOutletEnth + &
+    VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy = PartLoadRatio*LoadSideOutletEnth + &
                                                   (1.d0-PartLoadRatio)*LoadSideInletEnth
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat   = PartLoadRatio*LoadsideOutletHumRat + &
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat   = PartLoadRatio*LoadsideOutletHumRat + &
                                                   (1.d0-PartLoadRatio)*LoadSideInletHumRat
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp   = PsyTdbFnHW(WtoADXCoil(DXCoilNum)%OutletAirEnthalpy,  &
-                                                               WtoADXCoil(DXCoilNum)%OutletAirHumRat,RoutineName)
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp   = PsyTdbFnHW(VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy,  &
+                                                               VarSpeedCoil(DXCoilNum)%OutletAirHumRat,RoutineName)
     PLRCorrLoadSideMdot = LoadSideMassFlowRate
   ELSE
     ! default to cycling fan, cycling compressor
-    WtoADXCoil(DXCoilNum)%OutletAirEnthalpy = LoadSideOutletEnth
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat   = LoadsideOutletHumRat
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp   = LoadSideOutletDBTemp
+    VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy = LoadSideOutletEnth
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat   = LoadsideOutletHumRat
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp   = LoadSideOutletDBTemp
     PLRCorrLoadSideMdot = LoadSideMassFlowRate*PartLoadRatio
   END IF
 
@@ -3061,7 +4537,8 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
    ! scale heat transfer rates to PLR and power to RTF
   QLoadTotal = QLoadTotal*PartLoadRatio
   QSensible  = QSensible*PartLoadRatio
-  Winput     = Winput*RuntimeFrac
+  ! count the powr separately
+  Winput     = Winput*RuntimeFrac !+ VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower
   QSource    = QSource*PartLoadRatio
   QWasteHeat = QWasteHeat*PartLoadRatio
 
@@ -3070,33 +4547,41 @@ SUBROUTINE  CalcMulSpeedWSHPCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
 
   ReportingConstant=TimeStepSys*SecInHour
   !Update heat pump data structure
-  WtoADXCoil(DXCoilNum)%Power               = Winput
-  WtoADXCoil(DXCoilNum)%QLoadTotal          = QLoadTotal
-  WtoADXCoil(DXCoilNum)%QSensible           = QSensible
-  WtoADXCoil(DXCoilNum)%QSource             = QSource
-  WtoADXCoil(DXCoilNum)%Energy=Winput*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLoadTotal=QLoadTotal*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergySensible=QSensible*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLatent=0.0
-  WtoADXCoil(DXCoilNum)%EnergySource=QSource*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%Power               = Winput
+  VarSpeedCoil(DXCoilNum)%QLoadTotal          = QLoadTotal
+  VarSpeedCoil(DXCoilNum)%QSensible           = QSensible
+  VarSpeedCoil(DXCoilNum)%QSource             = QSource
+  VarSpeedCoil(DXCoilNum)%Energy=Winput*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLoadTotal=QLoadTotal*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergySensible=QSensible*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLatent=0.0
+  VarSpeedCoil(DXCoilNum)%EnergySource=QSource*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption = VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%DefrostConsumption = VarSpeedCoil(DXCoilNum)%DefrostPower*ReportingConstant
   IF(RunTimeFrac == 0.0) THEN
-    WtoADXCoil(DXCoilNum)%COP = 0.0
+    VarSpeedCoil(DXCoilNum)%COP = 0.0
   ELSE
-    WtoADXCoil(DXCoilNum)%COP = QLoadTotal/Winput
+    VarSpeedCoil(DXCoilNum)%COP = QLoadTotal/Winput
   END IF
-  WtoADXCoil(DXCoilNum)%RunFrac             = RuntimeFrac
-  WtoADXCoil(DXCoilNum)%PartLoadRatio       = PartLoadRatio
-  WtoADXCoil(DXCoilNum)%AirMassFlowRate     = PLRCorrLoadSideMdot
+  VarSpeedCoil(DXCoilNum)%RunFrac             = RuntimeFrac
+  VarSpeedCoil(DXCoilNum)%PartLoadRatio       = PartLoadRatio
+  VarSpeedCoil(DXCoilNum)%AirMassFlowRate     = PLRCorrLoadSideMdot
 
-  WtoADXCoil(DXCoilNum)%WaterMassFlowRate   = SourceSideMassFlowRate
-  WtoADXCoil(DXCoilNum)%OutletWaterTemp     = SourceSideInletTemp - QSource/(SourceSideMassFlowRate * CpWater)
-  WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy = SourceSideInletEnth - QSource/SourceSideMassFlowRate
+  IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) THEN
+    VarSpeedCoil(DXCoilNum)%WaterMassFlowRate   = 0.0d0
+    VarSpeedCoil(DXCoilNum)%OutletWaterTemp     = 0.0d0
+    VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = 0.0d0
+  ELSE
+    VarSpeedCoil(DXCoilNum)%WaterMassFlowRate   = SourceSideMassFlowRate
+    VarSpeedCoil(DXCoilNum)%OutletWaterTemp     = SourceSideInletTemp - QSource/(SourceSideMassFlowRate * CpSource)
+    VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = SourceSideInletEnth - QSource/SourceSideMassFlowRate
+  END IF
 
-  WtoADXCoil(DXCoilNum)%QWasteHeat =  QWasteHeat
+  VarSpeedCoil(DXCoilNum)%QWasteHeat =  QWasteHeat
   RETURN
-END SUBROUTINE CalcMulSpeedWSHPCoilHeating
+END SUBROUTINE CalcVarSpeedCoilHeating
 
-FUNCTION GetCoilCapacityMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
+FUNCTION GetCoilCapacityVariableSpeed(CoilType,CoilName,ErrorsFound) RESULT(CoilCapacity)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:GetCoilCapacity
@@ -3141,19 +4626,22 @@ FUNCTION GetCoilCapacityMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(CoilC
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
-  IF (CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .or.   &
-      CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT') THEN
-    WhichCoil=FindItemInList(CoilName,WtoADXCoil%Name,NumWaterToAirHPs)
+  IF (CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .OR.   &
+      CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .OR. &
+      CoilType == 'COIL:COOLING:DX:VARIABLESPEED' .OR.   &
+      CoilType == 'COIL:HEATING:DX:VARIABLESPEED') THEN
+    WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWaterToAirHPs)
     IF (WhichCoil /= 0) THEN
-      IF (CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT') THEN
-        CoilCapacity=WtoADXCoil(WhichCoil)%RatedCapHeat
+      IF (CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .OR. &
+        CoilType == 'COIL:HEATING:DX:VARIABLESPEED'  ) THEN
+        CoilCapacity=VarSpeedCoil(WhichCoil)%RatedCapHeat
       ELSE
-        CoilCapacity=WtoADXCoil(WhichCoil)%RatedCapCoolTotal
+        CoilCapacity=VarSpeedCoil(WhichCoil)%RatedCapCoolTotal
       ENDIF
     ENDIF
   ELSE
@@ -3168,9 +4656,9 @@ FUNCTION GetCoilCapacityMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(CoilC
 
   RETURN
 
-END FUNCTION GetCoilCapacityMulSpeedWSHP
+END FUNCTION GetCoilCapacityVariableSpeed
 
-FUNCTION GetCoilIndexMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(IndexNum)
+FUNCTION GetCoilIndexVariableSpeed(CoilType,CoilName,ErrorsFound) RESULT(IndexNum)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:GetCoilIndex
@@ -3215,12 +4703,12 @@ FUNCTION GetCoilIndexMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(IndexNum
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
-  IndexNum=FindItemInList(CoilName,WtoADXCoil%Name,NumWaterToAirHPs)
+  IndexNum=FindItemInList(CoilName,VarSpeedCoil%Name,NumWaterToAirHPs)
 
   IF (IndexNum == 0) THEN
     CALL ShowSevereError('Could not find CoilType="'//TRIM(CoilType)//'" with Name="'//TRIM(CoilName)//'"')
@@ -3229,9 +4717,9 @@ FUNCTION GetCoilIndexMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(IndexNum
 
   RETURN
 
-END FUNCTION GetCoilIndexMulSpeedWSHP
+END FUNCTION GetCoilIndexVariableSpeed
 
-FUNCTION GetCoilAirFlowRateMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(CoilAirFlowRate)
+FUNCTION GetCoilAirFlowRateVariableSpeed(CoilType,CoilName,ErrorsFound) RESULT(CoilAirFlowRate)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:GetCoilAirFlowRate
@@ -3276,22 +4764,24 @@ FUNCTION GetCoilAirFlowRateMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Co
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
-  IF (CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .or.   &
-      CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT') THEN
-    WhichCoil=FindItemInList(CoilName,WtoADXCoil%Name,NumWaterToAirHPs)
+  IF (CoilType == 'COIL:COOLING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .OR.   &
+      CoilType == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .OR. &
+      CoilType == 'COIL:COOLING:DX:VARIABLESPEED' .OR.   &
+      CoilType == 'COIL:HEATING:DX:VARIABLESPEED') THEN
+    WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWaterToAirHPs)
     IF (WhichCoil /= 0) THEN
-      !CoilAirFlowRate=WtoADXCoil(WhichCoil)%RatedAirVolFlowRate
-      IF(WtoADXCoil(WhichCoil)%RatedAirVolFlowRate == AUTOSIZE) THEN !means autosize
-        CoilAirFlowRate=WtoADXCoil(WhichCoil)%RatedAirVolFlowRate
+      !CoilAirFlowRate=VarSpeedCoil(WhichCoil)%RatedAirVolFlowRate
+      IF(VarSpeedCoil(WhichCoil)%RatedAirVolFlowRate == AUTOSIZE) THEN !means autosize
+        CoilAirFlowRate=VarSpeedCoil(WhichCoil)%RatedAirVolFlowRate
       ELSE
-        CoilAirFlowRate=WtoADXCoil(WhichCoil)%MSRatedAirVolFlowRate(WtoADXCoil(WhichCoil)%NumOfSpeeds)/ &
-            WtoADXCoil(WhichCoil)%MSRatedAirVolFlowRate(WtoADXCoil(WhichCoil)%NormSpedLevel) * &
-             WtoADXCoil(WhichCoil)%RatedAirVolFlowRate
+        CoilAirFlowRate=VarSpeedCoil(WhichCoil)%MSRatedAirVolFlowRate(VarSpeedCoil(WhichCoil)%NumOfSpeeds)/ &
+            VarSpeedCoil(WhichCoil)%MSRatedAirVolFlowRate(VarSpeedCoil(WhichCoil)%NormSpedLevel) * &
+             VarSpeedCoil(WhichCoil)%RatedAirVolFlowRate
       END IF ! use largest air flow rate
     ENDIF
   ELSE
@@ -3306,10 +4796,10 @@ FUNCTION GetCoilAirFlowRateMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Co
 
   RETURN
 
-END FUNCTION GetCoilAirFlowRateMulSpeedWSHP
+END FUNCTION GetCoilAirFlowRateVariableSpeed
 
 
-FUNCTION GetCoilInletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
+FUNCTION GetCoilInletNodeVariableSpeed(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:GetCoilInletNode
@@ -3353,14 +4843,14 @@ FUNCTION GetCoilInletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Node
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
-  WhichCoil=FindItemInList(CoilName,WtoADXCoil%Name,NumWatertoAirHPs)
+  WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWatertoAirHPs)
   IF (WhichCoil /= 0) THEN
-    NodeNumber=WtoADXCoil(WhichCoil)%AirInletNodeNum
+    NodeNumber=VarSpeedCoil(WhichCoil)%AirInletNodeNum
   ENDIF
 
   IF (WhichCoil == 0) THEN
@@ -3371,10 +4861,10 @@ FUNCTION GetCoilInletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Node
 
   RETURN
 
-END FUNCTION GetCoilInletNodeMulSpeedWSHP
+END FUNCTION GetCoilInletNodeVariableSpeed
 
 
-FUNCTION GetCoilOutletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
+FUNCTION GetCoilOutletNodeVariableSpeed(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:GetCoilOutletNode
@@ -3419,14 +4909,14 @@ FUNCTION GetCoilOutletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Nod
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
-  WhichCoil=FindItemInList(CoilName,WtoADXCoil%Name,NumWatertoAirHPs)
+  WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWatertoAirHPs)
   IF (WhichCoil /= 0) THEN
-    NodeNumber=WtoADXCoil(WhichCoil)%AirOutletNodeNum
+    NodeNumber=VarSpeedCoil(WhichCoil)%AirOutletNodeNum
   ENDIF
 
   IF (WhichCoil == 0) THEN
@@ -3437,9 +4927,131 @@ FUNCTION GetCoilOutletNodeMulSpeedWSHP(CoilType,CoilName,ErrorsFound) RESULT(Nod
 
   RETURN
 
-END FUNCTION GetCoilOutletNodeMulSpeedWSHP
+END FUNCTION GetCoilOutletNodeVariableSpeed
 
-SUBROUTINE SetMulSpeedWSHPData(WSHPNum,ErrorsFound,CompanionCoolingCoilNum,CompanionHeatingCoilNum)
+FUNCTION GetVSCoilCondenserInletNode(CoilName,ErrorsFound) RESULT(CondNode)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Bo Shen, based on DXCoil:GetCoilCondenserInletNode
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given coil and returns the condenser inlet node.  If
+          ! incorrect coil  name is given, errorsfound is returned as true.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  INTEGER                      :: CondNode     ! returned condenser node number of matched coil
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  ! Obtains and Allocates WatertoAirHP related parameters from input file
+  IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
+    CALL GetVarSpeedCoilInput
+!    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
+    GetCoilsInputFlag=.FALSE.
+  End If
+
+   WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWatertoAirHPs)
+  IF (WhichCoil /= 0) THEN
+    CondNode=VarSpeedCoil(WhichCoil)%CondenserInletNodeNum
+   ELSE
+    CALL ShowSevereError('GetCoilCondenserInletNode: Invalid VS DX Coil, Type= VS DX Cooling Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    CondNode=0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetVSCoilCondenserInletNode
+
+
+FUNCTION GetVSCoilMinOATCompressor(CoilName,ErrorsFound) RESULT(MinOAT)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Bo Shen
+          !       DATE WRITTEN   July 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given coil and returns min OAT for compressor operation.  If
+          ! incorrect coil  name is given, errorsfound is returned as true.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: CoilName     ! must match coil names for the coil type
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound  ! set to true if problem
+  REAL(r64)            :: MinOAT     ! returned min OAT for compressor operation
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil
+
+  ! Obtains and Allocates WatertoAirHP related parameters from input file
+  IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
+    CALL GetVarSpeedCoilInput
+!    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
+    GetCoilsInputFlag=.FALSE.
+  End If
+
+   WhichCoil=FindItemInList(CoilName,VarSpeedCoil%Name,NumWatertoAirHPs)
+  IF (WhichCoil /= 0) THEN
+    MinOAT = VarSpeedCoil(WhichCoil)%MinOATCompressor
+   ELSE
+    CALL ShowSevereError('GetVSCoilMinOATCompressor: Invalid VS DX Coil, Type= VS DX Cooling Name="'//TRIM(CoilName)//'"')
+    ErrorsFound=.true.
+    MinOAT = -1000.0d0
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetVSCoilMinOATCompressor
+
+
+SUBROUTINE SetVarSpeedCoilData(WSHPNum,ErrorsFound,CompanionCoolingCoilNum,CompanionHeatingCoilNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:SetWSHPData
@@ -3484,34 +5096,34 @@ SUBROUTINE SetMulSpeedWSHPData(WSHPNum,ErrorsFound,CompanionCoolingCoilNum,Compa
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
   IF (GetCoilsInputFlag) THEN  !First time subroutine has been entered
-    CALL GetMulSpeedWSHPInput
+    CALL GetVarSpeedCoilInput
 !    WaterIndex=FindGlycol('WATER') !Initialize the WaterIndex once
     GetCoilsInputFlag=.FALSE.
   End If
 
   IF (WSHPNum <= 0 .or. WSHPNum > NumWatertoAirHPs) THEN
-    CALL ShowSevereError('SetMulSpeedWSHPData: called with VS WSHP Coil Number out of range='//  &
+    CALL ShowSevereError('SetVarSpeedCoilData: called with VS WSHP Coil Number out of range='//  &
          TRIM(TrimSigDigits(WSHPNum))//' should be >0 and <'//TRIM(TrimSigDigits(NumWatertoAirHPs)))
     ErrorsFound=.true.
     RETURN
   ENDIF
 
   IF (PRESENT(CompanionCoolingCoilNum)) THEN
-    WtoADXCoil(WSHPNum)%CompanionCoolingCoilNum=CompanionCoolingCoilNum
-    WtoADXCoil(WSHPNum)%FindCompanionUpStreamCoil = .TRUE.
-    WtoADXCoil(CompanionCoolingCoilNum)%CompanionHeatingCoilNum=WSHPNum
+    VarSpeedCoil(WSHPNum)%CompanionCoolingCoilNum=CompanionCoolingCoilNum
+    VarSpeedCoil(WSHPNum)%FindCompanionUpStreamCoil = .TRUE.
+    VarSpeedCoil(CompanionCoolingCoilNum)%CompanionHeatingCoilNum=WSHPNum
   ENDIF
 
   IF (PRESENT(CompanionHeatingCoilNum)) THEN
-    WtoADXCoil(WSHPNum)%CompanionHeatingCoilNum=CompanionHeatingCoilNum
-    WtoADXCoil(CompanionHeatingCoilNum)%CompanionCoolingCoilNum=WSHPNum
+    VarSpeedCoil(WSHPNum)%CompanionHeatingCoilNum=CompanionHeatingCoilNum
+    VarSpeedCoil(CompanionHeatingCoilNum)%CompanionCoolingCoilNum=WSHPNum
   ENDIF
 
   RETURN
 
-END SUBROUTINE SetMulSpeedWSHPData
+END SUBROUTINE SetVarSpeedCoilData
 
-SUBROUTINE UpdateMulSpeedWSHP(DXCoilNum)
+SUBROUTINE UpdateVarSpeedCoil(DXCoilNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Bo Shen, based on WatertoAirHeatPumpSimple:UpdateSimpleWSHP
           !       DATE WRITTEN   March 2012
@@ -3555,40 +5167,40 @@ SUBROUTINE UpdateMulSpeedWSHP(DXCoilNum)
 
 
   !WatertoAirHP(DXCoilNum)%Simflag=.FALSE.
-  IF(.NOT. WtoADXCoil(DXCoilNum)%Simflag)THEN
+  IF(.NOT. VarSpeedCoil(DXCoilNum)%Simflag)THEN
     ! Heatpump is off; just pass through conditions
-    WtoADXCoil(DXCoilNum)%Power               = 0.0
-    WtoADXCoil(DXCoilNum)%QLoadTotal          = 0.0
-    WtoADXCoil(DXCoilNum)%QSensible           = 0.0
-    WtoADXCoil(DXCoilNum)%QLatent             = 0.0
-    WtoADXCoil(DXCoilNum)%QSource             = 0.0
-    WtoADXCoil(DXCoilNum)%Energy              = 0.0
-    WtoADXCoil(DXCoilNum)%EnergyLoadTotal     = 0.0
-    WtoADXCoil(DXCoilNum)%EnergySensible      = 0.0
-    WtoADXCoil(DXCoilNum)%EnergyLatent        = 0.0
-    WtoADXCoil(DXCoilNum)%EnergySource        = 0.0
-    WtoADXCoil(DXCoilNum)%COP                 = 0.0
-    WtoADXCoil(DXCoilNum)%RunFrac             = 0.0
-    WtoADXCoil(DXCoilNum)%PartLoadRatio       = 0.0
+    VarSpeedCoil(DXCoilNum)%Power               = 0.0
+    VarSpeedCoil(DXCoilNum)%QLoadTotal          = 0.0
+    VarSpeedCoil(DXCoilNum)%QSensible           = 0.0
+    VarSpeedCoil(DXCoilNum)%QLatent             = 0.0
+    VarSpeedCoil(DXCoilNum)%QSource             = 0.0
+    VarSpeedCoil(DXCoilNum)%Energy              = 0.0
+    VarSpeedCoil(DXCoilNum)%EnergyLoadTotal     = 0.0
+    VarSpeedCoil(DXCoilNum)%EnergySensible      = 0.0
+    VarSpeedCoil(DXCoilNum)%EnergyLatent        = 0.0
+    VarSpeedCoil(DXCoilNum)%EnergySource        = 0.0
+    VarSpeedCoil(DXCoilNum)%COP                 = 0.0
+    VarSpeedCoil(DXCoilNum)%RunFrac             = 0.0
+    VarSpeedCoil(DXCoilNum)%PartLoadRatio       = 0.0
 
-    WtoADXCoil(DXCoilNum)%OutletAirDBTemp     = WtoADXCoil(DXCoilNum)%InletAirDBTemp
-    WtoADXCoil(DXCoilNum)%OutletAirHumRat     = WtoADXCoil(DXCoilNum)%InletAirHumRat
-    WtoADXCoil(DXCoilNum)%OutletAirEnthalpy   = WtoADXCoil(DXCoilNum)%InletAirEnthalpy
-    WtoADXCoil(DXCoilNum)%OutletWaterTemp     = WtoADXCoil(DXCoilNum)%InletWaterTemp
-    WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy = WtoADXCoil(DXCoilNum)%InletWaterEnthalpy
+    VarSpeedCoil(DXCoilNum)%OutletAirDBTemp     = VarSpeedCoil(DXCoilNum)%InletAirDBTemp
+    VarSpeedCoil(DXCoilNum)%OutletAirHumRat     = VarSpeedCoil(DXCoilNum)%InletAirHumRat
+    VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy   = VarSpeedCoil(DXCoilNum)%InletAirEnthalpy
+    VarSpeedCoil(DXCoilNum)%OutletWaterTemp     = VarSpeedCoil(DXCoilNum)%InletWaterTemp
+    VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy = VarSpeedCoil(DXCoilNum)%InletWaterEnthalpy
   END IF
 
-  AirInletNode    = WtoADXCoil(DXCoilNum)%AirInletNodeNum
-  WaterInletNode  = WtoADXCoil(DXCoilNum)%WaterInletNodeNum
-  AirOutletNode   = WtoADXCoil(DXCoilNum)%AirOutletNodeNum
-  WaterOutletNode = WtoADXCoil(DXCoilNum)%WaterOutletNodeNum
+  AirInletNode    = VarSpeedCoil(DXCoilNum)%AirInletNodeNum
+  WaterInletNode  = VarSpeedCoil(DXCoilNum)%WaterInletNodeNum
+  AirOutletNode   = VarSpeedCoil(DXCoilNum)%AirOutletNodeNum
+  WaterOutletNode = VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum
 
 
   ! Set the air outlet  nodes of the WatertoAirHPSimple
   Node(AirOutletNode)%MassFlowRate          = Node(AirInletNode)%MassFlowRate     !LoadSideMassFlowRate
-  Node(AirOutletNode)%Temp                  = WtoADXCoil(DXCoilNum)%OutletAirDBTemp
-  Node(AirOutletNode)%HumRat                = WtoADXCoil(DXCoilNum)%OutletAirHumRat
-  Node(AirOutletNode)%Enthalpy              = WtoADXCoil(DXCoilNum)%OutletAirEnthalpy
+  Node(AirOutletNode)%Temp                  = VarSpeedCoil(DXCoilNum)%OutletAirDBTemp
+  Node(AirOutletNode)%HumRat                = VarSpeedCoil(DXCoilNum)%OutletAirHumRat
+  Node(AirOutletNode)%Enthalpy              = VarSpeedCoil(DXCoilNum)%OutletAirEnthalpy
 
    ! Set the air outlet nodes for properties that just pass through & not used
   Node(AirOutletNode)%Quality               = Node(AirInletNode)%Quality
@@ -3600,24 +5212,25 @@ SUBROUTINE UpdateMulSpeedWSHP(DXCoilNum)
 
    ! Set the water outlet node of the WatertoAirHPSimple
    ! Set the water outlet nodes for properties that just pass through & not used
-  CALL SafeCopyPlantNode(WaterInletNode , WaterOutletNode)
-
-  Node(WaterOutletNode)%Temp                = WtoADXCoil(DXCoilNum)%OutletWaterTemp
-  Node(WaterOutletNode)%Enthalpy            = WtoADXCoil(DXCoilNum)%OutletWaterEnthalpy
+  IF(WaterInletNode /=0 .AND. WaterOutletNode /=0) THEN
+    CALL SafeCopyPlantNode(WaterInletNode , WaterOutletNode)
+    Node(WaterOutletNode)%Temp                = VarSpeedCoil(DXCoilNum)%OutletWaterTemp
+    Node(WaterOutletNode)%Enthalpy            = VarSpeedCoil(DXCoilNum)%OutletWaterEnthalpy
+  END IF
 
   ReportingConstant                         = TimeStepSys*SecInHour
-  WtoADXCoil(DXCoilNum)%Energy          = WtoADXCoil(DXCoilNum)%Power*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLoadTotal = WtoADXCoil(DXCoilNum)%QLoadTotal*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergySensible  = WtoADXCoil(DXCoilNum)%QSensible*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergyLatent    = WtoADXCoil(DXCoilNum)%QLatent*ReportingConstant
-  WtoADXCoil(DXCoilNum)%EnergySource    = WtoADXCoil(DXCoilNum)%QSource*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%Energy          = VarSpeedCoil(DXCoilNum)%Power*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLoadTotal = VarSpeedCoil(DXCoilNum)%QLoadTotal*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergySensible  = VarSpeedCoil(DXCoilNum)%QSensible*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergyLatent    = VarSpeedCoil(DXCoilNum)%QLatent*ReportingConstant
+  VarSpeedCoil(DXCoilNum)%EnergySource    = VarSpeedCoil(DXCoilNum)%QSource*ReportingConstant
 
    IF (Contaminant%CO2Simulation) Then
      Node(AirOutletNode)%CO2 = Node(AirInletNode)%CO2
    End If
 
   RETURN
-END SUBROUTINE UpdateMulSpeedWSHP
+END SUBROUTINE UpdateVarSpeedCoil
 
 FUNCTION CalcEffectiveSHR(DXCoilNum,SHRss, CyclingScheme, RTF, QLatRated, QLatActual, EnteringDB, EnteringWB) RESULT(SHReff)
 
@@ -3691,11 +5304,11 @@ FUNCTION CalcEffectiveSHR(DXCoilNum,SHRss, CyclingScheme, RTF, QLatRated, QLatAc
   REAL(r64) :: Error                ! Error for iteration (DO) loop
   REAL(r64) :: LHRmult              ! Latent Heat Ratio (LHR) multiplier. The effective latent heat ratio LHR = (1-SHRss)*LHRmult
 
-   Twet_rated               = WtoADXCoil(DXCoilNum)%Twet_Rated
-   Gamma_rated              = WtoADXCoil(DXCoilNum)%Gamma_Rated
-   MaxONOFFCyclesperHour    = WtoADXCoil(DXCoilNum)%MaxONOFFCyclesperHour
-   HPTimeConstant           = WtoADXCoil(DXCoilNum)%HPTimeConstant
-   FanDelayTime             = WtoADXCoil(DXCoilNum)%FanDelayTime
+   Twet_rated               = VarSpeedCoil(DXCoilNum)%Twet_Rated
+   Gamma_rated              = VarSpeedCoil(DXCoilNum)%Gamma_Rated
+   MaxONOFFCyclesperHour    = VarSpeedCoil(DXCoilNum)%MaxONOFFCyclesperHour
+   HPTimeConstant           = VarSpeedCoil(DXCoilNum)%HPTimeConstant
+   FanDelayTime             = VarSpeedCoil(DXCoilNum)%FanDelayTime
 
 !  No moisture evaporation (latent degradation) occurs for runtime fraction of 1.0
 !  All latent degradation model parameters cause divide by 0.0 if not greater than 0.0
@@ -3890,7 +5503,11 @@ SUBROUTINE CalcTotCapSHR_VSWSHP(InletDryBulb,InletHumRat,InletEnthalpy,InletWetB
 !   Get capacity modifying factor (function of mass flow) for off-rated conditions
     TotCapAirFlowModFac1 = CurveValue(CCapAirFFlow1,AirMassFlowRatio)
     !Get capacity modifying factor (function of mass flow) for off-rated conditions
-    TotCapWaterFlowModFac1 = CurveValue(CCapWaterFFlow1,WaterMassFlowRatio)
+    IF(CCapWaterFFlow1 .EQ. 0 ) THEN
+        TotCapWaterFlowModFac1 = 1.0d0
+    ELSE
+        TotCapWaterFlowModFac1 = CurveValue(CCapWaterFFlow1,WaterMassFlowRatio)
+    END IF
 
 !   Get total capacity
     IF( NumSpeeds  < 2 ) THEN !ONLY ONE SPEED
@@ -3900,7 +5517,13 @@ SUBROUTINE CalcTotCapSHR_VSWSHP(InletDryBulb,InletHumRat,InletEnthalpy,InletWetB
     ELSE
         TotCapTempModFac2 = CurveValue(CCapFTemp2,InletWetBulbCalc,CondInletTemp)
         TotCapAirFlowModFac2 = CurveValue(CCapAirFFlow2,AirMassFlowRatio)
-        TotCapWaterFlowModFac2 = CurveValue(CCapWaterFFlow2,WaterMassFlowRatio)
+
+        IF(CCapWaterFFlow2 .EQ. 0) THEN
+            TotCapWaterFlowModFac2 = 1.0d0
+        ELSE
+            TotCapWaterFlowModFac2 = CurveValue(CCapWaterFFlow2,WaterMassFlowRatio)
+        END IF
+
         TotCapCalc1 = TotCapNom1 * TotCapAirFlowModFac1 * TotCapWaterFlowModFac1 * TotCapTempModFac1
         TotCapCalc2 = TotCapNom2 * TotCapAirFlowModFac2 * TotCapWaterFlowModFac2 * TotCapTempModFac2
 
@@ -3959,6 +5582,7 @@ FUNCTION AdjustCBF(CBFNom,AirMassFlowRateNom,AirMassFlowRate) RESULT(CBFAdj)
           ! FUNCTION INFORMATION:
           !       AUTHOR         Fred Buhl using Don Shirey's code
           !       DATE WRITTEN   September 2002
+          !       Modified       BOs March 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
@@ -4016,6 +5640,7 @@ FUNCTION CalcCBF(UnitType,UnitName,InletAirTemp,InletAirHumRat,TotCap,AirMassFlo
           ! FUNCTION INFORMATION:
           !       AUTHOR         Fred Buhl using Don Shirey's code
           !       DATE WRITTEN   September 2002
+          !       Modified by BOS Mark 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
@@ -4290,6 +5915,6 @@ END FUNCTION CalcCBF
 !
 !     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
 
-END MODULE WatertoAirMulSpeeddHP
+END MODULE VariableSpeedCoils
 
 

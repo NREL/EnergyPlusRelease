@@ -2123,11 +2123,11 @@ SUBROUTINE ReportCTFs(DoReportBecauseError)
   IF (DoReport .or. DoReportBecauseError) THEN
 !
 !                                      Write Descriptions
-    Write(OutputFileInits,'(A)') '! <Construction>,Construction Name,Index,#Layers,#CTFs,Time Step {hours},'// &
+    Write(OutputFileInits,'(A)') '! <Construction CTF>,Construction Name,Index,#Layers,#CTFs,Time Step {hours},'// &
                              'ThermalConductance {w/m2-K},'// &
                              'OuterThermalAbsorptance,InnerThermalAbsorptance,OuterSolarAbsorptance,'// &
                              'InnerSolarAbsorptance,Roughness'
-    Write(OutputFileInits,'(A)') '! <Material>,Material Name,Thickness {m},Conductivity {w/m-K},Density {kg/m3},'//  &
+    Write(OutputFileInits,'(A)') '! <Material CTF Summary>,Material Name,Thickness {m},Conductivity {w/m-K},Density {kg/m3},'//  &
                              'Specific Heat {J/kg-K},ThermalResistance {m2-K/w}'
     Write(OutputFileInits,'(A)') '! <Material:Air>,Material Name,ThermalResistance {m2-K/w}'
     Write(OutputFileInits,'(A)') '! <CTF>,Time,Outside,Cross,Inside,Flux (except final one)'
@@ -2145,8 +2145,8 @@ SUBROUTINE ReportCTFs(DoReportBecauseError)
                                  Construct(ThisNum)%InsideAbsorpSolar,  &
                                  TRIM(DisplayMaterialRoughness(Construct(ThisNum)%OutsideRoughness))
 !
- 700  FORMAT(' Construction,',A,3(',',I4),',',F8.3,',',G15.4,4(',',F8.3),',',A)
- 701  FORMAT(' Material,',A,',',F8.4,',',F14.3,',',F11.3,',',F13.3,',',G12.4)
+ 700  FORMAT(' Construction CTF,',A,3(',',I4),',',F8.3,',',G15.4,4(',',F8.3),',',A)
+ 701  FORMAT(' Material CTF Summary,',A,',',F8.4,',',F14.3,',',F11.3,',',F13.3,',',G12.4)
  702  FORMAT(' Material:Air,',A,',',G12.4)
  703  FORMAT(' CTF,',I4,4(',',G20.8))
  704  FORMAT(' CTF,',I4,3(',',G20.8))

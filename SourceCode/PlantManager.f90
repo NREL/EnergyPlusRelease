@@ -263,6 +263,7 @@ SUBROUTINE GetPlantLoopData
   USE SystemAvailabilityManager, ONLY: GetPlantAvailabilityManager
   USE FluidProperties,    ONLY: CheckFluidPropertyName, FindGlycol
   USE General, ONLY: RoundSigDigits
+  USE DataConvergParams, ONLY: PlantConvergence
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -309,6 +310,7 @@ SUBROUTINE GetPlantLoopData
 
   IF (TotNumLoops > 0) THEN
     ALLOCATE(PlantLoop(TotNumLoops))
+    ALLOCATE(PlantConvergence(TotNumLoops))
   ELSE
     RETURN
   END IF
@@ -861,7 +863,7 @@ SUBROUTINE GetPlantInput
                            TempLoop%Branch(BranchNum)%PressureCurveType, &
                            TempLoop%Branch(BranchNum)%PressureCurveIndex, &
                            TempLoop%Branch(BranchNum)%TotalComponents, &
-                           CompTypes,CompNames,CompCtrls,                              &
+                           CompTypes,CompNames,                              &
                            InletNodeNames,InletNodeNumbers,                            &
                            OutletNodeNames,OutletNodeNumbers,ErrorsFound)
 
@@ -1134,6 +1136,14 @@ SUBROUTINE GetPlantInput
             ELSEIF (LoopSideNum == SupplySide) THEN
               TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
             ENDIF
+          ELSEIF (SameString(CompTypes(CompNum), 'AirConditioner:VariableRefrigerantFlow') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_HeatPumpVRF
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_HeatPump
+            IF (LoopSideNum == DemandSide) THEN
+              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
+            ELSEIF (LoopSideNum == SupplySide) THEN
+              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
+            ENDIF
           ELSEIF (SameString(CompTypes(CompNum), 'DistrictCooling') ) THEN
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_PurchChilledWater
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_Purchased
@@ -1300,16 +1310,12 @@ SUBROUTINE GetPlantInput
           ENDIF
 
           TempLoop%Branch(BranchNum)%Comp(CompNum)%Name        = CompNames(CompNum)
-          TempLoop%Branch(BranchNum)%Comp(CompNum)%FlowCtrl    = CompCtrls(CompNum)
           TempLoop%Branch(BranchNum)%Comp(CompNum)%NodeNameIn  = InletNodeNames(CompNum)
           TempLoop%Branch(BranchNum)%Comp(CompNum)%NodeNumIn   = InletNodeNumbers(CompNum)
           TempLoop%Branch(BranchNum)%Comp(CompNum)%NodeNameOut = OutletNodeNames(CompNum)
           TempLoop%Branch(BranchNum)%Comp(CompNum)%NodeNumOut  = OutletNodeNumbers(CompNum)
 
-          IF(TempLoop%Branch(BranchNum)%Comp(CompNum)%FlowCtrl == ControlType_Bypass) THEN
-            TempLoop%Branch(BranchNum)%IsBypass = .TRUE.
-            TempLoop%ByPassExists = .TRUE.
-          END IF
+
            ! Increment pipe counter if component is a pipe
           IF (TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == TypeOf_Pipe .or. &
               TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == TypeOf_PipeInterior .or. &
@@ -1334,12 +1340,6 @@ SUBROUTINE GetPlantInput
 
         END DO
 
-        IF(TempLoop%Branch(BranchNum)%IsByPass .AND. &
-           ANY(TempLoop%Branch(BranchNum)%Comp%GeneralEquipType == GenEquipTypes_Pump)) THEN
-          CALL ShowSevereError('Pump not allowed in Bypass branch')
-          CALL ShowContinueError('Occurs in '//TRIM(TempLoop%Branch(BranchNum)%Name)//' in loop '// TRIM(TempLoop%Name))
-          ErrorsFound = .TRUE.
-        END IF
 
         DEALLOCATE(CompTypes)
         DEALLOCATE(CompNames)
@@ -1588,14 +1588,6 @@ SUBROUTINE GetPlantInput
 
               PipeNum = PipeNum + 1
               IF (PipeNum > NumOfPipesInLoop) CALL ShowFatalError('Pipe counting problem in GetPlantSideLoops')
-
-              IF ((TempLoop%Branch(BranchNum)%Comp(CompNum)%FlowCtrl /= ControlType_Passive).AND. &
-                  (TempLoop%Branch(BranchNum)%Comp(CompNum)%FlowCtrl /= ControlType_Bypass) )THEN
-                CALL ShowWarningError('Invalid Pipe Control, in Branch='//TRIM(TempLoop%Branch(BranchNum)%Name)//  &
-                          ', in Component='//TRIM(TempLoop%Branch(BranchNum)%Comp(CompNum)%Name))
-                CALL ShowContinueError('Pipe control must be PASSIVE or BYPASS, reset to PASSIVE')
-                LoopPipe(HalfLoopNum)%Pipe(PipeNum)%FlowCtrl  = ControlType_Passive
-              ENDIF
 
               LoopPipe(HalfLoopNum)%NumPipes                  = NumOfPipesInLoop
               LoopPipe(HalfLoopNum)%Pipe(PipeNum)%Name        = TempLoop%Branch(BranchNum)%Comp(CompNum)%Name
@@ -3672,7 +3664,6 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
   INTEGER     :: ComponentFlowCtrl
   INTEGER     :: ActiveCount
   INTEGER     :: ByPassCount
-  INTEGER     :: InputCompControl
   INTEGER     :: NumComponentsOnBranch
   INTEGER     :: NumCount
 
@@ -3698,7 +3689,6 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
         NumComponentsOnBranch = PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%TotalComponents
 
         DO CompCtr = 1, SIZE(PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp)
-          InputCompControl = PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl
 
           SELECT CASE (PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%TypeOf_Num)
 
@@ -4336,6 +4326,20 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
+          CASE (TypeOf_HeatPumpVRF) !       =  85  ! AirConditioner:VariableRefrigerantFlow
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+
+            IF (LoopSideCtr == DemandSide) THEN
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyAndTurnsLoopOn
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_NoneDemand
+            ELSE ! should never happen
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_TakesWhatGets
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_PassiveCap
+            ENDIF
           CASE DEFAULT
             Call ShowSevereError('SetBranchControlTypes: Caught unexpected equipment type of number')
 
@@ -4390,7 +4394,9 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
 
             ByPassCount = ByPassCount + 1
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%ControlType = ControlType_Bypass
-
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%IsBypass    = .TRUE.
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%ByPassExists                  = .TRUE.
+            
             IF(CompCtr > 1) THEN
               CALL ShowSevereError ('A pipe used as a bypass should not be in series with another component')
               CALL ShowContinueError('Occurs in Branch = ' &

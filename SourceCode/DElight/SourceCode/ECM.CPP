@@ -56,9 +56,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -70,11 +70,11 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "tools.h"
-#include "wxtmy2.h"
-#include "ecm.h"
-#include "sol.h"
+#include "DOE2DL.H"
+#include "TOOLS.H"
+#include "WxTMY2.h"
+#include "ECM.H"
+#include "SOL.H"
 
 /******************************** subroutine dillum *******************************/
 /* Calculates daylight illuminance levels (fc) for combined overcast sky, */

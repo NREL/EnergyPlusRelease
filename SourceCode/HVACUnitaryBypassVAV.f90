@@ -2765,7 +2765,7 @@ SUBROUTINE GetZoneLoads(CBVAVNum, QZoneReq)
         ZoneLoad = 0.d0
       ENDIF
     ELSE
-      ZoneLoad= ZoneSysEnergyDemand(CBVAV(CBVAVNum)%ControlledZoneNum(ZoneNum))%TotalOutputRequired
+      ZoneLoad= ZoneSysEnergyDemand(CBVAV(CBVAVNum)%ControlledZoneNum(ZoneNum))%RemainingOutputRequired
     ENDIF
 
 
@@ -2926,7 +2926,7 @@ REAL(r64) FUNCTION CalcSetpointTempTarget(CBVAVNumber)
           ZoneLoad = 0.d0
         ENDIF
       ELSE
-        ZoneLoad     = ZoneSysEnergyDemand(CBVAV(CBVAVNumber)%ControlledZoneNum(ZoneNum))%TotalOutputRequired
+        ZoneLoad     = ZoneSysEnergyDemand(CBVAV(CBVAVNumber)%ControlledZoneNum(ZoneNum))%RemainingOutputRequired
         QToCoolSetPt = ZoneSysEnergyDemand(CBVAV(CBVAVNumber)%ControlledZoneNum(ZoneNum))%OutputRequiredToCoolingSP
         QToHeatSetPt = ZoneSysEnergyDemand(CBVAV(CBVAVNumber)%ControlledZoneNum(ZoneNum))%OutputRequiredToHeatingSP
       ENDIF
@@ -3251,7 +3251,7 @@ SUBROUTINE SetAverageAirFlow(CBVAVNum,OnOffAirFlowRatio, FirstHVACIteration)
   USE MixedAir,              ONLY: SimOAMixer
   USE Psychrometrics,        ONLY: PsyCpAirFnWTdb
   USE ScheduleManager,       ONLY: GetCurrentScheduleValue
-  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadBandOrSetback
+  USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3316,7 +3316,7 @@ SUBROUTINE SetAverageAirFlow(CBVAVNum,OnOffAirFlowRatio, FirstHVACIteration)
         ZoneLoad = 0.d0
       ENDIF
     ELSE
-      ZoneLoad     = ZoneSysEnergyDemand(CBVAV(CBVAVNum)%ControlledZoneNum(ZoneNum))%TotalOutputRequired
+      ZoneLoad     = ZoneSysEnergyDemand(CBVAV(CBVAVNum)%ControlledZoneNum(ZoneNum))%RemainingOutputRequired
       QToHeatSetPt = ZoneSysEnergyDemand(CBVAV(CBVAVNum)%ControlledZoneNum(ZoneNum))%OutputRequiredToHeatingSP
     ENDIF
     CpZoneAir         = PsyCpAirFnWTdb(Node(ZoneNodeNum)%HumRat,Node(ZoneNodeNum)%Temp)
@@ -3438,7 +3438,7 @@ SUBROUTINE CalcNonDXHeatingCoils(CBVAVNum,FirstHVACIteration,HeatCoilLoad,FanMod
   USE WaterCoils,                ONLY: SimulateWaterCoilComponents
   USE SteamCoils,                ONLY: SimulateSteamCoilComponents
   USE PlantUtilities,            ONLY: SetComponentFlowRate
-  USE General,                   ONLY: SolveRegulaFalsi
+  USE General,                   ONLY: SolveRegulaFalsi,RoundSigDigits
   USE DataHVACGlobals,           ONLY: SmallLoad
 
   IMPLICIT NONE     ! Enforce explicit typing of all variables in this routine
@@ -3452,6 +3452,7 @@ SUBROUTINE CalcNonDXHeatingCoils(CBVAVNum,FirstHVACIteration,HeatCoilLoad,FanMod
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: ErrTolerance = 0.001d0    ! convergence limit for hotwater coil
+  INTEGER, PARAMETER :: SolveMaxIter=50
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3498,24 +3499,35 @@ SUBROUTINE CalcNonDXHeatingCoils(CBVAVNum,FirstHVACIteration,HeatCoilLoad,FanMod
                 Par(2) = 0.
               END IF
               Par(3) = HeatCoilLoad
-              CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+              CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
                                     MinWaterFlow, MaxHotWaterFlow, Par)
               IF (SolFlag == -1) THEN
-               IF (CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in changeover-bypass VAV system '//  &
-                    TRIM(CBVAV(CBVAVNum)%Name))
-                 CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
-               ENDIF
-              CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in changeover-bypass '//  &
-                    'VAV system '//TRIM(CBVAV(CBVAVNum)%Name),CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex)
+                IF (CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex == 0) THEN
+                  CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed for '//  &
+                     trim(CBVAV(CBVAVNum)%UnitType)//'="'//  &
+                     TRIM(CBVAV(CBVAVNum)%Name)//'"')
+                  CALL ShowContinueErrorTimeStamp(' ')
+                  CALL ShowContinueError('  Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                      '] exceeded in calculating hot water mass flow rate')
+                ENDIF
+                CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (iteration limit ['//  &
+                   trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(CBVAV(CBVAVNum)%UnitType)//'="'// &
+                   TRIM(CBVAV(CBVAVNum)%Name),CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex)
               ELSE IF (SolFlag == -2) THEN
                IF (CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in changeover-bypass VAV system '//  &
-                    TRIM(CBVAV(CBVAVNum)%Name))
-                 CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+                 CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed (maximum flow limits) for '//  &
+                     trim(CBVAV(CBVAVNum)%UnitType)//'="'// &
+                     TRIM(CBVAV(CBVAVNum)%Name)//'"')
+                 CALL ShowContinueErrorTimeStamp(' ')
+                 CALL ShowContinueError('...Bad hot water maximum flow rate limits')
+                 CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinWaterFlow,3))//' kg/s')
+                 CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxHotWaterFlow,3))//' kg/s')
                ENDIF
-               CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in changeover-bypass '//  &
-                    'VAV system '//TRIM(CBVAV(CBVAVNum)%Name),CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex2)
+               CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (flow limits) for '//  &
+                   trim(CBVAV(CBVAVNum)%UnitType)//'="'// &
+                   TRIM(CBVAV(CBVAVNum)%Name)//'"', &
+                   CBVAV(CBVAVNum)%HotWaterCoilMaxIterIndex2,  &
+                   ReportMinOf=MinWaterFlow,ReportMaxOf=MaxHotWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
               END IF
               ! simulate the hot water heating coil
               QCoilActual = HeatCoilLoad

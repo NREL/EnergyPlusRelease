@@ -34,12 +34,14 @@
 using namespace std;
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
 #include "BGL.h"
 
 #include <limits>
+#ifndef INFINITY
 extern Double INFINITY;
+#endif
 extern Double NaN_QUIET;
 extern Double MAXPointTol;
 

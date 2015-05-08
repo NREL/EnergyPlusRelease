@@ -230,7 +230,7 @@ SUBROUTINE SimGroundHeatExchangers(GlheType,GlheName, CompIndex,RunFlag, FirstIt
   CALL InitBoreholeHXSimVars(GlheNum,Runflag)
 
 
-          !SIMULATE HEAT EXCHANGER
+           !SIMULATE HEAT EXCHANGER
   CALL CalcVerticalGroundHeatExchanger(GlheNum)
   CALL UpdateVerticalGroundHeatExchanger(RunFlag,GlheNum)
 
@@ -287,7 +287,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     REAL(r64)              :: K_Ground_Factor
     REAL(r64)              :: Cp_Fluid
     REAL(r64)              :: Tground
-    REAL(r64),SAVE              :: ResistanceBhole           ! The thermal resistance of the borehole, (K per W/m]
+    REAL(r64)              :: ResistanceBhole           ! The thermal resistance of the borehole, (K per W/m]
     REAL(r64)              :: Gfuncval                  ! Interpolated G function value at a sub-hour
     REAL(r64)              :: ToutNew = 19.375
     REAL(r64)              :: FluidAveTemp
@@ -316,7 +316,6 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     REAL(r64)              :: C3                        ! **temperature at the U tube outlet.
     INTEGER, SAVE          :: PrevN =1                  ! The saved value of N at previous time step
     INTEGER                :: IndexN                    ! Used to index the LastHourN array
-    REAL(r64),SAVE              :: SavedMDot=-1     ! Holds the previous value of mass flow rate to detect change in mass flow rate.
     LOGICAL,SAVE           :: UpdateCurSimTime = .TRUE. ! Used to reset the CurSimtime to reset after Warmupflag
     LOGICAL, SAVE          :: TriggerDesignDayReset = .FALSE.
     INTEGER                :: GlheInletNode             ! Inlet node number of the Glhe
@@ -410,11 +409,8 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
 
   CALL CalcAggregateLoad(GlheNum)
 
-  ! HAS TO BE CALLED ONLY WHEN THERE IS A CHANGE IN MDOT..
-  IF(SavedMDot /= MDotActual ) THEN
-    CALL BoreholeResistance(GlheNum, ResistanceBhole)
-    SavedMDot = MDotActual
-  END IF
+  ! Update the borehole resistance each time
+  CALL BoreholeResistance(GlheNum, ResistanceBhole)
 
   IF(N .EQ. 1) THEN
     IF(MDotActual .LE. 0.0) THEN

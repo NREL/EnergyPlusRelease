@@ -56,9 +56,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -70,10 +70,10 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "sol.h"
+#include "DOE2DL.H"
+#include "SOL.H"
 #include "geom.h"
-#include "wxtmy2.h"
+#include "WxTMY2.h"
 
 /****************************** subroutine dzenlm *****************************/
 /* Calculates and returns clear sky zenith luminance (KCD/M**2) according to Liebelt. */

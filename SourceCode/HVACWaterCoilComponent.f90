@@ -2291,7 +2291,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             WaterCoil(CoilNum)%DesInletAirtemp = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak
           ELSE IF (ZoneEqFanCoil) THEN
             IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow > 0.0) THEN
-              FCOAFrac = MIN(ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
+              FCOAFrac = MIN(RhoAirStd*ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
             ELSE
               FCOAFrac = 0.0
             END IF
@@ -2347,7 +2347,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             WaterCoil(CoilNum)%DesInletAirHumRat = FinalZoneSizing(CurZoneEqNum)%ZoneHumRatAtCoolPeak
           ELSE IF (ZoneEqFanCoil) THEN
             IF (FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow > 0.0) THEN
-              FCOAFrac = MIN(ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
+              FCOAFrac = MIN(RhoAirStd*ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, 1.0d0)
             ELSE
               FCOAFrac = 0.0
             END IF
@@ -2780,7 +2780,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CoilInHumRat = FinalZoneSizing(CurZoneEqNum)%DesHeatCoilInHumRatTU
           ELSE IF (ZoneEqFanCoil) THEN
             IF (FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow > 0.0) THEN
-              FCOAFrac = MIN(ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow, 1.0d0)
+              FCOAFrac = MIN(RhoAirStd*ZoneEqSizing(CurZoneEqNum)%OAVolFlow / FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow, 1.0d0)
             ELSE
               FCOAFrac = 0.0
             END IF

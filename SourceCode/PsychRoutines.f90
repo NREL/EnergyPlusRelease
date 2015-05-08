@@ -237,7 +237,7 @@ function PsyRhoAirFnPbTdbW(pb,tdb,dw,calledfrom)  result(rhoair)
           ! ASHRAE handbook 1985 Fundamentals, Ch. 6, eqn. (6),(26)
 
           ! USE STATEMENTS:
-          ! na
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -262,6 +262,20 @@ function PsyRhoAirFnPbTdbW(pb,tdb,dw,calledfrom)  result(rhoair)
 
       w=MAX(dw,1.0d-5)
       rhoair = pb/(287.d0*(tdb+KelvinConv)*(1.d0+1.6077687d0*w))
+#ifdef EP_psych_errors
+      if (rhoair < 0.0d0) then
+        CALL ShowSevereError('PsyRhoAirFnPbTdbW: RhoAir (Density of Air) is calculated <= 0 ['// &
+             trim(RoundSigDigits(rhoair,5))//'].')
+        CALL ShowContinueError('pb =['//trim(RoundSigDigits(pb,2))//'], tdb=['//trim(RoundSigDigits(tdb,2))//  &
+             '], w=['//trim(RoundSigDigits(dw,7))//'].')
+        if (present(calledfrom)) then
+          CALL ShowContinueErrorTimeStamp(' Routine='//trim(calledfrom)//',')
+        else
+          CALL ShowContinueErrorTimeStamp(' Routine=Unknown,')
+        endif
+        CALL ShowFatalError('Program terminates due to preceding condition.')
+      endif
+#endif
 
   return
 end function PsyRhoAirFnPbTdbW

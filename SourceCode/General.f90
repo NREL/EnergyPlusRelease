@@ -269,9 +269,12 @@ REAL(r64), INTENT(IN)  :: B        ! Glazing property in fully switched state
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-          ! na
+REAL(r64) :: locSwitchFac
+! bound SwitchFac
+locSwitchFac = MIN(SwitchFac, 1.d0)
+locSwitchFac = MAX(locSwitchFac, 0.d0)
 
-InterpSw = (1.-SwitchFac)*A + SwitchFac*B
+InterpSw = (1.-locSwitchFac)*A + locSwitchFac*B
 RETURN
 END FUNCTION InterpSw
 
@@ -2863,12 +2866,16 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
         OutputEMSActuatorAvailFull  = .TRUE.
 
       CASE (' ')
-          CALL ShowWarningError(trim(cCurrentModuleObject)//': No '//trim(cAlphaFieldNames(1))//' supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose".')
+          CALL ShowWarningError(trim(cCurrentModuleObject)//': Blank '//trim(cAlphaFieldNames(1))//' supplied.')
+          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose". "None" will be used.')
+          OutputEMSActuatorAvailSmall = .FALSE.
+          OutputEMSActuatorAvailFull  = .FALSE.
       CASE DEFAULT
           CALL ShowWarningError(trim(cCurrentModuleObject)//': Invalid '//trim(cAlphaFieldNames(1))//'="'//  &
              trim(cAlphaArgs(1))//'" supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose".')
+          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose". "None" will be used.')
+          OutputEMSActuatorAvailSmall = .FALSE.
+          OutputEMSActuatorAvailFull  = .FALSE.
       END SELECT
 
       SELECT CASE (cAlphaArgs(2))
@@ -2883,13 +2890,16 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
         OutputEMSInternalVarsFull  = .TRUE.
         OutputEMSInternalVarsSmall = .FALSE.
       CASE (' ')
-          CALL ShowWarningError(trim(cCurrentModuleObject)//': No '//trim(cAlphaFieldNames(2))//' supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose".')
+          CALL ShowWarningError(trim(cCurrentModuleObject)//': Blank '//trim(cAlphaFieldNames(2))//' supplied.')
+          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose". "None" will be used.')
+          OutputEMSInternalVarsFull  = .FALSE.
+          OutputEMSInternalVarsSmall = .FALSE.
       CASE DEFAULT
           CALL ShowWarningError(trim(cCurrentModuleObject)//': Invalid '//trim(cAlphaFieldNames(2))//'="'//  &
              trim(cAlphaArgs(1))//'" supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose".')
-
+          CALL ShowContinueError(' Legal values are: "None", "NotByUniqueKeyNames", "Verbose". "None" will be used.')
+          OutputEMSInternalVarsFull  = .FALSE.
+          OutputEMSInternalVarsSmall = .FALSE.
       END SELECT
 
       SELECT CASE (cAlphaArgs(3))
@@ -2904,13 +2914,16 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
         OutputFullEMSTrace = .TRUE.
         OutputEMSErrors    = .TRUE.
       CASE (' ')
-          CALL ShowWarningError(trim(cCurrentModuleObject)//': No '//trim(cAlphaFieldNames(3))//' supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "ErrorsOnly", "Verbose".')
+          CALL ShowWarningError(trim(cCurrentModuleObject)//': Blank '//trim(cAlphaFieldNames(3))//' supplied.')
+          CALL ShowContinueError(' Legal values are: "None", "ErrorsOnly", "Verbose". "None" will be used.')
+          OutputEMSErrors    = .FALSE.
+          OutputFullEMSTrace = .FALSE.
       CASE DEFAULT
           CALL ShowWarningError(trim(cCurrentModuleObject)//': Invalid '//trim(cAlphaFieldNames(3))//'="'//  &
              trim(cAlphaArgs(1))//'" supplied.')
-          CALL ShowContinueError(' Legal values are: "None", "ErrorsOnly", "Verbose".')
-
+          CALL ShowContinueError(' Legal values are: "None", "ErrorsOnly", "Verbose". "None" will be used.')
+          OutputEMSErrors    = .FALSE.
+          OutputFullEMSTrace = .FALSE.
       END SELECT
 
     ENDDO

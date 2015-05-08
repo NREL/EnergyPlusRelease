@@ -238,7 +238,7 @@ SUBROUTINE ProcessScheduleInput
   INTEGER NumHrDaySchedules      ! Number of "hourly" dayschedules
   INTEGER NumIntDaySchedules     ! Number of "interval" dayschedules
   INTEGER NumExternalInterfaceSchedules ! Number of "PtolemyServer ExternalInterface" "compact" Schedules
-  INTEGER NumExternalInterfaceFunctionalMockupUnitSchedules ! Number of "FunctionalMockupUnit ExternalInterface"
+  INTEGER NumExternalInterfaceFunctionalMockupUnitImportSchedules ! Number of "FunctionalMockupUnitImport ExternalInterface"
                                                             ! "compact" Schedules ! added for FMI
   INTEGER NumLstDaySchedules     ! Number of "list" dayschedules
   INTEGER NumRegDaySchedules     ! Number of hourly+interval+list dayschedules
@@ -392,8 +392,8 @@ SUBROUTINE ProcessScheduleInput
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas+1)
   ENDIF
-  CurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Schedule'
-  NumExternalInterfaceFunctionalMockupUnitSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Schedule'
+  NumExternalInterfaceFunctionalMockupUnitImportSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
   IF (NumCptSchedules > 0) THEN
     CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
@@ -453,10 +453,10 @@ SUBROUTINE ProcessScheduleInput
   AddWeekSch = AddWeekSch + NumExternalInterfaceSchedules * 366 !number of days/year because need a week for each day
   AddDaySch = AddDaySch + NumExternalInterfaceSchedules  !one day schedule for ExternalInterface to update during run time
   ! added for FMI
-  ! add week and day schedules for each ExternalInterface:FunctionalMockupUnit:Schedule
-  AddWeekSch = AddWeekSch + NumExternalInterfaceFunctionalMockupUnitSchedules * 366 !number of days/year
+  ! add week and day schedules for each ExternalInterface:FunctionalMockupUnitImport:Schedule
+  AddWeekSch = AddWeekSch + NumExternalInterfaceFunctionalMockupUnitImportSchedules * 366 !number of days/year
                                                                                     !because need a week for each day
-  AddDaySch = AddDaySch + NumExternalInterfaceFunctionalMockupUnitSchedules  ! one day schedule for ExternalInterface
+  AddDaySch = AddDaySch + NumExternalInterfaceFunctionalMockupUnitImportSchedules  ! one day schedule for ExternalInterface
                                                                              ! to update during run time
 
 
@@ -465,7 +465,7 @@ SUBROUTINE ProcessScheduleInput
   NumDaySchedules=NumRegDaySchedules+AddDaySch
   NumWeekSchedules=NumRegWeekSchedules+NumCptWeekSchedules+AddWeekSch
   NumSchedules = NumRegSchedules + NumCptSchedules + NumCommaFileSchedules + NumConstantSchedules + NumExternalInterfaceSchedules &
-                   + NumExternalInterfaceFunctionalMockupUnitSchedules
+                   + NumExternalInterfaceFunctionalMockupUnitImportSchedules
 
 !!  Most initializations in the schedule data structures are taken care of in
 !!  the definitions (see above)
@@ -1435,7 +1435,7 @@ Until:  DO
         IF (ICHAR(LineIn(endLine:endLine)) == iUnicode_end) THEN
           CLOSE(unit=SchdFile)
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
-           '", '//TRIM(cAlphaFields(3))//'="'//TRIM(Alphas(3))//' appears to be a Unicode file.')
+           '", '//TRIM(cAlphaFields(3))//'="'//TRIM(Alphas(3))//' appears to be a Unicode or binary file.')
           CALL ShowContinueError('...This file cannot be read by this program. Please save as PC or Unix file and try again')
           CALL ShowFatalError('Program terminates due to previous condition.')
         ENDIF
@@ -1685,8 +1685,8 @@ Until:  DO
 
   ENDDO
   ! added for FMI
-  CurrentModuleObject='ExternalInterface:FunctionalMockupUnit:To:Schedule'
-  DO LoopIndex=1,NumExternalInterfaceFunctionalMockupUnitSchedules
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Schedule'
+  DO LoopIndex=1,NumExternalInterfaceFunctionalMockupUnitImportSchedules
 
     CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
@@ -1697,8 +1697,8 @@ Until:  DO
     IF (NumExternalInterfaceSchedules .GE. 1) THEN
      CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank, 'The schedule object with the name "' &
               //TRIM(Alphas(1))//'" is defined as an ExternalInterface:Schedule and ' &
-              //'ExternalInterface:FunctionalMockupUnit:To:Schedule. This will cause the schedule to be overwritten' &
-              //' by PtolemyServer and FunctionalMockUpUnit.')
+              //'ExternalInterface:FunctionalMockupUnitImport:To:Schedule. This will cause the schedule to be overwritten' &
+              //' by PtolemyServer and FunctionalMockUpUnitImport.')
     ELSE
       CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     END IF
@@ -4415,12 +4415,12 @@ SUBROUTINE ReportOrphanSchedules
 
 END SUBROUTINE ReportOrphanSchedules
 
-FUNCTION ScheduleAverageHoursPerWeek(ScheduleIndex,StartDayOfWeek) RESULT(AverageHoursPerWeek)
+FUNCTION ScheduleAverageHoursPerWeek(ScheduleIndex,StartDayOfWeek,isItLeapYear) RESULT(AverageHoursPerWeek)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Linda K. Lawrie
           !       DATE WRITTEN   August 2006
-          !       MODIFIED       na
+          !       MODIFIED       September 2012; Glazer - CR8849
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS FUNCTION:
@@ -4441,24 +4441,34 @@ FUNCTION ScheduleAverageHoursPerWeek(ScheduleIndex,StartDayOfWeek) RESULT(Averag
           ! FUNCTION ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)  :: ScheduleIndex  ! Which Schedule being tested
   INTEGER, INTENT(IN)  :: StartDayOfWeek ! Day of week for start of year
+  LOGICAL, INTENT(IN)  :: isItLeapYear   ! true if it is a leap year containing February 29
   REAL(r64)            :: AverageHoursPerWeek   ! Average Hours Per Week
 
           ! FUNCTION PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: WeeksInYear=(366./7.)
+          ! na
 
           ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
 
           ! DERIVED TYPE DEFINITIONS
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  INTEGER WkSch
-  INTEGER DayT
-  INTEGER Loop
-  REAL(r64) TotalHours
+  INTEGER    :: WkSch
+  INTEGER    :: DayT
+  INTEGER    :: Loop
+  REAL(r64)  :: TotalHours
+  REAL(r64)  :: WeeksInYear
+  INTEGER    :: DaysInYear
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (isItLeapYear) THEN
+    DaysInYear = 366
+    WeeksInYear = 366.d0/7.d0
+  ELSE
+    DaysInYear =  365
+    WeeksInYear = 365.d0/7.d0
+  ENDIF
+
+  IF (ScheduleIndex < -1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('ScheduleAverageHoursPerWeek called with ScheduleIndex out of range')
   ENDIF
 
@@ -4468,9 +4478,9 @@ FUNCTION ScheduleAverageHoursPerWeek(ScheduleIndex,StartDayOfWeek) RESULT(Averag
 
   IF (DayT == 0) RETURN
 
-  DO Loop=1,366
+  DO Loop=1,DaysInYear
     WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-    TotalHours=TotalHours+SUM(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue)/NumOfTimeStepInHour
+    TotalHours=TotalHours+SUM(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue)/REAL(NumOfTimeStepInHour,r64)
     DayT=DayT+1
     IF (DayT > 7) DayT=1
   ENDDO

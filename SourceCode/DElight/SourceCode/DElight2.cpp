@@ -54,10 +54,10 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
+#include "CONST.H"
+#include "DBCONST.H"
 
-#include "def.h"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -69,23 +69,26 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "DElight2.h"
 #include "struct.h"
-#include "loaddata.h"
+#include "Loaddata.h"
 #include "geom.h"
-#include "EPlus_LoadData.h"
+#include "EPlus_Loaddata.h"
 #include "EPlus_Geom.h"
-#include "DFCalcs.h"
-#include "ecm.h"
+#include "DFcalcs.h"
+#include "ECM.H"
 #include "savedata.h"
-#include "tools.h"
-#include "wxtmy2.h"
-#include "w4lib.h"
+#include "TOOLS.H"
+#include "WxTMY2.h"
+#include "W4Lib.h"
+#include <limits>
 
+#ifndef INFINITY
 double INFINITY = numeric_limits<double>::infinity();
+#endif
 double NaN_QUIET = numeric_limits<double>::quiet_NaN();
-double NaN_SIGNAL = numeric_limits<double>::signaling_NaN();
+double NaN_SIGNAL = NaN_QUIET;
 double MAXPointTol = 1.e-10;
 
 /******************************** subroutine DElight2 *******************************/
@@ -117,7 +120,7 @@ DllExport int	DElight2(
 	FILE *infile;						/* input file pointer */
 	FILE *outfile;						/* output file pointer */
 	FILE *W4libfile;					/* Window 4 library file pointer */
-	errno_t err;						// error return value from fopen_s
+	int err;						// error return value from fopen_s
 	ofstream ofdmpfile("DElight2.DMP");	/* LBLDLL debug dump file */
 	BLDG bldg;							/* bldg data structure */
 	LIB lib;							/* library data structure */
@@ -140,7 +143,7 @@ DllExport int	DElight2(
 	struct_init("LIB",(char *)&lib);
 
 	// Open the input file for loading
-	if((err = fopen_s(&infile, sInputName, "r" )) !=0 ) {
+	if((infile = fopen(sInputName, "r" )) == NULL ) {
 		ofdmpfile << "ERROR: DElight cannot open input file [" <<sInputName << "]\n";
 		/* Close dump file. */
 		ofdmpfile.close();
@@ -151,7 +154,7 @@ DllExport int	DElight2(
 	char cInputLine[MAX_CHAR_LINE+1];	/* Input line */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	char cInputVersion[MAX_CHAR_UNAME+1];
-	sscanf_s(cInputLine,"%*s %s\n",cInputVersion);
+	sscanf(cInputLine,"%*s %s\n",cInputVersion);
 
     // If the input version is either EPlus or 2.3 then load data using LoadDataFromEPlus()
 	if ((strcmp(cInputVersion,"EPlus") == 0) || (strcmp(cInputVersion,"2.3") == 0))
@@ -226,7 +229,7 @@ DllExport int	DElight2(
 
 	/* Open Window4 library file and read and process glazing types included in user input file. */
 	if (strcmp(sW4LibName,"") != 0) {
-		if((err = fopen_s(&W4libfile, sW4LibName, "r" )) !=0 ) {
+		if((W4libfile = fopen(sW4LibName, "r" )) == NULL ) {
 			ofdmpfile << "ERROR: DElight Cannot open Window4 library file [" <<sW4LibName << "]\n";
 			/* Close dump file. */
 			ofdmpfile.close();
@@ -251,7 +254,7 @@ DllExport int	DElight2(
 		wx_flag = 0;
 	}
 	else {
-		if((err = fopen_s(&wxfile, sWxName, "r" )) !=0 ) {
+		if((wxfile = fopen(sWxName, "r" )) == NULL ) {
 			ofdmpfile << "WARNING: DElight Cannot open weather file [" <<sWxName << "]\n";
 			wx_flag = 0;
             // Set return value for warning
@@ -331,7 +334,7 @@ DllExport int	DElight2(
 	}
 
 	/* Open output file. */
-	if((err = fopen_s(&outfile, sOutputName, "w" )) !=0 ) {
+	if((outfile = fopen(sOutputName, "w" )) == NULL ) {
 		ofdmpfile << "ERROR: DElight Cannot open output file [" <<sOutputName << "]\n";
 		/* Close dump file. */
 		ofdmpfile.close();

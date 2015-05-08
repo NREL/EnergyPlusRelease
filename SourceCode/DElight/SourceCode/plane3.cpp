@@ -35,11 +35,13 @@
 #include <cmath>
 using namespace std;
 
+#ifndef INFINITY
 extern double INFINITY;
+#endif
 extern double NaN_QUIET;
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
 #include "BGL.h"
 namespace BGL = BldgGeomLib;

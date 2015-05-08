@@ -26,6 +26,7 @@ MODULE DataSurfaces      ! EnergyPlus Data-Only Module
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength
 USE DataVectorTypes
+USE DataBSDFWindow
 
 IMPLICIT NONE   ! Enforce explicit typing of all variables
 
@@ -60,6 +61,14 @@ INTEGER, PARAMETER :: OtherSideCoefNoCalcExt    = -2
 INTEGER, PARAMETER :: OtherSideCoefCalcExt      = -3
 INTEGER, PARAMETER :: OtherSideCondModeledExt   = -4
 INTEGER, PARAMETER :: GroundFCfactorMethod      = -5
+
+CHARACTER(len=*), PARAMETER, DIMENSION (-5:0) :: cExtBoundCondition=  &
+  (/'FCGround           ', &
+    'OSCM               ', &
+    'OSC                ', &
+    'OSC                ', &
+    'Ground             ', &
+    'ExternalEnvironment'/)
 
           ! Parameters to indicate the first "corner" of a surface
           ! Currently, these are used only during input of surfaces
@@ -104,6 +113,18 @@ INTEGER, PARAMETER :: SurfaceClass_Overhang=15
 INTEGER, PARAMETER :: SurfaceClass_Fin=16
 INTEGER, PARAMETER :: SurfaceClass_TDD_Dome=17
 INTEGER, PARAMETER :: SurfaceClass_TDD_Diffuser=18
+
+  !Parameters to indicate heat transfer model to use for surface
+INTEGER, PARAMETER :: HeatTransferModel_NotSet = -1
+INTEGER, PARAMETER :: HeatTransferModel_None   = 0 ! shading surfaces for example
+INTEGER, PARAMETER :: HeatTransferModel_CTF    = 1
+INTEGER, PARAMETER :: HeatTransferModel_EMPD   = 2
+INTEGER, PARAMETER :: HeatTransferModel_CondFD = 5
+INTEGER, PARAMETER :: HeatTransferModel_HAMT   = 6
+INTEGER, PARAMETER :: HeatTransferModel_Window5 = 7 ! original detailed layer-by-layer based on window 4 and window 5
+INTEGER, PARAMETER :: HeatTransferModel_ComplexFenestration = 8 ! BSDF
+INTEGER, PARAMETER :: HeatTransferModel_TDD = 9 ! tubular daylighting device
+
 
   ! Parameters for classification of outside face of surfaces
 INTEGER, PARAMETER :: OutConvClass_WindwardVertWall    = 101
@@ -245,6 +266,11 @@ INTEGER, PARAMETER :: AirFlowWindow_ControlType_MaxFlow   = 1
 INTEGER, PARAMETER :: AirFlowWindow_ControlType_AlwaysOff = 2
 INTEGER, PARAMETER :: AirFlowWindow_ControlType_Schedule  = 3
 
+! Parameters for window model selection
+INTEGER, PARAMETER :: Window5DetailedModel   = 100 ! indicates original winkelmann window 5 implementation
+INTEGER, PARAMETER :: WindowBSDFModel = 101 ! indicates complex fenestration window 6 implementation
+
+
           ! DERIVED TYPE DEFINITIONS:
 TYPE SurfaceData
 
@@ -279,6 +305,8 @@ TYPE SurfaceData
           ! Boundary conditions and interconnections
   LOGICAL :: HeatTransSurf                 = .false. ! True if surface is a heat transfer surface,
                                                      ! False if a (detached) shadowing (sub)surface
+  INTEGER :: HeatTransferAlgorithm         = HeatTransferModel_NotSet ! used for surface-specific heat transfer algorithm.
+
   CHARACTER(len=MaxNameLength) :: BaseSurfName = ' ' ! Name of BaseSurf
   INTEGER :: BaseSurf                          = 0   ! "Base surface" for this surface.  Applies mainly to subsurfaces
                                                      ! in which case it points back to the base surface number.
@@ -296,6 +324,8 @@ TYPE SurfaceData
                                                      ! Otherwise, 0=external environment, -1=ground,
                                                      ! -2=other side coefficients (OSC--won't always use CTFs)
                                                      ! -3=other side conditions model
+                                                     ! During input, interim values of UnreconciledZoneSurface ("Surface") and
+                                                     ! UnenteredAdjacentZoneSurface ("Zone") are used until reconciled.
   INTEGER :: LowTempErrCount               = 0
   INTEGER :: HighTempErrCount              = 0
   LOGICAL :: ExtSolar                      = .false. ! True if the "outside" of the surface is exposed to solar
@@ -648,6 +678,10 @@ TYPE SurfaceWindowCalc          ! Calculated window-related values
                                              ! reflection of sky diffuse and beam solar from exterior obstructions [W/m2]
   REAL(r64)    :: GndSolarInc           = 0.0 ! Incident diffuse solar from ground; if CalcSolRefl is true, accounts
                                              ! for shadowing of ground by building and obstructions [W/m2]
+  REAL(r64)    :: SkyGndSolarInc           = 0.0 ! Incident diffuse solar from ground-reflected sky radiation; used for
+            !Complex Fen; if CalcSolRefl is true, accounts for shadowing of ground by building and obstructions [W/m2]
+  REAL(r64)    :: BmGndSolarInc           = 0.0 ! Incident diffuse solar from ground-reflected beam radiation; used for
+            !Complex Fen; if CalcSolRefl is true, accounts for shadowing of ground by building and obstructions [W/m2]
   REAL(r64),DIMENSION(3) :: ZoneAreaMinusThisSurf = 0.0 ! Zone inside surface area minus this surface and its subsurfaces
                                              ! for floor/wall/ceiling (m2)
   REAL(r64),DIMENSION(3) :: ZoneAreaReflProdMinusThisSurf   = 0.0 ! Zone product of inside surface area times vis reflectance
@@ -671,6 +705,10 @@ TYPE SurfaceWindowCalc          ! Calculated window-related values
   ! Added TH for thermochromic windows. 12/22/2008
   REAL(r64) :: TCLayerTemp = 0.0      ! The temperature of the thermochromic layer of the window
   REAL(r64) :: SpecTemp = 0.0         ! The specification temperature of the TC layer glass
+
+  ! Added for W6 integration June 2010
+  INTEGER   :: WindowModelType   = Window5DetailedModel ! if set to WindowBSDFModel, then uses BSDF methods
+  TYPE(BSDFWindowDescript) :: ComplexFen  ! Data for complex fenestration, see DataBSDFWindow.f90 for declaration
 
 END TYPE SurfaceWindowCalc
 
@@ -919,6 +957,7 @@ TYPE (ExtVentedCavityStruct), ALLOCATABLE, DIMENSION(:) :: ExtVentedCavity
 
 INTEGER :: TotSurfaces          =0 ! Total number of surfaces (walls, floors, roofs, windows, shading surfaces, etc.--everything)
 INTEGER :: TotWindows           =0 ! Total number of windows
+INTEGER :: TotComplexWin        =0 ! Total number of windows with complex optical properties
 INTEGER :: TotStormWin          =0 ! Total number of storm window blocks
 INTEGER :: TotWinShadingControl =0 ! Total number of window shading control blocks
 INTEGER :: TotIntConvCoeff      =0 ! Total number of interior convection coefficient (overrides)
@@ -976,6 +1015,11 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: BmToDiffReflFacGnd ! Factor for incident
 REAL(r64), ALLOCATABLE, DIMENSION(:,:)   :: AWinSurf ! Time step value of factor for beam
                                                      ! absorbed in window glass layers
 
+REAL(r64), ALLOCATABLE, DIMENSION(:,:)   :: AWinCFOverlap   ! Time step value of factor for beam
+                                                            ! absorbed in window glass layers which comes from other windows
+                                                            ! It happens sometimes that beam enters one window and hits back of
+                                                            ! second window. It is used in complex fenestration only
+                                                     
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: AirSkyRadSplit ! Fractional split between the air and
                                                        ! the sky for radiation from the surface
                                          ! Fraction of sky IR coming from sky itself; 1-AirSkyRadSplit comes from the atmosphere.

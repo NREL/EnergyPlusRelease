@@ -430,7 +430,8 @@ SUBROUTINE InitInteriorConvectionCoeffs(SurfaceTemperatures,ZoneToResimulate)
   USE DataHeatBalFanSys, ONLY: MAT
   USE DataHeatBalance,   ONLY: Construct
   USE DataZoneEquipment, ONLY: ZoneEquipInputsFilled, ZoneEquipSimulatedOnce
-
+  USE DataGlobals,       ONLY: BeginEnvrnFlag
+  USE DataLoopNode,      ONLY: Node, NumOfNodes
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -451,6 +452,7 @@ SUBROUTINE InitInteriorConvectionCoeffs(SurfaceTemperatures,ZoneToResimulate)
   INTEGER :: SurfNum            ! DO loop counter for surfaces in zone
   LOGICAL,SAVE :: NodeCheck=.true.  ! for CeilingDiffuser Zones
   LOGICAL,SAVE :: ActiveSurfaceCheck=.TRUE. ! for radiant surfaces in zone
+  LOGICAL, SAVE :: MyEnvirnFlag = .TRUE. 
 
           ! FLOW:
   IF (GetUserSuppliedConvectionCoeffs) THEN
@@ -479,6 +481,43 @@ SUBROUTINE InitInteriorConvectionCoeffs(SurfaceTemperatures,ZoneToResimulate)
     ActiveSurfaceCheck = .FALSE.
   ENDIF
 
+  IF (BeginEnvrnFlag .AND. MyEnvirnFlag) THEN
+    IF (ANY(Surface%IntConvCoeff == AdaptiveConvectionAlgorithm) .OR. &
+        ANY(Zone%InsideConvectionAlgo== AdaptiveConvectionAlgorithm)) THEN
+      !need to clear out node conditions because dynamic assignments will be affected
+      IF (NumOfNodes > 0 .AND. ALLOCATED(Node)) THEN
+        Node%Temp                      = DefaultNodeValues%Temp
+        Node%TempMin                   = DefaultNodeValues%TempMin
+        Node%TempMax                   = DefaultNodeValues%TempMax
+        Node%TempSetPoint              = DefaultNodeValues%TempSetPoint
+        Node%MassFlowRate              = DefaultNodeValues%MassFlowRate
+        Node%MassFlowRateMin           = DefaultNodeValues%MassFlowRateMin
+        Node%MassFlowRateMax           = DefaultNodeValues%MassFlowRateMax
+        Node%MassFlowRateMinAvail      = DefaultNodeValues%MassFlowRateMinAvail
+        Node%MassFlowRateMaxAvail      = DefaultNodeValues%MassFlowRateMaxAvail
+        Node%MassFlowRateSetPoint      = DefaultNodeValues%MassFlowRateSetPoint
+        Node%Quality                   = DefaultNodeValues%Quality
+        Node%Press                     = DefaultNodeValues%Press
+        Node%Enthalpy                  = DefaultNodeValues%Enthalpy
+        Node%HumRat                    = DefaultNodeValues%HumRat
+        Node%HumRatMin                 = DefaultNodeValues%HumRatMin
+        Node%HumRatMax                 = DefaultNodeValues%HumRatMax
+        Node%HumRatSetPoint            = DefaultNodeValues%HumRatSetPoint
+        Node%TempSetPointHi            = DefaultNodeValues%TempSetPointHi
+        Node%TempSetPointLo            = DefaultNodeValues%TempSetPointLo
+        IF (ALLOCATED(MoreNodeInfo)) THEN
+          MoreNodeInfo%WetbulbTemp       = DefaultNodeValues%Temp
+          MoreNodeInfo%RelHumidity       = 0.0
+          MoreNodeInfo%ReportEnthalpy    = DefaultNodeValues%Enthalpy
+          MoreNodeInfo%VolFlowRateStdRho = 0.0
+          MoreNodeInfo%VolFlowRateCrntRho= 0.0
+          MoreNodeInfo%AirDensity        = 0.0
+        ENDIF
+      ENDIF
+    ENDIF
+    MyEnvirnFlag = .FALSE.
+  ENDIF
+  IF (.NOT. BeginEnvrnFlag) MyEnvirnFlag = .TRUE.
 ZoneLoop1:  DO ZoneNum = 1, NumOfZones
 
     SELECT CASE (Zone(ZoneNum)%InsideConvectionAlgo)
@@ -718,10 +757,10 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           !   ASHRAE Transactions 100(1):  1087.
 
           IF (Windward(Surface(SurfNum)%CosTilt,Surface(SurfNum)%Azimuth, WindDir)) THEN
-           ConstantA = 2.38d0
+           ConstantA = 3.26d0
            ConstantB = 0.89d0
           ELSE ! leeward
-           ConstantA = 2.86d0
+           ConstantA = 3.55d0
            ConstantB = 0.617d0
           END IF
 
@@ -738,10 +777,10 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           !   Lawrence Berkeley Laboratory.  1994.  DOE2.1E-053 source code.
 
           IF (Windward(Surface(SurfNum)%CosTilt,Surface(SurfNum)%Azimuth, WindDir)) THEN
-            ConstantA = 2.38d0
+            ConstantA = 3.26d0
             ConstantB = 0.89d0
           ELSE ! leeward
-            ConstantA = 2.86d0
+            ConstantA = 3.55d0
             ConstantB = 0.617d0
           END IF
 
@@ -840,10 +879,10 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           !   film coefficient for windows in low-rise buildings.
           !   ASHRAE Transactions 100(1):  1087.
           IF (Windward(Surface(SurfNum)%CosTilt,Surface(SurfNum)%Azimuth, WindDir)) THEN
-           ConstantA = 2.38d0
+           ConstantA = 3.26d0
            ConstantB = 0.89d0
           ELSE ! leeward
-           ConstantA = 2.86d0
+           ConstantA = 3.55d0
            ConstantB = 0.617d0
           END IF
 
@@ -860,10 +899,10 @@ SUBROUTINE InitExteriorConvectionCoeff(SurfNum,HMovInsul,Roughness,AbsExt,TempEx
           !   Lawrence Berkeley Laboratory.  1994.  DOE2.1E-053 source code.
 
           IF (Windward(Surface(SurfNum)%CosTilt,Surface(SurfNum)%Azimuth, WindDir)) THEN
-            ConstantA = 2.38d0
+            ConstantA = 3.26d0
             ConstantB = 0.89d0
           ELSE ! leeward
-            ConstantA = 2.86d0
+            ConstantA = 3.55d0
             ConstantB = 0.617d0
           END IF
 
@@ -6974,7 +7013,7 @@ SUBROUTINE DynamicIntConvSurfaceClassification(SurfNum)
               CoolingPriorityStack(EquipOnCount) = ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%CoolingPriority(EquipNum)
             ENDIF
           ENDIF
-        CASE (WindowAC_Num, PkgTermHPAirToAir_Num, ZoneDXDehumidifier_Num, &
+        CASE (WindowAC_Num, PkgTermHPAirToAir_Num, PkgTermACAirToAir_Num, ZoneDXDehumidifier_Num, &
               PkgTermHPWaterToAir_Num, FanCoil4Pipe_Num, UnitVentilator_Num, UnitHeater_Num, &
               OutdoorAirUnit_Num)
           IF (.NOT. (ALLOCATED( ZoneEquipList(ZoneEquipConfig(ZoneNum)%EquipListIndex)%EquipData(EquipNum)%OutletNodeNums))) CYCLE
@@ -9790,7 +9829,7 @@ FUNCTION CalcMoWITTWindward(DeltaTemp, WindAtZ) RESULT (Hc)
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
           ! na
 
-  Hc = ((  0.84d0*((ABS(DeltaTemp))**OneThird)  )**2 + (2.38d0 * (WindAtZ**0.89d0) )**2) **0.5d0
+  Hc = ((  0.84d0*((ABS(DeltaTemp))**OneThird)  )**2 + (3.26d0 * (WindAtZ**0.89d0) )**2) **0.5d0
 
   RETURN
 
@@ -9837,7 +9876,7 @@ FUNCTION CalcMoWITTLeeward(DeltaTemp, WindAtZ) RESULT (Hc)
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
           ! na
 
-  Hc = ((  0.84d0*((ABS(DeltaTemp))**OneThird)  )**2 + (2.86d0 * (WindAtZ**0.617d0) )**2) **0.5d0
+  Hc = ((  0.84d0*((ABS(DeltaTemp))**OneThird)  )**2 + (3.55d0 * (WindAtZ**0.617d0) )**2) **0.5d0
 
   RETURN
 
@@ -9895,7 +9934,7 @@ FUNCTION CalcDOE2Windward(SurfaceTemp, AirTemp, CosineTilt, WindAtZ, RoughnessIn
 
   Hn = CalcHnASHRAETARPExterior(SurfaceTemp, AirTemp, CosineTilt)
 
-  HcSmooth = SQRT(Hn**2 + (2.38d0 * WindAtZ ** 0.89d0)**2)
+  HcSmooth = SQRT(Hn**2 + (3.26d0 * WindAtZ ** 0.89d0)**2)
 
   Hf = RoughnessMultiplier(RoughnessIndex) * (HcSmooth - Hn)
 
@@ -9955,7 +9994,7 @@ FUNCTION CalcDOE2Leeward(SurfaceTemp, AirTemp, CosineTilt, WindAtZ, RoughnessInd
 
   Hn = CalcHnASHRAETARPExterior(SurfaceTemp, AirTemp, CosineTilt)
 
-  HcSmooth = SQRT(Hn**2 + (2.86d0 * WindAtZ ** 0.617d0)**2)
+  HcSmooth = SQRT(Hn**2 + (3.55d0 * WindAtZ ** 0.617d0)**2)
 
   Hf = RoughnessMultiplier(RoughnessIndex) * (HcSmooth - Hn)
 

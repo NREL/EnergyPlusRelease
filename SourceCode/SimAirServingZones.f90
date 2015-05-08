@@ -246,6 +246,7 @@ USE MixedAir, ONLY: GetOASystemNumber, FindOAMixerMatchForOASystem, GetOAMixerIn
 USE HVACControllers, ONLY: CheckCoilWaterInletNode
 USE WaterCoils, ONLY: GetCoilWaterInletNode
 USE General, ONLY: RoundSigDigits
+USE DataConvergParams, ONLY: AirLoopConvergence
 !USE DataMixedAir, ONLY: OAMixer, OutsideAirSys, NumOAMixers, NumOASys
 
 IMPLICIT NONE
@@ -306,7 +307,6 @@ CHARACTER(len=MaxNameLength)                        :: ConnectorListName! Name o
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: BranchNames     ! Branch names from GetBranchList call
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: CompTypes       ! Component types from GetBranchList call
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: CompNames       ! Component names from GetBranchList call
-INTEGER,ALLOCATABLE,SAVE,DIMENSION(:) :: CompCtrls       ! Flow control type from GetBranchList call
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: InletNodeNames  ! Component inlet node names from GetBranchData call
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: OutletNodeNames ! Component outlet node names from GetBranchData call
 CHARACTER(len=MaxNameLength),ALLOCATABLE,SAVE,DIMENSION(:) :: NodeNames       ! Outlet node names from GetLoopSplitter call
@@ -381,6 +381,7 @@ ALLOCATE(AirToOANodeInfo(NumPrimaryAirSys)) ! allocate the array that stores the
 ALLOCATE(PackagedUnit(NumPrimaryAirSys))
 ALLOCATE(AirLoopControlInfo(NumPrimaryAirSys))
 ALLOCATE(AirLoopFlow(NumPrimaryAirSys))
+ALLOCATE(AirLoopConvergence(NumPrimaryAirSys))
 
 IF (NumPrimaryAirSys <= 0) THEN
   DEALLOCATE(TestUniqueNodes)
@@ -606,8 +607,6 @@ DO AirSysNum=1,NumPrimaryAirSys
       CompTypes=' '
       ALLOCATE(CompNames(NumCompsOnBranch))
       CompNames=' '
-      ALLOCATE(CompCtrls(NumCompsOnBranch))
-      CompCtrls=0
       ALLOCATE(InletNodeNames(NumCompsOnBranch))
       InletNodeNames=' '
       ALLOCATE(InletNodeNumbers(NumCompsOnBranch))
@@ -621,7 +620,7 @@ DO AirSysNum=1,NumPrimaryAirSys
                          PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%MaxVolFlowRate,  &
                          DummyInteger(1), DummyInteger(2), & !Placeholders for plant branch pressure data (not used in air loops)
                          NumCompsOnBranch, &
-                         CompTypes,CompNames,CompCtrls,       &
+                         CompTypes,CompNames,      &
                          InletNodeNames,InletNodeNumbers,     &
                          OutletNodeNames,OutletNodeNumbers,ErrorsFound)
       ALLOCATE (PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(NumCompsOnBranch))
@@ -636,7 +635,6 @@ DO AirSysNum=1,NumPrimaryAirSys
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf      = CompTypes(CompNum)
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%Name        = CompNames(CompNum)
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%CompIndex   = 0
-        PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%FlowCtrl    = CompCtrls(CompNum)
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%NodeNameIn  = InletNodeNames(CompNum)
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn   = InletNodeNumbers(CompNum)
         PrimaryAirSystem(AirSysNum)%Branch(BranchNum)%Comp(CompNum)%NodeNameOut = OutletNodeNames(CompNum)
@@ -716,7 +714,6 @@ DO AirSysNum=1,NumPrimaryAirSys
 
       DEALLOCATE(CompTypes)
       DEALLOCATE(CompNames)
-      DEALLOCATE(CompCtrls)
       DEALLOCATE(InletNodeNames)
       DEALLOCATE(InletNodeNumbers)
       DEALLOCATE(OutletNodeNames)
@@ -1250,7 +1247,7 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
   USE InputProcessor, ONLY: FindItemInList, SameString
   USE Psychrometrics, ONLY: PsyHFnTdbW,PsyRhoAirFnPbTdbW
   USE ZonePlenum, ONLY: ZoneSupPlenCond, NumZoneSupplyPlenums
-  USE DataConvergParams, ONLY: HVACFlowRateToler
+  USE DataConvergParams, ONLY: HVACFlowRateToler, AirLoopConvergence, ZoneInletConvergence
   USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2, OutdoorGC
   USE General, ONLY: FindNumberinList
 
@@ -1328,6 +1325,11 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
   LOGICAL,SAVE :: MyBranchSizingFlag = .true.
   LOGICAL :: ErrorsFound
   REAL(r64) :: OAReliefDiff = 0.d0 ! local for massflow change across OA system, kg/s
+
+  INTEGER, DIMENSION(:), ALLOCATABLE    :: tmpNodeARR
+  INTEGER :: nodeCount
+  INTEGER :: nodeLoop
+  INTEGER :: ZoneNum
 
 
   ErrorsFound = .FALSE.
@@ -1721,6 +1723,19 @@ SUBROUTINE InitAirLoops(FirstHVACIteration)
 
     END DO PrimaryAirSysLoop
 
+
+    ! now register zone inlet nodes as critical demand nodes in the convergence tracking
+    ALLOCATE(ZoneInletConvergence(NumOfZones))
+    DO ZoneNum = 1, NumOfZones
+      IF (ZoneEquipConfig(ZoneNum)%NumInletNodes > 0) THEN
+        ZoneInletConvergence(ZoneNum)%NumInletNodes = ZoneEquipConfig(ZoneNum)%NumInletNodes
+        ALLOCATE(ZoneInletConvergence(ZoneNum)%InletNode(ZoneEquipConfig(ZoneNum)%NumInletNodes))
+        Do nodeLoop =1, ZoneEquipConfig(ZoneNum)%NumInletNodes
+          ZoneInletConvergence(ZoneNum)%InletNode(nodeLoop)%NodeNum = ZoneEquipConfig(ZoneNum)%InletNode(nodeLoop)
+        ENDDO
+      ENDIF
+    END DO
+
     MyOneTimeFlag = .false.
 
     DEALLOCATE(CtrlZoneNumsCool)
@@ -1976,7 +1991,7 @@ SUBROUTINE SimAirLoops(FirstHVACIteration,SimZoneEquipment)
   USE MixedAir,               ONLY : SimOAController
   USE DataGlobals,            ONLY : BeginTimeStepFlag
   USE General,                ONLY : GetPreviousHVACTime
-
+  USE DataConvergParams,      ONLY : CalledFromAirSystemSupplySideDeck1, CalledFromAirSystemSupplySideDeck2
   IMPLICIT NONE
 
        ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2018,6 +2033,7 @@ SUBROUTINE SimAirLoops(FirstHVACIteration,SimZoneEquipment)
   LOGICAL, SAVE          :: OutputSetupFlag = .FALSE.
   ! Flag set by ResolveSysFlow; if TRUE, mass balance failed and there must be a second pass
   LOGICAL                :: SysReSim
+  INTEGER                :: CalledFrom
 
           ! FLOW:
 
@@ -2112,7 +2128,9 @@ SUBROUTINE SimAirLoops(FirstHVACIteration,SimZoneEquipment)
     ! the zone equipment side, looping through all supply air paths for this
     ! air loop.
     DO AirSysOutNum = 1, AirToZoneNodeInfo(AirLoopNum)%NumSupplyNodes
-      CALL UpdateHVACInterface( &
+      IF (AirSysOutNum == 1) CalledFrom = CalledFromAirSystemSupplySideDeck1
+      IF (AirSysOutNum == 2) CalledFrom = CalledFromAirSystemSupplySideDeck2
+      CALL UpdateHVACInterface( AirLoopNum, CalledFrom, &
         AirToZoneNodeInfo(AirLoopNum)%AirLoopSupplyNodeNum(AirSysOutNum),   &
         AirToZoneNodeInfo(AirLoopNum)%ZoneEquipSupplyNodeNum(AirSysOutNum), &
         SimZoneEquipment )
@@ -3901,15 +3919,26 @@ SUBROUTINE SetUpSysSizingArrays
       DO ZonesCooledNum=1,NumZonesCooled
         CtrlZoneNum = AirToZoneNodeInfo(AirLoopNum)%CoolCtrlZoneNums(ZonesCooledNum)
         IF (SysSizNum > 0) THEN
-          IF (SysSizInput(SysSizNum)%SystemOAMethod == 1) THEN ! ZoneSum Method
+          IF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_ZoneSum) THEN ! ZoneSum Method
             MinOAFlow = MinOAFlow +  FinalZoneSizing(CtrlZoneNum)%MinOA
             ZoneOAFracCooling = 0.0
-          ELSE ! Ventilation Rate Procedure
+          ELSEIF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
             ZoneOAUnc = PopulationDiversity*FinalZoneSizing(CtrlZoneNum)%TotalOAFromPeople +   &
                FinalZoneSizing(CtrlZoneNum)%TotalOAFromArea
             !save for Standard 62 tabular report
             VbzByZone(CtrlZoneNum) = ZoneOAUnc
             SysOAUnc = SysOAUnc + ZoneOAUnc
+
+            ! CR 8872 - check to see if uncorrected OA is calculated to be greater than 0
+            IF (.NOT. ZoneOAUnc > 0.0d0) THEN
+              CALL ShowSevereError('Sizing:System - The system outdoor air method is set to VRP in ' //  &
+                 TRIM(FinalSysSizing(AirLoopNum)%AirPriLoopName))
+              CALL ShowContinueError('But zone "'// TRIM(FinalZoneSizing(CtrlZoneNum)%ZoneName) //  &
+                 '" associated with system does not have OA flow/person')
+              CALL ShowContinueError('or flow/area values specified in DesignSpecification:OutdoorAir '//  &
+                 'object associated with the zone')
+            END IF
+
             !Save Std 62.1 cooling ventilation required by zone
             FinalZoneSizing(CtrlZoneNum)%VozClgByZone = ZoneOAUnc / FinalZoneSizing(CtrlZoneNum)%ZoneADEffCooling
             MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%VozClgByZone
@@ -3926,6 +3955,7 @@ SUBROUTINE SetUpSysSizingArrays
             ELSE
               ZoneOAFracCooling = 0.0
             ENDIF
+          ELSE  ! error
           ENDIF
         ELSE ! ZoneSum Method
           MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%MinOA
@@ -4019,10 +4049,10 @@ SUBROUTINE SetUpSysSizingArrays
                                                  NumZonesCooled)
           IF (MatchingCooledZoneNum == 0) THEN
             IF (SysSizNum > 0) THEN
-              IF (SysSizInput(SysSizNum)%SystemOAMethod == 1) THEN ! ZoneSum Method
+              IF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_ZoneSum) THEN ! ZoneSum Method
                 MinOAFlow = MinOAFlow +  FinalZoneSizing(CtrlZoneNum)%MinOA
                 ZoneOAFracHeating = 0.0
-              ELSE ! Ventilation Rate Procedure
+              ELSEIF (SysSizInput(SysSizNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
                 ZoneOAUnc = PopulationDiversity * FinalZoneSizing(CtrlZoneNum)%TotalOAFromPeople +   &
                    FinalZoneSizing(CtrlZoneNum)%TotalOAFromArea
                 !save for Standard 62 tabular report
@@ -4044,6 +4074,7 @@ SUBROUTINE SetUpSysSizingArrays
                 ELSE
                   ZoneOAFracHeating = 0.0
                 ENDIF
+              ELSE  ! would be error
               ENDIF
             ELSE ! ZoneSum Method
               MinOAFlow = MinOAFlow + FinalZoneSizing(CtrlZoneNum)%MinOA
@@ -4212,7 +4243,7 @@ SUBROUTINE SetUpSysSizingArrays
 
   ! write predefined standard 62.1 report data
   DO AirLoopNum=1,NumPrimaryAirSys
-    IF (FinalSysSizing(AirLoopNum)%SystemOAMethod .NE. 1) THEN
+    IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_VRP) THEN
       NumZonesCooled = AirToZoneNodeInfo(AirLoopNum)%NumZonesCooled
       !System Ventilation Requirements for Cooling
       CALL PreDefTableEntry(pdchS62svrClSumVpz,FinalSysSizing(AirLoopNum)%AirPriLoopName,VpzClgSumBySys(AirLoopNum),3)      !Vpz-sum
@@ -4861,12 +4892,12 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
 
         SELECT CASE(SysSizing(AirLoopNum,CurOverallSimDay)%SizingOption)
           CASE(Coincident)
-            IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == 1) THEN
+            IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_ZoneSum) THEN
               SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow = SysSizing(AirLoopNum,CurOverallSimDay)%CoinCoolMassFlow / &
                                                      StdRhoAir
               SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow = SysSizing(AirLoopNum,CurOverallSimDay)%CoinHeatMassFlow / &
                                                      StdRhoAir
-            ELSE ! Ventilation Rate Procedure
+            ELSEIF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
               ! cooling
               SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow = SysSizing(AirLoopNum,CurOverallSimDay)%CoinCoolMassFlow / &
                                                      StdRhoAir
@@ -5083,16 +5114,17 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                   ENDIF
                 END IF
               ENDIF
+            ELSE  ! error
             END IF
             SysSizing(AirLoopNum,CurOverallSimDay)%DesMainVolFlow =   &
                MAX(SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow, SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow)
           CASE(NonCoincident)
-            IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == 1) THEN
+            IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_ZoneSum) THEN
               SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow =   &
                    SysSizing(AirLoopNum,CurOverallSimDay)%NonCoinCoolMassFlow / StdRhoAir
               SysSizing(AirLoopNum,CurOverallSimDay)%DesHeatVolFlow =   &
                    SysSizing(AirLoopNum,CurOverallSimDay)%NonCoinHeatMassFlow / StdRhoAir
-            ELSE ! Ventilation Rate Procedure
+            ELSEIF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_VRP) THEN ! Ventilation Rate Procedure
               ! cooling
               SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow =   &
                  SysSizing(AirLoopNum,CurOverallSimDay)%NonCoinCoolMassFlow / StdRhoAir
@@ -5280,6 +5312,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
                   ENDIF
                 END IF
               END IF
+            ELSE  ! error
             END IF
 
             SysSizing(AirLoopNum,CurOverallSimDay)%DesMainVolFlow = MAX(SysSizing(AirLoopNum,CurOverallSimDay)%DesCoolVolFlow, &
@@ -5288,7 +5321,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
 
          ! If the ventilation was autosized using the ASHRAE VRP method, then the design zone ventilation value
          ! must be based on the larger of the system-level cooling Vot and/or heating Vot
-         IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. FinalSysSizing(AirLoopNum)%SystemOAMethod .NE. 1) THEN
+         IF (FinalSysSizing(AirLoopNum)%OAAutosized .AND. FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_VRP) THEN
             VotMax = MAX(VotClgBySys(AirLoopNum), VotHtgBySys(AirLoopNum))
 
             !Reset the system level ventilation
@@ -6008,7 +6041,7 @@ SUBROUTINE UpdateSysSizing(CallIndicator)
 
       ! write predefined standard 62.1 report data
       DO AirLoopNum=1,NumPrimaryAirSys
-        IF (FinalSysSizing(AirLoopNum)%SystemOAMethod .NE. 1) THEN
+        IF (FinalSysSizing(AirLoopNum)%SystemOAMethod == SOAM_VRP) THEN
           !system ventilation requirements for cooling table
           CALL PreDefTableEntry(pdchS62svrClVps,FinalSysSizing(AirLoopNum)%AirPriLoopName,  &
              FinalSysSizing(AirLoopNum)%DesCoolVolFlow,3) !Vps

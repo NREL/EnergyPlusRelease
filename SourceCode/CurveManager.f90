@@ -523,6 +523,7 @@ Real(r64), ALLOCATABLE, DIMENSION(:) :: TempArray3
 CHARACTER(len=MaxNameLength) :: FileName  ! name of external table data file
 INTEGER,EXTERNAL   :: GetNewUnitNumber
 LOGICAL            :: ReadFromFile       ! True if external data file exists
+INTEGER :: CurveFound
 
 ! Find the number of each type of curve (note: Current Module object not used here, must rename manually)
 
@@ -590,6 +591,15 @@ DO CurveIndex=1,NumBiQuad
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   ! could add checks for blank numeric fields, and use field names for errors.
   PerfCurve(CurveNum)%Name = Alphas(1)
@@ -661,6 +671,15 @@ DO CurveIndex=1,NumCubic
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Cubic
   PerfCurve(CurveNum)%ObjectType = CurveType_Cubic
@@ -713,6 +732,15 @@ DO CurveIndex=1,NumQuartic
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Quartic
@@ -768,6 +796,15 @@ DO CurveIndex=1,NumQuad
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Quadratic
   PerfCurve(CurveNum)%ObjectType = CurveType_Quadratic
@@ -819,6 +856,15 @@ DO CurveIndex=1,NumQuadLinear
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name      = Alphas(1)
   PerfCurve(CurveNum)%CurveType = QuadraticLinear
@@ -888,6 +934,15 @@ DO CurveIndex=1,NumLinear
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name      = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Linear
   PerfCurve(CurveNum)%ObjectType = CurveType_Linear
@@ -937,6 +992,15 @@ DO CurveIndex=1,NumBicubic
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name      = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Bicubic
@@ -1009,6 +1073,15 @@ DO CurveIndex=1,NumTriQuad
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = TriQuadratic
@@ -1116,6 +1189,15 @@ DO CurveIndex=1,NumQLinear
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name      = Alphas(1)
   PerfCurve(CurveNum)%CurveType = QuadLinear
   PerfCurve(CurveNum)%ObjectType = CurveType_QuadLinear
@@ -1215,6 +1297,15 @@ DO CurveIndex=1,NumExponent
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name      = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Exponent
   PerfCurve(CurveNum)%ObjectType = CurveType_Exponent
@@ -1259,6 +1350,15 @@ DO CurveIndex=1,NumFanPressRise
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = FanPressureRise
@@ -1309,6 +1409,15 @@ DO CurveIndex=1,NumExpSkewNorm
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = ExponentialSkewNormal
@@ -1363,6 +1472,15 @@ DO CurveIndex=1,NumSigmoid
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = Sigmoid
@@ -1419,6 +1537,15 @@ DO CurveIndex=1,NumRectHyper1
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = RectangularHyperbola1
   PerfCurve(CurveNum)%ObjectType = CurveType_RectangularHyperbola1
@@ -1471,6 +1598,15 @@ DO CurveIndex=1,NumRectHyper2
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = RectangularHyperbola2
@@ -1525,6 +1661,15 @@ DO CurveIndex=1,NumExpDecay
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = ExponentialDecay
   PerfCurve(CurveNum)%ObjectType = CurveType_ExponentialDecay
@@ -1578,6 +1723,15 @@ DO CurveIndex=1,NumDoubleExpDecay
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%CurveType = DoubleExponentialDecay
@@ -1638,6 +1792,15 @@ DO CurveIndex=1,NumOneVarTab
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%ObjectType = CurveType_TableOneIV
@@ -1822,6 +1985,15 @@ DO CurveIndex=1,NumTwoVarTab
   IF (IsNotOK) THEN
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
+  ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
   ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%ObjectType = CurveType_TableTwoIV
@@ -2086,6 +2258,15 @@ DO CurveIndex=1,NumMultVarLookup
     ErrorsFound=.true.
     IF (IsBlank) Alphas(1)='xxxxx'
   ENDIF
+  ! Need to verify that this name isn't used in Pressure Curves as well.
+  IF (NumPressureCurves > 0) THEN
+    CurveFound=FindItemInList(Alphas(1),PressureCurve%Name,NumPressureCurves)
+    IF (CurveFound /= 0) THEN
+      CALL ShowSevereError('GetCurveInput: '//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+      CALL ShowContinueError('...Curve name duplicates one of the Pressure Curves. Names must be unique across all curves.')
+      ErrorsFound=.true.
+    ENDIF
+  ENDIF
   PerfCurve(CurveNum)%Name = Alphas(1)
   PerfCurve(CurveNum)%ObjectType = CurveType_TableMultiIV
   PerfCurve(CurveNum)%TableIndex = TableNum
@@ -2345,7 +2526,7 @@ DO CurveIndex=1,NumMultVarLookup
 END DO
 
 IF (ErrorsFound) THEN
-  CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
+  CALL ShowFatalError('GetCurveInput: Errors found in getting Curve Objects.  Preceding condition(s) cause termination.')
 END IF
 
 RETURN
@@ -2479,14 +2660,34 @@ SUBROUTINE InitCurveReporting
                               'HVAC','Average',PerfCurve(CurveIndex)%Name)
   END DO
 
+  DO CurveIndex = 1, NumPressureCurves
+    CALL SetupOutputVariable('Performance Curve Input 1',PressureCurve(CurveIndex)%CurveInput1, &
+            'HVAC','Average',PressureCurve(CurveIndex)%Name)
+    CALL SetupOutputVariable('Performance Curve Input 2',PressureCurve(CurveIndex)%CurveInput2, &
+            'HVAC','Average',PressureCurve(CurveIndex)%Name)
+    CALL SetupOutputVariable('Performance Curve Input 3',PressureCurve(CurveIndex)%CurveInput3, &
+            'HVAC','Average',PressureCurve(CurveIndex)%Name)
+    CALL SetupOutputVariable('Performance Curve Output []',PressureCurve(CurveIndex)%CurveOutput, &
+                              'HVAC','Average',PressureCurve(CurveIndex)%Name)
+  ENDDO
+
   IF (AnyEnergyManagementSystemInModel) Then ! provide hook for possible EMS control
     DO CurveIndex = 1,  NumCurves
       CALL SetupEMSActuator('Curve',  PerfCurve(CurveIndex)%Name , &
                             'Curve Result','[unknown]' ,&
                             PerfCurve(CurveIndex)%EMSOverrideOn  , &
                             PerfCurve(CurveIndex)%EMSOverrideCurveValue)
-    ENDDO ! All curves
+    ENDDO ! All performance curves
   ENDIF
+  IF (AnyEnergyManagementSystemInModel) Then ! provide hook for possible EMS control
+    DO CurveIndex = 1,  NumPressureCurves
+      CALL SetupEMSActuator('Curve',  PressureCurve(CurveIndex)%Name , &
+                            'Curve Result','[unknown]' ,&
+                            PressureCurve(CurveIndex)%EMSOverrideOn  , &
+                            PressureCurve(CurveIndex)%EMSOverrideCurveValue)
+    ENDDO ! All pressure curves
+  ENDIF
+
 
   RETURN
 
@@ -2584,7 +2785,7 @@ LOGICAL            :: FileExists
     IF (endcol > 0) THEN
       IF (ICHAR(NextLine(endcol:endcol)) == iUnicode_end) THEN
         CALL ShowSevereError('ReadTableData: For Table:MultiVariableLookup "'//TRIM(PerfCurve(CurveNum)%Name)//'" '//  &
-         ' external file, appears to be a Unicode file.')
+         ' external file, appears to be a Unicode or binary file.')
         CALL ShowContinueError('...This file cannot be read by this program. Please save as PC or Unix file and try again')
         CALL ShowFatalError('Program terminates due to previous condition.')
       ENDIF
@@ -5356,7 +5557,7 @@ SUBROUTINE GetPressureSystemInput()
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName
+  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList
   USE DataIPShortcuts
 !  USE PlantPressureSystem, ONLY: PlantPressureCurveData, PressureCurve
 
@@ -5385,6 +5586,7 @@ SUBROUTINE GetPressureSystemInput()
   LOGICAL                         :: IsNotOK              ! Flag to verify name
   LOGICAL                         :: IsBlank              ! Flag for blank name
   INTEGER                         :: CurveNum
+  INTEGER                         :: CurveFound
 
   NumPressure = GetNumObjectsFound(CurveObjectName)
   ALLOCATE(PressureCurve(NumPressure))
@@ -5397,6 +5599,15 @@ SUBROUTINE GetPressureSystemInput()
     IF (IsNotOK) THEN
       ErrsFound=.true.
       IF (IsBlank) Alphas(1)='xxxxx'
+    ENDIF
+    ! Need to verify that this name isn't used in Performance Curves as well.
+    IF (NumCurves > 0) THEN
+      CurveFound=FindItemInList(Alphas(1),PerfCurve%Name,NumCurves)
+      IF (CurveFound /= 0) THEN
+        CALL ShowSevereError('GetPressureCurveInput: '//trim(CurveObjectName)//'="'//trim(Alphas(1))//'", duplicate curve name.')
+        CALL ShowContinueError('...Curve name duplicates one of the Performance Curves. Names must be unique across all curves.')
+        ErrsFound=.true.
+      ENDIF
     ENDIF
     PressureCurve(CurveNum)%Name      = Alphas(1)
     PressureCurve(CurveNum)%EquivDiameter  = Numbers(1)
@@ -5411,8 +5622,10 @@ SUBROUTINE GetPressureSystemInput()
     END IF
   END DO
 
+  NumPressureCurves=NumPressure
+
   IF (ErrsFound) THEN
-    CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
+    CALL ShowFatalError('GetPressureCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
   END IF
 
   RETURN
@@ -5532,7 +5745,6 @@ RETURN
 
 END SUBROUTINE GetPressureCurveTypeAndIndex
 
-
 REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Viscosity)
 
           ! FUNCTION INFORMATION:
@@ -5601,6 +5813,10 @@ REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Vis
   !If we don't have any flow then exit out
   IF (MassFlow .LT. MassFlowTolerance) THEN
     PressureCurveValue = 0.0d0
+    PressureCurve(PressureCurveIndex)%CurveInput1=MassFlow
+    PressureCurve(PressureCurveIndex)%CurveInput2=Density
+    PressureCurve(PressureCurveIndex)%CurveInput3=Velocity
+    PressureCurve(PressureCurveIndex)%CurveOutput=0.0d0
     RETURN
   END IF
 
@@ -5613,6 +5829,11 @@ REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Vis
 
   !Pressure drop calculation
   PressureCurveValue  =  (FrictionFactor * (Length / Diameter) + MinorLossCoeff) * (Density * Velocity**2) / 2.0d0
+
+  PressureCurve(PressureCurveIndex)%CurveInput1=MassFlow
+  PressureCurve(PressureCurveIndex)%CurveInput2=Density
+  PressureCurve(PressureCurveIndex)%CurveInput3=Velocity
+  PressureCurve(PressureCurveIndex)%CurveOutput=PressureCurveValue
 
 END FUNCTION PressureCurveValue
 

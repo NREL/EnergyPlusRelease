@@ -58,11 +58,11 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
-#include	"const.h"
-#include	"DBconst.h"
-#include	"def.h"
+#include	"CONST.H"
+#include	"DBCONST.H"
+#include	"DEF.H"
 #include	"helpers.h"
 #include	"hemisphiral.h"
 #include	"NodeMesh2.h"
@@ -70,7 +70,7 @@ namespace BGL = BldgGeomLib;
 #include	"btdf.h"
 #include	"CFSSystem.h"
 #include	"CFSSurface.h"
-#include	"DOE2dl.h"
+#include	"DOE2DL.H"
 
 extern double NaN_SIGNAL;
 

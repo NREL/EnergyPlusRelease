@@ -34,38 +34,54 @@ PUBLIC          ! By definition, all variables which are placed in this data
   INTEGER, PARAMETER :: ZoneReturnPlenum_Type = 4
 
 ! Start zone equip objects
-  INTEGER, PARAMETER :: AirDistUnit_Num      = 1
-  INTEGER, PARAMETER :: DirectAir_Num    = 2
-  INTEGER, PARAMETER :: WindowAC_Num   = 3
-  INTEGER, PARAMETER :: PkgTermHPAirToAir_Num = 4
-  INTEGER, PARAMETER :: FanCoil4Pipe_Num = 5
-  INTEGER, PARAMETER :: UnitVentilator_Num = 6
-  INTEGER, PARAMETER :: UnitHeater_Num = 7
-  INTEGER, PARAMETER :: PurchasedAir_Num = 8
-  INTEGER, PARAMETER :: BBWaterConvective_Num = 9
-  INTEGER, PARAMETER :: BBElectricConvective_Num = 10
-  INTEGER, PARAMETER :: HiTempRadiant_Num = 11
-  INTEGER, PARAMETER :: LoTempRadiant_Num = 12
-  INTEGER, PARAMETER :: ZoneExhaustFan_Num = 13
-  INTEGER, PARAMETER :: HeatXchngr_Num = 14
-  INTEGER, PARAMETER :: ERVStandAlone_Num = 15
-  INTEGER, PARAMETER :: HPWaterHeater_Num = 16
-  INTEGER, PARAMETER :: BBWater_Num = 17
-  INTEGER, PARAMETER :: VentilatedSlab_Num = 18
-  INTEGER, PARAMETER :: PkgTermHPWaterToAir_Num = 19
-  INTEGER, PARAMETER :: ZoneDXDehumidifier_Num = 20
-  INTEGER, PARAMETER :: BBSteam_Num = 21
-  INTEGER, PARAMETER :: OutdoorAirUnit_Num = 22
-  INTEGER, PARAMETER :: BBElectric_Num = 23
-  INTEGER, PARAMETER :: VRFTerminalUnit_Num = 24
-  INTEGER, PARAMETER :: RefrigerationAirChillerSet_Num = 25
-  INTEGER, PARAMETER :: UserDefinedZoneHVACForcedAir_Num = 26
+  INTEGER, PARAMETER :: FanCoil4Pipe_Num         = 1
+  INTEGER, PARAMETER :: PkgTermHPAirToAir_Num    = 2
+  INTEGER, PARAMETER :: PkgTermACAirToAir_Num    = 3
+  INTEGER, PARAMETER :: PkgTermHPWaterToAir_Num  = 4
+  INTEGER, PARAMETER :: WindowAC_Num             = 5
+  INTEGER, PARAMETER :: UnitHeater_Num           = 6
+  INTEGER, PARAMETER :: UnitVentilator_Num       = 7
+  INTEGER, PARAMETER :: ERVStandAlone_Num        = 8
+  INTEGER, PARAMETER :: VentilatedSlab_Num       = 9
+  INTEGER, PARAMETER :: OutdoorAirUnit_Num       = 10
+  INTEGER, PARAMETER :: VRFTerminalUnit_Num      = 11
+  INTEGER, PARAMETER :: PurchasedAir_Num         = 12
+  INTEGER, PARAMETER :: AirDistUnit_Num          = 13
+  INTEGER, PARAMETER :: DirectAir_Num            = 14
+  INTEGER, PARAMETER :: BBWaterConvective_Num    = 15
+  INTEGER, PARAMETER :: BBElectricConvective_Num = 16
+  INTEGER, PARAMETER :: HiTempRadiant_Num        = 17
+  INTEGER, PARAMETER :: LoTempRadiant_Num        = 18
+  INTEGER, PARAMETER :: ZoneExhaustFan_Num       = 19
+  INTEGER, PARAMETER :: HeatXchngr_Num           = 20
+  INTEGER, PARAMETER :: HPWaterHeater_Num        = 21
+  INTEGER, PARAMETER :: BBWater_Num              = 22
+  INTEGER, PARAMETER :: ZoneDXDehumidifier_Num   = 23
+  INTEGER, PARAMETER :: BBSteam_Num              = 24
+  INTEGER, PARAMETER :: BBElectric_Num           = 25
+  INTEGER, PARAMETER :: RefrigerationAirChillerSet_Num   = 26
+  INTEGER, PARAMETER :: UserDefinedZoneHVACForcedAir_Num = 27
 !
-  INTEGER, PARAMETER :: TotalNumZoneEquipType = 26
+  INTEGER, PARAMETER :: TotalNumZoneEquipType = 27
   ! **NOTE**... if you add another zone equipment object, then increment
   ! TotalNumZoneEquipType above to match the total number of zone equipment types
 ! End zone equip objects
 
+
+  INTEGER, PARAMETER :: NumValidSysAvailZoneComponents = 12
+  CHARACTER(len=*), PARAMETER, DIMENSION(NumValidSysAvailZoneComponents) :: cValidSysAvailManagerCompTypes=    &
+                 (/'ZoneHVAC:FourPipeFanCoil                        ',     &
+                   'ZoneHVAC:PackagedTerminalHeatPump               ',     &
+                   'ZoneHVAC:PackagedTerminalAirConditioner         ',     &
+                   'ZoneHVAC:WaterToAirHeatPump                     ',     &
+                   'ZoneHVAC:WindowAirConditioner                   ',     &
+                   'ZoneHVAC:UnitHeater                             ',     &
+                   'ZoneHVAC:UnitVentilator                         ',     &
+                   'ZoneHVAC:EnergyRecoveryVentilator               ',     &
+                   'ZoneHVAC:VentilatedSlab                         ',     &
+                   'ZoneHVAC:OutdoorAirUnit                         ',     &
+                   'ZoneHVAC:TerminalUnit:VariableRefrigerantFlow   ',     &
+                   'ZoneHVAC:IdealLoadsAirSystem                    '/)
 
           ! DERIVED TYPE DEFINITIONS:
   TYPE EquipMeterData
@@ -571,7 +587,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     ENDIF
   ENDIF
 
-  ! Read in the equipment type, name and priority information
+  ! Read in the equipment type, name and sequence information
   ! for each equipment list
 
   CurrentModuleObject = 'ZoneHVAC:EquipmentList'
@@ -586,9 +602,9 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
     IsBlank=.false.
     CALL VerifyName(AlphArray(1),ZoneEquipList%Name,ControlledZoneNum-1,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('Bad Zone Equipment name in ZoneHVAC:EquipmentList = '//  &
-                             TRIM(ZoneEquipConfig(ControlledZoneNum)%EquipListName))
-      CALL ShowContinueError('For Zone = '//TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
+      CALL ShowContinueError('Bad Zone Equipment name in '//trim(CurrentModuleObject)//'="'//  &
+                             TRIM(ZoneEquipConfig(ControlledZoneNum)%EquipListName)//'"')
+      CALL ShowContinueError('For Zone="'//TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName)//'".')
       ErrorsFound=.true.
       IF (IsBlank) AlphArray(1)='xxxxx'
     ENDIF
@@ -597,6 +613,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
 
     maxEquipCount=0
     numEquipCount=(NumAlphas-1)/2
+    if (numEquipCount*2 /= (NumAlphas-1)) numEquipCount=numEquipCount+1
     DO ZoneEquipTypeNum = 1,numEquipCount
       IF (.not. lAlphaBlanks(2*ZoneEquipTypeNum) .and. .not. lAlphaBlanks(2*ZoneEquipTypeNum + 1)) THEN
         maxEquipCount=maxEquipCount+1
@@ -638,13 +655,13 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
       ENDIF
       ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum) = &
                     NINT(NumArray(2*ZoneEquipTypeNum-1))
-      IF ((ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum) < 0) .OR. &
+      IF ((ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum) <= 0) .OR. &
           (ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum) > &
             ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphArray(1))//'".')
         CALL ShowContinueError('invalid '//TRIM(cNumericFields(2*ZoneEquipTypeNum-1))//'=['&
               //TRIM(RoundSigDigits(ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum)))//'].')
-        CALL ShowContinueError('priority must be > 0 and <= number of equipments in the list.')
+        CALL ShowContinueError('equipment sequence must be > 0 and <= number of equipments in the list.')
         IF (ZoneEquipList(ControlledZoneNum)%CoolingPriority(ZoneEquipTypeNum) > 0) &
           CALL ShowContinueError('only '//trim(RoundSigDigits(ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes))//' in the list.')
         ErrorsFound=.true.
@@ -652,13 +669,13 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
 
       ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum) = &
                     NINT(NumArray(2*ZoneEquipTypeNum))
-      IF ((ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum) < 0) .OR. &
+      IF ((ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum) <= 0) .OR. &
           (ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum) > &
             ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphArray(1))//'".')
         CALL ShowContinueError('invalid '//TRIM(cNumericFields(2*ZoneEquipTypeNum))//'=['&
               //TRIM(RoundSigDigits(ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum)))//'].')
-        CALL ShowContinueError('priority must be > 0 and <= number of equipments in the list.')
+        CALL ShowContinueError('equipment sequence must be > 0 and <= number of equipments in the list.')
         IF (ZoneEquipList(ControlledZoneNum)%HeatingPriority(ZoneEquipTypeNum) > 0) &
           CALL ShowContinueError('only '//trim(RoundSigDigits(ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes))//' in the list.')
         ErrorsFound=.true.
@@ -679,7 +696,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=PkgTermHPAirToAir_Num
 
         CASE ('ZONEHVAC:PACKAGEDTERMINALAIRCONDITIONER') ! Packaged Terminal Air Conditioner
-          ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=PkgTermHPAirToAir_Num
+          ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=PkgTermACAirToAir_Num
 
         CASE ('ZONEHVAC:DEHUMIDIFIER:DX') ! Zone dehumidifier
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=ZoneDXDehumidifier_Num
@@ -754,15 +771,40 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
           ZoneEquipList(ControlledZoneNum)%EquipType_Num(ZoneEquipTypeNum)=UserDefinedZoneHVACForcedAir_Num
 
         CASE DEFAULT
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
           CALL ShowContinueError('..Invalid Equipment Type = '//TRIM(ZoneEquipList(ControlledZoneNum)%EquipType(ZoneEquipTypeNum)))
           ErrorsFound=.true.
 
       END SELECT
     END DO
+    DO ZoneEquipTypeNum = 1, ZoneEquipList(ControlledZoneNum)%NumOfEquipTypes
+      IF (COUNT(ZoneEquipList(ControlledZoneNum)%CoolingPriority==ZoneEquipTypeNum) > 1) THEN
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
+        CALL ShowContinueError('...multiple assignments for Zone Equipment Cooling Sequence='//  &
+           trim(RoundSigDigits(ZoneEquipTypeNum))//  &
+           ', must be 1-1 correspondence between sequence assignments and number of equipments.')
+        ErrorsFound=.true.
+      ELSEIF (COUNT(ZoneEquipList(ControlledZoneNum)%CoolingPriority==ZoneEquipTypeNum) == 0) THEN
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
+        CALL ShowContinueError('...zero assignments for Zone Equipment Cooling Sequence='//  &
+           trim(RoundSigDigits(ZoneEquipTypeNum))//', apparent gap in sequence assignments in this equipment list.')
+      ENDIF
+      IF (COUNT(ZoneEquipList(ControlledZoneNum)%HeatingPriority==ZoneEquipTypeNum) > 1) THEN
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
+        CALL ShowContinueError('...multiple assignments for Zone Equipment Heating or No-Load Sequence='//  &
+           trim(RoundSigDigits(ZoneEquipTypeNum))//  &
+           ', must be 1-1 correspondence between sequence assignments and number of equipments.')
+        ErrorsFound=.true.
+      ELSEIF (COUNT(ZoneEquipList(ControlledZoneNum)%HeatingPriority==ZoneEquipTypeNum) == 0) THEN
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneEquipList(ControlledZoneNum)%Name))
+        CALL ShowContinueError('...zero assignments for Zone Equipment Heating or No-Load Sequence='//  &
+           trim(RoundSigDigits(ZoneEquipTypeNum))//', apparent gap in sequence assignments in this equipment list.')
+      ENDIF
+    ENDDO
 
   ELSE
-    CALL ShowSevereError(TRIM(CurrentModuleObject)//' not found = '//TRIM(ZoneEquipConfig(ControlledZoneNum)%EquipListName))
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' not found = '//  &
+       TRIM(ZoneEquipConfig(ControlledZoneNum)%EquipListName))
     CALL ShowContinueError('In ZoneHVAC:EquipmentConnections object, for Zone = '//  &
                            TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
     ErrorsFound=.true.

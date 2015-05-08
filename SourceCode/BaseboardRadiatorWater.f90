@@ -628,8 +628,8 @@ SUBROUTINE InitHWBaseboard(BaseboardNum, ControlledZoneNumSub, FirstHVACIteratio
   INTEGER, INTENT(IN)    :: ControlledZoneNumSub
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: Constant         = 0.0062     ! Constant of linear equation for air mass flow rate
-  REAL(r64), PARAMETER :: Coeff            = 0.0000275  ! Correlation coefficient to capacity
+  REAL(r64), PARAMETER :: Constant         = 0.0062d0     ! Constant of linear equation for air mass flow rate
+  REAL(r64), PARAMETER :: Coeff            = 0.0000275d0  ! Correlation coefficient to capacity
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -819,6 +819,7 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
   USE DataSizing
   USE DataLoopNode,    ONLY: Node
   USE PlantUtilities,  ONLY: RegisterPlantCompDesignFlow
+  USE General,         ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -828,8 +829,8 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: AirInletTempStd  = 18.0d0     ! I=B=R rating document
   REAL(r64), PARAMETER :: CPAirStd         = 1005.0d0   ! Average specific heat of air at between 25C and 40C in J/kg-k
-  REAL(r64), PARAMETER :: Constant         = 0.0062     ! Constant of linear equation for air mass flow rate
-  REAL(r64), PARAMETER :: Coeff            = 0.0000275  ! Correlation coefficient to capacity
+  REAL(r64), PARAMETER :: Constant         = 0.0062d0     ! Constant of linear equation for air mass flow rate
+  REAL(r64), PARAMETER :: Coeff            = 0.0000275d0  ! Correlation coefficient to capacity
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -897,7 +898,7 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
                           'BaseboardRadiatorWater:SizeHWBaseboard')
         WaterMassFlowRateStd = HWBaseboard(BaseboardNum)%WaterVolFlowRateMax * rho
       END IF
-      CALL CheckZoneSizing(cCMO_BBRadiator_Water,HWBaseboard(BaseboardNum)%EquipID)
+!      CALL CheckZoneSizing(cCMO_BBRadiator_Water,HWBaseboard(BaseboardNum)%EquipID)
       IF (DesCoilLoad >= SmallLoad) THEN
                   ! Calculate UA value
                   ! Air mass flow rate is obtained from the following linear equation
@@ -907,20 +908,31 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
                          HWBaseboard(BaseboardNum)%WaterTempAvg,                      &
                          PlantLoop(HWBaseboard(BaseboardNum)%LoopNum)%FluidIndex, &
                          'SizeHWBaseboard')
-        WaterInletTempStd  = (DesCoilLoad / (2.0d0 * WaterMassFlowRateStd &
-                         * Cp)) &
+        WaterInletTempStd  = (DesCoilLoad / (2.0d0 * WaterMassFlowRateStd * Cp)) &
                          + HWBaseboard(BaseboardNum)%WaterTempAvg
         WaterOutletTempStd = ABS((2.0d0 * HWBaseboard(BaseboardNum)%WaterTempAvg) - WaterInletTempStd)
         AirOutletTempStd = (DesCoilLoad / (AirMassFlowRate * CPAirStd)) + AirInletTempStd
-              HWBaseboard(BaseboardNum)%AirMassFlowRateStd = AirMassFlowRate
+        HWBaseboard(BaseboardNum)%AirMassFlowRateStd = AirMassFlowRate
 
                   ! Check Ta,out < Tw,in
         IF (AirOutletTempStd >= WaterInletTempStd) THEN
-          AirOutletTempStd = WaterInletTempStd - 0.001
-          CALL ShowSevereError('SizeHWBaseboard: Air outlet temperature must be below the inlet water temperature')
-          CALL ShowContinueError('...reset to rated capacity')
-          CALL ShowContinueError('Occurs in Hot Water Baseboard Heater='//TRIM(HWBaseboard(BaseboardNum)%EquipID))
+          CALL ShowSevereError('SizeHWBaseboard: ZoneHVAC:Baseboard:RadiantConvective:Water="'//  &
+             TRIM(HWBaseboard(BaseboardNum)%EquipID)//'".')
+          CALL ShowContinueError('...Air Outlet temperature must be below the Water Inlet temperature')
+          CALL ShowContinueError('...Air Outlet Temperature=['//trim(RoundSigDigits(AirOutletTempStd,2))//  &
+              '], Water Inlet Temperature=['//trim(RoundSigDigits(WaterInletTempStd,2))//'].')
           AirOutletTempStd = WaterInletTempStd-0.01d0
+          CALL ShowContinueError('...Air Outlet Temperature set to ['//trim(RoundSigDigits(AirOutletTempStd,2))//'].')
+        END IF
+                  ! Check Tw,out < Ta,in
+        IF (AirInletTempStd >= WaterOutletTempStd) THEN
+          CALL ShowSevereError('SizeHWBaseboard: ZoneHVAC:Baseboard:RadiantConvective:Water="'//  &
+             TRIM(HWBaseboard(BaseboardNum)%EquipID)//'".')
+          CALL ShowContinueError('...Water Outlet temperature must be below the Air Inlet temperature')
+          CALL ShowContinueError('...Air Inlet Temperature=['//trim(RoundSigDigits(AirInletTempStd,2))//  &
+              '], Water Outlet Temperature=['//trim(RoundSigDigits(WaterOutletTempStd,2))//'].')
+          WaterOutletTempStd = AirInletTempStd+0.01d0
+          CALL ShowContinueError('...Water Outlet Temperature set to ['//trim(RoundSigDigits(WaterOutletTempStd,2))//'].')
         END IF
                   ! LMTD calculation
         DeltaT1 = WaterInletTempStd  - AirOutletTempStd
@@ -960,14 +972,26 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
       AirOutletTempStd = (DesCoilLoad / (AirMassFlowRate * CPAirStd)) + AirInletTempStd
       HWBaseboard(BaseboardNum)%AirMassFlowRateStd = AirMassFlowRate
 
-                ! Check Ta,out < Tw,in
-      IF (AirOutletTempStd >= WaterInletTempStd) THEN
-        AirOutletTempStd = WaterInletTempStd - 0.001
-        CALL ShowSevereError('SizeHWBaseboard: Air outlet temperature must be below the inlet water temperature')
-        CALL ShowContinueError('...reset to rated capacity')
-        CALL ShowContinueError('Occurs in Hot Water Baseboard Heater='//TRIM(HWBaseboard(BaseboardNum)%EquipID))
-        AirOutletTempStd = WaterInletTempStd-0.01d0
-      END IF
+                  ! Check Ta,out < Tw,in
+        IF (AirOutletTempStd >= WaterInletTempStd) THEN
+          CALL ShowSevereError('SizeHWBaseboard: ZoneHVAC:Baseboard:RadiantConvective:Water="'//  &
+             TRIM(HWBaseboard(BaseboardNum)%EquipID)//'".')
+          CALL ShowContinueError('...Air Outlet temperature must be below the Water Inlet temperature')
+          CALL ShowContinueError('...Air Outlet Temperature=['//trim(RoundSigDigits(AirOutletTempStd,2))//  &
+              '], Water Inlet Temperature=['//trim(RoundSigDigits(WaterInletTempStd,2))//'].')
+          AirOutletTempStd = WaterInletTempStd-0.01d0
+          CALL ShowContinueError('...Air Outlet Temperature set to ['//trim(RoundSigDigits(AirOutletTempStd,2))//'].')
+        END IF
+                  ! Check Tw,out < Ta,in
+        IF (AirInletTempStd >= WaterOutletTempStd) THEN
+          CALL ShowSevereError('SizeHWBaseboard: ZoneHVAC:Baseboard:RadiantConvective:Water="'//  &
+             TRIM(HWBaseboard(BaseboardNum)%EquipID)//'".')
+          CALL ShowContinueError('...Water Outlet temperature must be below the Air Inlet temperature')
+          CALL ShowContinueError('...Air Inlet Temperature=['//trim(RoundSigDigits(AirInletTempStd,2))//  &
+              '], Water Outlet Temperature=['//trim(RoundSigDigits(WaterOutletTempStd,2))//'].')
+          WaterOutletTempStd = AirInletTempStd+0.01d0
+          CALL ShowContinueError('...Water Outlet Temperature set to ['//trim(RoundSigDigits(WaterOutletTempStd,2))//'].')
+        END IF
                 ! LMTD calculation
       DeltaT1 = WaterInletTempStd  - AirOutletTempStd
       DeltaT2 = WaterOutletTempStd - AirInletTempStd
@@ -979,7 +1003,7 @@ SUBROUTINE SizeHWBaseboard(BaseboardNum)
               ! Report an UA value
     CALL ReportSizingOutput(cCMO_BBRadiator_Water,HWBaseboard(BaseboardNum)%EquipID,&
                               'U-Factor times Area [W/C]',HWBaseboard(BaseboardNum)%UA)
-    
+
   END IF
 
      ! save the design water flow rate for use by the water loop sizing algorithms
@@ -1019,7 +1043,7 @@ END SUBROUTINE SizeHWBaseboard
     USE DataSizing
     USE DataLoopNode,          ONLY: Node
     USE ScheduleManager,       ONLY: GetCurrentScheduleValue
-    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, DeadbandOrSetback
+    USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
     USE DataInterfaces, ONLY: CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
 
     IMPLICIT NONE
@@ -1029,9 +1053,9 @@ END SUBROUTINE SizeHWBaseboard
     REAL(r64), INTENT(OUT) :: LoadMet
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  REAL(r64), PARAMETER :: Constant = 0.0062     ! Constant of linear equation for air mass flow rate
-  REAL(r64), PARAMETER :: Coeff  = 0.0000275    ! Correlation coefficient to capacity
-  REAL(r64), PARAMETER :: MinFrac  = 0.0005     ! Minimum fraction that delivers radiant heats to surfaces
+  REAL(r64), PARAMETER :: Constant = 0.0062d0     ! Constant of linear equation for air mass flow rate
+  REAL(r64), PARAMETER :: Coeff  = 0.0000275d0    ! Correlation coefficient to capacity
+  REAL(r64), PARAMETER :: MinFrac  = 0.0005d0     ! Minimum fraction that delivers radiant heats to surfaces
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -1071,59 +1095,59 @@ END SUBROUTINE SizeHWBaseboard
     WaterOutletTemp   = WaterInletTemp
     WaterMassFlowRate = Node(HWBaseboard(BaseboardNum)%WaterInletNode)%MassFlowRate
 
-    IF (QZnReq > 0.0d0 &
-       .AND. .NOT. DeadbandOrSetback(ZoneNum) &
+    IF (QZnReq > SmallLoad &
+       .AND. .NOT. CurDeadbandOrSetback(ZoneNum) &
        .AND. (GetCurrentScheduleValue(HWBaseboard(BaseboardNum)%SchedPtr) > 0) &
        .AND. (WaterMassFlowRate > 0.0d0) ) THEN
         ! Assume the air mass flow rate is twice the water mass flow rate
         ! Calculate air mass flow rate
-    AirMassFlowRate  = HWBaseboard(BaseboardNum)%AirMassFlowRateStd * &
-                        (WaterMassFlowRate / HWBaseboard(BaseboardNum)%WaterMassFlowRateStd)
-    CapacitanceAir   = PsyCpAirFnWTdb(HWBaseboard(BaseboardNum)%AirInletHumRat,AirInletTemp) * AirMassFlowRate
-    Cp =  GetSpecificHeatGlycol(PlantLoop(HWBaseboard(BaseboardNum)%LoopNum)%FluidName,  &
+      AirMassFlowRate  = HWBaseboard(BaseboardNum)%AirMassFlowRateStd * &
+                          (WaterMassFlowRate / HWBaseboard(BaseboardNum)%WaterMassFlowRateStd)
+      CapacitanceAir   = PsyCpAirFnWTdb(HWBaseboard(BaseboardNum)%AirInletHumRat,AirInletTemp) * AirMassFlowRate
+      Cp =  GetSpecificHeatGlycol(PlantLoop(HWBaseboard(BaseboardNum)%LoopNum)%FluidName,  &
                                WaterInletTemp,                      &
                                PlantLoop(HWBaseboard(BaseboardNum)%LoopNum)%FluidIndex, &
                                'CalcHWBaseboard')
 
-    CapacitanceWater = Cp * WaterMassFlowRate
-    CapacitanceMax   = MAX(CapacitanceAir,CapacitanceWater)
-    CapacitanceMin   = MIN(CapacitanceAir,CapacitanceWater)
-    CapacityRatio    = CapacitanceMin / CapacitanceMax
-    NTU = HWBaseboard(BaseboardNum)%UA / CapacitanceMin
+      CapacitanceWater = Cp * WaterMassFlowRate
+      CapacitanceMax   = MAX(CapacitanceAir,CapacitanceWater)
+      CapacitanceMin   = MIN(CapacitanceAir,CapacitanceWater)
+      CapacityRatio    = CapacitanceMin / CapacitanceMax
+      NTU = HWBaseboard(BaseboardNum)%UA / CapacitanceMin
 
       ! The effectiveness is given by the following formula:
       ! Effectiveness = 1. - EXP((1./CapacityRatio)*(NTU)**0.22*(EXP(-CapacityRatio*(NTU)**0.78)-1.))
       ! To prevent possible underflows (numbers smaller than the computer can handle) we must break
       ! the calculation up into steps and check the size of the exponential arguments.
-    AA = -CapacityRatio*(NTU)**0.78d0
-    IF (AA.LT.-20.0d0) THEN
-      BB = 0.0d0
-    ELSE
-      BB = EXP(AA)
-    END IF
+      AA = -CapacityRatio*(NTU)**0.78d0
+      IF (AA.LT.-20.0d0) THEN
+        BB = 0.0d0
+      ELSE
+        BB = EXP(AA)
+      END IF
       CC = (1.d0/ CapacityRatio)*(NTU)**0.22d0 * (BB-1.d0)
-    IF (CC.LT.-20.d0) THEN
-       Effectiveness = 1.0d0
-    ELSE
-       Effectiveness  = 1.0d0 - EXP(CC)
-    END IF
+      IF (CC.LT.-20.d0) THEN
+        Effectiveness = 1.0d0
+      ELSE
+        Effectiveness  = 1.0d0 - EXP(CC)
+      END IF
 
-    AirOutletTemp = AirInletTemp + Effectiveness * CapacitanceMin * (WaterInletTemp-AirInletTemp) / CapacitanceAir
-    WaterOutletTemp = WaterInletTemp - CapacitanceAir * (AirOutletTemp-AirInletTemp) / CapacitanceWater
-    BBHeat = CapacitanceWater * (WaterInletTemp - WaterOutletTemp)
-    RadHeat = BBHeat * HWBaseboard(BaseboardNum)%FracRadiant
-    QBBRadSource(BaseboardNum) = RadHeat
+      AirOutletTemp = AirInletTemp + Effectiveness * CapacitanceMin * (WaterInletTemp-AirInletTemp) / CapacitanceAir
+      WaterOutletTemp = WaterInletTemp - CapacitanceAir * (AirOutletTemp-AirInletTemp) / CapacitanceWater
+      BBHeat = CapacitanceWater * (WaterInletTemp - WaterOutletTemp)
+      RadHeat = BBHeat * HWBaseboard(BaseboardNum)%FracRadiant
+      QBBRadSource(BaseboardNum) = RadHeat
 
-    IF (HWBaseboard(BaseboardNum)%FracRadiant <= MinFrac) THEN
+      IF (HWBaseboard(BaseboardNum)%FracRadiant <= MinFrac) THEN
         LoadMet = BBHeat
-    ELSE
+      ELSE
 
        ! Now, distribute the radiant energy of all systems to the appropriate surfaces, to people, and the air
-    CALL DistributeBBRadGains
+        CALL DistributeBBRadGains
        ! Now "simulate" the system by recalculating the heat balances
-    CALL CalcHeatBalanceOutsideSurf(ZoneNum)
+        CALL CalcHeatBalanceOutsideSurf(ZoneNum)
 
-    CALL CalcHeatBalanceInsideSurf(ZoneNum)
+        CALL CalcHeatBalanceInsideSurf(ZoneNum)
 
        ! Here an assumption is made regarding radiant heat transfer to people.
        ! While the radiant heat transfer to people array will be used by the thermal comfort
@@ -1133,11 +1157,11 @@ END SUBROUTINE SizeHWBaseboard
        ! that all energy radiated to people is converted to convective energy is
        ! not very precise, but at least it conserves energy. The system impact to heat balance
        ! should include this.
-    LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
+        LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
               + (BBHeat *  HWBaseboard(BaseboardNum)%FracConvect) &
               + (RadHeat * HWBaseboard(BaseboardNum)%FracDistribPerson)
-    END IF
-    HWBaseboard(BaseboardNum)%WaterOutletEnthalpy = HWBaseboard(BaseboardNum)%WaterInletEnthalpy - BBHeat &
+      END IF
+      HWBaseboard(BaseboardNum)%WaterOutletEnthalpy = HWBaseboard(BaseboardNum)%WaterInletEnthalpy - BBHeat &
                                                     / WaterMassFlowRate
     ELSE
       CapacitanceWater  = 0.0d0

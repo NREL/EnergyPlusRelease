@@ -148,6 +148,8 @@ TYPE FanCoilData
   REAL(r64)                    :: MinHotWaterVolFlow  =0.0 ! m3/s
   REAL(r64)                    :: MinHotWaterFlow     =0.0 ! kg/s
   REAL(r64)                    :: HotControlOffset    =0.0 ! control tolerance
+  INTEGER                      :: AvailStatus         =0
+  CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
   ! Report data
   REAL(r64)                    :: HeatPower           =0.0 ! unit heating output in watts
   REAL(r64)                    :: HeatEnergy          =0.0 ! unit heating output in J
@@ -203,8 +205,8 @@ SUBROUTINE SimFanCoilUnit(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList
-  USE General, ONLY: TrimSigDigits
+  USE InputProcessor,    ONLY: FindItemInList
+  USE General,           ONLY: TrimSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -265,7 +267,7 @@ ENDIF
 ZoneEqFanCoil = .TRUE.
 
 ! Initialize the fan coil unit
-CALL InitFanCoilUnits(FanCoilNum)
+CALL InitFanCoilUnits(FanCoilNum,ZoneNum)
 
 ! Select the correct unit type
 SELECT CASE(FanCoil(FanCoilNum)%UnitType_Num)
@@ -292,6 +294,7 @@ SUBROUTINE GetFanCoilUnits
           !       MODIFIED       Bereket Nigusse, FSEC, April 2011: eliminated input node names
           !                                                         added OA Mixer object type
           !                                                         and fan object type
+          !                      Chandan Sharma, FSEC, July 2012: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -312,11 +315,11 @@ SUBROUTINE GetFanCoilUnits
   USE DataIPShortCuts
   USE WaterCoils,            ONLY: GetCoilWaterInletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXCoilWaterInletNode=>GetCoilWaterInletNode,GetHXCoilTypeAndName
-  USE DataHvacGlobals,       ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff
+  USE DataHvacGlobals,       ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, ZoneComp
   USE DataPlant,             ONLY: TypeOf_CoilWaterSimpleHeating, TypeOf_CoilWaterDetailedFlatCooling, &
                                    TypeOf_CoilWaterCooling
   USE MixedAir,              ONLY: GetOAMixerIndex, GetOAMixerNodeNumbers
-  USE DataZoneEquipment,     ONLY: ZoneEquipConfig
+  USE DataZoneEquipment,     ONLY: ZoneEquipConfig, FanCoil4Pipe_Num
   USE DataGlobals,           ONLY: NumOfZones
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -586,6 +589,11 @@ DO FanCoilIndex = 1,Num4PipeFanCoils
   FanCoil(FanCoilNum)%FanType = Alphas(9)
   FanCoil(FanCoilNum)%FanName = Alphas(10)
 
+  IF (.NOT. lAlphaBlanks(15)) THEN
+    FanCoil(FanCoilNum)%AvailManagerListName = Alphas(15)
+    ZoneComp(FanCoil4Pipe_Num)%ZoneCompAvailMgrs(FanCoilNum)%AvailManagerListName  = Alphas(15)
+  ENDIF
+
   ErrFlag = .FALSE.
   CALL ValidateComponent(FanCoil(FanCoilNum)%FanType,FanCoil(FanCoilNum)%FanName,ErrFlag,TRIM(CurrentModuleObject))
   IF (ErrFlag) THEN
@@ -743,18 +751,19 @@ Do FanCoilNum=1,NumFanCoils
     CALL SetupOutputVariable('Part Load Ratio []',FanCoil(FanCoilNum)%PLR,'System','Average',&
                               FanCoil(FanCoilNum)%Name)
   END IF
-
+  CALL SetupOutputVariable('Fan Coil Fan Availability Status',FanCoil(FanCoilNum)%AvailStatus,&
+                             'System','Average',FanCoil(FanCoilNum)%Name)
 END DO
 
 RETURN
 END SUBROUTINE GetFanCoilUnits
 
-SUBROUTINE InitFanCoilUnits(FanCoilNum)
+SUBROUTINE InitFanCoilUnits(FanCoilNum, ZoneNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   March 2000
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -767,17 +776,19 @@ SUBROUTINE InitFanCoilUnits(FanCoilNum)
           ! na
 
           ! USE STATEMENTS:
-  USE Psychrometrics, ONLY:PsyRhoAirFnPbTdbW
-  USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList
-  USE DataPlant,  ONLY: PlantLoop, ScanPlantLoopsForObject, TypeOf_CoilWaterCooling, &
-                        TypeOf_CoilWaterDetailedFlatCooling
-  USE FluidProperties, ONLY: GetDensityGlycol
-  USE PlantUtilities, ONLY: InitComponentNodes
+  USE Psychrometrics,     ONLY: PsyRhoAirFnPbTdbW
+  USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList, FanCoil4Pipe_Num
+  USE DataPlant,          ONLY: PlantLoop, ScanPlantLoopsForObject, TypeOf_CoilWaterCooling, &
+                                TypeOf_CoilWaterDetailedFlatCooling
+  USE FluidProperties,    ONLY: GetDensityGlycol
+  USE PlantUtilities,     ONLY: InitComponentNodes
+  USE DataHVACGlobals,    ONLY: ZoneComp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT (IN) :: FanCoilNum ! number of the current fan coil unit being simulated
+  INTEGER, INTENT (IN) :: ZoneNum    ! number of zone being served
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -819,6 +830,11 @@ IF (MyOneTimeFlag) THEN
   MyOneTimeFlag = .false.
 
 END IF
+
+IF (ALLOCATED(ZoneComp)) THEN
+  ZoneComp(FanCoil4Pipe_Num)%ZoneCompAvailMgrs(FanCoilNum)%ZoneNum = ZoneNum
+  FanCoil(FanCoilNum)%AvailStatus = ZoneComp(FanCoil4Pipe_Num)%ZoneCompAvailMgrs(FanCoilNum)%AvailStatus
+ENDIF
 
 IF (MyPlantScanFlag(FanCoilNum) .AND. ALLOCATED(PlantLoop)) THEN
   errFlag=.false.
@@ -1000,7 +1016,6 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
   USE General,        ONLY: TrimSigDigits
   USE WaterCoils,     ONLY: SetCoilDesFlow, GetCoilWaterInletNode, GetCoilWaterOutletNode
   USE HVACHXAssistedCoolingCoil, ONLY: GetHXDXCoilName, GetHXCoilType
-!  USE BranchInputManager, ONLY: MyPlantSizingIndex
   USE DataPlant,      ONLY: PlantLoop, MyPlantSizingIndex
   USE FluidProperties, ONLY: GetDensityGlycol, GetSpecificHeatGlycol
   USE ReportSizingManager, ONLY: ReportSizingOutput
@@ -1330,6 +1345,7 @@ INTEGER      :: InletNode        ! unit air inlet node
 REAL(r64)    :: QTotUnitOut      ! total unit output [watts]
 REAL(r64)    :: AirMassFlow      ! air mass flow rate [kg/sec]
 REAL(r64)    :: QUnitOutNoHC     ! unit output with no active heating or cooling [W]
+REAL(r64)    :: QUnitOutMaxHC    ! unit output with full active heating or cooling [W]
 REAL(r64)    :: QCoilHeatSP      ! coil load to the heating setpoint [W]
 REAL(r64)    :: QCoilCoolSP      ! coil load to the cooling setpoint [W]
 REAL(r64)    :: LatentOutput     ! Latent (moisture) add/removal rate, negative is dehumidification [kg/s]
@@ -1394,26 +1410,36 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                                 FanCoil(FanCoilNum)%HWBranchNum, &
                                 FanCoil(FanCoilNum)%HWCompNum)
 
-    
     ! obtain unit output with no active heating/cooling
     CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutNoHC)
     ! get the loads at the coils
     QCoilHeatSP = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP - QUnitOutNoHC
     QCoilCoolSP = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP - QUnitOutNoHC
-    IF (UnitOn .and. QCoilCoolSP < 0.0 .and. TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
-      ! cooling coil action
-      ControlNode = FanCoil(FanCoilNum)%ColdControlNode
-      ControlOffset = FanCoil(FanCoilNum)%ColdControlOffset
-      MaxWaterFlow = FanCoil(FanCoilNum)%MaxColdWaterFlow
-      MinWaterFlow = FanCoil(FanCoilNum)%MinColdWaterFlow
-      !On the first HVAC iteration the system values are given to the controller, but after that
-      ! the demand limits are in place and there needs to be feedback to the Zone Equipment
-      If(.not. FirstHVACIteration) Then
-        MaxWaterFlow = Node(ControlNode)%MassFlowRateMaxAvail
-        MinWaterFlow = Node(ControlNode)%MassFlowRateMinAvail
-      End If
-      QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
-      CALL ControlCompOutput(CompType=cMO_FanCoil,CompNum=FanCoilNum, &
+    IF (UnitOn .and. QCoilCoolSP < (-1.d0*SmallLoad) .and. TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
+      ! get full load result
+      mdot = FanCoil(FanCoilNum)%MaxColdWaterFlow
+      CALL SetComponentFlowRate(mdot , &
+                                FanCoil(FanCoilNum)%ColdControlNode, &
+                                FanCoil(FanCoilNum)%ColdPlantOutletNode, &
+                                FanCoil(FanCoilNum)%CWLoopNum, &
+                                FanCoil(FanCoilNum)%CWLoopSide, &
+                                FanCoil(FanCoilNum)%CWBranchNum, &
+                                FanCoil(FanCoilNum)%CWCompNum)
+      CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutMaxHC)
+      IF(QUnitOutMaxHC .LT. QCoilCoolSP)THEN
+        ! more cooling than required, find reduced water flow rate to meet the load
+        ControlNode = FanCoil(FanCoilNum)%ColdControlNode
+        ControlOffset = FanCoil(FanCoilNum)%ColdControlOffset
+        MaxWaterFlow = FanCoil(FanCoilNum)%MaxColdWaterFlow
+        MinWaterFlow = FanCoil(FanCoilNum)%MinColdWaterFlow
+        !On the first HVAC iteration the system values are given to the controller, but after that
+        ! the demand limits are in place and there needs to be feedback to the Zone Equipment
+        If(.not. FirstHVACIteration) Then
+          MaxWaterFlow = Node(ControlNode)%MassFlowRateMaxAvail
+          MinWaterFlow = Node(ControlNode)%MassFlowRateMinAvail
+        End If
+        QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP
+        CALL ControlCompOutput(CompType=cMO_FanCoil,CompNum=FanCoilNum, &
                              FirstHVACIteration=FirstHVACIteration,QZnReq=QZnReq, &
                              ActuatedNode=ControlNode,MaxFlow=MaxWaterFlow, &
                              MinFlow=MinWaterFlow,ControlOffSet=ControlOffset,Action=iReverseAction, &
@@ -1423,22 +1449,34 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              LoopNum     = FanCoil(FanCoilNum)%CWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%CWLoopSide, &
                              BranchIndex = FanCoil(FanCoilNum)%CWBranchNum)
+      END IF
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
-    ELSE IF (UnitOn .and. QCoilHeatSP > 0.0 .and. TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
-      ! heating coil action
-      ControlNode = FanCoil(FanCoilNum)%HotControlNode
-      ControlOffset = FanCoil(FanCoilNum)%HotControlOffset
-      MaxWaterFlow = FanCoil(FanCoilNum)%MaxHotWaterFlow
-      MinWaterFlow = FanCoil(FanCoilNum)%MinHotWaterFlow
-      !On the first HVAC iteration the system values are given to the controller, but after that
-      ! the demand limits are in place and there needs to be feedback to the Zone Equipment
-      If(.not. FirstHVACIteration) Then
-        MaxWaterFlow = Node(ControlNode)%MassFlowRateMaxAvail
-        MinWaterFlow = Node(ControlNode)%MassFlowRateMinAvail
-      End If
-      QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP
-      CALL ControlCompOutput(CompType=cMO_FanCoil,CompNum=FanCoilNum, &
+    ELSE IF (UnitOn .and. QCoilHeatSP > SmallLoad .and. TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
+      ! get full load result
+      mdot = FanCoil(FanCoilNum)%MaxHotWaterFlow
+      CALL SetComponentFlowRate(mdot , &
+                                FanCoil(FanCoilNum)%HotControlNode, &
+                                FanCoil(FanCoilNum)%HotPlantOutletNode, &
+                                FanCoil(FanCoilNum)%HWLoopNum, &
+                                FanCoil(FanCoilNum)%HWLoopSide, &
+                                FanCoil(FanCoilNum)%HWBranchNum, &
+                                FanCoil(FanCoilNum)%HWCompNum)
+      CALL Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,QUnitOutMaxHC)
+      IF(QUnitOutMaxHC .GT. QCoilHeatSP)THEN
+        ! more heating than required, find reduced water flow rate to meet the load
+        ControlNode = FanCoil(FanCoilNum)%HotControlNode
+        ControlOffset = FanCoil(FanCoilNum)%HotControlOffset
+        MaxWaterFlow = FanCoil(FanCoilNum)%MaxHotWaterFlow
+        MinWaterFlow = FanCoil(FanCoilNum)%MinHotWaterFlow
+        !On the first HVAC iteration the system values are given to the controller, but after that
+        ! the demand limits are in place and there needs to be feedback to the Zone Equipment
+        If(.not. FirstHVACIteration) Then
+          MaxWaterFlow = Node(ControlNode)%MassFlowRateMaxAvail
+          MinWaterFlow = Node(ControlNode)%MassFlowRateMinAvail
+        End If
+        QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP
+        CALL ControlCompOutput(CompType=cMO_FanCoil,CompNum=FanCoilNum, &
                              FirstHVACIteration=FirstHVACIteration,QZnReq=QZnReq, &
                              ActuatedNode=ControlNode,MaxFlow=MaxWaterFlow, &
                              MinFlow=MinWaterFlow,ControlOffSet=ControlOffset,Action=iNormalAction, &
@@ -1448,7 +1486,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
                              LoopNum     = FanCoil(FanCoilNum)%HWLoopNum, &
                              LoopSide    = FanCoil(FanCoilNum)%HWLoopSide, &
                              BranchIndex = FanCoil(FanCoilNum)%HWBranchNum)
-
+      ENDIF
       QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
                    - PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
     ELSE
@@ -1517,7 +1555,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
 
       CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutNOHC)
 
-      IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < 0.0 .and. &
+      IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < (-1.d0*SmallLoad) .and. &
           TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
         ! cooling coil action, maximum cold water flow
         mdot = FanCoil(FanCoilNum)%MaxColdWaterFlow
@@ -1576,7 +1614,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
         ! at the end calculate output with adjusted PLR
         CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
 
-      ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > 0.0 .and. &
+      ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > SmallLoad .and. &
                TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
         ! heating coil action, maximun hot water flow
     !    Node(FanCoil(FanCoilNum)%HotControlNode)%MassFlowRate = FanCoil(FanCoilNum)%MaxHotWaterFlow
@@ -1695,7 +1733,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
 
     CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOutNOHC)
 
-    IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < 0.0 .and. &
+    IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToCoolSP < (-1.d0*SmallLoad) .and. &
         TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) THEN
       ! cooling coil action, maximum cold water flow
       mdot = FanCoil(FanCoilNum)%MaxColdWaterFlow
@@ -1743,7 +1781,7 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       ! at the end calculate output with adjusted PLR
       CALL Calc4PipeFanCoil (FanCoilNum,FirstHVACIteration,QUnitOut, PLR)
 
-    ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > 0.0 .and. &
+    ELSE IF (UnitOn .and. ZoneSysEnergyDemand(ZoneNum)%RemainingOutputReqToHeatSP > SmallLoad .and. &
              TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) THEN
       ! heating coil action, maximun hot water flow
       mdot = FanCoil(FanCoilNum)%MaxHotWaterFlow
@@ -1831,7 +1869,7 @@ SUBROUTINE Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,LoadMet,PLR)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   March 2000
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1844,11 +1882,12 @@ SUBROUTINE Calc4PipeFanCoil(FanCoilNum,FirstHVACIteration,LoadMet,PLR)
           ! na
 
           ! USE STATEMENTS:
-USE MixedAir, ONLY:   SimOAMixer
-USE Fans, ONLY:       SimulateFanComponents
-USE WaterCoils, ONLY: SimulateWaterCoilComponents
+USE MixedAir,            ONLY: SimOAMixer
+USE Fans,                ONLY: SimulateFanComponents
+USE WaterCoils,          ONLY: SimulateWaterCoilComponents
 USE HVACHXAssistedCoolingCoil, ONLY: SimHXAssistedCoolingCoil
-USE Psychrometrics, ONLY:PsyHFnTdbW
+USE Psychrometrics,      ONLY: PsyHFnTdbW
+USE DataHVACGlobals,     ONLY: ZoneCompTurnFansOn, ZoneCompTurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1915,13 +1954,15 @@ IF(FanCoil(FanCoilNum)%CapCtrlMeth_Num .eq. CCM_CycFan)THEN
   ! cycling fan coil unit calculation
   IF (FanCoil(FanCoilNum)%SpeedFanSel .eq. 1)THEN
     CALL SimulateFanComponents(FanCoil(FanCoilNum)%FanName,FirstHVACIteration,  &
-       FanCoil(FanCoilNum)%FanIndex,FanCoil(FanCoilNum)%LowSpeedRatio)
+         FanCoil(FanCoilNum)%FanIndex,FanCoil(FanCoilNum)%LowSpeedRatio, &
+         ZoneCompTurnFansOn, ZoneCompTurnFansOff)
   ELSE IF (FanCoil(FanCoilNum)%SpeedFanSel .eq. 2)THEN
     CALL SimulateFanComponents(FanCoil(FanCoilNum)%FanName,FirstHVACIteration,  &
-       FanCoil(FanCoilNum)%FanIndex,FanCoil(FanCoilNum)%MedSpeedRatio)
+         FanCoil(FanCoilNum)%FanIndex,FanCoil(FanCoilNum)%MedSpeedRatio, &
+         ZoneCompTurnFansOn, ZoneCompTurnFansOff)
   ELSE
     CALL SimulateFanComponents(FanCoil(FanCoilNum)%FanName,FirstHVACIteration,  &
-       FanCoil(FanCoilNum)%FanIndex, 1.0d0)
+         FanCoil(FanCoilNum)%FanIndex, 1.0d0, ZoneCompTurnFansOn, ZoneCompTurnFansOff)
   END IF
   IF(FanCoil(FanCoilNum)%CCoilType_Num == CCoil_HXAssist) THEN
     CALL SimHXAssistedCoolingCoil(FanCoil(FanCoilNum)%CCoilName,FirstHVACIteration,On,  &
@@ -1935,7 +1976,8 @@ IF(FanCoil(FanCoilNum)%CapCtrlMeth_Num .eq. CCM_CycFan)THEN
 
 ELSE
   ! Constant fan and variable flow calculation AND variable fan
-  CALL SimulateFanComponents(FanCoil(FanCoilNum)%FanName,FirstHVACIteration,FanCoil(FanCoilNum)%FanIndex)
+  CALL SimulateFanComponents(FanCoil(FanCoilNum)%FanName,FirstHVACIteration,FanCoil(FanCoilNum)%FanIndex, &
+                               ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
   IF(FanCoil(FanCoilNum)%CCoilType_Num == CCoil_HXAssist) THEN
     CALL SimHXAssistedCoolingCoil(FanCoil(FanCoilNum)%CCoilName,FirstHVACIteration,On,  &
                                    0.0d0,FanCoil(FanCoilNum)%CCoilName_Index,ContFanCycCoil)

@@ -39,7 +39,7 @@ using namespace std;
 #include "BGL.h"
 namespace BGL = BldgGeomLib;
 
-#include	"def.h"
+#include	"DEF.H"
 #include	"NodeMesh2.h"
 #include	"WLCSurface.h"
 

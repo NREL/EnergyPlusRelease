@@ -86,13 +86,32 @@ INTEGER :: pdchCoolCoilArea
 ! DX Cooling Coil subtable
 INTEGER :: pdstDXCoolCoil            !
 INTEGER :: pdchDXCoolCoilType        ! DX cooling coil type
-INTEGER :: pdchDXCoolCoilSEERSI      ! SEER value in SI unit at AHRI std. 210/240 conditions [W/W]
+
+INTEGER :: pdchDXCoolCoilNetCapSI      ! Standard Rated (Net) Cooling Capacity [W]
+INTEGER :: pdchDXCoolCoilCOP       ! EER/COP value in SI unit at AHRI std. 340/360 conditions [W/W]
 INTEGER :: pdchDXCoolCoilSEERIP      ! SEER value in IP unit at AHRI std. 210/240 conditions [Btu/W-hr]
-INTEGER :: pdchDXCoolCoilNetCap      ! Standard Rated (Net) Cooling Capacity [W]
-INTEGER :: pdchDXCoolCoilEERSI       ! EER value in SI unit at AHRI std. 340/360 conditions [W/W]
-INTEGER :: pdchDXCoolCoilEERIP       ! EER value in IP unit at AHRI std. 340/360 conditions [W/W]
-INTEGER :: pdchDXCoolCoilIEERSI      ! IEER value in SI unit at AHRI std. 340/360 conditions [W/W]
-INTEGER :: pdchDXCoolCoilIEERIP      ! IEER value in IP unit at AHRI std. 340/360 conditions [W/W]
+INTEGER :: pdchDXCoolCoilEERIP       ! EER value in IP unit at AHRI std. 340/360 conditions [Btu/W-h]
+INTEGER :: pdchDXCoolCoilIEERIP      ! IEER value in IP unit at AHRI std. 340/360 conditions
+
+! VAV DX Cooling Ratings Details
+INTEGER :: pdstVAVDXCoolCoil   ! details for Packaged VAV rating under AHRI 340/360
+INTEGER :: pdchVAVDXCoolCoilType
+INTEGER :: pdchVAVDXFanName
+INTEGER :: pdchVAVDXCoolCoilNetCapSI
+INTEGER :: pdchVAVDXCoolCoilCOP
+INTEGER :: pdchVAVDXCoolCoilIEERIP
+INTEGER :: pdchVAVDXCoolCoilEERIP
+INTEGER :: pdchVAVDXCoolCoilMdotA
+INTEGER :: pdchVAVDXCoolCoilCOP_B
+INTEGER :: pdchVAVDXCoolCoilEER_B_IP
+INTEGER :: pdchVAVDXCoolCoilMdotB
+INTEGER :: pdchVAVDXCoolCoilCOP_C
+INTEGER :: pdchVAVDXCoolCoilEER_C_IP
+INTEGER :: pdchVAVDXCoolCoilMdotC
+INTEGER :: pdchVAVDXCoolCoilCOP_D
+INTEGER :: pdchVAVDXCoolCoilEER_D_IP
+INTEGER :: pdchVAVDXCoolCoilMdotD
+
 
 ! DX Heating Coil subtable
 INTEGER :: pdstDXHeatCoil            !
@@ -420,103 +439,103 @@ INTEGER :: pdchSHGSHtIzaRem
 INTEGER :: pdchSHGSHtInfilRem
 INTEGER :: pdchSHGSHtOtherRem
 !Standard62Report
-INTEGER :: pdrStd62 
-INTEGER :: pdstS62sysVentReqCool 
-INTEGER :: pdchS62svrClSumVpz 
-INTEGER :: pdchS62svrClPs 
-INTEGER :: pdchS62svrClSumPz 
-INTEGER :: pdchS62svrClD 
-INTEGER :: pdchS62svrClVou 
-INTEGER :: pdchS62svrClVps 
-INTEGER :: pdchS62svrClXs 
-INTEGER :: pdchS62svrClEv 
-INTEGER :: pdchS62svrClVot 
-INTEGER :: pdchS62svrClPercOA 
+INTEGER :: pdrStd62
+INTEGER :: pdstS62sysVentReqCool
+INTEGER :: pdchS62svrClSumVpz
+INTEGER :: pdchS62svrClPs
+INTEGER :: pdchS62svrClSumPz
+INTEGER :: pdchS62svrClD
+INTEGER :: pdchS62svrClVou
+INTEGER :: pdchS62svrClVps
+INTEGER :: pdchS62svrClXs
+INTEGER :: pdchS62svrClEv
+INTEGER :: pdchS62svrClVot
+INTEGER :: pdchS62svrClPercOA
 
-INTEGER :: pdstS62sysVentReqHeat 
-INTEGER :: pdchS62svrHTSumVpz 
-INTEGER :: pdchS62svrHtPs 
-INTEGER :: pdchS62svrHtSumPz 
-INTEGER :: pdchS62svrHtD 
-INTEGER :: pdchS62svrHtVou 
-INTEGER :: pdchS62svrHtVps 
-INTEGER :: pdchS62svrHtXs 
-INTEGER :: pdchS62svrHtEv 
-INTEGER :: pdchS62svrHtVot 
-INTEGER :: pdchS62svrHtPercOA 
+INTEGER :: pdstS62sysVentReqHeat
+INTEGER :: pdchS62svrHTSumVpz
+INTEGER :: pdchS62svrHtPs
+INTEGER :: pdchS62svrHtSumPz
+INTEGER :: pdchS62svrHtD
+INTEGER :: pdchS62svrHtVou
+INTEGER :: pdchS62svrHtVps
+INTEGER :: pdchS62svrHtXs
+INTEGER :: pdchS62svrHtEv
+INTEGER :: pdchS62svrHtVot
+INTEGER :: pdchS62svrHtPercOA
 
-INTEGER :: pdstS62znVentPar 
+INTEGER :: pdstS62znVentPar
 INTEGER :: pdchS62zvpAlN
-INTEGER :: pdchS62zvpRp 
-INTEGER :: pdchS62zvpPz 
-INTEGER :: pdchS62zvpRa 
-INTEGER :: pdchS62zvpAz 
-INTEGER :: pdchS62zvpVbz 
-INTEGER :: pdchS62zvpClEz 
-INTEGER :: pdchS62zvpClVoz 
-INTEGER :: pdchS62zvpHtEz 
-INTEGER :: pdchS62zvpHtVoz 
+INTEGER :: pdchS62zvpRp
+INTEGER :: pdchS62zvpPz
+INTEGER :: pdchS62zvpRa
+INTEGER :: pdchS62zvpAz
+INTEGER :: pdchS62zvpVbz
+INTEGER :: pdchS62zvpClEz
+INTEGER :: pdchS62zvpClVoz
+INTEGER :: pdchS62zvpHtEz
+INTEGER :: pdchS62zvpHtVoz
 
-INTEGER :: pdstS62sysVentPar 
-INTEGER :: pdchS62svpRp 
-INTEGER :: pdchS62svpPz 
-INTEGER :: pdchS62svpRa 
-INTEGER :: pdchS62svpAz 
-INTEGER :: pdchS62svpVbz 
-INTEGER :: pdchS62svpClVoz 
-INTEGER :: pdchS62svpHtVoz 
+INTEGER :: pdstS62sysVentPar
+INTEGER :: pdchS62svpRp
+INTEGER :: pdchS62svpPz
+INTEGER :: pdchS62svpRa
+INTEGER :: pdchS62svpAz
+INTEGER :: pdchS62svpVbz
+INTEGER :: pdchS62svpClVoz
+INTEGER :: pdchS62svpHtVoz
 
-INTEGER :: pdstS62znCoolDes 
+INTEGER :: pdstS62znCoolDes
 INTEGER :: pdchS62zcdAlN
 INTEGER :: pdchS62zcdBox
-INTEGER :: pdchS62zcdVpz 
-INTEGER :: pdchS62zcdVps 
+INTEGER :: pdchS62zcdVpz
+INTEGER :: pdchS62zcdVps
 INTEGER :: pdchS62zcdVsec
-INTEGER :: pdchS62zcdVdz 
-INTEGER :: pdchS62zcdVpzmin 
-INTEGER :: pdchS62zcdVozclg 
-INTEGER :: pdchS62zcdZpz 
-INTEGER :: pdchS62zcdEp 
-INTEGER :: pdchS62zcdEr 
-INTEGER :: pdchS62zcdFa 
-INTEGER :: pdchS62zcdFb 
-INTEGER :: pdchS62zcdFc 
-INTEGER :: pdchS62zcdEvz 
+INTEGER :: pdchS62zcdVdz
+INTEGER :: pdchS62zcdVpzmin
+INTEGER :: pdchS62zcdVozclg
+INTEGER :: pdchS62zcdZpz
+INTEGER :: pdchS62zcdEp
+INTEGER :: pdchS62zcdEr
+INTEGER :: pdchS62zcdFa
+INTEGER :: pdchS62zcdFb
+INTEGER :: pdchS62zcdFc
+INTEGER :: pdchS62zcdEvz
 
-INTEGER :: pdstS62sysCoolDes 
-INTEGER :: pdchS62scdVpz 
-INTEGER :: pdchS62scdVps 
+INTEGER :: pdstS62sysCoolDes
+INTEGER :: pdchS62scdVpz
+INTEGER :: pdchS62scdVps
 INTEGER :: pdchS62scdVsec
-INTEGER :: pdchS62scdVdz 
-INTEGER :: pdchS62scdVpzmin 
-INTEGER :: pdchS62scdVozclg 
-INTEGER :: pdchS62scdEvz 
+INTEGER :: pdchS62scdVdz
+INTEGER :: pdchS62scdVpzmin
+INTEGER :: pdchS62scdVozclg
+INTEGER :: pdchS62scdEvz
 
-INTEGER :: pdstS62znHeatDes 
+INTEGER :: pdstS62znHeatDes
 INTEGER :: pdchS62zhdAlN
 INTEGER :: pdchS62zhdBox
-INTEGER :: pdchS62zhdVpz 
-INTEGER :: pdchS62zhdVps 
+INTEGER :: pdchS62zhdVpz
+INTEGER :: pdchS62zhdVps
 INTEGER :: pdchS62zhdVsec
-INTEGER :: pdchS62zhdVdz 
-INTEGER :: pdchS62zhdVpzmin 
-INTEGER :: pdchS62zhdVozhtg 
-INTEGER :: pdchS62zhdZpz 
-INTEGER :: pdchS62zhdEp 
-INTEGER :: pdchS62zhdEr 
-INTEGER :: pdchS62zhdFa 
-INTEGER :: pdchS62zhdFb 
-INTEGER :: pdchS62zhdFc 
-INTEGER :: pdchS62zhdEvz 
+INTEGER :: pdchS62zhdVdz
+INTEGER :: pdchS62zhdVpzmin
+INTEGER :: pdchS62zhdVozhtg
+INTEGER :: pdchS62zhdZpz
+INTEGER :: pdchS62zhdEp
+INTEGER :: pdchS62zhdEr
+INTEGER :: pdchS62zhdFa
+INTEGER :: pdchS62zhdFb
+INTEGER :: pdchS62zhdFc
+INTEGER :: pdchS62zhdEvz
 
-INTEGER :: pdstS62sysHeatDes 
-INTEGER :: pdchS62shdVpz 
-INTEGER :: pdchS62shdVps 
+INTEGER :: pdstS62sysHeatDes
+INTEGER :: pdchS62shdVpz
+INTEGER :: pdchS62shdVps
 INTEGER :: pdchS62shdVsec
-INTEGER :: pdchS62shdVdz 
-INTEGER :: pdchS62shdVpzmin 
-INTEGER :: pdchS62shdVozhtg 
-INTEGER :: pdchS62shdEvz 
+INTEGER :: pdchS62shdVdz
+INTEGER :: pdchS62shdVpzmin
+INTEGER :: pdchS62shdVozhtg
+INTEGER :: pdchS62shdEvz
 
 ! Internal data structures to store information provided by calls
 
@@ -524,6 +543,7 @@ INTEGER, PARAMETER :: sizeIncrement = 100
 
 TYPE reportNameType
   CHARACTER(len=MaxNameLength) :: name = ''
+  CHARACTER(len=MaxNameLength) :: namewithspaces = ''  ! a "prettier version" than the key value
   CHARACTER(len=MaxNameLength) :: abrev = ''
   LOGICAL                      :: show = .FALSE.
 END TYPE
@@ -535,7 +555,7 @@ INTEGER                                           :: numReportName
 TYPE SubTableType
   CHARACTER(len=MaxNameLength)  :: name      = ''
   INTEGER                       :: indexReportName  = 0
-  CHARACTER(len=MaxNameLength)  :: footnote  = ''
+  CHARACTER(len=2*MaxNameLength)  :: footnote  = ''
 END TYPE
 TYPE (SubTableType), ALLOCATABLE, DIMENSION(:) :: subTable
 TYPE (SubTableType), ALLOCATABLE, DIMENSION(:) :: subTableCopy
@@ -640,7 +660,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
 ! Climate Summary Report
-pdrClim = newPreDefReport('ClimaticDataSummary','Clim')
+pdrClim = newPreDefReport('ClimaticDataSummary','Clim','Climatic Data Summary')
 
 pdstDesDay = newPreDefSubTable(pdrClim,'SizingPeriod:DesignDay')
 
@@ -656,7 +676,7 @@ pdchWthrVal = newPreDefColumn(pdstWthr,'Value')
 
 ! Envelope Report
 
-pdrEnvelope =   newPreDefReport('EnvelopeSummary','Env')
+pdrEnvelope =   newPreDefReport('EnvelopeSummary','Env','Envelope Summary')
 
 pdstOpaque =    newPreDefSubTable(pdrEnvelope,'Opaque Exterior')
 
@@ -712,7 +732,7 @@ pdchDrGrArea =  newPreDefColumn(pdstDoor,'Gross Area [m2]')
 pdchDrParent = newPreDefColumn(pdstDoor,'Parent Surface')
 
 ! Shading Report
-pdrShading =       newPreDefReport('ShadingSummary','Shade')
+pdrShading =       newPreDefReport('ShadingSummary','Shade','Shading Summary')
 
 pdstSunlitFrac  =   newPreDefSubTable(pdrShading,'Sunlit Fraction')
 
@@ -735,7 +755,7 @@ pdchWscControl = newPreDefColumn(pdstWindowControl,'Control')
 pdchWscGlare = newPreDefColumn(pdstWindowControl,'Glare Control')
 
 ! Lighting Report
-pdrLighting =  newPreDefReport('LightingSummary','Light')
+pdrLighting =  newPreDefReport('LightingSummary','Light','Lighting Summary')
 
 pdstInLite =   newPreDefSubTable(pdrLighting, 'Interior Lighting')
 
@@ -773,7 +793,7 @@ pdchExLtConsump = newPreDefColumn(pdstExtLite,'Consumption [GJ]')
 
 ! HVAC Equipment Report
 
-pdrEquip = newPreDefReport('EquipmentSummary','Equip')
+pdrEquip = newPreDefReport('EquipmentSummary','Equip','Equipment Summary')
 
 pdstMech = newPreDefSubTable(pdrEquip,'Central Plant')
 
@@ -828,21 +848,20 @@ pdchCoolCoilUATotal = newPreDefColumn(pdstCoolCoil,'Nominal Coil UA Value [W/C]'
 pdchCoolCoilArea    = newPreDefColumn(pdstCoolCoil,'Nominal Coil Surface Area [m2]')
 
 pdstDXCoolCoil = newPreDefSubTable(pdrEquip,'DX Cooling Coils')
-pdchDXCoolCoilType   = newPreDefColumn(pdstDXCoolCoil,'DX Cooling Coil Type')
-pdchDXCoolCoilNetCap = newPreDefColumn(pdstDXCoolCoil,'Standard Rating (Net) Cooling Capacity [W]')
-pdchDXCoolCoilSEERSI = newPreDefColumn(pdstDXCoolCoil,'SEER in SI Units [W/W]')
-pdchDXCoolCoilSEERIP = newPreDefColumn(pdstDXCoolCoil,'SEER in IP Units [Btu/W-h]')
-pdchDXCoolCoilEERSI = newPreDefColumn(pdstDXCoolCoil,'EER in SI Units [W/W]')
-pdchDXCoolCoilEERIP = newPreDefColumn(pdstDXCoolCoil,'EER in IP Units [Btu/W-h]')
-pdchDXCoolCoilIEERSI = newPreDefColumn(pdstDXCoolCoil,'IEER in SI Units [W/W]')
-pdchDXCoolCoilIEERIP = newPreDefColumn(pdstDXCoolCoil,'IEER in IP Units [Btu/W-h]')
+pdchDXCoolCoilType     = newPreDefColumn(pdstDXCoolCoil,'DX Cooling Coil Type')
+pdchDXCoolCoilNetCapSI = newPreDefColumn(pdstDXCoolCoil,'Standard Rated Net Cooling Capacity [W]')
+
+pdchDXCoolCoilCOP      = newPreDefColumn(pdstDXCoolCoil, 'Standard Rated Net COP [W/W]')
+pdchDXCoolCoilEERIP    = newPreDefColumn(pdstDXCoolCoil,'EER [Btu/W-h]')
+pdchDXCoolCoilSEERIP   = newPreDefColumn(pdstDXCoolCoil,'SEER [Btu/W-h]')
+pdchDXCoolCoilIEERIP   = newPreDefColumn(pdstDXCoolCoil,'IEER [Btu/W-h]')
+
 
 pdstDXHeatCoil          = newPreDefSubTable(pdrEquip,'DX Heating Coils')
 pdchDXHeatCoilType      = newPreDefColumn(pdstDXHeatCoil,'DX Heating Coil Type')
 pdchDXHeatCoilHighCap   = newPreDefColumn(pdstDXHeatCoil,'High Temperature Heating (net) Rating Capacity [W]')
 pdchDXHeatCoilLowCap    = newPreDefColumn(pdstDXHeatCoil,'Low Temperature Heating (net) Rating Capacity [W]')
-pdchDXHeatCoilHSPFSI    = newPreDefColumn(pdstDXHeatCoil,'HSPF in SI Units [W/W]')
-pdchDXHeatCoilHSPFIP    = newPreDefColumn(pdstDXHeatCoil,'HSPF in IP Units [Btu/W-h]')
+pdchDXHeatCoilHSPFIP    = newPreDefColumn(pdstDXHeatCoil,'HSPF [Btu/W-h]')
 pdchDXHeatCoilRegionNum = newPreDefColumn(pdstDXHeatCoil,'Region Number')
 
 pdstHeatCoil = newPreDefSubTable(pdrEquip,'Heating Coils')
@@ -881,7 +900,7 @@ pdchSWHEnFac =       newPreDefColumn(pdstSWH,'Energy Factor')
 
 ! Sizing Report
 
-pdrSizing =     newPreDefReport('HVACSizingSummary','Size')
+pdrSizing =     newPreDefReport('HVACSizingSummary','Size','HVAC Sizing Summary')
 
 pdstZoneClSize =  newPreDefSubTable(pdrSizing,'Zone Cooling')
 
@@ -914,7 +933,7 @@ pdchSysSizUserHtAir    = newPreDefColumn(pdstSystemSize,'User heating [m3/s]')
 
 ! System Summary Report
 
-pdrSystem =  newPreDefReport('SystemSummary','Sys')
+pdrSystem =  newPreDefReport('SystemSummary','Sys','System Summary')
 
 pdstEconomizer = newPreDefSubTable(pdrSystem, 'Economizer')
 
@@ -948,7 +967,7 @@ pdchULnotMetHeatOcc    = newPreDefColumn(pdstUnmetLoads,'During Occupied Heating
 pdchULnotMetCoolOcc    = newPreDefColumn(pdstUnmetLoads,'During Occupied Cooling [hr]')
 
 ! Outside Air Report
-pdrOutsideAir = newPreDefReport('OutdoorAirSummary','OA')
+pdrOutsideAir = newPreDefReport('OutdoorAirSummary','OA','Outdoor Air Summary')
 
 pdstOAavgOcc = newPreDefSubTable(pdrOutsideAir, 'Average Outdoor Air During Occupied Hours')
 
@@ -974,7 +993,7 @@ pdchOaoMinSimpVent =  newPreDefColumn(pdstOAminOcc,'Simple Ventilation [ach]')
 CALL addFootNoteSubTable(pdstOAminOcc,'Values shown for a single zone without multipliers')
 
 ! Object Count Report
-pdrObjCnt = newPreDefReport('ObjectCountSummary','Count')
+pdrObjCnt = newPreDefReport('ObjectCountSummary','Count','Object Count Summary')
 
 pdstSurfCnt = newPreDefSubTable(pdrObjCnt,'Surfaces by Class')
 pdchSurfCntTot =  newPreDefColumn(pdstSurfCnt,'Total')
@@ -987,7 +1006,7 @@ pdstFieldCnt = newPreDefSubTable(pdrObjCnt,'Input Fields')
 pdchFieldCntVal =  newPreDefColumn(pdstFieldCnt,'Count')
 
 ! Energy Meters report
-pdrEnergyMeters = newPreDefReport('EnergyMeters','Meters')
+pdrEnergyMeters = newPreDefReport('EnergyMeters','Meters','Energy Meters')
 
 !pdstEMvalues = newPreDefSubTable(pdrEnergyMeters,'Annual and Peak Values')
 !pdchEMannual = newPreDefColumn(pdstEMvalues,'Annual Value [GJ]')
@@ -1060,7 +1079,7 @@ pdchEMotherJmaxvalue = newPreDefColumn(pdstEMotherJvalues,'Maximum Value [W]')
 pdchEMotherJmaxvaluetime = newPreDefColumn(pdstEMotherJvalues,'Timestamp of Maximum')
 
 ! Sensible Heat Gas Component Report
-pdrSensibleGain = newPreDefReport('SensibleHeatGainSummary','SHGS')
+pdrSensibleGain = newPreDefReport('SensibleHeatGainSummary','SHGS','Sensible Heat Gain Summary')
 
 pdstSHGSannual = newPreDefSubTable(pdrSensibleGain, 'Annual Building Sensible Heat Gain Components')
 
@@ -1124,7 +1143,7 @@ pdchSHGSHtOtherRem  =   newPreDefColumn(pdstSHGSpkHt,'Opaque Surface Conduction 
 
 !Standard62Report
 IF (DoZoneSizing .OR. DoSystemSizing) THEN
-  pdrStd62 = newPreDefReport('Standard62.1Summary','Std62')
+  pdrStd62 = newPreDefReport('Standard62.1Summary','Std62','Standard 62.1 Summary')
 
   pdstS62sysVentReqCool = newPreDefSubTable(pdrStd62, 'System Ventilation Requirements for Cooling')
 
@@ -1572,7 +1591,7 @@ ShadowRelate(numShadowRelate)%recKind =    receivingKind
 END SUBROUTINE AddShadowRelateTableEntry
 
 
-INTEGER FUNCTION newPreDefReport(inReportName,inReportAbrev)
+INTEGER FUNCTION newPreDefReport(inReportName,inReportAbrev,inReportNamewithSpaces)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Jason Glazer
           !       DATE WRITTEN   August 2006
@@ -1598,6 +1617,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE PARAMETER DEFINITIONS:
 CHARACTER(len=*),INTENT(IN)  :: inReportName
 CHARACTER(len=*),INTENT(IN)  :: inReportAbrev
+CHARACTER(len=*),INTENT(IN)  :: inReportNamewithSpaces
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -1627,6 +1647,7 @@ END IF
 ! initialize new record
 reportName(numReportName)%name = inReportName
 reportName(numReportName)%abrev = inReportAbrev
+reportName(numReportName)%namewithspaces = inReportNamewithSpaces
 reportName(numReportName)%show = .FALSE.
 newPreDefReport = numReportName
 END FUNCTION newPreDefReport

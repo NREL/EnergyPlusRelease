@@ -2876,7 +2876,7 @@ SUBROUTINE OpenOutputTabularFile
 
           ! USE STATEMENTS:
 USE DataStringGlobals, ONLY : VerString
-USE DataEnvironment,   ONLY : EnvironmentName
+USE DataEnvironment,   ONLY : EnvironmentName, WeatherFileLocationTitle
 USE DataHeatBalance,   ONLY : BuildingName
 
 IMPLICIT NONE
@@ -2921,7 +2921,11 @@ IF (WriteTabularFiles) THEN
       WRITE(curFH,*) 'Tabular Output Report in Format: '// curDel // 'Comma'
       WRITE(curFH,fmta) ''
       WRITE(curFH,fmta) 'Building:'    // curDel //TRIM(BuildingName)
-      WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)
+      IF (EnvironmentName == WeatherFileLocationTitle) THEN
+        WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)
+      ELSE
+        WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle)
+      ENDIF
       WRITE(curFH,fmta) ''
     ELSEIF (tableStyle(iStyle) .eq. tableStyleTab) THEN
       CALL DisplayString('Writing tabular output file results using tab format.')
@@ -2933,7 +2937,11 @@ IF (WriteTabularFiles) THEN
       WRITE(curFH,fmta) 'Tabular Output Report in Format: '// curDel // 'Tab'
       WRITE(curFH,fmta) ''
       WRITE(curFH,fmta) 'Building:'    // curDel //TRIM(BuildingName)
-      WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)
+      IF (EnvironmentName == WeatherFileLocationTitle) THEN
+        WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)
+      ELSE
+        WRITE(curFH,fmta) 'Environment:' // curDel //TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle)
+      ENDIF
       WRITE(curFH,fmta) ''
     ELSEIF (tableStyle(iStyle) .eq. tableStyleHTML) THEN
       CALL DisplayString('Writing tabular output file results using HTML format.')
@@ -2945,7 +2953,11 @@ IF (WriteTabularFiles) THEN
                                   '"http://www.w3.org/TR/html4/loose.dtd">'
       WRITE(curFH,fmta) '<html>'
       WRITE(curFH,fmta) '<head>'
-      WRITE(curFH,fmta) '<title> ' // TRIM(BuildingName) // ' ' // TRIM(EnvironmentName)
+      IF (EnvironmentName == WeatherFileLocationTitle) THEN
+        WRITE(curFH,fmta) '<title> ' // TRIM(BuildingName) // ' ' // TRIM(EnvironmentName)
+      ELSE
+        WRITE(curFH,fmta) '<title> ' // TRIM(BuildingName) // ' ' // TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle)
+      ENDIF
       WRITE(curFH,TimeStampFmt1) '  ',td(1),'-', td(2),'-',td(3)
       WRITE(curFH,TimeStampFmt2) '  ',td(5),':', td(6),':',td(7),' '
       WRITE(curFH,fmta) ' - EnergyPlus</title>'
@@ -2956,7 +2968,11 @@ IF (WriteTabularFiles) THEN
       WRITE(curFH,fmta) '<p>Program Version:<b>'// TRIM(VerString) // '</b></p>'
       WRITE(curFH,fmta) '<p>Tabular Output Report in Format: <b>HTML</b></p>'
       WRITE(curFH,fmta) '<p>Building: <b>' //TRIM(BuildingName) // '</b></p>'
-      WRITE(curFH,fmta) '<p>Environment: <b>' //TRIM(EnvironmentName) // '</b></p>'
+      IF (EnvironmentName == WeatherFileLocationTitle) THEN
+        WRITE(curFH,fmta) '<p>Environment: <b>' //TRIM(EnvironmentName) // '</b></p>'
+      ELSE
+        WRITE(curFH,fmta) '<p>Environment: <b>' //TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle)// '</b></p>'
+      ENDIF
       WRITE(curFH,TimeStampFmt1) "<p>Simulation Timestamp: <b>", td(1),'-', td(2),'-',td(3)
       WRITE(curFH,TimeStampFmt2) '  ',td(5),':', td(6),':',td(7),'</b></p>'
     ELSE
@@ -2969,7 +2985,11 @@ IF (WriteTabularFiles) THEN
       WRITE(curFH,fmta) 'Tabular Output Report in Format: '// curDel // 'Fixed'
       WRITE(curFH,fmta) ''
       WRITE(curFH,fmta) 'Building:        ' //TRIM(BuildingName)
-      WRITE(curFH,fmta) 'Environment:     ' //TRIM(EnvironmentName)
+      IF (EnvironmentName == WeatherFileLocationTitle) THEN
+        WRITE(curFH,fmta) 'Environment:     ' //TRIM(EnvironmentName)
+      ELSE
+        WRITE(curFH,fmta) 'Environment:     ' //TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle)
+      ENDIF
       WRITE(curFH,fmta) ''
     END IF
   END DO
@@ -3112,8 +3132,8 @@ DO iStyle = 1, numStyles
     END IF
     DO kReport = 1, numReportName
       IF (reportName(kReport)%show) THEN
-        WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName(TRIM(reportName(kReport)%name), &
-                          'Entire Facility')) // '">'//TRIM(reportName(kReport)%name)//'</a>'
+        WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName(TRIM(reportName(kReport)%namewithSpaces), &
+                          'Entire Facility')) // '">'//TRIM(reportName(kReport)%namewithSpaces)//'</a>'
       END IF
     END DO
     IF (DoWeathSim) THEN
@@ -4069,8 +4089,10 @@ SUBROUTINE GatherHeatGainReport(IndexTypeKey)
 ! Column                               Output Variable                                Internal Data Structure       Timestep    Rate/Energy
 ! ------                               ---------------                                -----------------------       --------    -----------
 ! HVAC Input Sensible Air Heating      Zone Air Balance System Air Transfer Rate      ZnAirRpt()%SumMCpDTsystem     HVAC        Rate
+!                                      Zone Air Balance System Convective Gains Rate  ZnAirRpt()%SumNonAirSystem    HVAC        Rate
 !
 ! HVAC Input Sensible Air Cooling      Zone Air Balance System Air Transfer Rate      ZnAirRpt()%SumMCpDTsystem     HVAC        Rate
+!                                      Zone Air Balance System Convective Gains Rate  ZnAirRpt()%SumNonAirSystem    HVAC        Rate
 !
 ! HVAC Input Heated Surface Heating    Electric Low Temp Radiant Heating Energy       ElecRadSys()%HeatEnergy       HVAC        Energy
 !                                      Ventilated Slab Radiant Heating Energy         VentSlab()%RadHeatingEnergy   HVAC        Energy
@@ -4200,12 +4222,14 @@ DO iZone = 1, NumOfZones
   ZonePreDefRep(iZone)%SHGSAnLiteAdd =  ZonePreDefRep(iZone)%SHGSAnLiteAdd + ZnRpt(iZone)%LtsTotGain * timeStepRatio
   !HVAC Input Sensible Air Heating
   !HVAC Input Sensible Air Cooling
-  IF (ZnAirRpt(iZone)%SumMCpDTsystem .GT. 0.0) THEN
+  IF ((ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0.0) THEN
     ZonePreDefRep(iZone)%SHGSAnHvacHt =  ZonePreDefRep(iZone)%SHGSAnHvacHt +   &
-       ZnAirRpt(iZone)%SumMCpDTsystem * TimeStepSys * SecInHour
+       ZnAirRpt(iZone)%SumMCpDTsystem * TimeStepSys * SecInHour &
+       + ZnAirRpt(iZone)%SumNonAirSystem * TimeStepSys * SecInHour
   ELSE
     ZonePreDefRep(iZone)%SHGSAnHvacCl =  ZonePreDefRep(iZone)%SHGSAnHvacCl +   &
-       ZnAirRpt(iZone)%SumMCpDTsystem * TimeStepSys * SecInHour
+       ZnAirRpt(iZone)%SumMCpDTsystem * TimeStepSys * SecInHour &
+       + ZnAirRpt(iZone)%SumNonAirSystem * TimeStepSys * SecInHour
   END IF
   !Interzone Air Transfer Heat Addition
   !Interzone Air Transfer Heat Removal
@@ -4307,9 +4331,10 @@ END DO
 ! ZONE PEAK COOLING AND HEATING
 !--------------------------------
 DO iZone = 1, NumOfZones
-  IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)) .GT. 0) THEN
-    IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)) .GT. ZonePreDefRep(iZone)%htPeak) THEN
-      ZonePreDefRep(iZone)%htPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)
+  IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)+ ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0) THEN
+    IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)+ ZnAirRpt(iZone)%SumNonAirSystem) &
+          .GT. ZonePreDefRep(iZone)%htPeak) THEN
+      ZonePreDefRep(iZone)%htPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone) + ZnAirRpt(iZone)%SumNonAirSystem
       !determine timestamp
 !      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
 !      ActualtimeE = ActualTimeS+TimeStepSys
@@ -4320,7 +4345,7 @@ DO iZone = 1, NumOfZones
       ZonePreDefRep(iZone)%htPtTimeStamp = timestepTimeStamp
       !HVAC Input Sensible Air Heating
       !HVAC Input Sensible Air Cooling
-      ZonePreDefRep(iZone)%SHGSHtHvacHt = ZnAirRpt(iZone)%SumMCpDTsystem
+      ZonePreDefRep(iZone)%SHGSHtHvacHt = ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem
       ZonePreDefRep(iZone)%SHGSHtHvacCl = 0.0
       ! HVAC Input Heated Surface Heating
       ! HVAC Input Cooled Surface Cooling
@@ -4389,8 +4414,9 @@ DO iZone = 1, NumOfZones
       ENDIF
     END IF
   ELSE
-    IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone)) .LT. ZonePreDefRep(iZone)%clPeak) THEN
-      ZonePreDefRep(iZone)%clPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone)
+    IF ((ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone) + ZnAirRpt(iZone)%SumNonAirSystem) &
+          .LT. ZonePreDefRep(iZone)%clPeak) THEN
+      ZonePreDefRep(iZone)%clPeak = ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone) + ZnAirRpt(iZone)%SumNonAirSystem
       !determine timestamp
 !      ActualTimeS = CurrentTime-TimeStepZone+SysTimeElapsed
 !      ActualtimeE = ActualTimeS+TimeStepSys
@@ -4402,7 +4428,7 @@ DO iZone = 1, NumOfZones
       !HVAC Input Sensible Air Heating
       !HVAC Input Sensible Air Cooling
       ZonePreDefRep(iZone)%SHGSClHvacHt = 0.0
-      ZonePreDefRep(iZone)%SHGSClHvacCl = ZnAirRpt(iZone)%SumMCpDTsystem
+      ZonePreDefRep(iZone)%SHGSClHvacCl = ZnAirRpt(iZone)%SumMCpDTsystem + ZnAirRpt(iZone)%SumNonAirSystem
       ! HVAC Input Heated Surface Heating
       ! HVAC Input Cooled Surface Cooling
       ZonePreDefRep(iZone)%SHGSClSurfHt = radiantHeat(iZone)
@@ -4477,10 +4503,10 @@ END DO
 bldgHtPk = 0.0
 bldgClPk = 0.0
 DO iZone = 1, NumOfZones
-  IF ((ZnAirRpt(iZone)%SumMCpDTsystem  + radiantHeat(iZone)).GT. 0) THEN
-    bldgHtPk = bldgHtPk + ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone)
+  IF ((ZnAirRpt(iZone)%SumMCpDTsystem  + radiantHeat(iZone) + ZnAirRpt(iZone)%SumNonAirSystem) .GT. 0) THEN
+    bldgHtPk = bldgHtPk + ZnAirRpt(iZone)%SumMCpDTsystem + radiantHeat(iZone) + ZnAirRpt(iZone)%SumNonAirSystem
   ELSE
-    bldgClPk = bldgClPk + ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone)
+    bldgClPk = bldgClPk + ZnAirRpt(iZone)%SumMCpDTsystem + radiantCool(iZone) + ZnAirRpt(iZone)%SumNonAirSystem
   END IF
 END DO
 IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
@@ -4513,7 +4539,8 @@ IF (bldgHtPk .GT. BuildingPreDefRep%htPeak) THEN
   DO iZone = 1, NumOfZones
     !HVAC Input Sensible Air Heating
     !HVAC Input Sensible Air Cooling
-    BuildingPreDefRep%SHGSHtHvacHt = BuildingPreDefRep%SHGSHtHvacHt + ZnAirRpt(iZone)%SumMCpDTsystem
+    BuildingPreDefRep%SHGSHtHvacHt = BuildingPreDefRep%SHGSHtHvacHt + ZnAirRpt(iZone)%SumMCpDTsystem &
+                                      + ZnAirRpt(iZone)%SumNonAirSystem
     ! HVAC Input Heated Surface Heating
     ! HVAC Input Cooled Surface Cooling
     BuildingPreDefRep%SHGSHtSurfHt = BuildingPreDefRep%SHGSHtSurfHt + radiantHeat(iZone)
@@ -4603,7 +4630,8 @@ IF (bldgClPk .LT. BuildingPreDefRep%clPeak) THEN
   DO iZone = 1, NumOfZones
     !HVAC Input Sensible Air Heating
     !HVAC Input Sensible Air Cooling
-    BuildingPreDefRep%SHGSClHvacCl = BuildingPreDefRep%SHGSClHvacCl + ZnAirRpt(iZone)%SumMCpDTsystem
+    BuildingPreDefRep%SHGSClHvacCl = BuildingPreDefRep%SHGSClHvacCl + ZnAirRpt(iZone)%SumMCpDTsystem &
+                                      + ZnAirRpt(iZone)%SumNonAirSystem
     ! HVAC Input Heated Surface Heating
     ! HVAC Input Cooled Surface Cooling
     BuildingPreDefRep%SHGSClSurfHt = BuildingPreDefRep%SHGSClSurfHt + radiantHeat(iZone)
@@ -4724,6 +4752,11 @@ SUBROUTINE FillWeatherPredefinedEntries
 
           ! METHODOLOGY EMPLOYED:
           !   na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
 USE OutputReportPredefined
 
 IMPLICIT NONE
@@ -5355,7 +5388,7 @@ SUBROUTINE FillRemainingPredefinedEntries
 USE DataHeatBalance,   ONLY: Zone, TotLights, Lights, ZonePreDefRep, ZnAirRpt, BuildingPreDefRep
 USE ExteriorEnergyUse, ONLY: ExteriorLights, NumExteriorLights, ScheduleOnly, AstroClockOverride
 USE ScheduleManager,   ONLY: ScheduleAverageHoursPerWeek, GetScheduleName
-USE DataEnvironment,   ONLY: RunPeriodStartDayOfWeek
+USE DataEnvironment,   ONLY: RunPeriodStartDayOfWeek,CurrentYearIsLeapYear
 USE DataHeatBalance,   ONLY: ZoneIntGain
 USE DataHVACGlobals,   ONLY: NumPrimaryAirSys
 USE DataOutputs,       ONLY: iNumberOfRecords,iNumberOfDefaultedFields,iTotalFieldsWithDefaults,  &
@@ -5419,7 +5452,7 @@ DO iLight = 1, TotLights
     CALL PreDefTableEntry(pdchInLtCond,Lights(iLight)%Name,'N')
   END IF
   CALL PreDefTableEntry(pdchInLtAvgHrSchd,Lights(iLight)%Name,ScheduleAverageHoursPerWeek(Lights(iLight)%SchedPtr, &
-                                                                          StartOfWeek))
+                                                                          StartOfWeek,CurrentYearIsLeapYear))
   ! average operating hours per week
   IF (gatherElapsedTimeBEPS .GT. 0) THEN
     HrsPerWeek = 24 * 7 * Lights(iLight)%SumTimeNotZeroCons/gatherElapsedTimeBEPS
@@ -5440,7 +5473,7 @@ consumptionTotal = 0.0
 DO iLight = 1, NumExteriorLights
   IF (ExteriorLights(iLight)%ControlMode .EQ. 1) THEN                          !photocell/schedule
     CALL PreDefTableEntry(pdchExLtAvgHrSchd,ExteriorLights(iLight)%Name,ScheduleAverageHoursPerWeek( &
-                           ExteriorLights(iLight)%SchedPtr, StartOfWeek))
+                           ExteriorLights(iLight)%SchedPtr, StartOfWeek,CurrentYearIsLeapYear))
   END IF
   ! average operating hours per week
   IF (gatherElapsedTimeBEPS .GT. 0) THEN
@@ -6428,7 +6461,7 @@ CHARACTER(len=52)                             :: tableString
 
 IF (displayTabularBEPS) THEN
   ! show the headers of the report
-  CALL WriteReportHeaders('AnnualBuildingUtilityPerformanceSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Annual Building Utility Performance Summary','Entire Facility',isAverage)
   ! show the number of hours that the table applies to
   CALL writeSubtitle('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours')
   IF (gatherElapsedTimeBEPS .LT. 8759.0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
@@ -7689,7 +7722,7 @@ INTEGER :: indexUnitConv
 
 IF (displaySourceEnergyEndUseSummary) THEN
   ! show the headers of the report
-  CALL WriteReportHeaders('SourceEnergyEndUseComponentsSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Source Energy End Use Components Summary','Entire Facility',isAverage)
   ! show the number of hours that the table applies to
   CALL writeSubtitle('Values gathered over ' // RealToStr(gatherElapsedTimeBEPS,2) // ' hours')
   IF (gatherElapsedTimeBEPS .LT. 8759.0) THEN  ! might not add up to 8760 exactly but can't be more than 1 hour diff.
@@ -7989,7 +8022,7 @@ REAL(r64)                                      :: flowConversion
 
 IF (displayDemandEndUse) THEN
   ! show the headers of the report
-  CALL WriteReportHeaders('DemandEndUseComponentsSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Demand End Use Components Summary','Entire Facility',isAverage)
   ! totals - select which other fuel to display and which other district heating
   collapsedTotal=0.0
   collapsedTotal(1) = gatherDemandTotal(1)    !electricity
@@ -8614,7 +8647,7 @@ SUBROUTINE WriteVeriSumTable
           ! USE STATEMENTS:
 USE DataStringGlobals, ONLY: VerString
 USE DataEnvironment,   ONLY: EnvironmentName,Latitude,Longitude,Elevation,TimeZoneNumber, &
-                             RunPeriodStartDayOfWeek
+                             RunPeriodStartDayOfWeek,WeatherFileLocationTitle
 USE DataHeatBalance,   ONLY: Zone, BuildingAzimuth, Construct, TotLights, Lights, ZoneIntGain, &
                              People, TotPeople, ZoneElectric, TotElecEquip, ZoneGas, TotGasEquip, &
                              ZoneOtherEq, TotOthEquip, ZoneHWEq, TotHWEquip, BuildingRotationAppendixG
@@ -8729,7 +8762,7 @@ REAL(r64) :: TotalWindowArea
 ! all arrays are in the format: (row, columnm)
 IF (displayTabularVeriSum) THEN
   ! show the headers of the report
-  CALL WriteReportHeaders('InputVerificationandResultsSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Input Verification and Results Summary','Entire Facility',isAverage)
 
   ! do unit conversions if necessary
   IF (unitsStyle .EQ. unitsStyleInchPound) THEN
@@ -8760,36 +8793,38 @@ IF (displayTabularVeriSum) THEN
   !
 
   ! since a variable number of design days is possible, first read them before sizing the arrays
-  ALLOCATE(rowHead(9))
+  ALLOCATE(rowHead(10))
   ALLOCATE(columnHead(1))
   ALLOCATE(columnWidth(1))
   columnWidth = 14 !array assignment - same for all columns
-  ALLOCATE(tableBody(9,1))
+  ALLOCATE(tableBody(10,1))
 
   columnHead(1) = 'Value'
   rowHead(1)  = 'Program Version and Build'
-  rowHead(2)  = 'Weather'
-  rowHead(3)  = 'Latitude [deg]'
-  rowHead(4)  = 'Longitude [deg]'
+  rowHead(2)  = 'RunPeriod'
+  rowHead(3)  = 'Weather File'
+  rowHead(4)  = 'Latitude [deg]'
+  rowHead(5)  = 'Longitude [deg]'
 
-  rowHead(5)  = 'Elevation ' // TRIM(m_unitName)
-  rowHead(6)  = 'Time Zone'
-  rowHead(7)  = 'North Axis Angle [deg]'
-  rowHead(8)  = 'Rotation for Appendix G [deg]'
-  rowHead(9)  = 'Hours Simulated [hrs]'
+  rowHead(6)  = 'Elevation ' // TRIM(m_unitName)
+  rowHead(7)  = 'Time Zone'
+  rowHead(8)  = 'North Axis Angle [deg]'
+  rowHead(9)  = 'Rotation for Appendix G [deg]'
+  rowHead(10) = 'Hours Simulated [hrs]'
 !  rowHead(9)  = 'Num Table Entries' !used for debugging
 
   tableBody = ''
 
   tableBody(1,1) = TRIM(VerString) !program
-  tableBody(2,1) = TRIM(EnvironmentName) !weather
-  tableBody(3,1) = TRIM(RealToStr(Latitude,2)) !latitude
-  tableBody(4,1) = TRIM(RealToStr(Longitude,2)) !longitude
-  tableBody(5,1) = TRIM(RealToStr(Elevation * m_unitConv,2)) !Elevation
-  tableBody(6,1) = TRIM(RealToStr(TimeZoneNumber,2)) !Time Zone
-  tableBody(7,1) = TRIM(RealToStr(BuildingAzimuth,2)) !north axis angle
-  tableBody(8,1) = TRIM(RealToStr(BuildingRotationAppendixG,2)) !Rotation for Appendix G
-  tableBody(9,1) = TRIM(RealToStr(gatherElapsedTimeBEPS,2)) !hours simulated
+  tableBody(2,1) = TRIM(EnvironmentName) !runperiod name
+  tableBody(3,1) = TRIM(WeatherFileLocationTitle) !weather
+  tableBody(4,1) = TRIM(RealToStr(Latitude,2)) !latitude
+  tableBody(5,1) = TRIM(RealToStr(Longitude,2)) !longitude
+  tableBody(6,1) = TRIM(RealToStr(Elevation * m_unitConv,2)) !Elevation
+  tableBody(7,1) = TRIM(RealToStr(TimeZoneNumber,2)) !Time Zone
+  tableBody(8,1) = TRIM(RealToStr(BuildingAzimuth,2)) !north axis angle
+  tableBody(9,1) = TRIM(RealToStr(BuildingRotationAppendixG,2)) !Rotation for Appendix G
+  tableBody(10,1) = TRIM(RealToStr(gatherElapsedTimeBEPS,2)) !hours simulated
 !  tableBody(9,1) = TRIM(IntToStr(numTableEntry)) !number of table entries for predefined tables
 
   CALL writeSubtitle('General')
@@ -9085,20 +9120,29 @@ IF (displayTabularVeriSum) THEN
   DEALLOCATE(columnWidth)
   DEALLOCATE(tableBody)
 
-  IF (SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied) > 0.0d0) THEN
-    pdiff=ABS((wallAreaN + wallAreaS + wallAreaE + wallAreaW)-SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied))/  &
-       SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied)
+  IF (SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied) > 0.0d0 .or.   &
+      SUM(Zone(1:NumOfZones)%ExtGrossGroundWallArea_Multiplied) > 0.0d0) THEN
+    pdiff=ABS((wallAreaN + wallAreaS + wallAreaE + wallAreaW)-  &
+       (SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied)+SUM(Zone(1:NumOfZones)%ExtGrossGroundWallArea_Multiplied)))/  &
+       (SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied)+SUM(Zone(1:NumOfZones)%ExtGrossGroundWallArea_Multiplied))
     IF (pdiff > .019d0) THEN
       CALL ShowWarningError('WriteVeriSumTable: InputVerificationsAndResultsSummary: '//  &
          'Wall area based on [>=60,<=120] degrees (tilt) as walls ')
       CALL ShowContinueError('differs ~'//trim(RoundSigDigits(pdiff*100.d0,1))//  &
          '% from user entered Wall class surfaces. '//  &
          'Degree calculation based on ASHRAE 90.1 wall definitions.')
-      CALL ShowContinueError('Calculated based on degrees=['//  &
-         trim(adjustl(RealToStr((wallAreaN + wallAreaS + wallAreaE + wallAreaW),3)))//  &
-         '] m2, Calculated from user entered Wall class surfaces=['//  &
-         trim(adjustl(RealToStr(SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied),3)))//'] m2.')
+!      CALL ShowContinueError('Calculated based on degrees=['//  &
+!         trim(adjustl(RealToStr((wallAreaN + wallAreaS + wallAreaE + wallAreaW),3)))//  &
+!         '] m2, Calculated from user entered Wall class surfaces=['//  &
+!         trim(adjustl(RealToStr(SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied),3)))//' m2.')
       CALL ShowContinueError('Check classes of surfaces and tilts for discrepancies.')
+      CALL ShowContinueError('Total wall area by ASHRAE 90.1 definition='//  &
+         trim(adjustl(RealToStr((wallAreaN + wallAreaS + wallAreaE + wallAreaW),3)))//  &
+         ' m2.')
+      CALL ShowContinueError('Total exterior wall area from user entered classes='//  &
+         trim(adjustl(RealToStr(SUM(Zone(1:NumOfZones)%ExtGrossWallArea_Multiplied),3)))//' m2.')
+      CALL ShowContinueError('Total ground contact wall area from user entered classes='//  &
+         trim(adjustl(RealToStr(SUM(Zone(1:NumOfZones)%ExtGrossGroundWallArea_Multiplied),3)))//' m2.')
     ENDIF
   ENDIF
   !
@@ -9334,7 +9378,7 @@ SUBROUTINE WriteAdaptiveComfortTable
     ALLOCATE(rowHead(numPeopleAdaptive))
     ALLOCATE(tableBody(numPeopleAdaptive,5))
 
-    CALL WriteReportHeaders('AdaptiveComfortSummary','Entire Facility',0)
+    CALL WriteReportHeaders('Adaptive Comfort Summary','Entire Facility',0)
     CALL writeSubtitle('Time Not Meeting the Adaptive Comfort Models during Occupied Hours')
 
     ALLOCATE(columnWidth(5))
@@ -9483,7 +9527,7 @@ END DO
 ! loop through all reports and include those that have been flagged as 'show'
 DO iReportName = 1, numReportName
   IF (reportName(iReportName)%show) THEN
-    CALL WriteReportHeaders(reportName(iReportname)%name,'Entire Facility',isAverage)
+    CALL WriteReportHeaders(reportName(iReportname)%namewithSpaces,'Entire Facility',isAverage)
     ! loop through the subtables and include those that are associated with this report
     DO jSubTable = 1, numSubTable
       IF (subTable(jSubTable)%indexReportName .EQ. iReportName) THEN
@@ -9682,7 +9726,7 @@ REAL(r64) :: curValueSI = 0.0d0
 REAL(r64) :: curValue = 0.0d0
 
 IF (displayComponentSizing) THEN
-  CALL WriteReportHeaders('ComponentSizingSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Component Sizing Summary','Entire Facility',isAverage)
   !The arrays that look for unique headers are dimensioned in the
   !running program since the size of the number of entries is
   !not previouslly known. Use the size of all entries since that
@@ -9933,7 +9977,7 @@ IF (displaySurfaceShadowing) THEN
     ENDDO
   ENDDO
 
-  CALL WriteReportHeaders('SurfaceShadowingSummary','Entire Facility',isAverage)
+  CALL WriteReportHeaders('Surface Shadowing Summary','Entire Facility',isAverage)
   ALLOCATE(unique(numShadowRelate))
   !do entire process twice, once with surfaces receiving, once with subsurfaces receiving
   DO iKindRec = recKindSurface,recKindSubsurface
@@ -10012,7 +10056,6 @@ SUBROUTINE WriteReportHeaders(reportName,objectName,averageOrSum)
           ! PURPOSE OF THIS SUBROUTINE:
           !   Write the first few lines of each report with headers to the output
           !   file for tabular reports.
-USE DataEnvironment,   ONLY : EnvironmentName
 USE DataStringGlobals, ONLY : VerString
 USE DataHeatBalance,   ONLY : BuildingName
 

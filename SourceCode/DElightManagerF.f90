@@ -65,6 +65,7 @@ USE DataDElight
 IMPLICIT NONE         ! Enforce explicit typing of all variables
 
 PUBLIC DElightInputGenerator
+PUBLIC GenerateDElightDaylightCoefficients
 
         ! MODULE VARIABLE DECLARATIONS:
 
@@ -969,6 +970,60 @@ SUBROUTINE DElightInputGenerator
     return
 
 END SUBROUTINE DElightInputGenerator
+
+SUBROUTINE GenerateDElightDaylightCoefficients (dLatitude, iErrorFlag)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! The purpose of this subroutine is to provide an envelop to the DElightDaylightCoefficients
+          ! routine (and remove IEEE calls from main EnergyPlus core routines).
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE, INTRINSIC :: ieee_exceptions
+  USE, INTRINSIC :: ieee_arithmetic
+  USE, INTRINSIC :: ieee_features
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64) :: dLatitude
+  INTEGER iErrorFlag
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+ CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW,.FALSE.)
+ CALL IEEE_SET_HALTING_MODE(IEEE_INVALID,.FALSE.)
+ CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO,.FALSE.)
+ CALL DElightDaylightCoefficients(dLatitude, iErrorFlag)
+ CALL IEEE_SET_FLAG(ieee_all,.false.)
+ CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW,.TRUE.)
+ CALL IEEE_SET_HALTING_MODE(IEEE_INVALID,.TRUE.)
+ CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO,.TRUE.)
+
+  RETURN
+
+END SUBROUTINE GenerateDElightDaylightCoefficients
 
 SUBROUTINE CheckForGeometricTransform(DoTransform,OldAspectRatio,NewAspectRatio)
 

@@ -1964,22 +1964,22 @@ SUBROUTINE InitMSHeatPump(MSHeatPumpNum,FirstHVACIteration,AirLoopNum,QZnReq,OnO
                   SequencedOutputRequiredToCoolingSP(MSHeatPump(MSHeatPumpNum)%ZoneSequenceCoolingNum)
     ZoneLoadToHeatSPSequenced = ZoneSysEnergyDemand(MSHeatPump(MSHeatPumpNum)%ControlZoneNum)%&
                   SequencedOutputRequiredToHeatingSP(MSHeatPump(MSHeatPumpNum)%ZoneSequenceHeatingNum)
-    IF (ZoneLoadToHeatSPSequenced > 0.d0 .AND. ZoneLoadToCoolSPSequenced > 0.d0) THEN
+    IF (ZoneLoadToHeatSPSequenced > SmallLoad .AND. ZoneLoadToCoolSPSequenced > SmallLoad) THEN
       QZnReq = ZoneLoadToHeatSPSequenced
-    ELSEIF (ZoneLoadToHeatSPSequenced < 0.d0 .AND. ZoneLoadToCoolSPSequenced < 0.d0) THEN
+    ELSEIF (ZoneLoadToHeatSPSequenced < (-1.d0*SmallLoad) .AND. ZoneLoadToCoolSPSequenced < (-1.d0*SmallLoad)) THEN
       QZnReq = ZoneLoadToCoolSPSequenced
-    ELSEIF (ZoneLoadToHeatSPSequenced <= 0.d0 .AND. ZoneLoadToCoolSPSequenced >= 0.d0) THEN
+    ELSEIF (ZoneLoadToHeatSPSequenced <= (-1.d0*SmallLoad) .AND. ZoneLoadToCoolSPSequenced >= SmallLoad) THEN
       QZnReq = 0.d0
     ENDIF
     QZnReq = QZnReq/MSHeatPump(MSHeatPumpNum)%FlowFraction
   ELSE
-    QZnReq = ZoneSysEnergyDemand(ZoneNum)%TotalOutputRequired/MSHeatPump(MSHeatPumpNum)%FlowFraction
+    QZnReq = ZoneSysEnergyDemand(ZoneNum)%RemainingOutputRequired/MSHeatPump(MSHeatPumpNum)%FlowFraction
   ENDIF
   If (CurDeadbandOrSetback(ZoneNum)) QZnReq = 0.0
 
-  If (QZnReq > 0.0) then
+  If (QZnReq > SmallLoad) then
     MSHeatPump(MSHeatPumpNum)%HeatCoolMode = HeatingMode
-  Else If (QZnReq < 0.0) then
+  Else If (QZnReq < (-1.d0*SmallLoad)) then
     MSHeatPump(MSHeatPumpNum)%HeatCoolMode = CoolingMode
   Else
     MSHeatPump(MSHeatPumpNum)%HeatCoolMode = 0
@@ -1988,11 +1988,11 @@ SUBROUTINE InitMSHeatPump(MSHeatPumpNum,FirstHVACIteration,AirLoopNum,QZnReq,OnO
   ! Set the inlet node mass flow rate
   IF (MSHeatPump(MSHeatPumpNum)%OpMode .EQ. ContFanCycCoil) THEN
   ! constant fan mode
-    IF (QZnReq > 0.0 .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+    IF (QZnReq > SmallLoad .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
       CompOnMassFlow = MSHeatPump(MSHeatPumpNum)%HeatMassFlowRate(1)
       CompOnFlowRatio = MSHeatPump(MSHeatPumpNum)%HeatingSpeedRatio(1)
       MSHeatPump(MSHeatPumpNum)%LastMode = HeatingMode
-    ELSE IF (QZnReq < 0.0 .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+    ELSE IF (QZnReq < (-1.d0*SmallLoad) .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
       CompOnMassFlow = MSHeatPump(MSHeatPumpNum)%CoolMassFlowRate(1)
       CompOnFlowRatio = MSHeatPump(MSHeatPumpNum)%CoolingSpeedRatio(1)
       MSHeatPump(MSHeatPumpNum)%LastMode = CoolingMode
@@ -2004,10 +2004,10 @@ SUBROUTINE InitMSHeatPump(MSHeatPumpNum,FirstHVACIteration,AirLoopNum,QZnReq,OnO
     CompOffFlowRatio = MSHeatPump(MSHeatPumpNum)%IdleSpeedRatio
   ELSE
   ! cycling fan mode
-    IF (QZnReq > 0.0 .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+    IF (QZnReq > SmallLoad .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
       CompOnMassFlow = MSHeatPump(MSHeatPumpNum)%HeatMassFlowRate(1)
       CompOnFlowRatio = MSHeatPump(MSHeatPumpNum)%HeatingSpeedRatio(1)
-    ELSE IF (QZnReq < 0.0 .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
+    ELSE IF (QZnReq < (-1.d0*SmallLoad) .AND. .NOT. CurDeadbandOrSetback(ZoneNum)) THEN
       CompOnMassFlow = MSHeatPump(MSHeatPumpNum)%CoolMassFlowRate(1)
       CompOnFlowRatio = MSHeatPump(MSHeatPumpNum)%CoolingSpeedRatio(1)
     ELSE
@@ -2405,7 +2405,8 @@ SUBROUTINE ControlMSHPOutput(MSHeatPumpNum,FirstHVACIteration,CompOp,OpMode,QZnR
 
   ! If cooling and NoCompOutput < QZnReq, the coil needs to be off
   ! If heating and NoCompOutput > QZnReq, the coil needs to be off
-  IF ((QZnReq < 0.0 .AND. NoCompOutput < QZnReq) .OR. (QZnReq > 0.0 .AND. NoCompOutput > QZnReq) .OR. QZnReq == 0) THEN
+  IF ((QZnReq < (-1.d0*SmallLoad) .AND. NoCompOutput < QZnReq) .OR. (QZnReq > SmallLoad .AND. NoCompOutput > QZnReq) &
+       .OR. ABS(QZnReq) <= SmallLoad) THEN
     RETURN
   END IF
 
@@ -2422,7 +2423,7 @@ SUBROUTINE ControlMSHPOutput(MSHeatPumpNum,FirstHVACIteration,CompOp,OpMode,QZnR
   CALL CalcMSHeatPump(MSHeatPumpNum,FirstHVACIteration,CompOp,SpeedNum,SpeedRatio,PartLoadFrac,FullOutput,QZnReq,  &
                       OnOffAirFlowRatio,SupHeaterLoad)
 
-  IF (QZnReq .LT. 0.0) THEN
+  IF (QZnReq .LT. (-1.d0*SmallLoad)) THEN
   ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCompOutput
   ! Check that this is the case; if not set PartLoadFrac = 0.0 (off) and return
     IF (FullOutput >= 0.0 .OR. FullOutput >= NoCompOutput) THEN
@@ -2458,7 +2459,7 @@ SUBROUTINE ControlMSHPOutput(MSHeatPumpNum,FirstHVACIteration,CompOp,OpMode,QZnR
   END IF
 
   ! Calculate the part load fraction
-  IF ((QZnReq .GT. 0.0 .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. 0.0 .AND. QZnReq > FullOutput)) THEN
+  IF ((QZnReq .GT. SmallLoad .AND. QZnReq < FullOutput) .OR. (QZnReq .LT. (-1.d0*SmallLoad) .AND. QZnReq > FullOutput)) THEN
 
     Par(1) = MSHeatPumpNum
     Par(2) = ZoneNum
@@ -2501,7 +2502,7 @@ SUBROUTINE ControlMSHPOutput(MSHeatPumpNum,FirstHVACIteration,CompOp,OpMode,QZnR
       ! Check to see which speed to meet the load
       PartLoadFrac = 1.0
       SpeedRatio = 1.0
-      If (QZnReq .LT. 0.0) Then ! Cooling
+      If (QZnReq .LT. (-1.d0*SmallLoad)) Then ! Cooling
         DO I=2,MSHeatPump(MSHeatPumpNum)%NumOfSpeedCooling
           CALL CalcMSHeatPump(MSHeatPumpNum,FirstHVACIteration,CompOp,I,SpeedRatio,PartLoadFrac,TempOutput, &
                               QZnReq,OnOffAirFlowRatio,SupHeaterLoad)
@@ -2547,7 +2548,7 @@ SUBROUTINE ControlMSHPOutput(MSHeatPumpNum,FirstHVACIteration,CompOp,OpMode,QZnR
   ! if the DX heating coil cannot meet the load, trim with supplemental heater
   ! occurs with constant fan mode when compressor is on or off
   ! occurs with cycling fan mode when compressor PLR is equal to 1
-  IF ((QZnReq .GT. 0.0 .AND. QZnReq .GT. FullOutput))THEN
+  IF ((QZnReq .GT. SmallLoad .AND. QZnReq .GT. FullOutput))THEN
     PartLoadFrac  = 1.0
     SpeedRatio  = 1.0
     IF (OutsideDryBulbTemp .LE. MSHeatPump(MSHeatPumpNum)%SuppMaxAirTemp) THEN
@@ -2669,7 +2670,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
   ! if blow through, simulate fan then coils
   IF (MSHeatPump(MSHeatPumpNum)%FanPlaceType .EQ. BlowThru) THEN
     CALL SimulateFanComponents(MSHeatPump(MSHeatPumpNum)%FanName,FirstHVACIteration,MSHeatPump(MSHeatPumpNum)%FanNum,FanSpeedRatio)
-    IF (QZnReq .LT. 0.0) THEN
+    IF (QZnReq .LT. (-1.d0*SmallLoad)) THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor) THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -2684,7 +2685,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
       CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,0.0d0,0.0d0,&
                                  MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
     END IF
-    IF (QZnReq .GT. 0)THEN
+    IF (QZnReq .GT. SmallLoad)THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor)THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXHeatCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXHeatCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -2701,7 +2702,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
     END IF
     ! Call twice to ensure the fan outlet conditions are updated
     CALL SimulateFanComponents(MSHeatPump(MSHeatPumpNum)%FanName,FirstHVACIteration,MSHeatPump(MSHeatPumpNum)%FanNum,FanSpeedRatio)
-    IF (QZnReq .LT. 0.0) THEN
+    IF (QZnReq .LT. (-1.d0*SmallLoad)) THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor) THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -2716,7 +2717,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
       CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,0.0d0,0.0d0,&
                                MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
     END IF
-    IF (QZnReq .GT. 0)THEN
+    IF (QZnReq .GT. SmallLoad)THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor)THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXHeatCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXHeatCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -2736,7 +2737,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
       CALL CalcNonDXHeatingCoils(MSHeatPumpNum,FirstHVACIteration,SupHeaterLoad,MSHeatPump(MSHeatPumpNum)%OpMode,QCoilActual)
     ENDIF
   ELSE ! otherwise simulate DX coils then fan then supplemental heater
-    IF(QZnReq .LT. 0.0)THEN
+    IF(QZnReq .LT. (-1.d0*SmallLoad))THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor)THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -2751,7 +2752,7 @@ USE DXCoils,                 ONLY: SimDXCoilMultiSpeed,DXCoilPartLoadRatio
       CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXCoolCoilName,0.0d0,0.0d0,&
                                  MSHeatPump(MSHeatPumpNum)%DXCoolCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
     END IF
-    IF(QZnReq .GT. 0)THEN
+    IF(QZnReq .GT. SmallLoad)THEN
       IF(OutsideDryBulbTemp .GT. MSHeatPump(MSHeatPumpNum)%MinOATCompressor)THEN
         CALL SimDXCoilMultiSpeed(MSHeatPump(MSHeatPumpNum)%DXHeatCoilName,SpeedRatio,PartLoadFrac,&
                                  MSHeatPump(MSHeatPumpNum)%DXHeatCoilIndex,SpeedNum,MSHeatPump(MSHeatPumpNum)%OpMode,CompOp)
@@ -3285,7 +3286,7 @@ SUBROUTINE CalcNonDXHeatingCoils(MSHeatPumpNum,FirstHVACIteration,SupHeaterLoad,
   USE WaterCoils,                ONLY: SimulateWaterCoilComponents
   USE SteamCoils,                ONLY: SimulateSteamCoilComponents
   USE PlantUtilities,            ONLY: SetComponentFlowRate
-  USE General,                   ONLY: SolveRegulaFalsi
+  USE General,                   ONLY: SolveRegulaFalsi,RoundSigDigits
   USE DataHVACGlobals,           ONLY: SmallLoad
 
   IMPLICIT NONE     ! Enforce explicit typing of all variables in this routine
@@ -3299,6 +3300,8 @@ SUBROUTINE CalcNonDXHeatingCoils(MSHeatPumpNum,FirstHVACIteration,SupHeaterLoad,
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: ErrTolerance = 0.001d0    ! convergence limit for hotwater coil
+  INTEGER, PARAMETER :: SolveMaxIter=50
+  CHARACTER(len=*), PARAMETER :: CurrentModuleObject = 'AirLoopHVAC:UnitaryHeatPump:AirToAir:MultiSpeed'
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3346,22 +3349,36 @@ SUBROUTINE CalcNonDXHeatingCoils(MSHeatPumpNum,FirstHVACIteration,SupHeaterLoad,
             Par(2) = 0.
           END IF
           Par(3) = SupHeaterLoad
-          CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+          CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
                                 MinWaterFlow, MaxHotWaterFlow, Par)
           IF (SolFlag == -1) THEN
             IF (MSHeatPump(MSHeatPumpNum)%HotWaterCoilMaxIterIndex == 0) THEN
-              CALL ShowWarningMessage('Hot water coil control failed in MultiSpeed HeatPump '//TRIM(MSHeatPump(MSHeatPumpNum)%Name))
-              CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+              CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed for '//  &
+              trim(CurrentModuleObject)//'="'//  &
+              TRIM(MSHeatPump(MSHeatPumpNum)%Name)//'"')
+              CALL ShowContinueErrorTimeStamp(' ')
+              CALL ShowContinueError('  Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                    '] exceeded in calculating hot water mass flow rate')
             ENDIF
-          CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in MultiSpeed HeatPump '//  &
+          CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (iteration limit ['//  &
+                  trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(CurrentModuleObject)//'="'// &
               TRIM(MSHeatPump(MSHeatPumpNum)%Name),MSHeatPump(MSHeatPumpNum)%HotWaterCoilMaxIterIndex)
           ELSE IF (SolFlag == -2) THEN
             IF (MSHeatPump(MSHeatPumpNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
-              CALL ShowWarningMessage('Hot water coil control failed in Furnace '//TRIM(MSHeatPump(MSHeatPumpNum)%Name))
-              CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+              CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed (maximum flow limits) for '//  &
+                    trim(CurrentModuleObject)//'="'// &
+                    TRIM(MSHeatPump(MSHeatPumpNum)%Name)//'"')
+              CALL ShowContinueErrorTimeStamp(' ')
+              CALL ShowContinueError('...Bad hot water maximum flow rate limits')
+              CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinWaterFlow,3))//' kg/s')
+              CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxHotWaterFlow,3))//' kg/s')
             ENDIF
-            CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in MultiSpeed HeatPump '//  &
-                TRIM(MSHeatPump(MSHeatPumpNum)%Name),MSHeatPump(MSHeatPumpNum)%HotWaterCoilMaxIterIndex2)
+            CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (flow limits) for '//  &
+                  trim(CurrentModuleObject)//'="'// &
+                  TRIM(MSHeatPump(MSHeatPumpNum)%Name)//'"', &
+                  MSHeatPump(MSHeatPumpNum)%HotWaterCoilMaxIterIndex2,  &
+                  ReportMinOf=MinWaterFlow,ReportMaxOf=MaxHotWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
+
           END IF
           ! simulate hot water supplemental heating coil
           CALL SimulateWaterCoilComponents(MSHeatPump(MSHeatPumpNum)%SuppHeatCoilName,FirstHVACIteration, &

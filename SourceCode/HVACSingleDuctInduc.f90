@@ -27,7 +27,8 @@ USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, &
                            InitConvTemp, SysSizingCalc
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
-                           SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd
+                           SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd, &
+                           ShowContinueErrorTimeStamp
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
           ! Use statements for access to subroutines in other modules
 USE ScheduleManager
@@ -814,7 +815,7 @@ SUBROUTINE SizeIndUnit(IUNum)
             ! the design heating coil load is the zone load minus whatever the central system does. Note that
             ! DesHeatCoilInTempTU is really the primary air inlet temperature for the unit.
             IF (TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak > 0.0) THEN
-              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor - & 
+              DesCoilLoad = CalcFinalZoneSizing(CurZoneEqNum)%DesHeatLoad * CalcFinalZoneSizing(CurZoneEqNum)%HeatSizingFactor - &
                               CpAir*RhoAir*DesPriVolFlow* &
                              (TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU -   &
                               TermUnitFinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak)
@@ -976,7 +977,7 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
 
           ! USE STATEMENTS:
   USE DataZoneEnergyDemands
-  USE General, ONLY: SolveRegulaFalsi
+  USE General, ONLY: SolveRegulaFalsi,RoundSigDigits
   USE DataPlant, ONLY: PlantLoop
   USE PlantUtilities, ONLY: SetComponentFlowRate
 
@@ -989,7 +990,7 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
   INTEGER, INTENT (IN)  :: ZoneNodeNum           ! zone node number
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  INTEGER, PARAMETER :: SolveMaxIter=50
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -1110,24 +1111,35 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
         Par(6) = QPriOnly
         Par(7) = PowerMet
         ErrTolerance=IndUnit(IUNum)%HotControlOffset
-        CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HWFlow, FourPipeIUHeatingResidual, &
+        CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HWFlow, FourPipeIUHeatingResidual, &
                               MinHotWaterFlow, MaxHotWaterFlow, Par)
         IF (SolFlag == -1) THEN
-          CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HWFlow, FourPipeIUHeatingResidual, &
-                              MinHotWaterFlow, MaxHotWaterFlow, Par)
           IF (IndUnit(IUNum)%HWCoilFailNum1 == 0) THEN
-            CALL ShowWarningMessage('Hot water coil control failed in 4 pipe induction unit '//TRIM(IndUnit(IUNum)%Name))
-            CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+            CALL ShowWarningMessage('SimFourPipeIndUnit: Hot water coil control failed for '//  &
+                trim(IndUnit(IUNum)%UnitType)//'="'//  &
+                TRIM(IndUnit(IUNum)%Name)//'"')
+            CALL ShowContinueErrorTimeStamp(' ')
+            CALL ShowContinueError('  Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                 '] exceeded in calculating hot water mass flow rate')
           ENDIF
-          CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in 4 pipe induction unit '//  &
-             TRIM(IndUnit(IUNum)%Name),IndUnit(IUNum)%HWCoilFailNum1)
+          CALL ShowRecurringWarningErrorAtEnd('SimFourPipeIndUnit: Hot water coil control failed (iteration limit ['//  &
+              trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(IndUnit(IUNum)%UnitType)//'="'// &
+              TRIM(IndUnit(IUNum)%Name)//'"',IndUnit(IUNum)%HWCoilFailNum1)
         ELSE IF (SolFlag == -2) THEN
           IF (IndUnit(IUNum)%HWCoilFailNum2 == 0) THEN
-            CALL ShowWarningMessage('Hot water coil control failed in 4 pipe induction unit '//TRIM(IndUnit(IUNum)%Name))
-            CALL ShowContinueError('  Bad hot water flow limits')
+            CALL ShowWarningMessage('SimFourPipeIndUnit: Hot water coil control failed (maximum flow limits) for '//  &
+                trim(IndUnit(IUNum)%UnitType)//'="'// &
+                TRIM(IndUnit(IUNum)%Name)//'"')
+            CALL ShowContinueErrorTimeStamp(' ')
+            CALL ShowContinueError('...Bad hot water maximum flow rate limits')
+            CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinHotWaterFlow,3))//' kg/s')
+            CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxHotWaterFlow,3))//' kg/s')
           ENDIF
-          CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in 4 pipe induction unit '//  &
-             TRIM(IndUnit(IUNum)%Name),IndUnit(IUNum)%HWCoilFailNum2)
+          CALL ShowRecurringWarningErrorAtEnd('SimFourPipeIndUnit: Hot water coil control failed (flow limits) for '//  &
+              trim(IndUnit(IUNum)%UnitType)//'="'// &
+              TRIM(IndUnit(IUNum)%Name)//'"', &
+              IndUnit(IUNum)%HWCoilFailNum2,  &
+              ReportMinOf=MinHotWaterFlow,ReportMaxOf=MaxHotWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
         END IF
       END IF
     ELSE IF (QToCoolSetPt - QPriOnly <  - SmallLoad) THEN
@@ -1147,22 +1159,35 @@ SUBROUTINE SimFourPipeIndUnit(IUNum,ZoneNum,ZoneNodeNum,FirstHVACIteration)
         Par(6) = QPriOnly
         Par(7) = PowerMet
         ErrTolerance=IndUnit(IUNum)%ColdControlOffset
-        CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, CWFlow, FourPipeIUCoolingResidual, &
+        CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, CWFlow, FourPipeIUCoolingResidual, &
                               MinColdWaterFlow, MaxColdWaterFlow, Par)
         IF (SolFlag == -1) THEN
           IF (IndUnit(IUNum)%CWCoilFailNum1 == 0) THEN
-            CALL ShowWarningMessage('Cold water coil control failed in 4 pipe induction unit '//TRIM(IndUnit(IUNum)%Name))
-            CALL ShowContinueError('  Iteration limit exceeded in calculating cold water mass flow rate')
+            CALL ShowWarningMessage('SimFourPipeIndUnit: Cold water coil control failed for '//  &
+                trim(IndUnit(IUNum)%UnitType)//'="'//  &
+                TRIM(IndUnit(IUNum)%Name)//'"')
+            CALL ShowContinueErrorTimeStamp(' ')
+            CALL ShowContinueError('  Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                 '] exceeded in calculating cold water mass flow rate')
           ENDIF
-          CALL ShowRecurringWarningErrorAtEnd('Cold water coil control failed (iteration limit) in 4 pipe induction unit '//  &
-             TRIM(IndUnit(IUNum)%Name),IndUnit(IUNum)%CWCoilFailNum1)
+          CALL ShowRecurringWarningErrorAtEnd('SimFourPipeIndUnit: Cold water coil control failed (iteration limit ['//  &
+              trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(IndUnit(IUNum)%UnitType)//'="'// &
+              TRIM(IndUnit(IUNum)%Name),IndUnit(IUNum)%CWCoilFailNum1)
         ELSE IF (SolFlag == -2) THEN
           IF (IndUnit(IUNum)%CWCoilFailNum2 == 0) THEN
-            CALL ShowWarningMessage('Cold water coil control failed in 4 pipe induction unit '//TRIM(IndUnit(IUNum)%Name))
-            CALL ShowContinueError('  Bad cold water flow limits')
+            CALL ShowWarningMessage('SimFourPipeIndUnit: Cold water coil control failed (maximum flow limits) for '//  &
+                trim(IndUnit(IUNum)%UnitType)//'="'// &
+                TRIM(IndUnit(IUNum)%Name)//'"')
+            CALL ShowContinueErrorTimeStamp(' ')
+            CALL ShowContinueError('...Bad cold water maximum flow rate limits')
+            CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinColdWaterFlow,3))//' kg/s')
+            CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxColdWaterFlow,3))//' kg/s')
           ENDIF
-          CALL ShowRecurringWarningErrorAtEnd('Cold water coil control failed (flow limits) in 4 pipe induction unit '//  &
-             TRIM(IndUnit(IUNum)%Name),IndUnit(IUNum)%CWCoilFailNum2)
+          CALL ShowRecurringWarningErrorAtEnd('SimFourPipeIndUnit: Cold water coil control failed (flow limits) for '//  &
+              trim(IndUnit(IUNum)%UnitType)//'="'// &
+              TRIM(IndUnit(IUNum)%Name)//'"', &
+              IndUnit(IUNum)%CWCoilFailNum2,  &
+              ReportMinOf=MinColdWaterFlow,ReportMaxOf=MaxColdWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
         END IF
       END IF
     ELSE

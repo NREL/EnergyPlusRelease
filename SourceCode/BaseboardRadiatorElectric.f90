@@ -662,7 +662,7 @@ SUBROUTINE CalcElectricBaseboard(BaseboardNum, ControlledZoneNum)
     USE DataZoneEquipment,  ONLY: ZoneEquipConfig
     USE DataZoneEnergyDemands, ONLY: ZoneSysEnergyDemand, CurDeadbandOrSetback
     USE DataInterfaces, ONLY: CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
-
+    USE DataHVACGlobals, ONLY: SmallLoad
     IMPLICIT NONE
           ! SUBROUTINE ARGUMENT DEFINITIONS:
     INTEGER, INTENT(IN)    :: BaseboardNum
@@ -703,25 +703,25 @@ REAL(r64), PARAMETER :: SimpConvAirFlowSpeed = 0.5d0 ! m/s
     ! thermal loss that could be accounted for with this efficiency input.
     Effic = ElecBaseboard(BaseboardNum)%BaseBoardEfficiency
 
-    IF (QZnReq > 0.0d0 &
+    IF (QZnReq > SmallLoad &
         .AND. .NOT. CurDeadBandOrSetback(ZoneNum) &
         .AND. GetCurrentScheduleValue(ElecBaseboard(BaseboardNum)%SchedPtr) > 0.0d0) THEN
 
             ! If the load exceeds the capacity than the capacity is set to the BB limit.
-       IF(QZnReq > ElecBaseboard(BaseboardNum)%NominalCapacity) THEN
-          QBBCap = ElecBaseboard(BaseboardNum)%NominalCapacity
-       Else
-          QBBCap = QZnReq
-       End IF
-    RadHeat = QBBCap * ElecBaseboard(BaseboardNum)%FracRadiant
-    QBBElecRadSource(BaseboardNum) = RadHeat
+      IF(QZnReq > ElecBaseboard(BaseboardNum)%NominalCapacity) THEN
+        QBBCap = ElecBaseboard(BaseboardNum)%NominalCapacity
+      Else
+        QBBCap = QZnReq
+      End IF
+      RadHeat = QBBCap * ElecBaseboard(BaseboardNum)%FracRadiant
+      QBBElecRadSource(BaseboardNum) = RadHeat
 
-       IF (ElecBaseboard(BaseboardNum)%FracRadiant > 0.0d0) THEN  ! User defines radiant heat addition
+      IF (ElecBaseboard(BaseboardNum)%FracRadiant > 0.0d0) THEN  ! User defines radiant heat addition
             ! Now, distribute the radiant energy of all systems to the appropriate surfaces, to people, and the air
-          CALL DistributeBBElecRadGains
+        CALL DistributeBBElecRadGains
             ! Now "simulate" the system by recalculating the heat balances
-          CALL CalcHeatBalanceOutsideSurf(ZoneNum)
-          CALL CalcHeatBalanceInsideSurf(ZoneNum)
+        CALL CalcHeatBalanceOutsideSurf(ZoneNum)
+        CALL CalcHeatBalanceInsideSurf(ZoneNum)
             ! Here an assumption is made regarding radiant heat transfer to people.
             ! While the radiant heat transfer to people array will be used by the thermal comfort
             ! routines, the energy transfer to people would get lost from the perspective
@@ -730,35 +730,35 @@ REAL(r64), PARAMETER :: SimpConvAirFlowSpeed = 0.5d0 ! m/s
             ! that all energy radiated to people is converted to convective energy is
             ! not very precise, but at least it conserves energy. The system impact to heat balance
             ! should include this.
-       LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
+        LoadMet = (SumHATsurf(ZoneNum) - ZeroSourceSumHATsurf(ZoneNum)) &
                  + (QBBCap *  ElecBaseboard(BaseboardNum)%FracConvect) &
                  + (RadHeat * ElecBaseboard(BaseboardNum)%FracDistribPerson)
 
-          IF (LoadMet < 0.0d0) THEN ! No cooling output
+        IF (LoadMet < 0.0d0) THEN ! No cooling output
           AirOutletTemp = AirInletTemp
           ElecBaseboard(BaseboardNum)%ElecUseRate = 0.0d0
-          ELSE
+        ELSE
           AirOutletTemp = AirInletTemp + QBBCap/CapacitanceAir
             ! This could be utilized somehow or even reported so the data structures are left in place
             ! The BaseBoard electric Load is calculated using the efficiency
           ElecBaseboard(BaseboardNum)%ElecUseRate = QBBCap/Effic
-          END IF
+        END IF
 
       ELSE ! zero radiant fraction, no need of recalculation of heat balances
 
-       LoadMet = QBBCap
-       ElecBaseboard(BaseboardNum)%ElecUseRate = QBBCap/Effic
+        LoadMet = QBBCap
+        ElecBaseboard(BaseboardNum)%ElecUseRate = QBBCap/Effic
 
-       END IF
+      END IF
 
     ELSE  ! If there is an off condition the BB does nothing.
 
-    QBBCap  = 0.0d0
-    LoadMet = 0.0d0
-    RadHeat = 0.0d0
-    AirOutletTemp = AirInletTemp
-    QBBElecRadSource(BaseboardNum) = 0.0d0
-    ElecBaseboard(BaseboardNum)%ElecUseRate = 0.0d0
+      QBBCap  = 0.0d0
+      LoadMet = 0.0d0
+      RadHeat = 0.0d0
+      AirOutletTemp = AirInletTemp
+      QBBElecRadSource(BaseboardNum) = 0.0d0
+      ElecBaseboard(BaseboardNum)%ElecUseRate = 0.0d0
     END IF
 
         ! Assign calculated ones

@@ -670,7 +670,7 @@ CONTAINS
     ! SUBROUTINE INFORMATION:
     !       AUTHOR         Phillip Biddulph
     !       DATE WRITTEN   June 2008
-    !       MODIFIED       na
+    !       MODIFIED       B. Griffith, Aug 2012 for surface-specific algorithms
     !       RE-ENGINEERED  na
 
     ! PURPOSE OF THIS SUBROUTINE:
@@ -683,7 +683,7 @@ CONTAINS
     ! na
 
     ! USE STATEMENTS:
-    USE General,        ONLY: TrimSigDigits
+    USE General,        ONLY: TrimSigDigits, ScanForReports, RoundSigDigits
 
 
 
@@ -718,7 +718,7 @@ CONTAINS
     INTEGER :: adj2
     INTEGER :: errorCount
     INTEGER :: concell
-
+    INTEGER :: MaterNum
 
 
     REAL(r64) :: runor
@@ -726,7 +726,7 @@ CONTAINS
     REAL(r64) :: low2
     REAL(r64) :: testlen
     REAL(r64) :: waterd ! water density
-
+    LOGICAL   :: DoReport
     deltat=TimeStepZone*3600.0d0
 
 
@@ -734,89 +734,90 @@ CONTAINS
     errorCount=0
     TotCellsMax=0
     DO sid=1,TotSurfaces
-       IF(Surface(sid)%Class /= SurfaceClass_Window)THEN
-          conid=Surface(sid)%Construction
-          IF (conid == 0) CYCLE
-          DO lid=1,Construct(conid)%TotLayers
-             matid=Construct(conid)%LayerPoint(lid)
-             IF (Material(matid)%ROnly) THEN
-                CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name)//  &
-                   ' cannot contain R-only value materials.')
-                CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'".')
-                errorCount=errorCount+1
-                CYCLE
-             ENDIF
+       IF (Surface(sid)%Class == SurfaceClass_Window) CYCLE
+       IF (Surface(sid)%HeatTransferAlgorithm /= HeatTransferModel_HAMT) CYCLE
+        conid=Surface(sid)%Construction
+        IF (conid == 0) CYCLE
+        DO lid=1,Construct(conid)%TotLayers
+           matid=Construct(conid)%LayerPoint(lid)
+           IF (Material(matid)%ROnly) THEN
+              CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name)//  &
+                 ' cannot contain R-only value materials.')
+              CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'".')
+              errorCount=errorCount+1
+              CYCLE
+           ENDIF
 
-             IF(Material(matid)%nmu<0)THEN
-                CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                  ' does not have required Water Vapor Diffusion Resistance Factor (mu) data.')
-                errorCount=errorCount+1
-             ENDIF
+           IF(Material(matid)%nmu<0)THEN
+              CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+              CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                ' does not have required Water Vapor Diffusion Resistance Factor (mu) data.')
+              errorCount=errorCount+1
+           ENDIF
 
-             IF(Material(matid)%niso<0)THEN
-                CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                  ' does not have required isotherm data.')
-                errorCount=errorCount+1
-             ENDIF
-             IF(Material(matid)%nsuc<0)THEN
-                CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                  ' does not have required liquid transport coefficient (suction) data.')
-                errorCount=errorCount+1
-             ENDIF
-             IF(Material(matid)%nred<0)THEN
-                CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                  ' does not have required liquid transport coefficient (redistribution) data.')
-                errorCount=errorCount+1
-             ENDIF
-             IF(Material(matid)%ntc<0)THEN
-                IF(Material(matid)%Conductivity>0)THEN
-                   CALL ShowWarningError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                   CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                     ' does not have thermal conductivity data. Using fixed value.')
-                   Material(matid)%ntc=2
-                   Material(matid)%tcwater(1)=0.0d0
-                   Material(matid)%tcdata(1)=Material(matid)%Conductivity
-                   Material(matid)%tcwater(2)=Material(matid)%isodata(Material(matid)%niso)
-                   Material(matid)%tcdata(2)=Material(matid)%Conductivity
-                ELSE
-                   CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                   CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                    ' does not have required thermal conductivity data.')
-                   errorCount=errorCount+1
-                ENDIF
-             ENDIF
+           IF(Material(matid)%niso<0)THEN
+              CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+              CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                ' does not have required isotherm data.')
+              errorCount=errorCount+1
+           ENDIF
+           IF(Material(matid)%nsuc<0)THEN
+              CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+              CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                ' does not have required liquid transport coefficient (suction) data.')
+              errorCount=errorCount+1
+           ENDIF
+           IF(Material(matid)%nred<0)THEN
+              CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+              CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                ' does not have required liquid transport coefficient (redistribution) data.')
+              errorCount=errorCount+1
+           ENDIF
+           IF(Material(matid)%ntc<0)THEN
+              IF(Material(matid)%Conductivity>0)THEN
+                 CALL ShowWarningError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+                 CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                   ' does not have thermal conductivity data. Using fixed value.')
+                 Material(matid)%ntc=2
+                 Material(matid)%tcwater(1)=0.0d0
+                 Material(matid)%tcdata(1)=Material(matid)%Conductivity
+                 Material(matid)%tcwater(2)=Material(matid)%isodata(Material(matid)%niso)
+                 Material(matid)%tcdata(2)=Material(matid)%Conductivity
+              ELSE
+                 CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+                 CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                  ' does not have required thermal conductivity data.')
+                 errorCount=errorCount+1
+              ENDIF
+           ENDIF
 
-             ! convert material water content to RH
+           ! convert material water content to RH
 
-             waterd=Material(matid)%iwater*Material(matid)%density
-             CALL interp(Material(matid)%niso,Material(matid)%isodata,Material(matid)%isorh,&
-                  waterd,Material(matid)%irh)
+           waterd=Material(matid)%iwater*Material(matid)%density
+           CALL interp(Material(matid)%niso,Material(matid)%isodata,Material(matid)%isorh,&
+                waterd,Material(matid)%irh)
 
-             Material(matid)%divs=INT(Material(matid)%Thickness/Material(matid)%divsize)+Material(matid)%divmin
-             IF(Material(matid)%divs>Material(matid)%divmax) THEN
-                Material(matid)%divs=Material(matid)%divmax
-             ENDIF
-             ! Check length of cell - reduce number of divisions if neccessary
-             DO
-                testlen=Material(matid)%Thickness*((SIN(pi*(-1/REAL(Material(matid)%divs))-pi/2.0)/2.0)-(SIN(-pi/2.0)/2.0))
-                IF(testlen>adjdist)EXIT
-                Material(matid)%divs= Material(matid)%divs-1
-                IF(Material(matid)%divs<1)THEN
-                   CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
-                   CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
-                     ' is too thin.')
-                   errorCount=errorCount+1
-                   EXIT
-                ENDIF
-             ENDDO
-             TotCellsMax=TotCellsMax+Material(matid)%divs
-          ENDDO
-          TotCellsMax=TotCellsMax+7
-       ENDIF
+           Material(matid)%divs=INT(Material(matid)%Thickness/Material(matid)%divsize)+Material(matid)%divmin
+           IF(Material(matid)%divs>Material(matid)%divmax) THEN
+              Material(matid)%divs=Material(matid)%divmax
+           ENDIF
+           ! Check length of cell - reduce number of divisions if neccessary
+           DO
+              testlen=Material(matid)%Thickness*((SIN(pi*(-1/REAL(Material(matid)%divs))-pi/2.0)/2.0)-(SIN(-pi/2.0)/2.0))
+              IF(testlen>adjdist)EXIT
+              Material(matid)%divs= Material(matid)%divs-1
+              IF(Material(matid)%divs<1)THEN
+                 CALL ShowSevereError(RoutineName//'Construction='//trim(Construct(conid)%Name))
+                 CALL ShowContinueError('Reference Material="'//TRIM(Material(matid)%Name)//'"'//  &
+                   ' is too thin.')
+                 errorCount=errorCount+1
+                 EXIT
+              ENDIF
+           ENDDO
+           TotCellsMax=TotCellsMax+Material(matid)%divs
+        ENDDO
+        TotCellsMax=TotCellsMax+7
+
     ENDDO
 
 
@@ -837,107 +838,108 @@ CONTAINS
 
     ! Set up surface cell structure
     DO sid=1,TotSurfaces
-       IF (.not. Surface(sid)%HeatTransSurf) CYCLE
-       IF(Surface(sid)%Class /= SurfaceClass_Window)THEN
-          ! Boundary Cells
-          runor=-0.02
-          ! Air Convection Cell
-          cid=cid+1
-          firstcell(sid)=cid
-          ExtConcell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+      IF (.not. Surface(sid)%HeatTransSurf) CYCLE
+      IF (Surface(sid)%Class == SurfaceClass_Window) CYCLE
+      IF (Surface(sid)%HeatTransferAlgorithm /= HeatTransferModel_HAMT) CYCLE
+      ! Boundary Cells
+      runor=-0.02
+      ! Air Convection Cell
+      cid=cid+1
+      firstcell(sid)=cid
+      ExtConcell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
 
-          ! Air Radiation Cell
-          cid=cid+1
-          ExtRadcell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+      ! Air Radiation Cell
+      cid=cid+1
+      ExtRadcell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
 
-          ! Sky Cell
-          cid=cid+1
-          ExtSkycell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+      ! Sky Cell
+      cid=cid+1
+      ExtSkycell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
 
-          ! Ground Cell
-          cid=cid+1
-          ExtGrncell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
-          runor=runor+ cells(cid)%length(1)
+      ! Ground Cell
+      cid=cid+1
+      ExtGrncell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+      runor=runor+ cells(cid)%length(1)
 
-          ! External Virtual Cell
-          cid=cid+1
-          Extcell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
-          runor=runor+ cells(cid)%length(1)
+      ! External Virtual Cell
+      cid=cid+1
+      Extcell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+      runor=runor+ cells(cid)%length(1)
 
 
-          ! Material Cells
-          conid=Surface(sid)%Construction
-          DO lid=1,Construct(conid)%TotLayers
-             matid=Construct(conid)%LayerPoint(lid)
+      ! Material Cells
+      conid=Surface(sid)%Construction
+      DO lid=1,Construct(conid)%TotLayers
+         matid=Construct(conid)%LayerPoint(lid)
 
-             DO did=1,Material(matid)%divs
-                cid=cid+1
+         DO did=1,Material(matid)%divs
+            cid=cid+1
 
-                cells(cid)%matid=matid
-                cells(cid)%sid=sid
+            cells(cid)%matid=matid
+            cells(cid)%sid=sid
 
-                cells(cid)%temp=Material(matid)%itemp
-                cells(cid)%tempp1=Material(matid)%itemp
-                cells(cid)%tempp2=Material(matid)%itemp
+            cells(cid)%temp=Material(matid)%itemp
+            cells(cid)%tempp1=Material(matid)%itemp
+            cells(cid)%tempp2=Material(matid)%itemp
 
-                cells(cid)%rh=Material(matid)%irh
-                cells(cid)%rhp1=Material(matid)%irh
-                cells(cid)%rhp2=Material(matid)%irh
+            cells(cid)%rh=Material(matid)%irh
+            cells(cid)%rhp1=Material(matid)%irh
+            cells(cid)%rhp2=Material(matid)%irh
 
-                cells(cid)%density=Material(matid)%Density
-                cells(cid)%spech=Material(matid)%SpecHeat
+            cells(cid)%density=Material(matid)%Density
+            cells(cid)%spech=Material(matid)%SpecHeat
 
-                ! Make cells smaller near the surface
-                cells(cid)%length(1)=Material(matid)%Thickness* &
-                     ((SIN(pi*(-REAL(did)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0)- &
-                     (SIN(pi*(-REAL(did-1)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0))
+            ! Make cells smaller near the surface
+            cells(cid)%length(1)=Material(matid)%Thickness* &
+                 ((SIN(pi*(-REAL(did)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0)- &
+                 (SIN(pi*(-REAL(did-1)/REAL(Material(matid)%divs))-pi/2.0d0)/2.0d0))
 
-                cells(cid)%origin(1)=runor+cells(cid)%length(1)/2.0d0
-                runor=runor+cells(cid)%length(1)
+            cells(cid)%origin(1)=runor+cells(cid)%length(1)/2.0d0
+            runor=runor+cells(cid)%length(1)
 
-                cells(cid)%volume=cells(cid)%length(1)*Surface(sid)%Area
+            cells(cid)%volume=cells(cid)%length(1)*Surface(sid)%Area
 
-             ENDDO
-          ENDDO
+         ENDDO
+      ENDDO
 
-          ! Interior Virtual Cell
-          cid=cid+1
-          Intcell(sid)=cid
-          cells(cid)%sid=sid
-          cells(cid)%rh=0.0d0
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)=cells(cid)%length(1)/2.0d0+runor
-          runor=runor+ cells(cid)%length(1)
+      ! Interior Virtual Cell
+      cid=cid+1
+      Intcell(sid)=cid
+      cells(cid)%sid=sid
+      cells(cid)%rh=0.0d0
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)=cells(cid)%length(1)/2.0d0+runor
+      runor=runor+ cells(cid)%length(1)
 
-          ! Air Convection Cell
-          cid=cid+1
-          lastcell(sid)=cid
-          IntConcell(sid)=cid
-          cells(cid)%rh=0.0d0
-          cells(cid)%sid=sid
-          cells(cid)%length(1)=0.01d0
-          cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
-       ENDIF
+      ! Air Convection Cell
+      cid=cid+1
+      lastcell(sid)=cid
+      IntConcell(sid)=cid
+      cells(cid)%rh=0.0d0
+      cells(cid)%sid=sid
+      cells(cid)%length(1)=0.01d0
+      cells(cid)%origin(1)= cells(cid)%length(1)/2.0d0+runor
+
     ENDDO
 
 
@@ -981,68 +983,84 @@ CONTAINS
 1965      FORMAT('! <HAMT origins>, Surface Name, Construction Name, Cell origins (m) ')
     !cCurrentModuleObject='MaterialProperty:HeatAndMoistureTransfer:*'
     DO sid=1,TotSurfaces
-       IF (.not. Surface(sid)%HeatTransSurf) CYCLE
-       IF(Surface(sid)%Class /= SurfaceClass_Window)THEN
-          cells(Extcell(sid))%origin(1)=cells(Extcell(sid))%origin(1)+cells(Extcell(sid))%length(1)/2.0d0
-          cells(Intcell(sid))%origin(1)=cells(Intcell(sid))%origin(1)-cells(Intcell(sid))%length(1)/2.0d0
-          cells(Extcell(sid))%volume=0.0
-          cells(Intcell(sid))%volume=0.0
-          watertot(sid)=0.0
-          surfrh(sid)=0.0
-          surfextrh(sid)=0.0
-          surftemp(sid)=0.0
-          surfexttemp(sid)=0.0
-          surfvp(sid)=0.0
-          CALL SetUpOutputVariable('HAMT Surface Water Content [kg/kg]',watertot(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('HAMT Surface Interior Temperature [C]',surftemp(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('HAMT Surface Interior Relative Humidity [%]',surfrh(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('HAMT Surface Interior Vapor Pressure [Pa]',surfvp(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('HAMT Surface Exterior Temperature [C]',surfexttemp(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('HAMT Surface Exterior Relative Humidity [%]',surfextrh(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
-          CALL SetUpOutputVariable('Inside Surface Relative Humidity[]',surfrh(sid),  &
-             'Zone','State',TRIM(Surface(sid)%Name))
+      IF (.not. Surface(sid)%HeatTransSurf) CYCLE
+      IF (Surface(sid)%Class == SurfaceClass_Window) CYCLE
+      IF (Surface(sid)%HeatTransferAlgorithm /= HeatTransferModel_HAMT) CYCLE
+      cells(Extcell(sid))%origin(1)=cells(Extcell(sid))%origin(1)+cells(Extcell(sid))%length(1)/2.0d0
+      cells(Intcell(sid))%origin(1)=cells(Intcell(sid))%origin(1)-cells(Intcell(sid))%length(1)/2.0d0
+      cells(Extcell(sid))%volume=0.0
+      cells(Intcell(sid))%volume=0.0
+      watertot(sid)=0.0
+      surfrh(sid)=0.0
+      surfextrh(sid)=0.0
+      surftemp(sid)=0.0
+      surfexttemp(sid)=0.0
+      surfvp(sid)=0.0
+      CALL SetUpOutputVariable('HAMT Surface Water Content [kg/kg]',watertot(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Interior Temperature [C]',surftemp(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Interior Relative Humidity [%]',surfrh(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Interior Vapor Pressure [Pa]',surfvp(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Exterior Temperature [C]',surfexttemp(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Exterior Relative Humidity [%]',surfextrh(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('Inside Surface Relative Humidity[]',surfrh(sid),  &
+         'Zone','State',TRIM(Surface(sid)%Name))
 
-          ! write cell origins to initilisation output file
-          conid=Surface(sid)%Construction
-          WRITE(OutputFileInits,1968) TRIM(Surface(sid)%Name),TRIM(Construct(conid)%Name),  &
-             (concell, concell=1,Intcell(sid)-Extcell(sid)+1)
+      ! write cell origins to initilisation output file
+      conid=Surface(sid)%Construction
+      WRITE(OutputFileInits,1968) TRIM(Surface(sid)%Name),TRIM(Construct(conid)%Name),  &
+         (concell, concell=1,Intcell(sid)-Extcell(sid)+1)
 1968      FORMAT('HAMT cells, ',A,',',A,400(:,',',i4))
-          WRITE(OutputFileInits,1967) TRIM(Surface(sid)%Name),TRIM(Construct(conid)%Name),  &
-             cells(Extcell(sid):Intcell(sid))%origin(1)
+      WRITE(OutputFileInits,1967) TRIM(Surface(sid)%Name),TRIM(Construct(conid)%Name),  &
+         cells(Extcell(sid):Intcell(sid))%origin(1)
 1967      FORMAT('HAMT origins,',A,',',A,400(:,',',f10.7))
 
-          concell=1
-          DO cid=Extcell(sid),Intcell(sid)
-             CALL SetUpOutputVariable( &
-                  'HAMT Profile Construction Cell ' &
-                  //TRIM(TrimSigDigits(concell))//' Temperature [C]', &
-                  cells(cid)%temp,'Zone','State',TRIM(Surface(sid)%Name))
-             concell=concell+1
-          ENDDO
-          concell=1
-          DO cid=Extcell(sid),Intcell(sid)
-             CALL SetUpOutputVariable( &
-                  'HAMT Profile Construction Cell ' &
-                  //TRIM(TrimSigDigits(concell))//' Water Content [kg/kg]', &
-                  cells(cid)%wreport,'Zone','State',TRIM(Surface(sid)%Name))
-             concell=concell+1
-          ENDDO
-          concell=1
-          DO cid=Extcell(sid),Intcell(sid)
-             CALL SetUpOutputVariable( &
-                  'HAMT Profile Construction Cell ' &
-                  //TRIM(TrimSigDigits(concell))//' Relative Humidity [%]', &
-                  cells(cid)%rhp,'Zone','State',TRIM(Surface(sid)%Name))
-             concell=concell+1
-          ENDDO
-       ENDIF
+      concell=1
+      DO cid=Extcell(sid),Intcell(sid)
+         CALL SetUpOutputVariable( &
+              'HAMT Profile Construction Cell ' &
+              //TRIM(TrimSigDigits(concell))//' Temperature [C]', &
+              cells(cid)%temp,'Zone','State',TRIM(Surface(sid)%Name))
+         concell=concell+1
+      ENDDO
+      concell=1
+      DO cid=Extcell(sid),Intcell(sid)
+         CALL SetUpOutputVariable( &
+              'HAMT Profile Construction Cell ' &
+              //TRIM(TrimSigDigits(concell))//' Water Content [kg/kg]', &
+              cells(cid)%wreport,'Zone','State',TRIM(Surface(sid)%Name))
+         concell=concell+1
+      ENDDO
+      concell=1
+      DO cid=Extcell(sid),Intcell(sid)
+         CALL SetUpOutputVariable( &
+              'HAMT Profile Construction Cell ' &
+              //TRIM(TrimSigDigits(concell))//' Relative Humidity [%]', &
+              cells(cid)%rhp,'Zone','State',TRIM(Surface(sid)%Name))
+         concell=concell+1
+      ENDDO
     ENDDO
+    
+    CALL ScanForReports('Constructions',DoReport,'Constructions')
+    IF (DoReport) THEN
+
+      WRITE(OutputFileInits,108)
+
+      Do MaterNum=1,TotMaterials
+
+         WRITE(OutputFileInits,111) Trim(Material(MaterNum)%Name),TRIM(RoundSigDigits(NominalR(MaterNum),4))
+
+      end do
+
+    End If
+
+    108 FORMAT('! <Material Nominal Resistance>, Material Name,  Nominal R')
+    111 FORMAT('Material Nominal Resistance',2(',',A))
 
   END SUBROUTINE InitHeatBalHAMT
 

@@ -786,7 +786,10 @@ FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFl
                    NodeFluidStream,ObjectIsParent)
 
   IF (NumNodes > 1) THEN
-    CALL ShowSevereError('Only 1st Node used from List='//TRIM(NodeName)//' for '//TRIM(NodeObjectType)//'='//TRIM(NodeObjectName))
+    CALL ShowSevereError('GetOnlySingleNode: Only 1st Node used from NodeList="'//  &
+       TRIM(NodeName)//'" for '//TRIM(NodeObjectType)//  &
+       '="'//TRIM(NodeObjectName)//'"')
+    CALL ShowContinueError('...a Nodelist may not be valid in this context.')
     errFlag=.true.
   ELSEIF (NumNodes == 0) THEN
     NodeNums(1)=0

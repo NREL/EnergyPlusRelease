@@ -46,14 +46,14 @@ MODULE LowTempRadiantSystem
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataGlobals,       ONLY : MaxNameLength, BeginTimeStepFlag, InitConvTemp, SysSizingCalc, WarmUpFlag
-USE DataInterfaces,    ONLY : ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, &
+USE DataInterfaces,    ONLY : ShowWarningError, ShowWarningMessage, ShowSevereError, ShowFatalError, ShowContinueError, &
                               SetupOutputVariable, ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd, &
                               CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
 
-USE DataHeatBalance,   ONLY : Material, TotMaterials,MaxLayersInConstruct, UseCTF, &
-                           QRadThermInAbs,Construct, TotConstructs,SolutionAlgo,UseCondFD,RegularMaterial,Air
+USE DataHeatBalance,   ONLY : Material, TotMaterials,MaxLayersInConstruct,   &
+                           QRadThermInAbs,Construct, TotConstructs,  RegularMaterial,Air
 
-USE DataSurfaces,      ONLY : Surface, TotSurfaces
+USE DataSurfaces,      ONLY : Surface, TotSurfaces, HeatTransferModel_CTF
 USE DataHeatBalFanSys, ONLY : QRadSysSource, TCondFDSourceNode  ! Heat source/sink value & temperature for CondFD algo.
 USE DataHVACGlobals,   ONLY : SmallLoad
 
@@ -69,6 +69,9 @@ PRIVATE ! Everything private unless explicitly made public
 INTEGER, PARAMETER :: HydronicSystem     = 1 ! Variable flow hydronic radiant system
 INTEGER, PARAMETER :: ConstantFlowSystem = 2 ! Constant flow, variable (controlled) temperature radiant system
 INTEGER, PARAMETER :: ElectricSystem     = 3 ! Electric resistance radiant heating system
+CHARACTER(len=*), PARAMETER :: cHydronicSystem='ZoneHVAC:LowTemperatureRadiant:VariableFlow'
+CHARACTER(len=*), PARAMETER :: cConstantFlowSystem='ZoneHVAC:LowTemperatureRadiant:ConstantFlow'
+CHARACTER(len=*), PARAMETER :: cElectricSystem='ZoneHVAC:LowTemperatureRadiant:Electric'
   ! Operating modes:
 INTEGER, PARAMETER :: NotOperating = 0  ! Parameter for use with OperatingMode variable, set for heating
 INTEGER, PARAMETER :: HeatingMode = 1   ! Parameter for use with OperatingMode variable, set for heating
@@ -132,7 +135,7 @@ TYPE, PUBLIC :: HydronicRadiantSystemData
   INTEGER                      :: CWBranchNum       = 0
   INTEGER                      :: CWCompNum         = 0
   INTEGER                      :: GlycolIndex       = 0   ! Index to Glycol (Water) Properties
-  INTEGER                      :: CondErrCount      = 0   ! Error count for warning messages
+  INTEGER                      :: CondErrIndex      = 0   ! Error index for recurring warning messages
   INTEGER                      :: CondCtrlType      = 1   ! Condensation control type (initialize to simple off)
   REAL(r64)                    :: CondDewPtDeltaT   = 1.0 ! Diff between surface temperature and dew point for cond. shut-off
   REAL(r64)                    :: CondCausedTimeOff = 0.0 ! Amount of time condensation did or could have turned system off
@@ -221,7 +224,7 @@ TYPE, PUBLIC :: ConstantFlowRadiantSystemData
   INTEGER                      :: CWBranchNum       = 0
   INTEGER                      :: CWCompNum         = 0
   INTEGER                      :: GlycolIndex       = 0   ! Index to Glycol (Water) Properties
-  INTEGER                      :: CondErrCount      = 0   ! Error count for warning messages
+  INTEGER                      :: CondErrIndex      = 0   ! Error index for warning messages
   INTEGER                      :: CondCtrlType      = 1   ! Condensation control type (initialize to simple off)
   REAL(r64)                    :: CondDewPtDeltaT   = 1.0 ! Diff between surface temperature and dew point for cond. shut-off
   REAL(r64)                    :: CondCausedTimeOff = 0.0 ! Amount of time condensation did or could have turned system off
@@ -1499,7 +1502,10 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
   REAL(r64)      :: TotalEffic            ! Intermediate calculation variable for total pump efficiency
   INTEGER        :: WaterNodeIn           ! Node number for water inlet node
   INTEGER        :: ZoneNum               ! Intermediate variable for keeping track of the zone number
-  LOGICAL, SAVE  :: MyEnvrnFlag=.true.
+  LOGICAL, SAVE, ALLOCATABLE, DIMENSION(:)  :: MyEnvrnFlagHydr
+  LOGICAL, SAVE, ALLOCATABLE, DIMENSION(:)  :: MyEnvrnFlagCFlo
+  LOGICAL, SAVE, ALLOCATABLE, DIMENSION(:)  :: MyEnvrnFlagElec
+  LOGICAL, SAVE  :: MyEnvrnFlagGeneral = .TRUE.
   LOGICAL,SAVE   :: ZoneEquipmentListChecked = .false.  ! True after the Zone Equipment List has been checked for items
   Integer        :: Loop
   LOGICAL,SAVE        :: MyOneTimeFlag = .TRUE.           ! Initialization flag
@@ -1510,10 +1516,16 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
   LOGICAL    :: errFlag
           ! FLOW:
   IF (MyOneTimeFlag) THEN
+    ALLOCATE(MyEnvrnFlagHydr(NumOfHydrLowTempRadSys))
+    ALLOCATE(MyEnvrnFlagCFlo(NumOfCFloLowTempRadSys))
+    ALLOCATE(MyEnvrnFlagElec(NumOfElecLowTempRadSys))
     ALLOCATE(MyPlantScanFlagHydr(NumOfHydrLowTempRadSys))
     ALLOCATE(MyPlantScanFlagCFlo(NumOfCFloLowTempRadSys))
     MyPlantScanFlagHydr  = .TRUE.
     MyPlantScanFlagCFlo  = .TRUE.
+    MyEnvrnFlagHydr   = .TRUE.
+    MyEnvrnFlagCFlo   = .TRUE.
+    MyEnvrnFlagElec   = .TRUE.
     MyOneTimeFlag = .FALSE.
   END IF
 
@@ -1789,92 +1801,102 @@ SUBROUTINE InitLowTempRadiantSystem(FirstHVACIteration,RadSysNum,SystemType)
     END IF
   END IF
 
-  IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
-    ZeroSourceSumHATsurf = 0.0D0
-    QRadSysSrcAvg = 0.0D0
-    LastQRadSysSrc = 0.0D0
-    LastSysTimeElapsed = 0.0D0
-    LastTimeStepSys = 0.0D0
-    IF (NumOfHydrLowTempRadSys > 0) THEN
-      HydrRadSys%HeatPower          = 0.0
-      HydrRadSys%HeatEnergy         = 0.0
-      HydrRadSys%CoolPower          = 0.0
-      HydrRadSys%CoolEnergy         = 0.0
-      HydrRadSys%WaterInletTemp     = 0.0
-      HydrRadSys%WaterOutletTemp    = 0.0
-      HydrRadSys%WaterMassFlowRate  = 0.0
-
-      Do loop =1, NumOfHydrLowTempRadSys
-        IF (MyPlantScanFlagHydr(loop)) CYCLE
-        IF (HydrRadSys(loop)%HotWaterInNode > 0) THEN
-          CALL InitComponentNodes(0.0d0, HydrRadSys(loop)%WaterFlowMaxHeat, &
-                            HydrRadSys(loop)%HotWaterInNode, &
-                            HydrRadSys(loop)%HotWaterOutNode, &
-                            HydrRadSys(loop)%HWLoopNum, &
-                            HydrRadSys(loop)%HWLoopSide, &
-                            HydrRadSys(loop)%HWBranchNum, &
-                            HydrRadSys(loop)%HWCompNum  )
-        ENDIF
-        IF (HydrRadSys(loop)%ColdWaterInNode > 0) THEN
-          CALL InitComponentNodes(0.0d0, HydrRadSys(loop)%WaterFlowMaxCool, &
-                            HydrRadSys(loop)%ColdWaterInNode, &
-                            HydrRadSys(loop)%ColdWaterOutNode, &
-                            HydrRadSys(loop)%CWLoopNum, &
-                            HydrRadSys(loop)%CWLoopSide, &
-                            HydrRadSys(loop)%CWBranchNum, &
-                            HydrRadSys(loop)%CWCompNum  )
-        ENDIF
-      ENDDO
-    ENDIF
-    IF (NumOfCFloLowTempRadSys > 0) THEN
-      CFloRadSys%WaterInletTemp     = 0.0
-      CFloRadSys%WaterOutletTemp    = 0.0
-      CFloRadSys%PumpInletTemp      = 0.0
-      CFloRadSys%WaterMassFlowRate  = 0.0
-      CFloRadSys%WaterInjectionRate = 0.0
-      CFloRadSys%WaterRecircRate    = 0.0
-      CFloRadSys%HeatPower          = 0.0
-      CFloRadSys%HeatEnergy         = 0.0
-      CFloRadSys%CoolPower          = 0.0
-      CFloRadSys%CoolEnergy         = 0.0
-      CFloRadSys%PumpPower          = 0.0
-      CFloRadSys%PumpMassFlowRate   = 0.0
-      CFloRadSys%PumpHeattoFluid    = 0.0
-      Do loop =1, NumOfCFloLowTempRadSys
-        IF (MyPlantScanFlagCFlo(loop)) CYCLE
-        IF (CFloRadSys(loop)%HotWaterInNode > 0) THEN
-          CALL InitComponentNodes(0.0d0, CFloRadSys(loop)%HotDesignWaterMassFlowRate, &
-                            CFloRadSys(loop)%HotWaterInNode, &
-                            CFloRadSys(loop)%HotWaterOutNode, &
-                            CFloRadSys(loop)%HWLoopNum, &
-                            CFloRadSys(loop)%HWLoopSide, &
-                            CFloRadSys(loop)%HWBranchNum, &
-                            CFloRadSys(loop)%HWCompNum  )
-        ENDIF
-        IF (CFloRadSys(loop)%ColdWaterInNode > 0) THEN
-          CALL InitComponentNodes(0.0d0, CFloRadSys(loop)%ColdDesignWaterMassFlowRate, &
-                            CFloRadSys(loop)%ColdWaterInNode, &
-                            CFloRadSys(loop)%ColdWaterOutNode, &
-                            CFloRadSys(loop)%CWLoopNum, &
-                            CFloRadSys(loop)%CWLoopSide, &
-                            CFloRadSys(loop)%CWBranchNum, &
-                            CFloRadSys(loop)%CWCompNum  )
-        ENDIF
-      ENDDO
-
-    ENDIF
-    IF (NumOfElecLowTempRadSys > 0) THEN
-      ElecRadSys%HeatPower          = 0.0
-      ElecRadSys%HeatEnergy         = 0.0
-      ElecRadSys%ElecPower          = 0.0
-      ElecRadSys%ElecEnergy         = 0.0
-    ENDIF
-    MyEnvrnFlag=.false.
+  IF (BeginEnvrnFlag .and. MyEnvrnFlagGeneral) THEN
+    ZeroSourceSumHATsurf = 0.D0
+    QRadSysSrcAvg        = 0.D0
+    LastQRadSysSrc       = 0.D0
+    LastSysTimeElapsed   = 0.D0
+    LastTimeStepSys      = 0.D0
+    MyEnvrnFlagGeneral   = .FALSE.
   ENDIF
+  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlagGeneral = .TRUE.
 
-  IF (.not. BeginEnvrnFlag) THEN
-    MyEnvrnFlag =.true.
+  IF (NumOfHydrLowTempRadSys > 0) THEN
+    IF (BeginEnvrnFlag .and. MyEnvrnFlagHydr(RadSysNum)) THEN
+      HydrRadSys(RadSysNum)%HeatPower          = 0.d0
+      HydrRadSys(RadSysNum)%HeatEnergy         = 0.d0
+      HydrRadSys(RadSysNum)%CoolPower          = 0.d0
+      HydrRadSys(RadSysNum)%CoolEnergy         = 0.d0
+      HydrRadSys(RadSysNum)%WaterInletTemp     = 0.d0
+      HydrRadSys(RadSysNum)%WaterOutletTemp    = 0.d0
+      HydrRadSys(RadSysNum)%WaterMassFlowRate  = 0.d0
+
+      IF (.NOT. MyPlantScanFlagHydr(RadSysNum)) THEN
+        IF (HydrRadSys(RadSysNum)%HotWaterInNode > 0) THEN
+          CALL InitComponentNodes(0.0d0, HydrRadSys(RadSysNum)%WaterFlowMaxHeat, &
+                            HydrRadSys(RadSysNum)%HotWaterInNode, &
+                            HydrRadSys(RadSysNum)%HotWaterOutNode, &
+                            HydrRadSys(RadSysNum)%HWLoopNum, &
+                            HydrRadSys(RadSysNum)%HWLoopSide, &
+                            HydrRadSys(RadSysNum)%HWBranchNum, &
+                            HydrRadSys(RadSysNum)%HWCompNum  )
+        ENDIF
+        IF (HydrRadSys(RadSysNum)%ColdWaterInNode > 0) THEN
+          CALL InitComponentNodes(0.0d0, HydrRadSys(RadSysNum)%WaterFlowMaxCool, &
+                            HydrRadSys(RadSysNum)%ColdWaterInNode, &
+                            HydrRadSys(RadSysNum)%ColdWaterOutNode, &
+                            HydrRadSys(RadSysNum)%CWLoopNum, &
+                            HydrRadSys(RadSysNum)%CWLoopSide, &
+                            HydrRadSys(RadSysNum)%CWBranchNum, &
+                            HydrRadSys(RadSysNum)%CWCompNum  )
+        ENDIF
+      ENDIF
+      MyEnvrnFlagHydr(RadSysNum)=.false.
+    ENDIF
+  ENDIF !NumOfHydrLowTempRadSys > 0
+  IF (.NOT. BeginEnvrnFlag .AND. (NumOfHydrLowTempRadSys > 0)) MyEnvrnFlagHydr(RadSysNum)= .TRUE.
+
+  IF (NumOfCFloLowTempRadSys > 0) THEN
+    IF (BeginEnvrnFlag .and. MyEnvrnFlagCFlo(RadSysNum)) THEN
+      CFloRadSys(RadSysNum)%WaterInletTemp     = 0.0
+      CFloRadSys(RadSysNum)%WaterOutletTemp    = 0.0
+      CFloRadSys(RadSysNum)%PumpInletTemp      = 0.0
+      CFloRadSys(RadSysNum)%WaterMassFlowRate  = 0.0
+      CFloRadSys(RadSysNum)%WaterInjectionRate = 0.0
+      CFloRadSys(RadSysNum)%WaterRecircRate    = 0.0
+      CFloRadSys(RadSysNum)%HeatPower          = 0.0
+      CFloRadSys(RadSysNum)%HeatEnergy         = 0.0
+      CFloRadSys(RadSysNum)%CoolPower          = 0.0
+      CFloRadSys(RadSysNum)%CoolEnergy         = 0.0
+      CFloRadSys(RadSysNum)%PumpPower          = 0.0
+      CFloRadSys(RadSysNum)%PumpMassFlowRate   = 0.0
+      CFloRadSys(RadSysNum)%PumpHeattoFluid    = 0.0
+
+      IF (.NOT. MyPlantScanFlagCFlo(RadSysNum)) THEN
+        IF (CFloRadSys(RadSysNum)%HotWaterInNode > 0) THEN
+          CALL InitComponentNodes(0.0d0, CFloRadSys(RadSysNum)%HotDesignWaterMassFlowRate, &
+                            CFloRadSys(RadSysNum)%HotWaterInNode, &
+                            CFloRadSys(RadSysNum)%HotWaterOutNode, &
+                            CFloRadSys(RadSysNum)%HWLoopNum, &
+                            CFloRadSys(RadSysNum)%HWLoopSide, &
+                            CFloRadSys(RadSysNum)%HWBranchNum, &
+                            CFloRadSys(RadSysNum)%HWCompNum  )
+        ENDIF
+        IF (CFloRadSys(RadSysNum)%ColdWaterInNode > 0) THEN
+          CALL InitComponentNodes(0.0d0, CFloRadSys(RadSysNum)%ColdDesignWaterMassFlowRate, &
+                            CFloRadSys(RadSysNum)%ColdWaterInNode, &
+                            CFloRadSys(RadSysNum)%ColdWaterOutNode, &
+                            CFloRadSys(RadSysNum)%CWLoopNum, &
+                            CFloRadSys(RadSysNum)%CWLoopSide, &
+                            CFloRadSys(RadSysNum)%CWBranchNum, &
+                            CFloRadSys(RadSysNum)%CWCompNum  )
+        ENDIF
+      ENDIF
+      MyEnvrnFlagCFlo(RadSysNum) = .FALSE.
+    ENDIF
+  ENDIF ! NumOfCFloLowTempRadSys > 0
+  IF (.NOT. BeginEnvrnFlag .AND. (NumOfCFloLowTempRadSys > 0)) MyEnvrnFlagCFlo(RadSysNum) = .TRUE.
+  
+  IF (NumOfElecLowTempRadSys > 0) THEN
+    IF (BeginEnvrnFlag .and. MyEnvrnFlagElec(RadSysNum)) THEN
+      ElecRadSys(RadSysNum)%HeatPower          = 0.0
+      ElecRadSys(RadSysNum)%HeatEnergy         = 0.0
+      ElecRadSys(RadSysNum)%ElecPower          = 0.0
+      ElecRadSys(RadSysNum)%ElecEnergy         = 0.0
+    ENDIF
+    MyEnvrnFlagElec(RadSysNum)=.false.
   ENDIF
+  IF (.not. BeginEnvrnFlag .AND. (NumOfElecLowTempRadSys > 0)) MyEnvrnFlagElec(RadSysNum) = .TRUE.
 
   IF (SystemType==ConstantFlowSystem) THEN
 
@@ -2481,7 +2503,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
                                  ZoneAirHumRat
   USE DataHeatBalSurface, ONLY : TH
   USE DataLoopNode,       ONLY : Node
-  USE DataSurfaces,       ONLY : Surface
+  USE DataSurfaces,       ONLY : Surface, HeatTransferModel_CondFD, HeatTransferModel_CTF
   USE PlantUtilities,     ONLY : SetComponentFlowRate
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -2523,8 +2545,6 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
 
   REAL(r64) :: Ca,Cb,Cc,Cd,Ce,Cf,Cg,Ch,Ci,Cj,Ck,Cl ! Coefficients to relate the inlet water temperature to the heat source
                                                  ! For more info on Ca through Cl, see comments below
-
-  INTEGER, SAVE :: CondensationErrorCount = 0   ! Counts the number of times the radiant systems are shutdown due to condensation
 
           ! FLOW:
           ! First, apply heat exchanger logic to find the heat source/sink to the system.
@@ -2631,7 +2651,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
           ! as well as all of the heat balance terms "hidden" in Ck and Cl).
       ConstrNum = Surface(SurfNum)%Construction
 
-      IF (SolutionAlgo == UseCTF) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF) THEN
 
 
         Ca = RadSysTiHBConstCoef(SurfNum)
@@ -2653,7 +2673,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
         QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - Ck) &
                               /(1.d0 + (EpsMdotCp*Cl/Surface(SurfNum)%Area) )
 
-      ELSE IF (SolutionAlgo == UseCondFD) THEN
+      ELSE IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD) THEN
 
         QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - TCondFDSourceNode(SurfNum))
 
@@ -2738,25 +2758,24 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
           END DO
           ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
           IF (.not. WarmUpFlag) THEN
-            CondensationErrorCount = CondensationErrorCount + 1
-            IF (CondensationErrorCount <= NumOfHydrLowTempRadSys) THEN  ! allow errors up to number of radiant systems
-              CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-              CALL ShowContinueError('Flow to the following radiant system will be shut-off to avoid condensation')
-              CALL ShowContinueError('Hydronic Radiant System Name = '//TRIM(HydrRadSys(RadSysNum)%Name))
+            IF (HydrRadSys(RadSysNum)%CondErrIndex == 0) THEN  ! allow errors up to number of radiant systems
+              CALL ShowWarningMessage(cHydronicSystem//' ['//TRIM(HydrRadSys(RadSysNum)%Name)//']')
+              CALL ShowContinueError('Surface ['//trim(Surface(HydrRadSys(RadSysNum)%SurfacePtr(RadSurfNum2))%Name)//  &
+                 '] temperature below dew-point temperature--potential for condensation exists')
+              CALL ShowContinueError('Flow to the radiant system will be shut-off to avoid condensation')
               CALL ShowContinueError('Predicted radiant system surface temperature = '// &
-                                     RoundSigDigits(TH(HydrRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2))
-              CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
+                                     trim(RoundSigDigits(TH(HydrRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2)))
+              CALL ShowContinueError('Zone dew-point temperature + safety delta T= '//  &
+                 trim(RoundSigDigits(DewPointTemp+HydrRadSys(RadSysNum)%CondDewPtDeltaT,2)))
               CALL ShowContinueErrorTimeStamp(' ')
-              IF (CondensationErrorCount == 1) THEN
-                CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(HydrRadSys(RadSysNum)%CondDewPtDeltaT,2))// &
-                                       ' C safety was chosen in the input for the shut-off criteria')
-                CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
-              END IF
-            ELSE
-              CALL ShowRecurringWarningErrorAtEnd('Hydronic radiant system ['//TRIM(HydrRadSys(RadSysNum)%Name)//  &
-                           '] condensation shut-off occurrence continues.',  &
-                           HydrRadSys(RadSysNum)%CondErrCount)
+              CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(HydrRadSys(RadSysNum)%CondDewPtDeltaT,4))// &
+                                     ' C safety was chosen in the input for the shut-off criteria')
+              CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
             END IF
+            CALL ShowRecurringWarningErrorAtEnd(cHydronicSystem//' ['//TRIM(HydrRadSys(RadSysNum)%Name)//  &
+                           '] condensation shut-off occurrence continues.',  &
+                           HydrRadSys(RadSysNum)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                           ReportMaxUnits='C',ReportMinUnits='C')
           END IF
           EXIT ! outer do loop
         END IF
@@ -2773,7 +2792,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
 
     ELSE IF ( (OperatingMode == CoolingMode) .AND. (HydrRadSys(RadSysNum)%CondCtrlType == CondCtrlVariedOff) ) THEN
 
-      LowestRadSurfTemp = 999.9
+      LowestRadSurfTemp = 999.9d0
       CondSurfNum       = 0
       DO RadSurfNum2 = 1, HydrRadSys(RadSysNum)%NumOfSurfaces
         IF (TH(HydrRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+HydrRadSys(RadSysNum)%CondDewPtDeltaT)) THEN
@@ -2846,7 +2865,8 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
                                                HydrRadSys(RadSysNum)%TubeLength,                    &
                                                HydrRadSys(RadSysNum)%TubeDiameter,                  &
                                                HydrRadSys(RadSysNum)%GlycolIndex)
-            IF (SolutionAlgo == UseCTF) THEN ! For documentation on coefficients, see code earlier in this subroutine...
+            IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF) THEN
+              ! For documentation on coefficients, see code earlier in this subroutine
               Ca = RadSysTiHBConstCoef(SurfNum)
               Cb = RadSysTiHBToutCoef(SurfNum)
               Cc = RadSysTiHBQsrcCoef(SurfNum)
@@ -2861,7 +2881,7 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
               Cl = Ch + ( ( Ci*(Cc+Cb*Cf) + Cj*(Cf+Ce*Cc) ) / ( 1. - Ce*Cb ) )
               QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - Ck) &
                                       /(1. + (EpsMdotCp*Cl/Surface(SurfNum)%Area) )
-            ELSE IF (SolutionAlgo == UseCondFD) THEN
+            ELSE IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD) THEN
               QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - TCondFDSourceNode(SurfNum))
             END IF
             IF (Surface(SurfNum)%ExtBoundCond > 0 .AND. Surface(SurfNum)%ExtBoundCond /= SurfNum) &
@@ -2903,25 +2923,24 @@ SUBROUTINE CalcLowTempHydrRadSysComps(RadSysNum,LoadMet)
         IF (HydrRadSys(RadSysNum)%CondCausedShutDown) THEN
           ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
           IF (.not. WarmUpFlag) THEN
-            CondensationErrorCount = CondensationErrorCount + 1
-            IF (CondensationErrorCount <= NumOfHydrLowTempRadSys) THEN  ! allow errors up to number of radiant systems
-              CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-              CALL ShowContinueError('Flow to the following radiant system will be shut-off to avoid condensation')
-              CALL ShowContinueError('Hydronic Radiant System Name = '//TRIM(HydrRadSys(RadSysNum)%Name))
+            IF (HydrRadSys(RadSysNum)%CondErrIndex == 0) THEN  ! allow errors up to number of radiant systems
+              CALL ShowWarningMessage(cHydronicSystem//' ['//TRIM(HydrRadSys(RadSysNum)%Name)//']')
+              CALL ShowContinueError('Surface ['//trim(Surface(HydrRadSys(RadSysNum)%SurfacePtr(CondSurfNum))%Name)//  &
+                 '] temperature below dew-point temperature--potential for condensation exists')
+              CALL ShowContinueError('Flow to the radiant system will be shut-off to avoid condensation')
               CALL ShowContinueError('Predicted radiant system surface temperature = '// &
-                                     RoundSigDigits(TH(HydrRadSys(RadSysNum)%SurfacePtr(RadSurfNum),1,2),2))
-              CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
+                                     trim(RoundSigDigits(TH(HydrRadSys(RadSysNum)%SurfacePtr(CondSurfNum),1,2),2)))
+              CALL ShowContinueError('Zone dew-point temperature + safety delta T= '//  &
+                 trim(RoundSigDigits(DewPointTemp+HydrRadSys(RadSysNum)%CondDewPtDeltaT,2)))
               CALL ShowContinueErrorTimeStamp(' ')
-              IF (CondensationErrorCount == 1) THEN
-                CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(HydrRadSys(RadSysNum)%CondDewPtDeltaT,2))// &
-                                       ' C safety was chosen in the input for the shut-off criteria')
-                CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
-              END IF
-            ELSE
-              CALL ShowRecurringWarningErrorAtEnd('Hydronic radiant system ['//TRIM(HydrRadSys(RadSysNum)%Name)//  &
-                           '] condensation shut-off occurrence continues.',  &
-                           HydrRadSys(RadSysNum)%CondErrCount)
+              CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(HydrRadSys(RadSysNum)%CondDewPtDeltaT,4))// &
+                                     ' C safety was chosen in the input for the shut-off criteria')
+              CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
             END IF
+            CALL ShowRecurringWarningErrorAtEnd(cHydronicSystem//' ['//TRIM(HydrRadSys(RadSysNum)%Name)//  &
+                           '] condensation shut-off occurrence continues.',  &
+                           HydrRadSys(RadSysNum)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                           ReportMaxUnits='C',ReportMinUnits='C')
           END IF
         END IF
       END IF  ! Condensation Predicted in Variable Shut-Off Control Type
@@ -3254,7 +3273,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! We now have inlet and outlet temperatures--we still need to set the flow rates
         IF ((SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) /= 0.d0) THEN ! protect divide by zero
           CFloRadSys(RadSysNum)%WaterInjectionRate =  ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                                                       *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
+                                           *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)   &
                                                        /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
                                                      -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
                                                        /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
@@ -3274,10 +3293,12 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! We now have inlet and outlet temperatures--we still need to set the flow rates
         IF ((SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) /= 0.d0) THEN ! protect divide by zero
           CFloRadSys(RadSysNum)%WaterInjectionRate =  ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                                                       *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
+                                             *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)   &
                                                        /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
                                                      -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
                                                        /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
+        ELSE
+          CFloRadSys(RadSysNum)%WaterInjectionRate = CFloRadSys(RadSysNum)%WaterMassFlowRate
         ENDIF
         IF (CFloRadSys(RadSysNum)%WaterInjectionRate > CFloRadSys(RadSysNum)%WaterMassFlowRate) &
           CFloRadSys(RadSysNum)%WaterInjectionRate = CFloRadSys(RadSysNum)%WaterMassFlowRate
@@ -3305,7 +3326,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! then we cannot meet the inlet temperature and we have to "iterate" through the
           ! alternate solution.
         InjectFlowRate = ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                          *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
+                       *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)   &
                           /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
                         -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
                           /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
@@ -3368,12 +3389,18 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! Best condition--loop inlet temperature lower than requested and we have enough flow.
           ! So, proceed assuming the RadInTemp requested by the controls and then figure out the
           ! mixing after the outlet radiant temperature is calculated.
-          CFloRadSys(RadSysNum)%WaterInletTemp = RadInTemp
+          
+          ! This condition can also happen when LoopReqTemp has been reset  to dewpoint for condensation control
+          IF (.NOT. VarOffCond) THEN
+            CFloRadSys(RadSysNum)%WaterInletTemp = RadInTemp
+          ELSE
+            CFloRadSys(RadSysNum)%WaterInletTemp = LoopReqTemp
+          ENDIF
           CALL CalcLowTempCFloRadSysComps(RadSysNum,LoopInNode,Iteration,LoadMet)
 
           ! We now have inlet and outlet temperatures--we still need to set the flow rates
           CFloRadSys(RadSysNum)%WaterInjectionRate =  ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                                                       *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
+                                                 *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) &
                                                        /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
                                                      -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
                                                        /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
@@ -3390,11 +3417,15 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           CALL CalcLowTempCFloRadSysComps(RadSysNum,LoopInNode,Iteration,LoadMet)
 
           ! We now have inlet and outlet temperatures--we still need to set the flow rates
-          CFloRadSys(RadSysNum)%WaterInjectionRate =  ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                                                       *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
-                                                       /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
-                                                     -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
-                                                       /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
+          IF ((SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) /= 0.d0) THEN ! protect div by zero
+            CFloRadSys(RadSysNum)%WaterInjectionRate =  ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
+                                                 *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) &
+                                                         /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp ) ) &
+                                                       -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
+                                                         /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
+          ELSE ! no temp change present, set injection rate to full flow
+            CFloRadSys(RadSysNum)%WaterInjectionRate = CFloRadSys(RadSysNum)%WaterMassFlowRate
+          ENDIF
           IF (CFloRadSys(RadSysNum)%WaterInjectionRate > CFloRadSys(RadSysNum)%WaterMassFlowRate) &
             CFloRadSys(RadSysNum)%WaterInjectionRate = CFloRadSys(RadSysNum)%WaterMassFlowRate
           CFloRadSys(RadSysNum)%WaterRecircRate    = 0.0  ! by definition
@@ -3408,7 +3439,12 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! the proper temperature inlet to the radiant system, then we are done.  If not, we
           ! have to repeat the solution for an unknown inlet temperature and a known recirculation
           ! rate.
-          CFloRadSys(RadSysNum)%WaterInletTemp = RadInTemp
+          ! This condition might happen when LoopReqTemp has been reset  to dewpoint for condensation control
+          IF (.NOT. VarOffCond) THEN
+            CFloRadSys(RadSysNum)%WaterInletTemp = RadInTemp
+          ELSE
+            CFloRadSys(RadSysNum)%WaterInletTemp = LoopReqTemp
+          ENDIF
           CALL CalcLowTempCFloRadSysComps(RadSysNum,LoopInNode,Iteration,LoadMet)
 
           ! Now see if we can really get that desired into temperature (RadInTemp) by solving
@@ -3421,7 +3457,7 @@ SUBROUTINE CalcLowTempCFloRadiantSystem(RadSysNum,LoadMet)
           ! then we cannot meet the inlet temperature and we have to "iterate" through the
           ! alternate solution.
           InjectFlowRate = ( CFloRadSys(RadSysNum)%WaterMassFlowRate                    &
-                            *(RadInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
+                            *(CFloRadSys(RadSysNum)%WaterInletTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)        &
                             /(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp) ) &
                           -( CFloRadSys(RadSysNum)%PumpHeattoFluid                      &
                             /(CpFluid*(SysWaterInTemp - CFloRadSys(RadSysNum)%WaterOutletTemp)) )
@@ -3538,7 +3574,7 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
                                  ZoneAirHumRat
   USE DataHeatBalSurface, ONLY : TH
   USE DataLoopNode,       ONLY : Node
-  USE DataSurfaces,       ONLY : Surface
+  USE DataSurfaces,       ONLY : Surface, HeatTransferModel_CondFD, HeatTransferModel_CTF
   USE FluidProperties,    ONLY : GetSpecificHeatGlycol
   USE PlantUtilities,     ONLY : SetComponentFlowRate
 
@@ -3596,7 +3632,6 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
   REAL(r64), SAVE, DIMENSION(:), ALLOCATABLE :: WaterTempOut ! Array of outlet water temperatures for
                                                              ! each surface in the radiant system
 
-  INTEGER, SAVE :: CondensationErrorCount = 0   ! Counts the number of times the radiant systems are shutdown due to condensation
   LOGICAL, SAVE :: FirstTimeFlag=.true.  ! for setting size of Ckj, Cmj, WaterTempOut arrays
 
           ! FLOW:
@@ -3737,11 +3772,12 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
 
       IF (.NOT. Iteration) THEN
 
-        IF (SolutionAlgo == UseCTF)  &
+        IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF)  &
             QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - Ck) &
                                 /(1. + (EpsMdotCp*Cl/Surface(SurfNum)%Area) )
 
-        IF (SolutionAlgo== UseCondFD ) QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - TCondFDSourceNode(SurfNum))
+        IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD ) &
+            QRadSysSource(SurfNum) = EpsMdotCp * (WaterTempIn - TCondFDSourceNode(SurfNum))
 
         IF (Surface(SurfNum)%ExtBoundCond > 0 .AND. Surface(SurfNum)%ExtBoundCond /= SurfNum) &
           QRadSysSource(Surface(SurfNum)%ExtBoundCond) = QRadSysSource(SurfNum)   ! Also set the other side of an interzone
@@ -3863,28 +3899,85 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
         EXIT ! outer do loop
       END IF
     END DO
-          ! Condensation Cut-off:
-          ! Check to see whether there are any surface temperatures within the radiant system that have
-          ! dropped below the dew-point temperature.  If so, we need to shut off this radiant system.
-          ! A safety parameter is added (hardwired parameter) to avoid getting too close to condensation
-          ! conditions.
-      CFloRadSys(RadSysNum)%CondCausedShutDown = .FALSE.
-      DewPointTemp = PsyTdpFnWPb(ZoneAirHumRat(CFloRadSys(RadSysNum)%ZonePtr),OutBaroPress)
+        ! Condensation Cut-off:
+        ! Check to see whether there are any surface temperatures within the radiant system that have
+        ! dropped below the dew-point temperature.  If so, we need to shut off this radiant system.
+        ! A safety parameter is added (hardwired parameter) to avoid getting too close to condensation
+        ! conditions.
+    CFloRadSys(RadSysNum)%CondCausedShutDown = .FALSE.
+    DewPointTemp = PsyTdpFnWPb(ZoneAirHumRat(CFloRadSys(RadSysNum)%ZonePtr),OutBaroPress)
 
-      IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlSimpleOff) ) THEN
+    IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlSimpleOff) ) THEN
 
-        DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
-          IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT)) THEN
-          ! Condensation warning--must shut off radiant system
+      DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
+        IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT)) THEN
+        ! Condensation warning--must shut off radiant system
+          CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
+          WaterMassFlow                           = 0.0
+          CALL SetComponentFlowRate(WaterMassFlow, &
+                                CFloRadSys(RadSysNum)%ColdWaterInNode, &
+                                CFloRadSys(RadSysNum)%ColdWaterOutNode, &
+                                CFloRadSys(RadSysNum)%CWLoopNum, &
+                                CFloRadSys(RadSysNum)%CWLoopSide, &
+                                CFloRadSys(RadSysNum)%CWBranchNum, &
+                                CFloRadSys(RadSysNum)%CWCompNum)
+          CFloRadSys(RadSysNum)%WaterMassFlowRate = WaterMassFlow
+          DO RadSurfNum3 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
+            SurfNum2 = CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum3)
+            QRadSysSource(SurfNum2) = 0.0D0
+            IF (Surface(SurfNum2)%ExtBoundCond > 0 .AND. Surface(SurfNum2)%ExtBoundCond /= SurfNum2) &
+              QRadSysSource(Surface(SurfNum2)%ExtBoundCond) = 0.0D0   ! Also zero the other side of an interzone
+          END DO
+        ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
+          IF (.not. WarmupFlag) THEN
+            IF (CFloRadSys(RadSysNum)%CondErrIndex == 0) THEN  ! allow errors up to number of radiant systems
+              CALL ShowWarningMessage(cConstantFlowSystem//' ['//TRIM(CFloRadSys(RadSysNum)%Name)//']')
+              CALL ShowContinueError('Surface ['//trim(Surface(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2))%Name)//  &
+                 '] temperature below dew-point temperature--potential for condensation exists')
+              CALL ShowContinueError('Flow to the radiant system will be shut-off to avoid condensation')
+              CALL ShowContinueError('Predicted radiant system surface temperature = '// &
+                                     trim(RoundSigDigits(TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2)))
+              CALL ShowContinueError('Zone dew-point temperature + safety delta T= '//  &
+                 trim(RoundSigDigits(DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT,2)))
+              CALL ShowContinueErrorTimeStamp(' ')
+              CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(CFloRadSys(RadSysNum)%CondDewPtDeltaT,4))// &
+                                     ' C safety was chosen in the input for the shut-off criteria')
+              CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
+            END IF
+            CALL ShowRecurringWarningErrorAtEnd(cConstantFlowSystem//' ['//TRIM(CFloRadSys(RadSysNum)%Name)//  &
+                         '] condensation shut-off occurrence continues.',  &
+                         CFloRadSys(RadSysNum)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                         ReportMaxUnits='C',ReportMinUnits='C')
+          END IF
+          EXIT ! outer do loop
+        END IF
+      END DO
+
+    ELSE IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlNone) ) THEN
+
+      DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
+        IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < DewPointTemp) THEN
+        ! Condensation occurring but user does not want to shut radiant system off ever
+          CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
+        END IF
+      END DO
+
+    ELSE IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlVariedOff) ) THEN
+
+      DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
+        IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT)) THEN
+          VarOffCond = .TRUE.
+          IF (CFloCondIterNum >= 2) THEN
+        ! We have already iterated once so now we must shut off radiant system
             CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
             WaterMassFlow                           = 0.0
             CALL SetComponentFlowRate(WaterMassFlow, &
-                                  CFloRadSys(RadSysNum)%ColdWaterInNode, &
-                                  CFloRadSys(RadSysNum)%ColdWaterOutNode, &
-                                  CFloRadSys(RadSysNum)%CWLoopNum, &
-                                  CFloRadSys(RadSysNum)%CWLoopSide, &
-                                  CFloRadSys(RadSysNum)%CWBranchNum, &
-                                  CFloRadSys(RadSysNum)%CWCompNum)
+                                CFloRadSys(RadSysNum)%ColdWaterInNode, &
+                                CFloRadSys(RadSysNum)%ColdWaterOutNode, &
+                                CFloRadSys(RadSysNum)%CWLoopNum, &
+                                CFloRadSys(RadSysNum)%CWLoopSide, &
+                                CFloRadSys(RadSysNum)%CWBranchNum, &
+                                CFloRadSys(RadSysNum)%CWCompNum)
             CFloRadSys(RadSysNum)%WaterMassFlowRate = WaterMassFlow
             DO RadSurfNum3 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
               SurfNum2 = CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum3)
@@ -3892,94 +3985,35 @@ SUBROUTINE CalcLowTempCFloRadSysComps(RadSysNum,MainLoopNodeIn,Iteration,LoadMet
               IF (Surface(SurfNum2)%ExtBoundCond > 0 .AND. Surface(SurfNum2)%ExtBoundCond /= SurfNum2) &
                 QRadSysSource(Surface(SurfNum2)%ExtBoundCond) = 0.0D0   ! Also zero the other side of an interzone
             END DO
-          ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
+        ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
             IF (.not. WarmupFlag) THEN
-              CondensationErrorCount = CondensationErrorCount + 1
-              IF (CondensationErrorCount <= NumOfCFloLowTempRadSys) THEN
-                CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-                CALL ShowContinueError('Flow to the following radiant system will be shut-off to avoid condensation')
-                CALL ShowContinueError('Constant Flow Radiant System Name = '//TRIM(CFloRadSys(RadSysNum)%Name))
+              IF (CFloRadSys(RadSysNum)%CondErrIndex == 0) THEN  ! allow errors up to number of radiant systems
+                CALL ShowWarningMessage(cConstantFlowSystem//' ['//TRIM(CFloRadSys(RadSysNum)%Name)//']')
+                CALL ShowContinueError('Surface ['//trim(Surface(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2))%Name)//  &
+                   '] temperature below dew-point temperature--potential for condensation exists')
+                CALL ShowContinueError('Flow to the radiant system will be shut-off to avoid condensation')
                 CALL ShowContinueError('Predicted radiant system surface temperature = '// &
-                                       RoundSigDigits(TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2))
-                CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
+                                       trim(RoundSigDigits(TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2)))
+                CALL ShowContinueError('Zone dew-point temperature + safety delta T= '//  &
+                   trim(RoundSigDigits(DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT,2)))
                 CALL ShowContinueErrorTimeStamp(' ')
-                IF (CondensationErrorCount == 1) THEN
-                  CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(CFloRadSys(RadSysNum)%CondDewPtDeltaT,2))// &
-                                         ' C safety was chosen in the input for the shut-off criteria')
-                  CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
-                END IF
-              ELSE
-                CALL ShowRecurringWarningErrorAtEnd('Constant flow radiant system ['//TRIM(CFloRadSys(RadSysNum)%Name)//  &
-                             '] condensation shut-off occurrence continues.',  &
-                             CFloRadSys(RadSysNum)%CondErrCount)
+                CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(CFloRadSys(RadSysNum)%CondDewPtDeltaT,4))// &
+                                       ' C safety was chosen in the input for the shut-off criteria')
+                CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
               END IF
+              CALL ShowRecurringWarningErrorAtEnd(cConstantFlowSystem//' ['//TRIM(CFloRadSys(RadSysNum)%Name)//  &
+                         '] condensation shut-off occurrence continues.',  &
+                         CFloRadSys(RadSysNum)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                         ReportMaxUnits='C',ReportMinUnits='C')
             END IF
             EXIT ! outer do loop
+          ELSE ! (First iteration--reset loop required temperature and try again to avoid condensation)
+            LoopReqTemp       = DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT
           END IF
-        END DO
+        END IF
+      END DO
 
-      ELSE IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlNone) ) THEN
-
-        DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
-          IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < DewPointTemp) THEN
-          ! Condensation occurring but user does not want to shut radiant system off ever
-            CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
-          END IF
-        END DO
-
-      ELSE IF ( (OperatingMode == CoolingMode) .AND. (CFloRadSys(RadSysNum)%CondCtrlType == CondCtrlVariedOff) ) THEN
-
-        DO RadSurfNum2 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
-          IF (TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2) < (DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT)) THEN
-            VarOffCond = .TRUE.
-            IF (CFloCondIterNum >= 2) THEN
-          ! We have already iterated once so now we must shut off radiant system
-              CFloRadSys(RadSysNum)%CondCausedShutDown = .TRUE.
-              WaterMassFlow                           = 0.0
-              CALL SetComponentFlowRate(WaterMassFlow, &
-                                  CFloRadSys(RadSysNum)%ColdWaterInNode, &
-                                  CFloRadSys(RadSysNum)%ColdWaterOutNode, &
-                                  CFloRadSys(RadSysNum)%CWLoopNum, &
-                                  CFloRadSys(RadSysNum)%CWLoopSide, &
-                                  CFloRadSys(RadSysNum)%CWBranchNum, &
-                                  CFloRadSys(RadSysNum)%CWCompNum)
-              CFloRadSys(RadSysNum)%WaterMassFlowRate = WaterMassFlow
-              DO RadSurfNum3 = 1, CFloRadSys(RadSysNum)%NumOfSurfaces
-                SurfNum2 = CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum3)
-                QRadSysSource(SurfNum2) = 0.0D0
-                IF (Surface(SurfNum2)%ExtBoundCond > 0 .AND. Surface(SurfNum2)%ExtBoundCond /= SurfNum2) &
-                  QRadSysSource(Surface(SurfNum2)%ExtBoundCond) = 0.0D0   ! Also zero the other side of an interzone
-              END DO
-          ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
-              IF (.not. WarmupFlag) THEN
-                CondensationErrorCount = CondensationErrorCount + 1
-                IF (CondensationErrorCount <= NumOfCFloLowTempRadSys) THEN
-                  CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-                  CALL ShowContinueError('Flow to the following radiant system will be shut-off to avoid condensation')
-                  CALL ShowContinueError('Constant Flow Radiant System Name = '//TRIM(CFloRadSys(RadSysNum)%Name))
-                  CALL ShowContinueError('Predicted radiant system surface temperature = '// &
-                                         RoundSigDigits(TH(CFloRadSys(RadSysNum)%SurfacePtr(RadSurfNum2),1,2),2))
-                  CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
-                  CALL ShowContinueErrorTimeStamp(' ')
-                  IF (CondensationErrorCount == 1) THEN
-                    CALL ShowContinueError('Note that a '//TRIM(RoundSigDigits(CFloRadSys(RadSysNum)%CondDewPtDeltaT,2))// &
-                                           ' C safety was chosen in the input for the shut-off criteria')
-                    CALL ShowContinueError('Note also that this affects all surfaces that are part of this radiant system')
-                  END IF
-                ELSE
-                  CALL ShowRecurringWarningErrorAtEnd('Constant flow radiant system ['//TRIM(CFloRadSys(RadSysNum)%Name)//  &
-                               '] condensation shut-off occurrence continues.',  &
-                               CFloRadSys(RadSysNum)%CondErrCount)
-                END IF
-              END IF
-              EXIT ! outer do loop
-            ELSE ! (First iteration--reset loop required temperature and try again to avoid condensation)
-              LoopReqTemp       = DewPointTemp+CFloRadSys(RadSysNum)%CondDewPtDeltaT
-            END IF
-          END IF
-        END DO
-
-      END IF
+    END IF
 
           ! Determine radiant system outlet temperature (two ways to calculate--use as a check)
     WaterOutletTempCheck = 0.0
@@ -4108,7 +4142,7 @@ SUBROUTINE CalcLowTempElecRadiantSystem(RadSysNum,LoadMet)
 
           ! Determine the current setpoint temperature and the temperature at which the unit should be completely off
     SetptTemp = GetCurrentScheduleValue(ElecRadSys(RadSysNum)%SetptSchedPtr)
-    OffTemp   = SetptTemp + 0.5*ElecRadSys(RadSysNum)%ThrottlRange
+    OffTemp   = SetptTemp + 0.5d0*ElecRadSys(RadSysNum)%ThrottlRange
 
           ! Determine the control temperature--what the setpoint/offtemp is being compared to for unit operation
     SELECT CASE (ElecRadSys(RadSysNum)%ControlType)

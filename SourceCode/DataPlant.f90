@@ -176,7 +176,7 @@ CHARACTER(len=MaxNameLength), PARAMETER    :: PressureSimType(4)      = (/'NONE 
                                                                           'LOOPFLOWCORRECTION ',    &
                                                                           'PRESSURESIMULATION '/)
 ! Parameters for Component/Equipment Types  (ref: TypeOf in CompData)
-INTEGER, PARAMETER :: NumSimPlantEquipTypes=84
+INTEGER, PARAMETER :: NumSimPlantEquipTypes=85
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: SimPlantEquipTypes=  &
       (/'BOILER:HOTWATER                                         ', & !01
         'BOILER:STEAM                                            ', & !02
@@ -261,7 +261,8 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: SimPlantEquipTy
         'PLANTCOMPONENT:USERDEFINED                              ', & !81
         'COIL:USERDEFINED                                        ', & !82
         'ZONEHVAC:FORCEDAIR:USERDEFINED                          ', & !83
-        'AIRTERMINAL:SINGLEDUCT:USERDEFINED                      '/)  !84
+        'AIRTERMINAL:SINGLEDUCT:USERDEFINED                      ', & !84
+        'AIRCONDITIONER:VARIABLEREFRIGERANTFLOW                  '/)  !85
 
 CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ccSimPlantEquipTypes=  &
       (/'Boiler:HotWater                                         ', & !01
@@ -347,7 +348,8 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ccSimPlantEquip
         'PlantComponent:UserDefined                              ', & !81
         'Coil:UserDefined                                        ', & !82
         'ZoneHVAC:ForcedAir:UserDefined                          ', & !83
-        'AirTerminal:SingleDuct:UserDefined                      '/)  !84
+        'AirTerminal:SingleDuct:UserDefined                      ', & !84
+        'AirConditioner:VariableRefrigerantFlow                  '/)  !85
 
 INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
  (/LoopType_Plant,     &     ! 01  BOILER:HOTWATER
@@ -433,7 +435,8 @@ INTEGER, PARAMETER, DIMENSION(NumSimPlantEquipTypes) :: ValidLoopEquipTypes=  &
    LoopType_Both,      &     ! 81  PlantComponent:UserDefined
    LoopType_Both,      &     ! 82  Coil:UserDefined
    LoopType_Both,      &     ! 83  ZoneHVAC:ForcedAir:UserDefined
-   LoopType_Both       /)    ! 84  AirTerminal:SingleDuct:UserDefined
+   LoopType_Both,      &     ! 84  AirTerminal:SingleDuct:UserDefined
+   LoopType_Both      /)     ! 85  AirConditioner:VariableRefrigerantFlow
 
 INTEGER, PARAMETER :: TypeOf_Other                       = -1
 INTEGER, PARAMETER :: TypeOf_Boiler_Simple               =  1
@@ -520,6 +523,7 @@ INTEGER, PARAMETER :: TypeOf_PlantComponentUserDefined   = 81
 INTEGER, PARAMETER :: TypeOf_CoilUserDefined             = 82
 INTEGER, PARAMETER :: TypeOf_ZoneHVACAirUserDefined      = 83
 INTEGER, PARAMETER :: TypeOf_AirTerminalUserDefined      = 84
+INTEGER, PARAMETER :: TypeOf_HeatPumpVRF                 = 85
 
 ! Parameters for General Equipment Types
 INTEGER, PARAMETER :: NumGeneralEquipTypes               = 22
@@ -786,6 +790,8 @@ END TYPE ConnectedLoopData                      ! DSU
 !END TYPE TwoWayCommonPipeData
 
 INTEGER, PARAMETER :: NumConvergenceHistoryTerms = 5
+REAL(r64), PARAMETER, DIMENSION(NumConvergenceHistoryTerms) :: ConvergenceHistoryARR = &
+               (/0.d0, -1.d0, -2.d0, -3.d0, - 4.d0 /)
 TYPE PlantConvergencePoint
   REAL(r64), DIMENSION(NumConvergenceHistoryTerms) :: MassFlowRateHistory
   REAL(r64), DIMENSION(NumConvergenceHistoryTerms) :: TemperatureHistory

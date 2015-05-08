@@ -53,9 +53,9 @@ using namespace std;
 #include "BGL.h"
 namespace BGL = BldgGeomLib;
 
-#include	"const.h"
-#include	"DBconst.h"
-#include	"def.h"
+#include	"CONST.H"
+#include	"DBCONST.H"
+#include	"DEF.H"
 #include	"helpers.h"
 #include	"hemisphiral.h"
 #include	"NodeMesh2.h"
@@ -63,7 +63,7 @@ namespace BGL = BldgGeomLib;
 #include	"btdf.h"
 #include	"CFSSystem.h"
 #include	"CFSSurface.h"
-#include	"DOE2dl.h"
+#include	"DOE2DL.H"
 
 extern double MAXPointTol;
 
@@ -75,7 +75,7 @@ extern double MAXPointTol;
 CFSSurface::CFSSurface()
 {}
 
-CFSSurface::CFSSurface(SURF *Parent, string CFSTypeName, HemiSphiral& lm, Double rotation, vector<BGL::point3> p3List,Double CFSmaxNodeArea)
+CFSSurface::CFSSurface(SURF *& Parent, string & CFSTypeName, HemiSphiral lm, Double & rotation, vector<BGL::point3> & p3List,Double & CFSmaxNodeArea)
 : pParent(Parent), CFStype(CFSTypeName), rotangle(rotation), reveal(0), LumMap(lm)
 {
 	// names, etc...	

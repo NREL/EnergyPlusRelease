@@ -152,17 +152,18 @@ SUBROUTINE ManageSurfaceHeatBalance
   CALL UpdateFinalSurfaceHeatBalance
 
           ! Before we leave the Surface Manager the thermal histories need to be updated
-  IF(SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD) THEN
+  IF((ANY(HeatTransferAlgosUsed == UseCTF)) .or. (ANY(HeatTransferAlgosUsed == UseEMPD))) THEN
     CALL UpdateThermalHistories  !Update the thermal histories
   END IF
 
-  IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple) THEN
+  IF ( ANY(HeatTransferAlgosUsed == UseCondFD) ) THEN
     DO SurfNum =1, TotSurfaces
       IF(Surface(SurfNum)%Construction <= 0) CYCLE  ! Shading surface, not really a heat transfer surface
       ConstrNum=Surface(SurfNum)%Construction
       IF(Construct(ConstrNum)%TypeIsWindow) CYCLE  !  Windows simulated in Window module
+      IF (Surface(SurfNum)%HeatTransferAlgorithm  /= HeatTransferModel_CondFD) CYCLE
       CALL UpdateMoistureBalanceFD(SurfNum)
-    enddo
+    ENDDO
   ENDIF
 
   CALL ManageThermalComfort ! "Record keeping" for the zone
@@ -543,7 +544,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   ENDIF
 
           ! Initialize the temperature history terms for conduction through the surfaces
-  IF ((SolutionAlgo == UseCondFD) .OR. (SolutionAlgo == UseCondFDSimple )) THEN
+  IF (ANY(HeatTransferAlgosUsed == UseCondFD) ) THEN
     CALL InitHeatBalFiniteDiff
   ENDIF
 
@@ -553,6 +554,8 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   DO SurfNum = 1, TotSurfaces   ! Loop through all surfaces...
 
     IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE  ! Skip non-heat transfer surfaces
+    IF (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CTF .AND. &
+        Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) CYCLE
     IF(Surface(SurfNum)%Class == SurfaceClass_Window) CYCLE
        ! Outside surface temp of "normal" windows not needed in Window5 calculation approach
        ! Window layer temperatures are calculated in CalcHeatBalanceInsideSurf
@@ -1377,15 +1380,19 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
                                 'Zone','State',Surface(Loop)%Name)
       CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Rate [W]', QdotRadOutRep(loop),   &
                                 'Zone', 'State', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Rate per Area [W/m2]', QdotRadOutRepPerArea(loop),  &
+      CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Rate per Area [W/m2]',   &
+         QdotRadOutRepPerArea(loop),  &
                                 'Zone', 'State', Surface(Loop)%Name)
       CALL SetupOutputVariable('Surface Outside Face Net Thermal Radiation Heat Gain Energy [J]',QRadOutReport(loop),   &
                                 'Zone', 'Sum', Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Air Heat Transfer Coefficient [W/m2-K]',HAirExtSurf(Loop),&
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Air Heat Transfer Coefficient [W/m2-K]',  &
+         HAirExtSurf(Loop),&
                                 'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Sky Heat Transfer Coefficient [W/m2-K]',HSkyExtSurf(Loop),&
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Sky Heat Transfer Coefficient [W/m2-K]',  &
+         HSkyExtSurf(Loop),&
                                 'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Ground Heat Transfer Coefficient [W/m2-K]',HGrdExtSurf(Loop),&
+      CALL SetupOutputVariable('Surface Outside Face Thermal Radiation to Ground Heat Transfer Coefficient [W/m2-K]',  &
+         HGrdExtSurf(Loop),&
                                 'Zone','State',Surface(Loop)%Name)
       IF(Surface(Loop)%Class /= SurfaceClass_Window) THEN
         CALL SetupOutputVariable('Surface Outside Face Solar Radiation Heat Gain Rate [W]',  &
@@ -1484,8 +1491,8 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
 
   ENDDO
 
-  ALLOCATE (QBV(NumOfZones))
-  QBV=0.0
+!unused  ALLOCATE (QBV(NumOfZones))
+!unused  QBV=0.0
   ALLOCATE (QC(NumOfZones))
   QC=0.0
   ALLOCATE (QD(NumOfZones))
@@ -1566,6 +1573,7 @@ SUBROUTINE InitThermalAndFluxHistories
   XM2T       = 23.d0  ! DataHeatBalFanSys array
   XM3T       = 23.d0  ! DataHeatBalFanSys array
   XM4T       = 23.d0
+  XMPT       = 23.d0
   DSXMAT     = 23.d0  ! DataHeatBalFanSys array
   DSXM2T     = 23.d0  ! DataHeatBalFanSys array
   DSXM3T     = 23.d0  ! DataHeatBalFanSys array
@@ -1581,7 +1589,7 @@ SUBROUTINE InitThermalAndFluxHistories
   SumHmARaW= 0.0D0
 
           ! "Bulk" initializations of arrays sized to TotSurfaces
-  SUMH          = 0.d0     ! module level array
+  SUMH          = 0     ! module level array
   TempSurfIn    = 23.d0 ! module level array
   TempSurfInTmp = 23.d0 ! module level array
   HConvIn       = 3.076d0 ! module level array
@@ -1631,7 +1639,7 @@ SUBROUTINE InitThermalAndFluxHistories
   QHM       = 0.0D0
   QsrcHist  = 0.0D0
   QsrcHistM = 0.0D0
-
+  CondFDRelaxFactor=CondFDRelaxFactorInput
           ! Initialize window frame and divider temperatures
   SurfaceWindow%FrameTempSurfIn = 23.d0
   SurfaceWindow%FrameTempSurfInOld = 23.d0
@@ -1711,7 +1719,7 @@ SUBROUTINE InitSolarHeatGains
           ! This subroutine initializes the arrays associated with solar heat
           ! gains for both individual surfaces and for zones.  As a result,
           ! this routine sets the following variable arrays:
-          ! QBV, QDV, QC, QD; QRadSWOutAbs and QRadSWInAbs (for opaque surfaces);
+          ! QBV(unused), QDV, QC, QD; QRadSWOutAbs and QRadSWInAbs (for opaque surfaces);
           ! QRadSWwinAbs (for windows)
 
           ! METHODOLOGY EMPLOYED:
@@ -1760,6 +1768,8 @@ SUBROUTINE InitSolarHeatGains
   REAL(r64) :: SkySolarInc        ! Sky diffuse solar incident on a surface
   REAL(r64) :: GndSolarInc        ! Ground diffuse solar incident on a surface
   INTEGER   :: TotGlassLay        ! Number of glass layers
+  INTEGER   :: TotSolidLay        ! Number of solid layers in fenestration system (glass + shading)
+  INTEGER   :: CurrentState       ! Current state for Complex Fenestration
   REAL(r64) :: AbsDiffWin(MaxSolidWinLayers) ! Diffuse solar absorptance of glass layers
   REAL(r64) :: AbsDiffWinGnd(MaxSolidWinLayers) ! Ground diffuse solar absorptance of glass layers
   REAL(r64) :: AbsDiffWinSky(MaxSolidWinLayers) ! Sky diffuse solar absorptance of glass layers
@@ -1849,6 +1859,9 @@ SUBROUTINE InitSolarHeatGains
   QRadSWOutIncBmToDiffReflObs = 0.0
   QRadSWOutIncSkyDiffReflObs = 0.0
   CosIncidenceAngle = 0.0
+  BSDFBeamDirectionRep = 0
+  BSDFBeamThetaRep = 0.0
+  BSDFBeamPhiRep = 0.0
   OpaqSurfInsFaceBeamSolAbsorbed = 0.0
 
   DO SurfNum = 1, TotSurfaces
@@ -1960,7 +1973,7 @@ SUBROUTINE InitSolarHeatGains
     QDforDaylight  = 0.0
     QC  = 0.0
     QDV = 0.0
-    QBV = 0.0
+!unused    QBV = 0.0
     ZoneTransSolar = 0.0
     ZoneBmSolFrExtWinsRep = 0.0
     ZoneBmSolFrIntWinsRep = 0.0
@@ -2005,12 +2018,20 @@ SUBROUTINE InitSolarHeatGains
     DO SurfNum = 1,TotSurfaces
       SurfaceWindow(SurfNum)%SkySolarInc = DifSolarRad * AnisoSkyMult(SurfNum)
       SurfaceWindow(SurfNum)%GndSolarInc = GndSolarRad * Surface(SurfNum)%ViewFactorGround
+      !For Complex Fenestrations:
+      SurfaceWindow(SurfNum)%SkyGndSolarInc = SurfaceWindow(SurfNum)%GndSolarInc
+      SurfaceWindow(SurfNum)%BmGndSolarInc =0.
+      !
       IF(CalcSolRefl) THEN
         SurfaceWindow(SurfNum)%SkySolarInc = SurfaceWindow(SurfNum)%SkySolarInc + &
                     BeamSolarRad * (BmToBmReflFacObs(SurfNum) + BmToDiffReflFacObs(SurfNum))  +  &
                     DifSolarRad * ReflFacSkySolObs(SurfNum)
         SurfaceWindow(SurfNum)%GndSolarInc = BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum) +  &
                     DifSolarRad * GndReflectance * ReflFacSkySolGnd(SurfNum)
+        !For Complex Fenestrations:
+        SurfaceWindow(SurfNum)%SkyGndSolarInc = DifSolarRad * GndReflectance * ReflFacSkySolGnd(SurfNum)
+        SurfaceWindow(SurfNum)%BmGndSolarInc =BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum)
+        !
         BmToBmReflFacObs(SurfNum)   = (WeightNow * ReflFacBmToBmSolObs(SurfNum,HourOfDay) + &
                    WeightPreviousHour * ReflFacBmToBmSolObs(SurfNum,PreviousHour))
         BmToDiffReflFacObs(SurfNum) = (WeightNow * ReflFacBmToDiffSolObs(SurfNum,HourOfDay) + &
@@ -2029,7 +2050,7 @@ SUBROUTINE InitSolarHeatGains
     DO ZoneNum = 1, NumOfZones
 
       ! TH 3/24/2010 - QBV is not used!
-      QBV(ZoneNum) = (CBZone(ZoneNum) + DBZone(ZoneNum))*BeamSolarRad
+!unused      QBV(ZoneNum) = (CBZone(ZoneNum) + DBZone(ZoneNum))*BeamSolarRad
 
       ! RJH 08/30/07 - QDV does not seem to ever be used. NOT USED!
       !QDV(ZoneNum) = DSZone(ZoneNum)*DifSolarRad &
@@ -2212,88 +2233,108 @@ SUBROUTINE InitSolarHeatGains
 
             ELSE ! Exterior window
 
-              TotGlassLay = Construct(ConstrNum)%TotGlassLayers
-              DO Lay = 1,TotGlassLay
-                AbsDiffWin(Lay) = Construct(ConstrNum)%AbsDiff(Lay)
-              END DO
+              IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
+                TotGlassLay = Construct(ConstrNum)%TotGlassLayers
+                DO Lay = 1,TotGlassLay
+                  AbsDiffWin(Lay) = Construct(ConstrNum)%AbsDiff(Lay)
+                END DO
 
-              ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
+                ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
 
-              IF(ShadeFlag > 0) THEN          ! Shaded window
-                ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-                IF(SurfaceWindow(SurfNum)%StormWinFlag==1) ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
+                IF(ShadeFlag > 0) THEN          ! Shaded window
+                  ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+                  IF(SurfaceWindow(SurfNum)%StormWinFlag==1) ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
 
-                IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. &
-                   ShadeFlag==BGShadeOn  .OR. ShadeFlag==ExtScreenOn) THEN  ! Shade/screen on
+                  IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. &
+                    ShadeFlag==BGShadeOn  .OR. ShadeFlag==ExtScreenOn) THEN  ! Shade/screen on
 
-                  DO Lay = 1,TotGlassLay
-                    AbsDiffWin(Lay) = Construct(ConstrNumSh)%AbsDiff(Lay)
-                  END DO
-                  SurfaceWindow(SurfNum)%ExtDiffAbsByShade = Construct(ConstrNumSh)%AbsDiffShade * &
-                    (SkySolarInc + GndSolarInc)
-                END IF
+                    DO Lay = 1,TotGlassLay
+                      AbsDiffWin(Lay) = Construct(ConstrNumSh)%AbsDiff(Lay)
+                    END DO
+                    SurfaceWindow(SurfNum)%ExtDiffAbsByShade = Construct(ConstrNumSh)%AbsDiffShade * &
+                      (SkySolarInc + GndSolarInc)
+                  END IF
 
-                IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN  ! Blind on
-                  DO Lay = 1,TotGlassLay
-                    AbsDiffWin(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                      SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiff(Lay,1:MaxSlatAngs))
-                    AbsDiffWinGnd(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                      SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffGnd(Lay,1:MaxSlatAngs))
-                    AbsDiffWinSky(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                      SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffSky(Lay,1:MaxSlatAngs))
-                  END DO
-                  SurfaceWindow(SurfNum)%ExtDiffAbsByShade = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                  IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. ShadeFlag==BGBlindOn) THEN  ! Blind on
+                    DO Lay = 1,TotGlassLay
+                      AbsDiffWin(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                        SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiff(Lay,1:MaxSlatAngs))
+                      AbsDiffWinGnd(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                        SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffGnd(Lay,1:MaxSlatAngs))
+                      AbsDiffWinSky(Lay) = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                        SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffSky(Lay,1:MaxSlatAngs))
+                    END DO
+                    SurfaceWindow(SurfNum)%ExtDiffAbsByShade = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
                       SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlind) * &
                        (SkySolarInc + GndSolarInc)
-                  IF(Blind(SurfaceWindow(SurfNum)%BlindNumber)%SlatOrientation==Horizontal) THEN
-                    ACosTlt = ABS(Surface(SurfNum)%CosTilt)
-                    AbsDiffBlindGnd = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                      SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlindGnd)
-                    AbsDiffBlindSky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                      SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlindSky)
-                    SurfaceWindow(SurfNum)%ExtDiffAbsByShade = &
-                      SkySolarInc*(0.5*ACosTlt*AbsDiffBlindGnd + (1.-0.5*ACosTlt)*AbsDiffBlindSky) +  &
-                      GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffBlindGnd + 0.5*ACosTlt*AbsDiffBlindSky)
+                    IF(Blind(SurfaceWindow(SurfNum)%BlindNumber)%SlatOrientation==Horizontal) THEN
+                      ACosTlt = ABS(Surface(SurfNum)%CosTilt)
+                      AbsDiffBlindGnd = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                        SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlindGnd)
+                      AbsDiffBlindSky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                        SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%AbsDiffBlindSky)
+                      SurfaceWindow(SurfNum)%ExtDiffAbsByShade = &
+                        SkySolarInc*(0.5*ACosTlt*AbsDiffBlindGnd + (1.-0.5*ACosTlt)*AbsDiffBlindSky) +  &
+                        GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffBlindGnd + 0.5*ACosTlt*AbsDiffBlindSky)
+                    END IF
                   END IF
-                END IF
 
-                ! Correct for shadowing of divider onto interior shading device (note that dividers are
-                ! not allowed in windows with between-glass shade/blind)
+                  ! Correct for shadowing of divider onto interior shading device (note that dividers are
+                  ! not allowed in windows with between-glass shade/blind)
 
-                IF((ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) .AND. SurfaceWindow(SurfNum)%DividerArea > 0.0) &
-                    SurfaceWindow(SurfNum)%ExtDiffAbsByShade = SurfaceWindow(SurfNum)%ExtDiffAbsByShade * &
-                      SurfaceWindow(SurfNum)%GlazedFrac
+                  IF((ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) .AND. SurfaceWindow(SurfNum)%DividerArea > 0.0) &
+                      SurfaceWindow(SurfNum)%ExtDiffAbsByShade = SurfaceWindow(SurfNum)%ExtDiffAbsByShade * &
+                        SurfaceWindow(SurfNum)%GlazedFrac
 
-                IF(ShadeFlag == SwitchableGlazing) THEN       ! Switchable glazing
-                  SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
-                  DO Lay = 1,TotGlassLay
-                    AbsDiffWin(Lay) = InterpSw(SwitchFac, AbsDiffWin(Lay), Construct(ConstrNumSh)%AbsDiff(Lay))
-                  END DO
-                END IF
+                  IF(ShadeFlag == SwitchableGlazing) THEN       ! Switchable glazing
+                    SwitchFac = SurfaceWindow(SurfNum)%SwitchingFactor
+                    DO Lay = 1,TotGlassLay
+                      AbsDiffWin(Lay) = InterpSw(SwitchFac, AbsDiffWin(Lay), Construct(ConstrNumSh)%AbsDiff(Lay))
+                    END DO
+                  END IF
 
-              END IF ! End of check if window has shading device on
+                END IF ! End of check if window has shading device on
 
-              QRadSWwinAbsTot(SurfNum) = 0.
-              DO Lay = 1,TotGlassLay
-                QRadSWwinAbs(SurfNum,Lay) = AbsDiffWin(Lay) * (SkySolarInc + GndSolarInc) &
-                  + AWinSurf(SurfNum,Lay) * BeamSolar  ! AWinSurf is from InteriorSolarDistribution
-                IF(ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn.OR.ShadeFlag==BGBlindOn) THEN
-                   IF(Blind(SurfaceWindow(SurfNum)%BlindNumber)%SlatOrientation==Horizontal) THEN
-                     AbsDiffGlassLayGnd = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                       SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffGnd(Lay,1:19))
-                     AbsDiffGlassLaySky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
-                       SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffSky(Lay,1:19))
-                     QRadSWwinAbs(SurfNum,Lay) = &
-                      SkySolarInc*(0.5*ACosTlt*AbsDiffGlassLayGnd + (1.-0.5*ACosTlt)*AbsDiffGlassLaySky) +  &
-                      GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffGlassLayGnd + 0.5*ACosTlt*AbsDiffGlassLaySky) +  &
-                      AWinSurf(SurfNum,Lay) * BeamSolar
-                   END IF
-                END IF
+                QRadSWwinAbsTot(SurfNum) = 0.
+                DO Lay = 1,TotGlassLay
+                  QRadSWwinAbs(SurfNum,Lay) = AbsDiffWin(Lay) * (SkySolarInc + GndSolarInc) &
+                    + AWinSurf(SurfNum,Lay) * BeamSolar  ! AWinSurf is from InteriorSolarDistribution
+                  IF(ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn.OR.ShadeFlag==BGBlindOn) THEN
+                     IF(Blind(SurfaceWindow(SurfNum)%BlindNumber)%SlatOrientation==Horizontal) THEN
+                       AbsDiffGlassLayGnd = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                         SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffGnd(Lay,1:19))
+                       AbsDiffGlassLaySky = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTs, &
+                         SurfaceWindow(SurfNum)%MovableSlats,Construct(ConstrNumSh)%BlAbsDiffSky(Lay,1:19))
+                       QRadSWwinAbs(SurfNum,Lay) = &
+                        SkySolarInc*(0.5*ACosTlt*AbsDiffGlassLayGnd + (1.-0.5*ACosTlt)*AbsDiffGlassLaySky) +  &
+                        GndSolarInc*((1.-0.5*ACosTlt)*AbsDiffGlassLayGnd + 0.5*ACosTlt*AbsDiffGlassLaySky) +  &
+                        AWinSurf(SurfNum,Lay) * BeamSolar
+                     END IF
+                  END IF
 
-                ! Total solar absorbed in all glass layers (W), for reporting
-                QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
-              END DO
-              QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
+                  ! Total solar absorbed in all glass layers (W), for reporting
+                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+                END DO
+                QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
+
+              ELSE IF (SurfaceWindow(SurfNum)%WindowModelType == WindowBSDFModel) THEN
+                TotSolidLay = Construct(ConstrNum)%TotSolidLayers
+                CurrentState = SurfaceWindow(SurfNum)%ComplexFen%CurrentState
+                DO Lay = 1, TotSolidLay
+                  ! Several notes about this equation.  First part is accounting for duffuse solar radiation for the ground and
+                  ! from the sky.  Second item (AWinSurf(SurfNum,Lay) * BeamSolar) is accounting for absorbed solar radiation
+                  ! originating from beam on exterior side.  Third item (AWinCFOverlap(SurfNum,Lay)) is accounting for
+                  ! absorptances from beam hitting back of the window which passes through rest of exterior windows
+                  QRadSWwinAbs(SurfNum,Lay) = SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyFtAbs(Lay) * SkySolarInc &
+                    & + SurfaceWindow(SurfNum)%ComplexFen%State(CurrentState)%WinSkyGndAbs(Lay) * GndSolarInc &
+                    & + AWinSurf(SurfNum,Lay) * BeamSolar &
+                    & + AWinCFOverlap(SurfNum,Lay) * BeamSolar
+
+                  ! Total solar absorbed in all glass layers (W), for reporting
+                  QRadSWwinAbsTot(SurfNum) = QRadSWwinAbsTot(SurfNum) + QRadSWwinAbs(SurfNum,Lay) * Surface(SurfNum)%Area
+                END DO
+                QRadSWwinAbsTotEnergy(SurfNum) = QRadSWwinAbsTot(SurfNum) * TimeStepZone * SecInHour
+              END IF ! IF (SurfaceWindow(SurfNum)%WindowModelType /= WindowBSDFModel) THEN
 
               ! Solar absorbed by window frame and dividers
               FrDivNum = Surface(SurfNum)%FrameDivider
@@ -2661,7 +2702,8 @@ SUBROUTINE InitIntSolarDistribution
           ! COMPUTE CONVECTIVE GAINS AND ZONE FLUX DENSITY.
   DO ZoneNum = 1, NumOfZones
     QS(ZoneNum) = QS(ZoneNum) * FractDifShortZtoZ(ZoneNum,ZoneNum) * VMULT(ZoneNum)
-    QSLights(ZoneNum) = QSLights(ZoneNum) * FractDifShortZtoZ(ZoneNum,ZoneNum) * VMULT(ZoneNum) ! CR 8695, VMULT not based on visible
+     ! CR 8695, VMULT not based on visible
+    QSLights(ZoneNum) = QSLights(ZoneNum) * FractDifShortZtoZ(ZoneNum,ZoneNum) * VMULT(ZoneNum)
   END DO
 
           ! COMPUTE RADIANT GAINS ON SURFACES
@@ -3598,7 +3640,8 @@ SUBROUTINE InitEMSControlledConstructions
             EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
             EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
 
-          ELSEIF (SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD ) THEN
+          ELSEIF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+                  Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD ) THEN
             ! compare old construction to new construction and see if terms match
             ! set as okay and turn false if find a big problem
             EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
@@ -3656,7 +3699,7 @@ SUBROUTINE InitEMSControlledConstructions
               Surface(SurfNum)%Construction = Surface(SurfNum)%EMSConstructionOverrideValue
             ENDIF
 
-          ELSEIF (SolutionAlgo == UseCondFD) THEN
+          ELSEIF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD) THEN
             EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
             EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
             IF (ConstructFD(Surface(SurfNum)%Construction)%TotNodes /=  &
@@ -3697,17 +3740,9 @@ SUBROUTINE InitEMSControlledConstructions
               Surface(SurfNum)%Construction = Surface(SurfNum)%EMSConstructionOverrideValue
             ENDIF
 
-          ELSEIF(SolutionAlgo == UseHAMT) THEN ! don't allow
+          ELSEIF(Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_HAMT) THEN ! don't allow
             CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not available with ' &
                                   //'Heat transfer algorithm CombinedHeatAndMoistureFiniteElement.')
-            CALL ShowContinueError('This actuator is not allowed for surface name = ' &
-                             //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
-            EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
-            EMSConstructActuatorIsOkay( SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .FALSE.
-
-          ELSEIF(SolutionAlgo == UseCondFDSimple) THEN ! don't allow
-            CALL ShowSevereError('InitEMSControlledConstructions: EMS Construction State Actuator not available with ' &
-                                  //'Heat transfer algorithm ConductionFiniteDifferenceSimplified.')
             CALL ShowContinueError('This actuator is not allowed for surface name = ' &
                              //TRIM(Surface(SurfNum)%Name)// ', and the simulation continues without the override' )
             EMSConstructActuatorChecked(SurfNum, Surface(SurfNum)%EMSConstructionOverrideValue) = .TRUE.
@@ -3894,6 +3929,9 @@ SUBROUTINE UpdateThermalHistories
 
     IF (Surface(SurfNum)%Class == SurfaceClass_Window .or. .NOT.Surface(SurfNum)%HeatTransSurf) CYCLE
 
+    IF ((Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CTF) .AND.  &
+        (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) ) CYCLE
+
     ConstrNum = Surface(SurfNum)%Construction
 
     IF (Construct(ConstrNum)%NumCTFTerms == 0) CYCLE    ! Skip surfaces with no history terms
@@ -3914,6 +3952,7 @@ SUBROUTINE UpdateThermalHistories
        Surface(SurfNum)%Class==SurfaceClass_IntMass .or.  &
        Surface(SurfNum)%Class==SurfaceClass_Roof  .OR. Surface(SurfNum)%Class==SurfaceClass_Door) THEN
       OpaqSurfInsFaceConduction(SurfNum) = Surface(SurfNum)%Area * QH(SurfNum,1,2)
+      OpaqSurfInsFaceConductionFlux(SurfNum) = QH(SurfNum,1,2) !CR 8901
 !      IF (Surface(SurfNum)%Class/=SurfaceClass_IntMass)  &
 !      ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfInsFaceCond(Surface(SurfNum)%Zone) + &
 !              OpaqSurfInsFaceConduction(SurfNum)
@@ -3957,7 +3996,9 @@ SUBROUTINE UpdateThermalHistories
   DO SurfNum = 1, TotSurfaces   ! Loop through all (heat transfer) surfaces...
 
     IF (Surface(SurfNum)%Class == SurfaceClass_Window .or. .NOT.Surface(SurfNum)%HeatTransSurf) CYCLE
-
+    IF ((Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CTF) .AND.  &
+        (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) .AND. &
+        (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_TDD)) CYCLE
     IF (SUMH(SurfNum) == 0) THEN    ! First time step in a block for a surface, update arrays
       TempExt1(SurfNum) = TH(SurfNum,1,1)
       TempInt1(SurfNum) = TempSurfIn(SurfNum)
@@ -3975,11 +4016,14 @@ SUBROUTINE UpdateThermalHistories
 
     IF (Surface(SurfNum)%Class == SurfaceClass_Window .or. Surface(SurfNum)%Class == SurfaceClass_TDD_Dome &
       .or. .NOT.Surface(SurfNum)%HeatTransSurf) CYCLE
+    IF ((Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_CTF) .AND.  &
+        (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_EMPD) .AND. &
+        (Surface(SurfNum)%HeatTransferAlgorithm /= HeatTransferModel_TDD) ) CYCLE
 
     ConstrNum       = Surface(SurfNum)%Construction
 
     SUMH(SurfNum)    = SUMH(SurfNum)+1
-    SumTime(SurfNum) = SUMH(SurfNum)*TimeStepZone
+    SumTime(SurfNum) = REAL(SUMH(SurfNum),r64)*TimeStepZone
 
     IF (SUMH(SurfNum) == Construct(ConstrNum)%NumHistories) THEN
 
@@ -4281,7 +4325,8 @@ SUBROUTINE ReportSurfaceHeatBalance
       ENDIF
 
       ! do surface storage rate updates
-      OpaqSurfStorageConductionFlux(SurfNum) = - (OpaqSurfInsFaceConductionFlux(SurfNum) + OpaqSurfOutsideFaceConductionFlux(SurfNum))
+      OpaqSurfStorageConductionFlux(SurfNum) =   &
+         - (OpaqSurfInsFaceConductionFlux(SurfNum) + OpaqSurfOutsideFaceConductionFlux(SurfNum))
       OpaqSurfStorageConduction(SurfNum) = - (OpaqSurfInsFaceConduction(SurfNum) + OpaqSurfOutsideFaceConduction(SurfNum))
       OpaqSurfStorageConductionEnergy(SurfNum) = OpaqSurfStorageConduction(SurfNum) * SecInHour * TimeStepZone
       OpaqSurfStorageGainRep(SurfNum) = 0.d0
@@ -4473,7 +4518,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
       IF (Construct(ConstrNum)%SourceSinkPresent) RadSysToHBConstCoef(SurfNum) = TH(SurfNum,1,1)
 
 ! start HAMT
-      IF (SolutionAlgo == UseHAMT) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_HAMT) THEN
       ! Set variables used in the HAMT moisture balance
         TempOutsideAirFD(SurfNum)= GroundTemp
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRh(GroundTemp,1.0d0,'HBSurfMan:Ground:HAMT')
@@ -4489,7 +4534,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
       ENDIF
 ! end HAMT
 
-      IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD ) THEN
       ! Set variables used in the FD moisture balance
         TempOutsideAirFD(SurfNum)= GroundTemp
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRhLBnd0C(GroundTemp,1.0d0,'HBSurfMan:Ground:CondFD')
@@ -4510,7 +4555,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
       ! Set the only radiant system heat balance coefficient that is non-zero for this case
       IF (Construct(ConstrNum)%SourceSinkPresent) RadSysToHBConstCoef(SurfNum) = TH(SurfNum,1,1)
 
-      IF (SolutionAlgo == UseHAMT) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
       ! Set variables used in the HAMT moisture balance
         TempOutsideAirFD(SurfNum)= GroundTempFC
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRh(GroundTempFC,1.0d0,'HBSurfMan:GroundFC:HAMT')
@@ -4525,7 +4570,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
         HAirFD(SurfNum) = HAir
       ENDIF
 
-      IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD ) THEN
       ! Set variables used in the FD moisture balance
         TempOutsideAirFD(SurfNum)= GroundTempFC
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRhLBnd0C(GroundTempFC,1.0d0,'HBSurfMan:GroundFC:CondFD')
@@ -4577,7 +4622,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ! Set the only radiant system heat balance coefficient that is non-zero for this case
         IF (Construct(ConstrNum)%SourceSinkPresent) RadSysToHBConstCoef(SurfNum) = TH(SurfNum,1,1)
 
-        IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+        IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD .OR. &
+            Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT ) THEN
         ! Set variables used in the FD moisture balance and HAMT
           TempOutsideAirFD(SurfNum)= TH(SurfNum,1,1)
           RhoVaporAirOut(SurfNum)=PsyRhovFnTdbWPb(TempOutsideAirFD(SurfNum),OutHumRat,OutBaroPress)
@@ -4625,7 +4671,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ! Set the only radiant system heat balance coefficient that is non-zero for this case
       IF (Construct(ConstrNum)%SourceSinkPresent) RadSysToHBConstCoef(SurfNum) = TH(SurfNum,1,1)
 
-      IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+      IF ( Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD .OR. &
+            Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT ) THEN
       ! Set variables used in the FD moisture balance and HAMT
         TempOutsideAirFD(SurfNum)= TempExt
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbWPb(TempOutsideAirFD(SurfNum),OutHumRat,OutBaroPress)
@@ -4639,8 +4686,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
       ENDIF
 
       ! Call the outside surface temp calculation and pass the necessary terms
-
-      IF (SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD) &
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+          Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) &
         CALL CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
 
           ! This ends the calculations for this surface and goes on to the next SurfNum
@@ -4664,7 +4711,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ! Set the only radiant system heat balance coefficient that is non-zero for this case
       IF (Construct(ConstrNum)%SourceSinkPresent) RadSysToHBConstCoef(SurfNum) = TH(SurfNum,1,1)
 
-      IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD .OR. &
+          Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT ) THEN
       ! Set variables used in the FD moisture balance and HAMT
         TempOutsideAirFD(SurfNum)= TempExt
         RhoVaporAirOut(SurfNum)=PsyRhovFnTdbWPb(TempOutsideAirFD(SurfNum),OutHumRat,OutBaroPress)
@@ -4678,16 +4726,16 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
       ENDIF
 
       ! Call the outside surface temp calculation and pass the necessary terms
-
-      IF (SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+          Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN
 
         IF ( Surface(SurfNum)%ExtCavityPresent ) THEN
           CALL CalcExteriorVentedCavity(SurfNum)
         ENDIF
 
         CALL CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
-
-      ELSEIF (SolutionAlgo == UseCondFD .OR. SolutionAlgo == UseCondFDSimple .OR. SolutionAlgo == UseHAMT) THEN
+      ELSEIF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD .OR. &
+              Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT ) THEN
         IF ( Surface(SurfNum)%ExtCavityPresent ) THEN
           CALL CalcExteriorVentedCavity(SurfNum)
         ENDIF
@@ -4730,7 +4778,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           TempExt = Surface(SurfNum)%OutWetBulbTemp
 
 ! start HAMT
-          IF (SolutionAlgo == UseHAMT) THEN
+          IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
             ! Set variables used in the HAMT moisture balance
             TempOutsideAirFD(SurfNum)= TempExt
             RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRh(TempOutsideAirFD(SurfNum),1.0d0,'HBSurfMan:Rain:HAMT')
@@ -4744,7 +4792,7 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
           ENDIF
 ! end HAMT
 
-          IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple) THEN
+          IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD ) THEN
             ! Set variables used in the FD moisture balance
             TempOutsideAirFD(SurfNum)= TempExt
             RhoVaporAirOut(SurfNum)=PsyRhovFnTdbRhLBnd0C(TempOutsideAirFD(SurfNum),1.0d0,'HBSurfMan:Rain:CondFD')
@@ -4761,7 +4809,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
           TempExt = Surface(SurfNum)%OutDryBulbTemp
 
-          IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+          IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD .OR. &
+              Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
             ! Set variables used in the FD moisture balance and HAMT
             TempOutsideAirFD(SurfNum)= TempExt
             RhoVaporAirOut(SurfNum)=PsyRhovFnTdbWPb(TempOutsideAirFD(SurfNum),OutHumRat,OutBaroPress)
@@ -4787,7 +4836,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
         TempExt = Surface(SurfNum)%OutDryBulbTemp
 
-        IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+        IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD .OR.      &
+            Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
           ! Set variables used in the FD moisture balance and HAMT
           TempOutsideAirFD(SurfNum)= TempExt
           RhoVaporAirOut(SurfNum)=PsyRhovFnTdbWPb(TempOutsideAirFD(SurfNum),OutHumRat,OutBaroPress)
@@ -4802,8 +4852,9 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
       END IF
 
-      IF (SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD) &
-        CALL CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+          Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD)   &
+          CALL CalcOutsideSurfTemp(SurfNum,ZoneNum,ConstrNum,HMovInsul,TempExt)
 
     CASE DEFAULT   ! for interior or other zone surfaces
 
@@ -4813,7 +4864,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
         ! No need to set any radiant system heat balance coefficients here--will be done during inside heat balance
 
-        IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+        IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD .OR.      &
+            Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
           ! Set variables used in the FD moisture balance HAMT
           TempOutsideAirFD(SurfNum)= TempSurfIn(SurfNum)
           RhoVaporAirOut(SurfNum)=RhoVaporAirIn(SurfNum)
@@ -4832,7 +4884,8 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
 
         ! No need to set any radiant system heat balance coefficients here--will be done during inside heat balance
 
-        IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) THEN
+        IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD .OR.      &
+            Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
           ! Set variables used in the FD moisture balance and HAMT
           TempOutsideAirFD(SurfNum)= TH(Surface(SurfNum)%ExtBoundCond,1,2)
           RhoVaporAirOut(SurfNum)=RhoVaporAirIn(Surface(SurfNum)%ExtBoundCond)
@@ -5006,7 +5059,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   IF (FirstTime) THEN
     ALLOCATE(TempInsOld(TotSurfaces))
     ALLOCATE(RefAirTemp(TotSurfaces))
-    IF (SolutionAlgo == UseEMPD) THEN
+    IF (ANY(HeatTransferAlgosUsed == UseEMPD)) THEN
       MinIterations = MinEMPDIterations
     ELSE
       MinIterations = 1
@@ -5185,9 +5238,14 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       IF (Surface(SurfNum)%ExtBoundCond == SurfNum .and. Surface(SurfNum)%Class /= SurfaceClass_Window) THEN
 !CR6869 -- let Window HB take care of it      IF (Surface(SurfNum)%ExtBoundCond == SurfNum) THEN
         ! Surface is a partition
+        IF ( Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+             Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN  !Regular CTF Surface and/or EMPD surface
 
-        If(SolutionAlgo == UseCTF .or. SolutionAlgo == UseEMPD) Then  !Regular CTF Surface and/or EMPD surface
-          TempSurfInTmp(SurfNum) = ( CTFConstInPart(SurfNum)             & ! Constant portion of conduction eq (history terms)
+           If (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) Then
+             Call CalcMoistureBalanceEMPD(SurfNum, TempSurfInTmp(SurfNum), &
+                   TH(SurfNum,2,2), MAT(ZoneNum),TempSurfInSat)
+           End If
+           TempSurfInTmp(SurfNum) = ( CTFConstInPart(SurfNum)             & ! Constant portion of conduction eq (history terms)
                                     +QRadThermInAbs(SurfNum)             & ! LW radiation from internal sources
                                     +QRadSWInAbs(SurfNum)                & ! SW radiation from internal sources
                                     +HConvIn(SurfNum)*RefAirTemp(SurfNum) & ! Convection from surface to zone air
@@ -5203,6 +5261,24 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                   /( Construct(ConstrNum)%CTFInside(0)   & ! Conduction term (both partition sides same temp)
                                     -Construct(ConstrNum)%CTFCross(0)    & ! Conduction term (both partition sides same temp)
                                     +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
+
+            If (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) Then
+              TempSurfInTmp(SurfNum) = TempSurfInTmp(SurfNum)              &
+                                      -MoistEMPDFlux(SurfNum)              &
+                                      /( Construct(ConstrNum)%CTFInside(0) &  ! Conduction term (both partition sides same temp)
+                                        -Construct(ConstrNum)%CTFCross(0)  &  ! Conduction term (both partition sides same temp)
+                                        +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
+              if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
+                 TempSurfInTmp(SurfNum) = TempSurfInSat    ! Surface temp cannot be below dew point
+              end if
+            End If
+          ! if any mixed heat transfer models in zone, apply limits to CTF result
+          IF (ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_CondFD)&
+              .OR. &
+              ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm == HeatTransferModel_HAMT) )&
+              THEN
+            TempSurfInTmp(SurfNum) = MAX(MinSurfaceTempLimit,MIN(MaxSurfaceTempLimit,TempSurfInTmp(SurfNum)))  !Limit Check
+          ENDIF
 
           IF (Construct(ConstrNum)%SourceSinkPresent) THEN  ! Set the appropriate parameters for the radiant system
 
@@ -5231,23 +5307,13 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
 
           END IF
 
-           If (SolutionAlgo == UseEMPD) Then
-              Call CalcMoistureBalanceEMPD(SurfNum, TempSurfInTmp(SurfNum), &
-                   TH(SurfNum,2,2), MAT(ZoneNum),TempSurfInSat)
-              TempSurfInTmp(SurfNum) = TempSurfInTmp(SurfNum)              &
-                                      -MoistEMPDFlux(SurfNum)              &
-                                      /( Construct(ConstrNum)%CTFInside(0) &  ! Conduction term (both partition sides same temp)
-                                        -Construct(ConstrNum)%CTFCross(0)  &  ! Conduction term (both partition sides same temp)
-                                        +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
-              if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
-                 TempSurfInTmp(SurfNum) = TempSurfInSat    ! Surface temp cannot be below dew point
-              end if
-           End If
-        Else If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .or. SolutionAlgo == UseHAMT) Then
+        ELSE IF(Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CondFD .OR. &
+                Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
 
-          IF(SolutionAlgo == UseHAMT) CALL ManageHeatBalHAMT(SurfNum,TempSurfInTmp(SurfNum),TempSurfOutTmp)  !HAMT
+          IF(Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) &
+             CALL ManageHeatBalHAMT(SurfNum,TempSurfInTmp(SurfNum),TempSurfOutTmp)  !HAMT
 
-          If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple)   &
+          If(Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD )  &
              CALL ManageHeatBalFiniteDiff(SurfNum,TempSurfInTmp(SurfNum),TempSurfOutTmp)
 
           TH(SurfNum,1,1) = TempSurfOutTmp
@@ -5266,9 +5332,14 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
 
           IF (HMovInsul <= 0.0) THEN  ! No movable insulation present, normal heat balance equation
 
-            IF (SolutionAlgo == UseCTF .OR. SolutionAlgo == UseEMPD) THEN ! Regular CTF Surface and/or EMPD surface
+            IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_CTF .OR. &
+                Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN ! Regular CTF Surface and/or EMPD surface
 
-              TempSurfInTmp(SurfNum) = ( CTFConstInPart(SurfNum)              & ! Constant part of conduction eq (history terms)
+               IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN
+                  Call CalcMoistureBalanceEMPD(SurfNum, TempSurfInTmp(SurfNum), &
+                      TH(SurfNum,2,2), MAT(ZoneNum),TempSurfInSat)
+               End If
+               TempSurfInTmp(SurfNum) = ( CTFConstInPart(SurfNum)              & ! Constant part of conduction eq (history terms)
                                         +QRadThermInAbs(SurfNum)              & ! LW radiation from internal sources
                                         +QRadSWInAbs(SurfNum)                 & ! SW radiation from internal sources
                                         +HConvIn(SurfNum)*RefAirTemp(SurfNum) & ! Convection from surface to zone air
@@ -5285,6 +5356,23 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                          *TH(SurfNum,1,1) )                   & ! the outside surface
                                       /( Construct(ConstrNum)%CTFInside(0)    & ! Coefficient for conduction (current time)
                                         +HConvIn(SurfNum)+IterDampConst )         ! Convection and damping term
+               IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN
+                 TempSurfInTmp(SurfNum) = TempSurfInTmp(SurfNum)              &
+                                          -MoistEMPDFlux(SurfNum)              &
+                                          /( Construct(ConstrNum)%CTFInside(0) &  ! Coefficient for conduction (current time)
+                                            +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
+                 if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
+                   TempSurfInTmp(SurfNum) = TempSurfInSat ! Surface temp cannot be below dew point
+                 end if
+               End If
+             ! if any mixed heat transfer models in zone, apply limits to CTF result
+              IF (ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm &
+                       == HeatTransferModel_CondFD) .OR. &
+                  ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm &
+                       == HeatTransferModel_HAMT) )&
+                  THEN
+                TempSurfInTmp(SurfNum) = MAX(MinSurfaceTempLimit,MIN(MaxSurfaceTempLimit,TempSurfInTmp(SurfNum)))  !Limit Check
+              ENDIF
 
               IF (Construct(ConstrNum)%SourceSinkPresent) THEN  ! Set the appropriate parameters for the radiant system
 
@@ -5325,21 +5413,10 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
 
               END IF
 
-               If (SolutionAlgo == UseEMPD) Then
-                  Call CalcMoistureBalanceEMPD(SurfNum, TempSurfInTmp(SurfNum), &
-                      TH(SurfNum,2,2), MAT(ZoneNum),TempSurfInSat)
-                  TempSurfInTmp(SurfNum) = TempSurfInTmp(SurfNum)              &
-                                          -MoistEMPDFlux(SurfNum)              &
-                                          /( Construct(ConstrNum)%CTFInside(0) &  ! Coefficient for conduction (current time)
-                                            +HConvIn(SurfNum)+IterDampConst )   ! Convection and damping term
-                  if (TempSurfInSat .GT. TempSurfInTmp(SurfNum)) then
-                     TempSurfInTmp(SurfNum) = TempSurfInSat ! Surface temp cannot be below dew point
-                  end if
-               End If
+            Else If(Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD .OR. &
+                    Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
 
-          Else If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple .OR. SolutionAlgo == UseHAMT) THEN
-
-              IF(SolutionAlgo == UseHAMT) THEN
+              IF(Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
                  IF (Surface(SurfNum)%ExtBoundCond > 0) THEN
                     ! HAMT get the correct other side zone zone air temperature --
                     OtherSideSurfNum = Surface(SurfNum)%ExtBoundCond
@@ -5350,7 +5427,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                 CALL ManageHeatBalHAMT(SurfNum,TempSurfInTmp(SurfNum),TempSurfOutTmp)
               ENDIF
 
-              If(SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple)   &
+              If(Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD )   &
                   CALL ManageHeatBalFiniteDiff(SurfNum,TempSurfInTmp(SurfNum),TempSurfOutTmp)
 
               TH(SurfNum,1,1) = TempSurfOutTmp
@@ -5389,7 +5466,14 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
                                       -Construct(ConstrNum)%CTFCross(0)      &
                                        *TH(SurfNum,1,1) )                    &
                                     /( HMovInsul )
-
+            ! if any mixed heat transfer models in zone, apply limits to CTF result
+            IF (ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm &
+                     == HeatTransferModel_CondFD) .OR. &
+                ANY(Surface(Zone(ZoneNum)%SurfaceFirst:Zone(ZoneNum)%SurfaceLast)%HeatTransferAlgorithm &
+                     == HeatTransferModel_HAMT) )&
+                THEN
+              TempSurfInTmp(SurfNum) = MAX(MinSurfaceTempLimit,MIN(MaxSurfaceTempLimit,TempSurfInTmp(SurfNum)))  !Limit Check
+            ENDIF
           END IF
 
         ELSE  ! Window
@@ -5747,7 +5831,8 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       ConstrNum = Surface(SurfNum)%Construction
       IF(Construct(ConstrNum)%TransDiff <= 0.0) THEN  ! Opaque surface
         MaxDelTemp = MAX(ABS(TempSurfIn(SurfNum)-TempInsOld(SurfNum)),MaxDelTemp)
-        IF (SolutionAlgo == UseCondFD) THEN ! also check all internal nodes as well as surface faces
+        IF (Surface(SurfNum)%HeatTransferAlgorithm  == HeatTransferModel_CondFD) THEN
+          ! also check all internal nodes as well as surface faces
           MaxDelTemp = MAX(MaxDelTemp, SurfaceFD(SurfNum)%MaxNodeDelTemp)
         ENDIF
       END IF
@@ -5755,7 +5840,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
 
     END DO  ! ...end of loop to check for convergence
 
-    IF (SolutionAlgo /= UseCondFD) THEN
+    IF (.NOT. ANY(HeatTransferAlgosUsed == UseCondFD)) THEN
       IF (MaxDelTemp <= MaxAllowedDelTemp) Converged = .TRUE.
     ELSE
       IF (MaxDelTemp <= MaxAllowedDelTempCondFD) Converged = .TRUE.
@@ -5784,7 +5869,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       IF (.NOT.WarmupFlag) THEN
         ErrCount=ErrCount+1
         IF (ErrCount < 16) THEN
-          IF (SolutionAlgo /= UseCondFD) THEN
+          IF (.NOT. ANY(HeatTransferAlgosUsed == UseCondFD)) THEN
             CALL ShowWarningError('Inside surface heat balance did not converge '// &
                  'with Max Temp Difference [C] ='//TRIM(RoundSigDigits(MaxDelTemp,3))//  &
                  ' vs Max Allowed Temp Diff [C] ='//TRIM(RoundSigDigits(MaxAllowedDelTemp,3)))
@@ -5807,8 +5892,8 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   END DO    ! ...end of main inside heat balance DO loop (ends when Converged)
 
   ! Update SumHmXXXX
-  IF (SolutionAlgo == UseCondFD .or. SolutionAlgo == UseCondFDSimple  .or.   &
-      SolutionAlgo == UseEMPD .or. SolutionAlgo == UseHAMT) THEN
+  IF ( ANY(HeatTransferAlgosUsed == UseCondFD) .OR. &
+       ANY(HeatTransferAlgosUsed == UseEMPD) .OR. ANY(HeatTransferAlgosUsed == UseHAMT)) THEN
     DO SurfNum = 1, TotSurfaces
       IF (.NOT. Surface(SurfNum)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
       IF (Surface(SurfNum)%Class == SurfaceClass_Window) CYCLE
@@ -5821,7 +5906,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
         ENDIF
       ENDIF
 
-      IF(SolutionAlgo == UseHAMT) THEN
+      IF(Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_HAMT) THEN
          CALL UpdateHeatBalHAMT(SurfNum)
 
          SumHmAW(ZoneNum)= SumHmAW(ZoneNum)+HMassConvInFD(SurfNum)*Surface(SurfNum)%Area*  &
@@ -5839,7 +5924,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
          SumHmARaW(ZoneNum)= SumHmARaW(ZoneNum)+HMassConvInFD(SurfNum)*Surface(SurfNum)%Area*RhoAirZone*Wsurf
       ENDIF
 
-      IF (SolutionAlgo == UseEMPD) THEN
+      IF (Surface(SurfNum)%HeatTransferAlgorithm == HeatTransferModel_EMPD) THEN
          ! need to calculate the amount of moisture that is entering or
          ! leaving the zone  Qm [kg/sec] = hmi * Area * (Del Rhov)
          ! {Hmi [m/sec];     Area [m2];    Rhov [kg moist/m3]  }
@@ -5847,11 +5932,11 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
          ! leaving the zone.  SumHmAw is the sum of the moisture entering or
          ! leaving the zone from all of the surfaces and is a rate.  Multiply
          ! by time to get the actual amount affecting the zone volume of air.
-         IF (SolutionAlgo == UseEMPD) THEN
-            CALL UpdateMoistureBalanceEMPD(SurfNum)
-            RhoVaporSurfIn(SurfNum) = MoistEMPDNew(SurfNum)
+
+         CALL UpdateMoistureBalanceEMPD(SurfNum)
+         RhoVaporSurfIn(SurfNum) = MoistEMPDNew(SurfNum)
             !SUMC(ZoneNum) = SUMC(ZoneNum)-MoistEMPDFlux(SurfNum)*Surface(SurfNum)%Area
-         END IF
+
 
 
          SumHmAW(ZoneNum)= SumHmAW(ZoneNum)+HMassConvInFD(SurfNum)*Surface(SurfNum)%Area*  &

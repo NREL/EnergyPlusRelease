@@ -48,6 +48,7 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 #include <cmath>
 #include <vector>
 #include <map>
+#include <cstring>
 #include <string>
 using namespace std;
 
@@ -56,9 +57,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -70,11 +71,11 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
+#include "DOE2DL.H"
 #include "DFcalcs.h"
-#include "sol.h"
+#include "SOL.H"
 #include "geom.h"
-#include "tools.h"
+#include "TOOLS.H"
 #include "Radiosity.h"
 
 /****************************** subroutine CalcDFs *****************************/
@@ -664,8 +665,8 @@ int	CalcDFs(
 				// For 0th sun position altitude
 				phsun_deg = phsmin;
                 char cSkyStr[MAX_CHAR_LINE];
-	            strcpy_s(cSkyStr,"");
-	            sprintf_s(cSkyStr,"SKY^GEN^CIEOVERCASTSKY^%6.2lf^%4.2lf", phsun_deg, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
+	            strcpy(cSkyStr,"");
+	            sprintf(cSkyStr,"SKY^GEN^CIEOVERCASTSKY^%6.2lf^%4.2lf", phsun_deg, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
 	            string	skyStr = cSkyStr;
                 // Decode the DNA string
 	            LumParam lpsky;
@@ -797,8 +798,8 @@ int	CalcDFs(
                                 sphiralN = 10000;
                             }
                         }
-	                    strcpy_s(cSkyStr,"");
-	                    sprintf_s(cSkyStr,"SKY^GEN^CIECLEARSUN^%6.2lf^%6.2lf^%10.4lf^%10.4lf^%6.2lf^%6.2lf^%8.2lf^%4.2lf", phsun_deg, thsun_deg, solic[IMREF], tfac, bldg_ptr->atmmoi[IMREF], bldg_ptr->atmtur[IMREF], bldg_ptr->alt, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
+	                    strcpy(cSkyStr,"");
+	                    sprintf(cSkyStr,"SKY^GEN^CIECLEARSUN^%6.2lf^%6.2lf^%10.4lf^%10.4lf^%6.2lf^%6.2lf^%8.2lf^%4.2lf", phsun_deg, thsun_deg, solic[IMREF], tfac, bldg_ptr->atmmoi[IMREF], bldg_ptr->atmtur[IMREF], bldg_ptr->alt, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
 	                    string	skyStr = cSkyStr;
 //    cout << skyStr << "\n";
                         // Decode the DNA string
@@ -932,8 +933,8 @@ int	CalcDFs(
                         double thsun_deg = thsun/DTOR;
                         if (thsun_deg < -180.) thsun_deg += 360.;
                         if (thsun_deg > 180.) thsun_deg -= 360.;
-	                    strcpy_s(cSkyStr,"");
-	                    sprintf_s(cSkyStr,"SKY^GEN^CIECLEARSKY^%6.2lf^%6.2lf^%10.6lf^%4.2lf", phsun_deg, thsun_deg, zenl, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
+	                    strcpy(cSkyStr,"");
+	                    sprintf(cSkyStr,"SKY^GEN^CIECLEARSKY^%6.2lf^%6.2lf^%10.6lf^%4.2lf", phsun_deg, thsun_deg, zenl, bldg_ptr->zone[izone]->surf[isurf]->gnd_refl);
 	                    string	skyStr = cSkyStr;
                         // Decode the DNA string
 	                    if (!SecretDecoderRing(lpsky,skyStr)) {
@@ -1225,7 +1226,7 @@ int	wndo_element_refpt_illum_contrib(
 						/* set lib_index component type to glass */
 						char sLibCompType[MAX_CHAR_UNAME+1];	/* temp str */
 						/* get library index of current window glass type */
-						strcpy_s(sLibCompType,"glass");
+						strcpy(sLibCompType,"glass");
 						int igt = lib_index(lib_ptr,sLibCompType,bldg_ptr->zone[izone]->surf[iWndoSurf]->wndo[iwndo]->glass_type);
 						int iGlass_Type_ID = atoi(bldg_ptr->zone[izone]->surf[iWndoSurf]->wndo[iwndo]->glass_type);
 						// glass type ID: 1 to 11 => DOE2 original, >11 => W4lib.dat, <0 => E10 library
@@ -1467,7 +1468,7 @@ int	wndo_element_surfnode_lum_contrib(
 						/* set lib_index component type to glass */
 						char sLibCompType[MAX_CHAR_UNAME+1];	/* temp str */
 						/* get library index of current window glass type */
-						strcpy_s(sLibCompType,"glass");
+						strcpy(sLibCompType,"glass");
 						int igt = lib_index(lib_ptr,sLibCompType,bldg_ptr->zone[izone]->surf[iWndoSurf]->wndo[iwndo]->glass_type);
 						int iGlass_Type_ID = atoi(bldg_ptr->zone[izone]->surf[iWndoSurf]->wndo[iwndo]->glass_type);
 						// glass type ID: 1 to 11 => DOE2 original, >11 => W4lib.dat, <0 => E10 library

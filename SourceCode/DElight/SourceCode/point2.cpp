@@ -35,11 +35,11 @@
 using namespace std;
 
 #include "DEF.H"
-#include "const.h"
+#include "CONST.H"
 #include "vector2.h"
 #include "point2.h"
 // writewndo() Error handler include
-#include "DelightManagerC.h"
+#include "DElightManagerC.h"
 
 using namespace BldgGeomLib;
 

@@ -906,8 +906,8 @@ END SUBROUTINE FigureConstGradPattern
 
     IF (SurfMinZ < (ZoneZorig-TolValue)) then
       IF (DisplayExtraWarnings) THEN
-        call ShowWarningError('RoomAirModelUserTempPattern: Problem in non-dimensional height calculation, too low surface: '&
-            //trim(surface(thisHBsurf)%name)//' in zone: '//trim(zone(thisZone)%name  ) )
+        call ShowWarningError('RoomAirModelUserTempPattern: Problem in non-dimensional height calculation')
+        call ShowContinueError('too low surface: '//trim(surface(thisHBsurf)%name)//' in zone: '//trim(zone(thisZone)%name  ) )
         call ShowContinueError('**** Average floor height of zone is: '//trim(RoundSigDigits(ZoneZorig, 3) ) )
         call ShowContinueError('**** Surface minimum height is: '//trim(RoundSigDigits(SurfMinZ , 3) ) )
       ELSE
@@ -917,8 +917,8 @@ END SUBROUTINE FigureConstGradPattern
 
     IF (SurfMaxZ > (ZoneZorig + ZoneCeilHeight + TolValue)  ) then
       IF (DisplayExtraWarnings) THEN
-        call ShowWarningError('RoomAirModelUserTempPattern: Problem in non-dimensional height calculation, too high surface:'&
-            //trim(surface(thisHBsurf)%name )//' in zone: '//trim(zone(thisZone)%name) )
+        call ShowWarningError('RoomAirModelUserTempPattern: Problem in non-dimensional height calculation')
+        call ShowContinueError(' too high surface: '//trim(surface(thisHBsurf)%name )//' in zone: '//trim(zone(thisZone)%name) )
         call ShowContinueError('**** Average Ceiling height of zone is: '//trim(RoundSigDigits((ZoneZorig + ZoneCeilHeight), 3) ) )
         call ShowContinueError('**** Surface Maximum height is: '//trim(RoundSigDigits(SurfMaxZ , 3) ) )
       ELSE
@@ -1076,12 +1076,12 @@ END SUBROUTINE FigureConstGradPattern
          TempRetAir = TempRetAir + QRetAir/(MassFlowRA * CpAir)
          IF (TempRetAir > RetTempMax) THEN
            Node(ReturnNode)%Temp = RetTempMax
-           IF (.not. ZoneSizingCalc) THEN 
+           IF (.not. ZoneSizingCalc) THEN
              SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + CpAir*MassFlowRA*(TempRetAir-RetTempMax)
            END IF
          ELSE IF (TempRetAir < RetTempMin) THEN
            Node(ReturnNode)%Temp = RetTempMin
-           IF (.not. ZoneSizingCalc) THEN 
+           IF (.not. ZoneSizingCalc) THEN
              SysDepZoneLoads(ZoneNum) = SysDepZoneLoads(ZoneNum) + CpAir*MassFlowRA*(TempRetAir-RetTempMin)
            END IF
          ELSE

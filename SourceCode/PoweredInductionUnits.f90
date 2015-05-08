@@ -1283,7 +1283,7 @@ IF (UnitOn) THEN
     ! in deadband or very small load: set primary air flow to the minimum
     PriAirMassFlow = PriAirMassFlowMin
     SecAirMassFlow = MAX( 0.0d0, PIU(PIUNum)%MaxTotAirMassFlow - PriAirMassFlow )
-  ELSE IF (QZnReq.GT.0.0) THEN
+  ELSE IF (QZnReq.GT.SmallLoad) THEN
     ! heating: set primary air flow to the minimum
     PriAirMassFlow = PriAirMassFlowMin
     SecAirMassFlow = MAX( 0.0d0, PIU(PIUNum)%MaxTotAirMassFlow - PriAirMassFlow )
@@ -1547,7 +1547,7 @@ IF (UnitOn) THEN
     ! in deadband or very small load: set primary air flow to the minimum
     PriAirMassFlow = PriAirMassFlowMin
     SecAirMassFlow = PIU(PIUNum)%MaxSecAirMassFlow
-  ELSE IF (QZnReq.GT.0.0) THEN
+  ELSE IF (QZnReq.GT.SmallLoad) THEN
     ! heating: set primary air flow to the minimum
     PriAirMassFlow = PriAirMassFlowMin
     SecAirMassFlow = PIU(PIUNum)%MaxSecAirMassFlow

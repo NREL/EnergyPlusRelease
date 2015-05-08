@@ -45,6 +45,9 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 #include <fstream>
 #include <map>
 #include <vector>
+#include <string>
+#include <cstring>
+#include <stdlib.h>
 
 using namespace std;
 
@@ -53,9 +56,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -67,8 +70,8 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "loaddata.h"
+#include "DOE2DL.H"
+#include "Loaddata.h"
 #include "struct.h"
 #include "geom.h"
 
@@ -91,31 +94,31 @@ int load_bldg(
 
 	/* Read site data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->name,_countof(bldg_ptr->name));
+	sscanf(cInputLine,"%*s %s\n",bldg_ptr->name,_countof(bldg_ptr->name));
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->lat);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->lat);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->lon);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->lon);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->alt);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->alt);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->azm);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->azm);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->timezone);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->timezone);
 	/* monthly atmospheric moisture */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	/* tokenize the line label */
-	token = strtok_s(cInputLine," ",&next_token);
+	token = strtok(cInputLine," ");
 	for (im=0; im<MONTHS; im++) {
-		token = strtok_s(NULL," ",&next_token);
+		token = strtok(NULL," ");
 		bldg_ptr->atmmoi[im] = atof(token);
 	}
 	/* monthly atmospheric turbidity */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	/* tokenize the line label */
-	token = strtok_s(cInputLine," ",&next_token);
+	token = strtok(cInputLine," ");
 	for (im=0; im<MONTHS; im++) {
-		token = strtok_s(NULL," ",&next_token);
+		token = strtok(NULL," ");
 		bldg_ptr->atmtur[im] = atof(token);
 	}
 
@@ -125,7 +128,7 @@ int load_bldg(
 
 	/* Read zone data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
+	sscanf(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
 	for (iz=0; iz<bldg_ptr->nzones; iz++) {
 		bldg_ptr->zone[iz] = new ZONE;
 		if (bldg_ptr->zone[iz] == NULL) {
@@ -140,35 +143,35 @@ int load_bldg(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->name,_countof(bldg_ptr->zone[iz]->name));
+		sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->name,_countof(bldg_ptr->zone[iz]->name));
 		/* zone origin in bldg system coordinates */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 		/* tokenize the line label */
-		token = strtok_s(cInputLine," ",&next_token);
+		token = strtok(cInputLine," ");
 		for (icoord=0; icoord<NCOORDS; icoord++) {
-			token = strtok_s(NULL," ",&next_token);
+			token = strtok(NULL," ");
 			bldg_ptr->zone[iz]->origin[icoord] = atof(token);
 		}
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->azm);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->mult);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->mult);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->flarea);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->flarea);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->volume);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->volume);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lighting);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lighting);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_power);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_power);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_light);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_light);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->lt_ctrl_steps);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->lt_ctrl_steps);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lt_ctrl_prob);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lt_ctrl_prob);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->view_azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->view_azm);
 
 		/* Read and discard ZONE LIGHTING SCHEDULE headings lines */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
@@ -176,7 +179,7 @@ int load_bldg(
 
 		/* Read lighting schedule data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nltsch);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nltsch);
 		for (ils=0; ils<bldg_ptr->zone[iz]->nltsch; ils++) {
 			bldg_ptr->zone[iz]->ltsch[ils] = new LTSCH;
 			if (bldg_ptr->zone[iz]->ltsch[ils] == NULL) {
@@ -191,25 +194,25 @@ int load_bldg(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ltsch[ils]->name,_countof(bldg_ptr->zone[iz]->ltsch[ils]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ltsch[ils]->name,_countof(bldg_ptr->zone[iz]->ltsch[ils]->name));
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_end);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_end);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_end);
 			/* lighting schedule hourly fractions */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			/* tokenize the line label */
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			for (ihr=0; ihr<HOURS; ihr++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				bldg_ptr->zone[iz]->ltsch[ils]->frac[ihr] = atof(token);
 			}
 		}
@@ -220,7 +223,7 @@ int load_bldg(
 
 		/* Read surface data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nsurfs);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nsurfs);
 		for (is=0; is<bldg_ptr->zone[iz]->nsurfs; is++) {
 			bldg_ptr->zone[iz]->surf[is] = new SURF;
 			if (bldg_ptr->zone[iz]->surf[is] == NULL) {
@@ -235,31 +238,31 @@ int load_bldg(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->name,_countof(bldg_ptr->zone[iz]->surf[is]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->name,_countof(bldg_ptr->zone[iz]->surf[is]->name));
 			/* surface origin in zone system coordinates */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			/* tokenize the line label */
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			for (icoord=0; icoord<NCOORDS; icoord++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				bldg_ptr->zone[iz]->surf[is]->origin[icoord] = atof(token);
 			}
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->height);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->height);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->width);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->width);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->azm_zs);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->azm_zs);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->tilt_zs);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->tilt_zs);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->vis_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->vis_refl);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->ext_vis_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->ext_vis_refl);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->gnd_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->gnd_refl);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->type);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->type);
 
 			/* Read and discard SURFACE WINDOWS headings lines */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
@@ -293,7 +296,7 @@ int load_bldg(
 
 			/* Read window data */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->nwndos);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->nwndos);
 			for (iw=0; iw<bldg_ptr->zone[iz]->surf[is]->nwndos; iw++) {
 				bldg_ptr->zone[iz]->surf[is]->wndo[iw] = new WNDO;
 				if (bldg_ptr->zone[iz]->surf[is]->wndo[iw] == NULL) {
@@ -308,41 +311,41 @@ int load_bldg(
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name));
+				sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name));
 				/* window origin in surface system coordinates */
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (icoord=0; icoord<NCOORDS; icoord++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->surf[is]->wndo[iw]->origin[icoord] = atof(token);
 				}
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->height);
+				sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->height);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->width);
+				sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->width);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type));
+				sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type));
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag);
+				sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag);
 				if (bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag != 0) {
 					fgets(cInputLine, MAX_CHAR_LINE, infile);
-					sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type));
+					sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type));
 				}
 				/* window overhang/fin zone shade depth (ft) */
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (izshade_x=0; izshade_x<NZSHADES; izshade_x++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->surf[is]->wndo[iw]->zshade_x[izshade_x] = atof(token);
 				}
 				/* window overhang/fin zone shade distance from window (ft) */
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (izshade_y=0; izshade_y<NZSHADES; izshade_y++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->surf[is]->wndo[iw]->zshade_y[izshade_y] = atof(token);
 				}
 			}
@@ -353,7 +356,7 @@ int load_bldg(
 
 			/* Read CFS data */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->ncfs);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->ncfs);
 			for (int icfs=0; icfs<bldg_ptr->zone[iz]->surf[is]->ncfs; icfs++) {
 
 				/* Read and discard CFS headings lines */
@@ -363,14 +366,14 @@ int load_bldg(
 				/* Read and store CFS name line */
 				char charCFSname[MAX_CHAR_UNAME+1];
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",charCFSname,_countof(charCFSname));
+				sscanf(cInputLine,"%*s %s\n",charCFSname,_countof(charCFSname));
 				/* CFS origin in surface system coordinates */
 				double dCFSorigin[NCOORDS];
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (icoord=0; icoord<NCOORDS; icoord++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					dCFSorigin[icoord] = atof(token);
 				}
 				// CFS geometry
@@ -378,31 +381,31 @@ int load_bldg(
 				double dCFSheight, dCFSwidth, dCFSrotation;
 				int iCFSnodesheight, iCFSnodeswidth;
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSheight);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSheight);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSwidth);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSwidth);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSrotation);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSrotation);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&iCFSnodesheight);
+				sscanf(cInputLine,"%*s %d\n",&iCFSnodesheight);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&iCFSnodeswidth);
+				sscanf(cInputLine,"%*s %d\n",&iCFSnodeswidth);
 				// CFS System
 				string cCFStype;
 				char charCFStype[MAX_CHAR_UNAME+1];
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",charCFStype,_countof(charCFStype));
+				sscanf(cInputLine,"%*s %s\n",charCFStype,_countof(charCFStype));
 				cCFStype = charCFStype;
 				// CFS System parameter list
 				double dCFSBFlux, dCFSConeAngle, dCFSTheta, dCFSPhi;
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSBFlux);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSBFlux);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSConeAngle);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSConeAngle);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSTheta);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSTheta);
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSPhi);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSPhi);
 
 				// Create new CFS surface object and store pointer
 // RJH - new constructor based on vertex list               CFSSurface(SURF *Parent, string CFStype, Double rotation, vector<BGL::point3> p3List,Double CFSmaxNodeArea);
@@ -426,7 +429,7 @@ int load_bldg(
 
 		/* Read reference point data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
 		for (irp=0; irp<bldg_ptr->zone[iz]->nrefpts; irp++) {
 			bldg_ptr->zone[iz]->ref_pt[irp] = new REFPT;
 			if (bldg_ptr->zone[iz]->ref_pt[irp] == NULL) {
@@ -441,21 +444,21 @@ int load_bldg(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ref_pt[irp]->name,_countof(bldg_ptr->zone[iz]->ref_pt[irp]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ref_pt[irp]->name,_countof(bldg_ptr->zone[iz]->ref_pt[irp]->name));
 			/* reference point in zone system coordinates */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			/* tokenize the line label */
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			for (icoord=0; icoord<NCOORDS; icoord++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				bldg_ptr->zone[iz]->ref_pt[irp]->zs[icoord] = atof(token);
 			}
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->zone_frac);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->zone_frac);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_set_pt);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_set_pt);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_ctrl_type);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_ctrl_type);
 			/* Allocate memory for window luminance factors for each ref_pt<->wndo combination */
 			for (is=0; is<bldg_ptr->zone[iz]->nsurfs; is++) {
 				for (iw=0; iw<bldg_ptr->zone[iz]->surf[is]->nwndos; iw++) {
@@ -477,7 +480,7 @@ int load_bldg(
 
 	/* Read building shade data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->nbshades);
+	sscanf(cInputLine,"%*s %d\n",&bldg_ptr->nbshades);
 	for (ish=0; ish<bldg_ptr->nbshades; ish++) {
 		bldg_ptr->bshade[ish] = new BSHADE;
 		if (bldg_ptr->bshade[ish] == NULL) {
@@ -492,27 +495,27 @@ int load_bldg(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->bshade[ish]->name,_countof(bldg_ptr->bshade[ish]->name));
+		sscanf(cInputLine,"%*s %s\n",bldg_ptr->bshade[ish]->name,_countof(bldg_ptr->bshade[ish]->name));
 		/* bldg shade origin in bldg system coordinates */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 		/* tokenize the line label */
-		token = strtok_s(cInputLine," ",&next_token);
+		token = strtok(cInputLine," ");
 		for (icoord=0; icoord<NCOORDS; icoord++) {
-			token = strtok_s(NULL," ",&next_token);
+			token = strtok(NULL," ");
 			bldg_ptr->bshade[ish]->origin[icoord] = atof(token);
 		}
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->height);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->height);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->width);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->width);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->azm);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->tilt);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->tilt);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->vis_refl);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->vis_refl);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->gnd_refl);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->gnd_refl);
 	}
 
 	return(0);
@@ -538,7 +541,7 @@ int load_lib(
 
 	/* Read glass type data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&lib_ptr->nglass);
+	sscanf(cInputLine,"%*s %d\n",&lib_ptr->nglass);
 	for (ig=0; ig<lib_ptr->nglass; ig++) {
 		lib_ptr->glass[ig] = new GLASS;
 		if (lib_ptr->glass[ig] == NULL) {
@@ -553,45 +556,45 @@ int load_lib(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",lib_ptr->glass[ig]->name,_countof(lib_ptr->glass[ig]->name));
+		sscanf(cInputLine,"%*s %s\n",lib_ptr->glass[ig]->name,_countof(lib_ptr->glass[ig]->name));
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->vis_trans);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->vis_trans);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->inside_refl);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->inside_refl);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam1);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam1);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam2);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam2);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam3);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam3);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam4);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam4);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam9);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->cam9);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10hemi_trans);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10hemi_trans);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[0]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[0]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[1]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[1]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[2]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[2]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[3]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->E10coef[3]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusDiffuse_Trans);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusDiffuse_Trans);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[0]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[0]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[1]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[1]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[2]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[2]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[3]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[3]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[4]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[4]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[5]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[5]);
 	}
 
 	/* Read and discard WSHADE TYPES headings lines */
@@ -600,7 +603,7 @@ int load_lib(
 
 	/* Read wshade type data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&lib_ptr->nwshades);
+	sscanf(cInputLine,"%*s %d\n",&lib_ptr->nwshades);
 	for (iws=0; iws<lib_ptr->nwshades; iws++) {
 		lib_ptr->wshade[iws] = new WSHADE;
 		if (lib_ptr->wshade[iws] == NULL) {
@@ -615,11 +618,11 @@ int load_lib(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",lib_ptr->wshade[iws]->name,_countof(lib_ptr->wshade[iws]->name));
+		sscanf(cInputLine,"%*s %s\n",lib_ptr->wshade[iws]->name,_countof(lib_ptr->wshade[iws]->name));
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->wshade[iws]->vis_trans);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->wshade[iws]->vis_trans);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->wshade[iws]->inside_refl);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->wshade[iws]->inside_refl);
 	}
 
 	return(0);

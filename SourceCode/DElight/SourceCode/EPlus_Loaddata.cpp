@@ -45,8 +45,10 @@ WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 // Standard includes
 #include <fstream>
 #include <map>
-#include <string>
+#include <cstring>
 #include <vector>
+#include <stdlib.h>
+#include <string>
 
 using namespace std;
 
@@ -55,9 +57,9 @@ using namespace std;
 namespace BGL = BldgGeomLib;
 
 // includes
-#include "const.h"
-#include "DBconst.h"
-#include "def.h"
+#include "CONST.H"
+#include "DBCONST.H"
+#include "DEF.H"
 
 // WLC includes
 #include "NodeMesh2.h"
@@ -69,8 +71,8 @@ namespace BGL = BldgGeomLib;
 #include "CFSSurface.h"
 
 // includes
-#include "doe2dl.h"
-#include "EPlus_LoadData.h"
+#include "DOE2DL.H"
+#include "EPlus_Loaddata.h"
 #include "struct.h"
 #include "geom.h"
 
@@ -94,31 +96,31 @@ int LoadDataFromEPlus(
 
 	/* Read site data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->name,_countof(bldg_ptr->name));
+	sscanf(cInputLine,"%*s %s\n",bldg_ptr->name,_countof(bldg_ptr->name));
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->lat);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->lat);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->lon);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->lon);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->alt);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->alt);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->azm);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->azm);
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->timezone);
+	sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->timezone);
 	/* monthly atmospheric moisture */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	/* tokenize the line label */
-	token = strtok_s(cInputLine," ",&next_token);
+	token = strtok(cInputLine," ");
 	for (im=0; im<MONTHS; im++) {
-		token = strtok_s(NULL," ",&next_token);
+		token = strtok(NULL," ");
 		bldg_ptr->atmmoi[im] = atof(token);
 	}
 	/* monthly atmospheric turbidity */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
 	/* tokenize the line label */
-	token = strtok_s(cInputLine," ",&next_token);
+	token = strtok(cInputLine," ");
 	for (im=0; im<MONTHS; im++) {
-		token = strtok_s(NULL," ",&next_token);
+		token = strtok(NULL," ");
 		bldg_ptr->atmtur[im] = atof(token);
 	}
 
@@ -128,7 +130,7 @@ int LoadDataFromEPlus(
 
 	/* Read zone data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
+	sscanf(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
 	if (bldg_ptr->nzones > MAX_BLDG_ZONES) {
 		*pofdmpfile << "ERROR: DElight exceeded maximum ZONES limit of " << MAX_BLDG_ZONES << "\n";
 		return(-1);
@@ -146,37 +148,37 @@ int LoadDataFromEPlus(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->name,_countof(bldg_ptr->zone[iz]->name));
+		sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->name,_countof(bldg_ptr->zone[iz]->name));
 		/* zone origin in bldg system coordinates */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 		/* tokenize the line label */
-		token = strtok_s(cInputLine," ",&next_token);
+		token = strtok(cInputLine," ");
 		for (icoord=0; icoord<NCOORDS; icoord++) {
-			token = strtok_s(NULL," ",&next_token);
+			token = strtok(NULL," ");
 			bldg_ptr->zone[iz]->origin[icoord] = atof(token);
 		}
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->azm);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->mult);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->mult);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->flarea);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->flarea);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->volume);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->volume);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lighting);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lighting);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_power);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_power);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_light);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->min_light);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->lt_ctrl_steps);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->lt_ctrl_steps);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lt_ctrl_prob);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->lt_ctrl_prob);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->view_azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->view_azm);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->max_grid_node_area);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->max_grid_node_area);
 
 		/* Read and discard ZONE LIGHTING SCHEDULE headings lines */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
@@ -185,7 +187,7 @@ int LoadDataFromEPlus(
 		/* Read lighting schedule data */
 		// NOTE: Left here for consistency even though Schedules are not included in EPlus generated input file.
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nltsch);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nltsch);
 		if (bldg_ptr->zone[iz]->nltsch > MAX_LT_SCHEDS) {
 			*pofdmpfile << "ERROR: DElight exceeded maximum LIGHTING SCHEDULES limit of " << MAX_LT_SCHEDS << "\n";
 			return(-1);
@@ -203,25 +205,25 @@ int LoadDataFromEPlus(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ltsch[ils]->name,_countof(bldg_ptr->zone[iz]->ltsch[ils]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ltsch[ils]->name,_countof(bldg_ptr->zone[iz]->ltsch[ils]->name));
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->mon_end);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->day_end);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_begin);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_begin);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_end);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ltsch[ils]->dow_end);
 			/* lighting schedule hourly fractions */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			/* tokenize the line label */
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			for (ihr=0; ihr<HOURS; ihr++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				bldg_ptr->zone[iz]->ltsch[ils]->frac[ihr] = atof(token);
 			}
 		}
@@ -232,7 +234,7 @@ int LoadDataFromEPlus(
 
 		/* Read surface data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nsurfs);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nsurfs);
 		if (bldg_ptr->zone[iz]->nsurfs > MAX_ZONE_SURFS) {
 			*pofdmpfile << "ERROR: DElight exceeded maximum ZONE SURFACES limit of " << MAX_ZONE_SURFS << "\n";
 			return(-1);
@@ -250,28 +252,28 @@ int LoadDataFromEPlus(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->name,_countof(bldg_ptr->zone[iz]->surf[is]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->name,_countof(bldg_ptr->zone[iz]->surf[is]->name));
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->azm_bs);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->azm_bs);
 			bldg_ptr->zone[iz]->surf[is]->azm_zs = bldg_ptr->zone[iz]->surf[is]->azm_bs - bldg_ptr->zone[iz]->azm;
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->tilt_bs);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->tilt_bs);
 			bldg_ptr->zone[iz]->surf[is]->tilt_zs = bldg_ptr->zone[iz]->surf[is]->tilt_bs;
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->vis_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->vis_refl);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->ext_vis_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->ext_vis_refl);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->gnd_refl);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->surf[is]->gnd_refl);
 
 			/* Vertices in World Coordinate System coordinates */
 			int iVertices;
 			// Read number of vertices
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&iVertices);
+			sscanf(cInputLine,"%*s %d\n",&iVertices);
             bldg_ptr->zone[iz]->surf[is]->nvertices = iVertices;
 			BGL::point3			p3TmpPt;
 			double dTmpVertex[NCOORDS];
@@ -280,9 +282,9 @@ int LoadDataFromEPlus(
 				// Read the coords of each vertex
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (icoord=0; icoord<NCOORDS; icoord++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					dTmpVertex[icoord] = atof(token);
 				}
 				// Store the vertex coords as a BGL point3
@@ -308,7 +310,7 @@ int LoadDataFromEPlus(
 
 			/* Read window data */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->nwndos);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->nwndos);
 			if (bldg_ptr->zone[iz]->surf[is]->nwndos > MAX_SURF_WNDOS) {
 				*pofdmpfile << "ERROR: DElight exceeded maximum SURFACE WINDOWS limit of " << MAX_SURF_WNDOS << "\n";
 				return(-1);
@@ -326,44 +328,44 @@ int LoadDataFromEPlus(
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name));
+				sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->name));
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type));
+				sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->glass_type));
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag);
+				sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag);
 				if (bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_flag != 0) {
 					fgets(cInputLine, MAX_CHAR_LINE, infile);
-					sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type));
+					sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type,_countof(bldg_ptr->zone[iz]->surf[is]->wndo[iw]->shade_type));
 				}
 				/* window overhang/fin zone shade depth (ft) */
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (izshade_x=0; izshade_x<NZSHADES; izshade_x++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->surf[is]->wndo[iw]->zshade_x[izshade_x] = atof(token);
 				}
 				/* window overhang/fin zone shade distance from window (ft) */
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				for (izshade_y=0; izshade_y<NZSHADES; izshade_y++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->surf[is]->wndo[iw]->zshade_y[izshade_y] = atof(token);
 				}
 
 				/* Vertices in World Coordinate System coordinates */
 				// Read number of vertices
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&iVertices);
+				sscanf(cInputLine,"%*s %d\n",&iVertices);
                 bldg_ptr->zone[iz]->surf[is]->wndo[iw]->nvertices = iVertices;
 				for (ivert=0; ivert<iVertices; ivert++) {
 					// Read the coords of each vertex
 					fgets(cInputLine, MAX_CHAR_LINE, infile);
 					/* tokenize the line label */
-					token = strtok_s(cInputLine," ",&next_token);
+					token = strtok(cInputLine," ");
 					for (icoord=0; icoord<NCOORDS; icoord++) {
-						token = strtok_s(NULL," ",&next_token);
+						token = strtok(NULL," ");
 						dTmpVertex[icoord] = atof(token);
 					}
 				    // Store the vertex coords as a BGL point3
@@ -392,7 +394,7 @@ int LoadDataFromEPlus(
 
 			/* Read CFS data */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->ncfs);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->surf[is]->ncfs);
 			if (bldg_ptr->zone[iz]->surf[is]->ncfs > MAX_SURF_CFS) {
 				*pofdmpfile << "ERROR: DElight exceeded maximum SURFACE CFS limit of " << MAX_SURF_CFS << "\n";
 				return(-1);
@@ -406,32 +408,32 @@ int LoadDataFromEPlus(
 				/* Read and store CFS name line */
 				char charCFSname[MAX_CHAR_UNAME+1];
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",charCFSname,_countof(charCFSname));
+				sscanf(cInputLine,"%*s %s\n",charCFSname,_countof(charCFSname));
 
 				// CFS System Parameters
 				string strCFSParameters;
 				char charCFSParameters[MAX_CHAR_UNAME+1];
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %s\n",charCFSParameters,_countof(charCFSParameters));
+				sscanf(cInputLine,"%*s %s\n",charCFSParameters,_countof(charCFSParameters));
 				strCFSParameters = charCFSParameters;
 
 				// CFS Rotation
 				double dCFSrotation;
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %lf\n",&dCFSrotation);
+				sscanf(cInputLine,"%*s %lf\n",&dCFSrotation);
 				
 				/* CFS Vertices in World Coordinate System coordinates */
 				// Read number of vertices
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
-				sscanf_s(cInputLine,"%*s %d\n",&iVertices);
+				sscanf(cInputLine,"%*s %d\n",&iVertices);
 	            vector<BGL::point3> vPt3;
 				for (ivert=0; ivert<iVertices; ivert++) {
 					// Read the coords of each vertex
 					fgets(cInputLine, MAX_CHAR_LINE, infile);
 					/* tokenize the line label */
-					token = strtok_s(cInputLine," ",&next_token);
+					token = strtok(cInputLine," ");
 					for (icoord=0; icoord<NCOORDS; icoord++) {
-						token = strtok_s(NULL," ",&next_token);
+						token = strtok(NULL," ");
 						dTmpVertex[icoord] = atof(token);
 					}
 				    // Store the vertex coords as a BGL point3
@@ -509,7 +511,7 @@ int LoadDataFromEPlus(
 
 		/* Read reference point data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
 		if (bldg_ptr->zone[iz]->nrefpts > MAX_REF_PTS) {
 			*pofdmpfile << "ERROR: DElight exceeded maximum ZONE REFERENCE POINTS limit of " << MAX_REF_PTS << "\n";
 			return(-1);
@@ -527,23 +529,23 @@ int LoadDataFromEPlus(
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ref_pt[irp]->name,_countof(bldg_ptr->zone[iz]->ref_pt[irp]->name));
+			sscanf(cInputLine,"%*s %s\n",bldg_ptr->zone[iz]->ref_pt[irp]->name,_countof(bldg_ptr->zone[iz]->ref_pt[irp]->name));
 			/* reference point in world system coordinates */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			/* tokenize the line label */
-			token = strtok_s(cInputLine," ",&next_token);
+			token = strtok(cInputLine," ");
 			for (icoord=0; icoord<NCOORDS; icoord++) {
-				token = strtok_s(NULL," ",&next_token);
+				token = strtok(NULL," ");
 				bldg_ptr->zone[iz]->ref_pt[irp]->zs[icoord] = atof(token);
                 // All coordinates from EPlus are in WCS so bldg sys = zone sys coords
 				bldg_ptr->zone[iz]->ref_pt[irp]->bs[icoord] = bldg_ptr->zone[iz]->ref_pt[irp]->zs[icoord];
 			}
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->zone_frac);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->zone_frac);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_set_pt);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_set_pt);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_ctrl_type);
+			sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->ref_pt[irp]->lt_ctrl_type);
 			/* Allocate memory for window luminance factors for each ref_pt<->wndo combination */
 			for (is=0; is<bldg_ptr->zone[iz]->nsurfs; is++) {
 				for (iw=0; iw<bldg_ptr->zone[iz]->surf[is]->nwndos; iw++) {
@@ -564,7 +566,7 @@ int LoadDataFromEPlus(
 
 	/* Read building shade data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->nbshades);
+	sscanf(cInputLine,"%*s %d\n",&bldg_ptr->nbshades);
 	if (bldg_ptr->nbshades > MAX_BLDG_SHADES) {
 		*pofdmpfile << "ERROR: DElight exceeded maximum BUILDING SHADES limit of " << MAX_BLDG_SHADES << "\n";
 		return(-1);
@@ -582,27 +584,27 @@ int LoadDataFromEPlus(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",bldg_ptr->bshade[ish]->name,_countof(bldg_ptr->bshade[ish]->name));
+		sscanf(cInputLine,"%*s %s\n",bldg_ptr->bshade[ish]->name,_countof(bldg_ptr->bshade[ish]->name));
 		/* bldg shade origin in bldg system coordinates */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 		/* tokenize the line label */
-		token = strtok_s(cInputLine," ",&next_token);
+		token = strtok(cInputLine," ");
 		for (icoord=0; icoord<NCOORDS; icoord++) {
-			token = strtok_s(NULL," ",&next_token);
+			token = strtok(NULL," ");
 			bldg_ptr->bshade[ish]->origin[icoord] = atof(token);
 		}
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->height);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->height);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->width);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->width);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->azm);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->azm);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->tilt);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->tilt);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->vis_refl);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->vis_refl);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->gnd_refl);
+		sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->bshade[ish]->gnd_refl);
 	}
 
 	return(0);
@@ -628,7 +630,7 @@ int LoadLibDataFromEPlus(
 
 	/* Read glass type data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&lib_ptr->nglass);
+	sscanf(cInputLine,"%*s %d\n",&lib_ptr->nglass);
 	if (lib_ptr->nglass > MAX_LIB_COMPS) {
 		*pofdmpfile << "ERROR: DElight exceeded maximum GLASS TYPES limit of " << MAX_LIB_COMPS << "\n";
 		return(-1);
@@ -646,23 +648,23 @@ int LoadLibDataFromEPlus(
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
 
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %s\n",lib_ptr->glass[ig]->name,_countof(lib_ptr->glass[ig]->name));
+		sscanf(cInputLine,"%*s %s\n",lib_ptr->glass[ig]->name,_countof(lib_ptr->glass[ig]->name));
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusDiffuse_Trans);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusDiffuse_Trans);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->inside_refl);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->inside_refl);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[0]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[0]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[1]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[1]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[2]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[2]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[3]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[3]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[4]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[4]);
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[5]);
+		sscanf(cInputLine,"%*s %lf\n",&lib_ptr->glass[ig]->EPlusCoef[5]);
 	}
 
 	return(0);
@@ -692,7 +694,7 @@ int LoadDFs(
 
 	/* Read zone data */
 	fgets(cInputLine, MAX_CHAR_LINE, infile);
-	sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
+	sscanf(cInputLine,"%*s %d\n",&bldg_ptr->nzones);
 	for (int iz=0; iz<bldg_ptr->nzones; iz++) {
 
 		/* Read and discard ZONE headings lines */
@@ -708,7 +710,7 @@ int LoadDFs(
 
 		/* Read reference point data */
 		fgets(cInputLine, MAX_CHAR_LINE, infile);
-		sscanf_s(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
+		sscanf(cInputLine,"%*s %d\n",&bldg_ptr->zone[iz]->nrefpts);
 		for (int irp=0; irp<bldg_ptr->zone[iz]->nrefpts; irp++) {
 
 			/* Read and discard REFERENCE POINT DATA headings lines */
@@ -721,7 +723,7 @@ int LoadDFs(
 			/* Read Reference_Point_Daylight_Factor_for_Overcast_Sky lines */
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
-			sscanf_s(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->dfskyo);
+			sscanf(cInputLine,"%*s %lf\n",&bldg_ptr->zone[iz]->ref_pt[irp]->dfskyo);
 
 			// Read the Reference Point Daylight Factors for Clear Sky heading lines
 			fgets(cInputLine, MAX_CHAR_LINE, infile);
@@ -733,10 +735,10 @@ int LoadDFs(
 			for (isunalt=0; isunalt<NPHS; isunalt++) {
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				// Now tokenize the clear sky DFs
 				for (int isunazm=0; isunazm<NTHS; isunazm++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->ref_pt[irp]->dfsky[isunalt][isunazm] = atof(token);
 				}
 			}
@@ -750,10 +752,10 @@ int LoadDFs(
 			for (isunalt=0; isunalt<NPHS; isunalt++) {
 				fgets(cInputLine, MAX_CHAR_LINE, infile);
 				/* tokenize the line label */
-				token = strtok_s(cInputLine," ",&next_token);
+				token = strtok(cInputLine," ");
 				// Now tokenize the clear sun DFs
 				for (int isunazm=0; isunazm<NTHS; isunazm++) {
-					token = strtok_s(NULL," ",&next_token);
+					token = strtok(NULL," ");
 					bldg_ptr->zone[iz]->ref_pt[irp]->dfsun[isunalt][isunazm] = atof(token);
 				}
 			}

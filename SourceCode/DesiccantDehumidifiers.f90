@@ -3028,7 +3028,7 @@ SUBROUTINE CalcNonDXHeatingCoils(DesicDehumNum,FirstHVACIteration,RegenCoilLoad,
   USE WaterCoils,                ONLY: SimulateWaterCoilComponents
   USE SteamCoils,                ONLY: SimulateSteamCoilComponents
   USE PlantUtilities,            ONLY: SetComponentFlowRate
-  USE General,                   ONLY: SolveRegulaFalsi
+  USE General,                   ONLY: SolveRegulaFalsi,RoundSigDigits
   USE DataHVACGlobals,           ONLY: SmallLoad
 
   IMPLICIT NONE     ! Enforce explicit typing of all variables in this routine
@@ -3041,6 +3041,7 @@ SUBROUTINE CalcNonDXHeatingCoils(DesicDehumNum,FirstHVACIteration,RegenCoilLoad,
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER :: ErrTolerance = 0.001d0    ! convergence limit for hotwater coil
+  INTEGER, PARAMETER :: SolveMaxIter=50             ! Max iteration for SolveRegulaFalsi
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3090,23 +3091,35 @@ SUBROUTINE CalcNonDXHeatingCoils(DesicDehumNum,FirstHVACIteration,RegenCoilLoad,
                 Par(2) = 0.
               END IF
               Par(3) = RegenCoilLoad
-              CALL SolveRegulaFalsi(ErrTolerance, 50, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
+              CALL SolveRegulaFalsi(ErrTolerance, SolveMaxIter, SolFlag, HotWaterMdot, HotWaterCoilResidual, &
                                     MinWaterFlow, MaxHotWaterFlow, Par)
               IF (SolFlag == -1) THEN
                IF (DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in Desiccant Dehumidifier '// &
-                                         TRIM(DesicDehum(DesicDehumNum)%Name))
-                 CALL ShowContinueError('  Iteration limit exceeded in calculating hot water mass flow rate')
+                 CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed for '//  &
+                    trim(DesicDehum(DesicDehumNum)%DehumType)//'="'// &
+                    TRIM(DesicDehum(DesicDehumNum)%Name)//'"')
+                 CALL ShowContinueErrorTimeStamp(' ')
+                 CALL ShowContinueError('...Iteration limit ['//trim(RoundSigDigits(SolveMaxIter))//  &
+                    '] exceeded in calculating hot water mass flow rate')
                ENDIF
-              CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (iteration limit) in Desiccant Dehumidifier ' &
-                                    //TRIM(DesicDehum(DesicDehumNum)%Name),DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex)
+              CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (iteration limit ['//  &
+                 trim(RoundSigDigits(SolveMaxIter))//']) for '//trim(DesicDehum(DesicDehumNum)%DehumType)//'="' &
+                 //TRIM(DesicDehum(DesicDehumNum)%Name)//'"',DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex)
               ELSE IF (SolFlag == -2) THEN
                IF (DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex2 == 0) THEN
-                 CALL ShowWarningMessage('Hot water coil control failed in Furnace '//TRIM(DesicDehum(DesicDehumNum)%Name))
-                 CALL ShowContinueError('  Bad hot water maximum flow rate limits')
+                 CALL ShowWarningMessage('CalcNonDXHeatingCoils: Hot water coil control failed (maximum flow limits) for '//  &
+                    trim(DesicDehum(DesicDehumNum)%DehumType)//'="'// &
+                    TRIM(DesicDehum(DesicDehumNum)%Name)//'"')
+                 CALL ShowContinueErrorTimeStamp(' ')
+                 CALL ShowContinueError('...Bad hot water maximum flow rate limits')
+                 CALL ShowContinueError('...Given minimum water flow rate='//trim(RoundSigDigits(MinWaterFlow,3))//' kg/s')
+                 CALL ShowContinueError('...Given maximum water flow rate='//trim(RoundSigDigits(MaxHotWaterFlow,3))//' kg/s')
                ENDIF
-               CALL ShowRecurringWarningErrorAtEnd('Hot water coil control failed (flow limits) in Desiccant Dehumidifier '// &
-                    TRIM(DesicDehum(DesicDehumNum)%Name),DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex2)
+               CALL ShowRecurringWarningErrorAtEnd('CalcNonDXHeatingCoils: Hot water coil control failed (flow limits) for '//  &
+                  trim(DesicDehum(DesicDehumNum)%DehumType)//'="'// &
+                  TRIM(DesicDehum(DesicDehumNum)%Name)//'"', &
+                  DesicDehum(DesicDehumNum)%HotWaterCoilMaxIterIndex2,  &
+                  ReportMinOf=MinWaterFlow,ReportMaxOf=MaxHotWaterFlow,ReportMinUnits='[kg/s]',ReportMaxUnits='[kg/s]')
               END IF
 
               RegenCoilActual = RegenCoilLoad

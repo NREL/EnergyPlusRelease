@@ -44,8 +44,8 @@ MODULE FluidProperties
         ! USE STATEMENTS
 USE DataPrecisionGlobals
 USE DataGlobals, ONLY: MaxNameLength, WarmupFlag, OutputFileDebug
-USE DataInterfaces, ONLY: ShowFatalError, ShowWarningError, ShowSevereError, ShowRecurringWarningErrorAtEnd, &
-                       ShowRecurringSevereErrorAtEnd, ShowContinueError, ShowContinueErrorTimeStamp, ShowMessage
+USE DataInterfaces, ONLY: ShowFatalError, ShowWarningError, ShowWarningMessage, ShowSevereError, ShowRecurringWarningErrorAtEnd, &
+                       ShowRecurringSevereErrorAtEnd, ShowContinueError, ShowContinueErrorTimeStamp, ShowMessage, ShowSevereMessage
 
 IMPLICIT NONE                           ! Enforce explicit typing of all variables
 PRIVATE
@@ -196,9 +196,59 @@ TYPE FluidPropsGlycolData
   REAL(r64), ALLOCATABLE, DIMENSION(:)  :: ViscValues                ! viscosity values (mPa-s)
 END TYPE
 
+TYPE FluidPropsRefrigErrors
+  CHARACTER(len=MaxNameLength) :: Name=' '
+  INTEGER :: SatTempErrIndex=0            ! Index for Sat Temperature Error (Recurring errors)
+  INTEGER :: SatTempErrCount=0            ! Count for Sat Temperature Error (Recurring errors)
+  INTEGER :: SatPressErrIndex=0            ! Index for Sat Pressure Error (Recurring errors)
+  INTEGER :: SatPressErrCount=0            ! Count for Sat Pressure Error (Recurring errors)
+  INTEGER :: SatTempDensityErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatTempDensityErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyTempErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyTempErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyPresErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupEnthalpyPresErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureTempErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureTempErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureEnthErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupPressureEnthErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityTempErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityTempErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityPresErrIndex=0            ! Index for Sat Temperature (Density) Error (Recurring errors)
+  INTEGER :: SatSupDensityPresErrCount=0            ! Count for Sat Temperature (Density) Error (Recurring errors)
+END TYPE
+
+TYPE FluidPropsGlycolErrors
+  CHARACTER(len=MaxNameLength) :: Name=' ' ! Which glycol this error structure is for
+  INTEGER :: SpecHeatLowErrIndex=0         ! Index for Specific Heat Low Error (Recurring errors)
+  INTEGER :: SpecHeatHighErrIndex=0        ! Index for Specific Heat High Error (Recurring errors)
+  INTEGER :: SpecHeatLowErrCount=0         ! Count for Specific Heat Low Error (Recurring errors)
+  INTEGER :: SpecHeatHighErrCount=0        ! Count for Specific Heat High Error (Recurring errors)
+  INTEGER :: DensityHighErrCount=0         ! Index for Density Low Error (Recurring errors)
+  INTEGER :: DensityLowErrIndex=0          ! Index for Density High Error (Recurring errors)
+  INTEGER :: DensityHighErrIndex=0         ! Count for Density Low Error (Recurring errors)
+  INTEGER :: DensityLowErrCount=0          ! Count for Density High Error (Recurring errors)
+  INTEGER :: ConductivityLowErrIndex=0     ! Index for Conductivity Low Error (Recurring errors)
+  INTEGER :: ConductivityHighErrIndex=0    ! Index for Conductivity High Error (Recurring errors)
+  INTEGER :: ConductivityLowErrCount=0     ! Count for Conductivity Low Error (Recurring errors)
+  INTEGER :: ConductivityHighErrCount=0    ! Count for Conductivity High Error (Recurring errors)
+  INTEGER :: ViscosityLowErrIndex=0        ! Index for Viscosity Low Error (Recurring errors)
+  INTEGER :: ViscosityHighErrIndex=0       ! Index for Viscosity High Error (Recurring errors)
+  INTEGER :: ViscosityLowErrCount=0        ! Count for Viscosity Low Error (Recurring errors)
+  INTEGER :: ViscosityHighErrCount=0       ! Count for Viscosity High Error (Recurring errors)
+END TYPE
+
 TYPE (FluidPropsRefrigerantData), ALLOCATABLE, DIMENSION(:) :: RefrigData
+TYPE (FluidPropsRefrigErrors), ALLOCATABLE, DIMENSION(:)    :: RefrigErrorTracking
 TYPE (FluidPropsGlycolRawData), ALLOCATABLE, DIMENSION(:)   :: GlyRawData
 TYPE (FluidPropsGlycolData), ALLOCATABLE, DIMENSION(:)      :: GlycolData
+TYPE (FluidPropsGlycolErrors), ALLOCATABLE, DIMENSION(:)    :: GlycolErrorTracking
 
         ! INTERFACE BLOCK SPECIFICATIONS
         ! na
@@ -258,6 +308,8 @@ SUBROUTINE GetFluidPropertiesData
           !       DATE WRITTEN   April 2000
           !       MODIFIED       May 2002 Simon Rees (Added saturated pressure data retreaval)
           !                      June 2004 Rick Strand (Added glycol defaults and modified glycol data structure)
+          !                      August 2011 Linda Lawrie (Added steam as default refrigerant)
+          !                      August 2012 Linda Lawrie (more error checks on data input)
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -288,6 +340,7 @@ SUBROUTINE GetFluidPropertiesData
   INTEGER, PARAMETER :: DefaultNumSteamTemps = 111 ! Temperature dimension of default steam data.
   INTEGER, PARAMETER :: DefaultNumSteamSuperheatedTemps = 114 ! Temperature dimension of default steam data.
   INTEGER, PARAMETER :: DefaultNumSteamSuperheatedPressure = 114 ! Temperature dimension of default steam data.
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetFluidPropertiesData: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3284,7 +3337,7 @@ SUBROUTINE GetFluidPropertiesData
       NumOfGlycols = NumOfGlycols + 1
       FluidNames(FluidNum)%IsGlycol=.true.
     ELSE
-      CALL ShowSevereError('GetFluidPropertiesData: '//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid type')
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid type')
       CALL ShowContinueError('...entered value="'//TRIM(Alphas(2))//', Only REFRIGERANT or GLYCOL allowed as '//  &
          trim(cAlphaFieldNames(2)))
       ErrorsFound=.true.
@@ -3292,13 +3345,14 @@ SUBROUTINE GetFluidPropertiesData
   END DO
 
   IF (ErrorsFound) THEN
-    CALL ShowFatalError('GetFluidPropertiesData: Previous errors in input cause program termination.')
+    CALL ShowFatalError(RoutineName//' Previous errors in input cause program termination.')
   ENDIF
 
   IF (NumOfRefrigerants+1 > 0) THEN
     ALLOCATE(RefrigData(NumOfRefrigerants+1))
     ALLOCATE(RefrigUsed(NumOfRefrigerants+1))
     RefrigUsed=.false.
+    ALLOCATE(RefrigErrorTracking(NumOfRefrigerants+1))
   ENDIF
   IF (NumOfGlycols > 0) THEN
     ALLOCATE(GlyRawData(NumOfGlycols))
@@ -3309,10 +3363,12 @@ SUBROUTINE GetFluidPropertiesData
   NumOfGlycols      = 0
   RefrigData(1)%Name = 'STEAM'
   RefrigUsed(1)=.true.
+  RefrigErrorTracking(1)%Name = 'STEAM'
   DO Loop = 1, FluidNum
     IF (.not. FluidNames(Loop)%IsGlycol) THEN
       NumOfRefrigerants = NumOfRefrigerants + 1
       RefrigData(NumOfRefrigerants)%Name = FluidNames(Loop)%Name
+      RefrigErrorTracking(NumOfRefrigerants)%Name = FluidNames(Loop)%Name
     ELSEIF (FluidNames(Loop)%IsGlycol) THEN
       NumOfGlycols = NumOfGlycols + 1
       GlyRawData(NumOfGlycols)%Name = FluidNames(Loop)%Name
@@ -3380,9 +3436,9 @@ SUBROUTINE GetFluidPropertiesData
 
     DO TempLoop = 2, FluidTemps(Loop)%NumOfTemps
       IF (FluidTemps(Loop)%Temps(TempLoop) <= FluidTemps(Loop)%Temps(TempLoop-1)) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: '//TRIM(CurrentModuleObject)//' lists must have data in ascending order')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' name='//TRIM(FluidTemps(Loop)%Name))
-        CALL ShowContinueError('First Occurance at Temp('//TRIM(RoundSigDigits(TempLoop-1))//  &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' name='//TRIM(FluidTemps(Loop)%Name)//  &
+           ', lists must have data in ascending order')
+        CALL ShowContinueError('First out of order occurance at Temperature #('//TRIM(RoundSigDigits(TempLoop-1))//  &
                  ') {'//TRIM(RoundSigDigits(FluidTemps(Loop)%Temps(TempLoop-1),3))//'} >= Temp('//  &
                  TRIM(RoundSigDigits(TempLoop))//') {'//TRIM(RoundSigDigits(FluidTemps(Loop)%Temps(TempLoop),3))//'}')
         ErrorsFound=.true.
@@ -3428,12 +3484,11 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumPsPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and fluid saturation pressure '// &
-                                                            'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperature Name='//TRIM(TempsName)//', Temperature array and fluid saturation pressure '// &
+                             'array must have the same number of points')
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
-                                      TRIM(RefrigData(Loop)%Name)//' # points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumPsPoints)))
+                             TRIM(RefrigData(Loop)%Name)//' # pressure points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumPsPoints)))
               ErrorsFound=.true.
               EXIT ! the TempLoop DO Loop
             ENDIF
@@ -3448,9 +3503,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: '//  &
-               'Found saturated fluid gas/fluid pressure input but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated fluid gas/fluid pressure input but no matching temperature array')
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3463,11 +3518,9 @@ SUBROUTINE GetFluidPropertiesData
           ! If it made it all the way to the last input occurrence and didn't find a match,
           ! then no sat press data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Gas/Fluid Saturation Pressure found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="Pressure" and '//trim(cAlphaFieldNames(3))//  &
-           '="FluidGas".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Gas/Fluid Saturation Pressure found. Need properties '//  &
+             'with '//trim(cAlphaFieldNames(2))//'="Pressure" and '//trim(cAlphaFieldNames(3))//'="FluidGas".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3500,10 +3553,9 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumHPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated fluid enthalpy '//  &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowSevereError('Temperature Name='//TRIM(TempsName)//', Temperature array and saturated fluid enthalpy '//  &
                                    'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
                                       TRIM(RefrigData(Loop)%Name)//' # points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumHPoints)))
               ErrorsFound=.true.
@@ -3520,8 +3572,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated fluid enthalpy input but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated fluid enthalpy input but no matching temperature array')
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3533,11 +3586,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat fluid enthalpy data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Fluid Enthalpy found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object:')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="Enthalpy" and '//trim(cAlphaFieldNames(3))//  &
-           '="Fluid".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Saturated Fluid Enthalpy found. Need properties to be entered '//  &
+             'with '//trim(cAlphaFieldNames(2))//'="Enthalpy" and '//trim(cAlphaFieldNames(3))//'="Fluid".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3559,9 +3610,9 @@ SUBROUTINE GetFluidPropertiesData
 
           IF (SameString(Alphas(4),FluidTemps(TempLoop)%Name)) THEN
             IF (.NOT.SameString(FluidTemps(TempLoop)%Name,TempsName)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperatures for enthalpy fluid and '// &
-                                   'gas/fluid points are not the same')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperatures for enthalpy fluid and '// &
+                                         'gas/fluid points are not the same')
               CALL ShowContinueError('Name='//TRIM(Alphas(4))//' => '//TRIM(FluidTemps(TempLoop)%Name)//' /= '//TRIM(TempsName))
               ErrorsFound=.true.
               EXIT
@@ -3572,10 +3623,9 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumHPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated gas/fluid '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperature Name='//TRIM(TempsName)//', Temperature array and saturated gas/fluid '// &
                                    'enthalpy array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
                                       TRIM(RefrigData(Loop)%Name)//' # points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumHPoints)))
               ErrorsFound=.true.
@@ -3591,9 +3641,10 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated gas/fluid enthalpy input '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated gas/fluid enthalpy input '// &
                                  'but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3605,11 +3656,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat f/g enthalpy data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Gas/Fluid Enthalpy found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="Enthalpy" and '//trim(cAlphaFieldNames(3))//  &
-           '="FluidGas".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Saturated Gas/Fluid Enthalpy found. Need properties to be entered '//  &
+            'with '//trim(cAlphaFieldNames(2))//'="Enthalpy" and '//trim(cAlphaFieldNames(3))//'="FluidGas".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3640,12 +3689,11 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumCpPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated fluid Cp '//  &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowSevereError('Temperature Name='//TRIM(TempsName)//', Temperature array and saturated fluid Cp '//  &
                                    'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
-                                      TRIM(RefrigData(Loop)%Name)//' # points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumCpPoints)))
+                              TRIM(RefrigData(Loop)%Name)//' # Cp points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumCpPoints)))
               ErrorsFound=.true.
               EXIT ! the TempLoop DO Loop
             ENDIF
@@ -3660,9 +3708,10 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated fluid specific heat (Cp) input '//  &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated fluid specific heat (Cp) input '//  &
                'but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3674,11 +3723,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat fluid Cp data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Fluid Specific Heat found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="SpecificHeat" and '//trim(cAlphaFieldNames(3))//  &
-           '="Fluid".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Saturated Fluid Specific Heat found. Need properties to be entered '//  &
+           'with '//trim(cAlphaFieldNames(2))//'="SpecificHeat" and '//trim(cAlphaFieldNames(3))//'="Fluid".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3700,9 +3747,9 @@ SUBROUTINE GetFluidPropertiesData
 
           IF (SameString(Alphas(4),FluidTemps(TempLoop)%Name)) THEN
             IF (.NOT.SameString(FluidTemps(TempLoop)%Name,TempsName)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperatures for specific heat fluid and '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperatures for specific heat fluid and '// &
                                    'gas/fluid points are not the same')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
               CALL ShowContinueError('Name='//TRIM(Alphas(4))//' => '//TRIM(FluidTemps(TempLoop)%Name)//' /= '//TRIM(TempsName))
               ErrorsFound=.true.
               EXIT
@@ -3713,12 +3760,11 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumCpPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated gas/fluid Cp '//  &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperature Name='//TRIM(TempsName)//', Temperature array and saturated gas/fluid Cp '//  &
                                    'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
-                                      TRIM(RefrigData(Loop)%Name)//' # points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumCpPoints)))
+                             TRIM(RefrigData(Loop)%Name)//' # Cp points='//TRIM(RoundSigDigits(RefrigData(Loop)%NumCpPoints)))
               ErrorsFound=.true.
               EXIT ! the TempLoop DO Loop
             ENDIF
@@ -3732,9 +3778,10 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated gas/fluid specific heat (Cp) input '//  &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated gas/fluid specific heat (Cp) input '//  &
                'but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3746,11 +3793,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat f/g Cp data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Gas/Fluid Specific Heat found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="SpecificHeat" and '//trim(cAlphaFieldNames(3))//  &
-           '="FluidGas".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Saturated Gas/Fluid Specific Heat found. Need properties to be entered '//  &
+           'with '//trim(cAlphaFieldNames(2))//'="SpecificHeat" and '//trim(cAlphaFieldNames(3))//'="FluidGas".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3781,12 +3826,11 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumRhoPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated fluid density '//  &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperature Name='//TRIM(TempsName)//', Temperature array and saturated fluid density '//  &
                                    'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
-                                      TRIM(RefrigData(Loop)%Name)//' # points='//  &
+                                      TRIM(RefrigData(Loop)%Name)//' # Density points='//  &
                                       TRIM(RoundSigDigits(RefrigData(Loop)%NumRhoPoints)))
               ErrorsFound=.true.
               EXIT ! the TempLoop DO Loop
@@ -3802,8 +3846,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated fluid density input but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated fluid density input but no matching temperature array')
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3815,11 +3860,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat fluid density data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Fluid Density found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="Density" and '//trim(cAlphaFieldNames(3))//  &
-           '="Fluid".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No Saturated Fluid Density found. Need properties to be entered '//  &
+           'with '//trim(cAlphaFieldNames(2))//'="Density" and '//trim(cAlphaFieldNames(3))//'="Fluid".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3841,9 +3884,9 @@ SUBROUTINE GetFluidPropertiesData
 
           IF (SameString(Alphas(4),FluidTemps(TempLoop)%Name)) THEN
             IF (.NOT.SameString(FluidTemps(TempLoop)%Name,TempsName)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperatures for density fluid and '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperatures for density fluid and '// &
                                    'gas/fluid points are not the same')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
               CALL ShowContinueError('Name='//TRIM(Alphas(4))//' => '//TRIM(FluidTemps(TempLoop)%Name)//' /= '//TRIM(TempsName))
               ErrorsFound=.true.
               EXIT
@@ -3854,12 +3897,12 @@ SUBROUTINE GetFluidPropertiesData
 
             ! Make sure the number of points in the two arrays (temps and values) are the same
             IF (NumNumbers /= RefrigData(Loop)%NumRhoPoints) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Temperature array and saturated gas/fluid density '//  &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+              CALL ShowContinueError('Temperature Name='//TRIM(TempsName)//  &
+                 ', Temperature array and saturated gas/fluid density '//  &
                                    'array must have the same number of points')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-              CALL ShowContinueError('with Temperature Name='//TRIM(TempsName))
               CALL ShowContinueError('Temperature # points='//TRIM(RoundSigDigits(NumNumbers))//' whereas '//  &
-                                      TRIM(RefrigData(Loop)%Name)//' # points='//  &
+                                      TRIM(RefrigData(Loop)%Name)//' # density points='//  &
                                       TRIM(RoundSigDigits(RefrigData(Loop)%NumRhoPoints)))
               ErrorsFound=.true.
               EXIT ! the TempLoop DO Loop
@@ -3874,10 +3917,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last temperature array and didn't find a match, then no match was found
           IF (TempLoop == NumOfFluidTempArrays) THEN
-            CALL ShowFatalError('Found saturated gas/fluid density input but no matching temperature array')
-            CALL ShowSevereError('GetFluidPropertiesData: Found saturated gas/fluid density input '// &
-                                 'but no matching temperature array')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('Found saturated gas/fluid density input but no matching temperature array')
+            CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
             ErrorsFound=.true.
           ENDIF
 
@@ -3889,11 +3931,9 @@ SUBROUTINE GetFluidPropertiesData
 
           ! If it made it all the way to the last input occurrence and didn't find a match, then no sat f/g density data found
       IF (InData == NumOfSatFluidPropArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No Saturated Gas/Fluid Density found')
-        CALL ShowContinueError('Was looking for properties for Refrigerant='//TRIM(RefrigData(Loop)%Name))
-        CALL ShowContinueError('Need properties to be entered for '//trim(CurrentModuleObject)//' object.')
-        CALL ShowContinueError('with '//trim(cAlphaFieldNames(2))//'="Density" and '//trim(cAlphaFieldNames(3))//  &
-           '="FluidGas".')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowSevereError('No Saturated Gas/Fluid Density found. Need properties to be entered '//  &
+           'with '//trim(cAlphaFieldNames(2))//'="Density" and '//trim(cAlphaFieldNames(3))//'="FluidGas".')
         ErrorsFound=.true.
       ENDIF
 
@@ -3923,6 +3963,57 @@ SUBROUTINE GetFluidPropertiesData
 !      END DO
 !    END IF
 
+!   Error check on entering saturated data
+    iTemp=0
+    CurrentModuleObject = 'FluidProperties:Saturated'
+    DO InData = 1, NumOfSatFluidPropArrays
+
+      CALL GetObjectItem(TRIM(CurrentModuleObject),InData,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      IF (SameString(Alphas(3),Fluid)) THEN
+        IF (.not. SameString(Alphas(2),Enthalpy) .and. .not. SameString(Alphas(2),SpecificHeat)   &
+            .and. .not. SameString(Alphas(2),Density)) THEN
+          IF (iTemp == 0) THEN
+            CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError(trim(cAlphaFieldNames(3))//'="'//trim(Fluid)//'", but '//trim(cAlphaFieldNames(2))//  &
+               '="'//trim(Alphas(2))//'" is not valid.')
+            CALL ShowContinueError('Valid choices are "'//trim(Enthalpy)//'", "'//trim(SpecificHeat)//'", "'//  &
+              trim(Density)//'".')
+            CALL ShowContinueError('This fluid property will not be processed mor available for the simulation.')
+          ENDIF
+          iTemp=iTemp+1
+        ENDIF
+      ELSEIF (SameString(Alphas(3),GasFluid)) THEN
+        IF (.not. SameString(Alphas(2),Pressure) .and. .not. SameString(Alphas(2),Enthalpy)   &
+            .and. .not. SameString(Alphas(2),SpecificHeat) .and. .not. SameString(Alphas(2),Density)) THEN
+          IF (iTemp == 0) THEN
+            CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError(trim(cAlphaFieldNames(3))//'="'//trim(Fluid)//'", but '//trim(cAlphaFieldNames(2))//  &
+               '="'//trim(Alphas(2))//'" is not valid.')
+            CALL ShowContinueError('Valid choices are "'//trim(Pressure)//'", "'//trim(Enthalpy)//'", "'//  &
+              trim(SpecificHeat)//'", "'//trim(Density)//'".')
+            CALL ShowContinueError('This fluid property will not be processed nor available for the simulation.')
+          ENDIF
+          iTemp=iTemp+1
+        ENDIF
+      ELSE
+        IF (iTemp == 0) THEN
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowContinueError(trim(cAlphaFieldNames(3))//'="'//trim(Alphas(3))//'" is not valid.')
+          CALL ShowContinueError('Valid choices are "'//trim(Fluid)//'", "'//trim(GasFluid)//'".')
+          CALL ShowContinueError('This fluid property will not be processed nor available for the simulation.')
+        ENDIF
+        iTemp=iTemp+1
+      ENDIF
+    ENDDO
+
+    IF (iTemp > 1) THEN
+      CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//' has '//trim(RoundSigDigits(iTemp-1))//  &
+         ' similar errors to the previous.')
+    ENDIF
+
+
           ! **********   SUPERHEATED DATA SECTION   **********
           ! Get: ***** ENTHALPY of SUPERHEATED GAS  *****
           ! First find the number of pressure value syntax lines have been entered and
@@ -3943,18 +4034,18 @@ SUBROUTINE GetFluidPropertiesData
           FirstSHMatch = .FALSE.
         ELSE
           IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: All superheated data for the same property must use '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+            CALL ShowContinueError('All superheated data for the same property must use '// &
                                  'the same temperature list')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-            CALL ShowContinueError('Expected Temperature name='//TRIM(TempsName)//', Input had name='//TRIM(Alphas(3)))
+            CALL ShowContinueError('Expected name='//TRIM(TempsName)//', Entered name='//TRIM(Alphas(3)))
             ErrorsFound=.true.
           ENDIF
         END IF
       END IF
     END DO
     IF (NumOfPressPts == 0) THEN
-      CALL ShowSevereError('GetFluidPropertiesData: No pressure data found for superheated enthalpy')
-      CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+      CALL ShowContinueError('No pressure data found for superheated enthalpy')
       ErrorsFound=.true.
     ENDIF
 
@@ -3968,9 +4059,10 @@ SUBROUTINE GetFluidPropertiesData
         EXIT ! the TempLoop DO loop
       END IF
       IF (TempLoop == NumOfFluidTempArrays) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: No match for temperature array name found with '// &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('No match for temperature array name found with '// &
                              'superheated enthalpy data')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('Entered Temperature Name='//trim(TempsName))
         ErrorsFound=.true.
       ENDIF
     END DO
@@ -3992,9 +4084,9 @@ SUBROUTINE GetFluidPropertiesData
       IF ((SameString(Alphas(1),RefrigData(Loop)%Name)).AND.(SameString(Alphas(2),Enthalpy))) THEN
         NumOfPressPts = NumOfPressPts + 1
         IF (Numbers(1) <= 0.0) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: Negative pressures not allowed in fluid property input data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-          CALL ShowContinueError('...Value =['//trim(RoundSigDigits(Numbers(1),3))//'].')
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowContinueError('Negative pressures not allowed in fluid property input data, '//  &
+             'Value =['//trim(RoundSigDigits(Numbers(1),3))//'].')
           ErrorsFound=.true.
         ENDIF
         PressurePtr(NumOfPressPts)%Pressure = Numbers(1)
@@ -4027,8 +4119,8 @@ SUBROUTINE GetFluidPropertiesData
       ! a little error trapping
       IF (InData > 1) THEN
         IF (RefrigData(Loop)%SHPress(InData) <= RefrigData(Loop)%SHPress(Indata-1)) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: Pressures must be entered in ascending order for fluid property data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowContinueError('Pressures must be entered in ascending order for fluid property data')
           CALL ShowContinueError('First Occurance at Pressure('//TRIM(RoundSigDigits(Indata-1))//  &
                                  ') {'//TRIM(RoundSigDigits(RefrigData(Loop)%SHPress(Indata-1),3))//  &
                                  '} >= Pressure('//TRIM(RoundSigDigits(Indata))//  &
@@ -4040,9 +4132,9 @@ SUBROUTINE GetFluidPropertiesData
       IF ((NumNumbers-1) == RefrigData(Loop)%NumSuperTempPts) THEN
         RefrigData(Loop)%HshValues(1:RefrigData(Loop)%NumSuperTempPts,Indata) = Numbers(2:NumNumbers)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Number of superheated enthalpy data points '// &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('Number of superheated enthalpy data points '// &
                              'not equal to number of temperature points')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
         ErrorsFound=.true.
       END IF
     END DO
@@ -4065,9 +4157,9 @@ SUBROUTINE GetFluidPropertiesData
       IF ((SameString(Alphas(1),RefrigData(Loop)%Name)).AND.(SameString(Alphas(2),Density))) THEN
         NumOfPressPts = NumOfPressPts + 1
         IF (Numbers(1) <= 0.0) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: Negative pressures not allowed in fluid property input data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
-          CALL ShowContinueError('...Value =['//trim(RoundSigDigits(Numbers(1),3))//'].')
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowContinueError('Negative pressures not allowed in fluid property input data, '//   &
+             'Value =['//trim(RoundSigDigits(Numbers(1),3))//'].')
           ErrorsFound=.true.
         ENDIF
         PressurePtr(NumOfPressPts)%Pressure = Numbers(1)
@@ -4097,38 +4189,63 @@ SUBROUTINE GetFluidPropertiesData
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IF (ABS(Numbers(1)-RefrigData(Loop)%SHPress(Indata)) > PressToler) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: All superheated data for the same refrigerant must '// &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('All superheated data for the same refrigerant must '// &
                              'use the same pressure data')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
         ErrorsFound=.true.
       END IF
       IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-        CALL ShowSevereError('GetFluidPropertiesData: All superheated data for the same property must use '// &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('All superheated data for the same property must use '// &
                              'the same temperature list')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
         ErrorsFound=.true.
       END IF
       IF ((NumNumbers-1) == RefrigData(Loop)%NumSuperTempPts) THEN
         RefrigData(Loop)%RhoshValues(1:RefrigData(Loop)%NumSuperTempPts,InData) = Numbers(2:NumNumbers)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Number of superheated density data points not equal to '// &
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+        CALL ShowContinueError('Number of superheated density data points not equal to '// &
                              'number of temperature points')
-        CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
         ErrorsFound=.true.
       END IF
     END DO
 
     DEALLOCATE(PressurePtr)
 
+!   Error check on entering superheated data
+    iTemp=0
+    CurrentModuleObject = 'FluidProperties:Superheated'
+    DO InData = 1, NumOfSHFluidPropArrays
+
+      CALL GetObjectItem(TRIM(CurrentModuleObject),InData,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      IF (.not. SameString(Alphas(2),Enthalpy) .and. .not. SameString(Alphas(2),Density)) THEN
+        IF (iTemp == 0) THEN
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+          CALL ShowContinueError(trim(cAlphaFieldNames(2))//'="'//trim(Alphas(2))//'" is not valid.')
+          CALL ShowContinueError('Valid choices are "'//trim(Enthalpy)//'", "'//trim(Density)//'".')
+          CALL ShowContinueError('Pressure value of this item=['//trim(RoundSigDigits(Numbers(1),2))//'].')
+          CALL ShowContinueError('This fluid property will not be processed nor available for the simulation.')
+        ENDIF
+        iTemp=iTemp+1
+      ENDIF
+    ENDDO
+
+    IF (iTemp > 1) THEN
+      CALL ShowWarningError(RoutineName//trim(CurrentModuleObject)//' has '//trim(RoundSigDigits(iTemp-1))//  &
+         ' similar errors to the previous.')
+    ENDIF
+
     IF (NumOfPressPts == 0) THEN
-      CALL ShowSevereError('GetFluidPropertiesData: No pressure data found for superheated density')
-      CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+      CALL ShowSevereError('No pressure data found for superheated density')
       ErrorsFound=.true.
     END IF
     IF (NumOfPressPts /= RefrigData(Loop)%NumSuperPressPts) THEN
-      CALL ShowSevereError('GetFluidPropertiesData: Number of pressure points for superheated data '// &
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
+      CALL ShowSevereError('Number of pressure points for superheated data '// &
                            'different for enthalpy and density')
-      CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(RefrigData(Loop)%Name))
       ErrorsFound=.true.
     END IF
 
@@ -4159,9 +4276,9 @@ SUBROUTINE GetFluidPropertiesData
           FirstSHMatch = .FALSE.
         ELSE
           IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: All glycol specific heat data for the same glycol must use '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('All glycol specific heat data for the same glycol must use '// &
                                  'the same temperature list')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             CALL ShowContinueError('Expected name='//TRIM(TempsName)//', Entered name='//TRIM(Alphas(3)))
             ErrorsFound=.true.
           END IF
@@ -4180,8 +4297,8 @@ SUBROUTINE GetFluidPropertiesData
           EXIT ! the TempLoop DO loop
         END IF
         IF (TempLoop == NumOfFluidTempArrays) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: No match for temperature array name found with glycol data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowContinueError('No match for temperature array name found with glycol data')
           ErrorsFound=.true.
         END IF
       END DO
@@ -4204,24 +4321,24 @@ SUBROUTINE GetFluidPropertiesData
           ! a little error trapping
           IF (NumOfConcPts == 1) THEN
             IF (GlyRawData(Loop)%CpConcs(NumOfConcPts) < 0.0) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Negative concentrations not allowed in fluid property input data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Negative concentrations not allowed in fluid property input data')
               ErrorsFound=.true.
             END IF
           ELSE
             IF (GlyRawData(Loop)%CpConcs(NumOfConcPts) <= GlyRawData(Loop)%CpConcs(NumOfConcPts-1)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Concentrations must be entered in ascending order '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Concentrations must be entered in ascending order '// &
                                    'for fluid property data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
               ErrorsFound=.true.
             END IF
           END IF
           IF ((NumNumbers-1) == GlyRawData(Loop)%NumCpTempPts) THEN
             GlyRawData(Loop)%CpValues(1:GlyRawData(Loop)%NumCpTempPts,NumOfConcPts) = Numbers(2:NumNumbers)
           ELSE
-            CALL ShowSevereError('GetFluidPropertiesData: Number of specific heat data points not equal to number of '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('Number of specific heat data points not equal to number of '// &
                                  'temperature points')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             ErrorsFound=.true.
           END IF
         END IF
@@ -4246,9 +4363,9 @@ SUBROUTINE GetFluidPropertiesData
           FirstSHMatch = .FALSE.
         ELSE
           IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: All glycol density data for the same glycol must use '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('All glycol density data for the same glycol must use '// &
                                  'the same temperature list')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             CALL ShowContinueError('Expected name='//TRIM(TempsName)//', Entered name='//TRIM(Alphas(3)))
             ErrorsFound=.true.
           END IF
@@ -4267,8 +4384,8 @@ SUBROUTINE GetFluidPropertiesData
           EXIT ! the TempLoop DO loop
         END IF
         IF (TempLoop == NumOfFluidTempArrays) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: No match for temperature array name found with glycol data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowContinueError('No match for temperature array name found with glycol data')
           ErrorsFound=.true.
         END IF
       END DO
@@ -4291,24 +4408,24 @@ SUBROUTINE GetFluidPropertiesData
           ! a little error trapping
           IF (NumOfConcPts == 1) THEN
             IF (GlyRawData(Loop)%RhoConcs(NumOfConcPts) < 0.0) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Negative concentrations not allowed in fluid property input data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Negative concentrations not allowed in fluid property input data')
               ErrorsFound=.true.
             END IF
           ELSE
             IF (GlyRawData(Loop)%RhoConcs(NumOfConcPts) <= GlyRawData(Loop)%RhoConcs(NumOfConcPts-1)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Concentrations must be entered in ascending order '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Concentrations must be entered in ascending order '// &
                                    'for fluid property data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
               ErrorsFound=.true.
             END IF
           END IF
           IF ((NumNumbers-1) == GlyRawData(Loop)%NumRhoTempPts) THEN
             GlyRawData(Loop)%RhoValues(1:GlyRawData(Loop)%NumRhoTempPts,NumOfConcPts) = Numbers(2:NumNumbers)
           ELSE
-            CALL ShowSevereError('GetFluidPropertiesData: Number of density data points not equal to number of '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('Number of density data points not equal to number of '// &
                                  'temperature points')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             ErrorsFound=.true.
           END IF
         END IF
@@ -4333,9 +4450,9 @@ SUBROUTINE GetFluidPropertiesData
           FirstSHMatch = .FALSE.
         ELSE
           IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: All glycol conductivity data for the same glycol must use '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('All glycol conductivity data for the same glycol must use '// &
                                  'the same temperature list')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             CALL ShowContinueError('Expected name='//TRIM(TempsName)//', Entered name='//TRIM(Alphas(3)))
             ErrorsFound=.true.
           END IF
@@ -4354,8 +4471,8 @@ SUBROUTINE GetFluidPropertiesData
           EXIT ! the TempLoop DO loop
         END IF
         IF (TempLoop == NumOfFluidTempArrays) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: No match for temperature array name found with glycol data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowContinueError('No match for temperature array name found with glycol data')
           ErrorsFound=.true.
         END IF
       END DO
@@ -4378,24 +4495,24 @@ SUBROUTINE GetFluidPropertiesData
           ! a little error trapping
           IF (NumOfConcPts == 1) THEN
             IF (GlyRawData(Loop)%CondConcs(NumOfConcPts) < 0.0) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Negative concentrations not allowed in fluid property input data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Negative concentrations not allowed in fluid property input data')
               ErrorsFound=.true.
             END IF
           ELSE
             IF (GlyRawData(Loop)%CondConcs(NumOfConcPts) <= GlyRawData(Loop)%CondConcs(NumOfConcPts-1)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Concentrations must be entered in ascending order '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Concentrations must be entered in ascending order '// &
                                    'for fluid property data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
               ErrorsFound=.true.
             END IF
           END IF
           IF ((NumNumbers-1) == GlyRawData(Loop)%NumCondTempPts) THEN
             GlyRawData(Loop)%CondValues(1:GlyRawData(Loop)%NumCondTempPts,NumOfConcPts) = Numbers(2:NumNumbers)
           ELSE
-            CALL ShowSevereError('GetFluidPropertiesData: Number of conductivity data points not equal to number of '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('Number of conductivity data points not equal to number of '// &
                                  'temperature points')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             ErrorsFound=.true.
           END IF
         END IF
@@ -4420,9 +4537,9 @@ SUBROUTINE GetFluidPropertiesData
           FirstSHMatch = .FALSE.
         ELSE
           IF (.NOT.SameString(TempsName,Alphas(3))) THEN
-            CALL ShowSevereError('GetFluidPropertiesData: All glycol viscosity data for the same glycol must use '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('All glycol viscosity data for the same glycol must use '// &
                                  'the same temperature list')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             CALL ShowContinueError('Expected name='//TRIM(TempsName)//', Entered name='//TRIM(Alphas(3)))
             ErrorsFound=.true.
           END IF
@@ -4441,8 +4558,8 @@ SUBROUTINE GetFluidPropertiesData
           EXIT ! the TempLoop DO loop
         END IF
         IF (TempLoop == NumOfFluidTempArrays) THEN
-          CALL ShowSevereError('GetFluidPropertiesData: No match for temperature array name found with glycol data')
-          CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+          CALL ShowContinueError('No match for temperature array name found with glycol data')
           ErrorsFound=.true.
         END IF
       END DO
@@ -4465,24 +4582,24 @@ SUBROUTINE GetFluidPropertiesData
           ! a little error trapping
           IF (NumOfConcPts == 1) THEN
             IF (GlyRawData(Loop)%ViscConcs(NumOfConcPts) < 0.0) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Negative concentrations not allowed in fluid property input data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Negative concentrations not allowed in fluid property input data')
               ErrorsFound=.true.
             END IF
           ELSE
             IF (GlyRawData(Loop)%ViscConcs(NumOfConcPts) <= GlyRawData(Loop)%ViscConcs(NumOfConcPts-1)) THEN
-              CALL ShowSevereError('GetFluidPropertiesData: Concentrations must be entered in ascending order '// &
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+              CALL ShowContinueError('Concentrations must be entered in ascending order '// &
                                    'for fluid property data')
-              CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
               ErrorsFound=.true.
             END IF
           END IF
           IF ((NumNumbers-1) == GlyRawData(Loop)%NumViscTempPts) THEN
             GlyRawData(Loop)%ViscValues(1:GlyRawData(Loop)%NumViscTempPts,NumOfConcPts) = Numbers(2:NumNumbers)
           ELSE
-            CALL ShowSevereError('GetFluidPropertiesData: Number of viscosity data points not equal to number of '// &
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
+            CALL ShowContinueError('Number of viscosity data points not equal to number of '// &
                                  'temperature points')
-            CALL ShowContinueError('Error occurs in '//TRIM(CurrentModuleObject)//' Name='//TRIM(GlyRawData(Loop)%Name))
             ErrorsFound=.true.
           END IF
         END IF
@@ -4595,12 +4712,12 @@ SUBROUTINE GetFluidPropertiesData
         GlycolData(NumOfGlyConcs)%Name = Alphas(1)
         GlycolData(NumOfGlyConcs)%GlycolName = Alphas(3)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: '//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid reference')
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid reference')
         CALL ShowContinueError('... not found in the FluidProperties:Name list: "'//TRIM(Alphas(3))//'".')
         ErrorsFound = .TRUE.
       END IF
     ELSE
-      CALL ShowSevereError('GetFluidPropertiesData: '//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid field')
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid field')
       CALL ShowContinueError('...'//trim(cAlphaFieldNames(2))//'="'//trim(Alphas(2))//'".')
       CALL ShowContinueError('... Legal values are PropoleneGlycol, EthyleneGlycol or UserDefinedGlycolType.')
       ErrorsFound=.true.
@@ -4694,7 +4811,7 @@ SUBROUTINE GetFluidPropertiesData
                                        GlyRawData(Index)%CpConcs,GlyRawData(Index)%CpValues, &
                                        GlycolData(Loop)%Concentration,GlycolData(Loop)%CpValues)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Specific heat data not entered for a '//TRIM(CurrentModuleObject))
+        CALL ShowSevereError(RoutineName//'Specific heat data not entered for a '//TRIM(CurrentModuleObject))
         CALL ShowContinueError('ALL data must be entered for user-defined glycols')
         CALL ShowContinueError('Glycol mixture name = '//TRIM(GlycolData(Loop)%Name))
         CALL ShowContinueError('Glycol fluid name = '//TRIM(GlycolData(Loop)%GlycolName))
@@ -4712,7 +4829,7 @@ SUBROUTINE GetFluidPropertiesData
                                        GlyRawData(Index)%RhoConcs,GlyRawData(Index)%RhoValues, &
                                        GlycolData(Loop)%Concentration,GlycolData(Loop)%RhoValues)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Density data not entered for a '//TRIM(CurrentModuleObject))
+        CALL ShowSevereError(RoutineName//'Density data not entered for a '//TRIM(CurrentModuleObject))
         CALL ShowContinueError('ALL data must be entered for user-defined glycols')
         CALL ShowContinueError('Glycol mixture name = '//TRIM(GlycolData(Loop)%Name))
         CALL ShowContinueError('Glycol fluid name = '//TRIM(GlycolData(Loop)%GlycolName))
@@ -4730,7 +4847,7 @@ SUBROUTINE GetFluidPropertiesData
                                        GlyRawData(Index)%CondConcs,GlyRawData(Index)%CondValues, &
                                        GlycolData(Loop)%Concentration,GlycolData(Loop)%CondValues)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Conductivity data not entered for a '//TRIM(CurrentModuleObject))
+        CALL ShowSevereError(RoutineName//'Conductivity data not entered for a '//TRIM(CurrentModuleObject))
         CALL ShowContinueError('ALL data must be entered for user-defined glycols')
         CALL ShowContinueError('Glycol mixture name = '//TRIM(GlycolData(Loop)%Name))
         CALL ShowContinueError('Glycol fluid name = '//TRIM(GlycolData(Loop)%GlycolName))
@@ -4748,7 +4865,7 @@ SUBROUTINE GetFluidPropertiesData
                                        GlyRawData(Index)%ViscConcs,GlyRawData(Index)%ViscValues, &
                                        GlycolData(Loop)%Concentration,GlycolData(Loop)%ViscValues)
       ELSE
-        CALL ShowSevereError('GetFluidPropertiesData: Viscosity data not entered for a '//TRIM(CurrentModuleObject))
+        CALL ShowSevereError(RoutineName//'Viscosity data not entered for a '//TRIM(CurrentModuleObject))
         CALL ShowContinueError('ALL data must be entered for user-defined glycols')
         CALL ShowContinueError('Glycol mixture name = '//TRIM(GlycolData(Loop)%Name))
         CALL ShowContinueError('Glycol fluid name = '//TRIM(GlycolData(Loop)%GlycolName))
@@ -4760,6 +4877,8 @@ SUBROUTINE GetFluidPropertiesData
   END DO
 
   NumOfGlycols = NumOfGlyConcs  ! Reset number of glycols to actual number
+  ALLOCATE(GlycolErrorTracking(NumOfGlycols))
+  GlycolErrorTracking%Name=GlycolData%Name
 
   IF (.not. ErrorsFound) CALL InitializeGlycolTempLimits(ErrorsFound)   ! Initialize the Temp limits for the glycols
 
@@ -4775,7 +4894,7 @@ SUBROUTINE GetFluidPropertiesData
   DEALLOCATE(lNumericFieldBlanks)
 
   IF (ErrorsFound) THEN
-    CALL ShowFatalError('GetFluidPropertiesData: Previous errors in input cause program termination.')
+    CALL ShowFatalError(RoutineName//'Previous errors in input cause program termination.')
   ENDIF
 
   IF (GetNumSectionsFound(MakeUPPERCase('ReportGlycols')) > 0) DebugReportGlycols=.true.
@@ -6063,20 +6182,22 @@ FUNCTION GetSatPressureRefrig(Refrigerant,Temperature,RefrigIndex,calledfrom) RE
   ENDIF
 
   IF (.not. WarmupFlag .and. ErrorFlag) THEN
-     TempRangeErrCount = TempRangeErrCount + 1
+    RefrigErrorTracking(RefrigNum)%SatTempErrCount = RefrigErrorTracking(RefrigNum)%SatTempErrCount + 1
     ! send warning
-    IF (TempRangeErrCount <= RefrigerantErrorLimitTest) THEN
-      CALL ShowSevereError('GetSatPressureRefrig: Saturation temperature requested is out of range for supplied data: **')
-      CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
-      CALL ShowContinueErrorTimeStamp(' ')
-      CALL ShowContinueError('..Refrigerant Temperature='//TRIM(RoundSigDigits(Temperature,2))//  &
+    IF (RefrigErrorTracking(RefrigNum)%SatTempErrCount <= RefrigerantErrorLimitTest) THEN
+      CALL ShowSevereMessage('GetSatPressureRefrig: Saturation temperature is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **')
+      CALL ShowContinueError('...Called From:'//trim(calledfrom))
+      CALL ShowContinueError('...Supplied Refrigerant Temperature='//TRIM(RoundSigDigits(Temperature,2))//  &
                           ' Returned saturated pressure value = '//TRIM(RoundSigDigits(ReturnValue,0)))
-    ELSE
-      CALL ShowRecurringWarningErrorAtEnd('GetSatPressureRefrig: Refrigerant Saturation temperature out of range error',  &
-                                             TempRangeErrIndex,ReportMaxOf=Temperature,ReportMinOf=Temperature,  &
-                                             ReportMaxUnits='{C}',ReportMinUnits='{C}')
+      CALL ShowContinueErrorTimeStamp(' ')
     ENDIF
-  END IF
+    CALL ShowRecurringSevereErrorAtEnd('GetSatPressureRefrig: Saturation temperature is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatTempErrIndex,  &
+                                             ReportMaxOf=Temperature,ReportMinOf=Temperature,  &
+                                             ReportMaxUnits='{C}',ReportMinUnits='{C}')
+  ENDIF
 
   RETURN
 
@@ -6180,19 +6301,21 @@ FUNCTION GetSatTemperatureRefrig(Refrigerant, Pressure, RefrigIndex,calledfrom) 
   ENDIF
 
   IF(.NOT. WarmupFlag .and. ErrorFlag)THEN
-     PresRangeErrCount = PresRangeErrCount + 1
-   ! send warning
-    IF (PresRangeErrCount <= RefrigerantErrorLimitTest) THEN
-      CALL ShowSevereError('GetSatTemperatureRefrig: Saturation pressure requested is out of range for supplied data: **')
-      CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+    RefrigErrorTracking(RefrigNum)%SatPressErrCount = RefrigErrorTracking(RefrigNum)%SatPressErrCount + 1
+    ! send warning
+    IF (RefrigErrorTracking(RefrigNum)%SatPressErrCount <= RefrigerantErrorLimitTest) THEN
+      CALL ShowSevereMessage('GetSatTemperatureRefrig: Saturation pressure is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **')
+      CALL ShowContinueError('...Called From:'//trim(calledfrom))
+      CALL ShowContinueError('...Supplied Refrigerant Pressure='//TRIM(RoundSigDigits(Pressure,0))//  &
+                          ' Returned saturated temperature value ='//TRIM(RoundSigDigits(ReturnValue,2)))
       CALL ShowContinueErrorTimeStamp(' ')
-      CALL ShowContinueError('..Refrigerant Pressure='//TRIM(RoundSigDigits(Pressure,2))//  &
-                          ' Returned saturated temperature value ='//TRIM(RoundSigDigits(ReturnValue,0)))
-    ELSE
-      CALL ShowRecurringWarningErrorAtEnd('GetSatTemperatureRefrig: Refrigerant saturation pressure out of range error',  &
-                                             PresRangeErrIndex,ReportMinOf=Pressure,ReportMaxOf=Pressure,  &
-                                             ReportMinUnits='{Pa}',ReportMaxUnits='{Pa}')
     ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('GetSatTemperatureRefrig: Saturation pressure is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatPressErrIndex,  &
+                                             ReportMaxOf=Pressure,ReportMinOf=Pressure,  &
+                                             ReportMaxUnits='{Pa}',ReportMinUnits='{Pa}')
   END IF
   RETURN
 
@@ -6420,20 +6543,21 @@ FUNCTION GetSatDensityRefrig(Refrigerant,Temperature,Quality,RefrigIndex,calledf
   ENDIF
 
   IF (.not. WarmupFlag .and. ErrorFlag) THEN
-    TempRangeErrCount = TempRangeErrCount + 1
-   ! send warning
-    IF (TempRangeErrCount <= RefrigerantErrorLimitTest) THEN
-      CALL ShowSevereError('GetInterpolatedSatProp: Saturation temperature for interpolation is out of range '// &
-                           'for supplied data: **')
-      CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+    RefrigErrorTracking(RefrigNum)%SatTempDensityErrCount = RefrigErrorTracking(RefrigNum)%SatTempDensityErrCount + 1
+    ! send warning
+    IF (RefrigErrorTracking(RefrigNum)%SatTempDensityErrCount <= RefrigerantErrorLimitTest) THEN
+      CALL ShowSevereMessage('GetSatDensityRefrig: Saturation temperature is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **')
+      CALL ShowContinueError('...Called From:'//trim(calledfrom))
+      CALL ShowContinueError('...Supplied Refrigerant Temperature='//TRIM(RoundSigDigits(Temperature,2))//  &
+                          ' Returned saturated density value ='//TRIM(RoundSigDigits(ReturnValue,2)))
       CALL ShowContinueErrorTimeStamp(' ')
-      CALL ShowContinueError('..Refrigerant Temperature='//TRIM(RoundSigDigits(Temperature,2))//  &
-                          ' Returned saturated property value = '//TRIM(RoundSigDigits(ReturnValue,0)))
-    ELSE
-      CALL ShowRecurringWarningErrorAtEnd('GetInterpolatedSatProp: Saturation temperature out of range error',     &
-                                               TempRangeErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
-                                               ReportMinUnits='{C}',ReportMaxUnits='{C}')
     ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('GetSatDensityRefrig: Saturation temperature is out of range for refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] supplied data: **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatTempDensityErrIndex,  &
+                                             ReportMaxOf=Temperature,ReportMinOf=Temperature,  &
+                                             ReportMaxUnits='{C}',ReportMinUnits='{C}')
   END IF
   RETURN
 
@@ -6716,18 +6840,24 @@ FUNCTION GetSupHeatEnthalpyRefrig(Refrigerant,Temperature,Pressure,RefrigIndex,c
         RefrigNum,'GetSupHeatEnthalpyRefrig:'//trim(calledfrom))
     ! send warning
     IF (.not. WarmupFlag) THEN
-      IF (SatErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowSevereError('GetSupHeatEnthalpyRefrig: Refrigerant is saturated at the given conditions: **')
-        CALL ShowContinueError('saturated enthalpy at given temperature returned.    **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
-        CALL ShowContinueErrorTimeStamp(' ')
+      RefrigErrorTracking(RefrigNum)%SatSupEnthalpyErrCount = RefrigErrorTracking(RefrigNum)%SatSupEnthalpyErrCount +   &
+         SatErrCount
+      ! send warning
+      IF (RefrigErrorTracking(RefrigNum)%SatTempDensityErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowSevereMessage('GetSupHeatEnthalpyRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//'] is saturated at the given conditions, '//  &
+              'saturated enthalpy at given temperature returned. **')
+        CALL ShowContinueError('...Called From:'//trim(calledfrom))
         CALL ShowContinueError('Refrigerant temperature = '//TRIM(RoundSigDigits(Temperature,2)))
         CALL ShowContinueError('Refrigerant pressure = '//TRIM(RoundSigDigits(Pressure,0)))
         CALL ShowContinueError('Returned Enthalpy value = '//TRIM(RoundSigDigits(ReturnValue,3)))
-      ELSEIF (SatErrCount>RefrigerantErrorLimitTest) THEN
-        CALL ShowRecurringSevereErrorAtEnd('GetSupHeatEnthalpyRefrig: Refrigerant saturated at the given conditions error',  &
-                          SatErrIndex, ReportMinOf=Temperature,ReportMaxOf=Temperature,ReportMinUnits='{C}',ReportMaxUnits='{C}')
+        CALL ShowContinueErrorTimeStamp(' ')
       ENDIF
+      CALL ShowRecurringSevereErrorAtEnd('GetSupHeatEnthalpyRefrig: Refrigerant ['//  &
+         trim(RefrigErrorTracking(RefrigNum)%Name)//'] saturated at the given conditions **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatSupEnthalpyErrIndex,  &
+                                             ReportMaxOf=Temperature,ReportMinOf=Temperature,  &
+                                             ReportMaxUnits='{C}',ReportMinUnits='{C}')
     ENDIF
     RETURN
   ENDIF
@@ -6736,31 +6866,42 @@ FUNCTION GetSupHeatEnthalpyRefrig(Refrigerant,Temperature,Pressure,RefrigIndex,c
       ! some checks...
     IF(ErrCount > 0)THEN
       ! send temp range error if flagged
-      TempRangeErrCount=TempRangeErrCount + CurTempRangeErrCount
-      IF (TempRangeErrCount > 1 .AND. TempRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatEnthalpyRefrig: Temperature is out of range for superheated refrigerant '// &
-                              'enthalpy: values capped **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupEnthalpyTempErrCount = RefrigErrorTracking(RefrigNum)%SatSupEnthalpyTempErrCount +   &
+         CurTempRangeErrCount
+      IF (CurTempRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupEnthalpyTempErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatEnthalpyRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant enthalpy: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (TempRangeErrCount>1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-           'GetSupHeatEnthalpyRefrig: Temperature out of range for superheated refrigerant enthalpy',TempRangeErrIndex,   &
-              ReportMaxOf=Temperature,ReportMinOf=Temperature,ReportMaxUnits='{C}',ReportMinUnits='{C}')
+      ENDIF
+      IF (CurTempRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatEnthalpyRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant enthalpy: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupEnthalpyTempErrIndex,   &
+           ReportMaxOf=Temperature,ReportMinOf=Temperature,ReportMaxUnits='{C}',ReportMinUnits='{C}')
       ENDIF
 
       ! send pressure range error if flagged
-      PresRangeErrCount=PresRangeErrCount + CurPresRangeErrCount
-      IF (PresRangeErrCount > 1 .AND. PresRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatEnthalpyRefrig: Pressure is out of range for superheated refrigerant enthalpy: '// &
-                              'values capped **')
-      ELSEIF (PresRangeErrCount>1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-           'GetSupHeatEnthalpyRefrig: Pressure out of range for superheated refrigerant enthalpy',PresRangeErrIndex, &
-              ReportMaxOf=Pressure,ReportMinOf=Pressure,ReportMaxUnits='{Pa}',ReportMinUnits='{Pa}')
+      RefrigErrorTracking(RefrigNum)%SatSupEnthalpyPresErrCount = RefrigErrorTracking(RefrigNum)%SatSupEnthalpyPresErrCount +   &
+         CurPresRangeErrCount
+      IF (CurPresRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupEnthalpyPresErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatEnthalpyRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant enthalpy: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
+        CALL ShowContinueErrorTimeStamp(' ')
+      ENDIF
+      IF (CurPresRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatEnthalpyRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant enthalpy: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupEnthalpyPresErrIndex,   &
+           ReportMaxOf=Pressure,ReportMinOf=Pressure,ReportMaxUnits='{Pa}',ReportMinUnits='{Pa}')
       ENDIF
     END IF ! end error checking
   ENDIF
-
 
   RETURN
 
@@ -6797,7 +6938,7 @@ FUNCTION GetSupHeatPressureRefrig(Refrigerant,Temperature,Enthalpy,RefrigIndex,c
         ! na
 
         ! USE STATEMENTS:
-        ! na
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE           ! Enforce explicit typing of all variables in this routine
 
@@ -7019,38 +7160,61 @@ FUNCTION GetSupHeatPressureRefrig(Refrigerant,Temperature,Enthalpy,RefrigIndex,c
     ! ** make error checks **
     IF(ErrCount > 0) THEN
       ! send near saturation warning if flagged
-      SatErrCount=SatErrCount+CurSatErrCount
-      IF (SatErrCount > 1 .AND. SatErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatPressureRefrig: Refrigerant is saturated at given enthalpy and temperature: '// &
-                               'saturation pressure returned **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupPressureErrCount = RefrigErrorTracking(RefrigNum)%SatSupPressureErrCount +   &
+         CurSatErrCount
+      ! send warning
+      IF (RefrigErrorTracking(RefrigNum)%SatSupPressureErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowSevereMessage('GetSupHeatPressureRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//'] is saturated at the given enthalpy and temperature, '//  &
+              'saturated enthalpy at given temperature returned. **')
+        CALL ShowContinueError('...Called From:'//trim(calledfrom))
+        CALL ShowContinueError('Refrigerant temperature = '//TRIM(RoundSigDigits(Temperature,2)))
+        CALL ShowContinueError('Refrigerant Enthalpy = '//TRIM(RoundSigDigits(Enthalpy,3)))
+        CALL ShowContinueError('Returned Pressure value = '//TRIM(RoundSigDigits(ReturnValue,0)))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (SatErrCount > 1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-             'GetSupHeatPressureRefrig: Refrigerant near saturation error',SatErrIndex)
+      ENDIF
+      IF (CurSatErrCount > 0) THEN
+        CALL ShowRecurringSevereErrorAtEnd('GetSupHeatPressureRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//'] saturated at the given enthalpy and temperature **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatSupPressureErrIndex,  &
+                                             ReportMaxOf=ReturnValue,ReportMinOf=ReturnValue,  &
+                                             ReportMaxUnits='{Pa}',ReportMinUnits='{Pa}')
       ENDIF
 
       ! send temp range error if flagged
-      TempRangeErrCount=TempRangeErrCount+CurTempRangeErrCount
-      IF (TempRangeErrCount > 1 .AND. TempRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatPressureRefrig: Temperature is out of range for superheated refrigerant '// &
-                               'pressure: values capped **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupPressureTempErrCount = RefrigErrorTracking(RefrigNum)%SatSupPressureTempErrCount +   &
+         CurTempRangeErrCount
+      IF (CurTempRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupPressureTempErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatPressureRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant pressure: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (TempRangeErrCount > 1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-                'GetSupHeatPressureRefrig: Temperature out of range for superheated refrigerant pressure',TempRangeErrIndex)
       ENDIF
+      IF (CurTempRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatPressureRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant pressure: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupPressureTempErrIndex,   &
+           ReportMaxOf=Temperature,ReportMinOf=Temperature,ReportMaxUnits='{C}',ReportMinUnits='{C}')
+      ENDIF
+
       ! send enthalpy range error if flagged
-      EnthalpyRangeErrCount=EnthalpyRangeErrCount+CurEnthalpyRangeErrCount
-      IF (EnthalpyRangeErrCount > 1 .AND. EnthalpyRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatPressureRefrig: Enthlalpy is out of range for superheated refrigerant pressure: '// &
-                               'values capped **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupPressureEnthErrCount = RefrigErrorTracking(RefrigNum)%SatSupPressureEnthErrCount +   &
+         CurEnthalpyRangeErrCount
+      IF (CurEnthalpyRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupPressureEnthErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatPressureRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant enthalpy: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (EnthalpyRangeErrCount > 1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-                'GetSupHeatPressureRefrig: Enthlalpy out of range for superheated refrigerant pressure',EnthalpyRangeErrIndex)
+      ENDIF
+      IF (CurEnthalpyRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatPressureRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant pressure: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupPressureEnthErrIndex,   &
+           ReportMaxOf=Enthalpy,ReportMinOf=Enthalpy,ReportMaxUnits='{J}',ReportMinUnits='{J}')
       ENDIF
     END IF ! end error checking
   ENDIF
@@ -7250,17 +7414,26 @@ FUNCTION GetSupHeatDensityRefrig(Refrigerant,Temperature,Pressure,RefrigIndex,ca
     ! set return value
     ReturnValue = GetSatDensityRefrig(Refrigerant,Temperature, 1.0d0, RefrigNum, ' GetSupHeatDensityRefrig')
     ! send warning
-    IF (SatErrCount <= RefrigerantErrorLimitTest) THEN
-      CALL ShowSevereError('Refrigerant is saturated at the given conditions: **')
-      CALL ShowContinueError('saturated density at given temperature returned.    **')
-      CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
-      CALL ShowContinueErrorTimeStamp(' ')
-      CALL ShowContinueError('Refrigerant temperature = '//TRIM(RoundSigDigits(Temperature,2)))
-      CALL ShowContinueError('Refrigerant pressure = '//TRIM(RoundSigDigits(Pressure,0)))
-      CALL ShowContinueError('Returned Density value = '//TRIM(RoundSigDigits(ReturnValue,3)))
-    ELSEIF (SatErrCount>1) THEN
-      CALL ShowRecurringSevereErrorAtEnd('Refrigerant saturated at the given conditions error',SatErrIndex)
-    ENDIF
+    RefrigErrorTracking(RefrigNum)%SatSupDensityErrCount = RefrigErrorTracking(RefrigNum)%SatSupDensityErrCount +   &
+         SatErrCount
+      ! send warning
+      IF (RefrigErrorTracking(RefrigNum)%SatSupDensityErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowSevereMessage('GetSupHeatDensityRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//'] is saturated at the given conditions, '//  &
+              'saturated density at given temperature returned. **')
+        CALL ShowContinueError('...Called From:'//trim(calledfrom))
+        CALL ShowContinueError('Refrigerant temperature = '//TRIM(RoundSigDigits(Temperature,2)))
+        CALL ShowContinueError('Refrigerant pressure = '//TRIM(RoundSigDigits(Pressure,0)))
+        CALL ShowContinueError('Returned Density value = '//TRIM(RoundSigDigits(ReturnValue,3)))
+        CALL ShowContinueErrorTimeStamp(' ')
+      ENDIF
+      IF (SatErrCount > 0) THEN
+        CALL ShowRecurringSevereErrorAtEnd('GetSupHeatDensityRefrig: Refrigerant ['//  &
+           trim(RefrigErrorTracking(RefrigNum)%Name)//'] saturated at the given conditions **',  &
+                                             RefrigErrorTracking(RefrigNum)%SatSupEnthalpyErrIndex,  &
+                                             ReportMaxOf=Temperature,ReportMinOf=Temperature,  &
+                                             ReportMaxUnits='{C}',ReportMinUnits='{C}')
+      ENDIF
     RETURN
   ENDIF
 
@@ -7268,28 +7441,37 @@ FUNCTION GetSupHeatDensityRefrig(Refrigerant,Temperature,Pressure,RefrigIndex,ca
       ! some checks...
     IF(ErrCount > 0)THEN
       ! send temp range error if flagged
-      TempRangeErrCount=TempRangeErrCount+CurTempRangeErrCount
-      IF (TempRangeErrCount > 1 .AND. TempRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatDensityRefrig: Temperature is out of range for superheated refrigerant '// &
-                               'density: values capped **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupDensityTempErrCount = RefrigErrorTracking(RefrigNum)%SatSupDensityTempErrCount +   &
+         CurTempRangeErrCount
+      IF (CurTempRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupDensityTempErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatDensityRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant density: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (TempRangeErrCount > 1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-            'GetSupHeatDensityRefrig: Temperature out of range for superheated refrigerant density',TempRangeErrIndex,  &
-               ReportMinOf=Temperature,ReportMaxOf=Temperature,ReportMinUnits='{C}',ReportMaxUnits='{C}')
       ENDIF
+      IF (CurTempRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatDensityRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Temperature is out of range for superheated refrigerant density: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupDensityTempErrIndex,   &
+           ReportMaxOf=Temperature,ReportMinOf=Temperature,ReportMaxUnits='{C}',ReportMinUnits='{C}')
+      ENDIF
+
       ! send pressure range error if flagged
-      PresRangeErrCount=PresRangeErrCount+CurPresRangeErrCount
-      IF (PresRangeErrCount > 1 .AND. PresRangeErrCount <= RefrigerantErrorLimitTest) THEN
-        CALL ShowWarningError('GetSupHeatDensityRefrig: Pressure is out of range for superheated refrigerant density: '// &
-                               'values capped **')
-        CALL ShowContinueError(' Called From:'//trim(calledfrom)//' Refrigerant='//TRIM(RefrigData(RefrigNum)%Name))
+      RefrigErrorTracking(RefrigNum)%SatSupDensityPresErrCount = RefrigErrorTracking(RefrigNum)%SatSupDensityPresErrCount +   &
+         CurPresRangeErrCount
+      IF (CurPresRangeErrCount > 0 .AND.   &
+          RefrigErrorTracking(RefrigNum)%SatSupDensityPresErrCount <= RefrigerantErrorLimitTest) THEN
+        CALL ShowWarningMessage('GetSupHeatDensityRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant density: values capped **')
+        CALL ShowContinueError(' Called From:'//trim(calledfrom))
         CALL ShowContinueErrorTimeStamp(' ')
-      ELSEIF (PresRangeErrCount > 1) THEN
-        CALL ShowRecurringWarningErrorAtEnd(  &
-            'GetSupHeatDensityRefrig: Pressure out of range for superheated refrigerant density',PresRangeErrIndex,  &
-               ReportMinOf=Pressure,ReportMaxOf=Pressure,ReportMinUnits='{Pa}',ReportMaxUnits='{Pa}')
+      ENDIF
+      IF (CurPresRangeErrCount > 0) THEN
+        CALL ShowRecurringWarningErrorAtEnd('GetSupHeatDensityRefrig: Refrigerant ['//trim(RefrigErrorTracking(RefrigNum)%Name)//  &
+           '] Pressure is out of range for superheated refrigerant density: values capped **',  &
+           RefrigErrorTracking(RefrigNum)%SatSupDensityPresErrIndex,   &
+           ReportMaxOf=Pressure,ReportMinOf=Pressure,ReportMaxUnits='{Pa}',ReportMinUnits='{Pa}')
       ENDIF
     END IF ! end error checking
   ENDIF
@@ -7407,30 +7589,42 @@ FUNCTION GetSpecificHeatGlycol(Glycol,Temperature,GlycolIndex,calledfrom) RESULT
           ! Error handling
   IF (.not. WarmupFlag) THEN
 
-    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
-    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+!    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
+!    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+    IF (LowErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%SpecHeatLowErrCount = GlycolErrorTracking(GlycolIndex)%SpecHeatLowErrCount + 1
+      LowTempLimitErr = GlycolErrorTracking(GlycolIndex)%SpecHeatLowErrCount
+    ENDIF
+    IF (HighErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%SpecHeatHighErrCount = GlycolErrorTracking(GlycolIndex)%SpecHeatHighErrCount + 1
+      HighTempLimitErr = GlycolErrorTracking(GlycolIndex)%SpecHeatHighErrCount
+    ENDIF
 
     IF ( (LowErrorThisTime) .AND. (LowTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetSpecificHeatGlycol: Temperature is out of range (too low) for fluid specific heat **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Fluid name ='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too low) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] specific heat **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( LowErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too low) for fluid specific heat', &
-            LowTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
-            ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
+    IF (LowErrorThisTime) THEN
+      CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too low) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] specific heat **', &
+            GlycolErrorTracking(GlycolIndex)%SpecHeatLowErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
+            ReportMaxUnits='{C}',ReportMinUnits='{C}')
+    ENDIF
 
     IF ( (HighErrorThisTime) .AND. (HighTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetSpecificHeatGlycol: Temperature is out of range (too high) for fluid specific heat **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Fluid name ='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too high) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] specific heat **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( HighErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too high) for fluid specific heat', &
-            HighTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,   &
+    ENDIF
+    IF (HighErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too high) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] specific heat **', &
+            GlycolErrorTracking(GlycolIndex)%SpecHeatHighErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
             ReportMaxUnits='{C}',ReportMinUnits='{C}')
-    END IF
+    ENDIF
   ENDIF
 
 
@@ -7546,28 +7740,40 @@ FUNCTION GetDensityGlycol(Glycol,Temperature,GlycolIndex,calledfrom) RESULT(Retu
           ! Error handling
   IF (.not. WarmupFlag) THEN
 
-    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
-    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+!    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
+!    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+    IF (LowErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%DensityLowErrCount = GlycolErrorTracking(GlycolIndex)%DensityLowErrCount + 1
+      LowTempLimitErr = GlycolErrorTracking(GlycolIndex)%DensityLowErrCount
+    ENDIF
+    IF (HighErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%DensityHighErrCount = GlycolErrorTracking(GlycolIndex)%DensityHighErrCount + 1
+      HighTempLimitErr = GlycolErrorTracking(GlycolIndex)%DensityHighErrCount
+    ENDIF
 
     IF ( (LowErrorThisTime) .AND. (LowTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetDensityGlycol: Temperature is out of range (too low) for fluid density **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Glycol='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too low) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] density **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( LowErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetDensityGlycol: Temperature is out of range (too low) for fluid density',  &
-         LowTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
+    ENDIF
+    IF (LowErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too low) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] density **', &
+            GlycolErrorTracking(GlycolIndex)%DensityLowErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
             ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
 
     IF ( (HighErrorThisTime) .AND. (HighTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetDensityGlycol: Temperature is out of range (too high) for fluid density **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Fluid name ='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too high) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] density **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( HighErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetDensityGlycol: Temperature out of range (too high) for fluid density',   &
-            HighTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,   &
+    ENDIF
+    IF (HighErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too high) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] density **', &
+            GlycolErrorTracking(GlycolIndex)%DensityHighErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
             ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
   ENDIF
@@ -7684,28 +7890,40 @@ FUNCTION GetConductivityGlycol(Glycol,Temperature,GlycolIndex,calledfrom) RESULT
           ! Error handling
   IF (.not. WarmupFlag) THEN
 
-    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
-    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+!    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
+!    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+    IF (LowErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%ConductivityLowErrCount = GlycolErrorTracking(GlycolIndex)%ConductivityLowErrCount + 1
+      LowTempLimitErr = GlycolErrorTracking(GlycolIndex)%ConductivityLowErrCount
+    ENDIF
+    IF (HighErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%ConductivityHighErrCount = GlycolErrorTracking(GlycolIndex)%ConductivityHighErrCount + 1
+      HighTempLimitErr = GlycolErrorTracking(GlycolIndex)%ConductivityHighErrCount
+    ENDIF
 
     IF ( (LowErrorThisTime) .AND. (LowTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetConductivityGlycol: Temperature is out of range (too low) for glycol conductivity **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Glycol='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too low) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] conductivity **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( LowErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetConductivityGlycol: Temperature is out of range (too low) for glycol conductivity',  &
-            LowTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
+    ENDIF
+    IF (LowErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too low) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] conductivity **', &
+            GlycolErrorTracking(GlycolIndex)%ConductivityLowErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
             ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
 
     IF ( (HighErrorThisTime) .AND. (HighTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetConductivityGlycol: Temperature is out of range (too high) for glycol conductivity **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Glycol='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too high) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] conductivity **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( HighErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetConductivityGlycol: Temperature is out of range (too high) for glycol conductivity', &
-            HighTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,   &
+    ENDIF
+    IF (HighErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too high) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] conductivity **', &
+            GlycolErrorTracking(GlycolIndex)%ConductivityHighErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
             ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
   ENDIF
@@ -7822,29 +8040,41 @@ FUNCTION GetViscosityGlycol(Glycol,Temperature,GlycolIndex,calledfrom) RESULT(Re
           ! Error handling
   IF (.not. WarmupFlag) THEN
 
-    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
-    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+!    IF (LowErrorThisTime)  LowTempLimitErr = LowTempLimitErr + 1
+!    IF (HighErrorThisTime) HighTempLimitErr = HighTempLimitErr + 1
+    IF (LowErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%ViscosityLowErrCount = GlycolErrorTracking(GlycolIndex)%ViscosityLowErrCount + 1
+      LowTempLimitErr = GlycolErrorTracking(GlycolIndex)%ViscosityLowErrCount
+    ENDIF
+    IF (HighErrorThisTime)  THEN
+      GlycolErrorTracking(GlycolIndex)%ViscosityHighErrCount = GlycolErrorTracking(GlycolIndex)%ViscosityHighErrCount + 1
+      HighTempLimitErr = GlycolErrorTracking(GlycolIndex)%ViscosityHighErrCount
+    ENDIF
 
     IF ( (LowErrorThisTime) .AND. (LowTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetViscosityGlycol: Temperature is out of range (too low) for glycol viscosity **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Glycol='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too low) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] viscosity **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( LowErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetViscosityGlycol: Temperature is out of range (too low) for glycol viscosity',  &
-         LowTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
-         ReportMaxUnits='{C}',ReportMinUnits='{C}')
+    ENDIF
+    IF (LowErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too low) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] viscosity **', &
+            GlycolErrorTracking(GlycolIndex)%ViscosityLowErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
+            ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
 
     IF ( (HighErrorThisTime) .AND. (HighTempLimitErr <= GlycolErrorLimitTest) ) THEN
-       CALL ShowWarningError('GetViscosityGlycol: Temperature is out of range (too high) for glycol viscosity **')
-       CALL ShowContinueError('..Called From:'//trim(calledfrom)//' Glycol='//TRIM(GlycolData(GlycolIndex)%Name)//  &
-                                         ',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
+       CALL ShowWarningMessage('GetSpecificHeatGlycol: Temperature is out of range (too high) for fluid ['//  &
+          trim(GlycolData(GlycolIndex)%Name)//'] viscosity **')
+       CALL ShowContinueError('..Called From:'//trim(calledfrom)//',Temperature='//TRIM(RoundSigDigits(Temperature,2)))
        CALL ShowContinueErrorTimeStamp(' ')
-    ELSE IF ( HighErrorThisTime ) THEN
-      CALL ShowRecurringWarningErrorAtEnd('GetViscosityGlycol: Temperature is out of range (too high) for glycol viscosity',   &
-         HighTempLimitIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
-         ReportMaxUnits='{C}',ReportMinUnits='{C}')
+    ENDIF
+    IF (HighErrorThisTime) THEN
+       CALL ShowRecurringWarningErrorAtEnd('GetSpecificHeatGlycol: Temperature out of range (too high) for fluid ['//  &
+            trim(GlycolData(GlycolIndex)%Name)//'] viscosity **', &
+            GlycolErrorTracking(GlycolIndex)%ViscosityHighErrIndex,ReportMinOf=Temperature,ReportMaxOf=Temperature,  &
+            ReportMaxUnits='{C}',ReportMinUnits='{C}')
     END IF
   ENDIF
 

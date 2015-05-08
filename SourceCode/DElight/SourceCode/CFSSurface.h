@@ -42,7 +42,7 @@ public:
 	// -------------------- constructors -------------------- 
 	CFSSurface();
 //	CFSSurface(SURF *Parent, string CFStype, BGL::vector3 offset, Double width, Double height, Double rotation);
-	CFSSurface(SURF *Parent, string CFStype, HemiSphiral& LumMap, Double rotation, vector<BGL::point3> p3List,Double CFSmaxNodeArea);
+	CFSSurface(SURF *& Parent, string & CFStype, HemiSphiral LumMap, Double & rotation, vector<BGL::point3> & p3List,Double & CFSmaxNodeArea);
 	~CFSSurface();
 
 

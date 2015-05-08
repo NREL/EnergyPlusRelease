@@ -29,7 +29,7 @@ MODULE VentilatedSlab
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, BeginTimeStepFlag, MaxNameLength, &
                            InitConvTemp, SysSizingCalc, WarmUpFlag
-USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
+USE DataInterfaces,  ONLY: ShowWarningError, ShowWarningMessage, ShowFatalError, ShowSevereError, ShowContinueError, &
                            SetupOutputVariable, ShowContinueErrorTimeStamp, &
                            ShowRecurringWarningErrorAtEnd,CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
 
@@ -237,9 +237,9 @@ TYPE, PUBLIC :: VentilatedSlabData
                                                                ! (where the highest Air temperature is requested)
   INTEGER                      :: ColdCtrlLoTempSchedPtr  = 0   ! Schedule index for the lowest control temperature
                                                                ! (where the highest Air temperature is requested)
-  INTEGER                      :: CondErrCount      = 0   ! Error count for warning messages
-  INTEGER                      :: EnrgyImbalErrCount = 0  ! Error count for warning messages
-  INTEGER                      :: RadSurfNum        = 0   ! Error count for warning messages
+  INTEGER                      :: CondErrIndex      = 0   ! Error index for recurring warning messages
+  INTEGER                      :: EnrgyImbalErrIndex = 0  ! Error index for recurring warning messages
+  INTEGER                      :: RadSurfNum        = 0   ! Radiant Surface Number
   INTEGER                      :: MSlabIn        = 0   ! Internal Slab Inlet Node Number
   INTEGER                      :: MSlabOut       = 0   ! INternal Slab Outlet Node Number
   CHARACTER(len=MaxNameLength) :: DSSlabInNodeName  =' '
@@ -270,7 +270,10 @@ TYPE, PUBLIC :: VentilatedSlabData
   REAL(r64)                    :: SlabOutTemp                  =0.0 ! Slab outlet temp in degree C
   REAL(r64)                    :: ReturnAirTemp                =0.0 !
   REAL(r64)                    :: FanOutletTemp                =0.0 ! FanOutlet temp in degree C
-  REAL(r64)                    :: ZoneInletTemp               =0.0  ! supply air temp
+  REAL(r64)                    :: ZoneInletTemp                =0.0 ! supply air temp
+  CHARACTER(len=MaxNameLength) :: AvailManagerListName         = ' ' ! Name of an availability manager list object
+  INTEGER                      :: AvailStatus                  = 0
+
 END TYPE VentilatedSlabData
 
 TYPE (VentilatedSlabData), ALLOCATABLE, PUBLIC, DIMENSION(:) :: VentSlab
@@ -329,8 +332,8 @@ SUBROUTINE SimVentilatedSlab(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOut
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: FindItemInList
-  USE General, ONLY: TrimSigDigits
+  USE InputProcessor,      ONLY: FindItemInList
+  USE General,             ONLY: TrimSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -389,8 +392,7 @@ SUBROUTINE SimVentilatedSlab(CompName,ZoneNum,FirstHVACIteration,PowerMet,LatOut
     ENDIF
   ENDIF
 
-
-  CALL InitVentilatedSlab(Item,FirstHVACIteration)
+  CALL InitVentilatedSlab(Item,ZoneNum,FirstHVACIteration)
 
   CALL CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutputProvided)
 
@@ -407,7 +409,7 @@ SUBROUTINE GetVentilatedSlabInput
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -433,13 +435,15 @@ SUBROUTINE GetVentilatedSlabInput
   USE DataGlobals,              ONLY : NumOfZones
   USE DataHeatBalance,          ONLY : Zone, Construct
   USE DataSizing,               ONLY : AutoSize
+  USE DataZoneEquipment,        ONLY : VentilatedSlab_Num
   USE ScheduleManager,          ONLY : GetScheduleIndex
   USE DataLoopNode
   USE DataSurfaceLists
-  USE OutAirNodeManager, ONLY: CheckAndAddAirNodeNumber
-  USE FluidProperties, ONLY: FindRefrigerant
-  USE DataPlant,       ONLY: TypeOf_CoilWaterCooling, TypeOf_CoilWaterDetailedFlatCooling, &
-                             TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
+  USE OutAirNodeManager,        ONLY: CheckAndAddAirNodeNumber
+  USE FluidProperties,          ONLY: FindRefrigerant
+  USE DataPlant,                ONLY: TypeOf_CoilWaterCooling, TypeOf_CoilWaterDetailedFlatCooling, &
+                                      TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
+  USE DataHVACGlobals,          ONLY: ZoneComp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1227,6 +1231,10 @@ SUBROUTINE GetVentilatedSlabInput
        ErrorsFound=.true.
      END IF
    ENDIF
+    IF (.NOT. lAlphaBlanks(33)) THEN
+      VentSlab(Item)%AvailManagerListName = cAlphaArgs(33)
+      ZoneComp(VentilatedSlab_Num)%ZoneCompAvailMgrs(Item)%AvailManagerListName = cAlphaArgs(33)
+    ENDIF
 
    SELECT CASE (VentSlab(Item)%CoilOption)
       CASE (Bothoption) ! 'HeatingAndCooling'
@@ -1340,6 +1348,8 @@ SUBROUTINE GetVentilatedSlabInput
     CALL SetupOutputVariable('Ventilated Slab Slab Fan Outlet Air Temperature [C]',   &
                              VentSlab(Item)%FanOutletTemp,'System','Average', &
                              VentSlab(Item)%Name)
+    CALL SetupOutputVariable('Ventilated Slab Fan Availability Status', VentSlab(Item)%AvailStatus,&
+                             'System','Average',VentSlab(Item)%Name)
 
 
   END DO
@@ -1349,12 +1359,12 @@ SUBROUTINE GetVentilatedSlabInput
 END SUBROUTINE GetVentilatedSlabInput
 
 
-SUBROUTINE InitVentilatedSlab(Item, FirstHVACIteration)
+SUBROUTINE InitVentilatedSlab(Item, VentSlabZoneNum, FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1368,21 +1378,23 @@ SUBROUTINE InitVentilatedSlab(Item, FirstHVACIteration)
           ! na
 
           ! USE STATEMENTS:
-  USE DataEnvironment, ONLY: OutBaroPress, OutDryBulbTemp, OutHumRat, StdBaroPress,StdRhoAir
+  USE DataEnvironment,   ONLY : OutBaroPress, OutDryBulbTemp, OutHumRat, StdBaroPress,StdRhoAir
   USE DataGlobals,       ONLY : NumOfZones, BeginEnvrnFlag, AnyPlantInModel
   USE DataLoopNode,      ONLY : Node
   USE ScheduleManager,   ONLY : GetCurrentScheduleValue
   USE DataHeatBalFanSys, ONLY : MAT,ZoneAirHumRat
-  USE DataZoneEquipment, ONLY : ZoneEquipInputsFilled,CheckZoneEquipmentList
+  USE DataZoneEquipment, ONLY : ZoneEquipInputsFilled,CheckZoneEquipmentList, VentilatedSlab_Num
   USE DataPlant,         ONLY : PlantLoop, ScanPlantLoopsForObject, TypeOf_CoilWaterSimpleHeating,&
                                 TypeOf_CoilSteamAirHeating, TypeOf_CoilWaterCooling, TypeOf_CoilWaterDetailedFlatCooling
   USE FluidProperties,   ONLY : GetDensityGlycol
   USE PlantUtilities,    ONLY : InitComponentNodes
+  USE DataHVACGlobals,   ONLY : ZoneComp
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: Item         ! index for the current ventilated slab
+  INTEGER, INTENT(IN) :: Item                ! index for the current ventilated slab
+  INTEGER, INTENT(IN) :: VentSlabZoneNum     ! number of zone being served
   LOGICAL, INTENT(IN) :: FirstHVACIteration  ! TRUE if 1st HVAC simulation of system timestep
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -1451,6 +1463,11 @@ IF (MyOneTimeFlag) THEN
   MyPlantScanFlag = .TRUE.
   MyOneTimeFlag = .FALSE.
 END IF
+
+IF (ALLOCATED(ZoneComp)) THEN
+  ZoneComp(VentilatedSlab_Num)%ZoneCompAvailMgrs(Item)%ZoneNum = VentSlabZoneNum
+  VentSlab(Item)%AvailStatus = ZoneComp(VentilatedSlab_Num)%ZoneCompAvailMgrs(Item)%AvailStatus
+ENDIF
 
 IF (MyPlantScanFlag(item) .AND. ALLOCATED(PlantLoop)) THEN
   IF ( (VentSlab(Item)%HCoil_PlantTypeNum == TypeOf_CoilWaterSimpleHeating) .or. &
@@ -1991,6 +2008,7 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
           !       MODIFIED       Don Shirey, Aug 2009 (LatOutputProvided)
+          !                      July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2037,27 +2055,27 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
   USE DataEnvironment,           ONLY : OutDryBulbTemp, OutWetBulbTemp, EnvironmentName, CurMnDy, OutBaroPress
   USE DataHeatBalance,           ONLY : MRT
   USE DataHeatBalFanSys,         ONLY : MAT,ZoneAirHumRat
-  USE DataHVACGlobals,           ONLY : SmallLoad
+  USE DataHVACGlobals,           ONLY : SmallLoad, ZoneCompTurnFansOn, ZoneCompTurnFansOff
   USE DataLoopNode,              ONLY : Node
   USE ScheduleManager,           ONLY : GetCurrentScheduleValue
   USE HeatingCoils,              ONLY : CheckHeatingCoilSchedule
   USE WaterCoils,                ONLY : CheckWaterCoilSchedule
-  USE HVACHXAssistedCoolingCoil, ONLY :CheckHXAssistedCoolingCoilSchedule
-  Use SteamCoils,                ONLY: CheckSteamCoilSchedule
+  USE HVACHXAssistedCoolingCoil, ONLY : CheckHXAssistedCoolingCoilSchedule
+  Use SteamCoils,                ONLY : CheckSteamCoilSchedule
   USE General,                   ONLY : TrimSigDigits
-  USE Fans,         ONLY : SimulateFanComponents !12/18
-  USE DataHeatBalSurface, ONLY : TH
-  USE NodeInputManager,         ONLY : GetOnlySingleNode
-  USE DataInterfaces, ONLY: ControlCompOutput
+  USE Fans,                      ONLY : SimulateFanComponents !12/18
+  USE DataHeatBalSurface,        ONLY : TH
+  USE NodeInputManager,          ONLY : GetOnlySingleNode
+  USE DataInterfaces,            ONLY : ControlCompOutput
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(INOUT) :: Item        ! number of the current ventilated slab being simulated
-  INTEGER, INTENT(IN)   :: ZoneNum            ! number of zone being served
-  LOGICAL, INTENT(IN)    :: FirstHVACIteration ! TRUE if 1st HVAC simulation of system timestep
-  REAL(r64),    INTENT(OUT)   :: PowerMet           ! power supplied (W)
-  REAL(r64),    INTENT(OUT)   :: LatOutputProvided  ! latent capacity supplied (kg/s)
+  INTEGER, INTENT(INOUT)      :: Item               ! number of the current ventilated slab being simulated
+  INTEGER, INTENT(IN)         :: ZoneNum            ! number of zone being served
+  LOGICAL, INTENT(IN)         :: FirstHVACIteration ! TRUE if 1st HVAC simulation of system timestep
+  REAL(r64), INTENT(OUT)      :: PowerMet           ! power supplied (W)
+  REAL(r64), INTENT(OUT)      :: LatOutputProvided  ! latent capacity supplied (kg/s)
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -2076,17 +2094,17 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)    :: AirMassFlow      ! air mass flow rate [kg/sec]
-  INTEGER :: AirRelNode       ! outside air relief node
-  INTEGER :: ControlNode      ! the hot water or cold water inlet node
-  INTEGER :: InletNode        ! system air inlet node
-  INTEGER :: FanOutletNode        ! system fan outlet node
-  INTEGER :: ZoneAirInNode        ! zone supply air node
+  INTEGER      :: AirRelNode       ! outside air relief node
+  INTEGER      :: ControlNode      ! the hot water or cold water inlet node
+  INTEGER      :: InletNode        ! system air inlet node
+  INTEGER      :: FanOutletNode    ! system fan outlet node
+  INTEGER      :: ZoneAirInNode    ! zone supply air node
   REAL(r64)    :: MaxOAFrac        ! maximum possible outside air fraction
   REAL(r64)    :: MaxWaterFlow     ! maximum water flow for heating or cooling [kg/sec]
   REAL(r64)    :: MinOAFrac        ! minimum possible outside air fraction
   REAL(r64)    :: MinWaterFlow     ! minimum water flow for heating or cooling [kg/sec]
-  INTEGER :: OutletNode       ! air outlet node
-  INTEGER :: OutsideAirNode   ! outside air node
+  INTEGER      :: OutletNode       ! air outlet node
+  INTEGER      :: OutsideAirNode   ! outside air node
   REAL(r64)    :: QTotUnitOut      ! total unit output [watts]
   REAL(r64)    :: QUnitOut         ! heating or sens. cooling provided by fan coil unit [watts]
   REAL(r64)    :: LatentOutput     ! Latent (moisture) add/removal rate, negative is dehumidification [kg/s]
@@ -2101,23 +2119,21 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
   REAL(r64)    :: SetpointTemp     ! temperature that will be used to control the radiant system [Celsius]
   REAL(r64)    :: SetpointTempHi   ! Current high point in setpoint temperature range
   REAL(r64)    :: SetpointTempLo   ! Current low point in setpoint temperature range
-  REAL(r64)    :: AirTempHi      ! Current high point in water temperature range
-  REAL(r64)    :: AirTempLo      ! Current low point in water temperature range
-  REAL(r64)    :: AirTempHeatHi      ! Current high point in water temperature range
-  REAL(r64)    :: AirTempCoolLo      ! Current low point in water temperature range
-  REAL(r64)    :: CpFan             ! Intermediate calculational variable for specific heat of air <<NOV9 Updated
-  REAL(r64)    :: ZoneRadNum      ! number of zone being served *********************
+  REAL(r64)    :: AirTempHi        ! Current high point in water temperature range
+  REAL(r64)    :: AirTempLo        ! Current low point in water temperature range
+  REAL(r64)    :: AirTempHeatHi    ! Current high point in water temperature range
+  REAL(r64)    :: AirTempCoolLo    ! Current low point in water temperature range
+  REAL(r64)    :: CpFan            ! Intermediate calculational variable for specific heat of air <<NOV9 Updated
+  REAL(r64)    :: ZoneRadNum       ! number of zone being served *********************
   REAL(r64)    :: QZnReq
-  INTEGER      :: RadSurfNum      ! DO loop counter for the surfaces that comprise a particular radiant system
+  INTEGER      :: RadSurfNum       ! DO loop counter for the surfaces that comprise a particular radiant system
   CHARACTER(len=MaxNameLength) ::MSlabIn
   CHARACTER(len=MaxNameLength) ::MSlabOut
   CHARACTER(len=MaxNameLength) ::SlabName
   INTEGER   :: MSlabInletNode
   INTEGER   :: MSlabOutletNode
-  LOGICAL                        :: ErrorsFound=.false. ! Set to true if errors in input, fatal at end of routine
+  LOGICAL    :: ErrorsFound=.false. ! Set to true if errors in input, fatal at end of routine
   CHARACTER(len=*), PARAMETER :: CurrentModuleObject='ZoneHVAC:VentilatedSlab'
-
-
 
 
  SELECT CASE (VentSlab(Item)%CoilOption)
@@ -2195,13 +2211,11 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
 
  END SELECT
 
-
-
           ! FLOW:
 
-  FanElecPower = 0.0D0
+  FanElecPower   = 0.0D0
           ! initialize local variables
-  ControlNode    = 0
+  ControlNode    = 0.0D0
   QUnitOut       = 0.0D0
   LatentOutput   = 0.0D0
   MaxWaterFlow   = 0.0D0
@@ -2214,8 +2228,8 @@ SUBROUTINE CalcVentilatedSlab(Item,ZoneNum,FirstHVACIteration,PowerMet,LatOutput
   AirRelNode     = VentSlab(Item)%AirReliefNode
   ZoneRadNum     = VentSlab(Item)%ZonePtr
   RadSurfNum     = VentSlab(Item)%NumOfSurfaces
-  Tinlet    = Node(InletNode)%Temp
-  Toutdoor  = Node(OutsideAirNode)%Temp
+  Tinlet         = Node(InletNode)%Temp
+  Toutdoor       = Node(OutsideAirNode)%Temp
 
   ! Control Type Check
 SELECT CASE (VentSlab(Item)%ControlType)
@@ -2239,15 +2253,10 @@ SELECT CASE (VentSlab(Item)%ControlType)
         CALL ShowFatalError('Preceding condition causes termination.')
     END SELECT
 
-
-
            ! Load Check
 
         AirTempHeatHi    = GetCurrentScheduleValue(VentSlab(Item)%HotCtrlHiTempSchedPtr)
         AirTempCoolLo    = GetCurrentScheduleValue(VentSlab(Item)%ColdCtrlLoTempSchedPtr)
-
-
-
 
 IF (((SetpointTemp >= AirTempHeatHi) .AND. (SetpointTemp <= AirTempCoolLo)) .OR. &
      (GetCurrentScheduleValue(VentSlab(Item)%SchedPtr) <= 0) ) THEN
@@ -2510,10 +2519,10 @@ Else ! System On
      END SELECT
 
      CALL SimVentSlabOAMixer(Item)
-     CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index)
-
-        CpFan                 = PsyCpAirFnWTdb(Node(FanOutletNode)%HumRat,Node(FanOutletNode)%Temp)
-        QZnReq               = (Node(OutletNode)%MassFlowRate)*CpFan*(RadInTemp-Node(FanOutletNode)%Temp)
+     CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index, &
+                                ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
+     CpFan     = PsyCpAirFnWTdb(Node(FanOutletNode)%HumRat,Node(FanOutletNode)%Temp)
+     QZnReq    = (Node(OutletNode)%MassFlowRate)*CpFan*(RadInTemp-Node(FanOutletNode)%Temp)
 
              ! Setup the coil configuration
       SELECT CASE (VentSlab(Item)%HCoilType)
@@ -2759,7 +2768,8 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
         HCoilOn = .FALSE.
 
         CALL SimVentSlabOAMixer(Item)
-        CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index)
+        CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index, &
+                                   ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
 
         CpFan                 = PsyCpAirFnWTdb(Node(FanOutletNode)%HumRat,Node(FanOutletNode)%Temp)
         QZnReq                = (Node(OutletNode)%MassFlowRate)*CpFan*(RadInTemp-Node(FanOutletNode)%Temp)
@@ -2802,6 +2812,7 @@ END IF    ! ...end of system ON/OFF IF-THEN block
   VentSlab(Item)%TotCoolCoilPower  = ABS(MIN(0.0d0,QTotUnitOut))
   VentSlab(Item)%LateCoolCoilPower = VentSlab(Item)%TotCoolCoilPower - VentSlab(Item)%SensCoolCoilPower
   VentSlab(Item)%ElecFanPower      = FanElecPower
+  VentSlab(Item)%AirMassFlowRate   = AirMassFlow
 
   PowerMet = QUnitOut
   LatOutputProvided = LatentOutput
@@ -2817,7 +2828,7 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Young Tae Chae, Rick Strand
           !       DATE WRITTEN   June 2008
-          !       MODIFIED       na
+          !       MODIFIED       July 2012, Chandan Sharma - FSEC: Added zone sys avail managers
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2839,8 +2850,9 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
   USE Fans,         ONLY : SimulateFanComponents
   USE HeatingCoils, ONLY : SimulateHeatingCoilComponents
   USE WaterCoils,   ONLY : SimulateWaterCoilComponents
-  USE HVACHXAssistedCoolingCoil, ONLY :SimHXAssistedCoolingCoil
-  Use SteamCoils,   ONLY: SimulateSteamCoilComponents
+  USE HVACHXAssistedCoolingCoil, ONLY : SimHXAssistedCoolingCoil
+  Use SteamCoils,                ONLY : SimulateSteamCoilComponents
+  USE DataHVACGlobals,           ONLY : ZoneCompTurnFansOn, ZoneCompTurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2873,11 +2885,9 @@ SUBROUTINE CalcVentilatedSlabComps(Item,FirstHVACIteration,LoadMet)
 
           ! FLOW:
 
-
   CALL SimVentSlabOAMixer(Item)
-  CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index)
-
-
+  CALL SimulateFanComponents(VentSlab(Item)%FanName,FirstHVACIteration,VentSlab(Item)%Fan_Index, &
+                              ZoneCompTurnFansOn = ZoneCompTurnFansOn,ZoneCompTurnFansOff = ZoneCompTurnFansOff)
   IF ((VentSlab(Item)%CCoilPresent) .AND. (VentSlab(Item)%CCoilSchedValue >= 0.0)) THEN
     IF(VentSlab(Item)%CCoilType == Cooling_CoilHXAssisted) THEN
       CALL SimHXAssistedCoolingCoil(VentSlab(Item)%CCoilName,FirstHVACIteration,On,0.0d0,VentSlab(Item)%CCoil_Index,ContFanCycCoil)
@@ -3088,7 +3098,7 @@ SUBROUTINE CalcVentilatedSlabRadComps(Item, FirstHVACIteration)
   OAInletNode      = VentSlab(Item)%OutsideAirNode
   MixoutNode       = VentSlab(Item)%OAMixerOutNode
   Returnairnode    = VentSlab(Item)%ReturnAirNode
-  ZoneAirInnode    = VentSlab(ITem)%ZoneAirInNode
+  ZoneAirInnode    = VentSlab(Item)%ZoneAirInNode
 
 
 
@@ -3143,7 +3153,15 @@ IF (AirMassFlow <= 0.0) THEN
     END DO
 
     VentSlab(Item)%SlabOutTemp = VentSlab(Item)%SlabInTemp
-
+    
+    ! zero out node flows
+    Node(SlabInNode)%MassFlowRate          = 0.0
+    Node(FanOutletNode)%MassFlowRate       = 0.0
+    Node(OAInletNode)%MassFlowRate         = 0.0
+    Node(MixoutNode)%MassFlowRate          = 0.0
+    Node(Returnairnode)%MassFlowRate       = 0.0
+    Node(FanOutletNode)%Temp = Node(SlabInNode)%Temp
+    AirMassFlow                            = 0.0
 END IF
 
 IF (AirMassFlow > 0.0) THEN
@@ -3275,27 +3293,27 @@ IF (AirMassFlow > 0.0) THEN
           ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
             IF (.not. WarmupFlag) THEN
               CondensationErrorCount = CondensationErrorCount + 1
-              IF (CondensationErrorCount <= NumOfVentSlabs) THEN
-                CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-                CALL ShowContinueError('Flow to the following ventilated slab will be shut-off to avoid condensation')
-                CALL ShowContinueError('Ventilated Slab Name = '//TRIM(VentSlab(Item)%Name))
-                CALL ShowContinueError('Predicted ventilated slab surface temperature = '// &
-                                       RoundSigDigits(TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2),2))
-                CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
+
+              IF (VentSlab(Item)%CondErrIndex == 0) THEN
+                CALL ShowWarningMessage(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//']')
+                CALL ShowContinueError('Surface ['//trim(Surface(VentSlab(Item)%SurfacePtr(RadSurfNum2))%Name)//  &
+                   '] temperature below dew-point temperature--potential for condensation exists')
+                CALL ShowContinueError('Flow to the ventilated slab system will be shut-off to avoid condensation')
+                CALL ShowContinueError('Predicted radiant system surface temperature = '// &
+                                       trim(RoundSigDigits(TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2),2)))
+                CALL ShowContinueError('Zone dew-point temperature + safety factor delta= '//  &
+                   trim(RoundSigDigits(DewPointTemp+CondDeltaTemp,2)))
                 CALL ShowContinueErrorTimeStamp(' ')
-                CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
-                CALL ShowContinueErrorTimeStamp(' ')
-                IF (CondensationErrorCount == 1) THEN
-                  CALL ShowContinueError('Note that there is a '//TRIM(RoundSigDigits(CondDeltaTemp,2))// &
+              ENDIF
+              IF (CondensationErrorCount == 1) THEN
+                  CALL ShowContinueError('Note that there is a '//TRIM(RoundSigDigits(CondDeltaTemp,4))// &
                                          ' C safety built-in to the shut-off criteria')
                   CALL ShowContinueError('Note also that this affects all surfaces that are part of this system')
-
-                END IF
-              ELSE
-                CALL ShowRecurringWarningErrorAtEnd('Ventilated Slab ['//TRIM(VentSlab(Item)%Name)//  &
-                             '] shut-off occurrence continues due to temperature comparison error.',  &
-                             VentSlab(Item)%CondErrCount)
               END IF
+              CALL ShowRecurringWarningErrorAtEnd(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//  &
+                         '] condensation shut-off occurrence continues.',  &
+                         VentSlab(Item)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                         ReportMaxUnits='C',ReportMinUnits='C')
             END IF
             EXIT ! outer do loop
           END IF
@@ -3324,25 +3342,24 @@ IF (AirMassFlow > 0.0) THEN
 
           IF (.not. WarmupFlag) THEN
             EnergyImbalanceErrorCount = EnergyImbalanceErrorCount + 1
-            IF (EnergyImbalanceErrorCount <= NumOfVentSlabs) THEN
-              CALL ShowWarningError('Ventilated Slab (slab only type) air outlet temperature calculation mismatch for '// &
-                TRIM(VentSlab(Item)%Name))
+            IF (VentSlab(Item)%EnrgyImbalErrIndex == 0) THEN
+              CALL ShowWarningMessage(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//']')
+              CALL ShowContinueError('Ventilated Slab (slab only type) air outlet temperature calculation mismatch.')
               CALL ShowContinueError('This should not happen as it indicates a potential energy imbalance in the calculations.')
               CALL ShowContinueError('However, it could also result from improper input for the ventilated slab or')
               CALL ShowContinueError('illogical control temperatures.  Check your input for this ventilated slab and')
               CALL ShowContinueError('also look at the internal data shown below.')
               CALL ShowContinueError('Predicted return air temperature [C] from the overall energy balance = '// &
-                                     RoundSigDigits(Node(ReturnAirNode)%Temp,4))
+                                     trim(RoundSigDigits(Node(ReturnAirNode)%Temp,4)))
               CALL ShowContinueError('Predicted return air temperature [C] from the slab section energy balances = '// &
-                                     RoundSigDigits(AirOutletTempCheck,4))
+                                     trim(RoundSigDigits(AirOutletTempCheck,4)))
               CALL ShowContinueError('Total energy rate (power) [W] added to the slab = '// &
-                                     RoundSigDigits(TotalVentSlabRadPower,4))
+                                     trim(RoundSigDigits(TotalVentSlabRadPower,4)))
               CALL ShowContinueErrorTimeStamp(' ')
-            ELSE
-              CALL ShowRecurringWarningErrorAtEnd('Ventilated Slab ['//TRIM(VentSlab(Item)%Name)//  &
-                           '] temperature calculation mismatch occurrence continues.',  &
-                           VentSlab(Item)%EnrgyImbalErrCount)
-            END IF
+            ENDIF
+            CALL ShowRecurringWarningErrorAtEnd(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//  &
+                       '] temperature calculation mismatch occurrence continues.',  &
+                       VentSlab(Item)%EnrgyImbalErrIndex)
           END IF
 
          END IF
@@ -3361,25 +3378,24 @@ IF (AirMassFlow > 0.0) THEN
 
           IF (.not. WarmupFlag) THEN
             EnergyImbalanceErrorCount = EnergyImbalanceErrorCount + 1
-            IF (EnergyImbalanceErrorCount <= NumOfVentSlabs) THEN
-              CALL ShowWarningError('Ventilated Slab (slab and zone type) air outlet temperature calculation mismatch for '// &
-                TRIM(VentSlab(Item)%Name))
+            IF (VentSlab(Item)%EnrgyImbalErrIndex == 0) THEN
+              CALL ShowWarningMessage(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//']')
+              CALL ShowContinueError('Ventilated Slab (slab only type) air outlet temperature calculation mismatch.')
               CALL ShowContinueError('This should not happen as it indicates a potential energy imbalance in the calculations.')
               CALL ShowContinueError('However, it could also result from improper input for the ventilated slab or')
               CALL ShowContinueError('illogical control temperatures.  Check your input for this ventilated slab and')
               CALL ShowContinueError('also look at the internal data shown below.')
               CALL ShowContinueError('Predicted return air temperature [C] from the overall energy balance = '// &
-                                     RoundSigDigits(Node(ReturnAirNode)%Temp,4))
+                                     trim(RoundSigDigits(Node(ReturnAirNode)%Temp,4)))
               CALL ShowContinueError('Predicted return air temperature [C] from the slab section energy balances = '// &
-                                     RoundSigDigits(AirOutletTempCheck,4))
+                                     trim(RoundSigDigits(AirOutletTempCheck,4)))
               CALL ShowContinueError('Total energy rate (power) [W] added to the slab = '// &
-                                     RoundSigDigits(TotalVentSlabRadPower,4))
+                                     trim(RoundSigDigits(TotalVentSlabRadPower,4)))
               CALL ShowContinueErrorTimeStamp(' ')
-            ELSE
-              CALL ShowRecurringWarningErrorAtEnd('Ventilated Slab ['//TRIM(VentSlab(Item)%Name)//  &
-                           '] temperature calculation mismatch occurrence continues.',  &
-                           VentSlab(Item)%EnrgyImbalErrCount)
-            END IF
+            ENDIF
+            CALL ShowRecurringWarningErrorAtEnd(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//  &
+                       '] temperature calculation mismatch occurrence continues.',  &
+                       VentSlab(Item)%EnrgyImbalErrIndex)
           END IF
 
        END IF
@@ -3538,27 +3554,26 @@ IF (AirMassFlow > 0.0) THEN
           ! Produce a warning message so that user knows the system was shut-off due to potential for condensation
             IF (.not. WarmupFlag) THEN
               CondensationErrorCount = CondensationErrorCount + 1
-              IF (CondensationErrorCount <= NumOfVentSlabs) THEN
-                CALL ShowWarningError('Surface temperature below dew-point temperature--potential for condensation exists')
-                CALL ShowContinueError('Flow to the following ventilated slab will be shut-off to avoid condensation')
-                CALL ShowContinueError('Ventilated Slab Name = '//TRIM(VentSlab(Item)%Name))
-                CALL ShowContinueError('Predicted ventilated slab surface temperature = '// &
-                                       RoundSigDigits(TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2),2))
-                CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
+              IF (VentSlab(Item)%CondErrIndex == 0) THEN
+                CALL ShowWarningMessage(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//']')
+                CALL ShowContinueError('Surface ['//trim(Surface(VentSlab(Item)%SurfacePtr(RadSurfNum2))%Name)//  &
+                   '] temperature below dew-point temperature--potential for condensation exists')
+                CALL ShowContinueError('Flow to the ventilated slab system will be shut-off to avoid condensation')
+                CALL ShowContinueError('Predicted radiant system surface temperature = '// &
+                                       trim(RoundSigDigits(TH(VentSlab(Item)%SurfacePtr(RadSurfNum2),1,2),2)))
+                CALL ShowContinueError('Zone dew-point temperature + safety factor delta= '//  &
+                   trim(RoundSigDigits(DewPointTemp+CondDeltaTemp,2)))
                 CALL ShowContinueErrorTimeStamp(' ')
-                CALL ShowContinueError('Zone dew-point temperature= '//RoundSigDigits(DewPointTemp,2))
-                CALL ShowContinueErrorTimeStamp(' ')
-                IF (CondensationErrorCount == 1) THEN
-                  CALL ShowContinueError('Note that there is a '//TRIM(RoundSigDigits(CondDeltaTemp,2))// &
+              ENDIF
+              IF (CondensationErrorCount == 1) THEN
+                  CALL ShowContinueError('Note that there is a '//TRIM(RoundSigDigits(CondDeltaTemp,4))// &
                                          ' C safety built-in to the shut-off criteria')
                   CALL ShowContinueError('Note also that this affects all surfaces that are part of this system')
-
-                END IF
-              ELSE
-                CALL ShowRecurringWarningErrorAtEnd('Ventilated Slab ['//TRIM(VentSlab(Item)%Name)//  &
-                             '] condensation shut-off occurrence continues.',  &
-                             VentSlab(Item)%CondErrCount)
               END IF
+              CALL ShowRecurringWarningErrorAtEnd(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//  &
+                         '] condensation shut-off occurrence continues.',  &
+                         VentSlab(Item)%CondErrIndex,ReportMinOf=DewPointTemp,ReportMaxOf=DewPointTemp,  &
+                         ReportMaxUnits='C',ReportMinUnits='C')
             END IF
             EXIT ! outer do loop
           END IF
@@ -3620,25 +3635,24 @@ IF (AirMassFlow > 0.0) THEN
 
           IF (.not. WarmupFlag) THEN
             EnergyImbalanceErrorCount = EnergyImbalanceErrorCount + 1
-            IF (EnergyImbalanceErrorCount <= NumOfVentSlabs) THEN
-              CALL ShowWarningError('Ventilated Slab (series type) air outlet temperature calculation mismatch for '// &
-                TRIM(VentSlab(Item)%Name))
+            IF (VentSlab(Item)%EnrgyImbalErrIndex == 0) THEN
+              CALL ShowWarningMessage(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//']')
+              CALL ShowContinueError('Ventilated Slab (slab only type) air outlet temperature calculation mismatch.')
               CALL ShowContinueError('This should not happen as it indicates a potential energy imbalance in the calculations.')
               CALL ShowContinueError('However, it could also result from improper input for the ventilated slab or')
               CALL ShowContinueError('illogical control temperatures.  Check your input for this ventilated slab and')
               CALL ShowContinueError('also look at the internal data shown below.')
               CALL ShowContinueError('Predicted return air temperature [C] from the overall energy balance = '// &
-                                     RoundSigDigits(Node(ReturnAirNode)%Temp,4))
+                                     trim(RoundSigDigits(Node(ReturnAirNode)%Temp,4)))
               CALL ShowContinueError('Predicted return air temperature [C] from the slab section energy balances = '// &
-                                     RoundSigDigits(AirOutletTempCheck,4))
+                                     trim(RoundSigDigits(AirOutletTempCheck,4)))
               CALL ShowContinueError('Total energy rate (power) [W] added to the slab = '// &
-                                     RoundSigDigits(TotalVentSlabRadPower,4))
+                                     trim(RoundSigDigits(TotalVentSlabRadPower,4)))
               CALL ShowContinueErrorTimeStamp(' ')
-            ELSE
-              CALL ShowRecurringWarningErrorAtEnd('Ventilated Slab ['//TRIM(VentSlab(Item)%Name)//  &
-                           '] temperature calculation mismatch occurrence continues.',  &
-                           VentSlab(Item)%EnrgyImbalErrCount)
-            END IF
+            ENDIF
+            CALL ShowRecurringWarningErrorAtEnd(cMO_VentilatedSlab//' ['//TRIM(TRIM(VentSlab(Item)%Name))//  &
+                       '] temperature calculation mismatch occurrence continues.',  &
+                       VentSlab(Item)%EnrgyImbalErrIndex)
           END IF
         END IF
 
@@ -4248,6 +4262,9 @@ SUBROUTINE ReportVentilatedSlab(Item)
     VentSlab(Item)%ZoneInletTemp = Node(VentSlab(Item)%ZoneAirInNode)%Temp
     VentSlab(Item)%SlabOutTemp =   Node(VentSlab(Item)%ReturnAirNode)%Temp
   END IF
+  
+  VentSlab(Item)%ReturnAirTemp = Node(VentSlab(Item)%ReturnAirNode)%Temp
+  VentSlab(Item)%FanOutletTemp = Node(VentSlab(Item)%FanOutletNode)%Temp
 
   RETURN
 

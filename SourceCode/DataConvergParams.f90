@@ -5,6 +5,7 @@ MODULE DataConvergParams      ! EnergyPlus Data-Only Module
           ! of the HVAC simulation.
 
 USE DataPrecisionGlobals
+USE DataGlobals, ONLY: MaxNameLength
 
 IMPLICIT NONE   ! Enforce explicit typing of all variables
 
@@ -20,21 +21,32 @@ PUBLIC          ! By definition, all variables which are placed in this data
           ! parameters should be.
   REAL(r64), PARAMETER :: HVACEnthalpyToler    = 260.d0     ! Tolerance for enthalpy comparisons (in kJ/kgK)
   REAL(r64), PARAMETER :: HVACFlowRateToler    = 0.01d0     ! Tolerance for mass flow rate convergence (in kg/s) [~20 CFM]
-  REAL(r64), PARAMETER :: HVACHumRatToler      = 0.0001d0   ! Tolerance for humidity ratio comparisons (in kg water/kg air)
+  REAL(r64), PARAMETER :: HVACFlowRateSlopeToler = 0.001d0  ! Slope tolerance for mass flow, kg/s/iteration
+  REAL(r64), PARAMETER :: HVACFlowRateOscillationToler = 0.0000001d0 !tolerance for detecting duplicate flow rate in stack
+  REAL(r64), PARAMETER :: HVACHumRatToler      = 0.0001d0   ! Tolerance for humidity ratio comparisons (kg water/kg dryair)
+  REAL(r64), PARAMETER :: HVACHumRatSlopeToler = 0.00001d0  ! Slope tolerance for humidity ratio, kg water/kg-dryair/iteration
+  REAL(r64), PARAMETER :: HVACHumRatOscillationToler = 0.00000001d0 ! tolerance for detecting duplicate humidity ratio in stack
   REAL(r64), PARAMETER :: HVACQualityToler     = 0.01d0     ! Tolerance for fluid quality comparisons (dimensionless)
   REAL(r64), PARAMETER :: HVACPressToler       = 10.0d0     ! Tolerance for pressure comparisons (in Pascals)
   REAL(r64), PARAMETER :: HVACTemperatureToler = 0.01d0     ! Tolerance for temperature comparisons (in degrees C or K)
+  REAL(r64), PARAMETER :: HVACTemperatureSlopeToler = 0.001d0 ! Slope tolerance for Temperature, Deg C/iteration
+  REAL(r64), PARAMETER :: HVACTemperatureOscillationToler = 0.000001d0 !tolerance for detecting duplicate temps in stack
   REAL(r64), PARAMETER :: HVACEnergyToler      = 10.0d0     ! Tolerance for Energy comparisons (in Watts W)
+                                                            ! to be consistent, should be 20.d0 (BG Aug 2012)
 
   REAL(r64), PARAMETER :: HVACCpApprox         = 1004.844d0 ! Air Cp (20C,0.0Kg/Kg) Only for energy Tolerance Calculation
                                                      ! Only used to scale the answer for a more intuitive answer for comparison
 
   REAL(r64), PARAMETER :: PlantEnthalpyToler    = 0.10d0     ! Tolerance for enthalpy comparisons (in kJ/kgK)
   REAL(r64), PARAMETER :: PlantFlowRateToler    = 0.001d0    ! Tolerance for mass flow rate convergence (in kg/s) [~2 CFM]
-  REAL(r64), PARAMETER :: PlantHumRatToler      = 0.0001d0   ! Tolerance for humidity ratio comparisons (in kg water/kg air)
-  REAL(r64), PARAMETER :: PlantQualityToler     = 0.01d0     ! Tolerance for fluid quality comparisons (dimensionless)
+  REAL(r64), PARAMETER :: PlantFlowRateOscillationToler = 0.0000001d0
+  REAL(r64), PARAMETER :: PlantFlowRateSlopeToler = 0.0001d0  ! Slope tolerance for mass flow, kg/s/iteration
+
   REAL(r64), PARAMETER :: PlantPressToler       = 10.0d0     ! Tolerance for pressure comparisons (in Pascals)
   REAL(r64), PARAMETER :: PlantTemperatureToler = 0.01d0     ! Tolerance for temperature comparisons (in degrees C or K)
+  REAL(r64), PARAMETER :: PlantTemperatureSlopeToler = 0.001d0 ! Slope tolerance for Temperature, Deg C/iteration
+  REAL(r64), PARAMETER :: PlantTemperatureOscillationToler = 0.000001d0 !tolerance for detecting duplicate temps in stack
+
   REAL(r64), PARAMETER :: PlantEnergyToler      = 10.0d0     ! Tolerance for Energy comparisons (in Watts W)
 
   REAL(r64), PARAMETER :: PlantCpApprox         = 4180.0d0   ! Approximate Cp used in Interface manager for
@@ -42,53 +54,90 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                                              ! for a more intuitive answer for comparison
   REAL(r64), PARAMETER :: PlantFlowFlowRateToler= 0.01d0     ! Tolerance for mass flow rate convergence (in kg/s)
 
+
+  INTEGER, PARAMETER   :: ConvergLogStackDepth   = 10
+  REAL(r64), PARAMETER, DIMENSION(ConvergLogStackDepth) :: ConvergLogStackARR = &
+               (/0.d0, -1.d0, -2.d0, -3.d0, - 4.d0, -5.d0, -6.d0, -7.d0, -8.d0, -9.d0 /)
+
+
+  INTEGER, PARAMETER   :: CalledFromAirSystemDemandSide = 100
+  INTEGER, PARAMETER   :: CalledFromAirSystemSupplySideDeck1 = 101
+  INTEGER, PARAMETER   :: CalledFromAirSystemSupplySideDeck2 = 102
           ! DERIVED TYPE DEFINITIONS:
           ! na
 
           ! MODULE VARIABLE DECLARATIONS:
-  INTEGER :: HVACEnthTolFlag = 0         ! Flag to show enthalpy convergence (0) or failure (1)
-  INTEGER :: HVACFlowTolFlag = 0         ! Flag to show mass flow convergence (0) or failure (1)
-  INTEGER :: HVACHumTolFlag = 0          ! Flag to show humidity ratio convergence (0) or failure (1)
-  INTEGER :: HVACPressTolFlag = 0        ! Flag to show pressure convergence (0) or failure (1)
-  INTEGER :: HVACQualTolFlag = 0         ! Flag to show fluid quality convergence (0) or failure (1)
-  INTEGER :: HVACEnergyTolFlag = 0       ! Flag to show energy convergence (0) or failure (1)
-  INTEGER :: HVACTempTolFlag = 0         ! Flag to show temperature convergence (0) or failure (1)
-  REAL(r64)    :: HVACEnthTolValue(5)  =0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACFlowTolValue(5)  =0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACHumTolValue(5)   =0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACPressTolValue(5) =0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACQualTolValue(5)  =0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACEnergyTolValue(5)=0.0   ! Queue of convergence "results"
-  REAL(r64)    :: HVACTempTolValue(5)  =0.0   ! Queue of convergence "results"
-  INTEGER, DIMENSION(5) :: HVACOutletNodeTolOut = 0 ! Queue of outlet node index to identify with tol values
-  INTEGER :: HVACQuePtr           =0     ! Pointer to "head" of queue
+  TYPE HVACNodeConvergLogStruct
+    INTEGER :: NodeNum
+    LOGICAL :: NotConvergedHumRate
+    LOGICAL :: NotConvergedMassFlow
+    LOGICAL :: NotConvergedTemp
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HumidityRatio
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: MassFlowRate
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: Temperature
+  END TYPE HVACNodeConvergLogStruct
 
-  INTEGER :: PlantEnthTolFlag = 0        ! Flag to show enthalpy convergence (0) or failure (1)
-  INTEGER :: PlantFlowTolFlag = 0        ! Flag to show mass flow convergence (0) or failure (1)
-  INTEGER :: PlantHumTolFlag = 0         ! Flag to show humidity ratio convergence (0) or failure (1)
-  INTEGER :: PlantPressTolFlag = 0       ! Flag to show pressure convergence (0) or failure (1)
-  INTEGER :: PlantQualTolFlag = 0        ! Flag to show fluid quality convergence (0) or failure (1)
-  INTEGER :: PlantEnergyTolFlag = 0      ! Flag to show energy convergence (0) or failure (1)
-  INTEGER :: PlantTempTolFlag = 0        ! Flag to show temperature convergence (0) or failure (1)
-  REAL(r64)    :: PlantEnthTolValue(5)  =0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantFlowTolValue(5)  =0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantHumTolValue(5)   =0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantPressTolValue(5) =0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantQualTolValue(5)  =0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantEnergyTolValue(5)=0.0  ! Queue of convergence "results"
-  REAL(r64)    :: PlantTempTolValue(5)  =0.0  ! Queue of convergence "results"
-  INTEGER, DIMENSION(5) :: PlantOutletNodeTolOut = 0 ! Queue of outlet node index to identify with tol values
-  INTEGER :: PlantQuePtr           =0
+  TYPE HVACZoneInletConvergenceStruct
+    CHARACTER(len=MaxNameLength) :: ZoneName
+    INTEGER  :: NumInletNodes = 0 ! number of inlet nodes for zone
+    TYPE(HVACNodeConvergLogStruct), DIMENSION(:), ALLOCATABLE :: InletNode
+  END TYPE HVACZoneInletConvergenceStruct
 
-!  INTEGER :: PlantFlowEnthTolFlag = 0    ! Flag to show enthalpy convergence (0) or failure (1)
-  INTEGER :: PlantFlowFlowTolFlag = 0    ! Flag to show mass flow convergence (0) or failure (1)
-!  INTEGER :: PlantFlowHumTolFlag = 0     ! Flag to show humidity ratio convergence (0) or failure (1)
-!  INTEGER :: PlantFlowPressTolFlag = 0   ! Flag to show pressure convergence (0) or failure (1)
-!  INTEGER :: PlantFlowQualTolFlag = 0    ! Flag to show fluid quality convergence (0) or failure (1)
-!  INTEGER :: PlantFlowEnergyTolFlag = 0  ! Flag to show energy convergence (0) or failure (1)
-!  INTEGER :: PlantFlowTempTolFlag = 0    ! Flag to show temperature convergence (0) or failure (1)
-  REAL(r64)    :: PlantFlowFlowTolValue(5) = 0.0  ! Queue of convergence "results"
-  INTEGER :: PlantFlowQuePtr          = 0
+  TYPE (HVACZoneInletConvergenceStruct), DIMENSION(:), ALLOCATABLE :: ZoneInletConvergence
+
+  TYPE HVACAirLoopIterationConvergenceStruct
+    LOGICAL :: HVACMassFlowNotConverged = .FALSE.         ! Flag to show mass flow convergence
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACFlowDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACFlowSupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACFlowSupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACHumRatNotConverged = .FALSE.          ! Flag to show humidity ratio convergence   or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACHumDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACHumSupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACHumSupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACTempNotConverged = .FALSE.         ! Flag to show temperature convergence  or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACTempDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACTempSupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACTempSupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACEnergyNotConverged = .FALSE.         ! Flag to show energy convergence   or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnergyDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnergySupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnergySupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACEnthalpyNotConverged = .FALSE.         ! Flag to show energy convergence   or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnthalpyDemandToSupplyTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnthalpySupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACEnthalpySupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACPressureNotConverged = .FALSE.         ! Flag to show energy convergence   or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACPressureDemandToSupplyTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACPressureSupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACPressueSupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: HVACQualityNotConverged = .FALSE.         ! Flag to show energy convergence   or failure
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACQualityDemandToSupplyTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACQualitSupplyDeck1ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: HVACQualitySupplyDeck2ToDemandTolValue = 0.d0   ! Queue of convergence "results"
+
+  END TYPE HVACAirLoopIterationConvergenceStruct
+
+  TYPE(HVACAirLoopIterationConvergenceStruct), DIMENSION(:), ALLOCATABLE :: AirLoopConvergence
+
+  TYPE PlantIterationConvergenceStruct
+
+    LOGICAL :: PlantMassFlowNotConverged = .FALSE.         ! Flag to show mass flow convergence
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: PlantFlowDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: PlantFlowSupplyToDemandTolValue   = 0.d0   ! Queue of convergence "results"
+
+    LOGICAL :: PlantTempNotConverged = .FALSE.         ! Flag to show temperature convergence (0) or failure (1)
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: PlantTempDemandToSupplyTolValue   = 0.d0   ! Queue of convergence "results"
+    REAL(r64), DIMENSION(ConvergLogStackDepth) :: PlantTempSupplyToDemandTolValue   = 0.d0   ! Queue of convergence "results"
+
+  END TYPE PlantIterationConvergenceStruct
+
+  TYPE(PlantIterationConvergenceStruct) , DIMENSION(:), ALLOCATABLE :: PlantConvergence
 
   INTEGER :: AirLoopConvergFail = 0
 

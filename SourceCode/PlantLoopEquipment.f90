@@ -128,6 +128,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE PhotovoltaicThermalCollectors, ONLY: SimPVTcollectors, CalledFromPlantLoopEquipMgr
   USE PlantPipingSystemsManager,     ONLY: SimPipingSystemCircuit
   USE UserDefinedComponents,         ONLY: SimUserDefinedPlantComponent
+  USE HVACVariableRefrigerantFlow,   ONLY: SimVRFCondenserPlant
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -427,6 +428,17 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
 
         CASE (TypeOf_HPWaterEFHeating)
           CALL SimHPWatertoWaterSimple(EquipType, EquipTypeNum, EquipName,EquipNum, FirstHVACIteration, &    !DSU
+                                        InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,LoopNum)
+            IF(InitLoopEquip)THEN
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
+              PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+            END IF
+
+        CASE (TypeOf_HeatPumpVRF)
+
+          CALL SimVRFCondenserPlant(EquipType, EquipTypeNum, EquipName,EquipNum, FirstHVACIteration, &    !DSU
                                         InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,LoopNum)
             IF(InitLoopEquip)THEN
               PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad

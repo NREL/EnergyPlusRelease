@@ -27,7 +27,7 @@ INFORMATION, APPARATUS, PRODUCT, OR PROCESS DISCLOSED, OR REPRESENTS THAT ITS US
 WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS.
 */
 
-#define DllExport	__declspec( dllexport )
+#include "DElightAPI.h"
 
 DllExport int DElight2(
 	char sWxName[MAX_CHAR_LINE+1],		/* weather file name */
